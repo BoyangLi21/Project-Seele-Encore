@@ -15,7 +15,7 @@ def main():
         dict(id='west_observation',points=[(-29,y,-284) for y in (-394,-367)]),
         dict(id='commander_office',points=[(28,y,314) for y in (-388,-340)])]
     nav.GOALS=[('command','指挥室入口',(28,-406,269)),('hangars','机库登机通道',(90,-394,-255)),
-        ('station','总部火车站',(30,-466,451)),('pyramid_station','金字塔接驳站',(30,-466,520)),
+        ('station','总部火车站',(30,-466,451)),('pyramid_station','金字塔接驳站',(30,-466,518)),
         ('launch_station','发射区车站',(150,-442,-28)),('observation','机库观景走廊',(90,-367,-221)),('dogma','终极教条前厅',(30,-566,280))]
     nav.LIFT_BOARD_COST=4.;nav.LIFT_VERTICAL_COST=.12;nav.LIFT_DIRECT=True;nav.STAIR_COST=4.
     nav.main(False,OUT,OUT/'nerv_routes_r24.json.gz')

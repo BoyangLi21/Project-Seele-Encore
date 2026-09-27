@@ -21,7 +21,8 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid="projectseele")
 public final class SortieR32Review
 {
-    public static final boolean ENABLED="r32-sortie".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R41="r41-sortie".equals(System.getProperty("projectseele.regionalBuild",""));
+    public static final boolean ENABLED=R41||"r32-sortie".equals(System.getProperty("projectseele.regionalBuild",""));
     public static volatile boolean ready,finished;
     private static int ticks,stage,ritsukoStart,misatoStart;
     private static ServerLevel level;private static ServerPlayer player;private static Path world;
@@ -46,7 +47,13 @@ public final class SortieR32Review
                 EvaShutdownR30.clear(eva);if(mode==EvaShutdownR30.WRECK)EvaShutdownR30.fail(eva);else EvaShutdownR30.ensureUnpilotedR31(eva);
                 // The settled disabled pose is the exact visible input to pickup, not a standing substitute.
                 var nbt=eva.saveWithoutId(new CompoundTag());nbt.putLong("R30ShutdownSince",level.getGameTime()-40);eva.load(nbt);
-                var before=EvaBodyPose.sample(eva,1);EvaAirTransportR31.begin(eva);EvaAirTransportR31.transition(eva,0,1,1);
+                var before=EvaBodyPose.sample(eva,1);EvaAirTransportR31.begin(eva);
+                // R35 added articulated shutdown. Production hands that body
+                // to an active cradle at the next physics tick; this isolated
+                // synchronous fixture must perform the same handoff first.
+                com.projectseele.physics.CombatBodyDynamics.cancel(eva);
+                com.projectseele.physics.CombatBodyDynamics.acknowledgeHandoff(eva);
+                EvaAirTransportR31.transition(eva,0,1,1);
                 var clamped=EvaBodyPose.sample(eva,2);double worst=0;
                 for(var bone:before.rig.keySet())
                 {
@@ -74,7 +81,7 @@ public final class SortieR32Review
         {
             if(world==null)
             {
-                world=event.getServer().getWorldPath(LevelResource.ROOT).normalize();if(!world.getFileName().toString().equals("SEELE_R32_SORTIE_REVIEW"))throw new IllegalStateException("Wrong review world");
+                world=event.getServer().getWorldPath(LevelResource.ROOT).normalize();if(!world.getFileName().toString().equals(R41?"SEELE_R41_MECHANICS_REVIEW":"SEELE_R32_SORTIE_REVIEW"))throw new IllegalStateException("Wrong review world");
                 level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);player=event.getServer().getPlayerList().getPlayers().get(0);
                 player.stopRiding();player.setGameMode(GameType.CREATIVE);player.teleportTo(level,27.5,-407,282.5,0,0);
                 player.getInventory().add(new net.minecraft.world.item.ItemStack(com.projectseele.registry.ModItems.NERV_EMPLOYEE_CARD.get()));
@@ -108,7 +115,29 @@ public final class SortieR32Review
             {
                 var plug=EntryPlugDirector.canonical(level,1);Vec3 hatch=plug.transformPlugMarker(EntryPlugKinematics.HATCH_PORTAL_CENTRE_P);
                 Vec3 outward=plug.getCanonicalTransform().transformVector(EntryPlugKinematics.PILOT_VIEW_FORWARD_P).normalize();Vec3 eye=hatch.add(outward.scale(2.4)),look=hatch.subtract(eye);
+                if(R41)
+                {
+                    var deck=EvaHangarBuilder.boardingPosition(RegionalFacilityLayout.evaOrigin(level),1);
+                    eye=new Vec3(deck.getX()+.5,deck.getY()+player.getEyeHeight(),deck.getZ()+.5);look=hatch.subtract(eye);
+                    check("actual_boarding_deck_has_floor",level.getBlockState(deck.below()).isFaceSturdy(level,deck.below(),net.minecraft.core.Direction.UP));
+                }
                 player.teleportTo(level,eye.x,eye.y-player.getEyeHeight(),eye.z,(float)Math.toDegrees(Math.atan2(-look.x,look.z)),(float)-Math.toDegrees(Math.atan2(look.y,look.horizontalDistance())));
+                if(R41)
+                {
+                    // LivingEntity's view direction uses head yaw. A server
+                    // teleport alone can retain the previous room's head
+                    // direction until the next player tick.
+                    player.setYHeadRot(player.getYRot());player.yHeadRotO=player.getYRot();
+                }
+                if(R41)
+                {
+                    JsonObject diagnostic=new JsonObject();diagnostic.addProperty("player",player.position().toString());diagnostic.addProperty("eye",player.getEyePosition().toString());diagnostic.addProperty("hatch",hatch.toString());
+                    diagnostic.addProperty("distance",player.getEyePosition().distanceTo(hatch));diagnostic.addProperty("viewDot",hatch.subtract(player.getEyePosition()).normalize().dot(player.getViewVector(1)));
+                    diagnostic.addProperty("hatchOpen",plug.isHatchOpen());diagnostic.addProperty("stage",plug.getInsertionStage());diagnostic.addProperty("canonicalPose",plug.hasCanonicalPose());diagnostic.addProperty("playerPassenger",player.isPassenger());diagnostic.addProperty("occupant",String.valueOf(plug.getFirstPassenger()));
+                    var hit=level.clip(new net.minecraft.world.level.ClipContext(player.getEyePosition(),hatch,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,player));
+                    diagnostic.addProperty("rayHit",hit.getType().toString());diagnostic.addProperty("hitPos",hit.getBlockPos().toShortString());diagnostic.addProperty("hitToHatch",hit.getLocation().distanceTo(hatch));
+                    report.add("boardingContext",diagnostic);com.projectseele.ProjectSeele.LOGGER.info("R41 boarding diagnostic {}",diagnostic);
+                }
                 plug.tryBoardFromHatch(player);check("real_player_boarded",plug.getFirstPassenger()==player);stage=2;return;
             }
             for(int i=0;i<3;i++)
@@ -132,6 +161,19 @@ public final class SortieR32Review
                 report.addProperty("ritsuko_presses",ritsuko.pressCount()-ritsukoStart);report.addProperty("misato_presses",misato.pressCount()-misatoStart);
                 check("ritsuko_prepared_all",ritsuko.pressCount()-ritsukoStart==3);check("misato_launched_all_once",misato.pressCount()-misatoStart==3);
                 check("two_independent_npc_controllers",NervPilotCombatR30.controls(EvaLogisticsDirector.canonicalUnit(level,0))&&NervPilotCombatR30.controls(EvaLogisticsDirector.canonicalUnit(level,2)));
+                if(R41)
+                {
+                    var recovering=EvaLogisticsDirector.canonicalUnit(level,1);
+                    if(!EvaLogisticsDirector.recoveryMotionSettled(recovering))return;
+                    check("original_player_unit_recovery_accepted",EvaLogisticsDirector.requestRecovery(level,1).accepted());stage=4;
+                }
+                else finish(true,null);
+            }
+            if(R41&&stage==4&&EvaLogisticsDirector.status(level,1).phase().equals("PARKED"))
+            {
+                var deck=EvaHangarBuilder.boardingPosition(RegionalFacilityLayout.evaOrigin(level),1);
+                check("return_bridge_floor_rebuilt",level.getBlockState(deck.below()).isFaceSturdy(level,deck.below(),net.minecraft.core.Direction.UP));
+                check("original_eva_and_plug_recovered",EvaLogisticsDirector.canonicalUnit(level,1).getUUID().equals(fleet[1])&&EntryPlugDirector.canonical(level,1).getUUID().equals(plugs[1]));
                 finish(true,null);
             }
         }

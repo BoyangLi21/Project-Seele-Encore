@@ -659,6 +659,11 @@ public final class S20MovingElevatorsAdapter
                         "NERV CLEARANCE ACCEPTED / FLOOR UNLOCKED")
                         .withStyle(ChatFormatting.GREEN), true);
             }
+            // The x=96 controller and x=93 car belong to adjacent chunks.
+            // A remote first call can load the controller without the car;
+            // reconcile only after the actual cage footprint is available.
+            for(var stop:spec.stops())level.getChunkAt(stop.cabinCentre());
+            reconcile(level,spec);
             ControllerBlockEntity target = controller(level,
                     controllerPosition(spec, landing));
             if (target == null || !target.hasGroup())

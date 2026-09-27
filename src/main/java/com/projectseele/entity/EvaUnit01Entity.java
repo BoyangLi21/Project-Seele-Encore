@@ -1224,6 +1224,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             float wanted=this.isPilotProne()?3F:this.isPilotCrouching()?1F:0F;
             float stance=this.entityData.get(DATA_RIFLE_STANCE);
+            float priorStance=stance;
             if(!rifleStanceInitialized){stance=wanted;rifleStanceInitialized=true;}
             float remaining=wanted-stance;
             float desired=Math.copySign(Math.min(.08F,(float)Math.sqrt(2*.012F*Math.abs(remaining))),remaining);
@@ -1234,6 +1235,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             }
             else stance=Mth.clamp(stance+rifleStanceVelocity,0,3);
             this.entityData.set(DATA_RIFLE_STANCE,stance);
+            EvaStanceFoleyR41.tick(this,priorStance,stance);
             double dx=this.getX()-riflePreviousX,dz=this.getZ()-riflePreviousZ;
             double distance=Double.isFinite(dx)?Math.hypot(dx,dz):0;riflePreviousX=this.getX();riflePreviousZ=this.getZ();
             boolean moving=distance>.006&&distance<8&&!this.isPilotControlLocked();

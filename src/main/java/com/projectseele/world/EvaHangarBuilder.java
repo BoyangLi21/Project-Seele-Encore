@@ -894,7 +894,7 @@ public final class EvaHangarBuilder
         BlockPos bed = hangarBed(origin, variant);
         return new BlockPos(bed.getX() + 2,
                 bed.getY() + REAR_GANTRY_ABOVE_BED + 1,
-                bed.getZ() + REAR_BOARDING_Z_FROM_BED + 1);
+                bed.getZ() + REAR_BOARDING_Z_FROM_BED + 3);
     }
 
     /** Centre of the permanent pilot standby platform facing the EVA. */
@@ -1413,11 +1413,8 @@ public final class EvaHangarBuilder
                 }
             }
         }
-        // No rails on this deck: it shares its level with the shoulder catwalk
-        // and the audited boarding route walks the very columns a rail would
-        // occupy. The catwalk's own rails and the extended split bridge fence
-        // the drop; the exit lane is only open while the bridge is retracted
-        // for launch, when nobody is boarding.
+        // Edge-mounted rails leave the central pilot-sized volume clear.
+        // The moving bridge refreshes their boundary after every extension.
     }
 
     /**
@@ -2278,20 +2275,41 @@ public final class EvaHangarBuilder
                     // runs on every login and every retraction step, and it was
                     // deleting the lower half of the suspension and the whole
                     // visible arm the moment they were drawn.
-                    clearExceptCrane(level, floor.above(y));
+                    BlockPos cell=floor.above(y);
+                    if(level.getBlockState(cell).is(ModBlocks.NERV_EDGE_RAIL.get()))set(level,cell,Blocks.AIR.defaultBlockState());
+                    else clearExceptCrane(level,cell);
                 }
             }
-            // No split-bridge guardrails: they stood exactly on the columns the
-            // pilot and the walking dummy must cross from the side gantry to the
-            // plug, so they fenced boarding off. The extended lane is a full
-            // solid deck; the retracted lane is only open during launch, when
-            // nobody is on the deck. Clear any left by an earlier revision.
+            // Retire the old full-column barriers; the new boundary rails are
+            // rebuilt after the complete split deck reaches its next step.
             for (int x : new int[] {
                     -EXIT_LANE_HALF_WIDTH, EXIT_LANE_HALF_WIDTH})
             {
                 clear(level, new BlockPos(bed.getX() + x, floorY + 1, z));
             }
         }
+        refreshBoardingEdgeRails(level,bed);
+    }
+    private static void refreshBoardingEdgeRails(ServerLevel level,BlockPos bed)
+    {
+        int floorY=bed.getY()+REAR_GANTRY_ABOVE_BED;
+        for(int x=-SIDE_CATWALK_X;x<=SIDE_CATWALK_X;x++)
+            for(int z=REAR_BOARDING_Z_FROM_BED;z<REAR_GANTRY_Z_FROM_BED;z++)
+            {
+                BlockPos floor=new BlockPos(bed.getX()+x,floorY,bed.getZ()+z);
+                if(!level.getBlockState(floor).isFaceSturdy(level,floor,Direction.UP))continue;
+                BlockPos at=floor.above();BlockState before=level.getBlockState(at);
+                if(!before.isAir()&&!before.is(ModBlocks.NERV_EDGE_RAIL.get())&&!before.is(Blocks.LIGHT))continue;
+                BlockState rail=FacilityEdgeRailR41.empty(ModBlocks.NERV_EDGE_RAIL.get());boolean edge=false;
+                for(Direction side:Direction.Plane.HORIZONTAL)
+                {
+                    BlockPos adjacent=floor.relative(side);
+                    if(!level.getBlockState(adjacent).isFaceSturdy(level,adjacent,Direction.UP))
+                    {rail=rail.setValue(FacilityEdgeRailR41.side(side),true);edge=true;}
+                }
+                if(edge)set(level,at,rail);
+                else if(before.is(ModBlocks.NERV_EDGE_RAIL.get()))set(level,at,Blocks.AIR.defaultBlockState());
+            }
     }
     private static boolean isBoardingRouteWalkable(ServerLevel level,
                                                     BlockPos origin,
@@ -2366,7 +2384,7 @@ public final class EvaHangarBuilder
                     return "gantry " + failure;
                 }
             }
-            int centreOffset = z <= boardingEndZ + 1 ? 2 : 0;
+            int centreOffset = z <= boardingEndZ + 1 ? 3 : 0;
             String failure = walkable(level,
                     new BlockPos(bed.getX() + centreOffset, gantryY, z));
             if (failure != null)
@@ -2398,7 +2416,9 @@ public final class EvaHangarBuilder
             {
                 continue;
             }
-            if (!state.getCollisionShape(level, clearance).isEmpty())
+            var body=new net.minecraft.world.phys.AABB(.2,1,.2,.8,2.8,.8);
+            final int height=y;
+            if (state.getCollisionShape(level, clearance).toAabbs().stream().anyMatch(box->box.move(0,height,0).intersects(body)))
             {
                 return "clearance " + clearance.toShortString() + "="
                         + state.getBlock().getDescriptionId();
@@ -2549,7 +2569,7 @@ public final class EvaHangarBuilder
 
     private static void clear(ServerLevel level, BlockPos position)
     {
-        if (!level.getBlockState(position).isAir())
+        if (!level.getBlockState(position).isAir()&&!level.getBlockState(position).is(ModBlocks.NERV_EDGE_RAIL.get()))
         {
             set(level, position, Blocks.AIR.defaultBlockState());
         }

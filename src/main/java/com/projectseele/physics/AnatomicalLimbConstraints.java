@@ -29,6 +29,28 @@ public final class AnatomicalLimbConstraints
             solve(pose,"arm_"+side,"forearm_"+side,"hand_"+side,joint,axis,row.getAsJsonArray("hinge").get(1).getAsFloat(),target);return;
         }
     }
+    public static Vector3f elbowJoint(CombatBodyProfiles.Profile profile,String side,Vector3f fallback)
+    {
+        if(profile!=null)for(var element:profile.definition().getAsJsonArray("bodies"))
+        {
+            var row=element.getAsJsonObject();if(!row.get("name").getAsString().equals("forearm_"+side))continue;
+            var m=row.getAsJsonArray("joint");return new Vector3f(m.get(3).getAsFloat(),m.get(7).getAsFloat(),m.get(11).getAsFloat()).div(CombatBodyProfiles.MODEL_TO_PHYSICS);
+        }
+        return new Vector3f(fallback);
+    }
+    /** Solve the real two-link arm for a tip extending along its forearm. */
+    public static void reachForearmTip(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile,String side,Vector3f target,float extension)
+    {
+        if(profile==null)return;
+        for(var element:profile.definition().getAsJsonArray("bodies"))
+        {
+            var row=element.getAsJsonObject();if(!row.get("name").getAsString().equals("forearm_"+side))continue;var m=row.getAsJsonArray("joint");
+            var joint=new Vector3f(m.get(3).getAsFloat(),m.get(7).getAsFloat(),m.get(11).getAsFloat()).div(CombatBodyProfiles.MODEL_TO_PHYSICS);
+            var axis=new Vector3f(m.get(2).getAsFloat(),m.get(6).getAsFloat(),m.get(10).getAsFloat()).normalize();
+            var hand=pose.rig.get("hand_"+side).pivot();var tip=new Vector3f(hand).add(new Vector3f(hand).sub(joint).normalize().mul(extension));
+            solve(pose,"arm_"+side,"forearm_"+side,"hand_"+side,joint,axis,row.getAsJsonArray("hinge").get(1).getAsFloat(),target,tip);return;
+        }
+    }
     public static void reachFoot(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile,String side,Vector3f target,Quaternionf orientation)
     {
         if(profile==null)
@@ -57,10 +79,12 @@ public final class AnatomicalLimbConstraints
         return new Matrix3f().setColumn(0,x).setColumn(1,y).setColumn(2,z);
     }
     private static void solve(EvaBodyPose.Sample p,String upper,String lower,String end,Vector3f joint,Vector3f axis,float maximum,Vector3f goal)
+    {solve(p,upper,lower,end,joint,axis,maximum,goal,null);}
+    private static void solve(EvaBodyPose.Sample p,String upper,String lower,String end,Vector3f joint,Vector3f axis,float maximum,Vector3f goal,Vector3f extendedEnd)
     {
         Vector3f origin=point(p,upper),target=goal==null?point(p,end):new Vector3f(goal),oldJoint=p.matrix(upper).transformPosition(new Vector3f(joint));
         Quaternionf endOrientation=p.matrix(end).getUnnormalizedRotation(new Quaternionf()).normalize();
-        Vector3f u=new Vector3f(joint).sub(p.rig.get(upper).pivot()),v=new Vector3f(p.rig.get(end).pivot()).sub(joint);
+        Vector3f u=new Vector3f(joint).sub(p.rig.get(upper).pivot()),v=new Vector3f(extendedEnd==null?p.rig.get(end).pivot():extendedEnd).sub(joint);
         float la=u.length(),lb=v.length();Vector3f parallel=new Vector3f(axis).mul(axis.dot(v)),perpendicular=new Vector3f(v).sub(parallel);
         float a=u.dot(perpendicular),b=u.dot(new Vector3f(axis).cross(v)),c=u.dot(parallel),amplitude=(float)Math.hypot(a,b),neutral=(float)Math.atan2(b,a);
         float longest=(float)Math.sqrt(la*la+lb*lb+2*(amplitude+c))*.9999F;

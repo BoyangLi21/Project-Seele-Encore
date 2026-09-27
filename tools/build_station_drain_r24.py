@@ -5,7 +5,7 @@ ROOT=Path(__file__).resolve().parents[1];A=ROOT/'src/main/resources/assets/proje
 def save(p,d):p.parent.mkdir(parents=True,exist_ok=True);p.write_text(json.dumps(d,indent=2)+'\n',encoding='utf8')
 def main():
     elements=[]
-    def box(a,b,texture):elements.append({'from':a,'to':b,'faces':{d:{'texture':'#'+texture} for d in ('north','south','east','west','up','down')}})
+    def box(a,b,texture):elements.append({'from':a,'to':b,'faces':{d:{'texture':'#'+texture,'uv':[0,0,16,16]} for d in ('north','south','east','west','up','down')}})
     box([0,0,0],[16,15.4,16],'floor');box([.5,15.4,.5],[15.5,15.6,15.5],'dark')
     for a,b in [([.4,15.6,.4],[15.6,16,1.4]),([.4,15.6,14.6],[15.6,16,15.6]),([.4,15.6,1.4],[1.4,16,14.6]),([14.6,15.6,1.4],[15.6,16,14.6])]:box(a,b,'metal')
     for x in range(2,15,2):box([x,15.7,1.4],[x+.75,16,14.6],'metal')

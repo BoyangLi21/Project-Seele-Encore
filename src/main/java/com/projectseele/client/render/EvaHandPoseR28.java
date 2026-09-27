@@ -12,6 +12,21 @@ final class EvaHandPoseR28
     static void resetEntityR31(EvaUnit01Entity eva){STATES.remove(eva);}
     static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva,BakedGeoModel model,float partial)
     {
+        if(com.projectseele.entity.EvaGameplayMotionR32.sharedBody(eva,partial))
+        {STATES.remove(eva);return EvaMotionEngineV2.BoneWrites.empty();}
+        if(com.projectseele.entity.EvaBodyPose.hasTerrainStances()&&!eva.isNervLogisticsLocked()
+                &&!eva.isFirstBattleActive()&&!com.projectseele.entity.EvaShutdownR30.disabled(eva)
+                &&eva.getVisualPose()==0)
+        {
+            var body=com.projectseele.entity.EvaBodyPose.sample(eva,partial);
+            Set<String> names=new LinkedHashSet<>();
+            for(String name:body.rig.keySet())if(name.startsWith("finger_"))model.getBone(name).ifPresent(b->{
+                EvaRigTransforms.rotate(b,body.rotations.get(name));var p=body.positions.get(name);
+                b.setPosX(-p.x*16);b.setPosY(p.y*16);b.setPosZ(p.z*16);names.add(name);
+            });
+            STATES.remove(eva);
+            return new EvaMotionEngineV2.BoneWrites(Set.copyOf(names),Set.copyOf(names),"MOTION_ENGINE_LIVE_ACTION");
+        }
         if(model.getBone("r30_hand_frame_r").isPresent())return EvaUNHandPoseR30.apply(eva,model,partial);
         if(com.projectseele.entity.EvaGameplayMotionR32.sharedHands(eva,partial))
         {STATES.remove(eva);return EvaMotionEngineV2.BoneWrites.empty();}

@@ -56,7 +56,9 @@ public final class EvaBodyPose
     {
         try
         {
-            Path path=Path.of(System.getProperty("projectseele.bodyPoseReview","projectseele-local-maps/eva_body_r25.json"));
+            String currentBody=Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r41.json"))
+                    ?"projectseele-local-maps/eva_body_r41.json":"projectseele-local-maps/eva_body_r25.json";
+            Path path=Path.of(System.getProperty("projectseele.bodyPoseReview",currentBody));
             if(!Files.isRegularFile(path))path=Path.of("projectseele-local-maps/eva_body_r11.json");
             if(!Files.isRegularFile(path))path=Path.of("projectseele-local-maps/eva_body_r06.json");
             if(!Files.isRegularFile(path))path=Path.of("projectseele-local-maps/eva_body_r05.json");
@@ -127,6 +129,12 @@ public final class EvaBodyPose
                 if(Files.isRegularFile(capture))combatClips.put(variant,readCombatClipsR31(JsonParser.parseString(Files.readString(capture)).getAsJsonObject(),names));
                 var gameplay=EvaGameplayMotionR32.profile(variant);
                 if(gameplay!=null){var merged=new HashMap<>(combatClips.getOrDefault(variant,Map.of()));merged.putAll(readCombatClipsR31(gameplay,names));combatClips.put(variant,Map.copyOf(merged));}
+                if(all.has("stance_clips_by_rig")&&all.getAsJsonObject("stance_clips_by_rig").has(Integer.toString(variant)))
+                {
+                    var merged=new HashMap<>(combatClips.getOrDefault(variant,Map.of()));
+                    merged.putAll(readCombatClipsR31(all.getAsJsonObject("stance_clips_by_rig").getAsJsonObject(Integer.toString(variant)),names));
+                    combatClips.put(variant,Map.copyOf(merged));
+                }
             }
             data=new Data(names,index,Map.copyOf(clips),Map.copyOf(rigs),Map.copyOf(support),object(all,"prone"),object(all,"grip"),object(all,"rifle_mocap"),Map.copyOf(eyes),Map.copyOf(rigSupport),Map.copyOf(carrierHulls),Map.copyOf(combatClips));
             ProjectSeele.LOGGER.info("EVA shared body/socket pose loaded: private={} clips={} bones={} gameplayProfiles={}",Files.isRegularFile(path),clips.size(),names.length,combatClips.values().stream().filter(c->c.containsKey("r32_jab")).count());
@@ -328,6 +336,7 @@ public final class EvaBodyPose
             }
             body=mix(body,lying,prone);
         }
+        EvaHandsR41.apply(entity,body,partial);
         // Ground the actual body hull during stance blending, including chest support in prone.
         float floor=Float.POSITIVE_INFINITY;
         for(var e:d.rigSupport().getOrDefault(variant,d.support()).entrySet())
@@ -363,6 +372,7 @@ public final class EvaBodyPose
             body=mix(body,clip(d,variant,capture,capturePhase),w);
             preserveJointCentres(body);
         }
+        EvaHandsR41.apply(entity,body,partial);
         body=EvaGameplayMotionR32.apply(entity,body,partial);
         preserveJointCentres(body);
         com.projectseele.visual.BodyPoseLayersR40.capture("authored",body);

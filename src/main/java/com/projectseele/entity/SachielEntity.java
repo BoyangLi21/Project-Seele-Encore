@@ -73,7 +73,19 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         if(SachielGameplayMotionR32.phrases())entityData.set(STRIKE_FROM,EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)));
         mode=Math.max(1,Math.min(SachielGameplayMotionR32.ready()?6:5,mode));strikeTarget=target;strikeHit=false;committedStrikeYaw=yBodyRot;strikeChoice++;
         strikeAdvance=mode==SachielStrike.PILE?0:(float)Math.min(mode==SachielStrike.OVERHEAD?2:5,Math.max(0,distanceTo(target)-17));
-        entityData.set(STRIKE_MODE,mode);entityData.set(STRIKE_AIM,com.projectseele.physics.CombatBodyContacts.strikeAim(this,target).toVector3f());entityData.set(STRIKE_AGE,0);getNavigation().stop();return true;
+        entityData.set(STRIKE_MODE,mode);entityData.set(STRIKE_AIM,strikeAimFor(target,mode).toVector3f());entityData.set(STRIKE_AGE,0);getNavigation().stop();return true;
+    }
+    private Vec3 strikeAimFor(LivingEntity target,int mode)
+    {
+        if(mode==SachielStrike.STOMP&&SachielGameplayMotionR32.ready())
+        {
+            var pose=SachielGameplayMotionR32.pose(this,SachielStrike.contactStart(mode)+2);
+            String foot="foot_"+(SachielStrike.strikingLeft(mode)?"l":"r");
+            var at=com.projectseele.physics.CombatBodyContacts.soleLocal(this,pose,SachielStrike.strikingLeft(mode)?"l":"r");
+            var world=new Vec3(SachielStrike.root(this,0).transformPosition(at));
+            return com.projectseele.physics.CombatBodyContacts.bearingAim(target,world);
+        }
+        return com.projectseele.physics.CombatBodyContacts.strikeAim(this,target);
     }
     private void tickStrike()
     {
@@ -83,7 +95,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         {
             Vec3 to=strikeTarget.position().subtract(position());float wanted=(float)Math.toDegrees(Math.atan2(-to.x,to.z));
             committedStrikeYaw=net.minecraft.util.Mth.approachDegrees(committedStrikeYaw,wanted,3);
-            entityData.set(STRIKE_AIM,com.projectseele.physics.CombatBodyContacts.strikeAim(this,strikeTarget).toVector3f());
+            entityData.set(STRIKE_AIM,strikeAimFor(strikeTarget,mode).toVector3f());
         }
         setYRot(committedStrikeYaw);yBodyRot=yHeadRot=committedStrikeYaw;
         double step=strikeAdvance*(SachielStrike.drive(mode,age)-SachielStrike.drive(mode,age-1));

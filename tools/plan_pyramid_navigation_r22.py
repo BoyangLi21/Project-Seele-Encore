@@ -70,14 +70,32 @@ def main(apply=False,output=None,export_routes=None):
   candidates=tree.query_ball_point(point,radius);same=[i for i in candidates if abs(coords[i,0]+LO[1]-point[1])<.55]
   if not same:return None
   return min(same,key=lambda i:sum((coords[i,[2,0,1]]+LO-np.array(point))**2))
- rows=[];cols=[];weights=[]
+ # Centre clearance alone cannot establish an edge: a thin fence can leave
+ # both centres free while blocking the segment between them.
+ boundary_low=[];boundary_head=[]
+ for bs in sh:
+  low=[];high=[]
+  for dx,dz in ((1,0),(-1,0),(0,1),(0,-1)):
+   axis=0 if dx else 2;tangent=2 if dx else 0;positive=dx+dz>0
+   def cross(b):
+    return b[tangent]<.795 and b[tangent+3]>.205 and (b[axis+3]>.795 if positive else b[axis]<.205)
+   low.append(any(cross(b) and b[4]>.6 and b[1]<1.79 for b in bs))
+   high.append(any(cross(b) and b[4]>.01 and b[1]<.79 for b in bs))
+  boundary_low.append(low);boundary_head.append(high)
+ boundary_low=np.asarray(boundary_low,bool);boundary_head=np.asarray(boundary_head,bool)
+ rows=[];cols=[];weights=[];blocked_edges=0
  for dy in (-1,0,1):
-  for dz,dx in ((0,1),(0,-1),(1,0),(-1,0)):
+  for direction,(dz,dx) in enumerate(((0,1),(0,-1),(1,0),(-1,0))):
    aa=tuple(slice(max(0,-d),min(size,size-d)) for size,d in zip(a.shape,(dy,dz,dx)));bb=tuple(slice(max(0,d),min(size,size+d)) for size,d in zip(a.shape,(dy,dz,dx)))
    keep=walk[aa]&walk[bb]
    if dy:
     support_stair=np.zeros(a.shape,bool);support_stair[1:]=stairs[a[:-1]];keep&=support_stair[aa]|support_stair[bb]
-   rows.extend(index[aa][keep]);cols.extend(index[bb][keep]);weights.extend([STAIR_COST if dy else 1.]*int(keep.sum()))
+   source=index[aa][keep];dest=index[bb][keep];first=coords[source];last=coords[dest]
+   sf=a[tuple(first.T)];df=a[tuple(last.T)];shd=a[tuple((first+[1,0,0]).T)];dhd=a[tuple((last+[1,0,0]).T)]
+   closed=boundary_low[sf,direction]|boundary_head[shd,direction]|boundary_low[df,direction^1]|boundary_head[dhd,direction^1]
+   blocked_edges+=int(closed.sum());source=source[~closed];dest=dest[~closed]
+   rows.extend(source);cols.extend(dest);weights.extend([STAIR_COST if dy else 1.]*len(source))
+ (OUT/'boundary_collision_audit.json').write_text(json.dumps(dict(blocked_candidate_edges=blocked_edges,method='Native source/target foot and head shapes across the shared boundary; node-centre clearance remains separate'),indent=2),'utf8')
  landings=[];lift_edges=[]
  for lift in LIFT_GROUPS:
   local=[]

@@ -67,7 +67,7 @@ public final class EvaGameplayMotionR32
     public static boolean sharedHands(EvaUnit01Entity e,float partial)
     {
         var p=profile(variant(e));return e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&p!=null
-                &&p.has("hand_pose_revision")&&p.get("hand_pose_revision").getAsInt()>=2&&owns(e,partial);
+                &&p.has("hand_pose_revision")&&p.get("hand_pose_revision").getAsInt()>=2&&sharedBody(e,partial);
     }
     public static boolean directed(EvaUnit01Entity e){var p=profile(variant(e));return p!=null&&p.has("combat_foundation")&&p.get("combat_foundation").getAsInt()>=34;}
     public static boolean phrases(EvaUnit01Entity e){var p=profile(variant(e));return p!=null&&p.has("combat_foundation")&&p.get("combat_foundation").getAsInt()>=36;}
@@ -166,9 +166,18 @@ public final class EvaGameplayMotionR32
         if(!ready(e)||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)||EvaCombatR31.action(e)>=EvaCombatR31.REACH&&EvaCombatR31.action(e)<=EvaCombatR31.THROW)return false;
         if(e instanceof EvaPrototypeEntity un&&un.isUNFlying())return false;
         if(EvaDorsalMechanism.bow(e)>.001F||EvaDorsalMechanism.open(e)>.001F)return false;
-        if(EvaCombatSupportR33.ready(e)&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&!e.hasLiveActionForRender(partial)&&!e.isPilotProne()&&!e.isPilotCrouching())return true;
+        if(EvaCombatSupportR33.ready(e)&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&!e.hasLiveActionForRender(partial)&&e.rifleStanceLevel(partial)<1)return true;
         return age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0||landAge(e,partial)>=0&&landAge(e,partial)<18||e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()
                 ||e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&!e.hasLiveActionForRender(partial)&&!e.isPilotProne()&&!e.isPilotCrouching()&&e.getEntityData().get(GUARD)>.01F;
+    }
+    public static boolean sharedBody(EvaUnit01Entity e,float partial)
+    {
+        if(owns(e,partial))return true;
+        return ready(e)&&EvaBodyPose.hasTerrainStances()&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS
+                &&e.isPoweredOn()&&!e.isNervLogisticsLocked()&&!e.isFirstBattleActive()&&!EvaShutdownR30.disabled(e)
+                &&e.getVisualPose()==0&&e.getActivationTicks()==0&&e.getMotionLabPhysicsPreview()==0
+                &&!e.hasLiveActionForRender(partial)&&EvaCombatR31.action(e)==EvaCombatR31.NONE
+                &&!(e instanceof EvaPrototypeEntity un&&un.isUNFlying());
     }
     public static EvaBodyPose.Sample apply(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial)
     {
@@ -241,11 +250,13 @@ public final class EvaGameplayMotionR32
         if(e.getOrdinaryAttackStage()>=0){String name=ordinary(e.getOrdinaryAttackStage());return actionPose(e,name,e.getOrdinaryAttackProgress(partial),base,partial);}
         if(e.isHeavyMotionActive())return actionPose(e,"heavy",e.heavyMotionProgress(partial),base,partial);
         var guard=EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F);
-        if(EvaCombatSupportR33.ready(e)&&e.rifleRunBlend(partial)<.5F)return EvaBodyPose.blend(base,EvaCombatSupportR33.locomotion(e,guard,partial),e.getEntityData().get(GUARD));
+        float low=Mth.clamp(e.rifleStanceLevel(partial),0,1);low=low*low*(3-2*low);
+        float guardBlend=e.getEntityData().get(GUARD)*(1-low);
+        if(EvaCombatSupportR33.ready(e)&&e.rifleRunBlend(partial)<.5F)return EvaBodyPose.blend(base,EvaCombatSupportR33.locomotion(e,guard,partial),guardBlend);
         // Retain the measured locomotion in the legs while keeping the guard up.
         if(e.rifleMoveBlend(partial)>.1F)for(String n:base.rig.keySet())if(n.equals("root")||n.startsWith("leg_")||n.startsWith("shin_")||n.startsWith("ankle_")||n.startsWith("foot_"))
         {guard.rotations.put(n,base.rotations.get(n));guard.positions.put(n,base.positions.get(n));}
-        guard.dirty();return EvaBodyPose.blend(base,guard,e.getEntityData().get(GUARD));
+        guard.dirty();return EvaBodyPose.blend(base,guard,guardBlend);
     }
     private static EvaBodyPose.Sample actionPose(EvaUnit01Entity e,String name,float progress,EvaBodyPose.Sample base,float partial)
     {

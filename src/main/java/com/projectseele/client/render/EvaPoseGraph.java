@@ -176,7 +176,7 @@ public final class EvaPoseGraph
             return finish(entity,model,partialTick,modelToWorld,physical,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         }
         if(com.projectseele.entity.EvaCombatSupportR33.ready(entity)
-                &&com.projectseele.entity.EvaGameplayMotionR32.owns(entity,partialTick)
+                &&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(entity,partialTick)
                 &&entity.getWeapon()==EvaUnit01Entity.WEAPON_FISTS)
         {
             // This owner produces the complete body. Do not evaluate the old

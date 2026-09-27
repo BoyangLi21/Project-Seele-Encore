@@ -21,6 +21,7 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid="projectseele",value=Dist.CLIENT)
 public final class CombatR31Client
 {
+    private static final boolean PERFORMANCE_ONLY=Boolean.getBoolean("projectseele.combatPerformanceOnly");
     private static final Map<String,Integer> receivedSounds=new java.util.concurrent.ConcurrentHashMap<>();
     @SubscribeEvent public static void sound(net.minecraftforge.client.event.sound.PlaySoundEvent event)
     {
@@ -37,6 +38,26 @@ public final class CombatR31Client
         var eva=mc.level.getEntity(CombatR31Review.evaId);var angel=mc.level.getEntity(CombatR31Review.angelId);if(eva==null)return null;
         if(angel!=null)lastAngelCamera=angel.getPosition(partial);if(lastAngelCamera==null)return null;
         Vec3 p=eva.getPosition(partial),q=lastAngelCamera,centre=p.lerp(q,.5).add(0,30,0);
+        if(com.projectseele.visual.StanceContactR41Review.ENABLED&&CombatR31Review.stageTicks<=360
+                &&CombatR31Review.stageName.equals("reaction")&&eva instanceof EvaUnit01Entity unit)
+        {
+            if(Boolean.getBoolean("projectseele.r41HandCamera"))
+            {
+                String side=CombatR31Review.stageTicks<=160?"r":"l",bone="hand_"+side;
+                var pose=com.projectseele.entity.EvaBodyPose.sample(unit,partial);
+                var local=pose.matrix(bone).transformPosition(new org.joml.Vector3f(pose.rig.get(bone).pivot()))
+                        .mul(com.projectseele.entity.EvaScale.RENDER_SCALE).rotateY((180-unit.getYRot())*(float)Math.PI/180);
+                Vec3 target=p.add(local.x,local.y,local.z);
+                if(unit.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE)
+                {
+                    var rifle=com.projectseele.entity.EvaRifleKinematics.sample(unit,partial,unit.getAimDirectionForPoseCapture(partial));
+                    target=rifle.grip().add(rifle.forward().scale(side.equals("l")?5:0));
+                }
+                return new View(target.add(side.equals("r")?-13:13,8,12),target);
+            }
+            Vec3 target=com.projectseele.physics.CombatBodyContacts.coreBounds(unit).getCenter();
+            return new View(target.add(62,27,56),target);
+        }
         if(CombatR31Review.AWAKENING&&eva instanceof EvaUnit01Entity unit&&com.projectseele.entity.EvaBerserkMotionR34.introduction(unit))
         {
             Vec3 target=com.projectseele.entity.EvaBodyPose.opticalEye(unit,partial).add(0,-1.8,0);
@@ -52,7 +73,7 @@ public final class CombatR31Client
     }
     private static final JsonArray supportContacts=new JsonArray();
     public static void toeSupport(com.projectseele.entity.EvaUnit01Entity e,String side,Vec3 actual,Vec3 target)
-    {if(e.getId()!=CombatR31Review.evaId||supportContacts.size()>12000)return;var r=new JsonObject();r.addProperty("stage",CombatR31Review.stageName);r.addProperty("tick",CombatR31Review.stageTicks);r.addProperty("phase",e.getOrdinaryAttackStage()>=0?e.getOrdinaryAttackProgress(1):e.heavyMotionProgress(1));r.addProperty("side",side);r.addProperty("error_blocks",actual.distanceTo(target));supportContacts.add(r);}
+    {if(PERFORMANCE_ONLY||e.getId()!=CombatR31Review.evaId||supportContacts.size()>12000)return;var r=new JsonObject();r.addProperty("stage",CombatR31Review.stageName);r.addProperty("tick",CombatR31Review.stageTicks);r.addProperty("phase",e.getOrdinaryAttackStage()>=0?e.getOrdinaryAttackProgress(1):e.heavyMotionProgress(1));r.addProperty("side",side);r.addProperty("error_blocks",actual.distanceTo(target));supportContacts.add(r);}
     private static boolean started,oldPause,oldGui;private static int oldDistance,epoch,end;
     private static CameraType oldCamera;private static Path folder;private static String lastPhoto="";
     private static long nextFrame,lastWitness;private static int frame;
@@ -62,7 +83,7 @@ public final class CombatR31Client
     private static long lastAngelSole;
     public static void angelSupport(net.minecraft.world.entity.LivingEntity actor,double lowest)
     {
-        if(!CombatR31Review.ENABLED||actor.getId()!=CombatR31Review.angelId||CombatR31Review.done)return;
+        if(PERFORMANCE_ONLY||!CombatR31Review.ENABLED||actor.getId()!=CombatR31Review.angelId||CombatR31Review.done)return;
         long now=System.nanoTime();if(now-lastAngelSole<80_000_000)return;lastAngelSole=now;
         var row=new JsonObject();var beat=com.projectseele.entity.CombatFeelR31.beat(actor);row.addProperty("stage",CombatR31Review.stageName);row.addProperty("tick",CombatR31Review.stageTicks);row.addProperty("world_min_y",lowest);row.addProperty("root_y",actor.getY());row.addProperty("ground",actor.onGround());row.addProperty("reaction",beat==null?0:beat.kind());angelSoles.add(row);
     }
@@ -143,7 +164,7 @@ public final class CombatR31Client
     {witness(eva,side,actual.distanceTo(expected),weight,actual,expected);}
     private static void witness(EvaUnit01Entity eva,String side,double error,float weight,Vec3 actual,Vec3 expected)
     {
-        if(!CombatR31Review.ENABLED||eva.getId()!=CombatR31Review.evaId||CombatR31Review.done)return;
+        if(PERFORMANCE_ONLY||!CombatR31Review.ENABLED||eva.getId()!=CombatR31Review.evaId||CombatR31Review.done)return;
         // A blended approach is deliberately not at the contact yet. Check the
         // exact contact constraint only at full weight, retaining ALL blends below.
         if(weight>=.9999F){CombatR31Review.handSamples++;CombatR31Review.maximumHandError=Math.max(CombatR31Review.maximumHandError,Double.isFinite(error)?error:Double.POSITIVE_INFINITY);}
@@ -154,7 +175,7 @@ public final class CombatR31Client
     private static JsonArray vector(Vec3 p){var a=new JsonArray();a.add(p.x);a.add(p.y);a.add(p.z);return a;}
     public static void normalWitness(EvaUnit01Entity eva,software.bernie.geckolib.cache.object.BakedGeoModel model,String point)
     {
-        if(!CombatR31Review.ENABLED||eva.getId()!=CombatR31Review.evaId||CombatR31Review.done||normalBones.size()>3500)return;
+        if(PERFORMANCE_ONLY||!CombatR31Review.ENABLED||eva.getId()!=CombatR31Review.evaId||CombatR31Review.done||normalBones.size()>3500)return;
         long now=System.nanoTime();if(point.equals("before")&&now-boneAt<35_000_000)return;if(point.equals("before"))boneAt=now;else if(now-boneAt>25_000_000)return;
         var row=new JsonObject();row.addProperty("stage",CombatR31Review.stageName);row.addProperty("tick",CombatR31Review.stageTicks);row.addProperty("point",point);row.addProperty("action",com.projectseele.entity.EvaCombatR31.action(eva));row.addProperty("ordinary",eva.getOrdinaryAttackStage());row.addProperty("live_phase",eva.combatPhaseR31());row.addProperty("gameplay",com.projectseele.entity.EvaGameplayMotionR32.ready(eva));row.addProperty("gameplay_air_age",com.projectseele.entity.EvaGameplayMotionR32.airAge(eva,0));row.addProperty("ground",eva.onGround());row.addProperty("airborne",eva.isVisuallyAirborneForRender());row.addProperty("y",eva.getY());
         row.addProperty("berserk",eva.isBerserk());row.addProperty("berserk_kind",com.projectseele.entity.EvaBerserkMotionR34.kind(eva));row.addProperty("mouth",com.projectseele.entity.EvaBerserkMotionR34.mouth(eva,0));row.addProperty("powered",eva.isPoweredOn());row.addProperty("health",eva.getHealth());
@@ -168,6 +189,7 @@ public final class CombatR31Client
         var mc=Minecraft.getInstance();if(mc.level==null||mc.player==null)return;
         long frameAt=System.nanoTime();if(renderCount++==0)firstRender=frameAt;lastRender=frameAt;performance.computeIfAbsent(CombatR31Review.stageName,name->new FrameStats()).sample(frameAt);
         if(CombatR31Review.mounted)CombatR31Review.warmFrames++;
+        if(PERFORMANCE_ONLY)return;
         try
         {
             String photo=CombatR31Review.photo;

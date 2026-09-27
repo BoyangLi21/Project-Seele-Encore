@@ -11,7 +11,8 @@ public final class BodyPoseLayersR40
     public static final boolean ENABLED = Boolean.getBoolean("projectseele.r40PoseLayers");
     public static final String[] BONES = {"root", "torso_lower", "torso_upper", "head",
             "leg_l", "leg_r", "shin_l", "shin_r", "ankle_l", "ankle_r", "foot_l", "foot_r",
-            "arm_l", "arm_r", "forearm_l", "forearm_r", "hand_l", "hand_r"};
+            "arm_l", "arm_r", "forearm_l", "forearm_r", "hand_l", "hand_r",
+            "finger_index_l", "finger_index_r", "finger_middle_l", "finger_middle_r", "finger_thumb_l", "finger_thumb_r"};
     private static final JsonArray ROWS = new JsonArray();
     private static final ThreadLocal<JsonObject> CURRENT = new ThreadLocal<>();
     private static long lastTick = -1;

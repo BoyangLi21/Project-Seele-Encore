@@ -80,6 +80,46 @@ public final class CombatBodyContacts
         Vec3 direction=target.position().subtract(attacker.position()).multiply(1,0,1).normalize();
         return clip(target,centre.subtract(direction.scale(70)),centre,.2).orElse(centre).add(direction.scale(.65));
     }
+    /** A downward strike aims at the posed surface nearest its actual foot. */
+    public static Vec3 bearingAim(LivingEntity target,Vec3 foot)
+    {
+        var profile=CombatBodyProfiles.get(target);if(profile==null)return target.getBoundingBox().getCenter();
+        var pose=CombatBodyDynamics.active(target)?CombatBodyDynamics.sample(target,0):CombatBodyDynamics.raw(target,0);
+        var matrices=CombatBodyProfiles.physicalMatrices(pose,profile);double best=Double.POSITIVE_INFINITY;Vec3 nearest=null;
+        float yaw=(180-target.getYRot())*(float)Math.PI/180;
+        for(var part:parts(profile))
+        {
+            var matrix=new Matrix4f(matrices.get(part.bone)).mul(part.bind);
+            for(var vertex:part.vertices)
+            {
+                var local=matrix.transformPosition(new Vector3f(vertex)).div(CombatBodyProfiles.BLOCK_TO_PHYSICS).rotateY(yaw);
+                var point=target.position().add(local.x,local.y,local.z);double distance=point.distanceToSqr(foot);
+                if(distance<best){best=distance;nearest=point;}
+            }
+        }
+        if(nearest==null)return target.getBoundingBox().getCenter();
+        return clip(target,nearest.add(0,80,0),nearest.add(0,-4,0),.05).orElse(nearest).add(0,-.25,0);
+    }
+    public static Vector3f soleLocal(LivingEntity actor,EvaBodyPose.Sample pose,String side)
+    {
+        String name="foot_"+side;var profile=CombatBodyProfiles.get(actor);
+        var fallback=pose.matrix(name).transformPosition(new Vector3f(pose.rig.get(name).pivot()));
+        if(profile==null)return fallback;
+        for(var part:parts(profile))if(part.bone.equals(name)&&!part.vertices.isEmpty())
+        {
+            var matrix=new Matrix4f(CombatBodyProfiles.physicalMatrices(pose,profile).get(name)).mul(part.bind);
+            float low=Float.POSITIVE_INFINITY;
+            for(var vertex:part.vertices)low=Math.min(low,matrix.transformPosition(new Vector3f(vertex)).y);
+            Vector3f total=new Vector3f();int count=0;
+            for(var vertex:part.vertices)
+            {
+                var point=matrix.transformPosition(new Vector3f(vertex));
+                if(point.y<=low+.005F){total.add(point);count++;}
+            }
+            return total.div(count*CombatBodyProfiles.MODEL_TO_PHYSICS);
+        }
+        return fallback;
+    }
     public static Optional<Vec3> clip(LivingEntity target,Vec3 from,Vec3 to,double radius)
     {
         var profile=CombatBodyProfiles.get(target);

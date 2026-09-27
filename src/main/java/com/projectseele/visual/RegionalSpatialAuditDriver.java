@@ -31,7 +31,8 @@ import java.util.*;
 public final class RegionalSpatialAuditDriver
 {
     private static final boolean COMBINED=Set.of("r10-world","r20-civil-annex").contains(System.getProperty("projectseele.regionalBuild",""));
-    private static final boolean R40="r40-collision".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R41="r41-collision".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R40=R41||"r40-collision".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R30=R40||Set.of("r30-shapes","r30-collision").contains(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R29_TOUR="r29-worldtour".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R29=R30||R29_TOUR||"r29-collision".equals(System.getProperty("projectseele.regionalBuild",""));
@@ -87,7 +88,7 @@ public final class RegionalSpatialAuditDriver
     {
         if(!ENABLED||done||event.phase!=TickEvent.Phase.END)return;
         var server=event.getServer();Path world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals(R40?"SEELE_FIELD_R40_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R29?"SEELE_FIELD_R29_REVIEW":R28?"SEELE_FIELD_R28_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R24?"SEELE_R24_TV_REVIEW":R23?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":R19?"SEELE_R19_NATIVE_REVIEW":"SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong quality audit world");
+        if(!world.getFileName().toString().equals(R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R29?"SEELE_FIELD_R29_REVIEW":R28?"SEELE_FIELD_R28_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R24?"SEELE_R24_TV_REVIEW":R23?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":R19?"SEELE_R19_NATIVE_REVIEW":"SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong quality audit world");
         ServerLevel level=server.getLevel(FacilitySchemaV2.DIMENSION);
         if(level!=null)level.resetEmptyTime();
         try
@@ -128,7 +129,7 @@ public final class RegionalSpatialAuditDriver
                     }
                     Files.writeString(world.resolve("quality_terrain_survey.json"),GSON.toJson(heights));
                 }
-                cases=JsonParser.parseString(Files.readString(world.resolve(R40?"r40_walk_cases.json":R30?"r30_walk_cases.json":R29?"r29_walk_cases.json":R28?"r28_walk_cases.json":R26?"r26_walk_cases.json":R25?"r25_walk_cases.json":R24?"r24_walk_cases.json":R23?"r23_walk_cases.json":"quality_walk_cases.json"))).getAsJsonArray();
+                cases=JsonParser.parseString(Files.readString(world.resolve(R41?"r41_walk_cases.json":R40?"r40_walk_cases.json":R30?"r30_walk_cases.json":R29?"r29_walk_cases.json":R28?"r28_walk_cases.json":R26?"r26_walk_cases.json":R25?"r25_walk_cases.json":R24?"r24_walk_cases.json":R23?"r23_walk_cases.json":"quality_walk_cases.json"))).getAsJsonArray();
                 ProjectSeele.LOGGER.info("SPATIAL NATIVE shapes={} cases={} playerStep={}",shapes.size(),cases.size(),player.maxUpStep());
             }
             if(Files.exists(world.resolve("regional_stop_requested")))
@@ -166,6 +167,17 @@ public final class RegionalSpatialAuditDriver
                 stepLimit=Math.max(2000,(int)Math.ceil(length/.12)+route.size()*100);
                 TRACE.asList().clear();positioned=true;
                 activeLevel=level;RESTORE.clear();doorInteractions=0;
+                if(R41&&!level.noCollision(player,player.getBoundingBox()))
+                {
+                    // A .6F player is 0.6000000238 blocks wide. Decimal
+                    // catalogue endpoints .3 from a wall can overlap it by
+                    // 1.2e-8 despite having no meaningful penetration.
+                    if(!level.noCollision(player,player.getBoundingBox().deflate(1e-7)))
+                    {finish(test,"probe_start_obstructed");return;}
+                    test.addProperty("startBoundaryTolerance",1e-7);
+                }
+                if(R41&&test.has("barrier")&&!level.getBlockCollisions(player,player.getBoundingBox().move(0,-.2,0)).iterator().hasNext())
+                {finish(test,"probe_start_unsupported");return;}
                 if(test.has("readingBoard"))
                 {
                     var b=test.getAsJsonArray("readingBoard");BlockPos at=new BlockPos(b.get(0).getAsInt(),b.get(1).getAsInt(),b.get(2).getAsInt());
@@ -243,15 +255,20 @@ public final class RegionalSpatialAuditDriver
             for(int n=0;n<120;n++)
             {
                 Vec3 old=player.position();double dx=end.x-old.x,dz=end.z-old.z;distance=Math.hypot(dx,dz);
+                if(test.has("climbablePort")&&player.onClimbable())
+                {finish(test,start.y-old.y<=2.5?"pass":"unsafe_ladder_entry_drop");break;}
                 if(distance<.18 && player.onGround() && settled>=2)
                 {
                     if(Math.abs(old.y-end.y)>=.16){finish(test,"wrong_arrival_height");break;}
+                    if(R41&&!test.has("barrier")&&waypoint==route.size()-1
+                            &&!level.noCollision(player,player.getBoundingBox().move(end.subtract(old)).deflate(1e-7)))
+                    {finish(test,"requested_endpoint_obstructed");break;}
                     if(++waypoint==route.size()){finish(test,"pass");break;}
                     // A route gets one initial placement. Turns continue from the actual
                     // settled player position, so a disconnected seam cannot be skipped.
                     start=end;end=vector(route.get(waypoint).getAsJsonArray());settled=0;stalled=0;continue;
                 }
-                if(old.y<Math.min(start.y,end.y)-.65){finish(test,"floor_gap");break;}
+                if(old.y<Math.min(start.y,end.y)-(test.has("climbablePort")?2.5:.65)){finish(test,"floor_gap");break;}
                 double amount=distance<.18?0:Math.min(.12,distance);
                 fallSpeed=(fallSpeed-.08)*.98;
                 player.move(MoverType.SELF,new Vec3(distance<.001?0:dx/distance*amount,fallSpeed,distance<.001?0:dz/distance*amount));
@@ -267,7 +284,8 @@ public final class RegionalSpatialAuditDriver
                     {
                         var boundary=test.getAsJsonObject("barrier");double coordinate=boundary.get("axis").getAsString().equals("x")?now.x:now.z;
                         double gap=Math.abs(coordinate-boundary.get("plane").getAsDouble());
-                        finish(test,gap>=.25&&gap<=.75&&Math.abs(now.y-start.y)<.16?"pass":"barrier_not_reached");
+                        double maximum=boundary.has("maxGap")?boundary.get("maxGap").getAsDouble():.75;
+                        finish(test,gap>=.25&&gap<=maximum&&Math.abs(now.y-start.y)<.16?"pass":"barrier_not_reached");
                     }
                     else finish(test,"blocked_by_native_collision");break;
                 }

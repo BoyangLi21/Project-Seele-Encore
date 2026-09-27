@@ -24,7 +24,7 @@ public final class EvaCombatPoseR31
     {
         if(e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e))return EvaMotionEngineV2.BoneWrites.empty();
         Set<String> changed=new HashSet<>(),position=new HashSet<>();int action=EvaCombatR31.action(e);float age=EvaCombatR31.age(e,partial);
-        if(EvaGameplayMotionR32.owns(e,partial))
+        if(EvaGameplayMotionR32.sharedBody(e,partial))
         {
             var body=EvaBodyPose.sample(e,partial);
             PhysicalBodyRenderer.pivots(body,m);

@@ -1,0 +1,104 @@
+{
+  "multipart": [
+    {
+      "when": {
+        "north": "true"
+      },
+      "apply": {
+        "model": "projectseele:block/nerv_edge_rail_beam",
+        "y": 0
+      }
+    },
+    {
+      "when": {
+        "east": "true"
+      },
+      "apply": {
+        "model": "projectseele:block/nerv_edge_rail_beam",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true"
+      },
+      "apply": {
+        "model": "projectseele:block/nerv_edge_rail_beam",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true"
+      },
+      "apply": {
+        "model": "projectseele:block/nerv_edge_rail_beam",
+        "y": 270
+      }
+    },
+    {
+      "when": {
+        "OR": [
+          {
+            "north": "true"
+          },
+          {
+            "west": "true"
+          }
+        ]
+      },
+      "apply": {
+        "model": "projectseele:block/nerv_edge_rail_post",
+        "y": 0
+      }
+    },
+    {
+      "when": {
+        "OR": [
+          {
+            "north": "true"
+          },
+          {
+            "east": "true"
+          }
+        ]
+      },
+      "apply": {
+        "model": "projectseele:block/nerv_edge_rail_post",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "OR": [
+          {
+            "south": "true"
+          },
+          {
+            "east": "true"
+          }
+        ]
+      },
+      "apply": {
+        "model": "projectseele:block/nerv_edge_rail_post",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "OR": [
+          {
+            "south": "true"
+          },
+          {
+            "west": "true"
+          }
+        ]
+      },
+      "apply": {
+        "model": "projectseele:block/nerv_edge_rail_post",
+        "y": 270
+      }
+    }
+  ]
+}

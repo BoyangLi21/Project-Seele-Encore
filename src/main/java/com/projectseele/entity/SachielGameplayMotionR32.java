@@ -124,9 +124,22 @@ public final class SachielGameplayMotionR32
             boolean left=count==2?i==1:left(mode);String side=left?"l":"r",bone=(stomp?"foot_":"hand_")+side;
             Vec3 goal=actor.strikeAim();var forward=actor.getForward().multiply(1,0,1).normalize();
             if(count==2)goal=goal.add(new Vec3(forward.z,0,-forward.x).scale(left?-3.5:3.5));
-            if(mode==SachielStrike.PILE)goal=goal.subtract(forward.scale(17));
             Vector3f local=inverse.transformPosition(goal.toVector3f());
-            Vector3f atContact=reference.matrix(bone).transformPosition(new Vector3f(reference.rig.get(bone).pivot()));
+            Vector3f atContact=stomp?com.projectseele.physics.CombatBodyContacts.soleLocal(actor,reference,side)
+                    :reference.matrix(bone).transformPosition(new Vector3f(reference.rig.get(bone).pivot()));
+            if(mode==SachielStrike.PILE)
+            {
+                var joint=com.projectseele.physics.AnatomicalLimbConstraints.elbowJoint(profile,side,pose.rig.get("forearm_"+side).pivot());
+                var referenceElbow=reference.matrix("forearm_"+side).transformPosition(new Vector3f(joint));
+                var referenceTip=new Vector3f(atContact).add(new Vector3f(atContact).sub(referenceElbow).normalize().mul(5));
+                var offset=local.sub(referenceTip);if(offset.length()>5.6F)offset.normalize().mul(5.6F);
+                var hand=pose.matrix(bone).transformPosition(new Vector3f(pose.rig.get(bone).pivot()));
+                var elbow=pose.matrix("forearm_"+side).transformPosition(new Vector3f(joint));
+                float extension=extension(age)*5;
+                var tip=new Vector3f(hand).add(new Vector3f(hand).sub(elbow).normalize().mul(extension)).fma(weight,offset);
+                com.projectseele.physics.AnatomicalLimbConstraints.reachForearmTip(pose,profile,side,tip,extension);
+                continue;
+            }
             Vector3f offset=local.sub(atContact);if(offset.length()>5.6F)offset.normalize().mul(5.6F);
             Vector3f current=pose.matrix(bone).transformPosition(new Vector3f(pose.rig.get(bone).pivot())).fma(weight,offset);
             if(stomp)com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(pose,profile,side,current,pose.matrix(bone).getUnnormalizedRotation(new Quaternionf()).normalize());
@@ -136,11 +149,15 @@ public final class SachielGameplayMotionR32
     public static SachielStrike.Frame contact(SachielEntity e,float age,float partial,boolean left)
     {
         var pose=SachielBodyPoseR35.sampleAt(e,age,partial);String side=left?"l":"r",name=e.strikeMode()==SachielStrike.STOMP?"foot_"+side:"hand_"+side;
-        var matrix=SachielStrike.root(e,partial);var local=pose.matrix(name).transformPosition(new Vector3f(pose.rig.get(name).pivot()));var hand=new Vec3(matrix.transformPosition(local));
+        var matrix=SachielStrike.root(e,partial);var local=e.strikeMode()==SachielStrike.STOMP?com.projectseele.physics.CombatBodyContacts.soleLocal(e,pose,side)
+                :pose.matrix(name).transformPosition(new Vector3f(pose.rig.get(name).pivot()));var hand=new Vec3(matrix.transformPosition(local));
         String upstream=e.strikeMode()==SachielStrike.STOMP?"shin_"+side:"forearm_"+side;
-        var elbow=new Vec3(matrix.transformPosition(pose.matrix(upstream).transformPosition(new Vector3f(pose.rig.get(upstream).pivot()))));
-        Vec3 direction=hand.subtract(elbow).normalize();float extension=e.strikeMode()==SachielStrike.PILE?EvaDorsalMechanism.smooth((age-21)/5)*(1-EvaDorsalMechanism.smooth((age-30)/7)):0;
+        Vector3f joint=e.strikeMode()==SachielStrike.PILE?com.projectseele.physics.AnatomicalLimbConstraints.elbowJoint(com.projectseele.physics.CombatBodyProfiles.get(e),side,pose.rig.get(upstream).pivot()):new Vector3f(pose.rig.get(upstream).pivot());
+        var elbow=new Vec3(matrix.transformPosition(pose.matrix(upstream).transformPosition(joint)));
+        Vec3 direction=hand.subtract(elbow).normalize();float extension=e.strikeMode()==SachielStrike.PILE?extension(age):0;
         return new SachielStrike.Frame(hand,hand.add(direction.scale(extension*25)),direction,1,extension);
     }
+    private static float extension(float age)
+    {return EvaDorsalMechanism.smooth((age-21)/5)*(1-EvaDorsalMechanism.smooth((age-30)/7));}
     private SachielGameplayMotionR32(){}
 }

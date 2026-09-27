@@ -30,6 +30,7 @@ public final class ModBlocks
     public static final RegistryObject<Block> NERV_MACHINE_PANEL=structuralFinish("nerv_machine_panel");
     public static final RegistryObject<Block> NERV_SHAFT_PANEL=structuralFinish("nerv_shaft_panel");
     public static final RegistryObject<Block> NERV_MACHINE_EDGE=structuralFinish("nerv_machine_edge");
+    public static final RegistryObject<Block> NERV_EDGE_RAIL=BLOCKS.register("nerv_edge_rail",()->new com.projectseele.world.FacilityEdgeRailR41(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion()));
     public static final RegistryObject<Block> NERV_MACHINE_HAZARD=structuralFinish("nerv_machine_hazard");
 
     private static RegistryObject<Block> structuralFinish(String name)
