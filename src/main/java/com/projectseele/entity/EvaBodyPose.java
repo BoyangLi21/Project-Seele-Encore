@@ -56,7 +56,7 @@ public final class EvaBodyPose
     {
         try
         {
-            String currentBody=Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r41.json"))
+            String currentBody=Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r42.json"))?"projectseele-local-maps/eva_body_r42.json":Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r41.json"))
                     ?"projectseele-local-maps/eva_body_r41.json":"projectseele-local-maps/eva_body_r25.json";
             Path path=Path.of(System.getProperty("projectseele.bodyPoseReview",currentBody));
             if(!Files.isRegularFile(path))path=Path.of("projectseele-local-maps/eva_body_r11.json");
@@ -479,7 +479,7 @@ public final class EvaBodyPose
     }
     private static void groundGameplay(EvaUnit01Entity e,Sample pose,float partial)
     {
-        if(!EvaGameplayMotionR32.owns(e,partial)||e.isVisuallyAirborneForRender()&&!e.onGround())return;
+        if(!EvaGameplayMotionR32.owns(e,partial)||EvaGameplayMotionR32.airAge(e,partial)>=0||e.isVisuallyAirborneForRender()&&!e.onGround())return;
         var reaction=CombatFeelR31.beat(e);if(reaction!=null&&(reaction.kind()==CombatFeelR31.DOWN||reaction.kind()==CombatFeelR31.THROWN))return;
         var mesh=data.rigSupport().getOrDefault(rigKey(e),data.support());float lowest=Float.POSITIVE_INFINITY;
         for(String name:List.of("foot_l","foot_r"))

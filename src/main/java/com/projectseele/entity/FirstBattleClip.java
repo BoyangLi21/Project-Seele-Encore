@@ -23,7 +23,7 @@ public final class FirstBattleClip
     public record BonePose(String[] names,Quaternionf[] rotations,Vector3f[] positions) {}
     public record CameraPose(Vec3 position,Vec3 target,float fov) {}
     private record Role(String[] bones,Quaternionf[][] rotations,Vector3f[][] positions,Map<String,Vec3[]> curves) {}
-    private record Data(float fps,Map<String,Role> roles,Vec3[] cameras,Vec3[] targets,float[] fov,Set<Integer> cuts,String surfaceHash,int landingTick) {}
+    private record Data(float fps,Map<String,Role> roles,Vec3[] cameras,Vec3[] targets,float[] fov,Set<Integer> cuts,String surfaceHash,int landingTick,Map<Integer,Integer> eventTicks,float[] referenceSeconds) {}
     private static String loadedFingerprint="";
     private static final Data DATA=load();
     private static Vec3 vector(JsonArray p){return new Vec3(p.get(0).getAsDouble(),p.get(1).getAsDouble(),p.get(2).getAsDouble());}
@@ -35,12 +35,12 @@ public final class FirstBattleClip
     {
         String review=System.getProperty("projectseele.firstBattleReviewClip","");
         String mode=System.getProperty("projectseele.regionalBuild","");
-        if(!review.isEmpty()&&(mode.equals("r10-firstbattle")||mode.startsWith("r24-campaign")))
+        if(!review.isEmpty()&&(mode.equals("r10-firstbattle")||mode.startsWith("r24-campaign")||mode.equals("r31-combat")&&Boolean.getBoolean("projectseele.combatAwakening")))
         {
             try{return readLocal(Path.of(review),"isolated candidate review");}
             catch(Exception e){throw new IllegalStateException("Requested battle candidate could not load",e);}
         }
-        for(String revision:List.of("r24","r18","r15","r14","r12"))
+        for(String revision:List.of("r42","r24","r18","r15","r14","r12"))
         {
             Path local=Path.of("projectseele-local-maps/first_battle_"+revision+".json");
             if(!Files.isRegularFile(local))continue;
@@ -119,13 +119,19 @@ public final class FirstBattleClip
             }
             int landing=root.has("landing_tick")?root.get("landing_tick").getAsInt():234;
             if(landing<0||landing>=DURATION_TICKS)throw new IllegalArgumentException("Invalid landing cue");
-            return new Data(fps,Map.copyOf(roles),positions,targets,fov,Set.copyOf(cuts),surfaceHash,landing);
+            Map<Integer,Integer> cues=new HashMap<>();
+            if(root.has("event_tick_remap_r42"))root.getAsJsonObject("event_tick_remap_r42").entrySet().forEach(e->cues.put(Integer.parseInt(e.getKey()),e.getValue().getAsInt()));
+            float[] reference=new float[count];for(int i=0;i<count;i++)reference[i]=root.has("reference_seconds_r42")?root.getAsJsonArray("reference_seconds_r42").get(i).getAsFloat():i/fps;
+            return new Data(fps,Map.copyOf(roles),positions,targets,fov,Set.copyOf(cuts),surfaceHash,landing,Map.copyOf(cues),reference);
     }
     private static void validateCurve(Vec3[] curve,int count)
     {
         if(curve.length!=count)throw new IllegalArgumentException("First-battle curve length mismatch");
         for(Vec3 point:curve)if(!Double.isFinite(point.x)||!Double.isFinite(point.y)||!Double.isFinite(point.z))throw new IllegalArgumentException("Invalid first-battle curve point");
     }
+    public static int eventTick(int original){return DATA==null?original:DATA.eventTicks.getOrDefault(original,original);}
+    public static float referenceSeconds(float seconds)
+    {if(DATA==null)return seconds;float frame=frame(seconds,DATA.referenceSeconds.length);int a=(int)frame,b=Math.min(a+1,DATA.referenceSeconds.length-1);return Mth.lerp(frame-a,DATA.referenceSeconds[a],DATA.referenceSeconds[b]);}
     private static void adaptDorsalCurves(JsonObject root,Map<String,Vec3[]> curves)
     {
         if(root.has("dorsal_profile_version")&&root.get("dorsal_profile_version").getAsInt()>=13)return;
@@ -159,6 +165,18 @@ public final class FirstBattleClip
         Quaternionf[] qs=new Quaternionf[role.bones.length];Vector3f[] ps=new Vector3f[role.bones.length];
         for(int i=0;i<qs.length;i++){qs[i]=new Quaternionf(role.rotations[a][i]).slerp(role.rotations[b][i],mix);ps[i]=new Vector3f(role.positions[a][i]).lerp(role.positions[b][i],mix);}
         return new BonePose(role.bones,qs,ps);
+    }
+    public static EvaBodyPose.Sample finalEvaPose(EvaUnit01Entity eva)
+    {
+        var result=EvaBodyPose.neutralForTransportR32(eva);var authored=pose(true,DURATION_TICKS/20F);
+        for(int i=0;i<authored.names().length;i++)
+        {
+            String name=authored.names()[i];if(!result.rig.containsKey(name))continue;
+            var q=authored.rotations()[i];var p=authored.positions()[i];
+            result.rotations.put(name,new Quaternionf(-q.x,-q.y,q.z,q.w));
+            result.positions.put(name,new Vector3f(-p.x,p.y,p.z).div(16));
+        }
+        result.dirty();return result;
     }
     public static Vec3 world(FirstBattleSignals.Spec spec,Vec3 local)
     {

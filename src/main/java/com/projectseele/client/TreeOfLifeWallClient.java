@@ -88,6 +88,9 @@ public final class TreeOfLifeWallClient
     @SubscribeEvent
     public static void onRenderLevel(RenderLevelStageEvent event)
     {
+        // Kept solely to reproduce the old shader/depth bug in an isolated
+        // review. Production images are mounted, culled block entities.
+        if(!Boolean.getBoolean("projectseele.legacyWallArtReview"))return;
         if (event.getStage() != RenderLevelStageEvent.Stage.AFTER_TRANSLUCENT_BLOCKS)
         {
             return;
@@ -268,6 +271,13 @@ public final class TreeOfLifeWallClient
     {
         return ensureNervTexture(minecraft) ? NERV_TEXTURE_ID : null;
     }
+    public static ResourceLocation artworkTexture(String artwork)
+    {
+        Minecraft mc=Minecraft.getInstance();
+        return artwork.equals("tree")?(ensureTreeTexture(mc)?TREE_TEXTURE_ID:null):nervLogoTexture(mc);
+    }
+    public static float artworkAspect(String artwork)
+    {return artwork.equals("tree")?treeImageAspect:nervImageAspect;}
 
     /**
      * The supplied logo has a light checkerboard baked into its RGB pixels.

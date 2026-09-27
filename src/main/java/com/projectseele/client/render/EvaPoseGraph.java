@@ -170,6 +170,13 @@ public final class EvaPoseGraph
         }
         EvaCervicalPivotR25.apply(entity,model,partialTick);
         EvaPoseTransition.rememberGecko(model);
+        if(entity.isFirstBattleActive())
+        {
+            // The paired performance owns the complete skeleton. In the old
+            // path, the late gameplay hand writer replaced its finger bases.
+            var scene=FirstBattlePoseRenderer.apply(entity,model,partialTick);
+            return finish(entity,model,partialTick,modelToWorld,scene,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
+        }
         if(com.projectseele.physics.CombatBodyDynamics.active(entity))
         {
             var physical=PhysicalBodyRenderer.apply(entity,model,partialTick);

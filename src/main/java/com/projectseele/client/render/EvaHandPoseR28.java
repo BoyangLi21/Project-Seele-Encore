@@ -12,13 +12,15 @@ final class EvaHandPoseR28
     static void resetEntityR31(EvaUnit01Entity eva){STATES.remove(eva);}
     static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva,BakedGeoModel model,float partial)
     {
-        if(com.projectseele.entity.EvaGameplayMotionR32.sharedBody(eva,partial))
+        if(eva.isFirstBattleActive())return EvaMotionEngineV2.BoneWrites.empty();
+        if(eva.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(eva,partial))
         {STATES.remove(eva);return EvaMotionEngineV2.BoneWrites.empty();}
-        if(com.projectseele.entity.EvaBodyPose.hasTerrainStances()&&!eva.isNervLogisticsLocked()
-                &&!eva.isFirstBattleActive()&&!com.projectseele.entity.EvaShutdownR30.disabled(eva)
-                &&eva.getVisualPose()==0)
+        if(com.projectseele.entity.EvaBodyPose.hasTerrainStances()
+                &&!com.projectseele.entity.EvaShutdownR30.disabled(eva)
+                &&!com.projectseele.entity.EvaAirTransportR31.active(eva))
         {
             var body=com.projectseele.entity.EvaBodyPose.sample(eva,partial);
+            com.projectseele.entity.EvaHandsR41.apply(eva,body,partial);
             Set<String> names=new LinkedHashSet<>();
             for(String name:body.rig.keySet())if(name.startsWith("finger_"))model.getBone(name).ifPresent(b->{
                 EvaRigTransforms.rotate(b,body.rotations.get(name));var p=body.positions.get(name);

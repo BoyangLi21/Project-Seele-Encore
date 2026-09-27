@@ -252,7 +252,9 @@ public final class ClientFxManager
             poseStack.pushPose();
             poseStack.translate(fx.pos.x - cam.x, fx.pos.y - cam.y, fx.pos.z - cam.z);
             VertexConsumer target = fx instanceof KabbalahTree
-                    ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof CrossExplosion
+                    ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof CrossExplosion || fx instanceof NukeExplosion
+                    // Vanilla lightning writes depth even for translucent
+                    // rings, cutting a hard empty band through the smoke.
                     ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.CROSS) : buffer.getBuffer(RenderType.lightning());
             fx.render(poseStack, target, event.getPartialTick());
             poseStack.popPose();

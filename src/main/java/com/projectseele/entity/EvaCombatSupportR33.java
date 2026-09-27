@@ -87,7 +87,9 @@ public final class EvaCombatSupportR33
     public static Vec3 anchor(EvaUnit01Entity e,String side,float partial)
     {var t=e.getEntityData().get(CONTACTS);var targets=TARGETS.get(e);return t.isEmpty()||t.contains("release")||targets==null?null:targets[side.equals("l")?0:1];}
     private static boolean supported(EvaUnit01Entity e)
-    {return e.onGround()||!e.isVisuallyAirborneForRender();}
+    {return e.onGround()&&!e.isVisuallyAirborneForRender()&&EvaGameplayMotionR32.airAge(e,0)<0;}
+    public static void release(EvaUnit01Entity e)
+    {if(!e.level().isClientSide)e.getEntityData().set(CONTACTS,new CompoundTag());TARGETS.remove(e);}
     public static void tick(EvaUnit01Entity e)
     {
         if(e.level().isClientSide||!ready(e))return;

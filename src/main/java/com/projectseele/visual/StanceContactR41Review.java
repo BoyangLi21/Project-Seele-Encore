@@ -11,6 +11,7 @@ import java.util.*;
 public final class StanceContactR41Review
 {
     public static final boolean ENABLED=CombatR31Review.ENABLED&&Boolean.getBoolean("projectseele.r41StanceContacts");
+    public static final boolean ARTICULATION=ENABLED&&Boolean.getBoolean("projectseele.r42Locomotion");
     private static final boolean POSE_ONLY=Boolean.getBoolean("projectseele.r41PoseOnly");
     private static final JsonArray EVENTS=new JsonArray(),POSES=new JsonArray(),CONTACTS=new JsonArray();
     private static final Map<String,Quaternionf> PREVIOUS=new HashMap<>();
@@ -29,6 +30,7 @@ public final class StanceContactR41Review
     }
     public static boolean tick(EvaUnit01Entity eva,SachielEntity angel,ServerPlayer pilot,int tick)
     {
+        if(ARTICULATION)return locomotion(eva,angel,pilot,tick);
         if(tick<=360)
         {
             if(tick==1)
@@ -98,10 +100,40 @@ public final class StanceContactR41Review
         }
         row.add("fingers",fingers);POSES.add(row);
     }
-    public static boolean passed(){return passed&&(POSE_ONLY||CONTACTS.size()==RANGES.length)&&EVENTS.size()>=4&&poseSamples>=300&&crawlDistance>1&&maxRotation<35;}
+    private static int flightTicks,jumps;
+    private static boolean inFlight;
+    private static double jumpFloor,peak;
+    private static boolean locomotion(EvaUnit01Entity eva,SachielEntity angel,ServerPlayer pilot,int tick)
+    {
+        if(tick==1)CombatR31Review.arrangeR41(240);
+        if(tick==110)CombatR31Review.arrangeR41(32);
+        CombatR31Review.forward=tick>=20&&tick<80||tick>=120&&tick<132||tick>=385&&tick<430?1:0;
+        CombatR31Review.jump=tick>=165&&tick<169;
+        if(tick==160){jumpFloor=eva.getY();peak=jumpFloor;}
+        if(tick>=165&&tick<250)
+        {
+            if(!eva.onGround()) {if(!inFlight)jumps++;inFlight=true;flightTicks++;peak=Math.max(peak,eva.getY());}
+            else if(inFlight)inFlight=false;
+        }
+        if(tick==270||tick==286)CombatR31Review.inputR42(1);
+        // The low-stance traversal case needs unobstructed terrain. Keep the
+        // EVA continuous; move only the separate strike target out of its path.
+        if(tick==312)angel.setPos(eva.getX()+70,CombatR31Review.FLOOR+1,eva.getZ()-50);
+        if(tick==315)eva.setPilotCrouching(pilot,true);
+        if(tick==350)eva.toggleProne(pilot);
+        if(tick==385)crawlStart=eva.position();
+        if(tick==430)crawlDistance=eva.position().distanceTo(crawlStart);
+        if(tick==440)eva.toggleProne(pilot);
+        if(tick==465)eva.setPilotCrouching(pilot,false);
+        if(tick!=1&&tick!=110)sample(eva,tick);else PREVIOUS.clear();
+        if(Set.of(50,90,141,178,185,205,285,338,379,410,485).contains(tick))CombatR31Review.photo="r42_motion_"+tick;
+        return tick>=510;
+    }
+    public static boolean passed(){return ARTICULATION?jumps==1&&flightTicks>=10&&flightTicks<=35&&peak-jumpFloor>10&&crawlDistance>1:passed&&(POSE_ONLY||CONTACTS.size()==RANGES.length)&&EVENTS.size()>=4&&poseSamples>=300&&crawlDistance>1&&maxRotation<35;}
     public static JsonObject details()
     {
         JsonObject result=new JsonObject();result.addProperty("passed",passed());result.addProperty("pose_samples",poseSamples);result.addProperty("maximum_joint_delta_degrees",maxRotation);result.addProperty("crawl_distance",crawlDistance);
+        result.addProperty("r42_locomotion",ARTICULATION);result.addProperty("jump_count",jumps);result.addProperty("airborne_ticks",flightTicks);result.addProperty("jump_height",peak-jumpFloor);
         result.add("events",EVENTS);result.add("poses",POSES);result.add("contact_cases",CONTACTS);return result;
     }
     private StanceContactR41Review(){}

@@ -159,9 +159,9 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 this::shouldRenderBodyMesh));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 EvaUnit01Renderer::meshResourceForEntity,
-                entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"textures/entity/"+entity.experimentalAssetName()+"_eyes.png"):eyeTextureResourceForVariant(entity.getUnitVariant()),
+                entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"textures/entity/"+entity.experimentalAssetName()+"_eyes.png"):EvaEyeMaterialsR42.texture(entity,eyeTextureResourceForVariant(entity.getUnitVariant())),
                 (entity, bone) -> !this.pilotView && (com.projectseele.entity.EvaDorsalMechanism.eyesEnabled(entity)
-                        && "head".equals(bone.getName()) || entity instanceof com.projectseele.entity.EvaPrototypeEntity un
+                        && "head".equals(bone.getName()) || !entity.isExperimentalUnit() && entity.getUnitVariant()==EvaUnit01Entity.UNIT_01 && "head".equals(bone.getName()) || entity instanceof com.projectseele.entity.EvaPrototypeEntity un
                         && un.getUNSerial()==1&&un.isUNFlying()&&bone.getName().startsWith("r30_thruster_")), true));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 EvaUnit01Renderer::knifeMeshResource,

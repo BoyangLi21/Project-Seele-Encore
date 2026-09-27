@@ -22,7 +22,8 @@ public final class RegionalStationPhoto
     private static final String MODE=System.getProperty("projectseele.regionalBuild","");
     private static final boolean R10_MODELS=MODE.equals("r10-models")||MODE.equals("r10-choreography");
     private static final boolean R16=MODE.equals("r16-photos");
-    private static final boolean R41=MODE.equals("r41-facility-photos");
+    private static final boolean R42=MODE.equals("r42-facility-photos");
+    private static final boolean R41=R42||MODE.equals("r41-facility-photos");
     private static final boolean R40=R41||MODE.equals("r40-facility-photos");
     private static final boolean R39=MODE.equals("r39-lighting-photos");
     private static final boolean R38=MODE.equals("r38-lighting-photos");
@@ -33,6 +34,8 @@ public final class RegionalStationPhoto
                         java.util.List<net.minecraft.core.BlockPos> requiredSections)
     {View(String file,Vec3 position,float yaw,float pitch){this(file,position,yaw,pitch,"",220,java.util.List.of());}}
     private static volatile boolean actionReady=true;
+    private static volatile String positioningFailure="";
+    private static final com.google.gson.JsonArray PHOTO_EVIDENCE=new com.google.gson.JsonArray();
     private static View[] VIEWS=MODE.equals("quality-photos")?new View[]{
             new View("quality_kirisato_exterior.png",new Vec3(-2918.5,97,-1150.5),-60,8),
             new View("quality_kirisato_402.png",new Vec3(-2846.5,86,-1106.5),25,12),
@@ -54,9 +57,10 @@ public final class RegionalStationPhoto
         if(!ENABLED||event.phase!=TickEvent.Phase.END)return;
         Minecraft mc=Minecraft.getInstance();if(mc.player==null||mc.getSingleplayerServer()==null)return;
         var server=mc.getSingleplayerServer();Path world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals(R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R39?"SEELE_FIELD_R39_REVIEW":R38?"SEELE_FIELD_R38_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R16?"SEELE_TV_FACILITIES_R16":R10_MODELS?"SEELE_ANGEL_MODEL_REVIEW_R10":"SEELE_TV_WORLD_PREVIEW_20260906"))return;
+        if(!world.getFileName().toString().equals(R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R39?"SEELE_FIELD_R39_REVIEW":R38?"SEELE_FIELD_R38_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R16?"SEELE_TV_FACILITIES_R16":R10_MODELS?"SEELE_ANGEL_MODEL_REVIEW_R10":"SEELE_TV_WORLD_PREVIEW_20260906"))return;
         try
         {
+            if(!positioningFailure.isEmpty())throw new IllegalStateException(positioningFailure);
             if(finishing)
             {
                 if(MODE.equals("r10-world")&&!com.projectseele.visual.RegionalSpatialAuditDriver.done){mc.options.pauseOnLostFocus=false;return;}
@@ -168,7 +172,11 @@ public final class RegionalStationPhoto
                 for(var p:VIEWS[view].requiredSections())
                     ProjectSeele.LOGGER.info("REGIONAL PHOTO WAIT file={} anchor={} loaded={} compiled={} state={}",
                             VIEWS[view].file(),p,mc.level.hasChunkAt(p),mc.levelRenderer.isChunkCompiled(p),mc.level.getBlockState(p));
-            if(sceneAge>VIEWS[view].warmup()&&frames>100&&!ready&&geometryReady)
+            boolean cameraReady=mc.gameRenderer.getMainCamera().getPosition().distanceToSqr(VIEWS[view].position().add(0,1.62,0))<.01
+                    &&mc.level.dimension().equals(R10_MODELS?net.minecraft.world.level.Level.OVERWORLD:FacilitySchemaV2.DIMENSION)
+                    &&mc.getCameraEntity()==mc.player;
+            if(!cameraReady&&sceneAge%40==0)server.execute(()->position(mc));
+            if(sceneAge>VIEWS[view].warmup()&&frames>100&&!ready&&geometryReady&&cameraReady)
             {
                 ready=true;Files.writeString(world.resolve("station_photo_ready.json"),"{\"ready\":true,\"renderedSections\":"+mc.levelRenderer.countRenderedChunks()+"}");
                 ProjectSeele.LOGGER.info("REGIONAL PHOTO READY file={} sections={} camera={}",VIEWS[view].file(),mc.levelRenderer.countRenderedChunks(),mc.gameRenderer.getMainCamera().getPosition());
@@ -206,11 +214,17 @@ public final class RegionalStationPhoto
     {
         if(!ENABLED||!entered||finishing)return;Minecraft mc=Minecraft.getInstance();if(mc.player==null)return;
         View camera=VIEWS[view];
-        if(event.phase==TickEvent.Phase.START){mc.player.setYRot(camera.yaw());mc.player.yRotO=camera.yaw();mc.player.setXRot(camera.pitch());mc.player.xRotO=camera.pitch();return;}
+        if(event.phase==TickEvent.Phase.START){mc.setCameraEntity(mc.player);mc.player.setYRot(camera.yaw());mc.player.yRotO=camera.yaw();mc.player.setXRot(camera.pitch());mc.player.xRotO=camera.pitch();return;}
         frames++;
         if(ready&&!captured)
         {
+            Vec3 actual=mc.gameRenderer.getMainCamera().getPosition();
+            if(actual.distanceToSqr(camera.position().add(0,1.62,0))>=.01){ready=false;return;}
             Screenshot.grab(mc.gameDirectory,camera.file(),mc.getMainRenderTarget(),ignored->{});captured=true;
+            var row=new com.google.gson.JsonObject();row.addProperty("file",camera.file());row.addProperty("actual_camera",actual.toString());
+            row.addProperty("position_error_metres",actual.distanceTo(camera.position().add(0,1.62,0)));row.addProperty("dimension",mc.level.dimension().location().toString());PHOTO_EVIDENCE.add(row);
+            try{Files.writeString(mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).resolve("verified_photo_positions_r42.json"),PHOTO_EVIDENCE.toString());}
+            catch(Exception failure){throw new IllegalStateException("Could not record photo position",failure);}
         }
     }
     private static void position(Minecraft mc)
@@ -220,7 +234,8 @@ public final class RegionalStationPhoto
         Vec3 eye=camera.position().add(0,1.62,0);var cell=net.minecraft.core.BlockPos.containing(eye);
         var state=level.getBlockState(cell);
         if(DETAIL&&state.getCollisionShape(level,cell).toAabbs().stream().anyMatch(b->b.move(cell).contains(eye)))
-            throw new IllegalStateException("Review camera intersects a solid block: "+camera.file()+" "+cell+" "+state);
+        {positioningFailure="Review camera intersects a solid block: "+camera.file()+" "+cell+" "+state;return;}
+        p.stopRiding();
         p.teleportTo(level,camera.position().x,camera.position().y,camera.position().z,camera.yaw(),camera.pitch());
     }
 }

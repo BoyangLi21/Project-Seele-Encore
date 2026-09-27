@@ -118,7 +118,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
     public void completeFirstBattle()
     {
+        var finalPose=FirstBattleClip.finalEvaPose(this);
         this.endFirstBattle();this.entityData.set(DATA_BERSERK,false);this.entityData.set(DATA_BERSERK_TICKS,0);this.berserkRecoveryTicks=0;
+        EvaBerserkMotionR34.clear(this);EvaDorsalMechanism.afterBerserk(this);
+        if(this.isPowerDepleted())EvaShutdownR30.restAfterFirstBattle(this,finalPose);
     }
     public static final int WEAPON_FISTS = 0;
     public static final int WEAPON_KNIFE = 1;
@@ -232,8 +235,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private static final float CROUCH_SPEED = 0.18F;
     private static final float PRONE_SPEED = 0.10F;
     private static final float SPRINT_SPEED = 0.78F;
-    private static final double JUMP_VELOCITY = 6.2D;
-    private static final double AIRFRAME_GRAVITY = 0.32D;
+    private static final double JUMP_VELOCITY = 5.3D;
+    private static final double AIRFRAME_GRAVITY = 0.42D;
     private static final double JUMP_SUPPORT_PROBE = 0.75D;
     private static final int JUMP_COOLDOWN_TICKS = 10;
     private static final int JUMP_BUFFER_TICKS = 20;
@@ -832,7 +835,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         super.readAdditionalSaveData(tag);
         EvaDorsalMechanism.load(this,tag);
         var gravity=this.getAttribute(ForgeMod.ENTITY_GRAVITY.get());
-        if(gravity!=null&&(Math.abs(gravity.getBaseValue()-.08D)<.000001D||Math.abs(gravity.getBaseValue()-.18D)<.000001D))
+        if(gravity!=null&&(Math.abs(gravity.getBaseValue()-.08D)<.000001D||Math.abs(gravity.getBaseValue()-.18D)<.000001D||Math.abs(gravity.getBaseValue()-.32D)<.000001D))
             gravity.setBaseValue(AIRFRAME_GRAVITY);
         int intrinsicMask = this.intrinsicArmamentMask();
         int savedWeapon = tag.contains("SeeleWeapon")
@@ -3088,6 +3091,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private void cancelLiveActionsForStanceChange()
     {
         this.cancelOrdinaryGroupCAttack();
+        this.cancelHeavyMotion();
         this.cancelSideKick();
         this.cancelKnifeMotion();
         this.meleeInputBufferTicks = 0;
@@ -3384,6 +3388,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             this.entityData.set(DATA_PRONE, false);
         }
+        if(this.getWeapon()==WEAPON_FISTS&&(this.getOrdinaryAttackStage()>=0||this.isHeavyMotionActive()))EvaGameplayMotionR32.releaseToMovement(this);
         this.cancelLiveActionsForStanceChange();
         this.entityData.set(DATA_CROUCHING, crouching);
         this.entityData.set(DATA_SPRINTING, false);
@@ -3406,6 +3411,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             pilot.displayClientMessage(Component.translatable("msg.projectseele.cannot_stand"), true);
             return;
         }
+        if(this.getWeapon()==WEAPON_FISTS&&(this.getOrdinaryAttackStage()>=0||this.isHeavyMotionActive()))EvaGameplayMotionR32.releaseToMovement(this);
         this.cancelLiveActionsForStanceChange();
         this.entityData.set(DATA_PRONE, prone);
         this.entityData.set(DATA_CROUCHING, false);
@@ -3998,6 +4004,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
 
         LivingEntity target = this.getTarget();
+        if(target==null&&!EvaBerserkMotionR34.active(this)&&!this.isFirstBattleActive())
+        {this.finishBerserk();return;}
         if (target != null && target.isAlive()&&!EvaBerserkMotionR34.active(this))
         {
             this.getLookControl().setLookAt(target, 30.0F, 30.0F);
@@ -4038,10 +4046,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.getNavigation().stop();
         }
 
-        if (this.tickCount % 3 == 0)
-        {
-            this.emitBerserkEyes(server);
-        }
+        // Eye colour is attached to the real eye surface. The old particles
+        // used a guessed upright head position and drifted away during motion.
         if (remaining <= 0)
         {
             this.finishBerserk();
@@ -4055,6 +4061,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private boolean canArmBerserkR37()
     {
         return getUnitVariant()==UNIT_01&&!isExperimentalUnit()&&!isBerserk()&&berserkRecoveryTicks==0
+                &&!EvaDorsalMechanism.dormantAfterBerserk(this)
                 &&!isCrucified()&&!isLaunchSequenceActive()&&!isNervLogisticsLocked()&&!isFirstBattleActive()
                 &&!EvaAirTransportR31.active(this)&&!EvaShutdownR30.wreck(this)&&!EvaBayRepairR33.active(this)&&getPilotEntity()!=null;
     }
@@ -4177,6 +4184,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.entityData.set(DATA_BERSERK, false);
         this.entityData.set(DATA_BERSERK_TICKS, 0);
         EvaBerserkMotionR34.clear(this);
+        EvaDorsalMechanism.afterBerserk(this);
         this.berserkRecoveryTicks = SeeleConfig.COMMON_SPEC.isLoaded()
                 ? SeeleConfig.EVA_BERSERK_RECOVERY_TICKS.get() : 6000;
         this.getNavigation().stop();

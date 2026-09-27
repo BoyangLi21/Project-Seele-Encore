@@ -59,7 +59,7 @@ public final class LiftSlidingDoorDirector
         Direction lateral = landing.exit().getClockWise();
         BlockPos plane = landing.cabinCentre().relative(
                 landing.exit(), DOOR_DISTANCE);
-        int doorId = Objects.hash(lift.id(), landing.label(),
+        int doorId = Objects.hash(lift.id(),
                 landing.walkY(), landing.cabinCentre().getX(),
                 landing.cabinCentre().getZ());
         NervLiftDoorEntity door = NervLiftDoorEntity.reconcile(

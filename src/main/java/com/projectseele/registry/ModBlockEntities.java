@@ -27,4 +27,6 @@ public final class ModBlockEntities
             BLOCK_ENTITY_TYPES.register("station_departure_board",()->BlockEntityType.Builder.of(com.projectseele.world.StationDepartureBoardBlockEntity::new,ModBlocks.STATION_DEPARTURE_BOARD.get(),ModBlocks.NERV_DIRECTION_PANEL.get()).build(null));
     public static final RegistryObject<BlockEntityType<com.projectseele.world.PeriodFixtureBlockEntity>> PERIOD_FIXTURE=
             BLOCK_ENTITY_TYPES.register("period_fixture",()->BlockEntityType.Builder.of(com.projectseele.world.PeriodFixtureBlockEntity::new,ModBlocks.PERIOD_FIXTURE.get()).build(null));
+    public static final RegistryObject<BlockEntityType<com.projectseele.world.WallArtworkBlockEntity>> WALL_ARTWORK=
+            BLOCK_ENTITY_TYPES.register("wall_artwork",()->BlockEntityType.Builder.of(com.projectseele.world.WallArtworkBlockEntity::new,ModBlocks.WALL_ARTWORK.get()).build(null));
 }

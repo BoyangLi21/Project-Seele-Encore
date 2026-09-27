@@ -1,6 +1,5 @@
 package com.projectseele.client.fx;
 
-import com.projectseele.client.render.EnergyGlowR24;
 import com.projectseele.network.*;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.Minecraft;
@@ -16,6 +15,10 @@ import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
+import org.joml.Vector3f;
+import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.LightTexture;
+import net.minecraft.client.renderer.texture.OverlayTexture;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -26,7 +29,6 @@ public final class BattleFinaleClientR29
     private record Blast(Vec3 point,long started) {}
     private static final List<Blast> BLASTS=new ArrayList<>();
     private static ClientLevel world;
-    private static final int[][] CORNERS={{0,0},{0,1},{1,1},{1,0}};
     public static int received;
     public static void accept(ClientboundBattleFinalePacket p)
     {
@@ -51,7 +53,7 @@ public final class BattleFinaleClientR29
     {
         if(event.getStage()!=RenderLevelStageEvent.Stage.AFTER_PARTICLES||world==null||BLASTS.isEmpty())return;
         float strength=com.projectseele.config.SeeleConfig.FX_INTENSITY.get().floatValue();if(strength<=0)return;
-        var mc=Minecraft.getInstance();var buffers=mc.renderBuffers().bufferSource();var consumer=buffers.getBuffer(EnergyGlowR24.SMOKE);var poses=event.getPoseStack();var camera=event.getCamera().getPosition();
+        var mc=Minecraft.getInstance();var buffers=mc.renderBuffers().bufferSource();var type=FinaleSmokeTextureR42.layer();var consumer=buffers.getBuffer(type);var poses=event.getPoseStack();var camera=event.getCamera().getPosition();
         for(var blast:BLASTS)
         {
             float age=world.getGameTime()-blast.started+event.getPartialTick();
@@ -81,19 +83,24 @@ public final class BattleFinaleClientR29
             }
             poses.popPose();
         }
-        buffers.endBatch(EnergyGlowR24.SMOKE);
+        buffers.endBatch(type);
     }
     private static void puff(Matrix4f m,VertexConsumer out,float x,float y,float z,float rx,float ry,float rz,float alpha,float tone)
     {
-        for(int lat=0;lat<12;lat++)for(int lon=0;lon<24;lon++)
+        // A density cloud has soft, irregular edges; a stack of translucent
+        // latitude/longitude meshes looked like inflated plastic spheres.
+        // Billboards also remove tens of thousands of redundant vertices.
+        var rotation=Minecraft.getInstance().gameRenderer.getMainCamera().rotation();
+        Vector3f right=rotation.transform(new Vector3f(rx,0,0));
+        Vector3f up=rotation.transform(new Vector3f(0,ry,0));
+        Vector3f normal=m.transformDirection(rotation.transform(new Vector3f(0,0,1))).normalize();
+        float value=Mth.clamp(tone+.24F,.28F,.92F);
+        for(float[] corner:new float[][]{{-1,-1,0,1},{1,-1,1,1},{1,1,1,0},{-1,1,0,0}})
         {
-            for(int[] corner:CORNERS)
-            {
-                double a=Math.PI*(lat+corner[0])/12-Math.PI/2,b=Math.PI*2*(lon+corner[1])/24;
-                float nx=(float)(Math.cos(a)*Math.cos(b)),ny=(float)Math.sin(a),nz=(float)(Math.cos(a)*Math.sin(b));
-                float light=Mth.clamp(tone+.15F*ny-.06F*nx,.16F,.80F);
-                out.vertex(m,x+rx*nx,y+ry*ny,z+rz*nz).color(light,light*.91F,light*.77F,alpha).endVertex();
-            }
+            Vector3f point=new Vector3f(x,y,z).fma(corner[0]*1.3F,right).fma(corner[1]*1.3F,up);
+            out.vertex(m,point.x,point.y,point.z).color(value,value*.97F,value*.92F,alpha*.62F)
+                    .uv(corner[2],corner[3]).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(LightTexture.FULL_BRIGHT)
+                    .normal(normal.x,normal.y,normal.z).endVertex();
         }
     }
     private BattleFinaleClientR29() {}

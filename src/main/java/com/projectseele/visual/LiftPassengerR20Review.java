@@ -19,7 +19,9 @@ import java.util.*;
 public final class LiftPassengerR20Review
 {
     private static final boolean DESCENT="r22-lift-descend".equals(System.getProperty("projectseele.regionalBuild",""));
-    private static final boolean R41="r41-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R42="r42-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static boolean accessReviewed;
+    private static final boolean R41=R42||"r41-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R40=R41||"r40-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean ALL=R40||"r22-lifts-all".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R26="r26-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
@@ -61,10 +63,42 @@ public final class LiftPassengerR20Review
     private static void append(List<Trip> trips,String id,int... floors)
     {for(int i=1;i<floors.length;i++)trips.add(new Trip(id,floors[i-1],floors[i]));}
     private static void require(boolean value,String why){if(!value)throw new IllegalStateException(why);}
+    private static void reviewAccess(ServerLevel level,ServerPlayer player,Path world)throws Exception
+    {
+        var before=player.position();var dimension=player.serverLevel();float yaw=player.getYRot(),pitch=player.getXRot();
+        var main=player.getMainHandItem().copy();var off=player.getOffhandItem().copy();var rows=new JsonArray();
+        try
+        {
+            for(String id:List.of(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID))
+            {
+                var spec=NervLiftPassengerSync.managedLifts(level).stream().filter(s->s.id().equals(id)).findFirst().orElseThrow();
+                for(var stop:spec.stops())
+                {level.getChunkAt(stop.cabinCentre());level.getChunkAt(S20MovingElevatorsAdapter.controllerPosition(spec,stop));}
+                require(S20MovingElevatorsAdapter.reconcile(level,spec),"Clearance review controller not ready");
+                var controller=(ControllerBlockEntity)level.getBlockEntity(S20MovingElevatorsAdapter.controllerPosition(spec,spec.lower()));
+                var target=id.equals(S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID)?spec.upper():spec.lower();
+                var publicStop=spec.stops().stream().filter(s->Math.abs(s.walkY()-target.walkY())>8).findFirst().orElseThrow();
+                player.teleportTo(level,publicStop.cabinCentre().getX()+.5,publicStop.walkY(),publicStop.cabinCentre().getZ()+.5,0,0);
+                player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,net.minecraft.world.item.ItemStack.EMPTY);
+                player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND,net.minecraft.world.item.ItemStack.EMPTY);
+                boolean denied=!S20MovingElevatorsAdapter.allowDisplayPress(controller.getGroup(),target.walkY(),0,player);
+                player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND,new net.minecraft.world.item.ItemStack(com.projectseele.registry.ModItems.TERMINAL_DOGMA_ACCESS_CARD.get()));
+                boolean admitted=S20MovingElevatorsAdapter.allowDisplayPress(controller.getGroup(),target.walkY(),0,player);
+                var row=new JsonObject();row.addProperty("lift",id);row.addProperty("label",target.label());row.addProperty("denied_without_card",denied);row.addProperty("admitted_with_card",admitted);rows.add(row);
+                require(denied&&admitted,"Translated landing changed real clearance policy: "+id);
+            }
+            Files.writeString(world.resolve("r42_clearance_review.json"),rows.toString());
+        }
+        finally
+        {
+            player.setItemInHand(net.minecraft.world.InteractionHand.MAIN_HAND,main);player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND,off);
+            player.teleportTo(dimension,before.x,before.y,before.z,yaw,pitch);
+        }
+    }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent e)
     {
         if(!ENABLED||finished||e.phase!=TickEvent.Phase.END||!clientReady||e.getServer().getPlayerList().getPlayers().isEmpty())return;
-        Path world=e.getServer().getWorldPath(LevelResource.ROOT).normalize();require(world.getFileName().toString().equals(R41?"SEELE_R41_MECHANICS_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R22?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":"SEELE_R20_REVIEW"),"Lift review boundary");
+        Path world=e.getServer().getWorldPath(LevelResource.ROOT).normalize();require(world.getFileName().toString().equals(R42?"SEELE_R42_MECHANICS_REVIEW":R41?"SEELE_R41_MECHANICS_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R22?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":"SEELE_R20_REVIEW"),"Lift review boundary");
         var player=e.getServer().getPlayerList().getPlayers().get(0);var level=e.getServer().getLevel(FacilitySchemaV2.DIMENSION);
         try
         {
@@ -72,6 +106,7 @@ public final class LiftPassengerR20Review
             if(DESCENT&&index==4){write(world,"");finished=true;return;}
             if((R21||R22)&&!R25&&!R40){FROM[3]=75;TO[2]=75;if(index==4&&!ALL)index=6;}
             if(index==IDS.length||R41&&index==Integer.getInteger("projectseele.r41LiftEnd",IDS.length)||R21&&index==8){write(world,"");finished=true;return;}
+            if(R42&&!accessReviewed){reviewAccess(level,player,world);accessReviewed=true;}
             var spec=NervLiftPassengerSync.managedLifts(level).stream().filter(s->s.id().equals(IDS[index])).findFirst().orElseThrow();
             var from=spec.stops().stream().filter(s->s.walkY()==FROM[index]).findFirst().orElseThrow();var to=spec.stops().stream().filter(s->s.walkY()==TO[index]).findFirst().orElseThrow();
             var base=S20MovingElevatorsAdapter.controllerPosition(spec,spec.lower());level.getChunkAt(base);

@@ -35,13 +35,13 @@ public final class FirstBattleEffects
         for(var actor:mc.level.entitiesForRendering())
         {
             if(!(actor instanceof EvaUnit01Entity eva)||!eva.isFirstBattleActive()||!FirstBattleClip.ready())continue;
-            var signals=eva.firstBattleSignals();var spec=signals.spec(eva);float t=signals.time(eva,event.getPartialTick());var pose=event.getPoseStack();Vec3 cam=event.getCamera().getPosition();
+            var signals=eva.firstBattleSignals();var spec=signals.spec(eva);float seconds=signals.time(eva,event.getPartialTick()),t=FirstBattleClip.referenceSeconds(seconds);var pose=event.getPoseStack();Vec3 cam=event.getCamera().getPosition();
             pose.pushPose();pose.translate(spec.origin().x-cam.x,spec.origin().y-cam.y,spec.origin().z-cam.z);pose.mulPose(Axis.YP.rotationDegrees(-spec.yaw()));
             float intensity=SeeleConfig.FX_INTENSITY.get().floatValue();
             if(t>.5&&t<5.1&&intensity>0){field(pose.last().pose(),buffers.getBuffer(FIELD),t,intensity);drewField=true;}
             if(t>=12.75&&t<16.8&&intensity>0)
             {
-                Vec3 core=FirstBattleClip.localPoint(spec,false,"core_blocks",t).add(0,.4,0);var out=buffers.getBuffer(FIELD);int cracks=t>14.15?7:4;
+                Vec3 core=FirstBattleClip.localPoint(spec,false,"core_blocks",seconds).add(0,.4,0);var out=buffers.getBuffer(FIELD);int cracks=t>14.15?7:4;
                 for(int i=0;i<cracks;i++)
                 {
                     double angle=i*Math.PI*2/cracks+.2;Vec3 a=core.add(Math.cos(angle)*.12,0,Math.sin(angle)*.12),b=core.add(Math.cos(angle+.18)*1.8,.035,Math.sin(angle+.18)*1.8);
@@ -51,9 +51,9 @@ public final class FirstBattleEffects
             }
             if(t>=15.35&&t<16.9)
             {
-                Vec3 hand=FirstBattleClip.localPoint(spec,true,"hand_r_blocks",t),world=FirstBattleClip.world(spec,hand);int light=LevelRenderer.getLightColor(mc.level,BlockPos.containing(world));
-                Vec3 tip=FirstBattleClip.hasCurve(true,"rib_tip_blocks")?FirstBattleClip.localPoint(spec,true,"rib_tip_blocks",t):hand.add(0,-6.05,0);
-                Vec3 side=FirstBattleClip.hasCurve(true,"rib_side_blocks")?FirstBattleClip.localPoint(spec,true,"rib_side_blocks",t).subtract(hand):new Vec3(1,0,0);
+                Vec3 hand=FirstBattleClip.localPoint(spec,true,"hand_r_blocks",seconds),world=FirstBattleClip.world(spec,hand);int light=LevelRenderer.getLightColor(mc.level,BlockPos.containing(world));
+                Vec3 tip=FirstBattleClip.hasCurve(true,"rib_tip_blocks")?FirstBattleClip.localPoint(spec,true,"rib_tip_blocks",seconds):hand.add(0,-6.05,0);
+                Vec3 side=FirstBattleClip.hasCurve(true,"rib_side_blocks")?FirstBattleClip.localPoint(spec,true,"rib_side_blocks",seconds).subtract(hand):new Vec3(1,0,0);
                 rib(pose,buffers.getBuffer(BONE),hand,tip,side,light);drewBone=true;
             }
             pose.popPose();

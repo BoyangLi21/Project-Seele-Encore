@@ -96,11 +96,11 @@ public final class AnatomicalLimbConstraints
         if(bend.lengthSquared()<1e-8F)bend.set(0,0,-1).fma(direction.z,direction);bend.normalize();
         Vector3f middle=new Vector3f(origin).fma(along,direction).fma((float)Math.sqrt(Math.max(0,la*la-along*along)),bend);
         Quaternionf upperWorld;
-        if(lower.startsWith("shin_"))
+        if(lower.startsWith("shin_")||goal==null)
         {
-            // The bind leg bows sideways. Its almost-straight joint position
-            // cannot define a knee pole: that turned tiny offsets into hip roll.
-            // Preserve the authored twist, and swing only the complete hinge reach.
+            // An almost-straight limb cannot define a stable pole from its
+            // joint position. During normalization preserve the authored twist
+            // for elbows too; only swing the complete anatomical hinge reach.
             Quaternionf authored=p.matrix(upper).getUnnormalizedRotation(new Quaternionf()).normalize();
             Vector3f reach=authored.transform(new Vector3f(u).add(hinge.transform(new Vector3f(v)))).normalize();
             upperWorld=new Quaternionf().rotationTo(reach,direction).mul(authored).normalize();

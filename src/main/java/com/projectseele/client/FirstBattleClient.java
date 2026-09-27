@@ -133,7 +133,7 @@ public final class FirstBattleClient
     {
         var eva=actor();if(eva==null)return;float t=eva.firstBattleSignals().time(eva,partial);float fade=FirstBattleClip.smooth(t/.7F)*(1-FirstBattleClip.smooth((t-21.6F)/1.4F));int bars=Math.round(height*.09F*fade),alpha=Math.round(fade*235);
         g.fill(0,0,width,bars,alpha<<24);g.fill(0,height-bars,width,height,alpha<<24);
-        String title=t<5?"制御不能 / AT フィールド侵蝕":t<FirstBattleClip.landingTick()/20F?"自律作動 — THE BEAST":t<18.6?"目標コア制圧":t<21.6?"目標沈黙":"操縦系復帰";
+        String title=t<5?"制御不能 / AT フィールド侵蝕":t<FirstBattleClip.landingTick()/20F?"自律作動 — THE BEAST":t<18.6?"目標コア制圧":t<21.6?"目標沈黙":eva.isPowerDepleted()?"初号機・活動停止":"操縦系復帰";
         if(bars>12){g.drawString(gui.getFont(),title,14,Math.max(4,bars-15),0xFFFF8250,false);g.drawString(gui.getFont(),"Enter · 跳过演出",14,height-bars+6,0xFFB5BABE,false);}
     };
     private FirstBattleClient() {}

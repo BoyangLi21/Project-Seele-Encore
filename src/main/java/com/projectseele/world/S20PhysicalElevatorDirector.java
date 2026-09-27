@@ -139,15 +139,15 @@ public final class S20PhysicalElevatorDirector
          * south, so all four keep the original south exit.
          */
         return new LiftSpec(COMMAND_REAR_LIFT_ID, List.of(
-                new Landing("TERMINAL DOGMA",
+                new Landing("终极教条区",
                         new BlockPos(12, -566, 253), Direction.SOUTH),
-                new Landing("LOWER INTERCHANGE",
+                new Landing("地下交通层",
                         new BlockPos(12, -448, 253), Direction.SOUTH),
-                new Landing("COMMAND BRIDGE",
+                new Landing("主指挥台",
                         new BlockPos(12, -423, 253), Direction.SOUTH),
-                new Landing("REAR SERVICE",
+                new Landing("后方勤务层",
                         new BlockPos(12, -419, 253), Direction.SOUTH),
-                new Landing("COMMAND GALLERY",
+                new Landing("指挥室观察廊",
                         new BlockPos(12, -409, 253), Direction.SOUTH)));
     }
 
@@ -155,9 +155,9 @@ public final class S20PhysicalElevatorDirector
     public static LiftSpec observationHangarLift()
     {
         return new LiftSpec(OBSERVATION_HANGAR_LIFT_ID,
-                new Landing("LAUNCH OBSERVATION",
+                new Landing("发射区观察廊",
                         new BlockPos(94, -418, 241), Direction.WEST),
-                new Landing("EVA HANGAR ACCESS",
+                new Landing("机库联络层",
                         new BlockPos(94, -394, 241), Direction.NORTH));
     }
 
@@ -165,11 +165,11 @@ public final class S20PhysicalElevatorDirector
     public static LiftSpec oldCommandToCompactCageLift()
     {
         return new LiftSpec(COMPACT_CAGE_LIFT_ID, List.of(
-                new Landing("EVA CAGES / LAUNCH PLANT",
+                new Landing("机库与发射整备层",
                         new BlockPos(93, -442, 204), Direction.SOUTH),
-                new Landing("HANGAR INTERCHANGE / B-49",
+                new Landing("机库接驳层",
                         new BlockPos(93, -394, 204), Direction.SOUTH),
-                new Landing("UPPER HANGAR OBSERVATION",
+                new Landing("机库上层观察廊",
                         new BlockPos(93, -370, 204), Direction.NORTH)));
     }
 
@@ -181,13 +181,13 @@ public final class S20PhysicalElevatorDirector
     public static LiftSpec surfaceTransitLift()
     {
         return new LiftSpec(SURFACE_TRANSIT_LIFT_ID,
-                new Landing("GEOFRONT TRANSIT",
+                new Landing("地下交通层",
                         new BlockPos(
                                 S20SurfaceTransitDirector.AXIS_X,
                                 S20SurfaceTransitDirector.LOWER_WALK_Y,
                                 S20SurfaceTransitDirector.AXIS_Z),
                         Direction.WEST),
-                new Landing("TOKYO-3 SURFACE",
+                new Landing("第三新东京地面入口",
                         new BlockPos(
                                 S20SurfaceTransitDirector.AXIS_X,
                                 S20SurfaceTransitDirector.UPPER_WALK_Y,
@@ -202,12 +202,12 @@ public final class S20PhysicalElevatorDirector
                 : S20SurfaceTransitDirector.UPPER_WALK_Y;
         if(BattlefieldR21.installed(level))upperWalkY=75;
         return new LiftSpec(SURFACE_TRANSIT_LIFT_ID,
-                new Landing("GEOFRONT TRANSIT",
+                new Landing("地下交通层",
                         new BlockPos(S20SurfaceTransitDirector.AXIS_X,
                                 S20SurfaceTransitDirector.LOWER_WALK_Y,
                                 S20SurfaceTransitDirector.AXIS_Z),
                         Direction.WEST),
-                new Landing("TOKYO-3 SURFACE",
+                new Landing("第三新东京地面入口",
                         new BlockPos(S20SurfaceTransitDirector.AXIS_X,
                                 upperWalkY,
                                 S20SurfaceTransitDirector.AXIS_Z),
@@ -227,9 +227,9 @@ public final class S20PhysicalElevatorDirector
     public static LiftSpec centralDogmaLift()
     {
         return new LiftSpec(CENTRAL_DOGMA_LIFT_ID,
-                new Landing("TERMINAL DOGMA / QUARANTINE",
+                new Landing("终极教条区 · 隔离层",
                         new BlockPos(72, -566, 273), Direction.WEST),
-                new Landing("CENTRAL DOGMA ACCESS",
+                new Landing("中央教条区入口",
                         new BlockPos(72, -442, 273), Direction.WEST));
     }
 
@@ -237,9 +237,9 @@ public final class S20PhysicalElevatorDirector
     public static LiftSpec commanderOfficeLift()
     {
         return new LiftSpec(COMMANDER_OFFICE_LIFT_ID,
-                new Landing("COMMAND ACCESS",
+                new Landing("总指挥联络厅",
                         new BlockPos(28, -388, 321), Direction.NORTH),
-                new Landing("COMMANDER OFFICE / RESTRICTED",
+                new Landing("总指挥会客厅",
                         new BlockPos(28, -340, 321), Direction.NORTH));
     }
 
@@ -2243,8 +2243,8 @@ public final class S20PhysicalElevatorDirector
             ServerPlayer player, LiftSpec spec, Landing target,
             BlockPos acknowledgement)
     {
-        boolean restrictedDogma = spec.id().equals(COMMAND_REAR_LIFT_ID)
-                && target.label().contains("TERMINAL DOGMA");
+        boolean restrictedDogma = (spec.id().equals(COMMAND_REAR_LIFT_ID)||spec.id().equals(CENTRAL_DOGMA_LIFT_ID))
+                && target.walkY()==spec.lower().walkY();
         boolean restrictedOffice = spec.id().equals(COMMANDER_OFFICE_LIFT_ID)
                 && target.equals(spec.upper());
         if (!restrictedDogma && !restrictedOffice)

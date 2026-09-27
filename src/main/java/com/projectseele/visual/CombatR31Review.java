@@ -35,6 +35,9 @@ public final class CombatR31Review
     public static final boolean CLOSE=Boolean.getBoolean("projectseele.r38Close"),CLOSE_FINALE=Boolean.getBoolean("projectseele.r38CloseFinale");
     public static final boolean PRONE_WRECK=Boolean.getBoolean("projectseele.r38ProneWreck");
     private static int closeCase;
+    public static void inputR42(int action){input(action);}
+    private static int finaleCompleteAt=-1;
+    public static volatile boolean postFinaleOptics;
     public static final String WORLD="SEELE_FIELD_R31_REVIEW";
     public static final int X=12000,Z=12000,FLOOR=280;
     public static volatile boolean ready,tracked,mounted,done,jump;
@@ -85,6 +88,13 @@ public final class CombatR31Review
             if(stage==Stage.ARENA){buildArena();return;}
             if(AWAKENING&&sawFinale&&eva!=null&&!eva.isFirstBattleActive()&&(angel==null||!angel.isAlive()||angel.isRemoved()))
             {
+                if(Boolean.getBoolean("projectseele.r42OpticsReview"))
+                {
+                    if(finaleCompleteAt<0){finaleCompleteAt=stageTicks;postFinaleOptics=true;}
+                    if(stageTicks-finaleCompleteAt==20)photo="r42_dormant_eyes";
+                    if(stageTicks-finaleCompleteAt<40)return;
+                    record("post_berserk_dark_eyes",!EvaDorsalMechanism.eyesEnabled(eva),"powered",eva.isPoweredOn()?1:0);
+                }
                 record("natural_awakening_to_finale",sawSilence&&sawRoar&&protectedHull&&(CLOSE_FINALE||feralKinds.size()>=3),"attack_kinds",feralKinds.size());
                 var row=cases.get(cases.size()-1).getAsJsonObject();row.addProperty("silence",sawSilence);row.addProperty("roar",sawRoar);row.addProperty("protection",protectedHull);row.addProperty("automatic_finale",sawFinale);finish("");return;
             }
@@ -137,7 +147,7 @@ public final class CombatR31Review
                         arrange(23);initialEvaHealth=eva.getHealth();next(Stage.REACTION);
                     }
                 }
-                case REACTION->{if(StanceContactR41Review.ENABLED){if(StanceContactR41Review.tick(eva,angel,pilot,stageTicks)){record("stance_and_contact",StanceContactR41Review.passed(),"native_cases",6);finish("");}}else reaction();}
+                case REACTION->{if(StanceContactR41Review.ENABLED){if(StanceContactR41Review.tick(eva,angel,pilot,stageTicks)){record(StanceContactR41Review.ARTICULATION?"locomotion_and_jump_r42":"stance_and_contact",StanceContactR41Review.passed(),"native_cases",StanceContactR41Review.ARTICULATION?1:6);finish("");}}else reaction();}
                 case FINISH->finish("");
                 default->{}
             }
@@ -347,7 +357,8 @@ public final class CombatR31Review
         {
             boolean ids=true;for(var entry:fleetIds.entrySet())ids&=EvaFleetSavedData.get(level.getServer()).canonicalId(entry.getKey()).filter(entry.getValue()::equals).isPresent();
             var r=new JsonObject();r.addProperty("error",error);r.addProperty("fleet_ids_unchanged",ids);r.addProperty("hand_samples",handSamples);r.addProperty("maximum_hand_error_metres",Double.isFinite(maximumHandError)?maximumHandError:-1);r.addProperty("media",mediaFolder);
-            boolean all=error.isEmpty()&&ids&&(StanceContactR41Review.ENABLED?cases.size()==1:CLOSE?cases.size()==4:EXCHANGE||RECOVERY?cases.size()==1:NORMALS?cases.size()>=6:cases.size()>=7&&handSamples>5&&maximumHandError<.8);
+            int exchangeCases=AWAKENING&&Boolean.getBoolean("projectseele.r42OpticsReview")?2:1;
+            boolean all=error.isEmpty()&&ids&&(StanceContactR41Review.ENABLED?cases.size()==1:CLOSE?cases.size()==4:EXCHANGE||RECOVERY?cases.size()==exchangeCases:NORMALS?cases.size()>=6:cases.size()>=7&&handSamples>5&&maximumHandError<.8);
             for(var c:cases)all&=c.getAsJsonObject().get("passed").getAsBoolean();r.addProperty("passed",all);r.add("cases",cases);r.add("contacts",events);r.add("trace",trace);if(StanceContactR41Review.ENABLED)r.add("stance_r41",StanceContactR41Review.details());
             Path out=world.resolve("Review");Files.createDirectories(out);Files.writeString(out.resolve((NORMALS?"r32_normal_":"r31_combat_")+(all?"pass":"failure")+".json"),new GsonBuilder().setPrettyPrinting().create().toJson(r));
         }

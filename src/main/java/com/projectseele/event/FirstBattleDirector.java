@@ -197,21 +197,21 @@ public final class FirstBattleDirector
                 if(record.npcPilot==null&&record.age%20==0)level.getChunkSource().move(pilot);
                 if(angel!=null)angel.setFirstBattleField(900*(1-FirstBattleClip.smooth((seconds-3)/2)));
                 Vec3 field=FirstBattleClip.world(record.spec,new Vec3(0,40,21));
-                if(record.age==19||record.age==122||record.age==410||record.age==428)
-                    sound(level,FirstBattleClip.point(record.spec,true,record.age==19||record.age==410?"foot_l_blocks":"foot_r_blocks",seconds),ModSounds.EVA_FOOT_CONCRETE.get(),1.5F);
-                if(record.age==28||record.age==53||record.age==75)sound(level,field,ModSounds.EVA_AT_PRESSURE.get(),1.3F);
-                if(record.age==99)sound(level,field,ModSounds.EVA_AT_TEAR.get(),1.8F);
-                if(record.age==107)CrossExplosionFX.spawn(level,FirstBattleClip.point(record.spec,false,"eye_blocks",seconds),.30F);
-                if(record.age==160){Vec3 p=FirstBattleClip.point(record.spec,false,"hand_r_blocks",seconds);sound(level,p,ModSounds.EVA_ARMOR_IMPACT.get(),1.5F);chips(level,p,true);}
-                if(record.age==184){Vec3 p=FirstBattleClip.point(record.spec,true,"foot_l_blocks",seconds);sound(level,p,ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,false);}
+                if(record.age==FirstBattleClip.eventTick(19)||record.age==FirstBattleClip.eventTick(122)||record.age==FirstBattleClip.eventTick(410)||record.age==FirstBattleClip.eventTick(428))
+                    sound(level,FirstBattleClip.point(record.spec,true,record.age==FirstBattleClip.eventTick(19)||record.age==FirstBattleClip.eventTick(410)?"foot_l_blocks":"foot_r_blocks",seconds),ModSounds.EVA_FOOT_CONCRETE.get(),1.5F);
+                if(record.age==FirstBattleClip.eventTick(28)||record.age==FirstBattleClip.eventTick(53)||record.age==FirstBattleClip.eventTick(75))sound(level,field,ModSounds.EVA_AT_PRESSURE.get(),1.3F);
+                if(record.age==FirstBattleClip.eventTick(99))sound(level,field,ModSounds.EVA_AT_TEAR.get(),1.8F);
+                if(record.age==FirstBattleClip.eventTick(107))CrossExplosionFX.spawn(level,FirstBattleClip.point(record.spec,false,"eye_blocks",seconds),.30F);
+                if(record.age==FirstBattleClip.eventTick(160)){Vec3 p=FirstBattleClip.point(record.spec,false,"hand_r_blocks",seconds);sound(level,p,ModSounds.EVA_ARMOR_IMPACT.get(),1.5F);chips(level,p,true);}
+                if(record.age==FirstBattleClip.eventTick(184)){Vec3 p=FirstBattleClip.point(record.spec,true,"foot_l_blocks",seconds);sound(level,p,ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,false);}
                 if(record.age==FirstBattleClip.landingTick())sound(level,eva.position(),ModSounds.EVA_LAND.get(),2.1F);
-                if(record.age==307){Vec3 p=FirstBattleClip.point(record.spec,true,"hand_r_blocks",seconds);sound(level,p,ModSounds.EVA_ARMOR_IMPACT.get(),1.4F);chips(level,p,true);}
-                if(record.age==255||record.age==283||record.age==321)
+                if(record.age==FirstBattleClip.eventTick(307)){Vec3 p=FirstBattleClip.point(record.spec,true,"hand_r_blocks",seconds);sound(level,p,ModSounds.EVA_ARMOR_IMPACT.get(),1.4F);chips(level,p,true);}
+                if(record.age==FirstBattleClip.eventTick(255)||record.age==FirstBattleClip.eventTick(283)||record.age==FirstBattleClip.eventTick(321))
                 {
-                    Vec3 p=FirstBattleClip.point(record.spec,true,"hand_r_blocks",seconds);sound(level,p,record.age==321?ModSounds.EVA_CORE_BREAK.get():ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,record.age==321);
-                    if(angel!=null)angel.setHealth(Math.max(1,record.originalHealth*(record.age==255?.6F:record.age==283?.25F:.05F)));
+                    Vec3 p=FirstBattleClip.point(record.spec,true,"hand_r_blocks",seconds);sound(level,p,record.age==FirstBattleClip.eventTick(321)?ModSounds.EVA_CORE_BREAK.get():ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,record.age==FirstBattleClip.eventTick(321));
+                    if(angel!=null)angel.setHealth(Math.max(1,record.originalHealth*(record.age==FirstBattleClip.eventTick(255)?.6F:record.age==FirstBattleClip.eventTick(283)?.25F:.05F)));
                 }
-                if(record.age==354)sound(level,FirstBattleClip.point(record.spec,false,"core_blocks",seconds),ModSounds.EVA_AT_PRESSURE.get(),1.6F);
+                if(record.age==FirstBattleClip.eventTick(354))sound(level,FirstBattleClip.point(record.spec,false,"core_blocks",seconds),ModSounds.EVA_AT_PRESSURE.get(),1.6F);
                 if(record.age>=FirstBattleClip.DEATH_TICK&&!record.deathResolved)finishAngel(level,data,eva,angel,pilot);
                 if(record.age>=FirstBattleClip.DURATION_TICKS)
                 {
@@ -219,7 +219,7 @@ public final class FirstBattleDirector
                     eva.completeFirstBattle();if(angel!=null)angel.endFirstBattle();
                     publishControlReturn(level,eva,pilot);if(angel!=null)publishState(level,angel,pilot);
                     data.completedPilots.add(pilot.getUUID());data.active=null;data.missionOwner=null;data.missionAngel=null;release(level);
-                    pilot.displayClientMessage(Component.literal("目標沈黙 — 初号机操纵已恢复"),true);ProjectSeele.LOGGER.info("R10 FIRST BATTLE COMPLETE hero={} pilot={}",eva.getUUID(),pilot.getUUID());
+                    pilot.displayClientMessage(Component.literal(eva.isPowerDepleted()?"目标沉默。初号机停止活动，可以呼叫回收。":"目标沉默。操纵系统已恢复。"),true);ProjectSeele.LOGGER.info("R10 FIRST BATTLE COMPLETE hero={} pilot={}",eva.getUUID(),pilot.getUUID());
                 }
                 data.setDirty();
             }

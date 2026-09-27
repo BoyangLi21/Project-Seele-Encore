@@ -160,7 +160,9 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             com.projectseele.client.visual.EvaMeshAuditR05.capture(eva.getId(),meshLocation.getPath().contains("pallet_smg")?"rifle":bone.getName(),
                     values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),renderer.renderedMeshTransform(pose,eva,partialTick));
-        int vertexLight = this.fullBright
+        boolean dormantEye = animatable instanceof EvaUnit01Entity eva && "head".equals(bone.getName())
+                && !com.projectseele.entity.EvaDorsalMechanism.eyesEnabled(eva);
+        int vertexLight = this.fullBright && !dormantEye
                 ? LightTexture.FULL_BRIGHT : packedLight;
         if(GPU_DIAGNOSTICS.add(animatable.getClass()))com.projectseele.ProjectSeele.LOGGER.info(
                 "Rigid mesh dispatch: entity={} rigid={} buffer={} texture={}",animatable.getClass().getSimpleName(),values==part.vertices(),targetBuffer.getClass().getName(),this.textureSelector!=null);
@@ -199,6 +201,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
 
     public static void clearCache()
     {
+        EvaEyeMaterialsR42.reload();
         RigidCapsuleGpu.clear();
         CACHE.clear();
         LOAD_ATTEMPTED.clear();

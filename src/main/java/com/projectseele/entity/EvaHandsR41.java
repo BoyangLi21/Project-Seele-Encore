@@ -3,6 +3,7 @@ package com.projectseele.entity;
 import net.minecraft.util.Mth;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import org.joml.Matrix3f;
 
 /** Locomotion uses the current anatomical finger hinges, on both hands. */
 public final class EvaHandsR41
@@ -19,6 +20,11 @@ public final class EvaHandsR41
         float transitionSupport=stance>1&&stance<3?(float)Math.pow(Math.sin((stance-1)*Math.PI/2),2):0;
         for(String side:new String[]{"l","r"})
         {
+            Vector3f along=longitudinal(body,side);
+            Vector3f palmar=palmar(body,side,along);
+            Quaternionf extended=new Quaternionf().setFromNormalized(new Matrix3f()
+                    .setColumn(0,palmar).setColumn(1,new Vector3f(along).negate())
+                    .setColumn(2,new Vector3f(palmar).cross(new Vector3f(along).negate())));
             float support=rifle&&side.equals("l")?transitionSupport:!weapon&&!grasp?low:0;
             for(String digit:new String[]{"index","middle","ring","little","thumb"})
             {
@@ -30,18 +36,10 @@ public final class EvaHandsR41
                     body.positions.put(axis,new Vector3f());
                     if(!digit.equals("thumb"))
                     {
-                        // TV rigs were recovered from curled source fingers.
-                        // Their adapter's zero points out of the palm plane;
-                        // the UN adapters already describe extended digits.
-                        // Establish extension along the measured metacarpal,
-                        // then apply anatomical curl in that same hinge plane.
-                        Vector3f along=new Vector3f(body.rig.get("finger_middle_"+side).pivot())
-                                .sub(body.rig.get("hand_"+side).pivot()).normalize();
-                        var bind=body.rig.get(axis).bindRotation();
-                        Vector3f distal=bind.transform(new Vector3f(0,-1,0));
-                        Vector3f flex=bind.transform(new Vector3f(1,0,0));
-                        float extended=(float)Math.atan2(along.dot(flex),along.dot(distal));
-                        body.rotations.get(axis).rotateZ(extended);
+                        // The recovered TV wrist marker lies off the palm's
+                        // longitudinal axis. Its middle-MCP vector describes
+                        // an oblique diagonal, not finger extension.
+                        body.rotations.put(axis,new Quaternionf(extended));
                     }
                     if(digit.equals("thumb"))
                     {
@@ -64,10 +62,11 @@ public final class EvaHandsR41
                         // marker descendants must not create extra hinges.
                         if(joint==0)
                         {
-                            Vector3f vector=side.equals("l")?new Vector3f(-59.326567F,-140.163194F,-6.397107F)
-                                    :new Vector3f(-59.107334F,140.223847F,6.348767F);
-                            vector.mul(Mth.DEG_TO_RAD*(weapon||grasp?.65F:1));float angle=vector.length();
-                            Quaternionf opposed=angle>1e-6F?new Quaternionf().rotationAxis(angle,vector.div(angle)):new Quaternionf();
+                            Vector3f thumb=body.rig.get(name).pivot();
+                            Vector3f tangent=new Vector3f(body.rig.get(stem+"_tip_"+side).pivot()).sub(thumb).normalize();
+                            Vector3f target=new Vector3f(body.rig.get("finger_index_"+side).pivot())
+                                    .fma(1.6F/16,palmar).fma(1.4F/16,along).sub(thumb).normalize();
+                            Quaternionf opposed=new Quaternionf().rotationTo(tangent,target);
                             Quaternionf open=openThumb(body,side);
                             rotation=weapon||grasp?opposed.slerp(open,support):open.slerp(opposed,.08F*(1-support));
                         }
@@ -84,12 +83,25 @@ public final class EvaHandsR41
         Vector3f root=body.rig.get("finger_thumb_"+side).pivot();
         Vector3f tangent=new Vector3f(body.rig.get("finger_thumb_tip_"+side).pivot()).sub(root).normalize();
         Vector3f middle=body.rig.get("finger_middle_"+side).pivot();
-        Vector3f along=new Vector3f(middle).sub(body.rig.get("hand_"+side).pivot()).normalize();
-        Vector3f normal=new Vector3f(body.rig.get("finger_index_"+side).pivot()).sub(body.rig.get("finger_little_"+side).pivot()).cross(along).normalize();
+        Vector3f along=longitudinal(body,side);
+        Vector3f normal=palmar(body,side,along);
         Vector3f radial=new Vector3f(root).sub(middle);radial.fma(-radial.dot(along),along).fma(-radial.dot(normal),normal).normalize();
         // Extend the actual single rigid thumb in the palm plane, with radial
         // abduction. Its source zero was almost perpendicular to that plane.
         return new Quaternionf().rotationTo(tangent,along.add(radial).normalize());
+    }
+    private static Vector3f longitudinal(EvaBodyPose.Sample body,String side)
+    {
+        Vector3f width=new Vector3f(body.rig.get("finger_index_"+side).pivot()).sub(body.rig.get("finger_little_"+side).pivot()).normalize();
+        Vector3f along=new Vector3f(body.rig.get("hand_"+side).pivot()).sub(body.rig.get("forearm_"+side).pivot());
+        return along.fma(-along.dot(width),width).normalize();
+    }
+    private static Vector3f palmar(EvaBodyPose.Sample body,String side,Vector3f along)
+    {
+        Vector3f width=new Vector3f(body.rig.get("finger_index_"+side).pivot()).sub(body.rig.get("finger_little_"+side).pivot()).normalize();
+        Vector3f normal=width.cross(along).normalize();
+        Vector3f flex=body.rig.get("finger_middle_axis_"+side).bindRotation().transform(new Vector3f(1,0,0));
+        return normal.dot(flex)<0?normal.negate():normal;
     }
     private EvaHandsR41(){}
 }

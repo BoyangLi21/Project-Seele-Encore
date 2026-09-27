@@ -60,6 +60,15 @@ public final class EvaShutdownR30
     {
         if(e.level().isClientSide)return;begin(e,WRECK);e.setHealth(0);e.setPersistenceRequired();
     }
+    public static void restAfterFirstBattle(EvaUnit01Entity e,EvaBodyPose.Sample finalPose)
+    {
+        if(e.level().isClientSide)return;
+        MEMORY.computeIfAbsent(e,k->new Memory()).last=encode(finalPose);
+        begin(e,POWER_LOCK);
+        // The authored final pose is authoritative; a delayed pre-cinematic
+        // pilot snapshot must not replace it after the return packet.
+        e.getPersistentData().putBoolean("R30FrozenPoseConfirmed",true);
+    }
     private static void begin(EvaUnit01Entity e,int mode)
     {
         if(mode(e)==mode)return;
@@ -82,6 +91,7 @@ public final class EvaShutdownR30
     public static void tick(EvaUnit01Entity e)
     {
         if(e.level().isClientSide)return;var memory=MEMORY.computeIfAbsent(e,k->new Memory());boolean piloted=e.getPilotEntity()!=null;
+        EvaDorsalMechanism.rearmAfterRepair(e);
         waitingR31(e,e.getPersistentData().getBoolean("R30AwaitingIntake")||e.getPersistentData().getBoolean("R30AwaitingNervRecovery"));
         if(e.tickCount>5&&(mode(e)==WRECK||mode(e)==EMPTY)&&e.getPersistentData().getInt("R31ShutdownPoseVersion")<31)
         {e.getEntityData().set(POSE,encode(EvaBodyPose.inactivePoseR30(e,mode(e)==WRECK)));e.getPersistentData().putInt("R31ShutdownPoseVersion",31);}

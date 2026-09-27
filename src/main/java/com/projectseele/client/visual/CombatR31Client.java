@@ -33,11 +33,31 @@ public final class CombatR31Client
     private static Vec3 lastAngelCamera;
     public static View cameraView(float partial)
     {
-        if(!CombatR31Review.ENABLED||!Boolean.getBoolean("projectseele.combatSideView"))return null;
+        if(!CombatR31Review.ENABLED||!Boolean.getBoolean("projectseele.combatSideView")&&!Boolean.getBoolean("projectseele.r42OpticsReview"))return null;
         var mc=Minecraft.getInstance();if(mc.level==null)return null;
         var eva=mc.level.getEntity(CombatR31Review.evaId);var angel=mc.level.getEntity(CombatR31Review.angelId);if(eva==null)return null;
         if(angel!=null)lastAngelCamera=angel.getPosition(partial);if(lastAngelCamera==null)return null;
         Vec3 p=eva.getPosition(partial),q=lastAngelCamera,centre=p.lerp(q,.5).add(0,30,0);
+        if(CombatR31Review.postFinaleOptics&&eva instanceof EvaUnit01Entity unit)
+        {
+            Vec3 eye=com.projectseele.entity.EvaBodyPose.opticalEye(unit,partial);
+            return new View(eye.add(new Vec3(4,1,10).yRot(-(float)Math.toRadians(unit.getYRot()))),eye);
+        }
+        if(com.projectseele.visual.StanceContactR41Review.ARTICULATION&&eva instanceof EvaUnit01Entity unit)
+        {
+            int tick=CombatR31Review.stageTicks;
+            if(tick<160&&CombatR31Review.stageName.equals("reaction"))
+            {
+                String side=tick<80?"r":"l",name="hand_"+side;
+                var body=com.projectseele.entity.EvaBodyPose.sample(unit,partial);
+                var local=body.matrix(name).transformPosition(new org.joml.Vector3f(body.rig.get(name).pivot()))
+                        .mul(com.projectseele.entity.EvaScale.RENDER_SCALE).rotateY((180-unit.getYRot())*(float)Math.PI/180);
+                Vec3 target=p.add(local.x,local.y-1,local.z);
+                return new View(target.add(side.equals("r")?-12:12,5,12),target);
+            }
+            Vec3 target=com.projectseele.physics.CombatBodyContacts.coreBounds(unit).getCenter();
+            return new View(target.add(57,14,53),target);
+        }
         if(com.projectseele.visual.StanceContactR41Review.ENABLED&&CombatR31Review.stageTicks<=360
                 &&CombatR31Review.stageName.equals("reaction")&&eva instanceof EvaUnit01Entity unit)
         {
@@ -116,7 +136,7 @@ public final class CombatR31Client
             var server=mc.getSingleplayerServer();
             if(server==null||!server.getWorldPath(LevelResource.ROOT).normalize().getFileName().toString().equals(CombatR31Review.WORLD))throw new IllegalStateException("R31 client fixture only supports the isolated integrated review world");
             started=true;oldPause=mc.options.pauseOnLostFocus;oldGui=mc.options.hideGui;oldDistance=mc.options.renderDistance().get();oldCamera=mc.options.getCameraType();
-            mc.options.pauseOnLostFocus=false;mc.options.hideGui=Boolean.getBoolean("projectseele.combatSideView");mc.options.renderDistance().set(8);mc.options.broadcastOptions();mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);mc.setCameraEntity(mc.player);
+            mc.options.pauseOnLostFocus=false;mc.options.hideGui=Boolean.getBoolean("projectseele.combatSideView")||Boolean.getBoolean("projectseele.r42OpticsReview");mc.options.renderDistance().set(8);mc.options.broadcastOptions();mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);mc.setCameraEntity(mc.player);
             folder=mc.gameDirectory.toPath().resolve("../artifacts/facility_r31/native_combat_"+System.currentTimeMillis()).normalize();
             try{Files.createDirectories(folder);}catch(Exception e){throw new IllegalStateException(e);}
             CombatR31Review.mediaFolder=folder.toString();CombatR31Review.ready=true;

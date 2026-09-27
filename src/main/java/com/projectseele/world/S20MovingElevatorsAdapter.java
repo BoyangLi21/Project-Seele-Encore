@@ -1551,8 +1551,11 @@ public final class S20MovingElevatorsAdapter
             S20PhysicalElevatorDirector.LiftSpec spec,
             S20PhysicalElevatorDirector.Landing landing)
     {
-        return landing.label().contains("TERMINAL DOGMA")
-                || landing.label().contains("QUARANTINE")
+        // Access policy follows the registered lift/stop identity, never its
+        // translated display name.
+        return (spec.id().equals(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID)
+                ||spec.id().equals(S20PhysicalElevatorDirector.CENTRAL_DOGMA_LIFT_ID))
+                &&landing.walkY()==spec.lower().walkY()
                 || spec.id().equals(
                 S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID)
                 && landing.equals(spec.upper());
