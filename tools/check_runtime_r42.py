@@ -1,12 +1,13 @@
 """Read-only hash check of the installed R42 profiles and preserved private rigs."""
 from pathlib import Path
-import hashlib,json
+import contextlib,hashlib,io,json
 from check_runtime_r37 import check as foundation
 ROOT=Path(__file__).resolve().parents[1]
 
 
 def check():
-    foundation();local=ROOT/'run/projectseele-local-maps';marker=json.loads((local/'revision_r42.json').read_text())
+    with contextlib.redirect_stdout(io.StringIO()):foundation()
+    local=ROOT/'run/projectseele-local-maps';marker=json.loads((local/'revision_r42.json').read_text())
     assert marker['revision']==42 and marker['protocol']==45
     required=['eva_body_r42.json','first_battle_r42.json']+[f'eva_gameplay_r42_{i}.json' for i in range(5)]
     assert all(name in marker['runtime_sha256'] for name in required)
