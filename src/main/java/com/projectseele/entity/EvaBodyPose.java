@@ -166,6 +166,33 @@ public final class EvaBodyPose
     {if(data==null)reload();return data.carrierHulls().getOrDefault(rigKey(eva),List.of());}
     public static Sample neutralForTransportR32(EvaUnit01Entity eva)
     {if(data==null)reload();return new Sample(data.rigs().get(rigKey(eva)));}
+    public static List<net.minecraft.world.phys.Vec3> carrierVerticesR40(EvaUnit01Entity eva,Sample pose)
+    {
+        if(data==null)reload();var result=new ArrayList<net.minecraft.world.phys.Vec3>();
+        for(var entry:data.rigSupport().getOrDefault(rigKey(eva),data.support()).entrySet())
+        {
+            if(!pose.rig.containsKey(entry.getKey()))continue;var matrix=pose.matrix(entry.getKey());
+            for(var vertex:entry.getValue())
+            {var p=matrix.transformPosition(new Vector3f(vertex)).mul(EvaScale.RENDER_SCALE);result.add(new net.minecraft.world.phys.Vec3(p.x,p.y,p.z));}
+        }
+        return result;
+    }
+    /** Surface vertices under each measured part, used by the receiving dolly. */
+    public static List<net.minecraft.world.phys.Vec3> carrierBearingPointsR40(EvaUnit01Entity eva,Sample pose)
+    {
+        if(data==null)reload();var result=new ArrayList<net.minecraft.world.phys.Vec3>();
+        for(var entry:data.rigSupport().getOrDefault(rigKey(eva),data.support()).entrySet())
+        {
+            if(!pose.rig.containsKey(entry.getKey()))continue;
+            var matrix=pose.matrix(entry.getKey());var points=new ArrayList<Vector3f>();float low=Float.POSITIVE_INFINITY;
+            for(var vertex:entry.getValue())
+            {var p=matrix.transformPosition(new Vector3f(vertex)).mul(EvaScale.RENDER_SCALE);points.add(p);low=Math.min(low,p.y);}
+            Vector3f centre=new Vector3f();int count=0;
+            for(var p:points)if(p.y<=low+.12F){centre.add(p);count++;}
+            if(count>0){centre.div(count);centre.y=low;result.add(new net.minecraft.world.phys.Vec3(centre.x,centre.y,centre.z));}
+        }
+        return result;
+    }
     /** Individual posed parts, in model-local metres; never a standing bounding box for a fallen body. */
     public static List<net.minecraft.world.phys.AABB> posedCarrierHulls(EvaUnit01Entity eva, Sample pose)
     {
@@ -338,7 +365,9 @@ public final class EvaBodyPose
         }
         body=EvaGameplayMotionR32.apply(entity,body,partial);
         preserveJointCentres(body);
+        com.projectseele.visual.BodyPoseLayersR40.capture("authored",body);
         EvaTerrainSupport.apply(entity,body);body.dirty();
+        com.projectseele.visual.BodyPoseLayersR40.capture("terrain",body);
         var beat=CombatFeelR31.beat(entity);
         if(beat!=null&&beat.kind()==CombatFeelR31.STAGGER&&!CombatReactionsR36.enabled(entity)&&!entity.isPilotProne()&&!entity.isPilotCrouching()&&entity.onGround())
         {
@@ -370,9 +399,14 @@ public final class EvaBodyPose
                 body=mix(body,inactivePoseR30(entity,true),w);
             }
         }
-        groundGameplay(entity,body,partial);EvaCombatSupportR33.apply(entity,body,partial);
+        com.projectseele.visual.BodyPoseLayersR40.capture("reaction",body);
+        groundGameplay(entity,body,partial);
+        com.projectseele.visual.BodyPoseLayersR40.capture("ground",body);
+        EvaCombatSupportR33.apply(entity,body,partial);
+        com.projectseele.visual.BodyPoseLayersR40.capture("feet",body);
         if(!entity.isNervLogisticsLocked()&&!entity.isFirstBattleActive()&&!EvaAirTransportR31.active(entity))
         {EvaAerialContactR35.apply(entity,body,partial);com.projectseele.physics.CombatBodyDynamics.normalize(entity,body);}
+        com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;
     }
 

@@ -128,6 +128,7 @@ public final class CombatR31Client
                 var soundCounts=new JsonObject();receivedSounds.forEach(soundCounts::addProperty);output.add("received_combat_sounds",soundCounts);
                 output.add("normal_bones",normalBones);output.add("support_contacts_r33",supportContacts);output.add("render_performance",performance());Files.writeString(folder.resolve("render_performance.json"),new GsonBuilder().setPrettyPrinting().create().toJson(performance()));
                 Files.writeString(folder.resolve("client_evidence.json"),new GsonBuilder().setPrettyPrinting().create().toJson(output));
+                com.projectseele.visual.BodyPoseLayersR40.write(folder);
             }
             catch(Exception e){throw new IllegalStateException("R31 client evidence",e);}
             mc.options.keyUp.setDown(false);mc.options.keyDown.setDown(false);mc.options.keyJump.setDown(false);mc.options.keyAttack.setDown(false);mc.options.keyUse.setDown(false);

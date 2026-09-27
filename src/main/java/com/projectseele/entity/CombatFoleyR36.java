@@ -25,6 +25,15 @@ public final class CombatFoleyR36
     }
     public static void load(EvaUnit01Entity actor)
     {play(actor,actor.position().add(0,actor.getBbHeight()*.57,0),ModSounds.EVA_JOINT_LOAD.get(),.8F,1);}
+    /** Called once by a transport job after stable physical bearing contact. */
+    public static void airliftTouchdown(EvaUnit01Entity actor,Vec3 contact)
+    {
+        play(actor,contact,ModSounds.EVA_LAND.get(),4.2F,.92F);
+        play(actor,contact.add(0,actor.getBbHeight()*.18,0),
+                ModSounds.EVA_JOINT_LOAD.get(),.9F,.86F);
+        com.projectseele.ProjectSeele.LOGGER.info("EVA transport load transferred: unit={} contact={}",actor.getUUID(),contact);
+        com.projectseele.visual.AirLiftR30Review.touchdown(actor);
+    }
     public static void swing(SachielEntity actor)
     {play(actor,SachielStrike.sample(actor,0).hand(),ModSounds.SACHIEL_SWING.get(),1.5F,1);}
     public static void impact(LivingEntity actor,LivingEntity target,Vec3 point,boolean field,boolean heavy)

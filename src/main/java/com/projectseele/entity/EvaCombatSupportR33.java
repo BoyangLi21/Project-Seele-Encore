@@ -172,34 +172,13 @@ public final class EvaCombatSupportR33
             Vector3f delta=point(p,a).sub(targets[i]);float distance=delta.length();
             if(distance>reach){p.positions.get("root").sub(delta.mul(1-reach/distance));p.dirty();}
         }
-        for(int i=0;i<2;i++)if(!EvaGameplayMotionR32.directed(e)||t.getBoolean(sides[i]+"active"))solve(p,sides[i],targets[i],orientations[i]);
+        var profile=com.projectseele.physics.CombatBodyProfiles.get(e);
+        for(int i=0;i<2;i++)if(!EvaGameplayMotionR32.directed(e)||t.getBoolean(sides[i]+"active"))
+            com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(p,profile,sides[i],targets[i],orientations[i]);
         TARGETS.put(e,worldTargets);
     }
     private static Vector3f point(EvaBodyPose.Sample p,String n){return p.matrix(n).transformPosition(new Vector3f(p.rig.get(n).pivot()));}
-    private static Quaternionf parent(EvaBodyPose.Sample p,String n){String up=p.rig.get(n).parent();return up==null?new Quaternionf():p.matrix(up).getUnnormalizedRotation(new Quaternionf());}
     private static Vector3f knee(EvaBodyPose.Sample p,String side)
     {String marker="r30_knee_socket_"+side;return p.rig.containsKey(marker)?new Vector3f(p.rig.get(marker).pivot()):new Vector3f(p.rig.get("shin_"+side).pivot()).add(0,11.4F/16,0);}
-    private static void aim(EvaBodyPose.Sample p,String n,Vector3f from,Vector3f to)
-    {
-        var world=p.matrix(n).getUnnormalizedRotation(new Quaternionf());
-        var q=new Quaternionf().rotationTo(from.normalize(),to.normalize()).mul(world);
-        p.rotations.put(n,parent(p,n).invert().mul(q));EvaBodyPose.preserveJointCentres(p);
-    }
-    static void solve(EvaBodyPose.Sample p,String s,Vector3f target,Quaternionf footOrientation)
-    {
-        String a="leg_"+s,b="shin_"+s,c="foot_"+s,marker="r30_knee_socket_"+s;
-        Vector3f joint=knee(p,s);
-        Vector3f hip=point(p,a),knee=p.matrix(a).transformPosition(new Vector3f(joint)),ankle=point(p,c);
-        float upper=joint.distance(p.rig.get(a).pivot()),lower=joint.distance(p.rig.get(c).pivot());
-        Vector3f direction=new Vector3f(target).sub(hip);float distance=Mth.clamp(direction.length(),Math.abs(upper-lower)+.0001F,upper+lower-.0001F);direction.normalize();
-        Vector3f bend=new Vector3f(knee).sub(hip);bend.fma(-bend.dot(direction),direction);
-        if(bend.lengthSquared()<1e-7F)bend.set(0,0,-1).fma(direction.z,direction);
-        bend.normalize();float along=(upper*upper-lower*lower+distance*distance)/(2*distance);
-        Vector3f desiredKnee=new Vector3f(hip).fma(along,direction).fma((float)Math.sqrt(Math.max(0,upper*upper-along*along)),bend);
-        aim(p,a,new Vector3f(knee).sub(hip),new Vector3f(desiredKnee).sub(hip));
-        knee=p.matrix(a).transformPosition(new Vector3f(joint));ankle=point(p,c);
-        aim(p,b,new Vector3f(ankle).sub(knee),new Vector3f(target).sub(knee));
-        p.rotations.put(c,parent(p,c).invert().mul(footOrientation));p.dirty();
-    }
     private EvaCombatSupportR33(){}
 }

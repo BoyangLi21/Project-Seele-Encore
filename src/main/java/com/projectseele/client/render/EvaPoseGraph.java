@@ -183,8 +183,13 @@ public final class EvaPoseGraph
             // locomotion/impact/transition/foot-placement stack and overwrite it
             // afterwards: that also leaves those controllers' histories stale.
             com.projectseele.client.visual.CombatR31Client.normalWitness(entity,model,"before");
+            com.projectseele.visual.BodyPoseLayersR40.begin(entity,partialTick);
             var body=EvaCombatPoseR31.apply(entity,model,partialTick,modelToWorld);
             var hands=EvaHandPoseR28.apply(entity,model,partialTick);
+            if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
+                for(String name:com.projectseele.visual.BodyPoseLayersR40.BONES)
+                    model.getBone(name).ifPresent(b->com.projectseele.visual.BodyPoseLayersR40.rendered(name,EvaRigTransforms.model(b)));
+            com.projectseele.visual.BodyPoseLayersR40.end();
             com.projectseele.client.visual.CombatR31Client.normalWitness(entity,model,"after");
             return finish(entity,model,partialTick,modelToWorld,body,EvaMotionEngineV2.BoneWrites.empty(),hands);
         }

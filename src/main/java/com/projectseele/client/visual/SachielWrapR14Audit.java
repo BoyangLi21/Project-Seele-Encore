@@ -14,7 +14,8 @@ import java.nio.file.Path;
 /** Compares the actual submitted surface with its authored world points in the native review. */
 public final class SachielWrapR14Audit
 {
-    public static final boolean ENABLED="r10-firstbattle".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R40="r31-combat".equals(System.getProperty("projectseele.regionalBuild",""))&&Boolean.getBoolean("projectseele.surfaceAuditR40");
+    public static final boolean ENABLED=R40||"r10-firstbattle".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final long RUN=System.currentTimeMillis();
     private static int samples;
     private static float maxXZ,maxY;
@@ -29,7 +30,7 @@ public final class SachielWrapR14Audit
         {
             try
             {
-                Path folder=Path.of("../artifacts/world_refinement_r14/native");Files.createDirectories(folder);
+                Path folder=Path.of(R40?"../artifacts/world_combat_r40/native_surface_audit":"../artifacts/world_refinement_r14/native");Files.createDirectories(folder);
                 String json="{\"samples\":"+samples+",\"max_xz\":"+maxXZ+",\"max_y\":"+maxY+",\"passed\":"+(maxXZ<.03&&maxY<.12)+"}";
                 Files.writeString(folder.resolve("surface_"+RUN+".json"),json);
             }

@@ -354,3 +354,15 @@ The R37 feral clips adapt the already permitted Haley Tuffles recordings `ArmsSl
 ## R38 facility shader (2026-09-25)
 
 `ComplementaryUnbound_r5.3_SEELE_R38.zip` derives from the pinned Complementary Unbound 5.3 file and the existing LCL compatibility derivative. It retains the author's archive and license files and adds a spatially blended indirect-light floor in the surveyed facility volumes. The pinned original archive remains unchanged. Source/output SHA-256 and the modified shader path are recorded by `tools/build_facility_shader_r38.py`; no new model, animation recording, or official EVA image/audio was downloaded for R38.
+
+## R40 performed roar and doors (2026-09-26)
+
+`eva_berserk_performed_r40.ogg` adapts [Monster roar by colorsCrimsonTears](https://freesound.org/people/colorsCrimsonTears/sounds/537883/), licensed CC0 1.0. The source is the author's performed inhaled breath, not an anime recording. Changes: 0.88 resample pitch, mono 48 kHz, a 48–7000 Hz passband, mild compression and fades. `tools/build_roar_r40.py` checks the saved source hash; the original page, source and output hashes remain in the local R40 manifest. The conflicting optional R34 audition pack is deselected in the R40 client. Subjective auditory likeness has not been certified by an audio-inspection tool.
+
+[Macaw's Doors](https://modrinth.com/mod/macaws-doors) by Sketch Macaw and Sketch Peachy is pinned to Forge 1.20.1 version 1.1.5 (Modrinth version `n8BlIUm3`). Its distribution metadata declares MIT. `tools/fetch_facility_doors_r40.py` verifies the upstream SHA-512; client and server both need this dependency for the new storefront entrances. Development uses ForgeGradle remapping; the unmodified upstream JAR is the deployment dependency.
+
+## R40 offline deformation workflow
+
+[libigl 2.6.3](https://libigl.github.io/tutorial/#as-rigid-as-possible), distributed under MPL-2.0 for the core functions used here, is an offline authoring dependency. It is installed from the pinned official PyPI wheel into the ignored local geometry runtime. It is not added as a Minecraft runtime dependency. Installation metadata and the wheel hash are retained in the R40 artifact report.
+
+The paired Sachiel surface retains the existing private mesh topology/UVs and their original model licenses. Its authored soft-tissue motion uses ARAP with rigid anatomical attachments, grounded EVA supports and shared optical/socket curves. Original TV episode 02 was viewed for the reach, enclosing silhouette and core contact; no broadcast frame or audio is embedded. The public authoring tools do not contain third-party geometry. The saved `.blend`, private movie JSON, binary surface and native review videos remain local artifacts.

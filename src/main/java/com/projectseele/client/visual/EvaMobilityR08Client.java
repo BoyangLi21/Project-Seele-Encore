@@ -21,7 +21,7 @@ public final class EvaMobilityR08Client
             if(++ending>60)Minecraft.getInstance().stop();
             return;
         }
-        if(("collision-audit".equals(System.getProperty("projectseele.regionalBuild",""))||"r19-collision".equals(System.getProperty("projectseele.regionalBuild","")))
+        if(("collision-audit".equals(System.getProperty("projectseele.regionalBuild",""))||"r19-collision".equals(System.getProperty("projectseele.regionalBuild",""))||"r40-collision".equals(System.getProperty("projectseele.regionalBuild","")))
                 && event.phase==TickEvent.Phase.END
                 && com.projectseele.visual.RegionalSpatialAuditDriver.done)
         {

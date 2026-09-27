@@ -31,6 +31,14 @@ public final class AnatomicalLimbConstraints
     }
     public static void reachFoot(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile,String side,Vector3f target,Quaternionf orientation)
     {
+        if(profile==null)
+        {
+            String marker="r30_knee_socket_"+side;
+            Vector3f joint=pose.rig.containsKey(marker)?new Vector3f(pose.rig.get(marker).pivot())
+                    :new Vector3f(pose.rig.get("shin_"+side).pivot()).add(0,11.4F/16,0);
+            solve(pose,"leg_"+side,"shin_"+side,"foot_"+side,joint,new Vector3f(-1,0,0),2.62F,target);
+            pose.rotations.put("foot_"+side,parent(pose,"foot_"+side).invert().mul(orientation));pose.dirty();return;
+        }
         for(var element:profile.definition().getAsJsonArray("bodies"))
         {
             var row=element.getAsJsonObject();if(!row.get("name").getAsString().equals("shin_"+side))continue;var m=row.getAsJsonArray("joint");
@@ -63,8 +71,21 @@ public final class AnatomicalLimbConstraints
         float along=(la*la-lb*lb+length*length)/(2*length);Vector3f bend=oldJoint.sub(origin);bend.fma(-bend.dot(direction),direction);
         if(bend.lengthSquared()<1e-8F)bend.set(0,0,-1).fma(direction.z,direction);bend.normalize();
         Vector3f middle=new Vector3f(origin).fma(along,direction).fma((float)Math.sqrt(Math.max(0,la*la-along*along)),bend);
-        Matrix3f world=frame(new Vector3f(middle).sub(origin),new Vector3f(target).sub(middle)).mul(frame(u,hinge.transform(new Vector3f(v))).transpose());
-        Quaternionf upperWorld=new Quaternionf().setFromNormalized(world);
+        Quaternionf upperWorld;
+        if(lower.startsWith("shin_"))
+        {
+            // The bind leg bows sideways. Its almost-straight joint position
+            // cannot define a knee pole: that turned tiny offsets into hip roll.
+            // Preserve the authored twist, and swing only the complete hinge reach.
+            Quaternionf authored=p.matrix(upper).getUnnormalizedRotation(new Quaternionf()).normalize();
+            Vector3f reach=authored.transform(new Vector3f(u).add(hinge.transform(new Vector3f(v)))).normalize();
+            upperWorld=new Quaternionf().rotationTo(reach,direction).mul(authored).normalize();
+        }
+        else
+        {
+            Matrix3f world=frame(new Vector3f(middle).sub(origin),new Vector3f(target).sub(middle)).mul(frame(u,hinge.transform(new Vector3f(v))).transpose());
+            upperWorld=new Quaternionf().setFromNormalized(world);
+        }
         p.rotations.put(upper,parent(p,upper).invert().mul(upperWorld));p.rotations.put(lower,hinge);
         Vector3f offset=new Vector3f(joint).sub(p.rig.get(lower).pivot());p.positions.put(lower,new Vector3f(offset).sub(hinge.transform(offset)));p.dirty();
         p.rotations.put(end,parent(p,end).invert().mul(endOrientation));p.dirty();

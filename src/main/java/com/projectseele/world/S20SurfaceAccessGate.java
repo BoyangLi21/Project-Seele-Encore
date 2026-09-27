@@ -36,6 +36,14 @@ public final class S20SurfaceAccessGate
     private static final int VISUAL_DOOR_ID = 0x53414745;
     private static final Map<ServerLevel,Long> OPEN_UNTIL =
             Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<ServerLevel,Integer> GATE_AXES=new WeakHashMap<>();
+
+    private static int gateX(ServerLevel level)
+    {
+        return GATE_AXES.computeIfAbsent(level,l->java.nio.file.Files.isRegularFile(
+                l.getServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
+                        .resolve("surface_lift_access_r40.json"))?120:GATE_X);
+    }
 
     private S20SurfaceAccessGate() {}
 
@@ -43,20 +51,20 @@ public final class S20SurfaceAccessGate
     {
         int walkY = S20PhysicalElevatorDirector.surfaceTransitLift(level)
                 .upper().walkY();
-        BlockPos reader = reader(walkY);
+        BlockPos reader = reader(level,walkY);
         if (!level.hasChunkAt(reader))
         {
             return;
         }
         ensureReader(level, reader);
-        ensureButton(level, insideButton(walkY), Direction.EAST);
+        ensureButton(level, insideButton(level,walkY), Direction.EAST);
         long now = level.getGameTime();
         boolean open = now < OPEN_UNTIL.getOrDefault(level, 0L);
         setOpen(level, walkY, open);
         NervLiftDoorEntity visual = NervLiftDoorEntity.reconcile(
                 level, VISUAL_DOOR_ID, false, 5, 4,
                 NervLiftDoorEntity.STYLE_NERV_BLACK,
-                new Vec3(GATE_X + 0.5D, walkY,
+                new Vec3(gateX(level) + 0.5D, walkY,
                         (Z_MIN + Z_MAX) * 0.5D + 0.5D));
         if (visual != null)
         {
@@ -69,7 +77,7 @@ public final class S20SurfaceAccessGate
         ServerLevel level = player.serverLevel();
         int walkY = S20PhysicalElevatorDirector.surfaceTransitLift(level)
                 .upper().walkY();
-        if (clicked.equals(insideButton(walkY)))
+        if (clicked.equals(insideButton(level,walkY)))
         {
             OPEN_UNTIL.put(level, level.getGameTime() + OPEN_TICKS);
             setOpen(level, walkY, true);
@@ -77,7 +85,7 @@ public final class S20SurfaceAccessGate
                     SoundSource.BLOCKS, 0.9F, 1.18F);
             return true;
         }
-        if (!clicked.equals(reader(walkY)))
+        if (!clicked.equals(reader(level,walkY)))
         {
             return false;
         }
@@ -108,14 +116,14 @@ public final class S20SurfaceAccessGate
         return true;
     }
 
-    private static BlockPos reader(int walkY)
+    private static BlockPos reader(ServerLevel level,int walkY)
     {
-        return new BlockPos(GATE_X - 1, walkY + 1, Z_MIN - 1);
+        return new BlockPos(gateX(level) - 1, walkY + 1, Z_MIN - 1);
     }
 
-    private static BlockPos insideButton(int walkY)
+    private static BlockPos insideButton(ServerLevel level,int walkY)
     {
-        return new BlockPos(GATE_X + 1, walkY + 1, Z_MIN - 1);
+        return new BlockPos(gateX(level) + 1, walkY + 1, Z_MIN - 1);
     }
 
     private static void ensureReader(ServerLevel level, BlockPos position)
@@ -147,7 +155,7 @@ public final class S20SurfaceAccessGate
         {
             for (int z = Z_MIN; z <= Z_MAX; z++)
             {
-                BlockPos position = new BlockPos(GATE_X, y, z);
+                BlockPos position = new BlockPos(gateX(level), y, z);
                 BlockState current = level.getBlockState(position);
                 // The audited R28 aperture is air. Once installed, this owner
                 // only alternates its own full-collision glass and air; any human-authored

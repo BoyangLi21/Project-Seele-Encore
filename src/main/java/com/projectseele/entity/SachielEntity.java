@@ -122,7 +122,16 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
             }
             }
         }
-        if(age>=SachielStrike.duration(mode)){entityData.set(STRIKE_AGE,-1);strikeTarget=null;meleeRecovery=mode==SachielStrike.OVERHEAD||mode==SachielStrike.STOMP?16:mode==SachielStrike.JAB&&strikeHit?4:8;}
+        if(age>=SachielStrike.duration(mode))
+        {
+            if(SachielGameplayMotionR32.naturalRecovery())
+            {
+                var release=EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0));
+                release.putLong("r40_release_at",level().getGameTime());release.putFloat("r40_release_yaw",getYRot());
+                release.putDouble("r40_release_x",getX());release.putDouble("r40_release_z",getZ());entityData.set(STRIKE_FROM,release);
+            }
+            entityData.set(STRIKE_AGE,-1);strikeTarget=null;meleeRecovery=mode==SachielStrike.OVERHEAD||mode==SachielStrike.STOMP?16:mode==SachielStrike.JAB&&strikeHit?4:8;
+        }
     }
     private boolean firstBattleUsed,firstBattleDeathResolved;
     private float firstBattlePreviousField;

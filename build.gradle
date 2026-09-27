@@ -325,6 +325,9 @@ dependencies {
     if (file('.Codex/local-mods/grandpianomod-1.0.0.jar').exists()) {
         runtimeOnly fg.deobf('local:grandpianomod:1.0.0')
     }
+    if (file('.Codex/local-mods/mcw-doors-1.1.5-mc1.20.1forge.jar').exists()) {
+        runtimeOnly fg.deobf('local:mcw-doors:1.1.5-mc1.20.1forge')
+    }
     if (localSbw.exists() && localKff.exists()) {
         runtimeOnly fg.deobf('local:superbwarfare:0.8.9.1-hotfix-mc1.20.1-993063bed:all')
         runtimeOnly fg.deobf('local:kotlinforforge:4.12.0:all')
@@ -508,6 +511,20 @@ tasks.register('verifyCombatMotionR29', JavaExec) {
     mainClass = 'com.projectseele.entity.CombatMotionR29Test'
 }
 tasks.named('check').configure { dependsOn 'verifyCombatMotionR29' }
+
+tasks.register('verifyKneeSupportR40', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.physics.KneeSupportR40Test'
+}
+tasks.named('check').configure { dependsOn 'verifyKneeSupportR40' }
+
+tasks.register('verifyVerticalCarrierSweepR40', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.VerticalCarrierSweepR40Test'
+}
+tasks.named('check').configure { dependsOn 'verifyVerticalCarrierSweepR40' }
 
 // Compile/prepare with ForgeGradle, then release the build JVM before playing.
 // Export only explicitly changed environment values, not the user's full env.

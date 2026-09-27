@@ -236,13 +236,17 @@ def make_clip_action(armature: bpy.types.Object, motion: dict,
             frame_data, db_bones, bone_order, pivots, parents,
             bind_rotations
         )
-        # PoseBone.matrix is armature-space. Multiplying the desired runtime
-        # deformation by the edit-bone rest matrix lets Blender derive the
-        # correct local basis while preserving Gecko's absolute-pivot chain.
+        # Set the local basis explicitly. Assigning PoseBone.matrix while its
+        # parent has un-evaluated edits reads yesterday's parent transform and
+        # bakes that stale compensation into the child's keys (Blender 5.x).
+        # P_pose = D_parent P_rest, so basis = B_rest^-1 D_local B_rest.
         for bone_name in bone_order:
             pose_bone = armature.pose.bones[bone_name]
             rest = armature.data.bones[bone_name].matrix_local
-            pose_bone.matrix = matrices[bone_name] @ rest
+            parent = parents.get(bone_name)
+            local = (matrices[parent].inverted() @ matrices[bone_name]
+                     if parent else matrices[bone_name])
+            pose_bone.matrix_basis = rest.inverted() @ local @ rest
             pose_bone.keyframe_insert("location", frame=local_index,
                                       group=bone_name)
             pose_bone.keyframe_insert("rotation_quaternion", frame=local_index,

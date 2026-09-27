@@ -91,6 +91,8 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                               VertexConsumer buffer, float partialTick, int packedLight,
                               int packedOverlay)
     {
+        if(!this.fullBright&&bone.getName().equals("root")&&animatable instanceof net.minecraft.world.entity.Entity entity)
+            FirstBattlePoseRenderer.remember(entity,bone);
         if (bone.isHidden() || !this.partVisibility.test(animatable, bone))
         {
             return;

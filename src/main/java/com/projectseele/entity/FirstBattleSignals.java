@@ -89,9 +89,16 @@ public final class FirstBattleSignals
             d.set(origin,p);d.set(fraction,new Vector3f((float)(spec.origin.x-p.getX()),(float)(spec.origin.y-p.getY()),(float)(spec.origin.z-p.getZ())));
             d.set(yaw,spec.yaw);d.set(evaYaw,spec.evaYaw);d.set(angelYaw,spec.angelYaw);d.set(distance,spec.initialDistance);d.set(height,spec.initialHeight);
         }
-        public void resume(Entity entity,Spec spec,int tick,int other){setSpec(entity,spec);advance(entity,tick,other);entity.getEntityData().set(active,true);}
+        public void resume(Entity entity,Spec spec,int tick,int other)
+        {
+            if(entity instanceof net.minecraft.world.entity.LivingEntity body)
+            {CombatFeelR31.clear(body);com.projectseele.physics.CombatBodyDynamics.acknowledgeHandoff(body);}
+            setSpec(entity,spec);advance(entity,tick,other);entity.getEntityData().set(active,true);
+        }
         public void begin(Mob entity,Spec spec,int other,int oldWeapon)
         {
+            CombatFeelR31.clear(entity);
+            com.projectseele.physics.CombatBodyDynamics.acknowledgeHandoff(entity);
             var d=entity.getEntityData();d.set(flags,(entity.noPhysics?1:0)|(entity.isNoGravity()?2:0)|(entity.isNoAi()?4:0));d.set(weapon,oldWeapon);
             setSpec(entity,spec);advance(entity,0,other);d.set(active,true);entity.noPhysics=true;entity.setNoGravity(true);entity.setNoAi(true);entity.setDeltaMovement(Vec3.ZERO);entity.fallDistance=0;
         }
@@ -110,6 +117,7 @@ public final class FirstBattleSignals
         public void restore(Mob entity,CompoundTag tag)
         {
             if(!tag.contains("FirstBattleSceneR10"))return;var t=tag.getCompound("FirstBattleSceneR10");
+            CombatFeelR31.clear(entity);com.projectseele.physics.CombatBodyDynamics.acknowledgeHandoff(entity);
             Spec s=new Spec(new Vec3(t.getDouble("X"),t.getDouble("Y"),t.getDouble("Z")),t.getFloat("Yaw"),t.getFloat("EvaYaw"),t.getFloat("AngelYaw"),t.getFloat("Distance"),t.getFloat("Height"));
             setSpec(entity,s);var d=entity.getEntityData();d.set(age,t.getInt("Age"));d.set(flags,t.getInt("Flags"));d.set(weapon,t.getInt("Weapon"));d.set(active,true);
             entity.noPhysics=true;entity.setNoGravity(true);entity.setNoAi(true);

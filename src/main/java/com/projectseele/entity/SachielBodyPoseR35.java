@@ -13,11 +13,13 @@ public final class SachielBodyPoseR35
         var pose=SachielGameplayMotionR32.locomotion(actor,partial);
         if(actor.isStrikeActive())
         {
-            float age=strikeAge,blend=Math.min(1,age/4)*(1-Mth.clamp((age-SachielStrike.duration(actor.strikeMode())+6)/6,0,1));
+            float age=strikeAge,blend=Math.min(1,age/4);
+            if(!SachielGameplayMotionR32.naturalRecovery())blend*=1-Mth.clamp((age-SachielStrike.duration(actor.strikeMode())+6)/6,0,1);
             if(SachielGameplayMotionR32.phrases()&&age<4&&!actor.strikeEntryR36().isEmpty())EvaShutdownR30.decode(actor.strikeEntryR36(),pose);
             var strike=SachielGameplayMotionR32.pose(actor,age);
             for(String n:pose.rig.keySet()){pose.rotations.get(n).slerp(strike.rotations.get(n),blend);pose.positions.get(n).lerp(strike.positions.get(n),blend);}pose.dirty();
         }
+        else pose=SachielGameplayMotionR32.released(actor,pose,partial);
         if(EvaCombatR31.holds(actor))
         {
             float held=AngelGrappleSurfaceR31.heldWeight(actor,partial);

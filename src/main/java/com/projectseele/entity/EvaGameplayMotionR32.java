@@ -71,6 +71,8 @@ public final class EvaGameplayMotionR32
     }
     public static boolean directed(EvaUnit01Entity e){var p=profile(variant(e));return p!=null&&p.has("combat_foundation")&&p.get("combat_foundation").getAsInt()>=34;}
     public static boolean phrases(EvaUnit01Entity e){var p=profile(variant(e));return p!=null&&p.has("combat_foundation")&&p.get("combat_foundation").getAsInt()>=36;}
+    public static boolean naturalRecovery(EvaUnit01Entity e)
+    {var p=profile(variant(e));return p!=null&&p.has("natural_recovery")&&p.get("natural_recovery").getAsBoolean();}
     public static boolean planted(EvaUnit01Entity e,String side,float partial)
     {
         if(!directed(e)||!EvaCombatSupportR33.strike(e))return true;

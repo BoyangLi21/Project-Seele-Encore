@@ -72,7 +72,7 @@ public final class FirstBattleDirector
         var record=new FirstBattleSavedData.Encounter();record.eva=eva.getUUID();record.angel=angel.getUUID();record.pilot=pilot.getUUID();record.npcPilot=occupant instanceof com.projectseele.entity.TrainingPilotEntity?occupant.getUUID():null;record.spec=spec;record.originalField=angel.getAtField();record.originalHealth=angel.getHealth();data.active=record;data.setDirty();
         eva.beginFirstBattle(spec,angel.getId());angel.beginFirstBattle(spec,eva.getId());
         tickets(level,record);pilot.displayClientMessage(Component.literal("制御不能 — 初号机进入自主行动"),true);
-        com.projectseele.world.NervStaffDialogue.say(pilot,"赤木律子 · 指挥通信","初号机的动作已经脱离通常控制。保留全部记录，先确认驾驶员的连接！");
+        com.projectseele.world.NervStaffDialogue.say(pilot,"赤木律子 · 指挥通信","初号机没有接收指令……它在自行行动。驾驶员的生命信号还在。");
         sound(level,FirstBattleClip.point(spec,true,"eye_blocks",0),ModSounds.EVA_BERSERK_ROAR.get(),2.3F);
         ProjectSeele.LOGGER.info("R10 FIRST BATTLE START hero={} angel={} pilot={} health={}",record.eva,record.angel,record.pilot,record.originalHealth);return true;
     }

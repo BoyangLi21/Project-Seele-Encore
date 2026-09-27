@@ -70,7 +70,7 @@ public final class UNTransportEntity extends Entity
         else if(target!=jawTarget){jawFrom=visual(jawFrom,jawTarget,jawSince,now,0,.05F);jawTarget=target;jawSince=now;}
         return visual(jawFrom,jawTarget,jawSince,now,partial,.05F);
     }
-    @Override public AABB getBoundingBoxForCulling(){return groundCart()?new AABB(getX()-15,getY()-3,getZ()-17,getX()+15,getY()+9,getZ()+17):new AABB(getX()-74,getY()-hoistDistance()-1,getZ()-60,getX()+74,getY()+22,getZ()+60);}
+    @Override public AABB getBoundingBoxForCulling(){return groundCart()?new AABB(getX()-65,getY()-3,getZ()-65,getX()+65,getY()+12,getZ()+65):new AABB(getX()-74,getY()-hoistDistance()-1,getZ()-60,getX()+74,getY()+22,getZ()+60);}
     @Override public boolean shouldRenderAtSqrDistance(double distance){return distance<1600*1600;}
     public Vec3 renderFlightPosition(float partial)
     {
@@ -91,6 +91,12 @@ public final class UNTransportEntity extends Entity
     @Override public void tick()
     {
         super.tick();
+        if(!level().isClientSide&&groundCart()&&targetDeployment()>.01F&&tickCount%20==0&&level().getEntity(cargoEntityId())==null)
+        {
+            var level=(net.minecraft.server.level.ServerLevel)level();var id=com.projectseele.world.UNRecoveryR22.identity(level,serial());
+            if(id!=null&&level.getEntity(id) instanceof EvaPrototypeEntity eva&&eva.distanceToSqr(this)<120*120)
+                cargo(eva.getId(),false,targetDeployment());
+        }
         if(!level().isClientSide&&!groundCart()&&getTags().contains("seele_un_airlift")&&tickCount>200
                 &&!com.projectseele.world.UNAirLiftR29.ownsAircraft((net.minecraft.server.level.ServerLevel)level(),getUUID())){discard();return;}
     }

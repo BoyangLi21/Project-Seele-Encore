@@ -4460,7 +4460,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     this.resolveHeavyContact(combatPilot);
                 }
                 heavyEnded = --this.heavyTicks == 0;
-                if (heavyEnded) this.entityData.set(DATA_HEAVY_ACTIVE, false);
+                if (heavyEnded)
+                {
+                    if(EvaGameplayMotionR32.naturalRecovery(this))EvaGameplayMotionR32.releaseToMovement(this);
+                    this.entityData.set(DATA_HEAVY_ACTIVE, false);
+                }
             }
         }
         if (this.pendingKnifeContactTicks > 0 && --this.pendingKnifeContactTicks == 0
@@ -4485,6 +4489,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.ordinaryAttackVisualTicks--;
             if (this.ordinaryAttackVisualTicks == 0)
             {
+                if(EvaGameplayMotionR32.naturalRecovery(this))EvaGameplayMotionR32.releaseToMovement(this);
                 this.entityData.set(DATA_ORDINARY_ATTACK_STAGE, -1);
                 ordinaryEnded = true;
             }

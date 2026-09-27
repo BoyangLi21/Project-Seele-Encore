@@ -91,6 +91,11 @@ public final class S20MovingElevatorsAdapter
         boolean alreadyOwned = owns(level, spec);
         Set<String> normalized = NORMALIZED_CAGES.computeIfAbsent(level,
                 ignored -> new HashSet<>());
+        if(alreadyOwned&&!normalized.contains(spec.id()))
+        {
+            var base=controller(level,controllerPosition(spec,spec.lower()));
+            if(base!=null&&base.hasGroup()&&!base.getGroup().isMoving())repairIdentifiedCabinFloor(level,spec);
+        }
         /*
          * Once the official controllers and normalized cage own a shaft, the
          * migration scans are finished for this server run.  The old ordering
@@ -373,6 +378,7 @@ public final class S20MovingElevatorsAdapter
     private static Direction controllerFacing(
             S20PhysicalElevatorDirector.LiftSpec spec)
     {
+        if(spec.id().equals(NervLiftPassengerSync.GATEWAY))return Direction.EAST;
         return controllerSide(spec).getOpposite();
     }
 
@@ -447,7 +453,18 @@ public final class S20MovingElevatorsAdapter
         // Security belongs to the selected destination.  Hiding a floor name
         // or locking the whole in-car panel made every ordinary return trip
         // look forbidden.
-        String label = landing.label();
+        String label = switch(landing.label())
+        {
+            case "TERMINAL DOGMA" -> "终极教条 / TERMINAL DOGMA";
+            case "LOWER INTERCHANGE" -> "总部主环廊";
+            case "COMMAND BRIDGE" -> "指挥桥下层";
+            case "REAR SERVICE" -> "指挥桥中层";
+            case "COMMAND GALLERY" -> "指挥桥上层";
+            case "GEOFRONT TRANSIT" -> "地下交通层";
+            case "TOKYO-3 SURFACE" -> "地面联络厅";
+            case "COMMAND ACCESS" -> "总指挥接待层";
+            default -> landing.label();
+        };
         if (!Objects.equals(controller.getFloorName(), label))
         {
             controller.setFloorName(label);
@@ -953,6 +970,8 @@ public final class S20MovingElevatorsAdapter
                 || state.is(com.projectseele.registry.ModBlocks
                         .CLEAR_GLASS.get())
                 || state.is(com.projectseele.world.NervMaterials.STRUCTURAL_SHELL)
+                || state.is(com.projectseele.registry.ModBlocks.NERV_WALL_PANEL.get())
+                || state.is(com.projectseele.registry.ModBlocks.NERV_WALL_DATUM.get())
                 || state.is(Blocks.BLACK_CONCRETE)
                 || state.is(Blocks.ORANGE_CONCRETE)
                 || state.is(Blocks.IRON_BLOCK)
@@ -1347,6 +1366,30 @@ public final class S20MovingElevatorsAdapter
                 && anchor.getY() == centre.getY() - 1
                 && anchor.getZ() + group.getCageSizeZ() / 2
                 == centre.getZ();
+    }
+
+    /** A nearly intact parked car is identifiable by its floor, roof and
+     * registered landing. Repair missing tiles without rebuilding its body,
+     * controller, inventory-bearing blocks or a moving cage. */
+    private static void repairIdentifiedCabinFloor(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec)
+    {
+        int radius=isSurfaceLift(spec)?3:2,area=(radius*2+1)*(radius*2+1);
+        for(var landing:spec.stops())
+        {
+            if(!S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,landing.cabinCentre()))continue;
+            var missing=new java.util.ArrayList<BlockPos>();var materials=new java.util.HashMap<BlockState,Integer>();boolean foreign=false;
+            for(int x=-radius;x<=radius;x++)for(int z=-radius;z<=radius;z++)
+            {
+                var at=landing.cabinCentre().offset(x,-1,z);var state=level.getBlockState(at);
+                if(state.isAir())missing.add(at);
+                else if(S20PhysicalElevatorDirector.isCabinFloor(state))materials.merge(state,1,Integer::sum);
+                else foreign=true;
+            }
+            if(foreign||missing.isEmpty()||missing.size()>Math.max(1,area/10)||materials.isEmpty())continue;
+            var floor=materials.entrySet().stream().max(java.util.Map.Entry.comparingByValue()).orElseThrow().getKey();
+            for(var at:missing)level.setBlock(at,floor,Block.UPDATE_ALL);
+            ProjectSeele.LOGGER.info("Repaired {} missing floor tiles in identified parked lift {} at {}; cabin and controllers preserved",missing.size(),spec.id(),landing.cabinCentre());
+        }
     }
 
     /**

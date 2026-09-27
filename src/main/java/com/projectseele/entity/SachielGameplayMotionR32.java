@@ -47,6 +47,7 @@ public final class SachielGameplayMotionR32
             }
             boolean directed=json.has("combat_foundation")&&json.get("combat_foundation").getAsInt()>=34;
             PHRASES=json.has("combat_foundation")&&json.get("combat_foundation").getAsInt()>=36;
+            NATURAL_RECOVERY=json.has("natural_recovery")&&json.get("natural_recovery").getAsBoolean();
             float stride=directed?json.getAsJsonObject("clips").getAsJsonObject("r32_advance").get("stride_blocks").getAsFloat():15;
             cached=Optional.of(new Data(names.toArray(String[]::new),Map.copyOf(rig),Map.copyOf(clips),directed,stride));return cached.get();
         }
@@ -56,6 +57,25 @@ public final class SachielGameplayMotionR32
     public static boolean directed(){return ready()&&data().directed;}
     public static boolean phrases(){return ready()&&data().clips.containsKey("guard")&&PHRASES;}
     private static boolean PHRASES;
+    private static boolean NATURAL_RECOVERY;
+    public static boolean naturalRecovery(){return ready()&&NATURAL_RECOVERY;}
+    public static EvaBodyPose.Sample released(SachielEntity actor,EvaBodyPose.Sample destination,float partial)
+    {
+        var tag=actor.strikeEntryR36();
+        if(!naturalRecovery()||!tag.contains("r40_release_at"))return destination;
+        float age=actor.level().getGameTime()-tag.getLong("r40_release_at")+partial;
+        if(age<0||age>=6)return destination;
+        var from=new EvaBodyPose.Sample(destination.rig);EvaShutdownR30.decode(tag,from);
+        var turn=new Quaternionf().rotationY((actor.getYRot()-tag.getFloat("r40_release_yaw"))*Mth.DEG_TO_RAD);
+        var pivot=from.rig.get("root").pivot();
+        from.rotations.put("root",turn.mul(from.rotations.get("root"),new Quaternionf()));
+        from.positions.put("root",turn.transform(new Vector3f(from.positions.get("root")).add(pivot)).sub(pivot));
+        var current=actor.level().isClientSide?actor.getPosition(partial):actor.position();
+        var shift=new Vector3f((float)(tag.getDouble("r40_release_x")-current.x),0,(float)(tag.getDouble("r40_release_z")-current.z))
+                .rotateY(-(180-actor.getYRot())*Mth.DEG_TO_RAD).div(EvaScale.RENDER_SCALE);
+        from.positions.get("root").add(shift);from.dirty();
+        float t=age/6;t=t*t*t*(10+t*(-15+6*t));return blend(from,destination,t);
+    }
     public static float stride(){return data().stride;}
     public static String name(int mode){return switch(mode){case SachielStrike.PILE->"cross";case SachielStrike.HOOK->"hook";case SachielStrike.OVERHEAD->"heavy";case SachielStrike.SHOVE->"shove";case SachielStrike.STOMP->"stomp";default->"jab";};}
     public static boolean left(int mode){return data().clips.get(name(mode)).side.equals("l");}

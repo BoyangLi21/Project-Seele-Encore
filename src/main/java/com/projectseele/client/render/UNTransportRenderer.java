@@ -187,7 +187,26 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
             poses.translate(wanted.x-dispatcher.x,wanted.y-dispatcher.y,wanted.z-dispatcher.z);yaw=entity.renderFlightYaw(partial);
         }
         poses.mulPose(Axis.YP.rotationDegrees(-yaw));
-        if(entity.groundCart()){draw("un_ground_carrier",poses,buffers,light);poses.popPose();return;}
+        if(entity.groundCart())
+        {
+            draw("un_ground_carrier",poses,buffers,light);
+            if(entity.level().getEntity(entity.cargoEntityId()) instanceof EvaUnit01Entity load)
+            {
+                float extension=entity.rig(partial);
+                for(var pad:com.projectseele.entity.UNReceivingCradleR40.pads(load))
+                {
+                    var top=new Vector3f((float)pad.x,(float)pad.y,(float)pad.z);
+                    var base=new Vector3f(Mth.clamp(top.x,-10,10),-.65F,Mth.clamp(top.z,-12,12));
+                    top=new Vector3f(base).lerp(top,extension);
+                    var foot=new Vector3f(top.x,-.65F,top.z);
+                    rod(poses,buffers,light,base,foot,.40F,30);
+                    rod(poses,buffers,light,new Vector3f(base.x,-1.2F,base.z),new Vector3f(foot).add(0,-.45F,0),.25F,42);
+                    rod(poses,buffers,light,foot,new Vector3f(top).add(0,-.16F,0),.35F,58);
+                    rod(poses,buffers,light,new Vector3f(top).add(-1.5F,-.18F,0),new Vector3f(top).add(1.5F,-.18F,0),.18F,24);
+                }
+            }
+            poses.popPose();return;
+        }
         draw("un_transport_body",poses,buffers,light);
         if(com.projectseele.visual.MechanicsR31Review.ENABLED)
         {

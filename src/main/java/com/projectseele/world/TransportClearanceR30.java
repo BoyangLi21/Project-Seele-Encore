@@ -27,12 +27,25 @@ public final class TransportClearanceR30
         if(!loaded)return "正在检查并加载起吊点上方空域";
         double top=level.getMaxBuildHeight(),x=eva.getX(),y=eva.getY(),z=eva.getZ(),radius=Math.max(11,eva.getBbWidth()/2D+2);
         var pose=com.projectseele.entity.EvaBodyPose.sample(eva,1);
-        for(var part:com.projectseele.entity.EvaBodyPose.posedCarrierHulls(eva,pose))
+        Boolean measured=VerticalCarrierSweepR40.clear(level,eva,pose,0,eva.getYRot(),Math.max(1,top-y+1));
+        if(Boolean.FALSE.equals(measured))return "机体或四肢上方有遮挡，等待起吊通道清空";
+        if(measured==null)for(var part:com.projectseele.entity.EvaBodyPose.posedCarrierHulls(eva,pose))
         {
             AABB box=worldHull(eva,part);
             double bottom=Math.max(y+.12,box.minY+.12);
-            if(bottom<top&&level.getBlockCollisions(eva,new AABB(box.minX,bottom,box.minZ,box.maxX,top,box.maxZ)).iterator().hasNext())
-                return "机体或四肢上方有遮挡，等待起吊通道清空";
+            if(bottom<top)
+            {
+                var collisions=level.getBlockCollisions(eva,new AABB(box.minX,bottom,box.minZ,box.maxX,top,box.maxZ)).iterator();
+                if(collisions.hasNext())
+                {
+                    if("r40-airlift".equals(System.getProperty("projectseele.regionalBuild",""))&&level.getGameTime()%100==0)
+                    {
+                        var obstacle=collisions.next().bounds();var at=BlockPos.containing(obstacle.getCenter());
+                        com.projectseele.ProjectSeele.LOGGER.info("R40 pickup clearance obstruction: root={} bodyPart={} obstacle={} block={} state={}",eva.position(),box,obstacle,at,level.getBlockState(at));
+                    }
+                    return "机体或四肢上方有遮挡，等待起吊通道清空";
+                }
+            }
         }
         if(y+HOIST_OFFSET-15<top&&level.getBlockCollisions(eva,new AABB(x-72,y+HOIST_OFFSET-15,z-60,x+72,top,z+60)).iterator().hasNext())
             return "运输机机翼或吊架上方有遮挡，等待空域清空";

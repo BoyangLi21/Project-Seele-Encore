@@ -21,11 +21,23 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid="projectseele")
 public final class AirLiftR30Review
 {
-    private static final boolean R32="r32-airlift".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R40="r40-airlift".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R32=R40||"r32-airlift".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final int UN_SERIAL=Integer.getInteger("projectseele.airReviewUnSerial",0);
+    private static final boolean UN_ONLY=R40&&Boolean.getBoolean("projectseele.airReviewUnOnly");
+    private static final boolean RESUME_RETURN=R40&&Boolean.getBoolean("projectseele.airReviewResumeReturn");
     private static final boolean ENABLED=R32||"r30-airlift".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final TicketType<ChunkPos> TICKET=TicketType.create("r30_airlift_review",Comparator.comparingLong(ChunkPos::toLong),100);
     private static boolean done;private static int age,stage=R32&&Boolean.getBoolean("projectseele.airReviewNervOnly")?4:0,timer;private static FakePlayer operator;private static UUID unId,plugId,nervId;
     private static final JsonObject report=new JsonObject();private static final Set<String> phases=new TreeSet<>();
+    private static final Map<UUID,Integer> landings=new HashMap<>();
+    private static boolean sawNervHead;
+    public static volatile Vec3 observer;
+    public static volatile String reviewPhase="";
+    public static volatile int reviewStage;
+    public static boolean finished(){return R40&&done;}
+    public static void touchdown(EvaUnit01Entity eva)
+    {if(R40&&!done)landings.merge(eva.getUUID(),1,Integer::sum);}
     private static void check(String label,boolean value){report.addProperty(label,value);if(!value)throw new IllegalStateException(label);}
     private static void next(int s){stage=s;timer=0;com.projectseele.ProjectSeele.LOGGER.info("R30 AIRLIFT REVIEW stage={}",stage);}
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
@@ -40,9 +52,19 @@ public final class AirLiftR30Review
             if(operator==null)
             {
                 operator=FakePlayerFactory.get(l,new GameProfile(UUID.fromString("ca19e174-a03b-47a7-adf7-41508fda0e30"),"R30AirController"));operator.getInventory().add(new ItemStack(ModItems.NERV_EMPLOYEE_CARD.get()));operator.getInventory().add(new ItemStack(ModItems.SATELLITE_PHONE.get()));
-                unId=UNRecoveryR22.identity(l,0);nervId=EvaFleetSavedData.get(server).canonicalId(1).orElseThrow();check("registered_original_un",unId!=null);
+                unId=UNRecoveryR22.identity(l,UN_SERIAL);nervId=EvaFleetSavedData.get(server).canonicalId(1).orElseThrow();check("registered_original_un",unId!=null);
             }
-            String up=UNAirLiftR29.phaseName(l,0),np=NervAirLiftR30.phaseName(l);phases.add(stage+":"+up+":"+np);
+            String up=UNAirLiftR29.phaseName(l,UN_SERIAL),np=NervAirLiftR30.phaseName(l);phases.add(stage+":"+up+":"+np);
+            if(R40){reviewPhase=stage<4?up:np;reviewStage=stage;}
+            if(R40)
+            {
+                var id=stage<4?unId:nervId;
+                if(id!=null&&l.getEntity(id) instanceof EvaUnit01Entity watched)
+                {
+                    observer=watched.position();
+                    if(stage==5&&NervAirLiftR30.waitingAtHead(watched))sawNervHead=true;
+                }
+            }
             if(R32)for(UUID id:new UUID[]{unId,nervId})if(id!=null&&l.getEntity(id) instanceof EvaUnit01Entity carried&&EvaAirTransportR31.active(carried))
             {
                 check("no_power_during_pickup",!carried.isUmbilicalConnected());
@@ -61,30 +83,45 @@ public final class AirLiftR30Review
                 }
             }
             if(stage>0){check("no_un_transport_hold",!up.equals("HOLD"));check("no_nerv_transport_hold",!np.equals("HOLD"));}
-            if(timer%100==0)com.projectseele.ProjectSeele.LOGGER.info("R30 AIRLIFT REVIEW stage={} ticks={} un={} nerv={} status={}",stage,timer,up,np,stage<4?UNAirLiftR29.status(l,0):NervAirLiftR30.status(l));
+            if(timer%100==0)com.projectseele.ProjectSeele.LOGGER.info("R30 AIRLIFT REVIEW stage={} ticks={} un={} nerv={} status={}",stage,timer,up,np,stage<4?UNAirLiftR29.status(l,UN_SERIAL):NervAirLiftR30.status(l));
             if(stage==0)
             {
-                if(timer==1)UNRecoveryR22.request(operator.createCommandSourceStack(),0,true);
+                if(R40&&Boolean.getBoolean("projectseele.airReviewResumeGround"))
+                {
+                    if(!(l.getEntity(unId) instanceof EvaPrototypeEntity e)||UNPlugDirector.capsule(e)==null)return;
+                    plugId=UNPlugDirector.capsule(e).getUUID();
+                    if(!UNAirLiftR29.resumeGroundReviewR40(l,UN_SERIAL))return;
+                    report.addProperty("resumed_ground_only",true);next(3);return;
+                }
+                if(RESUME_RETURN)
+                {
+                    if(!(l.getEntity(unId) instanceof EvaPrototypeEntity e)||UNPlugDirector.capsule(e)==null)return;
+                    plugId=UNPlugDirector.capsule(e).getUUID();check("resumed_original_wreck",EvaShutdownR30.wreck(e)&&e.getHealth()==0);
+                    check("return_job_preserved",UNAirLiftR29.active(l,UN_SERIAL));report.addProperty("resumed_return_only",true);next(2);return;
+                }
+                if(timer==1)UNRecoveryR22.request(operator.createCommandSourceStack(),UN_SERIAL,true);
                 if(timer<80||!(l.getEntity(unId) instanceof EvaPrototypeEntity e)||UNPlugDirector.capsule(e)==null)return;
-                plugId=UNPlugDirector.capsule(e).getUUID();check("original_un_at_home",e.position().distanceTo(UNRecoveryR22.home(0))<.1);
-                report.addProperty("un_deliver_reply",UNAirLiftR29.request(operator,0,false,6442,-5980));check("delivery_started",UNAirLiftR29.active(l,0));next(1);return;
+                plugId=UNPlugDirector.capsule(e).getUUID();check("original_un_at_home",e.position().distanceTo(UNRecoveryR22.home(UN_SERIAL))<.1);
+                report.addProperty("un_deliver_reply",UNAirLiftR29.request(operator,UN_SERIAL,false,(int)UNRecoveryR22.home(UN_SERIAL).x,-5980));check("delivery_started",UNAirLiftR29.active(l,UN_SERIAL));next(1);return;
             }
             if(stage<4)
             {
                 if(!(l.getEntity(unId) instanceof EvaPrototypeEntity e))return;check("original_un_identity",e.getUUID().equals(unId));
                 var capsule=UNPlugDirector.capsule(e);check("original_un_capsule_identity",capsule!=null&&capsule.getUUID().equals(plugId));
-                if(stage==1&&!UNAirLiftR29.active(l,0))
+                if(stage==1&&!UNAirLiftR29.active(l,UN_SERIAL))
                 {
+                    if(R40)check("un_outbound_touchdown_once",landings.getOrDefault(unId,0)==1);
                     check("un_delivered",e.getZ()>-6050);check("un_control_released",!e.isNervLogisticsLocked()&&!e.hasActiveCarrierMotion());
-                    e.hurt(l.damageSources().fellOutOfWorld(),100000);check("un_wreck_ready",EvaShutdownR30.wreck(e));report.addProperty("un_recover_reply",UNAirLiftR29.request(operator,0,true,0,0));check("wreck_airlift_started",UNAirLiftR29.active(l,0));next(2);return;
+                    e.hurt(l.damageSources().fellOutOfWorld(),100000);check("un_wreck_ready",EvaShutdownR30.wreck(e));report.addProperty("un_recover_reply",UNAirLiftR29.request(operator,UN_SERIAL,true,0,0));check("wreck_airlift_started",UNAirLiftR29.active(l,UN_SERIAL));next(2);return;
                 }
-                if(stage==2&&!UNAirLiftR29.active(l,0))
+                if(stage==2&&!UNAirLiftR29.active(l,UN_SERIAL))
                 {
-                    check("un_delivered_to_intake",e.position().distanceTo(UNAirLiftR29.apron(0))<.1);check("un_wreck_not_healed",e.getHealth()==0);check("un_waits_before_docking",e.isNervLogisticsLocked()&&e.position().distanceTo(UNRecoveryR22.home(0))>50);
-                    report.addProperty("dock_reply",UNAirLiftR29.requestDock(operator,0));check("ground_dock_started",UNAirLiftR29.active(l,0));next(3);return;
+                    if(R40)check("un_wreck_return_touchdown_once",landings.getOrDefault(unId,0)==(RESUME_RETURN?1:2));
+                    check("un_delivered_to_intake",e.position().distanceTo(UNAirLiftR29.reception(l,UN_SERIAL))<.2);check("un_wreck_not_healed",e.getHealth()==0);check("un_waits_before_docking",e.isNervLogisticsLocked()&&e.position().distanceTo(UNRecoveryR22.home(UN_SERIAL))>50);
+                    report.addProperty("dock_reply",UNAirLiftR29.requestDock(operator,UN_SERIAL));check("ground_dock_started",UNAirLiftR29.active(l,UN_SERIAL));next(3);return;
                 }
-                if(stage==3&&!UNAirLiftR29.active(l,0))
-                {check("un_original_home_reached",e.position().distanceTo(UNRecoveryR22.home(0))<.1);check("wreck_remains_for_repair",e.getHealth()==0&&EvaShutdownR30.wreck(e));next(4);return;}
+                if(stage==3&&!UNAirLiftR29.active(l,UN_SERIAL))
+                {check("un_original_home_reached",e.position().distanceTo(UNRecoveryR22.home(UN_SERIAL))<.1);check("wreck_remains_for_repair",e.getHealth()==0&&EvaShutdownR30.wreck(e)||R40&&EvaBayRepairR33.active(e));if(UN_ONLY){report.addProperty("un_serial",UN_SERIAL);report.addProperty("passed",true);finish(l,path);}else next(4);return;}
             }
             if(stage==4)
             {
@@ -98,11 +135,20 @@ public final class AirLiftR30Review
             }
             if(stage==5&&NervAirLiftR30.phaseName(l).equals("IDLE"))
             {
+                if(R40)
+                {
+                    var original=EvaLogisticsDirector.canonicalUnit(l,1);
+                    check("nerv_original_identity",original!=null&&original.getUUID().equals(nervId));
+                    check("nerv_real_silo_handoff_seen",sawNervHead);
+                    check("nerv_touchdown_once",landings.getOrDefault(nervId,0)==1);
+                    if(NervAirLiftR30.waitingAtHead(original))check("surface_recovery_accepted",EvaLogisticsDirector.requestRecovery(l,1).accepted());
+                    next(6);return;
+                }
                 var e=EvaLogisticsDirector.canonicalUnit(l,1);check("nerv_original_identity",e!=null&&e.getUUID().equals(nervId));check("nerv_waits_on_own_head",NervAirLiftR30.waitingAtHead(e));check("nerv_wreck_retained",EvaShutdownR30.wreck(e));
                 var result=EvaLogisticsDirector.requestRecovery(l,1);report.addProperty("nerv_ground_recovery",result.message());check("surface_recovery_accepted",result.accepted());next(6);return;
             }
             if(stage==6&&EvaLogisticsDirector.status(l,1).phase().equals("PARKED"))
-            {var e=EvaLogisticsDirector.canonicalUnit(l,1);check("nerv_wreck_recovered_to_cage",e!=null&&e.getUUID().equals(nervId)&&EvaShutdownR30.wreck(e));report.addProperty("passed",true);finish(l,path);}
+            {var e=EvaLogisticsDirector.canonicalUnit(l,1);check("nerv_wreck_recovered_to_cage",e!=null&&e.getUUID().equals(nervId)&&(EvaShutdownR30.wreck(e)||R40&&EvaBayRepairR33.active(e)));report.addProperty("passed",true);finish(l,path);}
         }
         catch(Exception error){report.addProperty("passed",false);report.addProperty("stage",stage);report.addProperty("error",error.toString());com.projectseele.ProjectSeele.LOGGER.error("R30 airlift regression failed",error);finish(l,path);}
     }

@@ -98,10 +98,28 @@ public final class RegionalGatewayDirector
         if (group.getCageWidth() != 15 || group.getCageDepth() != 15 || group.getCageHeight() != 9)
             throw new IllegalStateException("Regional lift requires Moving Elevators maxCabinHorizontalSize=15");
         group.setTargetSpeed(0.85);
+        for(int y:new int[]{LOWER,UPPER})
+        {
+            installWallButton(level,new BlockPos(-355,y+1,740),Direction.NORTH);
+            if(carAt(level,y))
+                for(int z:new int[]{747,750})installWallButton(level,new BlockPos(-366,y+1,z),Direction.EAST);
+        }
         RUNTIMES.get(level).ready = true;
         ProjectSeele.LOGGER.info("REGIONAL GATE READY nativeCar={}x{}x{} anchor={} floors={}",
                 group.getCageSizeX(), group.getCageSizeY(), group.getCageSizeZ(), group.getCageAnchorBlockPos(UPPER), group.getFloorCount());
         return true;
+    }
+
+    private static void installWallButton(ServerLevel level,BlockPos pos,Direction facing)
+    {
+        // Controls sit on fixed jamb/cabin walls, outside both moving doors.
+        var backing=level.getBlockState(pos.relative(facing.getOpposite()));
+        var current=level.getBlockState(pos);
+        if(!backing.isCollisionShapeFullBlock(level,pos.relative(facing.getOpposite()))
+                ||!current.isAir()&&!(current.getBlock() instanceof net.minecraft.world.level.block.ButtonBlock))return;
+        set(level,pos,Blocks.POLISHED_BLACKSTONE_BUTTON.defaultBlockState()
+                .setValue(net.minecraft.world.level.block.ButtonBlock.FACE,net.minecraft.world.level.block.state.properties.AttachFace.WALL)
+                .setValue(net.minecraft.world.level.block.ButtonBlock.FACING,facing));
     }
 
     public static boolean validCard(ItemStack stack)
@@ -142,19 +160,46 @@ public final class RegionalGatewayDirector
 
     public static boolean request(ServerLevel level, int target, ServerPlayer player)
     {
+        if(!active(level)||(target!=LOWER&&target!=UPPER))return false;
         ElevatorGroup group = group(level);
-        if (group == null || group.isMoving()) return false;
-        if (carAt(level, target)) return true;
+        if (group == null || group.isMoving()) return rejected(target,"group unavailable or moving");
         Runtime state = RUNTIMES.get(level);
+        if (carAt(level, target)){state.doorsClosedUntil=0;return true;}
+        int source=target==LOWER?UPPER:LOWER;
+        for(int cz=46;cz<=47;cz++)
+        {ChunkPos at=new ChunkPos(-23,cz);level.getChunkSource().addRegionTicket(ATTACH,at,2,at);level.getChunk(-23,cz);}
+        if(!carAt(level,source))return rejected(target,"source car sensors not ready");
         state.doorsClosedUntil = level.getGameTime() + 40;
         for (int y : new int[]{LOWER, UPPER})
         {
             door(level, y, 741, false);
             if (carAt(level, y)) door(level, y, 743, false);
         }
-        group.onDisplayPress(target, 0, player);
-        return group.isMoving();
+        if(Boolean.getBoolean("projectseele.r40LiftDebug"))
+            for(int y:new int[]{LOWER,UPPER})
+            {
+                var anchor=group.getCageAnchorBlockPos(y);int index=group.getFloorNumber(y);
+                boolean valid=S20MovingElevatorsAdapter.validCommandCageSource(level,group,anchor);
+                boolean capture=com.supermartijn642.movingelevators.elevator.ElevatorCage.canCreateCage(level,anchor,group.getCageSizeX(),group.getCageSizeY(),group.getCageSizeZ(),null);
+                var fromController=level.getBlockEntity(controllerPos(y));var destination=level.getBlockEntity(controllerPos(target));
+                boolean place=fromController instanceof ControllerBlockEntity a&&destination instanceof ControllerBlockEntity b&&group.canCageBePlacedAt(b,a,null);
+                ProjectSeele.LOGGER.info("R40 GATE DIAGNOSTIC floor={} target={} index={} physicalCar={} validSource={} nativeCapture={} nativeAvailable={} destinationClear={} size={}x{}x{} anchor={} facing={}",y,target,index,carAt(level,y),valid,capture,index>=0&&group.isCageAvailableAt(index,true,null),place,group.getCageSizeX(),group.getCageSizeY(),group.getCageSizeZ(),anchor,group.facing);
+                if(!capture)for(var q:BlockPos.betweenClosed(anchor,anchor.offset(group.getCageSizeX()-1,group.getCageSizeY()-1,group.getCageSizeZ()-1)))
+                    if(!com.supermartijn642.movingelevators.elevator.ElevatorCage.canBlockBeIgnored(level,q)&&!com.supermartijn642.movingelevators.elevator.ElevatorCage.canBlockBeInCage(level,q))ProjectSeele.LOGGER.info("R40 GATE IMMOBILE {} {}",q,level.getBlockState(q));
+            }
+        // Select the positively identified full car, rather than asking the
+        // dependency to infer a source from all cached floor candidates.
+        int from=group.getFloorNumber(source),to=group.getFloorNumber(target);
+        if(from<0||to<0)return rejected(target,"floor indices not ready");
+        if(!group.isCageAvailableAt(from,true,player))return rejected(target,"native source availability");
+        var a=level.getBlockEntity(controllerPos(source));var b=level.getBlockEntity(controllerPos(target));
+        if(!(a instanceof ControllerBlockEntity origin)||!(b instanceof ControllerBlockEntity destination)
+                ||!group.canCageBePlacedAt(destination,origin,player))return rejected(target,"destination controller or native placement");
+        group.onDisplayPress(source,to-from,player);
+        return group.isMoving()||rejected(target,"native display did not start capture");
     }
+    private static boolean rejected(int target,String stage)
+    {ProjectSeele.LOGGER.warn("NERV GATE request rejected: target={} stage={}",target,stage);return false;}
 
     public static boolean carAt(ServerLevel level, int y)
     {

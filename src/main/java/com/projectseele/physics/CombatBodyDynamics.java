@@ -22,6 +22,8 @@ import java.util.*;
 public final class CombatBodyDynamics
 {
     private static final float SCALE=CombatBodyProfiles.BLOCK_TO_PHYSICS;
+    private static final net.minecraft.server.level.TicketType<net.minecraft.world.level.ChunkPos> TERRAIN_TICKET=
+            net.minecraft.server.level.TicketType.create("projectseele_articulated_terrain",Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong),80);
     private static final Map<LivingEntity,State> SERVER=new IdentityHashMap<>();
     private static final com.projectseele.util.WeakIdentityMap<LivingEntity,ClientState> CLIENT=new com.projectseele.util.WeakIdentityMap<>();
     private record History(long tick,Vec3 position,float yaw,Map<String,Matrix4f> matrices) {}
@@ -33,12 +35,15 @@ public final class CombatBodyDynamics
     {
         CombatBodyProfiles.Profile profile;ArticulatedBody simulation;EvaBodyPose.Sample template,pose,resting;
         boolean groundImpact,thrown;
-        Vec3 origin,position;float yaw;AABB bounds,terrainCoverage;long started;int age,stable,recoveryAge=-1;float recoveryStart,recoveryYaw,groundY;Vector3f recoveryOffset,endShift;
+        double stitchedMax;String stitchedBone="";
+        Vec3 origin,position;float yaw;AABB bounds,terrainCoverage;long started;int age,stable,pendingTerrain,recoveryAge=-1;float recoveryStart,recoveryYaw,groundY;Vector3f recoveryOffset,endShift;
     }
     private static final class ClientState
     {EvaBodyPose.Sample previous,current;Vec3 previousPosition,position;AABB bounds;float yaw;long at;int mode;}
     public static boolean active(LivingEntity entity)
-    {return !SAMPLING.get().contains(entity)&&(entity.level().isClientSide?CLIENT.get(entity)!=null:SERVER.containsKey(entity));}
+    {return !scripted(entity)&&!SAMPLING.get().contains(entity)&&(entity.level().isClientSide?CLIENT.get(entity)!=null:SERVER.containsKey(entity));}
+    private static boolean scripted(LivingEntity entity)
+    {return entity instanceof FirstBattleSignals.Actor actor&&actor.firstBattleSignals().active(entity);}
     public static boolean available(LivingEntity entity)
     {var p=CombatBodyProfiles.get(entity);return p!=null&&p.recovery()!=null;}
     public static boolean ownsGroundAction(EvaUnit01Entity eva)
@@ -71,7 +76,7 @@ public final class CombatBodyDynamics
     {
         var actor=event.getEntity();if(actor.level().isClientSide)return;
         if(actor instanceof EvaUnit01Entity e&&ownsGroundAction(e))ACTION_OWNERS.add(e);
-        if(actor.tickCount%2!=0||active(actor)||!(actor instanceof EvaUnit01Entity||actor instanceof SachielEntity)||!available(actor))return;
+        if(actor.tickCount%2!=0||active(actor)||scripted(actor)||!(actor instanceof EvaUnit01Entity||actor instanceof SachielEntity)||!available(actor))return;
         if(actor instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)))return;
         var profile=CombatBodyProfiles.get(actor);var pose=raw(actor,0);AnatomicalLimbConstraints.apply(pose,profile);
         HISTORY.put(actor,new History(actor.level().getGameTime(),actor.position(),actor.getYRot(),CombatBodyProfiles.physicalMatrices(pose,profile)));
@@ -111,7 +116,7 @@ public final class CombatBodyDynamics
     {return start(entity,point,direction,strength,null);}
     private static boolean start(LivingEntity entity,Vec3 point,Vec3 direction,float strength,EvaBodyPose.Sample releasePose)
     {
-        if(!(entity.level() instanceof ServerLevel level)||!available(entity))return false;
+        if(!(entity.level() instanceof ServerLevel level)||!available(entity)||scripted(entity))return false;
         if(entity instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||eva.hasActiveCarrierMotion()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)))return false;
         if(EvaCombatR31.holds(entity))return false;
         var previous=SERVER.get(entity);
@@ -164,12 +169,34 @@ public final class CombatBodyDynamics
         State state=SERVER.get(entity);if(state==null)return false;state.thrown=true;
         state.simulation.velocity(velocity.toVector3f().rotateY(-(180-state.yaw)*Mth.DEG_TO_RAD).mul(20*SCALE));return true;
     }
-    private static void addTerrain(ServerLevel level,LivingEntity entity,State s)
+    private static boolean retainTerrain(ServerLevel level,AABB coverage)
     {
-        s.simulation.clearTerrain();s.terrainCoverage=s.bounds.inflate(40,16,40);
+        boolean ready=true;
+        for(int x=Mth.floor(coverage.minX)>>4;x<=Mth.floor(coverage.maxX)>>4;x++)
+            for(int z=Mth.floor(coverage.minZ)>>4;z<=Mth.floor(coverage.maxZ)>>4;z++)
+            {
+                var chunk=new net.minecraft.world.level.ChunkPos(x,z);level.getChunkSource().addRegionTicket(TERRAIN_TICKET,chunk,2,chunk);
+                if(!level.getChunkSource().hasChunk(x,z))ready=false;
+            }
+        return ready;
+    }
+    private static boolean addTerrain(ServerLevel level,LivingEntity entity,State s)
+    {
+        var coverage=s.bounds.inflate(40,16,40);
+        if(!retainTerrain(level,coverage))
+        {
+            s.terrainCoverage=null;
+            if(++s.pendingTerrain==1&&"r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
+                ProjectSeele.LOGGER.info("R40 articulated terrain waiting: actor={} coverage={}",entity.getUUID(),coverage);
+            return false;
+        }
+        if(s.pendingTerrain>0&&"r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
+            ProjectSeele.LOGGER.info("R40 articulated terrain ready: actor={} waitedTicks={}",entity.getUUID(),s.pendingTerrain);
+        s.pendingTerrain=0;s.simulation.clearTerrain();s.terrainCoverage=coverage;
         List<AABB> boxes=new ArrayList<>();for(var shape:level.getBlockCollisions(entity,s.terrainCoverage))boxes.addAll(shape.toAabbs());
         boxes=merge(boxes,true);boxes=merge(boxes,false);Quaternionf orientation=new Quaternionf().rotationY(-(180-s.yaw)*Mth.DEG_TO_RAD);
         for(var b:boxes)s.simulation.addStaticBox(local(s,b.getCenter()),new Vector3f((float)b.getXsize(),(float)b.getYsize(),(float)b.getZsize()).mul(SCALE*.5F),orientation);
+        return true;
     }
     private static List<AABB> merge(List<AABB> boxes,boolean x)
     {
@@ -220,7 +247,7 @@ public final class CombatBodyDynamics
         for(var entry:new ArrayList<>(SERVER.entrySet()))
         {
             LivingEntity entity=entry.getKey();State s=entry.getValue();
-            if(entity.isRemoved()||entity instanceof EvaUnit01Entity e&&(e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaAirTransportR31.active(e))){cancel(entity);continue;}
+            if(entity.isRemoved()||scripted(entity)||entity instanceof EvaUnit01Entity e&&(e.isNervLogisticsLocked()||EvaAirTransportR31.active(e))){cancel(entity);acknowledgeHandoff(entity);continue;}
             try
             {
                 s.age++;
@@ -228,16 +255,31 @@ public final class CombatBodyDynamics
                 {
                     updateStandingActors(entity,s);
                     var needed=s.bounds.inflate(12,8,12);
-                    if(!s.terrainCoverage.contains(new Vec3(needed.minX,needed.minY,needed.minZ))
+                    if(s.terrainCoverage==null||!s.terrainCoverage.contains(new Vec3(needed.minX,needed.minY,needed.minZ))
                             ||!s.terrainCoverage.contains(new Vec3(needed.maxX,needed.maxY,needed.maxZ)))
-                        addTerrain((ServerLevel)entity.level(),entity,s);
+                    {if(!addTerrain((ServerLevel)entity.level(),entity,s)){entity.setDeltaMovement(Vec3.ZERO);continue;}}
+                    else if(s.age%20==0&&!retainTerrain((ServerLevel)entity.level(),s.terrainCoverage))
+                    {s.terrainCoverage=null;entity.setDeltaMovement(Vec3.ZERO);continue;}
                     if(s.age>2)s.simulation.step(.05F);var frame=s.simulation.frame();s.bounds=worldBounds(s,frame.min(),frame.max());
                     if(!s.groundImpact&&s.age>5&&frame.groundImpulse()>4)
                     {s.groundImpact=true;groundImpact((ServerLevel)entity.level(),world(s,frame.impactPoint()));}
                     var hip=new Vector3f(s.profile.rig().get("leg_l").pivot()).add(s.profile.rig().get("leg_r").pivot()).mul(.5F*CombatBodyProfiles.MODEL_TO_PHYSICS);
                     Vector3f moved=frame.deformation().get("torso_lower").transformPosition(new Vector3f(hip));
                     Vector3f offset=new Vector3f(moved.x-hip.x,frame.min().y,moved.z-hip.z);s.position=world(s,offset);
-                    s.pose=CombatBodyProfiles.render(s.template,frame.deformation(),offset);stitch(s.pose,s.profile);
+                    s.pose=CombatBodyProfiles.render(s.template,frame.deformation(),offset);
+                    Map<String,Vector3f> beforeStitch=null;
+                    if("r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
+                    {
+                        beforeStitch=new HashMap<>();
+                        for(var row:s.profile.definition().getAsJsonArray("bodies"))
+                        {String n=row.getAsJsonObject().get("name").getAsString();beforeStitch.put(n,s.pose.matrix(n).transformPosition(new Vector3f(s.pose.rig.get(n).pivot())));}
+                    }
+                    stitch(s.pose,s.profile);
+                    if(beforeStitch!=null)for(var before:beforeStitch.entrySet())
+                    {
+                        var n=before.getKey();double change=s.pose.matrix(n).transformPosition(new Vector3f(s.pose.rig.get(n).pivot())).distance(before.getValue())*EvaScale.RENDER_SCALE;
+                        if(change>s.stitchedMax){s.stitchedMax=change;s.stitchedBone=n;}
+                    }
                     s.stable=frame.supportContacts()>1&&frame.speed()<.40F?s.stable+1:0;
                     var beat=CombatFeelR31.beat(entity);
                     if(s.stable>0&&s.age>10&&s.thrown)
@@ -249,6 +291,8 @@ public final class CombatBodyDynamics
                 entity.setPos(s.position.x,s.position.y,s.position.z);entity.setYRot(s.yaw);entity.yBodyRot=entity.yHeadRot=s.yaw;entity.setBoundingBox(s.bounds);entity.setDeltaMovement(Vec3.ZERO);entity.resetFallDistance();entity.setOnGround(s.recoveryAge>=0||s.stable>0);
                 if(s.stable>=12&&entity instanceof EvaUnit01Entity eva&&EvaShutdownR30.disabled(eva))
                 {
+                    if("r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
+                        ProjectSeele.LOGGER.info("R40 articulated rest: actor={} ticks={} root={} maxStitchBlocks={} bone={}",entity.getUUID(),s.age,s.position,s.stitchedMax,s.stitchedBone);
                     AABB sole=new AABB(s.bounds.minX,s.bounds.minY-.4,s.bounds.minZ,s.bounds.maxX,s.bounds.minY+.35,s.bounds.maxZ);double ground=Double.NEGATIVE_INFINITY;
                     for(var shape:entity.level().getBlockCollisions(entity,sole))for(var box:shape.toAabbs())if(box.maxY<=s.bounds.minY+.35)ground=Math.max(ground,box.maxY);
                     if(Double.isFinite(ground)){double lift=ground+.025-s.bounds.minY;s.position=s.position.add(0,lift,0);s.bounds=s.bounds.move(0,lift,0);entity.setPos(s.position.x,s.position.y,s.position.z);entity.setBoundingBox(s.bounds);}
@@ -334,6 +378,8 @@ public final class CombatBodyDynamics
     }
     public static void receive(LivingEntity entity,ClientboundCombatBodyPose packet)
     {
+        if(entity instanceof FirstBattleSignals.Actor actor&&actor.firstBattleSignals().active(entity))
+        {CLIENT.remove(entity);return;}
         if(packet.mode()==0){CLIENT.remove(entity);entity.setPos(packet.position().x,packet.position().y,packet.position().z);entity.setYRot(packet.yaw());entity.yBodyRot=entity.yHeadRot=packet.yaw();entity.setDeltaMovement(Vec3.ZERO);entity.resetFallDistance();entity.refreshDimensions();entity.setOnGround(true);return;}
         var profile=CombatBodyProfiles.get(entity);if(profile==null)return;var pose=new EvaBodyPose.Sample(profile.rig());EvaShutdownR30.decode(packet.pose(),pose);
         ClientState s=CLIENT.get(entity);if(s==null){s=new ClientState();s.current=pose;s.position=packet.position();CLIENT.put(entity,s);if(entity instanceof EvaUnit01Entity eva)eva.beginPhysicalControlR35();}

@@ -19,7 +19,8 @@ import java.util.*;
 public final class LiftPassengerR20Review
 {
     private static final boolean DESCENT="r22-lift-descend".equals(System.getProperty("projectseele.regionalBuild",""));
-    private static final boolean ALL="r22-lifts-all".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R40="r40-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean ALL=R40||"r22-lifts-all".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R26="r26-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R25=R26||"r25-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
     public static final boolean R22=R25||ALL||DESCENT||"r22-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
@@ -28,7 +29,7 @@ public final class LiftPassengerR20Review
     public static volatile net.minecraft.core.BlockPos controllerPosition;
     public static volatile boolean clientReady,finished,moving;
     public static volatile int tripAge;
-    private static int age,index=DESCENT?3:R21?2:"r20-lift-rest".equals(System.getProperty("projectseele.regionalBuild",""))?4:0,stage,timer;
+    private static int age,index=R40?Integer.getInteger("projectseele.r40LiftStart",0):DESCENT?3:R21?2:"r20-lift-rest".equals(System.getProperty("projectseele.regionalBuild",""))?4:0,stage,timer;
     private static final JsonArray results=new JsonArray();
     private static final JsonArray damageEvents=new JsonArray();
     @SubscribeEvent public static void hurt(net.minecraftforge.event.entity.living.LivingHurtEvent e)
@@ -39,20 +40,35 @@ public final class LiftPassengerR20Review
         ProjectSeele.LOGGER.warn("R21 LIFT DAMAGE {}",r);
     }
     private static double minimumFloorError=100,maximumWallOverflow;
-    private static final String[] IDS=R26?new String[]{FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION,FacilityLiftsR25.OBSERVATION}:R25?new String[]{FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION,FacilityLiftsR25.OBSERVATION}:new String[]{S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,NervLiftPassengerSync.GATEWAY,NervLiftPassengerSync.GATEWAY,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID};
-    private static final int[] FROM=R26?new int[]{-461,-364,-448,-434,-420,-406,-392,-378,-394,-367}:R25?new int[]{-448,-392,-434,-420,-406,-448,-394,-367}:new int[]{-566,-448,-442,81,-466,81,-442,-370,-388,-340};
-    private static final int[] TO=R26?new int[]{-364,-448,-434,-420,-406,-392,-378,-461,-367,-394}:R25?new int[]{-392,-434,-420,-406,-448,-434,-367,-394}:new int[]{-448,-566,81,-442,81,-466,-370,-394,-340,-388};
+    private static final String[] IDS=R40?tripsR40().stream().map(Trip::id).toArray(String[]::new):R26?new String[]{FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION,FacilityLiftsR25.OBSERVATION}:R25?new String[]{FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION,FacilityLiftsR25.OBSERVATION}:new String[]{S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,NervLiftPassengerSync.GATEWAY,NervLiftPassengerSync.GATEWAY,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID};
+    private static final int[] FROM=R40?tripsR40().stream().mapToInt(Trip::from).toArray():R26?new int[]{-461,-364,-448,-434,-420,-406,-392,-378,-394,-367}:R25?new int[]{-448,-392,-434,-420,-406,-448,-394,-367}:new int[]{-566,-448,-442,81,-466,81,-442,-370,-388,-340};
+    private static final int[] TO=R40?tripsR40().stream().mapToInt(Trip::to).toArray():R26?new int[]{-364,-448,-434,-420,-406,-392,-378,-461,-367,-394}:R25?new int[]{-392,-434,-420,-406,-448,-434,-367,-394}:new int[]{-448,-566,81,-442,81,-466,-370,-394,-340,-388};
+    private record Trip(String id,int from,int to) {}
+    private static List<Trip> tripsR40()
+    {
+        var trips=new ArrayList<Trip>();
+        append(trips,S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,-566,-448,-423,-419,-409,-448,-566);
+        append(trips,S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,-442,75,-442);
+        append(trips,NervLiftPassengerSync.GATEWAY,-466,81,-466);
+        append(trips,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,-442,-394,-370,-442);
+        append(trips,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID,-388,-340,-388);
+        append(trips,FacilityLiftsR25.EAST,-461,-448,-434,-420,-406,-392,-378,-364,-461);
+        append(trips,FacilityLiftsR25.OBSERVATION,-394,-367,-394);
+        return trips;
+    }
+    private static void append(List<Trip> trips,String id,int... floors)
+    {for(int i=1;i<floors.length;i++)trips.add(new Trip(id,floors[i-1],floors[i]));}
     private static void require(boolean value,String why){if(!value)throw new IllegalStateException(why);}
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent e)
     {
         if(!ENABLED||finished||e.phase!=TickEvent.Phase.END||!clientReady||e.getServer().getPlayerList().getPlayers().isEmpty())return;
-        Path world=e.getServer().getWorldPath(LevelResource.ROOT).normalize();require(world.getFileName().toString().equals(R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R22?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":"SEELE_R20_REVIEW"),"Lift review boundary");
+        Path world=e.getServer().getWorldPath(LevelResource.ROOT).normalize();require(world.getFileName().toString().equals(R40?"SEELE_FIELD_R40_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R22?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":"SEELE_R20_REVIEW"),"Lift review boundary");
         var player=e.getServer().getPlayerList().getPlayers().get(0);var level=e.getServer().getLevel(FacilitySchemaV2.DIMENSION);
         try
         {
             if(++age>15000)throw new IllegalStateException("R20 lift suite timeout");
             if(DESCENT&&index==4){write(world,"");finished=true;return;}
-            if((R21||R22)&&!R25){FROM[3]=75;TO[2]=75;if(index==4&&!ALL)index=6;}
+            if((R21||R22)&&!R25&&!R40){FROM[3]=75;TO[2]=75;if(index==4&&!ALL)index=6;}
             if(index==IDS.length||R21&&index==8){write(world,"");finished=true;return;}
             var spec=NervLiftPassengerSync.managedLifts(level).stream().filter(s->s.id().equals(IDS[index])).findFirst().orElseThrow();
             var from=spec.stops().stream().filter(s->s.walkY()==FROM[index]).findFirst().orElseThrow();var to=spec.stops().stream().filter(s->s.walkY()==TO[index]).findFirst().orElseThrow();
@@ -66,9 +82,18 @@ public final class LiftPassengerR20Review
                 ProjectSeele.LOGGER.info("R20 lift setup {} {} -> {}",spec.id(),FROM[index],TO[index]);
                 var card=new net.minecraft.world.item.ItemStack(com.projectseele.registry.ModItems.TERMINAL_DOGMA_ACCESS_CARD.get());
                 if(!player.getInventory().contains(card))player.getInventory().add(card);
+                if(R40)player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND,card.copy());
                 player.setGameMode(GameType.CREATIVE);player.getAbilities().flying=false;player.onUpdateAbilities();
-                player.teleportTo(level,from.cabinCentre().getX()+.5,from.walkY(),from.cabinCentre().getZ()+(spec.id().equals(NervLiftPassengerSync.GATEWAY)?-11.5:7.5),180,0);
-                if(spec.id().equals(NervLiftPassengerSync.GATEWAY))RegionalGatewayDirector.request(level,FROM[index],player);else group.onDisplayPress(FROM[index],0,player);stage=1;timer=0;
+                double distance=spec.id().equals(NervLiftPassengerSync.GATEWAY)?11.5:7.5;
+                player.teleportTo(level,from.cabinCentre().getX()+.5+from.exit().getStepX()*distance,from.walkY(),from.cabinCentre().getZ()+.5+from.exit().getStepZ()*distance,from.exit().getOpposite().toYRot(),0);
+                if(R40)
+                {
+                    var call=spec.id().equals(NervLiftPassengerSync.GATEWAY)?new net.minecraft.core.BlockPos(-355,FROM[index]+1,740):S20PhysicalElevatorDirector.exteriorCallPosition(from);
+                    require(level.getBlockState(call).getBlock() instanceof net.minecraft.world.level.block.ButtonBlock,"Missing exterior call button: "+call);
+                    if(spec.id().equals(NervLiftPassengerSync.GATEWAY))RegionalGatewayDirector.request(level,FROM[index],player);
+                    else require(S20MovingElevatorsAdapter.handleExternalCall(player,call),"Exterior call rejected");
+                }
+                else if(spec.id().equals(NervLiftPassengerSync.GATEWAY))RegionalGatewayDirector.request(level,FROM[index],player);else group.onDisplayPress(FROM[index],0,player);stage=1;timer=0;
             }
             else if(stage==1)
             {

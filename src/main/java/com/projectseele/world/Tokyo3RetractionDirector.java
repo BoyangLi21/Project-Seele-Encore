@@ -637,8 +637,14 @@ public final class Tokyo3RetractionDirector
                 : ThirdTokyoSurfaceBuilder.armouredTowers())
         {
             BlockPos core = origin.offset(tower.x(), 0, tower.z());
-            BlockState state = level.getBlockState(core);
-            if (state.is(ModBlocks.RETRACTABLE_BUILDING_CORE.get()))
+            // This status refresh also runs while the player is deep below or
+            // far from the city. Never synchronously acquire a remote chunk
+            // from inside the server-tick registration pass.
+            var loaded = level.getChunkSource().getChunkNow(core.getX() >> 4, core.getZ() >> 4);
+            if (loaded == null) continue;
+            BlockState state = loaded.getBlockState(core);
+            if (state.is(ModBlocks.RETRACTABLE_BUILDING_CORE.get())
+                    && state.getValue(RetractableBuildingCoreBlock.ARMED) != armed)
             {
                 level.setBlock(core,
                         state.setValue(RetractableBuildingCoreBlock.ARMED, armed),

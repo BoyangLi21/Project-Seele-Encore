@@ -68,7 +68,9 @@ public final class EvaBayRepairR33
         if(elapsed>=DURATION)
         {
             e.setHealth(e.getMaxHealth());data.remove("R33Repair");e.getEntityData().set(ELAPSED,-1);
-            EvaShutdownR30.clear(e);e.enterHangarStandby();
+            EvaShutdownR30.clear(e);
+            if(e instanceof EvaPrototypeEntity){e.setYRot(0);e.setYHeadRot(0);e.setYBodyRot(0);}
+            e.enterHangarStandby();
             ProjectSeele.LOGGER.info("EVA bay repair complete: originalEva={} health={}",e.getUUID(),e.getHealth());
         }
     }

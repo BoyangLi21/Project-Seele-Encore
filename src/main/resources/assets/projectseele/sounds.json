@@ -291,8 +291,8 @@
     "subtitle": "subtitles.projectseele.eva_berserk_roar",
     "sounds": [
       {
-        "name": "projectseele:eva_berserk_roar",
-        "attenuation_distance": 224,
+        "name": "projectseele:eva_berserk_performed_r40",
+        "attenuation_distance": 384,
         "stream": false
       }
     ]

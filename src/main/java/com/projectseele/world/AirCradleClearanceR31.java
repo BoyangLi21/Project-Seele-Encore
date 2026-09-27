@@ -71,6 +71,17 @@ final class AirCradleClearanceR31
         float startPitch=EvaAirTransportR31.active(eva)?EvaAirTransportR31.acceptedPitch(eva):0;
         float endPitch=EvaAirTransportR31.active(eva)?EvaAirTransportR31.pitch(eva,0):0;
         float startYaw=eva.getYRot(),turn=Mth.wrapDegrees(targetYaw-startYaw);
+        if(delta.lengthSqr()>1e-12&&Math.abs(endPitch-startPitch)<1e-4&&Math.abs(turn)<1e-4
+                &&eva.level() instanceof net.minecraft.server.level.ServerLevel level)
+        {
+            var pose=EvaAirTransportR31.active(eva)?EvaAirTransportR31.origin(eva):EvaBodyPose.sample(eva,0);
+            Boolean measured=VerticalCarrierSweepR40.clearTranslationAt(level,eva,pose,startPitch,startYaw,eva.position(),delta);
+            if(measured!=null)
+            {
+                if(measured)EvaAirTransportR31.acceptPitch(eva,endPitch);else EvaAirTransportR31.holdAtPitch(eva,startPitch);
+                return measured;
+            }
+        }
         float rotationRatio=EvaAirTransportR31.adaptive(eva)?2:1;
         int pitchSteps=Math.max(1,Mth.ceil(Math.abs(endPitch-startPitch)*rotationRatio/.5F));
         int yawSteps=Math.max(1,Mth.ceil(Math.abs(turn)/.5F));
@@ -117,10 +128,62 @@ final class AirCradleClearanceR31
         if(!Double.isFinite(lift)||lift>4)throw new IllegalStateException("运输姿态与落点高度不相容，请检查机体姿态");
         return floor.add(0,lift,0);
     }
+    /** Real bearing surface under the lowest carried parts, including a prone
+     * body. Transport positions are kinematic, so Entity.onGround is stale. */
+    static Vec3 touchdownContact(EvaUnit01Entity eva)
+    {return touchdownContact(eva,null);}
+    static Vec3 touchdownContact(EvaUnit01Entity eva,UNTransportEntity receiver)
+    {
+        float pitch=EvaAirTransportR31.active(eva)?EvaAirTransportR31.acceptedPitch(eva):0;
+        if(Math.abs(pitch)>.5F)return null;
+        var hulls=new ArrayList<AABB>();double lowest=Double.POSITIVE_INFINITY;
+        for(var local:sections(eva))
+        {
+            var box=transformed(eva,local,eva.position(),pitch,eva.getYRot());
+            hulls.add(box);lowest=Math.min(lowest,box.minY);
+        }
+        for(var hull:hulls)
+        {
+            if(hull.minY>lowest+.12)continue;
+            var sole=new AABB(hull.minX,hull.minY-.16,hull.minZ,hull.maxX,hull.minY+.05,hull.maxZ);
+            for(var shape:eva.level().getBlockCollisions(eva,sole))for(var floor:shape.toAabbs())
+            {
+                if(floor.maxY<sole.minY||floor.maxY>sole.maxY||!floor.intersects(sole))continue;
+                return new Vec3((Math.max(sole.minX,floor.minX)+Math.min(sole.maxX,floor.maxX))*.5,
+                        floor.maxY,(Math.max(sole.minZ,floor.minZ)+Math.min(sole.maxZ,floor.maxZ))*.5);
+            }
+        }
+        if(receiver!=null&&receiver.groundCart()&&receiver.level()==eva.level())
+        {
+            Vec3 articulated=UNReceivingCradleR40.contact(eva,receiver);
+            if(articulated!=null)return articulated;
+            // The owned ground dolly is a kinematic mechanical support, not a
+            // terrain block. These are the rendered un_ground_carrier deck
+            // dimensions; never invent a ground plane at the nominal endpoint.
+            double top=receiver.getY()+.02;AABB deck=null;
+            for(double x:new double[]{-12.2,12.2})for(double z:new double[]{-14,14})
+            {
+                var corner=new org.joml.Vector3f((float)x,0,(float)z).rotateY(-receiver.getYRot()*Mth.DEG_TO_RAD);
+                var point=receiver.position().add(corner.x,0,corner.z);var box=new AABB(point.x,top-.4,point.z,point.x,top,point.z);
+                deck=deck==null?box:deck.minmax(box);
+            }
+            for(var hull:hulls)
+                if(Math.abs(hull.minY-top)<.16&&hull.maxX>deck.minX&&hull.minX<deck.maxX&&hull.maxZ>deck.minZ&&hull.minZ<deck.maxZ)
+                    return new Vec3((Math.max(hull.minX,deck.minX)+Math.min(hull.maxX,deck.maxX))*.5,top,
+                            (Math.max(hull.minZ,deck.minZ)+Math.min(hull.maxZ,deck.maxZ))*.5);
+        }
+        return null;
+    }
     static float landingYaw(EvaUnit01Entity eva,Vec3 destination,float preferred)
     {
         for(float yaw:new float[]{preferred,preferred+90,preferred-90,preferred+180})
         {
+            if(eva.level() instanceof net.minecraft.server.level.ServerLevel level)
+            {
+                var pose=EvaAirTransportR31.active(eva)?EvaAirTransportR31.origin(eva):EvaBodyPose.sample(eva,0);
+                Boolean corridor=VerticalCarrierSweepR40.clearAt(level,eva,pose,0,yaw,destination,Math.max(1,level.getMaxBuildHeight()-destination.y+1));
+                if(Boolean.FALSE.equals(corridor))continue;
+            }
             boolean clear=true;
             for(var local:sections(eva))
             {
