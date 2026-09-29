@@ -152,7 +152,7 @@ public final class UNAnnexR20
     {
         var branch=net.minecraft.commands.Commands.literal("un01");
         for(String a:new String[]{"status","drain","door","fill"})branch.then(net.minecraft.commands.Commands.literal(a).executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);String text=l==null?"地下维度未加载":request(l,a,c.getSource().getPlayerOrException());c.getSource().sendSuccess(()->Component.literal(text),false);return 1;}));
-        for(String destination:new String[]{"control","gantry"})branch.then(net.minecraft.commands.Commands.literal("visit").then(net.minecraft.commands.Commands.literal(destination).executes(c->{
+        if(com.projectseele.visual.DevelopmentCommandsR43.enabled())for(String destination:new String[]{"control","gantry"})branch.then(net.minecraft.commands.Commands.literal("visit").then(net.minecraft.commands.Commands.literal(destination).executes(c->{
             var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null||!installed(l))return 0;
             var p=c.getSource().getPlayerOrException();Vec3 at=destination.equals("gantry")?HOME.add(4,50,-12):new Vec3(6242.5,77,-6136.5);
             p.stopRiding();p.teleportTo(l,at.x,at.y,at.z,destination.equals("gantry")?90:180,0);p.fallDistance=0;p.setDeltaMovement(Vec3.ZERO);return 1;

@@ -81,6 +81,7 @@ public final class CoastalSeedScoutCommands
     @SubscribeEvent
     public static void register(RegisterCommandsEvent event)
     {
+        if(!DevelopmentCommandsR43.enabled())return;
         CommandDispatcher<CommandSourceStack> dispatcher =
                 event.getDispatcher();
         dispatcher.register(Commands.literal("seele_coastal_seed_scout")

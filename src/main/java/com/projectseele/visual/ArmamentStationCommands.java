@@ -31,6 +31,14 @@ public final class ArmamentStationCommands
     {
         CommandDispatcher<CommandSourceStack> dispatcher =
                 event.getDispatcher();
+        if(!DevelopmentCommandsR43.enabled())
+        {
+            dispatcher.register(Commands.literal("seele").then(Commands.literal("armament").requires(s->s.hasPermission(2))
+                    .then(Commands.literal("deploy").executes(c->change(c,true)))
+                    .then(Commands.literal("recall").executes(c->change(c,false)))
+                    .then(Commands.literal("status").executes(ArmamentStationCommands::status))));
+            return;
+        }
         dispatcher.register(Commands.literal("seele")
                 .then(Commands.literal("armament")
                         .requires(source -> source.hasPermission(2))

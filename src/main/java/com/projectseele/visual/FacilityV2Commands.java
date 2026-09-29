@@ -37,6 +37,7 @@ public final class FacilityV2Commands
     @SubscribeEvent
     public static void register(RegisterCommandsEvent event)
     {
+        if(!DevelopmentCommandsR43.enabled())return;
         CommandDispatcher<CommandSourceStack> dispatcher =
                 event.getDispatcher();
         dispatcher.register(Commands.literal("seele")

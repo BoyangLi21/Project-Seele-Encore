@@ -8,6 +8,10 @@ An open-source **Neon Genesis Evangelion** universe mod for Minecraft **Forge 1.
 
 ## Status / 状态
 
+R43 阶段验收已收尾，全域质量重构仍在进行。当前安装与指令以 [R43 阶段手册](docs/MANUAL_ACCEPTANCE_R43_STAGE.md) 为准；未完成范围见 [下一轮清单](docs/R43_STAGE_NEXT_ROUND.md)。历史版本的通过记录不代表当前动作或美术已获认可。
+
+进入配套世界：`/seele enter`。机库：`/seele tp hanger`。输入 `/seele tp` 查看全部传送地点。旧地图生成与原型实验指令不再出现在正式游戏中。
+
 Development build with playable EVA piloting, physical entry-plug insertion, rail transfer, launch/recovery and NPC-operated controls. The local world connects Tokyo-3, a second city, stations, airports, the GeoFront headquarters and a separate UN test base. The ordered TV campaign currently covers Sachiel (episodes 1–2) and Shamshel (episode 3); later chapters and Third Impact remain in development.
 
 当前开发版已经接通驾驶、真实插入栓吊装、轨道转运、发射回收和 NPC 操作控制台。地图修复采用逐格差量、真实人物碰撞、门／电梯联锁及全高度扫描。R24 增加地下设施路径导引、按用途细化的侧室与九十年代公共设施细节。
@@ -18,7 +22,9 @@ Pilot controls / 驾驶操作：`WASD` 移动、`Space` 跳跃、`Shift` 单膝�
 
 ## Docs / 文档
 
-- [R24 操作与验收](docs/MANUAL_ACCEPTANCE_R24.md) — NPC 出动、七处地下目的地和 TV 剧情入口
+- [R43 阶段操作与验收](docs/MANUAL_ACCEPTANCE_R43_STAGE.md) — 当前五包、传送与检查步骤
+- [工程清理记录](docs/STORAGE_CLEANUP_R43.md) — 保留范围和旧源文件恢复方法
+- [R24 操作与验收（历史）](docs/MANUAL_ACCEPTANCE_R24.md) — 旧版记录，不作为当前操作入口
 - [R24 开发与验证](docs/TV_DEVELOPMENT_R24.md) — 实际完成内容、证据与限制
 - [R24 渲染与性能](docs/PERFORMANCE_R24.md) — 24 区块实测、车辆优化及 UN 区域的当前瓶颈
 - [环境美术与参考](docs/ART_DIRECTION_R24.md) — 原创资源、实景依据及版本区分
@@ -62,30 +68,9 @@ The mod jar is written to `build/libs/`.
 
 ## Local visual testing / 本机视觉测试
 
-The desktop `Project SEELE 测试.bat` is a stable shim into the tracked
-`tools\start_test.bat`, so later repository changes cannot leave a stale copy
-on the desktop. The repository launcher rebuilds and validates the ignored
-local model pack before starting Forge. / 桌面文件直接转发到仓库内的最新版启动器，
-因此后续更新不会再遗留旧副本；启动 Forge 前会先重建并校验本机模型包。
+本次人工试玩使用 PCL 中的 **Project SEELE R43 Stage** 独立实例。Client ZIP 已内置模组、模型、存档及视觉资源，原 R42 实例保留。不要再使用旧版本的桌面启动副本或历史模型重建入口。
 
-```text
-tools\start_test.bat offline
-tools\start_test.bat visual unit01
-tools\start_test.bat visual unit00
-tools\start_test.bat visual unit02
-tools\start_test.bat visual mass
-tools\start_test.bat visual impact
-```
-
-`offline` regenerates all local EVA assets and writes a timestamped Unit-01 /
-Unit-00 / Unit-02 / Mass Production pose matrix without launching Minecraft.
-`visual mass` captures idle, move, attack, revive and ritual from seven fixed
-exterior views. / `offline` 不启动游戏，直接重建四台机体并输出带时间戳的离线姿态矩阵；
-`visual mass` 会分别截图待机、移动、攻击、复活与仪式五种状态。
-
-Screenshots are written to `run/screenshots/projectseele_visual/`. These local
-captures and third-party evaluation assets are ignored by Git and are not part
-of the distributable mod. / 截图与第三方评估模型只保留在本机，不进入发行包。
+原生开发检查在专用副本运行，不能对玩家正式存档开启自动复核脚本。需要旧实验命令时显式设置 JVM 参数 `-Dprojectseele.developerCommands=true`。截图、检查记录及第三方评估素材不随公开源码分发；本轮具体检查范围见阶段手册。
 
 ## License / 许可
 

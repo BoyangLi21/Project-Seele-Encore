@@ -42,6 +42,15 @@ public final class ThirdTokyoCommands
     public static void register(RegisterCommandsEvent event)
     {
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
+        if(!DevelopmentCommandsR43.enabled())
+        {
+            dispatcher.register(Commands.literal("seele").requires(s->s.hasPermission(2))
+                    .then(Commands.literal("tokyo3")
+                            .then(Commands.literal("status").executes(c->status(c.getSource())))
+                            .then(Commands.literal("retract").executes(c->setRetraction(c.getSource(),true)))
+                            .then(Commands.literal("restore").executes(c->setRetraction(c.getSource(),false)))));
+            return;
+        }
         dispatcher.register(Commands.literal("seele")
                 .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("tokyo3")

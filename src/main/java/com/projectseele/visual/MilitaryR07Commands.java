@@ -35,6 +35,7 @@ public final class MilitaryR07Commands
                 var player=c.getSource().getPlayerOrException();player.stopRiding();player.teleportTo(level,p.x,p.y,p.z,yaw,0);player.fallDistance=0;player.setDeltaMovement(Vec3.ZERO);return 1;
             }));
         }
-        root.then(visit);event.getDispatcher().register(Commands.literal("seele").requires(s->s.hasPermission(2)).then(root));
+        if(DevelopmentCommandsR43.enabled())root.then(visit);
+        event.getDispatcher().register(Commands.literal("seele").requires(s->s.hasPermission(2)).then(root));
     }
 }

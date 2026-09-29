@@ -12,6 +12,31 @@ Minecraft 1.20.1 / Forge 47.4.10 / Java 17，协议 45。客户端和服务端�
 - **Textures.zip / Shaders.zip** 是独立资源备份，与 Client.zip 内置资源相同，不必重复安装。
 - 客户端建议分配 6–8 GB。实例中的 `Enable-Visuals.bat` 启用内置光影；也可在视频设置中开关。总指挥席后拉杆继续控制指挥室照明。
 
+## 进入世界与快速传送
+
+`/seele enter` 固定传送到 SEELE 世界的 NERV 地面入口（X=-360.5、Y=81、Z=730.5）。输入 `/seele tp` 可查看并点击完整地点列表。
+
+| 指令 | 目的地 |
+|---|---|
+| `/seele tp hanger` | EVA 机库登机廊，接替旧 `geofront hangar` |
+| `/seele tp entrance` | NERV 地面入口 |
+| `/seele tp command` | 指挥室入口 |
+| `/seele tp dogma` | 终极教条前厅 |
+| `/seele tp observation` | 机库上层观察廊 |
+| `/seele tp station` | NERV 总部车站 |
+| `/seele tp hanger_station` | EVA 机库车站 |
+| `/seele tp tokyo3` | 第三新东京中央区域 |
+| `/seele tp hakone` | 新箱根中央车站 |
+| `/seele tp port` | 港口登舰栈桥 |
+| `/seele tp airport` | NERV 航空基地航站楼 |
+| `/seele tp un` | 联合国军事基地 |
+| `/seele tp un_hangar` | 联合国试验机库人员走廊 |
+| `/seele tp rei` | 绫波丽公寓门外 |
+
+指令需要开启作弊／服务器 OP 权限。固定地点会检查脚下支撑与身体净空；被改建或设备占据时会拒绝传送，不会自动填改地图。
+
+旧的地图生成、原型战斗和动作实验指令已从正式指令树移除。现用战役、整备、发射、回收、城市升降、武器部署和 UN 控制继续保留。需要开发工具时才显式使用 JVM 参数 `-Dprojectseele.developerCommands=true`；普通启动不用加。
+
 ## 建议先验收这些
 
 1. **眼睛状态**：正常初号机应为原涂装眼色，暴走红眼，暴走收尾停机后黑眼。若载入时机体已经处于上次战后的停机状态，请先回库维修再查正常状态。

@@ -86,5 +86,51 @@ def install():
     assert base.sha256(jar(target))==release['mod_sha256'];assert base.sha256(target/'saves'/WORLD/'nerv_routes_r24.json.gz')==release['navigation_sha256']
     data(OUT/'installed_local.json',dict(pcl=str(target),world=str(target/'saves'/WORLD),original_instance_retained=str(original),accounts_copied=False));print('Installed independent PCL instance:',target,flush=True)
 
+def refresh():
+    """Refresh this unaccepted batch after the requested command cleanup."""
+    guard();batch=read(OUT/'batch.json');proof=read(ART/'travel_commands/result.json')
+    assert proof['passed'] and len(proof['cases'])==15 and all(r.get('settled') for r in proof['cases'])
+    baseline=read(ROOT/'artifacts/facility_r31/baseline.json')
+    for name,digest in baseline['original_user_files'].items():assert base.sha256(ROOT/name)==digest,name
+    history=ART/'stage_refresh';history.mkdir(exist_ok=True)
+    for name in ('batch.json','RELEASE.json','production_check.json'):
+        if (OUT/name).exists() and not (history/name).exists():base.copy_file(OUT/name,history/name)
+    runtime=OUT/'private_runtime';base.copy_runtime_mods(runtime)
+    built=next(runtime.glob('projectseele-*.jar'));batch['mod_sha256']=base.sha256(built)
+    batch['updated']=datetime.datetime.now().astimezone().isoformat()
+    batch['verification']['travel_commands']=len(proof['cases'])
+    batch['verification']['production_command_tree']=proof['root_commands']
+    for kind in ('client','server'):
+        folder=STAGE/kind;old=jar(folder);assert old.name==built.name
+        base.copy_file(built,old)
+        for name in ('R43阶段安装与验收.md','R43_STAGE_TEST_GUIDE_CN.md','README_'+kind.upper()+'_CN.txt'):
+            base.copy_file(ROOT/'docs/MANUAL_ACCEPTANCE_R43_STAGE.md',folder/name)
+        base.copy_file(ROOT/'docs/R43_STAGE_NEXT_ROUND.md',folder/'下一轮继续清单.md')
+        if (ROOT/'docs/STORAGE_CLEANUP_R43.md').exists():base.copy_file(ROOT/'docs/STORAGE_CLEANUP_R43.md',folder/'工程清理记录.md')
+    for kind in ('client','server','world','textures','shaders'):data(STAGE/kind/'R43_STAGE_BATCH.json',batch)
+    assert base.sha256(STAGE/'world/nerv_routes_r24.json.gz')==batch['navigation_sha256']
+    data(OUT/'batch.json',batch);base.copy_file(ROOT/'docs/MANUAL_ACCEPTANCE_R43_STAGE.md',OUT/'阶段安装与验收.md')
+    for kind in ('Client','Server','World','Textures','Shaders'):
+        previous=OUT/f'Project_SEELE_R43_Stage_{kind}.zip'
+        assert previous.resolve().parent==OUT.resolve()
+        if previous.exists():previous.unlink()
+    print('Refreshed runtime and guide; staged world progress unchanged',flush=True)
+
+def update_installed():
+    guard();release=read(OUT/'RELEASE.json');assert release['server_validation']['passed']
+    receipt=read(OUT/'installed_local.json');target=Path(receipt['pcl'])
+    assert target.name=='Project SEELE R43 Stage' and target.is_dir()
+    world=target/'saves'/WORLD
+    before={p.relative_to(world).as_posix():base.sha256(p) for p in world.rglob('*') if p.is_file()}
+    old=jar(target);candidate=jar(STAGE/'client');prior=read(ART/'stage_refresh/batch.json')['mod_sha256']
+    assert base.sha256(old) in {prior,release['mod_sha256']},'Installed runtime changed outside this stage'
+    assert old.name==candidate.name;base.copy_file(candidate,old)
+    for source in (STAGE/'client').iterdir():
+        if source.is_file() and source.suffix.lower() in {'.md','.txt','.json'} and source.name!='options.txt':base.copy_file(source,target/source.name)
+    after={p.relative_to(world).as_posix():base.sha256(p) for p in world.rglob('*') if p.is_file()}
+    assert before==after,'Installed world must remain untouched'
+    receipt.update(runtime_sha256=base.sha256(old),world_files_unchanged=len(before),updated=datetime.datetime.now().astimezone().isoformat())
+    data(OUT/'installed_local.json',receipt);print('Updated installed R43 runtime; preserved',len(before),'world files',flush=True)
+
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('action',choices=['stage','seal','install']);args=p.parse_args();globals()[args.action]()
+    p=argparse.ArgumentParser();p.add_argument('action',choices=['stage','seal','install','refresh','update_installed']);args=p.parse_args();globals()[args.action]()

@@ -90,6 +90,7 @@ public final class FirstBattleMission
     }
     @SubscribeEvent public static void commands(RegisterCommandsEvent event)
     {
+        if(!com.projectseele.visual.DevelopmentCommandsR43.enabled())return;
         event.getDispatcher().register(Commands.literal("seele").then(Commands.literal("firstbattle")
             .then(Commands.literal("begin").requires(s->s.hasPermission(2)).executes(c->begin(c.getSource().getPlayerOrException())?1:0))
             .then(Commands.literal("cancel").executes(c->cancel(c.getSource().getPlayerOrException())?1:0))

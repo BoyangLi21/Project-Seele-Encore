@@ -74,13 +74,7 @@ public final class EvaLogisticsCommands
                                                         StringArgumentType.getString(context, "variant")))))
                                 .then(Commands.literal("status")
                                         .executes(context -> dummyStatus(
-                                                context.getSource())))))
-                .then(Commands.literal("geofront")
-                        .then(Commands.literal("hangar")
-                                .executes(context -> enterHangar(context.getSource())))
-                        .then(Commands.literal("recovery_control")
-                                .executes(context -> enterRecoveryControl(
-                                        context.getSource())))));
+                                                context.getSource()))))));
     }
 
     private static int status(CommandSourceStack source, String raw)
@@ -266,7 +260,7 @@ public final class EvaLogisticsCommands
         return variant;
     }
 
-    private static int enterHangar(CommandSourceStack source)
+    public static int enterHangar(CommandSourceStack source)
             throws CommandSyntaxException
     {
         ServerPlayer player = source.getPlayerOrException();
@@ -277,7 +271,7 @@ public final class EvaLogisticsCommands
         {
             target = com.projectseele.world.RegionalFacilityLayout.evaOrigin(level).offset(
                     0, EvaHangarBuilder.GALLERY_Y + 1,
-                    EvaHangarBuilder.GALLERY_Z - 1);
+                    EvaHangarBuilder.GALLERY_Z);
         }
         else if (FacilityV2EvaRuntime.ready(level, 1))
         {
@@ -294,6 +288,7 @@ public final class EvaLogisticsCommands
         player.stopRiding();
         player.teleportTo(level, target.getX() + 0.5D, target.getY(),
                 target.getZ() + 0.5D, 0.0F, 4.0F);
+        player.fallDistance=0;player.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
         source.sendSuccess(() -> Component.literal(
                 "Entered NERV EVA wet-cage observation and logistics gallery."), false);
         return 1;
