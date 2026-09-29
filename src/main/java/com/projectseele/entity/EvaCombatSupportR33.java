@@ -23,15 +23,26 @@ public final class EvaCombatSupportR33
         return p!=null&&p.has("combat_foundation")&&p.get("combat_foundation").getAsInt()>=33;
     }
     public static boolean strike(EvaUnit01Entity e){return e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()||EvaBerserkMotionR34.striking(e);}
+    public static float gaitWeight(EvaUnit01Entity e,float partial)
+    {
+        if(!ready(e))return 0;
+        float low=Mth.clamp(e.rifleStanceLevel(partial),0,1),run=Mth.clamp(e.rifleRunBlend(partial),0,1);
+        low=low*low*(3-2*low);run=run*run*(3-2*run);
+        return EvaGameplayMotionR32.guardWeight(e)*(1-low)*(1-run);
+    }
     public static float stride(EvaUnit01Entity e,double dx,double dz,float fallback)
     {
-        if(!ready(e)||EvaGameplayMotionR32.guardWeight(e)<.5F||e.isPilotProne()||e.isPilotCrouching()||e.isPilotSprinting())return fallback;
+        if(!ready(e))return fallback;
         Vec3 f=e.getForward();float front=(float)(dx*f.x+dz*f.z),right=(float)(dx*f.z-dz*f.x);
         Vector3f v=new Vector3f(right,0,front);if(v.lengthSquared()<1e-6)return fallback;v.normalize();
         e.getEntityData().set(DIRECTION,new Vector3f(e.getEntityData().get(DIRECTION)).lerp(v,.25F));
-        String name=Math.abs(front)>=Math.abs(right)?front>=0?"advance":"retreat":right>=0?"right":"left";
-        var clip=EvaGameplayMotionR32.profile(EvaGameplayMotionR32.variant(e)).getAsJsonObject("clips").getAsJsonObject("r32_"+name);
-        return clip==null?fallback:clip.get("stride_blocks").getAsFloat();
+        var clips=EvaGameplayMotionR32.profile(EvaGameplayMotionR32.variant(e)).getAsJsonObject("clips");
+        var foreClip=clips.getAsJsonObject(front>=0?"r32_advance":"r32_retreat");
+        var sideClip=clips.getAsJsonObject(right>=0?"r32_right":"r32_left");
+        if(foreClip==null||sideClip==null)return fallback;
+        float lateral=Math.abs(right)/Math.max(.001F,Math.abs(front)+Math.abs(right));
+        float supported=Mth.lerp(lateral,foreClip.get("stride_blocks").getAsFloat(),sideClip.get("stride_blocks").getAsFloat());
+        return Mth.lerp(gaitWeight(e,1),fallback,supported);
     }
     public static EvaBodyPose.Sample locomotion(EvaUnit01Entity e,EvaBodyPose.Sample guard,float partial)
     {

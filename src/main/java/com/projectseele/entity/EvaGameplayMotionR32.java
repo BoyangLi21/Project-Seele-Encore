@@ -32,11 +32,16 @@ public final class EvaGameplayMotionR32
     public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData d){d.define(AIR,-1L);d.define(LAND,-1L);d.define(TAKEOFF,-1L);d.define(FLOOR,-1000000F);d.define(VERTICAL,0F);d.define(GUARD,0F);d.define(LAND_FROM,new CompoundTag());d.define(ACTION_FROM,new CompoundTag());d.define(LOW_TARGET,false);d.define(SERVER_MOVEMENT,false);d.define(RELEASE_FROM,new CompoundTag());}
     public static boolean serverMovement(EvaUnit01Entity e){return e.getEntityData().get(SERVER_MOVEMENT);}
+    private static int takeoffTicks(EvaUnit01Entity e)
+    {
+        var c=clip(e,"jump_start");
+        return c.has("preparation_ticks")?Mth.clamp(c.get("preparation_ticks").getAsInt(),3,10):3;
+    }
     public static boolean prepareJump(EvaUnit01Entity e)
     {
         if(!ready(e))return true;
         if(age(e,TAKEOFF,0)<0){beginAction(e);EvaCombatSupportR33.release(e);e.getEntityData().set(TAKEOFF,e.level().getGameTime());return false;}
-        return age(e,TAKEOFF,0)>=3;
+        return age(e,TAKEOFF,0)>=takeoffTicks(e);
     }
     public static void beginAction(EvaUnit01Entity e)
     {
@@ -60,9 +65,18 @@ public final class EvaGameplayMotionR32
             String review=System.getProperty("projectseele.gameplayReviewDirectory", "");
             if(!review.isEmpty()&&"r31-combat".equals(System.getProperty("projectseele.regionalBuild", "")))
                 file=Path.of(review).resolve("eva_gameplay_r42_"+key+".json");
+            else if(Files.isRegularFile(Path.of("projectseele-local-maps/eva_gameplay_r43_"+key+".json")))file=Path.of("projectseele-local-maps/eva_gameplay_r43_"+key+".json");
             else if(!Files.isRegularFile(file))file=Path.of("projectseele-local-maps/eva_gameplay_r32_"+key+".json");
             if(!Files.isRegularFile(file))return Optional.empty();
-            try{var data=JsonParser.parseString(Files.readString(file)).getAsJsonObject();if(data.get("schema").getAsInt()!=2||data.get("rig_key").getAsInt()!=key)throw new IllegalArgumentException("Gameplay rig contract");return Optional.of(data);}
+            try
+            {
+                byte[] bytes=Files.readAllBytes(file);
+                var data=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                if(data.get("schema").getAsInt()!=2||data.get("rig_key").getAsInt()!=key)throw new IllegalArgumentException("Gameplay rig contract");
+                com.projectseele.ProjectSeele.LOGGER.info("EVA gameplay profile resolved: rig={} file={} sha256={}",key,file.toAbsolutePath().normalize(),
+                        java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
+                return Optional.of(data);
+            }
             catch(Exception error){throw new IllegalStateException("Gameplay motion rejected: "+file,error);}
         }).orElse(null);
     }
@@ -150,7 +164,7 @@ public final class EvaGameplayMotionR32
         }
         if(blocked){e.getEntityData().set(AIR,-1L);e.getEntityData().set(LAND,-1L);}
         state.air=air;
-        if(air||blocked||age(e,TAKEOFF,0)>8)e.getEntityData().set(TAKEOFF,-1L);
+        if(air||blocked||age(e,TAKEOFF,0)>takeoffTicks(e)+5)e.getEntityData().set(TAKEOFF,-1L);
         if(++state.scan%8==0||serverMovement(e)&&!state.guard&&!blocked)
         {
             boolean nearby=!blocked&&e.isPoweredOn()&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&!e.isPilotProne()&&!e.isPilotCrouching()
@@ -219,7 +233,7 @@ public final class EvaGameplayMotionR32
         float air=airAge(e,partial),land=landAge(e,partial);
         if(age(e,TAKEOFF,partial)>=0&&air<0)
         {
-            float progress=Math.min(1,age(e,TAKEOFF,partial)/3),contact=clip(e,"jump_start").get("takeoff_phase").getAsFloat();
+            float progress=Math.min(1,age(e,TAKEOFF,partial)/takeoffTicks(e)),contact=clip(e,"jump_start").get("takeoff_phase").getAsFloat();
             var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(ACTION_FROM),from);
             return EvaBodyPose.blend(from,EvaBodyPose.gameplayClip(e,"jump_start",progress*contact),progress);
         }
@@ -272,10 +286,12 @@ public final class EvaGameplayMotionR32
         var guard=EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F);
         float low=Mth.clamp(e.rifleStanceLevel(partial),0,1);low=low*low*(3-2*low);
         float guardBlend=e.getEntityData().get(GUARD)*(1-low);
-        if(EvaCombatSupportR33.ready(e)&&e.rifleRunBlend(partial)<.5F)return EvaBodyPose.blend(base,EvaCombatSupportR33.locomotion(e,guard,partial),guardBlend);
+        // Pose, stride and footfall timing use the same continuous blend.
+        // The old run<.5 switch changed complete hand/leg poses in one frame.
+        if(EvaCombatSupportR33.ready(e))return EvaBodyPose.blend(base,EvaCombatSupportR33.locomotion(e,guard,partial),EvaCombatSupportR33.gaitWeight(e,partial));
         // Retain the measured locomotion in the legs while keeping the guard up.
-        if(e.rifleMoveBlend(partial)>.1F)for(String n:base.rig.keySet())if(n.equals("root")||n.startsWith("leg_")||n.startsWith("shin_")||n.startsWith("ankle_")||n.startsWith("foot_"))
-        {guard.rotations.put(n,base.rotations.get(n));guard.positions.put(n,base.positions.get(n));}
+        for(String n:base.rig.keySet())if(n.equals("root")||n.startsWith("leg_")||n.startsWith("shin_")||n.startsWith("ankle_")||n.startsWith("foot_"))
+        {guard.rotations.get(n).slerp(base.rotations.get(n),e.rifleMoveBlend(partial));guard.positions.get(n).lerp(base.positions.get(n),e.rifleMoveBlend(partial));}
         guard.dirty();return EvaBodyPose.blend(base,guard,guardBlend);
     }
     private static EvaBodyPose.Sample actionPose(EvaUnit01Entity e,String name,float progress,EvaBodyPose.Sample base,float partial)

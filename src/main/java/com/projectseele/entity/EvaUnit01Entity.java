@@ -236,6 +236,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private static final float PRONE_SPEED = 0.10F;
     private static final float SPRINT_SPEED = 0.78F;
     private static final double JUMP_VELOCITY = 5.3D;
+    private static final float MELEE_RATE_R43 = 1.5F;
     private static final double AIRFRAME_GRAVITY = 0.42D;
     private static final double JUMP_SUPPORT_PROBE = 0.75D;
     private static final int JUMP_COOLDOWN_TICKS = 10;
@@ -1247,9 +1248,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.entityData.set(DATA_RIFLE_MOVE,move);this.entityData.set(DATA_RIFLE_RUN,run);
             if(moving)
             {
-                double stride=this.isPilotProne()?12D:this.isPilotCrouching()?15D:Mth.lerp(run,25.8334D,31.3944D);
+                double standingStride=Mth.lerp(run,
+                        EvaBodyPose.locomotionStrideR43(this,"walk",25.8334D),EvaBodyPose.locomotionStrideR43(this,"run",31.3944D));
+                double stride=stance<=1?Mth.lerp(stance,standingStride,15D):Mth.lerp((stance-1)/2,15D,12D);
                 stride=EvaCombatSupportR33.stride(this,dx,dz,(float)stride);
-                double sign=EvaCombatSupportR33.ready(this)&&EvaGameplayMotionR32.guardWeight(this)>.5F&&!this.isPilotSprinting()?1:dx*this.getForward().x+dz*this.getForward().z<0?-1:1;
+                double sign=EvaCombatSupportR33.gaitWeight(this,1)>.5F?1:dx*this.getForward().x+dz*this.getForward().z<0?-1:1;
                 float phase=this.entityData.get(DATA_RIFLE_GAIT)+(float)(sign*distance/stride);phase-=Mth.floor(phase);this.entityData.set(DATA_RIFLE_GAIT,phase);
             }
             EvaMovementSounds.tick(this,moving);
@@ -2428,6 +2431,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private float ordinaryAttackDurationTicks(int stage)
     {
+        return this.ordinaryAttackBaseDurationTicks(stage) / MELEE_RATE_R43;
+    }
+
+    private float ordinaryAttackBaseDurationTicks(int stage)
+    {
         if(EvaGameplayMotionR32.directed(this))return (stage==1?25F:stage==2?27F:23F)/Math.min(1.08F,EvaPilotCapability.attackSpeedMultiplier(this.getPilotSynchronization()));
         if(EvaCombatSupportR33.ready(this))return (stage==1?27F:stage==2?29F:24F)/Math.min(1.08F,EvaPilotCapability.attackSpeedMultiplier(this.getPilotSynchronization()));
         if(EvaGameplayMotionR32.ready(this))return (stage==1?18F:stage==2?17F:16F)/EvaPilotCapability.attackSpeedMultiplier(this.getPilotSynchronization());
@@ -2458,7 +2466,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float synchronizedTicks = authoredTicks
                 / EvaPilotCapability.attackSpeedMultiplier(
                         this.getPilotSynchronization());
-        return Math.max(1, Math.round(synchronizedTicks));
+        return Math.max(1, Math.round(synchronizedTicks / MELEE_RATE_R43));
     }
 
     public float getCockpitSmashAnim(float partialTick)
@@ -2527,7 +2535,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 : KNIFE_FORWARD_FRAME_INTERVALS;
         float authoredTicks = intervals * 20.0F / KNIFE_SOURCE_FPS;
         return authoredTicks / EvaPilotCapability.attackSpeedMultiplier(
-                this.getPilotSynchronization());
+                this.getPilotSynchronization()) / MELEE_RATE_R43;
     }
 
     private int knifeVisualTicks(boolean reverse)
@@ -2658,7 +2666,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         boolean knife = this.getWeapon() == WEAPON_KNIFE;
         boolean liveKnife = knife && !prone && !crouching;
         this.meleeCooldown = liveKnife ? this.knifeVisualTicks(false)
-                : this.synchronizedCooldown(MELEE_COOLDOWN_TICKS);
+                : this.fastMeleeCooldownR43(MELEE_COOLDOWN_TICKS);
         boolean fixedRightHandWeapon = lance || knife;
         this.cancelOrdinaryGroupCAttack();
         this.cancelSideKick();
@@ -2719,7 +2727,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float authoredTicks = KICK_FRAME_INTERVALS * 20.0F
                 / KICK_SOURCE_FPS / KICK_PLAYBACK_SPEED;
         return authoredTicks / EvaPilotCapability.attackSpeedMultiplier(
-                this.getPilotSynchronization());
+                this.getPilotSynchronization()) / MELEE_RATE_R43;
     }
 
     private int kickVisualTicks()
@@ -2734,7 +2742,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float synchronizedTicks = authoredTicks
                 / EvaPilotCapability.attackSpeedMultiplier(
                         this.getPilotSynchronization());
-        return Math.max(1, Math.round(synchronizedTicks));
+        return Math.max(1, Math.round(synchronizedTicks / MELEE_RATE_R43));
     }
 
     private void beginOrdinaryGroupCAttack()
@@ -2854,7 +2862,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.cancelOrdinaryGroupCAttack();
         this.cancelSideKick();
         this.cancelKnifeMotion();
-        this.smashCooldown = this.synchronizedCooldown(SMASH_COOLDOWN_TICKS);
+        this.smashCooldown = this.getWeapon()==WEAPON_KNIFE
+                ?this.fastMeleeCooldownR43(SMASH_COOLDOWN_TICKS):this.synchronizedCooldown(SMASH_COOLDOWN_TICKS);
         this.entityData.set(DATA_SMASH_SEQUENCE,
                 (this.entityData.get(DATA_SMASH_SEQUENCE) + 1) & Integer.MAX_VALUE);
 
@@ -2970,7 +2979,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         this.cancelOrdinaryGroupCAttack();
         this.cancelSideKick();
-        this.stompCooldown = this.synchronizedCooldown(STOMP_COOLDOWN_TICKS);
+        this.stompCooldown = this.fastMeleeCooldownR43(STOMP_COOLDOWN_TICKS);
         this.triggerAnim("strike", "stomp");
 
         this.resolveStompContact(pilot);
@@ -2989,7 +2998,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.kickDurationAtStart = this.kickDurationTicks();
         this.liveCombatRootPrevious = EvaLiveCombatMotion.kick(0.0F);
         this.pendingKickContactTicks = this.kickContactTicks();
-        this.stompCooldown = this.synchronizedCooldown(STOMP_COOLDOWN_TICKS);
+        this.stompCooldown = this.fastMeleeCooldownR43(STOMP_COOLDOWN_TICKS);
         this.entityData.set(DATA_KICK_SEQUENCE,
                 (this.entityData.get(DATA_KICK_SEQUENCE) + 1)
                         & Integer.MAX_VALUE);
@@ -3341,6 +3350,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             default -> 1.0F;
         };
     }
+
+    private int fastMeleeCooldownR43(int baseTicks)
+    {return Math.max(1,Mth.ceil(this.synchronizedCooldown(baseTicks)/MELEE_RATE_R43));}
 
     private int synchronizedCooldown(int baseTicks)
     {
@@ -7226,6 +7238,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }));
         controllers.add(new AnimationController<>(this, "strike", 3, state ->
         {
+            var trigger=state.getController().getTriggeredAnimation();
+            boolean fast=trigger!=null&&java.util.List.of(ANIM_MELEE,ANIM_MELEE_LEFT,ANIM_KNIFE,ANIM_KNIFE_LEFT,
+                    ANIM_KNIFE_HEAVY,ANIM_LANCE_THRUST,ANIM_PRONE_MELEE,ANIM_PRONE_MELEE_LEFT,ANIM_PRONE_KNIFE,
+                    ANIM_PRONE_KNIFE_HEAVY,ANIM_PRONE_LANCE_THRUST,ANIM_CROUCH_MELEE,ANIM_CROUCH_MELEE_LEFT,
+                    ANIM_CROUCH_KNIFE,ANIM_CROUCH_KNIFE_HEAVY,ANIM_CROUCH_LANCE_THRUST,ANIM_STOMP).contains(trigger);
+            state.getController().setAnimationSpeed(fast?MELEE_RATE_R43:1);
             if (this.isCrucified() || this.isNervLogisticsLocked()
                     || !this.isPoweredOn())
             {

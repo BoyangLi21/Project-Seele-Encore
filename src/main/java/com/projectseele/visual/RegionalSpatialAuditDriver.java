@@ -31,7 +31,8 @@ import java.util.*;
 public final class RegionalSpatialAuditDriver
 {
     private static final boolean COMBINED=Set.of("r10-world","r20-civil-annex").contains(System.getProperty("projectseele.regionalBuild",""));
-    private static final boolean R42="r42-collision".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R43="r43-collision".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R42=R43||"r42-collision".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R41=R42||"r41-collision".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R40=R41||"r40-collision".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R30=R40||Set.of("r30-shapes","r30-collision").contains(System.getProperty("projectseele.regionalBuild",""));
@@ -89,7 +90,7 @@ public final class RegionalSpatialAuditDriver
     {
         if(!ENABLED||done||event.phase!=TickEvent.Phase.END)return;
         var server=event.getServer();Path world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals(R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R29?"SEELE_FIELD_R29_REVIEW":R28?"SEELE_FIELD_R28_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R24?"SEELE_R24_TV_REVIEW":R23?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":R19?"SEELE_R19_NATIVE_REVIEW":"SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong quality audit world");
+        if(!world.getFileName().toString().equals(R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R29?"SEELE_FIELD_R29_REVIEW":R28?"SEELE_FIELD_R28_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R24?"SEELE_R24_TV_REVIEW":R23?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":R19?"SEELE_R19_NATIVE_REVIEW":"SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong quality audit world");
         ServerLevel level=server.getLevel(FacilitySchemaV2.DIMENSION);
         if(level!=null)level.resetEmptyTime();
         try
@@ -97,7 +98,7 @@ public final class RegionalSpatialAuditDriver
             if(++age<100)return;
             if(cases==null)
             {
-                if(R20&&Files.isRegularFile(world.resolve("r20_generate_chunks.json")))
+                if(R20&&!R43&&Files.isRegularFile(world.resolve("r20_generate_chunks.json")))
                 {
                     if(generation==null)generation=JsonParser.parseString(Files.readString(world.resolve("r20_generate_chunks.json"))).getAsJsonArray();
                     for(int n=0;n<2&&generated<generation.size();n++,generated++){var q=generation.get(generated).getAsJsonArray();level.getChunk(q.get(0).getAsInt(),q.get(1).getAsInt());}
@@ -112,14 +113,19 @@ public final class RegionalSpatialAuditDriver
                 JsonObject shapes=new JsonObject();
                 for(JsonElement e:JsonParser.parseString(Files.readString(world.resolve("regional_states.json"))).getAsJsonArray())
                 {
-                    String key=e.getAsString();BlockState state=parse(key);JsonArray boxes=new JsonArray();
-                    for(var b:state.getCollisionShape(EmptyBlockGetter.INSTANCE,BlockPos.ZERO,CollisionContext.of(player)).toAabbs())
-                    {JsonArray box=new JsonArray();for(double v:new double[]{b.minX,b.minY,b.minZ,b.maxX,b.maxY,b.maxZ})box.add(v);boxes.add(box);}
-                    shapes.add(key,boxes);
+                    String key=e.getAsString();BlockState state=parse(key);measureShape(shapes,key,state);
+                    if(R43&&state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock)
+                    {
+                        for(boolean open:new boolean[]{false,true})
+                        {
+                            var operated=state.setValue(net.minecraft.world.level.block.DoorBlock.OPEN,open);
+                            measureShape(shapes,net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(operated),operated);
+                        }
+                    }
                 }
                 Files.writeString(world.resolve("native_collision_shapes.json"),GSON.toJson(shapes));
                 Path survey=world.resolve("quality_survey_points.json");
-                if(Files.exists(survey))
+                if(!R43&&Files.exists(survey))
                 {
                     JsonArray heights=new JsonArray();
                     for(JsonElement e:JsonParser.parseString(Files.readString(survey)).getAsJsonArray())
@@ -130,7 +136,7 @@ public final class RegionalSpatialAuditDriver
                     }
                     Files.writeString(world.resolve("quality_terrain_survey.json"),GSON.toJson(heights));
                 }
-                cases=JsonParser.parseString(Files.readString(world.resolve(R42?"r42_walk_cases.json":R41?"r41_walk_cases.json":R40?"r40_walk_cases.json":R30?"r30_walk_cases.json":R29?"r29_walk_cases.json":R28?"r28_walk_cases.json":R26?"r26_walk_cases.json":R25?"r25_walk_cases.json":R24?"r24_walk_cases.json":R23?"r23_walk_cases.json":"quality_walk_cases.json"))).getAsJsonArray();
+                cases=JsonParser.parseString(Files.readString(world.resolve(R43?"r43_walk_cases.json":R42?"r42_walk_cases.json":R41?"r41_walk_cases.json":R40?"r40_walk_cases.json":R30?"r30_walk_cases.json":R29?"r29_walk_cases.json":R28?"r28_walk_cases.json":R26?"r26_walk_cases.json":R25?"r25_walk_cases.json":R24?"r24_walk_cases.json":R23?"r23_walk_cases.json":"quality_walk_cases.json"))).getAsJsonArray();
                 ProjectSeele.LOGGER.info("SPATIAL NATIVE shapes={} cases={} playerStep={}",shapes.size(),cases.size(),player.maxUpStep());
             }
             if(Files.exists(world.resolve("regional_stop_requested")))
@@ -300,6 +306,15 @@ public final class RegionalSpatialAuditDriver
             try{Files.writeString(world.resolve("quality_native_failure.txt"),exception.toString());}catch(Exception ignored){}
             done=true;server.halt(false);
         }
+    }
+    private static void measureShape(JsonObject shapes,String key,BlockState state)
+    {
+        JsonArray boxes=new JsonArray();
+        for(var b:state.getCollisionShape(EmptyBlockGetter.INSTANCE,BlockPos.ZERO,CollisionContext.of(player)).toAabbs())
+        {
+            JsonArray box=new JsonArray();for(double v:new double[]{b.minX,b.minY,b.minZ,b.maxX,b.maxY,b.maxZ})box.add(v);boxes.add(box);
+        }
+        shapes.add(key,boxes);
     }
     private static boolean openReachableDoor()
     {

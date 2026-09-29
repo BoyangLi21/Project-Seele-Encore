@@ -110,6 +110,10 @@ def pyramid(p):
         walk(f'r04/flight/{f}/mid',[64.5,f+8,355.5],[69.5,f+8,355.5])
         walk(f'r04/flight/{f}/b',[69.5,f+8,355.5],[69.5,f+15,365.5])
     p.fill(62,-356,350,72,-356,368,DARK,'r04/pyramid/stair_roof')
+    # R43: the retained under-stair floors are now service vestibules, linked
+    # to the stationary crossing in the east gallery rather than orphaned.
+    for f in (-435,-421,-407,-393):
+        p.fill(72,f+1,355,72,f+3,356,AIR,'r43/pyramid/east_stair_vestibule_port')
     p.meta['new_rooms']=n;p.meta['new_floor_walk_levels']=[-434,-420,-406,-392,-378,-364]
 
 def dogma(p):

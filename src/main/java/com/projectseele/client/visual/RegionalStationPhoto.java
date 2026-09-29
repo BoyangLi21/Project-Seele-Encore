@@ -22,7 +22,8 @@ public final class RegionalStationPhoto
     private static final String MODE=System.getProperty("projectseele.regionalBuild","");
     private static final boolean R10_MODELS=MODE.equals("r10-models")||MODE.equals("r10-choreography");
     private static final boolean R16=MODE.equals("r16-photos");
-    private static final boolean R42=MODE.equals("r42-facility-photos");
+    private static final boolean R43=MODE.equals("r43-facility-photos");
+    private static final boolean R42=R43||MODE.equals("r42-facility-photos");
     private static final boolean R41=R42||MODE.equals("r41-facility-photos");
     private static final boolean R40=R41||MODE.equals("r40-facility-photos");
     private static final boolean R39=MODE.equals("r39-lighting-photos");
@@ -50,6 +51,8 @@ public final class RegionalStationPhoto
     private static GameType oldMode;
     private static ResourceKey<Level> oldDimension;
     private static net.minecraft.client.CameraType oldCamera;
+    private static boolean oldSmartCull;
+    private static int occlusionRestores;
 
     @SubscribeEvent
     public static void tick(TickEvent.ClientTickEvent event)
@@ -57,7 +60,7 @@ public final class RegionalStationPhoto
         if(!ENABLED||event.phase!=TickEvent.Phase.END)return;
         Minecraft mc=Minecraft.getInstance();if(mc.player==null||mc.getSingleplayerServer()==null)return;
         var server=mc.getSingleplayerServer();Path world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals(R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R39?"SEELE_FIELD_R39_REVIEW":R38?"SEELE_FIELD_R38_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R16?"SEELE_TV_FACILITIES_R16":R10_MODELS?"SEELE_ANGEL_MODEL_REVIEW_R10":"SEELE_TV_WORLD_PREVIEW_20260906"))return;
+        if(!world.getFileName().toString().equals(R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R39?"SEELE_FIELD_R39_REVIEW":R38?"SEELE_FIELD_R38_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R16?"SEELE_TV_FACILITIES_R16":R10_MODELS?"SEELE_ANGEL_MODEL_REVIEW_R10":"SEELE_TV_WORLD_PREVIEW_20260906"))return;
         try
         {
             if(!positioningFailure.isEmpty())throw new IllegalStateException(positioningFailure);
@@ -92,7 +95,8 @@ public final class RegionalStationPhoto
                     if(views.isEmpty())throw new IllegalArgumentException("Empty photo itinerary");
                     VIEWS=views.toArray(View[]::new);
                 }
-                entered=true;oldDistance=mc.options.renderDistance().get();oldGui=mc.options.hideGui;oldPause=mc.options.pauseOnLostFocus;oldCamera=mc.options.getCameraType();
+                entered=true;oldDistance=mc.options.renderDistance().get();oldGui=mc.options.hideGui;oldPause=mc.options.pauseOnLostFocus;oldCamera=mc.options.getCameraType();oldSmartCull=mc.smartCull;
+                if(Boolean.getBoolean("projectseele.reviewNoOcclusion"))mc.smartCull=false;
                 Files.deleteIfExists(world.resolve("station_photo_ready.json"));
                 mc.options.pauseOnLostFocus=false;mc.options.renderDistance().set(net.minecraft.util.Mth.clamp(Integer.getInteger("projectseele.photoRenderDistance",R07?18:DETAIL?10:8),4,24));mc.options.hideGui=true;mc.options.setCameraType(net.minecraft.client.CameraType.FIRST_PERSON);mc.options.broadcastOptions();
                 actionReady=VIEWS[view].action().isEmpty();
@@ -145,8 +149,13 @@ public final class RegionalStationPhoto
                 });
                 if(age>20000)throw new IllegalStateException("R07 photo machinery did not settle");return;
             }
+            if(Boolean.getBoolean("projectseele.reviewNoOcclusion")&&mc.smartCull)
+            {
+                occlusionRestores++;mc.smartCull=false;
+                if(occlusionRestores<=4)ProjectSeele.LOGGER.info("R43 review reapplied visibility control at sceneTick={} view={}",sceneAge,view);
+            }
             sceneAge++;
-            if(sceneAge==120)mc.levelRenderer.allChanged();
+            if(sceneAge==120&&(!R43||Boolean.getBoolean("projectseele.reviewRebuildTerrain")))mc.levelRenderer.allChanged();
             if(MODE.equals("quality-photos")&&sceneAge==120&&!endpointCheckRequested)
             {
                 endpointCheckRequested=true;
@@ -203,7 +212,7 @@ public final class RegionalStationPhoto
             if(Files.exists(world.resolve("regional_stop_requested"))||age>Math.max(2400,itineraryBudget)||(!MODE.equals("station-photo")&&captured&&view+1==VIEWS.length&&sceneAge>280))
             {
                 Files.deleteIfExists(world.resolve("regional_stop_requested"));finishing=true;
-                mc.options.hideGui=oldGui;mc.options.renderDistance().set(oldDistance);mc.options.pauseOnLostFocus=oldPause;mc.options.setCameraType(oldCamera);
+                mc.options.hideGui=oldGui;mc.options.renderDistance().set(oldDistance);mc.options.pauseOnLostFocus=oldPause;mc.options.setCameraType(oldCamera);mc.smartCull=oldSmartCull;
                 server.execute(()->{var p=server.getPlayerList().getPlayers().get(0);p.teleportTo(server.getLevel(oldDimension),oldPos.x,oldPos.y,oldPos.z,oldYaw,oldPitch);p.setGameMode(oldMode);p.fallDistance=0;p.setDeltaMovement(Vec3.ZERO);p.getAbilities().flying=oldFlying;p.onUpdateAbilities();});
             }
         }
@@ -222,6 +231,7 @@ public final class RegionalStationPhoto
             if(actual.distanceToSqr(camera.position().add(0,1.62,0))>=.01){ready=false;return;}
             Screenshot.grab(mc.gameDirectory,camera.file(),mc.getMainRenderTarget(),ignored->{});captured=true;
             var row=new com.google.gson.JsonObject();row.addProperty("file",camera.file());row.addProperty("actual_camera",actual.toString());
+            row.addProperty("smart_cull",mc.smartCull);row.addProperty("occlusion_reapplies",occlusionRestores);row.addProperty("fps",mc.getFps());row.addProperty("rendered_sections",mc.levelRenderer.countRenderedChunks());
             row.addProperty("position_error_metres",actual.distanceTo(camera.position().add(0,1.62,0)));row.addProperty("dimension",mc.level.dimension().location().toString());PHOTO_EVIDENCE.add(row);
             try{Files.writeString(mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).resolve("verified_photo_positions_r42.json"),PHOTO_EVIDENCE.toString());}
             catch(Exception failure){throw new IllegalStateException("Could not record photo position",failure);}

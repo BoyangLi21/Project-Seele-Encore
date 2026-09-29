@@ -54,6 +54,7 @@ def main(apply=False):
             side=int(offset)//2;axis=0 if horizontal else 2;centre=x if horizontal else z
             # The installed Eidan vehicles have 5-metre door spacing (native
             # positionDefinitions door offsets ±40/±120 sixteenths).
+            edge_points={tuple(c['pos']) for c in edge}
             for c in edge:
                 q=tuple(c['pos']);face=properties(c['state'])['facing'];lower=(q[0],q[1]+1,q[2]);upper=(q[0],q[1]+2,q[2])
                 if not empty(lower) or not empty(upper):continue
@@ -62,7 +63,11 @@ def main(apply=False):
                 outward=(0,side) if horizontal else (side,0)
                 reader=(q[0]+outward[0],q[1],q[2]+outward[1])
                 if not supported(reader):held.append(dict(platform=r['id'],pos=q,reason='missing boarding apron'));continue
-                u=q[axis]-centre;phase=(u-2)%5;isdoor=phase in (0,1);part=phase if isdoor else u%2
+                u=q[axis]-centre;phase=(u-2)%5;isdoor=phase in (0,1)
+                if isdoor:
+                    partner=list(q);partner[axis]+=1 if phase==0 else -1
+                    isdoor=tuple(partner) in edge_points
+                part=phase if isdoor else u%2
                 if face in ('south','west'):part=1-part
                 base=c['state'].replace('door_type=none','door_type=apg');put(q,base,'native_apg_base')
                 for half,at in [('lower',lower),('upper',upper)]:

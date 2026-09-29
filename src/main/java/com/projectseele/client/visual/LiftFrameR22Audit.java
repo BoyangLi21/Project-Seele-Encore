@@ -23,7 +23,7 @@ public final class LiftFrameR22Audit
         var mc=Minecraft.getInstance();
         if(LiftPassengerR20Review.finished)
         {
-            try {var p=Path.of("../artifacts/access_r22/lift_frames.csv");Files.createDirectories(p.getParent());Files.write(p,ROWS);written=true;}
+            try {var p=Path.of(System.getProperty("projectseele.liftFrameFile","../artifacts/access_r22/lift_frames.csv"));Files.createDirectories(p.getParent());Files.write(p,ROWS);written=true;}
             catch(Exception x){throw new IllegalStateException(x);}return;
         }
         var pos=LiftPassengerR20Review.controllerPosition;

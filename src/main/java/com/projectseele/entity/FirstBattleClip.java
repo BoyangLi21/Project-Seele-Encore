@@ -40,7 +40,7 @@ public final class FirstBattleClip
             try{return readLocal(Path.of(review),"isolated candidate review");}
             catch(Exception e){throw new IllegalStateException("Requested battle candidate could not load",e);}
         }
-        for(String revision:List.of("r42","r24","r18","r15","r14","r12"))
+        for(String revision:List.of("r43","r42","r24","r18","r15","r14","r12"))
         {
             Path local=Path.of("projectseele-local-maps/first_battle_"+revision+".json");
             if(!Files.isRegularFile(local))continue;

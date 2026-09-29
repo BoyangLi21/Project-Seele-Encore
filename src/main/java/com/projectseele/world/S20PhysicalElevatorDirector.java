@@ -170,7 +170,7 @@ public final class S20PhysicalElevatorDirector
                 new Landing("机库接驳层",
                         new BlockPos(93, -394, 204), Direction.SOUTH),
                 new Landing("机库上层观察廊",
-                        new BlockPos(93, -370, 204), Direction.NORTH)));
+                        new BlockPos(93, -370, 204), Direction.NORTH, -369)));
     }
 
     /**
@@ -277,9 +277,8 @@ public final class S20PhysicalElevatorDirector
     private static LiftSpec transform(ServerLevel level, LiftSpec spec)
     {
         return new LiftSpec(spec.id(), spec.stops().stream()
-                .map(landing -> new Landing(landing.label(),
-                        S24CoordinateTransform.apply(level.getServer(),
-                                landing.cabinCentre()), landing.exit()))
+                .map(landing -> landing.relocated(
+                        S24CoordinateTransform.apply(level.getServer(),landing.cabinCentre())))
                 .toList());
     }
 
@@ -2720,8 +2719,11 @@ public final class S20PhysicalElevatorDirector
     }
 
     public record Landing(
-            String label, BlockPos cabinCentre, Direction exit)
+            String label, BlockPos cabinCentre, Direction exit, int approachWalkY)
     {
+        public Landing(String label,BlockPos cabinCentre,Direction exit)
+        {this(label,cabinCentre,exit,cabinCentre.getY());}
+
         public Landing
         {
             if (label == null || label.isBlank())
@@ -2742,6 +2744,9 @@ public final class S20PhysicalElevatorDirector
         {
             return this.cabinCentre.getY();
         }
+
+        public Landing relocated(BlockPos centre)
+        {return new Landing(label,centre,exit,approachWalkY+centre.getY()-cabinCentre.getY());}
     }
 
     /**

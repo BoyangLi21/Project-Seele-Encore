@@ -52,11 +52,9 @@ def main(apply=False):
     for x in (6471,6472):
         for z in (-6247,-6246):
             put((x,76,z),'projectseele:nerv_floor_panel','un_control_room/two_metre_turn_landing',{'mtr:escalator_step'})
-    # The through-walk predates this concrete partition. Its intact floor
-    # continues on both sides; form a five-wide doorway and preserve the posts.
-    for x in range(6418,6423):
-        for y in range(77,80):put((x,y,-6227),'minecraft:air','un_through_walk/open_partition_port',AIR|{'minecraft:gray_concrete'})
-    for y in range(77,80):put((6419,y,-6228),'minecraft:air','un_through_walk/retire_doorway_spur',{'minecraft:gray_concrete'})
+    # R43: z=-6227 is the widened UN pressure-cell rear wall. A legacy belt
+    # beneath it is retired equipment, not permission to cut a public door.
+    # Personnel use the retained west service corridor outside the wet cell.
     for q,(after,why) in sorted(changes.items()):p.match((*q,*q),w.block(q),after,'r41/'+why)
     p.meta.update(negative_control_source='negative_controls.json',old_world='source_world_backup',
                   source_scope='All 60261 FULL GeoFront chunks; whole-width exits, attached sheets and unguarded floor boundaries',

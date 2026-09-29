@@ -56,6 +56,23 @@ public final class StaffCommandBookR24
     }
     public static Order unitOrder(ServerLevel level,int unit)
     {return ORDERS.getOrDefault(level,Map.of()).values().stream().filter(order->order.unit==unit).findFirst().orElse(null);}
+    public static void cancelAutomatic(ServerLevel level,int unit)
+    {
+        var jobs=ORDERS.get(level);if(jobs==null)return;
+        for(var job:List.copyOf(jobs.values()))if(job.automatic&&job.unit==unit)
+        {
+            jobs.remove(job.actor);
+            if(level.getEntity(job.actor) instanceof NervStaffEntity npc)npc.finishTask();
+        }
+    }
+    public static boolean validateAutomatic(NervStaffEntity npc)
+    {
+        var job=order(npc);
+        if(job==null||!job.automatic)return true;
+        var level=(ServerLevel)npc.level();
+        if(AutoSortieR32.automaticAllowed(level,job.unit))return true;
+        cancelAutomatic(level,job.unit);return false;
+    }
 
     public static int request(ServerPlayer player, NervStaffEntity npc, String operation, int unit)
     {
@@ -161,6 +178,7 @@ public final class StaffCommandBookR24
                     continue;
                 }
                 job.missingTicks = 0; job.lastPosition = npc.blockPosition();
+                if(!validateAutomatic(npc))continue;
                 if (owner == null || owner.level() != level || !NervStaffDialogue.authorized(owner) || level.getGameTime() > job.deadline)
                 {
                     failed(npc, "待执行指令已取消：通讯中断、权限改变或等待超时。已开始的运输继续按安全流程运行。"); npc.finishTask(); continue;

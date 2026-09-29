@@ -34,7 +34,7 @@ def main():
         for x in (73.5,74.5):walk(f'east_junction/{foot}/{x}',[[x,foot,303.5],[x,foot,314.5]])
     for z in (724.5,725.5,727.5,728.5):walk('arrival_landing/'+str(z),[[-334.5,-466,z],[-331.5,-466,z]])
     for z in (-6246.5,-6245.5):walk('un_turn_landing/'+str(z),[[6469.5,77,z],[6472.5,77,z],[6472.5,77,-6244.5]])
-    for x in (6418.5,6419.5,6421.5,6422.5):walk('un_through_port/'+str(x),[[x,77,-6230.5],[x,77,-6225.5]])
+    walk('un_west_service_bypass',[[6386.5,77,-6230.5],[6386.5,77,-6225.5]])
     walk('airport_restored_facade',[[325.5,81,38.5],[325.5,81,35.5],[385.5,73,35.5],[385.5,73,38.5],[385.5,73,44.5]])
     for r in edges:
         q=tuple(r['pos']);n=r['normal'];start=tuple(q[i]-n[i] for i in range(3))

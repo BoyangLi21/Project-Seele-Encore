@@ -79,6 +79,7 @@ public final class TvCampaignDirector
         if (!chapter.playable()) return message(player, "这一章尚未制作完成。您可以从作战列表选择已制作的萨基尔或夏姆榭尔迎击。", false);
         var replay = FirstBattleSavedData.get(level);
         if (replay.active != null || replay.missionOwner != null) return message(player, "已有独立迎击或重播占用作战区，请先结束该行动。", false);
+        data.generationR43++;
         data.owner = player.getUUID(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = "出击编成："+TvSortiesR32.name(variant)+" · "+(npc?TrainingPilotEntity.pilotName(variant):"司令亲自驾驶"); data.angel = null; data.lastPosition = null; data.setDirty();
         data.assign(variant,player.getUUID(),npc,npc&&rifle);
         return message(player, "作战已接受。" + chapter.briefing().replace("东北迎击大道", CityBattlefieldR29.name(level)) + "\n" + CityBattlefieldR29.obstruction(level), true);

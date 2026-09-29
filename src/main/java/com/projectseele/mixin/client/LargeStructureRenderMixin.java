@@ -12,12 +12,23 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Unique;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.Redirect;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** Large geometry can be visible while the section at its feet is outside the view. */
 @Mixin(LevelRenderer.class)
 public abstract class LargeStructureRenderMixin
 {
     @Unique private Entity seele$renderCandidate;
+
+    @Inject(method="setupRender",at=@At("HEAD"))
+    private void seele$reviewTerrainVisibility(CallbackInfo ci)
+    {
+        // Oculus reapplies its pipeline's smartCull policy at renderLevel HEAD,
+        // after client ticks. Apply the diagnostic at the actual terrain pass.
+        if("r43-facility-photos".equals(System.getProperty("projectseele.regionalBuild",""))
+                &&Boolean.getBoolean("projectseele.reviewNoOcclusion"))Minecraft.getInstance().smartCull=false;
+    }
 
     @Redirect(method="renderLevel",at=@At(value="INVOKE",target="Lnet/minecraft/client/renderer/entity/EntityRenderDispatcher;shouldRender(Lnet/minecraft/world/entity/Entity;Lnet/minecraft/client/renderer/culling/Frustum;DDD)Z"))
     private boolean seele$rememberFrustumCandidate(EntityRenderDispatcher dispatcher,Entity entity,Frustum frustum,double x,double y,double z)

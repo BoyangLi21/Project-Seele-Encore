@@ -108,7 +108,7 @@ public final class NervWayfindingR24
         if(y<-520)return "终极教条区";
         if(y<=-465)return "总部车站层";if(y<=-455)return "交通接驳层";if(y<=-440)return "总部主环廊";
         if(y<=-426)return "作业联络层";if(y<=-412)return "技术联络层";if(y<=-399)return "指挥联络层";
-        if(y<=-384)return "综合服务层";return "上层接待区";
+        if(y<=-384)return "综合服务层";return y<-355?"上层接待区":"总指挥层";
     }
     private static String zone(BlockPos at)
     {return at.getZ()<0?(at.getY()>=-380?"机库观景层":at.getY()>=-405?"机库登机层":"发射区交通层"):zone(at.getY());}

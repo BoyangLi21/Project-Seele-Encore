@@ -5,6 +5,7 @@ import argparse,json
 import regional_voxels as v
 from measure_world_r40 import MeasuredWorld
 from query_blocks import AIR,iter_block_entities
+from facility_surfaces_r43 import gallery_bearing
 
 ROOT=Path(__file__).resolve().parents[1];ART=ROOT/'artifacts/spatial_repair_r41';WORLD=ROOT/'run/saves/SEELE_FIELD_R41_REVIEW'
 
@@ -50,11 +51,10 @@ def main(apply=False):
         elif old not in AIR:
             held.append(dict(pos=q,state=old,reason='Preserve existing fixture/barrier',source=reason));return
         rails[q].add(names[tuple(normal)])
-    gallery_floor={'minecraft:gray_concrete','minecraft:polished_deepslate','projectseele:nerv_floor_panel','projectseele:nerv_structural_panel'}
     for x in range(-35,96):
         for z in range(268,401):
             floor=state((x,-567,z));q=(x,-566,z)
-            if floor is None or floor.partition('[')[0] not in gallery_floor or state(q) not in AIR and not state(q).startswith('minecraft:light['):continue
+            if not gallery_bearing(floor) or state(q) not in AIR and not state(q).startswith('minecraft:light['):continue
             for dx,dz in ((1,0),(-1,0),(0,1),(0,-1)):
                 below=state((x+dx,-567,z+dz));at=state((x+dx,-566,z+dz))
                 if below in AIR and at in AIR:rail(q,(dx,0,dz),'complete_named_dogma_gallery_boundary')

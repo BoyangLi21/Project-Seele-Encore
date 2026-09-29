@@ -11,16 +11,16 @@ WORLD=ROOT/'run/saves/SEELE_FIELD_R40_REVIEW'
 DIM='projectseele:geofront'
 
 class MeasuredWorld:
-    def __init__(self,world=WORLD):
-        self.world=Path(world);self.selected=defaultdict(set);self.tiles={};self.status={}
+    def __init__(self,world=WORLD,dimension=DIM):
+        self.world=Path(world);self.dimension=dimension;self.selected=defaultdict(set);self.tiles={};self.status={}
     def box(self,lo,hi):
         for x in range(lo[0]//16,hi[0]//16+1):
             for z in range(lo[2]//16,hi[2]//16+1):self.selected[x,z].update(range(lo[1]//16,hi[1]//16+1))
     def around(self,point,radius=3):
         self.box(tuple(floor(a)-radius for a in point),tuple(floor(a)+radius for a in point))
     def load(self):
-        self.status=chunk_statuses(self.world,DIM,self.selected)
-        for x,z,y,palette,ids in iter_selected_sections(self.world,DIM,self.selected,skip_unfinished=True):
+        self.status=chunk_statuses(self.world,self.dimension,self.selected)
+        for x,z,y,palette,ids in iter_selected_sections(self.world,self.dimension,self.selected,skip_unfinished=True):
             self.tiles[x,y,z]=(tuple(map(canonical_state,palette)),np.asarray(ids,dtype=np.uint16))
         return self
     def get(self,x,y,z):

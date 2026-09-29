@@ -18,8 +18,9 @@ final class EvaEyeMaterialsR42
     static ResourceLocation texture(EvaUnit01Entity eva, ResourceLocation normal)
     {
         if (eva.getUnitVariant() != EvaUnit01Entity.UNIT_01 || eva.isExperimentalUnit()) return normal;
-        boolean lit = EvaDorsalMechanism.eyesEnabled(eva);
-        if (lit && !eva.isBerserk() && !eva.isFirstBattleActive()) return normal;
+        int surface = EvaDorsalMechanism.eyeSurface(eva);
+        if (surface == 0) return normal;
+        boolean lit = surface == 2;
         String state = lit ? "berserk" : "dormant";
         return CACHE.computeIfAbsent(normal + "/" + state, key -> create(normal, state, lit));
     }

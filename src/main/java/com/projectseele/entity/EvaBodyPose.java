@@ -20,7 +20,7 @@ public final class EvaBodyPose
     private record Data(String[] names,Map<String,Integer> index,Map<String,Clip> clips,
                         Map<Integer,Map<String,Bone>> rigs,Map<String,Vector3f[]> support,
                         JsonObject prone,JsonObject grip,JsonObject mocap,Map<Integer,Vector3f> eyes,Map<Integer,Map<String,Vector3f[]>> rigSupport,
-                        Map<Integer,List<net.minecraft.world.phys.AABB>> carrierHulls,Map<Integer,Map<String,Clip>> combatClips) {}
+                        Map<Integer,List<net.minecraft.world.phys.AABB>> carrierHulls,Map<Integer,Map<String,Clip>> combatClips,JsonObject locomotion) {}
     private static volatile Data data;
 
     public static final class Sample
@@ -56,14 +56,19 @@ public final class EvaBodyPose
     {
         try
         {
-            String currentBody=Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r42.json"))?"projectseele-local-maps/eva_body_r42.json":Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r41.json"))
+            String currentBody=Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r43.json"))?"projectseele-local-maps/eva_body_r43.json":Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r42.json"))?"projectseele-local-maps/eva_body_r42.json":Files.isRegularFile(Path.of("projectseele-local-maps/eva_body_r41.json"))
                     ?"projectseele-local-maps/eva_body_r41.json":"projectseele-local-maps/eva_body_r25.json";
             Path path=Path.of(System.getProperty("projectseele.bodyPoseReview",currentBody));
             if(!Files.isRegularFile(path))path=Path.of("projectseele-local-maps/eva_body_r11.json");
             if(!Files.isRegularFile(path))path=Path.of("projectseele-local-maps/eva_body_r06.json");
             if(!Files.isRegularFile(path))path=Path.of("projectseele-local-maps/eva_body_r05.json");
             JsonObject all;
-            if(Files.isRegularFile(path))all=JsonParser.parseString(Files.readString(path)).getAsJsonObject();
+            if(Files.isRegularFile(path))
+            {
+                byte[] bytes=Files.readAllBytes(path);all=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();
+                ProjectSeele.LOGGER.info("EVA body profile resolved: file={} sha256={}",path.toAbsolutePath().normalize(),
+                        java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
+            }
             else
             {
                 all=new JsonObject();all.add("motion",resource("motion/eva_connected_locomotion_v1.json"));
@@ -136,12 +141,33 @@ public final class EvaBodyPose
                     combatClips.put(variant,Map.copyOf(merged));
                 }
             }
-            data=new Data(names,index,Map.copyOf(clips),Map.copyOf(rigs),Map.copyOf(support),object(all,"prone"),object(all,"grip"),object(all,"rifle_mocap"),Map.copyOf(eyes),Map.copyOf(rigSupport),Map.copyOf(carrierHulls),Map.copyOf(combatClips));
+            data=new Data(names,index,Map.copyOf(clips),Map.copyOf(rigs),Map.copyOf(support),object(all,"prone"),object(all,"grip"),object(all,"rifle_mocap"),Map.copyOf(eyes),Map.copyOf(rigSupport),Map.copyOf(carrierHulls),Map.copyOf(combatClips),object(all,"locomotion_contract_r43"));
             ProjectSeele.LOGGER.info("EVA shared body/socket pose loaded: private={} clips={} bones={} gameplayProfiles={}",Files.isRegularFile(path),clips.size(),names.length,combatClips.values().stream().filter(c->c.containsKey("r32_jab")).count());
         }
         catch(Exception failure){throw new IllegalStateException("Shared EVA body pose could not load",failure);}
     }
     private static JsonObject object(JsonObject p,String n){return p.has(n)?p.getAsJsonObject(n):new JsonObject();}
+    private static JsonObject locomotionContractR43(EvaUnit01Entity e,String clip)
+    {
+        if(data==null)reload();String key=Integer.toString(rigKey(e));var all=data.locomotion();
+        if(!all.has(key)||!all.getAsJsonObject(key).has(clip))return null;
+        return all.getAsJsonObject(key).getAsJsonObject(clip);
+    }
+    public static double locomotionStrideR43(EvaUnit01Entity e,String clip,double fallback)
+    {
+        var contract=locomotionContractR43(e,clip);if(contract==null)return fallback;
+        double value=contract.get("stride_blocks").getAsDouble();
+        if(!Double.isFinite(value)||value<1||value>200)throw new IllegalStateException("Invalid captured locomotion stride: "+clip);
+        return value;
+    }
+    public static float locomotionContactR43(EvaUnit01Entity e,String clip,String side,boolean backwards,float fallback)
+    {
+        var contract=locomotionContractR43(e,clip);if(contract==null)return fallback;
+        var values=contract.getAsJsonObject("contacts").getAsJsonObject(side).getAsJsonArray(backwards?"reverse":"forward");
+        if(values.isEmpty())return fallback;float value=values.get(0).getAsFloat();
+        if(!Float.isFinite(value)||value<0||value>1)throw new IllegalStateException("Invalid captured foot contact phase");
+        return value;
+    }
     private static Map<String,Clip> readCombatClipsR31(JsonObject capture,String[] names)
     {
         var order=capture.getAsJsonArray("bones");var channels=new ArrayList<String>();
@@ -291,7 +317,9 @@ public final class EvaBodyPose
             }
             return frozen;
         }
-        float time=((entity.level().getGameTime()%24000)+partial)/20;float idlePhase=(time/2.5F)%1;
+        float time=((entity.level().getGameTime()%24000)+partial)/20;
+        var idleClip=d.combatClips().getOrDefault(variant,Map.of()).getOrDefault("idle",d.clips().get("idle"));
+        float idlePhase=(float)((((double)entity.level().getGameTime()+partial)/20.0/idleClip.duration())%1.0);
         float move=entity.rifleMoveBlend(partial),run=entity.rifleRunBlend(partial),crouch=entity.rifleCrouchBlend(partial),prone=entity.rifleProneBlend(partial);prone=prone*prone*prone*(10+prone*(-15+6*prone));
         var gait=mix(clip(d,variant,"walk",phase),clip(d,variant,"run",phase),run);
         boolean supported=d.clips().containsKey("rifle_stance");float stance=entity.rifleStanceLevel(partial);
@@ -299,8 +327,24 @@ public final class EvaBodyPose
         if(supported)
         {
             boolean armed=entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE;
-            body=clip(d,variant,!armed&&d.clips().containsKey("unarmed_stance")?"unarmed_stance":"rifle_stance",stance/3);
-            if(stance<.001F)body=mix(clip(d,variant,"idle",idlePhase),body,move);
+            String stanceClip=!armed&&d.clips().containsKey("unarmed_stance")?"unarmed_stance":"rifle_stance";
+            body=clip(d,variant,stanceClip,stance/3);
+            // The old zero-stance branch switched to an unrelated idle pose in
+            // one tick (95 degrees at a wrist). Apply the standing-reference
+            // difference continuously and remove it by the crouched endpoint.
+            float standing=1-Mth.clamp(stance,0,1);standing=standing*standing*(3-2*standing)*(1-move);
+            if(standing>0)
+            {
+                var idle=clip(d,variant,"idle",idlePhase);var reference=clip(d,variant,stanceClip,0);
+                for(String name:body.rig.keySet())
+                {
+                    var delta=new Quaternionf(idle.rotations.get(name)).mul(new Quaternionf(reference.rotations.get(name)).invert());
+                    var correction=new Quaternionf().slerp(delta,standing);
+                    body.rotations.put(name,correction.mul(body.rotations.get(name)));
+                    body.positions.get(name).add(new Vector3f(idle.positions.get(name)).sub(reference.positions.get(name)).mul(standing));
+                }
+                body.dirty();
+            }
             float supportWeight=Mth.clamp((stance-1)/.5F,0,1);
             supportWeight=supportWeight*supportWeight*(3-2*supportWeight);
             float mobility=move*(1-supportWeight);

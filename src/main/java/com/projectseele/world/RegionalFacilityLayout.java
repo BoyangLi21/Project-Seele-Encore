@@ -50,7 +50,7 @@ public final class RegionalFacilityLayout
         if(!migrated(level.getServer()) || !(spec.id().equals(S20PhysicalElevatorDirector.OBSERVATION_HANGAR_LIFT_ID)
                 ||spec.id().equals(S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID)))return spec;
         return new S20PhysicalElevatorDirector.LiftSpec(spec.id(),spec.stops().stream()
-                .map(stop->new S20PhysicalElevatorDirector.Landing(stop.label(),shiftEva(level,stop.cabinCentre()),stop.exit())).toList());
+                .map(stop->stop.relocated(shiftEva(level,stop.cabinCentre()))).toList());
     }
     @SubscribeEvent
     public static void maintainRemoteControls(TickEvent.ServerTickEvent event)

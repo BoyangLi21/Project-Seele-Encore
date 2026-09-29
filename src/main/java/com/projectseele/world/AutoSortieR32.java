@@ -8,11 +8,39 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import java.util.*;
 
-/** Boarding arms a persistent job on that original EVA. Operators still press real interlocked controls. */
+/** Active mission boarding arms a job; every physical press rechecks the mission. */
 @Mod.EventBusSubscriber(modid="projectseele")
 public final class AutoSortieR32
 {
     private static final TicketType<ChunkPos> TICKET=TicketType.create("auto_sortie_r32",Comparator.comparingLong(ChunkPos::toLong),100);
+    public static String missionToken(ServerLevel level)
+    {
+        var mission=TvCampaignSavedData.get(level);
+        return mission.active.isEmpty()||mission.phase.equals("cancel")||mission.owner==null?""
+                :mission.active+":"+mission.generationR43+":"+mission.owner;
+    }
+    private static boolean assigned(ServerLevel level,int unit,net.minecraft.world.entity.Entity pilot)
+    {
+        var assignment=TvCampaignSavedData.get(level).sorties.get(unit);if(assignment==null||pilot==null)return false;
+        return pilot instanceof TrainingPilotEntity npc?assignment.npc&&npc.getAssignedVariant()==unit
+                :pilot instanceof ServerPlayer player&&!assignment.npc&&player.getUUID().equals(assignment.commander);
+    }
+    public static boolean automaticAllowed(ServerLevel level,int unit)
+    {
+        String token=missionToken(level);var eva=EvaLogisticsDirector.canonicalUnit(level,unit);
+        var plug=EntryPlugDirector.canonical(level,unit);
+        var pilot=plug==null?null:plug.getFirstPassenger();if(pilot==null&&eva!=null)pilot=eva.getPilotEntity();
+        boolean occupied=assigned(level,unit,pilot);
+        return !token.isEmpty()&&eva!=null&&!eva.getPersistentData().getBoolean("R32AutoCancelled")
+                &&occupied
+                &&token.equals(eva.getPersistentData().getString("R43AutoMission"));
+    }
+    public static void clearAutomatic(ServerLevel level,int unit)
+    {
+        StaffCommandBookR24.cancelAutomatic(level,unit);
+        var eva=EvaLogisticsDirector.canonicalUnit(level,unit);if(eva==null)return;
+        var tag=eva.getPersistentData();tag.remove("R32AutoStep");tag.remove("R32AutoNext");tag.remove("R43AutoMission");
+    }
     public static void assignCommander(EvaUnit01Entity eva,ServerPlayer player)
     {if(eva!=null)eva.getPersistentData().putUUID("R32SortieCommander",player.getUUID());}
     public static void cancel(ServerPlayer player,int unit)
@@ -38,6 +66,8 @@ public final class AutoSortieR32
         for(int unit=0;unit<3;unit++)
         {
             var eva=EvaLogisticsDirector.canonicalUnit(level,unit);if(eva==null)continue;
+            String mission=missionToken(level);
+            if(mission.isEmpty()){clearAutomatic(level,unit);continue;}
             var tag=eva.getPersistentData();var plug=EntryPlugDirector.canonical(level,unit);
             var pilot=plug==null?null:plug.getFirstPassenger();if(pilot==null)pilot=eva.getPilotEntity();
             String phase=EvaLogisticsDirector.status(level,unit).phase();
@@ -46,16 +76,16 @@ public final class AutoSortieR32
                 if(phase.equals("PARKED")){tag.remove("R32BoardingPilot");tag.remove("R32AutoCancelled");tag.remove("R32AutoStep");}
                 continue;
             }
-            if(phase.equals("PARKED")&&(!tag.hasUUID("R32BoardingPilot")||!tag.getUUID("R32BoardingPilot").equals(pilot.getUUID())))
+            if(!assigned(level,unit,pilot)){clearAutomatic(level,unit);continue;}
+            if(Set.of("PARKED","SILO_READY").contains(phase)&&(!tag.hasUUID("R32BoardingPilot")||!tag.getUUID("R32BoardingPilot").equals(pilot.getUUID())
+                    ||!mission.equals(tag.getString("R43AutoMission"))))
             {
+                StaffCommandBookR24.cancelAutomatic(level,unit);tag.putString("R43AutoMission",mission);
                 tag.putUUID("R32BoardingPilot",pilot.getUUID());tag.putString("R32AutoStep","prepare");tag.remove("R32AutoCancelled");tag.remove("R32AutoNext");
-                if(pilot instanceof ServerPlayer player)assignCommander(eva,player);
-                else if(!tag.hasUUID("R32SortieCommander"))
-                {
-                    var commander=level.players().stream().filter(NervStaffDialogue::authorized).min(Comparator.comparingDouble(p->p.distanceToSqr(eva))).orElse(null);
-                    if(commander!=null)assignCommander(eva,commander);
-                }
+                tag.putUUID("R32SortieCommander",TvCampaignSavedData.get(level).sorties.get(unit).commander);
             }
+            if(tag.getBoolean("R32AutoCancelled")){StaffCommandBookR24.cancelAutomatic(level,unit);continue;}
+            if(!automaticAllowed(level,unit)){clearAutomatic(level,unit);continue;}
             if(!tag.contains("R32AutoStep")||tag.getBoolean("R32AutoCancelled")||!tag.hasUUID("R32SortieCommander"))continue;
             if(EvaShutdownR30.wreck(eva)||eva.getHealth()<=0)
             {

@@ -35,6 +35,10 @@ public final class EvaMovementSounds
         var rows=CONTACTS.getAsJsonObject(clip).getAsJsonObject(side).getAsJsonArray(backwards?"reverse":"forward");
         return rows.isEmpty()?(side.equals("l")?.7F:.2F):rows.get(0).getAsFloat();
     }
+    private static float mixContact(float from,float to,float weight)
+    {
+        return Mth.positiveModulo(from+(Mth.positiveModulo(to-from+.5F,1)-.5F)*weight,1);
+    }
     public static void tick(EvaUnit01Entity eva,boolean moving)
     {
         if(eva.level().isClientSide||com.projectseele.physics.CombatBodyDynamics.active(eva))return;
@@ -42,11 +46,14 @@ public final class EvaMovementSounds
         if(previous==null||!moving||!eva.onGround()||!eva.isPoweredOn()||eva.isNervLogisticsLocked()||eva.isPilotProne()||eva.isSilent()||EvaCombatSupportR33.strike(eva))return;
         float delta=phase-previous;if(delta>.5F)delta-=1;if(delta<-.5F)delta+=1;
         if(Math.abs(delta)<1e-5F||Math.abs(delta)>.3F)return;
-        boolean backwards=delta<0;float run=eva.rifleRunBlend(1);
+        boolean backwards=delta<0;float run=eva.rifleRunBlend(1),low=Mth.clamp(eva.rifleStanceLevel(1),0,1);
         for(String side:new String[]{"l","r"})
         {
-            boolean directed=EvaGameplayMotionR32.directed(eva)&&EvaGameplayMotionR32.guardWeight(eva)>.5F&&!eva.isPilotCrouching()&&run<.5F;
-            float threshold=directed?(side.equals("l")?0:.5F):eva.isPilotCrouching()?contact("crouch_walk",side,backwards):Mth.lerp(run,contact("walk",side,backwards),contact("run",side,backwards));
+            float threshold=mixContact(
+                    EvaBodyPose.locomotionContactR43(eva,"walk",side,backwards,contact("walk",side,backwards)),
+                    EvaBodyPose.locomotionContactR43(eva,"run",side,backwards,contact("run",side,backwards)),run);
+            threshold=mixContact(threshold,contact("crouch_walk",side,backwards),low);
+            threshold=mixContact(threshold,side.equals("l")?0:.5F,EvaCombatSupportR33.gaitWeight(eva,1));
             float before=Mth.positiveModulo(previous-threshold,1),after=Mth.positiveModulo(phase-threshold,1);
             if(backwards?after<=before:after>=before)continue;
             Vec3 forward=eva.getForward().multiply(1,0,1).normalize(),lateral=new Vec3(forward.z,0,-forward.x);
@@ -59,7 +66,7 @@ public final class EvaMovementSounds
             }
             var state=eva.level().getBlockState(BlockPos.containing(foot.x,foot.y-.2,foot.z));
             boolean soil=state.is(BlockTags.DIRT)||state.is(BlockTags.SAND)||state.is(BlockTags.LEAVES);
-            CombatFoleyR36.step(eva,foot,soil,eva.isPilotCrouching()?.5F:1+.28F*run);
+            CombatFoleyR36.step(eva,foot,soil,Mth.lerp(low,1+.28F*run,.5F));
             if(eva.getTags().contains("seele_motion_lab"))ProjectSeele.LOGGER.info("EVA FOOT CONTACT side={} phase={} position={} material={}",side,phase,foot,state);
         }
     }

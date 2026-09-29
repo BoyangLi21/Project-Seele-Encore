@@ -25,6 +25,17 @@ public final class TransitSnapshotR20
         JsonArray paths=new JsonArray();
         for(Depot depot:sim.depots){JsonObject p=new JsonObject();p.addProperty("depot",depot.getId());p.addProperty("name",depot.getName());p.add("path",objects(depot.getPath()));paths.add(p);}
         out.add("depot_paths",paths);
+        JsonArray resolved=new JsonArray();
+        for(Platform platform:sim.platforms)
+        {
+            JsonObject p=new JsonObject();p.addProperty("platform_id",Long.toString(platform.getId()));
+            p.addProperty("platform_hex",platform.getHexId());p.addProperty("mode",platform.getTransportMode().name());
+            p.addProperty("station_name",platform.getStationName());
+            if(platform.area!=null)p.addProperty("station_id",Long.toString(platform.area.getId()));
+            JsonArray routes=new JsonArray();for(Route route:platform.routes)routes.add(Long.toString(route.getId()));p.add("route_ids",routes);
+            resolved.add(p);
+        }
+        out.add("resolved_platforms",resolved);
         Files.writeString(Path.of(args[1]),new GsonBuilder().setPrettyPrinting().create().toJson(out));sim.stop();System.out.println("Snapshot rails="+sim.rails.size()+" stations="+sim.stations.size()+" platforms="+sim.platforms.size()+" routes="+sim.routes.size());
     }
 }

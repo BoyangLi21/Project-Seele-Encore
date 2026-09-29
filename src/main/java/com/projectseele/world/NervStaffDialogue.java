@@ -246,6 +246,7 @@ public final class NervStaffDialogue
         npc.setYRot(net.minecraft.util.Mth.approachDegrees(npc.getYRot(),facing,18));npc.yBodyRot=npc.getYRot();
         if(Math.abs(net.minecraft.util.Mth.wrapDegrees(facing-npc.getYRot()))>12)return;
         if(!city&&!EvaLogisticsDirector.status(level,variant).loaded()&&ticks<240)return;
+        if(!city&&!StaffCommandBookR24.validateAutomatic(npc))return;
         if(!npc.beginPressGesture(control))return;
         var state=level.getBlockState(control);
         if(!(state.getBlock() instanceof ButtonBlock)||state.getValue(ButtonBlock.POWERED))

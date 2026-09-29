@@ -187,5 +187,5 @@ def scan(world,out,samples=False):
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('action',choices=['index','scan','samples']);p.add_argument('--world',type=Path,default=WORLD);p.add_argument('--out',type=Path,default=ART/'envelopes');args=p.parse_args()
+    p=argparse.ArgumentParser();p.add_argument('action',choices=['index','scan','samples']);p.add_argument('--world',type=Path,default=WORLD);p.add_argument('--out',type=Path,default=ART/'envelopes');p.add_argument('--dimension',default=DIM);args=p.parse_args();DIM=args.dimension
     index(args.world,args.out) if args.action=='index' else scan(args.world,args.out,args.action=='samples')

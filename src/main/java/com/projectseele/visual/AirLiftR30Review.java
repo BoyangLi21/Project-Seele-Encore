@@ -27,12 +27,19 @@ public final class AirLiftR30Review
     private static final boolean UN_ONLY=R40&&Boolean.getBoolean("projectseele.airReviewUnOnly");
     private static final boolean RESUME_RETURN=R40&&Boolean.getBoolean("projectseele.airReviewResumeReturn");
     private static final boolean ENABLED=R32||"r30-airlift".equals(System.getProperty("projectseele.regionalBuild",""));
+    public static String reviewWorld()
+    {
+        String world=System.getProperty("projectseele.airReviewWorld",R32?"SEELE_R32_AIR_REVIEW":"SEELE_FIELD_R30_REVIEW");
+        if(!world.equals("SEELE_R32_AIR_REVIEW")&&!world.equals("SEELE_FIELD_R30_REVIEW")&&!world.matches("SEELE_R43_AIR_REVIEW(?:_V[0-9]+)?"))throw new IllegalStateException("Unapproved isolated airlift review world");
+        return world;
+    }
     private static final TicketType<ChunkPos> TICKET=TicketType.create("r30_airlift_review",Comparator.comparingLong(ChunkPos::toLong),100);
     private static boolean done;private static int age,stage=R32&&Boolean.getBoolean("projectseele.airReviewNervOnly")?4:0,timer;private static FakePlayer operator;private static UUID unId,plugId,nervId;
     private static final JsonObject report=new JsonObject();private static final Set<String> phases=new TreeSet<>();
     private static final Map<UUID,Integer> landings=new HashMap<>();
     private static boolean sawNervHead;
     public static volatile Vec3 observer;
+    public static volatile int observedEntity=-1;
     public static volatile String reviewPhase="";
     public static volatile int reviewStage;
     public static boolean finished(){return R40&&done;}
@@ -43,7 +50,7 @@ public final class AirLiftR30Review
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
         if(!ENABLED||done||event.phase!=TickEvent.Phase.END)return;var server=event.getServer();var path=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!path.getFileName().toString().equals(R32?"SEELE_R32_AIR_REVIEW":"SEELE_FIELD_R30_REVIEW"))throw new IllegalStateException("Wrong airlift review world");
+        if(!path.getFileName().toString().equals(reviewWorld()))throw new IllegalStateException("Wrong airlift review world");
         var l=server.getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return;l.resetEmptyTime();
         try
         {
@@ -61,7 +68,7 @@ public final class AirLiftR30Review
                 var id=stage<4?unId:nervId;
                 if(id!=null&&l.getEntity(id) instanceof EvaUnit01Entity watched)
                 {
-                    observer=watched.position();
+                    observer=watched.position();observedEntity=watched.getId();
                     if(stage==5&&NervAirLiftR30.waitingAtHead(watched))sawNervHead=true;
                 }
             }
@@ -117,7 +124,18 @@ public final class AirLiftR30Review
                 if(stage==2&&!UNAirLiftR29.active(l,UN_SERIAL))
                 {
                     if(R40)check("un_wreck_return_touchdown_once",landings.getOrDefault(unId,0)==(RESUME_RETURN?1:2));
-                    check("un_delivered_to_intake",e.position().distanceTo(UNAirLiftR29.reception(l,UN_SERIAL))<.2);check("un_wreck_not_healed",e.getHealth()==0);check("un_waits_before_docking",e.isNervLogisticsLocked()&&e.position().distanceTo(UNRecoveryR22.home(UN_SERIAL))>50);
+                    var pad=UNAirLiftR29.reception(l,UN_SERIAL);
+                    var cartTag=UNAirLiftR29.state(l).save(new net.minecraft.nbt.CompoundTag());
+                    var receiver=cartTag.hasUUID("Cart"+UN_SERIAL)?l.getEntity(cartTag.getUUID("Cart"+UN_SERIAL)):null;
+                    var bearing=receiver instanceof UNTransportEntity cart?UNReceivingCradleR40.contact(e,cart):null;
+                    var support=new JsonObject();support.addProperty("entity_root_y",e.getY());support.addProperty("pad_y",pad.y);
+                    support.addProperty("root_lift",e.getY()-pad.y);support.addProperty("horizontal_error",e.position().subtract(pad).horizontalDistance());
+                    support.addProperty("owned_receiver_bearing",bearing!=null);if(bearing!=null)support.addProperty("bearing_y",bearing.y);report.add("receiving_geometry",support);
+                    // A fallen body's measured clearance can lift its root off
+                    // the deck. Require its real owned receiver contact, not a
+                    // nominal entity coordinate that would push it into metal.
+                    check("un_delivered_to_intake",bearing!=null&&e.position().subtract(pad).horizontalDistance()<.2&&receiver.position().distanceTo(pad)<.1);
+                    check("un_wreck_not_healed",e.getHealth()==0);check("un_waits_before_docking",e.isNervLogisticsLocked()&&e.position().distanceTo(UNRecoveryR22.home(UN_SERIAL))>50);
                     report.addProperty("dock_reply",UNAirLiftR29.requestDock(operator,UN_SERIAL));check("ground_dock_started",UNAirLiftR29.active(l,UN_SERIAL));next(3);return;
                 }
                 if(stage==3&&!UNAirLiftR29.active(l,UN_SERIAL))

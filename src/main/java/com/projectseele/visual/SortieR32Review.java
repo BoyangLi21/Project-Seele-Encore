@@ -21,7 +21,8 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid="projectseele")
 public final class SortieR32Review
 {
-    private static final boolean R41="r41-sortie".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R43="r43-sortie".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R41=R43||"r41-sortie".equals(System.getProperty("projectseele.regionalBuild",""));
     public static final boolean ENABLED=R41||"r32-sortie".equals(System.getProperty("projectseele.regionalBuild",""));
     public static volatile boolean ready,finished;
     private static int ticks,stage,ritsukoStart,misatoStart;
@@ -29,6 +30,7 @@ public final class SortieR32Review
     private static final UUID[] fleet=new UUID[3],plugs=new UUID[3];
     private static final JsonObject report=new JsonObject();private static final JsonArray trace=new JsonArray();
     private static NervStaffEntity ritsuko,misato;
+    private static boolean gateComplete;
     private static void check(String key,boolean value){report.addProperty(key,value);if(!value)throw new IllegalStateException(key);}
     private static NervStaffEntity officer(String skin)
     {
@@ -81,19 +83,32 @@ public final class SortieR32Review
         {
             if(world==null)
             {
-                world=event.getServer().getWorldPath(LevelResource.ROOT).normalize();if(!world.getFileName().toString().equals(R41?"SEELE_R41_MECHANICS_REVIEW":"SEELE_R32_SORTIE_REVIEW"))throw new IllegalStateException("Wrong review world");
+                world=event.getServer().getWorldPath(LevelResource.ROOT).normalize();
+                String expected=R43?(Boolean.getBoolean("projectseele.r43GateBefore")?"SEELE_R43_GATE_BEFORE":"SEELE_R43_MECHANICS_REVIEW"):R41?"SEELE_R41_MECHANICS_REVIEW":"SEELE_R32_SORTIE_REVIEW";
+                if(R43)
+                {
+                    expected=System.getProperty("projectseele.r43ReviewWorld",expected);
+                    if(!expected.matches("SEELE_R43_(GATE_BEFORE|MECHANICS_REVIEW)(?:_V[0-9]+)?"))throw new IllegalStateException("Unsafe R43 test world");
+                }
+                if(!world.getFileName().toString().equals(expected))throw new IllegalStateException("Wrong review world");
                 level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);player=event.getServer().getPlayerList().getPlayers().get(0);
                 player.stopRiding();player.setGameMode(GameType.CREATIVE);player.teleportTo(level,27.5,-407,282.5,0,0);
                 player.getInventory().add(new net.minecraft.world.item.ItemStack(com.projectseele.registry.ModItems.NERV_EMPLOYEE_CARD.get()));
                 event.getServer().setFlightAllowed(true);player.getAbilities().flying=true;player.onUpdateAbilities();poseChecks();
             }
-            ticks++;level.resetEmptyTime();if(ticks>11000)throw new IllegalStateException("Sortie deadline stage "+stage);
+            ticks++;level.resetEmptyTime();if(ticks>(R43?18000:11000))throw new IllegalStateException("Sortie deadline stage "+stage);
             if(Files.deleteIfExists(world.resolve("regional_stop_requested")))throw new IllegalStateException("Review stopped for diagnosis");
             if(ticks%20==0)
             {
                 for(int unit=0;unit<3;unit++)EvaLogisticsDirector.loadControlTarget(level,unit);
                 var row=new JsonObject();row.addProperty("tick",ticks);row.addProperty("stage",stage);
                 for(int i=0;i<3;i++)row.addProperty("unit"+i,EvaLogisticsDirector.status(level,i).phase());trace.add(row);
+            }
+            if(R43&&AutoSortieGateR43.begun()&&!gateComplete)
+            {
+                ritsuko=officer("ritsuko");misato=officer("misato");if(ritsuko==null||misato==null)return;
+                if(!AutoSortieGateR43.tick(level,player,ritsuko,misato))return;
+                gateComplete=true;report.add("r43_mission_gate",AutoSortieGateR43.result());
             }
             if(stage==0)
             {
@@ -107,7 +122,9 @@ public final class SortieR32Review
                     // Test setup only: the owner's formal R31 contains a damaged Unit-01.
                     e.setHealth(e.getMaxHealth());EvaShutdownR30.clear(e);e.enterHangarStandby();
                 }
-                var d=TvCampaignSavedData.get(level);check("no_existing_encounter",d.active.isEmpty());ritsukoStart=ritsuko.pressCount();misatoStart=misato.pressCount();
+                var d=TvCampaignSavedData.get(level);check("no_existing_encounter",d.active.isEmpty());
+                if(R43&&!gateComplete){AutoSortieGateR43.tick(level,player,ritsuko,misato);return;}
+                ritsukoStart=ritsuko.pressCount();misatoStart=misato.pressCount();
                 TvCampaignDirector.select(player,"shamshel");check("mission_start",TvCampaignDirector.beginAssigned(player,0,true,true)==1);
                 check("second_unit_enrolled",TvSortiesR32.reinforce(player,1,false,false)==1);stage=1;return;
             }
@@ -181,6 +198,7 @@ public final class SortieR32Review
     }
     private static void finish(boolean passed,Throwable error)
     {
+        if(R43)report.add("r43_mission_gate",AutoSortieGateR43.result());
         finished=true;report.addProperty("pass",passed);report.add("trace",trace);if(error!=null){report.addProperty("failure",error.toString());com.projectseele.ProjectSeele.LOGGER.error("R32 sortie review failed",error);}
         try{Path dir=world.resolve("Review");Files.createDirectories(dir);Files.writeString(dir.resolve("r32_sortie_"+(passed?"pass":"failure")+".json"),new GsonBuilder().setPrettyPrinting().create().toJson(report));}catch(Exception e){throw new IllegalStateException(e);}
     }

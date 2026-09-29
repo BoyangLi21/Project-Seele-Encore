@@ -31,6 +31,10 @@ def main(apply):
         chosen=None
         for X,Z,direction in candidates:
             floor=y-3;s=b.get((X,floor,Z),'UNKNOWN');boxes=shapes.get(s,[])
+            # A gap in historical walking samples does not make the native
+            # train boarding apron a valid column site.
+            if 'station_tactile_' in s:continue
+            if any(b.get((X+dx2,floor,Z+dz2),'').startswith('mtr:platform[') for dx2,dz2 in ((1,0),(-1,0),(0,1),(0,-1))):continue
             if not any(a[0]<=.3 and a[3]>=.7 and a[2]<=.3 and a[5]>=.7 and a[4]>=.999 for a in boxes):continue
             if any(b.get((X,Y,Z)) not in AIR for Y in range(floor+1,y+1)):continue
             if walk.query([X+.5,floor+1,Z+.5])[0]<.75:continue

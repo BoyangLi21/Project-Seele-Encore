@@ -201,7 +201,8 @@ public final class FirstBattleDirector
                     sound(level,FirstBattleClip.point(record.spec,true,record.age==FirstBattleClip.eventTick(19)||record.age==FirstBattleClip.eventTick(410)?"foot_l_blocks":"foot_r_blocks",seconds),ModSounds.EVA_FOOT_CONCRETE.get(),1.5F);
                 if(record.age==FirstBattleClip.eventTick(28)||record.age==FirstBattleClip.eventTick(53)||record.age==FirstBattleClip.eventTick(75))sound(level,field,ModSounds.EVA_AT_PRESSURE.get(),1.3F);
                 if(record.age==FirstBattleClip.eventTick(99))sound(level,field,ModSounds.EVA_AT_TEAR.get(),1.8F);
-                if(record.age==FirstBattleClip.eventTick(107))CrossExplosionFX.spawn(level,FirstBattleClip.point(record.spec,false,"eye_blocks",seconds),.30F);
+                // Field rupture is a tear/contact cue. The cross belongs only
+                // to Sachiel's final self-destruction, not this earlier hit.
                 if(record.age==FirstBattleClip.eventTick(160)){Vec3 p=FirstBattleClip.point(record.spec,false,"hand_r_blocks",seconds);sound(level,p,ModSounds.EVA_ARMOR_IMPACT.get(),1.5F);chips(level,p,true);}
                 if(record.age==FirstBattleClip.eventTick(184)){Vec3 p=FirstBattleClip.point(record.spec,true,"foot_l_blocks",seconds);sound(level,p,ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,false);}
                 if(record.age==FirstBattleClip.landingTick())sound(level,eva.position(),ModSounds.EVA_LAND.get(),2.1F);

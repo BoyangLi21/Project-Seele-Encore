@@ -5,6 +5,7 @@ ROOT=v.ROOT;WORLD=ROOT/'run/saves/SEELE_R21_REVIEW';OUT=ROOT/'artifacts/world_re
 F='projectseele:nerv_floor_panel';W='projectseele:nerv_wall_panel';S='projectseele:nerv_structural_panel';G='projectseele:clear_glass';A='minecraft:air'
 def main():
  v.WORLD=WORLD;v.OUT=OUT;p=v.Painter();o='r21/complete_registered_ports'
+ p.protect((113,-444,-54,184,-433,-37),'r43/native_station_platform_and_apron')
  def b(box,state):p.fill(*box,state,o,'owned')
  # One station-side room, not overlapping corridor boxes that close one
  # another's internal edges. The active track starts south of Z=-43.

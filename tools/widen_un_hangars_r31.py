@@ -128,6 +128,12 @@ def author(serial, painter):
         if 'warning_beacon' in palette[int(before[index(pos)].item())]:fill(pos,AIR)
     # Keep the pressure floor supported and mark the widened floor lanes without
     # placing any railings or signs inside the machine's travel envelope.
+    # Widening incorporates the old personnel belt into the wet cell. Retire
+    # its complete floor assembly; painting only the left half left 26 broken
+    # MTR pairs and encouraged a later repair to cut the pressure rear wall.
+    wet_floor=index((cx-24,76,-6239,cx+24,76,-6137))
+    retired_steps=np.asarray([s.startswith('mtr:escalator_step[') for s in palette])[before[wet_floor]]
+    retained=after[wet_floor];retired_count=int(retired_steps.sum());retained[retired_steps]=code(FLOOR)
     for x in (cx-24,cx+24):
         for z in range(-6223,-6137,8):fill((x,76,z,x,76,min(z+3,-6137)),'minecraft:yellow_terracotta')
     # The UN-01 copied apron had a knee-high rail across its named staff entry.
@@ -154,7 +160,7 @@ def author(serial, painter):
                 old_outer_width=117,new_outer_width=133,old_pressure_width=33,new_pressure_width=49,
                 wet_min=[cx-24,77,-6226],wet_max=[cx+24,120,-6137],door=[cx+.5,77,-6135.5],
                 door_width=49,door_height=65,top_cassette=[cx-27,142,-6137,cx+27,160,-6133],
-                block_entities_preserved=len(be),home=[cx+.5,77,-6205.5])
+                block_entities_preserved=len(be),retired_pressure_floor_step_cells=retired_count,home=[cx+.5,77,-6205.5])
 
 def main(apply=False):
     assert WORLD.name=='SEELE_FIELD_R31_REVIEW'

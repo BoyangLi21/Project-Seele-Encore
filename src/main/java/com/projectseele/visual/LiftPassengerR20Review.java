@@ -19,7 +19,8 @@ import java.util.*;
 public final class LiftPassengerR20Review
 {
     private static final boolean DESCENT="r22-lift-descend".equals(System.getProperty("projectseele.regionalBuild",""));
-    private static final boolean R42="r42-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
+    public static final boolean R43="r43-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R42=R43||"r42-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
     private static boolean accessReviewed;
     private static final boolean R41=R42||"r41-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R40=R41||"r40-lifts".equals(System.getProperty("projectseele.regionalBuild",""));
@@ -32,10 +33,17 @@ public final class LiftPassengerR20Review
     public static volatile net.minecraft.core.BlockPos controllerPosition;
     public static volatile boolean clientReady,finished,moving;
     public static volatile int tripAge;
+    public static volatile net.minecraft.world.phys.Vec3 walkingTargetR43;
+    public static volatile String phaseR43="";
+    private static JsonObject pendingTripR43;
+    private static float entryHealthR43;
+    private static int entryDamageCountR43;
+    private static int entryStartedTimerR43;
     private static int age,index=R40?Integer.getInteger("projectseele.r40LiftStart",0):DESCENT?3:R21?2:"r20-lift-rest".equals(System.getProperty("projectseele.regionalBuild",""))?4:0,stage,timer,doorArrivalTicks;
     private static final JsonArray results=new JsonArray();
     private static final JsonArray damageEvents=new JsonArray();
     private static final JsonArray diagnosticStates=new JsonArray();
+    private static final JsonArray interfaceSpecsR43=new JsonArray();
     @SubscribeEvent public static void hurt(net.minecraftforge.event.entity.living.LivingHurtEvent e)
     {
         if(!ENABLED||finished||!(e.getEntity() instanceof ServerPlayer p))return;
@@ -98,10 +106,24 @@ public final class LiftPassengerR20Review
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent e)
     {
         if(!ENABLED||finished||e.phase!=TickEvent.Phase.END||!clientReady||e.getServer().getPlayerList().getPlayers().isEmpty())return;
-        Path world=e.getServer().getWorldPath(LevelResource.ROOT).normalize();require(world.getFileName().toString().equals(R42?"SEELE_R42_MECHANICS_REVIEW":R41?"SEELE_R41_MECHANICS_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R22?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":"SEELE_R20_REVIEW"),"Lift review boundary");
+        Path world=e.getServer().getWorldPath(LevelResource.ROOT).normalize();
+        String worldName=world.getFileName().toString();
+        require(R43?(worldName.equals("SEELE_FIELD_R43_REVIEW")||worldName.matches("SEELE_R43_LIFT_COLD_REVIEW_V[0-9]+"))
+                :worldName.equals(R42?"SEELE_R42_MECHANICS_REVIEW":R41?"SEELE_R41_MECHANICS_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R22?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":"SEELE_R20_REVIEW"),"Lift review boundary");
         var player=e.getServer().getPlayerList().getPlayers().get(0);var level=e.getServer().getLevel(FacilitySchemaV2.DIMENSION);
         try
         {
+            if(R43&&interfaceSpecsR43.isEmpty())
+                for(var resolved:NervLiftPassengerSync.managedLifts(level))for(var stop:resolved.stops())
+                {
+                    boolean gateway=resolved.id().equals(NervLiftPassengerSync.GATEWAY);double distance=gateway?11.5:7.5;
+                    var row=new JsonObject();row.addProperty("lift",resolved.id());row.addProperty("label",stop.label());
+                    row.addProperty("cabin_walk_y",stop.walkY());row.addProperty("approach_walk_y",stop.approachWalkY());row.addProperty("exit",stop.exit().getName());
+                    var centre=new JsonArray();centre.add(stop.cabinCentre().getX());centre.add(stop.cabinCentre().getY());centre.add(stop.cabinCentre().getZ());row.add("cabin_centre",centre);
+                    var approach=new JsonArray();approach.add(stop.cabinCentre().getX()+.5+stop.exit().getStepX()*distance);approach.add(stop.approachWalkY());approach.add(stop.cabinCentre().getZ()+.5+stop.exit().getStepZ()*distance);row.add("approach",approach);
+                    var control=S20MovingElevatorsAdapter.controllerPosition(resolved,stop);var call=gateway?new net.minecraft.core.BlockPos(-355,stop.walkY()+1,740):S20PhysicalElevatorDirector.exteriorCallPosition(stop);
+                    row.addProperty("controller",control.toShortString());row.addProperty("call_button",call.toShortString());interfaceSpecsR43.add(row);
+                }
             if(++age>15000)throw new IllegalStateException("R20 lift suite timeout");
             if(DESCENT&&index==4){write(world,"");finished=true;return;}
             if((R21||R22)&&!R25&&!R40){FROM[3]=75;TO[2]=75;if(index==4&&!ALL)index=6;}
@@ -116,6 +138,7 @@ public final class LiftPassengerR20Review
             var group=c.getGroup();timer++;
             if(stage==0)
             {
+                walkingTargetR43=null;phaseR43=index+"_outside_call";
                 doorArrivalTicks=0;
                 ProjectSeele.LOGGER.info("R20 lift setup {} {} -> {}",spec.id(),FROM[index],TO[index]);
                 var card=new net.minecraft.world.item.ItemStack(com.projectseele.registry.ModItems.TERMINAL_DOGMA_ACCESS_CARD.get());
@@ -123,7 +146,7 @@ public final class LiftPassengerR20Review
                 if(R40)player.setItemInHand(net.minecraft.world.InteractionHand.OFF_HAND,card.copy());
                 player.setGameMode(GameType.CREATIVE);player.getAbilities().flying=false;player.onUpdateAbilities();
                 double distance=spec.id().equals(NervLiftPassengerSync.GATEWAY)?11.5:7.5;
-                player.teleportTo(level,from.cabinCentre().getX()+.5+from.exit().getStepX()*distance,from.walkY(),from.cabinCentre().getZ()+.5+from.exit().getStepZ()*distance,from.exit().getOpposite().toYRot(),0);
+                player.teleportTo(level,from.cabinCentre().getX()+.5+from.exit().getStepX()*distance,R43?from.approachWalkY():from.walkY(),from.cabinCentre().getZ()+.5+from.exit().getStepZ()*distance,from.exit().getOpposite().toYRot(),0);
                 if(R40)
                 {
                     if(R41)diagnose(level,spec,group,player,"before_call");
@@ -144,6 +167,21 @@ public final class LiftPassengerR20Review
                 // than the landing interlock opens. Observe the completed
                 // door movement before testing a human walking through it.
                 if(R41&&++doorArrivalTicks<16)return;
+                if(R43)
+                {
+                    if(walkingTargetR43==null)
+                    {
+                        entryHealthR43=player.getHealth();entryDamageCountR43=damageEvents.size();
+                        entryStartedTimerR43=timer;
+                        player.setGameMode(GameType.SURVIVAL);player.getAbilities().flying=false;player.onUpdateAbilities();
+                        walkingTargetR43=new net.minecraft.world.phys.Vec3(from.cabinCentre().getX()+.5,from.walkY(),from.cabinCentre().getZ()+.5);
+                    }
+                    phaseR43=index+"_walking_into_car";
+                    require(player.getY()>=from.walkY()-.65,"Entry fell below landing: "+player.position());
+                    require(timer-entryStartedTimerR43<500,"Actual client could not enter cabin: "+player.position()+" target="+walkingTargetR43);
+                    if(player.position().subtract(walkingTargetR43).horizontalDistanceSqr()>.16||Math.abs(player.getY()-from.walkY())>.2)return;
+                    walkingTargetR43=null;stage=2;timer=0;minimumFloorError=100;maximumWallOverflow=0;return;
+                }
                 if(R41)probeOpenLanding(level,from);
                 double half=group.getCageSizeX()*.5D;
                 player.teleportTo(level,from.cabinCentre().getX()+.5+half-1.36,from.walkY(),from.cabinCentre().getZ()+.5+half-1.36,180,0);
@@ -154,7 +192,7 @@ public final class LiftPassengerR20Review
             else if(stage==2)
             {
                 // Start immediately after entry, including the old five-tick gap.
-                if(timer==1){player.setGameMode(GameType.CREATIVE);if(spec.id().equals(NervLiftPassengerSync.GATEWAY))
+                if(timer==1){player.setGameMode(R43?GameType.SURVIVAL:GameType.CREATIVE);phaseR43=index+"_ride";if(spec.id().equals(NervLiftPassengerSync.GATEWAY))
                     {
                         boolean accepted=RegionalGatewayDirector.request(level,TO[index],player);
                         if(!accepted)
@@ -182,16 +220,36 @@ public final class LiftPassengerR20Review
                 {
                     moving=false;require(NervLiftPassengerSync.carPresent(level,spec,to),"Wrong arrival floor");
                     require(Math.abs(player.getY()-to.walkY())<1.8,"Passenger did not arrive with cabin");
-                    require(level.noCollision(player,player.getBoundingBox().deflate(.03)),"Arrived inside cabin wall");require(player.getHealth()>=player.getMaxHealth()-.01,"Passenger took collision or fall damage");
-                    JsonObject r=new JsonObject();r.addProperty("lift",IDS[index]);r.addProperty("from",FROM[index]);r.addProperty("to",TO[index]);r.addProperty("minFloorError",minimumFloorError);r.addProperty("maxLateralOverflow",maximumWallOverflow);r.addProperty("ticks",timer);r.addProperty("passed",true);results.add(r);
+                    require(level.noCollision(player,player.getBoundingBox().deflate(.03)),"Arrived inside cabin wall");
+                    require(R43?player.getHealth()>=entryHealthR43-.01&&damageEvents.size()==entryDamageCountR43:player.getHealth()>=player.getMaxHealth()-.01,"Passenger took collision or fall damage");
+                    JsonObject r=new JsonObject();r.addProperty("lift",IDS[index]);r.addProperty("from",FROM[index]);r.addProperty("to",TO[index]);r.addProperty("minFloorError",minimumFloorError);r.addProperty("maxLateralOverflow",maximumWallOverflow);r.addProperty("ticks",timer);r.addProperty("passed",true);
+                    if(R43){pendingTripR43=r;stage=4;timer=0;doorArrivalTicks=0;phaseR43=index+"_arrival_wait";return;}
+                    results.add(r);
                     ProjectSeele.LOGGER.info("R20 native lift passenger pass {} {} -> {}",IDS[index],FROM[index],TO[index]);index++;stage=0;timer=0;
                 }
                 require(timer<1800,"Passenger trip stalled");
             }
+            else if(R43&&stage==4)
+            {
+                if(++doorArrivalTicks<16)return;
+                double distance=spec.id().equals(NervLiftPassengerSync.GATEWAY)?11.5:7.5;
+                walkingTargetR43=new net.minecraft.world.phys.Vec3(to.cabinCentre().getX()+.5+to.exit().getStepX()*distance,to.approachWalkY(),to.cabinCentre().getZ()+.5+to.exit().getStepZ()*distance);
+                phaseR43=index+"_walking_out_of_car";
+                require(player.isAlive()&&player.getY()>=to.walkY()-.65,"Exit fell below landing: "+player.position());
+                require(timer<500,"Actual client could not leave cabin: "+player.position()+" target="+walkingTargetR43);
+                if(player.position().subtract(walkingTargetR43).horizontalDistanceSqr()>.16||Math.abs(player.getY()-to.approachWalkY())>.2)return;
+                walkingTargetR43=null;pendingTripR43.addProperty("actual_client_entry",true);pendingTripR43.addProperty("actual_client_exit",true);
+                require(player.getHealth()>=entryHealthR43-.01&&damageEvents.size()==entryDamageCountR43,"Passenger lost health during exit");
+                pendingTripR43.addProperty("entry_health",entryHealthR43);pendingTripR43.addProperty("exit_health",player.getHealth());
+                pendingTripR43.addProperty("from_approach_y",from.approachWalkY());pendingTripR43.addProperty("to_approach_y",to.approachWalkY());
+                pendingTripR43.addProperty("outside_call","native button handler with real player and card permissions");
+                results.add(pendingTripR43);pendingTripR43=null;
+                ProjectSeele.LOGGER.info("R43 complete lift passage {} {} -> {}",IDS[index],FROM[index],TO[index]);index++;stage=0;timer=0;
+            }
         }
         catch(Exception failure)
         {
-            ProjectSeele.LOGGER.error("R20 lift passenger review failed",failure);moving=false;finished=true;write(world,failure.toString());
+            ProjectSeele.LOGGER.error("R20 lift passenger review failed",failure);walkingTargetR43=null;moving=false;finished=true;write(world,failure.toString());
         }
     }
     private static void probeOpenLanding(ServerLevel level,S20PhysicalElevatorDirector.Landing landing)
@@ -221,12 +279,19 @@ public final class LiftPassengerR20Review
     }
     private static void write(Path world,String error)
     {
-        try{JsonObject r=new JsonObject();r.addProperty("error",error);r.add("trips",results);r.add("damage",damageEvents);r.add("diagnostics",diagnosticStates);Files.writeString(world.resolve("r20_lift_review.json"),r.toString());}catch(Exception x){throw new IllegalStateException(x);}
+        try{JsonObject r=new JsonObject();r.addProperty("error",error);r.add("trips",results);r.add("damage",damageEvents);r.add("diagnostics",diagnosticStates);if(R43)r.add("resolved_interfaces",interfaceSpecsR43);Files.writeString(world.resolve("r20_lift_review.json"),r.toString());}catch(Exception x){throw new IllegalStateException(x);}
     }
     private static void diagnose(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec,com.supermartijn642.movingelevators.elevator.ElevatorGroup group,ServerPlayer player,String point)
     {
         if(Boolean.getBoolean("projectseele.r41LiftNoDiagnostics"))return;
         JsonObject r=new JsonObject();r.addProperty("point",point);r.addProperty("lift",spec.id());r.addProperty("currentY",group.getCurrentY());r.addProperty("moving",group.isMoving());
+        var nativeFloors=new JsonArray();for(int i=0;i<group.getFloorCount();i++)nativeFloors.add(group.getFloorYLevel(i));r.add("native_registered_floors",nativeFloors);
+        if(R43&&!Boolean.getBoolean("projectseele.r43DeepLiftDiagnosis"))
+        {
+            // Reading block/cage availability can load an adjacent chunk and
+            // initialize the very controller whose cold-start race is tested.
+            diagnosticStates.add(r);ProjectSeele.LOGGER.info("R43 passive lift state {}",r);return;
+        }
         JsonArray stops=new JsonArray();
         for(var landing:spec.stops())
         {

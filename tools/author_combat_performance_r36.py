@@ -58,14 +58,15 @@ def anatomy(a,p,closure=1,poles=None):
 def record(a,p,contacts):
     f=p.encode() if a.angel else a.rig.encode(p,tuple(contacts),hands.names(a.rig.rig));f['foot_contact']=list(contacts);return f
 
-def captured(a,source,mirror,label):
-    h,meta=common.human(source,mirror);retarget=common.rt.Retarget(h,a.angel,calibrated_trunk=True)
+def captured(a,source,mirror,label,retarget_class=None,pose_adapter=None):
+    adapter=pose_adapter or anatomy
+    h,meta=common.human(source,mirror);retarget=(retarget_class or common.rt.Retarget)(h,a.angel,calibrated_trunk=True)
     poses=[];travel=[];poles={}
     # The old 'feet' retarget snapped an ankle to the floor at a Boolean
     # threshold. It could change knee flexion by 100 degrees in one frame.
     # Keep continuous measured limb directions first, then ground the soles.
     for f in np.linspace(1,h.frames-1,121):
-        p,delta,_=retarget.pose(f,support='air');poses.append(anatomy(a,p,poles=poles));travel.append(delta)
+        p,delta,_=retarget.pose(f,support='air');poses.append(adapter(a,p,poles=poles));travel.append(delta)
     palms={s:np.array([p.point('hand_'+s)-(p.point('leg_l')+p.point('leg_r'))*.5 for p in poses]) for s in ('l','r')}
     lead=max(palms,key=lambda s:np.ptp(palms[s][:,2]));contact=int(np.argmax(-palms[lead][:,2]))
     if source in ('SlapDownwards','AerialSlapDownwards'):

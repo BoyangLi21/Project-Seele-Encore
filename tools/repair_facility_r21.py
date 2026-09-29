@@ -65,6 +65,9 @@ def main(apply=False):
  # The native U2 turnback is live rail, including the space west of its
  # platform. It must never be filled by a pedestrian-foyer union.
  s.protect((93,-448,-42,119,-431,-37))
+ # The north platform apron belongs to the station, including its ceiling.
+ # R21's foyer union previously replaced its first twelve gate cells.
+ s.protect((113,-444,-54,184,-433,-37))
  # Accepted command interior and pyramid skin are immutable.
  protected_states=np.array([q.startswith(('projectseele:nerv_pyramid_panel','projectseele:one_way_glass')) for q in s.palette])
  s.protected|=protected_states[s.before]

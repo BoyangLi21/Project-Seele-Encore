@@ -17,6 +17,7 @@ public final class TvCampaignSavedData extends SavedData
     public int assignedVariant=1,alertLine;
     public boolean npcPilot,autoArmament,pilotDispatchRequested;
     public long alertStarted;
+    public long generationR43;
     public String active = "", phase = "idle", notice = "";
     public BlockPos lastPosition;
     public final List<String> completed = new ArrayList<>();
@@ -46,6 +47,7 @@ public final class TvCampaignSavedData extends SavedData
         data.assignedVariant=tag.contains("AssignedVariant")?Math.max(0,Math.min(2,tag.getInt("AssignedVariant"))):1;
         data.npcPilot=tag.getBoolean("NpcPilot");data.autoArmament=tag.getBoolean("AutoArmament");data.pilotDispatchRequested=tag.getBoolean("PilotDispatchRequested");data.alertStarted=tag.getLong("AlertStarted");data.alertLine=tag.getInt("AlertLine");
         data.active = tag.getString("Active"); data.phase = tag.getString("Phase"); data.notice = tag.getString("Notice");
+        data.generationR43=tag.getLong("GenerationR43");
         if (tag.contains("LastPosition")) data.lastPosition = BlockPos.of(tag.getLong("LastPosition"));
         for (var entry : tag.getList("Completed", Tag.TAG_STRING)) data.completed.add(entry.getAsString());
         data.resumePending=!data.active.isEmpty()&&data.wasRiding&&data.pilotEva!=null&&data.pilotPlug!=null;
@@ -68,6 +70,7 @@ public final class TvCampaignSavedData extends SavedData
     @Override public CompoundTag save(CompoundTag tag)
     {
         tag.putInt("Chapter", chapter); tag.putString("Active", active); tag.putString("Phase", phase); tag.putString("Notice", notice);
+        tag.putLong("GenerationR43",generationR43);
         tag.putInt("AssignedVariant",assignedVariant);tag.putBoolean("NpcPilot",npcPilot);tag.putBoolean("AutoArmament",autoArmament);tag.putBoolean("PilotDispatchRequested",pilotDispatchRequested);tag.putLong("AlertStarted",alertStarted);tag.putInt("AlertLine",alertLine);
         if (owner != null) tag.putUUID("Owner", owner); if (angel != null) tag.putUUID("Angel", angel);
         if(pilotEva!=null)tag.putUUID("PilotEva",pilotEva);if(pilotPlug!=null)tag.putUUID("PilotPlug",pilotPlug);tag.putBoolean("WasRiding",wasRiding);

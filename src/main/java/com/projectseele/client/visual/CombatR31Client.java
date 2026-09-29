@@ -38,7 +38,7 @@ public final class CombatR31Client
         var eva=mc.level.getEntity(CombatR31Review.evaId);var angel=mc.level.getEntity(CombatR31Review.angelId);if(eva==null)return null;
         if(angel!=null)lastAngelCamera=angel.getPosition(partial);if(lastAngelCamera==null)return null;
         Vec3 p=eva.getPosition(partial),q=lastAngelCamera,centre=p.lerp(q,.5).add(0,30,0);
-        if(CombatR31Review.postFinaleOptics&&eva instanceof EvaUnit01Entity unit)
+        if((CombatR31Review.postFinaleOptics||OpticsR43Review.ENABLED)&&eva instanceof EvaUnit01Entity unit)
         {
             Vec3 eye=com.projectseele.entity.EvaBodyPose.opticalEye(unit,partial);
             return new View(eye.add(new Vec3(4,1,10).yRot(-(float)Math.toRadians(unit.getYRot()))),eye);
@@ -46,7 +46,7 @@ public final class CombatR31Client
         if(com.projectseele.visual.StanceContactR41Review.ARTICULATION&&eva instanceof EvaUnit01Entity unit)
         {
             int tick=CombatR31Review.stageTicks;
-            if(tick<160&&CombatR31Review.stageName.equals("reaction"))
+            if(!com.projectseele.visual.StanceContactR41Review.GAIT_R43&&tick<160&&CombatR31Review.stageName.equals("reaction"))
             {
                 String side=tick<80?"r":"l",name="hand_"+side;
                 var body=com.projectseele.entity.EvaBodyPose.sample(unit,partial);
@@ -137,7 +137,8 @@ public final class CombatR31Client
             if(server==null||!server.getWorldPath(LevelResource.ROOT).normalize().getFileName().toString().equals(CombatR31Review.WORLD))throw new IllegalStateException("R31 client fixture only supports the isolated integrated review world");
             started=true;oldPause=mc.options.pauseOnLostFocus;oldGui=mc.options.hideGui;oldDistance=mc.options.renderDistance().get();oldCamera=mc.options.getCameraType();
             mc.options.pauseOnLostFocus=false;mc.options.hideGui=Boolean.getBoolean("projectseele.combatSideView")||Boolean.getBoolean("projectseele.r42OpticsReview");mc.options.renderDistance().set(8);mc.options.broadcastOptions();mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);mc.setCameraEntity(mc.player);
-            folder=mc.gameDirectory.toPath().resolve("../artifacts/facility_r31/native_combat_"+System.currentTimeMillis()).normalize();
+            String root=System.getProperty("projectseele.reviewArtifactRoot","");
+            folder=(root.isEmpty()?mc.gameDirectory.toPath().resolve("../artifacts/facility_r31"):Path.of(root)).resolve("native_combat_"+System.currentTimeMillis()).normalize();
             try{Files.createDirectories(folder);}catch(Exception e){throw new IllegalStateException(e);}
             CombatR31Review.mediaFolder=folder.toString();CombatR31Review.ready=true;
         }
@@ -148,14 +149,14 @@ public final class CombatR31Client
         boolean driving=CombatR31Review.mounted&&!CombatR31Review.done&&!autonomous;int forward=driving?CombatR31Review.forward:0;
         mc.options.keyUp.setDown(forward>0);mc.options.keyDown.setDown(forward<0);mc.options.keyJump.setDown(driving&&CombatR31Review.jump);
         int strafe=driving?CombatR31Review.strafe:0;
-        mc.options.keyLeft.setDown(strafe>0);mc.options.keyRight.setDown(strafe<0);mc.options.keySprint.setDown(false);mc.options.keyShift.setDown(false);
+        mc.options.keyLeft.setDown(strafe>0);mc.options.keyRight.setDown(strafe<0);mc.options.keySprint.setDown(driving&&CombatR31Review.sprint);mc.options.keyShift.setDown(false);
         mc.player.input.up=forward>0;mc.player.input.down=forward<0;mc.player.input.left=strafe>0;mc.player.input.right=strafe<0;mc.player.input.forwardImpulse=forward;mc.player.input.leftImpulse=strafe;
         mc.player.input.jumping=driving&&CombatR31Review.jump;mc.player.zza=forward;mc.player.xxa=strafe;
         mc.player.setYRot(CombatR31Review.heading);mc.player.setXRot(0);mc.setCameraEntity(mc.player);
         if(event.phase==TickEvent.Phase.START&&driving&&epoch!=CombatR31Review.inputEpoch)
         {
             epoch=CombatR31Review.inputEpoch;int action=CombatR31Review.inputAction;
-            KeyMapping key=switch(action){case 1->mc.options.keyAttack;case 2->mc.options.keyUse;case 3->Keybinds.EVA_GRAPPLE;case 4->Keybinds.TOGGLE_AT_FIELD;default->null;};
+                KeyMapping key=switch(action){case 1->mc.options.keyAttack;case 2->mc.options.keyUse;case 3->Keybinds.EVA_GRAPPLE;case 4->Keybinds.TOGGLE_AT_FIELD;case 5->Keybinds.STOMP;default->null;};
             if(key!=null){KeyMapping.click(key.getKey());var row=new JsonObject();row.addProperty("epoch",epoch);row.addProperty("key",key.getName());row.addProperty("stage",CombatR31Review.stageName);row.addProperty("tick",CombatR31Review.stageTicks);keys.add(row);}
         }
         if(CombatR31Review.done&&event.phase==TickEvent.Phase.END)
@@ -170,9 +171,10 @@ public final class CombatR31Client
                 output.add("normal_bones",normalBones);output.add("support_contacts_r33",supportContacts);output.add("render_performance",performance());Files.writeString(folder.resolve("render_performance.json"),new GsonBuilder().setPrettyPrinting().create().toJson(performance()));
                 Files.writeString(folder.resolve("client_evidence.json"),new GsonBuilder().setPrettyPrinting().create().toJson(output));
                 com.projectseele.visual.BodyPoseLayersR40.write(folder);
+                OpticsR43Review.write(folder);
             }
             catch(Exception e){throw new IllegalStateException("R31 client evidence",e);}
-            mc.options.keyUp.setDown(false);mc.options.keyDown.setDown(false);mc.options.keyJump.setDown(false);mc.options.keyAttack.setDown(false);mc.options.keyUse.setDown(false);
+            mc.options.keyUp.setDown(false);mc.options.keyDown.setDown(false);mc.options.keyJump.setDown(false);mc.options.keyAttack.setDown(false);mc.options.keyUse.setDown(false);mc.options.keySprint.setDown(false);
             mc.options.pauseOnLostFocus=oldPause;mc.options.hideGui=oldGui;mc.options.renderDistance().set(oldDistance);mc.options.broadcastOptions();mc.options.setCameraType(oldCamera);mc.stop();
         }
     }
@@ -224,6 +226,8 @@ public final class CombatR31Client
                 var capture=net.minecraft.client.Screenshot.takeScreenshot(mc.getMainRenderTarget());
                 frameWriter.execute(()->{try(capture){NativeReviewFrames.writeJpeg(capture,folder.resolve(file));}catch(Exception failure){frameWriteFailure=failure.toString();}});
                 var row=new JsonObject();row.addProperty("file",file);row.addProperty("stage",stage);row.addProperty("server_tick",CombatR31Review.stageTicks);row.addProperty("actual_rendered_frame",renderCount);row.addProperty("render_elapsed_seconds",(now-firstRender)/1e9);
+                if(mc.level.getEntity(CombatR31Review.evaId) instanceof EvaUnit01Entity actor)
+                    row.addProperty("first_battle_seconds",actor.isFirstBattleActive()?actor.firstBattleSignals().time(actor,mc.getFrameTime()):-1);
                 row.addProperty("capture_epoch_ms",System.currentTimeMillis());
                 frames.add(row);
             }

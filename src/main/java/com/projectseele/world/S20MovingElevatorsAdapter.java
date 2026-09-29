@@ -663,7 +663,12 @@ public final class S20MovingElevatorsAdapter
             // A remote first call can load the controller without the car;
             // reconcile only after the actual cage footprint is available.
             for(var stop:spec.stops())level.getChunkAt(stop.cabinCentre());
-            reconcile(level,spec);
+            boolean reconciledForCall=reconcile(level,spec);
+            if(!callControllersReadyR43(level,spec.id()))
+            {
+                NativeLiftCallRetryR43.external(player,spec.id(),clicked);
+                return true;
+            }
             ControllerBlockEntity target = controller(level,
                     controllerPosition(spec, landing));
             if (target == null || !target.hasGroup())
@@ -674,6 +679,12 @@ public final class S20MovingElevatorsAdapter
                 return true;
             }
             ElevatorGroup group = target.getGroup();
+            if(Boolean.getBoolean("projectseele.r43LiftCallTrace"))
+            {
+                var floors=new java.util.ArrayList<Integer>();for(int i=0;i<group.getFloorCount();i++)floors.add(group.getFloorYLevel(i));
+                ProjectSeele.LOGGER.info("R43 native lift call: id={} reconciled={} target={} nativeFloors={} moving={} currentY={}",
+                        spec.id(),reconciledForCall,target.getFloorLevel(),floors,group.isMoving(),group.getCurrentY());
+            }
             BlockState physicalButton = level.getBlockState(clicked);
             if (physicalButton.getBlock() instanceof ButtonBlock)
             {
@@ -702,6 +713,20 @@ public final class S20MovingElevatorsAdapter
                     : "电梯尚未出发，请检查层门与轿厢状态 / LIFT NOT READY"), true);
             level.playSound(null, clicked, SoundEvents.STONE_BUTTON_CLICK_ON,
                     SoundSource.BLOCKS, 0.65F, 1.35F);
+            return true;
+        }
+        return false;
+    }
+
+    static boolean callControllersReadyR43(ServerLevel level,String liftId)
+    {
+        for(var spec:S20PhysicalElevatorDirector.s20Lifts(level))if(spec.id().equals(liftId))
+        {
+            for(var landing:spec.stops())
+            {
+                var controller=controller(level,controllerPosition(spec,landing));
+                if(controller==null||!controller.hasGroup())return false;
+            }
             return true;
         }
         return false;

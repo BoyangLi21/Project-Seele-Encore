@@ -161,9 +161,16 @@ public final class RegionalGatewayDirector
     public static boolean request(ServerLevel level, int target, ServerPlayer player)
     {
         if(!active(level)||(target!=LOWER&&target!=UPPER))return false;
+        if(!controllersReadyR43(level))
+        {
+            commission(level);
+            if(!controllersReadyR43(level))
+            {NativeLiftCallRetryR43.gateway(player,target);return true;}
+        }
         ElevatorGroup group = group(level);
         if (group == null || group.isMoving()) return rejected(target,"group unavailable or moving");
         Runtime state = RUNTIMES.get(level);
+        if(!state.ready&&!commission(level))return rejected(target,"native controller configuration incomplete");
         if (carAt(level, target)){state.doorsClosedUntil=0;return true;}
         int source=target==LOWER?UPPER:LOWER;
         for(int cz=46;cz<=47;cz++)
@@ -200,6 +207,13 @@ public final class RegionalGatewayDirector
     }
     private static boolean rejected(int target,String stage)
     {ProjectSeele.LOGGER.warn("NERV GATE request rejected: target={} stage={}",target,stage);return false;}
+
+    static boolean controllersReadyR43(ServerLevel level)
+    {
+        for(int y:new int[]{LOWER,UPPER})
+            if(!(level.getBlockEntity(controllerPos(y)) instanceof ControllerBlockEntity controller)||!controller.hasGroup())return false;
+        return true;
+    }
 
     public static boolean carAt(ServerLevel level, int y)
     {
