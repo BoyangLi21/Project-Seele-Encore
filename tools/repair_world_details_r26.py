@@ -4,6 +4,7 @@ import copy,json,math
 import numpy as np
 import regional_voxels as v,scan_regional_completion as scan,plan_factory_r20 as f,repair_facility_r21 as h
 from query_blocks import read_box,iter_block_entities,AIR
+from tv_crane_girder_design_r44 import running_state as crane_running_state_r44
 ROOT=v.ROOT;WORLD=ROOT/'run/saves/SEELE_R26_REVIEW';OUT=ROOT/'artifacts/facility_r26/details'
 
 def main():
@@ -36,18 +37,26 @@ def main():
     s.path('shaft_observer_retained',[[103.5,-369,-70.5],[103.5,-369,-52.5],[93.5,-369,-52.5]])
     apply(s,'continuous_launch_plant_envelope')
     # Lower the exact old overhead runways by nine metres with the hoist.
-    s=scene((-35,-374,-273),(96,-356,-212));moves=[]
+    s=scene((-35,-378,-273),(96,-356,-212));moves=[]
     for cx in (-12,30,72):
         candidates={(x,y,z) for x in (cx-4,cx+4) for y in range(-363,-360) for z in range(-271,-213)}
         candidates|={(x,y,z) for z in (-271,-214) for x in range(cx-19,cx+20) for y in range(-363,-360)}
         for q in candidates:
             x,y,z=q;old=s.palette[s.before[y-h.LO[1],z-h.LO[2],x-h.LO[0]]]
             if old!=f.EDGE:continue
-            target=(x,y-9,z);state=s.palette[s.before[target[1]-h.LO[1],z-h.LO[2],x-h.LO[0]]]
+            # Transverse frames carry the observer floor and keep the9m
+            # shift. Running beams must end atY-373 below the trolley,
+            # not form another3m-high solid channel through its top chord.
+            frame=z in (-271,-214)
+            running=(x in (cx-4,cx+4) and -266<=z<=-216)
+            target=(x,y-(9 if frame else 13),z)
+            state=s.palette[s.before[target[1]-h.LO[1],z-h.LO[2],x-h.LO[0]]]
             assert state in AIR|{f.EDGE,f.STRUCT,'projectseele:clear_glass'},('Lower runway is obstructed',target,state)
             # Retain roof material when this old rail shared a ceiling seam.
             roof=y==-361 and any(s.palette[s.before[y-h.LO[1],Z-h.LO[2],X-h.LO[0]]]==f.STRUCT for X,Z in ((x-1,z),(x+1,z)) if h.LO[0]<=X<=h.HI[0])
-            s.fill((*q,*q),f.STRUCT if roof else 'minecraft:air');s.fill((*target,*target),f.EDGE);moves.append(q)
+            s.fill((*q,*q),f.STRUCT if roof else 'minecraft:air')
+            if frame or running:s.fill((*target,*target),f.EDGE if frame else crane_running_state_r44(target[1],z))
+            moves.append(q)
     apply(s,'lowered_crane_runways');reports[-1]['moved_cells']=len(moves)
     # Explicitly retire only the protruding ledge in front of the unchanged skin.
     s=scene((-72,-450,207),(-40,-435,234));removed=0

@@ -38,6 +38,8 @@ public class ModCreativeTabs
                         output.accept(ModItems.NERV_BRIEFING_TILE.get());
                         output.accept(ModItems.NERV_WALL_PANEL.get());
                         output.accept(ModItems.NERV_STRUCTURAL_PANEL.get());
+                        output.accept(ModItems.RESIDENTIAL_PLASTER.get());
+                        output.accept(ModItems.RESIDENTIAL_PLASTER_SLAB.get());
                         output.accept(ModItems.NERV_WALL_DATUM.get());
                         output.accept(ModItems.NERV_FLOOR_PANEL.get());
                         output.accept(ModItems.NERV_HAZARD_PAVING.get());

@@ -28,7 +28,7 @@ public final class NativeStationDepartures
         String text = String.valueOf(call(object, method)).split("\\|", 2)[0].trim();
         return text.length() > limit ? text.substring(0, limit) : text;
     }
-    private static String nextAirport(Object simulator,Object arrival,long platformId,String fallback) throws ReflectiveOperationException
+    private static String nextStop(Object simulator,Object arrival,long platformId) throws ReflectiveOperationException
     {
         long routeId=((Number)call(arrival,"getRouteId")).longValue();
         for(Object route:(Iterable<?>)simulator.getClass().getField("routes").get(simulator))
@@ -42,12 +42,13 @@ public final class NativeStationDepartures
                 if(current!=null&&next!=null&&((Number)call(current,"getId")).longValue()==platformId
                         &&((Number)call(next,"getId")).longValue()!=platformId)destinations.add(shortName(next,"getStationName",15));
             }
-            // Out-and-back airport routes end at their starting airport. The
-            // simulator's trip destination therefore names this same terminal;
-            // a departure display needs the next actual airport in that route.
-            return destinations.size()==1?destinations.iterator().next():fallback;
+            // A single out-and-back trip ends at its origin. Its trip-level
+            // destination can therefore name this very station for an actual
+            // departing train, just as for an aircraft. Only a unique next
+            // stop for this precise platform may be labelled as the next stop.
+            return destinations.size()==1?destinations.iterator().next():null;
         }
-        return fallback;
+        return null;
     }
     public static Snapshot read(BlockPos centre) throws ReflectiveOperationException
     {return read(centre,-1);}
@@ -78,27 +79,31 @@ public final class NativeStationDepartures
         Object ids = longs.getConstructor(long[].class).newInstance((Object)new long[]{id});
         Class<?> requestClass = Class.forName("org.mtr.core.operation.ArrivalsRequest");
         Constructor<?> constructor = requestClass.getConstructor(longs, int.class, int.class);
-        Object request = constructor.newInstance(ids, airport?16:2, airport?16:2);
+        // Final arrivals do not depart in passenger service. Fetch beyond
+        // those entries so filtering them cannot hide the next real service.
+        Object request = constructor.newInstance(ids, 16, 16);
         Object response = requestClass.getMethod("getArrivals", simulator.getClass()).invoke(request, simulator);
         long now = ((Number)call(response, "getCurrentTime")).longValue();
         List<String> rows = new ArrayList<>();List<Long> times = new ArrayList<>();
         for (Object arrival : (Iterable<?>)call(response, "getArrivals"))
         {
-            if(airport&&Boolean.TRUE.equals(call(arrival,"getIsTerminating")))continue;
+            if(Boolean.TRUE.equals(call(arrival,"getIsTerminating")))continue;
             long departure = ((Number)call(arrival, "getDeparture")).longValue();
             String route = shortName(arrival, "getRouteNumber", 7);
             if (route.isBlank()) route = shortName(arrival, "getRouteName", 10);
             String destination = shortName(arrival, "getDestination", 15);
-            if(airport)destination=nextAirport(simulator,arrival,id,destination);
+            String next=nextStop(simulator,arrival,id);
+            String destinationLabel=next==null?"终点 "+destination:"下一站 "+next;
             long seconds = Math.max(0, (departure - now) / 1000);
             String eta = seconds <= 30 ? airport?"即将起飞":"即将进站" : "约" + ((seconds + 59) / 60) + "分钟";
-            rows.add(CLOCK.format(Instant.ofEpochMilli(departure)) + "  " + route + "  " + destination + "  " + eta);
+            rows.add(CLOCK.format(Instant.ofEpochMilli(departure)) + "  " + route + "  " + destinationLabel + "  " + eta);
             times.add(departure);
             if(rows.size()==2)break;
         }
         if (rows.isEmpty()) rows.add("当前暂无待发班次");
         Snapshot snapshot = new Snapshot(id, now, List.copyOf(times), List.copyOf(rows));
         cache.put(cacheKey, new Cached(moment + 1_000_000_000L, snapshot));
+        if (Boolean.getBoolean("projectseele.r44DepartureBoardAudit")) com.projectseele.visual.DepartureBoardAuditR44.captureSource(snapshot, response);
         return snapshot;
     }
     private NativeStationDepartures() {}

@@ -82,6 +82,7 @@ public final class EvaLogisticsDirector
     public static boolean validateCanonical(EvaUnit01Entity unit)
     {
         if(com.projectseele.visual.CombatR31Review.ownsFixture(unit))return true;
+        if(com.projectseele.visual.RuntimeR44ServerProbe.ownsFixture(unit))return true;
         if (unit.isExperimentalUnit()) return true;
         if (!(unit.level() instanceof ServerLevel level))
         {
@@ -398,6 +399,8 @@ public final class EvaLogisticsDirector
 
     public static ActionResult requestPrepare(ServerLevel level, int variant)
     {
+        var staffFault=TvPersonnelPlatformInterlockR44.prepareFault(level,variant);
+        if(staffFault.isPresent())return new ActionResult(false,staffFault.get());
         if (!logisticsReady(level, variant))
         {
             return v2MigrationInhibit("preparation");
@@ -429,6 +432,7 @@ public final class EvaLogisticsDirector
         {
             return new ActionResult(false, label(variant) + " is not loaded; use force reset.");
         }
+        if(unit.refreshTvPersonnelClockHoldR44())return new ActionResult(false,unit.tvPersonnelClockFaultR44());
         if (com.projectseele.entity.EvaBayRepairR33.active(unit))return new ActionResult(false,"机体正在检修，机械臂撤回后即可出动。");
         if (entry.phase() != Phase.PARKED)
         {
@@ -472,6 +476,8 @@ public final class EvaLogisticsDirector
      */
     public static ActionResult requestLaunch(ServerLevel level, int variant)
     {
+        var staffFault=TvPersonnelPlatformInterlockR44.prepareFault(level,variant);
+        if(staffFault.isPresent())return new ActionResult(false,staffFault.get());
         if (!logisticsReady(level, variant))
         {
             return v2MigrationInhibit("launch");
@@ -492,6 +498,7 @@ public final class EvaLogisticsDirector
             return new ActionResult(false,
                     label(variant) + " is not linked to the command network.");
         }
+        if(unit.refreshTvPersonnelClockHoldR44())return new ActionResult(false,unit.tvPersonnelClockFaultR44());
         if (entry.phase() != Phase.SILO_READY)
         {
             return new ActionResult(false, label(variant) + " is "
@@ -891,6 +898,27 @@ public final class EvaLogisticsDirector
         {
             return false;
         }
+        var installedControl = HangarOperationsR44.match(level, position);
+        if (installedControl.isPresent())
+        {
+            var control = installedControl.get();
+            switch (control.action())
+            {
+                case PREPARE -> handleHangarControl(player, control.variant(), true);
+                case STATUS -> handleHangarControl(player, control.variant(), false);
+                case CANCEL ->
+                {
+                    ActionResult result = requestCancel(level, control.variant());
+                    player.displayClientMessage(Component.literal(
+                            "[NERV HANGAR] " + result.message()).withStyle(
+                            result.accepted() ? ChatFormatting.GREEN : ChatFormatting.RED), false);
+                }
+            }
+            // These physical keys use the same guarded requests and fleet
+            // identities as the retained controls. Vanilla still depresses
+            // and sounds the actual button; no launch authority is added.
+            return true;
+        }
         if (modern)
         {
             for (int variant = 0; variant < 3; variant++)
@@ -1048,6 +1076,11 @@ public final class EvaLogisticsDirector
             }
             return;
         }
+        if (compactS20 && event.getServer().getTickCount() % 20 == 0
+                && !VERIFIED_INFRASTRUCTURE.contains(level))
+        {
+            maintainKnownParkedBayVisuals(level);
+        }
         if (!VERIFIED_INFRASTRUCTURE.contains(level))
         {
             if (modern)
@@ -1123,6 +1156,48 @@ public final class EvaLogisticsDirector
         }
     }
 
+    private static void maintainKnownParkedBayVisuals(ServerLevel level)
+    {
+        // The global fleet-repair barrier waits for entity sections at all
+        // wet, launch and surface stations before it may replace a missing
+        // identity. It must not hide a fixed installed bay while those remote
+        // sections attach. Reuse only already-loaded, actually parked
+        // canonical originals; no actor/phase/pose/ticket repair occurs here.
+        for (int variant = 0; variant < 3; variant++)
+        {
+            FleetEntry known = entry(level, variant);
+            if (known == null || known.phase() != Phase.PARKED)
+            {
+                continue;
+            }
+            Entity actual = level.getEntity(known.canonicalId());
+            if (!(actual instanceof EvaUnit01Entity unit) || !unit.isAlive()
+                    || unit.isExperimentalUnit() || unit.getUnitVariant() != variant)
+            {
+                continue;
+            }
+            BlockPos bed = hangarBed(level, variant);
+            Vec3 expected = new Vec3(bed.getX() + .5, bed.getY() + 1, bed.getZ() + .5);
+            if (unit.position().distanceToSqr(expected) > .05 * .05)
+            {
+                continue;
+            }
+            // Rack height is derived from the fleet phase. A canonical cold
+            // bay can load before distant station sections, so reconcile
+            // only its inactive visual channel before the fleet repair gate.
+            if (!unit.isVehicle() && !unit.isLaunchSequenceActive()
+                    && !unit.hasActiveCarrierMotion())
+            {
+                unit.setCarrierRiseProgress(0F);
+                unit.setRecoveryRackR39(false);
+            }
+            NervCarrierVisuals.updateRestraints(level, unit,
+                    expected.x, bed.getY(), expected.z, 1F);
+            NervCarrierVisuals.updateLclSurface(level, unit,
+                    expected.x, bed.getY(), expected.z, known.lclLayers());
+        }
+    }
+
     private static void maintainSurfaceSiloDoor(ServerLevel level,
                                                 int variant)
     {
@@ -1175,6 +1250,26 @@ public final class EvaLogisticsDirector
                 && entry.phase() != Phase.DEPLOYED;
         active = active || TrainingPilotDirector.requiresRouteTicket(variant);
         maintainRouteChunks(level, variant, entry.canonicalId(), active);
+        if (entry.phase() != Phase.PARKED && entry.phase() != Phase.DEPLOYED)
+        {
+            var staffMotionFault=TvPersonnelPlatformInterlockR44.movementFault(level,variant);
+            EvaUnit01Entity staffUnit=canonical(level,variant);
+            boolean independentClockHeld=staffUnit!=null&&staffUnit.refreshTvPersonnelClockHoldR44();
+            if(staffMotionFault.isPresent()||independentClockHeld)
+            {
+                // Pause before the hangar door, rack, fluid, boarding bridge,
+                // plug and phase clock. A stable clamp endpoint alone cannot
+                // authorize another owned machine to move through workers.
+                if(staffUnit!=null)
+                {
+                    staffUnit.refreshTvPersonnelClockHoldR44();
+                    staffUnit.getPersistentData().putString("TvPersonnelMotionBlockedR44",staffMotionFault.orElse(staffUnit.tvPersonnelClockFaultR44()));
+                }
+                TvPersonnelOwnedMotionR44.keepWetMachines(level,variant);
+                return;
+            }
+            if(staffUnit!=null)staffUnit.getPersistentData().remove("TvPersonnelMotionBlockedR44");
+        }
         // PARKED used to run the complete standby/plug reconciliation on all
         // three cages every server tick.  Besides resending unchanged entity
         // data, ensureSuspended performs an entity query in each cage.  A
@@ -1256,9 +1351,14 @@ public final class EvaLogisticsDirector
                         PLUG_FAULT, PLUG_LOCKING -> 1.0F;
                 default -> 0.0F;
             };
-            NervCarrierVisuals.updateRestraints(level, unit,
+            if (!NervCarrierVisuals.updateRestraints(level, unit,
                     hangar.getX() + 0.5D, hangar.getY(),
-                    hangar.getZ() + 0.5D, hangarRestraint);
+                    hangar.getZ() + 0.5D, hangarRestraint))
+            {
+                // The real phase clock and carrier wait with the visible
+                // restraints; a blocked actuator cannot grant departure.
+                return;
+            }
         }
         switch (entry.phase())
         {
@@ -1481,9 +1581,14 @@ public final class EvaLogisticsDirector
                         : 1.0F - Mth.clamp(confirmedDry
                                 / (float) RESTRAINT_TRAVEL_TICKS,
                                 0.0F, 1.0F);
-                NervCarrierVisuals.updateRestraints(level, unit,
+                if (!NervCarrierVisuals.updateRestraints(level, unit,
                         hangar.getX() + 0.5D, hangar.getY(),
-                        hangar.getZ() + 0.5D, restraint);
+                        hangar.getZ() + 0.5D, restraint))
+                {
+                    // Keep confirmedDry unchanged, so occupied travel never
+                    // reaches TO_SILO merely because its visual was stopped.
+                    break;
+                }
                 // Remove each physical top layer at the start of its interval;
                 // the client surface then descends continuously to the next
                 // real layer instead of waiting and dropping one full block.
@@ -1606,9 +1711,14 @@ public final class EvaLogisticsDirector
                 float restraint = Mth.clamp(
                         ticks / (float) RESTRAINT_TRAVEL_TICKS,
                         0.0F, 1.0F);
-                NervCarrierVisuals.update(level, unit,
+                if (!NervCarrierVisuals.updateRestraints(level, unit,
                         hangar.getX() + 0.5D, hangar.getY(),
-                        hangar.getZ() + 0.5D, restraint);
+                        hangar.getZ() + 0.5D, restraint))
+                {
+                    // Do not refill or extract through an occupied closing
+                    // sleeve/shoulder sweep, and retain the exact phase tick.
+                    break;
+                }
                 if(ticks<80)
                 {
                     // Close the fixed restraints and sink the transfer rack
@@ -1671,6 +1781,8 @@ public final class EvaLogisticsDirector
                 if (lcl
                         >= FacilityV2EvaRuntime.LCL_SHOULDER_LAYERS)
                 {
+                    unit.setCarrierRiseProgress(0F);
+                    unit.setRecoveryRackR39(false);
                     unit.setSortieDestination(level.dimension(), surface);
                     unit.setSortieParkingBed(hangar);
                     setBoardingBridgeExtension(level, variant,

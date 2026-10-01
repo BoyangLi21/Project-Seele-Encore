@@ -11,6 +11,8 @@
     "projectseele:station_tactile_warning",
     "projectseele:period_station_floor",
     "projectseele:period_fixture",
-    "projectseele:station_drain"
+    "projectseele:station_drain",
+    "projectseele:residential_plaster",
+    "projectseele:residential_plaster_slab"
   ]
 }

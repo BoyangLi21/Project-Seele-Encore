@@ -76,7 +76,7 @@ public final class ClientFxManager
         if (com.projectseele.config.SeeleConfig.FX_INTENSITY.get() > 0.0D)
         {
             ACTIVE.add(new AtFieldRipple(new Vec3(packet.x, packet.y, packet.z),
-                    new Vector3f(packet.nx, packet.ny, packet.nz)));
+                    new Vector3f(packet.nx, packet.ny, packet.nz),packet.radius));
         }
     }
 
@@ -252,7 +252,8 @@ public final class ClientFxManager
             poseStack.pushPose();
             poseStack.translate(fx.pos.x - cam.x, fx.pos.y - cam.y, fx.pos.z - cam.z);
             VertexConsumer target = fx instanceof KabbalahTree
-                    ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof CrossExplosion || fx instanceof NukeExplosion
+                    ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof AtFieldRipple
+                    ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.AT_FIELD) : fx instanceof CrossExplosion || fx instanceof NukeExplosion
                     // Vanilla lightning writes depth even for translucent
                     // rings, cutting a hard empty band through the smoke.
                     ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.CROSS) : buffer.getBuffer(RenderType.lightning());
@@ -261,6 +262,7 @@ public final class ClientFxManager
         }
         buffer.endBatch(RenderType.lightning());
         buffer.endBatch(com.projectseele.client.render.EnergyGlowR24.CROSS);
+        buffer.endBatch(com.projectseele.client.render.EnergyGlowR24.AT_FIELD);
         buffer.endBatch(TREE_GEOMETRY);
 
         // World-space lettering uses the same pose as the luminous geometry,
@@ -381,8 +383,7 @@ public final class ClientFxManager
     }
 
     /**
-     * A.T. Field impact: three nested orange hexagons expanding in the impact
-     * plane and fading — the universal "your weapons are useless" sign.
+     * A.T. Field cue: translucent octagonal bands in the event's world plane.
      */
     private static final class AtFieldRipple extends WorldFx
     {
@@ -390,10 +391,12 @@ public final class ClientFxManager
 
         private final Vector3f u;
         private final Vector3f v;
+        private final float radius;
 
-        AtFieldRipple(Vec3 pos, Vector3f normal)
+        AtFieldRipple(Vec3 pos, Vector3f normal,float radius)
         {
             super(pos);
+            this.radius=radius;
             Vector3f[] basis = RibbonRenderer.planeBasis(normal);
             this.u = basis[0];
             this.v = basis[1];
@@ -409,20 +412,7 @@ public final class ClientFxManager
         void render(PoseStack poseStack, VertexConsumer consumer, float partialTick)
         {
             float t = (this.age + partialTick) / LIFETIME;
-            float alpha = (1.0F - t) * 0.85F * fxIntensity();
-            Matrix4f pose = poseStack.last().pose();
-            for (int ring = 0; ring < 3; ring++)
-            {
-                float lag = ring * 0.13F;
-                float progress = Mth.clamp(t * 1.35F - lag, 0.0F, 1.0F);
-                if (progress <= 0.0F)
-                {
-                    continue;
-                }
-                float radius = (1.2F + 3.8F * progress) * (1.0F + ring * 0.55F);
-                RibbonRenderer.drawPolyRing(pose, consumer, this.u, this.v, 6, radius,
-                        0.22F - 0.04F * ring, 1.0F, 0.60F, 0.18F, alpha * (1.0F - ring * 0.22F));
-            }
+            com.projectseele.client.render.TvAtFieldSurfaceR44.impact(poseStack.last().pose(),consumer,this.u,this.v,t,fxIntensity(),this.radius);
         }
     }
 

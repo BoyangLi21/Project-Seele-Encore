@@ -2054,15 +2054,19 @@ public final class S20PhysicalElevatorDirector
                     side == 0 ? LANDING_LIGHT : structuralLandingFrame());
         }
 
-        BlockPos callBacking = centre
-                .relative(exit, LANDING_DOOR_DISTANCE)
-                .relative(lateral, 3).above(1);
+        Direction callFacing = exteriorCallFacing(landing);
+        BlockPos callBacking = movingElevatorLandingPanelPosition(landing);
+        if (internalEastLanding(landing))
+        {
+            set(level, callBacking.below(),
+                    ModBlocks.NERV_WALL_PANEL.get().defaultBlockState());
+        }
         set(level, callBacking, LANDING_ACCENT);
-        set(level, callBacking.relative(exit), wallButton(exit));
+        set(level, callBacking.relative(callFacing), wallButton(callFacing));
         set(level, callBacking.above(), CABIN_PANEL);
         // One exterior call button only. Floor selection belongs inside the
         // car, where the proven R28 cabin has separate UP and DOWN buttons.
-        set(level, callBacking.above().relative(exit), AIR);
+        set(level, callBacking.above().relative(callFacing), AIR);
         setLandingDoor(level, landing, false);
     }
 
@@ -2070,7 +2074,7 @@ public final class S20PhysicalElevatorDirector
             ServerLevel level, Landing landing)
     {
         BlockPos call = exteriorCallPosition(landing);
-        set(level, call, wallButton(landing.exit()));
+        set(level, call, wallButton(exteriorCallFacing(landing)));
         set(level, call.above(), AIR);
     }
 
@@ -2275,6 +2279,27 @@ public final class S20PhysicalElevatorDirector
 
     public static BlockPos exteriorCallPosition(Landing landing)
     {
+        if (internalEastLanding(landing))
+        {
+            return landing.cabinCentre().offset(-1, 1, 6);
+        }
+        return legacyExteriorCallPosition(landing);
+    }
+
+    public static Direction exteriorCallFacing(Landing landing)
+    {
+        return internalEastLanding(landing) ? Direction.EAST : landing.exit();
+    }
+
+    private static boolean internalEastLanding(Landing landing)
+    {
+        return landing.cabinCentre().getX() == 66
+                && landing.cabinCentre().getZ() == 302
+                && landing.exit() == Direction.SOUTH;
+    }
+
+    public static BlockPos legacyExteriorCallPosition(Landing landing)
+    {
         Direction lateral = landing.exit().getClockWise();
         return landing.cabinCentre()
                 .relative(landing.exit(), LANDING_DOOR_DISTANCE + 1)
@@ -2289,7 +2314,7 @@ public final class S20PhysicalElevatorDirector
     public static BlockPos movingElevatorLandingPanelPosition(Landing landing)
     {
         return exteriorCallPosition(landing).relative(
-                landing.exit().getOpposite());
+                exteriorCallFacing(landing).getOpposite());
     }
 
     /**
@@ -2568,6 +2593,21 @@ public final class S20PhysicalElevatorDirector
             setCabinDoor(level, centre, exit,
                     exit == current.exit(), doorDistance);
         }
+    }
+
+    /** Exact owned apertures for server-state replay, not an inferred whole doorway box. */
+    public static java.util.Set<BlockPos> movingDoorCells(LiftSpec spec,Landing current)
+    {
+        var cells=new java.util.LinkedHashSet<BlockPos>();
+        int distance=spec.id().equals(SURFACE_TRANSIT_LIFT_ID)?CABIN_DOOR_DISTANCE+1:CABIN_DOOR_DISTANCE;
+        for(Direction exit:spec.stops().stream().map(Landing::exit).distinct().toList())
+            for(int side=-CABIN_DOOR_HALF_WIDTH;side<=CABIN_DOOR_HALF_WIDTH;side++)
+                for(int dy=0;dy<DOOR_HEIGHT;dy++)
+                    cells.add(current.cabinCentre().relative(exit,distance).relative(exit.getClockWise(),side).above(dy));
+        for(int side=-LANDING_DOOR_HALF_WIDTH;side<=LANDING_DOOR_HALF_WIDTH;side++)
+            for(int dy=0;dy<DOOR_HEIGHT;dy++)
+                cells.add(current.cabinCentre().relative(current.exit(),LANDING_DOOR_DISTANCE).relative(current.exit().getClockWise(),side).above(dy));
+        return java.util.Collections.unmodifiableSet(cells);
     }
 
     /**

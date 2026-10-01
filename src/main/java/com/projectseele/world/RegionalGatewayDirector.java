@@ -147,6 +147,9 @@ public final class RegionalGatewayDirector
         ServerLevel level = player.serverLevel();
         BlockPos pos = event.getPos();
         boolean handled = false;
+        if(level.getBlockEntity(new BlockPos(-354,82,732)) instanceof NervAccessReaderEntityR44 reader
+                &&(pos.equals(new BlockPos(-354,82,732))||pos.equals(new BlockPos(-354,82,734))))
+        {return;}
         if (pos.equals(new BlockPos(-354, 82, 732))) { swipe(player); handled = true; }
         else if (pos.equals(new BlockPos(-354, 82, 734)))
         { RUNTIMES.get(level).gateUntil = level.getGameTime() + 160; handled = true; }
@@ -230,6 +233,15 @@ public final class RegionalGatewayDirector
             set(level, new BlockPos(x, y + dy, z), open ? AIR : CLOSED);
     }
 
+    public static java.util.Set<BlockPos> arrivalDoorCells(int y)
+    {
+        if(y!=LOWER && y!=UPPER)return java.util.Set.of();
+        var cells=new java.util.LinkedHashSet<BlockPos>();
+        for(int z:new int[]{741,743})for(int x=X-3;x<=X+3;x++)for(int dy=0;dy<5;dy++)
+            cells.add(new BlockPos(x,y+dy,z));
+        return java.util.Collections.unmodifiableSet(cells);
+    }
+
     @SubscribeEvent
     public static void tick(TickEvent.ServerTickEvent event)
     {
@@ -241,12 +253,14 @@ public final class RegionalGatewayDirector
         ElevatorGroup group = group(level);
         if (group == null || !state.ready) return;
         long time = level.getGameTime();
-        // Exit is always free; a body in the gate keeps the panel from closing into it.
-        if (!level.getEntitiesOfClass(ServerPlayer.class, new AABB(-364,81,733,-356,85,737)).isEmpty())
-            state.gateUntil = time + 40;
-        boolean gateOpen = state.gateUntil > time;
-        for (int x = X - 3; x <= X + 3; x++) for (int y = 81; y <= 85; y++)
-            set(level, new BlockPos(x,y,733), gateOpen ? AIR : CLOSED);
+        if(!(level.getBlockEntity(new BlockPos(-354,82,732)) instanceof NervAccessReaderEntityR44))
+        {
+            if (!level.getEntitiesOfClass(ServerPlayer.class, new AABB(-364,81,733,-356,85,737)).isEmpty())
+                state.gateUntil = time + 40;
+            boolean gateOpen = state.gateUntil > time;
+            for (int x = X - 3; x <= X + 3; x++) for (int y = 81; y <= 85; y++)
+                set(level, new BlockPos(x,y,733), gateOpen ? AIR : CLOSED);
+        }
         for (int y : new int[]{LOWER, UPPER})
         {
             boolean present = !group.isMoving() && carAt(level,y);

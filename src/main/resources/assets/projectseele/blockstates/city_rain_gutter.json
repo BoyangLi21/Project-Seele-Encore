@@ -1,0 +1,36 @@
+{
+  "variants": {
+    "facing=north,outlet=false": {
+      "model": "projectseele:block/city_rain_gutter",
+      "y": 0
+    },
+    "facing=north,outlet=true": {
+      "model": "projectseele:block/city_rain_gutter_outlet",
+      "y": 0
+    },
+    "facing=east,outlet=false": {
+      "model": "projectseele:block/city_rain_gutter",
+      "y": 90
+    },
+    "facing=east,outlet=true": {
+      "model": "projectseele:block/city_rain_gutter_outlet",
+      "y": 90
+    },
+    "facing=south,outlet=false": {
+      "model": "projectseele:block/city_rain_gutter",
+      "y": 180
+    },
+    "facing=south,outlet=true": {
+      "model": "projectseele:block/city_rain_gutter_outlet",
+      "y": 180
+    },
+    "facing=west,outlet=false": {
+      "model": "projectseele:block/city_rain_gutter",
+      "y": 270
+    },
+    "facing=west,outlet=true": {
+      "model": "projectseele:block/city_rain_gutter_outlet",
+      "y": 270
+    }
+  }
+}

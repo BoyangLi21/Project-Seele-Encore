@@ -10,6 +10,7 @@ import com.projectseele.entity.SiloHatchMechanism;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.GameRenderer;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.resources.ResourceLocation;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
@@ -19,12 +20,25 @@ import java.util.Map;
 /** Original TV-style rigid machinery, with each moving assembly baked only once. */
 public final class TvFacilityMeshes
 {
-    private static final Map<String,VertexBuffer> PARTS=new HashMap<>();
+    private static final Map<String,RigidMachineryPartR44> PARTS=new HashMap<>();
     private static final Map<Integer,float[][]> CARRIER_MOUNTS=new HashMap<>();
+    private static final ThreadLocal<MultiBufferSource> ACTIVE_BUFFERS=new ThreadLocal<>();
     private static boolean attempted;
+    /** Preserve the caller's normal/shadow/outline pass for nested machinery. */
+    public static void withBuffers(MultiBufferSource buffers,Runnable rendering)
+    {
+        var previous=ACTIVE_BUFFERS.get();ACTIVE_BUFFERS.set(buffers);
+        try{rendering.run();}
+        finally{if(previous==null)ACTIVE_BUFFERS.remove();else ACTIVE_BUFFERS.set(previous);}
+    }
+    static MultiBufferSource currentBuffers()
+    {
+        var buffers=ACTIVE_BUFFERS.get();
+        return buffers!=null?buffers:Minecraft.getInstance().renderBuffers().bufferSource();
+    }
     public static void clearCache()
     {
-        Runnable release=()->{PARTS.values().forEach(VertexBuffer::close);PARTS.clear();CARRIER_MOUNTS.clear();attempted=false;EvaBayMachineryR33.clearCache();};
+        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();attempted=false;EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();};
         if(RenderSystem.isOnRenderThread())release.run();else RenderSystem.recordRenderCall(release::run);
     }
     private static void load()
@@ -42,12 +56,7 @@ public final class TvFacilityMeshes
             }
             for(var part:parts.entrySet())
             {
-                var vertices=part.getValue().getAsJsonArray();BufferBuilder builder=new BufferBuilder(262144);
-                builder.begin(VertexFormat.Mode.TRIANGLES,DefaultVertexFormat.POSITION_COLOR);
-                for(int i=0;i<vertices.size();i+=6)
-                    builder.vertex(vertices.get(i).getAsDouble(),vertices.get(i+1).getAsDouble(),vertices.get(i+2).getAsDouble())
-                            .color(vertices.get(i+3).getAsInt(),vertices.get(i+4).getAsInt(),vertices.get(i+5).getAsInt(),255).endVertex();
-                VertexBuffer mesh=new VertexBuffer(VertexBuffer.Usage.STATIC);mesh.bind();mesh.upload(builder.end());VertexBuffer.unbind();PARTS.put(part.getKey(),mesh);
+                PARTS.put(part.getKey(),RigidMachineryPartR44.triangles(part.getValue().getAsJsonArray()));
             }
             ProjectSeele.LOGGER.info("TV facility machinery loaded: {} rigid assemblies",PARTS.size());
         }
@@ -57,28 +66,37 @@ public final class TvFacilityMeshes
     {draw(part,poses,light,1);}
     private static void draw(String part,PoseStack poses,int light,float opacity)
     {
-        load();VertexBuffer mesh=PARTS.get(part);if(mesh==null)return;
-        var type=RenderType.debugQuads();type.setupRenderState();
-        float illumination=.40F+.60F*Math.max((light>>4)&15,(light>>20)&15)/15F;
-        if(opacity<.999F){RenderSystem.enableBlend();RenderSystem.defaultBlendFunc();RenderSystem.depthMask(false);}
-        else {RenderSystem.disableBlend();RenderSystem.depthMask(true);RenderSystem.enableDepthTest();}
-        RenderSystem.setShaderColor(illumination,illumination,illumination,opacity);
-        mesh.bind();mesh.drawWithShader(poses.last().pose(),RenderSystem.getProjectionMatrix(),GameRenderer.getPositionColorShader());VertexBuffer.unbind();
-        RenderSystem.setShaderColor(1,1,1,1);if(opacity<.999F)RenderSystem.depthMask(true);type.clearRenderState();
+        load();RigidMachineryPartR44 mesh=PARTS.get(part);if(mesh==null)return;
+        mesh.draw(poses,currentBuffers(),light);
     }
+    public static float[] partBounds(String part)
+    {load();var mesh=PARTS.get(part);return mesh==null?null:mesh.bounds();}
     private static float ramp(float value,float a,float b){return EvaDorsalMechanism.smooth((value-a)/(b-a));}
     public static void cage(PoseStack poses,int light,float closed)
+    {cage(poses,light,closed,-1);}
+    public static void cage(PoseStack poses,int light,float closed,int variant)
     {
-        draw("cage_frame",poses,light);float opening=1-closed;
+        float opening=1-closed;
+        boolean tvEnclosure=TvCageEnclosureR44.render(variant,opening,poses,light);
+        if(!tvEnclosure)draw("cage_frame",poses,light);
+        boolean measuredShoulders=TvShoulderRestraintsR44.render(variant,opening,poses,light,!tvEnclosure);
         for(int side:new int[]{-1,1})
         {
             poses.pushPose();poses.scale(side,1,1);
             float shoulder=5.35F*ramp(opening,.23F,.88F),arm=3.3F*ramp(opening,.12F,.83F),leg=7.4F*ramp(opening,.35F,.96F);
-            poses.pushPose();poses.translate(shoulder,2.1*ramp(opening,0,.25F),0);draw("shoulder_pin",poses,light);poses.popPose();
-            poses.pushPose();poses.translate(shoulder,0,0);draw("shoulder_jaw",poses,light);poses.popPose();
-            rod(poses,light,"shoulder_rod",8.8F+shoulder,Math.max(.04F,5.1F-shoulder));
-            poses.pushPose();poses.translate(arm,0,0);draw("arm_guard",poses,light);poses.popPose();
-            rod(poses,light,"arm_rod",10.8F+arm,3.8F-arm);
+            if(!measuredShoulders)
+            {
+                poses.pushPose();poses.translate(shoulder,2.1*ramp(opening,0,.25F),0);draw("shoulder_pin",poses,light);poses.popPose();
+                poses.pushPose();poses.translate(shoulder,0,0);draw("shoulder_jaw",poses,light);poses.popPose();
+                rod(poses,light,"shoulder_rod",8.8F+shoulder,Math.max(.04F,5.1F-shoulder));
+            }
+            if(!tvEnclosure)
+            {
+                // The complete legacy guard/ram pair was authored outside
+                // the actual arms; it is not a valid closed TV contact.
+                poses.pushPose();poses.translate(arm,0,0);draw("arm_guard",poses,light);poses.popPose();
+                rod(poses,light,"arm_rod",10.8F+arm,3.8F-arm);
+            }
             poses.pushPose();poses.translate(leg,0,0);draw("lower_jaw",poses,light);poses.popPose();
             rod(poses,light,"lower_rod",6.8F+leg,7.6F-leg);
             poses.pushPose();poses.translate(4.0*ramp(opening,0,.60F),0,0);draw("cage_front",poses,light);poses.popPose();

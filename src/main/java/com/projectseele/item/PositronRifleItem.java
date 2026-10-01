@@ -55,9 +55,8 @@ public class PositronRifleItem extends Item
                 new ClipContext(from, farEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
         Vec3 end = blockHit.getLocation();
 
-        EntityHitResult entityHit = ProjectileUtil.getEntityHitResult(level, player, from, end,
-                new AABB(from, end).inflate(1.0D),
-                e -> e instanceof LivingEntity && e != player && !e.isSpectator() && e.isAlive());
+        EntityHitResult entityHit = com.projectseele.physics.CombatEntityQueryR44.ray(level,from,end,.3,
+                e -> e != player && !e.isSpectator() && e.isAlive());
         if (entityHit != null)
         {
             end = entityHit.getLocation();

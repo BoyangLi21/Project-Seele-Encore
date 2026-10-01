@@ -35,7 +35,6 @@ public final class S20EvaPlantDirector
 
     public static void tick(MinecraftServer server)
     {
-        if(FacilityLayoutR20.active(server))return;
         if (!FacilityWorldPolicy.isS20Rebuild(server)
                 || server.getTickCount() % PHASE_INTERVAL_TICKS != 0)
         {
@@ -43,6 +42,10 @@ public final class S20EvaPlantDirector
         }
         ServerLevel level = server.getLevel(FacilitySchemaV2.DIMENSION);
         if (level == null)
+        {
+            return;
+        }
+        if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
         {
             return;
         }

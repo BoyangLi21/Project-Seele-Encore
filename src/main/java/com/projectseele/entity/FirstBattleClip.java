@@ -34,13 +34,18 @@ public final class FirstBattleClip
     private static Data load()
     {
         String review=System.getProperty("projectseele.firstBattleReviewClip","");
-        String mode=System.getProperty("projectseele.regionalBuild","");
-        if(!review.isEmpty()&&(mode.equals("r10-firstbattle")||mode.startsWith("r24-campaign")||mode.equals("r31-combat")&&Boolean.getBoolean("projectseele.combatAwakening")))
+        if(!review.isEmpty())
         {
             try{return readLocal(Path.of(review),"isolated candidate review");}
             catch(Exception e){throw new IllegalStateException("Requested battle candidate could not load",e);}
         }
-        for(String revision:List.of("r43","r42","r24","r18","r15","r14","r12"))
+        String bundle=System.getProperty("projectseele.combatBundleDirectory","");
+        if(!bundle.isEmpty())
+        {
+            try{return readLocal(Path.of(bundle).resolve("first_battle_r44.json"),"R44 matched combat bundle");}
+            catch(Exception e){throw new IllegalStateException("Requested battle bundle could not load",e);}
+        }
+        for(String revision:List.of("r44","r43","r42","r24","r18","r15","r14","r12"))
         {
             Path local=Path.of("projectseele-local-maps/first_battle_"+revision+".json");
             if(!Files.isRegularFile(local))continue;
@@ -53,7 +58,7 @@ public final class FirstBattleClip
     }
     private static Data readLocal(Path path,String source)throws Exception
     {
-        byte[] bytes=Files.readAllBytes(path);
+        byte[] bytes=CombatMotionResourcesR44.read(path,"first-battle");
         Data result=read(new java.io.ByteArrayInputStream(bytes),source);
         loadedFingerprint=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
         ProjectSeele.LOGGER.info("First-battle loaded clip fingerprint {}",loadedFingerprint);

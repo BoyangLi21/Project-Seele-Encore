@@ -34,12 +34,46 @@ public abstract class CameraMixin
     @org.spongepowered.asm.mixin.Unique private double projectseele$carrierPivotHeight;
     @org.spongepowered.asm.mixin.Unique private long projectseele$carrierFrame;
     @org.spongepowered.asm.mixin.Unique private boolean projectseele$loosePlugCamera;
+    @org.spongepowered.asm.mixin.Unique private Vec3 projectseele$plugOrbitOffset=Vec3.ZERO;
+
+    @org.spongepowered.asm.mixin.Unique
+    private static boolean projectseele$outsideCapsule(EntryPlugCarrierEntity plug,float partial,Vec3 point)
+    {
+        Vec3 p=plug.getInterpolatedCanonicalTransform(partial).inverse().transformPoint(point)
+                .subtract(com.projectseele.world.EntryPlugKinematics.BODY_OBB_CENTRE_P);
+        Vec3 half=com.projectseele.world.EntryPlugKinematics.BODY_OBB_HALF_EXTENTS;
+        return Math.abs(p.x)>half.x+.35||Math.abs(p.y)>half.y+.35||Math.abs(p.z)>half.z+.35;
+    }
+
+    @org.spongepowered.asm.mixin.Unique
+    private double projectseele$looseOrbitZoom(Vec3 pivot)
+    {
+        this.setPosition(pivot.x,pivot.y,pivot.z);
+        return this.getMaxZoom(4);
+    }
+
+    @org.spongepowered.asm.mixin.Unique
+    private static boolean projectseele$cameraPointClear(BlockGetter level,Entity subject,Vec3 point)
+    {
+        var volume=new net.minecraft.world.phys.AABB(point.x-.2,point.y-.2,point.z-.2,point.x+.2,point.y+.2,point.z+.2);
+        for(var pos:net.minecraft.core.BlockPos.betweenClosed(net.minecraft.core.BlockPos.containing(volume.minX,volume.minY,volume.minZ),
+                net.minecraft.core.BlockPos.containing(volume.maxX,volume.maxY,volume.maxZ)))
+            for(var box:level.getBlockState(pos).getVisualShape(level,pos,net.minecraft.world.phys.shapes.CollisionContext.of(subject)).toAabbs())
+                if(box.move(pos).intersects(volume))return false;
+        return true;
+    }
 
     @Inject(method = "setup", at = @At("TAIL"))
     private void projectseele$smoothEntryPlugCamera(BlockGetter level,
             Entity subject, boolean detached, boolean mirrored,
             float partialTick, CallbackInfo callback)
     {
+        var networkReview=com.projectseele.client.visual.RuntimeR44ClientProbe.cameraView(partialTick);
+        if(networkReview!=null)
+        {
+            Vec3 p=networkReview.position(),d=networkReview.target().subtract(p);this.setPosition(p.x,p.y,p.z);
+            this.setRotation((float)Math.toDegrees(Math.atan2(-d.x,d.z)),(float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));return;
+        }
         var airReview=com.projectseele.client.visual.AirLiftR40Client.cameraView(partialTick);
         if(airReview!=null)
         {
@@ -74,17 +108,67 @@ public abstract class CameraMixin
         if(detached&&subject.getVehicle() instanceof EntryPlugCarrierEntity loose&&!loose.isLockedToEva())
         {
             long now=System.nanoTime();double dt=Math.min(.1,Math.max(0,(now-projectseele$carrierFrame)/1e9));
-            Vec3 pivot=loose.getInterpolatedPilotEyePosition(partialTick);
-            this.setPosition(pivot.x,pivot.y,pivot.z);
+            Vec3 eye=loose.getInterpolatedPilotEyePosition(partialTick);
+            var frame=loose.getInterpolatedCanonicalTransform(partialTick);
+            Camera camera=(Camera)(Object)this;
+            Vec3 back=Vec3.directionFromRotation(camera.getXRot(),camera.getYRot()).scale(-1);
+            int key=-loose.getId()-2;
+            if(projectseele$carrierCameraId!=key)projectseele$plugOrbitOffset=Vec3.ZERO;
+            Vec3 offset=Vec3.ZERO,pivot=eye;
             // The modelled pressure leaves project beyond their thin block
             // interlock. Keep the orbit off the visible leaf as well.
-            double available=Math.max(.25,this.getMaxZoom(4)-2.0);
-            int key=-loose.getId()-2;
+            double rawZoom=projectseele$looseOrbitZoom(pivot);
+            double originalEyeZoom=rawZoom;
+            double available=Math.max(.25,rawZoom-2.0);
+            boolean primaryClear=projectseele$outsideCapsule(loose,partialTick,pivot.add(back.scale(available)))
+                    &&projectseele$cameraPointClear(level,subject,pivot.add(back.scale(available)));
+            // A world-only dolly can be clamped inside the capsule by a rail
+            // beside the boarding hatch. Resolve actor penetration separately
+            // by moving the orbit pivot above/aside the capsule in its shared
+            // canonical frame. All alternate pivots retain the world rays.
+            Vec3 retained=primaryClear?projectseele$plugOrbitOffset.scale(Math.exp(-4*dt)):projectseele$plugOrbitOffset;
+            if(retained.lengthSqr()<.0001)retained=Vec3.ZERO;
+            boolean resolved=primaryClear&&retained==Vec3.ZERO;
+            if(!resolved)
+            {
+                Vec3[] offsets={retained,new Vec3(0,.75,0),new Vec3(0,1.5,0),new Vec3(0,2.25,0),
+                        new Vec3(0,3,0),new Vec3(0,4,0),new Vec3(2,1.5,0),new Vec3(-2,1.5,0),
+                        new Vec3(4,2.25,0),new Vec3(-4,2.25,0)};
+                for(Vec3 candidate:offsets)
+                {
+                    if(candidate==Vec3.ZERO)continue;
+                    Vec3 trial=eye.add(frame.transformVector(candidate));
+                    double clipped=projectseele$looseOrbitZoom(trial),distance=Math.max(.25,clipped-2);
+                    if(!projectseele$outsideCapsule(loose,partialTick,trial.add(back.scale(distance)))
+                            ||!projectseele$cameraPointClear(level,subject,trial.add(back.scale(distance))))continue;
+                    offset=candidate;pivot=trial;rawZoom=clipped;available=distance;resolved=true;break;
+                }
+            }
+            projectseele$plugOrbitOffset=offset;
             if(projectseele$carrierCameraId!=key)projectseele$carrierZoom=available;
             else projectseele$carrierZoom=Math.min(available,projectseele$carrierZoom+net.minecraft.util.Mth.clamp(available-projectseele$carrierZoom,-16*dt,12*dt));
+            // Collision correction is immediate; easing may only operate
+            // between positions that remain outside the pressure shell.
+            if(resolved&&(!projectseele$outsideCapsule(loose,partialTick,pivot.add(back.scale(projectseele$carrierZoom)))
+                    ||!projectseele$cameraPointClear(level,subject,pivot.add(back.scale(projectseele$carrierZoom)))))
+                projectseele$carrierZoom=available;
             projectseele$carrierCameraId=key;projectseele$carrierFrame=now;projectseele$loosePlugCamera=true;
-            Camera camera=(Camera)(Object)this;Vec3 p=pivot.add(Vec3.directionFromRotation(camera.getXRot(),camera.getYRot()).scale(-projectseele$carrierZoom));
-            this.setPosition(p.x,p.y,p.z);return;
+            Vec3 p=pivot.add(back.scale(projectseele$carrierZoom));
+            if(com.projectseele.visual.FactoryR20Review.ENABLED&&Boolean.getBoolean("projectseele.factoryNativePilotCamera"))
+            {
+                Vec3 far=pivot.add(Vec3.directionFromRotation(camera.getXRot(),camera.getYRot()).scale(-32));
+                var hit=level.clip(new net.minecraft.world.level.ClipContext(pivot,far,
+                        net.minecraft.world.level.ClipContext.Block.VISUAL,net.minecraft.world.level.ClipContext.Fluid.NONE,subject));
+                com.projectseele.client.visual.FactoryR20Client.looseCameraProbe(loose,partialTick,pivot,p,rawZoom,projectseele$carrierZoom,hit);
+                com.projectseele.client.visual.FactoryR20Client.looseCameraResolution(originalEyeZoom,offset,resolved);
+            }
+            this.setPosition(p.x,p.y,p.z);
+            if(offset.lengthSqr()>.0001)
+            {
+                Vec3 aim=eye.subtract(p);
+                this.setRotation((float)Math.toDegrees(Math.atan2(-aim.x,aim.z)),(float)-Math.toDegrees(Math.atan2(aim.y,aim.horizontalDistance())));
+            }
+            return;
         }
         boolean lockedCapsule=!(subject.getVehicle() instanceof EntryPlugCarrierEntity capsule)||capsule.isLockedToEva();
         if (detached && controlled != null && (controlled.hasActiveCarrierMotion()||controlled.isNervLogisticsLocked()&&lockedCapsule))
@@ -129,7 +213,7 @@ public abstract class CameraMixin
             this.setPosition(position.x, position.y, position.z);
             return;
         }
-        projectseele$carrierCameraId=-1;projectseele$loosePlugCamera=false;
+        projectseele$carrierCameraId=-1;projectseele$loosePlugCamera=false;projectseele$plugOrbitOffset=Vec3.ZERO;
         if(!detached&&controlled!=null&&com.projectseele.entity.EvaAirTransportR31.active(controlled))
         {
             Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight(),0);

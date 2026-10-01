@@ -223,6 +223,8 @@ public final class NervStaffDialogue
     }
     public static void tickTask(NervStaffEntity npc,UUID owner,String operation,int variant,BlockPos control,BlockPos approach,int ticks)
     {
+        if(operation.startsWith("coord_"))
+        {CityCoordinationR44.operatorTick(npc,owner,operation,control,approach,ticks);return;}
         var level=(ServerLevel)npc.level();var player=level.getServer().getPlayerList().getPlayer(owner);
         boolean city=operation.equals("city_rise")||operation.equals("city_lower");
         if(ticks%40==0&&"r15-staff-controls".equals(System.getProperty("projectseele.regionalBuild","")))ProjectSeele.LOGGER.info("STAFF CONTROL TRACE actor={} pos={} target={} navDone={} onGround={} loaded={}",npc.memberId(),npc.position(),approach,npc.getNavigation().isDone(),npc.onGround(),EvaLogisticsDirector.status(level,variant).loaded());

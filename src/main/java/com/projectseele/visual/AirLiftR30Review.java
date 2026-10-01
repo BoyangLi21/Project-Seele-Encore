@@ -30,7 +30,8 @@ public final class AirLiftR30Review
     public static String reviewWorld()
     {
         String world=System.getProperty("projectseele.airReviewWorld",R32?"SEELE_R32_AIR_REVIEW":"SEELE_FIELD_R30_REVIEW");
-        if(!world.equals("SEELE_R32_AIR_REVIEW")&&!world.equals("SEELE_FIELD_R30_REVIEW")&&!world.matches("SEELE_R43_AIR_REVIEW(?:_V[0-9]+)?"))throw new IllegalStateException("Unapproved isolated airlift review world");
+        if(!world.equals("SEELE_R32_AIR_REVIEW")&&!world.equals("SEELE_FIELD_R30_REVIEW")
+                &&!world.matches("SEELE_R4[34]_AIR_REVIEW(?:_V[0-9]+)?"))throw new IllegalStateException("Unapproved isolated airlift review world");
         return world;
     }
     private static final TicketType<ChunkPos> TICKET=TicketType.create("r30_airlift_review",Comparator.comparingLong(ChunkPos::toLong),100);

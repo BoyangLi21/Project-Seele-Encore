@@ -63,25 +63,67 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
     private void routeMapFace(StationDepartureBoardBlockEntity board,PoseStack poses,MultiBufferSource buffers,boolean rear)
     {
         var stops=board.rows().stream().filter(s->s.startsWith("│")||s.startsWith("●")).toList();
-        int rows=(stops.size()+1)/2;
-        float gap=Math.min(.18F,.54F/Math.max(1,rows-1));
-        float lettering=Math.min(.0155F,gap/11);
         poses.pushPose();poses.translate(.5,1.78,.5);
         poses.mulPose(Axis.YP.rotationDegrees((rear?180:0)-board.getBlockState().getValue(StationDepartureBoardBlock.FACING).toYRot()));
         poses.translate(0,0,rear?.145:.205);
-        physicalLine(board.title(),0,0,.021F,2.60F,0xffedbd55,poses,buffers);
-        physicalLine(board.station(),0,.22F,.017F,2.60F,0xffe9efde,poses,buffers);
-        for(int i=0;i<stops.size();i++)
+        String service=board.title().strip().split("\\s+",2)[0];
+        int routeColor=routeColor(service);
+        physicalLine(service+"  路线图",0,0,.021F,2.60F,routeColor,poses,buffers);
+        physicalLine(board.station()+" · 本站",0,.22F,.017F,2.60F,0xffe9efde,poses,buffers);
+        if(stops.size()<=4)
         {
-            String source=stops.get(i);boolean current=source.contains("本站");
-            String label=source.substring(1).trim().replace("  本站","").replace("本站","").trim();
-            physicalLine(String.format(java.util.Locale.ROOT,"%02d %s",i+1,label),i<rows?-.67F:.67F,
-                    .45F+(i%rows)*gap,lettering,1.24F,current?0xffffd572:0xffdbe9e4,poses,buffers);
+            float gap=1.76F/Math.max(1,stops.size()-1);
+            for(int i=0;i<stops.size()-1;i++)
+                physicalLine("━━━━━━",-.88F+(i+.5F)*gap,.60F,.027F,gap-.12F,routeColor,poses,buffers);
+            for(int i=0;i<stops.size();i++)
+            {
+                String source=stops.get(i);boolean current=source.contains("本站");
+                float x=stops.size()==1?0:-.88F+i*gap;
+                physicalLine(current?"●":"○",x,.54F,.036F,.25F,current?0xffffd572:routeColor,poses,buffers);
+                physicalLine(stopName(source),x,.82F,.014F,Math.min(.84F,gap-.06F),
+                        current?0xffffd572:0xffdbe9e4,poses,buffers);
+            }
+        }
+        else
+        {
+            int rows=(stops.size()+1)/2;
+            float gap=Math.min(.18F,.57F/Math.max(1,rows-1));
+            float lettering=Math.min(.0145F,gap/11);
+            for(int i=0;i<stops.size();i++)
+            {
+                int row=i%rows;float x=i<rows?-1.24F:.10F,y=.45F+row*gap;
+                String source=stops.get(i);boolean current=source.contains("本站");
+                if(row>0)physicalLine("│",x,y-gap*.70F,.019F,.09F,routeColor,poses,buffers);
+                physicalLine(current?"●":"○",x,y,.018F,.14F,current?0xffffd572:routeColor,poses,buffers);
+                physicalLine(stopName(source),x+.63F,y,lettering,1.10F,
+                        current?0xffffd572:0xffdbe9e4,poses,buffers);
+            }
+            // Order follows the real service, while the physical departure
+            // arrow below changes on the rear. Do not invent station numbers
+            // that would change when the opposite service reverses its list.
+            physicalLine("续 →",0,1.015F,.008F,.24F,routeColor,poses,buffers);
         }
         var footer=board.rows().stream().filter(s->!s.startsWith("│")&&!s.startsWith("●")).toList();
-        if(!footer.isEmpty())physicalLine(footer.get(0),0,1.12F,.014F,2.60F,0xffa9d9ae,poses,buffers);
+        if(!footer.isEmpty())physicalLine(rear?reversePhysicalDirection(footer.get(0)):footer.get(0),0,1.12F,.014F,2.60F,0xffa9d9ae,poses,buffers);
         if(footer.size()>1)physicalLine(footer.get(footer.size()-1),0,1.31F,.0105F,2.60F,0xffabbec5,poses,buffers);
         poses.popPose();
+    }
+    private static String stopName(String source)
+    {
+        return source.substring(1).replace("本站","").strip();
+    }
+    private static int routeColor(String service)
+    {
+        return switch(service)
+        {
+            case "R1" -> 0xff8ac9a4;
+            case "S1" -> 0xffe9b06d;
+            case "U1" -> 0xff8bc5e0;
+            case "U2" -> 0xffd5b778;
+            case "F1" -> 0xff8bd7d3;
+            case "F2" -> 0xffb9b3e7;
+            default -> 0xffedbd55;
+        };
     }
     private void physicalLine(String text,float x,float y,float scale,float width,int color,PoseStack poses,MultiBufferSource buffers)
     {
@@ -93,6 +135,22 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
         if(text.isEmpty()||text.endsWith(" · 直梯"))return text;
         char arrow=switch(text.charAt(0)){case '←'->'→';case '→'->'←';case '↑'->'↓';case '↓'->'↑';default->text.charAt(0);};
         return arrow+text.substring(1);
+    }
+    private static String reversePhysicalDirection(String text)
+    {
+        // The full diagram is readable from both platform approaches; a
+        // relative train-direction arrow must reverse on the opposite face.
+        var result = new StringBuilder(text.length());
+        for (char c : text.toCharArray())
+        {
+            result.append(switch (c)
+            {
+                case '←' -> '→'; case '→' -> '←';
+                case '↑' -> '↓'; case '↓' -> '↑';
+                default -> c;
+            });
+        }
+        return result.toString();
     }
     private static String compactDestination(String text,boolean sharedLiftHeader)
     {

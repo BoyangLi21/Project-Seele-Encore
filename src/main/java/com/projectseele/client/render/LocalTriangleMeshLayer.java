@@ -143,6 +143,20 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                         this.textureSelector.apply(animatable)));
         float[] values = skinVertices(mesh,part,bone);
         int stride = mesh.stride();
+        if(SharedHandContactWitnessR44.ENABLED&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
+                &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
+            SharedHandContactWitnessR44.submitted(eva,bone,values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
+                    renderer.renderedMeshTransform(pose,eva,partialTick),partialTick);
+        if(EvaHandWitnessR44.enabled()&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
+                &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
+            EvaHandWitnessR44.submitted(eva,bone,meshLocation,part.vertices(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
+                    renderer.renderedMeshTransform(pose,eva,partialTick));
+        if(Boolean.getBoolean("projectseele.r44HangarMeshWitness")&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
+            com.projectseele.client.visual.HangarMeshWitnessR44.capture(eva,bone.getName(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),renderer.renderedMeshTransform(pose,eva,partialTick));
+        if(Boolean.getBoolean("projectseele.r44NetworkClient")&&animatable instanceof EvaUnit01Entity eva
+                &&bone.getName().startsWith("foot_")&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
+            EvaFootWitnessR44.submitted(eva,bone,meshLocation,part.vertices(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
+                    renderer.renderedMeshTransform(pose,eva,partialTick));
         if(Boolean.getBoolean("projectseele.r38JointAudit")&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
                 &&eva.getId()==com.projectseele.visual.CombatR31Review.evaId&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             witnessAttachmentsR38(mesh,part,bone,values,renderer.renderedMeshTransform(pose,eva,partialTick));
@@ -708,6 +722,8 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         var root=bone;while(root.getParent()!=null)root=root.getParent();
         var inverse=EvaRigTransforms.model(bone).invert();var inverseRotation=EvaRigTransforms.rotation(inverse);int palette=skin.influences().size(),slot=0;
         float[][] transforms=new float[palette][8],weights=new float[palette][];
+        int[] stableBones=new int[palette];
+        var stableNames=skin.influences().keySet().stream().sorted().toList();
         for(var entry:skin.influences().entrySet())
         {
             var other=findBone(root,entry.getKey());if(other==null)throw new IllegalStateException("Authored seam bone missing: "+entry.getKey());
@@ -718,6 +734,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             // three-way junctions when limbs fold past 180 degrees.
             if(q.dot(new org.joml.Quaternionf(inverseRotation).mul(global))<0)q.mul(-1);
             var dual=new org.joml.Quaternionf(relative.m30(),relative.m31(),relative.m32(),0).mul(q).mul(.5F);
+            stableBones[slot]=stableNames.indexOf(entry.getKey());
             transforms[slot]=new float[]{q.x,q.y,q.z,q.w,dual.x,dual.y,dual.z,dual.w};weights[slot++]=entry.getValue();
         }
         float[] rest=skin.rest(),out=skin.scratch();int stride=mesh.stride();
@@ -725,6 +742,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         {
             float rx=0,ry=0,rz=0,rw=0,dx=0,dy=0,dz=0,dw=0;
             int dominant=0;for(int p=1;p<palette;p++)if(weights[p][vertex]>weights[dominant][vertex])dominant=p;
+            if(DqSkinReferenceR44.REVIEW)dominant=DqSkinReferenceR44.referenceSlot(stableBones,weights,vertex);
             var reference=transforms[dominant];
             for(int p=0;p<palette;p++)
             {

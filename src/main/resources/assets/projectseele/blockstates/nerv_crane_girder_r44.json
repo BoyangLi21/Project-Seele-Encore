@@ -1,0 +1,22 @@
+{
+  "variants": {
+    "joint=false,segment=base": {
+      "model": "projectseele:block/tv_crane_girder_r44_base"
+    },
+    "joint=true,segment=base": {
+      "model": "projectseele:block/tv_crane_girder_r44_base_joint"
+    },
+    "joint=false,segment=web": {
+      "model": "projectseele:block/tv_crane_girder_r44_web"
+    },
+    "joint=true,segment=web": {
+      "model": "projectseele:block/tv_crane_girder_r44_web_joint"
+    },
+    "joint=false,segment=top": {
+      "model": "projectseele:block/tv_crane_girder_r44_top"
+    },
+    "joint=true,segment=top": {
+      "model": "projectseele:block/tv_crane_girder_r44_top_joint"
+    }
+  }
+}

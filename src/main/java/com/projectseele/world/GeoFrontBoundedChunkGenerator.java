@@ -300,10 +300,6 @@ public final class GeoFrontBoundedChunkGenerator
             }
         }
 
-        if (canonical)
-        {
-            this.plantCanonicalForest(chunk, centre);
-        }
         chunk.setUnsaved(true);
     }
 
@@ -396,6 +392,35 @@ public final class GeoFrontBoundedChunkGenerator
                 }
             }
         }
+    }
+
+    @Override
+    public void applyBiomeDecoration(net.minecraft.world.level.WorldGenLevel world,
+                                     ChunkAccess chunk,StructureManager structures)
+    {
+        super.applyBiomeDecoration(world,chunk,structures);
+        if(getBiomeSource() instanceof RegionalEcologyBiomeSourceR44 ecology)
+            NativeGeofrontVegetationR44.decorate(world,this,chunk.getPos(),ecology);
+    }
+
+    boolean hasEcologicalCavernR44(ChunkPos chunk)
+    {
+        return tvPreview?TvWorldPreviewTerrain.insideDome(chunk):usesCanonicalDomeContract()&&candidateFor(chunk)!=null;
+    }
+    int ecologicalFloorR44(int x,int z)
+    {
+        return tvPreview?TvWorldPreviewTerrain.ground(x,z)
+                :canonicalTerrainHeight(x-activeManifest.centre().getX(),z-activeManifest.centre().getZ());
+    }
+    int ecologicalRoofR44(int x,int z)
+    {
+        return tvPreview?TvWorldPreviewTerrain.roof(x,z)
+                :canonicalRoofHeight(x-activeManifest.centre().getX(),z-activeManifest.centre().getZ(),surfaceDatum);
+    }
+    boolean ecologicalLakeR44(int x,int z)
+    {
+        return tvPreview?TvWorldPreviewTerrain.lakeDistance(x,z)<1.28
+                :canonicalLake(x-activeManifest.centre().getX(),z-activeManifest.centre().getZ());
     }
 
     private FacilitySchemaV2.ResolvedManifest candidateFor(

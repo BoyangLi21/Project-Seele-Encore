@@ -4,6 +4,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 
 import net.minecraft.server.MinecraftServer;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.storage.LevelResource;
 
 /**
@@ -182,7 +183,20 @@ public final class FacilityWorldPolicy
     {
         return !isCleanRebuild(server)
                 && !isS20Rebuild(server)
-                && !isReadOnlyBrokenArchive(server);
+                && !isReadOnlyBrokenArchive(server)
+                && !isSpatialPreviewFrozen(server)
+                && !isS22MigrationFrozen(server);
+    }
+
+    /** Regional receipts retire the original S20 civil templates as a whole. */
+    public static boolean unmigratedS20CivilGenerationAllowed(ServerLevel level)
+    {
+        MinecraftServer server = level.getServer();
+        return isS20Rebuild(server)
+                && !isSpatialPreviewFrozen(server)
+                && !isS22MigrationFrozen(server)
+                && !FacilityLayoutR20.active(server)
+                && !RegionalFacilityLayout.migrated(server);
     }
 
     public static void requireLegacyGenerationAllowed(

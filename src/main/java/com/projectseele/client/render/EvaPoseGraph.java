@@ -182,9 +182,16 @@ public final class EvaPoseGraph
             var physical=PhysicalBodyRenderer.apply(entity,model,partialTick);
             return finish(entity,model,partialTick,modelToWorld,physical,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         }
+        if(EvaLockedCagePoseR44.applies(entity))
+        {
+            EvaLockedCagePoseR44.witness(entity,model,"after_gecko");
+            var cage=EvaLockedCagePoseR44.apply(entity,model);
+            EvaLockedCagePoseR44.witness(entity,model,"locked_cage_final");
+            return finish(entity,model,partialTick,modelToWorld,cage,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
+        }
         if(com.projectseele.entity.EvaCombatSupportR33.ready(entity)
                 &&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(entity,partialTick)
-                &&entity.getWeapon()==EvaUnit01Entity.WEAPON_FISTS)
+                &&com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity))
         {
             // This owner produces the complete body. Do not evaluate the old
             // locomotion/impact/transition/foot-placement stack and overwrite it
@@ -245,7 +252,7 @@ public final class EvaPoseGraph
         {Set<String> r=new LinkedHashSet<>(motionWrites.rotationBones());r.addAll(impact.rotationBones());motionWrites=new EvaMotionEngineV2.BoneWrites(Set.copyOf(r),motionWrites.positionBones(),"MOTION_ENGINE_LIVE_ACTION");}
         EvaMotionEngineV2.BoneWrites transitions = EvaPoseTransition.apply(
                 entity, model, partialTick);
-        var jointWrites=entity.getMotionLabPhysicsPreview()==0&&!entity.isFirstBattleActive()?EvaArmArticulation.apply(model):EvaMotionEngineV2.BoneWrites.empty();
+        var jointWrites=entity.getMotionLabPhysicsPreview()==0&&!entity.isFirstBattleActive()&&!entity.isNervLogisticsLocked()?EvaArmArticulation.apply(model):EvaMotionEngineV2.BoneWrites.empty();
         var flight=UNFlightPoseR29.apply(entity,model,partialTick,modelToWorld);
         var firearm=EvaRifleContactRig.apply(entity,model,partialTick,modelToWorld);
         var terrain=EvaFootPlacement.apply(entity,model,partialTick,modelToWorld);
@@ -298,6 +305,8 @@ public final class EvaPoseGraph
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         JointAuditR38.capture(entity,model,partialTick);
+        EvaHandWitnessR44.capture(entity,model,partialTick,modelToWorld);
+        com.projectseele.client.visual.RuntimeR44ClientProbe.capture(entity,model,partialTick,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
         Snapshot committed = snapshot(
                 entity, partialTick, motionWrites, transitions, firearm, true);

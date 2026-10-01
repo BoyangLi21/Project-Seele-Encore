@@ -64,9 +64,8 @@ public final class ThirdTokyoSurfaceBuilder
             .mapToInt(tower -> ceilingTravelDepth(tower) + tower.height())
             .max().orElse(0);
     private static final int UPDATE_CLIENTS = Block.UPDATE_CLIENTS;
-    // Layer travel only ever moves full cubes, so the six recursive
-    // updateShape calls vanilla runs per placement are pure cost across the
-    // thousands of blocks a single layer rewrites.
+    // Journalled cargo includes doors, stairs and full block-entity NBT. Shape
+    // updates are deferred while its complete measured component is in flight.
     private static final int UPDATE_TRAVEL =
             Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE;
     /**
@@ -127,6 +126,8 @@ public final class ThirdTokyoSurfaceBuilder
         {
             buildPowerPylon(level, origin.offset(pylon[0], 0, pylon[1]));
         }
+        if(TvWorldPreviewTerrain.active(level))
+            for(int index=0;index<TV_MOVABLE_BUILDINGS.size();index++)refineTvLot(level,origin,index);
         connectPowerGrid(level, origin, -100);
         connectPowerGrid(level, origin, 100);
         buildSortieGate(level, origin.offset(0, 1, 52));
@@ -343,8 +344,12 @@ public final class ThirdTokyoSurfaceBuilder
         for (int y = 1; y <= Math.max(old.height(), tower.height()) + 3; y++)
             fillSquare(level, centre, y, old.halfSize(), Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
         paintRetractedHatch(level, centre, tower.halfSize(), tower.outerWard());
+        buildTowerInteriorLayerR44(level,centre,tower,0,0);
         for (int y = 1; y <= tower.height(); y++)
+        {
             buildTowerWallLayer(level, centre, tower, y, y);
+            buildTowerInteriorLayerR44(level,centre,tower,y,y);
+        }
         fillSquare(level, centre, tower.height() + 1, tower.halfSize(),
                 Blocks.SMOOTH_STONE.defaultBlockState(), UPDATE_TRAVEL);
         set(level, centre.offset(0, tower.height() + 1, 0), Blocks.REDSTONE_LAMP.defaultBlockState(), UPDATE_TRAVEL);
@@ -417,6 +422,38 @@ public final class ThirdTokyoSurfaceBuilder
                     "Tokyo-3 retraction depth must move by one layer");
         }
         TowerSpec tower = movableBuildings(level).get(towerIndex);
+        int cursor=0;
+        do
+        {
+            Tokyo3BuildingArchiveR44.TravelStep step=stepRetractionDepthR44(
+                    level,origin,oldDepth,newDepth,towerIndex,cursor);
+            if(step.failed())throw new IllegalStateException(step.fault());
+            if(step.complete())return;
+            cursor=step.cursor();
+        }
+        while(true);
+    }
+
+    public static Tokyo3BuildingArchiveR44.TravelStep stepRetractionDepthR44(
+            ServerLevel level,BlockPos origin,int oldDepth,int newDepth,int towerIndex,int cursor)
+    {
+        if(Math.abs(newDepth-oldDepth)!=1||oldDepth<0||newDepth<0
+                ||oldDepth>maximumRetractionDepth(origin)||newDepth>maximumRetractionDepth(origin))
+            return new Tokyo3BuildingArchiveR44.TravelStep(false,true,cursor,0,"Invalid generated-tower depth step");
+        TowerSpec tower=movableBuildings(level).get(towerIndex);
+        int travel=Math.max(tower.height(),-ceilingRoofRelativeY(tower,origin));
+        if(Math.max(0,tower.height()-oldDepth)==Math.max(0,tower.height()-newDepth)
+                &&Math.max(0,Math.min(tower.height(),oldDepth-travel))==Math.max(0,Math.min(tower.height(),newDepth-travel)))
+            return new Tokyo3BuildingArchiveR44.TravelStep(true,false,0,0,"");
+        return Tokyo3BuildingArchiveR44.get(level,origin.offset(tower.x(),0,tower.z())).step(level,origin,
+                tower,oldDepth,newDepth,cursor);
+    }
+
+    /* Retained only as the historical geometric reference for old receipts. */
+    private static void applyLegacyShellRetractionDepth(ServerLevel level,BlockPos origin,
+                                                       int oldDepth,int newDepth,int towerIndex)
+    {
+        TowerSpec tower=movableBuildings(level).get(towerIndex);
         int oldVisible = Math.max(0, tower.height() - oldDepth);
         int newVisible = Math.max(0, tower.height() - newDepth);
         int oldCeilingVisible = ceilingVisibleHeight(tower, oldDepth, origin);
@@ -977,6 +1014,8 @@ public final class ThirdTokyoSurfaceBuilder
             }
         }
         cutInnerDoor(level, centre, gridX, gridZ);
+        TowerSpec room=new TowerSpec(gridX,gridZ,height,LOT_HALF_SIZE,false);
+        for(int y=1;y<=height;y++)buildTowerInteriorLayerR44(level,centre,room,y,y);
         fillSquare(level, centre, height + 1, LOT_HALF_SIZE,
                 Blocks.SMOOTH_STONE.defaultBlockState());
         set(level, centre.offset(0, height, 0), Blocks.REDSTONE_BLOCK.defaultBlockState());
@@ -1027,6 +1066,8 @@ public final class ThirdTokyoSurfaceBuilder
             set(level, centre.offset(1, y, -half),
                     Blocks.AIR.defaultBlockState());
         }
+        TowerSpec room=new TowerSpec(gridX,gridZ,height,half,true);
+        for(int y=1;y<=height;y++)buildTowerInteriorLayerR44(level,centre,room,y,y);
     }
 
     private static BlockState towerWall(int y, int span, int gridX, int gridZ)
@@ -1127,13 +1168,33 @@ public final class ThirdTokyoSurfaceBuilder
         }
         if (tower.tv() && sourceY <= 3)
         {
-            for (int span = -1; span <= 1; span++)
-                set(level, centre.offset(span, targetY, half), Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
+            for (int span = 0; span <= 1; span++)
+            {
+                BlockState door=TvTokyo3Architecture.entrance(span,sourceY,half,tower);
+                set(level,centre.offset(span,targetY,half),door==null?Blocks.AIR.defaultBlockState():door,UPDATE_TRAVEL);
+            }
         }
         else if (!tower.tv() && !tower.outerWard() && targetY == sourceY)
         {
             cutInnerDoor(level, centre, tower.x(), tower.z());
         }
+    }
+
+    public static void buildTowerInteriorLayerR44(ServerLevel level,BlockPos centre,
+                                                  TowerSpec tower,int sourceY,int targetY)
+    {
+        for(int x=-tower.halfSize()+1;x<tower.halfSize();x++)
+            for(int z=-tower.halfSize()+1;z<tower.halfSize();z++)
+            {
+                BlockState state=TvTokyo3Architecture.interior(x,sourceY,z,tower);
+                if(sourceY==0&&x==0&&z==0&&level.getBlockState(centre).is(ModBlocks.RETRACTABLE_BUILDING_CORE.get()))continue;
+                if(state!=null)set(level,centre.offset(x,targetY,z),state,UPDATE_TRAVEL);
+            }
+    }
+
+    public static BlockState retractedHatchStateR44(int x,int z,TowerSpec tower)
+    {
+        return retractedHatchState(x,z,tower.halfSize(),tower.outerWard());
     }
 
     private static BlockState outerWardWall(int y, int span, TowerSpec tower)

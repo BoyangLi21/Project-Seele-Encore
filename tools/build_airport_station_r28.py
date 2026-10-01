@@ -57,7 +57,14 @@ def main():
             for z0,forward in ((basez,True),(basez+6,False)):
                 for lane in (0,1):
                     side='left' if lane==0 else 'right';z=z0+lane
-                    b((x,y,z,x,y,z),f'mtr:escalator_step[direction={str(forward).lower()},facing=east,orientation={orient},side={side},status=true]')
+                    # End the complete native mechanism at landing_top.
+                    # Its former3flat trailing rows carried the gate queue
+                    # sideways; the commissioned upper hall needs a real
+                    # stationary two-width landing before any gate or turn.
+                    if n>34:
+                        b((x,y,z,x,y,z),FLOOR)
+                    else:
+                        b((x,y,z,x,y,z),f'mtr:escalator_step[direction={str(forward).lower()},facing=east,orientation={orient},side={side},status=true]')
                     if orient not in ('flat','landing_bottom','landing_top'):
                         b((x,y+1,z,x,y+1,z),f'mtr:escalator_side[facing=east,orientation={orient},side={side}]')
         # Clear the station end wall across the whole upper landing width.
@@ -76,8 +83,12 @@ def main():
                 if isdoor:p.block_entities[x,y,edge]=nbtlib.Compound({'id':nbtlib.String('mtr:apg_door'),'x':nbtlib.Int(x),'y':nbtlib.Int(y),'z':nbtlib.Int(edge)})
             tactile=edge-1 if z==124 else edge+1;b((x,104,tactile,x,104,tactile),'projectseele:station_tactile_warning')
         for x in (545,594,650):
-            boardz=105 if z==124 else 151;at=(x,107,boardz);boardface='south' if z==124 else 'north'
-            b((x-1,105,boardz,x+1,109,boardz),STRUCT)
+            backingz=105 if z==124 else 151
+            boardz=backingz+(1 if z==124 else -1)
+            at=(x,107,boardz);boardface='south' if z==124 else 'north'
+            # The full three-metre face stands in front of its backing.
+            # An anchor cut into the backing hides its two outer text spans.
+            b((x-1,105,backingz,x+1,109,backingz),STRUCT)
             p.put(*at,f'projectseele:station_departure_board[facing={boardface},wayfinding=false]',owner,'owned')
             p.block_entities[at]=nbtlib.Compound({'id':nbtlib.String('projectseele:station_departure_board'),'x':nbtlib.Int(x),'y':nbtlib.Int(107),'z':nbtlib.Int(boardz),'PlatformCentre':nbtlib.Long(packed((585,104,z))),'NativePlatformId':nbtlib.Long(platform['id']),'Station':nbtlib.String('NERV 航空基地'),'Route':nbtlib.String('S1'),'Wayfinding':nbtlib.Byte(0)})
             boards.append(dict(position=at,platform_id=platform['id']))

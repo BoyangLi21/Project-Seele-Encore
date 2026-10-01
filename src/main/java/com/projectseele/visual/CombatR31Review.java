@@ -27,6 +27,8 @@ public final class CombatR31Review
     public static final boolean ENABLED="r31-combat".equals(System.getProperty("projectseele.regionalBuild",""));
     public static final boolean DUEL=Boolean.getBoolean("projectseele.combatDuel");
     public static final boolean NORMALS=Boolean.getBoolean("projectseele.combatNormals");
+    public static final boolean AT_FIELD_REVIEW=Boolean.getBoolean("projectseele.r44AtFieldCalibration");
+    public static volatile boolean atFieldPilotView;
     private static final boolean OPTICS_R43=Boolean.getBoolean("projectseele.r43OpticsStates");
     public static final boolean EXCHANGE=Boolean.getBoolean("projectseele.combatExchange");
     public static final boolean RECOVERY=Boolean.getBoolean("projectseele.combatRecovery");
@@ -111,6 +113,11 @@ public final class CombatR31Review
             {
                 stageName="normal_tempo";
                 if(TempoR43Review.tick(eva,pilot,stageTicks)){for(var row:TempoR43Review.results())cases.add(row);finish("");}
+                return;
+            }
+            if(AT_FIELD_REVIEW&&stage==Stage.WARM)
+            {
+                reviewAtFieldPresentation();
                 return;
             }
             if(AWAKENING&&sawFinale&&eva!=null&&!eva.isFirstBattleActive()&&(angel==null||!angel.isAlive()||angel.isRemoved()))
@@ -379,6 +386,35 @@ public final class CombatR31Review
         physics.addProperty("eva_bounds_height",eva.getBoundingBox().getYsize());physics.addProperty("angel_bounds_height",angel.getBoundingBox().getYsize());events.add(physics);
         var r=new JsonObject();r.addProperty("phase",stage.name());r.addProperty("tick",stageTicks);r.addProperty("action",EvaCombatR31.action(eva));r.addProperty("ordinary",eva.getOrdinaryAttackStage());r.addProperty("live_phase",eva.combatPhaseR31());r.addProperty("confirmed_airborne",eva.isVisuallyAirborneForRender());r.addProperty("observed_vertical_per_tick",observedVerticalPerTick);r.addProperty("server_velocity_y",eva.getDeltaMovement().y);r.add("eva",vector(eva.position()));r.add("angel",vector(angel.position()));r.addProperty("eva_health",eva.getHealth());r.addProperty("angel_health",angel.getHealth());r.addProperty("eva_ground",eva.onGround());r.addProperty("angel_ground",angel.onGround());r.addProperty("angel_strike",angel.isStrikeActive()?angel.strikeMode():0);r.addProperty("angel_strike_age",angel.strikeAge(0));var eb=CombatFeelR31.beat(eva);var ab=CombatFeelR31.beat(angel);r.addProperty("eva_reaction",eb==null?0:eb.kind());r.addProperty("angel_reaction",ab==null?0:ab.kind());trace.add(r);
     }
+    private static void reviewAtFieldPresentation()
+    {
+        forward=0;strafe=0;jump=false;sprint=false;
+        angel.setNoAi(true);angel.setTarget(null);
+        atFieldPilotView=stageTicks>=145;
+        stageName=atFieldPilotView?"atfield_pilot":"atfield_external";
+        if(stageTicks==35||stageTicks==165)input(4);
+        if(stageTicks==55||stageTicks==185)
+        {
+            if(!eva.isAtFieldOn())throw new IllegalStateException("Actual G key did not raise EVA field");
+        }
+        // Exercise the actual shield damage/packet path with a bounded QA
+        // impulse. This is a material/camera comparison, not an AI attack test.
+        if(stageTicks==80||stageTicks==210)eva.hurt(angel.damageSources().mobAttack(angel),1F);
+        if(stageTicks==115||stageTicks==245){if(eva.isAtFieldOn())input(4);}
+        if(stageTicks%5==0)
+        {
+            var row=new JsonObject();row.addProperty("event","at_field_native_state");row.addProperty("tick",stageTicks);
+            row.addProperty("pilot_view",atFieldPilotView);row.addProperty("field_on",eva.isAtFieldOn());row.addProperty("energy",eva.getAtFieldEnergy());
+            row.add("eva",vector(eva.position()));row.add("angel",vector(angel.position()));events.add(row);
+        }
+        if(stageTicks>=275)
+        {
+            record("native_at_field_material_camera_calibration",true,"ticks",stageTicks);
+            var row=cases.get(cases.size()-1).getAsJsonObject();row.addProperty("gameplay_lifecycle_or_art_acceptance",false);
+            row.addProperty("scope","Real pilot boarding/G key and shield damage cues; two actual camera modes. No movement, AI balance, tearing or art certification.");
+            finish("");
+        }
+    }
     private static void finish(String error)
     {
         jump=false;forward=0;failure=error;
@@ -387,7 +423,7 @@ public final class CombatR31Review
             boolean ids=true;for(var entry:fleetIds.entrySet())ids&=EvaFleetSavedData.get(level.getServer()).canonicalId(entry.getKey()).filter(entry.getValue()::equals).isPresent();
             var r=new JsonObject();r.addProperty("error",error);r.addProperty("fleet_ids_unchanged",ids);r.addProperty("hand_samples",handSamples);r.addProperty("maximum_hand_error_metres",Double.isFinite(maximumHandError)?maximumHandError:-1);r.addProperty("media",mediaFolder);
             int exchangeCases=AWAKENING&&Boolean.getBoolean("projectseele.r42OpticsReview")?2:1;
-            boolean all=error.isEmpty()&&ids&&(TempoR43Review.ENABLED?cases.size()==6:OPTICS_R43?cases.size()==1:StanceContactR41Review.ENABLED?cases.size()==1:CLOSE?cases.size()==4:EXCHANGE||RECOVERY?cases.size()==exchangeCases:NORMALS?cases.size()>=6:cases.size()>=7&&handSamples>5&&maximumHandError<.8);
+            boolean all=error.isEmpty()&&ids&&(AT_FIELD_REVIEW?cases.size()==1:TempoR43Review.ENABLED?cases.size()==6:OPTICS_R43?cases.size()==1:StanceContactR41Review.ENABLED?cases.size()==1:CLOSE?cases.size()==4:EXCHANGE||RECOVERY?cases.size()==exchangeCases:NORMALS?cases.size()>=6:cases.size()>=7&&handSamples>5&&maximumHandError<.8);
             for(var c:cases)all&=c.getAsJsonObject().get("passed").getAsBoolean();r.addProperty("passed",all);r.add("cases",cases);r.add("contacts",events);r.add("trace",trace);if(StanceContactR41Review.ENABLED)r.add("stance_r41",StanceContactR41Review.details());
             Path out=world.resolve("Review");Files.createDirectories(out);Files.writeString(out.resolve((NORMALS?"r32_normal_":"r31_combat_")+(all?"pass":"failure")+".json"),new GsonBuilder().setPrettyPrinting().create().toJson(r));
         }

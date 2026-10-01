@@ -94,7 +94,7 @@ public final class EvaCombatR31
     private static LivingEntity nearest(EvaUnit01Entity e,double range)
     {
         Vec3 direction=forward(e);
-        return e.level().getEntitiesOfClass(LivingEntity.class,e.getBoundingBox().inflate(range,22,range),t->
+        return com.projectseele.physics.CombatEntityQueryR44.candidates(e.level(),e.getBoundingBox().inflate(range,22,range),t->
                 t.isAlive()&&(t instanceof SachielEntity||t instanceof ShamshelEntity||t instanceof ZeruelEntity||t instanceof IsrafelEntity)
                 &&t.position().subtract(e.position()).multiply(1,0,1).normalize().dot(direction)>.55&&e.hasLineOfSight(t))
                 .stream().filter(t->e.distanceTo(t)<range).min(Comparator.comparingDouble(e::distanceToSqr)).orElse(null);
@@ -151,7 +151,7 @@ public final class EvaCombatR31
                 // Vanilla's section index stores a giant at its feet. A small
                 // hand-height query omits it even when the hand crosses its body.
                 // Broaden only the candidate search; keep the swept contact below.
-                for(var t:e.level().getEntitiesOfClass(LivingEntity.class,e.getBoundingBox().inflate(52,80,52),t->t instanceof Angel&&t.isAlive()))
+                for(var t:com.projectseele.physics.CombatEntityQueryR44.candidates(e.level(),new AABB(previous,hand).inflate(2),t->t instanceof Angel&&t.isAlive()))
                 {
                     var clipped=com.projectseele.physics.CombatBodyContacts.clip(t,previous,hand,2);if(clipped.isEmpty())continue;
                     Vec3 hit=clipped.orElse(previous);
@@ -205,7 +205,7 @@ public final class EvaCombatR31
     private static void slam(EvaUnit01Entity e)
     {
         var l=(ServerLevel)e.level();Vec3 centre=e.position().add(forward(e).scale(7));
-        for(var t:l.getEntitiesOfClass(LivingEntity.class,new AABB(centre,centre).inflate(18,60,18),t->t instanceof Angel&&t.isAlive()))
+        for(var t:com.projectseele.physics.CombatEntityQueryR44.overlap(l,new AABB(centre,centre).inflate(18,60,18),t->t instanceof Angel&&t.isAlive()))
             if(visible(e,centre.add(0,4,0),t.position().add(0,5,0)))
             {var d=t.position().subtract(centre).multiply(1,0,1).normalize();float hp=t.getHealth();if(EvaHitFeedback.hurt(t,e.damageSources().mobAttack(e),35,t.position().add(0,5,0),d)&&t.getHealth()<hp)CombatFeelR31.send(t,CombatFeelR31.DOWN,d,1.2F,56,3);}
         var floor=l.getBlockState(e.blockPosition().below());

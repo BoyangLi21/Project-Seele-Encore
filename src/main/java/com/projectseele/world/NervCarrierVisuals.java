@@ -45,7 +45,7 @@ public final class NervCarrierVisuals
     }
 
     /** Keeps the wet-cage machinery fixed in its authored hangar. */
-    public static void updateRestraints(ServerLevel level,
+    public static boolean updateRestraints(ServerLevel level,
                                         EvaUnit01Entity unit,
                                         double x, double y, double z,
                                         float restraintProgress)
@@ -54,7 +54,7 @@ public final class NervCarrierVisuals
         // In an inactive entity chunk, addFreshEntity followed by a UUID
         // lookup cannot establish ownership; recreating the non-saving
         // visual every tick churns entities and starves remote loads.
-        if (!level.isPositionEntityTicking(net.minecraft.core.BlockPos.containing(x, y, z))) return;
+        if (!level.isPositionEntityTicking(net.minecraft.core.BlockPos.containing(x, y, z))) return !TvCageCollisionR44.enabled();
         NervCarrierPlatformEntity gantry = resolve(level,
                 GANTRY_BY_EVA, unit.getUUID());
         if (gantry == null)
@@ -66,7 +66,7 @@ public final class NervCarrierVisuals
             gantry = createRestraintGantry(level, unit, x, y, z);
             if (gantry == null)
             {
-                return;
+                return !TvCageCollisionR44.enabled();
             }
             GANTRY_BY_EVA.put(unit.getUUID(), gantry.getUUID());
             ProjectSeele.LOGGER.info(
@@ -75,6 +75,11 @@ public final class NervCarrierVisuals
         }
         gantry.configureRestraintGantry();
         gantry.assignVariant(unit.getUnitVariant());
+        gantry.holdStatic(x, y + 0.04D, z);
+        if (!TvCageCollisionR44.canMove(level, unit, gantry, restraintProgress))
+        {
+            return false;
+        }
         gantry.setRestraintProgress(restraintProgress);
         gantry.setRepairProgressR33(com.projectseele.entity.EvaBayRepairR33.active(unit)?com.projectseele.entity.EvaBayRepairR33.progress(unit,0):-1);
         gantry.holdStatic(x, y + 0.04D, z);
@@ -82,6 +87,7 @@ public final class NervCarrierVisuals
         {
             discardDuplicateGantries(level, gantry, x, y + 0.04D, z);
         }
+        return true;
     }
 
     /** Publishes a fractional wet-cage liquid surface on the fixed gantry. */
@@ -194,7 +200,10 @@ public final class NervCarrierVisuals
         {
             if (candidate != canonical && candidate.isRestraintGantry())
             {
-                candidate.discard();
+                if (candidate.position().distanceToSqr(canonical.position()) < .01)
+                {
+                    candidate.discard();
+                }
             }
         }
     }
@@ -215,6 +224,12 @@ public final class NervCarrierVisuals
         for (NervCarrierPlatformEntity candidate : level.getEntitiesOfClass(
                 NervCarrierPlatformEntity.class, anchor))
         {
+            // The query tests the carrier's broad physical box, not its
+            // anchor. Ownership/adoption is by this exact fixed bay centre.
+            if (candidate.position().distanceToSqr(new net.minecraft.world.phys.Vec3(x, y + .04, z)) > .25)
+            {
+                continue;
+            }
             // A parked transfer deck and its fixed gantry deliberately share
             // the same anchor.  Cache recovery may adopt/clean gantries, but
             // must never discard that separately-owned moving deck.
@@ -227,7 +242,9 @@ public final class NervCarrierVisuals
             {
                 continue;
             }
-            if (candidate.isRestraintGantry() && adopted == null)
+            if (candidate.isRestraintGantry()
+                    && candidate.getUnitVariant() == unit.getUnitVariant()
+                    && adopted == null)
             {
                 adopted = candidate;
                 continue;

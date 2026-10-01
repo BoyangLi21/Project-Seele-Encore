@@ -163,6 +163,25 @@ def iter_block_entities(world: Path, dimension: str,
                 yield (x, y, z), entry
 
 
+def iter_selected_biome_sections(world: Path, dimension: str, selected):
+    """Yield exact FULL-chunk biome section NBT; quart codecs stay native.
+
+    The R44 native registry/PalettedContainer encoder supplies intended quart
+    changes. This read entry point deliberately does not decode biome packing.
+    """
+    if not selected:
+        return
+    bounds = (min(x for x, z in selected), max(x for x, z in selected),
+              min(z for x, z in selected), max(z for x, z in selected))
+    for cx, cz, chunk in iter_chunks(dimension_dir(world, dimension), bounds, selected):
+        if str(chunk.get('Status', '')).removeprefix('minecraft:') != 'full':
+            raise RuntimeError(f'Unfinished biome chunk {(cx, cz)}')
+        for section in chunk.get('sections', []):
+            sy = int(section.get('Y', 0))
+            if sy in selected[cx, cz] and 'biomes' in section:
+                yield cx, cz, sy, section['biomes'].copy()
+
+
 def short(state: str) -> str:
     return state.split("[", 1)[0].replace("minecraft:", "")
 

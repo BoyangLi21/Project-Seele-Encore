@@ -38,7 +38,6 @@ public final class NervCarrierPlatformRenderer
         {
             return;
         }
-        if(entity.isRestraintGantry()||entity.isPlugCrane())packedLight=net.minecraft.client.renderer.LightTexture.FULL_BRIGHT;
         if (entity.isPlugCrane())
         {
             renderPlugCrane(entity, partialTick, poses, buffers, packedLight);
@@ -75,9 +74,12 @@ public final class NervCarrierPlatformRenderer
                 renderLclSurface(entity, partialTick, poses, buffers,
                         packedLight);
             }
-            TvFacilityMeshes.cage(poses,packedLight,entity.getRestraintProgress(partialTick));
             float service=entity.repairProgressR33();
-            EvaBayMachineryR33.render(poses,service<0?-1:Math.min(1,service+partialTick/2400F),entity.tickCount+partialTick,15.2F,false,entity.getUnitVariant());
+            TvFacilityMeshes.withBuffers(buffers,()->
+            {
+                TvFacilityMeshes.cage(poses,packedLight,entity.getRestraintProgress(partialTick),entity.getUnitVariant());
+                EvaBayMachineryR33.render(poses,service<0?-1:Math.min(1,service+partialTick/2400F),entity.tickCount+partialTick,15.2F,false,entity.getUnitVariant());
+            });
             super.render(entity, yaw, partialTick, poses, buffers,
                     packedLight);
             return;
@@ -149,10 +151,8 @@ public final class NervCarrierPlatformRenderer
         {
             return;
         }
-        // Keep the interpolated hydraulic surface the same amber as the real
-        // fluid. The old opaque purple overlay hid its correct orange tint.
-        // A moving fractional layer must not write a second opaque depth
-        // sheet over the body beneath the actual fluid surface.
+        // Fractional drainage uses the same dense orange-red material as the
+        // complete fluid layers; there must be no clear/purple flash at a step.
         var out=buffers.getBuffer(EnergyGlowR24.SMOKE);
         float y=level+.93F;
         int tint=com.projectseele.fluid.LclFluidType.TINT;

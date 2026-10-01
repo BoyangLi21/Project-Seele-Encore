@@ -11,6 +11,11 @@ import nbtlib
 import regional_voxels as vox
 from query_blocks import AIR,iter_block_entities
 from scan_regional_completion import volume
+from tv_upper_observation_design_r44 import author_source as author_upper_observer_r44
+from tv_crane_girder_design_r44 import running_state as crane_running_state_r44
+from hangar_tv_design_r44 import (FINISHABLE, FULL_CUBE, wet_faces,
+    wet_finish, transfer_faces, transfer_finish, launch_faces, launch_finish,
+    upper_pressure_members, lower_pressure_seam_members)
 
 OUT=vox.ROOT/'artifacts/world_rebuild_r20/factory'
 LO=(-48,-513,-302);HI=(164,-310,24)
@@ -56,6 +61,8 @@ class Scene:
         return count
 
 def plan():
+    if (vox.WORLD/'eva_facility_r29.json').is_file() or (vox.WORLD/'.projectseele_spatial_preview_read_only.json').is_file():
+        raise RuntimeError('The historic R20 relocation template is retired for delivered/frozen facilities; use a measured R44 component revision')
     OUT.mkdir(parents=True,exist_ok=True);vox.OUT=OUT;p=vox.Painter();s=Scene()
     # The retained compact observation lift is a live mechanism. Protect its
     # complete shell and capture sweep, not merely its controller block.
@@ -76,6 +83,10 @@ def plan():
         s.fill((x0,-467,-292,x1,-444,-198),STRUCT);s.fill((x0,-443,-292,x1,-443,-198),FLOOR)
     for z0,z1 in ((-292,-276),(-213,-198)):
         s.fill((-34,-467,z0,94,-444,z1),STRUCT)
+    # The north maintenance platform is a declared personnel floor. The old
+    # template stopped at its foundation, leaving a one-metre sunken slab.
+    # The south band is a carrier/gate interface and has its own sweep below.
+    s.fill((-34,CAGE_Y,-292,94,CAGE_Y,-276),FLOOR)
     # Clear the obsolete flat transfer plant and lower observation passage.
     s.fill((-36,-443,-69,104,-350,-10),'minecraft:air')
     s.fill((-38,-420,-20,103,-389,-10),'minecraft:air')
@@ -131,9 +142,18 @@ def plan():
     for z in (-282,-250,-216):
         for x in (-34,9,51,94):s.fill((x-1,-467,z-1,x+1,-349,z+1),STRUCT)
         s.fill((-35,-352,z-1,95,-349,z+1),EDGE)
+    # Moving hoist wheel bottoms run on Y=-373; the old Y=-363 runway was
+    # ten metres above its current producer. The roof stays at its measured
+    # underside Y=-355. Outboard hangers leave both running wheel lanes free.
     for cx in CENTRES:
-        for x in (cx-4,cx+4):s.fill((x,-363,-271,x,-361,-214),EDGE)
-        for z in (-271,-214):s.fill((cx-19,-363,z,cx+19,-361,z),EDGE)
+        for x in (cx-4,cx+4):
+            for y in range(-376,-373):
+                for z in range(-266,-215):s.fill((x,y,z,x,y,z),crane_running_state_r44(y,z))
+        for z in (-264,-246,-228):
+            for sign in (-1,1):
+                x0,x1=sorted((cx+4*sign,cx+8*sign))
+                s.fill((x0,-377,z,x1,-377,z),STRUCT)
+                s.fill((cx+8*sign,-377,z,cx+8*sign,-356,z),STRUCT)
     # Staff reach every moved cage through enclosed galleries and the existing
     # three-stop compact lift; lower and upper levels do not cut one another.
     s.corridor_z(103,111,-289,-42,-443)
@@ -157,6 +177,39 @@ def plan():
     s.fill((92,-369,-58,94,-366,-55),'minecraft:air');s.fill((92,-370,-58,94,-370,-55),FLOOR)
     # Rejoin the commissioned station / headquarters lower gallery.
     s.fill((109,-444,-47,131,-437,-41),STRUCT);s.fill((110,-442,-46,130,-438,-42),'minecraft:air');s.fill((110,-443,-46,130,-443,-42),FLOOR)
+    # The initial authoring template and delivered-world skin share exactly
+    # one hierarchy. Only pre-existing known cubes of the resulting Scene may
+    # change finish; copied glass, machinery, openings and all BE stay whole.
+    shapes=json.loads((vox.WORLD/'native_collision_shapes.json').read_text(encoding='utf8'))
+    def finish(points,target):
+        for q in points:
+            if not all(LO[i]<=q[i]<=HI[i] for i in range(3)):continue
+            yy,zz,xx=q[1]-LO[1],q[2]-LO[2],q[0]-LO[0]
+            if s.protected[yy,zz,xx] or q in p.block_entities:continue
+            before=s.palette[int(s.after[yy,zz,xx])]
+            if before.partition('[')[0] not in FINISHABLE:continue
+            after=target(q,before)
+            if shapes.get(before)!=FULL_CUBE or shapes.get(after)!=FULL_CUBE:
+                raise RuntimeError(('Template finish has no complete native cube',q,before,after))
+            s.after[yy,zz,xx]=s.state(after)
+    for cx in CENTRES:
+        finish(wet_faces(cx),lambda q,b,cx=cx:wet_finish(cx,q,b))
+        finish(launch_faces(cx),lambda q,b,cx=cx:launch_finish(cx,q,b))
+    finish(transfer_faces(guide_y),transfer_finish)
+    for q,after in (upper_pressure_members() | lower_pressure_seam_members()).items():
+        yy,zz,xx=q[1]-LO[1],q[2]-LO[2],q[0]-LO[0]
+        if s.protected[yy,zz,xx] or q in p.block_entities:continue
+        before=s.palette[int(s.after[yy,zz,xx])]
+        if before.partition('[')[0] not in AIR:continue
+        # Preserve the exact copied observation slab/three-metre public head
+        # volume in a clean authoring scene as in the measured repair plan.
+        if q[1] in (-367,-366,-365):
+            floor=s.palette[int(s.after[-368-LO[1],zz,xx])]
+            if floor.partition('[')[0] in {'projectseele:clear_glass','projectseele:nerv_floor_panel','minecraft:polished_deepslate','minecraft:sea_lantern'}:
+                continue
+        if shapes.get(after)!=FULL_CUBE:raise RuntimeError(('Unknown pressure material',after))
+        s.after[yy,zz,xx]=s.state(after)
+    author_upper_observer_r44(s,p.block_entities)
     # Keep every protected cage cell exactly as measured, including absence.
     assert np.array_equal(s.before[s.protected],s.after[s.protected])
     changed=s.delta(p,'r20/factory_civil_reconstruction')

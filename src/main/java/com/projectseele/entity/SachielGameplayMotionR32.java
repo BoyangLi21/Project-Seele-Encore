@@ -18,11 +18,11 @@ public final class SachielGameplayMotionR32
     private static synchronized Data data()
     {
         if(cached!=null)return cached.orElse(null);
-        var file=Path.of("projectseele-local-maps/sachiel_gameplay_r32.json");
+        var file=CombatMotionResourcesR44.resolve("projectseele.gameplayReviewDirectory","sachiel_gameplay_r44.json","sachiel_gameplay_r32.json");
         if(!Files.isRegularFile(file)){cached=Optional.empty();return null;}
         try
         {
-            var json=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+            var json=JsonParser.parseString(new String(CombatMotionResourcesR44.read(file,"sachiel-gameplay"),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
             if(json.get("schema").getAsInt()!=2||!json.get("rig_key").getAsString().equals("sachiel"))throw new IllegalArgumentException("Sachiel motion contract");
             var names=new ArrayList<String>();for(var n:json.getAsJsonArray("bones"))names.add(n.getAsString());
             Map<String,EvaBodyPose.Bone> rig=new LinkedHashMap<>();

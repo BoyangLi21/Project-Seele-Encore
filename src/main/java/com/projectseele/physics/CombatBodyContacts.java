@@ -5,6 +5,7 @@ import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
 import java.util.*;
 
 /** Sweeps against posed body surfaces after Minecraft's coarse candidate query. */
@@ -149,6 +150,101 @@ public final class CombatBodyContacts
             }
         }
         return Float.isFinite(best)?Optional.of(from.lerp(to,best)):Optional.empty();
+    }
+    private static boolean fieldOrBox(LivingEntity target,CombatBodyProfiles.Profile profile)
+    {
+        return profile==null||!(target instanceof EvaUnit01Entity||target instanceof SachielEntity)
+                ||target instanceof Angel angel&&angel.getAtField()>0
+                ||target instanceof EvaUnit01Entity eva&&eva.isAtFieldOn()&&eva.getAtFieldEnergy()>0;
+    }
+    private static Matrix4f worldPart(LivingEntity target,Map<String,Matrix4f> matrices,Part part)
+    {
+        return new Matrix4f().translation(target.position().toVector3f())
+                .rotateY((180-target.getYRot())*(float)Math.PI/180).scale(1/CombatBodyProfiles.BLOCK_TO_PHYSICS)
+                .mul(matrices.get(part.bone)).mul(part.bind);
+    }
+    private static Vector3f project(Vector3f point,float[][] planes,int passes,boolean closest)
+    {
+        Vector3f value=new Vector3f(point);float[][] correction=closest?new float[planes.length][3]:null;
+        for(int pass=0;pass<passes;pass++)
+        {
+            float movement=0;
+            for(int i=0;i<planes.length;i++)
+            {
+                var plane=planes[i];float x=value.x,y=value.y,z=value.z;
+                if(closest){x+=correction[i][0];y+=correction[i][1];z+=correction[i][2];}
+                float norm=plane[0]*plane[0]+plane[1]*plane[1]+plane[2]*plane[2];
+                float outside=plane[0]*x+plane[1]*y+plane[2]*z+plane[3];
+                float step=norm<1e-12F?0:Math.max(0,outside)/norm;
+                float nx=x-plane[0]*step,ny=y-plane[1]*step,nz=z-plane[2]*step;
+                if(closest){correction[i][0]=x-nx;correction[i][1]=y-ny;correction[i][2]=z-nz;}
+                movement=Math.max(movement,value.distanceSquared(nx,ny,nz));value.set(nx,ny,nz);
+            }
+            if(movement<1e-12F)break;
+        }
+        return value;
+    }
+    private static boolean inside(Vector3f point,float[][] planes)
+    {
+        for(var plane:planes)
+            if(plane[0]*point.x+plane[1]*point.y+plane[2]*point.z+plane[3]>2e-5F)return false;
+        return true;
+    }
+    /** Volume attacks intersect posed convex parts, never only a standing box. */
+    public static boolean overlap(LivingEntity target,net.minecraft.world.phys.AABB area)
+    {
+        var profile=CombatBodyProfiles.get(target);if(fieldOrBox(target,profile))return target.getBoundingBox().intersects(area);
+        var pose=CombatBodyDynamics.active(target)?CombatBodyDynamics.sample(target,0):CombatBodyDynamics.raw(target,0);
+        AnatomicalLimbConstraints.apply(pose,profile);var matrices=CombatBodyProfiles.physicalMatrices(pose,profile);
+        Vector4f[] faces={new Vector4f(1,0,0,(float)-area.maxX),new Vector4f(-1,0,0,(float)area.minX),
+                new Vector4f(0,1,0,(float)-area.maxY),new Vector4f(0,-1,0,(float)area.minY),
+                new Vector4f(0,0,1,(float)-area.maxZ),new Vector4f(0,0,-1,(float)area.minZ)};
+        for(var part:parts(profile))
+        {
+            var world=worldPart(target,matrices,part);var transpose=new Matrix4f(world).transpose();
+            float[][] box=new float[6][4];
+            for(int i=0;i<6;i++)
+            {
+                var plane=transpose.transform(new Vector4f(faces[i]));float norm=(float)Math.sqrt(plane.x*plane.x+plane.y*plane.y+plane.z*plane.z);
+                box[i]=new float[]{plane.x/norm,plane.y/norm,plane.z/norm,plane.w/norm};
+            }
+            Vector3f centre=new Matrix4f(world).invert().transformPosition(area.getCenter().toVector3f());
+            for(var hull:part.hulls)
+            {
+                float[][] both=new float[hull.length+6][];System.arraycopy(hull,0,both,0,hull.length);System.arraycopy(box,0,both,hull.length,6);
+                var point=project(centre,both,64,false);if(inside(point,both))return true;
+            }
+        }
+        return false;
+    }
+    /** The same attenuation curve uses the nearest real exposed body point. */
+    public static Vec3 nearestSurfacePoint(LivingEntity target,Vec3 origin)
+    {
+        var profile=CombatBodyProfiles.get(target);
+        if(fieldOrBox(target,profile))
+        {
+            var box=target.getBoundingBox();return new Vec3(net.minecraft.util.Mth.clamp(origin.x,box.minX,box.maxX),
+                    net.minecraft.util.Mth.clamp(origin.y,box.minY,box.maxY),net.minecraft.util.Mth.clamp(origin.z,box.minZ,box.maxZ));
+        }
+        var pose=CombatBodyDynamics.active(target)?CombatBodyDynamics.sample(target,0):CombatBodyDynamics.raw(target,0);
+        AnatomicalLimbConstraints.apply(pose,profile);var matrices=CombatBodyProfiles.physicalMatrices(pose,profile);
+        Vec3 best=target.getBoundingBox().getCenter();double distance=Double.POSITIVE_INFINITY;
+        for(var part:parts(profile))
+        {
+            var world=worldPart(target,matrices,part);var local=new Matrix4f(world).invert().transformPosition(origin.toVector3f());
+            for(var vertex:part.vertices)
+            {
+                Vec3 candidate=new Vec3(world.transformPosition(new Vector3f(vertex)));double next=candidate.distanceToSqr(origin);
+                if(next<distance){distance=next;best=candidate;}
+            }
+            for(var hull:part.hulls)
+            {
+                var point=project(local,hull,48,true);if(!inside(point,hull))continue;
+                Vec3 candidate=new Vec3(world.transformPosition(point));double next=candidate.distanceToSqr(origin);
+                if(next<distance){distance=next;best=candidate;}
+            }
+        }
+        return best;
     }
     public static net.minecraft.world.phys.AABB coreBounds(LivingEntity actor)
     {

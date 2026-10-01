@@ -29,6 +29,8 @@ public class ModItems
             () -> new BlockItem(ModBlocks.NERV_WORKSTATION.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_WALL_PANEL=ITEMS.register("nerv_wall_panel",()->new BlockItem(ModBlocks.NERV_WALL_PANEL.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_STRUCTURAL_PANEL=ITEMS.register("nerv_structural_panel",()->new BlockItem(ModBlocks.NERV_STRUCTURAL_PANEL.get(),new Item.Properties()));
+    public static final RegistryObject<Item> RESIDENTIAL_PLASTER=ITEMS.register("residential_plaster",()->new BlockItem(ModBlocks.RESIDENTIAL_PLASTER.get(),new Item.Properties()));
+    public static final RegistryObject<Item> RESIDENTIAL_PLASTER_SLAB=ITEMS.register("residential_plaster_slab",()->new BlockItem(ModBlocks.RESIDENTIAL_PLASTER_SLAB.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_MACHINE_PANEL=ITEMS.register("nerv_machine_panel",()->new BlockItem(ModBlocks.NERV_MACHINE_PANEL.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_SHAFT_PANEL=ITEMS.register("nerv_shaft_panel",()->new BlockItem(ModBlocks.NERV_SHAFT_PANEL.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_MACHINE_EDGE=ITEMS.register("nerv_machine_edge",()->new BlockItem(ModBlocks.NERV_MACHINE_EDGE.get(),new Item.Properties()));
@@ -101,10 +103,14 @@ public class ModItems
 
     public static final RegistryObject<Item> TERMINAL_DOGMA_ACCESS_CARD =
             ITEMS.register("terminal_dogma_access_card",
-                    () -> new Item(new Item.Properties().stacksTo(1)));
+                    () -> new com.projectseele.item.NervAccessCardR44(new Item.Properties().stacksTo(1),3));
     public static final RegistryObject<Item> NERV_EMPLOYEE_CARD =
             ITEMS.register("nerv_employee_card",
-                    () -> new Item(new Item.Properties().stacksTo(1)));
+                    () -> new com.projectseele.item.NervAccessCardR44(new Item.Properties().stacksTo(1),1));
+    public static final RegistryObject<Item> NERV_ACCESS_READER=ITEMS.register("nerv_access_reader",()->new BlockItem(ModBlocks.NERV_ACCESS_READER.get(),new Item.Properties()));
+    public static final RegistryObject<Item> CITY_PERSONNEL_DOOR=ITEMS.register("city_personnel_door",()->new BlockItem(ModBlocks.CITY_PERSONNEL_DOOR.get(),new Item.Properties()));
+    public static final RegistryObject<Item> CITY_RAIN_PIPE=ITEMS.register("city_rain_pipe",()->new BlockItem(ModBlocks.CITY_RAIN_PIPE.get(),new Item.Properties()));
+    public static final RegistryObject<Item> CITY_RAIN_GUTTER=ITEMS.register("city_rain_gutter",()->new BlockItem(ModBlocks.CITY_RAIN_GUTTER.get(),new Item.Properties()));
     public static final RegistryObject<Item> BETA_CAPSULE =
             ITEMS.register("beta_capsule",
                     () -> new Item(new Item.Properties().stacksTo(1)));

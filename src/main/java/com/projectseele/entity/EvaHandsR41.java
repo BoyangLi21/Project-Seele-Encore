@@ -20,6 +20,7 @@ public final class EvaHandsR41
         float transitionSupport=stance>1&&stance<3?(float)Math.pow(Math.sin((stance-1)*Math.PI/2),2):0;
         for(String side:new String[]{"l","r"})
         {
+            boolean gripping=grasp||rifle||weapon&&side.equals("r");
             Vector3f along=longitudinal(body,side);
             Vector3f palmar=palmar(body,side,along);
             Quaternionf extended=new Quaternionf().setFromNormalized(new Matrix3f()
@@ -43,14 +44,14 @@ public final class EvaHandsR41
                     }
                     if(digit.equals("thumb"))
                     {
-                        float opposition=(weapon||grasp?65:10)*(1-support);
+                        float opposition=(gripping?65:10)*(1-support);
                         body.rotations.get(axis).rotateZ(opposition*Mth.DEG_TO_RAD*(side.equals("r")?1:-1));
                     }
                 }
-                float[] curl=digit.equals("thumb")?(weapon||grasp?new float[]{28,42,0}:new float[]{6,12,0})
+                float[] curl=digit.equals("thumb")?(gripping?new float[]{28,42,0}:new float[]{6,12,0})
                         :grasp?new float[]{34,48,25}
                         :rifle&&side.equals("r")&&digit.equals("index")?new float[]{12,24,8}
-                        :weapon?new float[]{57,84,54}:new float[]{10,14,7};
+                        :gripping?new float[]{57,84,54}:new float[]{10,14,7};
                 for(int joint=0;joint<3;joint++)
                 {
                     String name=stem+(joint==0?"":joint==1?"_tip":"_distal")+"_"+side;
@@ -68,7 +69,7 @@ public final class EvaHandsR41
                                     .fma(1.6F/16,palmar).fma(1.4F/16,along).sub(thumb).normalize();
                             Quaternionf opposed=new Quaternionf().rotationTo(tangent,target);
                             Quaternionf open=openThumb(body,side);
-                            rotation=weapon||grasp?opposed.slerp(open,support):open.slerp(opposed,.08F*(1-support));
+                            rotation=gripping?opposed.slerp(open,support):open.slerp(opposed,.08F*(1-support));
                         }
                     }
                     else rotation.rotationZ(curl[joint]*(1-support)*Mth.DEG_TO_RAD);

@@ -33,6 +33,7 @@ public final class CombatR31Client
     private static Vec3 lastAngelCamera;
     public static View cameraView(float partial)
     {
+        if(CombatR31Review.AT_FIELD_REVIEW&&CombatR31Review.atFieldPilotView)return null;
         if(!CombatR31Review.ENABLED||!Boolean.getBoolean("projectseele.combatSideView")&&!Boolean.getBoolean("projectseele.r42OpticsReview"))return null;
         var mc=Minecraft.getInstance();if(mc.level==null)return null;
         var eva=mc.level.getEntity(CombatR31Review.evaId);var angel=mc.level.getEntity(CombatR31Review.angelId);if(eva==null)return null;
@@ -88,7 +89,7 @@ public final class CombatR31Client
     }
     @SubscribeEvent public static void reviewFog(net.minecraftforge.client.event.ViewportEvent.RenderFog event)
     {
-        if(CombatR31Review.ENABLED&&Boolean.getBoolean("projectseele.combatSideView"))
+        if(CombatR31Review.ENABLED&&Boolean.getBoolean("projectseele.combatSideView")&&!(CombatR31Review.AT_FIELD_REVIEW&&CombatR31Review.atFieldPilotView))
         {event.setNearPlaneDistance(256);event.setFarPlaneDistance(768);event.setCanceled(true);}
     }
     private static final JsonArray supportContacts=new JsonArray();
@@ -143,6 +144,11 @@ public final class CombatR31Client
             CombatR31Review.mediaFolder=folder.toString();CombatR31Review.ready=true;
         }
         if(mc.screen!=null&&!CombatR31Review.done)mc.setScreen(null);
+        if(CombatR31Review.AT_FIELD_REVIEW&&!CombatR31Review.done)
+        {
+            mc.options.setCameraType(CombatR31Review.atFieldPilotView?CameraType.FIRST_PERSON:CameraType.THIRD_PERSON_BACK);
+            mc.options.hideGui=!CombatR31Review.atFieldPilotView;
+        }
         CombatR31Review.tracked=mc.level.getEntity(CombatR31Review.evaId)!=null&&mc.level.getEntity(CombatR31Review.angelId)!=null;
         CombatR31Review.mounted=mc.player.getRootVehicle().getId()==CombatR31Review.evaId;
         boolean autonomous=mc.level.getEntity(CombatR31Review.evaId) instanceof EvaUnit01Entity actor&&actor.isBerserk();
@@ -171,6 +177,7 @@ public final class CombatR31Client
                 output.add("normal_bones",normalBones);output.add("support_contacts_r33",supportContacts);output.add("render_performance",performance());Files.writeString(folder.resolve("render_performance.json"),new GsonBuilder().setPrettyPrinting().create().toJson(performance()));
                 Files.writeString(folder.resolve("client_evidence.json"),new GsonBuilder().setPrettyPrinting().create().toJson(output));
                 com.projectseele.visual.BodyPoseLayersR40.write(folder);
+                com.projectseele.client.render.SharedHandContactWitnessR44.write(folder);
                 OpticsR43Review.write(folder);
             }
             catch(Exception e){throw new IllegalStateException("R31 client evidence",e);}
@@ -207,6 +214,7 @@ public final class CombatR31Client
     }
     @SubscribeEvent public static void render(TickEvent.RenderTickEvent event)
     {
+        if(event.phase==TickEvent.Phase.END)com.projectseele.client.render.SharedHandContactWitnessR44.finishFrame();
         if(!CombatR31Review.ENABLED||!started||event.phase!=TickEvent.Phase.END||CombatR31Review.done)return;
         var mc=Minecraft.getInstance();if(mc.level==null||mc.player==null)return;
         long frameAt=System.nanoTime();if(renderCount++==0)firstRender=frameAt;lastRender=frameAt;performance.computeIfAbsent(CombatR31Review.stageName,name->new FrameStats()).sample(frameAt);
@@ -219,7 +227,7 @@ public final class CombatR31Client
             {try(var capture=net.minecraft.client.Screenshot.takeScreenshot(mc.getMainRenderTarget())){capture.writeToFile(folder.resolve(photo+".png"));}lastPhoto=photo;}
             long now=System.nanoTime();String stage=CombatR31Review.stageName;
             boolean video=Boolean.getBoolean("projectseele.combatVideo");
-            if(now>=nextFrame&&(stage.startsWith("normal_")||Set.of("air_strike","air_slam","reach","hold","throw","reaction","duel").contains(stage))&&frames.size()<(video?1800:180))
+            if(now>=nextFrame&&(stage.startsWith("normal_")||stage.startsWith("atfield_")||Set.of("air_strike","air_slam","reach","hold","throw","reaction","duel").contains(stage))&&frames.size()<(video?1800:180))
             {
                 nextFrame=now+(video?41_666_667L:400_000_000L);String file=String.format(Locale.ROOT,"contact_%04d.jpg",frame++);
                 if(frameWriter.getQueue().remainingCapacity()==0){droppedFrames++;return;}

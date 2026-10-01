@@ -24,22 +24,100 @@ public final class AirLiftR40Client
     private static final java.util.Set<String> photos=new java.util.HashSet<>();
     private static CombatR31Client.View lastView;
     private static boolean clearView;
+    private static net.minecraft.world.phys.AABB framedBounds;
+    private static int testedRays, clearRays;
+    private static double maximumProjection;
     private static final com.google.gson.JsonArray cameraEvidence=new com.google.gson.JsonArray();
     public static CombatR31Client.View cameraView(float partial)
     {
         var mc=Minecraft.getInstance();if(!ENABLED||mc.level==null||mc.player==null)return null;
         if(!(mc.level.getEntity(AirLiftR30Review.observedEntity) instanceof com.projectseele.entity.EvaUnit01Entity eva))return null;
-        var target=com.projectseele.physics.CombatBodyContacts.coreBounds(eva).getCenter();
-        clearView=false;lastView=null;
-        // Frame the posed cargo, whose centre changes during the saddle tilt.
-        // The old fixed observer angle often photographed only sky or a wall.
-        for(var offset:java.util.List.of(new net.minecraft.world.phys.Vec3(40,24,62),new net.minecraft.world.phys.Vec3(-40,24,62),new net.minecraft.world.phys.Vec3(45,28,-55),new net.minecraft.world.phys.Vec3(-45,28,-55),new net.minecraft.world.phys.Vec3(0,35,75)))
+        var pose=com.projectseele.entity.EvaBodyPose.sample(eva,partial);
+        var root=com.projectseele.entity.EvaAirTransportR31.active(eva)
+                ?com.projectseele.entity.EvaAirTransportR31.framePosition(eva,partial)
+                :new net.minecraft.world.phys.Vec3(net.minecraft.util.Mth.lerp(partial,eva.xOld,eva.getX()),
+                        net.minecraft.util.Mth.lerp(partial,eva.yOld,eva.getY()),
+                        net.minecraft.util.Mth.lerp(partial,eva.zOld,eva.getZ()));
+        float yaw=com.projectseele.entity.EvaAirTransportR31.active(eva)
+                ?com.projectseele.entity.EvaAirTransportR31.frameYaw(eva,partial):eva.getYRot();
+        var samples=new java.util.ArrayList<net.minecraft.world.phys.Vec3>();
+        framedBounds=null;
+        for(var local:com.projectseele.entity.EvaBodyPose.posedCarrierHulls(eva,pose))
         {
-            var at=target.add(offset);var hit=mc.level.clip(new net.minecraft.world.level.ClipContext(at,target,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,mc.player));
+            var box=worldBox(local,root,yaw);framedBounds=framedBounds==null?box:framedBounds.minmax(box);
+            samples.add(box.getCenter());
+        }
+        if(framedBounds==null)framedBounds=eva.getBoundingBoxForCulling();
+        if(samples.isEmpty())samples.add(framedBounds.getCenter());
+        // A cargo-only torso view can omit the head, feet, trunnions and the
+        // entire aircraft. Include each linked transport assembly in framing.
+        for(var entity:mc.level.entitiesForRendering())
+        {
+            if(entity instanceof com.projectseele.entity.UNTransportEntity transport
+                    &&transport.cargoEntityId()==eva.getId()
+                    &&transport.position().distanceToSqr(eva.position())<256D*256D)
+            {
+                framedBounds=framedBounds.minmax(transport.getBoundingBoxForCulling());
+                samples.add(transport.getBoundingBox().getCenter());
+            }
+        }
+        var target=framedBounds.getCenter();
+        clearView=false;lastView=null;
+        testedRays=clearRays=0;maximumProjection=Double.POSITIVE_INFINITY;
+        double aspect=(double)mc.getWindow().getWidth()/Math.max(1,mc.getWindow().getHeight());
+        double vertical=Math.tan(Math.toRadians(mc.options.fov().get()*.5D))*.8D;
+        double horizontal=vertical*aspect;
+        double radius=Math.sqrt(framedBounds.getXsize()*framedBounds.getXsize()
+                +framedBounds.getYsize()*framedBounds.getYsize()+framedBounds.getZsize()*framedBounds.getZsize())*.5D;
+        double distance=radius/Math.sin(Math.atan(Math.min(vertical,horizontal)))*1.2D;
+        for(var direction:java.util.List.of(new net.minecraft.world.phys.Vec3(40,24,62),new net.minecraft.world.phys.Vec3(-40,24,62),new net.minecraft.world.phys.Vec3(45,28,-55),new net.minecraft.world.phys.Vec3(-45,28,-55),new net.minecraft.world.phys.Vec3(0,35,75),new net.minecraft.world.phys.Vec3(0,35,-75)))
+        {
+            var at=target.add(direction.normalize().scale(Math.max(70,distance)));
+            var hit=mc.level.clip(new net.minecraft.world.level.ClipContext(at,target,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,mc.player));
             if(hit.getType()!=net.minecraft.world.phys.HitResult.Type.MISS)continue;
+            int visible=0;
+            for(var point:samples)
+            {
+                var ray=mc.level.clip(new net.minecraft.world.level.ClipContext(at,point,
+                        net.minecraft.world.level.ClipContext.Block.COLLIDER,
+                        net.minecraft.world.level.ClipContext.Fluid.NONE,mc.player));
+                if(ray.getType()==net.minecraft.world.phys.HitResult.Type.MISS)visible++;
+            }
+            double projection=projection(framedBounds,at,target,vertical,horizontal);
+            if(visible<Math.ceil(samples.size()*.8D)||projection>1D)continue;
+            testedRays=samples.size();clearRays=visible;maximumProjection=projection;
             clearView=true;lastView=new CombatR31Client.View(at,target);return lastView;
         }
         return null;
+    }
+    private static net.minecraft.world.phys.AABB worldBox(net.minecraft.world.phys.AABB local,
+            net.minecraft.world.phys.Vec3 root,float yaw)
+    {
+        net.minecraft.world.phys.AABB result=null;
+        for(double x:new double[]{local.minX,local.maxX})for(double y:new double[]{local.minY,local.maxY})for(double z:new double[]{local.minZ,local.maxZ})
+        {
+            var v=new org.joml.Vector3f((float)x,(float)y,(float)z)
+                    .rotateY((180-yaw)*net.minecraft.util.Mth.DEG_TO_RAD);
+            var point=root.add(v.x,v.y,v.z);var box=new net.minecraft.world.phys.AABB(point,point);
+            result=result==null?box:result.minmax(box);
+        }
+        return result;
+    }
+    private static double projection(net.minecraft.world.phys.AABB bounds,
+            net.minecraft.world.phys.Vec3 at,net.minecraft.world.phys.Vec3 target,
+            double vertical,double horizontal)
+    {
+        var forward=target.subtract(at).normalize();
+        var right=forward.cross(new net.minecraft.world.phys.Vec3(0,1,0)).normalize();
+        var up=right.cross(forward).normalize();double largest=0;
+        for(double x:new double[]{bounds.minX,bounds.maxX})for(double y:new double[]{bounds.minY,bounds.maxY})for(double z:new double[]{bounds.minZ,bounds.maxZ})
+        {
+            var v=new net.minecraft.world.phys.Vec3(x,y,z).subtract(at);double depth=v.dot(forward);
+            if(depth<=1D)return Double.POSITIVE_INFINITY;
+            largest=Math.max(largest,Math.max(Math.abs(v.dot(right))/(depth*horizontal),
+                    Math.abs(v.dot(up))/(depth*vertical)));
+        }
+        return largest;
     }
     @SubscribeEvent public static void sound(net.minecraftforge.client.event.sound.SoundEvent.SoundSourceEvent event)
     {
@@ -114,6 +192,10 @@ public final class AirLiftR40Client
                 var proof=new com.google.gson.JsonObject();proof.addProperty("file",key+".png");proof.addProperty("tracked_entity",AirLiftR30Review.observedEntity);
                 proof.addProperty("camera_error",mc.gameRenderer.getMainCamera().getPosition().distanceTo(lastView.position()));proof.addProperty("unobstructed_target_ray",clearView);
                 proof.addProperty("target",lastView.target().toString());proof.addProperty("camera",lastView.position().toString());cameraEvidence.add(proof);photos.add(key);
+                proof.addProperty("assembly_bounds",framedBounds.toString());
+                proof.addProperty("visibility_samples",testedRays);proof.addProperty("unobstructed_samples",clearRays);
+                proof.addProperty("maximum_screen_fraction",maximumProjection);
+                proof.addProperty("framed_full_assembly",maximumProjection<=1D);
             }
             catch(java.io.IOException error){throw new IllegalStateException("Airlift photo could not be written",error);}
         }

@@ -61,7 +61,7 @@ public final class TvWorldPreviewTerrain
         }
         // Retain the actual HQ foundation height and grade the adjacent park.
         double campus = 1 - smooth(rectangleDistance(x, z, -90, 96, 160, 447) / 64);
-        return (int) Math.round(y * (1 - campus) - 467 * campus);
+        return TvAuthoredTerrainR44.ground(x, z, (int) Math.round(y * (1 - campus) - 467 * campus));
     }
 
     public static void shape(ChunkAccess chunk)
@@ -114,7 +114,8 @@ public final class TvWorldPreviewTerrain
                 }
             }
         }
-        plantForest(chunk);
+        // Native placed features run in the decoration stage, after adjacent
+        // carved chunks are available. Shape only establishes soil and geology.
         chunk.setUnsaved(true);
     }
 

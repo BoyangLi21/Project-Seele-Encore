@@ -27,7 +27,7 @@ out vec2 texCoord0;
 out vec4 normal;
 void main() {
     vec4 posed = BoneMat * vec4(Position, 1.0);
-    vec3 posedNormal = BoneNormal * Normal;
+    vec3 posedNormal = normalize(BoneNormal * Normal);
     gl_Position = ProjMat * ModelViewMat * posed;
     vertexDistance = fog_distance(ModelViewMat, IViewRotMat * posed.xyz, FogShape);
     vertexColor = minecraft_mix_light(Light0_Direction, Light1_Direction, posedNormal, Color);

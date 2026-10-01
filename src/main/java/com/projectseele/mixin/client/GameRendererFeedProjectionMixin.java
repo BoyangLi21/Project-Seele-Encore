@@ -7,12 +7,20 @@ import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyArg;
 import org.spongepowered.asm.mixin.injection.Inject;
 import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 import com.mojang.blaze3d.vertex.PoseStack;
 
 /** Preserve the optical target's aspect when the pilot uses a different display ratio. */
 @Mixin(GameRenderer.class)
 public abstract class GameRendererFeedProjectionMixin
 {
+    @Inject(method="getFov",at=@At("RETURN"))
+    private void projectseele$observeReviewLens(net.minecraft.client.Camera camera,float partial,boolean useSetting,
+            CallbackInfoReturnable<Double> callback)
+    {
+        if(useSetting && EvaCommandFeedClient.captureTargetOverride()==null)
+            com.projectseele.client.visual.RegionalStationPhoto.observeEffectiveFov(callback.getReturnValue());
+    }
     @Inject(method="renderLevel",at=@At("HEAD"))
     private void projectseele$beginOpticalPass(float partial,long finishTime,PoseStack pose,CallbackInfo callback)
     {

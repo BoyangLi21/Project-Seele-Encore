@@ -4,7 +4,7 @@
 
 ## 打开与检查
 
-运行 `tools/start_pyramid_tv_preview.bat`，或打开世界 **SEELE - TV Pyramid Interior Preview**。
+本页保留 2026-09-05 的历史预览记录。原独立预览存档已不在当前工作目录，对应 BAT 入口已退役；当前试玩使用 PCL **Project SEELE R44 Stage**，见 [R44 阶段手册](MANUAL_ACCEPTANCE_R44_STAGE.md)。下列旧坐标仅解释当时预览，不作为当前安装入口。
 存档目录是 `run/saves/SEELE_PYRAMID_TV_PREVIEW_20260905`，源图为 `SEELE_S20_RECOVERY_R28`。
 入口在 `projectseele:geofront` 维度的 **(28.5, -448, 267.5)**，朝西进入新增通道。
 

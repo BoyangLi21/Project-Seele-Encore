@@ -36,9 +36,10 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
         if(ATTEMPTED.contains(resource))return CACHE.get(resource);
         ATTEMPTED.add(resource);
         var file=Minecraft.getInstance().getResourceManager().getResource(resource);if(file.isEmpty())return null;
-        try(var reader=file.get().openAsReader())
+        try(var stream=file.get().open())
         {
-            var json=JsonParser.parseReader(reader).getAsJsonObject();if(!json.has("skin"))return null;
+            byte[] loadedBytes=stream.readAllBytes();
+            var json=JsonParser.parseString(new String(loadedBytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();if(!json.has("skin"))return null;
             if(json.get("stride").getAsInt()!=8)throw new IllegalArgumentException("Invalid weighted mesh stride");
             var skin=json.getAsJsonObject("skin");var names=skin.getAsJsonArray("bones");String[] bones=new String[names.size()];
             for(int i=0;i<bones.length;i++)bones[i]=names.get(i).getAsString();
@@ -56,6 +57,8 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             for(int i=0;i<weights.length;i+=4)if(Math.abs(weights[i]+weights[i+1]+weights[i+2]+weights[i+3]-1)>1e-4)throw new IllegalArgumentException("Unnormalized skin weights");
             for(float v:vertices)if(!Float.isFinite(v))throw new IllegalArgumentException("Non-finite skin vertex");
             Model model=new Model(bones,vertices,indices,weights,new float[vertices.length/8*6]);CACHE.put(resource,model);
+            if(RiggedAngelSkinWitnessR44.ENABLED)RiggedAngelSkinWitnessR44.parsed(resource,file.get().sourcePackId(),
+                    java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(loadedBytes)),bones,vertices,indices,weights);
             SachielWrapSurface.prepare(resource,vertices.length/8);
             ProjectSeele.LOGGER.info("R10 weighted Angel loaded: {} triangles={} bones={}",resource,vertices.length/24,bones.length);return model;
         }
@@ -72,6 +75,10 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
         Model model=load(resource);if(model==null)return;
         Map<String,GeoBone> bones=new HashMap<>();collect(root,bones);
         Matrix4f inverseRoot=EvaRigTransforms.model(root).invert();
+        Matrix4f witnessWorld=RiggedAngelSkinWitnessR44.ENABLED&&entity instanceof net.minecraft.world.entity.Entity actor&&getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer?renderer.renderedMeshTransform(stack.last().pose(),actor,partial):null;
+        var skinWitness=RiggedAngelSkinWitnessR44.begin(entity,resource,partial,witnessWorld);
+        Matrix4f sharedContactWorld=SharedHandContactWitnessR44.ENABLED&&entity instanceof net.minecraft.world.entity.LivingEntity actor
+                &&getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer?renderer.renderedMeshTransform(stack.last().pose(),actor,partial):null;
         if(entity instanceof net.minecraft.world.entity.Entity worldEntity
                 &&entity instanceof com.projectseele.entity.FirstBattleSignals.Actor actor
                 &&!actor.isFirstBattleEva()&&actor.firstBattleSignals().active(worldEntity))
@@ -89,11 +96,13 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
                     Vector3f authored=com.projectseele.client.visual.SachielWrapR14Audit.ENABLED&&vertex%(Math.max(1,surface.vertexCount()/16))==0?new Vector3f(p):null;
                     p.sub((float)origin.x,(float)origin.y,(float)origin.z).div(5);
                     inverseRoot.transformPosition(p);inverseRoot.transformDirection(n).normalize();
+                    if(skinWitness!=null)skinWitness.vertex(p);
+                    if(entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,p,sharedContactWorld,"actual-wrap-cache");
                     if(authored!=null&&auditWorld!=null)com.projectseele.client.visual.SachielWrapR14Audit.sample(worldEntity,actor,auditWorld,p,authored);
                     emit(target,stack,p,n,surface.u(vertex),surface.v(vertex),light,overlay);
                     if(vertex%3==2)emit(target,stack,p,n,surface.u(vertex),surface.v(vertex),light,overlay);
                 }
-                return;
+                if(skinWitness!=null)skinWitness.finish("wrap-cache");return;
             }
         }
         Quaternionf[] real=new Quaternionf[model.bones.length],dual=new Quaternionf[model.bones.length];
@@ -107,6 +116,7 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             Vector3f translation=matrix.getTranslation(new Vector3f());
             dual[i]=new Quaternionf(translation.x,translation.y,translation.z,0).mul(real[i]).mul(.5F);
         }
+        if(skinWitness!=null)skinWitness.palette(model.bones,matrices,scaled,real,dual);
         Quaternionf q=new Quaternionf(),d=new Quaternionf(),translation=new Quaternionf(),conjugate=new Quaternionf();
         Vector3f point=new Vector3f(),normal=new Vector3f(),work=new Vector3f();
         boolean grounded=entity instanceof net.minecraft.world.entity.LivingEntity living&&AngelCombatPoseR31.needsGroundSupport(living);
@@ -129,11 +139,18 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             }
             else
             {
-                q.set(0,0,0,0);d.set(0,0,0,0);Quaternionf reference=real[model.indices[j]];
+                q.set(0,0,0,0);d.set(0,0,0,0);
+                int referenceBone=DqSkinReferenceR44.REVIEW
+                        ?DqSkinReferenceR44.referenceBone(model.indices,model.weights,j,4)
+                        :model.indices[j];
+                Quaternionf reference=real[referenceBone];
                 for(int k=0;k<4;k++)
                 {
                     float weight=model.weights[j+k];if(weight==0)continue;int b=model.indices[j+k];
-                    if(reference.dot(real[b])<0)weight=-weight;
+                    // The isolated DCC candidate aligns each positive slot
+                    // against the already weighted running sum. Zero padding
+                    // neither owns a reference nor advances that sum.
+                    if((DqSkinReferenceR44.RUNNING?q:reference).dot(real[b])<0)weight=-weight;
                     q.x+=real[b].x*weight;q.y+=real[b].y*weight;q.z+=real[b].z*weight;q.w+=real[b].w*weight;
                     d.x+=dual[b].x*weight;d.y+=dual[b].y*weight;d.z+=dual[b].z*weight;d.w+=dual[b].w*weight;
                 }
@@ -150,6 +167,8 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             else
             {
                 if(contactAudit!=null)worldFloor=Math.min(worldFloor,contactAudit.m01()*point.x+contactAudit.m11()*point.y+contactAudit.m21()*point.z+contactAudit.m31());
+                if(skinWitness!=null)skinWitness.vertex(point);
+                if(entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,point,sharedContactWorld,"actual-weighted-final-emit");
                 emit(target,stack,point,normal,v[i+3],v[i+4],light,overlay);
                 if(vertex%3==2)emit(target,stack,point,normal,v[i+3],v[i+4],light,overlay);
             }
@@ -161,15 +180,19 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             // four fall directions. Translate the rigid assembly, never scale
             // limbs or run an approximate second skinning pass.
             Vector3f lift=inverseRoot.transformDirection(new Vector3f(0,.016F-floor,0));
+            if(skinWitness!=null)skinWitness.supportTranslation(lift);
             for(int vertex=0;vertex<model.vertices.length/8;vertex++)
             {
                 int at=vertex*6,i=vertex*8;float[] output=model.groundedVertices;
                 point.set(output[at],output[at+1],output[at+2]).add(lift);normal.set(output[at+3],output[at+4],output[at+5]);
+                if(skinWitness!=null)skinWitness.vertex(point);
+                if(entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,point,sharedContactWorld,"actual-weighted-ground-lift-final-emit");
                 if(contactAudit!=null)worldFloor=Math.min(worldFloor,contactAudit.m01()*point.x+contactAudit.m11()*point.y+contactAudit.m21()*point.z+contactAudit.m31());
                 emit(target,stack,point,normal,model.vertices[i+3],model.vertices[i+4],light,overlay);
                 if(vertex%3==2)emit(target,stack,point,normal,model.vertices[i+3],model.vertices[i+4],light,overlay);
             }
         }
+        if(skinWitness!=null)skinWitness.finish(grounded?"grounded-final-lift":DqSkinReferenceR44.RUNNING?"running-sum-review-or-scale-lbs":DqSkinReferenceR44.REVIEW?"dominant-review-or-scale-lbs":"first-slot-or-scale-lbs");
         if(contactAudit!=null&&entity instanceof net.minecraft.world.entity.LivingEntity living)com.projectseele.client.visual.CombatR31Client.angelSupport(living,worldFloor);
     }
     private static void emit(VertexConsumer target,PoseStack stack,Vector3f p,Vector3f n,float u,float v,int light,int overlay)

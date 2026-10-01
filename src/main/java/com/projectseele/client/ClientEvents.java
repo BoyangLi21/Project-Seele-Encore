@@ -77,6 +77,7 @@ public class ClientEvents
         event.registerBlockEntityRenderer(com.projectseele.registry.ModBlockEntities.STATION_DEPARTURE_BOARD.get(),com.projectseele.client.render.StationDepartureBoardRenderer::new);
         event.registerBlockEntityRenderer(com.projectseele.registry.ModBlockEntities.PERIOD_FIXTURE.get(),com.projectseele.client.render.PeriodFixtureRenderer::new);
         event.registerBlockEntityRenderer(com.projectseele.registry.ModBlockEntities.WALL_ARTWORK.get(),com.projectseele.client.render.WallArtworkRenderer::new);
+        event.registerBlockEntityRenderer(com.projectseele.registry.ModBlockEntities.NERV_ACCESS_READER.get(),com.projectseele.client.render.NervAccessReaderRendererR44::new);
         event.registerEntityRenderer(ModEntities.ENTRY_PLUG_CARRIER.get(),
                 EntryPlugCarrierRenderer::new);
         event.registerEntityRenderer(ModEntities.TRAINING_PILOT.get(),

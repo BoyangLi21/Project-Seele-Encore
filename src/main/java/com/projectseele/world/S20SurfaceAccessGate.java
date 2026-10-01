@@ -56,6 +56,7 @@ public final class S20SurfaceAccessGate
         {
             return;
         }
+        if(level.getBlockEntity(reader) instanceof NervAccessReaderEntityR44)return;
         ensureReader(level, reader);
         ensureButton(level, insideButton(level,walkY), Direction.EAST);
         long now = level.getGameTime();
@@ -77,6 +78,12 @@ public final class S20SurfaceAccessGate
         ServerLevel level = player.serverLevel();
         int walkY = S20PhysicalElevatorDirector.surfaceTransitLift(level)
                 .upper().walkY();
+        if(level.getBlockEntity(reader(level,walkY)) instanceof NervAccessReaderEntityR44 upgraded)
+        {
+            // The physical inside button depresses normally; the reader ticks
+            // its POWERED state. Do not swallow that use before ButtonBlock.
+            return false;
+        }
         if (clicked.equals(insideButton(level,walkY)))
         {
             OPEN_UNTIL.put(level, level.getGameTime() + OPEN_TICKS);

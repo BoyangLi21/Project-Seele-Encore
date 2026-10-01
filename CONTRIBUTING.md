@@ -1,4 +1,4 @@
-# 参与 Project SEELE
+# 参与 Project SEELE: Encore
 
 欢迎从一个明确的小任务开始：一处通道、一组模型接触、一句原创对白、一次可复现的多人操作。项目主要参考 1995 年 TV 版；UN 机体和基地是独立的原创扩展。
 
@@ -7,8 +7,8 @@
 需要 Git、JDK 17；下面的依赖下载助手使用 Python 3.11 或更新版本的标准库。
 
 ```powershell
-git clone https://github.com/BoyangLi21/Project-Seele.git
-cd Project-Seele
+git clone https://github.com/BoyangLi21/Project-Seele-Encore.git
+cd Project-Seele-Encore
 python tools/bootstrap_dev_dependencies_r24.py
 .\gradlew.bat build
 .\gradlew.bat runClient

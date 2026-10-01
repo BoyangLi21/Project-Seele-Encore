@@ -1,6 +1,8 @@
 package com.projectseele.entity;
 
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.syncher.*;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
@@ -13,6 +15,12 @@ public final class EvaCombatSupportR33
     private record ReactionOrigin(long start,Vec3 position){}
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ReactionOrigin> REACTIONS=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Vec3[]> TARGETS=new com.projectseele.util.WeakIdentityMap<>();
+    private record FootFrame(long tick,Vec3[] feet){}
+    private record ReleaseFrame(long signal,long start,Vec3[] feet){}
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,FootFrame> FINAL_FEET=new com.projectseele.util.WeakIdentityMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ReleaseFrame> CLIENT_RELEASES=new com.projectseele.util.WeakIdentityMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ListTag> CLOCKS=new com.projectseele.util.WeakIdentityMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,CompoundTag> FLOOR_WITNESS=new com.projectseele.util.WeakIdentityMap<>();
     private static final EntityDataAccessor<CompoundTag> CONTACTS=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.COMPOUND_TAG);
     private static final EntityDataAccessor<Vector3f> DIRECTION=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.VECTOR3);
     public static boolean bootstrap(){return true;}
@@ -22,7 +30,107 @@ public final class EvaCombatSupportR33
         var p=EvaGameplayMotionR32.profile(EvaGameplayMotionR32.variant(e));
         return p!=null&&p.has("combat_foundation")&&p.get("combat_foundation").getAsInt()>=33;
     }
-    public static boolean strike(EvaUnit01Entity e){return e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()||EvaBerserkMotionR34.striking(e);}
+    public static boolean strike(EvaUnit01Entity e){return !EvaGameplayMotionR32.activeGroundClip(e,0).isEmpty();}
+    public static CompoundTag diagnosticR44(EvaUnit01Entity e)
+    {
+        var tag=e.getEntityData().get(CONTACTS).copy();var floor=FLOOR_WITNESS.get(e);if(floor!=null)tag.put("free_floor_r44",floor.copy());
+        var release=CLIENT_RELEASES.get(e);if(release!=null)tag.putDouble("client_release_ticks",(FirstBattleSignals.clientFrameTime()-release.start())/50_000_000D);return tag;
+    }
+    public static float renderLocomotionSignalR44(EvaUnit01Entity e,float partial,int channel,float fallback)
+    {
+        if(!e.level().isClientSide||e.hasLiveActionForRender(partial)||e.isFirstBattleActive()||e.isPilotCrouching()||e.isPilotProne())return fallback;
+        var tag=e.getEntityData().get(CONTACTS);if(!tag.contains("position_phase_r44",Tag.TAG_LIST))return fallback;
+        var samples=tag.getList("position_phase_r44",Tag.TAG_COMPOUND);if(samples.isEmpty())return fallback;
+        var origin=e.getPosition(partial);CompoundTag first=samples.getCompound(samples.size()-1),last=first;float amount=1;double best=Double.POSITIVE_INFINITY;
+        for(int i=0;i+1<samples.size();i++)
+        {
+            var a=samples.getCompound(i);var b=samples.getCompound(i+1);
+            double dx=b.getDouble("x")-a.getDouble("x"),dz=b.getDouble("z")-a.getDouble("z"),length=dx*dx+dz*dz;
+            if(length<1e-8)continue;
+            double u=Mth.clamp(((origin.x-a.getDouble("x"))*dx+(origin.z-a.getDouble("z"))*dz)/length,0,1);
+            double x=Mth.lerp(u,a.getDouble("x"),b.getDouble("x")),z=Mth.lerp(u,a.getDouble("z"),b.getDouble("z"));
+            double distance=(origin.x-x)*(origin.x-x)+(origin.z-z)*(origin.z-z)+(samples.size()-i)*1e-10;
+            if(distance<best){best=distance;first=a;last=b;amount=(float)u;}
+        }
+        // Every pair contains a phase, blend and the server origin from the
+        // same tick. Sample that pair at the actual renderer origin instead
+        // of advancing phase ahead of vanilla's three-tick position lerp.
+        if(best>64&&Double.isFinite(best))return fallback;
+        String key=channel==4?"gait":channel==5?"move":"run";float a=first.getFloat(key),b=last.getFloat(key);
+        if(channel==4){float difference=b-a;difference-=Math.round(difference);return a+difference*amount;}
+        return Mth.lerp(amount,a,b);
+    }
+    private static void rememberClockR44(EvaUnit01Entity e)
+    {
+        var prior=CLOCKS.get(e);var samples=prior==null?new ListTag():prior.copy();var row=new CompoundTag();
+        row.putLong("tick",e.level().getGameTime());row.putDouble("x",e.getX());row.putDouble("y",e.getY());row.putDouble("z",e.getZ());
+        row.putFloat("gait",e.rifleGaitPhase(0));row.putFloat("run",e.rifleRunBlend(0));row.putFloat("move",e.rifleMoveBlend(0));
+        if(!samples.isEmpty()&&samples.getCompound(samples.size()-1).getLong("tick")==e.level().getGameTime())samples.remove(samples.size()-1);
+        samples.add(row);while(samples.size()>8)samples.remove(0);CLOCKS.put(e,samples);
+    }
+    private static void attachClockR44(EvaUnit01Entity e,CompoundTag tag)
+    {var samples=CLOCKS.get(e);if(samples!=null)tag.put("position_phase_r44",samples.copy());}
+    public static void rememberFinalFeetR44(EvaUnit01Entity e,EvaBodyPose.Sample pose,float partial)
+    {
+        if(!EvaBodyPose.runtimeLocomotionR44(e)||e.rifleStanceLevel(partial)>.01F||!supported(e))return;
+        // Preserve the preceding moving pose at a stop; replacing it with an
+        // already-idle free leg would make the release itself jump backwards.
+        if(!e.level().isClientSide&&!strike(e)&&e.rifleMoveBlend(partial)<=.05F)return;
+        Vec3[] feet=new Vec3[2];int i=0;
+        for(String side:new String[]{"l","r"})
+        {
+            var p=pose.matrix("foot_"+side).transformPosition(new Vector3f(pose.rig.get("foot_"+side).pivot()).add(toe(e,side)))
+                    .mul(EvaScale.RENDER_SCALE).rotateY((180-e.getYRot())*Mth.DEG_TO_RAD);
+            feet[i++]=(e.level().isClientSide?e.getPosition(partial):e.position()).add(p.x,p.y,p.z);
+        }
+        FINAL_FEET.put(e,new FootFrame(e.level().getGameTime(),feet));
+    }
+    public static void beginReleaseR44(EvaUnit01Entity e)
+    {
+        if(e.level().isClientSide||!EvaBodyPose.runtimeLocomotionR44(e))return;
+        var old=e.getEntityData().get(CONTACTS);if(old.isEmpty()||old.contains("release"))return;
+        var t=old.copy();t.putLong("release",e.level().getGameTime());t.putBoolean("locomotion_r44",false);
+        var previous=FINAL_FEET.get(e);
+        if(previous!=null&&e.level().getGameTime()-previous.tick()<=3)
+            for(int i=0;i<2;i++)
+            {
+                String side=i==0?"l":"r";Vec3 point=previous.feet()[i];
+                var floor=e.level().clip(new net.minecraft.world.level.ClipContext(point.add(0,4,0),point.add(0,-8,0),net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,e));
+                if(floor.getType()!=net.minecraft.world.phys.HitResult.Type.BLOCK)continue;
+                t.putDouble(side+"x",point.x);t.putDouble(side+"z",point.z);t.putDouble(side+"y",floor.getLocation().y);
+                t.putDouble(side+"startY",point.y);t.putLong(side+"plant",e.level().getGameTime());t.putBoolean(side+"active",true);
+            }
+        attachClockR44(e,t);e.getEntityData().set(CONTACTS,t);
+    }
+    public static void preventFreeFootPenetrationR44(EvaUnit01Entity e,EvaBodyPose.Sample pose,float partial)
+    {
+        FLOOR_WITNESS.remove(e);
+        if(!EvaBodyPose.runtimeLocomotionR44(e)||!supported(e)||!EvaGameplayMotionR32.sharedWeapon(e)||e.rifleStanceLevel(partial)>.01F
+                ||e.isFirstBattleActive()||e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e)||CombatReactionsR36.active(e))return;
+        var origin=e.level().isClientSide?e.getPosition(partial):e.position();var diagnostics=new CompoundTag();
+        var profile=com.projectseele.physics.CombatBodyProfiles.get(e);
+        for(String side:new String[]{"l","r"})
+        {
+            var low=EvaBodyPose.lowestRigidFootR44(e,pose,side);if(low==null)continue;
+            var world=new Vector3f(low).mul(EvaScale.RENDER_SCALE).rotateY((180-e.getYRot())*Mth.DEG_TO_RAD).add((float)origin.x,(float)origin.y,(float)origin.z);
+            diagnostics.putDouble(side+"before_y",world.y);
+            // A planted end effector already owns its world point. For a free
+            // foot, support IK may have moved the pelvis after body grounding.
+            // Project only that leg onto the real terrain inequality; never
+            // lift the whole body and drag the planted foot.
+            if(anchor(e,side,partial)!=null&&!e.getEntityData().get(CONTACTS).contains("release")||world.y>=origin.y+.025)continue;
+            var point=new Vec3(world.x,world.y,world.z);
+            var hit=e.level().clip(new net.minecraft.world.level.ClipContext(point.add(0,4,0),point.add(0,-8,0),
+                    net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,e));
+            if(hit.getType()!=net.minecraft.world.phys.HitResult.Type.BLOCK||world.y>=hit.getLocation().y+.015)continue;
+            String name="foot_"+side;var matrix=pose.matrix(name);var orientation=matrix.getUnnormalizedRotation(new Quaternionf()).normalize();
+            var target=matrix.transformPosition(new Vector3f(pose.rig.get(name).pivot()));target.y+=(float)((hit.getLocation().y+.02-world.y)/EvaScale.RENDER_SCALE);
+            com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(pose,profile,side,target,orientation);
+            var finalLow=EvaBodyPose.lowestRigidFootR44(e,pose,side);diagnostics.putDouble(side+"after_y",origin.y+finalLow.y*EvaScale.RENDER_SCALE);
+            diagnostics.putDouble(side+"ground_y",hit.getLocation().y);
+        }
+        FLOOR_WITNESS.put(e,diagnostics);
+    }
     public static float gaitWeight(EvaUnit01Entity e,float partial)
     {
         if(!ready(e))return 0;
@@ -96,19 +204,31 @@ public final class EvaCombatSupportR33
         return new Vec3(t.getDouble(side+"x"),y,t.getDouble(side+"z"));
     }
     public static Vec3 anchor(EvaUnit01Entity e,String side,float partial)
-    {var t=e.getEntityData().get(CONTACTS);var targets=TARGETS.get(e);return t.isEmpty()||t.contains("release")||targets==null?null:targets[side.equals("l")?0:1];}
+    {var t=e.getEntityData().get(CONTACTS);var targets=TARGETS.get(e);return t.isEmpty()||targets==null?null:targets[side.equals("l")?0:1];}
     private static boolean supported(EvaUnit01Entity e)
     {return e.onGround()&&!e.isVisuallyAirborneForRender()&&EvaGameplayMotionR32.airAge(e,0)<0;}
     public static void release(EvaUnit01Entity e)
-    {if(!e.level().isClientSide)e.getEntityData().set(CONTACTS,new CompoundTag());TARGETS.remove(e);}
+    {if(!e.level().isClientSide)e.getEntityData().set(CONTACTS,new CompoundTag());TARGETS.remove(e);CLIENT_RELEASES.remove(e);}
     public static void tick(EvaUnit01Entity e)
     {
         if(e.level().isClientSide||!ready(e))return;
+        if(EvaBodyPose.runtimeLocomotionR44(e))rememberClockR44(e);
+        boolean locomotion=EvaBodyPose.runtimeLocomotionR44(e)&&EvaGameplayMotionR32.sharedWeapon(e)
+                &&e.getPilotEntity()!=null&&supported(e)&&!strike(e)&&e.rifleMoveBlend(0)>.05F&&e.rifleStanceLevel(0)<.01F
+                &&!e.isNervLogisticsLocked()&&!e.isFirstBattleActive()&&!EvaShutdownR30.disabled(e)&&!CombatReactionsR36.active(e);
+        if(locomotion){tickLocomotionR44(e);return;}
+        if(e.getEntityData().get(CONTACTS).getBoolean("locomotion_r44"))beginReleaseR44(e);
         var beat=CombatFeelR31.beat(e);boolean fallen=beat!=null&&(beat.kind()==CombatFeelR31.DOWN||beat.kind()==CombatFeelR31.THROWN);
         boolean release=!supported(e)||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)
-                ||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isPilotCrouching()||e.isPilotProne()||fallen||!strike(e)&&e.rifleMoveBlend(1)>.18F;
+                ||!EvaGameplayMotionR32.sharedWeapon(e)||e.isPilotCrouching()||e.isPilotProne()||fallen||!strike(e)&&e.rifleMoveBlend(1)>.18F;
         if(release&&!e.getEntityData().get(CONTACTS).isEmpty())e.getEntityData().set(CONTACTS,new CompoundTag());
         var t=e.getEntityData().get(CONTACTS);
+        if(t.contains("release")&&!strike(e))
+        {
+            if(e.level().getGameTime()-t.getLong("release")>=8)release(e);
+            else{var updated=t.copy();attachClockR44(e,updated);e.getEntityData().set(CONTACTS,updated);}
+            return;
+        }
         if(EvaGameplayMotionR32.directed(e)&&strike(e)&&!t.isEmpty())
         {
             var updated=t.copy();boolean changed=false;
@@ -141,20 +261,66 @@ public final class EvaCombatSupportR33
             if(t.contains("release")&&e.level().getGameTime()-t.getLong("release")>=8)e.getEntityData().set(CONTACTS,new CompoundTag());
         }
     }
+    private static void tickLocomotionR44(EvaUnit01Entity e)
+    {
+        var t=e.getEntityData().get(CONTACTS);
+        if(t.isEmpty()||!t.getBoolean("locomotion_r44")||t.contains("release")||Math.abs(Mth.wrapDegrees(e.getYRot()-t.getFloat("yaw")))>20)
+        {
+            release(e);capture(e,EvaBodyPose.sample(e,0));t=e.getEntityData().get(CONTACTS);
+            if(t.isEmpty())return;t=t.copy();t.putBoolean("locomotion_r44",true);
+            for(String side:new String[]{"l","r"})t.putBoolean(side+"active",false);
+            e.getEntityData().set(CONTACTS,t);
+        }
+        var updated=t.copy();boolean changed=false;
+        for(String side:new String[]{"l","r"})
+        {
+            boolean planted=EvaBodyPose.locomotionPlantedR44(e,side,0);
+            if(planted==t.getBoolean(side+"active"))continue;
+            changed=true;updated.putBoolean(side+"active",false);e.getEntityData().set(CONTACTS,updated.copy());
+            if(planted)
+            {
+                // Capture the current actual pose with the old support on the
+                // other side retained. This world anchor is sent to the client,
+                // so position prediction and gait interpolation cannot drag it.
+                var pose=EvaBodyPose.sample(e,0);String name="foot_"+side;
+                var point=pose.matrix(name).transformPosition(new Vector3f(pose.rig.get(name).pivot()).add(toe(e,side)))
+                        .mul(EvaScale.RENDER_SCALE).rotateY((180-e.getYRot())*Mth.DEG_TO_RAD);
+                var world=e.position().add(point.x,point.y,point.z);
+                var floor=e.level().clip(new net.minecraft.world.level.ClipContext(world.add(0,5,0),world.add(0,-8,0),
+                        net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,e));
+                if(floor.getType()==net.minecraft.world.phys.HitResult.Type.BLOCK)
+                {
+                    updated.putDouble(side+"x",world.x);updated.putDouble(side+"y",floor.getLocation().y);updated.putDouble(side+"z",world.z);
+                    updated.putDouble(side+"startY",world.y);updated.putLong(side+"plant",e.level().getGameTime());updated.putBoolean(side+"active",true);
+                }
+            }
+        }
+        attachClockR44(e,updated);e.getEntityData().set(CONTACTS,updated);
+    }
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample p,float partial)
     {
         TARGETS.remove(e);
         if(CombatReactionsR36.active(e))return;
         if(!ready(e)||!supported(e)||!EvaGameplayMotionR32.owns(e,partial)||e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e))return;
         var beat=CombatFeelR31.beat(e);if(beat!=null&&(beat.kind()==CombatFeelR31.DOWN||beat.kind()==CombatFeelR31.THROWN))return;
-        var t=e.getEntityData().get(CONTACTS);if(t.isEmpty()||t.getInt("weapon")!=EvaUnit01Entity.WEAPON_FISTS)return;
+        var t=e.getEntityData().get(CONTACTS);if(t.isEmpty()||t.getInt("weapon")!=e.getWeapon())return;
+        if(!t.contains("release"))CLIENT_RELEASES.remove(e);
+        else if(e.level().isClientSide)
+        {
+            var previous=CLIENT_RELEASES.get(e);var feet=FINAL_FEET.get(e);
+            if((previous==null||previous.signal()!=t.getLong("release"))&&feet!=null&&e.level().getGameTime()-feet.tick()<=3)
+                CLIENT_RELEASES.put(e,new ReleaseFrame(t.getLong("release"),FirstBattleSignals.clientFrameTime(),feet.feet()));
+        }
         var origin=e.level().isClientSide?e.getPosition(partial):e.position();
         String[] sides={"l","r"};Vector3f[] targets=new Vector3f[2];Quaternionf[] orientations=new Quaternionf[2];Vec3[] worldTargets=new Vec3[2];
+        boolean[] supportActive=new boolean[2];
+        for(int i=0;i<2;i++)supportActive[i]=e.level().isClientSide&&t.getBoolean("locomotion_r44")&&!t.contains("release")
+                ?EvaBodyPose.locomotionPlantedR44(e,sides[i],partial):t.getBoolean(sides[i]+"active");
         for(int i=0;i<2;i++)
         {
             String s=sides[i];
             String foot="foot_"+s;var orientation=p.matrix(foot).getUnnormalizedRotation(new Quaternionf());
-            if(EvaGameplayMotionR32.directed(e)&&!t.getBoolean(s+"active"))
+            if(EvaGameplayMotionR32.directed(e)&&!supportActive[i])
             {
                 targets[i]=point(p,foot);orientations[i]=orientation;continue;
             }
@@ -165,10 +331,20 @@ public final class EvaCombatSupportR33
                     .rotateY(-(180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD).div(EvaScale.RENDER_SCALE);
             if(t.contains("release"))
             {
-                float step=Mth.clamp((e.level().getGameTime()-t.getLong("release")+partial-i*4)/4F,0,1);
+                var release=CLIENT_RELEASES.get(e);
+                float ticks=release==null?e.level().getGameTime()-t.getLong("release")+partial
+                        :(FirstBattleSignals.clientFrameTime()-release.start())/50_000_000F;
+                if(release!=null)
+                {
+                    var start=release.feet()[i];target.set((float)(start.x-origin.x),(float)(start.y-origin.y),(float)(start.z-origin.z))
+                            .rotateY(-(180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD).div(EvaScale.RENDER_SCALE);
+                }
+                float step=Mth.clamp((ticks-i*4)/4F,0,1);
                 float u=step*step*step*(10+step*(-15+6*step));
                 var free=p.matrix(foot).transformPosition(new Vector3f(p.rig.get(foot).pivot()).add(toe(e,s)));
                 target.lerp(free,u).add(0,(float)Math.sin(step*Math.PI)*.25F,0);
+                var world=new Vector3f(target).mul(EvaScale.RENDER_SCALE).rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD);
+                worldTargets[i]=origin.add(world.x,world.y,world.z);
             }
             target.sub(orientation.transform(toe(e,s)));
             targets[i]=target;orientations[i]=orientation;
@@ -179,14 +355,14 @@ public final class EvaCombatSupportR33
         // support point and the visible sole silently slides several metres.
         for(int pass=0;pass<12;pass++)for(int i=0;i<2;i++)
         {
-            if(EvaGameplayMotionR32.directed(e)&&!t.getBoolean(sides[i]+"active"))continue;
+            if(EvaGameplayMotionR32.directed(e)&&!supportActive[i])continue;
             String s=sides[i],a="leg_"+s,c="foot_"+s;Vector3f joint=knee(p,s);
             float reach=(joint.distance(p.rig.get(a).pivot())+joint.distance(p.rig.get(c).pivot()))*.997F;
             Vector3f delta=point(p,a).sub(targets[i]);float distance=delta.length();
             if(distance>reach){p.positions.get("root").sub(delta.mul(1-reach/distance));p.dirty();}
         }
         var profile=com.projectseele.physics.CombatBodyProfiles.get(e);
-        for(int i=0;i<2;i++)if(!EvaGameplayMotionR32.directed(e)||t.getBoolean(sides[i]+"active"))
+        for(int i=0;i<2;i++)if(!EvaGameplayMotionR32.directed(e)||supportActive[i])
             com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(p,profile,sides[i],targets[i],orientations[i]);
         TARGETS.put(e,worldTargets);
     }

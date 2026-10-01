@@ -10,7 +10,9 @@ GREEN='projectseele:nerv_machine_panel';BLUE='projectseele:nerv_shaft_panel';EDG
 FINISHES={'projectseele:nerv_structural_panel','minecraft:polished_deepslate','minecraft:deepslate_bricks','minecraft:deepslate_tiles','minecraft:polished_blackstone_bricks','minecraft:gray_concrete','minecraft:orange_concrete','minecraft:purple_concrete','minecraft:red_concrete','minecraft:orange_terracotta','minecraft:purple_terracotta','minecraft:red_terracotta','minecraft:chiseled_polished_blackstone'}
 
 def plan():
- p=vox.Painter();written={};p.meta.update(reference='TV episodes 01 and 09: olive fabricated equipment, blue catapult wells, captive shoulder bolts, retracting restraints, vertical pallet, successive pressure shutters',preserved=['headquarters command layout','all original personnel paths and doors','EVA fleet and plug UUIDs','plug socket and crane kinematics','31x31 shaft clear cores'],bulkheads_y=[-332,-192,-52])
+ if (vox.WORLD/'eva_facility_r29.json').is_file() or (vox.WORLD/'.projectseele_spatial_preview_read_only.json').is_file():
+  raise RuntimeError('The old partial R16 palette plan is retired in delivered/frozen facilities; use the complete measured R44 component contract')
+ p=vox.Painter();written={};p.meta.update(reference='Cached animation frames: olive fabricated equipment, blue vessel/shaft surfaces, shoulder actuators, upright restraint pallet and shutters; episode/edition metadata remains unverified, not asserted from the filenames',preserved=['headquarters command layout','all original personnel paths and doors','EVA fleet and plug UUIDs','plug socket and crane kinematics','31x31 shaft clear cores'],bulkheads_y=[-332,-192,-52])
  for name in ('cages','launch'):
   src=np.load(OUT/'survey'/(name+'.npz'));a=src['blocks'];pal=src['palette'];lo=src['lo'];hi=src['hi'];ys,zs,xs=np.ogrid[lo[1]:hi[1]+1,lo[2]:hi[2]+1,lo[0]:hi[0]+1]
   if name=='cages':

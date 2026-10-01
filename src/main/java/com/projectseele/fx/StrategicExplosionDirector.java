@@ -75,10 +75,9 @@ public final class StrategicExplosionDirector
         }
         DamageSource damage = level.damageSources().explosion(source, source);
         AABB area = new AABB(impact, impact).inflate(radius);
-        for (LivingEntity target : level.getEntitiesOfClass(LivingEntity.class, area,
-                entity -> entity != source && entity.isAlive() && !entity.isSpectator()))
+        for (Entity target : com.projectseele.physics.CombatDamageTargetsR44.candidates(level,area,source,null))
         {
-            Vec3 centre = target.getBoundingBox().getCenter();
+            Vec3 centre = com.projectseele.physics.CombatDamageTargetsR44.nearestSurface(target,impact);
             double distance = centre.distanceTo(impact);
             if (distance > radius)
             {
@@ -88,7 +87,7 @@ public final class StrategicExplosionDirector
             float dealt = Math.max(1.0F, maximumDamage * exposure * exposure);
             target.hurt(damage, dealt);
             Vec3 away = centre.subtract(impact);
-            if (away.lengthSqr() > 1.0E-4D)
+            if (target instanceof LivingEntity && away.lengthSqr() > 1.0E-4D)
             {
                 Vec3 impulse = away.normalize().scale(0.8D + exposure * 4.2D);
                 target.push(impulse.x, Math.max(0.25D, impulse.y + exposure), impulse.z);

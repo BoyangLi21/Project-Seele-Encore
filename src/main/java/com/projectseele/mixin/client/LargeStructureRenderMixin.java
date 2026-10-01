@@ -43,7 +43,11 @@ public abstract class LargeStructureRenderMixin
     {
         Entity entity=this.seele$renderCandidate;
         if(entity instanceof EvaUnit01Entity eva&&eva.hasActiveCarrierMotion()&&entity.blockPosition().equals(position))return true;
-        if((entity instanceof EvaUnit01Entity||entity instanceof IndustrialMemberEntity||entity instanceof com.projectseele.entity.Angel)
+        if((entity instanceof EvaUnit01Entity||entity instanceof IndustrialMemberEntity||entity instanceof com.projectseele.entity.Angel
+                ||entity instanceof com.projectseele.entity.NervCarrierPlatformEntity
+                ||entity instanceof com.projectseele.entity.NervHangarDoorEntity
+                ||entity instanceof com.projectseele.entity.NervSiloDoorEntity
+                ||entity instanceof com.projectseele.entity.EntryPlugCarrierEntity)
                 &&entity.blockPosition().equals(position))
         {
             var level=Minecraft.getInstance().level;

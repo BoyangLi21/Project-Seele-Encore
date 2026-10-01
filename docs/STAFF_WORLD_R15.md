@@ -43,7 +43,7 @@
 
 ## 低配与服务器
 
-可选入口是 `tools/start_low_end_r15.bat`。它使用当前正式存档，验证固定版本依赖，应用低配配置，并在退出时恢复之前的选项。
+本页的旧低配 BAT 硬绑定历史预览存档，该存档已不在当前工作目录，入口现已退役；底层 Python 工具保留供历史复现。当前较低图形开销试玩选择 R44 **Client_Plain**，导入 PCL **Project SEELE R44 Stage**，见 [R44 阶段手册](MANUAL_ACCEPTANCE_R44_STAGE.md)。
 
 | 项目 | 低配预设 |
 | --- | --- |

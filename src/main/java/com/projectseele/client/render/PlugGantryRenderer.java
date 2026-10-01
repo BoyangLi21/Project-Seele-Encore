@@ -24,16 +24,25 @@ public final class PlugGantryRenderer
 {
     private static final ResourceLocation PAINT=new ResourceLocation("minecraft","textures/block/white_concrete.png");
     private static final int GREEN=0x566a51, EDGE=0x8d9a86, STEEL=0xadb7bb, DARK=0x222d32, GOLD=0xb69347;
-    private final PoseStack poses; private final VertexConsumer buffer; private final int light;private final BufferBuilder baking;
-    private static VertexBuffer TOP,YOKE,CHUCK,JAW_LEFT,JAW_RIGHT,HOSES_CLOSED,HOSES_OPEN,ROPE,SHEAVE,LINKS;
+    private final PoseStack poses; private final VertexConsumer buffer; private final int light;private final RigidMachineryPartR44.Builder baking;
+    private final MultiBufferSource buffers;
+    private static RigidMachineryPartR44 TOP,YOKE,CHUCK,JAW_LEFT,JAW_RIGHT,HOSES_CLOSED,HOSES_OPEN,ROPE,SHEAVE,LINKS,WHEEL;
     private PlugGantryRenderer(PoseStack poses, MultiBufferSource buffers, int light)
-    {this.poses=poses;this.buffer=buffers.getBuffer(RenderType.entitySolid(PAINT));this.light=light;this.baking=null;}
-    private PlugGantryRenderer(BufferBuilder builder){this.poses=new PoseStack();this.buffer=builder;this.light=15728880;this.baking=builder;}
+    {this.poses=poses;this.buffers=buffers;this.buffer=buffers.getBuffer(RenderType.entitySolid(PAINT));this.light=light;this.baking=null;}
+    private PlugGantryRenderer(RigidMachineryPartR44.Builder builder){this.poses=new PoseStack();this.buffers=null;this.buffer=null;this.light=15728880;this.baking=builder;}
     public static void render(NervCarrierPlatformEntity entity,float partial,PoseStack poses,MultiBufferSource buffers,int light)
-    {new PlugGantryRenderer(poses,buffers,light).draw(entity,partial);}
+    {TvCraneMeshWitnessR44.begin(entity,partial,poses);try{new PlugGantryRenderer(poses,buffers,light).draw(entity,partial);}finally{TvCraneMeshWitnessR44.end();}}
     private void draw(NervCarrierPlatformEntity entity,float partial)
     {
         gpu(topMesh(),poses,light);
+        // The two surveyed runways run along Z at X = body axis +/- 4.
+        // Wheel bottoms meet their Y=-373 running surface; no floating bogies.
+        for(double x:new double[]{-4,4})for(double z:new double[]{-2.8,2.8})
+        {
+            poses.pushPose();poses.translate(x,.38,z);
+            poses.mulPose(new Quaternionf().rotationX((float)(entity.getPosition(partial).z/.38)));
+            gpu(wheelMesh(),poses,light);poses.popPose();
+        }
         Vec3 lower=v(0,entity.getCraneBottomOffset(partial),0);
         EntryPlugCarrierEntity plug=entity.getCranePlug();
         com.projectseele.world.RigidTransform transform=plug==null?null:plug.getInterpolatedCanonicalTransform(partial);
@@ -76,49 +85,69 @@ public final class PlugGantryRenderer
         else for(double side:new double[]{-1,1})hose(side,released);
         poses.popPose();
     }
-    private static VertexBuffer bake(java.util.function.Consumer<PlugGantryRenderer> author)
+    public static void clearCache()
+    {TOP=YOKE=CHUCK=JAW_LEFT=JAW_RIGHT=HOSES_CLOSED=HOSES_OPEN=ROPE=SHEAVE=LINKS=WHEEL=null;}
+    private static RigidMachineryPartR44 bake(java.util.function.Consumer<PlugGantryRenderer> author)
     {
-        BufferBuilder builder=new BufferBuilder(262144);builder.begin(VertexFormat.Mode.QUADS,DefaultVertexFormat.POSITION_COLOR);author.accept(new PlugGantryRenderer(builder));
-        VertexBuffer mesh=new VertexBuffer(VertexBuffer.Usage.STATIC);mesh.bind();mesh.upload(builder.end());VertexBuffer.unbind();return mesh;
+        var builder=new RigidMachineryPartR44.Builder();author.accept(new PlugGantryRenderer(builder));return builder.finish();
     }
-    private static VertexBuffer topMesh(){if(TOP==null)TOP=bake(PlugGantryRenderer::top);return TOP;}
-    private static VertexBuffer yokeMesh(){if(YOKE==null)YOKE=bake(PlugGantryRenderer::yoke);return YOKE;}
-    private static VertexBuffer chuckMesh(){if(CHUCK==null)CHUCK=bake(PlugGantryRenderer::chuck);return CHUCK;}
-    private static VertexBuffer jawMesh(double side)
+    private static RigidMachineryPartR44 topMesh(){if(TOP==null)TOP=bake(PlugGantryRenderer::top);return TOP;}
+    private static RigidMachineryPartR44 yokeMesh(){if(YOKE==null)YOKE=bake(PlugGantryRenderer::yoke);return YOKE;}
+    private static RigidMachineryPartR44 chuckMesh(){if(CHUCK==null)CHUCK=bake(PlugGantryRenderer::chuck);return CHUCK;}
+    private static RigidMachineryPartR44 jawMesh(double side)
     {
         if(side<0){if(JAW_LEFT==null)JAW_LEFT=bake(r->r.jaw(-1));return JAW_LEFT;}
         if(JAW_RIGHT==null)JAW_RIGHT=bake(r->r.jaw(1));return JAW_RIGHT;
     }
-    private static VertexBuffer hoseMesh(boolean open)
+    private static RigidMachineryPartR44 hoseMesh(boolean open)
     {
         if(open){if(HOSES_OPEN==null)HOSES_OPEN=bake(r->{r.hose(-1,1);r.hose(1,1);});return HOSES_OPEN;}
         if(HOSES_CLOSED==null)HOSES_CLOSED=bake(r->{r.hose(-1,0);r.hose(1,0);});return HOSES_CLOSED;
     }
-    private static VertexBuffer sheaveMesh(){if(SHEAVE==null)SHEAVE=bake(r->r.cylinder(v(0,-.12,-.20),v(0,-.12,.20),.25,.10,DARK,16));return SHEAVE;}
-    private static VertexBuffer linksMesh(){if(LINKS==null)LINKS=bake(r->{r.rod(v(-2.45,1.4,0),v(-1.50,0,0),.17,STEEL);r.rod(v(2.45,1.4,0),v(1.50,0,0),.17,STEEL);});return LINKS;}
+    private static RigidMachineryPartR44 sheaveMesh(){if(SHEAVE==null)SHEAVE=bake(r->r.cylinder(v(0,-.12,-.20),v(0,-.12,.20),.25,.10,DARK,16));return SHEAVE;}
+    private static RigidMachineryPartR44 linksMesh(){if(LINKS==null)LINKS=bake(r->{r.rod(v(-2.45,1.4,0),v(-1.50,0,0),.17,STEEL);r.rod(v(2.45,1.4,0),v(1.50,0,0),.17,STEEL);});return LINKS;}
+    private static RigidMachineryPartR44 wheelMesh()
+    {
+        if(WHEEL==null)WHEEL=bake(r->
+        {
+            r.cylinder(v(-.36,0,0),v(.36,0,0),.38,.16,DARK,48);
+            r.cylinder(v(-.41,0,0),v(.41,0,0),.19,0,STEEL,32);
+            for(int i=0;i<8;i++)
+            {
+                double a=i*Math.PI/4;double y=Math.cos(a)*.28,z=Math.sin(a)*.28;
+                r.cylinder(v(-.38,y,z),v(.38,y,z),.045,0,STEEL,8);
+            }
+        });
+        return WHEEL;
+    }
     private void gpuRope(Vec3 a,Vec3 b,double radius)
     {
         if(ROPE==null)ROPE=bake(r->r.cylinder(v(0,0,0),v(0,1,0),1,0,STEEL,12));Vec3 delta=b.subtract(a);double length=delta.length();if(length<1e-6)return;
         poses.pushPose();poses.translate(a.x,a.y,a.z);poses.mulPose(new Quaternionf().rotationTo(new Vector3f(0,1,0),new Vector3f((float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length))));poses.scale((float)radius,(float)length,(float)radius);gpu(ROPE,poses,light);poses.popPose();
     }
-    private static void gpu(VertexBuffer mesh,PoseStack poses,int light)
+    private void gpu(RigidMachineryPartR44 mesh,PoseStack poses,int light)
     {
-        var type=RenderType.debugQuads();type.setupRenderState();float illumination=.32F+.68F*Math.max((light>>4)&15,(light>>20)&15)/15F;
-        RenderSystem.setShaderColor(illumination,illumination,illumination,1);mesh.bind();mesh.drawWithShader(poses.last().pose(),RenderSystem.getProjectionMatrix(),GameRenderer.getPositionColorShader());VertexBuffer.unbind();RenderSystem.setShaderColor(1,1,1,1);type.clearRenderState();
+        mesh.draw(poses,buffers,light);
     }
     private void top()
     {
-        for(double z:new double[]{-1.65,1.65})
+        for(double x:new double[]{-4,4})
         {
-            box(-6.6,-.10,z-.25,13.2,.16,.50,GREEN);box(-6.6,.90,z-.25,13.2,.16,.50,GREEN);box(-6.6,.06,z-.08,13.2,.84,.16,EDGE);
-            for(double x:new double[]{-6,6})
+            box(x-.25,.05,-3.6,.50,.16,7.2,GREEN);
+            box(x-.25,1.09,-3.6,.50,.16,7.2,GREEN);
+            box(x-.08,.21,-3.6,.16,.88,7.2,EDGE);
+            for(double z:new double[]{-2.8,2.8})
             {
-                housing(x-.62,-.20,z-.53,1.24,1.28,1.06,.22,GREEN);
-                cylinder(v(x,-.06,z-.57),v(x,-.06,z+.57),.38,.16,DARK,40);
-                cylinder(v(x,-.06,z-.61),v(x,-.06,z+.61),.19,0,STEEL,32);
-                for(double face:new double[]{-.57,.57})for(double dx:new double[]{-.36,.36})
-                    cylinder(v(x+dx,.67,z+face),v(x+dx,.67,z+face+Math.copySign(.055,face)),.045,0,DARK,6);
+                housing(x-.47,.46,z-.62,.94,.78,1.24,.16,GREEN);
+                cylinder(v(x-.54,.38,z),v(x+.54,.38,z),.12,0,STEEL,32);
+                for(double side:new double[]{-.5,.5})for(double dz:new double[]{-.42,.42})
+                    cylinder(v(x+side,.93,z+dz),v(x+side+Math.copySign(.045,side),.93,z+dz),.045,0,DARK,8);
             }
+        }
+        for(double z:new double[]{-2.1,2.1})
+        {
+            housing(-4.28,.50,z-.24,8.56,.63,.48,.12,GREEN);
+            for(double x:new double[]{-2.3,2.3})rod(v(x,-.4,z*.52),v(x,.78,z),.12,STEEL);
         }
         box(-3,-.65,-1.7,6,.28,3.4,GREEN);
         for(double x:new double[]{-2.30,2.30})
@@ -264,8 +293,7 @@ public final class PlugGantryRenderer
         float red=((colour>>16)&255)/255F,green=((colour>>8)&255)/255F,blue=(colour&255)/255F;
         if(baking!=null)
         {
-            float shade=(float)(.64+.36*Math.max(0,n.dot(v(-.3,.8,-.45).normalize())));
-            for(Vec3 p:new Vec3[]{a,b,c,d})baking.vertex((float)p.x,(float)p.y,(float)p.z).color(red*shade,green*shade,blue*shade,1).endVertex();return;
+            baking.quad(a,b,c,d,colour);return;
         }
         for(Vec3 p:new Vec3[]{a,b,c,d})buffer.vertex(poses.last().pose(),(float)p.x,(float)p.y,(float)p.z).color(red,green,blue,1).uv(.5F,.5F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(poses.last().normal(),(float)n.x,(float)n.y,(float)n.z).endVertex();
     }

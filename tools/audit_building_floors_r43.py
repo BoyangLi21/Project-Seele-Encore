@@ -13,10 +13,12 @@ from query_blocks import AIR
 ROOT=Path(__file__).resolve().parents[1];ART=ROOT/'artifacts/repair_r43';WORLD=ART/'source_world_backup';OUT=ART/'building_floors'
 DIR={'north':(0,-1),'south':(0,1),'east':(1,0),'west':(-1,0)}
 
-def main(extra_shapes=None):
-    OUT.mkdir(exist_ok=True);buildings=json.loads((ART/'facility_catalogue/authored_ownership.json').read_text('utf8'))['buildings']
+def main(extra_shapes=None,owners=None,only_ids=()):
+    OUT.mkdir(parents=True,exist_ok=True);buildings=json.loads((owners or ART/'facility_catalogue/authored_ownership.json').read_text('utf8'))['buildings']
+    if only_ids:buildings=[b for b in buildings if b['id'] in only_ids]
     stairs=json.loads((ART/'building_stairs/audit.json').read_text('utf8'))['components'];stairs_by={b['id']:[] for b in buildings}
-    for s in stairs:stairs_by[s['building']].append(s)
+    for s in stairs:
+        if s['building'] in stairs_by:stairs_by[s['building']].append(s)
     shapes={canonical_state(k):v for k,v in json.loads((WORLD/'native_collision_shapes.json').read_text('utf8')).items()}
     if extra_shapes:shapes.update({canonical_state(k):v for k,v in json.loads(extra_shapes.read_text('utf8')).items()})
     unknown=set();records=[];started=time.monotonic()
@@ -94,4 +96,7 @@ def main(extra_shapes=None):
     (OUT/'audit.json').write_text(json.dumps(dict(summary=summary,buildings=records,scope='Full floor and every edge of all authored building storeys; hinged doors are evaluated open using measured native shapes. Candidate failures require actual use, full threshold and generator review. No broad geometry change is authorized by these findings alone.'),ensure_ascii=False,indent=2),'utf8');print(summary,flush=True)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser();p.add_argument('--shapes',type=Path);a=p.parse_args();main(a.shapes)
+    p=argparse.ArgumentParser();p.add_argument('--shapes',type=Path);p.add_argument('--owners',type=Path);p.add_argument('--id',action='append',default=[]);p.add_argument('--world',type=Path);p.add_argument('--out',type=Path);a=p.parse_args()
+    if a.world:WORLD=a.world
+    if a.out:OUT=a.out
+    main(a.shapes,a.owners,a.id)

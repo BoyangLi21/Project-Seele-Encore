@@ -10,8 +10,14 @@
     "ServiceAircraftWorldR32Accessor",
     "ServiceAircraftSectionsR32Accessor",
     "CollisionChunkRevisionR24Mixin",
+    "TvCageCollisionR44Mixin",
+    "PublicStationGateR44Mixin",
     "SbwRestCollisionR24Mixin",
+    "SbwParkingTicketsR44Mixin",
+    "SbwBootstrapTicketsR44Mixin",
+    "GiantExplosionQueryMixinR44",
     "BiomeManagerMixin",
+    "EcologyPlacedFeatureR44Mixin",
     "PianoSyncServerR23Mixin",
     "MovingElevatorGroupAccessMixin",
     "MovingElevatorMotionR22Mixin",
@@ -24,6 +30,7 @@
     "EvaSmallObstacleMixin"
   ],
   "client": [
+    "client.LclSpriteOpacityR44Mixin",
     "client.SbwPhantomLoadR24Mixin",
     "client.ChunkSkySourceR24Mixin",
     "client.NervChestFinishR24Mixin",

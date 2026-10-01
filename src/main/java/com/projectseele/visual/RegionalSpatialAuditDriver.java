@@ -31,7 +31,9 @@ import java.util.*;
 public final class RegionalSpatialAuditDriver
 {
     private static final boolean COMBINED=Set.of("r10-world","r20-civil-annex").contains(System.getProperty("projectseele.regionalBuild",""));
-    private static final boolean R43="r43-collision".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean R44="r44-collision".equals(System.getProperty("projectseele.regionalBuild",""));
+    private static final boolean LEGACY_LEASE_CONTROL=R44&&Boolean.getBoolean("projectseele.r44AuditLeaseLegacyControl");
+    private static final boolean R43=R44||"r43-collision".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R42=R43||"r42-collision".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R41=R42||"r41-collision".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R40=R41||"r40-collision".equals(System.getProperty("projectseele.regionalBuild",""));
@@ -66,6 +68,22 @@ public final class RegionalSpatialAuditDriver
     private static final JsonArray TRACE=new JsonArray();
     private static ServerLevel activeLevel;
     private static final Map<BlockPos,BlockState> RESTORE=new LinkedHashMap<>();
+    private record RouteLease(ChunkPos chunk,int radius) { }
+    private static final Set<RouteLease> ROUTE_LEASES=new LinkedHashSet<>();
+    private static ServerLevel ticketLevel;
+    private static int leaseStarted,leaseRenewals;
+
+    private static void lease(ServerLevel level,ChunkPos chunk,int radius)
+    {
+        ticketLevel=level;ROUTE_LEASES.add(new RouteLease(chunk,radius));
+        level.getChunkSource().addRegionTicket(TICKET,chunk,radius,chunk);
+    }
+    private static void releaseLeases()
+    {
+        if(ticketLevel!=null)for(var lease:ROUTE_LEASES)
+            ticketLevel.getChunkSource().removeRegionTicket(TICKET,lease.chunk(),lease.radius(),lease.chunk());
+        ROUTE_LEASES.clear();ticketLevel=null;
+    }
 
     @SuppressWarnings({"rawtypes","unchecked"})
     private static BlockState parse(String text)
@@ -90,12 +108,13 @@ public final class RegionalSpatialAuditDriver
     {
         if(!ENABLED||done||event.phase!=TickEvent.Phase.END)return;
         var server=event.getServer();Path world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals(R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R29?"SEELE_FIELD_R29_REVIEW":R28?"SEELE_FIELD_R28_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R24?"SEELE_R24_TV_REVIEW":R23?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":R19?"SEELE_R19_NATIVE_REVIEW":"SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong quality audit world");
+        if(!world.getFileName().toString().equals(R44?"SEELE_FIELD_R44_REVIEW":R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R29?"SEELE_FIELD_R29_REVIEW":R28?"SEELE_FIELD_R28_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R24?"SEELE_R24_TV_REVIEW":R23?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":R19?"SEELE_R19_NATIVE_REVIEW":"SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong quality audit world");
         ServerLevel level=server.getLevel(FacilitySchemaV2.DIMENSION);
         if(level!=null)level.resetEmptyTime();
         try
         {
             if(++age<100)return;
+            if(R44&&!PlantConditionsR44Probe.advance(level,RegionalSpatialAuditDriver::parse))return;
             if(cases==null)
             {
                 if(R20&&!R43&&Files.isRegularFile(world.resolve("r20_generate_chunks.json")))
@@ -110,10 +129,20 @@ public final class RegionalSpatialAuditDriver
                 player.setMaxUpStep(.6F);
                 var stepAttribute=player.getAttribute(net.minecraftforge.common.ForgeMod.STEP_HEIGHT_ADDITION.get());
                 if(stepAttribute!=null)stepAttribute.setBaseValue(0);
-                JsonObject shapes=new JsonObject();
-                for(JsonElement e:JsonParser.parseString(Files.readString(world.resolve("regional_states.json"))).getAsJsonArray())
+                JsonObject shapes=new JsonObject();JsonObject stateTraits=new JsonObject();
+                var shapeInputs=JsonParser.parseString(Files.readString(world.resolve("regional_states.json"))).getAsJsonArray();
+                if(R44)shapeInputs=ShapeInputsR44.current(world,shapeInputs);
+                for(JsonElement e:shapeInputs)
                 {
                     String key=e.getAsString();BlockState state=parse(key);measureShape(shapes,key,state);
+                    if(R44)
+                    {
+                        JsonObject traits=new JsonObject();
+                        traits.addProperty("block",BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString());
+                        traits.addProperty("runtime_class",state.getBlock().getClass().getName());
+                        traits.addProperty("has_block_entity",state.hasBlockEntity());
+                        stateTraits.add(key,traits);
+                    }
                     if(R43&&state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock)
                     {
                         for(boolean open:new boolean[]{false,true})
@@ -124,6 +153,7 @@ public final class RegionalSpatialAuditDriver
                     }
                 }
                 Files.writeString(world.resolve("native_collision_shapes.json"),GSON.toJson(shapes));
+                if(R44)Files.writeString(world.resolve("native_state_traits_r44.json"),GSON.toJson(stateTraits));
                 Path survey=world.resolve("quality_survey_points.json");
                 if(!R43&&Files.exists(survey))
                 {
@@ -136,19 +166,20 @@ public final class RegionalSpatialAuditDriver
                     }
                     Files.writeString(world.resolve("quality_terrain_survey.json"),GSON.toJson(heights));
                 }
-                cases=JsonParser.parseString(Files.readString(world.resolve(R43?"r43_walk_cases.json":R42?"r42_walk_cases.json":R41?"r41_walk_cases.json":R40?"r40_walk_cases.json":R30?"r30_walk_cases.json":R29?"r29_walk_cases.json":R28?"r28_walk_cases.json":R26?"r26_walk_cases.json":R25?"r25_walk_cases.json":R24?"r24_walk_cases.json":R23?"r23_walk_cases.json":"quality_walk_cases.json"))).getAsJsonArray();
+                cases=JsonParser.parseString(Files.readString(world.resolve(R44?"r44_walk_cases.json":R43?"r43_walk_cases.json":R42?"r42_walk_cases.json":R41?"r41_walk_cases.json":R40?"r40_walk_cases.json":R30?"r30_walk_cases.json":R29?"r29_walk_cases.json":R28?"r28_walk_cases.json":R26?"r26_walk_cases.json":R25?"r25_walk_cases.json":R24?"r24_walk_cases.json":R23?"r23_walk_cases.json":"quality_walk_cases.json"))).getAsJsonArray();
                 ProjectSeele.LOGGER.info("SPATIAL NATIVE shapes={} cases={} playerStep={}",shapes.size(),cases.size(),player.maxUpStep());
             }
             if(Files.exists(world.resolve("regional_stop_requested")))
-            {Files.writeString(world.resolve("quality_native_walk_results.json"),GSON.toJson(RESULTS));Files.delete(world.resolve("regional_stop_requested"));done=true;server.halt(false);return;}
+            {Files.writeString(world.resolve("quality_native_walk_results.json"),GSON.toJson(RESULTS));Files.delete(world.resolve("regional_stop_requested"));releaseLeases();done=true;server.halt(false);return;}
             if(index==cases.size())
             {
                 Files.writeString(world.resolve("quality_native_walk_results.json"),GSON.toJson(RESULTS));
-                ProjectSeele.LOGGER.info("SPATIAL NATIVE COMPLETE cases={}",RESULTS.size());done=true;if(!COMBINED&&!R29_TOUR)server.halt(false);return;
+                ProjectSeele.LOGGER.info("SPATIAL NATIVE COMPLETE cases={}",RESULTS.size());releaseLeases();done=true;if(!COMBINED&&!R29_TOUR)server.halt(false);return;
             }
             JsonObject test=cases.get(index).getAsJsonObject();
             if(wait==0)
             {
+                releaseLeases();leaseStarted=age;leaseRenewals=0;
                 route=test.has("path")?test.getAsJsonArray("path"):new JsonArray();
                 if(!test.has("path")){route.add(test.getAsJsonArray("start"));route.add(test.getAsJsonArray("end"));}
                 if(route.size()<2)throw new IllegalStateException("Route needs two points");
@@ -158,12 +189,19 @@ public final class RegionalSpatialAuditDriver
                     Vec3 a=vector(route.get(segment-1).getAsJsonArray()),b=vector(route.get(segment).getAsJsonArray());
                     for(int cx=(int)Math.floor(Math.min(a.x,b.x)-3)>>4;cx<=(int)Math.floor(Math.max(a.x,b.x)+3)>>4;cx++)
                         for(int cz=(int)Math.floor(Math.min(a.z,b.z)-3)>>4;cz<=(int)Math.floor(Math.max(a.z,b.z)+3)>>4;cz++)
-                        {ChunkPos chunk=new ChunkPos(cx,cz);level.getChunkSource().addRegionTicket(TICKET,chunk,2,chunk);level.getChunk(cx,cz);}
+                        {ChunkPos chunk=new ChunkPos(cx,cz);lease(level,chunk,2);level.getChunk(cx,cz);}
                 }
                 // getChunk above is synchronous: the collision data is already
                 // FULL. Extra idle ticks here added half an hour to a whole-world
                 // audit without simulating any additional player movement.
                 wait=3;positioned=false;
+            }
+            // Long real paths can exceed the 100-tick lease. A FakePlayer
+            // does not keep ordinary player chunk tickets alive for us.
+            if(!LEGACY_LEASE_CONTROL&&(age-leaseStarted)%40==0&&ticketLevel!=null)
+            {
+                for(var lease:ROUTE_LEASES)ticketLevel.getChunkSource().addRegionTicket(TICKET,lease.chunk(),lease.radius(),lease.chunk());
+                leaseRenewals++;
             }
             if(wait++<3)return;
             if(!positioned)
@@ -253,7 +291,7 @@ public final class RegionalSpatialAuditDriver
             if(commandDoorWait>0)
             {
                 var b=test.getAsJsonArray("commandButton");var button=new BlockPos(b.get(0).getAsInt(),b.get(1).getAsInt(),b.get(2).getAsInt());
-                var chunk=new ChunkPos(button);level.getChunkSource().addRegionTicket(TICKET,chunk,3,chunk);
+                var chunk=new ChunkPos(button);lease(level,chunk,3);
                 if(!com.projectseele.world.CommandRoomSlidingDoorDirector.passageReady(level,button))
                 {if(--commandDoorWait==0)finish(test,"command_door_did_not_clear");return;}
                 commandDoorWait=0;
@@ -262,6 +300,8 @@ public final class RegionalSpatialAuditDriver
             for(int n=0;n<120;n++)
             {
                 Vec3 old=player.position();double dx=end.x-old.x,dz=end.z-old.z;distance=Math.hypot(dx,dz);
+                if(level.getChunkSource().getChunkNow(player.blockPosition().getX()>>4,player.blockPosition().getZ()>>4)==null)
+                {finish(test,"collision_chunk_unloaded");break;}
                 if(test.has("climbablePort")&&player.onClimbable())
                 {finish(test,start.y-old.y<=2.5?"pass":"unsafe_ladder_entry_drop");break;}
                 if(distance<.18 && player.onGround() && settled>=2)
@@ -303,6 +343,7 @@ public final class RegionalSpatialAuditDriver
         {
             ProjectSeele.LOGGER.error("SPATIAL NATIVE AUDIT FAILED",exception);
             if(activeLevel!=null){RESTORE.forEach((pos,state)->activeLevel.setBlock(pos,state,3));RESTORE.clear();}
+            releaseLeases();
             try{Files.writeString(world.resolve("quality_native_failure.txt"),exception.toString());}catch(Exception ignored){}
             done=true;server.halt(false);
         }
@@ -355,6 +396,10 @@ public final class RegionalSpatialAuditDriver
     {
         JsonObject result=test.deepCopy();result.addProperty("status",status);result.add("actual",position(player.position()));
         result.addProperty("waypointsReached",waypoint);result.addProperty("nativeDoorInteractions",doorInteractions);
+        result.addProperty("routeLeaseServerTicks",age-leaseStarted);result.addProperty("routeLeaseRenewals",leaseRenewals);
+        result.addProperty("legacyLeaseControl",LEGACY_LEASE_CONTROL);
+        result.addProperty("leasedChunkEntries",ROUTE_LEASES.size());
+        result.addProperty("collisionChunkLoadedBeforeDiagnosticRead",activeLevel.getChunkSource().getChunkNow(player.blockPosition().getX()>>4,player.blockPosition().getZ()>>4)!=null);
         result.addProperty("maxRise",maxRise);result.addProperty("playerStep",player.maxUpStep());result.add("trace",TRACE.deepCopy());RESULTS.add(result);
         if(test.has("commandButton"))
         {
@@ -369,6 +414,7 @@ public final class RegionalSpatialAuditDriver
         }
         ProjectSeele.LOGGER.info("SPATIAL WALK {} {} actual={} target={}",test.get("id").getAsString(),status,player.position(),end);
         RESTORE.forEach((pos,state)->activeLevel.setBlock(pos,state,3));RESTORE.clear();
+        releaseLeases();
         index++;wait=0;
     }
 }

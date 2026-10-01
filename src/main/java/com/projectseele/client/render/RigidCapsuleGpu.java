@@ -29,6 +29,7 @@ public final class RigidCapsuleGpu
     private static final Map<Object,Map<ResourceLocation,ExternalMesh>> EXTERNAL_PARTS=new IdentityHashMap<>();
     private static boolean externalReadyLogged;
     public static long drawCalls;
+    static ShaderInstance machineryShader(){return shader;}
     @SubscribeEvent public static void register(RegisterShadersEvent event)throws IOException
     {
         event.registerShader(new ShaderInstance(event.getResourceProvider(),new ResourceLocation(ProjectSeele.MODID,"rigid_capsule"),DefaultVertexFormat.NEW_ENTITY),instance->{shader=instance;ProjectSeele.LOGGER.info("Rigid local-mesh GPU shader ready");});

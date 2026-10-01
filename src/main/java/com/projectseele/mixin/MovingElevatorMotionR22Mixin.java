@@ -22,6 +22,14 @@ public abstract class MovingElevatorMotionR22Mixin
     private int projectSeele$moreFrequentMotionSync(int original){return 2;}
     @Inject(method="stopElevator",at=@At("HEAD"),remap=false)
     private void projectSeele$doNotCarryFinalStepTwice(CallbackInfo ci){lastY=currentY;}
+    @Inject(method="stopElevator",at=@At("TAIL"),remap=false)
+    private void projectSeele$acknowledgeClientCagePlacement(CallbackInfo ci)
+    {
+        if(!level.isClientSide || !level.dimension().equals(com.projectseele.world.FacilitySchemaV2.DIMENSION))return;
+        var group=(ElevatorGroup)(Object)this;
+        com.projectseele.network.SeeleNetwork.CHANNEL.sendToServer(new com.projectseele.network.ServerboundLiftArrivalR44(
+                new net.minecraft.core.BlockPos(group.x,targetY,group.z),group.facing));
+    }
     @Inject(method="updateCurrentY",at=@At("HEAD"),cancellable=true,remap=false)
     private void projectSeele$boundedCorrection(double received,double receivedSpeed,CallbackInfo ci)
     {

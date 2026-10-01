@@ -43,6 +43,7 @@ public class ProjectSeele
         ModCreativeTabs.TABS.register(modEventBus);
         ModSounds.SOUNDS.register(modEventBus);
         ModWorldgen.CHUNK_GENERATORS.register(modEventBus);
+        ModWorldgen.BIOME_SOURCES.register(modEventBus);
 
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SeeleConfig.COMMON_SPEC);
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SeeleConfig.CLIENT_SPEC);

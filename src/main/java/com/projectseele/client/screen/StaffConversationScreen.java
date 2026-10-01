@@ -128,7 +128,23 @@ public final class StaffConversationScreen extends Screen
             addButton("驾驶员装备："+(sortieRifle?"先前往武器井取枪":"近战出击"),x+12,controlsY+66,panelWidth-24,()->{sortieRifle=!sortieRifle;rebuildWidgets();},npcSortie);
             addButton("出击 / 加入增援",x+12,controlsY+88,half,()->send("CAMPAIGN:sortie:"+mission+":"+unit+":"+(npcSortie?"npc":"human")+":"+(sortieRifle?"rifle":"melee")),permitted("campaign"));
             addButton("撤销当前作战",x+16+half,controlsY+88,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
-            addButton("查看所选简报",x+12,controlsY+110,panelWidth-24,()->send("TOPIC:campaign"),true);
+            addButton("查看所选简报",x+12,controlsY+110,half,()->send("TOPIC:campaign"),true);
+            addButton("城市协同档案",x+16+half,controlsY+110,half,()->{switchTab(7);send("COORD:status");},view.canCommand());
+        }
+        else if(tab==7)
+        {
+            String[][] actions={{"接受档案","start"},{"当前状态","status"},{"撤销调度","cancel"},
+                    {"原页","read/page"},{"译注","read/annotation"},{"现场记录","read/field"},
+                    {"共享三份记录","share"},{"保留司令档案","private"},{"城市收纳 · 保电","evacuate/services"},
+                    {"城市收纳 · 蓄能","evacuate/storage"},{"委派远山复测","test/delegate"},{"亲自到站复测","test/onsite"},
+                    {"保电 · 等两轮","supply/services"},{"备用馈线 · 一轮","supply/reserve"},{"归档准备结果","finish"}};
+            for(int i=0;i<actions.length;i++){String action=actions[i][1];addButton(actions[i][0],x+12+(i%3)*(column+4),controlsY+(i/3)*22,column,()->send("COORD:"+action),view.canCommand());}
+            int half=(panelWidth-28)/2;
+            addButton("编成机体："+com.projectseele.world.TvSortiesR32.name(unit),x+12,controlsY+110,half,()->{unit=(unit+1)%5;rebuildWidgets();},true);
+            addButton((npcSortie?"驾驶员":"司令")+" / 切换",x+16+half,controlsY+110,half,()->{npcSortie=!npcSortie;rebuildWidgets();},unit<3);
+            addButton("加入编成",x+12,controlsY+132,column,()->send("COORD:assign/"+unit+"/"+(unit<3&&npcSortie?"npc":"human")),true);
+            addButton("确认说明与待命",x+16+column,controlsY+132,column,()->send("COORD:consent/"+unit),true);
+            addButton("驾驶员撤回",x+20+column*2,controlsY+132,column,()->send("COORD:withdraw/"+unit),true);
         }
         else if(tab==6)
         {
@@ -205,7 +221,7 @@ public final class StaffConversationScreen extends Screen
     private void switchTab(int next) { tab = next; rebuildWidgets(); }
     private boolean permitted(String action)
     { return view.canCommand() && com.projectseele.world.StaffAuthorityR25.allows("", view.skin(), action); }
-    private int controlsTop(){return y+panelHeight-(tab==2?157:tab==3||tab==1||tab==6?113:91);}
+    private int controlsTop(){return y+panelHeight-(tab==7?179:tab==2?157:tab==3||tab==1||tab==6?113:91);}
     private void submitText() { if (!input.getValue().isBlank()) { send(input.getValue()); input.setValue(""); } }
     private void send(String request)
     {

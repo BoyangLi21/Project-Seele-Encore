@@ -92,6 +92,12 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public static final int HATCH_SEAL_TICKS = 13;
 
     private int ejectionTicks;
+    private static final EntityDataAccessor<Boolean> DATA_TV_WET_EJECTION_HELD_R44=
+            SynchedEntityData.defineId(EntryPlugCarrierEntity.class,EntityDataSerializers.BOOLEAN);
+    private CompoundTag tvPersonnelWetTagR44=new CompoundTag();
+    private net.minecraft.nbt.Tag tvPersonnelWetOpaqueR44;
+    private boolean tvPersonnelWetPersistenceInvalidR44;
+    private String tvPersonnelWetFaultR44="";
     private Vec3 fieldEjectionStart = Vec3.ZERO;
     private Vec3 fieldEjectionEscape = Vec3.ZERO;
     private Vec3 fieldEjectionLanding = Vec3.ZERO;
@@ -211,6 +217,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         this.entityData.define(DATA_VARIANT, EvaUnit01Entity.UNIT_01);
         this.entityData.define(DATA_INDEPENDENT_UN,false);
         this.entityData.define(DATA_STAGE, STAGE_SUSPENDED);
+        this.entityData.define(DATA_TV_WET_EJECTION_HELD_R44,false);
         this.entityData.define(DATA_STAGE_EPOCH, 0);
         this.entityData.define(DATA_PROGRESS, 0);
         this.entityData.define(DATA_CABIN_STAGE, CABIN_OPEN);
@@ -256,6 +263,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
 
     public Quaternionf getCanonicalRotation(float partialTick)
     {
+        if(this.tvPersonnelWetEjectionHeldR44())return this.getCanonicalTransform().rotation();
         RigidTransform attached=this.lockedBodyRenderTransformR31(partialTick);
         if(attached!=null)return attached.rotation();
         if (!this.level().isClientSide)
@@ -294,6 +302,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     /** Render-frame transform shared by the shell and first-person camera. */
     public RigidTransform getInterpolatedCanonicalTransform(float partialTick)
     {
+        if(this.tvPersonnelWetEjectionHeldR44())return this.getCanonicalTransform();
         RigidTransform attached=this.lockedBodyRenderTransformR31(partialTick);
         if(attached!=null)return attached;
         if (!this.level().isClientSide || !this.hasCanonicalPose())
@@ -640,6 +649,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     /** Detaches the same capsule for hangar extraction or field ejection. */
     public void unlockFromEva()
     {
+        if(this.level().isClientSide)return;
         if (this.getVehicle() instanceof EvaUnit01Entity)
         {
             this.stopRiding();
@@ -955,7 +965,11 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     @Override
     protected void removePassenger(Entity passenger)
     {
+        passengerAuthorityTraceR44(passenger,"plug_before_remove_passenger");
         super.removePassenger(passenger);
+        // A client passenger-list refresh must not abort insertion, open the
+        // cabin or change synchronized progress. The server owns those edges.
+        if(this.level().isClientSide){passengerAuthorityTraceR44(passenger,"plug_after_client_graph_only");return;}
         if (this.getInsertionStage() == STAGE_INSERTING)
         {
             // Losing the pilot is an abort request, not permission to open a
@@ -989,6 +1003,16 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                         MobEffects.SLOW_FALLING, 20 * 12, 0));
             }
         }
+        passengerAuthorityTraceR44(passenger,"plug_after_authoritative_remove_cleanup");
+    }
+    private void passengerAuthorityTraceR44(Entity passenger,String stage)
+    {
+        if(!com.projectseele.visual.PassengerAuthorityWitnessR44.enabled())return;
+        var fields=new com.google.gson.JsonObject();fields.addProperty("insertion_stage",this.getInsertionStage());fields.addProperty("insertion_epoch",this.getInsertionEpoch());
+        fields.addProperty("abort_requested",this.isInsertionAbortRequested());fields.addProperty("host_uuid",this.hostEvaUuid==null?"":this.hostEvaUuid.toString());
+        fields.addProperty("host_id",this.entityData.get(DATA_HOST_EVA_ID));fields.addProperty("shell_visible",this.entityData.get(DATA_SHELL_VISIBLE));
+        fields.addProperty("cabin_stage",this.getCabinStage());fields.addProperty("cabin_progress",this.getCabinProgress());
+        com.projectseele.visual.PassengerAuthorityWitnessR44.capture(this,passenger,stage,fields);
     }
 
     @Override
@@ -1300,16 +1324,21 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                 // ensureSuspended every tick while an EVA is parked, which would
                 // otherwise snap the plug — pilot aboard — straight back to its
                 // cage instead of letting the crane withdraw it.
-                this.ejectionTicks++;
-                EntryPlugDirector.tickEjection(this, this.ejectionTicks);
+                if(!this.refreshTvPersonnelWetHoldR44())
+                {
+                    this.ejectionTicks++;
+                    EntryPlugDirector.tickEjection(this, this.ejectionTicks);
+                }
             }
             else if (this.getInsertionStage() == STAGE_FIELD_EJECTING)
             {
+                this.entityData.set(DATA_TV_WET_EJECTION_HELD_R44,false);
                 this.ejectionTicks++;
                 EntryPlugDirector.tickFieldEjection(this, this.ejectionTicks);
             }
             else
             {
+                this.entityData.set(DATA_TV_WET_EJECTION_HELD_R44,false);
                 this.ejectionTicks = 0;
             }
             EntryPlugDirector.keepPassengerState(this);
@@ -1512,6 +1541,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         putVector(tag, "FieldStart", this.fieldEjectionStart);
         putVector(tag, "FieldEscape", this.fieldEjectionEscape);
         putVector(tag, "FieldLanding", this.fieldEjectionLanding);
+        this.saveTvPersonnelWetR44(tag);
     }
 
     @Override
@@ -1583,6 +1613,66 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         this.fieldEjectionStart = getVector(tag, "FieldStart", this.position());
         this.fieldEjectionEscape = getVector(tag, "FieldEscape", this.position());
         this.fieldEjectionLanding = getVector(tag, "FieldLanding", this.position());
+        this.loadTvPersonnelWetR44(tag);
+    }
+
+    public boolean tvPersonnelWetEjectionHeldR44(){return this.entityData.get(DATA_TV_WET_EJECTION_HELD_R44);}
+    public int ejectionTicksR44(){return this.ejectionTicks;}
+    public String tvPersonnelWetFaultR44(){return this.tvPersonnelWetFaultR44;}
+    public boolean tvPersonnelWetPersistenceInvalidR44(){return this.tvPersonnelWetPersistenceInvalidR44;}
+    public boolean hasSavedTvPersonnelOwnershipR44()
+    {
+        return this.tvPersonnelWetTagR44.hasUUID("Owner")&&this.tvPersonnelWetTagR44.getUUID("Owner").equals(this.getUUID())
+                &&this.tvPersonnelWetTagR44.getString("Dimension").equals("projectseele:geofront");
+    }
+    public boolean refreshTvPersonnelWetHoldR44()
+    {
+        if(this.level().isClientSide)return this.tvPersonnelWetEjectionHeldR44();
+        var decision=com.projectseele.world.TvPersonnelOwnedMotionR44.wetPlug(this);
+        String fault=decision.owned()?(this.tvPersonnelWetPersistenceInvalidR44?"湿舱弹出时钟保存数据未知，保留原NBT。":decision.fault().orElse("")):"";
+        boolean held=decision.owned()&&!fault.isEmpty();
+        this.entityData.set(DATA_TV_WET_EJECTION_HELD_R44,held);this.tvPersonnelWetFaultR44=fault;
+        if(held)
+        {
+            this.setDeltaMovement(Vec3.ZERO);
+            com.projectseele.world.TvPersonnelOwnedMotionR44.keepWetMachines((ServerLevel)this.level(),this.getAssignedVariant());
+        }
+        return held;
+    }
+    private void saveTvPersonnelWetR44(CompoundTag tag)
+    {
+        if(this.tvPersonnelWetPersistenceInvalidR44)
+        {
+            if(this.tvPersonnelWetOpaqueR44!=null)tag.put("TvPersonnelWetEjectionR44",this.tvPersonnelWetOpaqueR44.copy());
+            else if(!this.tvPersonnelWetTagR44.isEmpty())tag.put("TvPersonnelWetEjectionR44",this.tvPersonnelWetTagR44.copy());
+            return;
+        }
+        var decision=com.projectseele.world.TvPersonnelOwnedMotionR44.wetPlug(this);
+        if(!decision.owned()&&this.tvPersonnelWetTagR44.isEmpty())return;
+        CompoundTag saved=this.tvPersonnelWetTagR44.copy();saved.putInt("Version",1);saved.putUUID("Owner",this.getUUID());
+        saved.putString("Dimension","projectseele:geofront");saved.putInt("Variant",this.getAssignedVariant());
+        saved.putInt("StageEpoch",this.getInsertionEpoch());saved.putInt("EjectionTicks",this.ejectionTicks);
+        saved.putBoolean("Active",decision.owned());saved.putBoolean("Held",this.tvPersonnelWetEjectionHeldR44());
+        tag.put("TvPersonnelWetEjectionR44",saved);this.tvPersonnelWetTagR44=saved.copy();
+    }
+    private void loadTvPersonnelWetR44(CompoundTag tag)
+    {
+        if(!tag.contains("TvPersonnelWetEjectionR44"))return;
+        if(!(tag.get("TvPersonnelWetEjectionR44") instanceof CompoundTag))
+        {
+            this.tvPersonnelWetOpaqueR44=tag.get("TvPersonnelWetEjectionR44").copy();this.tvPersonnelWetPersistenceInvalidR44=true;
+        }
+        else
+        {
+            this.tvPersonnelWetTagR44=tag.getCompound("TvPersonnelWetEjectionR44").copy();var saved=this.tvPersonnelWetTagR44;
+            this.tvPersonnelWetPersistenceInvalidR44=saved.getInt("Version")!=1||!this.hasSavedTvPersonnelOwnershipR44()
+                    ||saved.getInt("Variant")!=this.getAssignedVariant()||saved.getInt("StageEpoch")!=this.getInsertionEpoch()
+                    ||saved.getInt("EjectionTicks")!=this.ejectionTicks;
+        }
+        // Read does not declare the plant clear. Initial metadata carries a
+        // hold; the real loaded-section check in tick is the release authority.
+        if(com.projectseele.world.TvPersonnelOwnedMotionR44.wetPlug(this).owned())
+            this.entityData.set(DATA_TV_WET_EJECTION_HELD_R44,true);
     }
 
     private static void putVector(CompoundTag tag, String key, Vec3 value)

@@ -99,7 +99,8 @@ public final class NervFacilityTopologyBuilder
     public static TopologyAudit ensure(ServerLevel level, BlockPos origin)
     {
         TopologyAudit audit = inspect(level, origin);
-        if (!audit.valid())
+        if (!audit.valid()
+                && FacilityWorldPolicy.legacyGenerationAllowed(level.getServer()))
         {
             build(level, origin);
             audit = inspect(level, origin);
@@ -109,6 +110,8 @@ public final class NervFacilityTopologyBuilder
 
     public static TopologyAudit build(ServerLevel level, BlockPos origin)
     {
+        FacilityWorldPolicy.requireLegacyGenerationAllowed(
+                level.getServer(), "NervFacilityTopologyBuilder");
         PerformanceCounters.recordBuilderCall();
         buildB20CommandRing(level, origin);
         buildCommandSupportConnection(level, origin);
@@ -187,8 +190,8 @@ public final class NervFacilityTopologyBuilder
          * Do not reduce a pedestrian network to a handful of friendly sample
          * points. A single wall, missing floor or later room pass in the
          * middle of a 150-block corridor stranded players while the previous
-         * twelve-point audit still passed. Every centre-line cell is now part
-         * of the immutable topology contract.
+         * twelve-point audit still passed. Every interior lane is part of the
+         * contract; the outer lane is the authored pressure wall.
          */
         int links = 0;
         int expectedLinks = 0;
@@ -1497,9 +1500,11 @@ public final class NervFacilityTopologyBuilder
         BlockState floorState = level.getBlockState(floor);
         return !floorState.isAir()
                 && floorState.getFluidState().isEmpty()
-                && !floorState.getCollisionShape(level, floor).isEmpty()
-                && level.getBlockState(feet).isAir()
-                && level.getBlockState(feet.above()).isAir();
+                && floorState.isFaceSturdy(level, floor, Direction.UP)
+                && level.noCollision(new net.minecraft.world.phys.AABB(
+                        feet.getX() + 0.2D, feet.getY(), feet.getZ() + 0.2D,
+                        feet.getX() + 0.8D, feet.getY() + 1.8D,
+                        feet.getZ() + 0.8D));
     }
 
     private static int[] auditLineX(ServerLevel level, BlockPos origin,
@@ -1507,13 +1512,18 @@ public final class NervFacilityTopologyBuilder
                                     int z)
     {
         int passed = 0;
-        int expected = Math.abs(maximumX - minimumX) + 1;
+        int expected = (Math.abs(maximumX - minimumX) + 1)
+                * (CORRIDOR_RADIUS * 2 - 1);
         for (int x = Math.min(minimumX, maximumX);
              x <= Math.max(minimumX, maximumX); x++)
         {
-            if (walkable(level, origin.offset(x, floorY + 1, z)))
+            for (int lane = -CORRIDOR_RADIUS + 1;
+                 lane < CORRIDOR_RADIUS; lane++)
             {
-                passed++;
+                if (walkable(level, origin.offset(x, floorY + 1, z + lane)))
+                {
+                    passed++;
+                }
             }
         }
         return new int[] {passed, expected};
@@ -1524,13 +1534,18 @@ public final class NervFacilityTopologyBuilder
                                     int maximumZ)
     {
         int passed = 0;
-        int expected = Math.abs(maximumZ - minimumZ) + 1;
+        int expected = (Math.abs(maximumZ - minimumZ) + 1)
+                * (CORRIDOR_RADIUS * 2 - 1);
         for (int z = Math.min(minimumZ, maximumZ);
              z <= Math.max(minimumZ, maximumZ); z++)
         {
-            if (walkable(level, origin.offset(x, floorY + 1, z)))
+            for (int lane = -CORRIDOR_RADIUS + 1;
+                 lane < CORRIDOR_RADIUS; lane++)
             {
-                passed++;
+                if (walkable(level, origin.offset(x + lane, floorY + 1, z)))
+                {
+                    passed++;
+                }
             }
         }
         return new int[] {passed, expected};

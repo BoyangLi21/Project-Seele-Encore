@@ -15,6 +15,8 @@ STRUCT='projectseele:nerv_structural_panel';FLOOR='projectseele:nerv_floor_panel
 WALL='projectseele:nerv_wall_panel';GLASS='projectseele:clear_glass';LIGHT='projectseele:nerv_strip_light'
 
 def main(apply=False):
+    if (WORLD/'eva_facility_r29.json').is_file():
+        raise RuntimeError('The partial R40 arrival shell is retired for this delivered layout; use rebuild_arrival_hall_r44.plan with an explicit revision output')
     v.WORLD=WORLD;v.OUT=OUT;w=MeasuredWorld();w.box((-389,-470,716),(-327,-455,746));w.load();p=v.Painter();targets={};held=[]
     bes={q:t for q,t in iter_block_entities(WORLD,v.DIM,(-389,-470,716),(-327,-455,746))}
     def put(x,y,z,state,owner):

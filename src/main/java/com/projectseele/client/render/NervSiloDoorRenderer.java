@@ -43,7 +43,7 @@ public final class NervSiloDoorRenderer
     {
         float open = door.getOpenProgress(partialTick);
         poses.pushPose();
-        TvFacilityMeshes.shaftHatch(poses,packedLight,open);
+        TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.shaftHatch(poses,packedLight,open));
         if(!door.isTvBulkhead())renderSplitLogo(poses, buffers, open);
         poses.popPose();
         super.render(door, yaw, partialTick, poses, buffers, packedLight);

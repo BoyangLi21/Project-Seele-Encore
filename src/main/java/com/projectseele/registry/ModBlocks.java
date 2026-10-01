@@ -23,14 +23,36 @@ public final class ModBlocks
     public static final RegistryObject<Block> NERV_WORKSTATION = BLOCKS.register(
             "nerv_workstation", () -> new com.projectseele.world.NervWorkstationBlock(
                     BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
+    public static final RegistryObject<Block> NERV_ACCESS_READER=BLOCKS.register("nerv_access_reader",
+            ()->new com.projectseele.world.NervAccessReaderR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(2).noOcclusion()));
+    public static final RegistryObject<Block> CITY_PERSONNEL_DOOR=BLOCKS.register("city_personnel_door",
+            ()->new com.projectseele.world.CityPersonnelDoorR44(BlockBehaviour.Properties.copy(Blocks.IRON_DOOR).noOcclusion()));
+    public static final RegistryObject<Block> CITY_RAIN_PIPE=BLOCKS.register("city_rain_pipe",
+            ()->new com.projectseele.world.CityRainPipeR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
+    public static final RegistryObject<Block> CITY_RAIN_GUTTER=BLOCKS.register("city_rain_gutter",
+            ()->new com.projectseele.world.CityRainGutterR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()));
+    public static final RegistryObject<Block> NERV_GRID_SWITCH=BLOCKS.register("nerv_grid_switch",
+            ()->new com.projectseele.world.NervGridSwitchR44(BlockBehaviour.Properties.copy(Blocks.LEVER).noOcclusion()));
+    public static final RegistryObject<Block> NERV_CIRCUIT_INDICATOR=BLOCKS.register("nerv_circuit_indicator",
+            ()->new com.projectseele.world.NervCircuitIndicatorR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(1.5F).noOcclusion()
+                    .lightLevel(s->s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)?7:0)
+                    .emissiveRendering((s,l,p)->s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT))));
 
     public static final RegistryObject<Block> NERV_WALL_PANEL=finish("nerv_wall_panel",Blocks.IRON_BLOCK,0);
     public static final RegistryObject<Block> NERV_STRUCTURAL_PANEL=BLOCKS.register("nerv_structural_panel",
             ()->new Block(BlockBehaviour.Properties.copy(Blocks.REINFORCED_DEEPSLATE)));
+    public static final RegistryObject<Block> RESIDENTIAL_PLASTER=BLOCKS.register("residential_plaster",
+            ()->new Block(BlockBehaviour.Properties.copy(Blocks.WHITE_CONCRETE)));
+    public static final RegistryObject<Block> RESIDENTIAL_PLASTER_SLAB=BLOCKS.register("residential_plaster_slab",
+            ()->new net.minecraft.world.level.block.SlabBlock(BlockBehaviour.Properties.copy(Blocks.WHITE_CONCRETE)));
     public static final RegistryObject<Block> NERV_MACHINE_PANEL=structuralFinish("nerv_machine_panel");
     public static final RegistryObject<Block> NERV_SHAFT_PANEL=structuralFinish("nerv_shaft_panel");
     public static final RegistryObject<Block> NERV_MACHINE_EDGE=structuralFinish("nerv_machine_edge");
+    public static final RegistryObject<Block> NERV_CRANE_GIRDER_R44=BLOCKS.register("nerv_crane_girder_r44",
+            ()->new com.projectseele.world.TvCraneGirderR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(8F).noOcclusion()));
     public static final RegistryObject<Block> NERV_EDGE_RAIL=BLOCKS.register("nerv_edge_rail",()->new com.projectseele.world.FacilityEdgeRailR41(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion()));
+    public static final RegistryObject<Block> NERV_TV_PERSONNEL_DECK_R44=BLOCKS.register("tv_personnel_deck_r44",()->new com.projectseele.world.TvPersonnelDeckR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(3F).noOcclusion()));
+    public static final RegistryObject<Block> NERV_TV_PERSONNEL_GUARD_R44=BLOCKS.register("tv_personnel_guard_r44",()->new com.projectseele.world.TvPersonnelGuardR44(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion()));
     public static final RegistryObject<Block> NERV_MACHINE_HAZARD=structuralFinish("nerv_machine_hazard");
 
     private static RegistryObject<Block> structuralFinish(String name)

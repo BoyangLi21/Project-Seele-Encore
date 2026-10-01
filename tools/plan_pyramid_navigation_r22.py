@@ -19,7 +19,7 @@ def main(apply=False,output=None,export_routes=None):
  global OUT
  if output is not None:OUT=Path(output)
  OUT.mkdir(parents=True,exist_ok=True);scan.WORLD=WORLD;v.WORLD=WORLD;v.OUT=OUT
- a,pal=scan.volume(LO,HI);measured=a.copy();door_ports=[]
+ a,pal=scan.volume(LO,HI);pal=list(pal);measured=a.copy();door_ports=[];public_gate_ports=[]
  # Registered moving doors are real controlled connections. A static snapshot
  # of their closed barrier must not make the entire command suite disappear
  # from the navigation graph. No arbitrary glass or barrier is opened here.
@@ -33,15 +33,47 @@ def main(apply=False,output=None,export_routes=None):
      if current in ('minecraft:barrier','minecraft:air'):a[y-LO[1],z-LO[2],x-LO[0]]=air;included.append((x,y,z))
    if included:door_ports.append(dict(id=door['id'],aperture=included,buttons=door.get('buttons',[])))
  shapes={v.canonical_state(k):s for k,s in json.loads((WORLD/'native_collision_shapes.json').read_text()).items()}
+ public_gates=WORLD/'r44_public_station_gates.json'
+ if public_gates.exists():
+  declared=json.loads(public_gates.read_text(encoding='utf8'))
+  if declared.get('dimension')!='projectseele:geofront':raise RuntimeError('Public gate dimension does not match the measured graph')
+  for gate in declared['gates']:
+   x,y,z=gate['position']
+   if not all(LO[i]<=q<=HI[i] for i,q in enumerate((x,y,z))):continue
+   at=(y-LO[1],z-LO[2],x-LO[0]);current=pal[int(a[at])]
+   expected=v.canonical_state(gate['closed_state']);opened=v.canonical_state(gate['open_state'])
+   def gate_identity(state):
+    name,_,props=state.partition('[')
+    return name,tuple(p for p in props.rstrip(']').split(',') if p and not p.startswith('open='))
+   if gate_identity(v.canonical_state(current))!=gate_identity(expected) or gate_identity(opened)!=gate_identity(expected):
+    raise RuntimeError(('Declared operable public gate differs from the measured hardware',(x,y,z),current,expected))
+   if opened not in shapes:raise RuntimeError(('Missing actual native open-gate collision shape',opened))
+   if opened not in pal:pal.append(opened)
+   # The fixed native housing remains solid. Only these finite owned free
+   # gates are traversable after their real automatic opening; other gates,
+   # access readers, walls and barriers retain their measured collisions.
+   a[at]=pal.index(opened)
+   public_gate_ports.append(dict(position=(x,y,z),measured=current,operated=opened,station_id=gate['station_id'],
+                                operation='native automatic public opening; real lifecycle verified separately'))
+ (OUT/'operable_public_gates.json').write_text(json.dumps(public_gate_ports,ensure_ascii=False,indent=2),encoding='utf8')
+ unknown_shapes=set()
  def shape(s):
   if s in shapes:return shapes[s]
   if s.split('[')[0] in AIR|{'minecraft:light'}:return []
   if s.startswith('mtr:escalator_step') and 'orientation=flat' in s:return [[0,0,0,1,.9375,1]]
+  unknown_shapes.add(s)
   return [[0,0,0,1,1,1]]
  sh=[shape(s) for s in pal]
  def overlaps(b,height):return b[3]>.205 and b[0]<.795 and b[5]>.205 and b[2]<.795 and b[4]>.01 and b[1]<height
  free=np.array([not any(overlaps(b,1) for b in bs) for bs in sh]);head=np.array([not any(overlaps(b,.79) for b in bs) for bs in sh]);floor=np.array([any(.9<=b[4]<=1.001 and b[0]<=.5<=b[3] and b[2]<=.5<=b[5] for b in bs) for bs in sh]);stairs=np.array(['stairs' in s or 'escalator_step' in s for s in pal])
  forbidden=np.array([s.startswith(('minecraft:water','minecraft:lava','projectseele:lcl')) for s in pal]);free&=~forbidden;head&=~forbidden
+ known=np.array([s not in unknown_shapes for s in pal]);free&=known;head&=known;floor&=known
+ unknown_report={}
+ for state in sorted(unknown_shapes):
+  yy,zz,xx=np.where(measured==pal.index(state));unknown_report[state]=dict(cells=len(xx),
+      examples=[[int(x+LO[0]),int(y+LO[1]),int(z+LO[2])] for y,z,x in zip(yy[:16],zz[:16],xx[:16])])
+ (OUT/'unknown_collision_states.json').write_text(json.dumps(dict(states=unknown_report,
+      rule='Unknown cells/shapes supply neither air, clearance nor bearing; coordinates remain unresolved rather than passing'),ensure_ascii=False,indent=2),'utf8')
  floor&=np.array([not any(t in s for t in ('_wall[','_fence[','_bars[','_sign[','station_departure_board','nerv_direction_panel','escalator_side','chair','stool','command_seat')) for s in pal])
  walk=np.zeros(a.shape,bool);walk[1:-1]=floor[a[:-2]]&free[a[1:-1]]&head[a[2:]]
  if PUBLIC_DOMAINS is not None:

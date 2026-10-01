@@ -55,21 +55,18 @@ public final class Tokyo3RetractionDirector
      */
     private static final TicketType<ChunkPos> TRAVEL_TICKET = TicketType.create(
             "projectseele_tokyo3_travel", Comparator.comparingLong(ChunkPos::toLong),
-            /*
-             * Ticket lifetime is deliberately independent of the cinematic
-             * layer cadence.  Tying it to TICKS_PER_LAYER made the accelerated
-             * sequence unload its own city chunks at depth 188 and wait there
-             * forever with a full acquisition cursor.
-             */
-            20 * (ThirdTokyoSurfaceBuilder.maximumRetractionDepth() + 60));
+            // A complete cargo transfer may outlast the former six-minute TTL.
+            // Runtime tickets are removed at completion/fault and vanish when
+            // the server closes; an acquired cursor must never outlive its ticket.
+            0);
     private static final int TICKET_CLAIMS_PER_TICK = 12;
-    private static final Map<Long, long[]> TRAVEL_CHUNKS = new ConcurrentHashMap<>();
+    private static final Map<TravelKey, long[]> TRAVEL_CHUNKS = new ConcurrentHashMap<>();
     /** How much of {@link #travelChunks} each district has claimed so far. */
-    private static final Map<Long, Integer> TICKET_CURSOR = new ConcurrentHashMap<>();
+    private static final Map<TravelKey, Integer> TICKET_CURSOR = new ConcurrentHashMap<>();
     /** Block-work cost of the travel in progress, per district origin. */
-    private static final Map<Long, TravelCost> TRAVEL_COST = new ConcurrentHashMap<>();
+    private static final Map<TravelKey, TravelCost> TRAVEL_COST = new ConcurrentHashMap<>();
     /** Districts whose stray masts have been swept this server session. */
-    private static final java.util.Set<Long> SWEPT_ORIGINS =
+    private static final java.util.Set<TravelKey> SWEPT_ORIGINS =
             java.util.concurrent.ConcurrentHashMap.newKeySet();
     private static final double CORE_CONTROL_RANGE = 150.0D;
 
@@ -92,7 +89,7 @@ public final class Tokyo3RetractionDirector
                 || district.cursor() != 0 || district.voxelCursor() != 0) return;
         // Self-heal the lightning-rod pillars a pre-fix ascent left behind,
         // once per district per session, without waiting for a retract order.
-        if (SWEPT_ORIGINS.add(origin.asLong()))
+        if (SWEPT_ORIGINS.add(travelKey(level,origin)))
         {
             acquireTravelTickets(level, origin);
             if (districtLoaded(level, origin))
@@ -114,7 +111,7 @@ public final class Tokyo3RetractionDirector
             else
             {
                 // Chunks not resident yet; let a later register() retry.
-                SWEPT_ORIGINS.remove(origin.asLong());
+                SWEPT_ORIGINS.remove(travelKey(level,origin));
             }
         }
     }
@@ -182,6 +179,17 @@ public final class Tokyo3RetractionDirector
                     ? "Tokyo-3 armour towers are already fully retracted."
                     : "Tokyo-3 armour towers are already at street level.");
         }
+        if (current.depth() == target)
+        {
+            // A held request has not started a layer. Cancelling it reaches
+            // the current endpoint immediately, so no later layer tick exists
+            // to release the tickets on our behalf.
+            Tokyo3RetractionSavedData.get(level).put(new StoredDistrict(
+                    origin, target, target, level.getGameTime()));
+            updateCoreStates(level, origin, retract);
+            releaseTravelTickets(level, origin);
+            return new RequestResult(true, "Tokyo-3 held movement cancelled at its unchanged endpoint.");
+        }
         if (current.targetDepth() == target && current.depth() != target)
         {
             return new RequestResult(false, retract
@@ -225,7 +233,7 @@ public final class Tokyo3RetractionDirector
                 .removeAllExcept(retainedOrigin))
         {
             releaseTravelTickets(level, retired.origin());
-            long key = retired.origin().asLong();
+            TravelKey key = travelKey(level,retired.origin());
             TRAVEL_CHUNKS.remove(key);
             TICKET_CURSOR.remove(key);
             TRAVEL_COST.remove(key);
@@ -379,12 +387,12 @@ public final class Tokyo3RetractionDirector
 
             int direction = Integer.signum(district.targetDepth() - district.depth());
             int nextDepth = district.depth() + direction;
-            if (!layerInFlight && travelOccupied(
+            if (travelOccupied(
                     level, district.origin(), district.depth(), nextDepth))
             {
                 data.put(new StoredDistrict(district.origin(), district.depth(),
                         district.targetDepth(), gameTime + TICKS_PER_LAYER,
-                        0, 0, district.queuedTargetDepth()));
+                        district.cursor(), district.voxelCursor(), district.queuedTargetDepth()));
                 continue;
             }
 
@@ -396,18 +404,32 @@ public final class Tokyo3RetractionDirector
             long started = System.nanoTime();
             if (reached < generatedTowers)
             {
-                int budget = Math.max(1,
-                        (generatedTowers + LAYER_SPREAD_TICKS - 1)
-                                / LAYER_SPREAD_TICKS);
-                int generatedReached = Math.min(generatedTowers,
-                        reached + budget);
-                for (int index = reached; index < generatedReached; index++)
+                int writes=0;
+                while(reached<generatedTowers&&writes<4096
+                        &&System.nanoTime()-started<8_000_000L)
                 {
-                    ThirdTokyoSurfaceBuilder.applyRetractionDepth(level,
+                    Tokyo3BuildingArchiveR44.TravelStep step=
+                            ThirdTokyoSurfaceBuilder.stepRetractionDepthR44(level,
                             district.origin(), district.depth(), nextDepth,
-                            index);
+                            reached,voxelCursor);
+                    writes+=step.writes();voxelCursor=step.cursor();
+                    if(step.failed())
+                    {
+                        String fault="generatedTower="+reached+" depth="+district.depth()
+                                +"->"+nextDepth+" cursor="+step.cursor()+" "+step.fault();
+                        data.put(new StoredDistrict(district.origin(),district.depth(),
+                                district.targetDepth(),gameTime+TICKS_PER_LAYER,reached,
+                                voxelCursor,district.queuedTargetDepth(),fault));
+                        releaseTravelTickets(level,district.origin());
+                        TRAVEL_COST.remove(travelKey(level,district.origin()));
+                        ProjectSeele.LOGGER.error("Tokyo-3 cargo stopped fail-closed at {} {}",
+                                district.origin().toShortString(),fault);
+                        break;
+                    }
+                    if(!step.complete())break;
+                    reached++;voxelCursor=0;
                 }
-                reached = generatedReached;
+                if(data.get(district.origin()).map(StoredDistrict::faulted).orElse(false))continue;
             }
             else if (reached < towers)
             {
@@ -425,7 +447,7 @@ public final class Tokyo3RetractionDirector
                             gameTime + TICKS_PER_LAYER, reached,
                             step.cursor(), district.queuedTargetDepth(), fault));
                     releaseTravelTickets(level, district.origin());
-                    TRAVEL_COST.remove(district.origin().asLong());
+                    TRAVEL_COST.remove(travelKey(level,district.origin()));
                     ProjectSeele.LOGGER.error(
                             "Tokyo-3 travel stopped fail-closed at {} {}",
                             district.origin().toShortString(), fault);
@@ -438,7 +460,7 @@ public final class Tokyo3RetractionDirector
                     voxelCursor = 0;
                 }
             }
-            TRAVEL_COST.computeIfAbsent(district.origin().asLong(), key -> new TravelCost())
+            TRAVEL_COST.computeIfAbsent(travelKey(level,district.origin()), key -> new TravelCost())
                     .layerNanos += System.nanoTime() - started;
             // The next layer's dwell begins when this one starts. A detailed
             // imported building may legitimately take longer: bounded world
@@ -464,7 +486,7 @@ public final class Tokyo3RetractionDirector
                 updateCoreStates(level, district.origin(),
                         committedTarget > nextDepth);
             }
-            TravelCost cost = TRAVEL_COST.get(district.origin().asLong());
+            TravelCost cost = TRAVEL_COST.get(travelKey(level,district.origin()));
             cost.closeLayer();
             if (nextDepth == committedTarget)
             {
@@ -473,7 +495,7 @@ public final class Tokyo3RetractionDirector
                 releaseTravelTickets(level, district.origin());
                 level.playSound(null, district.origin(), SoundEvents.IRON_DOOR_CLOSE,
                         SoundSource.BLOCKS, 5.0F, retracted ? 0.55F : 0.85F);
-                TRAVEL_COST.remove(district.origin().asLong());
+                TRAVEL_COST.remove(travelKey(level,district.origin()));
                 // A layer has to stay small against the 50ms tick budget. Peak
                 // is the number that matters: it used to be the whole district
                 // rewritten inside a single tick.
@@ -489,13 +511,21 @@ public final class Tokyo3RetractionDirector
     }
 
     /** Every chunk a tower lot touches, so travel never waits on a chunk load. */
-    private static long[] travelChunks(BlockPos origin)
+    private static TravelKey travelKey(ServerLevel level,BlockPos origin)
     {
-        return TRAVEL_CHUNKS.computeIfAbsent(origin.asLong(), key ->
+        return new TravelKey(Tokyo3BuildingWorldIdentityR44.get(level),
+                level.dimension().location().toString(),origin.asLong());
+    }
+
+    private record TravelKey(String worldUUID,String dimension,long origin) {}
+
+    private static long[] travelChunks(ServerLevel level,BlockPos origin)
+    {
+        return TRAVEL_CHUNKS.computeIfAbsent(travelKey(level,origin), key ->
         {
             Set<Long> chunks = new LinkedHashSet<>();
             for (ThirdTokyoSurfaceBuilder.TowerSpec tower
-                    : ThirdTokyoSurfaceBuilder.movableBuildings())
+                    : ThirdTokyoSurfaceBuilder.movableBuildings(level))
             {
                 int half = tower.halfSize();
                 int centreX = origin.getX() + tower.x();
@@ -521,10 +551,10 @@ public final class Tokyo3RetractionDirector
      * loading up front; {@link #districtLoaded} holds the first layer back
      * until they have all arrived either way, so the ramp is free.
      */
-    private static void acquireTravelTickets(ServerLevel level, BlockPos origin)
+    static void acquireTravelTickets(ServerLevel level, BlockPos origin)
     {
-        long[] chunks = travelChunks(origin);
-        int claimed = TICKET_CURSOR.getOrDefault(origin.asLong(), 0);
+        long[] chunks = travelChunks(level,origin);
+        int claimed = TICKET_CURSOR.getOrDefault(travelKey(level,origin), 0);
         if (claimed >= chunks.length)
         {
             return;
@@ -536,13 +566,13 @@ public final class Tokyo3RetractionDirector
             ChunkPos chunk = new ChunkPos(chunks[index]);
             level.getChunkSource().addRegionTicket(TRAVEL_TICKET, chunk, 0, chunk);
         }
-        TICKET_CURSOR.put(origin.asLong(), end);
+        TICKET_CURSOR.put(travelKey(level,origin), end);
     }
 
     private static void releaseTravelTickets(ServerLevel level, BlockPos origin)
     {
-        TICKET_CURSOR.remove(origin.asLong());
-        for (long packed : travelChunks(origin))
+        TICKET_CURSOR.remove(travelKey(level,origin));
+        for (long packed : travelChunks(level,origin))
         {
             ChunkPos chunk = new ChunkPos(packed);
             level.getChunkSource().removeRegionTicket(TRAVEL_TICKET, chunk, 0, chunk);
@@ -565,9 +595,9 @@ public final class Tokyo3RetractionDirector
      * the far district corners instead would stall the travel forever whenever
      * the order is given from underground.
      */
-    private static boolean districtLoaded(ServerLevel level, BlockPos origin)
+    static boolean districtLoaded(ServerLevel level, BlockPos origin)
     {
-        for (long packed : travelChunks(origin))
+        for (long packed : travelChunks(level,origin))
         {
             ChunkPos chunk = new ChunkPos(packed);
             if (!level.hasChunk(chunk.x, chunk.z))
@@ -578,11 +608,11 @@ public final class Tokyo3RetractionDirector
         return true;
     }
 
-    private static boolean travelOccupied(ServerLevel level, BlockPos origin,
+    static boolean travelOccupied(ServerLevel level, BlockPos origin,
                                           int oldDepth, int newDepth)
     {
         for (ThirdTokyoSurfaceBuilder.TowerSpec tower
-                : ThirdTokyoSurfaceBuilder.movableBuildings())
+                : ThirdTokyoSurfaceBuilder.movableBuildings(level))
         {
             int oldVisible = Math.max(0, tower.height() - oldDepth);
             int newVisible = Math.max(0, tower.height() - newDepth);
@@ -593,15 +623,20 @@ public final class Tokyo3RetractionDirector
                     centre.getX() - half, centre.getY(),
                     centre.getZ() - half,
                     centre.getX() + half + 1,
-                    centre.getY() + maximumVisible + 4,
+                    centre.getY() + maximumVisible + 5,
                     centre.getZ() + half + 1);
             if (!level.getEntitiesOfClass(LivingEntity.class, layer,
-                    entity -> entity.isAlive() && !entity.isSpectator()
-                            && (entity instanceof net.minecraft.world.entity.player.Player
-                            || entity instanceof EvaUnit01Entity)).isEmpty())
+                    entity -> entity.isAlive() && !entity.isSpectator()).isEmpty())
             {
                 return true;
             }
+            int roof=origin.getY()+ThirdTokyoSurfaceBuilder.ceilingRoofRelativeY(tower,origin);
+            int travel=Math.max(tower.height(),origin.getY()-roof);
+            int below=Math.max(0,Math.min(tower.height(),Math.max(oldDepth,newDepth)-travel));
+            if(below>0&&!level.getEntitiesOfClass(LivingEntity.class,new AABB(
+                    centre.getX()-half,roof-below-2,centre.getZ()-half,
+                    centre.getX()+half+1,roof+4,centre.getZ()+half+1),
+                    entity->entity.isAlive()&&!entity.isSpectator()).isEmpty())return true;
         }
         return LocalMapAssetLoader.tokyo3SkyscraperTravelOccupied(
                 level, origin, oldDepth, newDepth);

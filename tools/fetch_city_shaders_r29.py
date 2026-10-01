@@ -16,8 +16,8 @@ def install(enable=False):
         if shader=='ComplementaryUnbound_r5.3.zip':
             from patch_lcl_shader_compat_r35 import build
             shader=build(ROOT/'run/shaderpacks'/shader,ROOT/'run/shaderpacks/ComplementaryUnbound_r5.3_SEELE_LCL.zip').name
-        revision=ROOT/'run/projectseele-local-maps/revision_r39.json'
-        if not revision.is_file():revision=ROOT/'run/projectseele-local-maps/revision_r38.json'
+        revisions=[ROOT/'run/projectseele-local-maps'/name for name in ('visuals_r44.json','revision_r39.json','revision_r38.json')]
+        revision=next((p for p in revisions if p.is_file()),revisions[-1])
         if revision.is_file():
             selected=json.loads(revision.read_text())['shader'];candidate=ROOT/'run/shaderpacks'/selected['filename']
             if hashlib.sha256(candidate.read_bytes()).hexdigest()!=selected['sha256']:raise ValueError('Pinned facility shader changed after review')

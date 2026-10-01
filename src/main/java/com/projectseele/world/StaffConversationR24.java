@@ -30,6 +30,7 @@ public final class StaffConversationR24
         int requestCount;
         String reply;
         int pilotContact=-1;
+        UUID coordinationInstance;
         Session(NervStaffEntity npc, boolean radio, String reply)
         { actor = npc.getUUID(); level = (ServerLevel) npc.level(); this.radio = radio; this.reply = reply; }
     }
@@ -145,6 +146,14 @@ public final class StaffConversationR24
         session.lastAction = tick;
         if (request.startsWith("CONTACT:"))
         { contact(player, request.substring(8)); return; }
+        if(request.startsWith("COORD:"))
+        {
+            String action=request.substring(6);
+            if(action.equals("status"))session.coordinationInstance=CityCoordinationR44.instance(player);
+            session.reply=CityCoordinationR44.request(player,npc,action,session.coordinationInstance);
+            if(action.equals("start"))session.coordinationInstance=CityCoordinationR44.instance(player);
+            send(player,npc,session,false);return;
+        }
         if (request.equals("WEAPONS"))
         {
             if (!NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc, "weapons"))

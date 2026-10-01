@@ -37,12 +37,17 @@ def main(apply=False):
    # Line colour is a narrow wall band and column marker, not a bright floor.
    colour='green' if r['line']=='R1' else 'orange'
    fill(-h+1,y+3,side*17,h-1,y+3,side*17,f'minecraft:{colour}_concrete')
-   for u in (-h+4,h-23):
+   # The old west/end offset (-h+4) put the complete service cabinet beyond
+   # the public landing on every elevated platform. Its plaque had no real
+   # reading approach; a collision-free cabinet roof was not passenger floor.
+   # Keep the commissioned inner service bay; R44 retires the whole former
+   # cabinet/plaque component with exact old states, never just its label.
+   for u in (h-23,):
     fill(u,y+1,side*15,u+3,y+1,side*16,'projectseele:nerv_storage_panel')
-    plaque(u+1,y+3,side*16,face,['非常按钮 / 消防箱','保持登车通道畅通','出口与换乘 → 楼梯'])
+    plaque(u+1,y+3,side*16,face,['消防设备','请勿遮挡','紧急情况联系站务'])
    # Floor arrows/tactile routes lead to the stair, not through the stairwell.
    fill(-h+2,y,side*8,h-3,y,side*8,'projectseele:station_tactile_path')
-   plaque(0,y+3,side*16,face,['候车室 / 优先席','车站出口 ← 下行楼梯','对向站台 → 跨线桥'])
+   plaque(0,y+3,side*16,face,['候车室 / 优先席','请先下后上','乘车方向见站台信息牌'])
    # Continuous native half-height screen gates. Eidan 9000 has 5 m door
    # spacing; complete left/right pairs and upper/lower halves are authored.
    low=-int(train_length/2)+3;high=int(train_length/2)-3;door_positions={}

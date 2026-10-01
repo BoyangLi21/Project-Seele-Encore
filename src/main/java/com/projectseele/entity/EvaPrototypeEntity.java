@@ -100,15 +100,13 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     {
         var level=(net.minecraft.server.level.ServerLevel)level();Vec3 eye=EvaUNOptics.eye(this,1),direction=Vec3.directionFromRotation(eyeAimPitch(),eyeAimYaw());Vec3 far=eye.add(direction.scale(256));
         var block=level.clip(new net.minecraft.world.level.ClipContext(eye,far,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this));Vec3 end=block.getLocation();
-        var hit=net.minecraft.world.entity.projectile.ProjectileUtil.getEntityHitResult(level,this,eye,end,new net.minecraft.world.phys.AABB(eye,end).inflate(32,80,32),e->e instanceof LivingEntity&&e!=this&&e!=pilot&&!hasPassenger(e)&&e.isAlive()&&!e.isSpectator());
+        var hit=com.projectseele.physics.CombatDamageTargetsR44.ray(level,eye,end,.3,this,pilot);
         if(hit!=null)
         {
-            LivingEntity target=(LivingEntity)hit.getEntity();
-            // This ProjectileUtil overload returns an entity-only hit result;
-            // its location is the entity origin, not the ray/surface contact.
-            end=target.getBoundingBox().inflate(.3D).clip(eye,end).orElse(hit.getLocation());
+            var target=hit.getEntity();
+            end=hit.getLocation();
             boolean shield=target instanceof Angel a&&a.getAtField()>0;
-            com.projectseele.event.EvaHitFeedback.hurt(target,pilot.damageSources().playerAttack(pilot),36,end,direction);
+            com.projectseele.physics.CombatDamageTargetsR44.hurt(target,pilot.damageSources().playerAttack(pilot),36,end,direction,com.projectseele.physics.CombatDamageTargetsR44.Weapon.LASER);
             if(shield)com.projectseele.fx.AtFieldFX.ripple(level,end,direction);
         }
         entityData.set(LASER_END,end.toVector3f());level.playSound(null,eye.x,eye.y,eye.z,com.projectseele.registry.ModSounds.BEAM_FIRE.get(),net.minecraft.sounds.SoundSource.PLAYERS,1,1.65F);

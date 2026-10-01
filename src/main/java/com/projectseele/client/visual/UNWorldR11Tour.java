@@ -16,6 +16,9 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID,value=Dist.CLIENT)
 public final class UNWorldR11Tour
 {
+    private static boolean actualChunkLoaded(Minecraft mc, net.minecraft.core.BlockPos pos)
+    {return mc.level.getChunkSource().hasChunk(pos.getX() >> 4, pos.getZ() >> 4);}
+
     private static final boolean BENCH="r19-worldtour-bench".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R29="r29-worldtour".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean R28=R29||"r28-worldtour".equals(System.getProperty("projectseele.regionalBuild",""));
@@ -65,10 +68,10 @@ public final class UNWorldR11Tour
                 // A teleport already queues the destination meshes. Throwing
                 // that queue away again produced empty-sky R23 captures.
                 if(settle++==40&&!BENCH&&!R23)mc.levelRenderer.allChanged();
-                boolean neighbourhoodReady=mc.level.hasChunkAt(net.minecraft.core.BlockPos.containing(target));
+                boolean neighbourhoodReady=actualChunkLoaded(mc, net.minecraft.core.BlockPos.containing(target));
                 if(R23)
                     for(int dx=-2;dx<=2;dx++)for(int dz=-2;dz<=2;dz++)
-                        neighbourhoodReady &= mc.level.hasChunkAt(net.minecraft.core.BlockPos.containing(eye.add(dx*16,0,dz*16)));
+                        neighbourhoodReady &= actualChunkLoaded(mc, net.minecraft.core.BlockPos.containing(eye.add(dx*16,0,dz*16)));
                 // Loaded block data can precede the actual GPU meshes by
                 // several seconds. Do not label a sky-only frame a capture.
                 boolean meshesReady=!R24||(mc.levelRenderer.countRenderedChunks()>0

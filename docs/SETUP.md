@@ -28,8 +28,8 @@ ssh -T git@github.com   # 出现 "Hi BoyangLi21!" 即成功
 ## 3. 克隆与首次构建
 
 ```powershell
-git clone git@github.com:BoyangLi21/Project-Seele.git
-cd Project-Seele
+git clone git@github.com:BoyangLi21/Project-Seele-Encore.git
+cd Project-Seele-Encore
 .\gradlew build      # 首次要下载依赖并反编译 MC：强 CPU 机器约 5-15 分钟
 .\gradlew runClient  # 冒烟测试：进主菜单 → Mods 列表应有 Project SEELE
 ```

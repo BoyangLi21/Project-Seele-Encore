@@ -229,6 +229,14 @@ public final class S20MovingElevatorsAdapter
             ServerPlayer player, BlockPos clicked)
     {
         ServerLevel level = player.serverLevel();
+        // A physical display click selects a particular native row. Consuming
+        // it as a card swipe (including an offhand card) suppressed every real
+        // selection while the card was held. The existing group-level guard
+        // validates the selected destination and accepts that same held card.
+        if (level.getBlockState(clicked).is(MovingElevators.display_block))
+        {
+            return false;
+        }
         for (S20PhysicalElevatorDirector.LiftSpec spec
                 : S20PhysicalElevatorDirector.s20Lifts(level))
         {
@@ -607,7 +615,8 @@ public final class S20MovingElevatorsAdapter
         BlockState callState = Blocks.POLISHED_BLACKSTONE_BUTTON
                 .defaultBlockState()
                 .setValue(ButtonBlock.FACE, AttachFace.WALL)
-                .setValue(ButtonBlock.FACING, landing.exit())
+                .setValue(ButtonBlock.FACING,
+                        S20PhysicalElevatorDirector.exteriorCallFacing(landing))
                 .setValue(ButtonBlock.POWERED, false);
         if (!level.getBlockState(call).equals(callState))
         {
@@ -866,11 +875,14 @@ public final class S20MovingElevatorsAdapter
             {
                 return;
             }
-            removeRetiredCabinButtons(level, spec, centre, fixedExit, input);
+            ControllerBlockEntity actualBase = controller(level, baseController);
+            int nativeFloorCount = actualBase != null && actualBase.getGroup() != null
+                    ? actualBase.getGroup().getFloorCount() : spec.stops().size();
+            removeRetiredCabinButtons(level, spec, centre, fixedExit, input, nativeFloorCount);
             bindRemote(level, input, side.getOpposite(), baseController,
                     floorIndex);
             ensureDisplays(level, input, fixedExit,
-                    Blocks.BLACK_CONCRETE.defaultBlockState());
+                    Blocks.BLACK_CONCRETE.defaultBlockState(), nativeFloorCount);
             return;
         }
     }
@@ -898,7 +910,7 @@ public final class S20MovingElevatorsAdapter
 
     private static void removeRetiredCabinButtons(
             ServerLevel level, S20PhysicalElevatorDirector.LiftSpec spec,
-            BlockPos centre, Direction exit, BlockPos officialPanel)
+            BlockPos centre, Direction exit, BlockPos officialPanel, int nativeFloorCount)
     {
         for (int index = 0; index < spec.stops().size(); index++)
         {
@@ -932,8 +944,9 @@ public final class S20MovingElevatorsAdapter
         /*
          * Old iterations left remote arrows at arbitrary cells inside the
          * moving cage (for example 93,-418,242).  Scan only the measured car
-         * envelope, retain the one technical input and its one labelled
-         * display, and remove every other elevator control or legacy button.
+         * envelope, retain the one technical input and its labelled selector
+         * (two vertical tiles when actual floors>7), and remove every other
+         * elevator control or legacy button.
          * No shaft, corridor or authored console is touched by this pass.
          */
         int radius = isSurfaceLift(spec)
@@ -946,7 +959,8 @@ public final class S20MovingElevatorsAdapter
                 {
                     BlockPos position = centre.offset(dx, dy, dz);
                     if (position.equals(officialPanel)
-                            || position.equals(officialPanel.above()))
+                            || position.equals(officialPanel.above())
+                            || nativeFloorCount > 7 && position.equals(officialPanel.above(2)))
                     {
                         continue;
                     }
@@ -969,7 +983,7 @@ public final class S20MovingElevatorsAdapter
             BlockPos officialPanel)
     {
         BlockPos old = S20PhysicalElevatorDirector
-                .exteriorCallPosition(landing);
+                .legacyExteriorCallPosition(landing);
         removeRetiredPanelBlock(level, old, officialPanel);
         removeRetiredPanelBlock(level, old.above(), officialPanel);
         removeRetiredPanelBlock(level, old.above(2), officialPanel);
@@ -1816,7 +1830,7 @@ public final class S20MovingElevatorsAdapter
 
     private static void ensureDisplays(
             ServerLevel level, BlockPos input, Direction widthDirection,
-            BlockState camouflage)
+            BlockState camouflage, int nativeFloorCount)
     {
         BlockPos position = input.above();
         BlockState current = level.getBlockState(position);
@@ -1846,11 +1860,32 @@ public final class S20MovingElevatorsAdapter
             level.setBlock(companion, Blocks.AIR.defaultBlockState(), UPDATE);
         }
 
-        // Six S20 stops fit on one official labelled display.  The former
-        // second display made the car look like a pile of duplicate buttons.
+        // A single official display exposes at most seven rows. The eight-
+        // stop East lift lost its bottom destination at the highest landing
+        // because this method unconditionally retired its second vertical
+        // tile. The native two-tile category2/3 is one selector, up to15 rows;
+        // it is not the coplanar companion removed above for z-fighting.
         BlockPos retiredTop = input.above(2);
         BlockState topState = level.getBlockState(retiredTop);
-        if (topState.is(MovingElevators.display_block)
+        if (nativeFloorCount > 7)
+        {
+            if (!replaceablePanelCell(topState)
+                    || topState.is(MovingElevators.elevator_block))
+            {
+                ProjectSeele.LOGGER.error("Native {}-floor car selector has another component at {}; no foreign device overwritten",
+                        nativeFloorCount, retiredTop.toShortString());
+                return;
+            }
+            if (!topState.is(MovingElevators.display_block))
+            {
+                level.setBlock(retiredTop, MovingElevators.display_block.defaultBlockState(), UPDATE);
+            }
+            if (level.getBlockEntity(retiredTop) instanceof CamoBlockEntity camo)
+            {
+                camouflage(camo, camouflage);
+            }
+        }
+        else if (topState.is(MovingElevators.display_block)
                 || topState.is(MovingElevators.button_block)
                 || topState.getBlock() instanceof ButtonBlock)
         {

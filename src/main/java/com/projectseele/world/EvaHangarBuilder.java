@@ -49,7 +49,11 @@ public final class EvaHangarBuilder
     // The EVA is parked at yaw 180, so it faces -Z and looks straight into the
     // observation gallery. Its back, and therefore the entry-plug socket, the
     // rear gate and the transport tunnel, are all on +Z.
-    private static final int FRONT_CROSS_Z_FROM_BED = -24;
+    // Three clear front circulation rows plus one supported inner guard row.
+    // At the measured retained beds this is Z=-267..-264, instead of a
+    // four-metre shelf extending to -261 in front of the TV mechanical beam.
+    private static final int FRONT_CROSS_Z_FROM_BED = -27;
+    private static final int FRONT_CROSS_DEPTH = 4;
     private static final int REAR_GANTRY_Z_FROM_BED = 25;
     private static final int REAR_BOARDING_Z_FROM_BED = 16;
     // The dorsal boarding deck sits on the SAME level as the shoulder catwalk
@@ -111,6 +115,8 @@ public final class EvaHangarBuilder
 
     public static HangarAudit build(ServerLevel level, BlockPos origin)
     {
+        FacilityWorldPolicy.requireLegacyGenerationAllowed(
+                level.getServer(), "EvaHangarBuilder");
         HangarAudit audit = buildMechanicalOnly(level, origin);
         NervOperationsCentreBuilder.linkHangars(level, origin);
         return audit;
@@ -124,6 +130,8 @@ public final class EvaHangarBuilder
     public static HangarAudit buildMechanicalOnly(ServerLevel level,
                                                    BlockPos origin)
     {
+        FacilityWorldPolicy.requireLegacyGenerationAllowed(
+                level.getServer(), "EvaHangarBuilder.buildMechanicalOnly");
         PerformanceCounters.recordBuilderCall();
         for (int variant = 0; variant < 3; variant++)
         {
@@ -149,6 +157,10 @@ public final class EvaHangarBuilder
                                     int variant)
     {
         requireVariant(variant);
+        if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
+        {
+            return;
+        }
         PerformanceCounters.recordBuilderCall();
         buildChamber(level, origin, variant);
 
@@ -224,6 +236,10 @@ public final class EvaHangarBuilder
     public static void buildS20ObservationGallery(
             ServerLevel level, BlockPos origin)
     {
+        if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
+        {
+            return;
+        }
         if (relocatedObservationInstalled(level, origin))
         {
             return;
@@ -277,6 +293,10 @@ public final class EvaHangarBuilder
                                              BlockPos origin, int variant)
     {
         requireVariant(variant);
+        if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
+        {
+            return;
+        }
         PerformanceCounters.recordBuilderCall();
         buildTransportTunnel(level, origin, variant);
         BlockPos bed = hangarBed(origin, variant);
@@ -331,6 +351,10 @@ public final class EvaHangarBuilder
     public static void buildS20LaunchControlSpine(ServerLevel level,
                                                    BlockPos origin)
     {
+        if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
+        {
+            return;
+        }
         PerformanceCounters.recordBuilderCall();
         int floorY = origin.getY() + GALLERY_Y;
         int shaftOuter = IntegratedNervMapBuilder.SHAFT_OUTER_RADIUS;
@@ -448,6 +472,10 @@ public final class EvaHangarBuilder
      */
     public static void buildS20LaunchWellFoundations(ServerLevel level)
     {
+        if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
+        {
+            return;
+        }
         int radius = IntegratedNervMapBuilder.SHAFT_OUTER_RADIUS;
         for (int variant = 0; variant < 3; variant++)
         {
@@ -869,7 +897,7 @@ public final class EvaHangarBuilder
     /** Top of the suspension, where the crane cables meet the rail. */
     public static int craneRailAboveBed()
     {
-        return 70;
+        return HangarStructuralFrameR44.CRANE_RUNNING_SURFACE_ABOVE_BED;
     }
 
     /**
@@ -1281,6 +1309,8 @@ public final class EvaHangarBuilder
                                      int variant)
     {
         BlockPos bed = hangarBed(origin, variant);
+        TvPersonnelPlatformRecipeR44.ensure(level, bed).ifPresent(fault ->
+                { throw new IllegalStateException("R44 personnel producer rejected before chamber writes: " + fault); });
         BlockState accent = accent(variant);
         for (int x = -HALF_WIDTH; x <= HALF_WIDTH; x++)
         {
@@ -1295,6 +1325,20 @@ public final class EvaHangarBuilder
                             || Math.abs(z) == HALF_DEPTH
                             || y == CHAMBER_HEIGHT;
                     BlockPos position = bed.offset(x, y, z);
+                    if (preservedCrewInfrastructureR44(level, bed, position))
+                    {
+                        continue;
+                    }
+                    boolean frontCrewOpening = z >= FRONT_CROSS_Z_FROM_BED
+                            && z < FRONT_CROSS_Z_FROM_BED + FRONT_CROSS_DEPTH - 1
+                            && Math.abs(x) <= SIDE_CATWALK_X
+                            && y > CATWALK_FLOOR_ABOVE_BED
+                            && y <= CATWALK_FLOOR_ABOVE_BED + 2;
+                    if (frontCrewOpening)
+                    {
+                        clear(level, position);
+                        continue;
+                    }
                     if (!wall)
                     {
                         clear(level, position);
@@ -1334,9 +1378,8 @@ public final class EvaHangarBuilder
     private static void buildShoulderCatwalk(ServerLevel level, BlockPos bed,
                                                BlockState accent)
     {
-        // Both side runs sit outside the exit lane, so they are the one part
-        // of the route that never has to move. Keeping this floor at bed + 36
-        // also makes it level with the shared observation gallery.
+        // Both side runs stay outside the exit lane. Their bed+48 datum is
+        // the actual shared gallery floor; boarding remains on the rear.
         int y = CATWALK_FLOOR_ABOVE_BED;
         for (int z = FRONT_CROSS_Z_FROM_BED; z <= REAR_GANTRY_Z_FROM_BED; z++)
         {
@@ -1344,43 +1387,106 @@ public final class EvaHangarBuilder
                     -(SIDE_CATWALK_X - 1), SIDE_CATWALK_X - 1,
                     SIDE_CATWALK_X})
             {
-                set(level, bed.offset(x, y, z),
+                setCrewBearingR44(level, bed, bed.offset(x, y, z),
                         personnelDeck(level,accent,Math.abs(x)!=SIDE_CATWALK_X));
             }
             // Inner guardrail only on the pure side-catwalk stretch. Across the
             // dorsal boarding deck (z >= boarding) the gantry floor reaches
             // inward to the plug and the pilot — or the walking dummy — has to
             // cross these very columns, so a rail here fences boarding off.
-            if (z < REAR_BOARDING_Z_FROM_BED)
+            if (z < REAR_BOARDING_Z_FROM_BED
+                    && z >= FRONT_CROSS_Z_FROM_BED + FRONT_CROSS_DEPTH - 1)
             {
-                set(level, bed.offset(-(SIDE_CATWALK_X - 2), y + 1, z),
-                        Blocks.IRON_BARS.defaultBlockState());
-                set(level, bed.offset(SIDE_CATWALK_X - 2, y + 1, z),
-                        Blocks.IRON_BARS.defaultBlockState());
+                // The inward guard needs a real structural lip. The two
+                // public lanes remain offsets18/19; the former template hung
+                // this offset17 rail over air without its declared support.
+                for (int side : new int[] {-1, 1})
+                {
+                    setCrewBearingR44(level, bed, bed.offset(side * (SIDE_CATWALK_X - 2), y, z),
+                            ModBlocks.NERV_FLOOR_PANEL.get().defaultBlockState());
+                    if (Math.floorMod(z - FRONT_CROSS_Z_FROM_BED, 10) == 4)
+                    {
+                        for (int offset = SIDE_CATWALK_X - 2;
+                             offset <= SIDE_CATWALK_X; offset++)
+                        {
+                            setCrewBearingR44(level, bed, bed.offset(side * offset, y - 1, z),
+                                    ModBlocks.NERV_STRUCTURAL_PANEL.get().defaultBlockState());
+                        }
+                    }
+                }
+                setCrewRailR44(level, bed, bed.offset(-(SIDE_CATWALK_X - 2), y + 1, z),
+                        FacilityEdgeRailR41.empty(ModBlocks.NERV_EDGE_RAIL.get())
+                                .setValue(FacilityEdgeRailR41.EAST, true));
+                setCrewRailR44(level, bed, bed.offset(SIDE_CATWALK_X - 2, y + 1, z),
+                        FacilityEdgeRailR41.empty(ModBlocks.NERV_EDGE_RAIL.get())
+                                .setValue(FacilityEdgeRailR41.WEST, true));
             }
             else
             {
-                clear(level, bed.offset(-(SIDE_CATWALK_X - 2), y + 1, z));
-                clear(level, bed.offset(SIDE_CATWALK_X - 2, y + 1, z));
+                clearOwnedCrewRailR44(level, bed, bed.offset(-(SIDE_CATWALK_X - 2), y + 1, z));
+                clearOwnedCrewRailR44(level, bed, bed.offset(SIDE_CATWALK_X - 2, y + 1, z));
             }
         }
         // The front cross faces the EVA and the gallery glass; it is a viewing
         // and service run only. Boarding happens at the rear gantry.
         for (int x = -SIDE_CATWALK_X; x <= SIDE_CATWALK_X; x++)
         {
-            set(level, bed.offset(x, y, FRONT_CROSS_Z_FROM_BED),
-                    Math.floorMod(x, 5) == 0
-                    ? Blocks.SEA_LANTERN.defaultBlockState()
-                    : personnelDeck(level,accent,false));
+            for (int row = 0; row < FRONT_CROSS_DEPTH; row++)
+            {
+                setCrewBearingR44(level, bed, bed.offset(x, y, FRONT_CROSS_Z_FROM_BED + row),
+                        Math.floorMod(x + row, 5) == 0
+                                ? Blocks.SEA_LANTERN.defaultBlockState()
+                                : personnelDeck(level, accent, false));
+            }
             // Stop short of the two side runs: this rail guards the cross
             // walkway's inner edge, and carrying it the full width would
             // fence off the very lanes the pilot uses to reach the back.
             if (Math.abs(x) <= SIDE_CATWALK_X - 2)
             {
-                set(level, bed.offset(x, y + 1, FRONT_CROSS_Z_FROM_BED + 1),
-                        Blocks.IRON_BARS.defaultBlockState());
+                // Mount the guard on this declared bearing slab. Placing
+                // bars one row beyond the crossway left their feet in air.
+                BlockState guard = FacilityEdgeRailR41.empty(ModBlocks.NERV_EDGE_RAIL.get())
+                        .setValue(FacilityEdgeRailR41.SOUTH, true);
+                if (Math.abs(x) == SIDE_CATWALK_X - 2)
+                    guard = guard.setValue(x < 0 ? FacilityEdgeRailR41.EAST : FacilityEdgeRailR41.WEST, true);
+                setCrewRailR44(level, bed, bed.offset(x, y + 1,
+                        FRONT_CROSS_Z_FROM_BED + FRONT_CROSS_DEPTH - 1), guard);
             }
         }
+    }
+
+    private static boolean preservedCrewInfrastructureR44(ServerLevel level, BlockPos bed, BlockPos position)
+    {
+        if (net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(level.getBlockState(position).getBlock())
+                .getNamespace().equals("mtr")) return true;
+        if (level.getBlockEntity(position) != null) return true;
+        // This is a measured complete legacy lift arrival and its approach,
+        // including its air apertures. It is not inferred from empty cells.
+        return bed.equals(new BlockPos(72, -443, -240))
+                && position.getX() >= 85 && position.getX() <= 98
+                && position.getY() >= -399 && position.getY() <= -390
+                && position.getZ() >= -264 && position.getZ() <= -248;
+    }
+
+    private static void setCrewBearingR44(ServerLevel level, BlockPos bed, BlockPos position, BlockState state)
+    {
+        if (!preservedCrewInfrastructureR44(level, bed, position)) set(level, position, state);
+    }
+
+    private static void setCrewRailR44(ServerLevel level, BlockPos bed, BlockPos position, BlockState state)
+    {
+        if (preservedCrewInfrastructureR44(level, bed, position)) return;
+        BlockState before = level.getBlockState(position);
+        if (before.isAir() || before.is(Blocks.LIGHT) || before.is(Blocks.IRON_BARS)
+                || before.is(ModBlocks.NERV_EDGE_RAIL.get())) set(level, position, state);
+    }
+
+    private static void clearOwnedCrewRailR44(ServerLevel level, BlockPos bed, BlockPos position)
+    {
+        if (preservedCrewInfrastructureR44(level, bed, position)) return;
+        BlockState before = level.getBlockState(position);
+        if (before.is(ModBlocks.NERV_EDGE_RAIL.get()) || before.is(Blocks.IRON_BARS))
+            set(level, position, Blocks.AIR.defaultBlockState());
     }
 
     /**
@@ -1616,6 +1722,10 @@ public final class EvaHangarBuilder
     private static boolean relocatedObservationInstalled(
             ServerLevel level, BlockPos origin)
     {
+        if (RegionalFacilityLayout.migrated(level.getServer()))
+        {
+            return true;
+        }
         BlockState floor = level.getBlockState(origin.offset(-43, 73, -107));
         BlockState window = level.getBlockState(origin.offset(-42, 74, -109));
         return (floor.is(Blocks.POLISHED_DEEPSLATE)
@@ -2184,13 +2294,15 @@ public final class EvaHangarBuilder
             for (int offset = SIDE_CATWALK_X - 1; offset <= SIDE_CATWALK_X; offset++)
             {
                 int x = bed.getX() + side * offset;
-                for (int z = galleryStartZ; z <= catwalkStartZ; z++)
+                for (int z = Math.min(galleryStartZ, catwalkStartZ);
+                     z <= Math.max(galleryStartZ, catwalkStartZ); z++)
                 {
                     BlockPos floor = new BlockPos(x, floorY, z);
-                    set(level, floor, personnelDeck(level,accent,Math.floorMod(x+z,5)==0));
+                    setCrewBearingR44(level, bed, floor, personnelDeck(level,accent,Math.floorMod(x+z,5)==0));
                     for (int y = 1; y <= 4; y++)
                     {
-                        clear(level, floor.above(y));
+                        if (!preservedCrewInfrastructureR44(level, bed, floor.above(y)))
+                            clear(level, floor.above(y));
                     }
                 }
             }
@@ -2200,14 +2312,18 @@ public final class EvaHangarBuilder
             int inner = bed.getX() + side * (SIDE_CATWALK_X - 2);
             for (int y = 1; y <= 5; y++)
             {
-                set(level, new BlockPos(outer, floorY + y, doorwayZ),
+                setCrewBearingR44(level, bed, new BlockPos(outer, floorY + y, doorwayZ),
                         Blocks.IRON_BLOCK.defaultBlockState());
-                set(level, new BlockPos(inner, floorY + y, doorwayZ),
-                        Blocks.IRON_BLOCK.defaultBlockState());
+                // The source doorway's upper frame hangs from its outer
+                // post/lintel; its old low inner jamb cut across the first
+                // of the three actual front circulation rows.
+                if (y > 2)
+                    setCrewBearingR44(level, bed, new BlockPos(inner, floorY + y, doorwayZ),
+                            Blocks.IRON_BLOCK.defaultBlockState());
             }
             for (int offset = SIDE_CATWALK_X - 2; offset <= SIDE_CATWALK_X + 1; offset++)
             {
-                set(level, new BlockPos(bed.getX() + side * offset,
+                setCrewBearingR44(level, bed, new BlockPos(bed.getX() + side * offset,
                                 floorY + 5, doorwayZ),
                         offset == SIDE_CATWALK_X
                                 ? Blocks.SEA_LANTERN.defaultBlockState() : accent);
@@ -2586,6 +2702,7 @@ public final class EvaHangarBuilder
 
     private static void set(ServerLevel level, BlockPos position, BlockState state)
     {
+        if (TvPersonnelPlatformRecipeR44.owns(level, position)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

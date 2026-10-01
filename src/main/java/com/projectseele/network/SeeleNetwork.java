@@ -12,7 +12,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
  */
 public final class SeeleNetwork
 {
-    private static final String PROTOCOL_VERSION = "45";
+    private static final String PROTOCOL_VERSION = "49";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),
@@ -190,5 +190,14 @@ public final class SeeleNetwork
         CHANNEL.messageBuilder(ServerboundEvaFrozenPoseR30.class,id++,NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ServerboundEvaFrozenPoseR30::encode).decoder(ServerboundEvaFrozenPoseR30::new)
                 .consumerMainThread(ServerboundEvaFrozenPoseR30::handle).add();
+        CHANNEL.messageBuilder(ClientboundCombatContractR44.class,id++,NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundCombatContractR44::encode).decoder(ClientboundCombatContractR44::new)
+                .consumerMainThread(ClientboundCombatContractR44::handle).add();
+        CHANNEL.messageBuilder(ServerboundCombatContractR44.class,id++,NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ServerboundCombatContractR44::encode).decoder(ServerboundCombatContractR44::new)
+                .consumerMainThread(ServerboundCombatContractR44::handle).add();
+        CHANNEL.messageBuilder(ServerboundLiftArrivalR44.class,id++,NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ServerboundLiftArrivalR44::encode).decoder(ServerboundLiftArrivalR44::new)
+                .consumerMainThread(ServerboundLiftArrivalR44::handle).add();
     }
 }

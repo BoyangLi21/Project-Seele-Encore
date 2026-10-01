@@ -1,0 +1,29 @@
+{
+  "sources": [
+    {
+      "type": "minecraft:single",
+      "resource": "minecraft:block/water_still",
+      "sprite": "projectseele:block/lcl_still"
+    },
+    {
+      "type": "minecraft:single",
+      "resource": "minecraft:block/water_flow",
+      "sprite": "projectseele:block/lcl_flow"
+    },
+    {
+      "type": "minecraft:unstitch",
+      "resource": "projectseele:material_sources/residential_plaster_original_r44",
+      "divisor_x": 1254,
+      "divisor_y": 1254,
+      "regions": [
+        {
+          "sprite": "projectseele:block/residential_plaster",
+          "x": 371,
+          "y": 371,
+          "width": 512,
+          "height": 512
+        }
+      ]
+    }
+  ]
+}

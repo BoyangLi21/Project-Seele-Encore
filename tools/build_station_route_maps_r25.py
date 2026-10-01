@@ -5,6 +5,7 @@ import argparse,copy,json,math
 import nbtlib
 import regional_voxels as v
 from query_blocks import read_box,iter_block_entities,AIR
+from station_sign_readers_r44 import reader_visibility
 
 ROOT=v.ROOT;WORLD=ROOT/'run/saves/SEELE_R25_REVIEW';OUT=ROOT/'artifacts/facility_r25/station_maps'
 NORMAL={'north':(0,-1),'south':(0,1),'west':(-1,0),'east':(1,0)}
@@ -78,6 +79,8 @@ def main(apply=False):
        rods=[(q[0]+(d if nz else 0),feet+dy,q[2]+(d if nx else 0)) for d in (-1,1) for dy in (0,1)]
        if any(state(pos).split('[')[0] not in AIR|{'minecraft:light'} or not support(state((pos[0],feet-1,pos[2]))) for pos in rods):continue
        if any('escalator' in state((pos[0],feet-1,pos[2])) for pos in rods):continue
+      optical=reader_visibility(state,lambda s: [] if s.split('[')[0] in AIR else shapes.get(s),q,facing,reader,direction=True,route_map=True)
+      if not optical['clear']:continue
       choice=(q,front,rods,reader,mount);break
     if choice:break
    if not choice:held.append(dict(station=label,line=line,side=side,centre=r['center'],feet=feet));continue

@@ -4,6 +4,7 @@ import nbtlib
 import regional_voxels as vox
 from query_blocks import AIR,read_box,iter_block_entities
 from build_station_boards_r19 import packed
+from station_sign_readers_r44 import reader_visibility,NORMAL
 
 OUT=vox.ROOT/'artifacts/world_repair_r19/stations'
 EMPTY=AIR|{'minecraft:light'}
@@ -15,6 +16,7 @@ def main(apply=False):
     stations+=json.loads((vox.ROOT/'artifacts/world_quality_r02/extension_plan.json').read_text(encoding='utf8'))['transit']['platforms']
     stations+=json.loads((vox.ROOT/'artifacts/world_expansion_r07/port_transit_plan.json').read_text(encoding='utf8'))['platforms']
     station_by_id={s['id']:s for s in stations};changes={};result=[]
+    shapes=json.loads((vox.WORLD/'native_collision_shapes.json').read_text('utf8'))
     def change(pos,old,new,owner):
         if old!=new:changes[pos]=(old,new,owner)
     for b in boards:
@@ -31,6 +33,12 @@ def main(apply=False):
             column=[xyz(u,yy,v) for yy in range(y+1,y+11)]
             allowed=EMPTY|{'minecraft:glass','minecraft:gray_stained_glass','minecraft:white_concrete','minecraft:light_gray_concrete','minecraft:gray_concrete','minecraft:polished_deepslate','minecraft:smooth_stone','minecraft:iron_block','projectseele:clear_glass','projectseele:nerv_wall_panel','projectseele:nerv_structural_panel'}
             if not all(measured[q].split('[')[0] in allowed or measured[q].startswith('projectseele:nerv_') and measured[q].split('[')[0].endswith(('_panel','_datum','_light')) for q in column):continue
+            at=xyz(u,y+3,v-sign)
+            face=('north' if sign>0 else 'south') if horizontal else ('west' if sign>0 else 'east')
+            nx,nz=NORMAL[face];reader=(at[0]+nx*3,y+1,at[2]+nz*3)
+            state_at=lambda q:measured.get(q,'UNKNOWN')
+            optical=reader_visibility(state_at,lambda state: [] if state.split('[')[0] in AIR else shapes.get(state),at,face,reader,direction=False)
+            if not optical['clear']:continue
             selected=u;break
         if selected is None:
             from collections import Counter

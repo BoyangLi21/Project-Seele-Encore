@@ -11,6 +11,7 @@ from scipy.spatial import cKDTree
 import regional_voxels as v
 from measure_world_r40 import MeasuredWorld
 from query_blocks import AIR,iter_block_entities
+from aircraft_boarding_authority_r44 import AircraftBoardingAuthority
 
 ROOT=Path(__file__).resolve().parents[1];ART=ROOT/'artifacts/spatial_repair_r41'
 WORLD=ROOT/'run/saves/SEELE_FIELD_R41_REVIEW';OUT=ART/'remaining_edges'
@@ -37,10 +38,12 @@ def main(apply=False):
     def airside(q):
         x,y,z=q
         return y>0 and ((480<=x<=1260 and 1320<=z<=1540) or (-2180<=x<=-1400 and -80<=z<=80) or (6720<=x<=6820 and -6690<=z<=-5990))
+    boarding=AircraftBoardingAuthority(WORLD)
     decisions=[];rails=defaultdict(set);changes={};names={(1,0,0):'east',(-1,0,0):'west',(0,0,1):'south',(0,0,-1):'north'}
     for r in rows:
         q=tuple(r['pos']);x,y,z=q;dx,_,dz=r['normal'];n=(x+dx,y,z+dz);state=w.block(q);why='';target=q
-        if supported((n[0],y-1,n[2])) or blocked(n):why='current_supported_floor_or_existing_boundary'
+        if boarding.owner(q):why='native_aircraft_dynamic_stair_or_door_interface_preserved'
+        elif supported((n[0],y-1,n[2])) or blocked(n):why='current_supported_floor_or_existing_boundary'
         elif y==-329:why='closed_commander_exterior_roof_not_public_circulation'
         elif airside(q):why='restricted_airside_graded_pavement_edge_keep_aircraft_clearance'
         elif any((w.get(x+dx*d,y,z+dz*d) or '').startswith(('mtr:apg_','mtr:psd_')) for d in (0,1,2)):
@@ -50,7 +53,7 @@ def main(apply=False):
                 # Fixed guards belong on pedestrian pavement, outside the
                 # actual native train envelope, not on its approach ballast.
                 options=[(x-dx*d,y,z-dz*d) for d in (1,2,3)]
-                target=next((p for p in options if supported((p[0],p[1]-1,p[2])) and not blocked(p) and not near_track(p)),None)
+                target=next((p for p in options if supported((p[0],p[1]-1,p[2])) and not blocked(p) and not near_track(p) and not boarding.owner(p)),None)
                 if target is None:why='native_track_approach_bed_no_safe_pedestrian_guard_cell'
             if not why:
                 old=w.block(target)

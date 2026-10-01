@@ -9,7 +9,7 @@ public final class NervMovingCarrierRenderer
 {
     public static void render(PoseStack poses,MultiBufferSource buffers,int light,EvaUnit01Entity unit,float partial)
     {
-        TvFacilityMeshes.carrier(poses,light,unit,partial);
+        TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.carrier(poses,light,unit,partial));
         if(com.projectseele.visual.NervStaffR24Review.R26&&unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR)
             com.projectseele.visual.NervStaffR24Review.rackRenderedDuringClosing=true;
     }

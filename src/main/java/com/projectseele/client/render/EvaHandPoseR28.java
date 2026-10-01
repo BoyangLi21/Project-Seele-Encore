@@ -13,7 +13,7 @@ final class EvaHandPoseR28
     static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva,BakedGeoModel model,float partial)
     {
         if(eva.isFirstBattleActive())return EvaMotionEngineV2.BoneWrites.empty();
-        if(eva.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(eva,partial))
+        if(com.projectseele.entity.EvaGameplayMotionR32.sharedHands(eva,partial))
         {STATES.remove(eva);return EvaMotionEngineV2.BoneWrites.empty();}
         if(com.projectseele.entity.EvaBodyPose.hasTerrainStances()
                 &&!com.projectseele.entity.EvaShutdownR30.disabled(eva)

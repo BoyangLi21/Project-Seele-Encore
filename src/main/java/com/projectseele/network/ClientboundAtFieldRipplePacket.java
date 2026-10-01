@@ -8,7 +8,7 @@ import net.minecraftforge.fml.DistExecutor;
 import net.minecraftforge.network.NetworkEvent;
 
 /**
- * Plays an A.T. Field ripple: concentric orange hexagons expanding in the
+ * Plays an A.T. Field ripple: translucent orange octagons expanding in the
  * plane whose normal is (nx, ny, nz), centred at (x, y, z).
  */
 public class ClientboundAtFieldRipplePacket
@@ -19,8 +19,12 @@ public class ClientboundAtFieldRipplePacket
     public final float nx;
     public final float ny;
     public final float nz;
+    public final float radius;
 
     public ClientboundAtFieldRipplePacket(double x, double y, double z, float nx, float ny, float nz)
+    {this(x,y,z,nx,ny,nz,10.5F);}
+
+    public ClientboundAtFieldRipplePacket(double x, double y, double z, float nx, float ny, float nz,float radius)
     {
         this.x = x;
         this.y = y;
@@ -28,12 +32,13 @@ public class ClientboundAtFieldRipplePacket
         this.nx = nx;
         this.ny = ny;
         this.nz = nz;
+        this.radius=Float.isFinite(radius)?net.minecraft.util.Mth.clamp(radius,.5F,96F):10.5F;
     }
 
     public ClientboundAtFieldRipplePacket(FriendlyByteBuf buf)
     {
         this(buf.readDouble(), buf.readDouble(), buf.readDouble(),
-                buf.readFloat(), buf.readFloat(), buf.readFloat());
+                buf.readFloat(), buf.readFloat(), buf.readFloat(),buf.readFloat());
     }
 
     public void encode(FriendlyByteBuf buf)
@@ -44,6 +49,7 @@ public class ClientboundAtFieldRipplePacket
         buf.writeFloat(this.nx);
         buf.writeFloat(this.ny);
         buf.writeFloat(this.nz);
+        buf.writeFloat(this.radius);
     }
 
     public void handle(Supplier<NetworkEvent.Context> ctx)

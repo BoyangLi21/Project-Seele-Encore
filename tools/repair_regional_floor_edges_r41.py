@@ -13,6 +13,7 @@ from scipy.spatial import cKDTree
 import regional_voxels as v
 from measure_world_r40 import MeasuredWorld
 from query_blocks import AIR,iter_block_entities
+from aircraft_boarding_authority_r44 import AircraftBoardingAuthority
 
 ROOT=Path(__file__).resolve().parents[1];ART=ROOT/'artifacts/spatial_repair_r41'
 WORLD=ROOT/'run/saves/SEELE_FIELD_R41_REVIEW';OUT=ART/'regional_edges'
@@ -38,7 +39,7 @@ def main(apply=False):
     w=MeasuredWorld(WORLD)
     for x,y,z in slabs:w.box((x,y-2,z),(x,y+2,z))
     for row in rows+explicit:w.around(row['pos'],4)
-    w.load()
+    w.load();boarding=AircraftBoardingAuthority(WORLD)
     native=json.loads((WORLD/'native_transit_r28.json').read_text('utf8'))
     points=np.asarray([p for c in native['curves'] if c['mode']=='TRAIN' for p in c['points']],float);tree=cKDTree(points[:,[0,2]])
     def track(q):
@@ -56,7 +57,7 @@ def main(apply=False):
         assert before is not None and before.partition('[')[0] in allowed,(q,before,why)
         if before!=after:changes[q]=(after,why)
     for x,g,z in sorted(slabs):
-        if track((x,g,z)):continue
+        if track((x,g,z)) or boarding.owner((x,g,z)):continue
         # Existing shafts, stair flights, doors and machinery are not voids
         # to fill. A missing paving cell has air above and no stair below.
         if state((x,g,z)) not in AIR or not all(state((x,Y,z)) in AIR or (state((x,Y,z)) or '').startswith('minecraft:light[') for Y in (g+1,g+2)):continue
@@ -67,7 +68,8 @@ def main(apply=False):
     confirmed={'authored_building_floor_edge','un_gantry_stair_floor_edge','underground_facility_floor_edge','port_yard_or_quay_edge','authored_station_ground_pad'}
     for row in rows+[{**r,'classification':'native_failed_edge'} for r in explicit]:
         q=tuple(row['pos']);x,y,z=q;dx,_,dz=row['normal'];n=(x+dx,y,z+dz);category=row['classification'];decision='retained_for_context_review'
-        if support((n[0],y-1,n[2])):decision='continuous_floor_or_restored_forecourt'
+        if boarding.owner(q):decision='native_aircraft_dynamic_stair_or_door_interface_preserved'
+        elif support((n[0],y-1,n[2])):decision='continuous_floor_or_restored_forecourt'
         elif category in ('central_city_one_metre_shoulder','one_metre_external_grade_change'):
             target=(n[0],y-1,n[2]);below=(n[0],y-2,n[2]);s=state(below) or ''
             if state(target) in AIR and support(below) and s.partition('[')[0] in {'minecraft:grass_block','minecraft:dirt','minecraft:stone','minecraft:gravel','minecraft:deepslate_bricks','minecraft:gray_concrete','minecraft:light_gray_concrete'} and not track(target):

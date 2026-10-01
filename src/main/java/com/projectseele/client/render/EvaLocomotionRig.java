@@ -10,6 +10,7 @@ public final class EvaLocomotionRig
 {
     public static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva,BakedGeoModel model,float partial)
     {
+        if(eva.hasLegacyStrikeForRender())return EvaMotionEngineV2.BoneWrites.empty();
         if(!EvaBodyPose.hasTerrainStances()||!eva.isPoweredOn()||eva.isFirstBattleActive()||eva.isBerserk()||eva.isCrucified()||eva.isNervLogisticsLocked()||eva.getActivationTicks()>0||eva.getVisualPose()!=0||eva.getMotionLabPhysicsPreview()!=0||eva.isVisuallyAirborneForRender()||eva.hasLiveActionForRender(partial))return EvaMotionEngineV2.BoneWrites.empty();
         if(eva.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS&&eva.getWeapon()!=EvaUnit01Entity.WEAPON_KNIFE)return EvaMotionEngineV2.BoneWrites.empty();
         var body=EvaBodyPose.sample(eva,partial);Set<String> names=new LinkedHashSet<>();

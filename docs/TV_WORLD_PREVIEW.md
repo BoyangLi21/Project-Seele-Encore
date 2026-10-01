@@ -1,8 +1,6 @@
 # TV 地形与都市重塑预览
 
-本机独立存档：`SEELE_TV_WORLD_PREVIEW_20260906`，显示名
-`SEELE - TV World Reconstruction Preview`。入口为
-`tools/start_tv_world_preview.bat`。本轮已到人工验收点，未替换原 R28 或已认可的 TV 内饰源档。
+本页保留当时独立存档 `SEELE_TV_WORLD_PREVIEW_20260906`（显示名 `SEELE - TV World Reconstruction Preview`）的历史重构记录。该独立预览存档已不在当前工作目录，对应 BAT 入口已退役；当前试玩使用 PCL **Project SEELE R44 Stage**，见 [R44 阶段手册](MANUAL_ACCEPTANCE_R44_STAGE.md)。以下布局与状态属于当时版本，不作为当前安装结论。
 
 ## 本轮布局
 

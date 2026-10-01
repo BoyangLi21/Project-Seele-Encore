@@ -16,6 +16,7 @@ from __future__ import annotations
 
 import argparse
 import gzip
+import hashlib
 from io import BytesIO
 import json
 import math
@@ -194,7 +195,9 @@ def state_colour(state: str) -> tuple[int, int, int]:
     for needle, colour in colours:
         if needle in text:
             return colour
-    value = abs(hash(state))
+    # Python randomizes hash() between processes. A diagnostic palette must
+    # not recolour unchanged buildings in successive before/after renders.
+    value = int.from_bytes(hashlib.sha256(state.encode('utf8')).digest()[:4], 'little')
     return 70 + value % 130, 70 + (value >> 8) % 130, 70 + (value >> 16) % 130
 
 

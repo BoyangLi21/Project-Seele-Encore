@@ -372,3 +372,9 @@ The paired Sachiel surface retains the existing private mesh topology/UVs and th
 R42 gameplay/body/paired profiles derive from the previously credited private rigs and motion sources. Changes include an anatomical palm frame, finger articulation, elbow continuity, explicitly authored punch phrases, a non-looping airborne pose and paired timing/support corrections. Existing licenses continue to apply. TV episode-2 footage was viewed as a motion reference only; no footage, frame or soundtrack is included in the release.
 
 The red and dormant-black eye textures are runtime colour derivatives of the existing eye alpha mask. The soft smoke density sprite and three baked seating models are original procedural assets. Wall artwork uses the pre-existing local images through a normal depth-tested block renderer; no new official image is embedded. The [Tokyu 1990 Den-en-chofu station photograph](https://tokyu.shibuyaphotomuseum.jp/detail/1765/) was viewed for entrance and pavement references and is not redistributed.
+
+## R44 residential plaster (2026-10-01)
+
+`assets/projectseele/textures/material_sources/residential_plaster_original_r44.png` is a new original bitmap produced with the built-in image-generation tool, without input images. Its full prompt and SHA-256 are recorded in `artifacts/rebuild_r44/city_expansion/misato_material_root_cause_v1/original_plaster_provenance.json`. The untouched 1254-pixel source is imported as a 512-pixel central sprite with Minecraft's native atlas `unstitch` source. No global quartz texture or PBR map is replaced.
+
+The domestic finish is an original interpretation of pale matte apartment walls. A reproduced TV kitchen frame was viewed only as a material/proportion reference; the exact episode cut remains unconfirmed. That frame is neither embedded nor redistributed. In-game material, tiling and whole-room visual acceptance remain pending until the R44 native review.

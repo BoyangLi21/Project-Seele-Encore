@@ -111,9 +111,12 @@ public class ZeruelEntity extends Monster implements Angel, SiegeAnchorAware, so
         Vec3 forward = toward.normalize();
         Vec3 center = this.position().add(0.0D, 12.0D, 0.0D).add(forward.scale(15.0D));
         AABB zone = new AABB(center, center).inflate(18.0D, 10.0D, 18.0D);
-        for (LivingEntity victim : this.level().getEntitiesOfClass(LivingEntity.class, zone,
+        for (LivingEntity victim : com.projectseele.physics.CombatEntityQueryR44.overlap(this.level(),zone,
                 e -> e != this && (e instanceof EvaUnit01Entity || e instanceof Player)))
         {
+            Vec3 contact=com.projectseele.physics.CombatBodyContacts.nearestSurfacePoint(victim,center);
+            if(this.level().clip(new net.minecraft.world.level.ClipContext(this.position().add(0,12,0),contact,
+                    net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)continue;
             victim.hurt(this.damageSources().mobAttack(this), 72.0F);
             Vec3 push = victim.position().subtract(this.position()).normalize().scale(2.2D);
             victim.push(push.x, 0.8D, push.z);
@@ -127,12 +130,17 @@ public class ZeruelEntity extends Monster implements Angel, SiegeAnchorAware, so
             return;
         }
         Vec3 from = this.position().add(0.0D, 22.0D, 0.0D);
-        Vec3 impact = target.getBoundingBox().getCenter();
+        Vec3 far=target.getBoundingBox().getCenter();
+        var wall=server.clip(new net.minecraft.world.level.ClipContext(from,far,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this));
+        Vec3 impact=wall.getLocation();
+        var hit=com.projectseele.physics.CombatEntityQueryR44.ray(server,from,impact,.3,
+                entity->entity!=this&&entity.isAlive()&&(entity instanceof EvaUnit01Entity||entity instanceof Player));
+        if(hit!=null)impact=hit.getLocation();
         SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
                 new ClientboundCannonBeamPacket(from.x, from.y, from.z, impact.x, impact.y, impact.z));
         SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
                 new ClientboundNukeFxPacket(impact.x, impact.y, impact.z, 2.2F, true));
-        target.hurt(this.damageSources().mobAttack(this), 125.0F);
+        if(hit!=null)hit.getEntity().hurt(this.damageSources().mobAttack(this),125.0F);
         server.explode(this, impact.x, impact.y, impact.z, 10.0F, ExplosionInteraction.MOB);
     }
 

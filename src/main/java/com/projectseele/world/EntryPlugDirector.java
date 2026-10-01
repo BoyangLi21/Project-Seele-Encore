@@ -1593,7 +1593,8 @@ public final class EntryPlugDirector
                     int trolleyY = bed.getY()
                             + EvaHangarBuilder.craneRailAboveBed();
                     NervCarrierVisuals.updatePlugCrane(level, variant,
-                            bed.getX(), trolleyY, pose.z(), pose.bottomY());
+                            HangarStructuralFrameR44.trolleyOrigin(bed, pose.z()).x,
+                            trolleyY, pose.z(), pose.bottomY());
                 }
             }
             return;
@@ -1672,7 +1673,8 @@ public final class EntryPlugDirector
         S20_CRANE_POSES.computeIfAbsent(level.dimension(),
                 ignored -> new CranePose[3])[variant] = pose;
         NervCarrierVisuals.updatePlugCrane(level, variant,
-                bed.getX(), trolleyY, pose.z(), pose.bottomY());
+                HangarStructuralFrameR44.trolleyOrigin(bed, pose.z()).x,
+                trolleyY, pose.z(), pose.bottomY());
     }
 
     private static void stowS20Crane(ServerLevel level, int variant,
@@ -1701,7 +1703,8 @@ public final class EntryPlugDirector
         poses[variant] = stowed;
         CRANE_SIGNATURE.remove(variant);
         NervCarrierVisuals.updatePlugCrane(level, variant,
-                bed.getX(), trolleyY, stowed.z(), stowed.bottomY());
+                HangarStructuralFrameR44.trolleyOrigin(bed, stowed.z()).x,
+                trolleyY, stowed.z(), stowed.bottomY());
     }
 
     /**

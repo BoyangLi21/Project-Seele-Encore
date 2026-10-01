@@ -24,7 +24,8 @@ def opening(p,x,z,floor,owner,facing='south',width=3,height=3,mode='owned'):
 
 def door(p,x,z,floor,owner,facing='south',iron=False,mode='new'):
     for dy,half in ((1,'lower'),(2,'upper')):
-        p.put(x,floor+dy,z,f"minecraft:{'iron' if iron else 'oak'}_door[facing={facing},half={half},hinge=left,open=false,powered=false]",owner,mode)
+        name='projectseele:city_personnel_door' if iron else 'minecraft:oak_door'
+        p.put(x,floor+dy,z,f"{name}[facing={facing},half={half},hinge=left,open=false,powered=false]",owner,mode)
 
 
 def stairs(p,x,z,floor,rise,heading,owner,width=3,mode='new'):
@@ -51,6 +52,8 @@ def bench(p,x,z,floor,owner,facing='south'):
 
 def building(p,b,floor,storeys,owner,style='residential',variant=0):
     x0,x1,z0,z1=b;cx=(x0+x1)//2
+    if owner in ('tokyo_south/13-05','tokyo_south/13-06'):
+        x1=152;b=(x0,x1,z0,z1)
     wall=['minecraft:white_concrete','minecraft:light_gray_concrete','minecraft:smooth_sandstone','minecraft:gray_concrete'][variant%4]
     p.grade(x0-3,z0-3,x1+3,z1+5,floor,owner,margin=8)
     p.fill(x0,floor+1,z0,x1,floor+storeys*5,z1,AIR,owner)
@@ -85,19 +88,41 @@ def building(p,b,floor,storeys,owner,style='residential',variant=0):
     p.fill(x0+2,roof+4,z0+3,x0+7,roof+4,z0+8,'minecraft:stone_slab[type=bottom,waterlogged=false]',owner)
     for x in (x0,x1):p.fill(x,roof+1,z0,x,roof+1,z1,wall,owner)
     for z in (z0,z1):p.fill(x0,roof+1,z,x1,roof+1,z,wall,owner)
-    # A real alternating stairwell joins every usable floor.
-    p.fill(x0+2,floor+1,z0+2,x0+7,roof-1,z0+10,AIR,owner)
-    for level in range(storeys-1):
+    # Build every landing before the flights; a later floor must not recap an
+    # earlier flight's headroom. This is the R02/R43 verified stair-core layout.
+    p.fill(x0+1,floor+1,z0+2,x0+9,roof-1,z0+10,AIR,owner)
+    flights=[]
+    for level in range(storeys):
         y=floor+level*5
-        if level%2==0:
-            stairs(p,x0+3,z0+9,y,5,'north',owner,3)
-            p.fill(x0+2,y+5,z0+2,x0+8,y+5,z0+4,FLOOR,owner)
-        else:
-            stairs(p,x0+6,z0+3,y,5,'south',owner,3)
-            p.fill(x0+2,y+5,z0+8,x0+8,y+5,z0+10,FLOOR,owner)
+        for za,zb in ((z0+2,z0+4),(z0+8,z0+10)):
+            p.fill(x0+1,y,za,x0+9,y,zb,FLOOR,owner)
+        p.fill(x0+9,y,z0+2,x0+9,y,z0+10,FLOOR,owner)
+        for xx in (x0+1,x0+5,x0+9):
+            p.fill(xx,y+1,z0+5,xx,y+2,z0+7,'minecraft:iron_bars[east=false,north=true,south=true,waterlogged=false,west=false]',owner)
+        p.put(x0+1,y+4,z0+3,LIGHT,owner)
+        if level<storeys-1:
+            north=level%2==0
+            flights.append((x0+(3 if north else 7),z0+(9 if north else 3),y,'north' if north else 'south'))
+    for x,z,y,heading in flights:stairs(p,x,z,y,5,heading,owner,3)
     opening(p,cx,z1,floor,owner,width=3,mode='new');door(p,cx,z1,floor,owner)
     p.fill(cx-3,floor,z1+1,cx+3,floor,z1+5,DARK,owner)
-    p.sign(cx+3,floor+3,z1+1,[owner.split('/')[-1],'入口','ENTRY',''],owner)
+    # Low-rise Japanese streets combine residential lobbies, small shops and
+    # offices. These original fronts are deliberately distinct from an EVA set.
+    fronts=[('町内事务所','minecraft:light_gray_concrete','minecraft:stone_brick_slab'),
+            ('街角书店','minecraft:brown_terracotta','minecraft:smooth_stone_slab'),
+            ('社区诊所','minecraft:white_concrete','minecraft:quartz_slab'),
+            ('喫茶店','minecraft:green_terracotta','minecraft:dark_oak_slab'),
+            ('日用品商店','minecraft:light_gray_terracotta','minecraft:smooth_stone_slab'),
+            ('办公楼入口','minecraft:gray_concrete','minecraft:stone_brick_slab'),
+            ('住宅入口','minecraft:light_gray_concrete','minecraft:smooth_stone_slab'),
+            ('街角商店','minecraft:orange_terracotta','minecraft:smooth_stone_slab')]
+    index=variant%len(fronts)
+    if style in ('residential','regional_city') and index in (0,2,5):index=6
+    label,accent,canopy=fronts[index]
+    for x in range(x0+2,x1-1):
+        if abs(x-cx)>2:p.put(x,floor+4,z1,accent,owner)
+    p.fill(cx-4,floor+4,z1+1,cx+4,floor+4,z1+1,canopy+'[type=top,waterlogged=false]',owner)
+    p.sign(cx+3,floor+3,z1+1,[label,'入口 / 出口','人员通行',owner.split('/')[-1]],owner)
     p.meta['landmarks'].append(dict(id=owner,bounds=b,floor=floor,storeys=storeys,entry=[cx,floor+1,z1+1],style=style))
 
 

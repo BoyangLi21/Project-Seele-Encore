@@ -294,5 +294,9 @@
   "subtitles.projectseele.pa_alert_r30": "All personnel, combat stations.",
   "subtitles.projectseele.pa_combat_r31": "Battle stations. All personnel to assigned posts.",
   "key.projectseele.eva_grapple": "Grapple / throw Angel",
-  "subtitles.projectseele.facility_hydraulic_launch": "Catapult hydraulics pressurize"
+  "subtitles.projectseele.facility_hydraulic_launch": "Catapult hydraulics pressurize",
+  "block.projectseele.city_rain_pipe": "Period Metal Downpipe",
+  "block.projectseele.city_rain_gutter": "Period Metal Eaves Gutter",
+  "block.projectseele.residential_plaster": "Painted Residential Plaster",
+  "block.projectseele.residential_plaster_slab": "Painted Plaster Slab"
 }

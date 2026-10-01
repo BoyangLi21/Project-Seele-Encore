@@ -108,6 +108,7 @@ public final class NervLiftDoorEntity extends Entity
 
     public float getOpenProgress(float partialTick)
     {
+        if (!this.level().isClientSide) return this.entityData.get(DATA_OPEN);
         return Mth.lerp(partialTick, this.clientOpenO, this.clientOpen);
     }
 

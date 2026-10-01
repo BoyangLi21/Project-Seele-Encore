@@ -124,13 +124,15 @@ class Painter:
         for p in self.block_entities:additions_by_chunk[p[0]//16,p[2]//16].add(p)
         touched=[];counts=Counter();protected=Counter();start=time.monotonic();entity_deltas=[]
         try:
+            from information_fixture_guard_r44 import retained_faces,check_retained_faces
+            information_faces=retained_faces(self,WORLD,DIM)
             for number,((rx,rz),chunks_ops) in enumerate(sorted(groups.items())):
                 selected={p:{sy for i in ops for sy in range(self.ops[i].box[1]//16,self.ops[i].box[4]//16+1)} for p,ops in chunks_ops.items()}
                 measured={(cx,cz,sy):(pal,idx) for cx,cz,sy,pal,idx in iter_selected_sections(WORLD,DIM,selected)}
                 missing=[(cx,cz,sy) for (cx,cz),ys in selected.items() for sy in ys if (cx,cz,sy) not in measured]
                 if missing:raise RuntimeError(f'Unmeasured sections: {missing[:5]}')
                 path=dimension_dir(WORLD,DIM)/f'region/r.{rx}.{rz}.mca';backup=report_dir/'before'/path.name;shutil.copy2(path,backup)
-                stamps,blobs=read_region(path);dirty=False
+                stamps,blobs=read_region(path);dirty=False;expected_entities={}
                 for (cx,cz),op_indices in chunks_ops.items():
                     slot=(cx&31)+(cz&31)*32;root=parse_chunk(blobs[slot]);decoded=decoded_sections(root)
                     minimum=min(selected[cx,cz]);maximum=max(selected[cx,cz]);palettes=[];lookup={}
@@ -199,7 +201,18 @@ class Painter:
                             continue
                         if op.mode in ('owned','retire'):mask=np.ones(src.shape,dtype=bool)
                         elif op.mode=='ground_clear':mask=np.asarray([s.split('[')[0].removeprefix('minecraft:') in NATURAL-{'water'} for s in palettes],dtype=bool)[src]
-                        elif op.mode=='match':mask=np.asarray([s==op.extra[0] for s in palettes],dtype=bool)[src]
+                        elif op.mode=='match':
+                            mask=np.asarray([s==op.extra[0] for s in palettes],dtype=bool)[src]
+                            # A measured single-cell delta is an assertion,
+                            # not a bulk palette filter. Previously a stale
+                            # state silently disappeared from the applied
+                            # subset and still received a verified receipt.
+                            # Legacy multi-cell palette selections keep their
+                            # filtering semantics; exact candidates fail and
+                            # roll back instead of quietly losing a member.
+                            if op.box[:3]==op.box[3:] and not bool(mask.all()):
+                                actual=palettes[int(src.reshape(-1)[0])]
+                                raise RuntimeError(f'Exact cell precondition changed: {op.box[:3]} expected {op.extra[0]}, actual {actual}, owner {op.owner}')
                         else:
                             allowed=np.asarray([natural(s) or s==op.state for s in palettes],dtype=bool)
                             if op.mode=='air':allowed=np.asarray([s.split('[')[0] in AIR or s.startswith('minecraft:light[') or s==op.state for s in palettes],dtype=bool)
@@ -207,6 +220,7 @@ class Painter:
                             protected[op.owner]+=int((~mask & (view!=target)).sum())
                         mask &= ~protected_cells(op.mode)[ay:by,az:bz,ax:bx]
                         view[mask]=target
+                    check_retained_faces(information_faces,(cx,cz),before,after,palettes,minimum)
                     diff=(before!=after)&(before!=65535)
                     old_entities={tuple(int(t[k]) for k in ('x','y','z')):t for t in root.get('block_entities',[])}
                     nbt_changes=set()
@@ -249,6 +263,11 @@ class Painter:
                     existing=[t for t in root.get('block_entities',[]) if tuple(int(t[k]) for k in ('x','y','z')) not in changed_positions]
                     existing += [self.block_entities[p] for p in changed_positions if p in self.block_entities]
                     root['block_entities']=nbtlib.List[nbtlib.Compound](existing)
+                    # New/retired doors, signs, beds and inventories need the
+                    # same complete NBT readback as state-preserving updates.
+                    # The old witness checked only self.entity_updates.
+                    for p in changed_positions:
+                        expected_entities[p]=self.block_entities.get(p)
                     if diff.any():
                         flush_decoded(root,decoded);root['isLightOn']=nbtlib.Byte(0);root.pop('Heightmaps',None)
                         for section in root.get('sections',[]):section.pop('BlockLight',None);section.pop('SkyLight',None)
@@ -263,12 +282,14 @@ class Painter:
                             if keep.any():
                                 expected=d['palette'][d['after'][keep]];actual=np.asarray(pal)[idx[(offsets[keep]%4096).astype(int)]]
                                 if not np.array_equal(actual,expected):raise RuntimeError(f'Readback mismatch {cx,cz,sy}')
-                    requested={p:entry for p,entry in self.entity_updates.items() if (p[0]//16,p[2]//16) in chunks_ops}
-                    if requested:
-                        lo=tuple(min(p[i] for p in requested) for i in range(3));hi=tuple(max(p[i] for p in requested) for i in range(3))
+                    if expected_entities:
+                        lo=tuple(min(p[i] for p in expected_entities) for i in range(3));hi=tuple(max(p[i] for p in expected_entities) for i in range(3))
                         current=dict(iter_block_entities(WORLD,DIM,lo,hi,selected_chunks=set(chunks_ops)))
-                        for p,(_,_,expected,_) in requested.items():
-                            if p not in current or current[p].snbt()!=expected.snbt():raise RuntimeError(f'NBT readback mismatch: {p}')
+                        for p,expected in expected_entities.items():
+                            actual=current.get(p)
+                            if (None if actual is None else actual.snbt())!=(None if expected is None else expected.snbt()):
+                                raise RuntimeError(f'Full created/retired/updated NBT readback mismatch: {p}')
+                        counts['block_entity_records_verified']+=len(expected_entities)
                 print(f'{name}: regions {number+1}/{len(groups)}, cells {counts["cells"]}, {time.monotonic()-start:.1f}s',flush=True)
         except Exception:
             for path,backup in touched:atomic_replace(path,backup.read_bytes())

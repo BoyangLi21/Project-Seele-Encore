@@ -1,14 +1,18 @@
-# Project SEELE
+# Project SEELE: Encore
 
 An open-source **Neon Genesis Evangelion** universe mod for Minecraft **Forge 1.20.1**.
 
 一个开源的《新世纪福音战士》世界观 Minecraft 模组（Forge 1.20.1）。
 
+一个 EVA 粉丝和算法爱好者，献给 EVA 与自己大学生涯的一次 Encore。
+
+源码仓库：[Project-Seele-Encore](https://github.com/BoyangLi21/Project-Seele-Encore)。原 main 的完整历史已按原提交哈希迁入独立新仓库；旧 Project-Seele 仓库保留。已按负责人要求移除 Encore 的旧 feat/mcp-bridge 分支。
+
 > God's in his heaven. All's right with the world.
 
 ## Status / 状态
 
-R43 阶段验收已收尾，全域质量重构仍在进行。当前安装与指令以 [R43 阶段手册](docs/MANUAL_ACCEPTANCE_R43_STAGE.md) 为准；未完成范围见 [下一轮清单](docs/R43_STAGE_NEXT_ROUND.md)。历史版本的通过记录不代表当前动作或美术已获认可。
+R44 按负责人要求提前收尾为人工验收半成品，全域重构尚未完成。当前安装选择、本轮实际改变、地区坐标及完整试玩步骤见 [R44 阶段手册](docs/MANUAL_ACCEPTANCE_R44_STAGE.md)；未完成制作和复核见 [R44 下一轮清单](docs/R44_STAGE_NEXT_ROUND.md)。六包在本机准备与核验，不代表已公开上传或网络发布。路径、构建和功能通过不代表动作、美术或用户验收通过。
 
 进入配套世界：`/seele enter`。机库：`/seele tp hanger`。输入 `/seele tp` 查看全部传送地点。旧地图生成与原型实验指令不再出现在正式游戏中。
 
@@ -22,13 +26,11 @@ Pilot controls / 驾驶操作：`WASD` 移动、`Space` 跳跃、`Shift` 单膝�
 
 ## Docs / 文档
 
-- [R43 阶段操作与验收](docs/MANUAL_ACCEPTANCE_R43_STAGE.md) — 当前五包、传送与检查步骤
-- [工程清理记录](docs/STORAGE_CLEANUP_R43.md) — 保留范围和旧源文件恢复方法
-- [R24 操作与验收（历史）](docs/MANUAL_ACCEPTANCE_R24.md) — 旧版记录，不作为当前操作入口
-- [R24 开发与验证](docs/TV_DEVELOPMENT_R24.md) — 实际完成内容、证据与限制
-- [R24 渲染与性能](docs/PERFORMANCE_R24.md) — 24 区块实测、车辆优化及 UN 区域的当前瓶颈
-- [环境美术与参考](docs/ART_DIRECTION_R24.md) — 原创资源、实景依据及版本区分
-- [B 站展示与同好共建](docs/BILIBILI_AND_COMMUNITY_R24.md) — 一次完整出动的分镜与贡献方向
+- [R44 阶段操作与人工验收](docs/MANUAL_ACCEPTANCE_R44_STAGE.md) — 完整／普通客户端选择、六包安装、本轮改变、分区与连续流程验收
+- [R44 下一轮接续](docs/R44_STAGE_NEXT_ROUND.md) — 动作、AT／第一人称、机库、全域美术与剩余交通验收
+- [R44 全域执行范围](docs/GLOBAL_RECONSTRUCTION_R44.md) — 本轮原始要求与质量边界
+- [R43 阶段手册（历史）](docs/MANUAL_ACCEPTANCE_R43_STAGE.md) — 上批操作及验收基线
+- [工程清理记录（R43 历史）](docs/STORAGE_CLEANUP_R43.md) — 旧源文件恢复方法
 - **[docs/ROADMAP.md](docs/ROADMAP.md)** — full plan through Third Impact & the Tree of Life / 完整路线图（直到第三次冲击与生命之树）
 - [docs/SETUP.md](docs/SETUP.md) — dev environment setup / 开发环境搭建
 - [docs/PROMPTS.md](docs/PROMPTS.md) — kickoff prompts for AI-assisted sessions / AI 协作开工手册
@@ -44,7 +46,6 @@ Pilot controls / 驾驶操作：`WASD` 移动、`Space` 跳跃、`Shift` 单膝�
 - [docs/EVA_POWER_TEST.md](docs/EVA_POWER_TEST.md) — five-minute battery, umbilical pylon and shutdown interlock / 五分钟电池、脐带供电与停机联锁
 - [docs/EVA_SYNCHRONIZATION_TEST.md](docs/EVA_SYNCHRONIZATION_TEST.md) — persistent pilot growth, response scaling and neural feedback / 持久同步率成长、响应增益与神经反噬
 - [docs/EVA_BERSERK_TEST.md](docs/EVA_BERSERK_TEST.md) — autonomous Unit-01 override and forced shutdown / 初号机自主暴走与强制停机
-- [docs/EVA_ARMAMENT_RACK_TEST.md](docs/EVA_ARMAMENT_RACK_TEST.md) — persistent physical EVA weapon loading and launch-bay racks / 持久化 EVA 实体装载与发射笼武器柜
 - [CLAUDE.md](CLAUDE.md) — project conventions for Claude Code / 项目协作约定
 
 ## Roadmap (short) / 路线图（简版）
@@ -68,7 +69,7 @@ The mod jar is written to `build/libs/`.
 
 ## Local visual testing / 本机视觉测试
 
-本次人工试玩使用 PCL 中的 **Project SEELE R43 Stage** 独立实例。Client ZIP 已内置模组、模型、存档及视觉资源，原 R42 实例保留。不要再使用旧版本的桌面启动副本或历史模型重建入口。
+本次人工试玩属于 **Project SEELE: Encore 的 R44 验收批次**，选择 **Project SEELE R44 Stage** 独立实例，安装方法见阶段手册。六包沿用 `Project_SEELE_R44_Stage_*` 文件名，模组 ID `projectseele` 与世界标识保持兼容。完整 Client 内含外部材质／光影且默认关闭光影；Client_Plain 不含外部材质包、光影及 Oculus，必需机体模型由 mod 内嵌。两个客户端使用相同 mod 与游戏功能，联机服务端必须同批协议 49。原 SEELE43 保留，不覆盖原实例和原存档。
 
 原生开发检查在专用副本运行，不能对玩家正式存档开启自动复核脚本。需要旧实验命令时显式设置 JVM 参数 `-Dprojectseele.developerCommands=true`。截图、检查记录及第三方评估素材不随公开源码分发；本轮具体检查范围见阶段手册。
 

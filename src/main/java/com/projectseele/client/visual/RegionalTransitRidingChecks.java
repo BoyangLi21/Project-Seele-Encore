@@ -611,6 +611,31 @@ public final class RegionalTransitRidingChecks
         return frame.getConstructor(list,Class.forName("org.mtr.core.data.VehicleCar"),boolean.class)
                 .newInstance(list.getConstructor(Collection.class).newInstance(frames),car,true);
     }
+    public record NativeDoorway(Vec3 door,Vec3 approach,Vec3 inside,float inwardYaw) {}
+    /** R44 commissioning reuses native car transforms and cached floor boxes.
+     * It never attaches a passenger or changes the simulator's motion. */
+    public static NativeDoorway measuredDoorway(Object vehicle,Object cache,Object car,Vec3 preferred,boolean aircraft,java.util.function.Predicate<Vec3> eligible)throws Exception
+    {
+        Object body=nativeBodyFrame(vehicle,car);Class<?> frame=body.getClass();Object p=frame.getField("position").get(body);
+        double yaw=frame.getField("yaw").getDouble(body),c=Math.cos(yaw),s=Math.sin(yaw),best=Double.POSITIVE_INFINITY;
+        NativeDoorway result=null;
+        for(Object box:(Iterable<?>)cache.getClass().getField("doorways").get(cache))
+        {
+            double x=((Double)call(box,"getMinXMapped")+(Double)call(box,"getMaxXMapped"))/2;
+            double z=((Double)call(box,"getMinZMapped")+(Double)call(box,"getMaxZMapped"))/2;
+            double sign=Math.signum(x),insideX=x-sign*.4,floorY=Double.NEGATIVE_INFINITY;
+            for(Object floor:(Iterable<?>)cache.getClass().getField("floors").get(cache))
+                if(insideX>=(Double)call(floor,"getMinXMapped")-.05&&insideX<=(Double)call(floor,"getMaxXMapped")+.05&&z>=(Double)call(floor,"getMinZMapped")-.05&&z<=(Double)call(floor,"getMaxZMapped")+.05)
+                    floorY=Math.max(floorY,(Double)call(floor,"getMaxYMapped"));
+            if(!Double.isFinite(floorY))continue;
+            var door=new Vec3(axis(p,"x")+x*c+z*s,axis(p,"y")+floorY,axis(p,"z")+z*c-x*s);
+            var outward=new Vec3(sign*c,0,-sign*s);var approach=door.add(outward.scale(1.2));
+            if(!eligible.test(approach))continue;
+            double distance=door.distanceToSqr(preferred);
+            if(distance<best){best=distance;result=new NativeDoorway(door,approach,door.subtract(outward.scale(aircraft?2.2:1.1)),(float)Math.toDegrees(Math.atan2(outward.x,-outward.z)));}
+        }
+        return result;
+    }
     private static Vec3 trainEntrance(Object vehicle,Object cache,Object car) throws Exception
     {
         Object body=nativeBodyFrame(vehicle,car);Class<?> frame=body.getClass();Object p=frame.getField("position").get(body);

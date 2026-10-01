@@ -1,0 +1,41 @@
+{
+  "textures": {
+    "body": "projectseele:block/nerv_machine_panel",
+    "screen": "projectseele:block/nerv_access_reader_screen",
+    "particle": "projectseele:block/nerv_machine_panel"
+  },
+  "elements": [
+    {
+      "from": [
+        3,
+        2,
+        12
+      ],
+      "to": [
+        13,
+        14,
+        16
+      ],
+      "faces": {
+        "north": {
+          "texture": "#screen"
+        },
+        "south": {
+          "texture": "#body"
+        },
+        "east": {
+          "texture": "#body"
+        },
+        "west": {
+          "texture": "#body"
+        },
+        "up": {
+          "texture": "#body"
+        },
+        "down": {
+          "texture": "#body"
+        }
+      }
+    }
+  ]
+}

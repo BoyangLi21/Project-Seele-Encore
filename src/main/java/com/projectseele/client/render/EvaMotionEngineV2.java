@@ -772,7 +772,7 @@ public final class EvaMotionEngineV2
         boolean kick = entity.isKickMotionActive(partialTick);
         int knife = entity.getKnifeMotionType(partialTick);
         boolean action = heavy || ordinary >= 0 || kick || knife >= 0;
-        boolean base = !action && entity.getVisualPose() == 0
+        boolean base = !action && !entity.hasLegacyStrikeForRender() && entity.getVisualPose() == 0
                 && !entity.isVisuallyAirborneForRender()
                 && (entity.getWeapon() == EvaUnit01Entity.WEAPON_FISTS
                     || entity.getWeapon() == EvaUnit01Entity.WEAPON_KNIFE

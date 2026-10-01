@@ -13,16 +13,18 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.minecraftforge.fluids.FluidType;
 
-/** Oxygenated orange LCL used only by Project SEELE facilities. */
+/** Dense orange-red LCL used only by Project SEELE facilities. */
 public final class LclFluidType extends FluidType
 {
     private static final ResourceLocation STILL = new ResourceLocation(
-            "minecraft", "block/water_still");
+            "projectseele", "block/lcl_still");
     private static final ResourceLocation FLOW = new ResourceLocation(
-            "minecraft", "block/water_flow");
+            "projectseele", "block/lcl_flow");
     private static final ResourceLocation OVERLAY = new ResourceLocation(
             "minecraft", "block/water_overlay");
-    public static final int TINT = 0x60E36A12;
+    // The deep cage pool must read as a liquid surface, not clear tinted water.
+    // Keep the R44 shader material and the carrier's fractional surface in sync.
+    public static final int TINT = 0xF2DB5420;
 
     public LclFluidType()
     {
@@ -78,7 +80,7 @@ public final class LclFluidType extends FluidType
                                            float darkenWorldAmount,
                                            Vector3f fluidFogColor)
             {
-                return new Vector3f(0.92F, 0.30F, 0.035F);
+                return new Vector3f(0.86F, 0.33F, 0.125F);
             }
 
             @Override
@@ -88,7 +90,7 @@ public final class LclFluidType extends FluidType
                                         FogShape shape)
             {
                 RenderSystem.setShaderFogStart(0.0F);
-                RenderSystem.setShaderFogEnd(Math.min(renderDistance, 42.0F));
+                RenderSystem.setShaderFogEnd(Math.min(renderDistance, 6.0F));
                 RenderSystem.setShaderFogShape(FogShape.SPHERE);
             }
         });

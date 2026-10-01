@@ -55,6 +55,11 @@ import org.jetbrains.annotations.Nullable;
 @Mod.EventBusSubscriber(modid = ProjectSeele.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE, value = Dist.CLIENT)
 public final class VisualCaptureManager
 {
+    private static boolean actualChunkLoaded(Minecraft mc, BlockPos pos)
+    {
+        return mc.level.getChunkSource().hasChunk(pos.getX() >> 4, pos.getZ() >> 4);
+    }
+
     private static final String CAPTURE_BATCH = DateTimeFormatter.ofPattern("yyyyMMdd-HHmmss")
             .format(LocalDateTime.now());
     /** One stable renderer baseline per EVA variant inside a capture batch. */
@@ -922,9 +927,9 @@ public final class VisualCaptureManager
                 }
                 return true;
             }
-            if (!minecraft.level.hasChunkAt(
+            if (!actualChunkLoaded(minecraft,
                     BlockPos.containing(CAMERAS[this.view]))
-                    || !minecraft.level.hasChunkAt(
+                    || !actualChunkLoaded(minecraft,
                     BlockPos.containing(TARGETS[this.view])))
             {
                 return waitOrFail("chunks");
@@ -1786,7 +1791,7 @@ public final class VisualCaptureManager
         private boolean viewChunksLoaded(Minecraft minecraft)
         {
             if (this.camera == null
-                    || !minecraft.level.hasChunkAt(this.camera.blockPosition()))
+                    || !actualChunkLoaded(minecraft, this.camera.blockPosition()))
             {
                 return false;
             }
@@ -1794,7 +1799,7 @@ public final class VisualCaptureManager
             {
                 for (int x : LIFT_X)
                 {
-                    if (!minecraft.level.hasChunkAt(
+                    if (!actualChunkLoaded(minecraft,
                             this.origin.offset(x, 1, -76)))
                     {
                         return false;
@@ -1824,7 +1829,7 @@ public final class VisualCaptureManager
                 case "lcl_lake" -> this.origin.offset(48, 1, 0);
                 default -> this.origin.offset(-128, 0, -96);
             };
-            return minecraft.level.hasChunkAt(landmark);
+            return actualChunkLoaded(minecraft, landmark);
         }
 
         private boolean auditView(Minecraft minecraft)

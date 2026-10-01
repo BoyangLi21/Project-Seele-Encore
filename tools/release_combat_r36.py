@@ -1,6 +1,6 @@
 """Install or package the reviewed R36 runtime, excluding all save data."""
 from pathlib import Path
-import argparse,datetime,hashlib,json,shutil,subprocess,zipfile
+import argparse,ctypes,datetime,hashlib,json,re,shutil,subprocess,zipfile
 from check_runtime_r36 import check
 from build_server_ready_pack import newest_project_jar
 ROOT=Path(__file__).resolve().parents[1];ART=ROOT/'artifacts/combat_direction_r36'
@@ -8,8 +8,30 @@ def sha(p):return hashlib.sha256(Path(p).read_bytes()).hexdigest()
 def files():
  result={p.name:p for p in (ART/'profiles').glob('*.json')};result['articulated_bodies_r35.json']=ROOT/'artifacts/combat_rebuild_r35/jbullet/articulated_bodies_r35.json';return result
 def guard():
- r=subprocess.run(['powershell','-NoProfile','-Command',"@(Get-CimInstance Win32_Process | Where-Object { ($_.Name -eq 'java.exe' -or $_.Name -eq 'javaw.exe') -and $_.CommandLine -match 'BootstrapLauncher|cpw.mods.modlauncher|net.minecraft.client.main.Main|client-.*[.]args|GradleDaemon' }).Count"],capture_output=True,text=True,check=True)
- if int(r.stdout.strip() or '0'):raise RuntimeError('Close Minecraft and Gradle before installing')
+ # Java @argfile launches hide BootstrapLauncher from the process command.
+ # R44's immutable launch.args must be inspected before declaring the world
+ # stopped; session.lock alone does not protect runtime assets or Gradle.
+ r=subprocess.run(['powershell','-NoProfile','-Command',"@(Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'java.exe' -or $_.Name -eq 'javaw.exe' } | Select-Object ProcessId,CommandLine) | ConvertTo-Json -Compress"],capture_output=True,text=True,check=True)
+ processes=json.loads(r.stdout.strip() or '[]');processes=[processes] if isinstance(processes,dict) else processes
+ marker=re.compile(r'BootstrapLauncher|cpw[.]mods[.]modlauncher|net[.]minecraft[.]client[.]main[.]Main|GradleDaemon|GradleWrapperMain')
+ parse=ctypes.windll.shell32.CommandLineToArgvW;parse.argtypes=[ctypes.c_wchar_p,ctypes.POINTER(ctypes.c_int)];parse.restype=ctypes.POINTER(ctypes.c_wchar_p)
+ free=ctypes.windll.kernel32.LocalFree;free.argtypes=[ctypes.c_void_p];free.restype=ctypes.c_void_p
+ blockers=[]
+ for process in processes:
+  command=process.get('CommandLine') or '';reason='Minecraft or Gradle' if marker.search(command) else None
+  count=ctypes.c_int();argv=parse(command,ctypes.byref(count)) if command else None
+  try:
+   for i in range(count.value):
+    arg=argv[i]
+    if not arg.startswith('@') or arg.startswith('@@'):continue
+    path=Path(arg[1:])
+    if not path.is_absolute() or not path.is_file():reason=reason or 'unresolved Java argument file';continue
+    if path.stat().st_size>4*1024*1024:reason=reason or 'oversized Java argument file';continue
+    if marker.search(path.read_text('utf8',errors='replace')):reason='Minecraft or Gradle via argument file'
+  finally:
+   if argv:free(ctypes.cast(argv,ctypes.c_void_p))
+  if reason:blockers.append(dict(pid=process['ProcessId'],reason=reason))
+ if blockers:raise RuntimeError('Close Minecraft and Gradle before installing: '+json.dumps(blockers))
 def main():
  ap=argparse.ArgumentParser();ap.add_argument('--install',action='store_true');ap.add_argument('--package',action='store_true');args=ap.parse_args();paths=files();check(ART/'profiles')
  hashes={n:sha(p) for n,p in paths.items()};proof=json.loads((ART/'acceptance.json').read_text())

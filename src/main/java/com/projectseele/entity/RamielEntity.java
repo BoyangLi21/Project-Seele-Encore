@@ -417,10 +417,10 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
     {
         Vec3 core = this.position();
         AABB range = new AABB(core, core).inflate(AT_FIELD_PUSH_RANGE);
-        for (LivingEntity target : this.level().getEntitiesOfClass(LivingEntity.class, range,
+        for (LivingEntity target : com.projectseele.physics.CombatEntityQueryR44.candidates(this.level(),range,
                 e -> e != this && !(e instanceof Angel) && e.isAlive() && !e.isSpectator()))
         {
-            Vec3 away = target.position().subtract(core);
+            Vec3 away = com.projectseele.physics.CombatBodyContacts.nearestSurfacePoint(target,core).subtract(core);
             double distance = away.length();
             if (distance > AT_FIELD_PUSH_RANGE || distance < 1.0E-3D)
             {
@@ -479,9 +479,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
 
         // The beam detonates on the first body it meets (an EVA blocks it
         // with its bulk) instead of lancing through to the far terrain.
-        EntityHitResult bodyHit = ProjectileUtil.getEntityHitResult(this.level(), this, from, end,
-                new AABB(from, end).inflate(1.0D),
-                e -> e instanceof LivingEntity && e != this && e.isAlive()
+        EntityHitResult bodyHit = com.projectseele.physics.CombatEntityQueryR44.ray(this.level(),from,end,.3,
+                e -> e != this && e.isAlive()
                         && !(e instanceof Angel)
                         && !(e.getVehicle() instanceof EvaUnit01Entity));
         if (bodyHit != null)
@@ -490,15 +489,15 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
         }
         final Vec3 impact = end;
 
-        for (LivingEntity victim : this.level().getEntitiesOfClass(LivingEntity.class,
+        for (LivingEntity victim : com.projectseele.physics.CombatEntityQueryR44.candidates(this.level(),
                 new AABB(from, end).inflate(1.0D), e -> e != this && e.isAlive()))
         {
             // The entry plug shields the pilot; the Unit takes the hit instead.
-            if (victim.getVehicle() instanceof EvaUnit01Entity)
+            if (victim.isPassenger()&&victim.getRootVehicle() instanceof EvaUnit01Entity)
             {
                 continue;
             }
-            Optional<Vec3> hit = victim.getBoundingBox().inflate(0.3D).clip(from, end);
+            Optional<Vec3> hit = com.projectseele.physics.CombatBodyContacts.clip(victim,from,end,.3);
             if (hit.isPresent())
             {
                 victim.hurt(this.damageSources().mobAttack(this),
@@ -915,7 +914,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
                 AABB column = new AABB(
                         this.ramiel.getX() - DRILL_RADIUS, floorY, this.ramiel.getZ() - DRILL_RADIUS,
                         this.ramiel.getX() + DRILL_RADIUS, coreY, this.ramiel.getZ() + DRILL_RADIUS);
-                for (LivingEntity victim : serverLevel.getEntitiesOfClass(LivingEntity.class, column,
+                for (LivingEntity victim : com.projectseele.physics.CombatEntityQueryR44.overlap(serverLevel,column,
                         e -> e != this.ramiel && e.isAlive()))
                 {
                     victim.hurt(this.ramiel.damageSources().mobAttack(this.ramiel),

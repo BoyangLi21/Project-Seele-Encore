@@ -15,6 +15,8 @@ public final class CombatBodyProfiles
     public record Recovery(String[] names,Quaternionf[][] rotations,Vector3f[][] positions,float duration,float[] frontY) {}
     public record Profile(String key,JsonObject definition,Map<String,EvaBodyPose.Bone> rig,Recovery recovery) {}
     private static Map<String,Profile> profiles;
+    private static String loadedFingerprint="ABSENT";
+    public static synchronized String fingerprint(){get(null);return loadedFingerprint;}
     public static String key(net.minecraft.world.entity.LivingEntity entity)
     {return entity instanceof EvaPrototypeEntity un?Integer.toString(3+un.getUNSerial()):entity instanceof EvaUnit01Entity eva?Integer.toString(eva.getUnitVariant()):entity instanceof SachielEntity?"sachiel":"";}
     public static synchronized Profile get(net.minecraft.world.entity.LivingEntity entity)
@@ -25,7 +27,10 @@ public final class CombatBodyProfiles
             if(!Files.isRegularFile(path)){profiles=Map.of();return null;}
             try
             {
-                var json=JsonParser.parseString(Files.readString(path)).getAsJsonObject();
+                byte[] bytes=Files.readAllBytes(path);
+                loadedFingerprint=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
+                com.projectseele.ProjectSeele.LOGGER.info("Combat physical profile resolved: file={} sha256={}",path.toAbsolutePath().normalize(),loadedFingerprint);
+                var json=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
                 if(!"projectseele.articulated-body.v1".equals(json.get("schema").getAsString()))throw new IllegalArgumentException("Body profile version");
                 Map<String,Profile> result=new HashMap<>();
                 for(var entry:json.getAsJsonObject("models").entrySet())

@@ -81,6 +81,7 @@ def main():
         # Direction strip and a supported, real aircraft departure display.
         at=(sx+4,85,terminal-2);support=(sx+5,85,terminal-2);ff(p,(*support,*support),STEEL,owner)
         p.put(*at,'projectseele:station_departure_board[facing=west]',owner);p.block_entities[at]=nbtlib.Compound({'id':nbtlib.String('projectseele:station_departure_board'),'x':nbtlib.Int(at[0]),'y':nbtlib.Int(at[1]),'z':nbtlib.Int(at[2]),'PlatformCentre':nbtlib.Long(packed(platform)),'Station':nbtlib.String('箱根湾机场' if name=='bay' else '新箱根机场'),'Route':nbtlib.String('F1')});boards.append(dict(pos=at,platform=platform))
+        p.block_entities[at]['AirService']=nbtlib.Byte(1)
         path(name+'/terminal_station',[[sx+.5,81,terminal-4.5],[sx+.5,81,sz-16.5]])
         path(name+'/station_boarding',[[sx+.5,81,sz-16.5],[sx+.5,81,zcross+.5],[bx+.5,81,zcross+.5],[bx+.5,81,bz+.5]])
     # Repaint taxi markings from the final native paths. This also covers old

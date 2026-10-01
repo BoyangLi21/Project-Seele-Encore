@@ -221,7 +221,11 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
             return;
         }
         Minecraft minecraft = Minecraft.getInstance();
-        this.pilotView = isLocalPilotView(minecraft, entity);
+        // The physical feed trims enclosing armour. The sun's view must keep
+        // the whole body, even though Minecraft's camera mode is first person.
+        boolean localPilotView=isLocalPilotView(minecraft, entity),shadowPass=ShaderShadowPassR44.active();
+        this.pilotView = localPilotView && !shadowPass;
+        EvaShadowProbeR44.renderMode(entity,localPilotView,shadowPass);
         if(this.pilotView)com.projectseele.client.EvaPilotBodyRenderBridge.mark(entity);
         EvaPoseRuntimeRecorder.maybeStartSmoke(entity);
         // Wet cages and launch shafts use dedicated NERV floodlights.  Keeping
@@ -240,7 +244,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                     nervFloodlit ? LightTexture.FULL_BRIGHT : packedLight,
                     entity,partialTick);
         }
-        EvaBayMachineryR33.render(poseStack,entity,partialTick);
+        TvFacilityMeshes.withBuffers(bufferSource,()->EvaBayMachineryR33.render(poseStack,entity,partialTick));
         boolean recording = EvaPoseRuntimeRecorder.wants(entity);
         if (recording)
         {
@@ -586,10 +590,12 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
     {
         if (!this.pilotView)
         {
+            EvaShadowProbeR44.admission(entity,bone.getName(),true);
             return true;
         }
         if (CAMERA_COVER_BONES.contains(bone.getName()))
         {
+            EvaShadowProbeR44.admission(entity,bone.getName(),false);
             return false;
         }
         // The rider socket is fixed to the entity while attack animations can
@@ -599,7 +605,9 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         // the exact world skeleton seen by third person without the chest
         // becoming an opaque wall during a knife strike or spear lunge.
         String surface=bone.getName().startsWith("r21_join_")&&bone.getParent()!=null?bone.getParent().getName():bone.getName();
-        return !PILOT_CAMERA_MESH_COVER.contains(surface);
+        boolean visible=!PILOT_CAMERA_MESH_COVER.contains(surface);
+        EvaShadowProbeR44.admission(entity,bone.getName(),visible);
+        return visible;
     }
 
     private static void hideSubtree(GeoBone bone)

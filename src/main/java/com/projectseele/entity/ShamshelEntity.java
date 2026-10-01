@@ -151,16 +151,20 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
             {
                 var points=ShamshelWhipMotion.points(this,age-1+sample/4F,1);
                 var previous=ShamshelWhipMotion.points(this,age-1.25F+sample/4F,1);
+                AABB sweep=new AABB(points.get(0),points.get(0));
+                for(var point:points)sweep=sweep.minmax(new AABB(point,point));
+                var victims=com.projectseele.physics.CombatEntityQueryR44.candidates(level(),sweep.inflate(1.2),
+                        e->(e instanceof EvaUnit01Entity||e instanceof Player&&!e.isPassenger())&&e.isAlive());
                 for(int i=1;i<points.size();i++)
                 {
                     Vec3 from=points.get(i-1),to=points.get(i);
                     var wall=level().clip(new net.minecraft.world.level.ClipContext(from,to,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this));
                     Vec3 end=wall.getLocation();
-                    for(var victim:level().getEntitiesOfClass(LivingEntity.class,new AABB(from,end).inflate(1.2),
-                            e->!hitVictims.contains(e.getUUID())&&(e instanceof EvaUnit01Entity||e instanceof Player&&!e.isPassenger())&&e.isAlive()))
+                    for(var victim:victims)
                     {
-                        var contact=victim.getBoundingBox().inflate(.7).clip(from,end);
-                        if(contact.isEmpty()&&!victim.getBoundingBox().inflate(.7).contains(from))continue;
+                        if(hitVictims.contains(victim.getUUID()))continue;
+                        var contact=com.projectseele.physics.CombatBodyContacts.clip(victim,from,end,.7);
+                        if(contact.isEmpty())continue;
                         hitVictims.add(victim.getUUID());Vec3 motion=points.get(i).subtract(previous.get(i));
                         Vec3 direction=motion.lengthSqr()>1e-6?motion.normalize():end.subtract(from).normalize();
                         if(com.projectseele.event.EvaHitFeedback.hurt(victim,damageSources().mobAttack(this),30F,contact.orElse(from),direction)&&!(victim instanceof EvaUnit01Entity))
