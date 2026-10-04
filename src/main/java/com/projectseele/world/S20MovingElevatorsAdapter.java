@@ -1,6 +1,7 @@
 package com.projectseele.world;
 
 import com.projectseele.ProjectSeele;
+import com.projectseele.registry.ModBlocks;
 import com.projectseele.mixin.MovingElevatorRemoteAccessor;
 import com.projectseele.registry.ModItems;
 import com.supermartijn642.movingelevators.MovingElevators;
@@ -105,6 +106,7 @@ public final class S20MovingElevatorsAdapter
                     return true;
                 }
                 held.remove(spec.id());
+                finishParkedCompactWindowR46(level,spec,base.getGroup());
             }
         }
         /*
@@ -1492,6 +1494,79 @@ public final class S20MovingElevatorsAdapter
         return true;
     }
 
+    /** Preserve the original car wherever it is currently parked. A finish
+     * migration does not move/rebuild a cage or edit a controller/selector. */
+    private static void finishParkedCompactWindowR46(ServerLevel level,
+            S20PhysicalElevatorDirector.LiftSpec spec,ElevatorGroup group)
+    {
+        if(!TvLiftFinishR45.compactWindowContract(level,spec)||group.isMoving()
+                ||group.getCageSizeX()!=5||group.getCageSizeY()!=6||group.getCageSizeZ()!=5)return;
+        S20PhysicalElevatorDirector.Landing car=null;int matches=0;
+        for(var stop:spec.stops())
+        {
+            if(!S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,stop.cabinCentre()))continue;
+            var centre=stop.cabinCentre();boolean roof=true;
+            for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)
+            {
+                var q=centre.offset(x,4,z);
+                roof&=level.hasChunkAt(q)&&level.getBlockEntity(q)==null
+                        &&TvLiftFinishR45.recognizedCabinRoof(level,spec,level.getBlockState(q));
+            }
+            if(roof&&captureMatchesLanding(group,group.getCageAnchorBlockPos(stop.walkY()),centre)){car=stop;matches++;}
+        }
+        if(matches!=1)return;
+        var centre=car.cabinCentre();var selector=cabinPanelPosition(spec,centre,spec.lower().exit());
+        var button=level.getBlockEntity(selector);var display=level.getBlockEntity(selector.above());
+        if(button==null||display==null||!level.getBlockState(selector).is(MovingElevators.button_block)
+                ||!level.getBlockState(selector.above()).is(MovingElevators.display_block))return;
+        var link=button.saveWithoutMetadata().getCompound("data");var controller=controllerPosition(spec,spec.lower());
+        if(!link.contains("controllerX")||!link.contains("controllerY")||!link.contains("controllerZ")
+                ||link.getInt("controllerX")!=controller.getX()||link.getInt("controllerZ")!=controller.getZ()
+                ||spec.stops().stream().noneMatch(s->controllerPosition(spec,s).getY()==link.getInt("controllerY")))return;
+        var exits=new HashSet<Direction>();spec.stops().forEach(s->exits.add(s.exit()));
+        // Certify the complete original floor/roof/shell/selector, including
+        // currently open and opposite closed apertures, before all11 writes.
+        for(int x=-2;x<=2;x++)for(int z=-2;z<=2;z++)for(int dy=-1;dy<=4;dy++)
+        {
+            var q=centre.offset(x,dy,z);if(!level.hasChunkAt(q))return;
+            var state=level.getBlockState(q);var be=level.getBlockEntity(q);
+            if(q.equals(selector)||q.equals(selector.above()))continue;
+            if(be!=null)return;
+            if(dy==-1){if(!S20PhysicalElevatorDirector.isCabinFloor(state))return;continue;}
+            if(dy==4){if(!TvLiftFinishR45.recognizedCabinRoof(level,spec,state))return;continue;}
+            if(Math.abs(x)<2&&Math.abs(z)<2){if(!state.isAir())return;continue;}
+            if(isCabinDoorCell(q,centre,exits))
+            {
+                if(!state.isAir()&&!state.is(Blocks.GRAY_STAINED_GLASS)&&!state.is(Blocks.LIGHT_GRAY_STAINED_GLASS)
+                        &&!state.is(ModBlocks.CLEAR_GLASS.get()))return;
+                continue;
+            }
+            boolean console=x==2&&Math.abs(z)<=1;
+            if(!(console&&state.is(Blocks.BLACK_CONCRETE))&&!state.is(Blocks.IRON_BLOCK)
+                    &&!state.is(ModBlocks.NERV_MACHINE_PANEL.get())&&!state.is(ModBlocks.NERV_STRUCTURAL_PANEL.get())
+                    &&!state.is(ModBlocks.CLEAR_GLASS.get()))return;
+        }
+        var changes=new java.util.LinkedHashMap<BlockPos,BlockState>();
+        for(int x=-2;x<=2;x++)for(int dy=0;dy<=3;dy++)
+        {
+            var q=centre.offset(x,dy,2);if(isCabinDoorCell(q,centre,exits))continue;
+            var state=level.getBlockState(q);
+            if(level.getBlockEntity(q)!=null||!state.is(Blocks.IRON_BLOCK)
+                    &&!state.is(ModBlocks.NERV_MACHINE_PANEL.get())&&!state.is(ModBlocks.NERV_STRUCTURAL_PANEL.get())
+                    &&!state.is(ModBlocks.CLEAR_GLASS.get()))return;
+            if(!state.is(ModBlocks.CLEAR_GLASS.get()))changes.put(q,state);
+        }
+        if(changes.isEmpty())return;
+        // Full preimages were observed in this one server thread; recheck
+        // every finite cell before changing its unchanged full-cube finish.
+        for(var row:changes.entrySet())if(!level.getBlockState(row.getKey()).equals(row.getValue())
+                ||level.getBlockEntity(row.getKey())!=null)return;
+        var previous=changes.entrySet().stream().map(e->e.getKey().toShortString()+"="+e.getValue()).toList();
+        changes.keySet().forEach(q->level.setBlock(q,ModBlocks.CLEAR_GLASS.get().defaultBlockState(),UPDATE));
+        ProjectSeele.LOGGER.info("NERV original parked compact window finish: car={} cells={} completeOldStates={} controller/selector/floor/roof/doors preserved",
+                centre,changes.size(),previous);
+    }
+
     private static boolean floorRepairDoorwayClear(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec,
             S20PhysicalElevatorDirector.Landing landing,int radius)
     {
@@ -1595,7 +1670,7 @@ public final class S20MovingElevatorsAdapter
                                     : Blocks.IRON_BLOCK.defaultBlockState();
                         }
                         if(!isCabinDoorCell(position,centre,exits))
-                            state=TvLiftFinishR45.cabinWall(level,spec,dy-1,state);
+                            state=TvLiftFinishR45.cabinWall(level,spec,dy-1,position,centre,state);
                     }
                     level.setBlock(position, state, UPDATE);
                 }

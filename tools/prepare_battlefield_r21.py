@@ -5,6 +5,15 @@ import numpy as np
 import scan_regional_completion as scan
 from query_blocks import iter_block_entities,AIR
 ROOT=Path(__file__).resolve().parents[1];WORLD=ROOT/'run/saves/SEELE_R21_REVIEW';OUT=ROOT/'artifacts/world_repair_r21/battlefield'
+def fixed_power_pylon(q):
+ x,y,z=q;y-=80
+ if not 1<=y<=28:return False
+ for cx in(-150,210):
+  for cz in(60,220,380):
+   if z!=cz:continue
+   dx=abs(x-cx);spread=max(0,4-y//7)
+   if y in(22,27)and dx<=5 or dx==spread or y%6==0 and dx<=spread:return True
+ return False
 def main():
  scan.WORLD=WORLD;lo=(-144,80,41);hi=(207,180,392);a,p=scan.volume(lo,hi);be=dict(iter_block_entities(WORLD,'projectseele:geofront',lo,hi));rows=[];counts={}
  assert not any('movingelevators' in str(t['id']) for q,t in be.items()),'All public-lift controls must be below the battle plane'
@@ -13,7 +22,9 @@ def main():
   if base in AIR|{'minecraft:light','minecraft:structure_void'}:continue
   points=np.argwhere(a[1:]==i)
   for yy,zz,xx in points:
-   q=(int(xx+lo[0]),int(yy+lo[1]+1),int(zz+lo[2]));row=[*q,state,'minecraft:air']
+   q=(int(xx+lo[0]),int(yy+lo[1]+1),int(zz+lo[2]))
+   if fixed_power_pylon(q):continue
+   row=[*q,state,'minecraft:air']
    if q in be:row.append(be[q].snbt())
    rows.append(row)
   counts[state]=len(points)

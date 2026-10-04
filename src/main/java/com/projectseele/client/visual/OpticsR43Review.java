@@ -16,7 +16,7 @@ public final class OpticsR43Review
     {
         if(!ENABLED||!CombatR31Review.ENABLED||eva.getId()!=CombatR31Review.evaId)return;
         String label=CombatR31Review.photo;if(!label.startsWith("r43_optics_"))return;
-        boolean dark=label.equals("r43_optics_post_berserk");
+        boolean dark=label.equals("r43_optics_parked")||label.equals("r43_optics_post_berserk");
         boolean actualDark=texture.getPath().equals("dynamic/unit01_eyes_dormant");
         boolean normal=texture.getPath().equals("textures/entity/eva_unit01_eyes.png");
         var row=new JsonObject();row.addProperty("case",label);row.addProperty("texture",texture.toString());

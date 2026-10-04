@@ -64,9 +64,11 @@ public final class TvLiftFinishR45
 
     /** Only new fallback non-door wall blocks use this palette; no live repaint. */
     public static BlockState cabinWall(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec,
-            int heightAboveFeet,BlockState original)
+            int heightAboveFeet,BlockPos position,BlockPos centre,BlockState original)
     {
         String style=styles(level).get(spec.id());if(style==null)return original;
+        if(spec.id().equals(S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID)
+                &&position.getZ()==centre.getZ()+2)return ModBlocks.CLEAR_GLASS.get().defaultBlockState();
         if(style.startsWith("tv22"))return heightAboveFeet==1
                 ?ModBlocks.TV_STAFF_LIFT_BAND_R45.get().defaultBlockState():ModBlocks.TV_STAFF_LIFT_PANEL_R45.get().defaultBlockState();
         return heightAboveFeet==2?ModBlocks.NERV_STRUCTURAL_PANEL.get().defaultBlockState()
@@ -86,6 +88,20 @@ public final class TvLiftFinishR45
         String style=styles(level).get(spec.id());if(style==null)return false;
         return state.is(ModBlocks.NERV_MACHINE_EDGE.get())
                 ||(style.startsWith("tv22")?state.is(ModBlocks.TV_STAFF_LIFT_PANEL_R45.get()):state.is(ModBlocks.TV_UTILITY_LIFT_CEILING_R45.get()));
+    }
+
+    /** The regional gate has its own nine-block car and roof sensor. */
+    public static boolean recognizedGatewayRoof(ServerLevel level,BlockState state)
+    {
+        if(state.is(Blocks.POLISHED_DEEPSLATE))return true;
+        return "tv12_large_utility".equals(styles(level).get(NervLiftPassengerSync.GATEWAY))
+                &&state.is(ModBlocks.TV_UTILITY_LIFT_CEILING_R45.get());
+    }
+
+    public static boolean compactWindowContract(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec)
+    {
+        return spec.id().equals(S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID)
+                &&"tv12_hangar_utility".equals(styles(level).get(spec.id()));
     }
 
     /** A single interior hole is distinct from an absent/misidentified platform. */

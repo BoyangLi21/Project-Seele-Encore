@@ -117,7 +117,7 @@ final class TvCageEnclosureR44
 
     static boolean render(int variant, float opening, PoseStack poses, int light)
     {
-        if (!Boolean.getBoolean("projectseele.r44TvCageReview") || variant < 0 || variant > 2) return false;
+        if (!com.projectseele.world.TvCageCollisionR44.enabled() || variant < 0 || variant > 2) return false;
         load();
         if (COMPONENTS.isEmpty()) return false;
         // Fixed supports are generated as complete members, never triangle-clipped by height.

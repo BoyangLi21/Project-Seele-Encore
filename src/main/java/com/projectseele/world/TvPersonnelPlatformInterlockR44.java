@@ -47,7 +47,7 @@ public final class TvPersonnelPlatformInterlockR44
 
     public static boolean enabled(ServerLevel level)
     {
-        return Boolean.getBoolean("projectseele.r44TvPersonnelPlatformsReview")
+        return com.projectseele.config.PortableRuntimeOwnersR45.personnelPlatforms()
                 && level.dimension().location().toString().equals("projectseele:geofront");
     }
 
@@ -190,19 +190,25 @@ public final class TvPersonnelPlatformInterlockR44
     {
         if (!enabled(level)) return Optional.empty();
         var contract=contract(level);
-        if (contract.isEmpty()) return Optional.of("人员平台归属契约不可用，设备保持停止。");
+        if (contract.isEmpty()) return Optional.of("检修平台状态尚未确认，暂缓整备。");
+        if(installedRequired)
+        {
+            var pilot=TrainingPilotDirector.existingPilotR45(level,variant);
+            if(pilot!=null&&pilot.getPersistentData().getBoolean("SeelePilotDoorClosePendingR46"))
+                return Optional.of("登机通道的安全门还没关好，整备暂停。");
+        }
         var volumes=contract.get().areas.get(variant);
-        if (volumes==null || volumes.isEmpty()) return Optional.of("人员平台完整区域缺失。");
+        if (volumes==null || volumes.isEmpty()) return Optional.of("检修平台不完整，暂缓整备。");
         for (var volume:volumes)
             for (int x=net.minecraft.util.Mth.floor(volume.minX)>>4;x<=net.minecraft.util.Mth.floor(volume.maxX-.0001)>>4;x++)
                 for (int z=net.minecraft.util.Mth.floor(volume.minZ)>>4;z<=net.minecraft.util.Mth.floor(volume.maxZ-.0001)>>4;z++)
                     if (!level.hasChunk(x,z) || !level.areEntitiesLoaded(ChunkPos.asLong(x,z)))
-                        return Optional.of("人员平台区域或实体分区未加载，不能将未知区域认作已清场。");
+                        return Optional.of("还没有收到检修平台的清场确认，请稍候。");
         if(installedRequired)
         {
-            if(!modelReady(level.getServer()))return Optional.of("人员平台实际模型资源身份不匹配或不可读取。");
+            if(!modelReady(level.getServer()))return Optional.of("检修平台设备状态异常，暂缓整备。");
             var cells=contract.get().installed.get(variant);
-            if(cells==null)return Optional.of("人员平台实际安装列表缺失。");
+            if(cells==null)return Optional.of("检修平台设备记录不完整，暂缓整备。");
             for(var cell:cells.entrySet())
                 if(!level.hasChunkAt(cell.getKey())||level.getBlockEntity(cell.getKey())!=null
                     ||!TvPersonnelPlatformRecipeR44.alreadyOwned(level.getBlockState(cell.getKey()),cell.getValue()))
@@ -212,7 +218,7 @@ public final class TvPersonnelPlatformInterlockR44
                 {
                     boolean open=level.getBlockState(gate.first).getValue(DoorBlock.OPEN);
                     for(var pos:List.of(gate.first,gate.first.above(),gate.second,gate.second.above()))
-                        if(level.getBlockState(pos).getValue(DoorBlock.OPEN)!=open)return Optional.of("人员平台四半门状态不一致。");
+                        if(level.getBlockState(pos).getValue(DoorBlock.OPEN)!=open)return Optional.of("检修平台的安全门没有正常闭合。");
                 }
         }
         AABB union=volumes.get(0);
@@ -220,7 +226,7 @@ public final class TvPersonnelPlatformInterlockR44
         for (var actor:level.getEntities((Entity)null,union,e->crew(level,e,variant)))
             for (var volume:volumes)
                 if (volume.intersects(actor.getBoundingBox()))
-                    return Optional.of("请先清空本机全部人员平台及绿色检修面："+actor.getUUID());
+                    return Optional.of("检修平台还有人员未撤离："+actor.getName().getString());
         return Optional.empty();
     }
 
@@ -246,6 +252,93 @@ public final class TvPersonnelPlatformInterlockR44
                 e->e.isAlive()&&e.isRestraintGantry()&&e.getUnitVariant()==variant);
         if(gantries.size()!=1)return Optional.of("本机实际拘束设备缺失或重复，不能开始整备／发射。");
         return Optional.empty();
+    }
+
+    /** A dispatch may open only the original pilot's matching parked bay doors. */
+    public static Optional<String> openForOriginalBoardingPilotR46(ServerLevel level,
+            com.projectseele.entity.TrainingPilotEntity pilot)
+    {
+        if(!enabled(level))return Optional.empty();
+        int variant=pilot.getAssignedVariant();
+        if(TrainingPilotDirector.existingPilotR45(level,variant)!=pilot)
+            return Optional.of("驾驶员与这台机体的登记不符，不能开启登机通道。");
+        var data=contract(level);var fleet=EvaFleetSavedData.get(level.getServer()).entry(variant);
+        if(data.isEmpty()||fleet.isEmpty()||fleet.get().phase()!=EvaFleetSavedData.Phase.PARKED)
+            return Optional.of("机体和检修平台还没有准备好，驾驶员先在原地待命。");
+        var installed=data.get().installed.get(variant);
+        if(installed==null||!modelReady(level.getServer()))return Optional.of("这台机体的检修平台暂时不能使用。");
+        for(var cell:installed.entrySet())
+            if(!level.hasChunkAt(cell.getKey())||level.getBlockEntity(cell.getKey())!=null
+                    ||!TvPersonnelPlatformRecipeR44.alreadyOwned(level.getBlockState(cell.getKey()),cell.getValue()))
+                return Optional.of("本机人员平台完整组件已改变，门保持现状："+cell.getKey());
+        double x=-11.5+42*variant;
+        var gantries=level.getEntitiesOfClass(NervCarrierPlatformEntity.class,new AABB(x-2,-445,-242,x+2,-439,-237),
+                e->e.isAlive()&&e.isRestraintGantry()&&e.getUnitVariant()==variant);
+        if(gantries.size()!=1)return Optional.of("拘束架尚未就位，驾驶员先在原地待命。");
+        float clock=gantries.get(0).getRestraintProgress();
+        if(clock>.001f&&clock<.999f)return Optional.of("拘束架还在移动，请驾驶员稍候。");
+        var gates=new HashSet<>(data.get().gates.values());
+        for(var gate:gates)if(gate.variant==variant)
+        {
+            boolean open=level.getBlockState(gate.first).getValue(DoorBlock.OPEN);
+            for(var pos:List.of(gate.first,gate.first.above(),gate.second,gate.second.above()))
+                if(level.getBlockState(pos).getValue(DoorBlock.OPEN)!=open)
+                    return Optional.of("登机通道的安全门状态异常，请先检查安全门。");
+            if(!open)for(var pos:List.of(gate.first,gate.second))
+                if(!level.getEntities((Entity)null,new AABB(pos).expandTowards(0,1,0),
+                        e->e!=pilot&&crew(level,e,variant)).isEmpty())return Optional.of("门口还有人，请驾驶员稍候。");
+        }
+        var opened=pilot.getPersistentData().getList("SeelePilotOpenedGatesR46",net.minecraft.nbt.Tag.TAG_LONG);
+        var recorded=new HashSet<Long>();for(var value:opened)recorded.add(((net.minecraft.nbt.NumericTag)value).getAsLong());
+        for(var gate:gates)if(gate.variant==variant&&!level.getBlockState(gate.first).getValue(DoorBlock.OPEN)
+                &&recorded.add(gate.first.asLong()))opened.add(net.minecraft.nbt.LongTag.valueOf(gate.first.asLong()));
+        pilot.getPersistentData().put("SeelePilotOpenedGatesR46",opened);
+        pilot.getPersistentData().putBoolean("SeelePilotDoorClosePendingR46",false);
+        for(var gate:gates)if(gate.variant==variant)
+            for(var pos:List.of(gate.first,gate.second))
+            {
+                var state=level.getBlockState(pos);
+                ((DoorBlock)state.getBlock()).setOpen(pilot,level,state,pos,true);
+            }
+        return Optional.empty();
+    }
+
+    public static void finishPilotDoorUseR46(ServerLevel level,com.projectseele.entity.TrainingPilotEntity pilot)
+    {
+        if(pilot.getPersistentData().getList("SeelePilotOpenedGatesR46",net.minecraft.nbt.Tag.TAG_LONG).isEmpty())return;
+        pilot.getPersistentData().putBoolean("SeelePilotDoorClosePendingR46",true);
+        tickPilotDoorClosureR46(level,pilot);
+    }
+
+    /** Persist only doors this dispatch actually opened; preserve prior user-open doors. */
+    public static void tickPilotDoorClosureR46(ServerLevel level,com.projectseele.entity.TrainingPilotEntity pilot)
+    {
+        if(!pilot.getPersistentData().getBoolean("SeelePilotDoorClosePendingR46"))return;
+        int variant=pilot.getAssignedVariant();var data=contract(level);
+        if(data.isEmpty()||TrainingPilotDirector.existingPilotR45(level,variant)!=pilot)return;
+        var remaining=new net.minecraft.nbt.ListTag();
+        for(var value:pilot.getPersistentData().getList("SeelePilotOpenedGatesR46",net.minecraft.nbt.Tag.TAG_LONG))
+        {
+            var at=BlockPos.of(((net.minecraft.nbt.NumericTag)value).getAsLong());
+            var gate=data.get().gates.get(at);boolean complete=gate!=null&&gate.variant==variant&&gate.first.equals(at);
+            if(complete)for(var pos:List.of(gate.first,gate.first.above(),gate.second,gate.second.above()))
+            {
+                var expected=data.get().installed.get(variant).get(pos);
+                complete&=expected!=null&&level.hasChunkAt(pos)&&level.getBlockEntity(pos)==null
+                        &&TvPersonnelPlatformRecipeR44.alreadyOwned(level.getBlockState(pos),expected);
+            }
+            if(!complete){remaining.add(value.copy());continue;}
+            boolean occupied=false;
+            for(var pos:List.of(gate.first,gate.second))
+                occupied|=!level.getEntities((Entity)null,new AABB(pos).expandTowards(0,1,0),e->crew(level,e,variant)).isEmpty();
+            if(occupied){remaining.add(value.copy());continue;}
+            for(var pos:List.of(gate.first,gate.second))
+            {
+                var state=level.getBlockState(pos);((DoorBlock)state.getBlock()).setOpen(pilot,level,state,pos,false);
+            }
+        }
+        pilot.getPersistentData().put("SeelePilotOpenedGatesR46",remaining);
+        if(remaining.isEmpty())pilot.getPersistentData().remove("SeelePilotDoorClosePendingR46");
     }
 
     public static boolean handleUse(ServerLevel level, BlockPos clicked, Player player)

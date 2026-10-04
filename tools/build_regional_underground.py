@@ -100,6 +100,8 @@ def pyramid(p):
     stairs(p,30,441,-467,5,'north','hq/arrival_stair',7,'owned')
     p.fill(26,-462,430,34,-462,437,FLOOR,'hq/arrival_stair','owned')
     p.fill(26,-461,430,34,-457,437,AIR,'hq/arrival_stair','owned')
+    from regional_architecture import headquarters_arrival_stair_sides_r46
+    headquarters_arrival_stair_sides_r46(p)
     opening(p,30,430,-462,'hq/hall_south_port','south',9,5)
     opening(p,30,475,-467,'hq/station_north_port','north',7,5)
     programmes=[('医療室','MEDICAL'),('職員休憩室','QUARTERS'),('記録保管室','ARCHIVE'),('食堂','CAFETERIA')]

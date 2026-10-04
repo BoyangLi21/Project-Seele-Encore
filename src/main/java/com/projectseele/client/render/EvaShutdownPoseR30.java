@@ -22,6 +22,12 @@ final class EvaShutdownPoseR30
                 ||actual!=null&&!actual.getUUID().equals(view.localOwner))
         {view.localPilot=false;view.localOwner=null;view.live=new CompoundTag();}
     }
+    static CompoundTag retainedPoseForBounds(EvaUnit01Entity eva)
+    {
+        var view=VIEWS.get(eva);
+        if(view!=null&&view.localPilot&&!view.held.isEmpty())return view.held;
+        return EvaShutdownR30.pose(eva);
+    }
     private static CompoundTag capture(BakedGeoModel model)
     {
         CompoundTag result=new CompoundTag();

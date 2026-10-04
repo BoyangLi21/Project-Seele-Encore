@@ -123,7 +123,10 @@ def main(apply=False):
                     tag=nbtlib.Compound({'id':nbtlib.String('projectseele:station_departure_board'),'x':nbtlib.Int(q[0]),'y':nbtlib.Int(q[1]),'z':nbtlib.Int(q[2]),'Wayfinding':nbtlib.Byte(1),'Station':nbtlib.String(r['station']),'Route':nbtlib.String('本站出发 · 沿途停靠'),'PlatformCentre':nbtlib.Long(packed((x,y,z))),'NativePlatformId':nbtlib.Long(r['id']),'MapRows':nbtlib.List[nbtlib.String]([nbtlib.String(s) for s in rows+['每分钟一班 · 站台门开后上车']])})
                     p.block_entities[q]=tag;boards.append(dict(platform=r['id'],station=r['station'],position=q,face=face,rows=rows,suspension=rods));count=1
             if count==0:held.append(dict(platform=r['id'],offset=offset,reason='no measured wall/ceiling mount; existing signs retained'))
-    for q,(after,why) in sorted(changes.items()):p.match((*q,*q),w.block(q),after,'r40/'+why)
+    from native_apg_factory_r46 import native_apg_tag
+    for q,(after,why) in sorted(changes.items()):
+        p.match((*q,*q),w.block(q),after,'r40/'+why)
+        if after.startswith('mtr:apg_door['):p.block_entities[q]=native_apg_tag(q,after)
     p.meta.update(native_platforms=len(audit),gates=gates,boards=boards,held=held,vehicle_door_reference='MTR 4.0.5 assets/mtr/properties/definition/eidan_9000*.json; native train opening must be exercised in-game')
     p.save_plan('all_native_platforms')
     if apply:p.apply('all_native_platforms')

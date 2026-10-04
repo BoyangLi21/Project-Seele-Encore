@@ -21,4 +21,6 @@ for (x,z),ys in bed.items():
     p.fill(x,bottom-3,z,x,bottom-1,z,DARK,'rail/continuous_graded_bed','owned')
 for x,y,z in points:p.fill(x-1,y,z-1,x+1,y+5,z+1,AIR,'rail/final_native_sweep','owned')
 stairs(p,30,441,-467,5,'north','hq/station_stair_last_handoff',7,'owned')
+from regional_architecture import headquarters_arrival_stair_sides_r46
+headquarters_arrival_stair_sides_r46(p)
 p.apply('continuous_track_beds')

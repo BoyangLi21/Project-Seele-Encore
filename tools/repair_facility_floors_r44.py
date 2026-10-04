@@ -33,6 +33,7 @@ Y = -442
 
 
 def plan(world=WORLD, out=OUT):
+    raise RuntimeError("R46 retired the complete lower service layer; old slab/port/belt repairs are no longer authorized")
     world, out = Path(world), Path(out)
     out.mkdir(parents=True, exist_ok=True)
     if list(out.glob("complete_low_plant/applied_*/receipt.json")):

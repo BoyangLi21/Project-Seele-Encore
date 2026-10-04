@@ -260,7 +260,8 @@ public final class EvaHud
 
         int powerTicks = eva.getPowerTicks();
         int powerSeconds = Math.max(0, powerTicks / 20);
-        Component powerStatus = com.projectseele.entity.EvaShutdownR30.disabled(eva)?Component.literal(com.projectseele.entity.EvaShutdownR30.wreck(eva)?"机体损毁 · 等待回收":com.projectseele.entity.EvaShutdownR30.mode(eva)==1?"电源耗尽 · 姿态锁止":"机体停机 · 驾驶舱无人").withStyle(ChatFormatting.RED):eva.isExperimentalUnit() ? Component.literal("核能反应堆 · 在线") : eva.isUmbilicalConnected()
+        Component powerStatus = eva.isBerserk() ? Component.literal("制御不能 · 自律活动").withStyle(ChatFormatting.RED, ChatFormatting.BOLD)
+                : com.projectseele.entity.EvaShutdownR30.disabled(eva)?Component.literal(com.projectseele.entity.EvaShutdownR30.wreck(eva)?"机体损毁 · 等待回收":com.projectseele.entity.EvaShutdownR30.mode(eva)==1?"电源耗尽 · 姿态锁止":"机体停机 · 驾驶舱无人").withStyle(ChatFormatting.RED):eva.isExperimentalUnit() ? Component.literal("核能反应堆 · 在线") : eva.isUmbilicalConnected()
                 ? (powerTicks < eva.getPowerCapacityTicks()
                     ? Component.translatable(
                             "hud.projectseele.power_external_charging",

@@ -18,6 +18,7 @@ public final class PortableRuntimeOwnersR45
             "captured_support","captured_locomotion_directory",
             "city.union.client.enabled","city.union.client.required","city.union.client.create_class_sha256","city.union.client.proof_sha256",
             "city.union.server.enabled","city.union.server.required","city.union.server.create_class_sha256","city.union.server.proof_sha256");
+    private static final Set<String> FACILITY_KEYS=Set.of("tv_cage","personnel_platforms");
     private static Properties values;private static String hash="ABSENT";
     private static synchronized Properties values()
     {
@@ -38,7 +39,14 @@ public final class PortableRuntimeOwnersR45
                 parsed.load(new StringReader(text));
                 if(!"projectseele.runtime-owners.r45.v1".equals(parsed.getProperty("schema")))
                     throw new IllegalStateException("Unknown portable runtime owner schema");
-                if(!KEYS.equals(parsed.stringPropertyNames()))throw new IllegalStateException("Incomplete/unknown portable runtime owner keys");
+                var allowed=new java.util.HashSet<>(KEYS);allowed.addAll(FACILITY_KEYS);
+                if(!parsed.stringPropertyNames().containsAll(KEYS)||!allowed.containsAll(parsed.stringPropertyNames()))
+                    throw new IllegalStateException("Incomplete/unknown portable runtime owner keys");
+                for(String name:FACILITY_KEYS)
+                    if(!Set.of("true","false").contains(parsed.getProperty(name,"false")))
+                        throw new IllegalStateException("Invalid explicit facility Boolean: "+name);
+                if(!parsed.getProperty("tv_cage","false").equals(parsed.getProperty("personnel_platforms","false")))
+                    throw new IllegalStateException("TV cage render, collision and personnel interlock must deploy together");
                 for(String name:new String[]{"weapon_handling","cannon_contact","captured_support","city.union.client.enabled","city.union.client.required","city.union.server.enabled","city.union.server.required"})
                     if(!Set.of("true","false").contains(parsed.getProperty(name)))throw new IllegalStateException("Invalid explicit owner Boolean: "+name);
                 portableDirectory(parsed.getProperty("captured_locomotion_directory"));
@@ -65,6 +73,8 @@ public final class PortableRuntimeOwnersR45
         String explicit=System.getProperty(legacyProperty);
         return explicit!=null?Boolean.parseBoolean(explicit):Boolean.parseBoolean(values().getProperty(key,"false"));
     }
+    public static boolean tvCage(){return enabled("tv_cage","projectseele.r44TvCageReview");}
+    public static boolean personnelPlatforms(){return enabled("personnel_platforms","projectseele.r44TvPersonnelPlatformsReview");}
     public static boolean weaponHandling(){return enabled("weapon_handling","projectseele.weaponHandlingReviewR45");}
     public static boolean cannonContact(){return enabled("cannon_contact","projectseele.r45CannonContactCandidate");}
     public static boolean capturedSupport(){return enabled("captured_support","projectseele.r44CapturedSupportOwnership");}
@@ -77,7 +87,7 @@ public final class PortableRuntimeOwnersR45
     }
     public static synchronized String fingerprint()
     {
-        values();String effective=hash+":"+weaponHandling()+":"+cannonContact()+":"+capturedSupport()+":"+!capturedDirectory().isEmpty();
+        values();String effective=hash+":"+weaponHandling()+":"+cannonContact()+":"+capturedSupport()+":"+!capturedDirectory().isEmpty()+":"+tvCage()+":"+personnelPlatforms();
         try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(effective.getBytes(StandardCharsets.UTF_8)));}
         catch(Exception error){throw new IllegalStateException("Cannot fingerprint actual runtime owners",error);}
     }

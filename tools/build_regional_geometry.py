@@ -75,6 +75,8 @@ def districts(p,plan,samples):
 
 
 def tracks_and_stations(p,transit,samples):
+    if (WORLD/'native_transit_r22.json').is_file():
+        raise RuntimeError('The installed R22 through-service layout retired C1 and its full original pier components; legacy regional transit geometry is not admitted. Use the current native rail/civil recipe.')
     for rail in samples:
         if rail['mode']!='TRAIN':continue
         owner='rail/'+rail['id'];cells={tuple(map(round,point)) for point in rail['points']}

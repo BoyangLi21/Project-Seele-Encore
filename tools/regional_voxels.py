@@ -94,6 +94,10 @@ class Painter:
             self.put(x,y,zz,f'minecraft:{color}_bed[facing=north,occupied=false,part={part}]',owner)
             self.block_entities[x,y,zz]=nbtlib.Compound({'id':nbtlib.String('minecraft:bed'),'x':nbtlib.Int(x),'y':nbtlib.Int(y),'z':nbtlib.Int(zz)})
     def save_plan(self,name):
+        from native_apg_factory_r46 import validate_apg_entities
+        validate_apg_entities(self)
+        from closed_surface_guard_admission_r46 import validate_closed_surface_guards
+        validate_closed_surface_guards(self,WORLD,DIM)
         folder=OUT/name;folder.mkdir(parents=True,exist_ok=True)
         with gzip.open(folder/'ops.json.gz','wt',encoding='utf-8') as f:json.dump([o.__dict__ for o in self.ops],f,ensure_ascii=False)
         (folder/'places.json').write_text(json.dumps(self.meta,ensure_ascii=False,indent=2),encoding='utf-8')

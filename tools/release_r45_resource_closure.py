@@ -53,6 +53,17 @@ def check_resource_closure(archive,declared,runtime_files):
    if entry.get('type','file')!='file':continue
    name=entry['name'];ns,sep,path=name.partition(':');ns,path=(ns,path) if sep else ('projectseele',name)
    if ns=='projectseele':require('assets/'+ns+'/sounds/'+path+'.ogg','sound event '+event)
+ # Match the actual packaged deformation cache to BOTH movie and final mesh bytes.
+ selected_runtime={row.get('destination'):row for row in runtime_files or []}
+ surface_row=selected_runtime.get('projectseele-local-maps/sachiel_wrap_r14.bin')
+ movie_row=selected_runtime.get('projectseele-local-maps/first_battle_r44.json')
+ if surface_row is not None or movie_row is not None:
+  if surface_row is None or movie_row is None:raise ResourceClosureError('Incomplete first-battle surface dependency')
+  surface=Path(surface_row['source']).read_bytes();movie=json.loads(Path(movie_row['source']).read_bytes())
+  require('assets/projectseele/mesh/sachiel.mesh.json','first-battle surface topology binding')
+  if len(surface)<60 or surface[:4]!=b'SW14':raise ResourceClosureError('Invalid first-battle surface header')
+  if hashlib.sha256(surface).hexdigest()!=movie.get('surface_deformation_r14'):raise ResourceClosureError('Movie / surface fingerprint mismatch')
+  if surface[28:60].hex()!=declared['assets/projectseele/mesh/sachiel.mesh.json']:raise ResourceClosureError('Angel mesh / surface fingerprint mismatch')
  profiles={};fingerprints={rig:'ABSENT' for rig in (0,1,2)}
  for row in runtime_files or []:
   destination=row.get('destination','')

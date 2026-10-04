@@ -718,5 +718,185 @@
         "attenuation_distance": 384
       }
     ]
+  },
+  "hangar_pa_prepare_r46": {
+    "subtitle": "subtitles.projectseele.pa_prepare",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_prepare_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_insert_r46": {
+    "subtitle": "subtitles.projectseele.pa_insert",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_insert_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_lock_r46": {
+    "subtitle": "subtitles.projectseele.pa_lock",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_lock_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_drain_r46": {
+    "subtitle": "subtitles.projectseele.pa_drain",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_drain_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_transfer_r46": {
+    "subtitle": "subtitles.projectseele.pa_transfer",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_transfer_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_ready_r46": {
+    "subtitle": "subtitles.projectseele.pa_ready",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_ready_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_recover_r46": {
+    "subtitle": "subtitles.projectseele.pa_recover",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_recover_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_return_r46": {
+    "subtitle": "subtitles.projectseele.pa_return",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_return_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_fill_r46": {
+    "subtitle": "subtitles.projectseele.pa_fill",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_fill_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_standby_r46": {
+    "subtitle": "subtitles.projectseele.pa_standby",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_standby_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_fault_r46": {
+    "subtitle": "subtitles.projectseele.pa_fault",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_fault_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_door_open_r46": {
+    "subtitle": "subtitles.projectseele.pa_door_open",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_door_open_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_door_close_r46": {
+    "subtitle": "subtitles.projectseele.pa_door_close",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_door_close_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_3_r46": {
+    "subtitle": "subtitles.projectseele.pa_3",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_3_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_2_r46": {
+    "subtitle": "subtitles.projectseele.pa_2",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_2_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_1_r46": {
+    "subtitle": "subtitles.projectseele.pa_1",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_1_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_launch_r46": {
+    "subtitle": "subtitles.projectseele.pa_launch",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_launch_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
+  },
+  "hangar_pa_combat_r31_r46": {
+    "subtitle": "subtitles.projectseele.pa_combat_r31",
+    "sounds": [
+      {
+        "name": "projectseele:hangar_pa_combat_r31_r46",
+        "attenuation_distance": 220,
+        "stream": false
+      }
+    ]
   }
 }

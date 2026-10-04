@@ -1421,15 +1421,14 @@ public final class EntryPlugDirector
         }
         if (passenger instanceof TrainingPilotEntity pilot)
         {
-            pilot.setInvisible(true);
+            pilot.setInvisible(plug.isLockedToEva());
             pilot.setTrainingStage(TrainingPilotEntity.STAGE_IN_PLUG);
         }
         else if (passenger instanceof Player player)
         {
-            // Once aboard the capsule the pilot is inside it — hide the body so
-            // the view reads as the plug's own first person, not a player
-            // sitting on a floating model.
-            player.setInvisible(true);
+            // A docked capsule has a real passenger seat. Hide its occupant only
+            // after insertion switches the rider to the internal EVA camera.
+            player.setInvisible(plug.isLockedToEva());
         }
         boolean emptyUNLoading=plug.isIndependentUNPlug()
                 &&plug.getLinkedEva() instanceof com.projectseele.entity.EvaPrototypeEntity un

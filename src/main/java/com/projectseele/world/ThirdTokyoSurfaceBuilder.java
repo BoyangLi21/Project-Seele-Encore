@@ -1443,6 +1443,22 @@ public final class ThirdTokyoSurfaceBuilder
     }
 
 
+    /** Complete original six-pylon identity mask; independent of present material/state. */
+    public static boolean fixedPowerPylonCell(BlockPos origin, BlockPos position)
+    {
+        int y = position.getY() - origin.getY();
+        if (y < 1 || y > 28) return false;
+        for (int[] pylon : PYLONS)
+        {
+            if (position.getZ() != origin.getZ() + pylon[1]) continue;
+            int x = position.getX() - origin.getX() - pylon[0];
+            if ((y == 22 || y == 27) && Math.abs(x) <= 5) return true;
+            int spread = Math.max(0, 4 - y / 7);
+            if (Math.abs(x) == spread || y % 6 == 0 && Math.abs(x) <= spread) return true;
+        }
+        return false;
+    }
+
     private static void buildPowerPylon(ServerLevel level, BlockPos centre)
     {
         for (int y = 1; y <= 28; y++)

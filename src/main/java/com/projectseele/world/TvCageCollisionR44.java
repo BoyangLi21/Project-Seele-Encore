@@ -72,7 +72,7 @@ public final class TvCageCollisionR44
 
     public static boolean enabled()
     {
-        return Boolean.getBoolean("projectseele.r44TvCageReview");
+        return com.projectseele.config.PortableRuntimeOwnersR45.tvCage();
     }
 
     private static Vec3 point(JsonArray values)

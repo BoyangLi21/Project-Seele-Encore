@@ -73,7 +73,7 @@ def main():
                 for Y in range(y,y+h-2):
                     q=(X,Y,Z)
                     if q not in car_doors and w.block(q)in('minecraft:air','minecraft:void_air'):wall_holes.append(q)
-                    if q not in car_doors:put(q,wall(style,Y-y),lift['id']+'/tv_cabin_non_door_wall','Original TV wall palette adapted to existing fixed-size native car; excludes moving doors, floor/roof and all devices')
+                    if q not in car_doors:put(q,'projectseele:clear_glass'if key==(96,-52)and Z==z+r else wall(style,Y-y),lift['id']+'/tv_cabin_non_door_wall','Original TV wall palette adapted to existing fixed-size native car; excludes moving doors, floor/roof and all devices')
         assert not wall_holes,('Do not paint an unclosed cabin as complete',lift['id'],wall_holes)
         for s in lift['landings']:
             cx,cy,cz=s['cabin_centre'];dx,dz=NORMAL[s['exit']];lx,lz=-dz,dx

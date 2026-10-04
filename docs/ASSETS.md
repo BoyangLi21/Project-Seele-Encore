@@ -402,3 +402,9 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 - 三包各用自身 REST_BIND 校准；v213/v215 候选保留源全身动作、原机体骨长、独立详细手部坐标系与源根位移。翻滚/倒地使用全身表面承托，来源不是调参生成的腕点轨迹。离线候选不等同正式装入、原生通过或用户认可。
 - 新 `eva02_longsword.mesh.json` 从上表 Rainbow_Slakot CC Attribution 双头刃武器的一端改编，延长单刃，重新制作原创直柄、护手、柄帽；保留原模型与高精度粒子刀文件。原作者、原作链接与许可证不变；新增造型和动作是游戏原创推演，不声称 TV 原作二号机曾使用这把长剑。手柄v205、手姿v209独立，未覆盖旧握拳/刀握姿。
 - 持盾动作制作依据：TV第六话 289/290/292/297 镜头的举盾、迎击与失衡（https://wiki.evageeks.org/FGC:Episode_06_Scene_08）；采用轮廓/受力关系，研究画面不复制进发行贴图。普通 Mesh2Motion 小盾姿势需要适配巨盾，不能直接当作已复原屋岛。
+
+## R46 既有素材的修复与派生
+
+- 18份机库 PA 混响：从已有本项目广播音源派生，只添加有限室内反射及响度整平。来源与台词许可沿用原音源，处理元数据见 `assets/projectseele/audio/hangar_pa_reverb_r46.json`。角色对白不新增语音。
+- 三机站姿右键重击候选：Mesh2Motion `human-addon-animations.glb` 的 `Attack_Ground_Pound`，沿用已登记 CC0-1.0 来源；它是手工关键帧动画，不标为真人动捕。保留完整动作顺序，重定向到各机原骨架；原创巨人双拳下砸解释，不宣称TV同一镜头复刻。生成器 `tools/author_heavy_ground_pound_r46.py`。
+- 萨基尔原有变形缓存重绑只修正元数据可移植化造成的字节指纹差异。严格证明网格/UV/蒙皮数据与全部变形帧未改变；没有放松运行时指纹验证。

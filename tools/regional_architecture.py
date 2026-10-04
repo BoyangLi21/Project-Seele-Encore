@@ -28,6 +28,15 @@ def door(p,x,z,floor,owner,facing='south',iron=False,mode='new'):
         p.put(x,floor+dy,z,f"{name}[facing={facing},half={half},hinge=left,open=false,powered=false]",owner,mode)
 
 
+
+def headquarters_arrival_stair_sides_r46(p):
+    """Finite real HQ stair sides; preserve all seven treads and clear lanes."""
+    for x in (26,34):
+        for z in range(437,442):
+            top=-460-(z-437)
+            p.fill(x,-465,z,x,top,z,'projectseele:clear_glass',
+                   'hq/arrival_stair/complete_side_screen_r46','air')
+
 def stairs(p,x,z,floor,rise,heading,owner,width=3,mode='new'):
     dx,dz={'north':(0,-1),'south':(0,1),'east':(1,0),'west':(-1,0)}[heading]
     sx,sz=(-dz,dx)

@@ -475,6 +475,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> DATA_POWER_TICKS =
             SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> DATA_POWERED_VISUAL_R46 =
+            SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> DATA_POWER_CONNECTED =
             SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> DATA_UMBILICAL_SEVERED =
@@ -778,6 +780,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.entityData.define(DATA_CARRIER_TO_Y, 0.0F);
         this.entityData.define(DATA_CARRIER_TO_Z, 0.0F);
         this.entityData.define(DATA_POWER_TICKS, 0);
+        this.entityData.define(DATA_POWERED_VISUAL_R46, false);
         this.entityData.define(DATA_POWER_CONNECTED, false);
         this.entityData.define(DATA_UMBILICAL_SEVERED, false);
         this.entityData.define(DATA_POWER_ANCHOR_X, 0);
@@ -1109,9 +1112,15 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
      */
     public boolean isPoweredOn()
     {
+        // Passenger packets and entity metadata are delivered independently.
+        // Observers must not infer the control circuit from a temporarily
+        // missing nested pilot, especially outside that passenger's tracking range.
+        if(this.level().isClientSide)return this.entityData.get(DATA_POWERED_VISUAL_R46);
         if(EvaBerserkMotionR34.silent(this))return false;
-        if(EvaShutdownR30.disabled(this)||EvaBayRepairR33.active(this))return false;
-        return this.isBerserk() || this.entityData.get(DATA_MOTION_LAB_ACTIVE)
+        if(EvaShutdownR30.wreck(this)||EvaBayRepairR33.active(this))return false;
+        if(this.isBerserk())return true;
+        if(EvaShutdownR30.disabled(this))return false;
+        return this.entityData.get(DATA_MOTION_LAB_ACTIVE)
                 || (this.isEntryPlugInserted()
                     && this.getPilotEntity() != null
                     && (this.isUmbilicalConnected()
@@ -5128,6 +5137,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.tickBerserkState();
         this.tickSortieParkingLock();
         this.tickLaunchSequence();
+        this.entityData.set(DATA_POWERED_VISUAL_R46, this.isPoweredOn());
         if (!this.onGround())
         {
             this.serverAirborneTicks++;

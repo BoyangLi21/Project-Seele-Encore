@@ -45,6 +45,8 @@ public final class RegionalGatewayDirector
     {
         boolean ready, checked, active;
         long gateUntil, doorsClosedUntil;
+        final long[] carSensorTimes={Long.MIN_VALUE,Long.MIN_VALUE};
+        final boolean[] carSensorResults=new boolean[2];
     }
 
     public static boolean active(ServerLevel level)
@@ -220,8 +222,30 @@ public final class RegionalGatewayDirector
 
     public static boolean carAt(ServerLevel level, int y)
     {
-        return level.getBlockState(new BlockPos(X, y - 1, Z)).is(Blocks.SMOOTH_STONE)
-                && level.getBlockState(new BlockPos(X, y + 7, Z)).is(Blocks.POLISHED_DEEPSLATE);
+        if(y!=LOWER&&y!=UPPER)return false;
+        var runtime=RUNTIMES.computeIfAbsent(level,key->new Runtime());
+        int index=y==LOWER?0:1;long time=level.getGameTime();
+        if(runtime.carSensorTimes[index]==time)return runtime.carSensorResults[index];
+        boolean present=completeCarAt(level,y);
+        runtime.carSensorTimes[index]=time;runtime.carSensorResults[index]=present;
+        return present;
+    }
+
+    private static boolean completeCarAt(ServerLevel level,int y)
+    {
+        // The R45 utility finish replaced this car's original roof. Check
+        // the complete original footprint with its finite finish contract;
+        // a centre tile or an arbitrary solid landing is not a parked car.
+        for(int dx=-7;dx<=7;dx++)for(int dz=-7;dz<=7;dz++)
+        {
+            var floor=new BlockPos(X+dx,y-1,Z+dz);
+            var roof=new BlockPos(X+dx,y+7,Z+dz);
+            if(!level.hasChunkAt(floor)||!level.hasChunkAt(roof)
+                    ||!level.getBlockState(floor).is(Blocks.SMOOTH_STONE)
+                    ||!TvLiftFinishR45.recognizedGatewayRoof(level,level.getBlockState(roof))
+                    ||level.getBlockEntity(floor)!=null||level.getBlockEntity(roof)!=null)return false;
+        }
+        return true;
     }
 
     private static void set(ServerLevel level, BlockPos pos, BlockState state)

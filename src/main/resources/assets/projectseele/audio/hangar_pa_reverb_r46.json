@@ -1,0 +1,200 @@
+[
+  {
+    "name": "hangar_pa_prepare_r46",
+    "original_name": "pa_prepare",
+    "source_sha256": "e0e4504c400819ef6d81e24aae707a6feeee6aecc39b453e99ce87355e1ab58d",
+    "sha256": "0a5c070fc5b6b9529005fe977f62054b819a1b7532a88adcdfe3ba0a1f3e0bb5",
+    "seconds": 4.8719166666666665,
+    "minimum_sequence_ticks": 104,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_insert_r46",
+    "original_name": "pa_insert",
+    "source_sha256": "f3094aa07604ad2538ec1658155b99cc0dc665772fa19f85de61b2e6eaaa34c4",
+    "sha256": "a607a28991e28dd4fbda613063c1aac934fb8df218bd386fc9e1f08ec9c4ac8a",
+    "seconds": 3.526875,
+    "minimum_sequence_ticks": 77,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_lock_r46",
+    "original_name": "pa_lock",
+    "source_sha256": "e67f713b0e16c94681f5186a694809ba3048f251ae693b58c2e8f3caa2e921eb",
+    "sha256": "4f8ddc8547edc30d52877ed5101b49553663a46cce80ae3129316824e329c002",
+    "seconds": 3.4689375,
+    "minimum_sequence_ticks": 76,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_drain_r46",
+    "original_name": "pa_drain",
+    "source_sha256": "0cb64e1b649140d6e2d794bd37321f7268c6714f06dacf64803b7ba99719e799",
+    "sha256": "bd12dcfbd3e401c1578ab021bd49edaa3c681c113677c7edeecc9d36ab667a2d",
+    "seconds": 3.2811666666666666,
+    "minimum_sequence_ticks": 72,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_transfer_r46",
+    "original_name": "pa_transfer",
+    "source_sha256": "5d28327662f796f9cd6ddae0f14822e55465d40d87993a949ce1d2667f7da457",
+    "sha256": "d0fd6b20c3623ef6497b7eb32aae400bf695a21c441fb76e330ea17a07f08787",
+    "seconds": 6.3654375,
+    "minimum_sequence_ticks": 134,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_ready_r46",
+    "original_name": "pa_ready",
+    "source_sha256": "53c6d74951c541381f118b8026b29b60bcb8b46097ec396fcb97db3ca4df0df9",
+    "sha256": "c6f1366ad8da343ba462b4d868c57e9fb264e9e9b6aac20a55c41d2a542965f0",
+    "seconds": 5.064125,
+    "minimum_sequence_ticks": 108,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_recover_r46",
+    "original_name": "pa_recover",
+    "source_sha256": "4da63d6a3b2c51346d7d2d5bd2e517ca6c3f2592c9ee32c42d88d4accab53b46",
+    "sha256": "d535637aa8664c239ef76a436772a656aa1d23a7a76df77c2ed0f778a083008d",
+    "seconds": 6.1556041666666665,
+    "minimum_sequence_ticks": 130,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_return_r46",
+    "original_name": "pa_return",
+    "source_sha256": "abfaa7e14c771b59015c38fed8debe7f4b5ca363b9b24f87beef5643fb23ce58",
+    "sha256": "7d039ffe5d485174238edad43daf3fb0cfd84e87e6eb089a4e730836ea52682b",
+    "seconds": 2.9447916666666667,
+    "minimum_sequence_ticks": 65,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_fill_r46",
+    "original_name": "pa_fill",
+    "source_sha256": "699de41fb09882b2aace165f56379820b0bc4a847e2a95dcf5d49b8c64dfb991",
+    "sha256": "b928ad76f0906b04de1e0411a282cc8b78923e9247e60e4690b12eb93f6e6650",
+    "seconds": 5.139833333333334,
+    "minimum_sequence_ticks": 109,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_standby_r46",
+    "original_name": "pa_standby",
+    "source_sha256": "8bdf79e3d8743463640b2c38fb8a61a9558024cdcdd9a041952053806dd9d586",
+    "sha256": "1a92a6f344e46adfa2173be13fb7a1e82d5eb084a2f6d2b8489f1c147512fffa",
+    "seconds": 2.7349375,
+    "minimum_sequence_ticks": 61,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_fault_r46",
+    "original_name": "pa_fault",
+    "source_sha256": "4dc5ba702631abe6b6720084258d3e205125232a6b1ca6d73990c1041e5dd2db",
+    "sha256": "9674a39813b3e6ec45193ffe2e1f6b4d7753d7352a7aceb2f8c594b0360b3900",
+    "seconds": 6.343145833333334,
+    "minimum_sequence_ticks": 133,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_door_open_r46",
+    "original_name": "pa_door_open",
+    "source_sha256": "36a4994ae97546af08f0d4e9ec7aefc2449a7de207eee724240f753a9fb5a126",
+    "sha256": "b11afe95cb6ea08537162a29e087fa3e0f6b83ba6c46eaeaed78842aa71c796a",
+    "seconds": 5.038270833333334,
+    "minimum_sequence_ticks": 107,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_door_close_r46",
+    "original_name": "pa_door_close",
+    "source_sha256": "7dc020f81071c51a2678fcc5c833f03052e69aafb1a72a6b96325285f30986d2",
+    "sha256": "b4794d7a168656e4c0dd822119908bc79162b80df728686068a7277ca430aa4a",
+    "seconds": 4.930666666666666,
+    "minimum_sequence_ticks": 105,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_3_r46",
+    "original_name": "pa_3",
+    "source_sha256": "5b13b35deb936e4d18709c09041259e64b5e5bbcb92ef1e16e5fa35abf2cdd36",
+    "sha256": "679391520d30f129843380e82cc485e830b9ec0b15a542d8dea49200e60707b0",
+    "seconds": 1.41325,
+    "minimum_sequence_ticks": 35,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_2_r46",
+    "original_name": "pa_2",
+    "source_sha256": "a83a1b0986b6893b60ca2b10522340fc127496610dbfc250cb21449637f3b760",
+    "sha256": "45d641acfac3193bca0e13ae5748bf66445972a4e2c778b06ce10c0fd6caeb53",
+    "seconds": 1.2621458333333333,
+    "minimum_sequence_ticks": 32,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_1_r46",
+    "original_name": "pa_1",
+    "source_sha256": "eb934e57da2c8a723889f9fcc1b14a98c177ccb8cbc6a4ec24790dd0a95a2cd0",
+    "sha256": "0d4f08f1accab94aff03af247fefe2edb599e24975f5194a18c2540b6c75f7f5",
+    "seconds": 1.4725625,
+    "minimum_sequence_ticks": 36,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_launch_r46",
+    "original_name": "pa_launch",
+    "source_sha256": "1efff246d7ba4fed1d92de13dd5ca4bb117fd13c39b8a4e6f79328661c6b3c1a",
+    "sha256": "5d6a08232a6e0384463c20c928db8a3068c5eca5dba1a7821c9f7838eb24ad60",
+    "seconds": 1.6879166666666667,
+    "minimum_sequence_ticks": 40,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  },
+  {
+    "name": "hangar_pa_combat_r31_r46",
+    "original_name": "pa_combat_r31",
+    "source_sha256": "027ecda6eb62ef313719912c7aa66a93016cf621b08639ab58fa786aeb2f9d78",
+    "sha256": "ddc7a7649cf431e26e2a8bffdd5fcc7d9aaab90de66ee1005fa801fc087001ef",
+    "seconds": 9.443104166666666,
+    "minimum_sequence_ticks": 195,
+    "source": "Original facility wording with standard Microsoft neural voice, no actor voice clone or TV audio",
+    "processing": "Original facility announcement, mono hall impulse response, band limited reflections, LUFS -19 / TP -3",
+    "user_listening_acceptance": false
+  }
+]

@@ -96,7 +96,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
     private static final Set<String> CAMERA_COVER_BONES = Set.of(
             "head", "Head", "horn", "Horn", "neck", "Neck", "r37_jaw", "r37_red_upper", "r37_red_lower", "r37_lining");
     private static final Set<String> PILOT_CAMERA_MESH_COVER = Set.of(
-            "torso_lower", "torso_upper", "pylon_l", "pylon_r");
+            "torso_lower", "torso_upper", "pylon_l", "pylon_r", "dorsal_cover", "dorsal_liner");
     private boolean pilotView;
     private BakedGeoModel pendingPoseModel;
     private EvaUnit01Entity pendingPoseEntity;
@@ -339,6 +339,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         {
             return true;
         }
+        var retainedBounds=EvaRetainedRenderBoundsR46.bounds(entity,minecraft.getFrameTime());
+        if(retainedBounds!=null)return frustum.isVisible(retainedBounds);
         return super.shouldRender(entity, frustum, cameraX, cameraY, cameraZ);
     }
 

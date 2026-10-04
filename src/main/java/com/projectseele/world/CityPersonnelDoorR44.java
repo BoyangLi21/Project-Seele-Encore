@@ -13,6 +13,15 @@ import net.minecraft.world.phys.BlockHitResult;
 public final class CityPersonnelDoorR44 extends DoorBlock
 {
     public CityPersonnelDoorR44(Properties properties){super(properties,BlockSetType.IRON);}
+    @Override public void setOpen(net.minecraft.world.entity.Entity actor,Level level,
+                                  BlockState state,BlockPos pos,boolean opening)
+    {
+        // Manual use is handled on the server only. Vanilla excludes the
+        // supplied player from the sound packet, assuming a client prediction
+        // which this metal hand-latch never performs. Broadcast this real use.
+        super.setOpen(!level.isClientSide&&actor instanceof Player?null:actor,
+                level,state,pos,opening);
+    }
     @Override public void neighborChanged(BlockState state,Level level,BlockPos pos,
                                          net.minecraft.world.level.block.Block block,BlockPos from,boolean moving)
     {

@@ -149,7 +149,7 @@ def main(world=WORLD, out=OUT, interfaces=INTERFACES, apply=False, parts=("hq", 
         goals = [("command", "指挥室入口", (28, -406, 269)), ("hangars", "机库登机通道", (90, -394, -255)),
                  ("station", "总部火车站", (30, -466, 451)), ("pyramid_station", "金字塔接驳站", (30, -466, 518)),
                  ("launch_station", "发射区车站", (150, -442, -28)), ("observation", "机库观景走廊", (90, -367, -221)),
-                 ("dogma", "终极教条前厅", (30, -566, 280)), ("low_plant", "机库低层检修厅", (-40, -442, -286))]
+                 ("dogma", "终极教条前厅", (30, -566, 280))]
         file, manifest = component(world, out / "hq", bounds, goals, groups)
         manifest["native_interface_source"] = str(interfaces.resolve())
         manifest["native_interface_sha256"] = digest(interfaces)

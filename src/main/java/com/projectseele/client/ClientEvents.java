@@ -49,6 +49,7 @@ public class ClientEvents
     {
         event.enqueueWork(() ->
         {
+            LocalPrivateShaderBootstrapR46.installAndSelect();
             ItemBlockRenderTypes.setRenderLayer(ModFluids.LCL_SOURCE.get(),
                     RenderType.translucent());
             ItemBlockRenderTypes.setRenderLayer(ModFluids.FLOWING_LCL.get(),

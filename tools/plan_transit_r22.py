@@ -87,7 +87,9 @@ def main():
  for r in out['routes']:
   d=copy.deepcopy(deps[r['id']]);out['depots'].append(d)
   sid=copy.deepcopy(next(x for x in s['sidings'] if x['name'].startswith(r['routeNumber'])))
-  if r['transportMode']=='TRAIN':sid['vehicleCars'][1:1]=[copy.deepcopy(sid['vehicleCars'][0]),copy.deepcopy(sid['vehicleCars'][-1])]
+  if r['transportMode']=='TRAIN':
+   trailer=copy.deepcopy(sid['vehicleCars'][0]);trailer.update(vehicleId='eidan_9000_mini_trailer',bogie1Position=-5.0,bogie2Position=5.0,couplingPadding1=0.0,couplingPadding2=0.0)
+   sid['vehicleCars'][1:1]=[copy.deepcopy(trailer),copy.deepcopy(trailer)]
   out['sidings'].append(sid)
  for line,seq in allseq.items():
   stops=[]

@@ -28,7 +28,7 @@ public final class NervWayfindingR24
     private static final Map<net.minecraft.server.MinecraftServer,Optional<Graph>> GRAPHS=new WeakHashMap<>();
     private static final Map<net.minecraft.server.MinecraftServer,Optional<Graph>> LOCAL_LIFT_GRAPHS=new WeakHashMap<>();
     private static final Map<net.minecraft.server.MinecraftServer,Map<UUID,Selection>> ACTIVE=new WeakHashMap<>();
-    public static final List<String> GOALS=List.of("command","hangars","station","pyramid_station","launch_station","observation","dogma","low_plant","nearest_lift");
+    public static final List<String> GOALS=List.of("command","hangars","station","pyramid_station","launch_station","observation","dogma","nearest_lift");
     private static Graph graph(ServerPlayer player)
     {return loadGraph(player.server,"nerv_routes_r24.json.gz",GRAPHS);}
     private static Graph loadGraph(net.minecraft.server.MinecraftServer server,String filename,

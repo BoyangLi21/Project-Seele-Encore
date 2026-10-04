@@ -75,7 +75,16 @@ public final class BattlefieldR21
         boolean restore=s.job.equals("restore");int processed=0;
         while(processed++<2048&&s.cursor<p.cells.size())
         {
-            var c=p.cells.get(s.cursor);level.getChunk(c.pos);BlockState from=restore?c.covered:c.before,to=restore?c.before:c.covered,actual=level.getBlockState(c.pos);
+            var c=p.cells.get(s.cursor);
+            // The old rectangular field sliced the three east pylons at X207.
+            // Keep the original plan/cursor archive, but fixed power objects
+            // never belong to the temporary battlefield cover or its restore.
+            if (ThirdTokyoSurfaceBuilder.fixedPowerPylonCell(origin,c.pos))
+            {
+                s.cursor++;
+                continue;
+            }
+            level.getChunk(c.pos);BlockState from=restore?c.covered:c.before,to=restore?c.before:c.covered,actual=level.getBlockState(c.pos);
             if(!actual.equals(from)&&!actual.equals(to)){s.conflicts++;s.cursor++;continue;}
             if(!actual.equals(to))
             {

@@ -5,7 +5,7 @@ import hashlib, io, json, re, struct, tomllib, zipfile
 from release_r45_resource_closure import check_resource_closure, check_optional_texture_pack
 
 SCHEMA='projectseele.release-r45.manifest.v1'
-PROTOCOL='53'
+PROTOCOL='54'
 CREATE_SHA='6fbb910c367dbce8e4fc7e5bf64b6edd4de980906ed00af8e47e4af843c0d9b0'
 SHADER_SHA='66061b3c5b4843e31bc9a7562a7ac697a51bb77c73defc7071f996b783efacce'
 LICENSE_SHA='1e1f730abd9c25ad4d0ba301453d37547d17102a3cfc628de794d5b08e278a20'
@@ -42,6 +42,11 @@ def sha(path):
  return h.hexdigest()
 
 def payload_hash(value):return hashlib.sha256(json.dumps(value,sort_keys=True,separators=(',',':'),ensure_ascii=False).encode()).hexdigest()
+def batch_series(m):
+ match=re.search(r'(?:^|_)(R4[56])(?:_|$)',str(m.get('batch_id','')))
+ if not match:raise ContractError('Current batch series missing')
+ return match.group(1)
+
 def input_digest(m):return payload_hash({k:v for k,v in m.items() if k not in ('source_review_receipt','acceptance_receipts')})
 def read_json(path):return json.loads(Path(path).read_text('utf-8-sig'))
 
@@ -56,7 +61,7 @@ def relative(value):
 def output_path(repo,value):
  if not value or not Path(value).is_absolute():raise ContractError('output_directory must be explicit and absolute')
  p=Path(value);actual=p.resolve();root=Path(repo).resolve()/'artifacts'
- if actual.parent!=root or not re.fullmatch(r'server-ready-r45-[a-zA-Z0-9_-]+',p.name):raise ContractError('Output must be a new artifacts/server-ready-r45-<epoch> directory')
+ if actual.parent!=root or not re.fullmatch(r'server-ready-r4[56]-[a-zA-Z0-9_-]+',p.name):raise ContractError('Output must be a new artifacts/server-ready-r45/r46-<epoch> directory')
  for q in [p,*p.parents]:
   if q.exists() and (q.is_symlink() or getattr(q,'is_junction',lambda:False)()):raise ContractError('Output reparse point forbidden')
   if q==Path(repo):break
@@ -121,7 +126,11 @@ def runtime_owner_config(data):
   values[key]=value
  keys={'schema','weapon_handling','cannon_contact','captured_support','captured_locomotion_directory'}
  for side in ('client','server'):keys|={f'city.union.{side}.{suffix}' for suffix in ('enabled','required','create_class_sha256','proof_sha256')}
- if set(values)!=keys or values['schema']!='projectseele.runtime-owners.r45.v1':raise ContractError('Incomplete/unknown runtime owner config')
+ optional={'tv_cage','personnel_platforms'}
+ if not keys.issubset(values) or not set(values).issubset(keys|optional) or values['schema']!='projectseele.runtime-owners.r45.v1':raise ContractError('Incomplete/unknown runtime owner config')
+ for key in optional:
+  if values.get(key,'false') not in ('true','false'):raise ContractError('Invalid explicit facility Boolean: '+key)
+ if values.get('tv_cage','false')!=values.get('personnel_platforms','false'):raise ContractError('TV cage and personnel platform owners must deploy together')
  for key in ('weapon_handling','cannon_contact','captured_support','city.union.client.enabled','city.union.client.required','city.union.server.enabled','city.union.server.required'):
   if values[key] not in ('true','false'):raise ContractError('Explicit runtime owner Boolean required: '+key)
  directory=values['captured_locomotion_directory']
@@ -291,8 +300,8 @@ class Validator:
  def validate(self):
   m=self.m
   if m.get('schema')!=SCHEMA:self.issue('SCHEMA','Explicit R45 manifest required; R44/v12 audit is not a build manifest')
-  if not re.fullmatch(r'(?:R45_[a-zA-Z0-9_-]+|Project_SEELE_Encore_R45_[0-9]{8})',str(m.get('batch_id',''))):self.issue('BATCH_ID','Explicit R45 or Project_SEELE_Encore_R45_<date> batch_id required')
-  if m.get('protocol')!=PROTOCOL:self.issue('PROTOCOL','Current R45 protocol53 required; older client semantics refused')
+  if not re.fullmatch(r'(?:R4[56]_[a-zA-Z0-9_-]+|Project_SEELE_Encore_R4[56]_[0-9]{8})',str(m.get('batch_id',''))):self.issue('BATCH_ID','Explicit R45 or Project_SEELE_Encore_R45_<date> batch_id required')
+  if m.get('protocol')!=PROTOCOL:self.issue('PROTOCOL','Current protocol54 required; older client semantics refused')
   if (m.get('minecraft'),m.get('forge'),m.get('java'))!=('1.20.1','47.4.10','17'):self.issue('PLATFORM','Pinned MC/Forge/Java versions required')
   self.runcheck('OUTPUT_PATH',lambda:output_path(self.repo,m.get('output_directory')))
   self.runcheck('SERVER_MEMORY',lambda:check_memory(m.get('server_jvm_args')))
@@ -306,7 +315,7 @@ class Validator:
    if not p.name.endswith('-all.jar'):self.issue('PROJECT_NOT_ALL','Production reobfuscated all.jar required')
    def project_contract():
     with zipfile.ZipFile(p) as z:
-     if PROTOCOL!=class_protocol(z.read('com/projectseele/network/SeeleNetwork.class')):raise ContractError('Actual jar protocol is not52')
+     if PROTOCOL!=class_protocol(z.read('com/projectseele/network/SeeleNetwork.class')):raise ContractError('Actual jar protocol is not54')
      nested=json.loads(z.read('META-INF/jarjar/metadata.json'))['jars']
      if not {'jbullet','stack-alloc','vecmath'}<=set(x['identifier']['artifact'] for x in nested):raise ContractError('Physics jarJar runtime missing')
      assets=build.get('embedded_assets')
@@ -318,6 +327,11 @@ class Validator:
       relative(name)
       if hashlib.sha256(z.read(name)).hexdigest()!=digest:raise ContractError(f'Embedded resource changed: {name}')
      self.resource_closure=check_resource_closure(z,assets,m.get('runtime_files'))
+     if re.fullmatch(r'(?:R46_[a-zA-Z0-9_-]+|Project_SEELE_Encore_R46_[0-9]{8})',str(m.get('batch_id',''))):
+      from release_r46_features import check_r46_features
+      recipes=[r for r in (m.get('shaders') or {}).get('adapter_files',[]) if r.get('destination')=='private_shader_recipe_v12.json']
+      if len(recipes)!=1:raise ContractError('One R46 actual personal recipe required')
+      check_r46_features(z,m.get('runtime_files'),recipes[0]['source'])
      for member in z.namelist():
       if member.startswith(('assets/','data/')) and Path(member).suffix.lower() in TEXT_SUFFIXES:portable_text(z.read(member),member)
      for prefix in ('assets/projectseele/mesh/','assets/projectseele/geo/','assets/projectseele/animations/','data/projectseele/nerv_dialogue/'):
@@ -348,7 +362,7 @@ class Validator:
     if not isinstance(row,dict) or not row.get('destination'):self.issue('DESTINATION_MISSING',key);continue
     dest=self.runcheck('DESTINATION',lambda r=row:relative(r['destination']))
     if not dest:continue
-    if any(t in dest.lower() for t in ('oculus','iris','shader','rubidium','gendo_player','accounts.json','launcher_profiles')) or (dest.endswith('.jar') and not (key=='server_files' and dest.startswith('libraries/'))) or dest.startswith(('mods/','saves/','shaderpacks/','resourcepacks/')) or dest in ('user_jvm_args.txt','R45_BATCH.json','R45_ACCEPTANCE.json','manifest.json','PCL/Setup.ini','COMPLEMENTARY_CREDITS.txt','options.txt'):self.issue('PAYLOAD_CONFLICT',key+':'+dest);continue
+    if any(t in dest.lower() for t in ('oculus','iris','shader','rubidium','gendo_player','accounts.json','launcher_profiles')) or (dest.endswith('.jar') and not (key=='server_files' and dest.startswith('libraries/'))) or dest.startswith(('mods/','saves/','shaderpacks/','resourcepacks/')) or re.fullmatch(r'R4[56]_(?:BATCH|ACCEPTANCE|CANDIDATE_STATUS)\.json',dest) or dest in ('user_jvm_args.txt','manifest.json','PCL/Setup.ini','COMPLEMENTARY_CREDITS.txt','options.txt'):self.issue('PAYLOAD_CONFLICT',key+':'+dest);continue
     for kind in kinds:self.blob(row,kind+'/'+dest)
   if not any(x['target'].startswith('server/libraries/') for x in self.inputs):self.issue('FORGE_RUNTIME_MISSING','Explicit server libraries file list required')
   def forge_runtime():
@@ -405,7 +419,7 @@ class Validator:
    if not rel:continue
    if rel.lower() in listed:self.issue('WORLD_DUPLICATE',rel)
    listed.add(rel.lower())
-   if rel in ('R45_BATCH.json','R45_ACCEPTANCE.json'):self.issue('WORLD_RELEASE_METADATA_CONFLICT','Prior package metadata requires explicit non-progress omission: '+rel)
+   if re.fullmatch(r'R4[56]_(?:BATCH|ACCEPTANCE|CANDIDATE_STATUS)\.json',rel):self.issue('WORLD_RELEASE_METADATA_CONFLICT','Prior package metadata requires explicit non-progress omission: '+rel)
    if rel.endswith('.lock') or rel=='session.lock':self.issue('WORLD_LOCK','Locks must have explicit omission receipt');continue
    p=source/rel
    if not world_approved:continue

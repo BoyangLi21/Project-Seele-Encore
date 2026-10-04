@@ -14,6 +14,9 @@ GOALS=[('command','指挥室入口',(28,-406,269)),('hangars','机库',(118,-442
 LIFT_GROUPS=[dict(id='command',points=[(12,y,258) for y in (-448,-423,-419,-409)])]
 PUBLIC_DOMAINS=None;PUBLIC_PATHS=None;RAIL_CURVES=None
 DEBUG_PATHS=None
+# Explicit R46 user retirement of the whole low maintenance layer and blind
+# north branch. Foundation/hoist structures remain physical, never public routes.
+RETIRED_WALK_DOMAINS=[((-43,-443,-292),(114,-437,-276)),((99,-443,-275),(114,-437,-49))]
 LIFT_BOARD_COST=24.;LIFT_VERTICAL_COST=1/.85;LIFT_DIRECT=False;STAIR_COST=math.sqrt(2)
 def main(apply=False,output=None,export_routes=None):
  global OUT
@@ -33,6 +36,26 @@ def main(apply=False,output=None,export_routes=None):
      if current in ('minecraft:barrier','minecraft:air'):a[y-LO[1],z-LO[2],x-LO[0]]=air;included.append((x,y,z))
    if included:door_ports.append(dict(id=door['id'],aperture=included,buttons=door.get('buttons',[])))
  shapes={v.canonical_state(k):s for k,s in json.loads((WORLD/'native_collision_shapes.json').read_text()).items()}
+ # Three imported free-latch command doors are real operated edges. Their
+ # full native OPEN shapes remain in the collision image; do not turn any
+ # arbitrary iron door, secure reader, window or wall into air.
+ if (WORLD/'.projectseele_tv_lifts_r45.json').is_file():
+  for lower in ((24,-423,254),(28,-448,282),(48,-448,282)):
+   halves=[lower,(lower[0],lower[1]+1,lower[2])]
+   actual=[pal[int(a[Y-LO[1],Z-LO[2],X-LO[0]])]for X,Y,Z in halves]
+   if not all(s.startswith('projectseele:city_personnel_door[')for s in actual):continue
+   from measure_world_r40 import properties
+   low,high=map(properties,actual)
+   if low.get('half')!='lower'or high.get('half')!='upper'or any(low.get(k)!=high.get(k)for k in ('facing','hinge','open','powered')):
+    raise RuntimeError(('Incomplete original free-latch door pair',lower,actual))
+   operated=[]
+   for q,current in zip(halves,actual):
+    opened=current.replace('open=false','open=true')
+    if v.canonical_state(opened)not in shapes:raise RuntimeError(('Actual free-latch open shape unavailable',q,opened))
+    if opened not in pal:pal.append(opened)
+    X,Y,Z=q;a[Y-LO[1],Z-LO[2],X-LO[0]]=pal.index(opened);operated.append(opened)
+   door_ports.append(dict(id='r46/free_latch/'+','.join(map(str,lower)),aperture=halves,
+      measured=actual,operated=operated,requires_actual_use=True,native_operation_verified=False))
  public_gates=WORLD/'r44_public_station_gates.json'
  if public_gates.exists():
   declared=json.loads(public_gates.read_text(encoding='utf8'))
@@ -76,6 +99,9 @@ def main(apply=False,output=None,export_routes=None):
       rule='Unknown cells/shapes supply neither air, clearance nor bearing; coordinates remain unresolved rather than passing'),ensure_ascii=False,indent=2),'utf8')
  floor&=np.array([not any(t in s for t in ('_wall[','_fence[','_bars[','_sign[','station_departure_board','nerv_direction_panel','escalator_side','chair','stool','command_seat')) for s in pal])
  walk=np.zeros(a.shape,bool);walk[1:-1]=floor[a[:-2]]&free[a[1:-1]]&head[a[2:]]
+ for low,high in RETIRED_WALK_DOMAINS:
+  first=np.maximum(low,LO);last=np.minimum(high,HI)
+  if np.all(last>=first):walk[first[1]-LO[1]:last[1]-LO[1]+1,first[2]-LO[2]:last[2]-LO[2]+1,first[0]-LO[0]:last[0]-LO[0]+1]=False
  if PUBLIC_DOMAINS is not None:
   approved=np.zeros(a.shape,bool)
   def include(lo,hi):

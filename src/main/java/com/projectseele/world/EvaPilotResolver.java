@@ -33,6 +33,16 @@ public final class EvaPilotResolver
         return null;
     }
 
+    /** Seat visibility follows physical insertion, not the capsule's assigned host. */
+    public static boolean sealedInAirframe(Entity pilot)
+    {
+        if (pilot.getVehicle() instanceof EntryPlugCarrierEntity plug)
+        {
+            return plug.isLockedToEva();
+        }
+        return pilot.getVehicle() instanceof EvaUnit01Entity;
+    }
+
     @Nullable
     public static LivingEntity pilot(EvaUnit01Entity eva)
     {

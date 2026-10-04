@@ -84,10 +84,8 @@ def plan():
         s.fill((x0,-467,-292,x1,-444,-198),STRUCT);s.fill((x0,-443,-292,x1,-443,-198),FLOOR)
     for z0,z1 in ((-292,-276),(-213,-198)):
         s.fill((-34,-467,z0,94,-444,z1),STRUCT)
-    # The north maintenance platform is a declared personnel floor. The old
-    # template stopped at its foundation, leaving a one-metre sunken slab.
-    # The south band is a carrier/gate interface and has its own sweep below.
-    s.fill((-34,CAGE_Y,-292,94,CAGE_Y,-276),FLOOR)
+    # R46 retires the north maintenance apron and lower blind corridor.
+    # Keep the independent wet-vessel foundation; no public wearing slab.
     # Clear the obsolete flat transfer plant and lower observation passage.
     s.fill((-36,-443,-69,104,-350,-10),'minecraft:air')
     s.fill((-38,-420,-20,103,-389,-10),'minecraft:air')
@@ -157,9 +155,8 @@ def plan():
                 s.fill((cx+8*sign,-377,z,cx+8*sign,-356,z),STRUCT)
     # Staff reach every moved cage through enclosed galleries and the existing
     # three-stop compact lift; lower and upper levels do not cut one another.
-    s.corridor_z(103,111,-289,-42,-443)
     s.corridor_z(95,103,-271,-42,-395)
-    for f in (-443,-395):
+    for f in (-395,):
         s.fill((92,f-1,-48,110,f+6,-44),STRUCT);s.fill((93,f+1,-47,109,f+5,-45),'minecraft:air');s.fill((93,f,-47,109,f,-45),FLOOR)
     # Upper front gallery of the third cage reaches the new longitudinal link.
     s.fill((90,-396,-270,100,-388,-262),STRUCT);s.fill((91,-394,-269,99,-389,-263),'minecraft:air');s.fill((91,-395,-269,99,-395,-263),FLOOR)

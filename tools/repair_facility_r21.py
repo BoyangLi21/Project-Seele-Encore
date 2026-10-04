@@ -83,10 +83,9 @@ def main(apply=False):
   sl=s.index(box);a=s.after[sl];ret=np.array([q.startswith('mtr:escalator_') for q in s.palette])[a]
   a[ret&~s.protected[sl]]=s.state(AIR)
  # Lower plant: one coherent enclosed junction, then the long north gallery.
- s.hall('factory_lower',[(102,114,-290,-43),(91,131,-48,-42)],-443,6,
+ # R46 retains the live station/lift junction and retires its north blind branch.
+ s.hall('factory_station_junction',[(91,131,-48,-42)],-443,6,
         [(91,-442,-49,95,-439,-46),(128,-442,-47,131,-438,-43)])
- s.belt('factory_lower/north',104,-284,222,-443,direction=True)
- s.belt('factory_lower/south',110,-284,222,-443,direction=False)
  # Middle gallery gains full two-direction moving walks and a spacious landing.
  s.hall('factory_middle',[(95,113,-275,-43),(89,113,-49,-43),(86,113,-271,-259)],-395,7,
         [(91,-394,-49,95,-391,-46),(86,-394,-269,90,-390,-263)])
@@ -172,7 +171,6 @@ def main(apply=False):
  # Carry exact section contracts plus positive and inverse voxel deltas.
  s.path('pyramid_launch_centre',[[118.5,-442,244.5],[118.5,-442,-17.5],[150.5,-442,-17.5],[150.5,-442,-28.5]])
  s.path('factory_middle',[[104.5,-394,-45.5],[104.5,-394,-265.5],[88.5,-394,-265.5]])
- s.path('factory_lower',[[108.5,-442,-44.5],[108.5,-442,-286.5]])
  s.path('upper_risers',[[104.5,-369,-78.5],[104.5,-369,-83.5],[104.5,-367,-88.5],[104.5,-367,-281.5]])
  s.path('upper_three_cages',[[102.5,-367,-221.5],[-29.5,-367,-221.5]])
  s.path('upper_front_observers',[[102.5,-367,-281.5],[-29.5,-367,-281.5]])

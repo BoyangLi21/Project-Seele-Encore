@@ -116,7 +116,7 @@ public final class TrainingPilotDirector
         level.getChunkAt(requestedStandby(level,variant));
         TrainingPilotEntity pilot = existingPilotR45(level,variant);
         if (pilot == null)
-            return new ActionResult(false,"原驾驶员尚未接通或身份不唯一，未创建替代驾驶员。");
+            return new ActionResult(false,"还没有确认驾驶员的位置，暂时不能安排登机。");
         if(RETURNING_PILOTS.contains(variant))
             return new ActionResult(false,"驾驶员正在返回待命，请等待离栓流程结束。");
         if(PilotRadioR28.occupiedUnit(pilot)==unit)
@@ -126,7 +126,7 @@ public final class TrainingPilotDirector
                 &&current.getAssignedVariant()==variant)
             return new ActionResult(true,"驾驶员已进入对应插入栓，等待机库联锁。");
         if(pilot.getVehicle()!=null)
-            return new ActionResult(false,"驾驶员正在使用另一台设备，未改变乘坐关系。");
+            return new ActionResult(false,"驾驶员还在另一台设备内，请先让驾驶员返回待命。");
         if(ACTIVE_REMOTE_PILOTS.contains(variant))
             return new ActionResult(true,"登机指令正在执行，驾驶员继续沿原通道行走。");
         boolean parked = EvaFleetSavedData.get(level.getServer())
@@ -152,15 +152,26 @@ public final class TrainingPilotDirector
             return new ActionResult(false, label(variant)
                     + " external entry plug is unavailable.");
         }
+        var gateFault=TvPersonnelPlatformInterlockR44.openForOriginalBoardingPilotR46(level,pilot);
+        if(gateFault.isPresent())return new ActionResult(false,gateFault.get());
         List<BlockPos> route = validatedBoardingRoute(level, variant, modern);
         if (route.isEmpty())
         {
+            TvPersonnelPlatformInterlockR44.finishPilotDoorUseR46(level,pilot);
             return new ActionResult(false, label(variant)
                     + " boarding route has an unsupported anchor.");
         }
-        if(!isSafeFeet(level,pilot.blockPosition())
+        if(!safeActualFeetR46(level,pilot.position())
                 ||pilot.position().distanceToSqr(Vec3.atBottomCenterOf(route.get(0)))>2.75D*2.75D)
+        {
+            TvPersonnelPlatformInterlockR44.finishPilotDoorUseR46(level,pilot);
             return new ActionResult(false,"驾驶员尚未到达登机通道起点，请先返回待命。");
+        }
+        if(!actualNativeRouteR46(level,pilot,route.get(route.size()-1)))
+        {
+            TvPersonnelPlatformInterlockR44.finishPilotDoorUseR46(level,pilot);
+            return new ActionResult(false,"登机通道还不能通过，驾驶员先在原地待命。");
+        }
         BOARDING_ROUTES.put(variant, route);
         BOARDING_LEG.put(variant, Math.min(1, route.size() - 1));
         BlockPos start = route.get(0);
@@ -252,6 +263,7 @@ public final class TrainingPilotDirector
             return;
         }
         int variant = pilot.getAssignedVariant();
+        TvPersonnelPlatformInterlockR44.tickPilotDoorClosureR46(level,pilot);
         if(pilot.getVehicle() instanceof EntryPlugCarrierEntity savedPlug&&savedPlug.getAssignedVariant()==variant
                 ||pilot.getVehicle() instanceof EvaUnit01Entity savedEva&&savedEva.getUnitVariant()==variant)
             ACTIVE_REMOTE_PILOTS.add(variant);
@@ -272,7 +284,7 @@ public final class TrainingPilotDirector
                 pilot.stopRiding();
                 return;
             }
-            pilot.setInvisible(true);
+            pilot.setInvisible(plug.isLockedToEva());
             EvaUnit01Entity linked = plug.getLinkedEva();
             if (linked != null&&plug.isLockedToEva())
             {
@@ -344,11 +356,12 @@ public final class TrainingPilotDirector
             pilot.getNavigation().stop();
             if (plug.boardPassenger(pilot))
             {
+                TvPersonnelPlatformInterlockR44.finishPilotDoorUseR46(level,pilot);
                 BOARDING_LEG.remove(variant);
                 CLOSEST_APPROACH.remove(variant);
                 STALLED_TICKS.remove(variant);
                 LAST_SAFE_FEET.remove(variant);
-                pilot.setInvisible(true);
+                pilot.setInvisible(plug.isLockedToEva());
                 pilot.setTrainingStage(TrainingPilotEntity.STAGE_IN_PLUG);
                 level.playSound(null, target, SoundEvents.IRON_DOOR_CLOSE,
                         SoundSource.BLOCKS, 1.4F, 0.78F);
@@ -427,7 +440,7 @@ public final class TrainingPilotDirector
         int variant=pilot.getAssignedVariant();
         if(!parkedR45(level,variant))return false;
         if(RETURNING_PILOTS.contains(variant))return true;
-        if(pilot.getVehicle()==null&&isSafeFeet(level,pilot.blockPosition())
+        if(pilot.getVehicle()==null&&safeActualFeetR46(level,pilot.position())
                 &&pilot.blockPosition().distManhattan(requestedStandby(level,variant))<=2)
         {parkPilot(level,pilot);return true;}
         var outbound=BOARDING_ROUTES.get(variant);
@@ -445,10 +458,10 @@ public final class TrainingPilotDirector
             feet=plug.getDismountLocationForPassenger(pilot);
         }
         int leg=nearestRouteLegR45(feet,route);
-        if(leg<0||!isSafeFeet(level,BlockPos.containing(feet)))return false;
+        if(leg<0||!safeActualFeetR46(level,feet))return false;
         // The real capsule chooses its safe dismount; no route-start teleport.
         if(pilot.getVehicle()!=null)pilot.stopRiding();
-        if(!isSafeFeet(level,pilot.blockPosition())){holdRouteR45(pilot,"dismount_not_on_catwalk");return false;}
+        if(!safeActualFeetR46(level,pilot.position())){holdRouteR45(pilot,"dismount_not_on_catwalk");return false;}
         leg=nearestRouteLegR45(pilot.position(),route);
         if(leg<0){holdRouteR45(pilot,"dismount_outside_return_route");return false;}
         pilot.getNavigation().stop();pilot.setInvisible(false);
@@ -477,6 +490,7 @@ public final class TrainingPilotDirector
 
     private static void holdRouteR45(TrainingPilotEntity pilot,String reason)
     {
+        if(pilot.level() instanceof ServerLevel level)TvPersonnelPlatformInterlockR44.finishPilotDoorUseR46(level,pilot);
         clearRouteState(pilot.getAssignedVariant());pilot.getNavigation().stop();
         pilot.getPersistentData().putString("SeelePilotRouteR30","hold");
         pilot.setInvisible(false);pilot.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);
@@ -534,7 +548,7 @@ public final class TrainingPilotDirector
         BlockPos routeTarget = route.get(leg);
         Vec3 destination = Vec3.atBottomCenterOf(routeTarget);
         BlockPos feet = pilot.blockPosition();
-        if (pilot.onGround() && isSafeFeet(level, feet))
+        if (pilot.onGround() && safeActualFeetR46(level,pilot.position()))
         {
             LAST_SAFE_FEET.put(variant, feet.immutable());
         }
@@ -572,8 +586,14 @@ public final class TrainingPilotDirector
         }
         if (pilot.tickCount % 20 == 1 || pilot.getNavigation().isDone())
         {
-            pilot.getNavigation().moveTo(destination.x, destination.y,
-                    destination.z, 1.05D);
+            var path=pilot.getNavigation().createPath(routeTarget,0);
+            if(path==null||!path.canReach())
+            {
+                ProjectSeele.LOGGER.warn("NERV original pilot native path cannot reach: eva={} from={} leg={} target={} pathNodes={}",
+                        variant,pilot.position(),leg,routeTarget,path==null?0:path.getNodeCount());
+                return RouteStep.FAILED;
+            }
+            pilot.getNavigation().moveTo(path,1.05D);
         }
         return RouteStep.MOVING;
     }
@@ -585,7 +605,7 @@ public final class TrainingPilotDirector
         if(pilot.getPersistentData().getString("SeelePilotRouteR30").equals("hold"))
         {pilot.getNavigation().stop();return;}
         int variant=pilot.getAssignedVariant();BlockPos feet=pilot.blockPosition();
-        if(!isSafeFeet(level,feet)||feet.distManhattan(requestedStandby(level,variant))>2)
+        if(!safeActualFeetR46(level,pilot.position())||feet.distManhattan(requestedStandby(level,variant))>2)
         {holdRouteR45(pilot,"standby_not_reached");return;}
         pilot.getNavigation().stop();pilot.setDeltaMovement(Vec3.ZERO);pilot.fallDistance=0;
         pilot.setInvisible(false);pilot.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);
@@ -632,7 +652,7 @@ public final class TrainingPilotDirector
         }
         if(best>36){holdRouteR45(pilot,"saved_route_outside_catwalk");return;}
         BOARDING_ROUTES.put(variant,List.copyOf(route));BOARDING_LEG.put(variant,leg);CLOSEST_APPROACH.remove(variant);STALLED_TICKS.remove(variant);
-        if(isSafeFeet(level,pilot.blockPosition()))LAST_SAFE_FEET.put(variant,pilot.blockPosition());
+        if(safeActualFeetR46(level,pilot.position()))LAST_SAFE_FEET.put(variant,pilot.blockPosition());
         if(intent.equals("return"))RETURNING_PILOTS.add(variant);else ACTIVE_REMOTE_PILOTS.add(variant);
         pilot.setNoAi(false);pilot.setNoGravity(false);
     }
@@ -727,12 +747,88 @@ public final class TrainingPilotDirector
 
     private static boolean isSafeFeet(ServerLevel level, BlockPos feet)
     {
-        return level.getBlockState(feet).getCollisionShape(level, feet)
-                .isEmpty()
-                && level.getBlockState(feet.above())
-                .getCollisionShape(level, feet.above()).isEmpty()
-                && level.getBlockState(feet.below()).isFaceSturdy(level,
-                feet.below(), Direction.UP);
+        // The real fine-grating/ramp surface may lie inside the feet block;
+        // faceSturdy plus two entirely empty voxels rejects that valid floor.
+        // Use the native collision top intersecting the actual .6m footprint.
+        for(int dy=-1;dy<=0;dy++)
+        {
+            var at=feet.offset(0,dy,0);if(!level.hasChunkAt(at))return false;
+            var state=level.getBlockState(at);
+            if(!state.getFluidState().isEmpty()||state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock
+                    ||state.getBlock() instanceof StationDepartureBoardBlock
+                    ||state.getBlock() instanceof TvPersonnelGuardR44)continue;
+            if(dy==0&&!(state.getBlock() instanceof TvPersonnelDeckR44)
+                    &&!(state.getBlock() instanceof net.minecraft.world.level.block.StairBlock)
+                    &&!state.is(com.projectseele.registry.ModBlocks.NERV_MOVING_WALK.get())
+                    &&!net.minecraft.core.registries.BuiltInRegistries.BLOCK.getKey(state.getBlock()).toString().equals("mtr:escalator_step"))continue;
+            for(var local:state.getCollisionShape(level,at).toAabbs())
+            {
+                var floor=local.move(at);double top=floor.maxY;
+                if(top<feet.getY()-.75||top>feet.getY()+1.0001
+                        ||floor.maxX<=feet.getX()+.2||floor.minX>=feet.getX()+.8
+                        ||floor.maxZ<=feet.getZ()+.2||floor.minZ>=feet.getZ()+.8)continue;
+                var body=new net.minecraft.world.phys.AABB(feet.getX()+.2,top+.001,feet.getZ()+.2,
+                        feet.getX()+.8,top+1.8,feet.getZ()+.8);
+                var volume=net.minecraft.world.phys.shapes.Shapes.create(body);boolean blocked=false;
+                for(var shape:level.getBlockCollisions(null,body))
+                    if(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(shape,volume,
+                            net.minecraft.world.phys.shapes.BooleanOp.AND)){blocked=true;break;}
+                if(!blocked)return true;
+            }
+        }
+        return false;
+    }
+
+    private static boolean safeActualFeetR46(ServerLevel level,Vec3 feet)
+    {
+        var body=new net.minecraft.world.phys.AABB(feet.x-.3,feet.y+.001,feet.z-.3,feet.x+.3,feet.y+1.8,feet.z+.3);
+        if(level.containsAnyLiquid(body))return false;
+        var volume=net.minecraft.world.phys.shapes.Shapes.create(body);
+        for(var collision:level.getBlockCollisions(null,body))
+            if(net.minecraft.world.phys.shapes.Shapes.joinIsNotEmpty(collision,volume,
+                    net.minecraft.world.phys.shapes.BooleanOp.AND))return false;
+        for(int x=Mth.floor(feet.x-.3);x<=Mth.floor(feet.x+.3);x++)
+            for(int z=Mth.floor(feet.z-.3);z<=Mth.floor(feet.z+.3);z++)
+                for(int y=Mth.floor(feet.y)-1;y<=Mth.floor(feet.y);y++)
+                {
+                    var at=new BlockPos(x,y,z);if(!level.hasChunkAt(at))return false;
+                    // Liquid below a dry grating is not liquid inside the pilot.
+                    var state=level.getBlockState(at);if(!state.getFluidState().isEmpty())continue;
+                    if(state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock
+                            ||state.getBlock() instanceof StationDepartureBoardBlock
+                            ||state.getBlock() instanceof TvPersonnelGuardR44)continue;
+                    for(var local:state.getCollisionShape(level,at).toAabbs())
+                    {
+                        var floor=local.move(at);
+                        if(Math.abs(floor.maxY-feet.y)<=.05&&floor.maxX>feet.x-.3&&floor.minX<feet.x+.3
+                                &&floor.maxZ>feet.z-.3&&floor.minZ<feet.z+.3)return true;
+                    }
+                }
+        return false;
+    }
+
+    private static boolean actualNativeRouteR46(ServerLevel level,TrainingPilotEntity pilot,BlockPos target)
+    {
+        var path=pilot.getNavigation().createPath(target,0);
+        if(path==null||!path.canReach())
+        {
+            ProjectSeele.LOGGER.warn("NERV original pilot full boarding path failed: eva={} from={} target={} reachable={} nodes={}",
+                    pilot.getAssignedVariant(),pilot.position(),target,path!=null&&path.canReach(),path==null?0:path.getNodeCount());
+            return false;
+        }
+        for(int i=0;i<path.getNodeCount();i++)
+        {
+            var node=path.getNode(i);var feet=new BlockPos(node.x,node.y,node.z);
+            if(!isSafeFeet(level,feet))
+            {
+                ProjectSeele.LOGGER.warn("NERV original pilot full boarding path unsafe node: eva={} index={} feet={} floor={} body={} head={}",
+                        pilot.getAssignedVariant(),i,feet,level.getBlockState(feet.below()),
+                        level.getBlockState(feet),level.getBlockState(feet.above()));return false;
+            }
+        }
+        ProjectSeele.LOGGER.info("NERV original pilot full native boarding path validated: eva={} nodes={} from={} target={}",
+                pilot.getAssignedVariant(),path.getNodeCount(),pilot.position(),target);
+        return true;
     }
 
     public static void resetRuntime()

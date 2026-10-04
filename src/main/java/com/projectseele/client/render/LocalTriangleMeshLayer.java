@@ -178,8 +178,14 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 && !com.projectseele.entity.EvaDorsalMechanism.eyesEnabled(eva);
         int vertexLight = this.fullBright && !dormantEye
                 ? LightTexture.FULL_BRIGHT : packedLight;
-        if(this.fullBright&&"head".equals(bone.getName())&&animatable instanceof EvaUnit01Entity eva&&this.textureSelector!=null)
-            com.projectseele.client.visual.OpticsR43Review.draw(eva,this.textureSelector.apply(animatable),vertexLight);
+        if("head".equals(bone.getName())&&animatable instanceof EvaUnit01Entity eva&&this.textureSelector!=null
+                &&com.projectseele.client.visual.OpticsR43Review.ENABLED)
+        {
+            var material=this.textureSelector.apply(animatable);
+            if(material.getPath().equals("textures/entity/eva_unit01_eyes.png")
+                    ||material.getPath().startsWith("dynamic/unit01_eyes_"))
+                com.projectseele.client.visual.OpticsR43Review.draw(eva,material,vertexLight);
+        }
         if(GPU_DIAGNOSTICS.add(animatable.getClass()))com.projectseele.ProjectSeele.LOGGER.info(
                 "Rigid mesh dispatch: entity={} rigid={} buffer={} texture={}",animatable.getClass().getSimpleName(),values==part.vertices(),targetBuffer.getClass().getName(),this.textureSelector!=null);
         if(values==part.vertices()&&this.textureSelector!=null

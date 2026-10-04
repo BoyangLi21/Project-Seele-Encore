@@ -129,6 +129,11 @@ public final class BlockEntityValidityReviewR45
             probes.add(probe("movingelevators:elevator_tile", "movingelevators:elevator_block[facing=east]"));
             probes.add(probe("movingelevators:elevator_tile", "movingelevators:elevator_block[facing=south]"));
             probes.add(probe("movingelevators:elevator_tile", "movingelevators:elevator_block[facing=west]"));
+            for (String facing : new String[]{"north", "south", "east", "west"})
+                for (String half : new String[]{"lower", "upper"})
+                    for (String side : new String[]{"left", "right"})
+                        probes.add(probe("mtr:apg_door", "mtr:apg_door[end=false,facing=" + facing
+                                + ",half=" + half + ",side=" + side + ",unlocked=true]"));
             result.add("exact_state_probes",probes);
             result.addProperty("elapsed_ms",(System.nanoTime()-began)/1_000_000);
             result.addProperty("limitation", "Custom BlockEntityType subclasses are not generalized beyond default states or exact probes. Factory probes are detached objects, never added to a level. Registry validity is not native tick/function/art approval; root must bind this export to installed mod jars.");
@@ -161,6 +166,12 @@ public final class BlockEntityValidityReviewR45
                 {
                     row.addProperty("detached_factory_type",BuiltInRegistries.BLOCK_ENTITY_TYPE.getKey(detached.getType()).toString());
                     row.addProperty("detached_factory_type_is_valid",detached.getType().isValid(state));
+                    var complete = detached.saveWithFullMetadata();
+                    row.addProperty("detached_factory_full_nbt",complete.toString());
+                    var reloaded = net.minecraft.world.level.block.entity.BlockEntity.loadStatic(BlockPos.ZERO,state,complete.copy());
+                    row.addProperty("detached_factory_full_nbt_roundtrip",reloaded != null
+                            && reloaded.getType() == detached.getType()
+                            && reloaded.saveWithFullMetadata().equals(complete));
                 }
             }
             row.addProperty("complete",true);

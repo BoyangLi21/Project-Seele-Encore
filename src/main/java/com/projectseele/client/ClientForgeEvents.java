@@ -824,7 +824,7 @@ public final class ClientForgeEvents
     @SubscribeEvent
     public static void onRenderPlayer(RenderPlayerEvent.Pre event)
     {
-        if (EvaPilotResolver.controlTarget(event.getEntity()) != null)
+        if (EvaPilotResolver.sealedInAirframe(event.getEntity()))
         {
             event.setCanceled(true);
             return;

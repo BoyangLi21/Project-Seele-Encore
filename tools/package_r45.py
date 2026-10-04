@@ -119,7 +119,7 @@ class Pipeline:
    'world_uuid':self.m['world']['world_uuid'],'world_seed':self.m['world']['seed'],'world_name':self.m['world']['world_name'],
    'reviews':reviews_public(self.m['reviews']),'state':'STAGED_CANDIDATE_NOT_NATIVE_NOT_RELEASED','native_executed':False,'released':False,
    'shader_enabled_by_default':False,'shader_local_personal_adaptation_only':True}
-  for kind in KINDS.values():new_json(stage/kind/'R45_BATCH.json',batch)
+  for kind in KINDS.values():new_json(stage/kind/(batch_series(self.m)+'_BATCH.json'),batch)
   hashes={p.relative_to(stage).as_posix():sha(p) for p in sorted(stage.rglob('*')) if p.is_file()}
   complete={'schema':'projectseele.r45.stage.v1','state':'STAGED_REQUIRES_ACTUAL_ROOT_ACCEPTANCE','input_digest':f['input_digest'],
    'frozen_receipt_sha256':sha(self.output/'FROZEN.json'),'files':hashes,'stage_digest':payload_hash(hashes),'native_executed':False,'released':False}
@@ -205,15 +205,18 @@ class Pipeline:
    if accepted['stage_digest']!=c['stage_digest']:raise ContractError('Accepted stage changed')
   receipt_name='CANDIDATE_RELEASE.json' if candidate else 'RELEASE.json'
   if (self.output/receipt_name).exists():raise ContractError('Existing archive receipt preserved')
-  destinations=[self.output/(self.m['batch_id']+('_CANDIDATE' if candidate else '')+'_'+label+'.zip') for label in KINDS]
+  labels=self.m.get('archive_kinds',list(KINDS))
+  if not isinstance(labels,list) or not labels or len(labels)!=len(set(labels)) or any(label not in KINDS for label in labels):raise ContractError('Unknown/duplicate requested archive kinds')
+  selected={label:KINDS[label] for label in labels}
+  destinations=[self.output/(self.m['batch_id']+('_CANDIDATE' if candidate else '')+'_'+label+'.zip') for label in selected]
   if any(p.exists() for p in destinations):raise ContractError('Existing ZIP preserved; no overwrite')
   stage=self.output/'stage';wname=self.m['world']['world_name'];archives=[]
   # The original staged bytes stay immutable; final acceptance metadata is added in archives.
   public_acceptance=candidate_public_status(self.m,c) if candidate else {'schema':'projectseele.r45.acceptance-public.v1','stage_digest':c['stage_digest'],
    'delivery_scope':a['delivery_scope'],'deferred_native_checks':self.m.get('deferred_native_checks',[]),'reviews':reviews_public(a['reviews']),'checks':a['checks'],'native_executed':True,'user_acceptance':a['user_acceptance'],
    'evidence_sha256':[row['sha256'] for row in a['evidence']]}
-  status_name='R45_CANDIDATE_STATUS.json' if candidate else 'R45_ACCEPTANCE.json'
-  for (label,kind),target in zip(KINDS.items(),destinations):
+  status_name=batch_series(self.m)+('_CANDIDATE_STATUS.json' if candidate else '_ACCEPTANCE.json')
+  for (label,kind),target in zip(selected.items(),destinations):
    expected={};client=kind in ('client','client_plain')
    with zipfile.ZipFile(target,'x',zipfile.ZIP_DEFLATED,compresslevel=1,allowZip64=True) as z:
     def add(source,name):
@@ -241,7 +244,7 @@ class Pipeline:
   result={'schema':'projectseele.r45.release.v1','batch_id':self.m['batch_id'],'protocol':PROTOCOL,'stage_digest':c['stage_digest'],
    'accepted_receipt_sha256':None if candidate else sha(self.output/'ACCEPTED.json'),'archives':archives,'reviews':public_acceptance['reviews'],
    'state':'INSTALLATION_CANDIDATE_NOT_RELEASE_ACCEPTED' if candidate else 'ACTUAL_RELEASE_ACCEPTED',
-   'native_executed':not candidate,'release_accepted':not candidate,'sealed_six_archives':True,'uploaded_or_pushed':False}
+   'native_executed':not candidate,'release_accepted':not candidate,'sealed_six_archives':len(archives)==6,'sealed_archive_count':len(archives),'uploaded_or_pushed':False}
   new_json(self.output/receipt_name,result);return result
 
 def main():

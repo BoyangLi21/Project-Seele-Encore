@@ -59,6 +59,20 @@ public class ModSounds
         return java.util.Collections.unmodifiableMap(result);
     }
 
+    /** Dedicated positional room recordings; ordinary facility and phone events stay dry. */
+    public static final java.util.Map<String,RegistryObject<SoundEvent>> HANGAR_PA=hangarPa();
+    private static java.util.Map<String,RegistryObject<SoundEvent>> hangarPa()
+    {
+        var result=new java.util.LinkedHashMap<String,RegistryObject<SoundEvent>>();
+        for(String original:new String[]{"pa_prepare", "pa_insert", "pa_lock", "pa_drain", "pa_transfer", "pa_ready", "pa_recover", "pa_return", "pa_fill", "pa_standby", "pa_fault", "pa_door_open", "pa_door_close", "pa_3", "pa_2", "pa_1", "pa_launch", "pa_combat_r31"})
+        {
+            String name="hangar_"+original+"_r46";
+            result.put(original,SOUNDS.register(name,()->SoundEvent.createFixedRangeEvent(
+                    new ResourceLocation(ProjectSeele.MODID,name),220)));
+        }
+        return java.util.Collections.unmodifiableMap(result);
+    }
+
     private static RegistryObject<SoundEvent> register(String name)
     {
         return SOUNDS.register(name,

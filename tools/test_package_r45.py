@@ -62,7 +62,7 @@ class Boundaries(unittest.TestCase):
  def test_synthetic_acceptance_never_native_pass(self):
   pipeline=object.__new__(Pipeline);pipeline.m={'build':{'project_jar':{'sha256':'a'*64}}};pipeline.check_stage=lambda:{'stage_digest':'b'*64}
   p=FIX/'SYNTHETIC_acceptance.json'
-  p.write_text(json.dumps({'schema':'projectseele.r45.stage-acceptance.v1','native_executed':True,'stage_digest':'b'*64,'tested_origin':'INSTALLED_STAGE_COPY','tested_payload_digest':'b'*64,'project_mod_sha256':'a'*64,'protocol':'52','scope':'SYNTHETIC','synthetic_fixture':True}),'utf-8')
+  p.write_text(json.dumps({'schema':'projectseele.r45.stage-acceptance.v1','native_executed':True,'stage_digest':'b'*64,'tested_origin':'INSTALLED_STAGE_COPY','tested_payload_digest':'b'*64,'project_mod_sha256':'a'*64,'protocol':PROTOCOL,'scope':'SYNTHETIC','synthetic_fixture':True}),'utf-8')
   with self.assertRaisesRegex(ContractError,'Synthetic'):pipeline.acceptance(p)
 
 def main():

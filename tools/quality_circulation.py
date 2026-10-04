@@ -131,6 +131,8 @@ def build(p):
     stairs(p,30,441,-467,5,'north','hq/arrival_stair',7,'owned')
     p.fill(26,-462,427,34,-462,436,FLOOR,'hq/arrival_top')
     p.fill(26,-461,427,34,-456,436,AIR,'hq/arrival_top')
+    from regional_architecture import headquarters_arrival_stair_sides_r46
+    headquarters_arrival_stair_sides_r46(p)
     walk('hq/arrival_stair',[30.5,-466,443.5],[30.5,-461,429.5])
     stairs(p,112,254,-449,6,'north','hq/public_transfer_stair',5,'owned')
     p.fill(109,-443,243,115,-443,248,FLOOR,'hq/public_transfer_top')

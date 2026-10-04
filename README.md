@@ -12,7 +12,9 @@ An open-source **Neon Genesis Evangelion** universe mod for Minecraft **Forge 1.
 
 ## Status / 状态
 
-R45 已打包为本地人工验收版。负责人承担美术、战斗与驾驶观感及服务器实测；本轮保留资源、动作状态和存档完整性检查，不声明全域重构或用户验收已经完成。安装、实际改动、操作和未启用项目见 [R45 人工验收手册](docs/MANUAL_ACCEPTANCE_R45.md)。六个 ZIP 已完成完整性与逐文件回读，和公开源码分别交付，不代表已上传网络发布。存档目录为 `SEELE_R45_WORLD`；为保留底本元数据，游戏列表显示名仍为“Project SEELE R44 阶段验收”。
+R46 为本轮人工验收候选，按负责人要求仅交付 **Server** 与 **Full Client** 两包。服务端包含 Forge 1.20.1 / 47.4.10 运行库及配套世界，内存上限20G；完整客户端包含模型、动作、材质和本地光影适配。两端协议54，采用新的独立目录和配套存档验收，不混入旧JAR/旧世界。
+
+本轮修复生产平台/光影未启用、大直梯饰面识别、站台门实体、候乘模型显示、眼色同步、旧设施维护复发及一批通道、导视和地表坑洞。有限本机检查、未实测场景与未完成范围分别记录，不声明全域重构或零bug。见 [R46 安装与人工验收](docs/MANUAL_ACCEPTANCE_R46.md)、[修复证据](docs/REBUILD_R46.md)、[下一轮接续](docs/NEXT_ROUND_R46.md)。R45文档保留为历史记录。
 
 进入配套世界：`/seele enter`。机库：`/seele tp hanger`。输入 `/seele tp` 查看全部传送地点。旧地图生成与原型实验指令不再出现在正式游戏中。
 
@@ -26,7 +28,8 @@ Pilot controls / 驾驶操作：`WASD` 移动、`Space` 跳跃、`Shift` 蹲姿�
 
 ## Docs / 文档
 
-- [R45 安装与人工验收](docs/MANUAL_ACCEPTANCE_R45.md) — 本轮六包、操作、实际改动与未验证项
+- [R46 安装与人工验收](docs/MANUAL_ACCEPTANCE_R46.md) — 本轮Server/Client两包、实际修复与待验证项
+- [R45 安装与人工验收（历史）](docs/MANUAL_ACCEPTANCE_R45.md)
 - [Mesh2Motion 全部 178 条动作与接入状态](docs/MESH2MOTION_ACTION_PLAN_R45.md) — 来源、动作族、当前候选与真实检查边界
 - [R44 阶段操作与人工验收（历史）](docs/MANUAL_ACCEPTANCE_R44_STAGE.md) — 上一批安装与试玩记录
 - [R44 下一轮接续](docs/R44_STAGE_NEXT_ROUND.md) — 动作、AT／第一人称、机库、全域美术与剩余交通验收

@@ -1,0 +1,73 @@
+{
+  "schema": "projectseele.native-apg-factory.r46.v1",
+  "mtr_version": "4.0.5",
+  "mtr_jar_sha256": "97466eb715ab02f50a7f7e23f920bf9fdd9d5e4bbb12620c06c6751324c66e9a",
+  "native_export_sha256": "1b1e3b0da4f34a507dcd5ad22bdbb071724eb69af66bc2504f4cfb3b40c11f16",
+  "native_factory_roundtrip_all16": true,
+  "states": [
+    {
+      "state": "mtr:apg_door[end=false,facing=north,half=lower,side=left,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=north,half=lower,side=right,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=north,half=upper,side=left,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=north,half=upper,side=right,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=south,half=lower,side=left,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=south,half=lower,side=right,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=south,half=upper,side=left,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=south,half=upper,side=right,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=east,half=lower,side=left,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=east,half=lower,side=right,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=east,half=upper,side=left,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=east,half=upper,side=right,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=west,half=lower,side=left,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=west,half=lower,side=right,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=west,half=upper,side=left,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    },
+    {
+      "state": "mtr:apg_door[end=false,facing=west,half=upper,side=right,unlocked=true]",
+      "full_snbt": "{id:\"mtr:apg_door\",x:0,y:0,z:0}"
+    }
+  ]
+}

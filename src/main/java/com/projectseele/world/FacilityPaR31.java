@@ -14,7 +14,7 @@ import java.util.WeakHashMap;
 /** Nearby cages share a PA circuit; obsolete phase announcements are never queued. */
 public final class FacilityPaR31
 {
-    private record Transmission(Vec3 position, String clip, long started, long until) {}
+    private record Transmission(Vec3 position, String clip, String sound, long started, long until) {}
     private static final Map<ServerLevel, List<Transmission>> ACTIVE = new WeakHashMap<>();
     private static final Map<ServerLevel, List<Transmission>> WARNINGS = new WeakHashMap<>();
     private static final Map<String,Integer> CLIP_TICKS=loadDurations();
@@ -63,15 +63,18 @@ public final class FacilityPaR31
                 for (var player : level.players())
                     if (player.position().distanceToSqr(previous.position()) < 240 * 240)
                         player.connection.send(new ClientboundStopSoundPacket(
-                                new ResourceLocation("projectseele", previous.clip()), SoundSource.BLOCKS));
+                                new ResourceLocation("projectseele", previous.sound()), SoundSource.BLOCKS));
                 iterator.remove();
             }
         }
         // Countdown clips must stay on the mechanism's actual second. Ordinary
         // reports can be omitted; delaying them would describe a phase already over.
+        boolean room=hangar(level,position)&&ModSounds.HANGAR_PA.containsKey(clip);
+        String sound=room?"hangar_"+clip+"_r46":clip;
         level.playSound(null, position.x, position.y, position.z,
-                ModSounds.FACILITY.get(clip).get(), SoundSource.BLOCKS, 1.05F, 1);
-        active.add(new Transmission(position, clip, now, now + durationTicks(clip)));
+                (room?ModSounds.HANGAR_PA:ModSounds.FACILITY).get(clip).get(), SoundSource.BLOCKS, 1.05F, 1);
+        active.add(new Transmission(position, clip, sound, now,
+                now + (room?HANGAR_CLIP_TICKS.get(sound):durationTicks(clip))));
     }
 
     public static void warning(ServerLevel level, Vec3 position)
@@ -83,7 +86,37 @@ public final class FacilityPaR31
         if (warnings.stream().anyMatch(sound -> sound.position().distanceToSqr(position) < 140 * 140)) return;
         level.playSound(null, position.x, position.y, position.z,
                 ModSounds.FACILITY.get("facility_siren").get(), SoundSource.BLOCKS, .48F, 1);
-        warnings.add(new Transmission(position, "facility_siren", now, now + 60));
+        warnings.add(new Transmission(position, "facility_siren", "facility_siren", now, now + 60));
+    }
+
+    private static final Map<String,Integer> HANGAR_CLIP_TICKS=loadHangarDurations();
+    private static Map<String,Integer> loadHangarDurations()
+    {
+        try(var stream=FacilityPaR31.class.getResourceAsStream("/assets/projectseele/audio/hangar_pa_reverb_r46.json"))
+        {
+            if(stream==null)throw new IllegalStateException("Hangar PA duration metadata missing");
+            var root=com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(stream,
+                    java.nio.charset.StandardCharsets.UTF_8)).getAsJsonArray();
+            var result=new java.util.HashMap<String,Integer>();
+            for(var item:root)
+            {
+                var row=item.getAsJsonObject();String name=row.get("name").getAsString();
+                int ticks=row.get("minimum_sequence_ticks").getAsInt();
+                if(ticks<1||ticks>600||result.put(name,ticks)!=null)throw new IllegalArgumentException("Hangar PA duration");
+            }
+            if(result.size()!=ModSounds.HANGAR_PA.size())throw new IllegalArgumentException("Incomplete hangar PA durations");
+            for(String clip:ModSounds.HANGAR_PA.keySet())
+                if(!result.containsKey("hangar_"+clip+"_r46"))throw new IllegalArgumentException("Hangar PA duration owner missing");
+            return Map.copyOf(result);
+        }
+        catch(Exception error){throw new IllegalStateException("Hangar PA timing rejected",error);}
+    }
+    private static boolean hangar(ServerLevel level,Vec3 position)
+    {
+        // The finite underground cage/transfer room excludes command PA, outdoor sites and phones.
+        return level.dimension().location().toString().equals("projectseele:geofront")
+                &&position.x>=-40&&position.x<=122&&position.y>=-455&&position.y<=-350
+                &&position.z>=-300&&position.z<=-15;
     }
 
     private static int durationTicks(String clip)

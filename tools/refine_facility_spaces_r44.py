@@ -259,6 +259,7 @@ def arrival(world=WORLD, out=OUT):
 
 
 def low_plant(world=WORLD, out=OUT):
+    raise RuntimeError("R46 retired the complete lower service layer; use the measured retirement component, never rebuild it")
     y = -442
     gallery = {(x, z) for x in range(-43, 108) for z in range(-292, -275)}
     access = {(x, z) for x in range(99, 108) for z in range(-276, -48)}
@@ -346,9 +347,7 @@ if __name__ == "__main__":
     p = argparse.ArgumentParser()
     p.add_argument("--world", type=Path, default=WORLD)
     p.add_argument("--out", type=Path, default=OUT)
-    p.add_argument("--part", choices=("arrival", "low", "both"), default="both")
+    p.add_argument("--part", choices=("arrival",), default="arrival")
     a = p.parse_args()
-    if a.part in ("arrival", "both"):
+    if a.part == "arrival":
         arrival(a.world, a.out)
-    if a.part in ("low", "both"):
-        low_plant(a.world, a.out)
