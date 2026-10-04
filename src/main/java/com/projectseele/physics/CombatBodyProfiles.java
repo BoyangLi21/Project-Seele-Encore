@@ -23,7 +23,7 @@ public final class CombatBodyProfiles
     {
         if(profiles==null)
         {
-            Path path=Path.of(System.getProperty("projectseele.bodyPhysicsProfiles","projectseele-local-maps/articulated_bodies_r35.json"));
+            Path path=CombatMotionResourcesR44.instancePath(System.getProperty("projectseele.bodyPhysicsProfiles","projectseele-local-maps/articulated_bodies_r35.json"));
             if(!Files.isRegularFile(path)){profiles=Map.of();return null;}
             try
             {

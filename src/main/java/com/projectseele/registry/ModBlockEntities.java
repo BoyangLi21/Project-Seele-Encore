@@ -13,6 +13,8 @@ public final class ModBlockEntities
     public static final DeferredRegister<BlockEntityType<?>> BLOCK_ENTITY_TYPES =
             DeferredRegister.create(ForgeRegistries.BLOCK_ENTITY_TYPES,
                     ProjectSeele.MODID);
+    public static final RegistryObject<BlockEntityType<com.projectseele.world.DeadSeaArchiveEntityR45>> DEAD_SEA_ARCHIVE=
+            BLOCK_ENTITY_TYPES.register("dead_sea_archive",()->BlockEntityType.Builder.of(com.projectseele.world.DeadSeaArchiveEntityR45::new,ModBlocks.DEAD_SEA_ARCHIVE.get()).build(null));
     public static final RegistryObject<BlockEntityType<com.projectseele.world.NervAccessReaderEntityR44>> NERV_ACCESS_READER=
             BLOCK_ENTITY_TYPES.register("nerv_access_reader",()->BlockEntityType.Builder.of(com.projectseele.world.NervAccessReaderEntityR44::new,ModBlocks.NERV_ACCESS_READER.get()).build(null));
 

@@ -26,8 +26,28 @@ public final class WallArtworkRenderer implements BlockEntityRenderer<WallArtwor
         poses.pushPose();var offset=panel.offset();poses.translate(offset.x,offset.y,offset.z);
         poses.mulPose(Axis.YP.rotationDegrees(-panel.facing().toYRot()));
         var pose=poses.last().pose();var normals=poses.last().normal();var consumer=buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
-        for(float[] v:new float[][]{{-halfWidth,-h,0,1},{halfWidth,-h,1,1},{halfWidth,h,1,0},{-halfWidth,h,0,0}})
-            consumer.vertex(pose,v[0],v[1],0).color(255,255,255,255).uv(v[2],v[3]).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(normals,0,0,1).endVertex();
+        // A mural has to follow its real supporting wall. Checking only the
+        // centre let a twelve-metre sheet cover doors and new wall openings.
+        double coordinate=panel.facing().getAxis()==net.minecraft.core.Direction.Axis.Z?panel.centre().x:panel.centre().z;
+        double sign=panel.facing().getAxis()==net.minecraft.core.Direction.Axis.Z?normal.z:-normal.x;
+        for(float bottom=-h;bottom<h;)
+        {
+            float top=Math.min(h,(float)(Math.floor(panel.centre().y+bottom+1e-5)+1-panel.centre().y));
+            for(float left=-halfWidth;left<halfWidth;)
+            {
+                double global=coordinate+sign*left;
+                double boundary=sign>0?Math.floor(global+1e-5)+1:Math.ceil(global-1e-5)-1;
+                float right=Math.min(halfWidth,(float)((boundary-coordinate)/sign));
+                if(panel.supportsTile((left+right)*.5,(bottom+top)*.5))
+                {
+                    float u0=(left+halfWidth)/(2*halfWidth),u1=(right+halfWidth)/(2*halfWidth),v0=(h-top)/(2*h),v1=(h-bottom)/(2*h);
+                    for(float[] v:new float[][]{{left,bottom,u0,v1},{right,bottom,u1,v1},{right,top,u1,v0},{left,top,u0,v0}})
+                        consumer.vertex(pose,v[0],v[1],0).color(255,255,255,255).uv(v[2],v[3]).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(normals,0,0,1).endVertex();
+                }
+                left=right;
+            }
+            bottom=top;
+        }
         poses.popPose();
     }
     @Override public int getViewDistance(){return 112;}

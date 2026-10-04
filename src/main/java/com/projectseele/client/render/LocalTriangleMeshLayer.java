@@ -479,9 +479,12 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                             float centreX, float minimumY,
                             float centreZ,Map<String,JointSkin> joints) {}
 
-    private record JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences)
+    private record ContactCorrective(Map<String,org.joml.Quaternionf> targets,float activationRadians,float[] sparse) {}
+    private record JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences,Map<String,Matrix4f> inverseBind,ContactCorrective corrective)
     {
-        JointSkin(String other,float[] weights,float[] rest,float[] scratch){this(other,weights,rest,scratch,Map.of());}
+        JointSkin(String other,float[] weights,float[] rest,float[] scratch){this(other,weights,rest,scratch,Map.of(),Map.of(),null);}
+        JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences)
+        {this(other,weights,rest,scratch,influences,Map.of(),null);}
     }
 
     private static final Map<String,WeldWitness> WELD_WITNESSES=new HashMap<>();
@@ -588,7 +591,22 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                     influences.put(row.getKey(),weights);
                 }
                 for(float sum:sums)if(Math.abs(sum-1)>.0002)throw new IOException("Joint influences must sum to one");
-                float[] rest=part.vertices().clone();result.put(entry.getKey(),new JointSkin("",new float[0],rest,rest.clone(),java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(influences))));continue;
+                Map<String,Matrix4f> inverseBind=new java.util.TreeMap<>();
+                if(definition.has("inverseBindColumnMajor"))
+                {
+                    for(var row:definition.getAsJsonObject("inverseBindColumnMajor").entrySet())
+                    {
+                        if(!influences.containsKey(row.getKey())||row.getValue().getAsJsonArray().size()!=16)
+                            throw new IOException("Authored skin inverse bind does not match its palette");
+                        float[] values=new float[16];for(int i=0;i<16;i++)
+                        {values[i]=row.getValue().getAsJsonArray().get(i).getAsFloat();if(!Float.isFinite(values[i]))throw new IOException("Non-finite inverse bind");}
+                        var matrix=new Matrix4f().set(values);
+                        if(Math.abs(matrix.determinant())<.0001F)throw new IOException("Singular inverse bind");
+                        inverseBind.put(row.getKey(),matrix);
+                    }
+                    if(inverseBind.size()!=influences.size())throw new IOException("Incomplete authored inverse-bind palette");
+                }
+                float[] rest=part.vertices().clone();result.put(entry.getKey(),new JointSkin("",new float[0],rest,rest.clone(),java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(influences)),Map.copyOf(inverseBind),readContactCorrective(definition,rest.length/stride)));continue;
             }
             var values=definition.getAsJsonArray("weights");
             if(part==null||values.size()!=part.vertices().length/stride)throw new IOException("Authored joint weight length: "+entry.getKey());
@@ -597,6 +615,48 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             float[] rest=part.vertices().clone();result.put(entry.getKey(),new JointSkin(definition.get("otherBone").getAsString(),weights,rest,rest.clone()));
         }
         return Map.copyOf(result);
+    }
+
+    private static ContactCorrective readContactCorrective(JsonObject definition,int vertices)
+    {
+        try{return readContactCorrectiveStrict(definition,vertices);}
+        catch(RuntimeException invalid)
+        {
+            ProjectSeele.LOGGER.warn("Optional hand contact corrective rejected; coherent base skin retained",invalid);
+            return null;
+        }
+    }
+
+    private static ContactCorrective readContactCorrectiveStrict(JsonObject definition,int vertices)
+    {
+        if(!definition.has("contactCorrectiveR45"))return null;
+        var data=definition.getAsJsonObject("contactCorrectiveR45");
+        float degrees=data.get("activation_degrees").getAsFloat();
+        if(!Float.isFinite(degrees)||degrees<=0||degrees>60)throw new IllegalArgumentException("Contact corrective activation");
+        Map<String,org.joml.Quaternionf> targets=new java.util.TreeMap<>();
+        for(var entry:data.getAsJsonObject("local_quaternion_xyzw").entrySet())
+        {
+            var row=entry.getValue().getAsJsonArray();
+            if(!entry.getKey().startsWith("r45_hand_")||row.size()!=4
+                    ||!definition.getAsJsonObject("influences").has(entry.getKey()))throw new IllegalArgumentException("Contact corrective driver");
+            var q=new org.joml.Quaternionf(row.get(0).getAsFloat(),row.get(1).getAsFloat(),row.get(2).getAsFloat(),row.get(3).getAsFloat());
+            if(!Float.isFinite(q.lengthSquared())||Math.abs(q.lengthSquared()-1)>.001F)throw new IllegalArgumentException("Contact corrective quaternion");
+            targets.put(entry.getKey(),q.normalize());
+        }
+        if(targets.isEmpty())throw new IllegalArgumentException("Contact corrective has no drivers");
+        var rows=data.getAsJsonArray("vertex_index_position_normal_delta");float[] sparse=new float[rows.size()*7];Set<Integer> unique=new HashSet<>();
+        for(int i=0;i<rows.size();i++)
+        {
+            var row=rows.get(i).getAsJsonArray();if(row.size()!=7)throw new IllegalArgumentException("Contact corrective row");
+            float raw=row.get(0).getAsFloat();int vertex=(int)raw;
+            if(raw!=vertex||vertex<0||vertex>=vertices||!unique.add(vertex))throw new IllegalArgumentException("Contact corrective vertex");
+            for(int k=0;k<7;k++)
+            {
+                float value=row.get(k).getAsFloat();if(!Float.isFinite(value)||k>0&&Math.abs(value)>2)throw new IllegalArgumentException("Unbounded contact corrective");
+                sparse[i*7+k]=value;
+            }
+        }
+        return new ContactCorrective(Map.copyOf(targets),(float)Math.toRadians(degrees),sparse);
     }
 
     private static Vector3f restPoint(MeshPart p,int offset)
@@ -727,7 +787,9 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         for(var entry:skin.influences().entrySet())
         {
             var other=findBone(root,entry.getKey());if(other==null)throw new IllegalStateException("Authored seam bone missing: "+entry.getKey());
-            var model=EvaRigTransforms.model(other);var global=EvaRigTransforms.rotation(model);if(global.w<0)global.mul(-1);
+            var model=EvaRigTransforms.model(other);
+            var bind=skin.inverseBind().get(entry.getKey());if(bind!=null)model.mul(bind);
+            var global=EvaRigTransforms.rotation(model);if(global.w<0)global.mul(-1);
             var relative=new Matrix4f(inverse).mul(model);var q=EvaRigTransforms.rotation(relative);
             // All seam copies use the same global quaternion hemisphere.
             // Choosing a separate short arc around each owning part tears
@@ -760,7 +822,33 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             x=-rest[i+5];y=rest[i+6];z=rest[i+7];ax=2*(ry*z-rz*y);ay=2*(rz*x-rx*z);az=2*(rx*y-ry*x);
             out[i+5]=-(x+rw*ax+ry*az-rz*ay);out[i+6]=y+rw*ay+rz*ax-rx*az;out[i+7]=z+rw*az+rx*ay-ry*ax;
         }
+        applyContactCorrective(skin.corrective(),root,out,stride);
         return out;
+    }
+
+    /** Pose-space skin correction follows the final local bones, including a
+     * saved powerless pose. No new skeleton transform or hand owner is added. */
+    private static void applyContactCorrective(ContactCorrective corrective,GeoBone root,float[] vertices,int stride)
+    {
+        if(corrective==null)return;
+        float distance=0;
+        for(var entry:corrective.targets().entrySet())
+        {
+            var driver=findBone(root,entry.getKey());if(driver==null)throw new IllegalStateException("Contact corrective bone missing");
+            var actual=new org.joml.Quaternionf().rotationZYX(driver.getRotZ(),driver.getRotY(),driver.getRotX());
+            float dot=Math.min(1,Math.abs(actual.dot(entry.getValue())));
+            distance=Math.max(distance,2*(float)Math.acos(dot));
+        }
+        float weight=Math.max(0,1-distance/corrective.activationRadians());weight=weight*weight*(3-2*weight);
+        if(weight<=0)return;
+        var rows=corrective.sparse();
+        for(int i=0;i<rows.length;i+=7)
+        {
+            int at=(int)rows[i]*stride;
+            for(int k=0;k<3;k++){vertices[at+k]+=weight*rows[i+1+k];vertices[at+5+k]+=weight*rows[i+4+k];}
+            float x=vertices[at+5],y=vertices[at+6],z=vertices[at+7];float length=(float)Math.sqrt(x*x+y*y+z*z);
+            if(length>1e-8F){vertices[at+5]/=length;vertices[at+6]/=length;vertices[at+7]/=length;}
+        }
     }
 
     private record MeshPart(float pivotX, float pivotY, float pivotZ,

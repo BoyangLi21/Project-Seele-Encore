@@ -37,7 +37,7 @@ public final class HangarMechanicsWitnessR44
             return;
         }
         var root = mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();
-        if (!root.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))
+        if (!root.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))
         {
             throw new IllegalStateException("Client hangar mechanics witness refuses another world");
         }

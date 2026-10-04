@@ -29,7 +29,7 @@ public final class AccessR44Review
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
         if(!ENABLED||done||event.phase!=TickEvent.Phase.END)return;var server=event.getServer();var world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))throw new IllegalStateException("Access review refuses an owner world");
+        if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))throw new IllegalStateException("Access review refuses an owner world");
         if(server.getPlayerList().getPlayers().isEmpty())return;var player=server.getPlayerList().getPlayers().get(0);
         try
         {

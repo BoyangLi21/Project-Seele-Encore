@@ -266,7 +266,7 @@ public final class RegionalTransitR44Checks
     private static void begin(Minecraft mc)
     {
         current=cases.get(index).getAsJsonObject();require(!profile(true).get("exit_path").isJsonNull(),"Configured destination exit unresolved "+current.get("destination_platform"));
-        Vec3 point=vec(profile(false).getAsJsonArray("staging"));staged=false;stagingAcknowledgedAt=-1;survivalRequested=false;serverStageEvidence=null;serverRiding=false;serverDetached=false;vehicleId=0;vehicle=null;cache=null;car=null;maxFrameStep=0;travel=0;
+        HakonePlatformLifecycleR45.beginCase(current);Vec3 point=vec(profile(false).getAsJsonArray("staging"));staged=false;stagingAcknowledgedAt=-1;survivalRequested=false;serverStageEvidence=null;serverRiding=false;serverDetached=false;vehicleId=0;vehicle=null;cache=null;car=null;maxFrameStep=0;travel=0;
         result=new JsonObject();result.addProperty("id",current.get("id").getAsString());result.addProperty("source_platform",current.get("source_platform").getAsString());result.addProperty("destination_platform",current.get("destination_platform").getAsString());
         result.addProperty("station_paths","UNVERIFIED separate station_walk_cases.json obligations");phase(0);
         mc.getSingleplayerServer().execute(()->{var player=mc.getSingleplayerServer().getPlayerList().getPlayers().get(0);player.stopRiding();player.setGameMode(GameType.SPECTATOR);player.teleportTo(mc.getSingleplayerServer().getLevel(FacilitySchemaV2.DIMENSION),point.x,point.y,point.z,0,0);player.setDeltaMovement(Vec3.ZERO);player.fallDistance=0;
@@ -283,7 +283,7 @@ public final class RegionalTransitR44Checks
         {
             if(!started)
             {
-                world=mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();require(world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"),"R44 transit refuses non-review save");
+                world=mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();require(world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()),"R44 transit refuses non-review save");
                 String file=System.getProperty("projectseele.r44TransitCases","");require(!file.isBlank(),"Current 38 native cases file is required");var data=JsonParser.parseString(Files.readString(Path.of(file))).getAsJsonObject();cases=data.getAsJsonArray("cases");require(cases.size()==38,"Required native interface denominator is 38");
                 index=Integer.getInteger("projectseele.r44TransitStart",0);end=Integer.getInteger("projectseele.r44TransitEnd",cases.size());require(index>=0&&end>index&&end<=38,"Invalid native transit window");
                 oldDistance=mc.options.renderDistance().get();oldPause=mc.options.pauseOnLostFocus;mc.options.renderDistance().set(8);mc.options.pauseOnLostFocus=false;mc.options.broadcastOptions();
@@ -291,6 +291,7 @@ public final class RegionalTransitR44Checks
             }
             require(serverFailure.isEmpty(),"Native server state read: "+serverFailure);require(clientFailure.isEmpty(),"Native rendered client state: "+clientFailure);ticks++;stageTicks++;require(ticks<120000,"Native case queue deadline");require(stageTicks<12000,"Native phase deadline "+stage+" "+current.get("id"));
             if(!staged)return;
+            if(current.has("r45_apg"))HakonePlatformLifecycleR45.observe(mc,current,result,stage);
             if(stage==0)
             {
                 keys(mc,false,false);Vec3 declared=vec(profile(false).getAsJsonArray("staging"));
@@ -324,8 +325,19 @@ public final class RegionalTransitR44Checks
                 {
                     if(!stoppedAt(v,Long.parseLong(current.get("source_platform").getAsString())))continue;
                     Object extra=v.getClass().getField("vehicleExtraData").get(v);var cars=(List<?>)extra.getClass().getField("immutableVehicleCars").get(extra);if(cars.isEmpty())continue;
-                    Object c=cars.get(0),resource=resourceCache(v,c);if(resource==null)continue;
-                    var d=RegionalTransitRidingChecks.measuredDoorway(v,resource,c,mc.player.position(),aircraft(),p->eligibleDoor(mc,p,false));if(d==null)continue;
+                    Object c,resource;RegionalTransitRidingChecks.NativeDoorway d;
+                    if(current.has("r45_apg"))
+                    {
+                        var selected=HakonePlatformLifecycleR45.select(mc,v,current);
+                        if(selected==null)continue;
+                        c=selected.car();resource=selected.resource();d=selected.doorway();
+                        result.add("r45_exact_source_APG",selected.evidence());
+                    }
+                    else
+                    {
+                        c=cars.get(0);resource=resourceCache(v,c);if(resource==null)continue;
+                        d=RegionalTransitRidingChecks.measuredDoorway(v,resource,c,mc.player.position(),aircraft(),p->eligibleDoor(mc,p,false));if(d==null)continue;
+                    }
                     vehicle=v;vehicleId=number(v,"getId");cache=resource;car=c;doorway=d;
                     result.addProperty("origin_stopped_with_open_doors",true);result.addProperty("vehicle_id",vehicleId);
                     setWalk(aircraft()?List.of(vec(profile(false).getAsJsonObject("air_stairs").getAsJsonArray("landing"))):liveFlatPath(mc,d.approach(),false));phase(2);break;
@@ -337,7 +349,8 @@ public final class RegionalTransitR44Checks
             {
                 mc.player.setYRot(doorway.inwardYaw());mc.player.setXRot(0);keys(mc,true,false);
                 if(onNativeVehicle())
-                {setWalk(List.of(doorway.inside()));result.addProperty("actual_native_door_crossing",true);phase(4);}
+                {if(current.has("r45_apg"))HakonePlatformLifecycleR45.requireCrossing(mc,current,doorway,result);
+                    setWalk(List.of(doorway.inside()));result.addProperty("actual_native_door_crossing",true);phase(4);}
                 else{vehicle=actualVehicle();if(vehicle==null||!stoppedAt(vehicle,Long.parseLong(current.get("source_platform").getAsString()))){keys(mc,false,false);phase(1);}}
             }
             else if(stage==4){if(walking(mc)){departure=mc.player.position();travel=0;previousRendered=null;while(motionHistory.size()>0)motionHistory.remove(0);phase(5);}}
@@ -349,7 +362,7 @@ public final class RegionalTransitR44Checks
                 {
                     result.addProperty("client_and_server_registered",true);result.addProperty("correct_destination_stop_and_doors",true);
                     var p=profile(true);Vec3 preferred=aircraft()?vec(p.getAsJsonObject("air_stairs").getAsJsonArray("landing")):vec(p.getAsJsonArray("exit_path").get(0).getAsJsonArray());
-                    doorway=RegionalTransitRidingChecks.measuredDoorway(vehicle,cache,car,preferred,aircraft(),q->eligibleDoor(mc,q,true));require(doorway!=null,"No supported destination doorway");
+                    doorway=current.has("r45_apg")?HakonePlatformLifecycleR45.destinationDoorway(vehicle,cache,car,preferred,q->eligibleDoor(mc,q,true)):RegionalTransitRidingChecks.measuredDoorway(vehicle,cache,car,preferred,aircraft(),q->eligibleDoor(mc,q,true));require(doorway!=null,"No supported destination doorway");
                     setWalk(List.of(aircraft()?preferred:doorway.approach()));phase(6);
                 }
             }
@@ -383,7 +396,7 @@ public final class RegionalTransitR44Checks
             {
                 if(!walking(mc))return;require(supported(mc,mc.player.position())&&mc.player.onGround(),"Exit path did not end on supported public floor");
                 require(mc.player.getHealth()>=health-.01&&mc.player.isAlive(),"Passenger lost health during actual native passage");
-                result.addProperty("actual_exit_path",true);result.addProperty("native_interface_pass",true);result.addProperty("whole_station","UNVERIFIED remaining station paths/entrances/gates/transfers");result.addProperty("max_rendered_step",maxFrameStep);results.add(result);completed.add(current.get("source_platform").getAsString());write("");
+                if(current.has("r45_apg"))HakonePlatformLifecycleR45.completeCase(result);result.addProperty("actual_exit_path",true);result.addProperty("native_interface_pass",true);result.addProperty("whole_station","UNVERIFIED remaining station paths/entrances/gates/transfers");result.addProperty("max_rendered_step",maxFrameStep);results.add(result);completed.add(current.get("source_platform").getAsString());write("");
                 if(++index>=end){finish(mc,"");return;}begin(mc);
             }
         }

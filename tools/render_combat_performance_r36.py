@@ -23,4 +23,9 @@ for spec in json.loads((OUT/'manifest.json').read_text()):
     data=np.load(OUT/(spec['file']+'.npz'));v=data['vertices'][:,[0,2,1]]*[1,-1,1];me=bpy.data.meshes.new('body');me.from_pydata(v,[],np.arange(len(v)).reshape(-1,3));me.update()
     uv=me.uv_layers.new();values=data['uv'].copy();values[:,1]=1-values[:,1];uv.data.foreach_set('uv',values.ravel());me.materials.append(materials[spec['model']]);obj=bpy.data.objects.new('body',me);bpy.context.collection.objects.link(obj)
     color=me.color_attributes.new(name='tint',type='FLOAT_COLOR',domain='CORNER');color.data.foreach_set('color',(data['colors'] if 'colors' in data else np.ones((len(v),4))).ravel())
+    weapon=None
+    if 'weapon_vertices'in data:
+        w=data['weapon_vertices'][:,[0,2,1]]*[1,-1,1];wm=bpy.data.meshes.new('weapon');wm.from_pydata(w,[],np.arange(len(w)).reshape(-1,3));wm.update()
+        weapon=bpy.data.objects.new('weapon',wm);bpy.context.collection.objects.link(weapon);steel=bpy.data.materials.get('Review steel')or bpy.data.materials.new('Review steel');steel.diffuse_color=(.28,.30,.34,1);wm.materials.append(steel)
     scene.render.filepath=str(OUT/(spec['file']+'.png'));bpy.ops.render.render(write_still=True);bpy.data.objects.remove(obj,do_unlink=True);bpy.data.meshes.remove(me)
+    if weapon is not None:bpy.data.objects.remove(weapon,do_unlink=True);bpy.data.meshes.remove(wm)

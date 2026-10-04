@@ -5,9 +5,13 @@ from release_combat_r36 import guard
 
 ROOT=Path(__file__).resolve().parents[1];ART=ROOT/'artifacts/repair_r43';WORLD=ROOT/'run/saves/SEELE_FIELD_R43_REVIEW'
 MODE='r43-facility-photos'
+TEMPLATE=ROOT/'.Codex/client-r42-interiors-photos.json'
+DEFAULT_PROPERTIES={}
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('--group',default='before_interfaces');p.add_argument('--shaders',action='store_true');p.add_argument('--shader-pack',type=Path);p.add_argument('--profile',action='store_true');p.add_argument('--rigid-gpu',action='store_true');p.add_argument('--tv-cage',action='store_true');p.add_argument('--no-occlusion',action='store_true');p.add_argument('--rebuild-terrain',action='store_true');p.add_argument('--itinerary',type=Path);p.add_argument('--hangar-witness',action='store_true');p.add_argument('--full-body-witness',action='store_true');p.add_argument('--gate-shapes',action='store_true');p.add_argument('--departure-audit-manifest',type=Path);p.add_argument('--vertical-cavern',action='store_true');args=p.parse_args();guard()
+    p=argparse.ArgumentParser();p.add_argument('--group',default='before_interfaces');p.add_argument('--shaders',action='store_true');p.add_argument('--shader-pack',type=Path);p.add_argument('--profile',action='store_true');p.add_argument('--rigid-gpu',action='store_true');p.add_argument('--tv-cage',action='store_true');p.add_argument('--tv-personnel',action='store_true');p.add_argument('--no-occlusion',action='store_true');p.add_argument('--rebuild-terrain',action='store_true');p.add_argument('--itinerary',type=Path);p.add_argument('--hangar-witness',action='store_true');p.add_argument('--full-body-witness',action='store_true');p.add_argument('--gate-shapes',action='store_true');p.add_argument('--departure-audit-manifest',type=Path);p.add_argument('--vertical-cavern',action='store_true');p.add_argument('--cage-resource-candidate',type=Path);p.add_argument('--rigid-production-default',action='store_true');p.add_argument('--material-pack',type=Path,action='append',default=[]);args=p.parse_args();guard()
+    assert not(args.rigid_gpu and args.rigid_production_default),'Choose forced GPU or unforced production default'
+    if args.cage_resource_candidate:assert args.tv_cage and args.hangar_witness,'Cage study requires the actual renderer/mechanics witness'
     if args.full_body_witness:args.hangar_witness=True
     # Java's world-directory validation rejects a junction here. The private
     # save is small enough for a normal directory; do not weaken that check.
@@ -31,14 +35,23 @@ def main():
     add('bay_transfer_cap',[336.5,107,301.3],[332,107.5,302.5],[[335,107,302],[332,106,302],[336,106,303]])
     if args.itinerary:views=json.loads(args.itinerary.read_text('utf8'))
     (WORLD/'r30_photo_views.json').write_text(json.dumps(views,ensure_ascii=False,indent=2),'utf8');(out/'itinerary.json').write_text(json.dumps(views,ensure_ascii=False,indent=2),'utf8')
-    spec=json.loads((ROOT/'.Codex/client-r42-interiors-photos.json').read_text('utf8'))
-    spec['command']=['-Dprojectseele.regionalBuild='+MODE if s.startswith('-Dprojectseele.regionalBuild=') else s for s in spec['command']]
+    spec=json.loads(TEMPLATE.read_text('utf8'))
+    spec['command']=[s for s in spec['command'] if not s.startswith('-Dprojectseele.regionalBuild=')
+        and not any(s.startswith('-Dprojectseele.'+k+'=')for k in DEFAULT_PROPERTIES)]
+    spec['command'][1:1]=['-Dprojectseele.regionalBuild='+MODE]+['-Dprojectseele.'+k+'='+str(v)for k,v in DEFAULT_PROPERTIES.items()]
+    if WORLD.name=='SEELE_FIELD_R45_REVIEW':
+        spec['command'][1:1]=['-Dprojectseele.nativeReviewWorld=SEELE_FIELD_R45_REVIEW']
     if args.no_occlusion:spec['command'][1:1]=['-Dprojectseele.reviewNoOcclusion=true']
     if args.vertical_cavern:
         assert MODE.startswith('r44-'),'Cavern visibility candidate belongs to R44'
         spec['command'][1:1]=['-Dprojectseele.r44VerticalCavern=true']
     if args.rebuild_terrain:spec['command'][1:1]=['-Dprojectseele.reviewRebuildTerrain=true']
-    if args.rigid_gpu:spec['command'][1:1]=['-Dprojectseele.r44RigidMachineryGpu=true']
+    # Explicitly preserve the requested controlled path even if the production
+    # renderer defaults to cached GPU geometry in a later compiled epoch.
+    if args.rigid_production_default:
+        assert not any(x.startswith(('-Dprojectseele.r44RigidMachineryGpu=','-Dprojectseele.rigidMachineryGpu=')) for x in spec['command']),'Production-default test must have no explicit GPU override'
+    else:
+        spec['command'][1:1]=['-Dprojectseele.r44RigidMachineryGpu='+str(args.rigid_gpu).lower()]
     if args.profile:
         assert MODE.startswith('r44-') and len(views)==1,'A stable one-view R44 profile is required'
         spec['command'][1:1]=['-Dprojectseele.photoCaptureHoldTicks=700']
@@ -46,6 +59,9 @@ def main():
         assert MODE.startswith('r44-'),'TV cage candidate belongs to R44 only'
         spec['command'][1:1]=['-Dprojectseele.r44TvCageReview=true','-Dprojectseele.r44TvCageShapeExport=true',
             '-Dprojectseele.r44TvCagePhysicalReview=true']
+    if args.tv_personnel:
+        assert args.tv_cage and (WORLD/'r44_tv_personnel_platforms.json').is_file(),'Whole TV personnel review requires installed geometry and world contract'
+        spec['command'][1:1]=['-Dprojectseele.r44TvPersonnelPlatformsReview=true']
     if args.hangar_witness:
         assert MODE.startswith('r44-'),'Real hangar witness is scoped to R44 construction only'
         spec['command'][1:1]=['-Dprojectseele.r44HangarMeshWitness=true','-Dprojectseele.r44HangarContacts=true',
@@ -68,6 +84,14 @@ def main():
     if MODE.startswith('r44-'):
         from freeze_native_r44 import freeze
         spec=freeze(spec,out)
+    overlay=None;activation=None;material_activations=[]
+    if args.cage_resource_candidate:
+        from prepare_mesh_resource_overlay_r44 import prepare
+        candidate=args.cage_resource_candidate.resolve()
+        assert candidate.is_file() and candidate.name=='tv_shoulder_shells_r44.json'
+        source=out/'cage_only_input';target=source/'assets/projectseele/mesh'/candidate.name
+        target.parent.mkdir(parents=True);shutil.copy2(candidate,target)
+        spec,overlay=prepare(spec,source,out,cage_study=True)
     launch=out/'launch.json';launch.write_text(json.dumps(spec),'utf8')
     cfg=ROOT/'run/config/oculus.properties';previous=cfg.read_bytes();began=time.time();text=previous.decode('utf8')
     witnesses=[ROOT/'build/classes/java/main/com/projectseele'/p for p in ('client/visual/RegionalStationPhoto.class','client/render/StationDepartureBoardRenderer.class','mixin/client/LargeStructureRenderMixin.class','mixin/client/GameRendererFeedProjectionMixin.class')]
@@ -89,6 +113,27 @@ def main():
     (out/'shader_witness.json').write_text(json.dumps(dict(enabled=args.shaders,pack=active,sha256=hashlib.sha256(shader.read_bytes()).hexdigest() if shader.is_file() else None),indent=2),'utf8')
     cfg.write_text(text.replace('enableShaders=false','enableShaders=true') if args.shaders else text.replace('enableShaders=true','enableShaders=false'),'utf8')
     try:
+        for index,source in enumerate(args.material_pack):
+            import zipfile
+            source=source.resolve()
+            with zipfile.ZipFile(source) as archive:
+                names=archive.namelist()
+                assert 'pack.mcmeta' in names and archive.testzip() is None
+                assert sum(info.file_size for info in archive.infolist())<2_000_000_000
+                for name in names:
+                    assert not name.startswith('/') and '..' not in Path(name).parts
+                    if name.startswith('assets/'):
+                        assert name.startswith(('assets/minecraft/textures/block/','assets/projectseele/textures/block/')),'Material review cannot replace entity/model assets: '+name
+                        assert name.endswith(('.png','.png.mcmeta')),'Unexpected material payload: '+name
+            record=dict(private_pack=str(source),private_pack_sha256=hashlib.sha256(source.read_bytes()).hexdigest(),files={})
+            material_out=out/('material_'+str(index));material_out.mkdir()
+            (material_out/'source.json').write_text(json.dumps(record,indent=2),'utf8')
+            from prepare_mesh_resource_overlay_r44 import activate
+            state=activate(record,material_out,kind='material')
+            material_activations.append((state,material_out))
+        if overlay:
+            from prepare_mesh_resource_overlay_r44 import activate
+            activation=activate(overlay,out)
         with (out/'native.log').open('w',encoding='utf8') as stream:
             if args.profile:
                 from profile_photo_r44 import run
@@ -105,9 +150,28 @@ def main():
             if args.no_occlusion:assert row.get('smart_cull') is False,('Visibility treatment did not remain applied',row)
             image=ROOT/'run/screenshots'/row['file'];assert image.stat().st_mtime>=began;shutil.copy2(image,out/image.name)
             row['sha256']=hashlib.sha256(image.read_bytes()).hexdigest()
+            requested=next(v for v in views if v['file']==row['file'])
+            if 'requiredGantryClosedByVariant' in requested:
+                actual={}
+                for machine in row.get('actual_tracked_gantries_at_capture',[]):
+                    assert machine['variant'] not in actual,'Duplicate actual gantry at photo capture'
+                    actual[machine['variant']]=machine['restraint_progress']
+                expected_states=requested['requiredGantryClosedByVariant']
+                state_ok=all(int(k) in actual and abs(actual[int(k)]-value)<.001 for k,value in expected_states.items())
+                state_evidence=dict(file=row['file'],expected=expected_states,actual=actual,passed=state_ok,
+                    reason='Measured at actual capture, not inferred from PARKED phase or model bytes')
+                (out/(Path(row['file']).stem+'_mechanical_state.json')).write_text(json.dumps(state_evidence,indent=2),'utf8')
+                assert state_ok,('Photo mechanical state does not match declared comparison',state_evidence)
         (out/'positions.json').write_text(json.dumps(proof,indent=2),'utf8')
         if args.shaders:
             assert all(row.get('actual_shader_active') is True for row in proof),'Requested shader fell back or actual shader pipeline was not witnessed'
+        if overlay:
+            import re
+            log=(ROOT/'run/logs/latest.log').read_text('utf8',errors='replace')
+            hashes=re.findall(r'R44 TV cage visual resource source=.*? sha256=([0-9a-f]{64})',log)
+            expected_hash=overlay['expected_resource_identities']['projectseele:mesh/tv_shoulder_shells_r44.json']
+            assert hashes and set(hashes)=={expected_hash},'Actual cage renderer did not select the frozen study asset'
+            (out/'cage_resource_readback.json').write_text(json.dumps(dict(expected_sha256=expected_hash,actual_sha256=sorted(set(hashes)),native_resource_selected=True,visual_accepted=False),indent=2),'utf8')
         if args.departure_audit_manifest:
             audit=out/'departure_audit.json'
             assert audit.is_file() and audit.stat().st_mtime>=began,'Actual departure audit was not completed in this run'
@@ -128,6 +192,13 @@ def main():
             raise RuntimeError('Incomplete photo itinerary: '+', '.join(sorted(expected-observed)))
         (ART/'space_photos'/('latest_'+args.group+'.json')).write_text(json.dumps(dict(folder=str(out),photos=len(proof),shaders=args.shaders,quality='UNREVIEWED until actual pictures inspected'),indent=2),'utf8')
         print('Fresh native photos with actual camera and compiled sections:',len(proof),out,flush=True)
-    finally:cfg.write_bytes(previous)
+    finally:
+        cfg.write_bytes(previous)
+        if activation:
+            from prepare_mesh_resource_overlay_r44 import deactivate
+            deactivate(activation,out)
+        for state,material_out in reversed(material_activations):
+            from prepare_mesh_resource_overlay_r44 import deactivate
+            deactivate(state,material_out)
 
 if __name__=='__main__':main()

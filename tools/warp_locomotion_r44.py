@@ -34,7 +34,7 @@ def episodes(mask):
     return result
 
 
-def targets(points,mask,source_stride,target_stride):
+def targets(points,mask,source_stride,target_stride,continuous_vertical=False,proportional_swing=False):
     count=len(points);result=np.empty_like(points);known=np.zeros(count,bool);components=episodes(mask)
     for start,end in components:
         ids=np.arange(start,end+1);idx=ids%count;phase=ids/count
@@ -55,12 +55,16 @@ def targets(points,mask,source_stride,target_stride):
             u=(i-(start-1))/span;idx=i%count
             old_chord=points[first]*(1-u)+points[last]*u
             new_chord=result[first]*(1-u)+result[last]*u
-            residual=points[idx]-old_chord;residual[[0,2]]*=target_stride/source_stride
-            result[idx]=new_chord+residual;result[idx,1]=points[idx,1]
+            residual=points[idx]-old_chord
+            residual[[0,2]]*=target_stride/source_stride
+            if proportional_swing:residual[1]*=target_stride/source_stride
+            result[idx]=new_chord+residual
+            if continuous_vertical:result[idx,1]=max(0.,result[idx,1])
+            else:result[idx,1]=points[idx,1]
     return result,components
 
 
-def warp(actor,document,label,gain,contract,toes,density):
+def warp(actor,document,label,gain,contract,toes,density,continuous_vertical=False,walk_clearance_fraction=None,proportional_swing=False):
     names=document['bones'];source=copy.deepcopy(document['clips'][label]);original=source['frames'];frames=[]
     for i in range((len(original)-1)*density):
         a=i//density;w=(i%density)/density
@@ -72,6 +76,8 @@ def warp(actor,document,label,gain,contract,toes,density):
     count=len(poses);vertices=common.BODY.get('rig_support',{}).get(str(actor.key),common.BODY['support'])
     points={};offsets={};orientations={};masks={};wanted={};support=[];floor_toe={}
     source_stride=float(contract['stride_blocks']);target_stride=source_stride/gain
+    contact_changes=[]
+    measured_clearance={};forward_velocity={}
     for side,index in [('l',0),('r',1)]:
         name='foot_'+side;patches=[];rotated=[];qs=[];heights=[];toe=np.asarray(toes[side])*16
         for p in poses:
@@ -83,15 +89,50 @@ def warp(actor,document,label,gain,contract,toes,density):
             patches.append(p.point(name)+patch);rotated.append(patch);qs.append(orientation)
         points[side]=np.asarray(patches);offsets[side]=np.asarray(rotated);orientations[side]=qs
         masks[side]=np.asarray([bool(f['foot_contact'][index]) for f in frames])
-        desired,components=targets(points[side],masks[side],source_stride/(5/16),target_stride/(5/16))
-        wanted[side]=desired;support.append(dict(side=side,episodes=components))
         floor_toe[side]=heights
+        measured_clearance[side]=points[side][:,1]-heights
+        forward_velocity[side]=(np.roll(points[side][:,2],-1)-np.roll(points[side][:,2],1))*count/2
+        if continuous_vertical:
+            before=masks[side].copy()
+            # A foot still sweeping forwards relative to the pelvis cannot
+            # own a planted world patch merely because it is low. The old
+            # height-only labels latched that foot before heel strike.
+            masks[side]&=forward_velocity[side]>source_stride/(5/16)*.05
+            contact_changes.append(dict(side=side,released_false_plants=np.flatnonzero(before&~masks[side]).tolist()))
+    if continuous_vertical and label=='walk':
+        for i in range(count):
+            if masks['l'][i]or masks['r'][i]:continue
+            supportable=[s for s in ['l','r']if measured_clearance[s][i]<actor.height*.006 and forward_velocity[s][i]>0]
+            if supportable:masks[min(supportable,key=lambda s:measured_clearance[s][i])][i]=True
+    clearance_revision=[]
+    for side in ['l','r']:
+        measured=points[side].copy()
+        # The marker sits above the sole during a heel/toe roll. Work in
+        # ground clearance, then restore that geometric offset for EVERY
+        # frame. Mixing absolute swing Y with planted sole Y created a jump.
+        if continuous_vertical:measured[:,1]-=floor_toe[side]
+        # When shortening a captured step, preserve its 3D swing proportions.
+        # Scaling only horizontal residuals retained the tall source arc over
+        # a much shorter step and changed the gait into a marching silhouette.
+        desired,components=targets(measured,masks[side],source_stride/(5/16),target_stride/(5/16),continuous_vertical,proportional_swing)
+        if walk_clearance_fraction is not None:
+            assert label=='walk' and continuous_vertical and .005<=walk_clearance_fraction<=.06
+            # Retarget the swing sole path, then solve the rigid leg chain.
+            # The inherited long-boot capture clears over 10% of body height:
+            # compressing stride alone retained that marching/high-step arc.
+            # Preserve contact episodes and horizontal ground anchors; only
+            # ordinary walk receives this authored clearance envelope.
+            peak=float(max(0,desired[:,1].max()));limit=actor.height*walk_clearance_fraction
+            scale=min(1.,limit/max(peak,1e-9));desired[:,1]*=scale
+            clearance_revision.append(dict(side=side,source_peak_model=peak,target_peak_model=float(desired[:,1].max()),fraction_of_rig_height=walk_clearance_fraction,scale=scale))
+        wanted[side]=desired;support.append(dict(side=side,episodes=components))
     exported=[];actual={s:[] for s in ('l','r')};joint_error=0;root_change=0
     for i,p in enumerate(poses):
         original_root=p.p['root'].copy();goals={}
         for side in ('l','r'):
             desired=wanted[side][i].copy()
-            if masks[side][i]:desired[1]=floor_toe[side][i]
+            if continuous_vertical:desired[1]+=floor_toe[side][i]
+            elif masks[side][i]:desired[1]=floor_toe[side][i]
             goals[side]=desired-offsets[side][i]
         reachable_root(actor,p,goals)
         for side in ('l','r'):
@@ -115,7 +156,10 @@ def warp(actor,document,label,gain,contract,toes,density):
     result['r44_stride_warp']=dict(source_stride_blocks=source_stride,runtime_stride_blocks=target_stride,cycle_gain=gain,
         source='Same ACCAD calibrated whole-body performance; support locks plus scaled swing residuals and anatomical IK',
         root_correction_max_model_units=root_change,ankle_target_error_max_model_units=joint_error,support=support,metrics=metrics,
-        source_frames=len(original),runtime_frames=len(exported),constraint_resolve_density=density)
+        source_frames=len(original),runtime_frames=len(exported),constraint_resolve_density=density,
+        continuous_sole_clearance_r45=continuous_vertical,contact_direction_audit_r45=contact_changes)
+    if clearance_revision:result['r44_stride_warp']['walk_swing_clearance_r45']=clearance_revision
+    if proportional_swing:result['r44_stride_warp']['source_3d_swing_proportion_preserved_r45']=True
     result['forefoot_curves_r44']={side:(np.vstack((actual[side],actual[side][0]))/16).tolist() for side in ('l','r')}
     result['forefoot_offsets_r44']=toes
     return result,result['r44_stride_warp']

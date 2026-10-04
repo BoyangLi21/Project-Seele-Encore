@@ -17,6 +17,7 @@ import regional_voxels as v
 from measure_world_r40 import MeasuredWorld, properties
 from query_blocks import AIR, iter_block_entities
 from audit_facility_transit_r44 import Geometry
+from arrival_stair_envelope_r45 import retained_stair_contract, verify_retained_stair_contract
 
 ROOT = Path(__file__).resolve().parents[1]
 WORLD = ROOT / "run/saves/SEELE_FIELD_R44_REVIEW"
@@ -35,7 +36,7 @@ def plan(world=WORLD, out=OUT):
     if list(out.glob("whole_arrival_component/applied_*/receipt.json")):
         raise RuntimeError("Applied arrival stage is immutable; use a new revision output")
     w = MeasuredWorld(world)
-    lo, hi = (-405, -470, 708), (-303, -450, 774)
+    lo, hi = (-405, -470, 708), (-303, -450, 779)
     w.box(lo, hi)
     w.load()
     tags = {q: copy.deepcopy(t) for q, t in iter_block_entities(world, v.DIM, lo, hi)}
@@ -66,6 +67,7 @@ def plan(world=WORLD, out=OUT):
             if state and state.partition("[")[0].endswith("_stairs"):
                 retained_stairs.append({"position": [x, y, z], "state": state})
                 stair_heads.update((x, y + d, z) for d in range(1, 4))
+    stair_contract = retained_stair_contract(w, retained_stairs)
     materials = AIR | {FLOOR, STRUCT, WALL, GLASS, "projectseele:nerv_machine_edge",
         "projectseele:nerv_edge_rail", "projectseele:nerv_strip_light", "projectseele:nerv_ceiling_light",
         "minecraft:smooth_stone", "minecraft:light_gray_concrete", "minecraft:polished_deepslate",
@@ -86,6 +88,11 @@ def plan(world=WORLD, out=OUT):
             if before != after:
                 protected.append({"position": q, "state": before, "reason": "Whole native device/port/NBT negative mask"})
             return
+        if q in stair_contract["bearing"] and before != after:
+            protected.append({"position": q, "state": before, "reason": "Retained complete stair landing and bearing"})
+            return
+        if q in stair_contract["body"]:
+            after = "minecraft:air"
         if q in stair_heads and after != "minecraft:air":
             protected.append({"position": q, "state": before, "reason": "Retained real stair headroom"})
             return
@@ -199,6 +206,7 @@ def plan(world=WORLD, out=OUT):
         def get(self, x, y, z):
             q = (int(x), int(y), int(z))
             return changes[q][0] if q in changes else w.block(q)
+    complete_stair_validation = verify_retained_stair_contract(Overlay(), stair_contract)
     geometry = Geometry(Overlay())
     floor_cells = {(x, Y, z) for x, z in mask if geometry.standing((x, Y, z))["status"] == "STATIC_STANDING"}
     seed = (-360, Y, 735)
@@ -241,6 +249,7 @@ def plan(world=WORLD, out=OUT):
         "preserved_real_ports": sorted(ports), "negative_masks": [shaft, call_widget],
         "original_complete_nbt": [{"position": q, "nbt": t.snbt()} for q, t in sorted(tags.items())],
         "retained_actual_station_stairs": retained_stairs,
+        "complete_retained_stair_validation_r45": complete_stair_validation,
         "retired": "R40 inner wall/low-ceiling component and 12 edge rails after their actual floor/enclosure is rebuilt",
         "public_floor_cells": len(floor_cells), "connected_cells": len(reached), "unknown_shapes": sorted(geometry.unknown),
         "ordinary_fixtures": sorted(furniture), "moving_walks": belts, "boards": [{"position": q, "facing": face, "rows": rows} for q, face, title, rows in boards],

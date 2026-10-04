@@ -5,6 +5,8 @@ import copy,json,math,nbtlib,numpy as np
 from scipy.spatial import cKDTree
 import regional_voxels as v
 from query_blocks import read_box,iter_block_entities,AIR
+from measure_world_r40 import properties
+from station_route_contract_r44 import RouteDiagrams
 ROOT=v.ROOT;WORLD=ROOT/'run/saves/SEELE_FIELD_R28_REVIEW';ART=ROOT/'artifacts/facility_r28';OUT=ART/'map_access'
 DIR={'north':(0,-1),'south':(0,1),'east':(1,0),'west':(-1,0)}
 OPPOSITE={'north':'south','south':'north','east':'west','west':'east'}
@@ -25,6 +27,20 @@ def main():
         def boxes(state):
             if state.split('[')[0] in AIR|{'minecraft:light'}:return []
             return shapes.get(state.replace(',propagate_property=0',''),[[0,0,0,1,1,1]])
+        def complete_map_clear_of_stairs(board,candidate_face):
+            proposed=old.replace('facing='+face,'facing='+candidate_face)
+            panel=shapes.get(proposed)
+            if panel is None:raise RuntimeError(('Unmeasured actual complete route-map shape',proposed))
+            for stair,st in cells.items():
+                if not st.partition('[')[0].endswith('_stairs'):continue
+                spec=properties(st)
+                if spec.get('half')!='bottom' or spec.get('shape')!='straight':continue
+                samples={'north':[(.5,.9,.5),(.5,.4,1)],'south':[(.5,.1,.5),(.5,.6,1)],'east':[(.1,.5,.5),(.6,.5,1)],'west':[(.9,.5,.5),(.4,.5,1)]}[spec['facing']]
+                for dx,dz,dy in samples:
+                    p=[stair[0]+dx,stair[1]+dy,stair[2]+dz]
+                    low=[p[0]-.3,p[1]+1e-6,p[2]-.3];high=[p[0]+.3,p[1]+1.8,p[2]+.3]
+                    if any(all(board[k]+b[k]<high[k]and board[k]+b[k+3]>low[k]for k in range(3))for b in panel):return False
+            return True
         def free(x,y,z,height=1):
             return not any(b[0]<.795 and b[3]>.205 and b[2]<.795 and b[5]>.205 and b[1]<height and b[4]>.001 for b in boxes(cells.get((x,y,z),'UNKNOWN')))
         def walkable(x,z):
@@ -49,7 +65,8 @@ def main():
                 if any(all(b[i]-1e-5<=local[i]<=b[i+3]+1e-5 for i in range(3)) for b in boxes(cells.get(cell,'UNKNOWN'))):return False
             return True
         options=[]
-        for candidate_face in (face,OPPOSITE[face]):
+        for candidate_face in dict.fromkeys((face,OPPOSITE[face],*DIR)):
+            if not complete_map_clear_of_stairs(q,candidate_face):continue
             nx,nz=DIR[candidate_face]
             for distance in (2,3,4):
                 reader=(q[0]+nx*distance,foot,q[2]+nz*distance);key=reader[0],reader[2]
@@ -69,6 +86,7 @@ def main():
                 for newface,(nx,nz) in DIR.items():
                     board=(x-nx*3,foot+2,z-nz*3);back=(board[0]-nx,board[1],board[2]-nz)
                     if board in tags or cells.get(board,'UNKNOWN').split('[')[0] not in AIR:continue
+                    if not complete_map_clear_of_stairs(board,newface):continue
                     if not boxes(cells.get(back,'minecraft:air')):continue
                     cross=(1,0) if nz else (0,1)
                     if any(cells.get((board[0]+d*cross[0],board[1]+dy,board[2]+d*cross[1]),'UNKNOWN').split('[')[0] not in AIR for d in (-1,0,1) for dy in (0,1)):continue
@@ -88,6 +106,14 @@ def main():
             for k,value in zip(('x','y','z'),newq):tag[k]=nbtlib.Int(value)
             p.block_entities[newq]=tag
         elif newstate!=old:p.match((*q,*q),old,newstate,'r28/route_diagram_faces_public_forecourt');p.block_entities[q]=copy.deepcopy(tags[q])
+        # A turned physical panel needs the corresponding exact rail-direction arrow.
+        if newstate!=old or newq!=q:
+            final_tag=copy.deepcopy(p.block_entities[newq])
+            if 'MapRows'in final_tag:
+                diagram=RouteDiagrams(WORLD/'native_transit_r28.json').diagram(int(final_tag['NativePlatformId']),newface,str(final_tag.get('Route','')))
+                final_tag['MapRows']=nbtlib.List[nbtlib.String]([nbtlib.String(text)for text in diagram['rows']])
+                for k in range(3):final_tag['Row'+str(k)]=nbtlib.String(diagram['rows'][k])
+            p.block_entities[newq]=final_tag
         point=[reader[0]+.5,foot,reader[2]+.5]
         overrides.append(dict(id=r['id'],path=[point,point],readingBoard=list(newq)))
         path=[[x+.5,foot,z+.5] for x,z in chain]

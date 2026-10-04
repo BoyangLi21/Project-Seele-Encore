@@ -36,7 +36,7 @@ public final class RuntimeProfileR44Review
                 traceTickets(event.getServer().getLevel(FacilitySchemaV2.DIMENSION));
         }
         if(!ENABLED||done)return;var server=event.getServer();var world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))throw new IllegalStateException("Runtime profile refuses owner world");
+        if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))throw new IllegalStateException("Runtime profile refuses owner world");
         if(server.getPlayerList().getPlayers().isEmpty())return;
         if(event.phase==TickEvent.Phase.START){began=System.nanoTime();return;}
         try
@@ -68,7 +68,7 @@ public final class RuntimeProfileR44Review
         try
         {
             var world=level.getServer().getWorldPath(LevelResource.ROOT).normalize();
-            if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))
+            if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))
                 throw new IllegalStateException("Chunk ticket trace refuses another world");
             var row=new JsonObject();row.addProperty("tick",level.getGameTime());row.addProperty("trace_age",ticketAge);
             row.addProperty("loaded_chunks",level.getChunkSource().getLoadedChunksCount());

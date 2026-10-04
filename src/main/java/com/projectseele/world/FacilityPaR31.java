@@ -17,6 +17,19 @@ public final class FacilityPaR31
     private record Transmission(Vec3 position, String clip, long started, long until) {}
     private static final Map<ServerLevel, List<Transmission>> ACTIVE = new WeakHashMap<>();
     private static final Map<ServerLevel, List<Transmission>> WARNINGS = new WeakHashMap<>();
+    private static final Map<String,Integer> CLIP_TICKS=loadDurations();
+    private static Map<String,Integer> loadDurations()
+    {
+        try(var stream=FacilityPaR31.class.getResourceAsStream("/assets/projectseele/audio/facility_voice_r45.json"))
+        {
+            if(stream==null)return Map.of();
+            var root=com.google.gson.JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonArray();
+            var result=new java.util.HashMap<String,Integer>();
+            for(var item:root){var row=item.getAsJsonObject();int ticks=row.get("minimum_sequence_ticks").getAsInt();if(ticks<1||ticks>600)throw new IllegalArgumentException("Facility clip duration");result.put(row.get("name").getAsString(),ticks);}
+            return Map.copyOf(result);
+        }
+        catch(Exception error){throw new IllegalStateException("Facility voice timing resource rejected",error);}
+    }
 
     private static List<Transmission> active(ServerLevel level)
     {
@@ -75,6 +88,7 @@ public final class FacilityPaR31
 
     private static int durationTicks(String clip)
     {
+        if(CLIP_TICKS.containsKey(clip))return CLIP_TICKS.get(clip);
         return switch (clip)
         {
             case "pa_1", "pa_2" -> 15;

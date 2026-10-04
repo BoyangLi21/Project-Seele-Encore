@@ -12,6 +12,8 @@ import nbtlib
 from measure_world_r40 import MeasuredWorld, properties
 from query_blocks import AIR, iter_block_entities
 from regional_voxels import canonical_state
+from city_bookshop_interior_r45 import resolve_ground_floor_use,author_bookshop_displays,source_owned_sign_text,create_owned_envelopes,intersects_create
+from city_clinic_interior_r45 import captured_bed_defaults,author_clinic_exam_bay
 
 ROOT = Path(__file__).resolve().parents[1]
 ART = ROOT / 'artifacts/rebuild_r44/city_buildings'
@@ -58,14 +60,30 @@ def main():
     global WORLD
     parser=argparse.ArgumentParser();parser.add_argument('--world', type=Path, default=WORLD)
     args=parser.parse_args();WORLD=args.world.resolve()
+    authored_signs={}
+    if (ART/'forward.jsonl.gz').exists():
+        with gzip.open(ART/'forward.jsonl.gz','rt',encoding='utf8') as stream:
+            for line in stream:
+                r=json.loads(line)
+                if r.get('after_nbt') and '_wall_sign[' in r['after']:
+                    authored_signs[tuple(r['pos'])]=nbtlib.parse_nbt(r['after_nbt'])
     assert WORLD.name == 'SEELE_FIELD_R44_REVIEW', 'Only the root-authorized construction world is measured'
     bs=json.loads(OWNERS.read_text('utf8'))['buildings']
+    clinic_bed_defaults={}
+    clinic_native_capture=ROOT/'artifacts/rebuild_r44/world_composition/city_archive_closeout/native_initialized_be_candidates.json'
+    clinic_world_type=WORLD/'datapacks/tv_world_preview/data/projectseele/dimension_type/geofront.json'
+    clinic_beds_allowed=clinic_world_type.exists() and json.loads(clinic_world_type.read_text('utf8')).get('bed_works') is True
+    if clinic_native_capture.exists() and clinic_beds_allowed:clinic_bed_defaults=captured_bed_defaults(json.loads(clinic_native_capture.read_text('utf8')))
+    create_envelopes=[]
+    create_contract=ROOT/'artifacts/rebuild_r45/city_motion/whole_topology_v2/manifest.json'
+    if create_contract.exists():create_envelopes=create_owned_envelopes(json.loads(create_contract.read_text('utf8')))
     assert len(bs)==193
     shape_path=ROOT/'artifacts/rebuild_r44/source_world_backup/native_collision_shapes.json'
     shapes={canonical_state(k):v for k,v in json.loads(shape_path.read_text('utf8')).items()}
     rows={};records=[];counts=Counter();missing=set()
     for i,b in enumerate(bs):
         x0,y0,z0=b['planned_bounds'][0];x1,y1,z1=b['planned_bounds'][1]
+        transport_scope=b['id'].startswith('airport/')
         if b['id'] in ('tokyo_south/13-05','tokyo_south/13-06'):
             receipt=json.loads((WORLD/'regional_quality_r03_structures.json').read_text('utf8'))
             assert receipt['cropped'][b['id']]==152 and receipt['receipt']['verified']
@@ -73,6 +91,8 @@ def main():
         w=MeasuredWorld(WORLD);lo=(x0-12,y0-8,z0-12);hi=(x1+12,y1+2,z1+16);w.box(lo,hi);w.load()
         tags={q:t for q,t in iter_block_entities(WORLD,b['dimension'],lo,hi)}
         def put(q, after, reason, allowed=PALETTE, after_nbt=None):
+            if transport_scope:
+                counts['preserved_transport_owned_write_attempts']+=1;return False
             q=tuple(q);before=w.block(q)
             if before is None:
                 counts['unmeasured_candidate']+=1;return False
@@ -106,6 +126,22 @@ def main():
         style_index=int(hashlib.sha256(b['id'].encode()).hexdigest()[:8],16)%len(FRONTS)
         if b['style']=='residential' and style_index in (0,2,5):style_index=6
         identity,label,accent,awning=FRONTS[style_index]
+        identity,label=resolve_ground_floor_use(identity,label,b['style'])
+        if transport_scope:identity,label='preserved_transport_facility',b['id'].split('/')[-1]
+        clinic_contents=None
+        if identity=='clinic' and b['style']=='office' and not transport_scope:
+            def clinic_put(q,state,owner,reason,nbt):
+                return put(q,state,reason,{'minecraft:smooth_quartz','minecraft:air'},nbt)
+            def clinic_protected(positions):
+                return any(tuple(q) in tags for q in positions) or intersects_create(positions,create_envelopes)
+            clinic_contents=author_clinic_exam_bay(b,w.block,clinic_put,clinic_bed_defaults,clinic_protected)
+        bookshop_contents=None
+        if identity=='bookshop' and b['style']=='office':
+            def display_put(q,state,owner,reason):
+                return put(q,state,reason,{'minecraft:smooth_quartz','minecraft:black_stained_glass','minecraft:bookshelf'})
+            def display_protected(positions):
+                return any(tuple(q) in tags for q in positions) or intersects_create(positions,create_envelopes)
+            bookshop_contents=author_bookshop_displays(b,w.block,display_put,display_protected)
         if b['style']!='old_danchi':
             cx=b['entry'][0];feet=b['planned_floor_feet'][0]
             for x in range(x0+2,x1-1):
@@ -120,7 +156,7 @@ def main():
                     put((x,y,z1),'minecraft:polished_andesite','frontage pier and continuous plinth')
             # Existing sign support is deliberately independent of the doorway.
             q=(cx+3,feet+2,z1+1);tag=tags.get(q)
-            if tag is not None and str(tag.get('id',''))=='minecraft:sign':
+            if tag is not None and str(tag.get('id',''))=='minecraft:sign' and source_owned_sign_text(tag,authored_signs.get(q)):
                 after_tag=nbtlib.parse_nbt(tag.snbt())
                 for face in ('front_text','back_text'):
                     if face in after_tag:
@@ -172,6 +208,8 @@ def main():
         records.append(dict(id=b['id'],style=b['style'],street_front=identity if b['style']!='old_danchi' else 'preserved_old_danchi',
             planned_bounds=b['planned_bounds'],public_doors=doors,entrances=entrances,status=status,native_walk_cases=tests,
             actual_building_bounds=[[x0,y0,z0],[x1,y1,z1]],
+            bookshop_ground_floor_components=bookshop_contents,
+            clinic_ground_floor_components=clinic_contents,transport_owned_write_scope_preserved=transport_scope,
             floor_coverage='R43 all-storey and all-stair evidence inherited; current entrances measured; interiors and visual review pending'))
         if i%25==0:print('Measured authored building',i+1,'/193',flush=True)
     summary=dict(buildings=len(records),door_pairs=sum(len(b['public_doors']) for b in records),

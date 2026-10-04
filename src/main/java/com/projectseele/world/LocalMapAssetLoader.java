@@ -44,7 +44,7 @@ import net.minecraft.world.phys.AABB;
 public final class LocalMapAssetLoader
 {
     private static final Path ASSET_DIRECTORY =
-            Paths.get("projectseele-local-maps");
+            com.projectseele.entity.CombatMotionResourcesR44.instancePath("projectseele-local-maps");
     private static final Path COMMAND_MODULE =
             ASSET_DIRECTORY.resolve("nerv_command_left.nbt");
     private static final Path TOKYO3_SKYSCRAPER =
@@ -232,6 +232,7 @@ public final class LocalMapAssetLoader
                     "Local NERV command module placement returned false at {}", base);
             return false;
         }
+        TvLiftFinishR45.finishImportedCommandDoors(level);
         set(level, geoFrontOrigin.offset(COMMAND_MARKER_A),
                 Blocks.NETHERITE_BLOCK.defaultBlockState());
         set(level, geoFrontOrigin.offset(COMMAND_MARKER_B),
@@ -386,6 +387,7 @@ public final class LocalMapAssetLoader
     public static int placeTokyo3Skyscrapers(ServerLevel level,
                                              BlockPos tokyo3Origin)
     {
+        if(CityRigidTopologyR45.owns(level,tokyo3Origin))return 0;
         return placeTokyo3Skyscrapers(level, tokyo3Origin, 0);
     }
 
@@ -397,6 +399,7 @@ public final class LocalMapAssetLoader
                                              BlockPos tokyo3Origin,
                                              int retractionDepth)
     {
+        if(CityRigidTopologyR45.owns(level,tokyo3Origin))return 0;
         StructureTemplate template = load(level, TOKYO3_SKYSCRAPER);
         if (template == null)
         {
@@ -481,6 +484,10 @@ public final class LocalMapAssetLoader
                                                   BlockPos tokyo3Origin,
                                                   int oldDepth, int newDepth)
     {
+        if (CityRigidTopologyR45.owns(level, tokyo3Origin))
+        {
+            return;
+        }
         for (int index = 0; index < SKYSCRAPERS.length; index++)
         {
             applyTokyo3RetractionDepth(level, tokyo3Origin, oldDepth,
@@ -498,6 +505,7 @@ public final class LocalMapAssetLoader
             ServerLevel level, BlockPos tokyo3Origin, int oldDepth,
             int newDepth, int index, int voxelCursor)
     {
+        if(CityRigidTopologyR45.owns(level,tokyo3Origin))return new SkyscraperTravelStep(false,true,voxelCursor,0);
         StructureTemplate template = load(level, TOKYO3_SKYSCRAPER);
         if (template == null)
         {
@@ -780,6 +788,10 @@ public final class LocalMapAssetLoader
                                                   int oldDepth, int newDepth,
                                                   int index)
     {
+        if (CityRigidTopologyR45.owns(level, tokyo3Origin))
+        {
+            return;
+        }
         StructureTemplate template = load(level, TOKYO3_SKYSCRAPER);
         if (template == null)
         {
@@ -1070,6 +1082,7 @@ public final class LocalMapAssetLoader
                                                     BlockPos tokyo3Origin,
                                                     int retractionDepth)
     {
+        if(CityRigidTopologyR45.owns(level,tokyo3Origin))return;
         for (int index = 0; index < SKYSCRAPERS.length; index++)
         {
             SkyscraperPlacement placement = SKYSCRAPERS[index];

@@ -32,6 +32,7 @@ public final class RegionalBuildingQualityR44
     private static final String JOB=System.getProperty("projectseele.r44RegionalBuildingQualityJob","");
     private static int age,index;private static boolean done;private static JsonObject input;
     private static JsonArray buildings;private static FakePlayer actor;
+    private static int catalogueDenominator=193,declaredFloorPlanes;
     private static final JsonArray results=new JsonArray(),failures=new JsonArray();
     private record Before(BlockState state,CompoundTag nbt){}
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
@@ -44,10 +45,33 @@ public final class RegionalBuildingQualityR44
             {
                 input=JsonParser.parseString(Files.readString(Path.of(JOB),StandardCharsets.UTF_8)).getAsJsonObject();
                 Path world=event.getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
-                if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW")||!world.equals(Path.of(input.get("world").getAsString()).toAbsolutePath().normalize())||level.getSeed()!=input.get("world_seed").getAsLong())throw new IllegalStateException("Different measured ordinary-building world");
+                if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName())||!world.equals(Path.of(input.get("world").getAsString()).toAbsolutePath().normalize())||level.getSeed()!=input.get("world_seed").getAsLong())throw new IllegalStateException("Different measured ordinary-building world");
                 if(!Tokyo3BuildingWorldIdentityR44.get(level).equals(input.get("world_id").getAsString()))throw new IllegalStateException("Different persisted WorldUUID");
-                buildings=JsonParser.parseString(Files.readString(Path.of(input.get("catalogue").getAsString()),StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonArray("buildings");
-                if(buildings.size()!=193)throw new IllegalStateException("Complete 193 ordinary-building denominator required");
+                Path cataloguePath=Path.of(input.get("catalogue").getAsString());
+                JsonObject catalogue=JsonParser.parseString(Files.readString(cataloguePath,StandardCharsets.UTF_8)).getAsJsonObject();
+                buildings=catalogue.getAsJsonArray("buildings");
+                if(input.has("catalogue_contract"))
+                {
+                    String format="r45_current_named_buildings_v1";
+                    if(!input.get("catalogue_contract").getAsString().equals(format)||!catalogue.get("format").getAsString().equals(format))
+                        throw new IllegalStateException("Different current named-building catalogue contract");
+                    String digest=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(cataloguePath)));
+                    if(!digest.equals(input.get("catalogue_sha256").getAsString()))throw new IllegalStateException("Current241 catalogue changed after scheduling");
+                    int originals=0,installed=0;Set<String> ids=new HashSet<>();
+                    for(JsonElement item:buildings)
+                    {
+                        JsonObject building=item.getAsJsonObject();
+                        if(!ids.add(building.get("id").getAsString()))throw new IllegalStateException("Duplicate current named building");
+                        if(building.get("original").getAsBoolean())originals++;else installed++;
+                        declaredFloorPlanes+=building.getAsJsonArray("declared_floor_feet").size();
+                    }
+                    if(originals!=193||installed!=48||buildings.size()!=241||catalogue.get("original_count").getAsInt()!=193
+                            ||catalogue.get("installed_additional_count").getAsInt()!=48||catalogue.get("total_count").getAsInt()!=241
+                            ||catalogue.get("declared_floor_planes").getAsInt()!=declaredFloorPlanes)
+                        throw new IllegalStateException("Complete193 original plus48 actual installed building contract required");
+                    catalogueDenominator=241;
+                }
+                else if(buildings.size()!=193)throw new IllegalStateException("Complete193 historical ordinary-building denominator required");
                 actor=FakePlayerFactory.get(level,new GameProfile(UUID.nameUUIDFromBytes((input.get("world_id").getAsString()+"/regional-entrances-r44").getBytes(StandardCharsets.UTF_8)),"R44RegionalEntry"));
                 actor.setGameMode(GameType.SURVIVAL);actor.getAbilities().flying=false;actor.noPhysics=false;actor.setMaxUpStep(.6F);
             }
@@ -130,6 +154,6 @@ public final class RegionalBuildingQualityR44
     private static void fail(String id,String kind,BlockPos p,String details)
     {JsonObject row=new JsonObject();row.addProperty("building",id);row.addProperty("kind",kind);row.addProperty("pos",p.toShortString());row.addProperty("details",details);failures.add(row);}
     private static JsonObject report()
-    {JsonObject report=new JsonObject();report.addProperty("objects_completed",results.size());report.addProperty("catalogue_denominator",193);report.addProperty("native_client_walk",false);report.addProperty("visual_passed",false);report.add("objects",results);report.add("failures",failures);return report;}
+    {JsonObject report=new JsonObject();report.addProperty("objects_completed",results.size());report.addProperty("catalogue_denominator",catalogueDenominator);report.addProperty("declared_floor_planes",declaredFloorPlanes);report.addProperty("actual_native_floor_reachability_verified",0);report.addProperty("native_client_walk",false);report.addProperty("visual_passed",false);report.add("objects",results);report.add("failures",failures);return report;}
     private RegionalBuildingQualityR44(){}
 }

@@ -63,7 +63,7 @@ public final class RegionalEcologyRetrofitR44
     {
         if(JOB.isEmpty()||done||event.phase!=TickEvent.Phase.END)return;
         Path world=event.getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
-        if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))
+        if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))
             throw new IllegalStateException("Ecology dry run refuses a different world identity");
         try
         {

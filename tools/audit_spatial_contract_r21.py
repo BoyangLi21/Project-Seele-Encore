@@ -11,6 +11,10 @@ def main():
  contract['world']='SEELE_TV_WORLD_PREVIEW_20260906'
  for section in contract['sections']:
   if section['id']=='factory_lower':section['rects']=[[102,114,-290,-54]]
+  if section['id']=='factory_middle':
+   section['rects']=[[95,113,-275,-43],[89,113,-49,-43],[86,113,-271,-259]]
+   section['south_end_role']='Enclosed industrial observation window; no south door'
+   section['enclosed_observation_boundaries']=[{'x': [90, 112], 'z': -43, 'feet': -394, 'wall_y': [-394, -389], 'waist_state': 'projectseele:nerv_wall_panel', 'glass_state': 'projectseele:clear_glass', 'frame_state': 'projectseele:nerv_structural_panel', 'vertical_frame_x': [90, 96, 104, 112], 'top_seal_y': -389, 'continuous_roof_y': -388, 'through_route': False, 'enclosed': True, 'clear_waiting_rows_z': [-46, -45, -44]}]
   if section['id']=='launch_station_west_foyer':section['rects']=[[102,132,-56,-43]];section['height']=6
  contract['sections'].append(dict(id='launch_station_retained_platform_gallery',rects=[[108,116,-35,-25]],floor=-443,height=7,ports=[]))
  contract['ports']=json.loads((OUT/'details/full_width_ports_and_taxi_finish/places.json').read_text())['ports']

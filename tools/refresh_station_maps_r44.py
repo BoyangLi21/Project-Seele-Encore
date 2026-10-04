@@ -16,6 +16,14 @@ WORLD = ROOT / "run/saves/SEELE_FIELD_R44_REVIEW"
 OUT = ROOT / "artifacts/rebuild_r44/facility_transit_r44/station_map_text_v1"
 
 
+# From ModBlockEntities.STATION_DEPARTURE_BOARD validBlocks; migrated MTR tags are a separate owner.
+STATION_BOARD_VALID_BLOCKS = frozenset({"projectseele:station_departure_board", "projectseele:nerv_direction_panel"})
+
+
+def valid_station_board_state(state):
+    return state is not None and state.split("[", 1)[0] in STATION_BOARD_VALID_BLOCKS
+
+
 def main(world=WORLD, out=OUT):
     world, out = Path(world), Path(out); out.mkdir(parents=True, exist_ok=True)
     if list(out.glob("all_retained_native_chinese_diagrams/applied_*/receipt.json")):
@@ -34,6 +42,10 @@ def main(world=WORLD, out=OUT):
         state = w.block(q)
         if state is None:
             raise RuntimeError(("Retained board state is unknown", q))
+        if not valid_station_board_state(state):
+            held.append({"position": q, "reason": "Project SEELE board NBT is not valid for actual block; require whole fixture migration before text refresh",
+                         "state": state, "whole_before_nbt": before.snbt()})
+            continue
         pid = int(before.get("NativePlatformId", -1)); face = properties(state).get("facing")
         try:
             diagram = diagrams.diagram(pid, face, str(before.get("Route", "")))

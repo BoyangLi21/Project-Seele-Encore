@@ -36,7 +36,7 @@ public final class PublicStationGateShapesR44
         }
         var server = event.getServer();
         var root = server.getWorldPath(LevelResource.ROOT).normalize();
-        if (!root.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))
+        if (!root.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))
         {
             throw new IllegalStateException("Native public-gate shape export refuses non-review world");
         }

@@ -18,17 +18,23 @@ public final class EvaShutdownR30
     private static final EntityDataAccessor<Boolean> WAITING=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<CompoundTag> REST_BOUNDS=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.COMPOUND_TAG);
     private static final Map<EvaUnit01Entity,Memory> MEMORY=new WeakHashMap<>();
-    private static final class Memory {boolean pilot;CompoundTag last=new CompoundTag();}
+    private static final class Memory {boolean pilot;UUID lastPilot;CompoundTag last=new CompoundTag();}
     public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData d){d.define(MODE,ACTIVE);d.define(SINCE,0L);d.define(POSE,new CompoundTag());d.define(ORIGIN,new CompoundTag());d.define(WAITING,false);d.define(REST_BOUNDS,new CompoundTag());}
     public static int mode(EvaUnit01Entity e){return e.getEntityData().get(MODE);}
     public static boolean disabled(EvaUnit01Entity e){return mode(e)!=ACTIVE;}
+    /** Normal loss of power/occupant holds the captured pose; damage still owns real knockdown. */
+    public static boolean retainsPoseModeR45(int value){return value==POWER_LOCK||value==EMPTY;}
+    public static boolean retainsPoseR45(EvaUnit01Entity e){return retainsPoseModeR45(mode(e));}
+    /** Visual cache/hand consumers must yield to real knockdown and mechanical owners. */
+    public static boolean displaysCapturedPoseR45(EvaUnit01Entity e)
+    {return retainsPoseR45(e)&&displayed(e)&&!com.projectseele.physics.CombatBodyDynamics.active(e)&&!EvaAirTransportR31.active(e);}
     public static boolean wreck(EvaUnit01Entity e){return mode(e)==WRECK;}
     public static boolean updatesBounds(EntityDataAccessor<?> accessor){return accessor==MODE||accessor==REST_BOUNDS;}
     public static long since(EvaUnit01Entity e){return e.getEntityData().get(SINCE);}
     public static CompoundTag pose(EvaUnit01Entity e){return e.getEntityData().get(POSE);}
     public static CompoundTag origin(EvaUnit01Entity e){return e.getEntityData().get(ORIGIN);}
-    public static float collapse(EvaUnit01Entity e,float partial){return mode(e)==POWER_LOCK?1:EvaDorsalMechanism.smooth((float)(((e.level().getGameTime()-since(e))+(double)partial)/18D));}
+    public static float collapse(EvaUnit01Entity e,float partial){return retainsPoseR45(e)?1:EvaDorsalMechanism.smooth((float)(((e.level().getGameTime()-since(e))+(double)partial)/18D));}
     public static boolean displayed(EvaUnit01Entity e){return disabled(e)&&(!e.isNervLogisticsLocked()||e.getEntityData().get(WAITING))&&!e.hasActiveCarrierMotion()&&!e.isLaunchSequenceActive();}
     public static void waitingR31(EvaUnit01Entity e,boolean waiting){if(!e.level().isClientSide)e.getEntityData().set(WAITING,waiting);}
     public static void save(EvaUnit01Entity e,CompoundTag t){t.putInt("R30Shutdown",mode(e));t.putLong("R30ShutdownSince",since(e));t.put("R30FrozenPose",pose(e).copy());t.put("R30ShutdownOrigin",origin(e).copy());t.put("R35RestBounds",e.getEntityData().get(REST_BOUNDS).copy());}
@@ -51,7 +57,7 @@ public final class EvaShutdownR30
     }
     public static void clear(EvaUnit01Entity e)
     {
-        if(e.level().isClientSide)return;e.getEntityData().set(MODE,ACTIVE);e.getEntityData().set(POSE,new CompoundTag());e.getEntityData().set(ORIGIN,new CompoundTag());e.getPersistentData().remove("R30FrozenPoseConfirmed");
+        if(e.level().isClientSide)return;MEMORY.remove(e);e.getEntityData().set(MODE,ACTIVE);e.getEntityData().set(POSE,new CompoundTag());e.getEntityData().set(ORIGIN,new CompoundTag());e.getPersistentData().remove("R30FrozenPoseConfirmed");
         e.getEntityData().set(REST_BOUNDS,new CompoundTag());com.projectseele.physics.CombatBodyDynamics.cancel(e);
     }
     public static void ensureUnpilotedR31(EvaUnit01Entity e)
@@ -72,17 +78,21 @@ public final class EvaShutdownR30
     private static void begin(EvaUnit01Entity e,int mode)
     {
         if(mode(e)==mode)return;
-        if(mode!=POWER_LOCK&&!com.projectseele.physics.CombatBodyDynamics.active(e)&&!e.isNervLogisticsLocked()&&!e.hasActiveCarrierMotion())
-            com.projectseele.physics.CombatBodyDynamics.start(e,e.getBoundingBox().getCenter(),e.getForward(),-1);
         var memory=MEMORY.computeIfAbsent(e,k->new Memory());
-        e.getEntityData().set(ORIGIN,memory.last.isEmpty()?encode(EvaBodyPose.sample(e,1)):memory.last.copy());
-        if(mode!=POWER_LOCK)e.stowHandsForShutdownR30();
-        CompoundTag snapshot=mode==POWER_LOCK&&!memory.last.isEmpty()?memory.last.copy():encode(mode==POWER_LOCK?EvaBodyPose.sample(e,1):EvaBodyPose.inactivePoseR30(e,mode==WRECK));
+        // Capture before disabling/stowing anything. A retained power snapshot must survive later pilot loss.
+        CompoundTag captured=retainsPoseR45(e)&&!pose(e).isEmpty()?pose(e).copy()
+                :EvaFieldActionsR45.active(e)||EvaSwordActionsR45.active(e)?encode(EvaBodyPose.sample(e,0))
+                :!memory.last.isEmpty()?memory.last.copy():encode(EvaBodyPose.sample(e,0));
+        if(e.getPilotEntity()!=null)memory.lastPilot=e.getPilotEntity().getUUID();
+        boolean confirmed=retainsPoseR45(e)&&e.getPersistentData().getBoolean("R30FrozenPoseConfirmed");
+        e.getEntityData().set(ORIGIN,captured.copy());
+        if(mode==WRECK&&!com.projectseele.physics.CombatBodyDynamics.active(e)&&!e.isNervLogisticsLocked()&&!e.hasActiveCarrierMotion())
+            com.projectseele.physics.CombatBodyDynamics.start(e,e.getBoundingBox().getCenter(),e.getForward(),-1);
+        if(mode==WRECK)e.stowHandsForShutdownR30();
+        CompoundTag snapshot=retainsPoseModeR45(mode)?captured:encode(EvaBodyPose.inactivePoseR30(e,true));
         e.getEntityData().set(POSE,snapshot);e.getEntityData().set(SINCE,e.level().getGameTime());e.getEntityData().set(MODE,mode);
-        if(mode==POWER_LOCK&&com.projectseele.physics.CombatBodyDynamics.active(e))
-        {physicalRest(e,EvaBodyPose.sample(e,0),e.getBoundingBox());com.projectseele.physics.CombatBodyDynamics.cancel(e);}
         e.getPersistentData().putInt("R31ShutdownPoseVersion",31);
-        e.getPersistentData().remove("R30FrozenPoseConfirmed");e.getNavigation().stop();e.setTarget(null);
+        if(!confirmed||!retainsPoseModeR45(mode))e.getPersistentData().remove("R30FrozenPoseConfirmed");e.getNavigation().stop();e.setTarget(null);
         if(e instanceof EvaPrototypeEntity un)un.stopUNFlight();
         if(!e.isNervLogisticsLocked()&&!e.hasActiveCarrierMotion())e.setNoGravity(false);
         e.refreshDimensions();
@@ -93,22 +103,37 @@ public final class EvaShutdownR30
         if(e.level().isClientSide)return;var memory=MEMORY.computeIfAbsent(e,k->new Memory());boolean piloted=e.getPilotEntity()!=null;
         EvaDorsalMechanism.rearmAfterRepair(e);
         waitingR31(e,e.getPersistentData().getBoolean("R30AwaitingIntake")||e.getPersistentData().getBoolean("R30AwaitingNervRecovery"));
-        if(e.tickCount>5&&(mode(e)==WRECK||mode(e)==EMPTY)&&e.getPersistentData().getInt("R31ShutdownPoseVersion")<31)
+        if(e.tickCount>5&&mode(e)==WRECK&&e.getPersistentData().getInt("R31ShutdownPoseVersion")<31)
         {e.getEntityData().set(POSE,encode(EvaBodyPose.inactivePoseR30(e,mode(e)==WRECK)));e.getPersistentData().putInt("R31ShutdownPoseVersion",31);}
         if(mode(e)==WRECK&&e.getHealth()>0&&!EvaBayRepairR33.active(e))clear(e);
-        if(mode(e)==POWER_LOCK&&!e.isPowerDepleted())clear(e);
+        if(mode(e)==POWER_LOCK&&!e.isPowerDepleted()&&piloted&&!com.projectseele.physics.CombatBodyDynamics.active(e))clear(e);
         if(mode(e)==ACTIVE&&!e.isFirstBattleActive()&&!e.isBerserk())
         {
             if(!e.isExperimentalUnit()&&piloted&&e.isEntryPlugInserted()&&e.isPowerDepleted()&&e.getActivationTicks()==0&&!e.isNervLogisticsLocked())begin(e,POWER_LOCK);
             else if(memory.pilot&&!piloted&&!e.isNervLogisticsLocked()&&!e.isLaunchSequenceActive()&&!e.hasActiveCarrierMotion())begin(e,EMPTY);
             else if(e.isPoweredOn())memory.last=encode(EvaBodyPose.sample(e,1));
         }
+        if(piloted)memory.lastPilot=e.getPilotEntity().getUUID();
         memory.pilot=piloted;
     }
     public static void acceptPilotPose(ServerPlayer player,int entityId,CompoundTag tag)
     {
-        if(!(player.serverLevel().getEntity(entityId) instanceof EvaUnit01Entity e)||mode(e)!=POWER_LOCK||e.getPilotEntity()!=player
-                ||e.getPersistentData().getBoolean("R30FrozenPoseConfirmed")||e.level().getGameTime()-since(e)>200||!valid(tag))return;
+        if(player.serverLevel().getEntity(entityId) instanceof EvaUnit01Entity observed
+                &&com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckEnabledR45(observed))
+        {
+            long observedAge=observed.level().getGameTime()-since(observed);var remembered=MEMORY.get(observed);var trace=new com.google.gson.JsonObject();
+            boolean observedCurrent=mode(observed)==POWER_LOCK&&observed.getPilotEntity()==player&&observedAge>=0&&observedAge<=200;
+            boolean observedExited=mode(observed)==EMPTY&&observed.getPilotEntity()==null&&remembered!=null&&player.getUUID().equals(remembered.lastPilot)&&observedAge>=0&&observedAge<=20;
+            String reason=!retainsPoseR45(observed)?"mode_not_retained":com.projectseele.physics.CombatBodyDynamics.active(observed)?"real_physics_owner":observed.getPersistentData().getBoolean("R30FrozenPoseConfirmed")?"already_confirmed_once":!valid(tag)?"payload_invalid":!observedCurrent&&!observedExited?"actor_or_mode_time_window_rejected":"accepted";
+            trace.addProperty("sender_uuid",player.getStringUUID());trace.addProperty("packet_entity_id",entityId);trace.addProperty("last_pilot_uuid",remembered==null||remembered.lastPilot==null?"none":remembered.lastPilot.toString());trace.addProperty("current_pilot_permission",observedCurrent);trace.addProperty("just_exited_permission",observedExited);trace.addProperty("payload_bones",tag.size());trace.addProperty("payload_valid",valid(tag));trace.addProperty("decision",reason);trace.addProperty("payload_snbt",tag.toString());
+            com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckTraceR45(observed,"server_actual_receive_and_admission",trace);
+        }
+        if(!(player.serverLevel().getEntity(entityId) instanceof EvaUnit01Entity e)||!retainsPoseR45(e)
+                ||com.projectseele.physics.CombatBodyDynamics.active(e)||e.getPersistentData().getBoolean("R30FrozenPoseConfirmed")||!valid(tag))return;
+        long age=e.level().getGameTime()-since(e);var memory=MEMORY.get(e);
+        boolean currentPilot=mode(e)==POWER_LOCK&&e.getPilotEntity()==player&&age>=0&&age<=200;
+        boolean justExited=mode(e)==EMPTY&&e.getPilotEntity()==null&&memory!=null&&player.getUUID().equals(memory.lastPilot)&&age>=0&&age<=20;
+        if(!currentPilot&&!justExited)return;
         e.getEntityData().set(POSE,tag.copy());e.getPersistentData().putBoolean("R30FrozenPoseConfirmed",true);
     }
     public static boolean valid(CompoundTag tag)
@@ -123,8 +148,7 @@ public final class EvaShutdownR30
     }
     public static Vector3f euler(Quaternionf q)
     {
-        return new Vector3f((float)Math.atan2(2*(q.w*q.x+q.y*q.z),1-2*(q.x*q.x+q.y*q.y)),
-                (float)Math.asin(Math.max(-1,Math.min(1,2*(q.w*q.y-q.z*q.x)))),(float)Math.atan2(2*(q.w*q.z+q.x*q.y),1-2*(q.y*q.y+q.z*q.z)));
+        return com.projectseele.util.QuaternionChannelsR45.euler(q);
     }
     public static CompoundTag encode(EvaBodyPose.Sample sample)
     {

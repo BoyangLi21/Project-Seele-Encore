@@ -72,6 +72,9 @@ class Retarget:
    if np.linalg.norm(np.cross(forward,across))<.05:
     candidates=[self.refq['wrist_'+side].apply(v) for v in np.eye(3)];across=min(candidates,key=lambda v:abs(v@forward))
    rest_forward=unit(self.P['hand_'+side]-self.elbows[side]) if angel else unit(eva.P['finger_middle_'+side]-self.P['hand_'+side]);rest_across=np.array([1.,0,0]) if angel else eva.P['finger_index_'+side]-eva.P['finger_little_'+side]
+   hand_basis=None if angel else getattr(eva,'anatomical_hand_basis_r45',None)
+   if hand_basis is not None:
+    rest_forward=unit(np.asarray(hand_basis[side]['longitudinal_bind'],float));rest_across=np.asarray(hand_basis[side]['across_bind'],float)
    self.hand_reference[side]=R.from_matrix(axes(forward,across)@axes(rest_forward,rest_across).T)
    for limb,a,mid,end,bone,lower,joint in [('arm','shoulder','elbow','wrist','arm_','forearm_',self.elbows[side]),('leg','hip','knee','ankle','leg_','shin_',self.knees[side])]:
     u=joint-self.P[bone+side];v=self.P[('hand_' if limb=='arm' else 'foot_')+side]-joint;rest_axis=unit(np.cross(u,v),(1,0,0))

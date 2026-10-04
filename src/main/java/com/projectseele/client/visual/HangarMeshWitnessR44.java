@@ -27,7 +27,7 @@ public final class HangarMeshWitnessR44
         if(Math.abs(entity.getX()-X[variant])>.12||Math.abs(entity.getY()+442)>.12||Math.abs(entity.getZ()+239.5)>.12)return;
         var mc=Minecraft.getInstance();if(mc.getSingleplayerServer()==null)return;
         Path world=mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))throw new IllegalStateException("Hangar mesh witness refuses another world");
+        if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))throw new IllegalStateException("Hangar mesh witness refuses another world");
         if(!frameTicks.containsKey(variant))
         {
             frameTicks.put(variant,entity.tickCount);parts.put(variant,new HashSet<>());

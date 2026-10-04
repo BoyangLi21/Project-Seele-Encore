@@ -163,6 +163,7 @@ public final class EvaPoseGraph
     }
     public static Snapshot commit(EvaUnit01Entity entity,BakedGeoModel model,float partialTick,org.joml.Matrix4f modelToWorld)
     {
+        EvaPoseTransition.beginFrameR45(entity);
         EvaMechanicalResetR30.apply(entity);
         if (!contract.ready())
         {
@@ -189,10 +190,20 @@ public final class EvaPoseGraph
             EvaLockedCagePoseR44.witness(entity,model,"locked_cage_final");
             return finish(entity,model,partialTick,modelToWorld,cage,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         }
+        if(com.projectseele.entity.EvaShutdownR30.displaysCapturedPoseR45(entity))
+        {
+            // A just-frozen draw/stow action can remain synchronized for one
+            // more frame. Its active flag must not bypass the shutdown owner.
+            var held=EvaShutdownPoseR30.apply(entity,model,partialTick);
+            return finish(entity,model,partialTick,modelToWorld,held,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
+        }
         if(com.projectseele.entity.EvaCombatSupportR33.ready(entity)
                 &&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(entity,partialTick)
-                &&com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity))
+                &&(com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity)
+                    ||com.projectseele.entity.EvaGameplayMotionR32.sharedJumpActive(entity,partialTick)))
         {
+            // The old engine is not evaluated here; do not keep its stale crouch/stance history.
+            EvaMotionEngineV2.resetEntityR30(entity);
             // This owner produces the complete body. Do not evaluate the old
             // locomotion/impact/transition/foot-placement stack and overwrite it
             // afterwards: that also leaves those controllers' histories stale.
@@ -200,12 +211,14 @@ public final class EvaPoseGraph
             com.projectseele.visual.BodyPoseLayersR40.begin(entity,partialTick);
             var body=EvaCombatPoseR31.apply(entity,model,partialTick,modelToWorld);
             var hands=EvaHandPoseR28.apply(entity,model,partialTick);
+            var exit=Boolean.getBoolean("projectseele.r45SharedExitReview")&&!entity.isExperimentalUnit()
+                    ?EvaPoseTransition.applySharedExitR45(entity,model,partialTick):EvaMotionEngineV2.BoneWrites.empty();
             if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
                 for(String name:com.projectseele.visual.BodyPoseLayersR40.BONES)
                     model.getBone(name).ifPresent(b->com.projectseele.visual.BodyPoseLayersR40.rendered(name,EvaRigTransforms.model(b)));
             com.projectseele.visual.BodyPoseLayersR40.end();
             com.projectseele.client.visual.CombatR31Client.normalWitness(entity,model,"after");
-            return finish(entity,model,partialTick,modelToWorld,body,EvaMotionEngineV2.BoneWrites.empty(),hands);
+            return finish(entity,model,partialTick,modelToWorld,body,exit,hands);
         }
         if(entity.isNervLogisticsLocked())
         {
@@ -299,6 +312,8 @@ public final class EvaPoseGraph
     private static Snapshot finish(EvaUnit01Entity entity,BakedGeoModel model,float partialTick,org.joml.Matrix4f modelToWorld,
                                    EvaMotionEngineV2.BoneWrites motionWrites,EvaMotionEngineV2.BoneWrites transitions,EvaMotionEngineV2.BoneWrites firearm)
     {
+        EvaCannonContactRigR45.apply(entity,model,partialTick,modelToWorld);
+        EvaAnatomicalHandPoseR45.apply(entity,model,partialTick);
         var mouth=EvaMouthR37.apply(entity,model,partialTick);
         if(!mouth.rotationBones().isEmpty())
         {var names=new java.util.HashSet<>(motionWrites.rotationBones());names.addAll(mouth.rotationBones());var positions=new java.util.HashSet<>(motionWrites.positionBones());positions.addAll(mouth.positionBones());motionWrites=new EvaMotionEngineV2.BoneWrites(Set.copyOf(names),Set.copyOf(positions),"MOTION_ENGINE_LIVE_ACTION");}
@@ -306,8 +321,10 @@ public final class EvaPoseGraph
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         JointAuditR38.capture(entity,model,partialTick);
         EvaHandWitnessR44.capture(entity,model,partialTick,modelToWorld);
+        PilotOpticsWitnessR45.capture(entity,model,partialTick,modelToWorld);
         com.projectseele.client.visual.RuntimeR44ClientProbe.capture(entity,model,partialTick,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
+        EvaShutdownPoseR30.rememberFinalLiveR45(entity,model);
         Snapshot committed = snapshot(
                 entity, partialTick, motionWrites, transitions, firearm, true);
         if (LAST_COMMITS.size() > 48)
@@ -424,6 +441,12 @@ public final class EvaPoseGraph
             }
         }
 
+        if(com.projectseele.entity.EvaAnatomicalHandsR45.enabled(entity)&&EvaHandSurfaceR45.applies(entity))
+        {
+            String owner=com.projectseele.entity.EvaAnatomicalHandsR45.OWNER;activeLayers.add(owner);
+            for(var joint:com.projectseele.entity.EvaAnatomicalHandsR45.rig(entity.getUnitVariant()).joints())
+            {rotationOwners.put(joint.name(),owner);positionOwners.put(joint.name(),owner);scaleOwners.put(joint.name(),owner);}
+        }
         List<String> upstreamSources = upstreamSources(entity, partialTick);
         Map<String, List<String>> upstreamOverlaps = upstreamOverlaps(
                 entity, partialTick, current);

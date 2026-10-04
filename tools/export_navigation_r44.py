@@ -14,6 +14,7 @@ import shutil
 from pathlib import Path
 
 import plan_pyramid_navigation_r22 as nav
+from audit_transport_facilities_r45 import floor_key,walking_fallback
 
 ROOT = Path(__file__).resolve().parents[1]
 WORLD = ROOT / "run/saves/SEELE_FIELD_R44_REVIEW"
@@ -49,6 +50,13 @@ def nearest_lift_paths(folder, data):
     coo = graph.tocoo()
     keep = ~np.isin(coo.row.astype(np.int64) * len(coords) + coo.col, list(removed))
     walking = coo_matrix((coo.data[keep], (coo.row[keep], coo.col[keep])), shape=graph.shape).tocsr()
+    walking_all = walking
+    # Local stair thresholds remain part of their commissioned use floor.
+    # Cross-floor stairs cannot choose another level's closer lift landing.
+    flat = walking.tocoo()
+    floor_keys = np.asarray([floor_key(q) for q in coords])
+    keep = floor_keys[flat.row] == floor_keys[flat.col]
+    walking = coo_matrix((flat.data[keep], (flat.row[keep], flat.col[keep])), shape=graph.shape).tocsr()
     costs, predecessors, sources = dijkstra(walking, directed=True, indices=indices, min_only=True, return_predecessors=True)
     metres = np.full(len(coords), np.inf)
     metres[indices] = 0.
@@ -72,12 +80,23 @@ def nearest_lift_paths(folder, data):
         next_index = int(predecessors[index])
         if next_index < 0:
             next_index = int(index)
-        table.append({"nearest_landing": source_to_landing[source], "walking_cost": float(costs[index]),
+        table.append({"nearest_landing": source_to_landing[source], "floor_key": str(floor_keys[index]), "walking_cost": float(costs[index]),
                       "walking_metres": float(metres[index]),
                       "next": coords[next_index].tolist()})
-    payload = {"graph_sha256": digest(folder / "nerv_routes_r24.json.gz"), "nodes": table,
+    export_coords=np.asarray(data["nodes"],dtype=int)[:,:3]
+    export_index={tuple(q):i for i,q in enumerate(export_coords)}
+    local=walking_all[exported][:,exported].tocsr();all_edges=local.tocoo()
+    stair_edges=[(int(i),int(j),float(w))for i,j,w in zip(all_edges.row,all_edges.col,all_edges.data)
+                 if abs(export_coords[i,1]-export_coords[j,1])==1]
+    fallback=walking_fallback(export_coords,np.ones(len(export_coords),dtype=bool),
+        lambda a,b:local[export_index[tuple(a)],export_index[tuple(b)]]>0,
+        data["lift_landings"],table,stair_edges)
+    unresolved=[export_coords[i].tolist()for i,row in enumerate(table)if row is None]
+    payload = {"graph_sha256": digest(folder / "nerv_routes_r24.json.gz"), "same_floor": True, "same_floor_schema": 3,
+               "node_floor_keys": [floor_key(q[:3]) for q in data["nodes"]], "nodes": table,
                "unresolved_coordinates": unresolved,
-               "scope": "Nearest actual landing by walking/stair graph cost, elevator edges excluded; actual equipment and permissions UNVERIFIED"}
+               "walking_stair_fallback_rows":fallback,
+               "scope": "Prefer current commissioned use-floor landing; when unavailable explicitly label existing walking/stair transfer. Elevator hops excluded; actual equipment and permissions UNVERIFIED"}
     file = folder / "nearest_lift_paths.json.gz"
     with gzip.open(file, "wt", encoding="utf8") as stream:
         json.dump(payload, stream, ensure_ascii=False, separators=(",", ":"))

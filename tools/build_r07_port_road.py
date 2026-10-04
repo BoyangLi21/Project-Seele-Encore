@@ -50,7 +50,7 @@ for x in range(445,1297):
         if x%20==0:
             for dz in (-5,5):p.fill(x-1,32,centre+dz-1,x+1,f-2,centre+dz+1,'minecraft:polished_andesite',o+'/bridge_pile')
     elif x%56==0:
-        p.fill(x,f+1,centre+6,x,f+6,centre+6,'minecraft:gray_concrete',o+'/lamp_post');p.fill(x,f+7,centre+4,x,f+7,centre+6,'projectseele:nerv_strip_light',o+'/lamp')
+        p.fill(x,f+1,centre+8,x,f+6,centre+8,'minecraft:gray_concrete',o+'/lamp_post');p.fill(x,f+7,centre+6,x,f+7,centre+8,'projectseele:nerv_strip_light',o+'/lamp')
 path=[[444.5,81,304.5]]+[[x+.5,height(x)+1,float(curve(x))+.5] for x in range(456,1296,16)]+[[1296.5,69,432.5]]
 cases=[dict(id='r07/connection/port_road',path=path),dict(id='r07/connection/port_road/return',path=path[::-1])]
 p.meta.update(source='Five R07 exact saved-volume surveys; existing X444 Y80 Z304 street',bridge_columns=bridge_columns,walk_cases=cases)

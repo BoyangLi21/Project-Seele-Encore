@@ -172,7 +172,7 @@ public final class TreeOfLifeWallClient
     {
         if (r04Plates != null) return r04Plates;
         r04Plates = new ArrayList<>();
-        Path path = Paths.get("projectseele-local-maps", "r04_wall_plates.json");
+        Path path = com.projectseele.entity.CombatMotionResourcesR44.instancePath("projectseele-local-maps/r04_wall_plates.json");
         if (!Files.isRegularFile(path)) return r04Plates;
         try (var reader = Files.newBufferedReader(path))
         {

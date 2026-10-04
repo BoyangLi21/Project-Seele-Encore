@@ -88,8 +88,19 @@ def main(apply=False):
  s.belt('factory_lower/north',104,-284,222,-443,direction=True)
  s.belt('factory_lower/south',110,-284,222,-443,direction=False)
  # Middle gallery gains full two-direction moving walks and a spacious landing.
- s.hall('factory_middle',[(95,113,-275,-42),(89,113,-49,-42),(86,113,-271,-259)],-395,7,
+ s.hall('factory_middle',[(95,113,-275,-43),(89,113,-49,-43),(86,113,-271,-259)],-395,7,
         [(91,-394,-49,95,-391,-46),(86,-394,-269,90,-390,-263)])
+ # Complete retracted enclosed observation boundary: keep the three
+ # original clear rows at Z=-46..-44 and the actual lift handoff at Z=-45.
+ for x in range(90,114):
+  for y in range(-396,-387):
+   old=s.palette[s.before[y-LO[1],-42-LO[2],x-LO[0]]]
+   if old in {FLOOR,STRUCT,WALL,GLASS}:s.fill((x,y,-42,x,y,-42),AIR)
+ for x in range(90,113):
+  for y in range(-394,-388):
+   state=STRUCT if x in (90,96,104,112) or y==-389 else WALL if y==-394 else GLASS
+   s.fill((x,y,-43,x,y,-43),state)
+ s.contract[-1].update(south_end_role='Enclosed industrial observation window; no south door',enclosed_observation_boundaries=[dict(x=[90,112],z=-43,feet=-394,wall_y=[-394,-389],waist_state=WALL,glass_state=GLASS,frame_state=STRUCT,vertical_frame_x=[90,96,104,112],top_seal_y=-389,continuous_roof_y=-388,through_route=False,enclosed=True,clear_waiting_rows_z=[-46,-45,-44])])
  s.belt('factory_middle/north',98,-252,185,-395,direction=True)
  s.belt('factory_middle/south',107,-252,185,-395,direction=False)
  # The old exterior half-escalator is absorbed into the usable width above.

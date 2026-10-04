@@ -401,6 +401,7 @@ public final class GeoFrontBoundedChunkGenerator
         super.applyBiomeDecoration(world,chunk,structures);
         if(getBiomeSource() instanceof RegionalEcologyBiomeSourceR44 ecology)
             NativeGeofrontVegetationR44.decorate(world,this,chunk.getPos(),ecology);
+        CityRigidGenerationR45.apply(this,chunk);
     }
 
     boolean hasEcologicalCavernR44(ChunkPos chunk)

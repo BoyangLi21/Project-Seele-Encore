@@ -31,26 +31,35 @@ public final class NervAccessReaderEntityR44 extends BlockEntity
     private UUID user;
     private InteractionHand presentedHand=InteractionHand.MAIN_HAND;
     private String label="NERV 门禁";
+    private String chamberId="",chamberRole="";
+    private boolean chamberDecision;
+    private CompoundTag preserved=new CompoundTag();
     public NervAccessReaderEntityR44(BlockPos pos,BlockState state){super(ModBlockEntities.NERV_ACCESS_READER.get(),pos,state);}
     public int indicator(){return status;}
     public int presentedClearance(){return presented;}
     public float swipeProgress(float partial)
     {return level==null||swipeAt<0?-1:(level.getGameTime()-swipeAt+partial)/12F;}
     public boolean isOpen(){return level!=null&&level.getGameTime()<openUntil;}
+    String chamberId(){return chamberId;}
+    String chamberRole(){return chamberRole;}
+    int requiredClearance(){return clearance;}
+    boolean exactChamberLayout(BlockPos expectedGate)
+    {return linked&&gate.equals(expectedGate)&&exit.equals(BlockPos.ZERO)&&width==3&&height==3&&alongX&&clearance==3;}
     public void present(Player player,InteractionHand hand,int tier)
     {
         if(!linked){player.displayClientMessage(Component.literal("读卡器未连接门体。"),true);return;}
         if(swipeAt>=0&&level.getGameTime()-swipeAt<12)return;
-        swipeAt=level.getGameTime();presented=tier;presentedHand=hand;user=player.getUUID();status=1;indicateUntil=swipeAt+32;sync();
+        swipeAt=level.getGameTime();presented=tier;presentedHand=hand;user=player.getUUID();status=1;indicateUntil=swipeAt+32;chamberDecision=false;sync();
     }
     public void requestExit()
-    {if(level!=null&&!level.isClientSide){openUntil=level.getGameTime()+120;status=2;indicateUntil=openUntil;sync();}}
+    {if(DeadSeaChamberR45.handles(this))return;if(level!=null&&!level.isClientSide){openUntil=level.getGameTime()+120;status=2;indicateUntil=openUntil;sync();}}
     private AABB opening()
     {return new AABB(gate.getX(),gate.getY(),gate.getZ(),gate.getX()+(alongX?width:1),gate.getY()+height,gate.getZ()+(alongX?1:width));}
     private BlockPos cell(int span,int y){return gate.offset(alongX?span:0,y,alongX?0:span);}
     public static void tick(Level raw,BlockPos pos,BlockState state,NervAccessReaderEntityR44 reader)
     {
         if(!(raw instanceof ServerLevel level)||!reader.linked)return;
+        if(DeadSeaChamberR45.handles(reader)){reader.tickChamber(level);return;}
         long now=level.getGameTime();
         if(!reader.exit.equals(BlockPos.ZERO))
         {
@@ -91,21 +100,40 @@ public final class NervAccessReaderEntityR44 extends BlockEntity
             if(!level.getBlockState(p).equals(wanted))level.setBlock(p,wanted,2);
         }
     }
+    private void tickChamber(ServerLevel level)
+    {
+        long now=level.getGameTime();long sharedUntil=DeadSeaChamberR45.observe(level,this);
+        if(openUntil!=sharedUntil){openUntil=sharedUntil;sync();}
+        if(swipeAt>=0&&!chamberDecision&&now-swipeAt>=6)
+        {
+            chamberDecision=true;Player player=user==null?null:level.getPlayerByUUID(user);
+            boolean granted=presented>=3&&DeadSeaChamberR45.grant(level,this,player,presentedHand);
+            status=granted?2:3;indicateUntil=now+32;
+            if(granted)openUntil=now+200;
+            if(player!=null)player.displayClientMessage(Component.literal(granted?"死海文书 · 通道开启十秒":"权限不足或通道未就绪，请使用最高权限卡。"),true);
+            level.playSound(null,worldPosition,granted?SoundEvents.NOTE_BLOCK_PLING.value():SoundEvents.NOTE_BLOCK_BASS.value(),SoundSource.BLOCKS,.35F,granted?1.3F:.75F);sync();
+        }
+        if(swipeAt>=0&&now-swipeAt>=12){swipeAt=-1;sync();}
+        if(status!=0&&now>indicateUntil){status=0;sync();}
+    }
     private void sync(){setChanged();if(level!=null)level.sendBlockUpdated(worldPosition,getBlockState(),getBlockState(),2);}
     @Override protected void saveAdditional(CompoundTag tag)
     {
         super.saveAdditional(tag);tag.putLong("Gate",gate.asLong());tag.putLong("Exit",exit.asLong());tag.putInt("Width",width);tag.putInt("Height",height);tag.putInt("Clearance",clearance);
+        for(String field:preserved.getAllKeys())if(!tag.contains(field))tag.put(field,preserved.get(field).copy());
         tag.putInt("Style",style);tag.putInt("DoorId",doorId);tag.putBoolean("AlongX",alongX);tag.putBoolean("Linked",linked);tag.putString("Label",label);
         tag.putLong("OpenUntil",openUntil);tag.putLong("SwipeAt",swipeAt);tag.putLong("IndicateUntil",indicateUntil);tag.putInt("Presented",presented);tag.putInt("Status",status);
         tag.putBoolean("OffHand",presentedHand==InteractionHand.OFF_HAND);
+        if(!chamberId.isBlank()){tag.putString("ChamberId",chamberId);tag.putString("ChamberRole",chamberRole);tag.putBoolean("ChamberDecision",chamberDecision);}
         if(user!=null)tag.putUUID("User",user);
     }
     @Override public void load(CompoundTag tag)
     {
-        super.load(tag);gate=BlockPos.of(tag.getLong("Gate"));exit=tag.contains("Exit")?BlockPos.of(tag.getLong("Exit")):BlockPos.ZERO;width=Math.max(1,Math.min(7,tag.getInt("Width")));height=Math.max(2,Math.min(9,tag.getInt("Height")));
+        super.load(tag);preserved=tag.copy();gate=BlockPos.of(tag.getLong("Gate"));exit=tag.contains("Exit")?BlockPos.of(tag.getLong("Exit")):BlockPos.ZERO;width=Math.max(1,Math.min(7,tag.getInt("Width")));height=Math.max(2,Math.min(9,tag.getInt("Height")));
         clearance=Math.max(1,Math.min(3,tag.getInt("Clearance")));style=tag.getInt("Style");doorId=tag.getInt("DoorId");alongX=tag.getBoolean("AlongX");linked=tag.getBoolean("Linked");label=tag.getString("Label");
         openUntil=tag.getLong("OpenUntil");swipeAt=tag.contains("SwipeAt")?tag.getLong("SwipeAt"):-1;indicateUntil=tag.getLong("IndicateUntil");presented=tag.getInt("Presented");status=tag.getInt("Status");user=tag.hasUUID("User")?tag.getUUID("User"):null;
         presentedHand=tag.getBoolean("OffHand")?InteractionHand.OFF_HAND:InteractionHand.MAIN_HAND;
+        chamberId=tag.getString("ChamberId");chamberRole=tag.getString("ChamberRole");chamberDecision=tag.getBoolean("ChamberDecision");
     }
     @Override public CompoundTag getUpdateTag(){return saveWithoutMetadata();}
     @Override public ClientboundBlockEntityDataPacket getUpdatePacket(){return ClientboundBlockEntityDataPacket.create(this);}

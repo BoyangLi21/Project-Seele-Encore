@@ -1,0 +1,12 @@
+{
+  "parent": "minecraft:block/cube",
+  "textures": {
+    "particle": "projectseele:block/nerv_machine_edge",
+    "down": "projectseele:block/tv_utility_lift_ceiling_r45",
+    "up": "projectseele:block/nerv_machine_edge",
+    "north": "projectseele:block/nerv_machine_edge",
+    "south": "projectseele:block/nerv_machine_edge",
+    "east": "projectseele:block/nerv_machine_edge",
+    "west": "projectseele:block/nerv_machine_edge"
+  }
+}

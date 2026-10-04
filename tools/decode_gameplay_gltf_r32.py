@@ -10,8 +10,8 @@ SOURCE = ROOT / 'external-assets/incoming/mocap/quaternius-ual2-standard/Univers
 STANDARD = ROOT / 'external-assets/incoming/mocap/quaternius-ual-standard/Universal Animation Library[Standard]/Unreal-Godot/UAL1_Standard.glb'
 OUT = ROOT / 'artifacts/combat_sortie_r32/gameplay_sources'
 
-def decode(clip_name, fps=60):
-    source=STANDARD if clip_name.startswith('Jump_') else SOURCE
+def decode(clip_name, fps=60, source=None, out=None):
+    source=Path(source) if source is not None else STANDARD if clip_name.startswith('Jump_') else SOURCE
     data = source.read_bytes()
     length = struct.unpack_from('<I', data, 12)[0]
     doc = json.loads(data[20:20+length])
@@ -26,22 +26,24 @@ def decode(clip_name, fps=60):
         stride = v.get('byteStride', width*4)
         return np.ndarray((a['count'], width), dtype='<f4', buffer=binary,
                           offset=offset, strides=(stride, 4)).copy()
-    animation = next(a for a in doc['animations'] if a['name'] == clip_name)
+    animation = next(a for a in doc['animations'] if a['name'] == clip_name) if clip_name is not None else {'channels':[]}
     channels = []
     for c in animation['channels']:
         s = animation['samplers'][c['sampler']]
         channels.append((c['target']['node'], c['target']['path'], accessor(s['input'])[:, 0],
                          accessor(s['output']), s.get('interpolation', 'LINEAR')))
-    duration = max(float(c[2][-1]) for c in channels)
+    duration = max((float(c[2][-1]) for c in channels),default=0)
     times = np.linspace(0, duration, round(duration*fps)+1)
     parents = [-1]*len(doc['nodes'])
     for i, node in enumerate(doc['nodes']):
         for child in node.get('children', []): parents[child] = i
-    alias = {'pelvis': 'Hip', 'spine_01': 'LowerSpine', 'spine_03': 'Chest', 'neck_01': 'Neck', 'Head': 'Head'}
+    alias = {'pelvis': 'Hip', 'spine_01': 'LowerSpine', 'spine_03': 'Chest', 'neck_01': 'Neck', 'Head': 'Head','head':'Head','head_leaf':'Head_End'}
     for side in ['l', 'r']:
-        for source, name in [('upperarm', 'Shoulder'), ('lowerarm', 'Forearm'), ('hand', 'Hand'), ('thigh', 'Thigh'), ('calf', 'Shin'), ('foot', 'Foot'), ('ball', 'Toe'), ('ball_leaf', 'Toe_End'), ('middle_01', 'Finger2'), ('thumb_01', 'Finger0')]:
-            alias[source+'_'+side] = side.upper()+name
-    names = [alias.get(n.get('name'), n.get('name', str(i))) for i, n in enumerate(doc['nodes'])]+['Head_End']
+        for bone_prefix, name in [('upperarm', 'Shoulder'), ('lowerarm', 'Forearm'), ('hand', 'Hand'), ('thigh', 'Thigh'), ('calf', 'Shin'), ('foot', 'Foot'), ('ball', 'Toe'), ('ball_leaf', 'Toe_End'), ('middle_01', 'Finger2'), ('thumb_01', 'Finger0')]:
+            alias[bone_prefix+'_'+side] = side.upper()+name
+    names = [alias.get(n.get('name'), n.get('name', str(i))) for i, n in enumerate(doc['nodes'])]
+    synthetic_head_end='Head_End' not in names
+    if synthetic_head_end:names.append('Head_End')
     positions, rotations = [], []
     for at in times:
         trs = [{k: np.array(node.get(k, default), float) for k, default in
@@ -59,8 +61,12 @@ def decode(clip_name, fps=60):
         def world(i):
             if i in cache: return cache[i]
             t = trs[i]; matrix = np.eye(4)
-            matrix[:3, :3] = Rotation.from_quat(t['rotation']).as_matrix() @ np.diag(t['scale'])
-            matrix[:3, 3] = t['translation']
+            if 'matrix' in doc['nodes'][i]:
+                assert not any(c[0]==i for c in channels),'Animated matrix nodes require explicit decomposition'
+                matrix=np.asarray(doc['nodes'][i]['matrix']).reshape(4,4).T
+            else:
+                matrix[:3, :3] = Rotation.from_quat(t['rotation']).as_matrix() @ np.diag(t['scale'])
+                matrix[:3, 3] = t['translation']
             if parents[i] >= 0: matrix = world(parents[i]) @ matrix
             cache[i] = matrix; return matrix
         points, qs = [], []
@@ -70,10 +76,11 @@ def decode(clip_name, fps=60):
         h = names.index('Head'); pelvis = names.index('Hip')
         head_length = max(.05, np.linalg.norm(points[h]-points[pelvis])*.25)
         neck = names.index('Neck'); up = points[h]-points[neck]; up /= max(1e-8, np.linalg.norm(up))
-        points.append(points[h]+up*head_length); qs.append(qs[h])
+        if synthetic_head_end:points.append(points[h]+up*head_length);qs.append(qs[h])
         positions.append(points); rotations.append(qs)
-    OUT.mkdir(parents=True, exist_ok=True)
-    target = OUT / (clip_name+'.npz')
+    output=Path(out) if out is not None else OUT
+    output.mkdir(parents=True, exist_ok=True)
+    target = output / ((clip_name or 'REST_BIND')+'.npz')
     np.savez_compressed(target, names=np.asarray(names), positions=np.asarray(positions), rotations=np.asarray(rotations), fps=fps, source=str(source), source_clip=clip_name)
     return target
 

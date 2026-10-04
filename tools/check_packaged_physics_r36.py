@@ -21,7 +21,8 @@ def main():
  java,env=java_environment();cp=os.pathsep.join(map(str,[jar,*libraries]))
  if args.source_override:
   override=OUT/'source_override';override.mkdir(exist_ok=True)
-  subprocess.run([str(java/'bin/javac.exe'),'-cp',cp,'-d',str(override),str(ROOT/'src/main/java/com/projectseele/physics/ArticulatedBody.java')],check=True,env=env)
+  sources=[ROOT/'src/main/java/com/projectseele/physics'/name for name in ['ArticulatedBody.java','ArticulatedInputTraceR45.java','AngularConeConstraintR45.java']]
+  subprocess.run([str(java/'bin/javac.exe'),'-cp',cp,'-d',str(override),*map(str,sources)],check=True,env=env)
   cp=str(override)+os.pathsep+cp
  subprocess.run([str(java/'bin/javac.exe'),'-cp',cp,'-d',str(OUT),str(ROOT/'tools/java/PackagedPhysicsR36Smoke.java')],check=True,env=env)
  result=OUT/('thin_floor_source.json' if args.source_override else 'thin_floor.json')

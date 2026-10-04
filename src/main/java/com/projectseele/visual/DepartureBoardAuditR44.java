@@ -297,7 +297,7 @@ public final class DepartureBoardAuditR44
         {
             if (++age > 2400) throw new IllegalStateException("Native board audit timeout");
             var server = event.getServer(); var world = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
-            if (!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW")) throw new IllegalStateException("Review world only");
+            if (!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName())) throw new IllegalStateException("Review world only");
             if (output == null)
             {
                 output = Path.of(System.getProperty("projectseele.r44DepartureBoardOutput", "")).toAbsolutePath().normalize();

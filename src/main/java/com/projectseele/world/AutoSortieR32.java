@@ -16,21 +16,26 @@ public final class AutoSortieR32
     public static String missionToken(ServerLevel level)
     {
         var mission=TvCampaignSavedData.get(level);
-        return mission.active.isEmpty()||mission.phase.equals("cancel")||mission.owner==null?""
+        return mission.active.isEmpty()||Set.of("cancel","failure","combat_victory","episode_archived").contains(mission.phase)
+                ||mission.targetDeathConfirmedR45||mission.owner==null?""
                 :mission.active+":"+mission.generationR43+":"+mission.owner;
     }
-    private static boolean assigned(ServerLevel level,int unit,net.minecraft.world.entity.Entity pilot)
+    public static boolean cancellationCurrentR45(boolean canceled,String acceptedMission,String mission)
+    {return canceled&&!mission.isEmpty()&&mission.equals(acceptedMission);}
+    static boolean assignedPilotR45(ServerLevel level,int unit,net.minecraft.world.entity.Entity pilot)
     {
-        var assignment=TvCampaignSavedData.get(level).sorties.get(unit);if(assignment==null||pilot==null)return false;
-        return pilot instanceof TrainingPilotEntity npc?assignment.npc&&npc.getAssignedVariant()==unit
-                :pilot instanceof ServerPlayer player&&!assignment.npc&&player.getUUID().equals(assignment.commander);
+        var assignment=TvCampaignSavedData.get(level).sorties.get(unit);if(assignment==null||pilot==null||!pilot.isAlive())return false;
+        if(TvSortiesR32.assignedUnit(level,assignment)==null)return false;
+        return assignment.pilotR45!=null&&assignment.pilotR45.equals(pilot.getUUID())
+                &&(pilot instanceof TrainingPilotEntity npc?assignment.npc&&npc.getAssignedVariant()==unit
+                :pilot instanceof ServerPlayer player&&!assignment.npc&&player.getUUID().equals(assignment.commander));
     }
     public static boolean automaticAllowed(ServerLevel level,int unit)
     {
         String token=missionToken(level);var eva=EvaLogisticsDirector.canonicalUnit(level,unit);
         var plug=EntryPlugDirector.canonical(level,unit);
         var pilot=plug==null?null:plug.getFirstPassenger();if(pilot==null&&eva!=null)pilot=eva.getPilotEntity();
-        boolean occupied=assigned(level,unit,pilot);
+        boolean occupied=assignedPilotR45(level,unit,pilot);
         return !token.isEmpty()&&eva!=null&&!eva.getPersistentData().getBoolean("R32AutoCancelled")
                 &&occupied
                 &&token.equals(eva.getPersistentData().getString("R43AutoMission"));
@@ -50,7 +55,11 @@ public final class AutoSortieR32
         {
             var e=EvaLogisticsDirector.canonicalUnit(level,i);if(e==null)continue;var tag=e.getPersistentData();
             if(player.hasPermissions(2)||tag.hasUUID("R32SortieCommander")&&player.getUUID().equals(tag.getUUID("R32SortieCommander")))
+            {
+                tag.putString("R43AutoMission",missionToken(level));
                 tag.putBoolean("R32AutoCancelled",true);
+                StaffCommandBookR24.cancelAutomatic(level,i);
+            }
         }
     }
     private static NervStaffEntity officer(ServerLevel level,String skin)
@@ -71,12 +80,15 @@ public final class AutoSortieR32
             var tag=eva.getPersistentData();var plug=EntryPlugDirector.canonical(level,unit);
             var pilot=plug==null?null:plug.getFirstPassenger();if(pilot==null)pilot=eva.getPilotEntity();
             String phase=EvaLogisticsDirector.status(level,unit).phase();
+            // A delayed boarding must not undo a cancellation of this mission.
+            if(cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),mission))
+            {StaffCommandBookR24.cancelAutomatic(level,unit);continue;}
             if(pilot==null)
             {
-                if(phase.equals("PARKED")){tag.remove("R32BoardingPilot");tag.remove("R32AutoCancelled");tag.remove("R32AutoStep");}
+                if(phase.equals("PARKED")){tag.remove("R32BoardingPilot");tag.remove("R32AutoStep");}
                 continue;
             }
-            if(!assigned(level,unit,pilot)){clearAutomatic(level,unit);continue;}
+            if(!assignedPilotR45(level,unit,pilot)){clearAutomatic(level,unit);continue;}
             if(Set.of("PARKED","SILO_READY").contains(phase)&&(!tag.hasUUID("R32BoardingPilot")||!tag.getUUID("R32BoardingPilot").equals(pilot.getUUID())
                     ||!mission.equals(tag.getString("R43AutoMission"))))
             {

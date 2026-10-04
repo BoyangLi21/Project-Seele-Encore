@@ -15,6 +15,7 @@ public class AlarmOverlay implements IGuiOverlay
 
     /** Eased 0..1 so the vignette fades in and out instead of popping. */
     private float intensity;
+    public void resetConnectionR45(){intensity=0;}
 
     @Override
     public void render(ForgeGui gui, GuiGraphics guiGraphics, float partialTick, int width, int height)

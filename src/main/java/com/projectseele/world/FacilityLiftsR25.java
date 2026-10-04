@@ -4,14 +4,10 @@ import com.projectseele.ProjectSeele;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
 import net.minecraft.server.level.ServerLevel;
-import net.minecraft.world.level.storage.LevelResource;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import java.nio.file.Files;
 import java.util.List;
-import java.util.Map;
-import java.util.WeakHashMap;
 
 /** Native lift controls are enabled only after the matching civil patch exists. */
 @Mod.EventBusSubscriber(modid = ProjectSeele.MODID)
@@ -19,13 +15,12 @@ public final class FacilityLiftsR25
 {
     public static final String EAST = "r25-east-command-gallery";
     public static final String OBSERVATION = "r25-west-observation";
-    private static final Map<ServerLevel, Boolean> ACTIVE = new WeakHashMap<>();
 
     public static List<S20PhysicalElevatorDirector.LiftSpec> installed(ServerLevel level)
     {
-        if (!level.dimension().equals(FacilitySchemaV2.DIMENSION) || !ACTIVE.computeIfAbsent(level,
-                l -> Files.isRegularFile(l.getServer().getWorldPath(LevelResource.ROOT).resolve("facility_lifts_r25.json")))) return List.of();
-        boolean internal=Files.isRegularFile(level.getServer().getWorldPath(LevelResource.ROOT).resolve("facility_lifts_r26.json"));
+        if (!level.dimension().equals(FacilitySchemaV2.DIMENSION)
+                || !FacilityWorldPolicy.markerPresent(level.getServer(), "facility_lifts_r25.json")) return List.of();
+        boolean internal=FacilityWorldPolicy.markerPresent(level.getServer(), "facility_lifts_r26.json");
         var east = new S20PhysicalElevatorDirector.LiftSpec(EAST,
                 java.util.Arrays.stream(internal?new int[]{-461,-448,-434,-420,-406,-392,-378,-364}:new int[]{-448,-434,-420,-406,-392}).mapToObj(y ->
                         new S20PhysicalElevatorDirector.Landing(floorName(y),

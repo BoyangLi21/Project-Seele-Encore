@@ -16,6 +16,7 @@ from tv_crane_girder_design_r44 import running_state as crane_running_state_r44
 from hangar_tv_design_r44 import (FINISHABLE, FULL_CUBE, wet_faces,
     wet_finish, transfer_faces, transfer_finish, launch_faces, launch_finish,
     upper_pressure_members, lower_pressure_seam_members)
+from plan_hangar_upper_enclosure_r44 import native_public_bearing, public_surface
 
 OUT=vox.ROOT/'artifacts/world_rebuild_r20/factory'
 LO=(-48,-513,-302);HI=(164,-310,24)
@@ -197,16 +198,21 @@ def plan():
         finish(launch_faces(cx),lambda q,b,cx=cx:launch_finish(cx,q,b))
     finish(transfer_faces(guide_y),transfer_finish)
     for q,after in (upper_pressure_members() | lower_pressure_seam_members()).items():
+        public_column = False
+        for feet in (-394, -367):
+            if feet - 1 <= q[1] <= feet + 2:
+                floor = s.palette[int(s.after[feet-1-LO[1], q[2]-LO[2], q[0]-LO[0]])]
+                if public_surface(floor) and shapes.get(floor) is None:
+                    raise RuntimeError(('Public pressure-column bearing has no exact native shape', q, feet, floor))
+                if native_public_bearing(floor, shapes.get(floor)):
+                    public_column = True
+                    break
+        if public_column:
+            continue
         yy,zz,xx=q[1]-LO[1],q[2]-LO[2],q[0]-LO[0]
         if s.protected[yy,zz,xx] or q in p.block_entities:continue
         before=s.palette[int(s.after[yy,zz,xx])]
         if before.partition('[')[0] not in AIR:continue
-        # Preserve the exact copied observation slab/three-metre public head
-        # volume in a clean authoring scene as in the measured repair plan.
-        if q[1] in (-367,-366,-365):
-            floor=s.palette[int(s.after[-368-LO[1],zz,xx])]
-            if floor.partition('[')[0] in {'projectseele:clear_glass','projectseele:nerv_floor_panel','minecraft:polished_deepslate','minecraft:sea_lantern'}:
-                continue
         if shapes.get(after)!=FULL_CUBE:raise RuntimeError(('Unknown pressure material',after))
         s.after[yy,zz,xx]=s.state(after)
     author_upper_observer_r44(s,p.block_entities)

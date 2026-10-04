@@ -22,7 +22,7 @@ public final class FactoryR20Review
     private static final boolean R21="r21-factory".equals(System.getProperty("projectseele.regionalBuild",""));
     public static final boolean R44_PASSENGER=Boolean.getBoolean("projectseele.r44PassengerFactoryReview");
     public static final boolean R35=R44_PASSENGER||"r35-factory".equals(System.getProperty("projectseele.regionalBuild",""));
-    public static final String R35_WORLD=R44_PASSENGER?"SEELE_FIELD_R44_REVIEW":"SEELE_FACTORY_R35_REVIEW";
+    public static final String R35_WORLD=R44_PASSENGER?com.projectseele.visual.NativeReviewWorldsR45.expectedName():"SEELE_FACTORY_R35_REVIEW";
     public static final boolean R27="r27-factory".equals(System.getProperty("projectseele.regionalBuild",""));
     public static final boolean R29="r29-factory".equals(System.getProperty("projectseele.regionalBuild",""));
     public static final boolean R28_VISUAL=R29||"r28-visual-factory".equals(System.getProperty("projectseele.regionalBuild",""));

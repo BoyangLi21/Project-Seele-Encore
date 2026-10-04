@@ -97,9 +97,25 @@ public final class StaffConversationR24
         String order = job == null ? "" : NervStaffDialogue.unitName(job.unit) + " · " + job.message;
         boolean canCommand = NervStaffDialogue.authorized(player) && StaffAuthorityR25.commandContact(npc);
         if (!canCommand && order.isEmpty()) order = "本次对话可查询信息，出动指令需要相应岗位与通行权限";
+        var coordination=CityCoordinationSavedDataR44.get(player.serverLevel());
+        boolean current=coordination.active&&session.coordinationInstance!=null&&session.coordinationInstance.equals(coordination.instance);
+        List<String> participants=new ArrayList<>();
+        if(current)for(int unit=0;unit<5;unit++)
+        {
+            var binding=coordination.binding(unit);String row=TvSortiesR32.name(unit)+" / 尚未编入";
+            if(binding!=null)
+            {
+                var actual=player.server.getPlayerList().getPlayer(binding.pilot());
+                String who=binding.kind().equals("npc")?com.projectseele.entity.TrainingPilotEntity.pilotName(unit):actual==null?"离线驾驶员":actual.getName().getString();
+                String role=switch(binding.role()){case "cover"->"掩护";case "shooter"->"射击";default->"支援";};
+                row=TvSortiesR32.name(unit)+" / "+who+" / "+role+(coordination.confirmationCurrent(unit)?" / 已确认":" / 待本人确认");
+            }
+            participants.add(row);
+        }
         var packet = new ClientboundStaffConversationPacket(session.nonce, npc.getUUID(), npc.getId(),
                 npc.getName().getString(), role(npc), npc.skin(), open, true, canCommand, session.radio,
-                session.reply, order, List.copyOf(units));
+                session.reply, order, List.copyOf(units),current?coordination.formationRevisionR45:0,
+                current?coordination.evidenceRevisionR45:0,List.copyOf(participants));
         SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
     }
 
@@ -162,7 +178,10 @@ public final class StaffConversationR24
             {
                 var eva = EvaPilotResolver.controlTarget(player);
                 var centre = eva == null ? player.position() : eva.position();
-                var station = com.projectseele.entity.NervArmamentStationEntity.nearest(player.level(), centre, 768, false);
+                var station = player.serverLevel().getEntitiesOfClass(com.projectseele.entity.NervArmamentStationEntity.class,
+                        new net.minecraft.world.phys.AABB(centre,centre).inflate(768,40,768),
+                        rack->!TvMissionEquipmentR45.missionRack(rack)).stream()
+                        .min(Comparator.comparingDouble(rack->rack.position().subtract(centre).horizontalDistanceSqr())).orElse(null);
                 session.reply = station != null && station.deploy()
                         ? "就近武器井正在升起，坐标：" + station.blockPosition().toShortString() + "。"
                         : "附近没有可部署的武器井，或武器井已展开。";
@@ -220,7 +239,7 @@ public final class StaffConversationR24
     private static String pilotStatus(ServerPlayer player,int unit)
     {
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),unit);
-        var pilot=TrainingPilotDirector.pilots(player.serverLevel()).stream().filter(p->p.getAssignedVariant()==unit).findFirst().orElse(null);
+        var pilot=TrainingPilotDirector.existingPilotR45(player.serverLevel(),unit);
         return com.projectseele.entity.TrainingPilotEntity.pilotName(unit)+"："+(pilot==null?"频道待接入。":PilotRadioR28.response(player,pilot,false));
     }
 

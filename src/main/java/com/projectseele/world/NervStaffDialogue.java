@@ -32,6 +32,11 @@ public final class NervStaffDialogue
         say(player,npc.getName().getString(),StaffDialogueCatalogR24.next(
                 player,npc.skin(),npc.staffRole(),"greeting"));
     }
+    public static String commandRefusal(ServerPlayer player,NervStaffEntity npc,String operation)
+    {
+        if(!authorized(player))return "请先出示 NERV 通行证。";
+        return StaffDialogueCatalogR24.next(player,npc.skin(),npc.staffRole(),"command_denied");
+    }
     private static MutableComponent option(String text,String command)
     {return Component.literal("["+text+"] ").withStyle(s->s.withColor(ChatFormatting.GOLD).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,command)));}
     public static String stage(String value)
@@ -79,7 +84,7 @@ public final class NervStaffDialogue
         if(text.startsWith("CAMPAIGN:"))
         {
             if(!StaffAuthorityR25.allows(npc,"campaign") || !authorized(player))
-            {reply(player,npc,"作战安排请联络葛城部长或赤木博士。");return 0;}
+            {reply(player,npc,"作战安排请联络葛城部长或冬月副司令。");return 0;}
             if(text.startsWith("CAMPAIGN:select:"))
             {
                 int result=com.projectseele.event.TvCampaignDirector.select(player,text.substring("CAMPAIGN:select:".length()));
@@ -116,7 +121,7 @@ public final class NervStaffDialogue
                 if(intent.subject().startsWith("city_"))
                 {
                     if(!authorized(player)||!StaffAuthorityR25.allows(npc,intent.subject()))
-                    {reply(player,npc,"城市升降请联络冬月副司令。他在最上面的指挥席。");return 0;}
+                    {reply(player,npc,"城市升降由冬月副司令操作，请联络他。");return 0;}
                     if(npc.busy()||StaffCommandBookR24.order(npc)!=null){reply(player,npc,"手上的操作还没结束，稍等一下。");return 0;}
                     return beginNativeAction(player,npc,intent.subject(),-1);
                 }
@@ -144,7 +149,9 @@ public final class NervStaffDialogue
                     var job=StaffCommandBookR24.order(npc);if(job!=null)reply(player,npc,"当前指令："+unitName(job.unit)+" · "+job.message+"。");
                 }
                 else if(intent.subject().equals("campaign"))
-                    reply(player,npc,com.projectseele.event.TvCampaignDirector.briefing(player));
+                    reply(player,npc,StaffAuthorityR25.allows(npc,"campaign")
+                        ?com.projectseele.event.TvCampaignDirector.briefing(player)
+                        :StaffDialogueCatalogR24.next(player,npc.skin(),npc.staffRole(),"campaign"));
                 else if(intent.subject().equals("city"))
                 {
                     var origin=IntegratedNervMapBuilder.tokyo3Origin(player.serverLevel());

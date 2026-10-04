@@ -75,7 +75,7 @@
   "key.projectseele.exit_eva": "EVA: Eject Entry Plug",
   "key.projectseele.stomp": "EVA: Side Kick",
   "key.projectseele.toggle_prone": "EVA: Toggle Prone",
-  "key.projectseele.cancel_launch": "EVA: Cancel Launch (Recall to Cage)",
+  "key.projectseele.cancel_launch": "Cancel Launch / Evade / Roll",
   "key.projectseele.self_launch": "EVA: TEST Self Launch",
   "hud.projectseele.self_launch_hint": "[%s] TEST SELF LAUNCH",
   "message.projectseele.self_launch_accepted": "TEST SELF LAUNCH accepted — catapult released",
@@ -148,6 +148,7 @@
   "item.projectseele.eva_progressive_knife": "EVA Progressive Knife Assembly",
   "item.projectseele.eva_pallet_rifle": "EVA Pallet Rifle Assembly",
   "item.projectseele.eva_positron_cannon": "EVA Positron Cannon Assembly",
+  "item.projectseele.yashima_shield": "Yashima EVA Shield",
   "item.projectseele.eva_n2_device": "EVA N² Self-Destruction Device",
   "message.projectseele.field_ejection_landed": "Emergency plug landed — pilot trauma: 50% maximum health",
   "msg.projectseele.command_seat_ikari": "Commander Ikari station occupied",
@@ -298,5 +299,11 @@
   "block.projectseele.city_rain_pipe": "Period Metal Downpipe",
   "block.projectseele.city_rain_gutter": "Period Metal Eaves Gutter",
   "block.projectseele.residential_plaster": "Painted Residential Plaster",
-  "block.projectseele.residential_plaster_slab": "Painted Plaster Slab"
+  "block.projectseele.residential_plaster_slab": "Painted Plaster Slab",
+  "block.projectseele.dead_sea_archive": "Dead Sea Scrolls",
+  "msg.projectseele.weapon_sword": "Unit-02 Long Sword",
+  "msg.projectseele.weapon_shield": "Unit-00 Shield",
+  "block.projectseele.tv_staff_lift_panel_r45": "TV Staff Lift Wall Panel",
+  "block.projectseele.tv_staff_lift_band_r45": "TV Staff Lift Purple Datum Panel",
+  "block.projectseele.tv_utility_lift_ceiling_r45": "TV Utility Lift Ceiling Grille"
 }

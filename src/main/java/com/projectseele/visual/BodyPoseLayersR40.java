@@ -37,6 +37,8 @@ public final class BodyPoseLayersR40
         current.addProperty("tick", tick);
         current.addProperty("entity_uuid",actor.getUUID().toString());current.addProperty("variant",EvaGameplayMotionR32.variant(actor));
         current.addProperty("stance",actor.rifleStanceLevel(partial));current.addProperty("gait",actor.rifleGaitPhase(partial));
+        current.addProperty("move_blend",actor.rifleMoveBlend(partial));current.addProperty("run_blend",actor.rifleRunBlend(partial));
+        current.addProperty("hit_paused",CombatFeelR31.hitPaused(actor));
         current.addProperty("world_y",actor.getPosition(partial).y);
         current.addProperty("entity_on_ground",actor.onGround());
         current.addProperty("entity_live_action",actor.hasLiveActionForRender(partial));

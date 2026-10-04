@@ -13,18 +13,18 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.minecraftforge.fluids.FluidType;
 
-/** Dense orange-red LCL used only by Project SEELE facilities. */
+/** Orange-red LCL with the active resource pack's native water surface. */
 public final class LclFluidType extends FluidType
 {
     private static final ResourceLocation STILL = new ResourceLocation(
-            "projectseele", "block/lcl_still");
+            "minecraft", "block/water_still");
     private static final ResourceLocation FLOW = new ResourceLocation(
-            "projectseele", "block/lcl_flow");
+            "minecraft", "block/water_flow");
     private static final ResourceLocation OVERLAY = new ResourceLocation(
             "minecraft", "block/water_overlay");
-    // The deep cage pool must read as a liquid surface, not clear tinted water.
-    // Keep the R44 shader material and the carrier's fractional surface in sync.
-    public static final int TINT = 0xF2DB5420;
+    // R45 inherits water animation, normals and transparency. Only the tint
+    // differs; do not force the atlas sprite to opaque or replace water math.
+    public static final int TINT = 0xFFDB5420;
 
     public LclFluidType()
     {

@@ -20,7 +20,8 @@ public abstract class TransportPassengerDiagnosticsMixin
     @Inject(method="teleport(DDDFFLjava/util/Set;)V",at=@At("HEAD"))
     private void projectSeele$traceCorrection(double x,double y,double z,float yaw,float pitch,Set<RelativeMovement> relative,CallbackInfo callback)
     {
-        if(!System.getProperty("projectseele.regionalBuild","").contains("riding"))return;
+        String mode=System.getProperty("projectseele.regionalBuild","");
+        if(!mode.contains("riding")&&!mode.equals("r44-transit-all")&&!Boolean.getBoolean("projectseele.r45TransportTrace"))return;
         ProjectSeele.LOGGER.info("TRANSIT SERVER TELEPORT from={} to=({}, {}, {}) noPhysics={} relative={} caller={}",
                 player.position(),x,y,z,player.noPhysics,relative,Arrays.stream(Thread.currentThread().getStackTrace()).skip(2).limit(8).toList());
     }

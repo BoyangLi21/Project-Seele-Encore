@@ -16,7 +16,9 @@ import java.util.*;
 /** Shoulder stock, wrist grips and head-to-sight alignment in the final pose commit. */
 public final class EvaRifleContactRig
 {
-    public record Witness(Vec3 expectedMuzzle,double rightError,double leftError,double footDrift,Vec3 stock,Vec3 shoulder) {}
+    public record ArmTrace(Vector3f elbow,Vector3f wrist,Vector3f pole) {}
+    public record Witness(Vec3 expectedMuzzle,double rightError,double leftError,double footDrift,Vec3 stock,Vec3 shoulder,
+                          ArmTrace left,ArmTrace right,boolean measured) {}
     public static final Map<Integer,Witness> LAST=new HashMap<>();
     private static void absolute(GeoBone b,Matrix4f desired,Matrix4f root)
     {
@@ -97,6 +99,14 @@ public final class EvaRifleContactRig
         // rises. Keep that contact on the gun rather than stretching the arm.
         float supportSlide=Math.min(2F,-along+(float)Math.sqrt(Math.max(0,discriminant)));
         Vector3f leftTarget=new Vector3f(supportBase).fma(supportSlide,forward);
+        var measured = com.projectseele.entity.EvaRifleGripR45.contacts(eva, body, f.grip(), f.right(), f.forward(), f.up());
+        if (measured != null && EvaHandSurfaceR45.applies(eva))
+        {
+            rightTarget = new Vector3f(measured.right().wrist());
+            leftTarget = new Vector3f(measured.left().wrist());
+            qR = new Quaternionf(measured.right().rotation());
+            qL = new Quaternionf(measured.left().rotation());
+        }
         float stance=eva.rifleStanceLevel(partial);
         float support=EvaBodyPose.hasSupportedStances()&&stance>1&&stance<3
                 ?(float)Math.pow(Math.sin((stance-1)*Math.PI/2),2):0;
@@ -124,11 +134,17 @@ public final class EvaRifleContactRig
                 if(flat.length()>horizontal&&flat.lengthSquared()>1e-6F)flat.normalize().mul(horizontal);
                 ground.x=leftShoulder.x+flat.x;ground.z=leftShoulder.z+flat.z;
             }
-            leftTarget.lerp(ground,support);
+            boolean fittedHand=com.projectseele.entity.EvaAnatomicalHandsR45.enabled(eva);
+            float palmTravel=fittedHand?com.projectseele.entity.EvaAnatomicalHandsR45.supportPalmTravelR45(support):support;
+            leftTarget.lerp(ground,palmTravel);
+            if(fittedHand)
+                leftTarget.fma(-2.5F*(float)Math.sin(Math.PI*palmTravel)
+                        -com.projectseele.entity.EvaAnatomicalHandsR45.supportGunClearanceR45(support),up);
             Vector3f handAlong=EvaRigTransforms.pivot(model.getBone("finger_middle_l").orElseThrow()).sub(EvaRigTransforms.pivot(leftHand));
             Vector3f across=EvaRigTransforms.pivot(model.getBone("finger_index_l").orElseThrow()).sub(EvaRigTransforms.pivot(model.getBone("finger_little_l").orElseThrow()));
             Quaternionf palmDown=new Quaternionf().setFromNormalized(handFrame(forward,right).mul(handFrame(handAlong,across).transpose()));
-            qL.slerp(palmDown,support);
+            float palmTurn=fittedHand?com.projectseele.entity.EvaAnatomicalHandsR45.supportPalmTurnR45(support):support;
+            qL.slerp(palmDown,palmTurn);
             final float plantedSupport=support;
             for(String n:body.rig.keySet())if(n.startsWith("finger_")&&n.endsWith("_l")&&!n.contains("_axis_"))
                 model.getBone(n).ifPresent(b->EvaRigTransforms.rotate(b,new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX()).slerp(new Quaternionf(),plantedSupport)));
@@ -148,7 +164,8 @@ public final class EvaRifleContactRig
         EvaRigTransforms.rotate(head,EvaRigTransforms.rotation(EvaRigTransforms.parent(head,root)).invert().mul(headWorld));
         if(!head.isHidden()&&!(eva instanceof com.projectseele.entity.EvaPrototypeEntity un&&un.isEyeLaserActive()))EvaHeadClearance.apply(eva,head,root,gun,headWorld,right,forward,partial);
         var shoulder=EvaRigTransforms.point(model.getBone("arm_r").orElseThrow(),EvaRigTransforms.pivot(model.getBone("arm_r").orElseThrow()),root);
-        if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),new Witness(f.muzzle(),re,le,-1,f.stock(),new Vec3(shoulder.x,shoulder.y,shoulder.z)));
+        if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),new Witness(f.muzzle(),re,le,-1,f.stock(),new Vec3(shoulder.x,shoulder.y,shoulder.z),
+                armTrace(model,"l",leftPole,root),armTrace(model,"r",rightPole,root),measured!=null&&EvaHandSurfaceR45.applies(eva)));
         rotations.addAll(Set.of("neck","head","arm_r","forearm_r","wrist_r","hand_r","arm_l","forearm_l","wrist_l","hand_l","cannon"));
         positions.addAll(Set.of("forearm_r","wrist_r","hand_r","forearm_l","wrist_l","hand_l","cannon"));
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),Set.copyOf(positions),"MOTION_ENGINE_LIVE_ACTION");
@@ -157,6 +174,15 @@ public final class EvaRifleContactRig
     {
         return EvaRigTransforms.solveArm(model.getBone("arm_"+side).orElseThrow(),model.getBone("forearm_"+side).orElseThrow(),model.getBone("wrist_"+side).orElseThrow(),model.getBone("hand_"+side).orElseThrow(),side,target,rotation,pole,root);
     }
+
+    private static ArmTrace armTrace(BakedGeoModel model,String side,Vector3f pole,Matrix4f root)
+    {
+        if(System.getProperty("projectseele.r44HandWitnessPath","").isBlank())return null;
+        var lower=model.getBone("forearm_"+side).orElseThrow();var hand=model.getBone("hand_"+side).orElseThrow();
+        return new ArmTrace(EvaRigTransforms.point(lower,EvaRigTransforms.elbow(lower,side),root),
+                EvaRigTransforms.point(hand,EvaRigTransforms.pivot(hand),root),new Vector3f(pole));
+    }
+
 
     private static Matrix3f handFrame(Vector3f along,Vector3f across)
     {

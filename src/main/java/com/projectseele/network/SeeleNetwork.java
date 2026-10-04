@@ -12,7 +12,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
  */
 public final class SeeleNetwork
 {
-    private static final String PROTOCOL_VERSION = "49";
+    private static final String PROTOCOL_VERSION = "53";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),
@@ -199,5 +199,20 @@ public final class SeeleNetwork
         CHANNEL.messageBuilder(ServerboundLiftArrivalR44.class,id++,NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ServerboundLiftArrivalR44::encode).decoder(ServerboundLiftArrivalR44::new)
                 .consumerMainThread(ServerboundLiftArrivalR44::handle).add();
+        CHANNEL.messageBuilder(ClientboundDeadSeaReadChallengeR45.class,id++,NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundDeadSeaReadChallengeR45::encode).decoder(ClientboundDeadSeaReadChallengeR45::new)
+                .consumerMainThread(ClientboundDeadSeaReadChallengeR45::handle).add();
+        CHANNEL.messageBuilder(ServerboundDeadSeaReadPageR45.class,id++,NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ServerboundDeadSeaReadPageR45::encode).decoder(ServerboundDeadSeaReadPageR45::new)
+                .consumerMainThread(ServerboundDeadSeaReadPageR45::handle).add();
+        CHANNEL.messageBuilder(ClientboundEncounterObserverPacket.class,id++,NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundEncounterObserverPacket::encode).decoder(ClientboundEncounterObserverPacket::new)
+                .consumerMainThread(ClientboundEncounterObserverPacket::handle).add();
+        CHANNEL.messageBuilder(ServerboundEncounterObserverReadyPacket.class,id++,NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ServerboundEncounterObserverReadyPacket::encode).decoder(ServerboundEncounterObserverReadyPacket::new)
+                .consumerMainThread(ServerboundEncounterObserverReadyPacket::handle).add();
+        com.projectseele.world.DeadSeaReadingR45.installBridge((player,challenge)->CHANNEL.send(
+                net.minecraftforge.network.PacketDistributor.PLAYER.with(()->player),new ClientboundDeadSeaReadChallengeR45(
+                        challenge.nonce(),challenge.revision(),challenge.pages())));
     }
 }

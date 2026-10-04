@@ -48,6 +48,7 @@ public final class EvaShadowProbeR44
 
     public static void admission(EvaUnit01Entity entity,String bone,boolean visible)
     {
+        PilotOpticsWitnessR45.shadowAdmission(entity,bone,visible);
         if(!ENABLED||entity.getId()!=actorId||!CRITICAL.contains(bone)||!ShaderShadowPassR44.active())return;
         (visible?admitted:rejected).merge(bone,1,Integer::sum);
     }

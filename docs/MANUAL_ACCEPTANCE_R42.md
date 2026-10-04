@@ -4,7 +4,7 @@ Minecraft 1.20.1 / Forge 47.4.10 / Java 17，协议 **45**。客户端与服务�
 
 ## 启动与安装
 
-- 本机入口 `D:\eva\start_eva_test_r42.bat`。`--check` 只检查准备；`--no-shaders` 关闭光影。
+- 本页保留 R42 历史安装说明；旧版开发快捷入口已退役。复现 R42 使用原批次的 Client.zip／Server.zip。当前开发与安装入口见 [README](../README.md) 及对应批次安装说明。
 - **Client.zip** 拖入 PCL，模型、模组、存档、材质及光影已内置，只可能补齐缺失的 Minecraft／Forge 基础库。
 - **Server.zip** 解压，将 **World.zip** 内容放进 `SEELE_R42_WORLD` 文件夹，其中直接包含 `level.dat`。确认 Minecraft EULA 后设置 `eula=true`，以 Java 17 运行 `Start-Server.bat` 或 `start-server.sh`。
 - **World.zip** 可单独装进客户端 `saves/SEELE_R42_WORLD`。

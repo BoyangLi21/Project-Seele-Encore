@@ -14,7 +14,11 @@ public final class EvaAerialContactR35
         if(SOLVING.get()||EvaCombatR31.action(eva)!=EvaCombatR31.AIR_STRIKE)return;
         var target=EvaCombatR31.target(eva);var profile=CombatBodyProfiles.get(eva);
         if(target==null||!target.isAlive()||profile==null||eva.distanceTo(target)>52)return;
-        float age=EvaCombatR31.age(eva,partial),weight=EvaDorsalMechanism.smooth((age-2)/5)*(1-EvaDorsalMechanism.smooth((age-11)/5));if(weight<=0)return;
+        // The button press precedes the actual airborne stroke. Using its
+        // clock reached toward the victim during ascent, then stopped solving
+        // the fist just as the downward strike began.
+        float stroke=EvaCombatR31.strokeAge(eva,partial);if(stroke<0)return;
+        float weight=EvaDorsalMechanism.smooth(stroke/5)*(1-EvaDorsalMechanism.smooth((stroke-9)/5));if(weight<=0)return;
         SOLVING.set(true);
         try
         {

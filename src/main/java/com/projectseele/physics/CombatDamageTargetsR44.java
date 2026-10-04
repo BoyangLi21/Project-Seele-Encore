@@ -17,6 +17,7 @@ import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.entity.PartEntity;
 import org.joml.Vector3d;
 import java.lang.reflect.Method;
+import java.lang.reflect.Field;
 import java.util.*;
 import java.util.function.Predicate;
 
@@ -63,7 +64,7 @@ public final class CombatDamageTargetsR44
                 e->allowed(e,attacker,pilot));
     }
 
-    private record VehicleShape(Method boxes,Method inflate,Method clip,Method contains,Method overlap,Method closest) {}
+    private record VehicleShape(Method boxes,Method inflate,Method clip,Method contains,Method overlap,Method closest,Method axes,Method extents,Field center) {}
     private static final ClassValue<VehicleShape> SHAPES=new ClassValue<>()
     {
         @Override protected VehicleShape computeValue(Class<?> type)
@@ -73,7 +74,8 @@ public final class CombatDamageTargetsR44
                 Class<?> obb=Class.forName("com.atsuishio.superbwarfare.tools.OBB",false,type.getClassLoader());
                 return new VehicleShape(type.getMethod("getOBBs"),obb.getMethod("inflate",double.class),
                         obb.getMethod("clip",Vector3d.class,Vector3d.class),obb.getMethod("contains",Vec3.class),
-                        obb.getMethod("isColliding",obb,AABB.class),obb.getMethod("getClosestPointOBB",Vector3d.class,obb));
+                        obb.getMethod("isColliding",obb,AABB.class),obb.getMethod("getClosestPointOBB",Vector3d.class,obb),
+                        obb.getMethod("getAxes"),obb.getMethod("extents"),obb.getField("center"));
             }
             catch(ReflectiveOperationException error){throw new IllegalStateException("Pinned SBW hull API changed",error);}
         }
@@ -106,6 +108,35 @@ public final class CombatDamageTargetsR44
         }
         AABB box=target.getBoundingBox().inflate(radius);
         return box.contains(from)?Optional.of(from):box.clip(from,to);
+    }
+    public static Optional<Vec3> clipBladeSweepR45(Entity target,Vec3 a,Vec3 b,Vec3 c,Vec3 d,double radius)
+    {
+        if(target instanceof LivingEntity living)return CombatBodyContacts.clipBladeSweepR45(living,a,b,c,d,radius);
+        if(!SbwStaticShapesR24.vehicle(target))return CombatBodyContacts.clipBladeBoxR45(target.getBoundingBox().inflate(radius),a,b,c,d);
+        VehicleShape shape=SHAPES.get(target.getClass());Vec3[] points={a,b,c,d};
+        try
+        {
+            for(Object raw:boxes(target,shape))
+            {
+                Object box=shape.inflate.invoke(raw,radius);
+                Vector3d center=(Vector3d)shape.center.get(box),extents=(Vector3d)shape.extents.invoke(box);
+                Vector3d[] axes=(Vector3d[])shape.axes.invoke(box);double[][] planes=new double[6][4];
+                for(int i=0;i<3;i++)
+                {
+                    Vector3d axis=axes[i];double size=i==0?extents.x:i==1?extents.y:extents.z;
+                    planes[2*i]=new double[]{axis.x,axis.y,axis.z,-axis.dot(center)-size};
+                    planes[2*i+1]=new double[]{-axis.x,-axis.y,-axis.z,axis.dot(center)-size};
+                }
+                for(int[] tri:new int[][]{{0,1,2},{0,2,3}})
+                {
+                    double[][] vertices=new double[3][3];for(int i=0;i<3;i++){Vec3 p=points[tri[i]];vertices[i]=new double[]{p.x,p.y,p.z};}
+                    var hit=com.projectseele.combat.BladeSweepClipR45.triangle(vertices,planes);
+                    if(hit!=null)return Optional.of(new Vec3(hit[0],hit[1],hit[2]));
+                }
+            }
+            return Optional.empty();
+        }
+        catch(ReflectiveOperationException error){throw new IllegalStateException("Cannot clip actual SBW blade sweep hull",error);}
     }
     public static boolean overlap(Entity target,AABB area)
     {

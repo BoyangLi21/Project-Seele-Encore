@@ -40,6 +40,22 @@ final class RiggedAngelSkinWitnessR44
         row.addProperty("game_time", entity.level().getGameTime());
         row.addProperty("frame", com.projectseele.entity.FirstBattleSignals.clientFrameTime());
         row.addProperty("partial_tick", partial);
+        row.addProperty("actor_tick", entity.tickCount);
+        if (entity instanceof com.projectseele.entity.SachielEntity sachiel)
+        {
+            var state = new JsonObject();
+            state.addProperty("no_ai", sachiel.isNoAi());
+            state.addProperty("on_ground", sachiel.onGround());
+            state.addProperty("origin_y", sachiel.getY());
+            state.addProperty("strike_active", sachiel.isStrikeActive());
+            state.addProperty("strike_mode", sachiel.strikeMode());
+            state.addProperty("strike_age", sachiel.strikeAge(partial));
+            state.addProperty("first_battle", sachiel.isFirstBattleActive());
+            state.addProperty("body_dynamics_active", com.projectseele.physics.CombatBodyDynamics.active(sachiel));
+            state.addProperty("reaction_active", com.projectseele.entity.CombatReactionsR36.active(sachiel));
+            state.addProperty("held", com.projectseele.entity.EvaCombatR31.holds(sachiel));
+            row.add("actual_sachiel_state", state);
+        }
         row.addProperty("resource", resource.toString());
         row.addProperty("gpu_pixels_sampled", false);
         row.addProperty("dominant_review", DqSkinReferenceR44.REVIEW);

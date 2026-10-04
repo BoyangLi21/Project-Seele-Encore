@@ -33,7 +33,7 @@ public final class TvCagePhysicalShapesR44
             throw new IllegalStateException("Native cage export requires the same review geometry/physics flag");
         var server = event.getServer();
         var root = server.getWorldPath(LevelResource.ROOT).normalize();
-        if (!root.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))
+        if (!root.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))
             throw new IllegalStateException("Cage shape export refuses another world");
         var level = server.getLevel(FacilitySchemaV2.DIMENSION);
         if (level == null) return;

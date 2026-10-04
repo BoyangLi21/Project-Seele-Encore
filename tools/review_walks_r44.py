@@ -16,6 +16,7 @@ WORLD=ROOT/'run/saves/SEELE_FIELD_R44_REVIEW'
 def main():
     p=argparse.ArgumentParser();p.add_argument('cases',type=Path);p.add_argument('--name',required=True)
     p.add_argument('--tv-cage',action='store_true');p.add_argument('--crane-girder',action='store_true');p.add_argument('--legacy-lease-control',action='store_true');p.add_argument('--timeout',type=int,default=900)
+    p.add_argument('--tv-personnel',action='store_true')
     p.add_argument('--plant-conditions',type=Path)
     args=p.parse_args();guard();assert args.name.replace('_','').replace('-','').isalnum()
     cases=json.loads(args.cases.read_text('utf8'));assert cases and len({c['id'] for c in cases})==len(cases)
@@ -24,7 +25,11 @@ def main():
     spec=json.loads((ART.parent/'repair_r43/moving_devices/native_dry_route/launch.json').read_text('utf8'))
     cmd=[s for s in spec['command'] if not s.startswith(('-Dprojectseele.','-Xmx','-Xms'))]
     cmd[1:1]=['-Xms512M','-Xmx4G','-Dprojectseele.regionalBuild=r44-collision']
+    if WORLD.name=='SEELE_FIELD_R45_REVIEW':cmd[1:1]=['-Dprojectseele.nativeReviewWorld=SEELE_FIELD_R45_REVIEW']
     if args.tv_cage:cmd[1:1]=['-Dprojectseele.r44TvCageReview=true']
+    if args.tv_personnel:
+        assert args.tv_cage and (WORLD/'r44_tv_personnel_platforms.json').is_file()
+        cmd[1:1]=['-Dprojectseele.r44TvPersonnelPlatformsReview=true']
     if args.crane_girder:cmd[1:1]=['-Dprojectseele.r44CraneGirderShapeExport=true']
     if args.legacy_lease_control:cmd[1:1]=['-Dprojectseele.r44AuditLeaseLegacyControl=true']
     if args.plant_conditions:

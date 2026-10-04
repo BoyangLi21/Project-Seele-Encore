@@ -28,12 +28,13 @@ public final class SachielBodyPoseR35
             {pose.rotations.get("arm_"+s).rotateX(.65F*held).rotateZ((s.equals("l")?.35F:-.35F)*held);pose.rotations.get("forearm_"+s).rotateX(2.0F*held);}
         }
         if(CombatReactionsR36.active(actor))
-        {pose=CombatReactionsR36.apply(actor,pose,partial);CombatBodyDynamics.normalize(actor,pose);return pose;}
+        {pose=CombatReactionsR36.apply(actor,pose,partial);CombatBodyDynamics.normalize(actor,pose);com.projectseele.physics.AuthoredTerrainContactR45.apply(actor,pose,partial);return pose;}
         var hit=EvaImpactResponse.sample(actor,partial);
         pose.rotations.get("torso_lower").rotateX(hit.pitch()*.3F).rotateZ(hit.roll()*.3F);
         pose.rotations.get("torso_upper").rotateX(hit.pitch()*.7F).rotateZ(hit.roll()*.7F);
         pose.rotations.get("head").rotateX(hit.head());pose.dirty();CombatBodyDynamics.normalize(actor,pose);
-        SachielGameplayMotionR32.adaptContact(actor,pose,strikeAge,partial);return pose;
+        SachielGameplayMotionR32.adaptContact(actor,pose,strikeAge,partial);
+        com.projectseele.physics.AuthoredTerrainContactR45.apply(actor,pose,partial);return pose;
     }
     private SachielBodyPoseR35(){}
 }

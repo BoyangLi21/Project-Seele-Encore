@@ -39,6 +39,7 @@ public final class PilotRadioR28
         var eva = occupiedUnit(pilot);
         if (eva == null && pilot.getVehicle() instanceof EntryPlugCarrierEntity && pilot.level() instanceof ServerLevel level
                 && java.util.Set.of("DESCENDING","TO_HANGAR","FILLING").contains(EvaLogisticsDirector.status(level,pilot.getAssignedVariant()).phase())) return "return";
+        if(eva==null&&pilot.getPersistentData().getString("SeelePilotRouteR30").equals("hold"))return "route_blocked";
         if (eva == null) return switch (pilot.getTrainingStage())
         {
             case TrainingPilotEntity.STAGE_WALKING -> pilot.getPersistentData().getString("SeelePilotRouteR30").equals("return") ? "disembark" : "boarding";

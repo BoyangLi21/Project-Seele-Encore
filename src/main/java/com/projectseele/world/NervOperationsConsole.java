@@ -621,6 +621,8 @@ public final class NervOperationsConsole
         ActionResult result;
         if (action == 0 || action == 1)
         {
+            if(FacilitySourceAdmissionR45.cityRequestsProhibited(level))
+            {player.displayClientMessage(Component.literal("本次为当前source设施专测；城市仍为原始未放置状态，城市变更请求已禁用。"),false);return true;}
             boolean retract = action == 1;
             Tokyo3RetractionDirector.RequestResult city =
                     Tokyo3RetractionDirector.request(level,

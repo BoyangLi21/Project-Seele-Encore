@@ -27,11 +27,43 @@ public final class TvSortiesR32
     }
     public static boolean ready(EvaUnit01Entity e)
     {return e!=null&&e.getPilotEntity()!=null&&e.isPoweredOn()&&!EvaShutdownR30.disabled(e)&&!e.isNervLogisticsLocked()&&!e.isLaunchSequenceActive()&&!EvaAirTransportR31.active(e);}
+    /** Task readiness uses the same original pilot/role predicate as automatic dispatch. */
+    public static boolean readyAssigned(ServerLevel level,TvCampaignSavedData.Sortie sortie)
+    {
+        if(sortie==null)return false;var eva=assignedUnit(level,sortie);
+        if(!ready(eva))return false;
+        // UN work is paused; retain its existing readiness behavior.
+        return sortie.unit>=3||AutoSortieR32.assignedPilotR45(level,sortie.unit,eva.getPilotEntity());
+    }
+    /** A later fleet replacement never inherits the accepted original's sortie. */
+    public static EvaUnit01Entity assignedUnit(ServerLevel l,TvCampaignSavedData.Sortie sortie)
+    {
+        var eva=unit(l,sortie.unit);
+        return eva!=null&&sortie.eva!=null&&sortie.eva.equals(eva.getUUID())?eva:null;
+    }
+    public static EvaUnit01Entity assignedUnit(ServerLevel l,TvCampaignSavedData data,int unit)
+    {var sortie=data.sorties.get(unit);return sortie==null?null:assignedUnit(l,sortie);}
+    /** Unloaded originals are retained and investigated, never counted as destroyed. */
+    public static boolean allOriginalsUnavailable(ServerLevel l,TvCampaignSavedData data)
+    {
+        if(data.sorties.isEmpty())return false;
+        for(var sortie:data.sorties.values())
+        {
+            var eva=assignedUnit(l,sortie);
+            if(eva==null)
+            {
+                if(sortie.unit<3)EvaLogisticsDirector.loadControlTarget(l,sortie.unit);
+                return false;
+            }
+            if(readyAssigned(l,sortie))return false;
+        }
+        return true;
+    }
     public static int reinforce(ServerPlayer caller,int unit,boolean npc,boolean rifle)
     {
         var l=TvCampaignDirector.level(caller);
         if(l==null||l!=caller.level()||!NervStaffDialogue.authorized(caller)||unit<0||unit>4||npc&&unit>2)return 0;
-        var d=TvCampaignSavedData.get(l);if(d.active.isEmpty()||d.phase.equals("cancel"))return 0;
+        var d=TvCampaignSavedData.get(l);if(d.active.isEmpty()||Set.of("cancel","failure","combat_victory","episode_archived").contains(d.phase)||d.targetDeathConfirmedR45)return 0;
         var current=d.sorties.get(unit);
         if(current!=null){caller.sendSystemMessage(Component.literal(name(unit)+"已经在出击编成中。"));return 1;}
         var e=unit(l,unit);
@@ -47,7 +79,12 @@ public final class TvSortiesR32
     {
         if(d.angel==null||!(l.getEntity(d.angel) instanceof Mob enemy))return;
         if(enemy instanceof FirstBattleSignals.Actor actor&&actor.firstBattleSignals().active(enemy))return;
-        var choices=d.sorties.values().stream().map(s->unit(l,s.unit)).filter(TvSortiesR32::ready).filter(e->!e.isFirstBattleActive()).toList();
+        var choices=d.sorties.values().stream().filter(s->readyAssigned(l,s)).map(s->assignedUnit(l,s)).filter(e->!e.isFirstBattleActive()).toList();
+        if(d.active.equals("ramiel"))
+        {
+            var shooter=assignedUnit(l,d,1);if(readyAssigned(l,d.sorties.get(1)))enemy.setTarget(shooter);
+            return; // Unit00 physically intercepts the ray; proximity is not target priority.
+        }
         var nearest=choices.stream().min(Comparator.comparingDouble(enemy::distanceToSqr)).orElse(null);
         var present=enemy.getTarget();
         // Retain an engaged target; switch only after it leaves combat or a much closer support intervenes.
@@ -57,20 +94,39 @@ public final class TvSortiesR32
     public static void continuity(ServerLevel l,TvCampaignSavedData d)
     {
         if(d.active.isEmpty()||d.phase.equals("cancel"))return;
+        boolean finishing=Set.of("failure","combat_victory","episode_archived").contains(d.phase)||d.targetDeathConfirmedR45;
+        if(!finishing)
         for(var player:l.players())
         {
             var eva=EvaPilotResolver.controlTarget(player);if(eva==null||!NervStaffDialogue.authorized(player))continue;
             int unit=slot(eva);var assigned=d.sorties.get(unit);
+            if(assigned!=null&&assigned.eva!=null&&!assigned.eva.equals(eva.getUUID()))continue;
             if(unit(l,unit)==eva&&(assigned==null||assigned.npc||!player.getUUID().equals(assigned.commander)))
                 d.assign(unit,player.getUUID(),false,false);
         }
         for(var s:d.sorties.values())
         {
             var eva=unit(l,s.unit);
+            // An explicit accepted assignment binds the loaded canonical airframe
+            // once, including NPC sorties before boarding or cargo handoff.
+            if(eva!=null&&s.eva==null&&!finishing){s.eva=eva.getUUID();d.setDirty();}
+            if(eva!=null&&!eva.getUUID().equals(s.eva))continue;
             if(eva!=null&&!eva.blockPosition().equals(s.position)){s.position=eva.blockPosition();d.setDirty();}
-            if(s.npc)continue;
+            if(s.npc)
+            {
+                if(eva!=null&&eva.getPilotEntity() instanceof TrainingPilotEntity pilot
+                        &&pilot.getAssignedVariant()==s.unit&&pilot.getVehicle() instanceof EntryPlugCarrierEntity plug
+                        &&plug.getLinkedEva()==eva&&plug.getVehicle()==eva)
+                {
+                    if(s.pilotR45==null&&!finishing){s.pilotR45=pilot.getUUID();d.setDirty();}
+                    if(s.pilotR45==null||!s.pilotR45.equals(pilot.getUUID())){eva.stopAutonomousR30();continue;}
+                    if(!plug.getUUID().equals(s.plug)){s.plug=plug.getUUID();d.setDirty();}
+                }
+                continue;
+            }
             var player=l.getServer().getPlayerList().getPlayer(s.commander);if(player==null)continue;
             if(player.level()!=l){s.resumePending=s.wasRiding=false;d.setDirty();continue;}
+            if(finishing){if(s.resumePending||s.wasRiding){s.resumePending=s.wasRiding=false;d.setDirty();}continue;}
             if(s.resumePending)
             {
                 if(++s.resumeTicks>200){s.resumePending=s.wasRiding=false;d.setDirty();continue;}

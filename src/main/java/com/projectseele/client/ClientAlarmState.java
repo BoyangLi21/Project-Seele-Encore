@@ -34,6 +34,13 @@ public final class ClientAlarmState
         }
     }
 
+    /** Disconnect is a new alarm session even if the last server never sent its stop packet. */
+    public static void resetConnectionR45()
+    {
+        active=false;
+        if(siren!=null)Minecraft.getInstance().getSoundManager().stop(siren);
+        siren=null;
+    }
     public static boolean isActive()
     {
         return active;

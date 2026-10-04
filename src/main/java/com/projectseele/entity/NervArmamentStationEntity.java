@@ -39,7 +39,7 @@ import net.minecraftforge.network.NetworkHooks;
  * continuously interpolated and therefore never rewrites surface blocks one
  * layer at a time.  Phase one carries one vertical Pallet Rifle.</p>
  */
-public final class NervArmamentStationEntity extends Entity
+public final class NervArmamentStationEntity extends Entity implements com.projectseele.world.TvEncounterEquipmentControlR45.CargoRackAccess
 {
     public static final int STOWED = 0;
     public static final int OPENING = 1;
@@ -232,7 +232,8 @@ public final class NervArmamentStationEntity extends Entity
                 if (this.phaseTicks >= HATCH_TICKS)
                 {
                     this.setHatch(0.0F);
-                    this.entityData.set(DATA_STOCKED, true);
+                    this.entityData.set(DATA_STOCKED, !com.projectseele.world.TvMissionEquipmentR45.missionRack(this)
+                    ||com.projectseele.world.TvMissionEquipmentR45.physicalStockPresent(this));
                     if (this.deployQueued)
                     {
                         this.deployQueued = false;
@@ -312,7 +313,8 @@ public final class NervArmamentStationEntity extends Entity
         if (cached != null
                 && level.getEntity(cached) instanceof
                 NervArmamentStationEntity station
-                && station.isAlive())
+                && station.isAlive()
+                && !com.projectseele.world.TvMissionEquipmentR45.missionRack(station))
         {
             return station;
         }
@@ -321,6 +323,7 @@ public final class NervArmamentStationEntity extends Entity
         {
             if (entity instanceof NervArmamentStationEntity station
                     && station.isAlive()
+                    && !com.projectseele.world.TvMissionEquipmentR45.missionRack(station)
                     && (selected == null || station.getUUID().compareTo(
                             selected.getUUID()) < 0))
             {
@@ -356,7 +359,8 @@ public final class NervArmamentStationEntity extends Entity
         {
             return false;
         }
-        this.entityData.set(DATA_STOCKED, true);
+        this.entityData.set(DATA_STOCKED, !com.projectseele.world.TvMissionEquipmentR45.missionRack(this)
+                    ||com.projectseele.world.TvMissionEquipmentR45.physicalStockPresent(this));
         this.setDoor(0.0F);
         this.transition(OPENING);
         return true;
@@ -376,6 +380,7 @@ public final class NervArmamentStationEntity extends Entity
 
     private boolean issueRifle(Player player, EvaUnit01Entity eva)
     {
+        if(com.projectseele.world.TvMissionEquipmentR45.missionRack(this))return false;
         if (!this.isReadyAndStocked()
                 || horizontalDistanceSqr(eva.position(), this.position())
                         > EVA_PICKUP_RANGE * EVA_PICKUP_RANGE)
@@ -400,10 +405,21 @@ public final class NervArmamentStationEntity extends Entity
     {
         NervArmamentStationEntity station = nearest(level, eva.position(),
                 EVA_PICKUP_RANGE, true);
+        var missionCargo=com.projectseele.world.TvMissionEquipmentR45.nearestPhysicalCargo(level,eva);
+        if(missionCargo!=null)return missionCargo.issueTvMissionEquipmentR45(player,eva);
         return station != null && station.issueRifle(player, eva);
     }
+    /** Real finite cargo handoff; the old rifle replenish path stays separate. */
+    public boolean issueTvMissionEquipmentR45(net.minecraft.world.entity.LivingEntity actualPilot,EvaUnit01Entity eva)
+    {
+        if(!com.projectseele.world.TvMissionEquipmentR45.issueFromStation(this,eva,actualPilot))return false;
+        this.entityData.set(DATA_STOCKED,false);this.transition(EMPTY);
+        eva.acceptIssuedTvMissionEquipmentR45();return true;
+    }
+
     public boolean issueToAssignedPilotR30(TrainingPilotEntity pilot,EvaUnit01Entity eva)
     {
+        if(com.projectseele.world.TvMissionEquipmentR45.missionRack(this))return false;
         if(this.level().isClientSide||eva.getPilotEntity()!=pilot||pilot.getAssignedVariant()!=eva.getUnitVariant()
                 ||!eva.isPoweredOn()||!this.isReadyAndStocked()
                 ||horizontalDistanceSqr(eva.position(),this.position())>EVA_PICKUP_RANGE*EVA_PICKUP_RANGE
@@ -430,9 +446,22 @@ public final class NervArmamentStationEntity extends Entity
         {
             return InteractionResult.SUCCESS;
         }
+        if(player instanceof net.minecraft.server.level.ServerPlayer serverPlayer
+                &&com.projectseele.world.TvMissionEquipmentR45.deliverHeldCargo(this,serverPlayer,hand))
+        {this.entityData.set(DATA_STOCKED,true);return InteractionResult.CONSUME;}
+        if(hand==InteractionHand.MAIN_HAND && player instanceof net.minecraft.server.level.ServerPlayer carrier
+                &&player.isShiftKeyDown()&&com.projectseele.world.TvMissionEquipmentR45.collectStoredCargo(this,carrier,hand))
+        {this.entityData.set(DATA_STOCKED,false);this.transition(EMPTY);return InteractionResult.CONSUME;}
+        if(player instanceof net.minecraft.server.level.ServerPlayer groundCrew
+                &&com.projectseele.world.TvMissionEquipmentR45.returnNearbyCargo(this,groundCrew))
+        {this.entityData.set(DATA_STOCKED,true);return InteractionResult.CONSUME;}
         EvaUnit01Entity eva = EvaPilotResolver.controlTarget(player);
         if (eva != null)
         {
+            if(com.projectseele.world.TvMissionEquipmentR45.stockedFor(this,eva))
+                return this.issueTvMissionEquipmentR45(player,eva)?InteractionResult.CONSUME:InteractionResult.FAIL;
+            if(com.projectseele.world.TvMissionEquipmentR45.returnToStation(this,eva))
+            {this.entityData.set(DATA_STOCKED,true);eva.refreshTvMissionEquipmentR45();return InteractionResult.CONSUME;}
             return this.issueRifle(player, eva)
                     ? InteractionResult.CONSUME : InteractionResult.FAIL;
         }

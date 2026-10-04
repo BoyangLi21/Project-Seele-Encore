@@ -17,6 +17,7 @@ import net.minecraftforge.registries.RegistryObject;
 public class ModItems
 {
     public static final DeferredRegister<Item> ITEMS = DeferredRegister.create(ForgeRegistries.ITEMS, ProjectSeele.MODID);
+    public static final RegistryObject<Item> DEAD_SEA_ARCHIVE=ITEMS.register("dead_sea_archive",()->new BlockItem(ModBlocks.DEAD_SEA_ARCHIVE.get(),new Item.Properties()));
 
     public static final RegistryObject<Item> SATELLITE_PHONE = ITEMS.register("satellite_phone",
             () -> new com.projectseele.item.SatellitePhoneItem(new Item.Properties().stacksTo(1)));
@@ -27,6 +28,9 @@ public class ModItems
             () -> new Item(new Item.Properties()));
     public static final RegistryObject<Item> NERV_WORKSTATION = ITEMS.register("nerv_workstation",
             () -> new BlockItem(ModBlocks.NERV_WORKSTATION.get(),new Item.Properties()));
+    public static final RegistryObject<Item> TV_STAFF_LIFT_PANEL_R45=ITEMS.register("tv_staff_lift_panel_r45",()->new BlockItem(ModBlocks.TV_STAFF_LIFT_PANEL_R45.get(),new Item.Properties()));
+    public static final RegistryObject<Item> TV_STAFF_LIFT_BAND_R45=ITEMS.register("tv_staff_lift_band_r45",()->new BlockItem(ModBlocks.TV_STAFF_LIFT_BAND_R45.get(),new Item.Properties()));
+    public static final RegistryObject<Item> TV_UTILITY_LIFT_CEILING_R45=ITEMS.register("tv_utility_lift_ceiling_r45",()->new BlockItem(ModBlocks.TV_UTILITY_LIFT_CEILING_R45.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_WALL_PANEL=ITEMS.register("nerv_wall_panel",()->new BlockItem(ModBlocks.NERV_WALL_PANEL.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_STRUCTURAL_PANEL=ITEMS.register("nerv_structural_panel",()->new BlockItem(ModBlocks.NERV_STRUCTURAL_PANEL.get(),new Item.Properties()));
     public static final RegistryObject<Item> RESIDENTIAL_PLASTER=ITEMS.register("residential_plaster",()->new BlockItem(ModBlocks.RESIDENTIAL_PLASTER.get(),new Item.Properties()));
@@ -77,6 +81,11 @@ public class ModItems
     public static final RegistryObject<Item> EVA_POSITRON_CANNON = ITEMS.register(
             "eva_positron_cannon",
             () -> new Item(new Item.Properties().stacksTo(1).fireResistant()));
+    /** Physical one-stack cargo; field protection still requires the real shield bridge. */
+    public static final RegistryObject<Item> YASHIMA_SHIELD = ITEMS.register(
+            "yashima_shield",
+            () -> new Item(new Item.Properties().stacksTo(1).fireResistant()));
+
     public static final RegistryObject<Item> EVA_N2_DEVICE = ITEMS.register(
             "eva_n2_device",
             () -> new Item(new Item.Properties().stacksTo(1).fireResistant()));

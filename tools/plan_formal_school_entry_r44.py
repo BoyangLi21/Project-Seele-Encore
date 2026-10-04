@@ -5,9 +5,10 @@ from measure_world_r40 import MeasuredWorld
 from query_blocks import AIR
 from regional_voxels import canonical_state
 from tv_landmark_architecture_r44 import school_entrance
+from school_hakone_lifecycle_guard_r45 import refuse_retired_school_producer
 ROOT=Path(__file__).resolve().parents[1];WORLD=ROOT/'run/saves/SEELE_FIELD_R44_REVIEW'
 def main():
- p=argparse.ArgumentParser();p.add_argument('source',type=Path);p.add_argument('output',type=Path);a=p.parse_args();assert not a.output.exists()
+ p=argparse.ArgumentParser();p.add_argument('source',type=Path);p.add_argument('output',type=Path);p.add_argument('--historical-r44',action='store_true');a=p.parse_args();refuse_retired_school_producer(a.historical_r44);assert not a.output.exists()
  d=json.loads((a.source/'new_district.json').read_text('utf8'));b=next(b for b in d['buildings'] if b['kind']=='tv_school');rows=[json.loads(r) for r in gzip.open(a.source/'forward.jsonl.gz','rt',encoding='utf8')];target={tuple(r['pos']):r for r in rows};w=MeasuredWorld(WORLD);x,z,X,Z=b['bounds'];w.box((x-8,b['floor']-8,z-8),(X+8,b['roof']+8,Z+20));w.load();held=[]
  def state(q):return target[q]['after'] if q in target else w.block(q)
  def put(q,s,owner,reason):

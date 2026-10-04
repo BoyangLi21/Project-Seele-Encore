@@ -13,11 +13,16 @@ import java.util.TreeMap;
 public final class CombatMotionResourcesR44
 {
     private static volatile Map<String,String> fingerprints;
+    public static Path instancePath(String value)
+    {
+        Path path=Path.of(value);
+        return path.isAbsolute()?path:net.minecraftforge.fml.loading.FMLPaths.GAMEDIR.get().resolve(path).normalize();
+    }
     public static Path resolve(String reviewProperty,String... names)
     {
         String review=System.getProperty(reviewProperty,"");
         String bundle=System.getProperty("projectseele.combatBundleDirectory","");
-        Path directory=Path.of(!review.isEmpty()?review:!bundle.isEmpty()?bundle:"projectseele-local-maps");
+        Path directory=instancePath(!review.isEmpty()?review:!bundle.isEmpty()?bundle:"projectseele-local-maps");
         for(String name:names)
         {
             Path file=directory.resolve(name);
@@ -55,7 +60,7 @@ public final class CombatMotionResourcesR44
         try
         {
             Map<String,String> values=new TreeMap<>();
-            values.put("pose-signals-contract","r44-captured-state-phase-displacement-v2");
+            values.put("pose-signals-contract","r44-captured-state-phase-displacement-v2:owners="+com.projectseele.config.PortableRuntimeOwnersR45.fingerprint());
             String explicit=System.getProperty("projectseele.bodyPoseReview","");
             Path body=explicit.isEmpty()?resolve("projectseele.bodyPoseReviewDirectory",
                     "eva_body_r44.json","eva_body_r43.json","eva_body_r42.json","eva_body_r41.json","eva_body_r25.json"):Path.of(explicit);
@@ -68,7 +73,7 @@ public final class CombatMotionResourcesR44
                         "eva_gameplay_r43_"+key+".json","eva_gameplay_r42_"+key+".json","eva_gameplay_r32_"+key+".json");
                 values.put("eva-profile-"+key,Files.isRegularFile(file)?digest(read(file,"login-gameplay-"+key)):"ABSENT");
             }
-            String captured=System.getProperty("projectseele.capturedLocomotionDirectory","");
+            String captured=com.projectseele.config.PortableRuntimeOwnersR45.capturedDirectory();
             if(!captured.isEmpty())for(int key=0;key<5;key++)
             {
                 Path file=Path.of(captured,"eva_locomotion_capture_r44_"+key+".json");
@@ -79,6 +84,9 @@ public final class CombatMotionResourcesR44
             FirstBattleClip.ready();String finisher=FirstBattleClip.fingerprint();
             values.put("first-battle",finisher.isEmpty()?bundled("motion/first_battle_r10.json"):finisher);
             values.put("physical-body-profiles",com.projectseele.physics.CombatBodyProfiles.fingerprint());
+            var hands=new StringBuilder();
+            for(int key=0;key<3;key++)hands.append(key).append(':').append(EvaAnatomicalHandsR45.contractFingerprintR45(key)).append(';');
+            values.put("anatomical-hand-rigs",digest(hands.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
             fingerprints=Map.copyOf(values);
             ProjectSeele.LOGGER.info("Combat required resource fingerprints: {}",values);
             return fingerprints;

@@ -143,7 +143,7 @@ public final class EvaCombatR31
             if(motion&&strokeAge(e,0)<0&&age>=4&&(a==AIR_STRIKE?falling&&strikeHeight:falling||age>=16))
             {e.getEntityData().set(STROKE,e.level().getGameTime());e.playSound(ModSounds.EVA_SWING.get(),2.6F,a==AIR_SLAM?.58F:.75F);}
             float stroke=strokeAge(e,0);
-            boolean window=motion?stroke>=0&&(a==AIR_SLAM||stroke<=9):a==AIR_STRIKE&&age>=6&&age<=18;
+            boolean window=motion?stroke>=0&&stroke<=9:a==AIR_STRIKE&&age>=6&&age<=18;
             if(window&&!s.contact)
             {
                 Vec3 hand=aerialHand(e,1),previous=s.previousContact==null?hand:s.previousContact;

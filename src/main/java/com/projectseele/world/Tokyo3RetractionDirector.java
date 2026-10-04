@@ -74,6 +74,7 @@ public final class Tokyo3RetractionDirector
 
     public static void register(ServerLevel level, BlockPos origin)
     {
+        if(CityCreateDistrictR45.owns(level,origin))return;
         retireLegacyS20Districts(level, origin);
         StoredDistrict district = ensure(level, origin);
         if (!SeeleConfig.dynamicTokyo3RetractionEnabled())
@@ -119,6 +120,7 @@ public final class Tokyo3RetractionDirector
     /** Deterministic reset reserved for isolated unattended visual fixtures. */
     public static void reset(ServerLevel level, BlockPos origin)
     {
+        if(CityCreateDistrictR45.owns(level,origin))throw new IllegalStateException("Installed rigid city requires its explicit recovery transaction");
         Tokyo3RetractionSavedData.get(level).put(new StoredDistrict(
                 origin, 0, 0, level.getGameTime()));
         updateCoreStates(level, origin, false);
@@ -126,6 +128,7 @@ public final class Tokyo3RetractionDirector
 
     public static int depth(ServerLevel level, BlockPos origin)
     {
+        if(CityCreateDistrictR45.owns(level,origin))return CityCreateDistrictR45.status(level,origin).depth();
         return ensure(level, origin).depth();
     }
 
@@ -134,6 +137,12 @@ public final class Tokyo3RetractionDirector
     {
         if (!retract && CityBattlefieldR29.combatActive(level))
             return new RequestResult(false, "城市中心正在交战，请先结束或取消作战，再恢复城市。");
+        if(CityCreateDistrictR45.owns(level,origin))
+        {
+            if(!SeeleConfig.dynamicTokyo3RetractionEnabled())return new RequestResult(false,"城市升降已在设置中关闭。");
+            if(!retract&&BattlefieldR21.deferRestore(level))return new RequestResult(true,"先恢复街面设施，再展开城市。");
+            return CityCreateDistrictR45.request(level,origin,retract);
+        }
         retireLegacyS20Districts(level, origin);
         if (!SeeleConfig.dynamicTokyo3RetractionEnabled())
         {
@@ -254,6 +263,7 @@ public final class Tokyo3RetractionDirector
     public static RequestResult forceDepth(ServerLevel level, BlockPos origin,
                                            boolean retract)
     {
+        if(CityCreateDistrictR45.owns(level,origin))return request(level,origin,retract);
         if (!SeeleConfig.dynamicTokyo3RetractionEnabled())
         {
             return new RequestResult(false,
@@ -301,6 +311,7 @@ public final class Tokyo3RetractionDirector
     }
     public static RequestResult toggleNearest(ServerLevel level, BlockPos position)
     {
+        var rigid=CityCreateDistrictR45.requestCore(level,position);if(rigid!=null)return rigid;
         return Tokyo3RetractionSavedData.get(level)
                 .nearest(position, CORE_CONTROL_RANGE)
                 .map(district -> request(level, district.origin(),
@@ -311,6 +322,7 @@ public final class Tokyo3RetractionDirector
 
     public static Status status(ServerLevel level, BlockPos origin)
     {
+        if(CityCreateDistrictR45.owns(level,origin))return CityCreateDistrictR45.status(level,origin);
         StoredDistrict district = ensure(level, origin);
         String phase;
         if (district.faulted())
@@ -357,6 +369,7 @@ public final class Tokyo3RetractionDirector
         long gameTime = level.getGameTime();
         for (StoredDistrict district : data.districts())
         {
+            if(CityCreateDistrictR45.owns(level,district.origin()))continue;
             if (district.faulted())
             {
                 continue;
@@ -668,6 +681,7 @@ public final class Tokyo3RetractionDirector
 
     private static void updateCoreStates(ServerLevel level, BlockPos origin, boolean armed)
     {
+        if(CityCreateDistrictR45.owns(level,origin))return;
         for (ThirdTokyoSurfaceBuilder.TowerSpec tower
                 : ThirdTokyoSurfaceBuilder.armouredTowers())
         {

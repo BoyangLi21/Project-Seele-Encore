@@ -8,6 +8,15 @@ public final class CombatSpacingR32
 {
     public static Vec3 clip(LivingEntity actor,Vec3 motion)
     {
+        return clip(actor,motion,true);
+    }
+    /** Authored attack steps stop at a torso; only deliberate locomotion slides around it. */
+    public static Vec3 clipAuthoredAdvance(LivingEntity actor,Vec3 motion)
+    {
+        return clip(actor,motion,false);
+    }
+    private static Vec3 clip(LivingEntity actor,Vec3 motion,boolean preserveTangent)
+    {
         if(motion.horizontalDistanceSqr()<1e-8)return motion;
         if(!actor.onGround())
         {
@@ -50,6 +59,7 @@ public final class CombatSpacingR32
             if(b>=0)continue;
             if(c<0)
             {
+                if(!preserveTangent){clipped=Vec3.ZERO;continue;}
                 Vec3 normal=delta.normalize();double inward=clipped.dot(normal);
                 clipped=clipped.subtract(normal.scale(Math.min(0,inward)));continue;
             }
@@ -62,7 +72,7 @@ public final class CombatSpacingR32
                 // Preserve the tangential step at contact. Cancelling the
                 // complete vector also cancelled strafing, pinning both giants
                 // together every time one tried to circle the other.
-                clipped=advance.add(remaining.subtract(normal.scale(Math.min(0,remaining.dot(normal)))));
+                clipped=preserveTangent?advance.add(remaining.subtract(normal.scale(Math.min(0,remaining.dot(normal))))):advance;
             }
         }
         return new Vec3(clipped.x,motion.y,clipped.z);

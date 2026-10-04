@@ -45,7 +45,7 @@ public final class CombatFeelR31
     {acceptedHit(target,source,damage,direction,guard,target.getBoundingBox().getCenter());}
     public static void acceptedHit(LivingEntity target,LivingEntity source,float damage,Vec3 direction,boolean guard,Vec3 point)
     {
-        if(target instanceof EvaUnit01Entity eva&&(eva.isFirstBattleActive()||eva.isNervLogisticsLocked()||EvaShutdownR30.disabled(eva)))return;
+        if(target instanceof EvaUnit01Entity eva&&(eva.isFirstBattleActive()||eva.isNervLogisticsLocked()||EvaShutdownR30.wreck(eva)))return;
         if(target instanceof FirstBattleSignals.Actor actor&&actor.firstBattleSignals().active(target))return;
         boolean melee=source instanceof EvaUnit01Entity eva&&eva.isMeleeWeapon()||source instanceof Angel;
         boolean crushing=source instanceof SachielEntity sachiel&&(sachiel.strikeMode()==SachielStrike.OVERHEAD||sachiel.strikeMode()==SachielStrike.STOMP)
@@ -66,6 +66,8 @@ public final class CombatFeelR31
                 &&(s.strikeMode()==SachielStrike.OVERHEAD||s.strikeMode()==SachielStrike.PILE||s.strikeMode()==SachielStrike.STOMP||s.strikeMode()==SachielStrike.SHOVE)
                 &&s.strikeAge(0)>=3&&s.strikeAge(0)<=SachielStrike.contactEnd(s.strikeMode()))kind=FLINCH;
         if(kind==DOWN)poise=0;POISE.put(target,poise);
+        if(target instanceof EvaUnit01Entity frozen&&EvaShutdownR30.retainsPoseR45(frozen)
+                &&kind!=DOWN&&!com.projectseele.physics.CombatBodyDynamics.active(target))return;
         if(!guard&&(kind==DOWN||com.projectseele.physics.CombatBodyDynamics.active(target)))
             com.projectseele.physics.CombatBodyDynamics.start(target,point,direction,strength);
         send(target,kind,direction,strength,kind==DOWN?64:kind==STAGGER?16:10,guard?1:crushing?2:1);

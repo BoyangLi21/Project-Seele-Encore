@@ -1,0 +1,6 @@
+{
+  "parent": "minecraft:block/cube_all",
+  "textures": {
+    "all": "projectseele:block/tv_staff_lift_band_r45"
+  }
+}

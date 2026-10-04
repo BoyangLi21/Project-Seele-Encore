@@ -29,6 +29,14 @@ public final class RigidMachineryGpuR44
     private static boolean resolved, logged;
     private static long draws, uploads, uploadedVertices, clears, releasedBytes;
 
+    public static boolean enabled()
+    {
+        String configured = System.getProperty("projectseele.rigidMachineryGpu");
+        if (configured != null) return Boolean.parseBoolean(configured);
+        // Retain the old explicit review override for controlled CPU baselines.
+        return Boolean.parseBoolean(System.getProperty("projectseele.r44RigidMachineryGpu", "true"));
+    }
+
     private static boolean resolveIrisState()
     {
         if (!resolved)
@@ -53,7 +61,7 @@ public final class RigidMachineryGpuR44
     static boolean draw(Object identity, float[] vertices, ResourceLocation texture,
                         PoseStack poses, MultiBufferSource buffers, int light)
     {
-        if (!Boolean.getBoolean("projectseele.r44RigidMachineryGpu") || buffers instanceof OutlineBufferSource)
+        if (!enabled() || buffers instanceof OutlineBufferSource)
             return false;
         boolean external = ShaderShadowPassR44.enabled();
         ShaderInstance custom = RigidCapsuleGpu.machineryShader();
@@ -151,7 +159,7 @@ public final class RigidMachineryGpuR44
     public static JsonObject snapshot()
     {
         var result = new JsonObject();
-        result.addProperty("enabled", Boolean.getBoolean("projectseele.r44RigidMachineryGpu"));
+        result.addProperty("enabled", enabled());
         result.addProperty("draw_calls", draws);
         result.addProperty("uploads", uploads);
         result.addProperty("uploaded_vertices", uploadedVertices);

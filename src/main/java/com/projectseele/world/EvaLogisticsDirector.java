@@ -1790,6 +1790,8 @@ public final class EvaLogisticsDirector
                     EntryPlugDirector.ensureSuspended(level, variant, unit);
                     put(level, variant, entry.withPhase(Phase.PARKED,
                             0, hangar.getZ(), lcl));
+                    TvMissionEquipmentR45.recoveryCompleted(unit);
+                    unit.refreshTvMissionEquipmentR45();
                     unit.playSound(SoundEvents.BEACON_ACTIVATE, 2.8F, 0.82F);
                 }
                 else

@@ -106,11 +106,30 @@ def build(part):
             if native<y-8 and number%24==0:
                 p.fill(x,native+1,z,x,y-3,z,'minecraft:polished_basalt[axis=y]','extension/road_pier')
                 p.fill(x-r-2,y-2,z-r-2,x+r+2,y-2,z+r+2,STEEL,'extension/road_crossbeam')
-            if native<y-8:
-                for side in (-r-3,r+3):
-                    xx,zz=x-dz*side,z+dx*side
+            # Judge each entire roadside bearing. The centre may be level
+            # while its outer shoulder hangs over the actual valley wall.
+            for sign in (-1,1):
+                side=sign*(r+3);xx,zz=x-dz*side,z+dx*side
+                ix,iz=xx-ox,zz-oz
+                if not (0<=ix<nx and 0<=iz<nz):
+                    p.meta.setdefault('whole_road_section_holds',[]).append(dict(x=x,z=z,side=side,reason='Unknown complete guard bearing profile'))
+                    continue
+                edge=int(target[iz,ix])
+                if edge<y:
+                    # Full cantilever coping ties into the already founded
+                    # original complete road deck; bars never float alone.
+                    for reach in range(r+1,r+4):
+                        sx,sz=x-dz*sign*reach,z+dx*sign*reach
+                        p.fill(sx,y-2,sz,sx,y-1,sz,STEEL,'extension/whole_guard_frame')
+                    p.put(xx,y,zz,FLOOR,'extension/whole_guard_coping')
                     p.fill(xx,y+1,zz,xx,y+2,zz,'minecraft:iron_bars[east=true,north=true,south=true,waterlogged=false,west=true]','extension/bridge_guard')
-            if native>y+8:
+            # A tunnel shell needs cover over its complete roof, not only one
+            # centre sample that later grades could leave outside the hill.
+            a,b=x-r-3-ox,x+r+3-ox;c,d=z-r-3-oz,z+r+3-oz
+            covered=0<=a<=b<nx and 0<=c<=d<nz and int(target[c:d+1,a:b+1].min())>=y+9
+            if native>y+8 and not covered:
+                p.meta.setdefault('whole_road_section_holds',[]).append(dict(x=x,z=z,reason='Centre-only tunnel rejected: complete final roof cover absent'))
+            if native>y+8 and covered:
                 p.fill(x-r-3,y+6,z-r-3,x+r+3,y+7,z+r+3,WALL,'extension/road_tunnel_roof')
                 for side in (-r-3,r+3):
                     xx,zz=x-dz*side,z+dx*side;p.fill(xx,y+1,zz,xx,y+5,zz,WALL,'extension/road_tunnel_wall')

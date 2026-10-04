@@ -27,10 +27,11 @@
     "MtrRouteEndpointMixin",
     "UNFlightSpeedR22Mixin",
     "SbwDefenseOwnerMixin",
-    "EvaSmallObstacleMixin"
+    "EvaSmallObstacleMixin",
+    "CityExactUnionCreateMixinR45",
+    "CitySavedOwnerUnionMixinR45"
   ],
   "client": [
-    "client.LclSpriteOpacityR44Mixin",
     "client.SbwPhantomLoadR24Mixin",
     "client.ChunkSkySourceR24Mixin",
     "client.NervChestFinishR24Mixin",

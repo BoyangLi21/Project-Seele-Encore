@@ -19,6 +19,9 @@ import java.util.WeakHashMap;
 public final class EvaMovementSounds
 {
     private static final Map<EvaUnit01Entity,Float> PREVIOUS=new WeakHashMap<>();
+    private static final boolean GEOMETRIC_CONTACTS=Boolean.parseBoolean(System.getProperty("projectseele.r45GeometricFootsteps","true"));
+    private static final Map<EvaUnit01Entity,Map<String,SoleContact>> SOLES=new WeakHashMap<>();
+    private static final class SoleContact {boolean raised;long tick=Long.MIN_VALUE;}
     private static final JsonObject CONTACTS=load();
     private static JsonObject load()
     {
@@ -43,7 +46,19 @@ public final class EvaMovementSounds
     {
         if(eva.level().isClientSide||com.projectseele.physics.CombatBodyDynamics.active(eva))return;
         float phase=eva.rifleGaitPhase(1);Float previous=PREVIOUS.put(eva,phase);
-        if(previous==null||!moving||!eva.onGround()||!eva.isPoweredOn()||eva.isNervLogisticsLocked()||eva.isPilotProne()||eva.isSilent()||EvaCombatSupportR33.strike(eva))return;
+        if(previous==null||!eva.onGround()||!eva.isPoweredOn()||eva.isNervLogisticsLocked()||eva.isPilotProne()||eva.isSilent()||EvaCombatSupportR33.strike(eva))
+        {SOLES.remove(eva);return;}
+        if(GEOMETRIC_CONTACTS&&!eva.isExperimentalUnit()
+                &&(eva.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||eva.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE
+                   ||eva.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||EvaCannonFrameR45.enabled(eva)))
+        {
+            // Mounted position updates can skip a tick while the visible gait
+            // remains in motion. Do not forget a raised foot in that interval.
+            if(!moving&&eva.rifleMoveBlend(1)<=.05F){SOLES.remove(eva);return;}
+            geometricSteps(eva,phase);
+            return;
+        }
+        if(!moving)return;
         float delta=phase-previous;if(delta>.5F)delta-=1;if(delta<-.5F)delta+=1;
         if(Math.abs(delta)<1e-5F||Math.abs(delta)>.3F)return;
         boolean backwards=delta<0;float run=eva.rifleRunBlend(1),low=Mth.clamp(eva.rifleStanceLevel(1),0,1);
@@ -67,7 +82,38 @@ public final class EvaMovementSounds
             var state=eva.level().getBlockState(BlockPos.containing(foot.x,foot.y-.2,foot.z));
             boolean soil=state.is(BlockTags.DIRT)||state.is(BlockTags.SAND)||state.is(BlockTags.LEAVES);
             CombatFoleyR36.step(eva,foot,soil,Mth.lerp(low,1+.28F*run,.5F));
+            com.projectseele.visual.StanceContactR41Review.sound(eva,"legacy_foot_"+side,foot);
             if(eva.getTags().contains("seele_motion_lab"))ProjectSeele.LOGGER.info("EVA FOOT CONTACT side={} phase={} position={} material={}",side,phase,foot,state);
+        }
+    }
+    /** Events follow an actual sole returning to a collision surface. */
+    private static void geometricSteps(EvaUnit01Entity eva,float phase)
+    {
+        var pose=EvaBodyPose.sample(eva,1);var world=EvaRifleKinematics.world(eva,1);
+        var contacts=SOLES.computeIfAbsent(eva,e->new java.util.HashMap<>());
+        long now=eva.level().getGameTime();float run=eva.rifleRunBlend(1),low=Mth.clamp(eva.rifleStanceLevel(1),0,1);
+        for(String side:new String[]{"l","r"})
+        {
+            var local=EvaBodyPose.lowestRigidFootR44(eva,pose,side);if(local==null)continue;
+            var point=world.transformPosition(new org.joml.Vector3f(local));
+            Vec3 foot=new Vec3(point.x,point.y,point.z);
+            var hit=eva.level().clip(new net.minecraft.world.level.ClipContext(foot.add(0,.5,0),foot.add(0,-1,0),
+                    net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,eva));
+            boolean bearing=hit.getType()==net.minecraft.world.phys.HitResult.Type.BLOCK;
+            double gap=bearing?foot.y-hit.getLocation().y:Double.POSITIVE_INFINITY;
+            var state=contacts.computeIfAbsent(side,s->new SoleContact());
+            if(state.tick!=now-1)state.raised=false;
+            state.tick=now;
+            if(!bearing||gap>.35){state.raised=true;continue;}
+            if(!state.raised||gap<-.12||gap>.12)continue;
+            state.raised=false;
+            Vec3 contact=hit.getLocation();
+            var bearingState=eva.level().getBlockState(hit.getBlockPos());
+            boolean soil=bearingState.is(BlockTags.DIRT)||bearingState.is(BlockTags.SAND)||bearingState.is(BlockTags.LEAVES);
+            CombatFoleyR36.step(eva,contact,soil,Mth.lerp(low,1+.28F*run,.5F));
+            com.projectseele.visual.StanceContactR41Review.sound(eva,"geometric_foot_"+side,contact);
+            if(eva.getTags().contains("seele_motion_lab"))
+                ProjectSeele.LOGGER.info("EVA SOLE CONTACT side={} phase={} gap={} position={}",side,phase,gap,contact);
         }
     }
     public static void swing(EvaUnit01Entity eva,float volume)

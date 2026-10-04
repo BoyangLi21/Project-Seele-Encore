@@ -19,6 +19,7 @@ public final class FactoryR20Client
     private static final JsonArray frames=new JsonArray();private static long began,lastFrame;private static boolean closing;
     private static JsonObject looseCameraProbe;
     private static final java.util.Map<String,Integer> facilitySounds=new java.util.HashMap<>();
+    private static final JsonArray facilitySoundEventsR45=new JsonArray();
     public static final java.util.Map<Integer,Integer> bodyDraws=new java.util.HashMap<>(),bodyCandidates=new java.util.HashMap<>();
     public static void bodyDraw(EvaUnit01Entity actor){if(FactoryR20Review.R35)bodyDraws.merge(actor.getId(),1,Integer::sum);}
     public static void bodyCandidate(EvaUnit01Entity actor){if(FactoryR20Review.R35)bodyCandidates.merge(actor.getId(),1,Integer::sum);}
@@ -67,7 +68,16 @@ public final class FactoryR20Client
     @SubscribeEvent public static void sound(net.minecraftforge.client.event.sound.PlaySoundEvent event)
     {
         if(FactoryR20Review.R35&&event.getSound()!=null)
-        {String name=event.getSound().getLocation().toString();if(name.contains("facility_hydraulic_launch")||name.contains("facility_catapult"))facilitySounds.merge(name,1,Integer::sum);}
+        {
+            String name=event.getSound().getLocation().toString();
+            if(name.startsWith("projectseele:facility_")||name.startsWith("projectseele:pa_"))
+            {
+                facilitySounds.merge(name,1,Integer::sum);
+                var row=new JsonObject();row.addProperty("event",name);row.addProperty("phase",FactoryR20Review.phase);
+                row.addProperty("client_tick",age);row.addProperty("x",event.getSound().getX());row.addProperty("y",event.getSound().getY());row.addProperty("z",event.getSound().getZ());
+                row.addProperty("volume",event.getSound().getVolume());facilitySoundEventsR45.add(row);
+            }
+        }
         if(!FactoryR20Review.R28_VISUAL||event.getSound()==null)return;
         var id=event.getSound().getLocation();
         if(id.toString().equals("superbwarfare:ntw_20_fire_3p")&&Minecraft.getInstance().getSoundManager().getSoundEvent(id)!=null)
@@ -100,7 +110,7 @@ public final class FactoryR20Client
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e)
     {
         if(!FactoryR20Review.ENABLED||e.phase!=TickEvent.Phase.END)return;var mc=Minecraft.getInstance();mc.options.pauseOnLostFocus=false;if(mc.screen instanceof PauseScreen)mc.setScreen(null);
-        if(FactoryR20Review.finished){if(distance>=0){mc.options.renderDistance().set(distance);mc.options.broadcastOptions();mc.options.hideGui=oldGui;distance=-1;}if(!closing){writer.shutdown();closing=true;}if(writer.isTerminated()&&++exit==1&&folder!=null){try{JsonObject report=new JsonObject();report.addProperty("source","Native framebuffer. Per-frame mechanical_closeup identifies scripted machinery cameras; only remaining frames use the pilot F5 camera.");report.addProperty("all_frames_are_normal_player_camera",allFramesUsePilotCamera());report.addProperty("dropped",dropped);report.addProperty("write_failure",frameError);report.add("frames",frames);report.add("facility_sounds",new Gson().toJsonTree(facilitySounds));Files.writeString(folder.resolve("frames.json"),report.toString());}catch(Exception x){throw new IllegalStateException(x);}}if(exit>30)mc.stop();return;}
+        if(FactoryR20Review.finished){if(distance>=0){mc.options.renderDistance().set(distance);mc.options.broadcastOptions();mc.options.hideGui=oldGui;distance=-1;}if(!closing){writer.shutdown();closing=true;}if(writer.isTerminated()&&++exit==1&&folder!=null){try{JsonObject report=new JsonObject();report.addProperty("source","Native framebuffer. Per-frame mechanical_closeup identifies scripted machinery cameras; only remaining frames use the pilot F5 camera.");report.addProperty("all_frames_are_normal_player_camera",allFramesUsePilotCamera());report.addProperty("dropped",dropped);report.addProperty("write_failure",frameError);report.add("frames",frames);report.add("facility_sounds",new Gson().toJsonTree(facilitySounds));report.add("facility_sound_events_r45",facilitySoundEventsR45);Files.writeString(folder.resolve("frames.json"),report.toString());}catch(Exception x){throw new IllegalStateException(x);}}if(exit>30)mc.stop();return;}
         if(mc.player==null||mc.level==null||mc.screen!=null)return;
         if(distance<0){distance=mc.options.renderDistance().get();oldGui=mc.options.hideGui;mc.options.hideGui=true;mc.options.renderDistance().set(10);mc.options.broadcastOptions();mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);folder=mc.gameDirectory.toPath().resolve((Boolean.getBoolean("projectseele.r44PassengerFactoryReview")?"../artifacts/rebuild_r44/factory_media/variant_"+Integer.getInteger("projectseele.r44PassengerFactoryVariant",0)+"/native_cycle_":FactoryR20Review.R29?"../artifacts/facility_r29/native_factory_":FactoryR20Review.R28?"../artifacts/facility_r28/native_cycle_":FactoryR20Review.R27?"../artifacts/facility_r27/native_cycle_":"r21-factory".equals(System.getProperty("projectseele.regionalBuild",""))?"../artifacts/world_repair_r21/factory/native_cycle_":"../artifacts/world_rebuild_r20/factory/native_cycle_")+System.currentTimeMillis());try{Files.createDirectories(folder);}catch(Exception x){throw new IllegalStateException(x);}}
         FactoryR20Review.ready=true;age++;

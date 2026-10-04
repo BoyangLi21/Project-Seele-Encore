@@ -19,6 +19,8 @@ public final class ModBlocks
 {
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(
             ForgeRegistries.BLOCKS, ProjectSeele.MODID);
+    public static final RegistryObject<Block> DEAD_SEA_ARCHIVE=BLOCKS.register("dead_sea_archive",
+            ()->new com.projectseele.world.DeadSeaArchiveBlockR45(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(3).noOcclusion()));
 
     public static final RegistryObject<Block> NERV_WORKSTATION = BLOCKS.register(
             "nerv_workstation", () -> new com.projectseele.world.NervWorkstationBlock(
@@ -38,6 +40,9 @@ public final class ModBlocks
                     .lightLevel(s->s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT)?7:0)
                     .emissiveRendering((s,l,p)->s.getValue(net.minecraft.world.level.block.state.properties.BlockStateProperties.LIT))));
 
+    public static final RegistryObject<Block> TV_STAFF_LIFT_PANEL_R45=finish("tv_staff_lift_panel_r45",Blocks.IRON_BLOCK,0);
+    public static final RegistryObject<Block> TV_STAFF_LIFT_BAND_R45=finish("tv_staff_lift_band_r45",Blocks.IRON_BLOCK,0);
+    public static final RegistryObject<Block> TV_UTILITY_LIFT_CEILING_R45=finish("tv_utility_lift_ceiling_r45",Blocks.IRON_BLOCK,0);
     public static final RegistryObject<Block> NERV_WALL_PANEL=finish("nerv_wall_panel",Blocks.IRON_BLOCK,0);
     public static final RegistryObject<Block> NERV_STRUCTURAL_PANEL=BLOCKS.register("nerv_structural_panel",
             ()->new Block(BlockBehaviour.Properties.copy(Blocks.REINFORCED_DEEPSLATE)));

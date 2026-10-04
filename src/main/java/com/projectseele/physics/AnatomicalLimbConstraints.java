@@ -9,6 +9,103 @@ import org.joml.Vector3f;
 /** A knee/elbow flexes about its measured axis; the bind-pose bow is not that axis. */
 public final class AnatomicalLimbConstraints
 {
+    /** A joint-centre compensation is derived from rotation, not an independent
+     * animation channel. Interpolating the two separately opens the hinge. */
+    public static void restoreAuthoredJointCentres(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile)
+    {
+        if(profile==null)return;
+        for(var element:profile.definition().getAsJsonArray("bodies"))
+        {
+            var row=element.getAsJsonObject();String name=row.get("name").getAsString();
+            if(!row.has("hinge")||!(name.startsWith("shin_")||name.startsWith("forearm_"))
+                    ||!pose.rig.containsKey(name))continue;
+            var m=row.getAsJsonArray("joint");
+            Vector3f joint=new Vector3f(m.get(3).getAsFloat(),m.get(7).getAsFloat(),m.get(11).getAsFloat())
+                    .div(CombatBodyProfiles.MODEL_TO_PHYSICS);
+            Vector3f offset=joint.sub(pose.rig.get(name).pivot());
+            pose.positions.put(name,AuthoredJointCentreR45.translation(offset,pose.rotations.get(name)));
+        }
+        pose.dirty();
+    }
+
+    /** Interpolate low-pose contact intent in body space. A local-only SLERP
+     * can swing a knee through the floor between two valid captured poses. */
+    public static void blendAuthoredContacts(EvaBodyPose.Sample pose,EvaBodyPose.Sample from,
+                                             EvaBodyPose.Sample to,float amount,CombatBodyProfiles.Profile profile)
+    {
+        if(profile==null||amount<=0||amount>=1)return;
+        restoreAuthoredJointCentres(pose,profile);
+        for(var element:profile.definition().getAsJsonArray("bodies"))
+        {
+            var row=element.getAsJsonObject();String lower=row.get("name").getAsString();
+            if(!row.has("hinge")||!(lower.startsWith("shin_")||lower.startsWith("forearm_")))continue;
+            String upper=row.get("parent").getAsString();
+            String end=(lower.startsWith("shin_")?"foot_":"hand_")+lower.charAt(lower.length()-1);
+            if(!pose.rig.containsKey(end))continue;
+            var m=row.getAsJsonArray("joint");
+            Vector3f joint=new Vector3f(m.get(3).getAsFloat(),m.get(7).getAsFloat(),m.get(11).getAsFloat())
+                    .div(CombatBodyProfiles.MODEL_TO_PHYSICS);
+            Vector3f target=point(from,end).lerp(point(to,end),amount);
+            Vector3f pole=from.matrix(upper).transformPosition(new Vector3f(joint))
+                    .lerp(to.matrix(upper).transformPosition(new Vector3f(joint)),amount);
+            Quaternionf orientation=from.matrix(end).getUnnormalizedRotation(new Quaternionf()).normalize()
+                    .slerp(to.matrix(end).getUnnormalizedRotation(new Quaternionf()).normalize(),amount);
+            var upperMatrix=pose.matrix(upper);
+            Vector3f origin=point(pose,upper),middle=upperMatrix.transformPosition(new Vector3f(joint));
+            Vector3f currentEnd=point(pose,end);
+            Quaternionf upperWorld=upperMatrix.getUnnormalizedRotation(new Quaternionf()).normalize();
+            Quaternionf lowerWorld=pose.matrix(lower).getUnnormalizedRotation(new Quaternionf()).normalize();
+            Vector3f axis=new Vector3f(m.get(2).getAsFloat(),m.get(6).getAsFloat(),m.get(10).getAsFloat()).normalize();
+            Vector3f fallback=upperWorld.transform(axis).cross(new Vector3f(currentEnd).sub(origin));
+            var solved=AuthoredTwoBoneIKR45.solveWithPole(origin,middle,currentEnd,target,pole,fallback);
+            if(solved==null)continue;
+            upperWorld=solved.upperSwing().mul(upperWorld);
+            lowerWorld=solved.lowerSwing().mul(lowerWorld);
+            pose.rotations.put(upper,parent(pose,upper).invert().mul(upperWorld));pose.dirty();
+            Quaternionf localLower=parent(pose,lower).invert().mul(lowerWorld);
+            pose.rotations.put(lower,localLower);
+            pose.positions.put(lower,AuthoredJointCentreR45.translation(
+                    new Vector3f(joint).sub(pose.rig.get(lower).pivot()),localLower));pose.dirty();
+            pose.rotations.put(end,parent(pose,end).invert().mul(orientation));pose.dirty();
+        }
+    }
+
+    /** Captured support already owns the bend plane and local knee twist. */
+    public static void reachAuthoredFoot(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile,
+                                         String side,Vector3f target,Quaternionf orientation)
+    {
+        if(profile==null)return;
+        for(var element:profile.definition().getAsJsonArray("bodies"))
+        {
+            var row=element.getAsJsonObject();String lower="shin_"+side;
+            if(!row.get("name").getAsString().equals(lower))continue;
+            String upper="leg_"+side,end="foot_"+side;
+            var m=row.getAsJsonArray("joint");
+            Vector3f joint=new Vector3f(m.get(3).getAsFloat(),m.get(7).getAsFloat(),m.get(11).getAsFloat())
+                    .div(CombatBodyProfiles.MODEL_TO_PHYSICS);
+            var upperMatrix=pose.matrix(upper);
+            Vector3f origin=point(pose,upper),middle=upperMatrix.transformPosition(new Vector3f(joint));
+            Vector3f currentEnd=point(pose,end);
+            Quaternionf currentOrientation=pose.matrix(end).getUnnormalizedRotation(new Quaternionf()).normalize();
+            if(currentEnd.distanceSquared(target)<1e-10F&&Math.abs(currentOrientation.dot(orientation))>1-1e-7F)return;
+            Quaternionf upperWorld=upperMatrix.getUnnormalizedRotation(new Quaternionf()).normalize();
+            Quaternionf lowerWorld=pose.matrix(lower).getUnnormalizedRotation(new Quaternionf()).normalize();
+            Vector3f axis=new Vector3f(m.get(2).getAsFloat(),m.get(6).getAsFloat(),m.get(10).getAsFloat()).normalize();
+            Vector3f fallback=upperWorld.transform(axis).cross(new Vector3f(currentEnd).sub(origin));
+            var solved=AuthoredTwoBoneIKR45.solve(origin,middle,currentEnd,target,fallback);
+            if(solved==null)return;
+            upperWorld=solved.upperSwing().mul(upperWorld);
+            lowerWorld=solved.lowerSwing().mul(lowerWorld);
+            pose.rotations.put(upper,parent(pose,upper).invert().mul(upperWorld));pose.dirty();
+            Quaternionf localLower=parent(pose,lower).invert().mul(lowerWorld);
+            pose.rotations.put(lower,localLower);
+            Vector3f offset=new Vector3f(joint).sub(pose.rig.get(lower).pivot());
+            pose.positions.put(lower,new Vector3f(offset).sub(localLower.transform(new Vector3f(offset))));pose.dirty();
+            pose.rotations.put(end,parent(pose,end).invert().mul(orientation));pose.dirty();
+            return;
+        }
+    }
+
     public static void apply(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile)
     {
         for(var element:profile.definition().getAsJsonArray("bodies"))

@@ -35,6 +35,13 @@ public final class EvaGameplayMotionR32
     public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData d){d.define(AIR,-1L);d.define(LAND,-1L);d.define(TAKEOFF,-1L);d.define(FLOOR,-1000000F);d.define(VERTICAL,0F);d.define(GUARD,0F);d.define(LAND_FROM,new CompoundTag());d.define(ACTION_FROM,new CompoundTag());d.define(LOW_TARGET,false);d.define(SERVER_MOVEMENT,false);d.define(RELEASE_FROM,new CompoundTag());}
     public static boolean serverMovement(EvaUnit01Entity e){return e.getEntityData().get(SERVER_MOVEMENT);}
+    public static boolean movementMayComposeR45(EvaUnit01Entity e)
+    {
+        if(e instanceof EvaPrototypeEntity||e.isBerserk()||!ready(e)||e.isNervLogisticsLocked()||e.isVisuallyAirborneForRender()
+                ||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)||e.rifleStanceLevel(0)>.01F
+                ||EvaCombatR31.action(e)!=EvaCombatR31.NONE)return false;
+        return java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(activeGroundClip(e,0));
+    }
     private static int takeoffTicks(EvaUnit01Entity e)
     {
         var c=clip(e,"jump_start");
@@ -89,6 +96,17 @@ public final class EvaGameplayMotionR32
     public static boolean ready(EvaUnit01Entity e){return profile(variant(e))!=null;}
     private static boolean singleFlight(EvaUnit01Entity e)
     {var p=profile(variant(e));return p!=null&&p.has("airborne_revision")&&p.get("airborne_revision").getAsInt()>=42;}
+    public static boolean sharedJump(EvaUnit01Entity e)
+    {
+        return !(e instanceof EvaPrototypeEntity)&&!e.isBerserk()
+                &&singleFlight(e)&&EvaBodyPose.hasTerrainStances()
+                &&(sharedWeapon(e)||e.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE);
+    }
+    public static boolean sharedJumpActive(EvaUnit01Entity e,float partial)
+    {
+        return sharedJump(e)&&(age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0
+                ||landAge(e,partial)>=0&&landAge(e,partial)<18);
+    }
     public static boolean sharedHands(EvaUnit01Entity e,float partial)
     {
         var p=profile(variant(e));return p!=null
@@ -115,9 +133,11 @@ public final class EvaGameplayMotionR32
     {return lowAttackReadyR44(e)&&e.hasLiveActionForRender(0)&&actionStanceR44(e)>0;}
     public static boolean kickReady(EvaUnit01Entity e){return hasClip(e,"kick");}
     public static boolean sharedWeapon(EvaUnit01Entity e)
-    {return e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&knifeReady(e);}
+    {return EvaSwordActionsR45.active(e)||EvaFieldActionsR45.active(e)||e.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45||EvaWeaponHandlingR45.active(e)||e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&(knifeReady(e)||EvaWeaponHandlingR45.available(e));}
     public static String activeGroundClip(EvaUnit01Entity e,float partial)
     {
+        if(EvaFieldActionsR45.active(e))return EvaFieldActionsR45.clip(e);
+        if(EvaSwordActionsR45.active(e))return EvaSwordActionsR45.clip(e);
         if(EvaBerserkMotionR34.striking(e))return EvaBerserkMotionR34.name(e);
         if(e.isHeavyMotionActive())return "heavy";
         if(e.getOrdinaryAttackStage()>=0)return ordinary(e.getOrdinaryAttackStage());
@@ -127,6 +147,8 @@ public final class EvaGameplayMotionR32
     }
     public static float activeGroundPhase(EvaUnit01Entity e,float partial)
     {
+        if(EvaFieldActionsR45.active(e))return EvaFieldActionsR45.progress(e,partial);
+        if(EvaSwordActionsR45.active(e))return EvaSwordActionsR45.progress(e,partial);
         if(EvaBerserkMotionR34.striking(e))return EvaBerserkMotionR34.phase(e,partial);
         if(e.isHeavyMotionActive())return e.heavyMotionProgress(partial);
         if(e.getOrdinaryAttackStage()>=0)return e.getOrdinaryAttackProgress(partial);
@@ -149,6 +171,7 @@ public final class EvaGameplayMotionR32
     {
         int stance=actionStanceR44(e);
         if(stance>0&&java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(name))return (stance>=3?"prone_":"crouch_")+name;
+        if(name.equals("jab")&&e.getOrdinaryAttackStage()==3&&hasClip(e,"jab_loop"))return "jab_loop";
         return phrases(e)&&e.getEntityData().get(LOW_TARGET)&&java.util.Set.of("jab","cross","hook","heavy").contains(name)?"low_"+name:name;
     }
     public static String resolvedGroundClipR44(EvaUnit01Entity e,float partial)
@@ -166,6 +189,47 @@ public final class EvaGameplayMotionR32
     {if(REVIEW_POSE_CHOICES){var row=POSE_CHOICES.get(e);if(row!=null)row.addProperty(key,value);}}
     private static JsonObject clip(EvaUnit01Entity e,String name){return profile(variant(e)).getAsJsonObject("clips").getAsJsonObject("r32_"+resolve(e,name));}
     public static float contactPhase(EvaUnit01Entity e,String name){return clip(e,name).get("contact_phase").getAsFloat();}
+    /** A recovered performance carries its own source clock. Older profiles
+     * retain their existing combat timing until deliberately re-authored. */
+    public static float authoredOrdinaryTicksR45(EvaUnit01Entity e,int stage)
+    {
+        if(!ready(e))return 0;
+        var c=clip(e,ordinary(stage));
+        if(!c.has("source_timing_r45")||!c.get("source_timing_r45").getAsBoolean())return 0;
+        float seconds=c.get("source_duration_seconds").getAsFloat();
+        if(!Float.isFinite(seconds)||seconds<.2F||seconds>2F)
+            throw new IllegalStateException("Invalid recovered ordinary source duration");
+        return seconds*20F;
+    }
+    public static boolean selectedThreeStageR45(EvaUnit01Entity e)
+    {
+        if(!ready(e)||actionStanceR44(e)>0)return false;
+        for(String name:List.of("jab","cross","hook","jab_loop"))
+        {
+            if(!hasClip(e,name))return false;
+            var c=clip(e,name);
+            if(!c.has("source_timing_r45")||!c.get("source_timing_r45").getAsBoolean())return false;
+        }
+        return true;
+    }
+    public static int authoredHeavyTicksR45(EvaUnit01Entity e)
+    {
+        if(!ready(e))return 0;
+        var c=clip(e,"heavy");
+        if(!c.has("source_timing_r45")||!c.get("source_timing_r45").getAsBoolean())return 0;
+        float seconds=c.get("source_duration_seconds").getAsFloat();
+        if(!Float.isFinite(seconds)||seconds<.2F||seconds>4F)
+            throw new IllegalStateException("Invalid authored heavy source duration");
+        return Math.max(1,Math.round(seconds*20));
+    }
+    public static boolean inContactWindowR45(EvaUnit01Entity e,String name,float phase)
+    {
+        float contact=contactPhase(e,name);
+        float lead=name.equals("heavy")?.29F:.21F,tail=name.equals("heavy")?.10F:.14F;
+        return phase>=Math.max(0,contact-lead)&&phase<=Math.min(.98F,contact+tail);
+    }
+    public static float swingSoundPhaseR45(EvaUnit01Entity e,String name)
+    {return Math.max(0,contactPhase(e,name)-(name.equals("heavy")?.15F:.19F));}
     public static float releasePhase(EvaUnit01Entity e)
     {
         var c=clip(e,ordinary(e.getOrdinaryAttackStage()));
@@ -181,6 +245,7 @@ public final class EvaGameplayMotionR32
     public static String ordinary(int stage){return switch(stage){case 1->"cross";case 2->"hook";default->"jab";};}
     public static float phase(EvaUnit01Entity e,String name,float progress)
     {
+        if(name.startsWith("sword_")||name.startsWith("evade_")||name.startsWith("roll_"))return progress;
         if(name.equals("kick")||name.startsWith("knife_"))return progress;
         if(directed(e)&&name.startsWith("berserk")||EvaCombatSupportR33.ready(e)&&java.util.Set.of("jab","cross","hook","heavy").contains(name))return progress;
         float contact=contactPhase(e,name),at=name.equals("heavy")?.50F:.45F;
@@ -250,6 +315,7 @@ public final class EvaGameplayMotionR32
         if(!ready(e)||e.hasLegacyStrikeForRender()||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)||EvaCombatR31.action(e)>=EvaCombatR31.REACH&&EvaCombatR31.action(e)<=EvaCombatR31.THROW)return false;
         if(e instanceof EvaPrototypeEntity un&&un.isUNFlying())return false;
         if(EvaDorsalMechanism.bow(e)>.001F||EvaDorsalMechanism.open(e)>.001F)return false;
+        if(EvaFieldActionsR45.active(e)||EvaSwordActionsR45.active(e))return true;
         if(EvaCombatSupportR33.ready(e)&&sharedWeapon(e)&&!e.hasLiveActionForRender(partial)&&e.rifleStanceLevel(partial)<1)return true;
         return age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0||landAge(e,partial)>=0&&landAge(e,partial)<18||e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()
                 ||e.isKickMotionActive(partial)&&kickReady(e)||e.getKnifeMotionType(partial)>=0&&knifeReady(e)
@@ -257,6 +323,7 @@ public final class EvaGameplayMotionR32
     }
     public static boolean sharedBody(EvaUnit01Entity e,float partial)
     {
+        if(EvaWeaponHandlingR45.active(e)||EvaWeaponHandlingR45.holding(e,partial))return true;
         if(owns(e,partial))return true;
         return ready(e)&&EvaBodyPose.hasTerrainStances()&&sharedWeapon(e)
                 &&e.isPoweredOn()&&!e.isNervLogisticsLocked()&&!e.isFirstBattleActive()&&!EvaShutdownR30.disabled(e)
@@ -278,6 +345,10 @@ public final class EvaGameplayMotionR32
         row.addProperty("locked",e.isNervLogisticsLocked());row.addProperty("first_battle",e.isFirstBattleActive());row.addProperty("weapon",e.getWeapon());row.addProperty("shared_weapon",sharedWeapon(e));
         row.addProperty("stance",e.rifleStanceLevel(partial));row.addProperty("prone_requested",e.isPilotProne());row.addProperty("crouch_requested",e.isPilotCrouching());
         row.addProperty("grapple_action",EvaCombatR31.action(e));row.addProperty("server_movement_owner",serverMovement(e));
+        row.addProperty("pilot_locomotion_intent_r45",e.pilotLocomotionRequestedR45());
+        row.addProperty("equipment_active_r45",EvaWeaponHandlingR45.active(e));
+        if(EvaWeaponHandlingR45.active(e))
+        {row.addProperty("equipment_phase_r45",EvaWeaponHandlingR45.phase(e,partial));row.addProperty("knife_draw_phase_r45",EvaWeaponHandlingR45.drawPhase(e,partial));}
         row.addProperty("dorsal_bow",EvaDorsalMechanism.bow(e));row.addProperty("dorsal_open",EvaDorsalMechanism.open(e));
         row.add("body_clip_resolution",EvaBodyPose.clipDiagnosticR44(e));return row;
     }
@@ -315,13 +386,25 @@ public final class EvaGameplayMotionR32
     private static EvaBodyPose.Sample applyAction(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial,boolean capturedBase,boolean[] movementOwner)
     {
         if(!owns(e,partial)){reviewChoice(e,"owner_branch","base");movementOwner[0]=capturedBase&&EvaCapturedLocomotionR44.SUPPORT_OWNERSHIP_CANDIDATE;return base;}
+        if(EvaFieldActionsR45.active(e))
+        {
+            String name=EvaFieldActionsR45.clip(e);float phase=EvaFieldActionsR45.progress(e,partial),entry=EvaFieldActionsR45.entryProgress(e,partial);
+            var pose=EvaBodyPose.gameplayClip(e,name,phase);
+            if(entry<1&&!e.getEntityData().get(ACTION_FROM).isEmpty())
+            {var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(ACTION_FROM),from);pose=EvaBodyPose.blend(from,pose,entry*entry*(3-2*entry));}
+            reviewChoice(e,"owner_branch","field_full_body");reviewChoice(e,"effective_action_clip","r32_"+name);reviewWeight(e,"sample_phase",phase);
+            return pose;
+        }
+        if(EvaSwordActionsR45.active(e))return actionPose(e,EvaSwordActionsR45.clip(e),EvaSwordActionsR45.progress(e,partial),base,partial);
         if(EvaBerserkMotionR34.silent(e))return EvaBerserkMotionR34.stillPose(e);
         if(EvaBerserkMotionR34.active(e))return actionPose(e,EvaBerserkMotionR34.name(e),EvaBerserkMotionR34.phase(e,partial),base,partial);
         if(e.isBerserk()&&profile(variant(e)).getAsJsonObject("clips").has("r32_berserk_run"))
         {
             float cycle=e.rifleGaitPhase(partial);cycle-=Mth.floor(cycle);
             var guard=EvaBodyPose.gameplayClip(e,"berserk_guard",(e.tickCount+partial)%100/100);
-            return EvaBodyPose.blend(guard,EvaBodyPose.gameplayClip(e,"berserk_run",cycle),e.rifleMoveBlend(partial));
+            var run=EvaBodyPose.gameplayClip(e,"berserk_run",cycle);
+            if(hasClip(e,"berserk_walk"))run=EvaBodyPose.blend(EvaBodyPose.gameplayClip(e,"berserk_walk",cycle),run,e.rifleRunBlend(partial));
+            return EvaBodyPose.blend(guard,run,e.rifleMoveBlend(partial));
         }
         float air=airAge(e,partial),land=landAge(e,partial);
         if(age(e,TAKEOFF,partial)>=0&&air<0)
@@ -354,11 +437,13 @@ public final class EvaGameplayMotionR32
                 boolean kick=action==EvaCombatR31.AIR_SLAM;String name=kick?"air_kick":"air_strike";
                 float age=EvaCombatR31.age(e,partial),stroke=EvaCombatR31.strokeAge(e,partial),contact=contactPhase(e,name);
                 float chamber=Math.max(0,contact-(kick?.14F:.07F));
-                float phase=stroke<0?Mth.lerp(Math.min(1,age/4),0,chamber):stroke<5?Mth.lerp(stroke/5,chamber,contact):kick?contact:Mth.lerp(Math.min(1,(stroke-5)/12),contact,1);
+                float phase=stroke<0?Mth.lerp(Math.min(1,age/4),0,chamber):stroke<5?Mth.lerp(stroke/5,chamber,contact):Mth.lerp(Math.min(1,(stroke-5)/12),contact,1);
                 var attack=EvaBodyPose.gameplayClip(e,name,phase);
                 // The pelvis drives the recorded downward stroke. Replacing its
                 // transform with the idle jump left the fist above the head.
-                float weight=Math.min(1,age/3)*(kick?1:1-Mth.clamp((stroke-13)/4,0,1));
+                // Both strokes follow through and return to the flight pose.
+                // The old heavy branch froze its contact pose until landing.
+                float weight=EvaDorsalMechanism.smooth(age/3)*(1-EvaDorsalMechanism.smooth((stroke-13)/4));
                 pose=EvaBodyPose.blend(pose,attack,weight);
             }
             return pose;
@@ -378,6 +463,15 @@ public final class EvaGameplayMotionR32
     }
     private static EvaBodyPose.Sample groundLocomotion(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial,boolean capturedBase,boolean[] movementOwner)
     {
+        if(e.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45&&hasClip(e,"sword_guard"))
+        {
+            var guard=EvaBodyPose.gameplayClip(e,"sword_guard",(e.tickCount+partial)%80/80F);
+            // Locomotion keeps its pelvis and supports. The sword carry affects
+            // only the captured shoulder/arm chain, never a frozen lower body.
+            for(String name:base.rig.keySet())if(name.startsWith("arm_")||name.startsWith("forearm_")||name.startsWith("wrist_")||name.startsWith("hand_"))
+            {base.rotations.put(name,new Quaternionf(guard.rotations.get(name)));base.positions.put(name,new Vector3f(guard.positions.get(name)));}
+            base.dirty();if(movementOwner!=null)movementOwner[0]=capturedBase;return base;
+        }
         reviewChoice(e,"owner_branch","ground_locomotion");reviewChoice(e,"effective_guard_clip","r32_guard");
         reviewWeight(e,"guard_phase",(e.level().getGameTime()%120+partial)/120F);
         var guard=EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F);
@@ -411,15 +505,47 @@ public final class EvaGameplayMotionR32
         reviewChoice(e,"owner_branch","action_pose");reviewChoice(e,"effective_action_clip","r32_"+resolved);reviewWeight(e,"sample_phase",phase);
         var pose=EvaBodyPose.gameplayClip(e,resolved,phase);
         if(progress<.18F&&!e.getEntityData().get(ACTION_FROM).isEmpty())
-        {var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(ACTION_FROM),from);reviewWeight(e,"entry_to_action_weight",progress/.18F);return EvaBodyPose.blend(from,pose,progress/.18F);}
+        {var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(ACTION_FROM),from);reviewWeight(e,"entry_to_action_weight",progress/.18F);pose=EvaBodyPose.blend(from,pose,progress/.18F);}
         if(progress>.86F&&!phrases(e)){var end=e.getEntityData().get(GUARD)>.5F?EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F):base;pose=EvaBodyPose.blend(pose,end,(progress-.86F)/.14F);}
+        if(!(e instanceof EvaPrototypeEntity)&&e.rifleStanceLevel(partial)<.01F
+                &&e.rifleMoveBlend(partial)>.001F
+                &&java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(name))
+        {
+            // Movement owns the pelvis and legs. The captured strike owns the
+            // chest/arms, rebased against that pelvis, rather than freezing the
+            // full lower body while the authoritative entity keeps travelling.
+            var chest=pose.matrix("torso_upper").getUnnormalizedRotation(new Quaternionf()).normalize();
+            float mobility=Mth.clamp(e.rifleMoveBlend(partial),0,1);
+            mobility=mobility*mobility*(3-2*mobility);
+            Vector3f pelvis=new Vector3f(),basePelvis=new Vector3f();
+            for(String side:List.of("l","r"))
+            {
+                String leg="leg_"+side;
+                pelvis.add(pose.matrix(leg).transformPosition(new Vector3f(pose.rig.get(leg).pivot())));
+                basePelvis.add(base.matrix(leg).transformPosition(new Vector3f(base.rig.get(leg).pivot())));
+            }
+            pelvis.mul(.5F).lerp(basePelvis.mul(.5F),mobility);
+            for(String n:base.rig.keySet())if(n.equals("root")||n.equals("torso_lower")||n.startsWith("leg_")
+                    ||n.startsWith("shin_")||n.startsWith("ankle_")||n.startsWith("foot_")||n.startsWith("toe_"))
+            {pose.rotations.get(n).slerp(base.rotations.get(n),mobility);pose.positions.get(n).lerp(base.positions.get(n),mobility);}
+            pose.dirty();var actualPelvis=new Vector3f();
+            for(String side:List.of("l","r"))
+            {String leg="leg_"+side;actualPelvis.add(pose.matrix(leg).transformPosition(new Vector3f(pose.rig.get(leg).pivot())));}
+            pose.positions.get("root").add(pelvis.sub(actualPelvis.mul(.5F)));pose.dirty();
+            String parent=pose.rig.get("torso_upper").parent();
+            var parentRotation=pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize();
+            pose.rotations.put("torso_upper",parentRotation.invert().mul(chest));pose.dirty();
+            reviewChoice(e,"lower_body_owner","r45_current_movement");
+            reviewWeight(e,"lower_body_movement_weight",mobility);
+        }
         return pose;
     }
     public static Vec3 hand(EvaUnit01Entity e,String side,float partial)
     {
         var body=EvaBodyPose.sample(e,partial);String name="hand_"+side;var point=new Vector3f(body.rig.get(name).pivot());String finger="finger_middle_"+side;
         if(body.rig.containsKey(finger))point.lerp(body.rig.get(finger).pivot(),.55F);
-        var local=body.matrix(name).transformPosition(point).mul(EvaScale.RENDER_SCALE).rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD);
+        var local=(EvaAnatomicalHandsR45.enabled(e)?EvaAnatomicalHandsR45.contact(e,body,side,partial):body.matrix(name).transformPosition(point))
+                .mul(EvaScale.RENDER_SCALE).rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD);
         return (e.level().isClientSide?e.getPosition(partial):e.position()).add(local.x,local.y,local.z);
     }
     public static Vec3 contact(EvaUnit01Entity e,String name,float partial)

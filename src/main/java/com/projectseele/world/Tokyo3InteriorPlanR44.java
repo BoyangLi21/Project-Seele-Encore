@@ -36,7 +36,7 @@ public final class Tokyo3InteriorPlanR44
         try
         {
             Path world=event.getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
-            if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))throw new IllegalStateException("Wrong city plan world");
+            if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))throw new IllegalStateException("Wrong city plan world");
             if(++age<40)return;
             ServerLevel level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);
             BlockPos origin=IntegratedNervMapBuilder.tokyo3Origin(level);

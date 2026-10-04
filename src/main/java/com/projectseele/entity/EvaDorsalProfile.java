@@ -26,7 +26,7 @@ public final class EvaDorsalProfile
     }
     private static Map<String,Profile> load()
     {
-        java.nio.file.Path privateProfile=java.nio.file.Path.of(System.getProperty("projectseele.dorsalPoseReview","projectseele-local-maps/eva_dorsal_r30.json"));
+        java.nio.file.Path privateProfile=CombatMotionResourcesR44.instancePath(System.getProperty("projectseele.dorsalPoseReview","projectseele-local-maps/eva_dorsal_r30.json"));
         try(var stream=java.nio.file.Files.isRegularFile(privateProfile)?java.nio.file.Files.newInputStream(privateProfile):EvaDorsalProfile.class.getResourceAsStream("/assets/projectseele/motion/eva_dorsal_r13.json"))
         {
             if(stream==null)throw new IllegalStateException("Dorsal profiles missing");

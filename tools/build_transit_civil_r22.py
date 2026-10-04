@@ -4,7 +4,8 @@ import argparse,json,math
 from collections import defaultdict
 import numpy as np,nbtlib
 import regional_voxels as v
-from query_blocks import chunk_statuses
+from query_blocks import chunk_statuses,iter_block_entities
+from measure_world_r40 import MeasuredWorld
 from build_transit_civil_r20 import grouped
 from build_station_boards_r19 import packed
 ROOT=v.ROOT;OUT=ROOT/'artifacts/access_r22/transit/civil';REVIEW=ROOT/'run/saves/SEELE_R22_REVIEW'
@@ -169,19 +170,75 @@ def main(apply=False,built='built4'):
    if r['kind']=='rail' and i%48==0:supports.append((x,y,z))
  for (x,z),ys in decks.items():
   for y in ys:ff(p,(x,y-3,z,x,y-1,z),DECK,'r22/evaluated_viaduct_deck')
- road=np.load(ROOT/'artifacts/world_rebuild_r20/transit/civil/road_contract.npz');rx,rz=map(int,road['origin']);piers=[]
+ road=np.load(ROOT/'artifacts/world_rebuild_r20/transit/civil/road_contract.npz');rx,rz=map(int,road['origin']);piers=[];relocated_piers=[]
+ road_mask=road['mask']
+ # Original positive road operations include later R07/R10/UN expansion widths.
+ expansion=load(ROOT/'artifacts/rebuild_r44/surface_network/road_authority_additions.json')
+ authored_paving={tuple(row['pos'])for row in expansion['columns']}
+ def road_footprint(x,z):
+  for X in range(x-3,x+4):
+   for Z in range(z-3,z+4):
+    if (X,Z)in authored_paving:return True
+    if 0<=Z-rz<road_mask.shape[0]and 0<=X-rx<road_mask.shape[1]and road_mask[Z-rz,X-rx]:return True
+  return False
+ # Verify all nine actual foundation columns, not an old centre-height sample.
+ pier_world=MeasuredWorld(REVIEW)
+ for sx,sy,sz in supports:pier_world.box((sx-11,31,sz-11),(sx+11,sy-3,sz+11))
+ pier_world.load()
+ shapes={v.canonical_state(state):boxes for state,boxes in load(REVIEW/'native_collision_shapes.json').items()}
+ selected=set(pier_world.selected)
+ tag_lo=(min(x for x,z in selected)*16,31,min(z for x,z in selected)*16)
+ tag_hi=(max(x for x,z in selected)*16+15,max(y for x,y,z in supports)-3,max(z for x,z in selected)*16+15)
+ pier_tags=dict(iter_block_entities(REVIEW,v.DIM,tag_lo,tag_hi,selected_chunks=selected))
+ natural={'minecraft:grass_block','minecraft:dirt','minecraft:stone','minecraft:gravel','minecraft:deepslate','minecraft:sandstone','minecraft:clay'}
+ blank={'minecraft:air','minecraft:cave_air','minecraft:void_air'}
+ planned_device_boxes=[op.box for op in p.ops if op.state not in {AIR,DECK}and op.state.partition('[')[0]not in natural]
+ def actual_full_soil(X,Y,Z):
+  state=pier_world.get(X,Y,Z)
+  return state is not None and state.partition('[')[0]in natural and shapes.get(state)==[[0,0,0,1,1,1]]
+ def foundation_columns(X,y,Z):
+  result=[]
+  for xx in range(X-1,X+2):
+   for zz in range(Z-1,Z+2):
+    actual=[yy for yy in range(34,y-3)if actual_full_soil(xx,yy,zz)]
+    if not actual:return None
+    datum=max(actual);base=datum-2;top=y-4
+    if not actual_full_soil(xx,base-1,zz):return None
+    for yy in range(base,top+1):
+     state=pier_world.get(xx,yy,zz)
+     if (xx,yy,zz)in pier_tags or (xx,yy,zz)in p.block_entities:return None
+     if state not in blank and (state is None or state.partition('[')[0]not in natural):return None
+    for protected in p.keep_boxes:
+     a,b,c,A,B,C=protected['box']
+     if protected['modes']and 'owned'not in protected['modes']:continue
+     if a<=xx<=A and c<=zz<=C and base<=B and top>=b:return None
+    if any(a<=xx<=A and c<=zz<=C and base<=B and top>=b for a,b,c,A,B,C in planned_device_boxes):return None
+    result.append(dict(x=xx,z=zz,actual_ground=datum,base=base,top=top,bearing=(xx,base-1,zz)))
+  return result
+ def pier_site(x,y,z):
+  offsets=sorted(((dx,dz)for dx in range(-10,11)for dz in range(-10,11)),key=lambda q:(q[0]*q[0]+q[1]*q[1],q))
+  for dx,dz in offsets:
+   X,Z=x+dx,z+dz
+   if road_footprint(X,Z):continue
+   if any(y not in decks.get((X+a,Z+b),set())for a in(-1,0,1)for b in(-1,0,1)):continue
+   if any(abs(X-q[0])<15 and abs(Z-q[2])<15 for q in piers):continue
+   if any(abs(X-r['center'][0])<r['half']+8 and abs(Z-r['center'][2])<r['half']+8 for r in records):continue
+   if foundation_columns(X,y,Z)is not None:return X,Z
+  raise RuntimeError(('No complete supported off-road pier site; structural review required',x,y,z))
  for x,y,z in supports:
   if any(abs(x-q[0])<15 and abs(z-q[2])<15 for q in piers):continue
-  if 0<=z-rz<road['mask'].shape[0] and 0<=x-rx<road['mask'].shape[1] and road['mask'][z-rz,x-rx]:continue
+  if road_footprint(x,z):
+   original=x,y,z;x,z=pier_site(x,y,z);relocated_piers.append(dict(before=original,after=(x,y,z)))
   if any(abs(x-r['center'][0])<r['half']+8 and abs(z-r['center'][2])<r['half']+8 for r in records):continue
-  g=ground(x,z)
-  if g>=y-4:continue
-  ff(p,(x-1,g-2,z-1,x+1,y-4,z+1),DECK,'r22/viaduct_pier');piers.append((x,y,z))
+  foundations=foundation_columns(x,y,z)
+  if foundations is None:raise RuntimeError(('Complete nine-column pier foundation or device keepout failed',x,y,z))
+  for column in foundations:ff(p,(column['x'],column['base'],column['z'],column['x'],column['top'],column['z']),DECK,'r22/viaduct_pier')
+  piers.append((x,y,z))
  for (x,z),ys in cores.items():
   for y in ys:ff(p,(x,y,z,x,y+6,z),AIR,'r22/train_body_clearance');ff(p,(x,y-1,z,x,y-1,z),'minecraft:gravel','r22/ballast')
  links=[transfer(p,'hakone_direct',(-1480,666),(0,-1),118,130,20),transfer(p,'bay_direct',(350,300),(-1,0),94,106,22)]
  links += [dict(id=x['id']+'/return',path=list(reversed(x['path']))) for x in links[:]]
- p.meta.update(stations=records,piers=piers,walk_nodes=[w for r in records for w in r['walks']]+links,boards=[b for r in records for b in r['boards']],belts=[b for r in records for b in r['belts']],surface_routes=2,transfer_links=links)
+ p.meta.update(stations=records,piers=piers,relocated_piers=relocated_piers,walk_nodes=[w for r in records for w in r['walks']]+links,boards=[b for r in records for b in r['boards']],belts=[b for r in records for b in r['belts']],surface_routes=2,transfer_links=links)
  p.save_plan('two_line_stations_and_viaducts')
  if apply:
   missing=[list(q) for q,status in chunk_statuses(REVIEW,v.DIM,p.by_chunk).items() if status!='full']

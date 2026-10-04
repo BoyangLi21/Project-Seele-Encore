@@ -58,7 +58,7 @@ def anatomy(a,p,closure=1,poles=None):
 def record(a,p,contacts):
     f=p.encode() if a.angel else a.rig.encode(p,tuple(contacts),hands.names(a.rig.rig));f['foot_contact']=list(contacts);return f
 
-def captured(a,source,mirror,label,retarget_class=None,pose_adapter=None):
+def captured(a,source,mirror,label,retarget_class=None,pose_adapter=None,stage_alignment='strike'):
     adapter=pose_adapter or anatomy
     h,meta=common.human(source,mirror);retarget=(retarget_class or common.rt.Retarget)(h,a.angel,calibrated_trunk=True)
     poses=[];travel=[];poles={}
@@ -73,7 +73,9 @@ def captured(a,source,mirror,label,retarget_class=None,pose_adapter=None):
         lead=max(palms,key=lambda s:np.max(-np.gradient(palms[s][:,1])));contact=int(np.argmax(-np.gradient(palms[lead][:,1])))
     if label=='stomp':
         lead=max(('l','r'),key=lambda s:np.ptp([p.point('foot_'+s)[1] for p in poses]));heights=np.array([p.point('foot_'+lead)[1] for p in poses]);peak=heights.argmax();contact=peak+int(np.argmin(heights[peak:]))
-    contact=int(np.clip(contact,10,108));aim=palms[lead][contact];turn=R.from_euler('y',0 if label in ('stomp','guard') else np.arctan2(aim[0],-aim[2]))
+    if stage_alignment not in ('strike','actor'):raise ValueError('Unknown source stage alignment')
+    contact=int(np.clip(contact,10,108));aim=palms[lead][contact];angle=0 if label in ('stomp','guard')or stage_alignment=='actor' else np.arctan2(aim[0],-aim[2]);turn=R.from_euler('y',angle)
+    meta=dict(meta,stage_alignment=stage_alignment,stage_yaw_degrees=float(np.degrees(angle)))
     world=turn.apply(np.array(travel)-travel[0]);world[:,1]=0
     frames=[]
     for p in poses:

@@ -296,6 +296,8 @@ public final class EvaMotionLabCommands
             case "cannon", "positron" -> EvaUnit01Entity.WEAPON_CANNON;
             case "rifle", "pallet" -> EvaUnit01Entity.WEAPON_RIFLE;
             case "n2" -> EvaUnit01Entity.WEAPON_N2;
+            case "sword" -> EvaUnit01Entity.WEAPON_SWORD_R45;
+            case "shield" -> EvaUnit01Entity.WEAPON_SHIELD_R45;
             default -> -1;
         };
     }

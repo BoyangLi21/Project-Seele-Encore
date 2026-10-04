@@ -62,6 +62,8 @@ public final class S20MovingElevatorsAdapter
             new HashSet<>();
     private static final Map<ServerLevel,Set<String>> NORMALIZED_CAGES =
             Collections.synchronizedMap(new WeakHashMap<>());
+    private static final Map<ServerLevel,Set<String>> FLOOR_REPAIR_HOLDS =
+            Collections.synchronizedMap(new WeakHashMap<>());
     /**
      * A control press closes the authored doors just before Moving Elevators
      * captures the cage.  Keep that interlock closed for the short hand-off;
@@ -91,10 +93,19 @@ public final class S20MovingElevatorsAdapter
         boolean alreadyOwned = owns(level, spec);
         Set<String> normalized = NORMALIZED_CAGES.computeIfAbsent(level,
                 ignored -> new HashSet<>());
-        if(alreadyOwned&&!normalized.contains(spec.id()))
+        if(alreadyOwned&&(!normalized.contains(spec.id())||level.getServer().getTickCount()%20==0))
         {
             var base=controller(level,controllerPosition(spec,spec.lower()));
-            if(base!=null&&base.hasGroup()&&!base.getGroup().isMoving())repairIdentifiedCabinFloor(level,spec);
+            if(base!=null&&base.hasGroup()&&!base.getGroup().isMoving())
+            {
+                var held=FLOOR_REPAIR_HOLDS.computeIfAbsent(level,l->new HashSet<>());
+                if(!repairIdentifiedCabinFloor(level,spec))
+                {
+                    if(held.add(spec.id()))ProjectSeele.LOGGER.error("Native lift {} held for an ambiguous/unsafe damaged cabin; no shaft clear, floor fill or car rebuild",spec.id());
+                    return true;
+                }
+                held.remove(spec.id());
+            }
         }
         /*
          * Once the official controllers and normalized cage own a shaft, the
@@ -1016,6 +1027,9 @@ public final class S20MovingElevatorsAdapter
                 || state.is(com.projectseele.world.NervMaterials.STRUCTURAL_SHELL)
                 || state.is(com.projectseele.registry.ModBlocks.NERV_WALL_PANEL.get())
                 || state.is(com.projectseele.registry.ModBlocks.NERV_WALL_DATUM.get())
+                || state.is(com.projectseele.registry.ModBlocks.TV_STAFF_LIFT_PANEL_R45.get())
+                || state.is(com.projectseele.registry.ModBlocks.TV_STAFF_LIFT_BAND_R45.get())
+                || state.is(com.projectseele.registry.ModBlocks.TV_UTILITY_LIFT_CEILING_R45.get())
                 || state.is(Blocks.BLACK_CONCRETE)
                 || state.is(Blocks.ORANGE_CONCRETE)
                 || state.is(Blocks.IRON_BLOCK)
@@ -1380,6 +1394,7 @@ public final class S20MovingElevatorsAdapter
                             && group.facing==controllerFacing(candidate);
                 }).findFirst().orElse(null);
         if(spec==null)return true;
+        if(FLOOR_REPAIR_HOLDS.getOrDefault(serverLevel,Set.of()).contains(spec.id()))return false;
         for (S20PhysicalElevatorDirector.Landing landing : spec.stops())
         {
             if (!captureMatchesLanding(group, anchor, landing.cabinCentre()))
@@ -1415,12 +1430,13 @@ public final class S20MovingElevatorsAdapter
     /** A nearly intact parked car is identifiable by its floor, roof and
      * registered landing. Repair missing tiles without rebuilding its body,
      * controller, inventory-bearing blocks or a moving cage. */
-    private static void repairIdentifiedCabinFloor(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec)
+    private static boolean repairIdentifiedCabinFloor(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec)
     {
         int radius=isSurfaceLift(spec)?3:2,area=(radius*2+1)*(radius*2+1);
+        var repairCells=new java.util.ArrayList<BlockPos>();
+        BlockState repairMaterial=null;int identifiedCars=0;boolean unsafe=false;
         for(var landing:spec.stops())
         {
-            if(!S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,landing.cabinCentre()))continue;
             var missing=new java.util.ArrayList<BlockPos>();var materials=new java.util.HashMap<BlockState,Integer>();boolean foreign=false;
             for(int x=-radius;x<=radius;x++)for(int z=-radius;z<=radius;z++)
             {
@@ -1429,11 +1445,69 @@ public final class S20MovingElevatorsAdapter
                 else if(S20PhysicalElevatorDirector.isCabinFloor(state))materials.merge(state,1,Integer::sum);
                 else foreign=true;
             }
-            if(foreign||missing.isEmpty()||missing.size()>Math.max(1,area/10)||materials.isEmpty())continue;
+            // Requiring a completely intact floor here made this repair
+            // unreachable for the one missing tile it was intended to fix.
+            // A complete roof and this car's untouched native selector are
+            // independent identity evidence; a bare stop/platform is not.
+            boolean roof=true;
+            for(int x=-radius;x<=radius;x++)for(int z=-radius;z<=radius;z++)
+                roof&=TvLiftFinishR45.recognizedCabinRoof(level,spec,level.getBlockState(landing.cabinCentre().offset(x,CAGE_VERTICAL-2,z)));
+            var input=cabinPanelPosition(spec,landing.cabinCentre(),spec.lower().exit());
+            var linked=level.getBlockEntity(input);boolean selector=false;
+            if(linked!=null&&level.getBlockState(input).is(MovingElevators.button_block)
+                    &&level.getBlockState(input.above()).is(MovingElevators.display_block))
+            {
+                var data=linked.saveWithoutMetadata().getCompound("data");
+                var controller=controllerPosition(spec,spec.lower());
+                selector=data.contains("controllerX")&&data.contains("controllerY")&&data.contains("controllerZ")
+                        &&data.getInt("controllerX")==controller.getX()&&data.getInt("controllerZ")==controller.getZ()
+                        &&spec.stops().stream().anyMatch(s->controllerPosition(spec,s).getY()==data.getInt("controllerY"));
+            }
+            boolean interior=missing.size()==1&&Math.abs(missing.get(0).getX()-landing.cabinCentre().getX())<radius
+                    &&Math.abs(missing.get(0).getZ()-landing.cabinCentre().getZ())<radius;
+            boolean doorway=floorRepairDoorwayClear(level,spec,landing,radius);
+            if(roof&&selector)identifiedCars++;
+            boolean damaged=!missing.isEmpty()||foreign;
+            if(!damaged)
+            {
+                if(selector&&(!roof||!doorway))unsafe=true;
+                continue;
+            }
+            // Even an unlinked/blocked nearly intact body must not fall into
+            // the old whole-shaft normalization and be silently rebuilt.
+            if(materials.values().stream().mapToInt(Integer::intValue).sum()>area/2
+                    &&!TvLiftFinishR45.mayRepairSingleInteriorFloorHole(missing.size(),roof,selector,doorway,foreign,interior))
+                unsafe=true;
+            if(materials.isEmpty()||!TvLiftFinishR45.mayRepairSingleInteriorFloorHole(missing.size(),roof,selector,
+                    doorway,foreign,interior))continue;
             var floor=materials.entrySet().stream().max(java.util.Map.Entry.comparingByValue()).orElseThrow().getKey();
-            for(var at:missing)level.setBlock(at,floor,Block.UPDATE_ALL);
-            ProjectSeele.LOGGER.info("Repaired {} missing floor tiles in identified parked lift {} at {}; cabin and controllers preserved",missing.size(),spec.id(),landing.cabinCentre());
+            repairCells.addAll(missing);repairMaterial=floor;
         }
+        if(unsafe||!repairCells.isEmpty()&&(identifiedCars!=1||repairCells.size()!=1))return false;
+        if(!repairCells.isEmpty())
+        {
+            level.setBlock(repairCells.get(0),repairMaterial,Block.UPDATE_ALL);
+            ProjectSeele.LOGGER.info("Repaired exactly one independent interior floor hole in native lift {} at {}; original cabin/hardware retained",spec.id(),repairCells.get(0));
+        }
+        return true;
+    }
+
+    private static boolean floorRepairDoorwayClear(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec,
+            S20PhysicalElevatorDirector.Landing landing,int radius)
+    {
+        for(var exit:spec.stops().stream().map(S20PhysicalElevatorDirector.Landing::exit).distinct().toList())
+            // Unused opposite car leaves stay closed against the shaft wall;
+            // only this floor's declared exit has a public landing throat.
+            for(int distance=radius;distance<=(exit==landing.exit()?4:radius);distance++)for(int across=-1;across<=1;across++)for(int dy=0;dy<3;dy++)
+            {
+                var at=landing.cabinCentre().relative(exit,distance).relative(exit.getClockWise(),across).above(dy);
+                var state=level.getBlockState(at);
+                boolean doorCell=distance==radius||distance==4;
+                if(!state.isAir()&&!(doorCell&&(state.is(Blocks.LIGHT_GRAY_STAINED_GLASS)
+                        ||state.is(Blocks.GRAY_STAINED_GLASS)||state.is(com.projectseele.registry.ModBlocks.CLEAR_GLASS.get())
+                        ||distance==4&&state.is(Blocks.BARRIER))))return false;
+            }
+        return true;
     }
 
     /**
@@ -1501,7 +1575,7 @@ public final class S20MovingElevatorsAdapter
                     }
                     else if (dy == group.getCageSizeY() - 1)
                     {
-                        state = Blocks.SMOOTH_QUARTZ.defaultBlockState();
+                        state = TvLiftFinishR45.cabinRoof(level,spec,Blocks.SMOOTH_QUARTZ.defaultBlockState());
                     }
                     else if (dx == 0 || dz == 0
                             || dx == group.getCageSizeX() - 1
@@ -1520,6 +1594,8 @@ public final class S20MovingElevatorsAdapter
                                             .defaultBlockState()
                                     : Blocks.IRON_BLOCK.defaultBlockState();
                         }
+                        if(!isCabinDoorCell(position,centre,exits))
+                            state=TvLiftFinishR45.cabinWall(level,spec,dy-1,state);
                     }
                     level.setBlock(position, state, UPDATE);
                 }

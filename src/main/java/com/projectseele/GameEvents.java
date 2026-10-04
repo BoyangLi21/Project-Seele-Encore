@@ -339,6 +339,14 @@ public class GameEvents
         if (event.getHand() == InteractionHand.MAIN_HAND
                 && event.getEntity() instanceof ServerPlayer player)
         {
+            // Reserve the authored door's passage hold before the vanilla
+            // button pulse. Keep vanilla use uncancelled for click/animation.
+            if (!player.isSpectator()
+                    && CommandRoomSlidingDoorDirector.handleUse(
+                            player, event.getPos()))
+            {
+                return;
+            }
             boolean cleanRebuild =
                     FacilityWorldPolicy.isCleanRebuild(player.getServer());
             boolean s20Rebuild =

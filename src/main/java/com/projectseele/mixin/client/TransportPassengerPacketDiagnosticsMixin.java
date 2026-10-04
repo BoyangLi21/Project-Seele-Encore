@@ -15,7 +15,8 @@ public abstract class TransportPassengerPacketDiagnosticsMixin
     @Inject(method="handleMovePlayer",at=@At("HEAD"))
     private void projectSeele$traceCorrection(ClientboundPlayerPositionPacket packet,CallbackInfo callback)
     {
-        if(!System.getProperty("projectseele.regionalBuild","").contains("riding")||!Minecraft.getInstance().isSameThread())return;
+        String mode=System.getProperty("projectseele.regionalBuild","");
+        if((!mode.contains("riding")&&!mode.equals("r44-transit-all")&&!Boolean.getBoolean("projectseele.r45TransportTrace"))||!Minecraft.getInstance().isSameThread())return;
         ProjectSeele.LOGGER.info("TRANSIT CLIENT POSITION PACKET ({}, {}, {}) relative={}",packet.getX(),packet.getY(),packet.getZ(),packet.getRelativeArguments());
     }
 }

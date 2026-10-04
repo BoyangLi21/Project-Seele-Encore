@@ -77,8 +77,10 @@ class Geometry:
             return {"position": q, "states": states, "status": "UNKNOWN"}
         # All nine points on the player's footprint need full-datum bearing;
         # one iron-bar collision box is not a supporting floor.
-        top = .9375 if states[0] and states[0].startswith("mtr:escalator_step[") \
-            and properties(states[0]).get("orientation") == "flat" else 1.
+        flat_mtr = states[0] and states[0].startswith("mtr:escalator_step[") \
+            and properties(states[0]).get("orientation") == "flat"
+        legacy_walk = states[0] and states[0].startswith("projectseele:nerv_moving_walk[")
+        top = .9375 if flat_mtr or legacy_walk else 1.
         bearing = all(any(b[0] <= a <= b[3] and b[2] <= c <= b[5]
                           and abs(b[4] - top) <= .001 for b in boxes[0])
                       for a in (.2, .5, .8) for c in (.2, .5, .8))

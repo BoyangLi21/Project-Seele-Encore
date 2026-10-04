@@ -158,15 +158,26 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"textures/entity/"+entity.experimentalAssetName()+".png"):textureResourceForVariant(entity.getUnitVariant()),
                 this::shouldRenderBodyMesh));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
+                EvaHandSurfaceR45::mesh,
+                entity -> textureResourceForVariant(entity.getUnitVariant()),
+                (entity,bone) -> EvaHandSurfaceR45.applies(entity)&&(bone.getName().startsWith("hand_")||bone.getName().startsWith("r45_hand_"))));
+        this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 EvaUnit01Renderer::meshResourceForEntity,
                 entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"textures/entity/"+entity.experimentalAssetName()+"_eyes.png"):EvaEyeMaterialsR42.texture(entity,eyeTextureResourceForVariant(entity.getUnitVariant())),
                 (entity, bone) -> !this.pilotView && (com.projectseele.entity.EvaDorsalMechanism.eyesEnabled(entity)
-                        && "head".equals(bone.getName()) || !entity.isExperimentalUnit() && entity.getUnitVariant()==EvaUnit01Entity.UNIT_01 && "head".equals(bone.getName()) || entity instanceof com.projectseele.entity.EvaPrototypeEntity un
+                        && "head".equals(bone.getName()) || entity instanceof com.projectseele.entity.EvaPrototypeEntity un
                         && un.getUNSerial()==1&&un.isUNFlying()&&bone.getName().startsWith("r30_thruster_")), true));
+        this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
+                EvaUnit01Renderer::meshResourceForEntity,
+                entity -> EvaEyeMaterialsR42.texture(entity,eyeTextureResourceForVariant(entity.getUnitVariant())),
+                (entity, bone) -> !this.pilotView && !entity.isExperimentalUnit()
+                        && entity.getUnitVariant()==EvaUnit01Entity.UNIT_01
+                        && "head".equals(bone.getName())
+                        && !com.projectseele.entity.EvaDorsalMechanism.eyesEnabled(entity)));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 EvaUnit01Renderer::knifeMeshResource,
                 EvaUnit01Renderer::knifeTextureResource,
-                (entity, bone) -> entity.getWeapon() == EvaUnit01Entity.WEAPON_KNIFE
+                (entity, bone) -> com.projectseele.entity.EvaWeaponHandlingR45.knifeVisible(entity,0)
                         && "knife".equals(bone.getName())));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 entity -> POSITRON_MESH, entity -> POSITRON_TEXTURE,
@@ -185,6 +196,11 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 EvaUnit01Renderer::lanceTextureResource,
                 (entity, bone) -> entity.getWeapon() == EvaUnit01Entity.WEAPON_LANCE
                         && "lance".equals(bone.getName())));
+        this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
+                entity -> new ResourceLocation(ProjectSeele.MODID,"mesh/eva02_longsword.mesh.json"),
+                entity -> new ResourceLocation(ProjectSeele.MODID,"textures/entity/eva02_longsword.png"),
+                (entity,bone) -> !entity.isExperimentalUnit()&&entity.getUnitVariant()==2
+                        &&entity.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45&&"lance".equals(bone.getName())));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"mesh/entry_plug_un.mesh.json"):ENTRY_PLUG_MESH,
                 entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"textures/entity/entry_plug_un.png"):ENTRY_PLUG_TEXTURE,
@@ -392,10 +408,11 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
             this.pendingPoseCommit = true;
         }
         // Weapon visibility applies on top in every view.
-        setWeaponVisibility(model, "knife", animatable.getWeapon() == EvaUnit01Entity.WEAPON_KNIFE);
+        setWeaponVisibility(model, "knife", com.projectseele.entity.EvaWeaponHandlingR45.knifeVisible(animatable,partialTick));
         setWeaponVisibility(model, "cannon", animatable.getWeapon() == EvaUnit01Entity.WEAPON_CANNON
                 || animatable.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE);
-        setWeaponVisibility(model, "lance", animatable.getWeapon() == EvaUnit01Entity.WEAPON_LANCE);
+        setWeaponVisibility(model, "lance", animatable.getWeapon() == EvaUnit01Entity.WEAPON_LANCE
+                ||animatable.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45);
         setWeaponVisibility(model, "n2", animatable.getWeapon() == EvaUnit01Entity.WEAPON_N2);
         setWeaponVisibility(model, "shield", false);
         // The external carrier owns the entire visible insertion. Once seated,
@@ -478,7 +495,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         ResourceLocation activeKnifeMesh = entity == null ? COMMON_KNIFE_MESH
                 : knifeMeshResource(entity);
         boolean knifeMesh = entity != null
-                && entity.getWeapon() == EvaUnit01Entity.WEAPON_KNIFE
+                && com.projectseele.entity.EvaWeaponHandlingR45.knifeVisible(entity,0)
                 && "knife".equals(bone.getName())
                 && LocalTriangleMeshLayer.hasPart(activeKnifeMesh, bone.getName());
         boolean entryHardwareMesh = !this.pilotView && entity != null
@@ -490,8 +507,11 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 && entity.getWeapon() == EvaUnit01Entity.WEAPON_LANCE
                 && "lance".equals(bone.getName())
                 && LocalTriangleMeshLayer.hasPart(activeLanceMesh, bone.getName());
+        boolean swordMesh=entity!=null&&entity.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45
+                &&"lance".equals(bone.getName())&&LocalTriangleMeshLayer.hasPart(
+                        new ResourceLocation(ProjectSeele.MODID,"mesh/eva02_longsword.mesh.json"),"lance");
         if (bodyMesh || cannonMesh || rifleMesh || n2Mesh
-                || knifeMesh || lanceMesh || entryHardwareMesh)
+                || knifeMesh || lanceMesh || swordMesh || entryHardwareMesh)
         {
             return;
         }
@@ -552,6 +572,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
 
     public static ResourceLocation knifeMeshResource(EvaUnit01Entity entity)
     {
+        var candidate=com.projectseele.entity.EvaAnatomicalHandsR45.knifeAttachment(entity);
+        if(candidate!=null)return new ResourceLocation("projectseele","mesh/"+candidate.mesh());
         return entity.getUnitVariant() == EvaUnit01Entity.UNIT_02
                 ? UNIT02_KNIFE_MESH : COMMON_KNIFE_MESH;
     }
@@ -588,6 +610,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
 
     private boolean shouldRenderBodyMesh(EvaUnit01Entity entity, GeoBone bone)
     {
+        if(EvaHandSurfaceR45.applies(entity)&&EvaHandSurfaceR45.oldSurface(bone.getName()))return false;
         if (!this.pilotView)
         {
             EvaShadowProbeR44.admission(entity,bone.getName(),true);
@@ -639,6 +662,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
 
     public static ResourceLocation meshResourceForEntity(EvaUnit01Entity entity)
     {
+        var mechanism=com.projectseele.entity.EvaAnatomicalHandsR45.knifeMechanism(entity);
+        if(mechanism!=null)return new ResourceLocation(ProjectSeele.MODID,"mesh/"+mechanism.bodyMesh());
         return entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"mesh/"+entity.experimentalAssetName()+".mesh.json"):meshResourceForVariant(entity.getUnitVariant());
     }
 

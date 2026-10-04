@@ -1,19 +1,34 @@
 package com.projectseele.world;
 
+import java.io.DataOutputStream;
+import java.io.File;
+import java.io.IOException;
+import java.nio.channels.FileChannel;
+import java.nio.file.Files;
+import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
+import java.nio.file.StandardOpenOption;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.TreeMap;
 import java.util.Set;
 import java.util.HashSet;
+import java.util.zip.Deflater;
+import java.util.zip.GZIPOutputStream;
 
+import it.unimi.dsi.fastutil.longs.Long2ObjectMap;
+import it.unimi.dsi.fastutil.longs.Long2ObjectOpenHashMap;
+import it.unimi.dsi.fastutil.longs.LongOpenHashSet;
+import com.projectseele.ProjectSeele;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.NbtUtils;
+import net.minecraft.nbt.NbtIo;
 import net.minecraft.nbt.Tag;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
@@ -21,6 +36,8 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.entity.BlockEntity;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.saveddata.SavedData;
+import net.minecraft.world.level.dimension.DimensionType;
+import net.minecraft.world.level.storage.LevelResource;
 
 /**
  * Per-world cargo and exact write-ahead transactions for generated city buildings.
@@ -36,12 +53,16 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
     private final Map<Long, Cargo> buildings = new LinkedHashMap<>();
     private String worldUUID="";
     private boolean loadedLegacy;
+    private Path archiveFile;
 
     public static Tokyo3BuildingArchiveR44 get(ServerLevel level,BlockPos centre)
     {
         Tokyo3BuildingArchiveR44 data=level.getDataStorage().computeIfAbsent(
                 Tokyo3BuildingArchiveR44::load, Tokyo3BuildingArchiveR44::new,
                 NAME+"_"+Long.toUnsignedString(centre.asLong()));
+        data.archiveFile = DimensionType.getStorageFolder(level.dimension(),
+                level.getServer().getWorldPath(LevelResource.ROOT)).resolve("data")
+                .resolve(NAME+"_"+Long.toUnsignedString(centre.asLong())+".dat");
         String expected=Tokyo3BuildingWorldIdentityR44.get(level);
         if(data.loadedLegacy&&!Boolean.getBoolean("projectseele.r44BindLegacyCityArchives"))
             throw new IllegalStateException("Legacy cargo archive needs a backed-up explicit WorldUUID/core-mask migration");
@@ -85,6 +106,9 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
     {
         root.putInt("Version", 1);
         root.putString("WorldUUID",worldUUID);
+        // BlockState is immutable. Share its read-only serialized tag only
+        // within this synchronous save; full per-cell BE NBT stays separate.
+        Map<BlockState, CompoundTag> stateTags = new HashMap<>();
         ListTag entries = new ListTag();
         buildings.forEach((key, cargo) ->
         {
@@ -97,11 +121,11 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
             ListTag cells = new ListTag();
             cargo.cells.forEach((pos, cell) ->
             {
-                CompoundTag value = cell.save(); value.putLong("Pos", pos); cells.add(value);
+                CompoundTag value = cell.save(stateTags); value.putLong("Pos", pos); cells.add(value);
             });
             tag.put("Cargo", cells);
             tag.putLongArray("NegativeDomeAnchorMask",cargo.fixedAnchors.stream().mapToLong(Long::longValue).toArray());
-            if (cargo.transaction != null) tag.put("Transaction", cargo.transaction.save());
+            if (cargo.transaction != null) tag.put("Transaction", cargo.transaction.save(stateTags));
             entries.add(tag);
         });
         root.put("Buildings", entries);
@@ -152,8 +176,8 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
         {
             try{capture(level, centre, tower, oldDepth, roof, cargo);}
             catch(IllegalStateException error){return new TravelStep(false,true,0,0,error.getMessage());}
-            Map<Long, Cell> beforeOwned = representation(centre, tower, oldDepth, roof, cargo);
-            Map<Long, Cell> afterOwned = representation(centre, tower, newDepth, roof, cargo);
+            Long2ObjectMap<Cell> beforeOwned = representation(centre, tower, oldDepth, roof, cargo);
+            Long2ObjectMap<Cell> afterOwned = representation(centre, tower, newDepth, roof, cargo);
             int visible=visibleBelow(tower,origin,newDepth);
             for(var entry:cargo.cells.entrySet())
             {
@@ -165,10 +189,12 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
                         return new TravelStep(false,true,0,0,"Cargo roof component collides with fixed dome anchor at "+target.toShortString());
                 }
             }
-            TreeMap<Long, Cell> union = new TreeMap<>();
-            union.putAll(beforeOwned); union.putAll(afterOwned);
+            LongOpenHashSet union = new LongOpenHashSet(beforeOwned.keySet());
+            union.addAll(afterOwned.keySet());
+            long[] ordered = union.toLongArray();
+            Arrays.sort(ordered);
             List<Write> writes = new ArrayList<>();
-            for (long key : union.keySet())
+            for (long key : ordered)
             {
                 BlockPos target = BlockPos.of(key);
                 if (target.equals(centre) && level.getBlockState(target)
@@ -183,13 +209,93 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
             cargo.transaction = new Transaction(oldDepth, newDepth, writes);
             setDirty();
             // Make the inverse durable before the first native placement.
-            level.getDataStorage().save();
+            try
+            {
+                persistWriteAhead();
+            }
+            catch (IOException error)
+            {
+                // This transaction has made no placements. Rebuild and retry
+                // it only after an explicit maintenance request repairs IO.
+                cargo.transaction = previous;
+                setDirty();
+                return new TravelStep(false, true, 0, 0,
+                        "Cannot persist complete cargo write-ahead archive: " + error);
+            }
             cursor = 0;
         }
         TravelStep step = apply(level, cargo.transaction, cursor, WRITE_BUDGET);
-        if(step.complete())cargo.transaction.complete=true;
-        setDirty();
+        if (step.complete() && !cargo.transaction.complete)
+        {
+            cargo.transaction.complete = true;
+            setDirty();
+        }
+        // The journal is immutable while a slice is applied; its cursor lives
+        // in Tokyo3RetractionSavedData. Do not reserialize cargo for each slice.
         return step;
+    }
+
+    private void persistWriteAhead() throws IOException
+    {
+        if (archiveFile == null) throw new IOException("Missing per-tower archive path");
+        persistAtomic(archiveFile);
+    }
+
+    @Override
+    public void save(File file)
+    {
+        if (!isDirty()) return;
+        try
+        {
+            // Autosave/close must not overwrite the durable inverse in place.
+            persistAtomic(file.toPath());
+        }
+        catch (IOException error)
+        {
+            setDirty();
+            ProjectSeele.LOGGER.error("Cannot atomically save Tokyo-3 cargo archive {}", file, error);
+        }
+    }
+
+    private void persistAtomic(Path target) throws IOException
+    {
+        CompoundTag root = new CompoundTag();
+        root.put("data", save(new CompoundTag()));
+        NbtUtils.addCurrentDataVersion(root);
+        Files.createDirectories(target.getParent());
+        Path pending = Files.createTempFile(target.getParent(),
+                target.getFileName().toString(), ".pending");
+        try
+        {
+            // Same v1 NBT and gzip container as SavedData, with a faster lossless
+            // compression level. Compression is synchronous before placement.
+            try (DataOutputStream output = new DataOutputStream(
+                    new FastGzipOutputStream(Files.newOutputStream(pending))))
+            {
+                NbtIo.write(root, output);
+            }
+            try (FileChannel file = FileChannel.open(pending, StandardOpenOption.WRITE))
+            {
+                file.force(true);
+            }
+            // Do not fall back to a non-atomic overwrite of the last inverse.
+            Files.move(pending, target, StandardCopyOption.ATOMIC_MOVE,
+                    StandardCopyOption.REPLACE_EXISTING);
+            setDirty(false);
+        }
+        finally
+        {
+            Files.deleteIfExists(pending);
+        }
+    }
+
+    private static final class FastGzipOutputStream extends GZIPOutputStream
+    {
+        FastGzipOutputStream(java.io.OutputStream output) throws IOException
+        {
+            super(output, 64 * 1024);
+            def.setLevel(Deflater.BEST_SPEED);
+        }
     }
 
     private static TravelStep apply(ServerLevel level, Transaction transaction, int cursor, int budget)
@@ -255,10 +361,10 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
         // missing; a separately reviewed migration must supply its own inverse.
     }
 
-    private static Map<Long, Cell> representation(BlockPos centre,
+    private static Long2ObjectMap<Cell> representation(BlockPos centre,
                 ThirdTokyoSurfaceBuilder.TowerSpec tower, int depth, int roof, Cargo cargo)
     {
-        Map<Long, Cell> result = new HashMap<>();
+        Long2ObjectMap<Cell> result = new Long2ObjectOpenHashMap<>();
         int surface = Math.max(0, tower.height() - depth);
         int below = visibleBelow(tower, BlockPos.of(cargo.origin), depth);
         if (surface > 0)
@@ -295,7 +401,7 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
             result.put(new BlockPos(centre.getX(),roof-tower.height()-1,centre.getZ()).asLong(),
                     new Cell(Blocks.SEA_LANTERN.defaultBlockState(),null));
         }
-        cargo.fixedAnchors.forEach(result::remove);
+        cargo.fixedAnchors.forEach(p -> result.remove(p.longValue()));
         return result;
     }
 
@@ -316,7 +422,7 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
         return mask;
     }
 
-    private static void planeRange(Map<Long,Cell> target, BlockPos centre, int half, int first, int last, Cell cell)
+    private static void planeRange(Long2ObjectMap<Cell> target, BlockPos centre, int half, int first, int last, Cell cell)
     {
         for (int y = first; y <= last; y++)
             for (int x = -half; x <= half; x++)
@@ -367,9 +473,9 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
             }
             PerformanceCounters.recordWorldBlockWrites(1);
         }
-        CompoundTag save()
+        CompoundTag save(Map<BlockState, CompoundTag> stateTags)
         {
-            CompoundTag tag=new CompoundTag();tag.put("State",NbtUtils.writeBlockState(state));
+            CompoundTag tag=new CompoundTag();tag.put("State",stateTags.computeIfAbsent(state,NbtUtils::writeBlockState));
             if(nbt!=null)tag.put("NBT",nbt.copy());return tag;
         }
         static Cell load(CompoundTag tag)
@@ -381,10 +487,10 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
 
     private record Write(BlockPos pos, Cell before, Cell after)
     {
-        CompoundTag save()
+        CompoundTag save(Map<BlockState, CompoundTag> stateTags)
         {
             CompoundTag tag=new CompoundTag();tag.putLong("Pos",pos.asLong());
-            tag.put("Before",before.save());tag.put("After",after.save());return tag;
+            tag.put("Before",before.save(stateTags));tag.put("After",after.save(stateTags));return tag;
         }
         static Write load(CompoundTag tag)
         {
@@ -397,11 +503,11 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
         final int oldDepth,newDepth;final List<Write> writes;boolean complete;
         Transaction(int oldDepth,int newDepth,List<Write> writes)
         {this.oldDepth=oldDepth;this.newDepth=newDepth;this.writes=List.copyOf(writes);}
-        CompoundTag save()
+        CompoundTag save(Map<BlockState, CompoundTag> stateTags)
         {
             CompoundTag tag=new CompoundTag();tag.putInt("OldDepth",oldDepth);tag.putInt("NewDepth",newDepth);
             tag.putBoolean("Complete",complete);
-            ListTag list=new ListTag();writes.forEach(w->list.add(w.save()));tag.put("Writes",list);return tag;
+            ListTag list=new ListTag();writes.forEach(w->list.add(w.save(stateTags)));tag.put("Writes",list);return tag;
         }
         static Transaction load(CompoundTag tag)
         {

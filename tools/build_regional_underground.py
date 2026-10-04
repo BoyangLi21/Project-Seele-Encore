@@ -68,11 +68,15 @@ def gateway(p):
         p.fill(-366,y,739,-354,y+5,742,AIR,name)
         p.fill(-363,y,741,-357,y+4,741,'minecraft:gray_stained_glass',name)
         p.put(-355,y+1,740,'minecraft:polished_blackstone_button[face=wall,facing=north,powered=false]',name)
-        p.sign(-355,y+3,740,['LIFT / 呼出','GEOFRONT' if y==81 else 'TOKYO-3','15 x 15',''],name)
+        p.sign(-355,y+3,740,['直梯 / 呼出','NERV 地面入口' if y==81 else '地下都市 · 到达厅','本层呼梯 · 轿厢内选层',''],name)
         # Real controller BEs are installed and configured by the commissioner.
         p.put(-368,y,750,AIR,name)
     # Exactly one physical car, initially on the surface.
-    box_room(p,(-367,-353,743,757),80,8,name+'/car',STEEL)
+    box_room(p,(-367,-353,743,757),80,8,name+'/car','projectseele:nerv_machine_panel')
+    # TV12 utility-cabin panel hierarchy, within the unchanged native box.
+    # Roof-grid/lamp detail is a separate original root-owned model overlay.
+    for x in (-367,-353):p.fill(x,83,743,x,83,757,'projectseele:nerv_structural_panel',name+'/car')
+    for z in (743,757):p.fill(-367,83,z,-353,83,z,'projectseele:nerv_structural_panel',name+'/car')
     opening(p,-360,743,80,name+'/car','north',7,5,'new')
     for z in (747,750):
         p.put(-366,82,z,'minecraft:polished_blackstone_button[face=wall,facing=east,powered=false]',name)

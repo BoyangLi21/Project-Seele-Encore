@@ -67,6 +67,7 @@ public class ClientEvents
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event)
     {
+        event.registerBlockEntityRenderer(com.projectseele.registry.ModBlockEntities.DEAD_SEA_ARCHIVE.get(),com.projectseele.client.render.DeadSeaArchiveRendererR45::new);
         event.registerEntityRenderer(ModEntities.RAMIEL.get(), RamielRenderer::new);
         event.registerEntityRenderer(ModEntities.EVA_UNIT01.get(), EvaUnit01Renderer::new);
         event.registerEntityRenderer(ModEntities.EVA_UNIT00.get(), EvaUnit01Renderer::new);
@@ -167,6 +168,7 @@ public class ClientEvents
         event.registerReloadListener((ResourceManagerReloadListener) resourceManager ->
         {
             LocalTriangleMeshLayer.clearCache();
+            com.projectseele.client.render.DeadSeaArchiveRendererR45.clearCache();
             RiggedAngelLayer.clearCache();
             com.projectseele.client.render.EvaFootPlacement.clear();
             LocalVisualAssetFingerprint.clearCache();

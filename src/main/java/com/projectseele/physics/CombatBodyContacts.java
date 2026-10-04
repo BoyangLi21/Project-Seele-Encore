@@ -151,6 +151,49 @@ public final class CombatBodyContacts
         }
         return Float.isFinite(best)?Optional.of(from.lerp(to,best)):Optional.empty();
     }
+    /** Two triangles cover the entire previous/current blade strip, not only its tip path. */
+    public static Optional<Vec3> clipBladeSweepR45(LivingEntity target,Vec3 a,Vec3 b,Vec3 c,Vec3 d,double radius)
+    {
+        var profile=CombatBodyProfiles.get(target);
+        if(fieldOrBox(target,profile))return clipBladeBoxR45(target.getBoundingBox().inflate(radius),a,b,c,d);
+        var pose=CombatBodyDynamics.active(target)?CombatBodyDynamics.sample(target,0):CombatBodyDynamics.raw(target,0);
+        AnatomicalLimbConstraints.apply(pose,profile);var matrices=CombatBodyProfiles.physicalMatrices(pose,profile);
+        float angle=-(180-target.getYRot())*(float)Math.PI/180,scale=CombatBodyProfiles.BLOCK_TO_PHYSICS;
+        Vec3[] world={a,b,c,d};Vector3f[] points=new Vector3f[4];
+        for(int i=0;i<4;i++)points[i]=world[i].subtract(target.position()).toVector3f().rotateY(angle).mul(scale);
+        for(var part:parts(profile))
+        {
+            var inverse=new Matrix4f(matrices.get(part.bone)).mul(part.bind).invert();
+            Vector3f[] local=new Vector3f[4];for(int i=0;i<4;i++)local[i]=inverse.transformPosition(new Vector3f(points[i]));
+            for(var hull:part.hulls)
+            {
+                double[][] planes=new double[hull.length][4];
+                for(int i=0;i<hull.length;i++)planes[i]=new double[]{hull[i][0],hull[i][1],hull[i][2],hull[i][3]-radius*scale};
+                for(int[] tri:new int[][]{{0,1,2},{0,2,3}})
+                {
+                    double[][] vertices=new double[3][3];for(int i=0;i<3;i++){var v=local[tri[i]];vertices[i]=new double[]{v.x,v.y,v.z};}
+                    var hit=com.projectseele.combat.BladeSweepClipR45.triangle(vertices,planes);if(hit==null)continue;
+                    var point=inverse.invert(new Matrix4f()).transformPosition(new Vector3f((float)hit[0],(float)hit[1],(float)hit[2]));
+                    point.div(scale).rotateY(-angle).add(target.position().toVector3f());
+                    return Optional.of(new Vec3(point.x,point.y,point.z));
+                }
+            }
+        }
+        return Optional.empty();
+    }
+    public static Optional<Vec3> clipBladeBoxR45(net.minecraft.world.phys.AABB box,Vec3 a,Vec3 b,Vec3 c,Vec3 d)
+    {
+        double[][] planes={{1,0,0,-box.maxX},{-1,0,0,box.minX},{0,1,0,-box.maxY},
+                {0,-1,0,box.minY},{0,0,1,-box.maxZ},{0,0,-1,box.minZ}};
+        Vec3[] p={a,b,c,d};
+        for(int[] tri:new int[][]{{0,1,2},{0,2,3}})
+        {
+            double[][] points=new double[3][3];for(int i=0;i<3;i++){var v=p[tri[i]];points[i]=new double[]{v.x,v.y,v.z};}
+            var hit=com.projectseele.combat.BladeSweepClipR45.triangle(points,planes);
+            if(hit!=null)return Optional.of(new Vec3(hit[0],hit[1],hit[2]));
+        }
+        return Optional.empty();
+    }
     private static boolean fieldOrBox(LivingEntity target,CombatBodyProfiles.Profile profile)
     {
         return profile==null||!(target instanceof EvaUnit01Entity||target instanceof SachielEntity)

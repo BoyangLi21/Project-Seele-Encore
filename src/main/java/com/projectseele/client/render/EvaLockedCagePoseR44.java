@@ -54,7 +54,7 @@ final class EvaLockedCagePoseR44
         var mc = Minecraft.getInstance();
         if (mc.getSingleplayerServer() == null || ShaderShadowPassR44.active()) return;
         var world = mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();
-        if (!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW")) return;
+        if (!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName())) return;
         int id = entity.getId();
         if (stage.equals("after_gecko"))
         {

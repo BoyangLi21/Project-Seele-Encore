@@ -4,7 +4,8 @@ import re
 import numpy as np
 from scipy.spatial.transform import Rotation
 
-def load_bvh(path):
+def load_bvh(path,translation_mode='replace'):
+ if translation_mode not in ('replace','offset'):raise ValueError('Explicit BVH translation convention required')
  text=Path(path).read_text(encoding='utf-8-sig');hierarchy,motion=text.split('MOTION',1);tokens=re.findall(r'[^\s{}]+|[{}]',hierarchy);cursor=1;nodes=[];channels=0
  def node(parent,kind):
   nonlocal cursor,channels
@@ -30,13 +31,15 @@ def load_bvh(path):
   for i,channel in enumerate(data['channels']):
    # Six-channel joint exporters (including BNR) store the full local
    # translation. OFFSET is the fallback for axes without a position channel.
-   if channel.endswith('position'):shift[:,'XYZ'.index(channel[0])]=raw[:,data['start']+i]
+   if channel.endswith('position'):
+    axis='XYZ'.index(channel[0]);value=raw[:,data['start']+i]
+    shift[:,axis]=value+(data['offset'][axis] if translation_mode=='offset' else 0)
    else:order.append(channel[0]);values.append(raw[:,data['start']+i])
   local=Rotation.from_euler(''.join(order),np.array(values).T,degrees=True) if order else Rotation.from_quat(ident)
   if data['parent']<0:positions[:,j]=shift;rotations[:,j]=local.as_quat()
   else:
    parent=Rotation.from_quat(rotations[:,data['parent']]);positions[:,j]=positions[:,data['parent']]+parent.apply(shift);rotations[:,j]=(parent*local).as_quat()
- return dict(names=[x['name'] for x in nodes],parents=np.array([x['parent'] for x in nodes]),offsets=np.array([x['offset'] for x in nodes]),positions=positions,rotations=rotations,fps=1/dt,source=str(Path(path).resolve()))
+ return dict(names=[x['name'] for x in nodes],parents=np.array([x['parent'] for x in nodes]),offsets=np.array([x['offset'] for x in nodes]),positions=positions,rotations=rotations,fps=1/dt,source=str(Path(path).resolve()),translation_mode=translation_mode)
 
 def save_npz(path,motion):
  np.savez_compressed(path,**{k:np.array(v) for k,v in motion.items()})

@@ -38,7 +38,9 @@ public final class LiftPassengerR20Client
                     LiftPassengerR20Review.blockedClientR44=LiftPassengerR20Review.collisionWitnessR44(mc.level,mc.player,target,"client");
             }
         }
-        if(LiftPassengerR20Review.R44&&LiftPassengerR20Review.clickTargetR44!=null&&!LiftPassengerR20Review.clickedR44&&target!=null&&target.subtract(mc.player.position()).horizontalDistanceSqr()<.09)
+        // A source-floor teleport is acknowledged only by the real client pose.
+        // Repeated floors share X/Z; horizontal proximity can match the old floor.
+        if(LiftPassengerR20Review.R44&&LiftPassengerR20Review.clickTargetR44!=null&&!LiftPassengerR20Review.clickedR44&&target!=null&&target.distanceToSqr(mc.player.position())<.09&&mc.player.onGround())
         {
             try
             {
@@ -47,7 +49,7 @@ public final class LiftPassengerR20Client
                 var b=shape.bounds();var point=LiftPassengerR20Review.clickPointR44;
                 if(point==null)point=new net.minecraft.world.phys.Vec3(pos.getX()+(b.minX+b.maxX)/2,pos.getY()+(b.minY+b.maxY)/2,pos.getZ()+(b.minZ+b.maxZ)/2);
                 var eye=mc.player.getEyePosition();var direction=point.subtract(eye);
-                if(direction.length()>mc.gameMode.getPickRange()+.05)throw new IllegalStateException("Lift input outside real client reach "+pos);
+                if(direction.length()>mc.gameMode.getPickRange()+.05)throw new IllegalStateException("Lift input outside real client reach "+pos+"; actual_client="+mc.player.position()+"; actual_eye="+eye+"; planned_operator="+target+"; planned_hit="+point+"; distance="+direction.length()+"; pick_range="+mc.gameMode.getPickRange()+"; phase="+LiftPassengerR20Review.phaseR43);
                 var hit=mc.level.clip(new net.minecraft.world.level.ClipContext(eye,point.add(direction.normalize().scale(.04)),net.minecraft.world.level.ClipContext.Block.OUTLINE,net.minecraft.world.level.ClipContext.Fluid.NONE,mc.player));
                 if(hit.getType()!=net.minecraft.world.phys.HitResult.Type.BLOCK||!hit.getBlockPos().equals(pos))throw new IllegalStateException("Actual lift-input sightline hits "+hit.getBlockPos()+" before "+pos);
                 mc.player.setYRot((float)Math.toDegrees(Math.atan2(-direction.x,direction.z)));mc.player.setXRot((float)-Math.toDegrees(Math.atan2(direction.y,direction.horizontalDistance())));

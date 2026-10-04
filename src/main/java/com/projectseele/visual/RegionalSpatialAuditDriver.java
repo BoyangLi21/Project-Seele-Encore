@@ -108,7 +108,7 @@ public final class RegionalSpatialAuditDriver
     {
         if(!ENABLED||done||event.phase!=TickEvent.Phase.END)return;
         var server=event.getServer();Path world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals(R44?"SEELE_FIELD_R44_REVIEW":R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R29?"SEELE_FIELD_R29_REVIEW":R28?"SEELE_FIELD_R28_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R24?"SEELE_R24_TV_REVIEW":R23?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":R19?"SEELE_R19_NATIVE_REVIEW":"SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong quality audit world");
+        if(!world.getFileName().toString().equals(R44?com.projectseele.visual.NativeReviewWorldsR45.expectedName():R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R29?"SEELE_FIELD_R29_REVIEW":R28?"SEELE_FIELD_R28_REVIEW":R26?"SEELE_R26_REVIEW":R25?"SEELE_R25_REVIEW":R24?"SEELE_R24_TV_REVIEW":R23?"SEELE_R22_REVIEW":R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":R19?"SEELE_R19_NATIVE_REVIEW":"SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong quality audit world");
         ServerLevel level=server.getLevel(FacilitySchemaV2.DIMENSION);
         if(level!=null)level.resetEmptyTime();
         try
@@ -227,7 +227,14 @@ public final class RegionalSpatialAuditDriver
                 {
                     var b=test.getAsJsonArray("readingBoard");BlockPos at=new BlockPos(b.get(0).getAsInt(),b.get(1).getAsInt(),b.get(2).getAsInt());
                     boolean wayfinding=test.has("readingWayfinding")&&test.get("readingWayfinding").getAsBoolean();
-                    if(!(level.getBlockEntity(at) instanceof com.projectseele.world.StationDepartureBoardBlockEntity board)
+                    boolean explicitNativeContract=test.has("readingNativeMtrBoard")||test.has("expectedNativePlatformId");
+                    if(explicitNativeContract)
+                    {
+                        var contract=com.projectseele.world.StationDiagramContractR45.inspect(level,at,test);
+                        test.add("actualDiagramContractR45",contract);
+                        if(!contract.get("passed").getAsBoolean()){finish(test,"actual_station_diagram_contract_failed");return;}
+                    }
+                    else if(!(level.getBlockEntity(at) instanceof com.projectseele.world.StationDepartureBoardBlockEntity board)
                             || (wayfinding?board.rows().size()<3:!board.routeMap()||board.rows().size()<4))
                     {finish(test,"missing_complete_station_diagram");return;}
                     var outline=level.getBlockState(at).getShape(level,at);
@@ -268,7 +275,10 @@ public final class RegionalSpatialAuditDriver
                 if(test.has("useDoor"))
                 {
                     JsonArray d=test.getAsJsonArray("door");BlockPos door=new BlockPos(d.get(0).getAsInt(),d.get(1).getAsInt(),d.get(2).getAsInt());
-                    for(BlockPos pos:List.of(door,door.above()))RESTORE.put(pos,level.getBlockState(pos));
+                    // Finite paired personnel gates operate four halves. Keep
+                    // both leaves' original states when the real use opens them.
+                    for(BlockPos pos:BlockPos.betweenClosed(door.offset(-1,0,-1),door.offset(1,1,1)))
+                        RESTORE.putIfAbsent(pos.immutable(),level.getBlockState(pos));
                     BlockState state=level.getBlockState(door);
                     if(!(state.getBlock() instanceof net.minecraft.world.level.block.DoorBlock)){finish(test,"missing_entry_door");return;}
                     if(!state.getValue(net.minecraft.world.level.block.DoorBlock.OPEN))state.use(level,player,net.minecraft.world.InteractionHand.MAIN_HAND,new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(door),net.minecraft.core.Direction.SOUTH,door,false));
@@ -304,7 +314,11 @@ public final class RegionalSpatialAuditDriver
                 {finish(test,"collision_chunk_unloaded");break;}
                 if(test.has("climbablePort")&&player.onClimbable())
                 {finish(test,start.y-old.y<=2.5?"pass":"unsafe_ladder_entry_drop");break;}
-                if(distance<.18 && player.onGround() && settled>=2)
+                // A wide player's edge can touch the next tread only a few
+                // centimetres beyond the ordinary horizontal arrival radius.
+                // Reach the actual target before rejecting its vertical datum.
+                double arrivalRadius=Math.abs(old.y-end.y)>=.16?.015:.18;
+                if(distance<arrivalRadius && player.onGround() && settled>=2)
                 {
                     if(Math.abs(old.y-end.y)>=.16){finish(test,"wrong_arrival_height");break;}
                     if(R41&&!test.has("barrier")&&waypoint==route.size()-1
@@ -316,7 +330,7 @@ public final class RegionalSpatialAuditDriver
                     start=end;end=vector(route.get(waypoint).getAsJsonArray());settled=0;stalled=0;continue;
                 }
                 if(old.y<Math.min(start.y,end.y)-(test.has("climbablePort")?2.5:.65)){finish(test,"floor_gap");break;}
-                double amount=distance<.18?0:Math.min(.12,distance);
+                double amount=distance<arrivalRadius?0:Math.min(.12,distance);
                 fallSpeed=(fallSpeed-.08)*.98;
                 player.move(MoverType.SELF,new Vec3(distance<.001?0:dx/distance*amount,fallSpeed,distance<.001?0:dz/distance*amount));
                 if(player.onGround())fallSpeed=0;
@@ -394,7 +408,26 @@ public final class RegionalSpatialAuditDriver
     }
     private static void finish(JsonObject test,String status)
     {
+        if(status.equals("pass")&&test.has("closeDoorAfter")&&test.get("closeDoorAfter").getAsBoolean())
+        {
+            var d=test.getAsJsonArray("door");var pos=new BlockPos(d.get(0).getAsInt(),d.get(1).getAsInt(),d.get(2).getAsInt());
+            if(player.position().distanceTo(Vec3.atCenterOf(pos))>4.5)status="return_gate_out_of_reach";
+            else
+            {
+                var state=activeLevel.getBlockState(pos);
+                state.use(activeLevel,player,net.minecraft.world.InteractionHand.MAIN_HAND,
+                        new net.minecraft.world.phys.BlockHitResult(Vec3.atCenterOf(pos),net.minecraft.core.Direction.SOUTH,pos,false));
+                if(activeLevel.getBlockState(pos).getValue(net.minecraft.world.level.block.DoorBlock.OPEN))status="return_gate_did_not_close";
+                else doorInteractions++;
+            }
+        }
         JsonObject result=test.deepCopy();result.addProperty("status",status);result.add("actual",position(player.position()));
+        if(test.has("door")&&test.has("useDoor"))
+        {
+            var d=test.getAsJsonArray("door");var pos=new BlockPos(d.get(0).getAsInt(),d.get(1).getAsInt(),d.get(2).getAsInt());
+            if(activeLevel.getBlockState(pos).getBlock() instanceof com.projectseele.world.CityPersonnelDoorR44)
+                result.add("pairedGate",com.projectseele.world.TvPersonnelPlatformInterlockR44.gateDiagnostic(activeLevel,pos,player));
+        }
         result.addProperty("waypointsReached",waypoint);result.addProperty("nativeDoorInteractions",doorInteractions);
         result.addProperty("routeLeaseServerTicks",age-leaseStarted);result.addProperty("routeLeaseRenewals",leaseRenewals);
         result.addProperty("legacyLeaseControl",LEGACY_LEASE_CONTROL);

@@ -19,7 +19,7 @@ import org.joml.Vector3f;
 /** Captured locomotion channels sampled inside the shared body owner. */
 public final class EvaCapturedLocomotionR44
 {
-    public static final boolean SUPPORT_OWNERSHIP_CANDIDATE=Boolean.getBoolean("projectseele.r44CapturedSupportOwnership");
+    public static final boolean SUPPORT_OWNERSHIP_CANDIDATE=com.projectseele.config.PortableRuntimeOwnersR45.capturedSupport();
     private record Clip(float duration, String[] names, Quaternionf[][] rotations, Vector3f[][] positions,
                         Vector3f[][] patches,float[][] support,double travelWorld) {}
     private record Profile(JsonArray rig, Map<String,Clip> clips,Map<String,Vector3f[]> boots) {}
@@ -108,7 +108,7 @@ public final class EvaCapturedLocomotionR44
 
     public static synchronized void reload()
     {
-        Map<Integer,Profile> profiles=new HashMap<>();STATES.clear();String directory=System.getProperty("projectseele.capturedLocomotionDirectory","");
+        Map<Integer,Profile> profiles=new HashMap<>();STATES.clear();String directory=com.projectseele.config.PortableRuntimeOwnersR45.capturedDirectory();
         if(directory.isEmpty()){PROFILES=Map.of();loaded=true;return;}
         for(int variant=0;variant<5;variant++)
         {
@@ -220,6 +220,10 @@ public final class EvaCapturedLocomotionR44
         return moving?(e.rifleRunBlend(partial)>.5F?"run":"walk"):"idle";
     }
     private static boolean prone(String state){return state.equals("crawl")||state.equals("prone_hold");}
+    private static boolean multiContact(String state)
+    {return prone(state)||state.equals("to_prone")||state.equals("from_prone");}
+    public static boolean ownsMultiContactPoseR45(EvaUnit01Entity entity)
+    {return PROFILES.containsKey(variant(entity))&&eligible(entity)&&multiContact(entity.getEntityData().get(CLIP));}
     private static boolean crouched(String state){return state.equals("crouch_idle")||state.equals("crouch_walk");}
     private static String transition(String from,String to)
     {
@@ -241,6 +245,8 @@ public final class EvaCapturedLocomotionR44
         if(e.isPilotCrouching()&&!e.isPilotProne()&&e.rifleMoveBlend(partial)>.12F&&!profile.clips().containsKey("crouch_walk"))return null;
         Clip clip=profile.clips().get(clipName);float elapsed=(e.level().getGameTime()-e.getEntityData().get(SINCE)+partial)/20F;
         float phase=phase(e,clipName,clip,elapsed,partial);EvaBodyPose.Sample pose=sample(clip,rig,phase);
+        var physical=com.projectseele.physics.CombatBodyProfiles.get(e);
+        com.projectseele.physics.AnatomicalLimbConstraints.restoreAuthoredJointCentres(pose,physical);
         CompoundTag origin=e.getEntityData().get(ORIGIN);
         if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
         {
@@ -259,7 +265,17 @@ public final class EvaCapturedLocomotionR44
             review.add("plants",plants);com.projectseele.visual.BodyPoseLayersR40.metadata("actual_captured_sample",review);
         }
         if(!origin.isEmpty()&&elapsed<.3F)
-        {var from=new EvaBodyPose.Sample(rig);EvaShutdownR30.decode(origin,from);pose=mix(from,pose,ease(elapsed/.3F));}
+        {
+            var from=new EvaBodyPose.Sample(rig);EvaShutdownR30.decode(origin,from);
+            var target=pose;float amount=ease(elapsed/.3F);pose=mix(from,target,amount);
+            if(multiContact(clipName))
+                com.projectseele.physics.AnatomicalLimbConstraints.blendAuthoredContacts(pose,from,target,amount,physical);
+        }
+        // Both frame interpolation and cross-state blending change rotation.
+        // Reconstruct only the measured knee/elbow offsets; preserve authored
+        // clavicle travel, root motion, limb angles and end-effector intent.
+        com.projectseele.physics.AnatomicalLimbConstraints.restoreAuthoredJointCentres(
+                pose,physical);
         return pose;
     }
 
@@ -279,7 +295,7 @@ public final class EvaCapturedLocomotionR44
     /** Called only by the existing server pose-signal update. */
     public static double serverCycle(EvaUnit01Entity e,float run,double dx,double dz)
     {
-        if(!loaded&&System.getProperty("projectseele.capturedLocomotionDirectory","").isEmpty())return 0;
+        if(!loaded&&com.projectseele.config.PortableRuntimeOwnersR45.capturedDirectory().isEmpty())return 0;
         if(!loaded)EvaBodyPose.hasTerrainStances();Profile profile=PROFILES.get(variant(e));
         if(profile==null||!eligible(e))
         {if(!e.getEntityData().get(CLIP).isEmpty())e.getEntityData().set(CLIP,"");return 0;}
@@ -313,6 +329,24 @@ public final class EvaCapturedLocomotionR44
         Profile profile=PROFILES.get(variant(e));String name=e.getEntityData().get(CLIP);
         if(profile==null||!eligible(e)||name.isEmpty()||e.hasLiveActionForRender(partial)||e.isVisuallyAirborneForRender()
                 ||EvaCombatR31.action(e)!=EvaCombatR31.NONE||CombatReactionsR36.active(e))return;
+        // In these captures the hands, elbows, knees and trunk share support.
+        // A toe touching the floor is not a planted standing foot. Re-solving
+        // only its ankle discarded the authored knee plane and drove a shin
+        // through the floor even when the captured whole pose was clear.
+        // Keep the authored multi-contact pose under EvaTerrainSupport's
+        // measured whole-body plane; never carry standing foot locks into it.
+        if(multiContact(name))
+        {
+            invalidateSupportOwnerR44(e);
+            if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
+            {
+                JsonObject mode=new JsonObject();mode.addProperty("clip",name);
+                mode.addProperty("mode","authored_multi_contact_with_measured_body_plane");
+                mode.addProperty("standing_foot_lock_applied",false);
+                com.projectseele.visual.BodyPoseLayersR40.metadata("actual_captured_contact_owner",mode);
+            }
+            return;
+        }
         Clip clip=profile.clips().get(name);float elapsed=(e.level().getGameTime()-e.getEntityData().get(SINCE)+partial)/20F;
         float phase=phase(e,name,clip,elapsed,partial),frame=phase*(clip.patches().length-1);int first=(int)frame,last=Math.min(first+1,clip.patches().length-1);
         double time=e.level().getGameTime()+partial;LevelStates levelState=STATES.computeIfAbsent(e.level(),level->new LevelStates(level.isClientSide));
@@ -364,14 +398,14 @@ public final class EvaCapturedLocomotionR44
             }
             Vector3f offset=new Vector3f(patch).sub(pose.rig.get(bone).pivot());
             Vector3f target=new Vector3f(goal).sub(orientation.transform(new Vector3f(offset)));
-            com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(pose,physics,suffix,target,orientation);
+            com.projectseele.physics.AnatomicalLimbConstraints.reachAuthoredFoot(pose,physics,suffix,target,orientation);
             Matrix4f actual=new Matrix4f(world).mul(pose.matrix(bone));float minimum=Float.POSITIVE_INFINITY;
             for(Vector3f vertex:profile.boots().get(suffix))minimum=Math.min(minimum,actual.transformPosition(new Vector3f(vertex)).y);
             float floor=ground(e,worldGoal,worldGoal.y);
             if(minimum<floor-.005F)
             {
                 target.y+=(floor-minimum)/EvaScale.RENDER_SCALE;
-                com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(pose,physics,suffix,target,orientation);
+                com.projectseele.physics.AnatomicalLimbConstraints.reachAuthoredFoot(pose,physics,suffix,target,orientation);
             }
             plant.bearing=bearing;plant.patch=patch;plant.footWorld=new Matrix4f(world).mul(pose.matrix(bone));
             if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)

@@ -335,7 +335,7 @@ enable-command-block=false
 
 def jvm_args() -> str:
     return """-Xms2G
--Xmx16G
+-Xmx20G
 -XX:+UseG1GC
 -XX:+ParallelRefProcEnabled
 -XX:MaxGCPauseMillis=200

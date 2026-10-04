@@ -23,7 +23,7 @@ public final class EvaRecoveryPoseR31
     private static synchronized Map<Integer,Profile> profiles()
     {
         if(profiles!=null)return profiles;
-        Path path=Path.of(System.getProperty("projectseele.recoveryPoseReview","projectseele-local-maps/eva_recovery_r31.json"));
+        Path path=CombatMotionResourcesR44.instancePath(System.getProperty("projectseele.recoveryPoseReview","projectseele-local-maps/eva_recovery_r31.json"));
         if(!Files.isRegularFile(path)){profiles=Map.of();return profiles;}
         try
         {

@@ -37,12 +37,19 @@ public final class CockpitFeedbackClient
             volume+=(wanted-volume)*.12F;pitch+=(.82F+speed*.25F-pitch)*.10F;
         }
     }
+    /** A new vehicle/link must not inherit another airframe's sound, alerts or FOV filter. */
+    public static void resetConnectionR45()
+    {
+        if(drive!=null)Minecraft.getInstance().getSoundManager().stop(drive);
+        drive=null;lastStance=-1;warningCooldown=0;linkedPilotActor=null;fovTime=Double.NaN;fovSpeed=0;
+    }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent event)
     {
         if(event.phase!=TickEvent.Phase.END)return;var eva=actor();var mc=Minecraft.getInstance();
-        if(eva==null){drive=null;lastStance=-1;warningCooldown=0;linkedPilotActor=null;fovTime=Double.NaN;fovSpeed=0;return;}
+        if(eva==null){resetConnectionR45();return;}
         if(!eva.getUUID().equals(linkedPilotActor))
         {
+            resetConnectionR45();
             linkedPilotActor=eva.getUUID();
             mc.gui.setOverlayMessage(net.minecraft.network.chat.Component.translatable("hud.projectseele.pilot_link_ready"),false);
         }

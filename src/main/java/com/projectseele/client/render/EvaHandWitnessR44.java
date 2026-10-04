@@ -47,6 +47,18 @@ public final class EvaHandWitnessR44
     static void capture(EvaUnit01Entity eva,BakedGeoModel model,float partial,Matrix4f modelToWorld)
     {
         if(!enabled()||ShaderShadowPassR44.active())return;
+        int minimumReviewTick=Integer.getInteger("projectseele.r45HandWitnessMinReviewTick",-1);
+        int maximumReviewTick=Integer.getInteger("projectseele.r45HandWitnessMaxReviewTick",Integer.MAX_VALUE);
+        if(minimumReviewTick>=0)
+        {
+            if(!com.projectseele.visual.CombatR31Review.ENABLED||eva.getId()!=com.projectseele.visual.CombatR31Review.evaId)return;
+            int reviewTick=com.projectseele.visual.CombatR31Review.stageTicks;
+            if(reviewTick<minimumReviewTick||reviewTick>maximumReviewTick)return;
+        }
+        String stage=System.getProperty("projectseele.r45HandWitnessStage","");
+        if(!stage.isEmpty()&&!stage.equals(com.projectseele.visual.CombatR31Review.stageName))return;
+        float minimum=Float.parseFloat(System.getProperty("projectseele.r45HandWitnessMinStance","0"));
+        if(eva.rifleStanceLevel(partial)<minimum)return;
         State state=STATES.get(eva);if(state==null){state=new State();STATES.put(eva,state);}
         long tick=eva.level().getGameTime();
         int gap=Math.max(1,Integer.getInteger("projectseele.r44HandWitnessTickGap",3));
@@ -57,10 +69,28 @@ public final class EvaHandWitnessR44
         String asset=eva.isExperimentalUnit()?eva.experimentalAssetName():"eva_unit0"+eva.getUnitVariant();
         row.addProperty("loaded_geometry_sha256",hash(new ResourceLocation("projectseele","geo/"+asset+".geo.json")));
         row.addProperty("stance",eva.rifleStanceLevel(partial));row.addProperty("gait",eva.rifleGaitPhase(partial));
+        row.addProperty("move_blend",eva.rifleMoveBlend(partial));row.addProperty("run_blend",eva.rifleRunBlend(partial));
+        row.addProperty("review_stage",com.projectseele.visual.CombatR31Review.stageName);
+        row.addProperty("review_tick",com.projectseele.visual.CombatR31Review.stageTicks);
+        row.addProperty("action_clip",EvaGameplayMotionR32.activeGroundClip(eva,partial));
+        row.addProperty("action_phase",EvaGameplayMotionR32.activeGroundPhase(eva,partial));
+        row.addProperty("actor_y",eva.getY());row.addProperty("partial",partial);
+        row.addProperty("rifle_sight",eva.rifleSightBlendR45(partial));
+        var firearm=EvaRifleContactRig.LAST.get(eva.getId());
+        if(firearm!=null&&firearm.left()!=null&&firearm.right()!=null)
+        {
+            var trace=new JsonObject();trace.addProperty("measured_grip",firearm.measured());
+            for(String side:java.util.List.of("l","r"))
+            {
+                var arm=side.equals("l")?firearm.left():firearm.right();var entry=new JsonObject();
+                entry.add("elbow_after_rifle",vector(arm.elbow()));entry.add("wrist_after_rifle",vector(arm.wrist()));entry.add("pole",vector(arm.pole()));trace.add(side,entry);
+            }
+            row.add("rifle_arm_owner_trace",trace);
+        }
         row.addProperty("shared_hands",EvaGameplayMotionR32.sharedHands(eva,partial));
         row.add("actual_owner_inputs",EvaGameplayMotionR32.ownerDiagnosticR44(eva,partial));
         row.add("model_to_world_column_major",matrix(modelToWorld));JsonArray palette=new JsonArray();
-        for(String side:new String[]{"l","r"})for(String name:handNames(side))
+        for(String name:observedNames())
         {
             GeoBone bone=model.getBone(name).orElse(null);if(bone==null)continue;
             JsonObject b=new JsonObject();b.addProperty("name",name);b.addProperty("parent",bone.getParent()==null?"":bone.getParent().getName());
@@ -69,12 +99,29 @@ public final class EvaHandWitnessR44
             var bind=bone.getInitialSnapshot();b.add("bind_local_euler_radians",vector(new Vector3f(bind.getRotX(),bind.getRotY(),bind.getRotZ())));
             b.add("pivot_model",vector(EvaRigTransforms.pivot(bone)));palette.add(b);
         }
-        row.add("bones",palette);write(row);
+        row.add("bones",palette);
+        if(Boolean.getBoolean("projectseele.r45BodySurfaceWitness"))
+        {
+            var joints=new JsonObject();
+            for(String side:new String[]{"l","r"})for(String family:new String[]{"knee","elbow"})
+            {
+                var marker=model.getBone("r30_"+family+"_socket_"+side).orElse(null);
+                var upper=model.getBone((family.equals("knee")?"leg_":"arm_")+side).orElse(null);
+                var lower=model.getBone((family.equals("knee")?"shin_":"forearm_")+side).orElse(null);
+                if(marker==null||upper==null||lower==null)continue;
+                var centre=EvaRigTransforms.pivot(marker);
+                var first=EvaRigTransforms.model(upper).transformPosition(new Vector3f(centre));
+                var second=EvaRigTransforms.model(lower).transformPosition(new Vector3f(centre));
+                joints.addProperty(family+"_"+side,first.distance(second)*com.projectseele.entity.EvaScale.RENDER_SCALE);
+            }
+            row.add("actual_parent_child_joint_error_blocks",joints);
+        }
+        write(row);
     }
     static void submitted(EvaUnit01Entity eva,GeoBone bone,ResourceLocation resource,float[] original,float[] submitted,
                           int stride,float px,float py,float pz,Matrix4f meshToWorld)
     {
-        if(!enabled()||ShaderShadowPassR44.active()||!(bone.getName().startsWith("finger_")||bone.getName().startsWith("hand_")))return;
+        if(!enabled()||ShaderShadowPassR44.active()||!observedPart(bone.getName()))return;
         State state=STATES.get(eva);
         if(state==null||state.frame!=FirstBattleSignals.clientFrameTime()||!state.parts.add(bone.getName()))return;
         JsonObject row=base(eva,state,"actual_cpu_submitted_part");row.addProperty("bone",bone.getName());
@@ -114,10 +161,30 @@ public final class EvaHandWitnessR44
     private static String[] handNames(String side)
     {
         java.util.List<String> names=new java.util.ArrayList<>();
-        for(String root:new String[]{"forearm_","wrist_","hand_","r30_hand_frame_"})names.add(root+side);
+        for(String root:new String[]{"arm_","forearm_","wrist_","hand_","r30_hand_frame_"})names.add(root+side);
         for(String digit:new String[]{"index","middle","ring","little","thumb"})
+        {
             for(String suffix:new String[]{"_axis","","_tip","_distal"})names.add("finger_"+digit+suffix+"_"+side);
+            for(int i=1;i<=3;i++)names.add("r45_hand_"+side+"_"+digit+"_"+i);
+        }
         return names.toArray(String[]::new);
+    }
+    private static String[] observedNames()
+    {
+        var names=new java.util.LinkedHashSet<String>();
+        for(String side:new String[]{"l","r"})java.util.Collections.addAll(names,handNames(side));
+        for(String side:new String[]{"l","r"})java.util.Collections.addAll(names,"r45_hand_"+side+"_cup_ring","r45_hand_"+side+"_cup_little");
+        java.util.Collections.addAll(names,"cannon","knife");
+        java.util.Collections.addAll(names,"pylon_l","r45_knife_hatch_l","r45_knife_carriage_l","r45_knife_actuator_l");
+        if(Boolean.getBoolean("projectseele.r45BodySurfaceWitness"))
+            java.util.Collections.addAll(names,"root","torso_lower","torso_upper","head","leg_l","leg_r","shin_l","shin_r","ankle_l","ankle_r","foot_l","foot_r");
+        return names.toArray(String[]::new);
+    }
+    private static boolean observedPart(String name)
+    {
+        return name.startsWith("finger_")||name.startsWith("hand_")||name.startsWith("r45_hand_")||name.equals("cannon")||name.equals("knife")||name.startsWith("r45_knife_")||name.equals("pylon_l")
+                ||Boolean.getBoolean("projectseele.r45BodySurfaceWitness")
+                &&java.util.Set.of("torso_lower","torso_upper","head","arm_l","arm_r","forearm_l","forearm_r","leg_l","leg_r","shin_l","shin_r","ankle_l","ankle_r","foot_l","foot_r").contains(name);
     }
     private static JsonObject base(EvaUnit01Entity eva,State state,String kind)
     {

@@ -234,9 +234,12 @@ def misato_home(b,state,put,door,bed):
         emit((left+8,y+1,front+1),'minecraft:bookshelf','Original storage/utility nook next to the washing space; PenPen refrigerator provision on the named household floor')
         # Original white refrigeration bay beside the kitchen/wet core.
         # Its actual usable door is retained as geometry, without TV logos.
-        emit((right-2,y+1,front+1),'minecraft:light_blue_concrete','Original blue-white refrigeration bay interior; no copied official brand texture')
-        emit((right-2,y+2,front+1),'minecraft:white_concrete','Complete supported refrigerator upper casing')
-        for half,dy in [('lower',1),('upper',2)]:emit((right-2,y+dy,front+2),f'projectseele:city_personnel_door[facing=south,half={half},hinge=left,open=false,powered=false]','Real refrigerator/service-nook door, original PenPen provision rather than a text-only room name')
+        # Keep the washing basin emitted above. A refrigerator is a cabinet,
+        # never a personnel doorway overwritten onto the basin and wet wall.
+        for dy in (1,2):
+            emit((right-2,y+dy,front+1),'minecraft:air','Complete washing-room service clearance after retiring the original blocked refrigeration casing')
+            emit((right-1,y+dy,front+8),'minecraft:smooth_quartz','Supported native closed refrigeration cabinet beside the actual kitchen wall, outside all real door approaches')
+            emit((right-2,y+dy,front+8),'minecraft:polished_blackstone_button[face=wall,facing=west,powered=false]','Recessed native cabinet handle, not a personnel door or room entrance')
         for xx in range(left+8,right-1):emit((xx,y+1,front+7),'minecraft:smooth_quartz','Actual kitchen work counter facing the living space')
         emit((left+8,y+1,front+9),'minecraft:crafting_table','Usable living/dining work table in the named unit')
         # Real balcony is outside the building wall; both public/return legs

@@ -56,8 +56,8 @@ import net.minecraftforge.network.PacketDistributor;
  */
 public final class S20CommandPresentationDirector
 {
-    private static final Path COMMAND_MODULE = Paths.get(
-            "projectseele-local-maps", "nerv_command_left.nbt");
+    private static final Path COMMAND_MODULE = com.projectseele.entity.CombatMotionResourcesR44.instancePath(
+            "projectseele-local-maps/nerv_command_left.nbt");
 
     /**
      * Measured placement in the actual human-approved reference save.

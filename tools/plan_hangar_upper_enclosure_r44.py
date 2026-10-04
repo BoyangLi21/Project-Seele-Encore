@@ -9,7 +9,7 @@ from collections import Counter
 import copy, hashlib, json
 import regional_voxels as v
 from query_blocks import AIR, iter_block_entities
-from measure_world_r40 import MeasuredWorld
+from measure_world_r40 import MeasuredWorld, properties
 from audit_facility_transit_r44 import Geometry
 from hangar_tv_design_r44 import upper_pressure_members, FULL_CUBE
 
@@ -18,6 +18,44 @@ WORLD = ROOT / "run/saves/SEELE_FIELD_R44_REVIEW"
 OUT = ROOT / "artifacts/rebuild_r44/facility_transit_r44/hangar_upper_enclosure_v2"
 PUBLIC_FLOORS = {"projectseele:clear_glass", "projectseele:nerv_floor_panel",
     "minecraft:polished_deepslate", "minecraft:sea_lantern"}
+
+
+def public_surface(state):
+    if state is None:
+        return False
+    name = state.partition("[")[0]
+    return name in PUBLIC_FLOORS or name == "projectseele:nerv_moving_walk" or name == "mtr:escalator_step" and properties(state).get("orientation") == "flat"
+
+
+def native_public_bearing(state, boxes):
+    if not public_surface(state) or boxes is None:
+        return False
+    name = state.partition("[")[0]
+    top = .9375 if name in {"mtr:escalator_step", "projectseele:nerv_moving_walk"} else 1.0
+    return all(any(b[0] <= a <= b[3] and b[2] <= c <= b[5] and abs(b[4] - top) <= .001
+        for b in boxes) for a in (.2, .5, .8) for c in (.2, .5, .8))
+
+
+def protected_public_columns(w, g, lo, hi):
+    protected = set()
+    for x in range(lo[0], hi[0] + 1):
+        for z in range(lo[2], hi[2] + 1):
+            for fy in (-394, -367):
+                floor = w.block((x, fy - 1, z))
+                if not public_surface(floor):
+                    continue
+                # A commissioned native flat belt has a .9375 top. Its
+                # original floor still establishes the whole public portal
+                # even when this owner's previous cladding blocked the head.
+                # Preservation never removes that existing foreign/head state.
+                boxes = g.boxes(floor)
+                if boxes is None:
+                    raise RuntimeError(("Public surface native bearing is unknown; hold complete pressure column", x, fy, z, floor))
+                flat_belt = floor.startswith("projectseele:nerv_moving_walk[") or floor.startswith("mtr:escalator_step[") and properties(floor).get("orientation") == "flat"
+                bearing = native_public_bearing(floor, boxes)
+                if g.standing((x, fy, z))["status"] == "STATIC_STANDING" or flat_belt and bearing:
+                    protected.update((x, y, z) for y in (fy - 1, fy, fy + 1, fy + 2))
+    return protected
 
 
 def plan(world=WORLD, out=OUT):
@@ -45,15 +83,7 @@ def plan(world=WORLD, out=OUT):
         roof_bearings.append({"position": q, "state": w.block(q)})
     # Explicit authored personnel levels, with a real nine-point slab and
     # source collision clearance. Protect full standing cells, not a centre.
-    protected_public = set()
-    for x in range(lo[0], hi[0] + 1):
-        for z in range(lo[2], hi[2] + 1):
-            for fy in (-394, -367):
-                floor = w.block((x, fy - 1, z))
-                if floor is None or floor.partition("[")[0] not in PUBLIC_FLOORS:
-                    continue
-                if g.standing((x, fy, z))["status"] == "STATIC_STANDING":
-                    protected_public.update((x, y, z) for y in (fy - 1, fy, fy + 1, fy + 2))
+    protected_public = protected_public_columns(w, g, lo, hi)
     for q, target in sorted(members.items()):
         before = w.block(q)
         if before is None:

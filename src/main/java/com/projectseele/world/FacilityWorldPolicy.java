@@ -2,6 +2,14 @@ package com.projectseele.world;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.util.HashMap;
+import java.util.Map;
+import java.util.WeakHashMap;
+import java.util.Objects;
+import com.projectseele.ProjectSeele;
+import net.minecraftforge.event.server.ServerStoppedEvent;
+import net.minecraftforge.eventbus.api.SubscribeEvent;
+import net.minecraftforge.fml.common.Mod;
 
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
@@ -15,6 +23,7 @@ import net.minecraft.world.level.storage.LevelResource;
  * name check alone is too weak because a local world can be renamed, so the
  * staging marker is authoritative and stable names are diagnostic fallbacks.</p>
  */
+@Mod.EventBusSubscriber(modid = ProjectSeele.MODID)
 public final class FacilityWorldPolicy
 {
     public static final String CLEAN_DIRECTORY = "SEELE_S19_CLEAN";
@@ -56,11 +65,48 @@ public final class FacilityWorldPolicy
 
     private FacilityWorldPolicy() {}
 
+    private static final Map<MinecraftServer, MarkerSnapshot> MARKERS = new WeakHashMap<>();
+    private record MarkerSnapshot(int tick, Path root, String levelName, Map<String, Boolean> present) {}
+
+    /** One real marker stat per server/world/tick, including negative results.
+     * Native Windows missing-file stats allocate an exception stack; repeated
+     * door synchronization must not repeat that work for the same decision.
+     * External changes are observed on the next tick, and explicit same-tick
+     * policy changes can call invalidate instead of weakening writer guards. */
+    public static boolean markerPresent(MinecraftServer server, String marker)
+    {
+        Path root = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
+        String name = server.getWorldData().getLevelName();
+        int tick = server.getTickCount();
+        synchronized (MARKERS)
+        {
+            MarkerSnapshot cached = MARKERS.get(server);
+            if (cached == null || cached.tick() != tick || !cached.root().equals(root) || !Objects.equals(cached.levelName(), name))
+            {
+                cached = new MarkerSnapshot(tick, root, name, new HashMap<>());
+                MARKERS.put(server, cached);
+            }
+            return cached.present().computeIfAbsent(marker, value -> Files.isRegularFile(root.resolve(value)));
+        }
+    }
+
+    public static void invalidate(MinecraftServer server)
+    {
+        synchronized (MARKERS) { MARKERS.remove(server); }
+        S20PhysicalElevatorDirector.invalidateLiftSpecs(server);
+    }
+
+    @SubscribeEvent
+    public static void onServerStopped(ServerStoppedEvent event)
+    {
+        invalidate(event.getServer());
+    }
+
     public static boolean isCleanRebuild(MinecraftServer server)
     {
         Path root = server.getWorldPath(LevelResource.ROOT);
         Path name = root.getFileName();
-        return Files.isRegularFile(root.resolve(CLEAN_MARKER))
+        return markerPresent(server, CLEAN_MARKER)
                 || CLEAN_LEVEL_NAME.equals(
                         server.getWorldData().getLevelName())
                 || name != null
@@ -79,8 +125,8 @@ public final class FacilityWorldPolicy
     {
         Path root = server.getWorldPath(LevelResource.ROOT);
         Path name = root.getFileName();
-        return Files.isRegularFile(root.resolve(S20_MARKER))
-                || Files.isRegularFile(root.resolve(S22_COASTAL_MARKER))
+        return markerPresent(server, S20_MARKER)
+                || markerPresent(server, S22_COASTAL_MARKER)
                 || S20_LEVEL_NAME.equals(
                         server.getWorldData().getLevelName())
                 || name != null && S20_DIRECTORY.equals(name.toString());
@@ -93,23 +139,21 @@ public final class FacilityWorldPolicy
     public static boolean isSpatialPreviewFrozen(MinecraftServer server)
     {
         Path root = server.getWorldPath(LevelResource.ROOT);
-        return Files.isRegularFile(
-                root.resolve(SPATIAL_PREVIEW_FREEZE_MARKER));
+        return markerPresent(server, SPATIAL_PREVIEW_FREEZE_MARKER);
     }
 
     /** True only for the separate-seed coastal migration world. */
     public static boolean isS22Coastal(MinecraftServer server)
     {
         Path root = server.getWorldPath(LevelResource.ROOT);
-        return Files.isRegularFile(root.resolve(S22_COASTAL_MARKER));
+        return markerPresent(server, S22_COASTAL_MARKER);
     }
 
     /** No S20 map writer may run while approved R28 volumes are in transit. */
     public static boolean isS22MigrationFrozen(MinecraftServer server)
     {
         Path root = server.getWorldPath(LevelResource.ROOT);
-        return Files.isRegularFile(
-                root.resolve(S22_MIGRATION_FREEZE_MARKER));
+        return markerPresent(server, S22_MIGRATION_FREEZE_MARKER);
     }
 
     /**
@@ -119,24 +163,21 @@ public final class FacilityWorldPolicy
     public static boolean isR10R12Approved(MinecraftServer server)
     {
         Path root = server.getWorldPath(LevelResource.ROOT);
-        return Files.isRegularFile(
-                root.resolve(S20_R10_R12_APPROVAL_RECEIPT));
+        return markerPresent(server, S20_R10_R12_APPROVAL_RECEIPT);
     }
 
     /** Correct observation lift, wrong-lift rollback and launch-well deck. */
     public static boolean isR14R16Approved(MinecraftServer server)
     {
         Path root = server.getWorldPath(LevelResource.ROOT);
-        return Files.isRegularFile(
-                root.resolve(S20_R14_R16_APPROVAL_RECEIPT));
+        return markerPresent(server, S20_R14_R16_APPROVAL_RECEIPT);
     }
 
     /** Duplicate deep MAGI sculptures were removed by the approved R28 packet. */
     public static boolean isR28Approved(MinecraftServer server)
     {
         Path root = server.getWorldPath(LevelResource.ROOT);
-        return Files.isRegularFile(
-                root.resolve(S20_R28_APPROVAL_RECEIPT));
+        return markerPresent(server, S20_R28_APPROVAL_RECEIPT);
     }
 
     public static boolean stagedBuildAuthorized(MinecraftServer server)
@@ -146,8 +187,7 @@ public final class FacilityWorldPolicy
             return false;
         }
         Path root = server.getWorldPath(LevelResource.ROOT);
-        return Files.isRegularFile(
-                root.resolve(CLEAN_BUILD_AUTHORIZATION));
+        return markerPresent(server, CLEAN_BUILD_AUTHORIZATION);
     }
 
     public static boolean isReadOnlyBrokenArchive(MinecraftServer server)
@@ -162,9 +202,8 @@ public final class FacilityWorldPolicy
                 || name != null
                 && (BROKEN_ARCHIVE_DIRECTORY.equals(name.toString())
                 || CONTAMINATED_ARCHIVE_DIRECTORY.equals(name.toString()))
-                || Files.isRegularFile(root.resolve(BROKEN_ARCHIVE_MARKER))
-                || Files.isRegularFile(
-                root.resolve(CONTAMINATED_ARCHIVE_MARKER));
+                || markerPresent(server, BROKEN_ARCHIVE_MARKER)
+                || markerPresent(server, CONTAMINATED_ARCHIVE_MARKER);
     }
 
     public static void requireCleanRebuild(

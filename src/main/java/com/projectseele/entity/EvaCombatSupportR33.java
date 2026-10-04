@@ -21,10 +21,36 @@ public final class EvaCombatSupportR33
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ReleaseFrame> CLIENT_RELEASES=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ListTag> CLOCKS=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,CompoundTag> FLOOR_WITNESS=new com.projectseele.util.WeakIdentityMap<>();
+    private static final class RenderClockR45
+    {
+        long frame; double serverTime,clientTime; float latestMove; boolean timedStop;
+    }
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,RenderClockR45> RENDER_CLOCKS_R45=new com.projectseele.util.WeakIdentityMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,com.google.gson.JsonObject> SIGNAL_REVIEW_R45=new com.projectseele.util.WeakIdentityMap<>();
+    public static com.google.gson.JsonObject signalReviewR45(EvaUnit01Entity e)
+    {
+        var review=SIGNAL_REVIEW_R45.get(e);return review==null?null:review.deepCopy();
+    }
+    private static float witnessSignalR45(EvaUnit01Entity e,float partial,int channel,float fallback,float value,String source,
+                                          CompoundTag first,CompoundTag last,float amount,boolean stationary)
+    {
+        if(com.projectseele.visual.BodyPoseLayersR40.ENABLED&&e.level().isClientSide)
+        {
+            var review=SIGNAL_REVIEW_R45.get(e);
+            if(review==null){review=new com.google.gson.JsonObject();SIGNAL_REVIEW_R45.put(e,review);}
+            var row=new com.google.gson.JsonObject();row.addProperty("source",source);row.addProperty("partial",partial);
+            row.addProperty("fallback",fallback);row.addProperty("value",value);row.addProperty("stationary",stationary);
+            if(first!=null){row.addProperty("first_tick",first.getLong("tick"));row.addProperty("last_tick",last.getLong("tick"));row.addProperty("amount",amount);}
+            var clock=RENDER_CLOCKS_R45.get(e);if(clock!=null){row.addProperty("server_time",clock.serverTime);row.addProperty("client_time",clock.clientTime);}
+            review.add(channel==4?"gait":channel==5?"move":"run",row);
+        }
+        return value;
+    }
     private static final EntityDataAccessor<CompoundTag> CONTACTS=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.COMPOUND_TAG);
+    private static final EntityDataAccessor<CompoundTag> PHASE_HISTORY_R45=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.COMPOUND_TAG);
     private static final EntityDataAccessor<Vector3f> DIRECTION=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.VECTOR3);
     public static boolean bootstrap(){return true;}
-    public static void define(SynchedEntityData d){d.define(CONTACTS,new CompoundTag());d.define(DIRECTION,new Vector3f(0,0,1));}
+    public static void define(SynchedEntityData d){d.define(CONTACTS,new CompoundTag());d.define(PHASE_HISTORY_R45,new CompoundTag());d.define(DIRECTION,new Vector3f(0,0,1));}
     public static boolean ready(EvaUnit01Entity e)
     {
         var p=EvaGameplayMotionR32.profile(EvaGameplayMotionR32.variant(e));
@@ -38,9 +64,16 @@ public final class EvaCombatSupportR33
     }
     public static float renderLocomotionSignalR44(EvaUnit01Entity e,float partial,int channel,float fallback)
     {
-        if(!e.level().isClientSide||e.hasLiveActionForRender(partial)||e.isFirstBattleActive()||e.isPilotCrouching()||e.isPilotProne())return fallback;
-        var tag=e.getEntityData().get(CONTACTS);if(!tag.contains("position_phase_r44",Tag.TAG_LIST))return fallback;
-        var samples=tag.getList("position_phase_r44",Tag.TAG_COMPOUND);if(samples.isEmpty())return fallback;
+        if(!e.level().isClientSide
+                ||e.hasLiveActionForRender(partial)&&!EvaGameplayMotionR32.movementMayComposeR45(e)
+                ||e.isFirstBattleActive()||e.isPilotCrouching()||e.isPilotProne())
+            return witnessSignalR45(e,partial,channel,fallback,fallback,"ineligible",null,null,0,false);
+        // Releasing a planted foot must not also discard the gait clock.
+        // Attacks and turning previously cleared CONTACTS, switching the
+        // same moving legs between two differently delayed sample streams.
+        var tag=e instanceof EvaPrototypeEntity?e.getEntityData().get(CONTACTS):e.getEntityData().get(PHASE_HISTORY_R45);
+        if(!tag.contains("position_phase_r44",Tag.TAG_LIST))return witnessSignalR45(e,partial,channel,fallback,fallback,"no_history",null,null,0,false);
+        var samples=tag.getList("position_phase_r44",Tag.TAG_COMPOUND);if(samples.isEmpty())return witnessSignalR45(e,partial,channel,fallback,fallback,"empty_history",null,null,0,false);
         var origin=e.getPosition(partial);CompoundTag first=samples.getCompound(samples.size()-1),last=first;float amount=1;double best=Double.POSITIVE_INFINITY;
         for(int i=0;i+1<samples.size();i++)
         {
@@ -55,10 +88,68 @@ public final class EvaCombatSupportR33
         // Every pair contains a phase, blend and the server origin from the
         // same tick. Sample that pair at the actual renderer origin instead
         // of advancing phase ahead of vanilla's three-tick position lerp.
-        if(best>64&&Double.isFinite(best))return fallback;
+        if(best>64&&Double.isFinite(best))return witnessSignalR45(e,partial,channel,fallback,fallback,"far_from_history",first,last,amount,false);
+        boolean stationaryReview=false,timedStopReview=false;
+        if(!(e instanceof EvaPrototypeEntity))
+        {
+            var newest=samples.getCompound(samples.size()-1);
+            var prior=samples.getCompound(Math.max(0,samples.size()-2));
+            double dx=newest.getDouble("x")-prior.getDouble("x"),dz=newest.getDouble("z")-prior.getDouble("z");
+            double ox=origin.x-newest.getDouble("x"),oz=origin.z-newest.getDouble("z");
+            boolean stationary=dx*dx+dz*dz<1e-8&&ox*ox+oz*oz<.0025;
+            stationaryReview=stationary;
+            double spatialTime=Mth.lerp((double)amount,(double)first.getLong("tick"),(double)last.getLong("tick"));
+            long frame=FirstBattleSignals.clientFrameTime();double clientTime=(double)e.level().getGameTime()+partial;
+            var clock=RENDER_CLOCKS_R45.get(e);
+            float newestMove=newest.getFloat("move"),priorMove=prior.getFloat("move");
+            // Start the stop timeline when the SERVER blend begins to fall,
+            // before vanilla's position lerp reaches the final point. Near a
+            // stop, several almost coincident spatial segments are ambiguous:
+            // nearest-segment selection jumped four source ticks in one frame.
+            // The already selected delayed timeline has that information.
+            boolean resumed=clock!=null&&newestMove>clock.latestMove+1e-4F;
+            boolean timedStop=!resumed&&(stationary||newestMove+1e-4F<priorMove
+                    ||clock!=null&&clock.timedStop&&newestMove<.999F&&newestMove<=priorMove+1e-4F);
+            if(clock==null)
+            {
+                clock=new RenderClockR45();clock.serverTime=spatialTime;clock.clientTime=clientTime;
+                clock.frame=frame;clock.timedStop=timedStop;clock.latestMove=newestMove;RENDER_CLOCKS_R45.put(e,clock);
+            }
+            else if(clock.frame!=frame)
+            {
+                // A zero-length spatial segment still contains real timed
+                // blend samples. Continue the SAME delayed render timeline
+                // through them; switching to the latest packet clock skips
+                // the first stopping poses on slower clients.
+                double elapsed=clientTime-clock.clientTime;
+                clock.serverTime=timedStop&&elapsed>=0&&elapsed<4
+                        ?clock.serverTime+elapsed:spatialTime;
+                clock.clientTime=clientTime;clock.frame=frame;clock.timedStop=timedStop;clock.latestMove=newestMove;
+            }
+            // All three channels must consume the SAME frame decision, and
+            // renewed movement must leave stop mode even if its rising packet
+            // was skipped and the next history already contains two full rows.
+            timedStop=clock.timedStop;timedStopReview=timedStop;
+            if(timedStop)
+            {
+                first=last=samples.getCompound(0);amount=0;
+                for(int i=1;i<samples.size();i++)
+                {
+                    var candidate=samples.getCompound(i);
+                    if(candidate.getLong("tick")>=clock.serverTime)
+                    {
+                        last=candidate;double duration=last.getLong("tick")-first.getLong("tick");
+                        amount=duration<=0?0:(float)Mth.clamp((clock.serverTime-first.getLong("tick"))/duration,0,1);break;
+                    }
+                    first=last=candidate;amount=0;
+                }
+            }
+        }
         String key=channel==4?"gait":channel==5?"move":"run";float a=first.getFloat(key),b=last.getFloat(key);
-        if(channel==4){float difference=b-a;difference-=Math.round(difference);return a+difference*amount;}
-        return Mth.lerp(amount,a,b);
+        float value;
+        if(channel==4){float difference=b-a;difference-=Math.round(difference);value=a+difference*amount;}
+        else value=Mth.lerp(amount,a,b);
+        return witnessSignalR45(e,partial,channel,fallback,value,timedStopReview?"stop_timeline":"position_history",first,last,amount,stationaryReview);
     }
     private static void rememberClockR44(EvaUnit01Entity e)
     {
@@ -67,6 +158,12 @@ public final class EvaCombatSupportR33
         row.putFloat("gait",e.rifleGaitPhase(0));row.putFloat("run",e.rifleRunBlend(0));row.putFloat("move",e.rifleMoveBlend(0));
         if(!samples.isEmpty()&&samples.getCompound(samples.size()-1).getLong("tick")==e.level().getGameTime())samples.remove(samples.size()-1);
         samples.add(row);while(samples.size()>8)samples.remove(0);CLOCKS.put(e,samples);
+        if(!(e instanceof EvaPrototypeEntity))
+        {
+            var history=new CompoundTag();
+            if(e.getPilotEntity()!=null&&!e.isNervLogisticsLocked())history.put("position_phase_r44",samples.copy());
+            if(!history.equals(e.getEntityData().get(PHASE_HISTORY_R45)))e.getEntityData().set(PHASE_HISTORY_R45,history);
+        }
     }
     private static void attachClockR44(EvaUnit01Entity e,CompoundTag tag)
     {var samples=CLOCKS.get(e);if(samples!=null)tag.put("position_phase_r44",samples.copy());}
@@ -105,7 +202,9 @@ public final class EvaCombatSupportR33
     public static void preventFreeFootPenetrationR44(EvaUnit01Entity e,EvaBodyPose.Sample pose,float partial)
     {
         FLOOR_WITNESS.remove(e);
-        if(!EvaBodyPose.runtimeLocomotionR44(e)||!supported(e)||!EvaGameplayMotionR32.sharedWeapon(e)||e.rifleStanceLevel(partial)>.01F
+        // Terrain non-penetration is independent of the optional locomotion
+        // foot-lock asset. Legacy clips and attacks use the same final soles.
+        if(e.isExperimentalUnit()||!supported(e)||!EvaGameplayMotionR32.sharedWeapon(e)||e.rifleStanceLevel(partial)>.01F
                 ||e.isFirstBattleActive()||e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e)||CombatReactionsR36.active(e))return;
         var origin=e.level().isClientSide?e.getPosition(partial):e.position();var diagnostics=new CompoundTag();
         var profile=com.projectseele.physics.CombatBodyProfiles.get(e);
@@ -114,11 +213,10 @@ public final class EvaCombatSupportR33
             var low=EvaBodyPose.lowestRigidFootR44(e,pose,side);if(low==null)continue;
             var world=new Vector3f(low).mul(EvaScale.RENDER_SCALE).rotateY((180-e.getYRot())*Mth.DEG_TO_RAD).add((float)origin.x,(float)origin.y,(float)origin.z);
             diagnostics.putDouble(side+"before_y",world.y);
-            // A planted end effector already owns its world point. For a free
-            // foot, support IK may have moved the pelvis after body grounding.
-            // Project only that leg onto the real terrain inequality; never
-            // lift the whole body and drag the planted foot.
-            if(anchor(e,side,partial)!=null&&!e.getEntityData().get(CONTACTS).contains("release")||world.y>=origin.y+.025)continue;
+            // Normalizing a knee after support IK can move even a planted
+            // sole below its actual surface. Preserve its X/Z and orientation;
+            // project only the penetrating leg, without lifting the assembly.
+            if(world.y>=origin.y+.025)continue;
             var point=new Vec3(world.x,world.y,world.z);
             var hit=e.level().clip(new net.minecraft.world.level.ClipContext(point.add(0,4,0),point.add(0,-8,0),
                     net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,e));
@@ -180,6 +278,8 @@ public final class EvaCombatSupportR33
     public static void capture(EvaUnit01Entity e,EvaBodyPose.Sample pose)
     {
         if(e.level().isClientSide||!ready(e)||!supported(e)||e.isPilotCrouching()||e.isPilotProne())return;
+        if(!(e instanceof EvaPrototypeEntity)&&(e.pilotLocomotionRequestedR45()||e.rifleMoveBlend(0)>.08F))
+        {release(e);return;}
         CompoundTag t=new CompoundTag();t.putFloat("yaw",e.getYRot());t.putLong("plant",e.level().getGameTime());t.putInt("weapon",e.getWeapon());
         for(String s:new String[]{"l","r"})
         {
@@ -212,7 +312,11 @@ public final class EvaCombatSupportR33
     public static void tick(EvaUnit01Entity e)
     {
         if(e.level().isClientSide||!ready(e))return;
-        if(EvaBodyPose.runtimeLocomotionR44(e))rememberClockR44(e);
+        // Packet/position timing also belongs to the preserved legacy clips.
+        // Gating the history on a new foot-lock asset contract left those
+        // clips on bursty packet clocks, skipping several gait poses at once.
+        // This records timing only; it does not enable planted-foot IK.
+        if(!(e instanceof EvaPrototypeEntity)||EvaBodyPose.runtimeLocomotionR44(e))rememberClockR44(e);
         boolean locomotion=EvaBodyPose.runtimeLocomotionR44(e)&&EvaGameplayMotionR32.sharedWeapon(e)
                 &&e.getPilotEntity()!=null&&supported(e)&&!strike(e)&&e.rifleMoveBlend(0)>.05F&&e.rifleStanceLevel(0)<.01F
                 &&!e.isNervLogisticsLocked()&&!e.isFirstBattleActive()&&!EvaShutdownR30.disabled(e)&&!CombatReactionsR36.active(e);
@@ -221,6 +325,12 @@ public final class EvaCombatSupportR33
         var beat=CombatFeelR31.beat(e);boolean fallen=beat!=null&&(beat.kind()==CombatFeelR31.DOWN||beat.kind()==CombatFeelR31.THROWN);
         boolean release=!supported(e)||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)
                 ||!EvaGameplayMotionR32.sharedWeapon(e)||e.isPilotCrouching()||e.isPilotProne()||fallen||!strike(e)&&e.rifleMoveBlend(1)>.18F;
+        if(!(e instanceof EvaPrototypeEntity))
+        {
+            var anchors=e.getEntityData().get(CONTACTS);
+            release|=e.rifleMoveBlend(1)>.08F||!anchors.isEmpty()
+                    &&Math.abs(Mth.wrapDegrees(EvaAirTransportR31.frameYaw(e,0)-anchors.getFloat("yaw")))>12;
+        }
         if(release&&!e.getEntityData().get(CONTACTS).isEmpty())e.getEntityData().set(CONTACTS,new CompoundTag());
         var t=e.getEntityData().get(CONTACTS);
         if(t.contains("release")&&!strike(e))
@@ -299,6 +409,8 @@ public final class EvaCombatSupportR33
     }
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample p,float partial)
     {
+        if(!(e instanceof EvaPrototypeEntity)&&e.rifleMoveBlend(partial)>.08F)
+        {TARGETS.remove(e);CLIENT_RELEASES.remove(e);return;}
         TARGETS.remove(e);
         if(CombatReactionsR36.active(e))return;
         if(!ready(e)||!supported(e)||!EvaGameplayMotionR32.owns(e,partial)||e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e))return;

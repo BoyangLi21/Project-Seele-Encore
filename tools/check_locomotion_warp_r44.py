@@ -25,13 +25,16 @@ def frame_between(a,b,weight):
 
 
 def main():
-    ap=argparse.ArgumentParser();ap.add_argument('--bundle',type=Path,default=ROOT/'artifacts/rebuild_r44/combat/locomotion_warp/motion');args=ap.parse_args()
-    body=json.loads((args.bundle/'eva_body_r44.json').read_text('utf8'));common.BODY=body;reports=[];errors=[]
-    for key in range(5):
+    ap=argparse.ArgumentParser();ap.add_argument('--bundle',type=Path,default=ROOT/'artifacts/rebuild_r44/combat/locomotion_warp/motion')
+    ap.add_argument('--body',type=Path);ap.add_argument('--profiles',type=Path);ap.add_argument('--rigs',default='0,1,2,3,4');ap.add_argument('--clips',default='walk,run');ap.add_argument('--out',type=Path);args=ap.parse_args()
+    body=json.loads((args.body or args.bundle/'eva_body_r44.json').read_text('utf8'));common.BODY=body;reports=[];errors=[]
+    for key in map(int,args.rigs.split(',')):
         rig=body['rigs'][str(key)];source=body['stance_clips_by_rig'][str(key)];vertices=body.get('rig_support',{}).get(str(key),body['support'])
-        toes=json.loads((args.bundle/f'eva_gameplay_r44_{key}.json').read_text('utf8'))['support_toes']
+        profiles=args.profiles or args.bundle
+        profile=next(profiles/f'eva_gameplay_r{rev}_{key}.json'for rev in [44,43,42,32]if(profiles/f'eva_gameplay_r{rev}_{key}.json').is_file())
+        toes=json.loads(profile.read_text('utf8'))['support_toes']
         actor=Actor(key)
-        for label in ('walk','run'):
+        for label in args.clips.split(','):
             clip=source['clips'][label];frames=clip['frames'];count=len(frames)-1
             stride=body['locomotion_contract_r43'][str(key)][label]['runtime_stride_blocks_r44'];points=[];support=[];worstJoint=0
             for at in np.linspace(0,count,count*4+1):
@@ -73,7 +76,7 @@ def main():
     result=dict(pass_=not errors,errors=errors,measurements=reports,
         scope='Read-back at quarter-frame phases through quaternion interpolation and runtime hinge-offset reconstruction; horizontal world support measured at the same forefoot marker as runtime, with source heel/toe roll retained',
         unverified=['Terrain/turning and walk-run mixture', 'Final GPU skinning', 'Network interpolation and perceptual cadence'])
-    (args.bundle.parent/'encoded_support_check.json').write_text(json.dumps(result,indent=2),'utf8')
+    (args.out or args.bundle.parent/'encoded_support_check.json').write_text(json.dumps(result,indent=2),'utf8')
     print(json.dumps(result),flush=True)
     if errors:raise SystemExit(1)
 

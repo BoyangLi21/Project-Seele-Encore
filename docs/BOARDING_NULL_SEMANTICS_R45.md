@@ -1,0 +1,15 @@
+# R45 机库417旧节点与当前人员设施分流
+
+当前证据为 `pyramid_components_sol_v1/boarding417_semantics_v4`。只读明确冷sourcecandidate，1736文件前后SHA相等；没有访问或锁定热QA，没有启动Java，也没有改冻结policy源码、模型或动态动作。1格compact地板、6格MTR出口、18格按钮候选仍安装false。
+
+417个旧FY=-394节点不是当前设施是否正常的分母。逐个完整柱回读后：15个坐标是当前427-owner里的永久护边，不是应站立的地板；240个位于旧全宽前横廊的内部清空带，当前进入由独立登记的双格接近桥承担；162个位于旧内部勤务/旧插栓孔框清空带，没有当前公共楼面或人员入口。417旧节点与当前202永久格栅的XZ重叠为0，不能按空气失败去填回旧棚架，也不能凭某个设备包围盒宣称这些点已是正常装置。
+
+当前保存的fleet三机都是PARKED，原canonical/EntryPlug UUID、实体完整NBT与阶段已回读。当前机库带保存的5个人员/训练员均在实际固定承重点，不在这417旧节点；未迁移其岗位、身份、任务或进度。永久人员格栅202、护边201及安全门24块的427个完整安装state/NBT与owner_provenance全部一致。普通门的合法open/powered变化单独归一；没有外国BE被覆盖。
+
+六个实际登记安全门口的完整双片下/上半门及公共接近面已回读。全部现有固定公共接近路径都能在正确实际datum通向本层west电梯(-29,-394,-285)及compact电梯(93,-394,-45)，涉及6848实际公共承重点，不仅走中心线。compact几何接近完整不等于轿厢可用；已知foreign floor角的1格恢复仍未安装。
+
+202个永久格栅的64种实际native collider、正确分数高度和完整0.6米脚印碰撞接触已逐格回读；全部固定世界身体净空CLEAR，291条相邻格栅在较高实际endpoint datum的全身扫掠均CLEAR。细格栅有刻意射线孔，不能强套普通实心9射线把它当空气。爬坡/0.25米段/STAIR跨格仍需真实native玩家，不把较高datum的静态扫掠冒充实际攀爬。模型私有inspection apron的声明几何单独存档；collision provider依赖review flag及实际no-save gantry，冷entity文件没有gantry不能证明正常或失效。
+
+真实派生导航缺项是：旧143080整数图只含30/202个当前永久格栅实际datum，另172个当前高度不在旧图中。原producer只遍历冻结坐标、使用通用floor_key和普通standing规则，不能完整表达带门权限、分数高度的私有操作区。修复候选为 `scoped_operator_graph_extension_UNBOUND.json`：六个明确当前operator scope、当前202格栅与全部邻边、真实本层公共接近路、原实际安全门与stationary-owner前置条件。它不把私有机械平台改成公共走廊，不替换旧公共图，也不填417旧坐标。
+
+候选及可逆新增文件建议见 `operator_scope_reversible_proposal.json`，绑定、安装、native pass均false。root应先在当前code/shape/world epoch下实测两宽度车道、全部ramp/门、真实gantry/provider与occupied/moving拒绝及回公共层，再决定派生scope接入；未决设备状态继续单列，不能用静态数或“PARKED”关掉全图问题。

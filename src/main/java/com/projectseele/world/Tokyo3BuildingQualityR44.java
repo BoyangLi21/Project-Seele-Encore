@@ -122,7 +122,7 @@ public final class Tokyo3BuildingQualityR44
     {
         input=JsonParser.parseString(Files.readString(Path.of(JOB),StandardCharsets.UTF_8)).getAsJsonObject();
         Path world=level.getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
-        if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW")
+        if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName())
                 ||!world.equals(Path.of(input.get("world").getAsString()).toAbsolutePath().normalize())
                 ||level.getSeed()!=input.get("world_seed").getAsLong())
             throw new IllegalStateException("Wrong measured world identity");

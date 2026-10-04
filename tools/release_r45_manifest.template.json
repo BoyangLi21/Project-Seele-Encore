@@ -1,0 +1,422 @@
+{
+  "schema": "projectseele.release-r45.manifest.v1",
+  "batch_id": "R45_USER_REVIEW_CANDIDATE",
+  "output_directory": null,
+  "protocol": "53",
+  "minecraft": "1.20.1",
+  "forge": "47.4.10",
+  "java": "17",
+  "source_review_receipt": null,
+  "forge_runtime_receipt": null,
+  "build": {
+    "project_jar": {
+      "source": null,
+      "sha256": null
+    },
+    "production_receipt": null,
+    "embedded_assets": {}
+  },
+  "world": {
+    "role": "DELIVERY_SOURCE",
+    "source_directory": null,
+    "world_name": null,
+    "world_uuid": null,
+    "seed": null,
+    "writer_closed": false,
+    "composition_receipt": null,
+    "files": null,
+    "omissions": []
+  },
+  "common_mods": [
+    {
+      "filename": "MTR-forge-4.0.5+1.20.1.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "Patchouli-1.20.1-85-FORGE.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "another-furniture-1.20.1-3.0.4.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "ars-nouveau-4.12.7.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "create-1.20.1-6.0.8.jar",
+      "source": null,
+      "sha256": "6fbb910c367dbce8e4fc7e5bf64b6edd4de980906ed00af8e47e4af843c0d9b0"
+    },
+    {
+      "filename": "curios-forge-1.20.1-5.14.1.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "ferritecore-6.0.1-forge.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "geckolib-forge-1.20.1-4.8.4.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "grandpianomod-1.0.0.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "kotlinforforge-4.12.0-all.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "mcw-doors-1.1.5-mc1.20.1forge.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "modernfix-forge-5.27.83+mc1.20.1.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "movingelevators-1.4.12-forge-mc1.20.1.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "superbwarfare-0.8.9.1-hotfix-mc1.20.1-993063bed-all.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "supermartijn642configlib-1.1.8-forge-mc1.20.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "supermartijn642corelib-1.1.24-forge-mc1.20.1.jar",
+      "source": null,
+      "sha256": null
+    }
+  ],
+  "client_mods": [
+    {
+      "filename": "embeddium-0.3.31+mc1.20.1.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "xaerominimap-forge-1.20.1-26.5.0.jar",
+      "source": null,
+      "sha256": null
+    },
+    {
+      "filename": "xaeroworldmap-forge-1.20.1-1.46.0.jar",
+      "source": null,
+      "sha256": null
+    }
+  ],
+  "full_client_mods": [
+    {
+      "filename": "oculus-mc1.20.1-1.8.0.jar",
+      "source": null,
+      "sha256": null
+    }
+  ],
+  "runtime_files": [
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/eva_body_r44.json",
+      "role": "eva_body"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/eva_gameplay_r44_0.json",
+      "role": "eva_gameplay_0"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/eva_gameplay_r44_1.json",
+      "role": "eva_gameplay_1"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/eva_gameplay_r44_2.json",
+      "role": "eva_gameplay_2"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/eva_gameplay_r44_3.json",
+      "role": "eva_gameplay_3"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/eva_gameplay_r44_4.json",
+      "role": "eva_gameplay_4"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/first_battle_r44.json",
+      "role": "first_battle"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/sachiel_gameplay_r44.json",
+      "role": "sachiel"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/angel_grip_r31.json",
+      "role": "grip"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/eva_recovery_r31.json",
+      "role": "recovery"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "projectseele-local-maps/articulated_bodies_r35.json",
+      "role": "physical_bodies"
+    },
+    {
+      "source": null,
+      "sha256": null,
+      "destination": "config/projectseele-runtime-r45.properties",
+      "role": "runtime_owners"
+    }
+  ],
+  "client_files": [],
+  "server_files": [],
+  "docs_files": [],
+  "client_options": {
+    "renderDistance": "24",
+    "simulationDistance": "8",
+    "mipmapLevels": "4",
+    "graphicsMode": "1",
+    "particles": "0",
+    "entityDistanceScaling": "1.0"
+  },
+  "server_jvm_args": [
+    "-Xms2G",
+    "-Xmx20G",
+    "-XX:+UseG1GC",
+    "-XX:+ParallelRefProcEnabled",
+    "-XX:MaxGCPauseMillis=200",
+    "-XX:G1HeapRegionSize=16M",
+    "-XX:G1ReservePercent=20",
+    "-XX:InitiatingHeapOccupancyPercent=15",
+    "-Dfile.encoding=UTF-8"
+  ],
+  "textures": {
+    "selected": null,
+    "license_receipt": null,
+    "files": []
+  },
+  "shaders": {
+    "original_zip": {
+      "source": null,
+      "sha256": "66061b3c5b4843e31bc9a7562a7ac697a51bb77c73defc7071f996b783efacce"
+    },
+    "adapter_files": [
+      {
+        "source": null,
+        "sha256": "cb93bd2f08924067cdfb5903723631fa23e6a8352066c5b4a15f7518ce1bbef7",
+        "destination": "Install-LocalPrivateVisuals.v12.ps1"
+      },
+      {
+        "source": null,
+        "sha256": "9293c7a6b2a6b985ff93e668109222c63607184175b784d6503a8430c814d8df",
+        "destination": "private_shader_recipe_v12.json"
+      }
+    ],
+    "enabled_by_default": false,
+    "credits_text": "Complementary Unbound r5.3 by Complementary Development. https://www.complementary.dev/ . Original License.txt retained. Project SEELE is responsible for modpack support. Adaptation is generated only in the personal local installation; no prebuilt modified shader is redistributed."
+  },
+  "reviews": {
+    "functional": [
+      {
+        "id": "BACKEND_PRODUCTION_38",
+        "status": "PASS",
+        "scope": "Actual root JVM production state/NBT checks; not live campaign"
+      },
+      {
+        "id": "IO_12",
+        "status": "PASS",
+        "scope": "Actual root I/O checks; not two real clients"
+      }
+    ],
+    "measured": [
+      {
+        "id": "CITY_96_ONE_DIRECTION",
+        "status": "PASS",
+        "scope": "Actual one-direction native execution; performance not passed"
+      },
+      {
+        "id": "GPU_DEFAULT_RELOAD_V72",
+        "status": "PASS",
+        "evidence_sha256": "571a838acecedafc6b2f657d152bc521a7ec097e5318ac9764acf2d30bf2c6ec",
+        "scope": "Actual no-override default, active shader, all three gantries closed in both captures; snapshot FPS44/39; native reload released160283200bytes; not platform TV art or all hardware/shaders acceptance"
+      }
+    ],
+    "inherited": [
+      {
+        "id": "PLAIN_EXPLICIT_GPU_V68",
+        "status": "INHERITED",
+        "scope": "Actual previous explicit GPU Plain, snapshot102FPS; not a new default-property Plain run"
+      }
+    ],
+    "visual_self": [
+      {
+        "id": "GANTRY_RELOAD_GEOMETRY_V72",
+        "status": "PASS",
+        "evidence_sha256": "571a838acecedafc6b2f657d152bc521a7ec097e5318ac9764acf2d30bf2c6ec",
+        "scope": "Root viewed both native images; static geometry consistent after reload; platform TV art unaccepted"
+      }
+    ],
+    "user": [
+      {
+        "id": "ACTION_TV_ART",
+        "status": "FAIL"
+      },
+      {
+        "id": "REALISTIC_TEXTURES",
+        "status": "PENDING"
+      }
+    ],
+    "unverified": [
+      {
+        "id": "CANCEL_NO_AUTO_LAUNCH",
+        "status": "UNVERIFIED"
+      },
+      {
+        "id": "CITY_BIDIRECTIONAL_PERFORMANCE",
+        "status": "UNVERIFIED"
+      },
+      {
+        "id": "COLD_RESTART",
+        "status": "UNVERIFIED"
+      },
+      {
+        "id": "FULL_PLAIN_VISUAL_RESOURCES",
+        "status": "UNVERIFIED"
+      },
+      {
+        "id": "SCRIPT_OFFLINE_INSTALL",
+        "status": "UNVERIFIED"
+      },
+      {
+        "id": "SERVER_20G_PERFORMANCE",
+        "status": "UNVERIFIED"
+      },
+      {
+        "id": "TWO_REAL_CLIENTS",
+        "status": "UNVERIFIED"
+      },
+      {
+        "id": "WORLD_IDENTITIES_AND_PROGRESS",
+        "status": "UNVERIFIED"
+      },
+      {
+        "id": "NPC_ORIGINAL_EVA",
+        "user_deferred": true,
+        "reason": "User postponed complete Yashima/harbor story and NPC multiple-airframe sortie/recovery chain to the next round; no completed feature claim.",
+        "status": "DEFERRED"
+      },
+      {
+        "id": "MID_MISSION_REINFORCEMENT",
+        "user_deferred": true,
+        "reason": "User postponed complete Yashima/harbor story and NPC multiple-airframe sortie/recovery chain to the next round; no completed feature claim.",
+        "status": "DEFERRED"
+      },
+      {
+        "id": "PHYSICAL_EQUIPMENT_CUSTODY",
+        "user_deferred": true,
+        "reason": "User postponed complete Yashima/harbor story and NPC multiple-airframe sortie/recovery chain to the next round; no completed feature claim.",
+        "status": "DEFERRED"
+      },
+      {
+        "id": "VICTORY_RETURN_ARCHIVE",
+        "user_deferred": true,
+        "reason": "User postponed complete Yashima/harbor story and NPC multiple-airframe sortie/recovery chain to the next round; no completed feature claim.",
+        "status": "DEFERRED"
+      },
+      {
+        "id": "CORE_EVA_PLAYER_CONTROLS",
+        "status": "UNVERIFIED",
+        "scope": "Retained actual final-stage check; source/JVM/synthetic checks do not substitute native or user acceptance."
+      },
+      {
+        "id": "CORE_RECOVERY_EQUIPMENT_RETURN",
+        "status": "UNVERIFIED",
+        "scope": "Retained actual final-stage check; source/JVM/synthetic checks do not substitute native or user acceptance."
+      },
+      {
+        "id": "FIRST_PERSON_OPTICS",
+        "status": "UNVERIFIED",
+        "scope": "Retained actual final-stage check; source/JVM/synthetic checks do not substitute native or user acceptance."
+      },
+      {
+        "id": "AT_FIELD_CONTACT",
+        "status": "UNVERIFIED",
+        "scope": "Retained actual final-stage check; source/JVM/synthetic checks do not substitute native or user acceptance."
+      },
+      {
+        "id": "AUDIO_LIFECYCLE",
+        "status": "UNVERIFIED",
+        "scope": "Retained actual final-stage check; source/JVM/synthetic checks do not substitute native or user acceptance."
+      },
+      {
+        "id": "REAL_AI_COMBAT",
+        "status": "UNVERIFIED",
+        "scope": "Retained actual final-stage check; source/JVM/synthetic checks do not substitute native or user acceptance."
+      }
+    ]
+  },
+  "acceptance_receipts": [],
+  "asset_policy_receipt": null,
+  "delivery_scope": "CORE_EVA_OPERATIONS_R45",
+  "deferred_native_checks": [
+    {
+      "id": "NPC_ORIGINAL_EVA",
+      "user_deferred": true,
+      "reason": "User postponed complete Yashima/harbor story and NPC multiple-airframe sortie/recovery chain to the next round; no completed feature claim."
+    },
+    {
+      "id": "MID_MISSION_REINFORCEMENT",
+      "user_deferred": true,
+      "reason": "User postponed complete Yashima/harbor story and NPC multiple-airframe sortie/recovery chain to the next round; no completed feature claim."
+    },
+    {
+      "id": "PHYSICAL_EQUIPMENT_CUSTODY",
+      "user_deferred": true,
+      "reason": "User postponed complete Yashima/harbor story and NPC multiple-airframe sortie/recovery chain to the next round; no completed feature claim."
+    },
+    {
+      "id": "VICTORY_RETURN_ARCHIVE",
+      "user_deferred": true,
+      "reason": "User postponed complete Yashima/harbor story and NPC multiple-airframe sortie/recovery chain to the next round; no completed feature claim."
+    }
+  ]
+}

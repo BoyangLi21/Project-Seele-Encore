@@ -35,7 +35,7 @@ public final class AngelGrappleSurfaceR31
     private static Map<String,Profile> profiles()
     {
         if(profiles!=null)return profiles;Map<String,Profile> loaded=new HashMap<>();
-        Path path=Path.of(System.getProperty("projectseele.angelGripProfile","projectseele-local-maps/angel_grip_r31.json"));
+        Path path=CombatMotionResourcesR44.instancePath(System.getProperty("projectseele.angelGripProfile","projectseele-local-maps/angel_grip_r31.json"));
         try
         {
             var all=JsonParser.parseString(Files.readString(path)).getAsJsonObject();

@@ -1,0 +1,1 @@
+{"variants":{"facing=north":{"model":"projectseele:block/dead_sea_archive"},"facing=south":{"model":"projectseele:block/dead_sea_archive","y":180},"facing=east":{"model":"projectseele:block/dead_sea_archive","y":90},"facing=west":{"model":"projectseele:block/dead_sea_archive","y":270}}}

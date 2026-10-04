@@ -27,6 +27,7 @@ public final class CombatR31Review
     public static final boolean ENABLED="r31-combat".equals(System.getProperty("projectseele.regionalBuild",""));
     public static final boolean DUEL=Boolean.getBoolean("projectseele.combatDuel");
     public static final boolean NORMALS=Boolean.getBoolean("projectseele.combatNormals");
+    private static final boolean HELD_MOVE_TURN_R45=Boolean.getBoolean("projectseele.r45HeldMoveTurnReview");
     public static final boolean AT_FIELD_REVIEW=Boolean.getBoolean("projectseele.r44AtFieldCalibration");
     public static volatile boolean atFieldPilotView;
     private static final boolean OPTICS_R43=Boolean.getBoolean("projectseele.r43OpticsStates");
@@ -43,8 +44,12 @@ public final class CombatR31Review
     private static int opticsTrackedAt=-1;
     public static volatile boolean postFinaleOptics;
     public static final String WORLD="SEELE_FIELD_R31_REVIEW";
-    public static final int X=12000,Z=12000,FLOOR=280;
+    private static final boolean SHUTDOWN_FIXTURE_R45=Boolean.getBoolean("projectseele.r45ShutdownLifecycleReview");
+    public static final int X=SHUTDOWN_FIXTURE_R45?Integer.getInteger("projectseele.r45ShutdownArenaX",14000):12000,
+            Z=SHUTDOWN_FIXTURE_R45?Integer.getInteger("projectseele.r45ShutdownArenaZ",14000):12000,
+            FLOOR=SHUTDOWN_FIXTURE_R45?180:280;
     public static volatile boolean ready,tracked,mounted,done,jump,sprint;
+    public static volatile boolean rifleFireHeldR45,rifleAimHeldR45;
     public static volatile int evaId,angelId,forward,strafe,warmFrames,stageTicks,inputAction,inputEpoch,stageOrdinal;
     public static volatile float heading;
     public static volatile String stageName="arena",photo="",failure="",mediaFolder="";
@@ -62,6 +67,21 @@ public final class CombatR31Review
     private static boolean sawSilence,sawRoar,sawFinale,protectedHull=true;private static final Set<Integer> feralKinds=new HashSet<>();
     private static final JsonArray cases=new JsonArray(),trace=new JsonArray(),events=new JsonArray();
     private static final Map<Integer,UUID> fleetIds=new HashMap<>();
+    private static final TicketType<ChunkPos> MOVING_REVIEW_TICKET=TicketType.create("r45_moving_combat_review",Comparator.comparingLong(ChunkPos::toLong),80);
+    private static final Set<ChunkPos> movingReviewChunks=new HashSet<>();
+    private static void retainMovingReviewActors()
+    {
+        if(!HELD_MOVE_TURN_R45||level==null)return;
+        for(var actor:Arrays.asList(eva,angel))if(actor!=null&&!actor.isRemoved())
+        {
+            var box=actor.getBoundingBox().inflate(18,0,18);
+            for(int x=net.minecraft.util.Mth.floor(box.minX)>>4;x<=net.minecraft.util.Mth.floor(box.maxX)>>4;x++)
+                for(int z=net.minecraft.util.Mth.floor(box.minZ)>>4;z<=net.minecraft.util.Mth.floor(box.maxZ)>>4;z++)
+                {
+                    var at=new ChunkPos(x,z);movingReviewChunks.add(at);level.getChunkSource().addRegionTicket(MOVING_REVIEW_TICKET,at,2,at);
+                }
+        }
+    }
 
     /** Single transient test actor; a tag by itself never bypasses fleet ownership. */
     public static boolean ownsFixture(EvaUnit01Entity unit)
@@ -82,7 +102,11 @@ public final class CombatR31Review
             if(++totalTicks>6500)throw new IllegalStateException("R31 total combat deadline");
             if(pilot==null)
             {
-                level=server.overworld();pilot=server.getPlayerList().getPlayers().get(0);pilot.stopRiding();pilot.setGameMode(GameType.SPECTATOR);
+                level=server.overworld();
+                if(SHUTDOWN_FIXTURE_R45&&(Math.abs((long)X-12000)<256&&Math.abs((long)Z-12000)<256
+                        ||FLOOR<level.getMinBuildHeight()||FLOOR+Math.ceil(EvaScale.NORMAL_HEIGHT)+12>=level.getMaxBuildHeight()))
+                    throw new IllegalStateException("Shutdown fixture must use a fresh sector with complete EVA/deck build-height clearance");
+                pilot=server.getPlayerList().getPlayers().get(0);pilot.stopRiding();pilot.setGameMode(GameType.SPECTATOR);
                 pilot.teleportTo(level,X+.5,FLOOR+3,Z+.5,0,0);server.setFlightAllowed(true);
                 level.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING).set(false,server);level.getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false,server);level.setDayTime(6000);
                 level.getGameRules().getRule(GameRules.RULE_WEATHER_CYCLE).set(false,server);level.setWeatherParameters(120000,0,false,false);
@@ -90,6 +114,7 @@ public final class CombatR31Review
             }
             stageTicks++;stageOrdinal=stage.ordinal();stageName=stage.name().toLowerCase(Locale.ROOT);
             if(stage==Stage.ARENA){buildArena();return;}
+            retainMovingReviewActors();
             if(OPTICS_R43&&stage==Stage.TRACK&&tracked)
             {
                 if(opticsTrackedAt<0)opticsTrackedAt=stageTicks;
@@ -139,7 +164,7 @@ public final class CombatR31Review
                 var encounter=com.projectseele.world.FirstBattleSavedData.get(level).active;
                 if(encounter!=null&&encounter.deathResolved&&encounter.angel.equals(angel.getUUID())&&stageTicks<1900)return;
             }
-            if(eva==null||eva.isRemoved()||angel==null||angel.isRemoved())throw new IllegalStateException("Review actor missing; no replacement or canonical lookup permitted");
+            if(eva==null||eva.isRemoved()||angel==null||angel.isRemoved())throw new IllegalStateException("Review actor missing; no replacement or canonical lookup permitted; eva="+(eva==null?"null":eva.getRemovalReason())+" angel="+(angel==null?"null":angel.getRemovalReason()));
             // Ridden vehicles report authoritative positions, while vanilla
             // clears their server velocity. Derive descent from those samples.
             observedVerticalPerTick=(eva.getY()-olderObservedY)*.5;olderObservedY=previousObservedY;previousObservedY=eva.getY();
@@ -153,7 +178,7 @@ public final class CombatR31Review
                 case WALK_FORWARD->{forward=1;if(eva.getZ()-stageOrigin.z>=10){record("real_forward",true,"distance",eva.getZ()-stageOrigin.z);forward=0;photo="02_forward";next(Stage.WALK_BACKWARD);}}
                 case WALK_BACKWARD->{forward=-1;if(stageOrigin.z-eva.getZ()>=7){record("real_backward",true,"distance",stageOrigin.z-eva.getZ());forward=0;arrange(NORMALS?100:23);next(NORMALS?Stage.NORMAL_EMPTY:Stage.AIR_STRIKE);}}
                 case NORMAL_EMPTY,NORMAL_CONTACT,NORMAL_HEAVY,NORMAL_MOVING->normalAttack();
-                case DUEL->{if(AWAKENING)awakening();else duel();}
+                case DUEL->{if(AWAKENING)awakening();else {duelFloorR45();duel();}}
                 case AIR_STRIKE->airborne(false);
                 case AIR_SLAM->airborne(true);
                 case REACH->
@@ -181,7 +206,7 @@ public final class CombatR31Review
                         arrange(23);initialEvaHealth=eva.getHealth();next(Stage.REACTION);
                     }
                 }
-                case REACTION->{if(StanceContactR41Review.ENABLED){if(StanceContactR41Review.tick(eva,angel,pilot,stageTicks)){record(StanceContactR41Review.ARTICULATION?"locomotion_and_jump_r42":"stance_and_contact",StanceContactR41Review.passed(),"native_cases",StanceContactR41Review.ARTICULATION?1:6);finish("");}}else reaction();}
+                case REACTION->{if(StanceContactR41Review.ENABLED){if(StanceContactR41Review.tick(eva,angel,pilot,stageTicks)){record(StanceContactR41Review.caseName(),StanceContactR41Review.passed(),"native_cases",StanceContactR41Review.caseCount());finish("");}}else reaction();}
                 case FINISH->finish("");
                 default->{}
             }
@@ -253,15 +278,36 @@ public final class CombatR31Review
     }
     private static void normalAttack()
     {
+        if(Boolean.getBoolean("projectseele.nativeStillsOnlyR45")
+                &&java.util.Set.of(20,25,32,44,90,145,200,250).contains(stageTicks))
+            photo="r45_"+stage.name().toLowerCase(Locale.ROOT)+"_"+stageTicks;
         jump=false;forward=stage==Stage.NORMAL_MOVING&&stageTicks<110?1:0;
+        if(HELD_MOVE_TURN_R45&&stage==Stage.NORMAL_MOVING)
+        {
+            forward=stageTicks<165?1:0;sprint=stageTicks<165;
+            heading=stageTicks<60?0:stageTicks<140?(stageTicks-60)*1.125F
+                    :stageTicks<180?90:Math.min(180,90+(stageTicks-180)*1.5F);
+            if(stageTicks>=15&&stageTicks<260&&stageTicks%6==3)input(1);
+            if(stageTicks%4==0)
+            {
+                var row=new JsonObject();row.addProperty("kind","r45_held_move_turn");row.addProperty("tick",stageTicks);
+                row.addProperty("heading",heading);row.addProperty("body_yaw",eva.yBodyRot);row.addProperty("entity_yaw",eva.getYRot());
+                row.addProperty("gait",eva.rifleGaitPhase(0));row.addProperty("run",eva.rifleRunBlend(0));row.addProperty("move",eva.rifleMoveBlend(0));
+                row.addProperty("actual_sprint",eva.isPilotSprinting());row.addProperty("ordinary_stage",eva.getOrdinaryAttackStage());
+                row.addProperty("forward_input_r45",forward);row.addProperty("pilot_locomotion_intent_r45",eva.pilotLocomotionRequestedR45());
+                var pose=com.projectseele.entity.EvaBodyPose.sample(eva,0);var root=pose.positions.get("root");
+                var delta=new JsonArray();delta.add(root.x);delta.add(root.y);delta.add(root.z);row.add("model_root_offset",delta);
+                row.add("actual_pose_owner",com.projectseele.entity.EvaGameplayMotionR32.ownerDiagnosticR44(eva,0));trace.add(row);
+            }
+        }
         if(stageTicks>=15&&stageTicks<125&&(stage==Stage.NORMAL_HEAVY?(stageTicks==15||stageTicks==85):stageTicks%6==3))input(stage==Stage.NORMAL_HEAVY?2:1);
         if(eva.getOrdinaryAttackStage()>=0||eva.isHeavyMotionActive())normalFrames++;
         if(EvaCombatR31.active(eva))falseAerial++;
-        if(stageTicks>=150)
+        if(stageTicks>=(HELD_MOVE_TURN_R45&&stage==Stage.NORMAL_MOVING?330:150))
         {
             record(stage.name().toLowerCase(Locale.ROOT),falseAerial==0&&normalFrames>0&&(stage!=Stage.NORMAL_CONTACT&&stage!=Stage.NORMAL_HEAVY||healthBefore-angel.getHealth()>0),"unexpected_air_ticks",falseAerial);
             var row=cases.get(cases.size()-1).getAsJsonObject();row.addProperty("normal_action_ticks",normalFrames);row.addProperty("actual_damage",healthBefore-angel.getHealth());
-            falseAerial=normalFrames=0;
+            falseAerial=normalFrames=0;sprint=false;
             switch(stage)
             {
                 case NORMAL_EMPTY->{arrange(23);next(Stage.NORMAL_CONTACT);}
@@ -271,6 +317,77 @@ public final class CombatR31Review
             }
         }
     }
+    private static final JsonArray DUEL_FLOOR_R45=new JsonArray();
+    private static JsonObject duelFloorFirstFailureR45;
+    private static UUID duelFloorEvaR45,duelFloorAngelR45;
+    private static final double DUEL_FLOOR_EPS_R45=1e-4;
+    private static JsonArray duelBoundsR45(net.minecraft.world.phys.AABB b)
+    {var a=new JsonArray();for(double v:new double[]{b.minX,b.minY,b.minZ,b.maxX,b.maxY,b.maxZ})a.add(v);return a;}
+    private static void duelFloorR45()
+    {
+        if(duelFloorEvaR45==null){duelFloorEvaR45=eva.getUUID();duelFloorAngelR45=angel.getUUID();}
+        for(var actor:java.util.List.of(eva,angel))
+        {
+            var row=new JsonObject();row.addProperty("duel_tick",stageTicks);row.addProperty("server_tick",level.getGameTime());row.addProperty("actor_uuid",actor.getStringUUID());
+            UUID original=actor==eva?duelFloorEvaR45:duelFloorAngelR45;boolean identity=actor.getUUID().equals(original);
+            row.addProperty("original_uuid_matches",identity);row.addProperty("entity_y",actor.getY());row.addProperty("dynamic_mode",com.projectseele.physics.CombatBodyDynamics.phase(actor));
+            row.add("actual_dynamic_bounds",duelBoundsR45(actor.getBoundingBox()));
+            var profile=com.projectseele.physics.CombatBodyProfiles.get(actor);var bodies=new JsonArray();var witnesses=new JsonArray();
+            boolean known=profile!=null;int vertices=0,outside=0,below=0,floorWrong=0;double minY=Double.POSITIVE_INFINITY,maxY=Double.NEGATIVE_INFINITY;
+            if(profile!=null)
+            {
+                var pose=com.projectseele.physics.CombatBodyDynamics.active(actor)?com.projectseele.physics.CombatBodyDynamics.sample(actor,0):com.projectseele.physics.CombatBodyDynamics.raw(actor,0);
+                var matrices=com.projectseele.physics.CombatBodyProfiles.physicalMatrices(pose,profile);
+                for(var raw:profile.definition().getAsJsonArray("bodies"))
+                {
+                    var body=raw.getAsJsonObject();String name=body.get("name").getAsString();var part=new JsonObject();part.addProperty("bone",name);
+                    int partCount=0,partBelow=0;double partMin=Double.POSITIVE_INFINITY,partMax=Double.NEGATIVE_INFINITY;
+                    if(!body.has("hulls")||body.getAsJsonArray("hulls").isEmpty()||!matrices.containsKey(name))known=false;
+                    else
+                    {
+                        float[] values=new float[16];for(int i=0;i<16;i++)values[i]=body.getAsJsonArray("bind").get(i).getAsFloat();
+                        var transform=new org.joml.Matrix4f(matrices.get(name)).mul(new org.joml.Matrix4f().set(values).transpose());int hullIndex=0;
+                        for(var hull:body.getAsJsonArray("hulls"))
+                        {
+                            int index=0;
+                            for(var point:hull.getAsJsonArray())
+                            {
+                                var v=point.getAsJsonArray();var local=transform.transformPosition(new org.joml.Vector3f(v.get(0).getAsFloat(),v.get(1).getAsFloat(),v.get(2).getAsFloat()))
+                                        .div(com.projectseele.physics.CombatBodyProfiles.BLOCK_TO_PHYSICS).rotateY((180-actor.getYRot())*(float)Math.PI/180);
+                                Vec3 world=actor.position().add(local.x,local.y,local.z);vertices++;partCount++;minY=Math.min(minY,world.y);maxY=Math.max(maxY,world.y);partMin=Math.min(partMin,world.y);partMax=Math.max(partMax,world.y);
+                                int x=net.minecraft.util.Mth.floor(world.x),z=net.minecraft.util.Mth.floor(world.z);
+                                if(x<X-256||x>X+256||z<Z-256||z>Z+256)outside++;
+                                else
+                                {
+                                    var floor=new BlockPos(x,FLOOR,z);var state=level.getBlockState(floor);
+                                    var expected=(Math.floorMod(x-X,16)==0||Math.floorMod(z-Z,16)==0?Blocks.LIGHT_GRAY_CONCRETE:Blocks.GRAY_CONCRETE).defaultBlockState();
+                                    if(!state.equals(expected))floorWrong++;
+                                    double depth=FLOOR+1-world.y;
+                                    if(depth>DUEL_FLOOR_EPS_R45)
+                                    {
+                                        below++;partBelow++;
+                                        if(witnesses.size()<16)
+                                        {var w=new JsonObject();w.addProperty("bone",name);w.addProperty("hull",hullIndex);w.addProperty("vertex",index);w.add("actual_world_surface_vertex",vector(world));w.addProperty("below_floor_top_blocks",depth);w.add("actual_floor_cell",vector(Vec3.atLowerCornerOf(floor)));w.addProperty("actual_full_floor_state",state.toString());w.addProperty("floor_equals_built_state",state.equals(expected));witnesses.add(w);}
+                                    }
+                                }
+                                index++;
+                            }
+                            hullIndex++;
+                        }
+                    }
+                    part.addProperty("surface_vertices",partCount);part.addProperty("geometry_known",partCount>0);if(partCount>0){part.addProperty("actual_min_y",partMin);part.addProperty("actual_max_y",partMax);}part.addProperty("vertices_below_floor_top",partBelow);bodies.add(part);
+                }
+            }
+            known&=vertices>0;row.addProperty("geometry_source","Current production posed armor hull vertices; no AABB/AT-field shortcut, no additional pose normalization, not GPU skin pixels");
+            row.addProperty("geometry_known",known);row.addProperty("actual_surface_vertices",vertices);row.addProperty("outside_built_floor_vertices",outside);row.addProperty("vertices_below_actual_floor_top",below);row.addProperty("unexpected_floor_states_under_surface",floorWrong);
+            if(vertices>0){row.addProperty("actual_geometry_min_y",minY);row.addProperty("actual_geometry_max_y",maxY);row.addProperty("maximum_geometry_below_floor_top",FLOOR+1-minY);}
+            row.addProperty("aabb_min_below_floor_top",actor.getBoundingBox().minY<FLOOR+1-DUEL_FLOOR_EPS_R45);row.addProperty("aabb_only_blank_corner_below",below==0&&actor.getBoundingBox().minY<FLOOR+1-DUEL_FLOOR_EPS_R45);
+            row.add("all_body_geometry",bodies);row.add("actual_intrusion_witnesses",witnesses);row.addProperty("numeric_epsilon_blocks",DUEL_FLOOR_EPS_R45);
+            boolean valid=identity&&known&&below==0&&outside==0&&floorWrong==0;row.addProperty("geometry_and_built_floor_retained",valid);DUEL_FLOOR_R45.add(row);
+            if(!valid&&duelFloorFirstFailureR45==null){duelFloorFirstFailureR45=row.deepCopy();ProjectSeele.LOGGER.warn("R45 DUEL FIRST REAL FLOOR FAILURE {}",row);}
+        }
+    }
+
     private static void duel()
     {
         Vec3 difference=angel.position().subtract(eva.position());heading=(float)Math.toDegrees(Math.atan2(-difference.x,difference.z));
@@ -280,6 +397,7 @@ public final class CombatR31Review
         strafe=EXCHANGE&&stageTicks%150>=105?(stageTicks/150%2==0?1:-1):0;
         if(stageTicks%100>70&&angel.isStrikeActive())forward=-1;
         if(stageTicks>15&&stageTicks%6==0&&(!EXCHANGE||range<35))input(stageTicks%120==0?2:1);
+        if(java.util.Set.of(30,70,110,180,250,350,450,530).contains(stageTicks))photo="r45_live_duel_"+stageTicks;
         if(stageTicks>=550||eva.getHealth()<30||angel.getHealth()<80)
         {
             finishDuel(false);
@@ -305,7 +423,7 @@ public final class CombatR31Review
     private static void finishDuel(boolean defeated)
     {
         double dealt=healthBefore-angel.getHealth(),received=initialEvaHealth-eva.getHealth();
-        boolean supported=true;for(var sample:trace){var row=sample.getAsJsonObject();if(row.get("phase").getAsString().equals("DUEL")&&row.getAsJsonArray("eva").get(1).getAsDouble()<FLOOR)supported=false;}
+        boolean supported=duelFloorFirstFailureR45==null&&DUEL_FLOOR_R45.size()==stageTicks*2;
         record("continuous_live_duel",dealt>0&&received>0&&supported,"damage_dealt",dealt);
         var row=cases.get(cases.size()-1).getAsJsonObject();row.addProperty("damage_received",received);row.addProperty("ticks",stageTicks);row.addProperty("natural_self_destruct",defeated);row.addProperty("floor_retained",supported);forward=0;
     }
@@ -424,12 +542,14 @@ public final class CombatR31Review
             var r=new JsonObject();r.addProperty("error",error);r.addProperty("fleet_ids_unchanged",ids);r.addProperty("hand_samples",handSamples);r.addProperty("maximum_hand_error_metres",Double.isFinite(maximumHandError)?maximumHandError:-1);r.addProperty("media",mediaFolder);
             int exchangeCases=AWAKENING&&Boolean.getBoolean("projectseele.r42OpticsReview")?2:1;
             boolean all=error.isEmpty()&&ids&&(AT_FIELD_REVIEW?cases.size()==1:TempoR43Review.ENABLED?cases.size()==6:OPTICS_R43?cases.size()==1:StanceContactR41Review.ENABLED?cases.size()==1:CLOSE?cases.size()==4:EXCHANGE||RECOVERY?cases.size()==exchangeCases:NORMALS?cases.size()>=6:cases.size()>=7&&handSamples>5&&maximumHandError<.8);
-            for(var c:cases)all&=c.getAsJsonObject().get("passed").getAsBoolean();r.addProperty("passed",all);r.add("cases",cases);r.add("contacts",events);r.add("trace",trace);if(StanceContactR41Review.ENABLED)r.add("stance_r41",StanceContactR41Review.details());
+            for(var c:cases)all&=c.getAsJsonObject().get("passed").getAsBoolean();r.addProperty("passed",all);r.add("cases",cases);r.add("contacts",events);r.add("trace",trace);r.add("duel_actual_geometry_floor_r45",DUEL_FLOOR_R45);if(duelFloorFirstFailureR45!=null)r.add("duel_first_geometry_floor_failure_r45",duelFloorFirstFailureR45);if(StanceContactR41Review.ENABLED)r.add("stance_r41",StanceContactR41Review.details());
             Path out=world.resolve("Review");Files.createDirectories(out);Files.writeString(out.resolve((NORMALS?"r32_normal_":"r31_combat_")+(all?"pass":"failure")+".json"),new GsonBuilder().setPrettyPrinting().create().toJson(r));
         }
         catch(Exception report){ProjectSeele.LOGGER.error("R31 combat report",report);}
         finally
         {
+            if(level!=null)for(var at:movingReviewChunks)level.getChunkSource().removeRegionTicket(MOVING_REVIEW_TICKET,at,2,at);
+            movingReviewChunks.clear();
             if(pilot!=null){pilot.stopRiding();pilot.setGameMode(GameType.CREATIVE);pilot.teleportTo(level,X+.5,FLOOR+2,Z-80.5,0,0);}
             if(eva!=null)eva.discard();if(angel!=null)angel.discard();done=true;
         }

@@ -79,17 +79,18 @@ public final class StaffCommandBookR24
         if (unit < 0 || unit > 2 || !Set.of("prepare", "launch", "recover", "deploy").contains(operation)) return 0;
         if (!NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc, operation))
         {
-            NervStaffDialogue.reply(player, npc, "这项指令需要指挥权限或 NERV 通行证，并由指挥或技术负责人执行。");
+            NervStaffDialogue.reply(player, npc, NervStaffDialogue.commandRefusal(player,npc,operation));
             return 0;
         }
         ServerLevel level = player.serverLevel();
         var orders = ORDERS.computeIfAbsent(level, key -> new LinkedHashMap<>());
         if (npc.busy() || orders.containsKey(npc.getUUID()) || orders.values().stream().anyMatch(job -> job.unit == unit))
         {
-            NervStaffDialogue.reply(player, npc, "操作人员或这台机体已有待执行指令。请等它完成，或由下令人取消后续操作。");
+            NervStaffDialogue.reply(player, npc, "司令，我这边或机体还有一道操作没结束。可以等它完成，也可以取消后续安排。");
             return 0;
         }
         var order = new Order(npc, player, operation, unit); orders.put(npc.getUUID(), order);
+        StaffOperationsTraceR45.event(level,"staff_order_accepted",player.getUUID(),npc.getUUID(),unit,operation,order.step.name());
         EvaLogisticsDirector.loadControlTarget(level, unit);
         NervStaffDialogue.reply(player, npc, operation.equals("deploy")
                 ? "收到，司令。驾驶员接入后开始整备，机体抵达发射台以后，我再确认发射时机。"
@@ -109,10 +110,16 @@ public final class StaffCommandBookR24
         {
             NervStaffDialogue.reply(player, npc, "当前待执行指令属于另一台机体，没有取消它。"); return 0;
         }
+        var pilotCancellation=StaffPilotOrdersR25.cancel(player,npc,unit);
+        if(pilotCancellation==StaffPilotOrdersR25.Cancellation.DENIED)
+        {
+            NervStaffDialogue.reply(player,npc,"请由下达这项指令的人取消，或联系值班指挥。");return 0;
+        }
         if (job != null) ORDERS.get(player.serverLevel()).remove(npc.getUUID());
         if(NervStaffDialogue.authorized(player)&&StaffAuthorityR25.commandContact(npc))
             AutoSortieR32.cancel(player,job==null?unit:job.unit);
         npc.finishTask();
+        StaffOperationsTraceR45.event(player.serverLevel(),"staff_pending_canceled",player.getUUID(),npc.getUUID(),job==null?unit:job.unit,"cancel",pilotCancellation.name());
         NervStaffDialogue.reply(player, npc, "后续按键操作已取消。已经开始的机械运输会按原流程运行到安全位置。");
         return 1;
     }
@@ -121,6 +128,7 @@ public final class StaffCommandBookR24
     {
         var job = order(npc); if (job == null) return;
         var level = (ServerLevel) npc.level(); ORDERS.get(level).remove(npc.getUUID());
+        StaffOperationsTraceR45.event(level,"staff_order_failed",job.owner,job.actor,job.unit,job.operation,message);
         var owner = level.getServer().getPlayerList().getPlayer(job.owner);
         if (owner != null) NervStaffDialogue.reply(owner, npc, message);
     }
@@ -135,6 +143,7 @@ public final class StaffCommandBookR24
             failed(npc, "联锁没有接受这次操作。" + NervStaffDialogue.readinessHint(level, job.unit, job.operation));
             return;
         }
+        StaffOperationsTraceR45.event(level,"physical_console_press_accepted",job.owner,job.actor,job.unit,job.operation,job.step.name());
         if(job.automatic)
         {
             var airframe=EvaLogisticsDirector.canonicalUnit(level,job.unit);
@@ -232,6 +241,7 @@ public final class StaffCommandBookR24
                         || job.operation.equals("recover") && !status.phase().equals("DEPLOYED"))
                 { failed(npc, NervStaffDialogue.readinessHint(level, job.unit, job.operation)); continue; }
                 job.step = Step.PRESS; job.message = "前往控制台操作按键";
+                StaffOperationsTraceR45.event(level,"physical_console_path_requested",job.owner,job.actor,job.unit,job.operation,job.step.name());
                 if (NervStaffDialogue.beginNativeAction(owner, npc, job.operation, job.unit) == 0)
                     failed(npc, "未能抵达对应控制按键，指令已停止。");
             }

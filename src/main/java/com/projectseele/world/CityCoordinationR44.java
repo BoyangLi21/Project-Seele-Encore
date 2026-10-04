@@ -24,7 +24,7 @@ import java.util.*;
 public final class CityCoordinationR44
 {
     private record Site(BlockPos reserve,BlockPos emergency,BlockPos test,BlockPos approach,BlockPos visit,
-                        BlockPos fieldButton,BlockPos fieldIndicator,boolean passengerAccessCertified) {}
+                        BlockPos fieldButton,BlockPos fieldIndicator,boolean passengerAccessCertified,List<String> requiredArchivePages) {}
     private static final Map<ServerLevel,Optional<Site>> SITES=new WeakHashMap<>();
     private static final TicketType<ChunkPos> TICKET=TicketType.create("city_coordination_r44",Comparator.comparingLong(ChunkPos::toLong),100);
     private static BlockPos point(JsonObject j,String key)
@@ -36,9 +36,12 @@ public final class CityCoordinationR44
             var path=l.getServer().getWorldPath(LevelResource.ROOT).resolve("city_coordination_r44.json");if(!Files.isRegularFile(path))return Optional.empty();
             var j=JsonParser.parseString(Files.readString(path)).getAsJsonObject();
             if(!j.get("dimension").getAsString().equals(l.dimension().location().toString()))return Optional.empty();
+            List<String> required=new ArrayList<>();
+            if(j.has("required_archive_pages"))for(var value:j.getAsJsonArray("required_archive_pages"))
+            {String id=value.getAsString();if(!DeadSeaReadingR45.knownDocument(id)||required.contains(id))throw new IllegalArgumentException("Unknown required archive page");required.add(id);}
             return Optional.of(new Site(point(j,"reserve"),point(j,"emergency"),point(j,"test"),point(j,"operator_approach"),point(j,"visit"),
                     j.has("field_button")?point(j,"field_button"):null,j.has("field_indicator")?point(j,"field_indicator"):null,
-                    j.has("passenger_access_certified")&&j.get("passenger_access_certified").getAsBoolean()));
+                    j.has("passenger_access_certified")&&j.get("passenger_access_certified").getAsBoolean(),List.copyOf(required)));
         }
         catch(Exception error){ProjectSeele.LOGGER.error("City coordination equipment rejected",error);return Optional.empty();}}).orElse(null);
     }
@@ -63,28 +66,31 @@ public final class CityCoordinationR44
             if(site==null)return "电网复测台尚未接入，请先联系通信管制室。";
             var battle=TvCampaignSavedData.get(level);var first=FirstBattleSavedData.get(level);
             if(!battle.active.isEmpty()||first.active!=null||first.missionOwner!=null)return "作战进行中。等机体回收后再安排复测。";
-            data.begin(player.getUUID());return "美里：司令，先把这三份记录放在一起看。射击条件还没有结论。\n"+status(player);
+            data.begin(player.getUUID());data.requiredArchivePagesR45.addAll(site.requiredArchivePages);
+            if(!site.requiredArchivePages.isEmpty())data.requiredArchiveRevisionR45=DeadSeaReadingR45.currentRevision();
+            data.setDirty();return "美里：司令，先把这三份记录放在一起看。射击条件还没有结论。\n"+status(player);
         }
         if(!data.active||expected==null||!expected.equals(data.instance))return "这条指令对应的档案已经结束。请重新打开当前档案。";
         if(action.startsWith("read/"))
         {
             String source=action.substring(5);int bit=switch(source){case "page"->1;case "annotation"->2;case "field"->4;default->0;};if(bit==0)return "找不到这条记录。";
-            data.evidence|=bit;data.acquired.add("r44/"+source);data.setDirty();
-            return switch(source)
+            String delivered=switch(source)
             {
                 case "page"->"档案 P-05 · 原页\n来源：旧保管库，保管人：冬月。记录提及近似规则多面体目标与高能定向反击；射击条件所在页缺失。\n外形与反击条件仍待确认。出击许可尚未下达。";
                 case "annotation"->"译注 · SEELE 抄录与 MAGI 工作记录\nSEELE 注释主张直接出击。律子标注：注释没有附测量数据，不能用它估算安全距离。两份记录保留各自来源。";
                 default->"现场记录 · 馈线烧蚀与测试节点\n远山：备用馈线的记录和注释对不上。我会先隔离，再复测。\n律子：这道痕迹只能证明发生过放电。射程还不清楚，不要把它当作安全线。";
             };
+            data.recordReading(expected,player.getUUID(),"r44/"+source,DeadSeaReadingR45.hashText(delivered),"command_dossier",level.getGameTime());
+            return delivered;
         }
+        if(action.startsWith("consent/")||action.startsWith("withdraw/"))return participantRequest(player,level,data,action,expected);
         if(!player.getUUID().equals(data.owner)&&!player.hasPermissions(2))return "调度方案由这次任务的司令确认。你可以继续查阅证据。";
         if(action.equals("cancel"))
         {data.active=false;data.restoring=true;data.isolating=data.fieldSampling=false;data.chargeTicks=0;data.notice="调度已撤销。机体保持待命，电网正在复原。已阅记录保留。";data.setDirty();return data.notice;}
         if(action.equals("share")||action.equals("private"))
         {
             if(data.evidence!=7)return "先读完三项证据，再决定共享范围。";
-            data.knowledge=action.equals("share")?7:0;if(data.stage==1)data.stage=2;
-            if(data.knowledge==0&&data.formation.values().contains("npc")){data.confirmed.clear();if(data.stage==6)data.stage=5;}data.setDirty();
+            data.changeKnowledge(action.equals("share")?7:0);if(data.stage==1)data.stage=2;
             return data.knowledge==7?"律子：记录已交给驾驶员。我们先核对条件，再决定出击。":"律子：现场记录仍会保留。未确认的条件不能作为安全保证。";
         }
         if(action.equals("evacuate/services")||action.equals("evacuate/storage"))
@@ -118,34 +124,76 @@ public final class CityCoordinationR44
         }
         if(action.startsWith("assign/"))
         {
-            if(data.stage!=5)return "先完成城市与供电准备。";
-            String[] parts=action.split("/");if(parts.length!=3)return "请选择机体和驾驶员。";
+            if(data.stage!=5&&data.stage!=6)return "先完成城市与供电准备。";
+            String[] parts=action.split("/");if(parts.length!=3&&parts.length!=4)return "请选择机体和驾驶员。";
             int unit;try{unit=Integer.parseInt(parts[1]);}catch(NumberFormatException error){return "机体编号无效。";}
             if(unit<0||unit>4||!Set.of("human","npc").contains(parts[2])||unit>2&&parts[2].equals("npc"))return "这台机体没有对应的 NERV 驾驶员。";
-            data.formation.put(unit,parts[2]);data.confirmed.remove(unit);data.setDirty();
+            UUID person=player.getUUID();
+            if(parts.length==4)
+            {if(!parts[2].equals("human"))return "NPC 驾驶员不能指定其他玩家身份。";try{person=UUID.fromString(parts[3]);}catch(IllegalArgumentException error){return "请指定真实玩家 UUID。";}}
+            var actual=actualBinding(level,unit,parts[2],person);
+            if(actual==null)return "原机体或实际驾驶员尚未接通，请等候，不能用替代实例确认。";
+            if(!data.bind(expected,actual))return "这名驾驶员已有另一台编成，或当前档案已变更。";
             return TvSortiesR32.name(unit)+"已加入编成，等待驾驶员确认。";
-        }
-        if(action.startsWith("consent/")||action.startsWith("withdraw/"))
-        {
-            int unit;try{unit=Integer.parseInt(action.substring(action.indexOf('/')+1));}catch(NumberFormatException error){return "请选择有效机体。";}
-            if(data.stage!=5&&data.stage!=6||!data.formation.containsKey(unit))return "这台机体还不在当前编成中。";
-            if(action.startsWith("withdraw/")){data.confirmed.remove(unit);data.formation.remove(unit);data.stage=5;data.setDirty();return "驾驶员已撤回，后续指令不会继续下达。";}
-            String pilot=data.formation.get(unit);
-            if(pilot.equals("npc"))
-            {
-                if(data.knowledge!=7)return "真嗣：爸爸……能先把计划告诉我吗？\n请先共享记录，再询问驾驶员。";
-                EvaLogisticsDirector.loadControlTarget(level,unit);
-                if(TrainingPilotDirector.pilots(level).stream().noneMatch(p->p.getAssignedVariant()==unit))return "驾驶员频道尚未接通，请稍候。";
-            }
-            data.confirmed.add(unit);if(!data.formation.isEmpty()&&data.confirmed.containsAll(data.formation.keySet()))data.stage=6;data.setDirty();
-            return pilot.equals("human")?"已确认由司令驾驶。尚未下达发射指令。":switch(unit){case 0->"丽：掩护位置确认了。我会待命。";case 1->"真嗣：我知道了。开火之前……再告诉我一次。";default->"明日香：计划我看过了。掩护交给谁，也先说清楚。";};
         }
         if(action.equals("finish"))
         {
-            if(data.stage!=6||!data.tested||data.supply.isEmpty()||data.formation.isEmpty()||!data.confirmed.containsAll(data.formation.keySet()))return "准备还没有完成，不能归档。";
+            if(data.stage!=6||!data.tested||data.supply.isEmpty()||!data.allConfirmed())return "准备或本次驾驶员确认还没有完成，不能归档。";
+            for(int unit:data.formation.keySet())
+            {var old=data.binding(unit);var actual=actualBinding(level,unit,old.kind(),old.pilot());if(!old.equals(actual))return "实际驾驶员或原机体已变更，请重新编成与确认。";}
             data.archive();return "美里：准备情况已记下。未知的射击条件还要继续确认。\n"+data.notice;
         }
         return "请选择档案中的有效操作。";
+    }
+    private static CityCoordinationSavedDataR44.Binding actualBinding(ServerLevel level,int unit,String kind,UUID human)
+    {
+        if(unit<0||unit>4||!Set.of("human","npc").contains(kind)||kind.equals("npc")&&unit>2)return null;
+        if(unit<3)EvaLogisticsDirector.loadControlTarget(level,unit);
+        var eva=TvSortiesR32.unit(level,unit);if(eva==null||!eva.isAlive())return null;
+        if(kind.equals("human"))
+        {
+            var player=level.getServer().getPlayerList().getPlayer(human);
+            if(player==null||player.level()!=level||!player.isAlive()||!NervStaffDialogue.authorized(player))return null;
+            var controlling=EvaPilotResolver.controlTarget(player);
+            if(controlling!=null&&controlling!=eva||eva.getPilotEntity()!=null&&eva.getPilotEntity()!=player)return null;
+            return new CityCoordinationSavedDataR44.Binding(unit,kind,CityCoordinationSavedDataR44.roleFor(unit),player.getUUID(),eva.getUUID());
+        }
+        var pilots=TrainingPilotDirector.pilots(level).stream().filter(p->p.isAlive()&&p.getAssignedVariant()==unit).toList();
+        if(pilots.size()!=1)return null;var pilot=pilots.get(0);var occupied=PilotRadioR28.occupiedUnit(pilot);
+        if(pilot.getVehicle()!=null&&!(pilot.getVehicle()==eva
+                ||pilot.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity plug
+                &&plug.getAssignedVariant()==unit&&plug==EntryPlugDirector.canonical(level,unit)))return null;
+        if(occupied!=null&&occupied!=eva||eva.getPilotEntity()!=null&&eva.getPilotEntity()!=pilot)return null;
+        return new CityCoordinationSavedDataR44.Binding(unit,kind,CityCoordinationSavedDataR44.roleFor(unit),pilot.getUUID(),eva.getUUID());
+    }
+    public static String participantLine(int unit,boolean accepted)
+    {
+        if(accepted)return switch(unit){case 0->"丽：掩护位置记下了。我会待命。";case 1->"真嗣：爸爸，我知道了。开火之前……再告诉我一次。";default->"明日香：支援位置我记住了。该接应的时候叫我。";};
+        return switch(unit){case 0->"丽：请先告诉我条件和掩护位置。";case 1->"真嗣：爸爸……能先把计划告诉我吗？";default->"明日香：先把计划说清楚。我的位置呢？";};
+    }
+    private static String participantRequest(ServerPlayer player,ServerLevel level,CityCoordinationSavedDataR44 data,String action,UUID expected)
+    {
+        String[] parts=action.split("/");int unit;long formationRevision,evidenceRevision;
+        try
+        {
+            if(parts.length!=4)return "编成确认已更新，请重新打开当前档案确认。";
+            unit=Integer.parseInt(parts[1]);formationRevision=Long.parseLong(parts[2]);evidenceRevision=Long.parseLong(parts[3]);
+        }
+        catch(NumberFormatException error){return "请选择当前档案中的有效机体确认。";}
+        if(formationRevision!=data.formationRevisionR45||evidenceRevision!=data.evidenceRevisionR45)return "这条确认来自旧编成或旧资料，请重新核对当前档案。";
+        var binding=data.binding(unit);
+        if(binding==null||data.stage!=5&&data.stage!=6)return "这台机体尚未绑定本次实际驾驶员，请重新编成。";
+        if(action.startsWith("withdraw/"))
+            return data.withdraw(expected,unit,player.getUUID())?"驾驶员已撤回，后续指令不会继续下达。":"这项撤回请由本人或本次司令确认。";
+        if(binding.kind().equals("human")&&!player.getUUID().equals(binding.pilot()))return "请由已编入的驾驶员本人确认，司令不能替其他玩家同意。";
+        if(binding.kind().equals("npc")&&!player.getUUID().equals(data.owner))return "请由本次司令接通这名驾驶员的频道。";
+        if(!data.requiredReadingComplete())return "本次要求的实体文书还没有服务端阅读回执，请在真实书台确认。";
+        if(binding.kind().equals("human")&&!data.dossierReadCurrent(player.getUUID()))return "请本人先查阅当前三份记录，不能由其他玩家代读后确认。";
+        if(binding.kind().equals("npc")&&data.knowledge!=7)return participantLine(unit,false)+"\n请先共享三份记录。";
+        var actual=actualBinding(level,unit,binding.kind(),binding.pilot());
+        if(!binding.equals(actual))return "原机体或驾驶员身份已变更，请重新编成，不沿用旧确认。";
+        if(!data.confirm(expected,actual,formationRevision,evidenceRevision,actual.pilot()))return "本次确认已失效，请核对当前编成与资料修订。";
+        return actual.kind().equals("human")?"已记录 "+player.getName().getString()+" 本人驾驶确认，尚未下达发射指令。":participantLine(unit,true);
     }
     private static NervStaffEntity find(ServerLevel level,String skin)
     {

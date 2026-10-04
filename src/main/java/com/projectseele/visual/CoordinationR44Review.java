@@ -35,7 +35,7 @@ public final class CoordinationR44Review
     {
         if(!ENABLED||done||event.phase!=TickEvent.Phase.END)return;var server=event.getServer();if(server.getPlayerList().getPlayers().isEmpty())return;
         var world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))throw new IllegalStateException("Dossier review refuses owner world");
+        if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))throw new IllegalStateException("Dossier review refuses owner world");
         try
         {
             if(++age>9000)throw new IllegalStateException("Dossier review deadline step="+step);

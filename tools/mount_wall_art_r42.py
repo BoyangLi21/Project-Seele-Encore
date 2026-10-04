@@ -21,11 +21,23 @@ def packed(q):
     return value if value<2**63 else value-2**64
 
 
-def main(apply=False):
+def main(apply=False,world=None):
+    global WORLD
+    if world is not None:WORLD=Path(world)
     w=MeasuredWorld(WORLD)
     for q,offset,art,width,height,facing,back in PANELS:w.around(q,2)
     w.load();v.WORLD=WORLD;v.OUT=OUT;p=v.Painter()
     for q,offset,art,width,height,facing,back in PANELS:
+        chamber=WORLD/'dimensions/projectseele/geofront/data/projectseele_dead_sea_chamber_r45.dat'
+        if q==(30,-322,339) and chamber.exists():
+            owner=nbtlib.load(chamber)['data']
+            if int(owner.get('Version',0))!=1 or str(owner.get('ChamberId',''))!='r45/dead_sea/highest_tree_chamber':
+                raise RuntimeError('Ambiguous/corrupt chamber ownership; do not remount the highest Tree image')
+            if bool(owner.get('Configured',False)):
+                # The original full artwork is owned by the durable chamber
+                # controller in both CLOSED and OPEN states; do not remount an
+                # intentionally hidden anchor or replace its complete NBT.
+                continue
         before=w.block(q);assert before in ('minecraft:air','projectseele:wall_artwork'),(q,before)
         assert w.block(back) not in (None,'minecraft:air'),('Missing mounting wall',back)
         existing=dict(iter_block_entities(WORLD,v.DIM,q,q)).get(q)
@@ -46,4 +58,4 @@ def main(apply=False):
 
 
 if __name__=='__main__':
-    ap=argparse.ArgumentParser();ap.add_argument('--apply',action='store_true');main(ap.parse_args().apply)
+    ap=argparse.ArgumentParser();ap.add_argument('--apply',action='store_true');ap.add_argument('--world',type=Path);a=ap.parse_args();main(a.apply,a.world)

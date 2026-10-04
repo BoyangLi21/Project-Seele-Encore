@@ -46,7 +46,7 @@ public class ClientboundCannonBeamPacket
     public void handle(Supplier<NetworkEvent.Context> ctx)
     {
         DistExecutor.unsafeRunWhenOn(Dist.CLIENT,
-                () -> () -> com.projectseele.client.fx.ClientFxManager.addCannonBeam(this));
+                () -> () -> {com.projectseele.visual.StanceContactR41Review.actualClientCannonBeamR45(x1,y1,z1,x2,y2,z2);com.projectseele.client.fx.ClientFxManager.addCannonBeam(this);});
         ctx.get().setPacketHandled(true);
     }
 }

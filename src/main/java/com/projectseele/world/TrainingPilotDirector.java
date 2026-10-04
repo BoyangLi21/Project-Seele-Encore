@@ -68,6 +68,8 @@ public final class TrainingPilotDirector
 
     public static ActionResult start(ServerLevel level, int variant)
     {
+        if(!parkedR45(level,variant))
+            return new ActionResult(false,"机体尚未在机库停稳，请先完成回收，驾驶员保持原位。");
         boolean compactS20 = FacilityWorldPolicy.isS20Rebuild(
                 level.getServer());
         /*
@@ -111,15 +113,22 @@ public final class TrainingPilotDirector
         {
             return new ActionResult(false, label(variant) + " is not loaded.");
         }
-        // One persistent pilot belongs to each cage. Resetting that synthetic
-        // occupant to the face-side observation platform releases a stale
-        // training capsule without ever touching a human passenger.
-        TrainingPilotEntity pilot = resetToStandby(level, variant);
+        level.getChunkAt(requestedStandby(level,variant));
+        TrainingPilotEntity pilot = existingPilotR45(level,variant);
         if (pilot == null)
-        {
-            return new ActionResult(false,
-                    "Training pilot standby spawn was rejected.");
-        }
+            return new ActionResult(false,"原驾驶员尚未接通或身份不唯一，未创建替代驾驶员。");
+        if(RETURNING_PILOTS.contains(variant))
+            return new ActionResult(false,"驾驶员正在返回待命，请等待离栓流程结束。");
+        if(PilotRadioR28.occupiedUnit(pilot)==unit)
+            return new ActionResult(true,"驾驶员已在对应机体内，保持现有乘坐关系。");
+        if(pilot.getVehicle() instanceof EntryPlugCarrierEntity current
+                &&current==EntryPlugDirector.canonical(level,variant)
+                &&current.getAssignedVariant()==variant)
+            return new ActionResult(true,"驾驶员已进入对应插入栓，等待机库联锁。");
+        if(pilot.getVehicle()!=null)
+            return new ActionResult(false,"驾驶员正在使用另一台设备，未改变乘坐关系。");
+        if(ACTIVE_REMOTE_PILOTS.contains(variant))
+            return new ActionResult(true,"登机指令正在执行，驾驶员继续沿原通道行走。");
         boolean parked = EvaFleetSavedData.get(level.getServer())
                 .entry(variant)
                 .map(entry -> entry.phase()
@@ -149,6 +158,9 @@ public final class TrainingPilotDirector
             return new ActionResult(false, label(variant)
                     + " boarding route has an unsupported anchor.");
         }
+        if(!isSafeFeet(level,pilot.blockPosition())
+                ||pilot.position().distanceToSqr(Vec3.atBottomCenterOf(route.get(0)))>2.75D*2.75D)
+            return new ActionResult(false,"驾驶员尚未到达登机通道起点，请先返回待命。");
         BOARDING_ROUTES.put(variant, route);
         BOARDING_LEG.put(variant, Math.min(1, route.size() - 1));
         BlockPos start = route.get(0);
@@ -157,8 +169,7 @@ public final class TrainingPilotDirector
         pilot.setNoAi(false);pilot.setNoGravity(false);
         pilot.setTrainingStage(TrainingPilotEntity.STAGE_WALKING);
         pilot.getPersistentData().putString("SeelePilotRouteR30","board");
-        pilot.moveTo(start.getX() + 0.5D, start.getY(), start.getZ() + 0.5D,
-                0.0F, 0.0F);
+        pilot.getPersistentData().putString("SeelePilotRouteMissionR45",AutoSortieR32.missionToken(level));
         // The operations room lies outside the wet-cage simulation distance.
         // Keep this one route resident while its synthetic pilot is active;
         // otherwise remote command makes the walking pilot freeze at spawn.
@@ -171,37 +182,44 @@ public final class TrainingPilotDirector
                 + " dummy is walking to the dorsal boarding bridge.");
     }
 
+    public static boolean parkedR45(ServerLevel level,int variant)
+    {
+        if(variant<0||variant>2)return false;
+        return EvaFleetSavedData.get(level.getServer()).entry(variant)
+                .map(entry->entry.phase()==EvaFleetSavedData.Phase.PARKED).orElse(false);
+    }
+
+    /** A missing/unloaded or duplicate NPC is never replaced by a dispatch. */
+    public static TrainingPilotEntity existingPilotR45(ServerLevel level,int variant)
+    {
+        var sortie=TvCampaignSavedData.get(level).sorties.get(variant);
+        if(sortie!=null&&sortie.npc&&sortie.pilotR45!=null)
+        {
+            var actual=level.getEntity(sortie.pilotR45);
+            return actual instanceof TrainingPilotEntity pilot&&pilot.isAlive()
+                    &&pilot.getAssignedVariant()==variant?pilot:null;
+        }
+        var candidates=pilots(level).stream().filter(p->p.isAlive()&&p.getAssignedVariant()==variant).toList();
+        return candidates.size()==1?candidates.get(0):null;
+    }
+
     public static int stop(ServerLevel level, int variant)
     {
-        int returning = 0;
-        for (TrainingPilotEntity pilot : pilots(level))
+        int returning=0;
+        for(int candidate=0;candidate<3;candidate++)
         {
-            if (variant >= 0 && pilot.getAssignedVariant() != variant)
+            if(variant>=0&&candidate!=variant||!parkedR45(level,candidate)
+                    ||StaffCommandBookR24.unitOrder(level,candidate)!=null)continue;
+            var pilot=existingPilotR45(level,candidate);
+            if(pilot==null||!beginReturnOrReset(level,pilot))continue;
+            AutoSortieR32.clearAutomatic(level,candidate);
+            var eva=EvaLogisticsDirector.canonicalUnit(level,candidate);
+            if(eva!=null)
             {
-                continue;
+                eva.getPersistentData().putString("R43AutoMission",AutoSortieR32.missionToken(level));
+                eva.getPersistentData().putBoolean("R32AutoCancelled",true);
             }
-            beginReturnOrReset(level, pilot);
             returning++;
-        }
-        if (variant >= 0 && returning == 0)
-        {
-            if (resetToStandby(level, variant) != null)
-            {
-                returning = 1;
-            }
-        }
-        else if (variant < 0)
-        {
-            for (int candidate = 0; candidate < 3; candidate++)
-            {
-                int wanted = candidate;
-                boolean exists = pilots(level).stream().anyMatch(
-                        pilot -> pilot.getAssignedVariant() == wanted);
-                if (!exists && resetToStandby(level, candidate) != null)
-                {
-                    returning++;
-                }
-            }
         }
         return returning;
     }
@@ -238,6 +256,9 @@ public final class TrainingPilotDirector
                 ||pilot.getVehicle() instanceof EvaUnit01Entity savedEva&&savedEva.getUnitVariant()==variant)
             ACTIVE_REMOTE_PILOTS.add(variant);
         if(!ACTIVE_REMOTE_PILOTS.contains(variant)&&!RETURNING_PILOTS.contains(variant))resumeSavedRouteR30(level,pilot);
+        if(pilot.getVehicle()==null&&pilot.getPersistentData().getString("SeelePilotRouteR30").equals("board")
+                &&!StaffPilotOrdersR25.missionContextCurrentR45(pilot.getPersistentData().getString("SeelePilotRouteMissionR45"),AutoSortieR32.missionToken(level)))
+            holdRouteR45(pilot,"mission_changed");
         if (!ACTIVE_REMOTE_PILOTS.contains(variant)
                 && !RETURNING_PILOTS.contains(variant))
         {
@@ -314,7 +335,7 @@ public final class TrainingPilotDirector
         RouteStep step = tickWalkingRoute(level, pilot, route);
         if (step == RouteStep.FAILED)
         {
-            parkPilot(level, pilot);
+            holdRouteR45(pilot,"boarding_route_failed");
             return;
         }
         if (step == RouteStep.ARRIVED)
@@ -348,31 +369,9 @@ public final class TrainingPilotDirector
         {
             return;
         }
-        TrainingPilotEntity keeper = null;
-        for (TrainingPilotEntity pilot : pilots(level))
-        {
-            if (pilot.getAssignedVariant() != variant)
-            {
-                continue;
-            }
-            if (keeper == null)
-            {
-                keeper = pilot;
-            }
-            else
-            {
-                pilot.stopRiding();
-                pilot.discard();
-            }
-        }
-        if (keeper == null)
-        {
-            resetToStandby(level, variant);
-        }
-        else
-        {
-            holdAtStandby(level, keeper);
-        }
+        level.getChunkAt(requestedStandby(level,variant));
+        TrainingPilotEntity keeper=existingPilotR45(level,variant);
+        if(keeper!=null&&keeper.getVehicle()==null)holdAtStandby(level,keeper);
     }
 
     public static TrainingPilotEntity resetToStandby(ServerLevel level,
@@ -384,6 +383,8 @@ public final class TrainingPilotDirector
         {
             return null;
         }
+        BlockPos safeStandby=nearestSafeFeet(level,standby);
+        if(safeStandby==null)return null;
         clearRouteState(variant);
         TrainingPilotEntity keeper = null;
         for (TrainingPilotEntity pilot : pilots(level))
@@ -415,62 +416,71 @@ public final class TrainingPilotDirector
                 return null;
             }
         }
+        keeper.stopRiding();
+        keeper.moveTo(safeStandby.getX()+.5D,safeStandby.getY(),safeStandby.getZ()+.5D,0,0);
         parkPilot(level, keeper);
         return keeper;
     }
 
-    private static void beginReturnOrReset(ServerLevel level,
-                                           TrainingPilotEntity pilot)
+    private static boolean beginReturnOrReset(ServerLevel level,TrainingPilotEntity pilot)
     {
-        int variant = pilot.getAssignedVariant();
-        if (RETURNING_PILOTS.contains(variant))
+        int variant=pilot.getAssignedVariant();
+        if(!parkedR45(level,variant))return false;
+        if(RETURNING_PILOTS.contains(variant))return true;
+        if(pilot.getVehicle()==null&&isSafeFeet(level,pilot.blockPosition())
+                &&pilot.blockPosition().distManhattan(requestedStandby(level,variant))<=2)
+        {parkPilot(level,pilot);return true;}
+        var outbound=BOARDING_ROUTES.get(variant);
+        if(outbound==null||outbound.size()<2)
+            outbound=validatedBoardingRoute(level,variant,FacilityV2EvaRuntime.ready(level,variant));
+        if(outbound.size()<2)return false;
+        var route=new ArrayList<>(outbound);java.util.Collections.reverse(route);
+        Vec3 feet=pilot.position();
+        if(pilot.getVehicle()!=null)
         {
-            parkPilot(level, pilot);
-            return;
+            if(!(pilot.getVehicle() instanceof EntryPlugCarrierEntity plug)
+                    ||plug!=EntryPlugDirector.canonical(level,variant)||plug.isLockedToEva()
+                    ||!Set.of(EntryPlugCarrierEntity.STAGE_SUSPENDED,EntryPlugCarrierEntity.STAGE_OCCUPIED,
+                            EntryPlugCarrierEntity.STAGE_ABORT_DOCKED).contains(plug.getInsertionStage()))return false;
+            feet=plug.getDismountLocationForPassenger(pilot);
         }
-        if (!ACTIVE_REMOTE_PILOTS.contains(variant)
-                && pilot.getVehicle() == null)
-        {
-            parkPilot(level, pilot);
-            return;
-        }
-        List<BlockPos> outbound = BOARDING_ROUTES.get(variant);
-        if (outbound == null || outbound.size() < 2)
-        {
-            outbound = validatedBoardingRoute(level, variant,
-                    FacilityV2EvaRuntime.ready(level, variant));
-        }
-        if (outbound.size() < 2)
-        {
-            parkPilot(level, pilot);
-            return;
-        }
-
-        pilot.stopRiding();
-        List<BlockPos> route = new ArrayList<>(outbound.size());
-        for (int index = outbound.size() - 1; index >= 0; index--)
-        {
-            route.add(outbound.get(index));
-        }
-        BlockPos start = route.get(0);
-        pilot.getNavigation().stop();
-        pilot.moveTo(start.getX() + 0.5D, start.getY(), start.getZ() + 0.5D,
-                180.0F, 0.0F);
-        pilot.setDeltaMovement(Vec3.ZERO);
-        pilot.setInvisible(false);
+        int leg=nearestRouteLegR45(feet,route);
+        if(leg<0||!isSafeFeet(level,BlockPos.containing(feet)))return false;
+        // The real capsule chooses its safe dismount; no route-start teleport.
+        if(pilot.getVehicle()!=null)pilot.stopRiding();
+        if(!isSafeFeet(level,pilot.blockPosition())){holdRouteR45(pilot,"dismount_not_on_catwalk");return false;}
+        leg=nearestRouteLegR45(pilot.position(),route);
+        if(leg<0){holdRouteR45(pilot,"dismount_outside_return_route");return false;}
+        pilot.getNavigation().stop();pilot.setInvisible(false);
         pilot.setTrainingStage(TrainingPilotEntity.STAGE_WALKING);
-        ACTIVE_REMOTE_PILOTS.remove(variant);
+        ACTIVE_REMOTE_PILOTS.remove(variant);RETURNING_PILOTS.add(variant);
         pilot.getPersistentData().putString("SeelePilotRouteR30","return");
-        RETURNING_PILOTS.add(variant);
-        BOARDING_ROUTES.put(variant, List.copyOf(route));
-        BOARDING_LEG.put(variant, 1);
-        LAST_SAFE_FEET.put(variant, start);
-        CLOSEST_APPROACH.remove(variant);
-        STALLED_TICKS.remove(variant);
-        ProjectSeele.LOGGER.info(
-                "NERV training pilot returning to standby: eva={} pilot={} start={} standby={}",
-                variant, pilot.getStringUUID(), start.toShortString(),
-                route.get(route.size() - 1).toShortString());
+        pilot.getPersistentData().remove("SeelePilotRouteMissionR45");
+        BOARDING_ROUTES.put(variant,List.copyOf(route));BOARDING_LEG.put(variant,leg);
+        LAST_SAFE_FEET.put(variant,pilot.blockPosition());CLOSEST_APPROACH.remove(variant);STALLED_TICKS.remove(variant);
+        ProjectSeele.LOGGER.info("NERV original pilot returning without reset: eva={} pilot={} at={} leg={}",variant,pilot.getStringUUID(),pilot.blockPosition(),leg);
+        return true;
+    }
+
+    private static int nearestRouteLegR45(Vec3 point,List<BlockPos> route)
+    {
+        int leg=-1;double best=36.0D;
+        for(int i=1;i<route.size();i++)
+        {
+            Vec3 a=Vec3.atBottomCenterOf(route.get(i-1)),b=Vec3.atBottomCenterOf(route.get(i)),ab=b.subtract(a);
+            double t=ab.lengthSqr()<1e-8?1:Mth.clamp(point.subtract(a).dot(ab)/ab.lengthSqr(),0,1);
+            double distance=point.distanceToSqr(a.add(ab.scale(t)));
+            if(distance<=best){best=distance;leg=i;}
+        }
+        return leg;
+    }
+
+    private static void holdRouteR45(TrainingPilotEntity pilot,String reason)
+    {
+        clearRouteState(pilot.getAssignedVariant());pilot.getNavigation().stop();
+        pilot.getPersistentData().putString("SeelePilotRouteR30","hold");
+        pilot.setInvisible(false);pilot.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);
+        ProjectSeele.LOGGER.warn("NERV original pilot route held in place: eva={} pilot={} at={} reason={}",pilot.getAssignedVariant(),pilot.getStringUUID(),pilot.blockPosition(),reason);
     }
 
     private static void tickReturn(ServerLevel level,
@@ -486,10 +496,8 @@ public final class TrainingPilotDirector
             return;
         }
         RouteStep step = tickWalkingRoute(level, pilot, route);
-        if (step != RouteStep.MOVING)
-        {
-            parkPilot(level, pilot);
-        }
+        if(step==RouteStep.ARRIVED)parkPilot(level,pilot);
+        else if(step==RouteStep.FAILED)holdRouteR45(pilot,"return_route_failed");
     }
 
     private static RouteStep tickWalkingRoute(ServerLevel level,
@@ -573,44 +581,15 @@ public final class TrainingPilotDirector
     private static void holdAtStandby(ServerLevel level,
                                       TrainingPilotEntity pilot)
     {
-        int variant = pilot.getAssignedVariant();
-        BlockPos requested = requestedStandby(level, variant);
-        BlockPos feet = pilot.blockPosition();
-        boolean alreadyParked = pilot.getVehicle() == null
-                && isSafeFeet(level, feet)
-                && feet.distManhattan(requested) <= 2;
-        BlockPos standby = alreadyParked ? feet
-                : nearestSafeFeet(level, requested);
-        if (standby == null)
-        {
-            pilot.getNavigation().stop();
-            if (pilot.tickCount % 200 == 0)
-            {
-                ProjectSeele.LOGGER.warn(
-                        "NERV dummy standby platform unsupported: eva={} requested={}",
-                        variant, requested.toShortString());
-            }
-            return;
-        }
-        if (pilot.getVehicle() != null)
-        {
-            pilot.stopRiding();
-        }
-        Vec3 centre = Vec3.atBottomCenterOf(standby);
-        if (pilot.position().distanceToSqr(centre) > 1.25D * 1.25D
-                || !isSafeFeet(level, pilot.blockPosition()))
-        {
-            pilot.moveTo(centre.x, centre.y, centre.z, 0.0F, 0.0F);
-        }
-        pilot.getNavigation().stop();
-        pilot.setDeltaMovement(Vec3.ZERO);
-        pilot.fallDistance = 0.0F;
-        pilot.setInvisible(false);
-        pilot.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);
-        pilot.setYRot(0.0F);
-        pilot.setXRot(0.0F);
-        pilot.yBodyRot = 0.0F;
-        pilot.yHeadRot = 0.0F;
+        if(pilot.getVehicle()!=null)return;
+        if(pilot.getPersistentData().getString("SeelePilotRouteR30").equals("hold"))
+        {pilot.getNavigation().stop();return;}
+        int variant=pilot.getAssignedVariant();BlockPos feet=pilot.blockPosition();
+        if(!isSafeFeet(level,feet)||feet.distManhattan(requestedStandby(level,variant))>2)
+        {holdRouteR45(pilot,"standby_not_reached");return;}
+        pilot.getNavigation().stop();pilot.setDeltaMovement(Vec3.ZERO);pilot.fallDistance=0;
+        pilot.setInvisible(false);pilot.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);
+        pilot.setYRot(0);pilot.setXRot(0);pilot.yBodyRot=pilot.yHeadRot=0;
     }
 
     private static void parkPilot(ServerLevel level,
@@ -651,7 +630,7 @@ public final class TrainingPilotDirector
             double t=ab.lengthSqr()<1e-8?1:Mth.clamp(pilot.position().subtract(a).dot(ab)/ab.lengthSqr(),0,1);
             double distance=pilot.position().distanceToSqr(a.add(ab.scale(t)));if(distance<best){best=distance;leg=i;}
         }
-        if(best>36){pilot.getPersistentData().putString("SeelePilotRouteR30","standby");return;}
+        if(best>36){holdRouteR45(pilot,"saved_route_outside_catwalk");return;}
         BOARDING_ROUTES.put(variant,List.copyOf(route));BOARDING_LEG.put(variant,leg);CLOSEST_APPROACH.remove(variant);STALLED_TICKS.remove(variant);
         if(isSafeFeet(level,pilot.blockPosition()))LAST_SAFE_FEET.put(variant,pilot.blockPosition());
         if(intent.equals("return"))RETURNING_PILOTS.add(variant);else ACTIVE_REMOTE_PILOTS.add(variant);

@@ -14,7 +14,7 @@ import shutil
 import time
 
 from apply_s20_approved_semantic_repairs import Change, atomic_replace, rewrite_region
-from query_blocks import AIR, dimension_dir, read_box
+from query_blocks import AIR, dimension_dir, read_box, iter_block_entities
 
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -60,6 +60,21 @@ def vectors(facing: str) -> tuple[tuple[int, int], tuple[int, int]]:
     if facing in {"north", "south"}:
         return (1, 0), (0, 1)
     return (0, 1), (1, 0)
+
+
+def complete_id15_stair_throat(cells, block_entities):
+    expected = {(27, -414, 283): ('minecraft:smooth_stone', 'minecraft:stone_stairs[facing=south,half=bottom,shape=straight,waterlogged=false]'), (27, -413, 283): ('minecraft:black_concrete', 'minecraft:air'), (27, -412, 283): ('minecraft:smooth_stone', 'minecraft:air'), (29, -414, 283): ('minecraft:smooth_stone', 'minecraft:stone_stairs[facing=south,half=bottom,shape=straight,waterlogged=false]'), (29, -413, 283): ('minecraft:black_concrete', 'minecraft:air'), (29, -412, 283): ('minecraft:smooth_stone', 'minecraft:air')}
+    guards = {(28, -414, 283): 'minecraft:stone_stairs[facing=south,half=bottom,shape=straight,waterlogged=false]', (28, -415, 282): 'minecraft:white_concrete', (27, -414, 284): 'minecraft:polished_andesite', (28, -414, 284): 'minecraft:polished_andesite', (29, -414, 284): 'minecraft:polished_andesite', (26, -414, 283): 'minecraft:smooth_stone', (26, -413, 283): 'minecraft:yellow_concrete', (26, -412, 283): 'minecraft:smooth_stone', (30, -414, 283): 'minecraft:smooth_stone', (30, -413, 283): 'minecraft:yellow_concrete', (30, -412, 283): 'minecraft:smooth_stone'}
+    for pos, state in guards.items():
+        if cells.get(pos) != state or pos in block_entities:
+            raise RuntimeError("ID15 authored approach guard changed: " + str(pos))
+    changes = []
+    for pos, (before, after) in sorted(expected.items()):
+        if pos in block_entities or cells.get(pos) not in {before, after}:
+            raise RuntimeError("ID15 exact approach preimage or full BE changed: " + str(pos))
+        if cells[pos] != after:
+            changes.append((pos, after))
+    return changes
 
 
 def plan(world: Path) -> tuple[list[Change], list[dict]]:
@@ -128,6 +143,11 @@ def plan(world: Path) -> tuple[list[Change], list[dict]]:
             "aperture": aperture,
             "buttons": buttons,
         })
+
+    approach_tags = dict(iter_block_entities(
+        world, DIMENSION, (26, -415, 282), (30, -412, 284)))
+    for pos, after in complete_id15_stair_throat(cells, approach_tags):
+        add(pos, after, "complete_ID15_original_three_lane_south_stair_throat")
 
     return (sorted(changes.values(), key=lambda c: (c.y, c.z, c.x)),
             report)

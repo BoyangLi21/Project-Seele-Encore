@@ -12,7 +12,7 @@ An open-source **Neon Genesis Evangelion** universe mod for Minecraft **Forge 1.
 
 ## Status / 状态
 
-R44 按负责人要求提前收尾为人工验收半成品，全域重构尚未完成。当前安装选择、本轮实际改变、地区坐标及完整试玩步骤见 [R44 阶段手册](docs/MANUAL_ACCEPTANCE_R44_STAGE.md)；未完成制作和复核见 [R44 下一轮清单](docs/R44_STAGE_NEXT_ROUND.md)。六包在本机准备与核验，不代表已公开上传或网络发布。路径、构建和功能通过不代表动作、美术或用户验收通过。
+R45 已打包为本地人工验收版。负责人承担美术、战斗与驾驶观感及服务器实测；本轮保留资源、动作状态和存档完整性检查，不声明全域重构或用户验收已经完成。安装、实际改动、操作和未启用项目见 [R45 人工验收手册](docs/MANUAL_ACCEPTANCE_R45.md)。六个 ZIP 已完成完整性与逐文件回读，和公开源码分别交付，不代表已上传网络发布。存档目录为 `SEELE_R45_WORLD`；为保留底本元数据，游戏列表显示名仍为“Project SEELE R44 阶段验收”。
 
 进入配套世界：`/seele enter`。机库：`/seele tp hanger`。输入 `/seele tp` 查看全部传送地点。旧地图生成与原型实验指令不再出现在正式游戏中。
 
@@ -22,11 +22,13 @@ Development build with playable EVA piloting, physical entry-plug insertion, rai
 
 **Public source and the complete local demonstration world are different deliverables.** The repository includes code, project-authored resources and fallback visuals. Private evaluation maps, extracted models and uncleared third-party artwork are not bundled. / **公开源码不等于完整本机演示包。** 私有测试地图、提取模型及尚未确认公开许可的第三方素材不随仓库分发。参与和构建见 [CONTRIBUTING.md](CONTRIBUTING.md)，具体区别见 [公开准备](docs/OPEN_SOURCE_RELEASE_R24.md)。
 
-Pilot controls / 驾驶操作：`WASD` 移动、`Space` 跳跃、`Shift` 单膝跪地、`Z` 趴下/匍匐、`Ctrl` 冲刺、`B` 踩踏、`R` 切换武器、`G` 开关 A.T. Field、左键近战/自动步枪、右键空手／刀重击（炮模式蓄能，N² 模式保险流程）、`V` 弹出插入栓。零号机展开 A.T. Field 后按住 `Shift`，即进入单膝举盾防御。战略武器测试与数值见 [`docs/WEAPONS_TEST.md`](docs/WEAPONS_TEST.md)。
+Pilot controls / 驾驶操作：`WASD` 移动、`Space` 跳跃、`Shift` 蹲姿、`Z` 趴下/匍匐、`Ctrl` 奔跑、`B` 踢击、`R` 切换武器、`G` 开关 A.T. Field、左键近战/步枪、右键空手或近战武器重击（炮模式蓄能，N² 模式保险流程）、`V` 弹出插入栓、`O` 驾驶通信。三台 NERV 机体空手/短刀站姿下，方向键配合 `C` 闪避，奔跑配合 `C` 翻滚；机械准备/发射期间 `C` 仍优先取消发射。零号机蹲姿不再强制举盾，完整独立盾装备尚未启用。
 
 ## Docs / 文档
 
-- [R44 阶段操作与人工验收](docs/MANUAL_ACCEPTANCE_R44_STAGE.md) — 完整／普通客户端选择、六包安装、本轮改变、分区与连续流程验收
+- [R45 安装与人工验收](docs/MANUAL_ACCEPTANCE_R45.md) — 本轮六包、操作、实际改动与未验证项
+- [Mesh2Motion 全部 178 条动作与接入状态](docs/MESH2MOTION_ACTION_PLAN_R45.md) — 来源、动作族、当前候选与真实检查边界
+- [R44 阶段操作与人工验收（历史）](docs/MANUAL_ACCEPTANCE_R44_STAGE.md) — 上一批安装与试玩记录
 - [R44 下一轮接续](docs/R44_STAGE_NEXT_ROUND.md) — 动作、AT／第一人称、机库、全域美术与剩余交通验收
 - [R44 全域执行范围](docs/GLOBAL_RECONSTRUCTION_R44.md) — 本轮原始要求与质量边界
 - [R43 阶段手册（历史）](docs/MANUAL_ACCEPTANCE_R43_STAGE.md) — 上批操作及验收基线
@@ -69,7 +71,7 @@ The mod jar is written to `build/libs/`.
 
 ## Local visual testing / 本机视觉测试
 
-本次人工试玩属于 **Project SEELE: Encore 的 R44 验收批次**，选择 **Project SEELE R44 Stage** 独立实例，安装方法见阶段手册。六包沿用 `Project_SEELE_R44_Stage_*` 文件名，模组 ID `projectseele` 与世界标识保持兼容。完整 Client 内含外部材质／光影且默认关闭光影；Client_Plain 不含外部材质包、光影及 Oculus，必需机体模型由 mod 内嵌。两个客户端使用相同 mod 与游戏功能，联机服务端必须同批协议 49。原 SEELE43 保留，不覆盖原实例和原存档。
+本次人工试玩使用 **R45 的独立新实例**，不要混装旧 R44 的 mod、动作文件或 JVM 调试参数。网络协议为 **53**；Client、Client_Plain 与 Server 必须同批。完整 Client 带额外材质和光影，光影默认关闭；Client_Plain 去掉额外材质、光影与 Oculus，仍内嵌完整核心机体模型。保留旧实例和存档作为回退，具体导入方法见 R45 手册。
 
 原生开发检查在专用副本运行，不能对玩家正式存档开启自动复核脚本。需要旧实验命令时显式设置 JVM 参数 `-Dprojectseele.developerCommands=true`。截图、检查记录及第三方评估素材不随公开源码分发；本轮具体检查范围见阶段手册。
 

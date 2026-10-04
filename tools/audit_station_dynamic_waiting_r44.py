@@ -20,9 +20,10 @@ AHEAD={'north':(0,-1),'south':(0,1),'east':(1,0),'west':(-1,0)}
 RIGHT={'north':(1,0),'south':(-1,0),'east':(0,1),'west':(0,-1)}
 
 
-def main(gates_path=GATES,cases_path=CASES,out_path=OUT):
-    global GATES,CASES,OUT
+def main(gates_path=GATES,cases_path=CASES,out_path=OUT,world_path=WORLD):
+    global GATES,CASES,OUT,WORLD
     GATES,CASES,OUT=map(Path,(gates_path,cases_path,out_path))
+    WORLD=Path(world_path)
     OUT.mkdir(parents=True,exist_ok=True)
     gates=json.loads(GATES.read_text('utf8'))['gates'];cases=json.loads(CASES.read_text('utf8'))
     ids={r['station_id'] for r in gates};assert len(gates)==80 and len(ids)==19 and len(cases)==160
@@ -59,8 +60,12 @@ def main(gates_path=GATES,cases_path=CASES,out_path=OUT):
             'new_native_step_cells':len(steps)-before})
     else:raise RuntimeError('Connected existing native belt did not close in20 measured iterations')
     g=Geometry(w)
-    native=json.loads((WORLD/'r44_public_station_gate_shapes.json').read_text('utf8'))
-    g.shapes.update({canonical_state(k):value for k,value in native['collision_shapes'].items()})
+    native_shapes=WORLD/'r44_public_station_gate_shapes.json'
+    if native_shapes.exists():
+        native=json.loads(native_shapes.read_text('utf8'))
+        g.shapes.update({canonical_state(k):value for k,value in native['collision_shapes'].items()})
+    # Delivery may merge these native states into the main shape snapshot.
+    # Missing states remain UNKNOWN; an absent supplemental file is not air.
     def support(point):
         rows={}
         for dx in (-.299,0,.299):
@@ -127,7 +132,7 @@ def main(gates_path=GATES,cases_path=CASES,out_path=OUT):
             'actual_attached_side_cells':[[*q,sides[q]] for q in sorted(sides) if (q[0],q[1]-1,q[2]) in seen],
             'complete_native_pairs':len(pairs),'orphan_halves':component_orphans,'endpoints':endpoints,
             'operation_proof':'UNVERIFIED actual native travel, disembark, static wait and opposite direction must be tested'})
-    report={'operating_station_denominator':19,'gate_cells':80,'gate_cases':160,'gate_buffer_footprints':gate_buffers,
+    report={'world':str(WORLD.resolve()),'operating_station_denominator':19,'gate_cells':80,'gate_cases':160,'gate_buffer_footprints':gate_buffers,
         'active_native_step_gate_buffers':active_hits,'station_native_belt_components':components,'orphan_step_halves':orphans,
         'step_count':len(steps),'side_count':len(sides),'connected_component_closure':closure,
         'retired_P1_excluded':True,'world_write_performed':False,
@@ -144,6 +149,7 @@ def main(gates_path=GATES,cases_path=CASES,out_path=OUT):
 
 
 if __name__=='__main__':
-    parser=argparse.ArgumentParser();parser.add_argument('--gates',type=Path,default=WORLD/'r44_public_station_gates.json')
+    parser=argparse.ArgumentParser();parser.add_argument('--gates',type=Path)
+    parser.add_argument('--world',type=Path,default=WORLD)
     parser.add_argument('--cases',type=Path,default=CASES);parser.add_argument('--out',type=Path,default=OUT)
-    args=parser.parse_args();main(args.gates,args.cases,args.out)
+    args=parser.parse_args();main(args.gates or args.world/'r44_public_station_gates.json',args.cases,args.out,args.world)

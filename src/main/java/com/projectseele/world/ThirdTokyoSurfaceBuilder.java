@@ -80,6 +80,7 @@ public final class ThirdTokyoSurfaceBuilder
 
     public static void buildDistrict(ServerLevel level, BlockPos origin)
     {
+        if(CityRigidTopologyR45.owns(level,origin))return;
         buildFoundation(level, origin);
         buildRoadGrid(level, origin);
 
@@ -149,6 +150,7 @@ public final class ThirdTokyoSurfaceBuilder
                                                  BlockPos origin,
                                                  int retractionDepth)
     {
+        if(CityRigidTopologyR45.owns(level,origin))return false;
         if (districtRevisionPresent(level, origin))
         {
             return false;
@@ -338,6 +340,7 @@ public final class ThirdTokyoSurfaceBuilder
     /** Explicit preview authoring: replace one old lot, preserving its controls. */
     public static void refineTvLot(ServerLevel level, BlockPos origin, int index)
     {
+        if(CityRigidTopologyR45.owns(level,origin))return;
         if (!TvWorldPreviewTerrain.active(level)) throw new IllegalArgumentException("TV preview only");
         TowerSpec old = MOVABLE_BUILDINGS.get(index), tower = TV_MOVABLE_BUILDINGS.get(index);
         BlockPos centre = origin.offset(tower.x(), 0, tower.z());
@@ -399,6 +402,7 @@ public final class ThirdTokyoSurfaceBuilder
     public static void applyRetractionDepth(ServerLevel level, BlockPos origin,
                                             int oldDepth, int newDepth)
     {
+        if(CityRigidTopologyR45.owns(level,origin))return;
         for (int index = 0; index < MOVABLE_BUILDINGS.size(); index++)
         {
             applyRetractionDepth(level, origin, oldDepth, newDepth, index);
@@ -413,6 +417,7 @@ public final class ThirdTokyoSurfaceBuilder
     public static void applyRetractionDepth(ServerLevel level, BlockPos origin,
                                             int oldDepth, int newDepth, int towerIndex)
     {
+        if(CityRigidTopologyR45.owns(level,origin))return;
         int maximumDepth = maximumRetractionDepth(origin);
         if (Math.abs(newDepth - oldDepth) != 1
                 || oldDepth < 0 || oldDepth > maximumDepth
@@ -437,6 +442,7 @@ public final class ThirdTokyoSurfaceBuilder
     public static Tokyo3BuildingArchiveR44.TravelStep stepRetractionDepthR44(
             ServerLevel level,BlockPos origin,int oldDepth,int newDepth,int towerIndex,int cursor)
     {
+        if(CityRigidTopologyR45.owns(level,origin))return new Tokyo3BuildingArchiveR44.TravelStep(false,true,cursor,0,"Rigid topology owns this complete city");
         if(Math.abs(newDepth-oldDepth)!=1||oldDepth<0||newDepth<0
                 ||oldDepth>maximumRetractionDepth(origin)||newDepth>maximumRetractionDepth(origin))
             return new Tokyo3BuildingArchiveR44.TravelStep(false,true,cursor,0,"Invalid generated-tower depth step");
@@ -552,6 +558,7 @@ public final class ThirdTokyoSurfaceBuilder
     public static int sweepStrayMasts(ServerLevel level, BlockPos origin,
                                        int currentDepth)
     {
+        if(CityRigidTopologyR45.owns(level,origin))return 0;
         int removed = 0;
         for (TowerSpec tower : movableBuildings(level))
         {
@@ -601,6 +608,7 @@ public final class ThirdTokyoSurfaceBuilder
                                               BlockPos origin,
                                               int currentDepth)
     {
+        if(CityRigidTopologyR45.owns(level,origin))return 0;
         int removedPlanes = 0;
         int minimumY = origin.getY() + 1;
         int maximumY = origin.getY() + 90;

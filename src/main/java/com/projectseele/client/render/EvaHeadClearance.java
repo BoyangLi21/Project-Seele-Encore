@@ -23,7 +23,7 @@ final class EvaHeadClearance
     record Node(Vector3f min,Vector3f max,Node left,Node right,List<Triangle> triangles) {}
     private record Correction(float lift,float roll,double time) {}
     private static final Map<Integer,List<Triangle>> HEADS=new HashMap<>();
-    private static final Map<Integer,Correction> LAST=new HashMap<>();
+    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Correction> LAST=new com.projectseele.util.WeakIdentityMap<>();
     private static final List<float[]> CANDIDATES=candidates();
     private static Node rifle;
 
@@ -133,15 +133,36 @@ final class EvaHeadClearance
             rifle=tree(triangles);
         }
         Matrix4f parent=EvaRigTransforms.parent(head,world),inverseGun=new Matrix4f(gun).invert();
+        double time=(eva.tickCount+partial)/20D;
+        var previous=LAST.get(eva);
+        if(previous!=null&&(time<previous.time()||time-previous.time()>.5))previous=null;
+        float oldLift=previous==null?0:previous.lift(),oldRoll=previous==null?0:previous.roll();
         float lift=0,roll=0;boolean found=false;
+        double best=Double.POSITIVE_INFINITY;
+        // The equally good left/right solutions used to alternate every time
+        // the sight passed a triangle edge. Prefer a continuous correction
+        // from this actor, not the first discrete candidate in global order.
+        if(previous!=null&&!applyAndTest(head,parent,world,inverseGun,desired,right,forward,oldLift,oldRoll,shape))
+        {
+            lift=oldLift;roll=oldRoll;found=true;
+            best=.08*(lift*lift+2*roll*roll);
+        }
         for(var candidate:CANDIDATES)
         {
             if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,candidate[0],candidate[1],shape))
             {
-                lift=candidate[0];roll=candidate[1];found=true;break;
+                double dl=candidate[0]-oldLift,dr=candidate[1]-oldRoll;
+                double score=dl*dl+2*dr*dr+.08*(candidate[0]*candidate[0]+2*candidate[1]*candidate[1]);
+                if(score<best){best=score;lift=candidate[0];roll=candidate[1];found=true;}
             }
         }
-        double time=(eva.tickCount+partial)/20D;var previous=LAST.get(eva.getId());
+        if(previous!=null)
+        {
+            float relax=(float)Math.exp(-Math.max(0,time-previous.time())/.18);
+            float restLift=oldLift*relax,restRoll=oldRoll*relax;
+            if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,restLift,restRoll,shape))
+            {lift=restLift;roll=restRoll;found=true;}
+        }
         if(found&&previous!=null&&time>previous.time()&&time-previous.time()<.5)
         {
             float alpha=(float)(1-Math.exp(-(time-previous.time())/.06));
@@ -153,6 +174,6 @@ final class EvaHeadClearance
             }
         }
         applyAndTest(head,parent,world,inverseGun,desired,right,forward,lift,roll,shape);
-        if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),new Correction(lift,roll,time));
+        LAST.put(eva,new Correction(lift,roll,time));
     }
 }

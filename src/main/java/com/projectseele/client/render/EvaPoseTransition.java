@@ -21,6 +21,9 @@ public final class EvaPoseTransition
 
     private EvaPoseTransition() {}
     public static void resetEntityR30(EvaUnit01Entity entity){STATES.remove(entity);}
+    /** A complete pose owner can bypass apply; that frame must not reuse its old pending delta. */
+    public static void beginFrameR45(EvaUnit01Entity entity)
+    {State state=STATES.get(entity);if(state!=null){state.frameOpen=true;state.evaluatedThisFrame=false;}}
 
     public static void clear()
     {
@@ -42,16 +45,23 @@ public final class EvaPoseTransition
     public static void rememberGecko(BakedGeoModel model)
     {
         Map<String, RawPose> saved = new HashMap<>();
-        for (String name : EvaPoseGraph.contract().boneOrder())
-        {
-            model.getBone(name).ifPresent(bone -> saved.put(name, RawPose.read(bone)));
-        }
+        for(GeoBone bone:model.topLevelBones())rememberGeckoBoneR45(bone,saved);
         GECKO_POSES.put(model, saved);
+    }
+
+    private static void rememberGeckoBoneR45(GeoBone bone,Map<String,RawPose> saved)
+    {
+        saved.put(bone.getName(),RawPose.read(bone));
+        for(GeoBone child:bone.getChildBones())rememberGeckoBoneR45(child,saved);
     }
 
     public static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity entity,
                                                     BakedGeoModel model,
                                                     float partialTick)
+    {return apply(entity,model,partialTick,false);}
+    public static EvaMotionEngineV2.BoneWrites applySharedExitR45(EvaUnit01Entity entity,BakedGeoModel model,float partialTick)
+    {return apply(entity,model,partialTick,true);}
+    private static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity entity,BakedGeoModel model,float partialTick,boolean sharedExit)
     {
         if (entity.getMotionLabPhysicsPreview() != 0 || entity.getVisualPose() != 0
                 || !entity.isPoweredOn() || entity.isCrucified()
@@ -73,12 +83,15 @@ public final class EvaPoseTransition
         boolean changed = !key.equals(state.key);
         if (changed)
         {
+            boolean leavingAction=state.liveAction&&!entity.hasLiveActionForRender(partialTick);
+            state.liveAction=entity.hasLiveActionForRender(partialTick);
             state.key = key;
             state.start = time;
             state.duration = entity.isPilotCrouching() || entity.isPilotProne()
                     || state.lowStance ? 0.28D
                     : entity.isHeavyMotionActive() ? 0.18D
                     : entity.hasLiveActionForRender(partialTick) ? 0.10D : 0.20D;
+            if(sharedExit&&!leavingAction)state.duration=0;
             state.lowStance = entity.isPilotCrouching() || entity.isPilotProne();
             for (Track track : state.bones.values())
             {
@@ -111,8 +124,25 @@ public final class EvaPoseTransition
                 positions.add(name);
             }
         }
+        if(sharedExit&&blending)
+        {
+            var pose=com.projectseele.entity.EvaBodyPose.neutralForTransportR32(entity);
+            for(String name:pose.rig.keySet())
+                model.getBone(name).ifPresent(b->pose.rotations.put(name,new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX())));
+            // The offset of a bent hinge is nonlinear in its rotation.
+            // Lerp'ing old and new offsets separated the knee/elbow sockets
+            // even when both endpoint poses were individually assembled.
+            com.projectseele.entity.EvaBodyPose.preserveJointCentres(pose);
+            for(String side:new String[]{"l","r"})for(String family:new String[]{"shin_","forearm_"})
+            {
+                String name=family+side;var offset=pose.positions.get(name);
+                if(offset!=null)model.getBone(name).ifPresent(b->{b.setPosX(-offset.x*16);b.setPosY(offset.y*16);b.setPosZ(offset.z*16);});
+            }
+        }
         state.time = time;
         state.pendingDt = dt;
+        state.frameOpen = true;
+        state.evaluatedThisFrame = true;
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),
                 Set.copyOf(positions), OWNER);
     }
@@ -125,18 +155,27 @@ public final class EvaPoseTransition
         private double start;
         private double duration;
         private boolean lowStance;
+        private boolean liveAction;
         private double pendingDt;
         private boolean finalInitialized;
+        private boolean evaluatedThisFrame;
+        private boolean frameOpen;
     }
 
     public static void recordFinal(EvaUnit01Entity entity,BakedGeoModel model)
     {
         State state=STATES.get(entity);if(state==null)return;
+        if(!state.frameOpen)return;
+        state.frameOpen=false;
+        if(!state.evaluatedThisFrame){STATES.remove(entity);return;}
+        state.evaluatedThisFrame=false;
         state.bones.forEach((name,track)->model.getBone(name).ifPresent(bone->{
             Pose pose=Pose.read(bone);
             if(!state.finalInitialized){track.last=pose;track.source=pose;}
             else if(state.pendingDt>1e-6)track.update(pose,state.pendingDt);
+            else{track.last=pose;track.linearVelocity.zero();track.angularVelocity.zero();}
         }));
+        state.pendingDt=0;
         state.finalInitialized=true;
     }
 

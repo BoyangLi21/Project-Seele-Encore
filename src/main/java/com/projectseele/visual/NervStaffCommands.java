@@ -15,7 +15,7 @@ public final class NervStaffCommands
     {
         event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("route")
                 .then(Commands.argument("destination",StringArgumentType.word())
-                        .suggests((c,b)->net.minecraft.commands.SharedSuggestionProvider.suggest(java.util.stream.Stream.concat(com.projectseele.world.NervWayfindingR24.GOALS.stream(),java.util.stream.Stream.of("stop")),b))
+                        .suggests((c,b)->net.minecraft.commands.SharedSuggestionProvider.suggest(java.util.stream.Stream.concat(java.util.stream.Stream.concat(com.projectseele.world.NervWayfindingR24.GOALS.stream(),com.projectseele.world.OperatorNavigationProductionR45.availableGoals(c.getSource().getPlayer()).stream()),java.util.stream.Stream.of("stop")),b))
                         .executes(c->{var player=c.getSource().getPlayerOrException();player.sendSystemMessage(net.minecraft.network.chat.Component.literal(com.projectseele.world.NervWayfindingR24.start(player,StringArgumentType.getString(c,"destination"))));return 1;}))));
         event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("contact")
                 .executes(c->com.projectseele.world.StaffConversationR24.contact(c.getSource().getPlayerOrException(),"美里"))

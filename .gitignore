@@ -50,3 +50,5 @@ forge*changelog.txt
 /results/
 /logs/
 /MUJOCO_LOG.TXT
+# Local authoring dependencies, not project source or a client payload.
+/.tools/

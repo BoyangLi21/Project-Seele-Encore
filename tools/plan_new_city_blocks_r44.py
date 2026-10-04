@@ -9,6 +9,8 @@ from query_blocks import AIR,iter_block_entities
 from regional_voxels import canonical_state
 from city_period_architecture_r44 import author as period_author
 from tv_landmark_architecture_r44 import school as tv_school,gym as tv_gym,misato_home as tv_misato_home,school_entrance
+from school_hakone_lifecycle_guard_r45 import refuse_retired_school_producer
+from city_building_lifecycle_guard_r45 import refuse_installed_city_commissioning
 from city_roof_r44 import compact_roof
 from compact_tv_household_r44 import author as compact_tv_household
 from tv_apartment_finish_r44 import author as finish_tv_apartment
@@ -81,8 +83,11 @@ def design(name):
 
 
 def main():
-    p=argparse.ArgumentParser();p.add_argument('district',choices=['tokyo_north','hakone_south','hakone_west','kirisato_north']);p.add_argument('output',type=Path);p.add_argument('--baseline-plan',type=Path);p.add_argument('--design-file',type=Path);a=p.parse_args();assert not a.output.exists()
-    d=json.loads(a.design_file.read_text('utf8')) if a.design_file else design(a.district);x0,x1,z0,z1=d['bounds'];w=MeasuredWorld(WORLD);w.box((x0-12,40,z0-12),(x1+12,220,z1+12));w.load()
+    p=argparse.ArgumentParser();p.add_argument('district',choices=['tokyo_north','hakone_south','hakone_west','kirisato_north']);p.add_argument('output',type=Path);p.add_argument('--baseline-plan',type=Path);p.add_argument('--design-file',type=Path);p.add_argument('--historical-r44',action='store_true');a=p.parse_args();assert not a.output.exists()
+    d=json.loads(a.design_file.read_text('utf8')) if a.design_file else design(a.district)
+    refuse_installed_city_commissioning(d,a.historical_r44)
+    if any(b.get('kind')=='tv_school' for b in d['buildings']):refuse_retired_school_producer(a.historical_r44)
+    x0,x1,z0,z1=d['bounds'];w=MeasuredWorld(WORLD);w.box((x0-12,40,z0-12),(x1+12,220,z1+12));w.load()
     tags=dict(iter_block_entities(WORLD,'projectseele:geofront',(x0-12,40,z0-12),(x1+12,220,z1+12),selected_chunks=set(w.selected)))
     if a.baseline_plan:
         baseline=[json.loads(line) for line in gzip.open(a.baseline_plan/'forward.jsonl.gz','rt',encoding='utf8')]
@@ -470,14 +475,16 @@ def main():
                 fill((x+10,y+1,roomZ,X-2,y+3,roomZ),'minecraft:light_gray_concrete',b['id'],'Real front waiting/reading room and rear work-room separation')
                 door(innerX,y,roomZ,b['id'])
                 if b['kind']=='book_office':fill((X-2,y+1,z+3,X-2,y+3,z+10),'minecraft:bookshelf',b['id'],'Actual book/record storage wall')
-                elif b['kind']=='clinic' and level>0:bed(X-4,y+1,Z-5,b['id'])
+                # Upper clinical/private-room beds stay one additional metre from
+                # the complete real door approach, outside the common stair core.
+                elif b['kind']=='clinic' and level>0:bed(X-5,y+1,Z-5,b['id'])
             b['architecture']='Separate front public room / rear work room / explicit inner doors, with original thin frontage'
         else:
             for level in range(1,b['storeys']):
                 y=f+level*5
                 unitX=max(x+11,cx)
                 fill((unitX,y+1,z+5,unitX,y+4,Z-3),material,b['id'],'Two actual upper residential/work units outside the complete common stair core')
-                door(unitX,y,min(z+9,Z-3),b['id'],'east');bed(X-4,y+1,Z-5,b['id'])
+                door(unitX,y,min(z+9,Z-3),b['id'],'east');bed(X-5,y+1,Z-5,b['id'])
             b['architecture']='Thin ground shopfront / two real upper units / common full stair core'
         entry_and_approach()
         if b['kind'] not in ['terraced_home','small_inn']:

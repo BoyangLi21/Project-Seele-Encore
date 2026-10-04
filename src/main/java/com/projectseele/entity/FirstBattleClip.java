@@ -36,18 +36,18 @@ public final class FirstBattleClip
         String review=System.getProperty("projectseele.firstBattleReviewClip","");
         if(!review.isEmpty())
         {
-            try{return readLocal(Path.of(review),"isolated candidate review");}
+            try{return readLocal(CombatMotionResourcesR44.instancePath(review),"isolated candidate review");}
             catch(Exception e){throw new IllegalStateException("Requested battle candidate could not load",e);}
         }
         String bundle=System.getProperty("projectseele.combatBundleDirectory","");
         if(!bundle.isEmpty())
         {
-            try{return readLocal(Path.of(bundle).resolve("first_battle_r44.json"),"R44 matched combat bundle");}
+            try{return readLocal(CombatMotionResourcesR44.instancePath(bundle).resolve("first_battle_r44.json"),"R44 matched combat bundle");}
             catch(Exception e){throw new IllegalStateException("Requested battle bundle could not load",e);}
         }
         for(String revision:List.of("r44","r43","r42","r24","r18","r15","r14","r12"))
         {
-            Path local=Path.of("projectseele-local-maps/first_battle_"+revision+".json");
+            Path local=CombatMotionResourcesR44.instancePath("projectseele-local-maps/first_battle_"+revision+".json");
             if(!Files.isRegularFile(local))continue;
             try{return readLocal(local,revision+" private capture adaptation");}
             catch(Exception e){ProjectSeele.LOGGER.warn("Private first-battle clip rejected; using bundled sequence",e);}
@@ -117,7 +117,7 @@ public final class FirstBattleClip
             if(!surfaceHash.isEmpty()&&!surfaceHash.matches("[0-9a-f]{64}"))throw new IllegalArgumentException("Invalid surface cache fingerprint");
             if(!surfaceHash.isEmpty())
             {
-                Path cache=Path.of("projectseele-local-maps/sachiel_wrap_r14.bin");
+                Path cache=CombatMotionResourcesR44.instancePath("projectseele-local-maps/sachiel_wrap_r14.bin");
                 if(!Files.isRegularFile(cache)||Files.size(cache)>96*1024*1024L)throw new IllegalArgumentException("Missing private surface performance");
                 String digest=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(cache)));
                 if(!digest.equals(surfaceHash))throw new IllegalArgumentException("Private movie / surface mismatch");

@@ -58,6 +58,23 @@ public final class EvaRifleKinematics
         boolean supported=EvaBodyPose.hasSupportedStances();
         double lateralOffset=supported?-2.3:switch(entity.getUnitVariant()){case 0->2.8;case 2->1.9;default->1.4;};
         double forwardOffset=EvaBodyPose.hasOwnUnRig(entity)?3.8:supported?5:2;
+        boolean measuredGrip=EvaAnatomicalHandsR45.enabled(entity)
+                &&!EvaBodyPose.hasOwnUnRig(entity)
+                &&!EvaAnatomicalHandsR45.rig(entity.getUnitVariant()).grips().isEmpty();
+        if(measuredGrip)
+        {
+            forwardOffset=1.2;
+            // At the exact server threshold where firing is allowed, the
+            // barrel and fingers must already be in their held pose. Using
+            // raw .96 left a 4.7m optical miss while fireRifle accepted shots.
+            ready=entity.rifleHeldPoseReadinessR45(partial);
+        }
+        // Low ready and shoulder aim are distinct poses. A client-only scope
+        // used to leave everyone else seeing the same carry height. The shared
+        // server aim signal now raises the existing stock into the shoulder
+        // pocket; measured grips, arm reach and optics consume that same frame.
+        float sight=entity.rifleSightBlendR45(partial);sight=sight*sight*(3-2*sight);
+        double stockLift=measuredGrip?5*sight:5;
         double pocketY=supported?-3.1:Mth.lerp(entity.rifleProneBlend(partial),-1.5D,.2D);
         Vec3 pocket=shoulder.add(bodyRight.scale(lateralOffset)).add(bodyForward.scale(forwardOffset)).add(0,pocketY,0);
         Vector3f headPoint=new Matrix4f(world).mul(body.matrix("head")).transformPosition(new Vector3f(body.rig.get("head").pivot()));
@@ -67,22 +84,24 @@ public final class EvaRifleKinematics
         Vector3f initialEye=baseHead.transform(new Vector3f(eyeLocal));
         Vec3 eye=joint.add(initialEye.x,initialEye.y,initialEye.z);
         Frame result=null;
+        double carryLift=0;
         // Camera, target ray and weapon share this deterministic optical point.
-        for(int iteration=0;iteration<3;iteration++)
+        for(int iteration=0;iteration<(measuredGrip?6:3);iteration++)
         {
+            Vec3 carriedPocket=pocket.add(0,carryLift,0);
             Vec3 end=eye.add(optical.scale(SeeleConfig.EVA_RIFLE_RANGE.get()));
             var hit=entity.level().clip(new ClipContext(eye,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,entity));
             Vec3 target=hit.getType()==HitResult.Type.MISS?end:hit.getLocation();
-            Vec3 aim=target.subtract(pocket.add(0,5,0)).normalize();
+            Vec3 aim=target.subtract(carriedPocket.add(0,stockLift,0)).normalize();
             if(aim.lengthSqr()<1e-8)aim=optical;
             for(int pass=0;pass<2;pass++)
             {
                 Vec3 right=aim.cross(new Vec3(0,1,0));right=right.lengthSqr()<1e-8?bodyRight:right.normalize();
                 Vec3 up=right.cross(aim).normalize();
-                aim=target.subtract(pocket.add(up.scale(5))).add(up.scale(STOCK_UP+CAP_DOWN)).normalize();
+                aim=target.subtract(carriedPocket.add(up.scale(stockLift))).add(up.scale(STOCK_UP+CAP_DOWN)).normalize();
             }
             aim=aim.add(0,-(1-ready)*.6+recoil*.008,0).normalize();
-            double height=Math.max(.5,pocket.y+5-entity.getY()-1.1);
+            double height=Math.max(.5,carriedPocket.y+stockLift-entity.getY()-1.1);
             double maxDown=Math.min(.98,height/(STOCK_BACK+CAP_FORWARD));
             if(aim.y < -maxDown)
             {
@@ -90,14 +109,23 @@ public final class EvaRifleKinematics
             }
             Vec3 right=aim.cross(new Vec3(0,1,0));right=right.lengthSqr()<1e-8?bodyRight:right.normalize();
             Vec3 up=right.cross(aim).normalize();
-            Vec3 stock=pocket.add(up.scale(5)).subtract(aim.scale(recoil*.22));
+            Vec3 stock=carriedPocket.add(up.scale(stockLift)).subtract(aim.scale(recoil*.22));
             Vec3 grip=stock.add(aim.scale(STOCK_BACK)).subtract(up.scale(STOCK_UP));
             // During kneel/prone handoffs the magazine or receiver can reach
             // the floor before the muzzle. Lift the complete held weapon by
             // its measured support hull; both hands and the optical solution
             // consume this same corrected frame.
-            double clearance=EvaRifleClearance.lift(grip,right,aim,up,entity.getY());
-            if(clearance>0){grip=grip.add(0,clearance,0);stock=stock.add(0,clearance,0);}
+            var contacts=EvaRifleGripR45.contacts(entity,body,grip,right,aim,up);
+            double clearance=Math.max(EvaRifleClearance.lift(grip,right,aim,up,entity.getY()),
+                    EvaRifleGripR45.reachLift(contacts,body,world));
+            if(clearance>0)
+            {
+                grip=grip.add(0,clearance,0);stock=stock.add(0,clearance,0);
+                // Re-solve from the ACTUAL carry origin on the next pass.
+                // Otherwise the prone gun ray misses the optical target by
+                // its floor/reach lift, even with zero recoil and full aim.
+                if(measuredGrip)carryLift+=clearance;
+            }
             Vec3 muzzle=grip.add(aim.scale(CAP_FORWARD)).subtract(up.scale(CAP_DOWN)).add(right.scale(-.0014665D*WEAPON_SCALE));
             if(supported)
             {
@@ -112,6 +140,12 @@ public final class EvaRifleKinematics
                     if(angle>.35F)align=new Quaternionf().slerp(align,.35F/angle);
                     float headWeight=Mth.clamp((ready-.35F)/.65F,0,1);
                     headWeight=headWeight*headWeight*(3-2*headWeight);
+                    if(measuredGrip)
+                    {
+                        float reachable=(float)Mth.clamp((radius*radius-across.lengthSqr())/(radius*radius*.3),0,1);
+                        reachable=reachable*reachable*(3-2*reachable);
+                        headWeight*=sight*reachable;
+                    }
                     align=new Quaternionf().slerp(align,headWeight);
                     head=new Quaternionf(align).mul(baseHead);
                 }

@@ -6,14 +6,21 @@ ROOT=Path(__file__).resolve().parents[1]
 
 def sha(path):return hashlib.sha256(Path(path).read_bytes()).hexdigest()
 
-def prepare(spec,source,dest):
+def prepare(spec,source,dest,*,cage_study=False):
     source=Path(source).resolve();dest=Path(dest);assert source.is_dir(),'Mesh overlay directory missing';files={}
     for path in source.rglob('*'):
         if not path.is_file():continue
         relative=path.relative_to(source).as_posix()
         if relative=='mesh_only_manifest.json':continue
-        assert re.fullmatch(r'assets/projectseele/mesh/[a-z0-9_.-]+\.mesh\.json',relative),'Non-mesh resource overlay rejected: '+relative
-        json.loads(path.read_text('utf8'));files[relative]=sha(path)
+        if cage_study:
+            assert relative=='assets/projectseele/mesh/tv_shoulder_shells_r44.json','Cage study accepts one exact machinery resource only'
+            document=json.loads(path.read_text('utf8'))
+            assert document.get('stride')==6 and document.get('frame')=='fixed_gantry_local_metres_world_axes'
+            assert document.get('parts') and document.get('collision_parts') and document.get('components')
+        else:
+            assert re.fullmatch(r'assets/projectseele/mesh/[a-z0-9_.-]+\.mesh\.json',relative),'Non-mesh resource overlay rejected: '+relative
+            json.loads(path.read_text('utf8'))
+        files[relative]=sha(path)
     assert files,'Empty mesh-only overlay'
     stage=dest/'private_resource_overlay';stage.mkdir();payload=stage/'payload'
     for relative,digest in files.items():
@@ -40,9 +47,10 @@ def prepare(spec,source,dest):
         activation_reason='Existing file/eva_real_model has higher priority than mod resources, so the same frozen mesh-only payload is temporarily selected at highest pack priority.',main_source_build_or_pack_overwritten=False)
     (stage/'resource_overlay_manifest.json').write_text(json.dumps(record,indent=2),'utf8');return spec,record
 
-def activate(record,dest):
+def activate(record,dest,*,kind='mesh'):
     dest=Path(dest);pack_root=(ROOT/'run/resourcepacks').resolve();options=ROOT/'run/options.txt';original=options.read_bytes();pack=Path(record['private_pack']);assert sha(pack)==record['private_pack_sha256']
-    target=pack_root/('seele_r44_mesh_review_'+record['private_pack_sha256'][:16]+'_'+dest.name+'.zip');assert target.parent==pack_root and not target.exists(),'Temporary review pack collision'
+    assert kind in ('mesh','material')
+    target=pack_root/('seele_r44_'+kind+'_review_'+record['private_pack_sha256'][:16]+'_'+dest.name+'.zip');assert target.parent==pack_root and not target.exists(),'Temporary review pack collision'
     activation=dict(options=options,options_before=original,target=target,created=False,main_mesh_before={relative:sha(ROOT/'run/resourcepacks/eva_real_model'/relative)for relative in record['files']if(ROOT/'run/resourcepacks/eva_real_model'/relative).is_file()})
     shutil.copy2(pack,target);activation['created']=True;assert sha(target)==record['private_pack_sha256'];selected_id='file/'+target.name
     try:

@@ -21,17 +21,21 @@ import java.util.zip.GZIPInputStream;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
 public final class NervWayfindingR24
 {
-    private record LiftRoute(int next,BlockPos landing,double walkingMetres){}
-    private record Graph(String dimension,List<String> ids,String[] names,BlockPos[] nodes,int[][] next,Map<Long,List<Integer>> columns,LiftRoute[] nearestLifts){}
+    private record LiftRoute(int next,BlockPos landing,double walkingMetres,boolean floorTransfer){}
+    private record Graph(String dimension,List<String> ids,String[] names,BlockPos[] nodes,boolean[] active,int[][] next,Map<Long,List<Integer>> columns,LiftRoute[] nearestLifts){}
     private record Selection(ServerLevel level,String goal){}
     public record Guide(String destination,BlockPos here,BlockPos next,String instruction,boolean arrived){}
     private static final Map<net.minecraft.server.MinecraftServer,Optional<Graph>> GRAPHS=new WeakHashMap<>();
+    private static final Map<net.minecraft.server.MinecraftServer,Optional<Graph>> LOCAL_LIFT_GRAPHS=new WeakHashMap<>();
     private static final Map<net.minecraft.server.MinecraftServer,Map<UUID,Selection>> ACTIVE=new WeakHashMap<>();
     public static final List<String> GOALS=List.of("command","hangars","station","pyramid_station","launch_station","observation","dogma","low_plant","nearest_lift");
     private static Graph graph(ServerPlayer player)
+    {return loadGraph(player.server,"nerv_routes_r24.json.gz",GRAPHS);}
+    private static Graph loadGraph(net.minecraft.server.MinecraftServer server,String filename,
+            Map<net.minecraft.server.MinecraftServer,Optional<Graph>> cache)
     {
-        return GRAPHS.computeIfAbsent(player.server,key->{
-            Path path=key.getWorldPath(LevelResource.ROOT).resolve("nerv_routes_r24.json.gz");if(!Files.isRegularFile(path))return Optional.empty();
+        return cache.computeIfAbsent(server,key->{
+            Path path=key.getWorldPath(LevelResource.ROOT).resolve(filename);if(!Files.isRegularFile(path))return Optional.empty();
             try(var input=new InputStreamReader(new GZIPInputStream(Files.newInputStream(path)),StandardCharsets.UTF_8))
             {
                 var json=JsonParser.parseReader(input).getAsJsonObject();var rows=json.getAsJsonArray("nodes");
@@ -41,43 +45,71 @@ public final class NervWayfindingR24
                 for(int i=0;i<count;i++){var goal=json.getAsJsonArray("goals").get(i).getAsJsonObject();ids.add(goal.get("id").getAsString());names[i]=goal.get("name").getAsString();}
                 if(new HashSet<>(ids).size()!=count)throw new IllegalArgumentException("Repeated routing destination");
                 BlockPos[] nodes=new BlockPos[rows.size()];int[][] next=new int[rows.size()][count];Map<Long,List<Integer>> columns=new HashMap<>();
+                boolean[] active=new boolean[nodes.length];Arrays.fill(active,true);
+                if(json.has("node_active"))
+                {
+                    var activity=json.getAsJsonArray("node_active");
+                    if(activity.size()!=nodes.length)throw new IllegalArgumentException("Routing activity count");
+                    for(int i=0;i<active.length;i++)
+                    {
+                        var value=activity.get(i);
+                        if(!value.isJsonPrimitive()||!value.getAsJsonPrimitive().isBoolean())throw new IllegalArgumentException("Routing activity type");
+                        active[i]=value.getAsBoolean();
+                    }
+                }
                 for(int i=0;i<nodes.length;i++)
                 {
                     var row=rows.get(i).getAsJsonArray();if(row.size()!=3+count)throw new IllegalArgumentException("Routing row");
                     nodes[i]=new BlockPos(row.get(0).getAsInt(),row.get(1).getAsInt(),row.get(2).getAsInt());
                     for(int g=0;g<count;g++){next[i][g]=row.get(g+3).getAsInt();if(next[i][g]<0||next[i][g]>=nodes.length)throw new IllegalArgumentException("Routing edge");}
-                    long column=net.minecraft.world.level.ChunkPos.asLong(nodes[i].getX(),nodes[i].getZ());columns.computeIfAbsent(column,x->new ArrayList<>()).add(i);
+                    if(active[i]){long column=net.minecraft.world.level.ChunkPos.asLong(nodes[i].getX(),nodes[i].getZ());columns.computeIfAbsent(column,x->new ArrayList<>()).add(i);}
                 }
-                return Optional.of(new Graph(json.get("dimension").getAsString(),List.copyOf(ids),names,nodes,next,columns,loadNearestLifts(path,nodes)));
+                for(int i=0;i<nodes.length;i++)for(int g=0;g<count;g++)
+                    if(!active[i]&&next[i][g]!=i||active[i]&&!active[next[i][g]])throw new IllegalArgumentException("Routing edge uses an inactive node");
+                return Optional.of(new Graph(json.get("dimension").getAsString(),List.copyOf(ids),names,nodes,active,next,columns,loadNearestLifts(path,nodes,active)));
             }
             catch(Exception failure){ProjectSeele.LOGGER.error("Measured wayfinding resource rejected",failure);return Optional.empty();}
         }).orElse(null);
     }
-    private static LiftRoute[] loadNearestLifts(Path graphPath,BlockPos[] nodes)
+    private static LiftRoute[] loadNearestLifts(Path graphPath,BlockPos[] nodes,boolean[] active)
     {
-        Path path=graphPath.resolveSibling("nearest_lift_paths_r44.json.gz");
+        Path path=graphPath.resolveSibling(graphPath.getFileName().toString().equals("local_lift_routes_r45.json.gz")
+                ?"local_nearest_lift_paths_r45.json.gz":"nearest_lift_paths_r44.json.gz");
         if(!Files.isRegularFile(path))return null;
         try(var input=new InputStreamReader(new GZIPInputStream(Files.newInputStream(path)),StandardCharsets.UTF_8))
         {
             var json=JsonParser.parseReader(input).getAsJsonObject();
+            if(!json.has("same_floor")||!json.get("same_floor").getAsBoolean())
+                throw new IllegalArgumentException("Nearest-lift table lacks the same-floor contract");
             String digest=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(graphPath)));
             if(!digest.equals(json.get("graph_sha256").getAsString()))throw new IllegalArgumentException("Nearest-lift table belongs to another floor graph");
             var rows=json.getAsJsonArray("nodes");
             if(rows.size()!=nodes.length)throw new IllegalArgumentException("Nearest-lift node count");
+            var floorKeys=json.has("node_floor_keys")?json.getAsJsonArray("node_floor_keys"):null;
+            if(floorKeys!=null&&floorKeys.size()!=nodes.length)throw new IllegalArgumentException("Nearest-lift floor ownership count");
             Map<BlockPos,Integer> index=new HashMap<>();
             for(int i=0;i<nodes.length;i++)index.put(nodes[i],i);
             LiftRoute[] result=new LiftRoute[nodes.length];
             for(int i=0;i<result.length;i++)
             {
                 if(rows.get(i).isJsonNull())continue;
+                if(!active[i])throw new IllegalArgumentException("Inactive routing node has a nearest-lift route");
                 var row=rows.get(i).getAsJsonObject();var nextRow=row.getAsJsonArray("next");var landingRow=row.getAsJsonArray("nearest_landing");
                 if(nextRow.size()!=3||landingRow.size()!=3)throw new IllegalArgumentException("Nearest-lift coordinates");
                 BlockPos next=new BlockPos(nextRow.get(0).getAsInt(),nextRow.get(1).getAsInt(),nextRow.get(2).getAsInt());
                 BlockPos landing=new BlockPos(landingRow.get(0).getAsInt(),landingRow.get(1).getAsInt(),landingRow.get(2).getAsInt());
-                Integer target=index.get(next);double cost=row.get("walking_metres").getAsDouble();
-                if(target==null||!index.containsKey(landing)||!Double.isFinite(cost)||cost<0||Math.abs(next.getY()-nodes[i].getY())>1)
+                Integer target=index.get(next),landingIndex=index.get(landing);double cost=row.get("walking_metres").getAsDouble();
+                boolean sameFloor=target!=null&&landingIndex!=null&&(floorKeys==null
+                        ?next.getY()==nodes[i].getY()&&landing.getY()==nodes[i].getY()
+                        :floorKeys.get(i).getAsString().equals(floorKeys.get(target).getAsString())
+                            &&floorKeys.get(i).getAsString().equals(floorKeys.get(landingIndex).getAsString())
+                            &&row.has("floor_key")&&row.get("floor_key").getAsString().equals(floorKeys.get(i).getAsString()));
+                boolean transfer=json.has("same_floor_schema")&&json.get("same_floor_schema").getAsInt()>=3
+                        &&row.has("requires_floor_transfer")&&row.get("requires_floor_transfer").getAsBoolean();
+                if(target==null||landingIndex==null||!active[target]||!active[landingIndex]||!sameFloor&&!transfer||!Double.isFinite(cost)||cost<0
+                        ||Math.abs(next.getY()-nodes[i].getY())>1)
                     throw new IllegalArgumentException("Nearest-lift route contains a nonwalking edge");
-                result[i]=new LiftRoute(target,landing,cost);
+                result[i]=new LiftRoute(target,landing,cost,transfer);
             }
             return result;
         }
@@ -100,6 +132,8 @@ public final class NervWayfindingR24
     public static String start(ServerPlayer player,String goal)
     {
         var selections=ACTIVE.computeIfAbsent(player.server,key->new HashMap<>());
+        if(goal.equals("operator_nearest_lift")){selections.remove(player.getUUID());return OperatorNavigationProductionR45.start(player);}
+        OperatorNavigationProductionR45.stop(player);
         if(goal.equals("stop")){selections.remove(player.getUUID());return "步行引导已关闭。";}
         var graph=graph(player);int index=graph==null?-1:graph.ids.indexOf(goal);
         if(goal.equals("nearest_lift"))
@@ -107,7 +141,7 @@ public final class NervWayfindingR24
             var guidance=nearestLift(player);
             if(guidance.isEmpty())return "当前通道尚未配置可达电梯导向，请沿现场标牌行走。";
             selections.put(player.getUUID(),new Selection(player.serverLevel(),goal));
-            return "已开启最近电梯引导。沿实际通廊和楼梯前往层门，在门外呼梯、进入轿厢后选层。";
+            return "已开启电梯入口引导。优先前往本层层门；需要经过原有阶梯时会标明换层，在门外呼梯、进入轿厢后选层。";
         }
         if(index<0||graph==null||!player.level().dimension().location().toString().equals(graph.dimension))return "当前区域尚未配置总部步行引导。";
         if(nearest(player,graph)<0)return "请先走到总部公共走廊或门外，再开启引导；不会指引你穿过墙面或玻璃。";
@@ -145,8 +179,12 @@ public final class NervWayfindingR24
     public static Optional<Guide> nearestLift(ServerPlayer player)
     {
         var graph=graph(player);
-        if(graph==null||graph.nearestLifts==null||!player.level().dimension().location().toString().equals(graph.dimension))return Optional.empty();
-        int node=nearest(player,graph);
+        int node=graph==null||graph.nearestLifts==null||!player.level().dimension().location().toString().equals(graph.dimension)?-1:nearest(player,graph);
+        if(node<0||graph.nearestLifts[node]==null)
+        {
+            graph=loadGraph(player.server,"local_lift_routes_r45.json.gz",LOCAL_LIFT_GRAPHS);
+            node=graph==null||graph.nearestLifts==null||!player.level().dimension().location().toString().equals(graph.dimension)?-1:nearest(player,graph);
+        }
         if(node<0||graph.nearestLifts[node]==null)return Optional.empty();
         var route=graph.nearestLifts[node];BlockPos here=graph.nodes[node],next=graph.nodes[route.next];
         boolean arrived=route.next==node;
@@ -157,6 +195,7 @@ public final class NervWayfindingR24
             int dy=Integer.signum(next.getY()-here.getY()),dx=Integer.signum(next.getX()-here.getX()),dz=Integer.signum(next.getZ()-here.getZ());
             String direction=dx>0?"东":dx<0?"西":dz>0?"南":"北";
             cue=(dy==0?"向"+direction+"沿廊前行":"沿楼梯"+(dy>0?"上行":"下行"))+" · 距层门约 "+Math.max(1,Math.round(route.walkingMetres))+" m";
+            if(route.floorTransfer)cue="本处需循原有通道与阶梯到"+zone(route.landing)+" · "+cue;
         }
         if(!arrived&&player.level().hasChunkAt(next))
         {
@@ -165,6 +204,9 @@ public final class NervWayfindingR24
                 cue="前方门禁：按门旁指示刷卡或操作出口开关，通过后继续";
             else if(!player.level().noCollision(player,new AABB(next.getX()+.2,next.getY()+.01,next.getZ()+.2,next.getX()+.8,next.getY()+1.79,next.getZ()+.8)))
                 cue="前方通道暂被设备占用，请等待通道清空后继续";
+            else if(!player.level().getBlockCollisions(player,new AABB(next.getX()+.25,next.getY()-.6,next.getZ()+.25,
+                    next.getX()+.75,next.getY()+.01,next.getZ()+.75)).iterator().hasNext())
+                cue="前方踏面暂不可用，请等待机械到位或循现场导向绕行";
         }
         return Optional.of(new Guide("最近电梯 · "+zone(route.landing),here,next,cue,arrived));
     }

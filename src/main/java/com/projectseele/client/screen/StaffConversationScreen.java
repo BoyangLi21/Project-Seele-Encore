@@ -19,6 +19,7 @@ public final class StaffConversationScreen extends Screen
     private boolean npcSortie,sortieRifle=true;
     private int x, y, panelWidth, panelHeight, tab, unit = 1, age, savedScale = -1, replyScroll, replyTop;
     private boolean restoring;
+    private UUID humanPilot;
 
     private StaffConversationScreen(ClientboundStaffConversationPacket view)
     {
@@ -35,7 +36,9 @@ public final class StaffConversationScreen extends Screen
                 if (mc.player != null) mc.player.displayClientMessage(Component.literal(packet.reply()), false);
                 mc.setScreen(null); return;
             }
-            boolean changed = screen.view.canCommand() != packet.canCommand();
+            boolean changed = screen.view.canCommand() != packet.canCommand()
+                    ||screen.view.coordinationFormationRevision()!=packet.coordinationFormationRevision()
+                    ||screen.view.coordinationEvidenceRevision()!=packet.coordinationEvidenceRevision();
             if (!screen.view.reply().equals(packet.reply()))
             {
                 screen.replyScroll = 0;
@@ -140,11 +143,12 @@ public final class StaffConversationScreen extends Screen
                     {"保电 · 等两轮","supply/services"},{"备用馈线 · 一轮","supply/reserve"},{"归档准备结果","finish"}};
             for(int i=0;i<actions.length;i++){String action=actions[i][1];addButton(actions[i][0],x+12+(i%3)*(column+4),controlsY+(i/3)*22,column,()->send("COORD:"+action),view.canCommand());}
             int half=(panelWidth-28)/2;
-            addButton("编成机体："+com.projectseele.world.TvSortiesR32.name(unit),x+12,controlsY+110,half,()->{unit=(unit+1)%5;rebuildWidgets();},true);
-            addButton((npcSortie?"驾驶员":"司令")+" / 切换",x+16+half,controlsY+110,half,()->{npcSortie=!npcSortie;rebuildWidgets();},unit<3);
-            addButton("加入编成",x+12,controlsY+132,column,()->send("COORD:assign/"+unit+"/"+(unit<3&&npcSortie?"npc":"human")),true);
-            addButton("确认说明与待命",x+16+column,controlsY+132,column,()->send("COORD:consent/"+unit),true);
-            addButton("驾驶员撤回",x+20+column*2,controlsY+132,column,()->send("COORD:withdraw/"+unit),true);
+            addButton("编成机体："+com.projectseele.world.TvSortiesR32.name(unit),x+12,controlsY+110,half,()->{unit=(unit+1)%5;if(unit>=3)npcSortie=false;rebuildWidgets();},true);
+            String driverLabel=npcSortie?"驾驶员："+com.projectseele.entity.TrainingPilotEntity.pilotName(unit):"驾驶者："+humanPilotName();
+            addButton(driverLabel+" / 切换",x+16+half,controlsY+110,half,()->{cycleParticipant();rebuildWidgets();},true);
+            addButton("加入编成",x+12,controlsY+132,column,()->send("COORD:assign/"+unit+"/"+(unit<3&&npcSortie?"npc":"human/"+selectedHuman())),true);
+            addButton("确认说明与待命",x+16+column,controlsY+132,column,()->send("COORD:consent/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),view.coordinationFormationRevision()>0);
+            addButton("驾驶员撤回",x+20+column*2,controlsY+132,column,()->send("COORD:withdraw/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),view.coordinationFormationRevision()>0);
         }
         else if(tab==6)
         {
@@ -218,6 +222,22 @@ public final class StaffConversationScreen extends Screen
                     active ? focused ? 0xFFEFD18E : 0xFFD5E7D8 : 0xFF738178);
         }
     }
+    private UUID selectedHuman(){return humanPilot!=null?humanPilot:minecraft.player.getUUID();}
+    private String humanPilotName()
+    {
+        if(humanPilot==null||humanPilot.equals(minecraft.player.getUUID()))return "我";
+        var player=minecraft.getConnection().getPlayerInfo(humanPilot);return player==null?"离线玩家":player.getProfile().getName();
+    }
+    private void cycleParticipant()
+    {
+        if(npcSortie){npcSortie=false;humanPilot=null;return;}
+        var people=new ArrayList<>(minecraft.getConnection().getOnlinePlayers());
+        people.sort(Comparator.comparing((net.minecraft.client.multiplayer.PlayerInfo p)->!p.getProfile().getId().equals(minecraft.player.getUUID()))
+                .thenComparing(p->p.getProfile().getName()));
+        UUID selected=selectedHuman();int index=-1;for(int i=0;i<people.size();i++)if(people.get(i).getProfile().getId().equals(selected)){index=i;break;}
+        if(index+1<people.size())humanPilot=people.get(index+1).getProfile().getId();
+        else if(unit<3){npcSortie=true;humanPilot=null;}else humanPilot=null;
+    }
     private void switchTab(int next) { tab = next; rebuildWidgets(); }
     private boolean permitted(String action)
     { return view.canCommand() && com.projectseele.world.StaffAuthorityR25.allows("", view.skin(), action); }
@@ -255,7 +275,7 @@ public final class StaffConversationScreen extends Screen
             for (String row : view.units())
             { graphics.drawString(font, row, x + 12, rowY, 0xFF92C9AE, false); rowY += 11; }
         else
-        {graphics.drawString(font,view.radio()?"指挥频道在线":"岗位通信在线",x+12,rowY,0xFF92C9AE,false);rowY+=11;}
+        {graphics.drawString(font,tab==7&&view.participants().size()>unit?view.participants().get(unit):view.radio()?"指挥频道在线":"岗位通信在线",x+12,rowY,0xFF92C9AE,false);rowY+=11;}
         if (!view.order().isBlank())
         { graphics.drawString(font, font.plainSubstrByWidth(view.order(), panelWidth - 24), x + 12, rowY + 2, 0xFFE2BB67, false); rowY += 15; }
         int bottom = controlsTop()-6;

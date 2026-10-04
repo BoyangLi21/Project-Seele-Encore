@@ -26,6 +26,14 @@ public final class WallArtworkBlockEntity extends BlockEntity
     public Vec3 centre(){return Vec3.atLowerCornerOf(worldPosition).add(offset);}
     public Direction facing(){return facing;}
     public boolean supported(){return level!=null&&level.hasChunkAt(backing)&&!level.getBlockState(backing).isAir();}
+    public boolean supportsTile(double horizontal,double vertical)
+    {
+        if(level==null)return false;
+        Vec3 normal=Vec3.atLowerCornerOf(facing.getNormal());
+        Vec3 right=new Vec3(normal.z,0,-normal.x);
+        BlockPos at=BlockPos.containing(centre().add(right.scale(horizontal)).add(0,vertical,0).subtract(normal.scale(.08)));
+        return level.hasChunkAt(at)&&level.getBlockState(at).isFaceSturdy(level,at,facing);
+    }
     @Override public void load(CompoundTag tag)
     {
         super.load(tag);artwork=tag.getString("Artwork").equals("tree")?"tree":"nerv";

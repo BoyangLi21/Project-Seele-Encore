@@ -7,6 +7,7 @@ import scan_regional_completion as scan
 import plan_factory_r20 as factory
 from build_transit_civil_r22 import Station
 from query_blocks import iter_block_entities
+from station_lower_support_r45 import support_ops
 ROOT=v.ROOT;WORLD=ROOT/'run/saves/SEELE_R22_REVIEW';OUT=ROOT/'artifacts/facility_r23/stations'
 AIR='minecraft:air';FLOOR='minecraft:smooth_stone';DECK='minecraft:light_gray_concrete';EDGE='projectseele:nerv_machine_edge';GLASS='projectseele:clear_glass';LIGHT='projectseele:nerv_strip_light'
 
@@ -20,6 +21,23 @@ class RevisedStation(Station):
   a=self.at(u,y,w);b=self.at(U,Y,W);self.scene.fill(tuple(map(int,(*np.minimum(a,b),*np.maximum(a,b)))),state)
  def replan(self):
   h,g,y=self.half,self.ground,self.y;rise=y-g;u0=-h+5
+  # The former R22 bridge usedw9..11; R23 usesw11..13. Retire its
+  # complete remaining outer two slopes and preserve their later lamps.
+  retired_bridge_lamps=[];old_bridge_b=h-15
+  def old_state(q):return self.scene.palette[int(self.scene.after[q[1]-factory.LO[1],q[2]-factory.LO[2],q[0]-factory.LO[0]])]
+  for sign in(-1,1):
+   for i in range(7):
+    for cross in(9,10):
+     for Y in range(y+1,y+i+2):
+      q=self.at(old_bridge_b+i,Y,sign*cross)
+      if q in getattr(self.scene,'source_BE_positions',set()):raise RuntimeError(('Old bridge retirement meets original BE',q))
+      if self.scene.protected[q[1]-factory.LO[1],q[2]-factory.LO[2],q[0]-factory.LO[0]]:raise RuntimeError(('Old bridge retirement crosses protected volume',q))
+      old=old_state(q)
+      expected=DECK if Y<y+i+1 else f'minecraft:smooth_quartz_stairs[facing={"east"if self.horizontal else"south"},half=bottom,shape=straight,waterlogged=false]'
+      if old==expected:self.fill(old_bridge_b+i,Y,sign*cross,old_bridge_b+i,Y,sign*cross,AIR)
+      elif old=='projectseele:nerv_ceiling_light[hanging=true,lit=true]':
+       retired_bridge_lamps.append((q,sign*cross,old));self.fill(old_bridge_b+i,Y,sign*cross,old_bridge_b+i,Y,sign*cross,AIR)
+      elif old!=AIR:raise RuntimeError(('Unclassified current object on superseded R22 bridge slope',q,old))
   edge=int(round(max(abs(((q['position1']['z']+q['position2']['z'])/2-self.cz) if self.horizontal else ((q['position1']['x']+q['position2']['x'])/2-self.cx)) for q in self.platforms)))+2
   # Retire native mechanisms inside this authored station before rebuilding
   # the complete two-block pairs. Rail geometry itself stays untouched.
@@ -33,7 +51,9 @@ class RevisedStation(Station):
    # Retiring an old frame must not cut through the newly laid deck.
    self.fill(-h,g+1,sign*15,h,y-3,sign*15,AIR)
    self.fill(-h,y+1,sign*15,h,y+10,sign*15,AIR)
-   for u in range(-h+2,h,16):self.fill(u,g+1,sign*17,u,y+10,sign*17,DECK)
+   for u in range(-h+2,h,16):
+    self.fill(u,y-2,sign*17,u,y+10,sign*17,DECK)
+    for op in support_ops(self.at,u,sign,g,y,h,self.scene,factory.LO,getattr(self.scene,"source_BE_positions",set())):self.fill(*op)
    self.fill(-h,y+1,sign*17,h,y+1,sign*17,EDGE);self.fill(-h,y+2,sign*17,h,y+3,sign*17,GLASS)
    self.fill(-h,y+10,sign*17,h,y+10,sign*17,EDGE);self.fill(-h,y+11,sign*17,h,y+11,sign*15,DECK)
    # Four unobstructed metres beside the platform edge, then an independent
@@ -80,6 +100,12 @@ class RevisedStation(Station):
     self.fill(b+i,y+i+1,w-1,b+i,y+i+1,w+1,f'minecraft:smooth_quartz_stairs[facing={"east" if self.horizontal else "south"},half=bottom,shape=straight,waterlogged=false]')
    self.path('overbridge_stair_'+str(sign),[self.at(b-1,y+1,w),self.at(b+8,y+8,w)])
   self.path('overbridge',[self.at(b+8,y+8,-12),self.at(b+8,y+8,12)])
+  for old,cross,state in retired_bridge_lamps:
+   q=self.at(b+7,y+6,cross);support=self.at(b+7,y+7,cross)
+   if q in getattr(self.scene,'source_BE_positions',set())or old_state(q)!=AIR or old_state(support)!=FLOOR:raise RuntimeError(('Retained lamp has no complete actual new bridge ceiling support',old,q,support))
+   for cell in(q,support):
+    if self.scene.protected[cell[1]-factory.LO[1],cell[2]-factory.LO[2],cell[0]-factory.LO[0]]:raise RuntimeError(('Retained lamp transfer meets protected device',cell))
+   self.fill(b+7,y+6,cross,b+7,y+6,cross,state)
   # Flat moving walks belong to the lower circulation hall, with crossing
   # landings, not beside boarding doors or stairs at the platform edge.
   for begin,end in [(-h+12,-5),(5,h-12)]:
@@ -94,7 +120,8 @@ def main(apply=False):
  OUT.mkdir(parents=True,exist_ok=True);v.WORLD=scan.WORLD=WORLD;v.OUT=OUT;p=v.Painter();source=json.loads((ROOT/'artifacts/access_r22/transit/civil/station_contract.json').read_text(encoding='utf8'));native=json.loads((WORLD/'native_transit_r22.json').read_text(encoding='utf8'));records=[];total=0
  for record in source['stations']:
   x,y,z=record['center'];h=record['half'];g=record['ground'];dx,dz=(h+2,19) if record['horizontal'] else (19,h+2);lo=(x-dx,g-3,z-dz);hi=(x+dx,y+14,z+dz);factory.LO=lo;factory.HI=hi;s=factory.Scene()
-  for q,be in iter_block_entities(WORLD,v.DIM,lo,hi):
+  original_tags=dict(iter_block_entities(WORLD,v.DIM,lo,hi));s.source_BE_positions=set(original_tags)
+  for q,be in original_tags.items():
    if str(be['id']) not in ('projectseele:station_departure_board','minecraft:sign'):s.protect((*q,*q))
   # Preserve the installed transfer passages through both station shells.
   for route in source['transfer_links']:

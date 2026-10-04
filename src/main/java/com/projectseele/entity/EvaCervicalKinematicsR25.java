@@ -1,17 +1,15 @@
 package com.projectseele.entity;
 
-import net.minecraft.util.Mth;
-
-/** The low-stance cervical hinge sits behind the jaw, beside the sealed nape. */
+/** The head keeps its anatomical socket in every stance. */
 public final class EvaCervicalKinematicsR25
 {
     public static float modelOffset(EvaUnit01Entity eva,float partial)
     {
-        // The UN airframes have a lower, independently measured dorsal port.
-        // The original TV rig's high nape plate must not rebase those helmets.
-        if(eva instanceof EvaPrototypeEntity||eva.isNervLogisticsLocked()||eva.isFirstBattleActive())return 0;
-        float p=Mth.clamp(eva.rifleProneBlend(partial),0,1);
-        return 16F*p*p*p*(10+p*(-15+6*p));
+        // The old prone rebase moved the hinge five world blocks in both Y
+        // and Z while the neck skin retained its original bind. Counter-
+        // rotating the head then stretched that skin instead of articulating
+        // the neck. Clearance must come from the authored joint rotations.
+        return 0;
     }
     private EvaCervicalKinematicsR25() {}
 }

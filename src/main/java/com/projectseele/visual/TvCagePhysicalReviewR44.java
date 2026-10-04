@@ -35,7 +35,7 @@ public final class TvCagePhysicalReviewR44
         if (!TvCageCollisionR44.enabled()) throw new IllegalStateException("Physical review requires the same cage flag");
         var server = event.getServer();
         var root = server.getWorldPath(LevelResource.ROOT).normalize();
-        if (!root.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))
+        if (!root.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))
             throw new IllegalStateException("Cage physical review refuses another world");
         var level = server.getLevel(FacilitySchemaV2.DIMENSION);
         if (level == null) return;

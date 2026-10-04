@@ -96,4 +96,4 @@ def main():
     print(json.dumps(ticks), flush=True)
 
 if __name__ == '__main__':
-    main()
+    raise SystemExit('R31 asset writer retired: use build_facility_voice_r45.py for candidates, then install_facility_audio_r45.py for the selected frozen voice and measured timing. This old writer would overwrite the R45 assets.')

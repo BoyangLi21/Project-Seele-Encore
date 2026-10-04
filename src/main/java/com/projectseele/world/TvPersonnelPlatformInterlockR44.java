@@ -296,6 +296,25 @@ public final class TvPersonnelPlatformInterlockR44
         return true;
     }
 
+    /** Observational failure evidence for the actual installed gate. */
+    public static com.google.gson.JsonObject gateDiagnostic(ServerLevel level,BlockPos clicked,Player player)
+    {
+        var row=new com.google.gson.JsonObject();row.addProperty("enabled",enabled(level));
+        var state=level.getBlockState(clicked);row.addProperty("state",TvPersonnelPlatformRecipeR44.stateKey(state));
+        var lower=state.hasProperty(DoorBlock.HALF)&&state.getValue(DoorBlock.HALF)==DoubleBlockHalf.UPPER?clicked.below():clicked;
+        var data=contract(level);row.addProperty("metadata_valid",data.isPresent());
+        if(!EXPECTED.contains(lower))return row;
+        var gate=data.isPresent()?data.get().gates.get(lower):finiteGate(lower);
+        var fleet=EvaFleetSavedData.get(level.getServer()).entry(gate.variant);
+        row.addProperty("variant",gate.variant);row.addProperty("fleet_phase",fleet.map(e->e.phase().name()).orElse("missing"));
+        row.addProperty("inside_operator_area",data.isPresent()&&data.get().areas.get(gate.variant).stream().anyMatch(v->v.intersects(player.getBoundingBox())));
+        double x=-11.5+gate.variant*42;
+        var machines=level.getEntitiesOfClass(NervCarrierPlatformEntity.class,new AABB(x-2,-445,-242,x+2,-439,-237),e->e.isAlive()&&e.isRestraintGantry()&&e.getUnitVariant()==gate.variant);
+        row.addProperty("actual_gantry_count",machines.size());
+        var clocks=new com.google.gson.JsonArray();machines.forEach(e->clocks.add(e.getRestraintProgress()));row.add("actual_gantry_clocks",clocks);
+        return row;
+    }
+
     private static Gate finiteGate(BlockPos lower)
     {
         for(int v=0;v<3;v++)

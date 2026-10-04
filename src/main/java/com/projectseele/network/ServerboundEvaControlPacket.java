@@ -39,6 +39,8 @@ public class ServerboundEvaControlPacket
     public static final int ACTION_UN_FLIGHT=20;
     public static final int ACTION_UN_FLIGHT_INPUT=21;
     public static final int ACTION_GRAPPLE=22;
+    public static final int ACTION_RIFLE_SIGHT_START_R45=23;
+    public static final int ACTION_RIFLE_SIGHT_STOP_R45=24;
 
     public final int action;
     public final int requestId;
@@ -115,7 +117,9 @@ public class ServerboundEvaControlPacket
                     case ACTION_STOMP -> eva.stompAttack(sender);
                     case ACTION_TOGGLE_PRONE -> eva.toggleProne(sender);
                     case ACTION_RIFLE_FIRE -> eva.fireRifle(sender);
-                    case ACTION_CANCEL_LAUNCH -> eva.cancelLaunchFromPilot(sender);
+                    case ACTION_RIFLE_SIGHT_START_R45 -> eva.setRifleSightHeldR45(sender,true);
+                    case ACTION_RIFLE_SIGHT_STOP_R45 -> eva.setRifleSightHeldR45(sender,false);
+                    case ACTION_CANCEL_LAUNCH -> eva.contextualPilotCR45(sender,this.requestId);
                     case ACTION_SELF_LAUNCH -> eva.releaseLaunchFromPilot(sender);
                     case ACTION_SKIP_FIRST_BATTLE -> com.projectseele.event.FirstBattleDirector.skip(sender);
                     case ACTION_UN_EYE_LASER -> {if(eva instanceof com.projectseele.entity.EvaPrototypeEntity un)un.requestEyeLaser(sender);}

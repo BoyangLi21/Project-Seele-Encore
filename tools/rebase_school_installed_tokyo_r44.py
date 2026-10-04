@@ -3,9 +3,10 @@ from pathlib import Path
 import argparse,gzip,json,shutil,math
 from measure_world_r40 import MeasuredWorld
 from query_blocks import iter_block_entities
+from school_hakone_lifecycle_guard_r45 import refuse_retired_school_producer
 ROOT=Path(__file__).resolve().parents[1];WORLD=ROOT/'run/saves/SEELE_FIELD_R44_REVIEW'
 def main():
- p=argparse.ArgumentParser();p.add_argument('school',type=Path);p.add_argument('tokyo',type=Path);p.add_argument('output',type=Path);a=p.parse_args();assert not a.output.exists()
+ p=argparse.ArgumentParser();p.add_argument('school',type=Path);p.add_argument('tokyo',type=Path);p.add_argument('output',type=Path);p.add_argument('--historical-r44',action='store_true');a=p.parse_args();refuse_retired_school_producer(a.historical_r44);assert not a.output.exists()
  rows=[json.loads(r) for r in gzip.open(a.school/'forward.jsonl.gz','rt',encoding='utf8')];tokyo={tuple(r['pos']):r for r in map(json.loads,gzip.open(a.tokyo/'forward.jsonl.gz','rt',encoding='utf8'))};w=MeasuredWorld(WORLD)
  lo=tuple(min(r['pos'][k] for r in rows)-3 for k in range(3));hi=tuple(max(r['pos'][k] for r in rows)+3 for k in range(3));w.box(lo,hi);w.load();tags=dict(iter_block_entities(WORLD,'projectseele:geofront',lo,hi,selected_chunks=set(w.selected)));final=[];preserved=[];held=[]
  for r in rows:

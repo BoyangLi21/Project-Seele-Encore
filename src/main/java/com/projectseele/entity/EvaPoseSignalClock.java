@@ -18,7 +18,9 @@ public final class EvaPoseSignalClock
         if(!initialized||restartOnBackward&&value<raw-.05F)
         {from=to=value;raw=value;start=now;initialized=true;return;}
         float current=sample(now),target=value;
-        if(cyclic){float d=value-current;d-=Math.round(d);target=current+d;}
+        // Accepted packet endpoints own travelled phase. Measuring from the
+        // lagging rendered value reverses forward bursts crossing half a cycle.
+        if(cyclic){float d=value-raw;d-=Math.round(d);target=to+d;}
         from=current;to=target;raw=value;start=now;
     }
 }

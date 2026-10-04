@@ -8,9 +8,10 @@ from measure_world_r40 import MeasuredWorld
 from query_blocks import AIR,iter_block_entities
 from plan_new_city_blocks_r44 import SOIL,SMALL,PAVING
 from regional_voxels import canonical_state
+from school_hakone_lifecycle_guard_r45 import refuse_retired_school_producer
 ROOT=Path(__file__).resolve().parents[1];WORLD=ROOT/'run/saves/SEELE_FIELD_R44_REVIEW'
 def main():
- p=argparse.ArgumentParser();p.add_argument('school',type=Path);p.add_argument('tokyo',type=Path);p.add_argument('output',type=Path);p.add_argument('--campus-only',action='store_true');p.add_argument('--south-campus',action='store_true');a=p.parse_args();assert not a.output.exists()
+ p=argparse.ArgumentParser();p.add_argument('school',type=Path);p.add_argument('tokyo',type=Path);p.add_argument('output',type=Path);p.add_argument('--campus-only',action='store_true');p.add_argument('--south-campus',action='store_true');p.add_argument('--historical-r44',action='store_true');a=p.parse_args();refuse_retired_school_producer(a.historical_r44);assert not a.output.exists()
  d=json.loads((a.school/'new_district.json').read_text('utf8'));base=[json.loads(r) for r in gzip.open(a.school/'forward.jsonl.gz','rt',encoding='utf8')];trows={tuple(r['pos']):r for r in map(json.loads,gzip.open(a.tokyo/'forward.jsonl.gz','rt',encoding='utf8'))};roads=json.loads((a.school/'road_authority.json').read_text('utf8'));cols={tuple(c['pos']):dict(c) for c in roads['columns']};tcols={tuple(c['pos']):c for c in json.loads((a.tokyo/'road_authority.json').read_text('utf8'))['columns']}
  if a.campus_only:
   cols={q:c for q,c in cols.items() if (150<=q[0]<=294 and -670<=q[1]<=-658) or (246<=q[0]<=258 and -682<=q[1]<=-664)}

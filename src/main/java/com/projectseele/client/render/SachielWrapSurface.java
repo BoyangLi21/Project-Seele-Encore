@@ -53,7 +53,7 @@ public final class SachielWrapSurface
         attempted=true;
         try
         {
-            Path path=Path.of("projectseele-local-maps/sachiel_wrap_r14.bin");
+            Path path=com.projectseele.entity.CombatMotionResourcesR44.instancePath("projectseele-local-maps/sachiel_wrap_r14.bin");
             long size=Files.size(path);if(size<60||size>96*1024*1024)throw new IllegalArgumentException("Invalid wrap cache size");
             byte[] bytes=Files.readAllBytes(path);var digest=MessageDigest.getInstance("SHA-256");
             if(!HexFormat.of().formatHex(digest.digest(bytes)).equals(FirstBattleClip.surfaceHash()))throw new IllegalArgumentException("Movie / surface fingerprint mismatch");

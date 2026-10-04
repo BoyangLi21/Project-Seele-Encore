@@ -37,6 +37,13 @@ public final class NervLiftPassengerSync
         AABB lastBounds;
         Vec3 cageAnchor;
         List<AABB> cageBoxes=List.of();
+        int observedTick=Integer.MIN_VALUE;
+    }
+    private static void invalidate(Riders riders)
+    {
+        riders.passengers.clear();riders.previousFloor=Double.NaN;riders.moving=false;
+        riders.arrivalGuard=0;riders.lastBounds=null;riders.cageAnchor=null;
+        riders.cageBoxes=List.of();riders.observedTick=Integer.MIN_VALUE;
     }
 
     @SubscribeEvent(priority=EventPriority.HIGHEST)
@@ -48,6 +55,7 @@ public final class NervLiftPassengerSync
         for(var entry:groups.entrySet())
         {
             var riders=entry.getValue();var car=riders.lastBounds;
+            if((long)p.getServer().getTickCount()-riders.observedTick>1)continue;
             if(car==null||!riders.passengers.contains(p.getUUID())||!riders.moving&&riders.arrivalGuard<=0)continue;
             if(Math.abs(p.getX()-car.getCenter().x)>12||Math.abs(p.getZ()-car.getCenter().z)>12)continue;
             double margin=1+p.getBbWidth()*.5+.065;
@@ -71,16 +79,20 @@ public final class NervLiftPassengerSync
         ServerLevel level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);
         if(level==null||!FacilityWorldPolicy.isS20Rebuild(event.getServer()))return;
         Map<String,Riders> groups=LEVELS.computeIfAbsent(level,l->new HashMap<>());
-        for(var spec:managedLifts(level))
+        var specs=managedLifts(level);var activeIds=new HashSet<String>();specs.forEach(spec->activeIds.add(spec.id()));
+        groups.keySet().removeIf(id->!activeIds.contains(id));
+        for(var spec:specs)
         {
             var base=S20MovingElevatorsAdapter.controllerPosition(spec,spec.lower());
-            if(!level.hasChunkAt(base)||!(level.getBlockEntity(base) instanceof ControllerBlockEntity controller))continue;
-            var group=controller.getGroup();if(group==null)continue;
+            if(!level.hasChunkAt(base)||!(level.getBlockEntity(base) instanceof ControllerBlockEntity controller))
+            {var stale=groups.get(spec.id());if(stale!=null)invalidate(stale);continue;}
+            var group=controller.getGroup();if(group==null)
+            {var stale=groups.get(spec.id());if(stale!=null)invalidate(stale);continue;}
             Riders riders=groups.computeIfAbsent(spec.id(),s->new Riders());
             double floor;AABB bounds;
             if(group.isMoving())
             {
-                var cage=group.getCage();if(cage==null)continue;
+                var cage=group.getCage();if(cage==null){invalidate(riders);continue;}
                 bounds=cage.bounds.move(group.getCageAnchorPos(group.getCurrentY()));
                 floor=bounds.minY+1.0D;
             }
@@ -88,7 +100,7 @@ public final class NervLiftPassengerSync
             {
                 var landing=spec.stops().stream().filter(s->level.hasChunkAt(s.cabinCentre())
                         &&carPresent(level,spec,s)).findFirst();
-                if(landing.isEmpty()){riders.passengers.clear();riders.moving=false;continue;}
+                if(landing.isEmpty()){invalidate(riders);continue;}
                 floor=landing.get().walkY();
                 double x=landing.get().cabinCentre().getX()+.5D,z=landing.get().cabinCentre().getZ()+.5D;
                 bounds=new AABB(x-group.getCageSizeX()*.5D,floor-1,z-group.getCageSizeZ()*.5D,
@@ -144,8 +156,11 @@ public final class NervLiftPassengerSync
             if(group.getCage()!=null){riders.cageBoxes=group.getCage().collisionBoxes;riders.cageAnchor=group.getCageAnchorPos(group.getCurrentY());}
             riders.arrivalGuard=group.isMoving()?2:Math.max(0,riders.arrivalGuard-1);
             riders.previousFloor=floor;riders.moving=group.isMoving();
+            riders.observedTick=event.getServer().getTickCount();
         }
     }
+    @SubscribeEvent public static void stopping(net.minecraftforge.event.server.ServerStoppingEvent event)
+    {LEVELS.keySet().removeIf(level->level.getServer()==event.getServer());}
 
     private static void reconcile(ServerPlayer player,double x,double y,double z,double floor,String lift)
     {

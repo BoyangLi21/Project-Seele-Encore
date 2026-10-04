@@ -120,7 +120,7 @@ public final class PublicStationGateReviewR44
         var player = server.getPlayerList().getPlayer(mc.player.getUUID());
         if (player == null) return;
         Path world = server.getWorldPath(LevelResource.ROOT).normalize();
-        if (!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))
+        if (!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))
             throw new IllegalStateException("Public-gate client lifecycle refuses another world");
         try
         {

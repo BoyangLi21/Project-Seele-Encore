@@ -73,7 +73,7 @@ public final class EvaBerserkMotionR34
             e.moveCombatRootR34(EvaGameplayMotionR32.root(e,clip,now).subtract(EvaGameplayMotionR32.root(e,clip,before)));
             var state=STROKES.get(e);Vec3 hand=EvaGameplayMotionR32.hand(e,side,0);
             if(age==Math.max(3,Math.round(duration(e)*.24F)))EvaMovementSounds.swing(e,3);
-            if(state!=null&&state.victim!=null&&state.victim.isAlive()&&!state.hit&&now>=.27F&&now<=.65F)
+            if(state!=null&&state.victim!=null&&state.victim.isAlive()&&!state.hit&&EvaGameplayMotionR32.inContactWindowR45(e,clip,now))
             {
                 Vec3 from=state.previous==null?hand:state.previous;
                 var contact=com.projectseele.physics.CombatBodyContacts.clip(state.victim,from,hand,1.8);

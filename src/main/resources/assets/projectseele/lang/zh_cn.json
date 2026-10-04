@@ -75,7 +75,7 @@
   "key.projectseele.exit_eva": "EVA：弹出插入栓",
   "key.projectseele.stomp": "EVA：侧踹",
   "key.projectseele.toggle_prone": "EVA：趴下/起身",
-  "key.projectseele.cancel_launch": "EVA：取消发射（推回机库）",
+  "key.projectseele.cancel_launch": "取消发射／闪避／翻滚",
   "key.projectseele.self_launch": "EVA：测试自助发射",
   "hud.projectseele.self_launch_hint": "[%s] 测试自助发射",
   "message.projectseele.self_launch_accepted": "测试自助发射已接受——弹射载台释放",
@@ -148,6 +148,7 @@
   "item.projectseele.eva_progressive_knife": "EVA 高振动粒子刀总成",
   "item.projectseele.eva_pallet_rifle": "EVA 帕雷特步枪总成",
   "item.projectseele.eva_positron_cannon": "EVA 阳电子炮总成",
+  "item.projectseele.yashima_shield": "屋岛作战防护盾",
   "item.projectseele.eva_n2_device": "EVA N² 自我毁灭装置",
   "message.projectseele.field_ejection_landed": "野外紧急弹射完成——驾驶员损失最大生命值的 50%",
   "msg.projectseele.command_seat_ikari": "已就座：NERV 总司令席 / 碇司令",
@@ -300,5 +301,11 @@
   "block.projectseele.city_rain_pipe": "旧式金属落水管",
   "block.projectseele.city_rain_gutter": "旧式金属檐沟",
   "block.projectseele.residential_plaster": "住宅哑光墙面",
-  "block.projectseele.residential_plaster_slab": "住宅哑光顶板"
+  "block.projectseele.residential_plaster_slab": "住宅哑光顶板",
+  "block.projectseele.dead_sea_archive": "死海文书",
+  "msg.projectseele.weapon_sword": "二号机长剑",
+  "msg.projectseele.weapon_shield": "零号机盾牌",
+  "block.projectseele.tv_staff_lift_panel_r45": "TV人员电梯浅绿壁板",
+  "block.projectseele.tv_staff_lift_band_r45": "TV人员电梯薄紫腰线壁板",
+  "block.projectseele.tv_utility_lift_ceiling_r45": "TV勤务电梯顶棚格栅"
 }

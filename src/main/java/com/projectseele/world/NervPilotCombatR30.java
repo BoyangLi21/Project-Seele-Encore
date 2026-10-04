@@ -29,8 +29,9 @@ public final class NervPilotCombatR30
         if(PilotReturnR39.controls(e))return true;
         if(!(e.level() instanceof ServerLevel l)||e.isExperimentalUnit())return false;var d=TvCampaignSavedData.get(l);
         var sortie=d.sorties.get(e.getUnitVariant());
-        return sortie!=null&&sortie.npc&&!d.active.isEmpty()&&!d.phase.equals("cancel")
-                &&e==EvaLogisticsDirector.canonicalUnit(l,sortie.unit)&&e.getPilotEntity() instanceof TrainingPilotEntity;
+        return sortie!=null&&sortie.npc&&!AutoSortieR32.missionToken(l).isEmpty()
+                &&e==TvSortiesR32.assignedUnit(l,sortie)&&e.getPilotEntity() instanceof TrainingPilotEntity pilot
+                &&sortie.pilotR45!=null&&sortie.pilotR45.equals(pilot.getUUID())&&pilot.getAssignedVariant()==sortie.unit;
     }
     private static void retain(ServerLevel l,BlockPos p)
     {var c=new ChunkPos(p);l.getChunkSource().addRegionTicket(TICKET,c,3,c);l.getChunkSource().getChunkFuture(c.x,c.z,ChunkStatus.FULL,true);}
@@ -52,17 +53,18 @@ public final class NervPilotCombatR30
     {
         if(event.phase!=TickEvent.Phase.START)return;var l=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return;
         var d=TvCampaignSavedData.get(l);
-        for(var entry:new ArrayList<>(BRAINS.entrySet()))if(entry.getKey().isRemoved()||d.active.isEmpty()||d.phase.equals("cancel")||!d.sorties.containsKey(entry.getKey().getUnitVariant())||!d.sorties.get(entry.getKey().getUnitVariant()).npc)
+        for(var entry:new ArrayList<>(BRAINS.entrySet()))if(entry.getKey().isRemoved()||AutoSortieR32.missionToken(l).isEmpty()||!d.sorties.containsKey(entry.getKey().getUnitVariant())||!d.sorties.get(entry.getKey().getUnitVariant()).npc)
         {entry.getKey().stopAutonomousR30();BRAINS.remove(entry.getKey());}
-        if(d.active.isEmpty()||d.phase.equals("cancel")||d.phase.equals("alert"))return;
+        if(d.active.isEmpty()||Set.of("cancel","failure","alert","combat_victory","episode_archived").contains(d.phase)||d.targetDeathConfirmedR45)return;
         for(var sortie:List.copyOf(d.sorties.values()))if(sortie.npc)tickUnit(l,d,sortie);
     }
     private static void tickUnit(ServerLevel l,TvCampaignSavedData d,TvCampaignSavedData.Sortie sortie)
     {
         var owner=l.getServer().getPlayerList().getPlayer(sortie.commander);
-        var eva=EvaLogisticsDirector.canonicalUnit(l,sortie.unit);
+        var eva=TvSortiesR32.assignedUnit(l,sortie);
         if(eva==null){EvaLogisticsDirector.loadControlTarget(l,sortie.unit);return;}
         if(owner==null||owner.level()!=l){eva.stopAutonomousR30();return;}
+        if(d.phase.equals("failure")){TvEncounterRulesR45.stopEquipment(l,d);eva.stopAutonomousR30();return;}
         retain(l,eva.blockPosition());var b=BRAINS.computeIfAbsent(eva,key->new Brain());b.age++;
         if(EvaShutdownR30.disabled(eva)){eva.stopAutonomousR30();d.notice="机体已关机。司令，可以通过运输部门请求回收。";return;}
         String phase=EvaLogisticsDirector.status(l,sortie.unit).phase();
@@ -71,21 +73,27 @@ public final class NervPilotCombatR30
             eva.stopAutonomousR30();if(l.getGameTime()<b.nextOrder)return;b.nextOrder=l.getGameTime()+100;
             if(phase.equals("PARKED"))
             {
-                var pilot=TrainingPilotDirector.pilots(l).stream().filter(p->p.getAssignedVariant()==sortie.unit).findFirst().orElse(null);
+                var pilots=TrainingPilotDirector.pilots(l).stream().filter(p->p.getAssignedVariant()==sortie.unit).toList();
+                if(pilots.size()!=1){d.notice="原驾驶员尚未接通，机体保持待命。";return;}
+                var pilot=pilots.get(0);
+                if(sortie.pilotR45==null){sortie.pilotR45=pilot.getUUID();d.setDirty();}
+                if(!sortie.pilotR45.equals(pilot.getUUID())){d.notice="驾驶员身份与本次编成不符，未重新派遣。";return;}
                 AutoSortieR32.assignCommander(eva,owner);
                 if(!sortie.dispatchRequested)
                 {var result=TrainingPilotDirector.start(l,sortie.unit);sortie.dispatchRequested=result.accepted();d.notice=result.message();d.setDirty();}
             }
             return;
         }
-        if(!(eva.getPilotEntity() instanceof TrainingPilotEntity pilot))return;
+        if(!(eva.getPilotEntity() instanceof TrainingPilotEntity pilot)||sortie.pilotR45==null||!sortie.pilotR45.equals(pilot.getUUID()))
+        {eva.stopAutonomousR30();return;}
         if(eva.isFirstBattleActive()||eva.isLaunchSequenceActive()||eva.isNervLogisticsLocked()){eva.stopAutonomousR30();return;}
         eva.autonomousGuardR30(pilot);
-        String city=CityBattlefieldR29.obstruction(l);
+        String city=TvEncounterRulesR45.obstruction(l,d);
         if(!city.isEmpty())
         {
             eva.stopAutonomousR30();d.notice=city;
-            if(l.getGameTime()>=b.nextOrder&&!CityBattlefieldR29.loweringRequested(l))
+            if(l.getGameTime()>=b.nextOrder&&!CityBattlefieldR29.loweringRequested(l)
+                    &&(!TvEncounterRulesR45.handles(d.active)||TvEncounterSitesR45.site(l,d.active).map(TvEncounterSitesR45.Site::cityInterlock).orElse(false)))
             {
                 var winter=officer(l,"fuyutsuki");
                 // Retry while the async entity section is still retained; a ten-second
@@ -96,7 +104,29 @@ public final class NervPilotCombatR30
             return;
         }
         LivingEntity angel=d.angel!=null&&l.getEntity(d.angel) instanceof LivingEntity target?target:null;
-        Vec3 goal=TvCampaignDirector.approachPointR30(l);if(goal==null)return;
+        Vec3 goal=TvEncounterRulesR45.handles(d.active)?TvEncounterRulesR45.unitApproach(l,d,sortie.unit):TvCampaignDirector.approachPointR30(l);
+        if(goal==null){eva.stopAutonomousR30();return;}
+        if(d.active.equals("ramiel"))
+        {
+            boolean held=sortie.unit==0?TvMissionEquipmentR45.shieldAuthorized(eva):sortie.unit==1?TvMissionEquipmentR45.cannonAuthorized(eva):true;
+            if(!held)
+            {
+                var depot=TvMissionEquipmentR45.nearestPhysicalCargo(l,eva);
+                if(depot==null){eva.stopAutonomousR30();d.notice=sortie.unit==0?"等待运输部门送达防护盾。":"等待运输部门送达阳离子炮。";return;}
+                retain(l,depot.blockPosition());if(!depot.isReadyAndStocked())depot.deploy();
+                if(eva.position().subtract(depot.position()).horizontalDistance()>21)
+                {move(l,eva,pilot,b,depot.position(),null,false);say(owner,pilot,b,"weapon_approach");return;}
+                eva.autonomousDriveR30(pilot,Vec3.ZERO,depot.position().add(0,35,0),false);
+                if(TvEncounterRulesR45.issueMissionAtStation(depot,eva,pilot))say(owner,pilot,b,"weapon_acquired");
+                return;
+            }
+            // Preserve collision-aware travel; never chase the distant boss or
+            // fall through to the old rifle/melee AI.
+            if(!TvEncounterRulesR45.npcTactic(l,d,eva,pilot))
+            {move(l,eva,pilot,b,goal,angel,false);say(owner,pilot,b,"enroute");}
+            else {b.tactic=sortie.unit==0?"shield_station":"cannon_station";}
+            return;
+        }
         if(sortie.rifle&&(eva.getArmamentMask()&(1<<EvaUnit01Entity.WEAPON_RIFLE))==0&&angel==null)
         {
             var station=b.station!=null&&l.getEntity(b.station) instanceof NervArmamentStationEntity n?n:NervArmamentStationEntity.commandStation(l);

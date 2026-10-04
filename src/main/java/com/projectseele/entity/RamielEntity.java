@@ -62,7 +62,7 @@ import org.joml.Vector3f;
  * Ramiel, the Fifth Angel: a hovering crystalline octahedron that snipes its
  * target with a devastating energy beam after a telegraphed charge-up.
  */
-public class RamielEntity extends FlyingMob implements Enemy, Angel
+public class RamielEntity extends FlyingMob implements Enemy, Angel, com.projectseele.world.TvEncounterRulesR45.BeamRangeSource
 {
     private static final EntityDataAccessor<Boolean> DATA_CHARGING =
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.BOOLEAN);
@@ -184,8 +184,20 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
         this.goalSelector.addGoal(1, new BeamAttackGoal(this));
         this.goalSelector.addGoal(2, new HoverGoal(this));
         // The EVA is the bigger threat; stray humans are an afterthought.
-        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, EvaUnit01Entity.class, false));
-        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, false));
+        this.targetSelector.addGoal(1, new NearestAttackableTargetGoal<>(this, EvaUnit01Entity.class, false)
+        {
+            @Override public boolean canUse()
+            {return com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(RamielEntity.this)==null&&super.canUse();}
+            @Override public boolean canContinueToUse()
+            {return com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(RamielEntity.this)==null&&super.canContinueToUse();}
+        });
+        this.targetSelector.addGoal(2, new NearestAttackableTargetGoal<>(this, Player.class, false)
+        {
+            @Override public boolean canUse()
+            {return com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(RamielEntity.this)==null&&super.canUse();}
+            @Override public boolean canContinueToUse()
+            {return com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(RamielEntity.this)==null&&super.canContinueToUse();}
+        });
     }
 
     @Override
@@ -468,11 +480,23 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
         return this.position().add(0.0D, this.getBbHeight() * 0.5D, 0.0D);
     }
 
+    @Override public double effectiveBeamRangeR45()
+    {return com.projectseele.world.TvEncounterRulesR45.missionAttackRange(this,SeeleConfig.BEAM_RANGE.get());}
+
+    private boolean beamLineOfSightR45(LivingEntity target)
+    {
+        if(com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this)==null)return this.hasLineOfSight(target);
+        return this.level().clip(new ClipContext(this.beamOrigin(),target.getEyePosition(),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this))
+                .getType()==net.minecraft.world.phys.HitResult.Type.MISS;
+    }
+
     private void fireBeam(LivingEntity target)
     {
+        if(com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this)!=null
+                &&!com.projectseele.world.TvEncounterRulesR45.missionBeamAllowed(this))return;
         Vec3 from = this.beamOrigin();
         Vec3 dir = target.getEyePosition().subtract(from).normalize();
-        Vec3 farEnd = from.add(dir.scale(SeeleConfig.BEAM_RANGE.get()));
+        Vec3 farEnd = from.add(dir.scale(this.effectiveBeamRangeR45()));
         BlockHitResult blockHit = this.level().clip(
                 new ClipContext(from, farEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
         Vec3 end = blockHit.getLocation();
@@ -487,6 +511,10 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
         {
             end = bodyHit.getLocation();
         }
+        // Clip against the same measured physical shield used by the mission gate.
+        // Missing geometry never creates an imaginary shield or alters ordinary beams.
+        var shieldHit=com.projectseele.world.TvEncounterRulesR45.missionShieldContactR45(this,from,end);
+        if(shieldHit.isPresent())end=shieldHit.get();
         final Vec3 impact = end;
 
         for (LivingEntity victim : com.projectseele.physics.CombatEntityQueryR44.candidates(this.level(),
@@ -682,6 +710,9 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
         {
             LivingEntity target = this.ramiel.getTarget();
             MoveControl control = this.ramiel.getMoveControl();
+            Vec3 missionAnchor=com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this.ramiel);
+            if(missionAnchor!=null)
+            {control.setWantedPosition(missionAnchor.x,missionAnchor.y,missionAnchor.z,1.0D);return;}
             if (target != null && target.isAlive())
             {
                 Vec3 away = this.ramiel.position().subtract(target.position());
@@ -723,12 +754,12 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
         public boolean canUse()
         {
             LivingEntity target = this.ramiel.getTarget();
-            double range = SeeleConfig.BEAM_RANGE.get();
+            double range = this.ramiel.effectiveBeamRangeR45();
             return this.ramiel.beamCooldown <= 0
                     && !this.ramiel.isDrilling()
                     && target != null && target.isAlive()
                     && this.ramiel.distanceToSqr(target) < range * range
-                    && this.ramiel.hasLineOfSight(target);
+                    && this.ramiel.beamLineOfSightR45(target);
         }
 
         @Override
@@ -818,6 +849,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel
         @Override
         public boolean canUse()
         {
+            if(com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this.ramiel)!=null)return false;
             if (this.cooldown > 0)
             {
                 this.cooldown--;

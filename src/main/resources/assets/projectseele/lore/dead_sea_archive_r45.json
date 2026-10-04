@@ -1,0 +1,57 @@
+{
+  "schema": 45,
+  "edition": "SEELE / 封存卷册",
+  "pages": [
+    {
+      "title": "死海文书",
+      "text": "",
+      "basis": "传统生命之树图式；项目原创图版"
+    },
+    {
+      "title": "卷首残文",
+      "text": "此星的最初之夜，曾有两枚种子降临。\n\n白之月携来亚当，黑之月携来莉莉丝。原应各归其所者，在同一片土地上醒来。\n\n后世称其为灾变。文书将它记作一次偏离。",
+      "basis": "EVA2机密情报之生命之种/两月；原创叙述"
+    },
+    {
+      "title": "两种果实",
+      "text": "生命之果，赐以永续；智慧之果，使之知晓自身。\n\n一方继承不朽的形体，一方以脆弱的肉身繁衍。\n\n若两者归于一身，人所设下的界限，便不再足以命名它。",
+      "basis": "TV生命之果与智慧之果设定；原创叙述"
+    },
+    {
+      "title": "拘束之器",
+      "text": "巨人的形体，依生命之种而造。其外覆甲，亦为枷锁。\n\n栓可置入，门可闭合。然而躯体深处的回应，并非服从。\n\n所寻之人若未被接纳，任何命令皆为空响。",
+      "basis": "TV机体拘束与驾驶员拒绝现象；原创叙述"
+    },
+    {
+      "title": "心之壁",
+      "text": "此壁无形。它分隔你与他者，也使你仍被称为你。\n\n壁相遇时，可以相拒，亦可以相消。\n\n若最后一面壁倒下，众生将不再孤独。无人知晓，那时还会留下怎样的自己。",
+      "basis": "TV第24话的个体边界；原创叙述"
+    },
+    {
+      "title": "枪与种",
+      "text": "枪被留在种子身侧，作为终止与沉默的凭据。\n\n一旦它离开守望之地，旧有的均衡便不再可靠。\n\n持枪之人须记住：能够使巨人沉默之物，也能为仪式开启道路。",
+      "basis": "EVA2机密情报的枪与种；仪式措辞为原创推演"
+    },
+    {
+      "title": "约定之地",
+      "text": "地表的城，在警报中沉入土下。林海之中，金字塔守着通往更深处的门。\n\n门的尽头，是白色巨人的沉默。\n\n归来的诸子，将沿此路抵达封印之处。",
+      "basis": "TV地下本部空间关系；封印措辞为游戏改编"
+    },
+    {
+      "title": "未写之页",
+      "text": "诸子来临的次序已被写下；迎击之人如何选择，尚留空白。\n\n将谁送往战场，将什么留给归来者——\n\n这些名字，须由仍然活着的人写入。",
+      "basis": "项目原创分支提示，不是官方文书原文"
+    },
+    {
+      "title": "封缄",
+      "text": "卷册止于此处。\n\n其余残页，依议定封存。\n\n\nSEELE\nΑ — Ω",
+      "basis": "项目原创封缄装帧"
+    }
+  ],
+  "sources": [
+    "https://www.alfasystem.net/game/eva2/product_introduction.html",
+    "https://wiki.evageeks.org/Classified_Information_(Translation)",
+    "https://wiki.evageeks.org/Dead_Sea_Scrolls"
+  ],
+  "editorial_note": "Original in-world prose inspired by TV and separately identified EVA2 supplementary lore; not an official transcription. Prior basis/source fields remain documentary metadata."
+}

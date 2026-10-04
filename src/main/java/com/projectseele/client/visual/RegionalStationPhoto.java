@@ -71,7 +71,7 @@ public final class RegionalStationPhoto
         if(!ENABLED||event.phase!=TickEvent.Phase.END)return;
         Minecraft mc=Minecraft.getInstance();if(mc.player==null||mc.getSingleplayerServer()==null)return;
         var server=mc.getSingleplayerServer();Path world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals(R44?"SEELE_FIELD_R44_REVIEW":R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R39?"SEELE_FIELD_R39_REVIEW":R38?"SEELE_FIELD_R38_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R16?"SEELE_TV_FACILITIES_R16":R10_MODELS?"SEELE_ANGEL_MODEL_REVIEW_R10":"SEELE_TV_WORLD_PREVIEW_20260906"))return;
+        if(!world.getFileName().toString().equals(R44?com.projectseele.visual.NativeReviewWorldsR45.expectedName():R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R39?"SEELE_FIELD_R39_REVIEW":R38?"SEELE_FIELD_R38_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R16?"SEELE_TV_FACILITIES_R16":R10_MODELS?"SEELE_ANGEL_MODEL_REVIEW_R10":"SEELE_TV_WORLD_PREVIEW_20260906"))return;
         try
         {
             if(!positioningFailure.isEmpty())throw new IllegalStateException(positioningFailure);
@@ -89,7 +89,9 @@ public final class RegionalStationPhoto
             {
                 if(DETAIL)
                 {
-                    var data=com.google.gson.JsonParser.parseString(Files.readString(world.resolve(R30?"r30_photo_views.json":R07?"r07_photo_views.json":"regional_photo_views.json"))).getAsJsonArray();
+                    Path itinerary=world.resolve(R30?"r30_photo_views.json":R07?"r07_photo_views.json":"regional_photo_views.json");
+                    if(!System.getProperty("projectseele.nativeFacilityBindingR45","").isEmpty())itinerary=com.projectseele.world.FacilitySourceAdmissionR45.photoViews(world);
+                    var data=com.google.gson.JsonParser.parseString(Files.readString(itinerary)).getAsJsonArray();
                     java.util.List<View> views=new java.util.ArrayList<>();
                     for(var item:data)
                     {
@@ -167,6 +169,15 @@ public final class RegionalStationPhoto
                     else if(R10_MODELS&&action.startsWith("pose:"))
                     {
                         com.projectseele.visual.AngelModelR10Review.seek(Float.parseFloat(action.substring(5)));actionReady=true;
+                    }
+                    else if(R44&&action.equals("read_archive"))
+                    {
+                        var at=new net.minecraft.core.BlockPos(30,-329,340);
+                        if(!(level.getBlockEntity(at) instanceof com.projectseele.world.DeadSeaArchiveEntityR45)
+                                ||server.getPlayerList().getPlayers().get(0).distanceToSqr(Vec3.atCenterOf(at))>16)
+                            throw new IllegalStateException("Archive physical approach unavailable");
+                        server.getPlayerList().getPlayers().get(0).setGameMode(GameType.CREATIVE);
+                        actionReady=true;
                     }
                     else if(R30&&action.startsWith("lights_"))
                     {
@@ -293,16 +304,43 @@ public final class RegionalStationPhoto
         frames++;
         if(ready&&!captured)
         {
+            if(camera.action().equals("read_archive")&&!(mc.screen instanceof com.projectseele.client.DeadSeaArchiveScreenR45))
+            {
+                // The photo camera uses spectator mode, which deliberately
+                // refuses ordinary block use. Await the real mode packet.
+                if(mc.gameMode.getPlayerMode()!=GameType.CREATIVE)return;
+                var at=new net.minecraft.core.BlockPos(30,-329,340);
+                mc.gameMode.useItemOn(mc.player,net.minecraft.world.InteractionHand.MAIN_HAND,
+                        new net.minecraft.world.phys.BlockHitResult(new Vec3(30.5,-327.9,340.5),net.minecraft.core.Direction.UP,at,false));
+                if(!(mc.screen instanceof com.projectseele.client.DeadSeaArchiveScreenR45))throw new IllegalStateException("Native archive right click failed");
+                return;
+            }
             Vec3 actual=mc.gameRenderer.getMainCamera().getPosition();
             if(actual.distanceToSqr(camera.position().add(0,1.62,0))>=.01){ready=false;return;}
             if(R44&&(!Double.isFinite(lastEffectiveFov)||Math.abs(lastEffectiveFov-camera.fov())>.02)){ready=false;return;}
             Screenshot.grab(mc.gameDirectory,camera.file(),mc.getMainRenderTarget(),ignored->{});captured=true;capturedAtSceneAge=sceneAge;
             var row=new com.google.gson.JsonObject();row.addProperty("file",camera.file());row.addProperty("actual_camera",actual.toString());
+            if(camera.action().equals("read_archive"))row.addProperty("actual_open_archive_page",((com.projectseele.client.DeadSeaArchiveScreenR45)mc.screen).pageIndex());
             row.addProperty("actual_day_time",mc.level.getDayTime());row.addProperty("actual_fixed_time",mc.level.dimensionType().fixedTime().isPresent()?mc.level.dimensionType().fixedTime().getAsLong():-1);
             row.addProperty("dimension_effects_class",mc.level.effects().getClass().getName());
             row.addProperty("dimension_effects_id",mc.level.dimensionType().effectsLocation().toString());
             row.add("vertical_cavern_visibility",com.projectseele.client.GeoFrontVerticalVisibilityR44.snapshot());
             row.addProperty("actual_shader_active",com.projectseele.client.render.ShaderShadowPassR44.enabled());
+            // A matching camera and asset can still depict a different
+            // mechanical state. Record the actual tracked gantries in the
+            // same capture callback, rather than borrowing a later snapshot.
+            var gantriesAtCapture=new com.google.gson.JsonArray();
+            for(var entity:mc.level.entitiesForRendering())
+                if(entity instanceof com.projectseele.entity.NervCarrierPlatformEntity gantry&&gantry.isRestraintGantry())
+                {
+                    var machine=new com.google.gson.JsonObject();
+                    machine.addProperty("uuid",gantry.getStringUUID());
+                    machine.addProperty("variant",gantry.getUnitVariant());
+                    machine.addProperty("restraint_progress",gantry.getRestraintProgress());
+                    machine.addProperty("position",gantry.position().toString());
+                    gantriesAtCapture.add(machine);
+                }
+            row.add("actual_tracked_gantries_at_capture",gantriesAtCapture);
             row.addProperty("smart_cull",mc.smartCull);row.addProperty("occlusion_reapplies",occlusionRestores);row.addProperty("fps",mc.getFps());row.addProperty("rendered_sections",mc.levelRenderer.countRenderedChunks());
             row.addProperty("fov_degrees",mc.options.fov().get());row.addProperty("required_section_count",camera.requiredSections().size());
             if(R44&&RESOURCE_RELOADS.size()>0)row.add("native_resource_reloads",RESOURCE_RELOADS.deepCopy());

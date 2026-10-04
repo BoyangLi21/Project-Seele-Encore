@@ -57,6 +57,7 @@ public final class ClientForgeEvents
     private static boolean chargeHeld;
     /** Local optical sight state; rifle fire itself remains server-authoritative. */
     private static boolean rifleAimHeld;
+    private static int rifleAimEntityR45=-1;
     private static boolean crouchHeld;
     private static boolean sprintHeld;
     private static boolean jumpHeld;
@@ -109,14 +110,24 @@ public final class ClientForgeEvents
 
     public static boolean isCannonScopeActive(EvaUnit01Entity eva)
     {
-        return eva != null && eva.getWeapon() == EvaUnit01Entity.WEAPON_CANNON
+        return opticsAvailable(eva) && eva.getWeapon() == EvaUnit01Entity.WEAPON_CANNON
                 && (chargeHeld || eva.getCannonCharge() > 0);
     }
 
     public static boolean isRifleSightActive(EvaUnit01Entity eva)
     {
-        return eva != null && eva.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE
+        return opticsAvailable(eva) && eva.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE
+                &&(eva.isExperimentalUnit()||!eva.isPilotSprinting())
                 && rifleAimHeld;
+    }
+
+    private static boolean opticsAvailable(EvaUnit01Entity eva)
+    {
+        return eva!=null&&eva.isPoweredOn()&&!eva.isNervLogisticsLocked()
+                &&!eva.isLaunchSequenceActive()&&!eva.isActivationCinematicActive()
+                &&!eva.isFirstBattleActive()&&!eva.isBerserk()
+                &&!com.projectseele.physics.CombatBodyDynamics.active(eva)
+                &&!com.projectseele.entity.EvaAirTransportR31.active(eva);
     }
 
     private static void send(int action)
@@ -253,13 +264,8 @@ public final class ClientForgeEvents
                 send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
             }
         }
-        while (Keybinds.CANCEL_LAUNCH.consumeClick())
-        {
-            if (eva != null)
-            {
-                send(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH);
-            }
-        }
+        int contextualCClicksR45=0;
+        while (Keybinds.CANCEL_LAUNCH.consumeClick())contextualCClicksR45++;
         while (Keybinds.SELF_LAUNCH.consumeClick())
         {
             if (eva != null)
@@ -364,6 +370,19 @@ public final class ClientForgeEvents
             clearJumpRequest();
         }
 
+        // Send sprint start/stop before C on the same channel, including Ctrl+C's first frame.
+        while(contextualCClicksR45-->0)
+        {
+            if(eva==null)continue;
+            boolean originalCancel=eva.isExperimentalUnit()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive();
+            if(!originalCancel&&minecraft.screen!=null)continue;
+            int directions=originalCancel?-1:(minecraft.options.keyUp.isDown()?1:0)
+                    |(minecraft.options.keyDown.isDown()?2:0)|(minecraft.options.keyLeft.isDown()?4:0)
+                    |(minecraft.options.keyRight.isDown()?8:0);
+            SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(
+                    ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,directions));
+        }
+
         // Hold-to-use: cannon optical charge and N2 arming share one validated
         // server edge, but expose different synchronized progress values.
         boolean wantCharge = eva != null
@@ -378,10 +397,14 @@ public final class ClientForgeEvents
                     ? ServerboundEvaControlPacket.ACTION_CHARGE_START
                     : ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
         }
-        rifleAimHeld = eva != null
+        boolean wantRifleSight = opticsAvailable(eva)
                 && eva.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE
                 && minecraft.screen == null
                 && minecraft.options.keyUse.isDown();
+        if(wantRifleSight!=rifleAimHeld||wantRifleSight&&eva.getId()!=rifleAimEntityR45)
+            send(wantRifleSight?ServerboundEvaControlPacket.ACTION_RIFLE_SIGHT_START_R45
+                    :ServerboundEvaControlPacket.ACTION_RIFLE_SIGHT_STOP_R45);
+        rifleAimHeld=wantRifleSight;rifleAimEntityR45=eva==null?-1:eva.getId();
 
         // The pallet SMG is automatic. The client may request every tick;
         // the entity's authoritative cooldown determines the actual fire rate.
@@ -517,7 +540,9 @@ public final class ClientForgeEvents
         {
             if (player != null && event.isUseItem() && !player.isShiftKeyDown())
             {
+                com.projectseele.visual.StanceContactR41Review.shutdownEntryTraceR45(player,null,"client_use_event_before_find",true,null);
                 Entity entryTarget = findEntryPlugTarget(player);
+                com.projectseele.visual.StanceContactR41Review.shutdownEntryTraceR45(player,entryTarget,"client_use_event_target",true,null);
                 if (entryTarget != null)
                 {
                     // The external capsule has a real hatch and passenger
@@ -876,6 +901,10 @@ public final class ClientForgeEvents
     public static void onClientLogout(ClientPlayerNetworkEvent.LoggingOut event)
     {
         EvaCommandFeedClient.resetConnectionState();
+        CockpitFeedbackClient.resetConnectionR45();
+        ClientAlarmState.resetConnectionR45();
+        AlarmOverlay.INSTANCE.resetConnectionR45();
+        com.projectseele.client.fx.ClientFxManager.clear();
     }
 
     private record ArmVisibility(boolean rightArm, boolean leftArm,
@@ -886,6 +915,7 @@ public final class ClientForgeEvents
     @SubscribeEvent
     public static void onComputeFovModifier(ComputeFovModifierEvent event)
     {
+        if(!Minecraft.getInstance().options.getCameraType().isFirstPerson())return;
         // Sniper zoom: the scope narrows as the positron cannon charges.
         if (event.getPlayer() instanceof LocalPlayer player)
         {
@@ -896,7 +926,7 @@ public final class ClientForgeEvents
             }
             else if (isRifleSightActive(eva))
             {
-                event.setNewFovModifier(0.72F);
+                event.setNewFovModifier(eva.isExperimentalUnit()?0.72F:Mth.lerp(eva.rifleSightBlendR45(0),1F,.72F));
             }
         }
     }

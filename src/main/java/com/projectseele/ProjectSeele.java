@@ -48,6 +48,12 @@ public class ProjectSeele
         ModLoadingContext.get().registerConfig(ModConfig.Type.COMMON, SeeleConfig.COMMON_SPEC);
         ModLoadingContext.get().registerConfig(ModConfig.Type.CLIENT, SeeleConfig.CLIENT_SPEC);
 
+        if(Boolean.getBoolean("projectseele.r45BeValidityReview"))
+        {
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(com.projectseele.visual.BlockEntityValidityReviewR45::register);
+            net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(com.projectseele.visual.BlockEntityValidityReviewR45::exportOnStart);
+        }
+
         modEventBus.addListener(this::commonSetup);
     }
 
@@ -56,6 +62,8 @@ public class ProjectSeele
         event.enqueueWork(() ->
         {
             SeeleNetwork.register();
+            if(!System.getProperty("projectseele.r45CampaignAcceptancePlan", "").isBlank())
+                net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(com.projectseele.visual.TvCampaignNativeAcceptanceR45.class);
             EvaLiveCombatMotion.preload();
             ForgeChunkManager.setForcedChunkLoadingCallback(MODID,
                     NervRuntimeMaintenance::validateForcedChunkTickets);

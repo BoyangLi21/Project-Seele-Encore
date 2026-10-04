@@ -69,6 +69,9 @@ def configure(key):
     m.rig=rig;m.parents={n:b.get('parent') for n,b in rig.items()};m.P={n:np.asarray(b['pivot'],float)*[-1,1,1] for n,b in rig.items()}
     m.K={s:m.P.get('r30_knee_socket_'+s,m.P['shin_'+s]+BASE_K[s]) for s in ('l','r')}
     m.E={s:m.P.get('r30_elbow_socket_'+s,m.P['forearm_'+s]+BASE_E[s]) for s in ('l','r')}
+    # New hand geometry declares its longitudinal frame explicitly. Clear it
+    # when switching rigs so a NERV calibration cannot leak into a UN actor.
+    m.anatomical_hand_basis_r45=BODY.get('anatomical_hand_basis_r45',{}).get(str(key))
     hulls={n:np.asarray(v,float) for n,v in BODY['rig_support'].get(str(key),BODY['support']).items()}
     m.feet={s:hulls['foot_'+s]-m.P['foot_'+s] for s in ('l','r')};m.idle=m.Pose()
     for n,b in rig.items():m.idle.setq(n,R.from_euler('xyz',np.asarray(b.get('rotation',[0,0,0]))*[-1,-1,1],degrees=True))

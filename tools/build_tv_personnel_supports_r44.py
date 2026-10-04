@@ -113,14 +113,18 @@ def platform02_utility():
                        2 * radius, sy(last) - sy(z) + 2 * radius, last - z)
 
 
-def inspection_edges(part, outer):
+def inspection_edges(part, outer, front_portal=None):
     """True worker edges delimit green work face from receiver/shoulder ends."""
     def sy(z):return 48.96+(z+20.50)*3.74/13.92
     # Both equipment ends remain visible and physical behind these boundaries.
     # The independent lane enters through the outer side, not either end.
-    for first,last in [(np.array([8.955,sy(-16.5),-16.5]),np.array([8.955,sy(-7.5),-7.5])),
-                       (np.array([8.955,sy(-16.5),-16.5]),np.array([outer,sy(-16.5),-16.5])),
-                       (np.array([8.955,sy(-7.5),-7.5]),np.array([outer,sy(-7.5),-7.5]))]:
+    front=[(8.955,outer)] if front_portal is None else [(8.955,front_portal[0]),(front_portal[1],outer)]
+    if front_portal is not None:
+        assert 8.955<=front_portal[0]<front_portal[1]<=outer
+    segments=[(np.array([8.955,sy(-16.5),-16.5]),np.array([8.955,sy(-7.5),-7.5]))]
+    segments.extend((np.array([start,sy(-16.5),-16.5]),np.array([end,sy(-16.5),-16.5]))for start,end in front if end>start)
+    segments.append((np.array([8.955,sy(-7.5),-7.5]),np.array([outer,sy(-7.5),-7.5])))
+    for first,last in segments:
         length=np.linalg.norm(last-first);count=max(2,int(np.ceil(length/2.4))+1)
         for p in np.linspace(first,last,count):
             a.m.cylinder(p+[0,.06,0],p+[0,1.15,0],.045,a.EDGE,12)

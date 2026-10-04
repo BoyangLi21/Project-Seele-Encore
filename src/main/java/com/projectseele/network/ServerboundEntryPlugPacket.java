@@ -35,6 +35,8 @@ public class ServerboundEntryPlugPacket
         ServerPlayer sender = context.getSender();
         context.enqueueWork(() ->
         {
+            if(sender!=null&&com.projectseele.visual.StanceContactR41Review.shutdownEntryTraceEnabledR45())
+                com.projectseele.visual.StanceContactR41Review.shutdownEntryTraceR45(sender,sender.serverLevel().getEntity(this.entityId),"server_entry_packet_received",true,null);
             if (sender == null || sender.isPassenger())
             {
                 return;

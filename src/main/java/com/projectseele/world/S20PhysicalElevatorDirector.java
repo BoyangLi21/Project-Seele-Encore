@@ -7,6 +7,10 @@ import java.util.Map;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import java.util.WeakHashMap;
+import java.nio.file.Path;
+import net.minecraft.world.level.storage.LevelResource;
+import net.minecraft.server.MinecraftServer;
 
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.NervCarrierPlatformEntity;
@@ -256,6 +260,31 @@ public final class S20PhysicalElevatorDirector
     }
 
     public static List<LiftSpec> s20Lifts(ServerLevel level)
+    {
+        MinecraftServer server = level.getServer();
+        Path root = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
+        String name = server.getWorldData().getLevelName();
+        int tick = server.getTickCount();
+        synchronized (LIFT_SPECS)
+        {
+            CachedLiftSpecs cached = LIFT_SPECS.get(level);
+            if (cached != null && cached.tick() == tick && cached.root().equals(root) && Objects.equals(cached.levelName(), name))
+                return cached.specs();
+            List<LiftSpec> current = buildCurrentLiftSpecs(level);
+            LIFT_SPECS.put(level, new CachedLiftSpecs(tick, root, name, current));
+            return current;
+        }
+    }
+
+    private static final Map<ServerLevel, CachedLiftSpecs> LIFT_SPECS = new WeakHashMap<>();
+    private record CachedLiftSpecs(int tick, Path root, String levelName, List<LiftSpec> specs) {}
+
+    public static void invalidateLiftSpecs(MinecraftServer server)
+    {
+        synchronized (LIFT_SPECS) { LIFT_SPECS.keySet().removeIf(level -> level.getServer() == server); }
+    }
+
+    private static List<LiftSpec> buildCurrentLiftSpecs(ServerLevel level)
     {
         List<LiftSpec> lifts;
         if (FacilityWorldPolicy.isS22Coastal(level.getServer()))

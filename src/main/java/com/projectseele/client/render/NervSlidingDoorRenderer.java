@@ -45,13 +45,12 @@ public final class NervSlidingDoorRenderer
         {
             poses.mulPose(Axis.YP.rotationDegrees(90.0F));
         }
-        panel(poses, buffers, packedLight,
-                -1.5D - slide, 0.0D, -0.09375D,
-                1.48F, 2.0F, 0.1875F);
-        panel(poses, buffers, packedLight,
-                0.02D + slide, 0.0D, -0.09375D,
-                1.48F, 2.0F, 0.1875F);
-        NervDoorFinish.frame(poses,buffers,packedLight,1.5,2,door.getOpenProgress(partialTick)>=.82F);
+        NervPressureDoorFinishR45.leaf(poses, buffers, packedLight, -1.5D - slide, true);
+        NervPressureDoorFinishR45.leaf(poses, buffers, packedLight, .02D + slide, false);
+        String number=String.format(java.util.Locale.ROOT,"%02d",door.getDoorId());
+        NervPressureDoorFinishR45.identity(poses,buffers,packedLight,-1.5D-slide,"R",number);
+        NervPressureDoorFinishR45.identity(poses,buffers,packedLight,.02D+slide,number,"R");
+        NervPressureDoorFinishR45.frame(poses, buffers, packedLight, door.getOpenProgress(partialTick));
         poses.popPose();
         super.render(door, yaw, partialTick, poses, buffers, packedLight);
     }

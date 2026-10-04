@@ -1,0 +1,36 @@
+# R45 已安装人员导航与验收层分离
+
+当前生产候选是 `pyramid_components_sol_v1/operator_navigation_production_v2`，不依赖CityAtomic临时lease、开发artifact绝对路径或开发class SHA。`OperatorNavigationR45`的bbfc冻结版仍仅用于受控QA diagnostic；其公共目标patch经root审核后不合入。新生产自有源码为`OperatorNavigationEngineR45`与`OperatorNavigationProductionR45`；共享NervWayfinding、NervStaffCommands、设备联锁、碰撞provider均未直接改。
+
+生产存档安装三份文件：`operator_navigation_manifest_r45.json`、`operator_return_routes_r45.json.gz`、`operator_navigation_acceptance_r45.json`。manifest只引用固定相对文件名，包含语义版本`R45_FIXED_PERSONNEL_V1`、dimension、已有世界UUID/seed、graph/验收摘要/当前metadata SHA、模型版本与资源SHA。loader直接只读现有UUID NBT，不创建SavedData身份、不保存身份、不读取热region/entity进度文件、不请求chunk。备份/改名存档可按同UUID/seed继续使用；不同UUID/seed或模型/语义版本拒绝。缓存绑定MinecraftServer、ServerLevel、绝对root与40tick窗口；每40tick复核这些小元数据，未变更时复用解析后的graph，server停止清理。
+
+图仍保留同一组202个实际Vec3脚位、291格栅邻边、六个登记入口、原西侧同层层门与固定公共接近；旧整数图172缺项仍保留在review同组回归。公共节点禁止别名到私有202列，私有/公共跨界必须经过实际登记门节点，私有格栅必须归属正确机号和左右侧。生产引擎使用完整0.6米宽、1.8米净高；5027个节点/较高endpoint全身扫掠以真实native形状再扫描，全部静态CLEAR，1736文件集/SHA前后相同。这个结果没有替代沿ramp/STAIR的真实移动。
+
+生产可见目标来自`availableGoals(player)`，有效已安装、实际设施已启用时才返回`operator_nearest_lift`。原公共`GOALS`不变，不展示QA目标或green inspection的未绑定目标。候选最小patch仅在NervWayfinding分派显式目标/关闭旧选择，并使NervStaffCommands suggestions动态查询生产目标；`root_production_navigation_dispatch.patch`已git apply --check通过，未应用。engine保留实际427-owner、完整state/NBT、正确脚底与下一shape高度、门四半片一致/open、实际唯一gantry、fleet PARKED、motion端点、loaded实体分区及全身路径占用检查。它不自动开门/移动人/改块，也不替代原真实内部worker紧急出口。
+
+未实际验收的安装包不可启用。当前manifest的`fixed_navigation_accepted=false`、验收摘要passed=false，安装recipe的`install_allowed=false`，world安装false。封装工具要求实际同202、全部291边的两宽度车道、六个门scope及全部负例的执行receipt，精确核原图SHA/metadata/model/world身份/坐标与不以teleport替代测量，再生成可安装manifest与自包含验收摘要。false模板已实际提交seal负例并拒绝，没有创建输出；没有虚构native success。
+
+生成器使用：
+
+```
+python tools/prepare_operator_navigation_production_r45.py --out <新候选目录>
+python tools/prepare_operator_navigation_production_r45.py --acceptance <实际root原生receipt> --out <新封装目录>
+```
+
+`actual_native_acceptance_INPUT_TEMPLATE_false.json`只定义root动作receipt契约，不是执行证据。安装proposal规定三文件before均absent、完整SHA、精确rollback，仅可删除该次新安装且SHA仍相同的三文件；不替换旧公共图，不改设备/模型/实体/任务进度。实际安装及更新1736基线、当前编译/native均由root负责。
+
+现有`TvPersonnelPlatformInterlockR44.enabled(level)`和`TvCageCollisionR44.enabled()`仍以review flags启用。生产加载器不能擅自将安装图当成打开机械/模型的授权，因此实际设施未启用时目标列表空，guide明确FLAGS_DISABLED。生产侧提供`installedFacility(level)`作为已安装、版本/UUID/模型/实际验收有效的authority；root审核后需把真实设施启用路径接到该authority。门联锁为level相关；碰撞provider也须按当前server/world及客户端连接同步启用，不能用全局布尔把一个存档的安装传播到其他存档。这一模型/机械接线不在本子代理源码归属，尚未实施。绿色inspection仍需实际no-save支架/provider/完整路线独立原生证明，不能由当前固定202图自动放行。
+
+当前尚未关闭的事项是root实际编译、受控same202/291/6与负例原生动作、真实设施生产启用接线、验收后封装安装。1cell/6cell/18buttons仍安装false；没有启动Java/Gradle/MC、写world或改冻结policy/City/模型动作源。
+
+root再次指定的统一安装authority契约在 `facility_authority_integration_contract_v1/data_contract.json`。正式服务端使用同一个已安装manifest验证结果驱动模型版本、人员联锁、实际碰撞与导航；不能单独用本地JVM flag决定正式模式。manifest还应声明完整bundle指纹：当前`tv_shoulder_shells_r44.json`、`hangar_shoulder_contacts_r44.json`、`tv_facilities_r16.json`，模型/metadata/实际验收版本必须一起匹配。此bundle扩展是root实施提案，当前v2未安装，正式资源/存档未替换。受控review仍是显式冷世界、当前代码/资源/metadata epoch的隔离分支，不给玩家生产目标，也不能凭review flag跨存档开启。
+
+root应在server main thread按当前MinecraftServer/ServerLevel/世界UUID发布不可变authority，碰撞查询只读该发布状态，不能每个shape/门/tick做磁盘probe。服务端向客户端同步connection session nonce、world UUID、dimension、authority generation、manifest/语义/模型版本、实际ResourceManager所需资源SHA、feature bits及当前三机canonical/实际gantry UUID+entityId绑定。客户端确认当前连接及资源包覆盖后的真实SHA后回ACK；ACK只能确认资源匹配，不能申请开启设施、授予权限或改时钟。实体clock继续用已跟踪entity的SynchedEntityData，门片继续用实际block更新，不新增本地影子clock或强行闭合。login/logout、换dimension、respawn level替换、资源重载或撤销均清理旧authority，不能把前一个存档/连接的ready传播过去。
+
+型号/metadata/owner失配要进入同world的INHIBITED态：停止owned clocks、关闭新入口与导航，保留最后已验证的同型号支承、联锁和内部worker退出语义，不能撤销authority就把已站人的绿色支持面或占用拒绝一起关掉。客户端不得在服务端新物理已经启用时静默画旧造型；资源不符应明确拒绝该bundle/交互。root需确保当前被画的gantry UUID与服务端当前绑定相等，缺失/重复或尚未tracked不能当READY。`TvCageEnclosureR44.render`当前入口仍是客户端`r44TvCageReview`，这是City无flag看到旧分支的直接源；正式分支应读取上述连接内已验证authority。`TvCageCollisionR44.append/canMove`和新生产engine也需改为level相关authority，不能保留无参全局布尔作为正式判定。
+
+`root_minimum_authority_adapters_PROPOSED.patch`只给五处适配差量，已git apply --check通过，未应用。它引用root待实现的`FacilityInstallationAuthorityR45` broker；不是独立可编译/可激活的patch。root还需实现packet+ACK/lifecycle、同world受抑制支承/紧急退出和实际model binding，然后才合入适配。两生产源、review bbfc与policy3源码继续原SHA冻结。
+
+碰撞保留不等于导航READY：适配提案中的`navigationReady(ServerPlayer)`还需同world READY发布态、当前连接资源ACK及已验收固定图；INHIBITED、review或未知状态均不显示生产目标、不返回可走next。root还需保护`TvFacilityMeshes`的旧模型fallback与真正被画的gantry UUID，不能只把enclosure的本地flag换掉而在同步未就绪/型号错误时又静默画旧分支。缺少authority/ACK的capture继续WAITING_AUTHORITY或失败，不能当已确认版本的截图。
+
+root报告的v71私有forebeam稿记为`FAILED_COMPARISON`：实际资源SHA被选中，但人员联锁MODEL_SHA正确拒绝新型号，同一截图的tracked gantry progress均0；不能与旧closed1照片比较，不绕过型号身份、不强制闭合。RegionalStationPhoto新增同一截图的actual_tracked_gantries_at_capture源码由root管理，当前未编译；这个报告不是本子代理执行的native receipt，也没有替换正式模型或存档。后续capture还应同刻记录服务端/客户端authority generation、资源SHA/sourcePack、metadata/owner、实际UUID与clock，才能证明看到和运行的是同一版。

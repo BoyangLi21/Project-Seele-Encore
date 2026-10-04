@@ -215,10 +215,11 @@ public final class EvaLogisticsCommands
             throws CommandSyntaxException
     {
         ServerLevel level = geoFront(source);
-        int removed = TrainingPilotDirector.stop(level, parseVariant(raw));
-        source.sendSuccess(() -> Component.literal(
-                "Removed " + removed + " NERV training pilot(s)."), false);
-        return removed;
+        int accepted = TrainingPilotDirector.stop(level, parseVariant(raw));
+        source.sendSuccess(() -> Component.literal(accepted>0
+                ?"已接受 "+accepted+" 位驾驶员返回待命的指令。"
+                :"未执行离栓：请确认机体已回库停稳、原驾驶员已接通，并取消待执行出动指令。"), false);
+        return accepted;
     }
 
     private static int dummyStatus(CommandSourceStack source)
@@ -232,9 +233,13 @@ public final class EvaLogisticsCommands
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
                     "DUMMY EVA-%02d stage=%s vehicle=%s position=%s",
                     pilot.getAssignedVariant(),
-                    pilot.getTrainingStage()
-                            == com.projectseele.entity.TrainingPilotEntity.STAGE_LINKED
-                            ? "LINKED" : "WALKING",
+                    switch(pilot.getTrainingStage())
+                    {
+                        case com.projectseele.entity.TrainingPilotEntity.STAGE_LINKED -> "LINKED";
+                        case com.projectseele.entity.TrainingPilotEntity.STAGE_IN_PLUG -> "IN_PLUG";
+                        case com.projectseele.entity.TrainingPilotEntity.STAGE_STANDBY -> pilot.getPersistentData().getString("SeelePilotRouteR30").equals("hold")?"ROUTE_HELD":"STANDBY";
+                        default -> "WALKING";
+                    },
                     pilot.getVehicle() == null ? "none"
                             : pilot.getVehicle().getStringUUID(),
                     pilot.blockPosition().toShortString())), false);

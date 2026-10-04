@@ -3,11 +3,12 @@ from pathlib import Path
 import argparse,copy,json,math,nbtlib,numpy as np
 import regional_voxels as v,scan_regional_completion as scan,plan_factory_r20 as f
 from query_blocks import read_box,iter_block_entities,AIR
+from station_lower_support_r45 import support_ops
 ROOT=v.ROOT;WORLD=ROOT/'run/saves/SEELE_R22_REVIEW';OUT=ROOT/'artifacts/facility_r23/access_finish'
 def main(apply=False):
  OUT.mkdir(parents=True,exist_ok=True);v.WORLD=scan.WORLD=WORLD;v.OUT=OUT;p=v.Painter();source=json.loads((ROOT/'artifacts/access_r22/transit/civil/station_contract.json').read_text(encoding='utf8'));routes=json.loads((ROOT/'artifacts/facility_r23/validation/full_walk_cases.json').read_text(encoding='utf8'));before=ROOT/'artifacts/facility_r23/finish/station_before';reports=[];allchanges=0
  for r in source['stations']:
-  x,y,z=r['center'];h=r['half'];g=r['ground'];horizontal=r['horizontal'];dx,dz=(h+4,21) if horizontal else (21,h+4);f.LO=(x-dx,g-3,z-dz);f.HI=(x+dx,y+14,z+dz);s=f.Scene();moved=[];ports=set();waiting=[]
+  x,y,z=r['center'];h=r['half'];g=r['ground'];horizontal=r['horizontal'];dx,dz=(h+4,21) if horizontal else (21,h+4);f.LO=(x-dx,g-3,z-dz);f.HI=(x+dx,y+14,z+dz);s=f.Scene();existing_BE=set(q for q,be in iter_block_entities(WORLD,v.DIM,f.LO,f.HI));moved=[];ports=set();waiting=[]
   def at(u,Y,w):return (x+u,Y,z+w) if horizontal else (x+w,Y,z+u)
   def state(q):return s.palette[s.after[q[1]-f.LO[1],q[2]-f.LO[2],q[0]-f.LO[0]]]
   def fill(u,Y,w,U,YY,W,value):
@@ -36,7 +37,9 @@ def main(apply=False):
      if abs(u)<=h and abs(abs(w)-17)<.5:ports.add((int(math.floor(u)),1 if w>0 else -1))
   for u,side in ports:
    fill(u-1,g+1,side*17,u+1,y+10,side*17,'minecraft:air')
-   for U in (u-3,u+3):fill(U,g+1,side*17,U,y+10,side*17,'minecraft:light_gray_concrete')
+   for U in (u-3,u+3):
+    fill(U,y-2,side*17,U,y+10,side*17,'minecraft:light_gray_concrete')
+    for op in support_ops(at,U,side,g,y,h,s,f.LO,existing_BE):fill(*op)
    fill(u-3,y+10,side*17,u+3,y+10,side*17,'projectseele:nerv_machine_edge')
    fill(u-2,y+1,side*17,u+2,y+1,side*17,'projectseele:nerv_machine_edge');fill(u-2,y+2,side*17,u+2,y+3,side*17,'projectseele:clear_glass')
   conflicts={('新箱根中央','R1'):1,('新箱根中央','S1'):-1,('湾岸防卫区','R1'):-1,('湾岸防卫区','S1'):1}

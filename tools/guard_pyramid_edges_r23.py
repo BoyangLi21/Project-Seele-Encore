@@ -16,6 +16,21 @@ def main(apply=False):
   x,y,z=r['floor'];dx,dz=r['outward'];q=(x+dx,y,z+dz)
   if q in seen:continue
   seen.add(q)
+  # These are the original full-width R04 descending stair throats. A void
+  # beside the top-floor centreline is headroom for the same stair, not a
+  # location for a new bracket/glass column. Guard the last supported floor.
+  if q[0] in (68,70) and q[2]==360 and y in (-434,-420,-406,-392,-378,-364):
+   assert x in (67,71) and z==360
+   supported=(x,y,z);old=at(supported)
+   if old not in {'minecraft:air','minecraft:cave_air','minecraft:light'} and not old.startswith('projectseele:nerv_edge_rail['):
+    held.append(dict(**r,reason='Registered stair boundary has an existing fixture; preserve'));continue
+   sides={k:'false'for k in ('east','north','south','west')}
+   if old.startswith('projectseele:nerv_edge_rail['):sides.update(dict(v.split('=',1)for v in old.split('[',1)[1].rstrip(']').split(',')))
+   sides['east'if dx>0 else'west']='true'
+   rail='projectseele:nerv_edge_rail['+','.join(k+'='+sides[k]for k in sorted(sides))+']'
+   s.fill((*supported,*supported),rail);guards.append(dict(**r,guard=supported,registered_stair_throat=True))
+   native.append(dict(id='r23/pyramid_guard/'+str(len(guards)),start=[x+.5,y,z+.5],direction=[dx,0,dz],barrier=list(supported)))
+   continue
   if any(mechanical((q[0],Y,q[2])) for Y in (y-1,y,y+1)):held.append(dict(**r,reason='native moving cabin/landing exclusion'));continue
   cells=[(q[0],Y,q[2]) for Y in (y-1,y,y+1)]
   if not all(at(c).split('[')[0] in {'minecraft:air','minecraft:cave_air','minecraft:light'} for c in cells):held.append(dict(**r,reason='occupied edge, requires shaped-collision check'));continue

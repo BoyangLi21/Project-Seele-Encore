@@ -42,12 +42,12 @@ public final class EvaDorsalMechanism
         if (eva.isFirstBattleActive() && eva.firstBattleSignals().time(eva, 0) >= FirstBattleClip.DEATH_TICK / 20F) return false;
         return eva.isPoweredOn() && open(eva) < .001F && bow(eva) < .001F;
     }
-    /** Surface colour and emission are separate: an empty hangar EVA retains
-     * its normal painted eye surface, even when the optic light is disabled. */
+    /** A cold or silent Unit-01 has a dark optic surface; activation restores
+     * the normal colour and berserk owns the red optic state. */
     public static int eyeSurface(EvaUnit01Entity eva)
     {
         if(eva.getUnitVariant()!=EvaUnit01Entity.UNIT_01||eva.isExperimentalUnit())return 0;
-        if(EvaBerserkMotionR34.silent(eva)||EvaShutdownR30.wreck(eva)
+        if(!eva.isPoweredOn()||EvaBerserkMotionR34.silent(eva)||EvaShutdownR30.wreck(eva)
                 ||dormantAfterBerserk(eva)&&!eva.isBerserk()
                 ||eva.isFirstBattleActive()&&eva.firstBattleSignals().time(eva,0)>=FirstBattleClip.DEATH_TICK/20F)return 1;
         return eva.isBerserk()||eva.isFirstBattleActive()?2:0;

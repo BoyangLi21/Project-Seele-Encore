@@ -360,23 +360,32 @@ public final class EvaBodyPose
     public static Vector3f eyePoint(EvaUnit01Entity eva){return eva instanceof EvaPrototypeEntity un?EvaUNOptics.lens(un):eyePoint(eva.getUnitVariant());}
     public static net.minecraft.world.phys.Vec3 opticalEye(EvaUnit01Entity eva,float partial)
     {
-        var body=sample(eva,partial);if(!EvaAirTransportR31.active(eva)&&!EvaShutdownR30.displayed(eva))body.rotations.get("head").rotateY((float)Math.toRadians(-eva.pilotHeadYawForRender(partial))).rotateX((float)Math.toRadians(-eva.pilotHeadPitchForRender(partial)));body.dirty();
+        var body=sample(eva,partial);
+        if(!EvaAirTransportR31.active(eva)&&!EvaShutdownR30.displayed(eva)&&!eva.isBerserk()
+                &&eva.getWeapon()!=EvaUnit01Entity.WEAPON_RIFLE
+                &&!(eva instanceof EvaPrototypeEntity un&&un.isEyeLaserActive()))
+            body.rotations.get("head").rotateY((float)Math.toRadians(-eva.pilotHeadYawForRender(partial))).rotateX((float)Math.toRadians(-eva.pilotHeadPitchForRender(partial)));
+        body.dirty();
         var p=new Matrix4f(EvaRifleKinematics.world(eva,partial)).mul(body.matrix("head")).transformPosition(eyePoint(eva));return new net.minecraft.world.phys.Vec3(p.x,p.y,p.z);
     }
     public static Sample sample(EvaUnit01Entity entity,float partial)
     {
-        if(com.projectseele.physics.CombatBodyDynamics.active(entity))return com.projectseele.physics.CombatBodyDynamics.sample(entity,partial);
+        if(com.projectseele.physics.CombatBodyDynamics.active(entity))
+        {
+            var physical=com.projectseele.physics.CombatBodyDynamics.sample(entity,partial);
+            EvaAnatomicalHandsR45.attachSwordR45(entity,physical);return physical;
+        }
         if(data==null)reload();Data d=data;int variant=rigKey(entity);float phase=entity.rifleGaitPhase(partial);phase-=Mth.floor(phase);
         if(EvaAirTransportR31.active(entity))return EvaAirTransportR31.sample(entity,new Sample(d.rigs().get(variant)),partial);
         if(EvaShutdownR30.displayed(entity)&&!EvaShutdownR30.pose(entity).isEmpty())
         {
             var frozen=new Sample(d.rigs().get(variant));EvaShutdownR30.decode(EvaShutdownR30.pose(entity),frozen);
-            if(EvaShutdownR30.mode(entity)!=EvaShutdownR30.POWER_LOCK)com.projectseele.physics.CombatBodyDynamics.alignJoints(entity,frozen);
+            if(!EvaShutdownR30.retainsPoseR45(entity))com.projectseele.physics.CombatBodyDynamics.alignJoints(entity,frozen);
             float blend=EvaShutdownR30.collapse(entity,partial);
             if(blend<1&&!EvaShutdownR30.origin(entity).isEmpty())
             {
                 var old=new Sample(d.rigs().get(variant));EvaShutdownR30.decode(EvaShutdownR30.origin(entity),old);var mixed=mix(old,frozen,blend);
-                if(EvaShutdownR30.mode(entity)!=EvaShutdownR30.POWER_LOCK)com.projectseele.physics.CombatBodyDynamics.alignJoints(entity,mixed);
+                if(!EvaShutdownR30.retainsPoseR45(entity))com.projectseele.physics.CombatBodyDynamics.alignJoints(entity,mixed);
                 return mixed;
             }
             return frozen;
@@ -491,6 +500,7 @@ public final class EvaBodyPose
             preserveJointCentres(body);
         }
         if(!capturedLocomotionOwns)EvaHandsR41.apply(entity,body,partial);
+        EvaAnatomicalHandsR45.naturalCarryR45(entity,body,partial);
         var gameplayApplied=EvaGameplayMotionR32.applyWithCapturedBaseR44(entity,body,partial,capturedLocomotionOwns);
         body=gameplayApplied.pose();
         boolean capturedSupport=capturedLocomotionOwns&&!entity.hasLiveActionForRender(partial)&&!entity.isVisuallyAirborneForRender()
@@ -506,6 +516,7 @@ public final class EvaBodyPose
             review.addProperty("foreign_joint_preservation_allowed",!capturedSupport);
             var plane=EvaTerrainSupport.sample(entity);var values=new com.google.gson.JsonArray();values.add(plane.x);values.add(plane.y);values.add(plane.z);review.add("actual_terrain_plane",values);
             var choice=EvaGameplayMotionR32.actualPoseChoiceReviewR44(entity,partial);if(choice!=null)review.add("actual_same_apply_choice",choice);
+            var signals=EvaCombatSupportR33.signalReviewR45(entity);if(signals!=null)review.add("actual_signal_samples_r45",signals);
             com.projectseele.visual.BodyPoseLayersR40.metadata("actual_support_ownership",review);
         }
         if(!capturedSupport)preserveJointCentres(body);
@@ -547,19 +558,46 @@ public final class EvaBodyPose
         com.projectseele.visual.BodyPoseLayersR40.capture("reaction",body);
         if(!capturedSupport)groundGameplay(entity,body,partial);
         com.projectseele.visual.BodyPoseLayersR40.capture("ground",body);
-        if(!capturedSupport)EvaCombatSupportR33.apply(entity,body,partial);
+        boolean capturedRootAction=EvaFieldActionsR45.active(entity)||EvaSwordActionsR45.active(entity);
+        if(!capturedSupport&&!capturedRootAction)EvaCombatSupportR33.apply(entity,body,partial);
         com.projectseele.visual.BodyPoseLayersR40.capture("feet",body);
         if(!capturedSupport&&!entity.isNervLogisticsLocked()&&!entity.isFirstBattleActive()&&!EvaAirTransportR31.active(entity))
         {EvaAerialContactR35.apply(entity,body,partial);com.projectseele.physics.CombatBodyDynamics.normalize(entity,body);}
         com.projectseele.visual.BodyPoseLayersR40.capture("normalized",body);
-        if(!capturedSupport)
+        if(!capturedSupport&&!capturedRootAction)
         {
             applyLocomotionContactGoalsR44(entity,body,partial);
             EvaCombatSupportR33.preventFreeFootPenetrationR44(entity,body,partial);
         }
+        supportProneFirearmChestR45(entity,body,partial);
+        EvaOriginalHandsR45.apply(entity,body);
+        body=EvaWeaponHandlingR45.apply(entity,body,partial);
+        if(!EvaWeaponHandlingR45.active(entity))EvaAnatomicalHandsR45.attachKnife(entity,body);
+        EvaAnatomicalHandsR45.attachSwordR45(entity,body);
         EvaCombatSupportR33.rememberFinalFeetR44(entity,body,partial);
         com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;
+    }
+    private static void supportProneFirearmChestR45(EvaUnit01Entity entity,Sample body,float partial)
+    {
+        if(entity.isExperimentalUnit()||entity.isNervLogisticsLocked()||entity.isFirstBattleActive()
+                ||EvaShutdownR30.disabled(entity)||entity.isVisuallyAirborneForRender()
+                ||(entity.getWeapon()!=EvaUnit01Entity.WEAPON_RIFLE&&entity.getWeapon()!=EvaUnit01Entity.WEAPON_CANNON))return;
+        float support=Mth.clamp((entity.rifleStanceLevel(partial)-2.4F)/.6F,0,1);
+        support=support*support*(3-2*support);if(support<=0)return;
+        var matrix=body.matrix("torso_upper");var up=matrix.transformDirection(new Vector3f(0,1,0)).normalize();
+        float elevation=(float)Math.asin(Mth.clamp(up.y,-1,1));
+        float minimum=12*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
+        float horizontal=(float)Math.hypot(up.x,up.z);if(horizontal<1e-6F)return;
+        float target=Mth.lerp(support,elevation,minimum),radius=(float)Math.cos(target);
+        var raised=new Vector3f(up.x*radius/horizontal,(float)Math.sin(target),up.z*radius/horizontal);
+        var rotation=new Quaternionf().rotationTo(up,raised).mul(matrix.getUnnormalizedRotation(new Quaternionf()).normalize());
+        String parent=body.rig.get("torso_upper").parent();
+        if(parent!=null)rotation=body.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(rotation);
+        // Support the upper chest for prone fire instead of moving the head
+        // socket off its neck. The held gun/arms are solved from this same
+        // shared chest on both sides, with the original limb lengths intact.
+        body.rotations.put("torso_upper",rotation);body.dirty();
     }
     private static void applyLocomotionContactGoalsR44(EvaUnit01Entity e,Sample pose,float partial)
     {
@@ -653,7 +691,7 @@ public final class EvaBodyPose
         var mesh=data.rigSupport().getOrDefault(rigKey(e),data.support());float lowest=Float.POSITIVE_INFINITY;
         // Low actions bear on the actual crouched/prone body. Supporting only
         // their feet can push the prone chest below the same terrain surface.
-        java.util.Collection<String> bearing=EvaGameplayMotionR32.lowActionR44(e)?mesh.keySet():List.of("foot_l","foot_r");
+        java.util.Collection<String> bearing=EvaGameplayMotionR32.lowActionR44(e)||EvaFieldActionsR45.active(e)?mesh.keySet():List.of("foot_l","foot_r");
         for(String name:bearing)
         {
             var points=mesh.get(name);if(points==null||!pose.rig.containsKey(name))continue;var m=pose.matrix(name);

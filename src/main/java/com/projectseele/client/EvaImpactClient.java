@@ -6,8 +6,6 @@ import com.projectseele.world.EvaPilotResolver;
 import net.minecraft.client.Minecraft;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraftforge.api.distmarker.Dist;
-import net.minecraftforge.client.event.ViewportEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID,value=Dist.CLIENT)
 public final class EvaImpactClient
@@ -21,11 +19,6 @@ public final class EvaImpactClient
             if(actor instanceof com.projectseele.entity.EvaUnit01Entity eva&&mc.player!=null&&EvaPilotResolver.controlTarget(mc.player)==eva)
                 EvaImpactResponse.displace(eva,p.direction(),p.strength());
         }
-    }
-    @SubscribeEvent public static void camera(ViewportEvent.ComputeCameraAngles event)
-    {
-        var mc=Minecraft.getInstance();if(mc.player==null||mc.getCameraEntity()!=mc.player||!mc.options.getCameraType().isFirstPerson())return;var eva=EvaPilotResolver.controlTarget(mc.player);if(eva==null||eva.isFirstBattleActive())return;
-        var p=EvaImpactResponse.sample(eva,(float)event.getPartialTick());float scale=com.projectseele.config.SeeleConfig.FX_INTENSITY.get().floatValue();event.setRoll(event.getRoll()+(p.roll()+p.pitch()*.22F)*7*scale);
     }
     private EvaImpactClient() {}
 }

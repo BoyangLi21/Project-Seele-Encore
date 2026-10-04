@@ -295,6 +295,12 @@ dependencies {
 
     // GeckoLib: animated entity pipeline (EVA units and humanoid Angels)
     implementation fg.deobf("software.bernie.geckolib:geckolib-forge-${minecraft_version}:${geckolib_version}")
+    if (file('.Codex/local-mods/create-1.20.1-6.0.8-slim.jar').exists()) {
+        runtimeOnly fg.deobf('local:create:1.20.1-6.0.8:slim')
+        runtimeOnly fg.deobf('local:flywheel-forge-1.20.1:1.0.5')
+        runtimeOnly fg.deobf('local:Ponder-Forge-1.20.1:1.0.91')
+        runtimeOnly fg.deobf('local:Registrate:MC1.20-1.3.3')
+    }
 
     // Cross-platform articulated body dynamics; no native DLL or second engine process.
     minecraftLibrary('com.github.stephengold:jbullet:1.0.3') { transitive = false }
@@ -525,6 +531,18 @@ tasks.register('verifyVerticalCarrierSweepR40', JavaExec) {
     mainClass = 'com.projectseele.world.VerticalCarrierSweepR40Test'
 }
 tasks.named('check').configure { dependsOn 'verifyVerticalCarrierSweepR40' }
+tasks.register('verifyEvaPoseClock', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.entity.EvaPoseSignalClockTest'
+}
+tasks.named('check').configure { dependsOn 'verifyEvaPoseClock' }
+tasks.register('verifyPoseSnapshotCodecR45', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.entity.PoseSnapshotCodecR45Test'
+}
+tasks.named('check').configure { dependsOn 'verifyPoseSnapshotCodecR45' }
 
 // Compile/prepare with ForgeGradle, then release the build JVM before playing.
 // Export only explicitly changed environment values, not the user's full env.
@@ -571,6 +589,33 @@ tasks.named('check').configure { dependsOn 'verifyVerticalCarrierSweepR40' }
                 workingDirectory: launch.workingDir.absolutePath
             ])), 'UTF-8')
             logger.lifecycle("Prepared ${side.toLowerCase()} launch: ${target}")
+        }
+    }
+}
+
+// Explicit frozen delivery assets only. No implicit private-pack replacement.
+tasks.named('processResources').configure {
+    if (project.hasProperty('r45FinalAssets')) {
+        def overlay = file(project.property('r45FinalAssets'))
+        def receipt = new File(overlay, 'ASSET_FROZEN.json')
+        inputs.file(receipt)
+        inputs.dir(overlay)
+        doLast {
+            def manifest = new groovy.json.JsonSlurper().parse(receipt)
+            if (manifest.schema != 'projectseele.final-assets-frozen.r45.v1') {
+                throw new GradleException('Explicit R45 frozen asset receipt required')
+            }
+            manifest.files.each { name, expected ->
+                if (!(name.startsWith('assets/') || name.startsWith('data/')) || name.contains('..') || name.contains('\\') || name.contains(':')) {
+                    throw new GradleException('Unsafe frozen asset path: ' + name)
+                }
+                def input = new File(overlay, name)
+                def actual = java.security.MessageDigest.getInstance('SHA-256').digest(input.bytes).encodeHex().toString()
+                if (actual != expected) throw new GradleException('Frozen selected asset changed: ' + name)
+                def target = new File(destinationDir, name)
+                target.parentFile.mkdirs()
+                java.nio.file.Files.copy(input.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
         }
     }
 }

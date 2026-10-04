@@ -20,7 +20,7 @@ public final class PilotReturnR39
     private static final TicketType<ChunkPos> TICKET=TicketType.create("seele_pilot_return_r39",Comparator.comparingLong(ChunkPos::toLong),100);
     private static final class Order
     {
-        int variant,stalled;UUID unit,commander;BlockPos position;String stage="WALK";
+        int variant,stalled;UUID unit,commander,pilot;BlockPos position;String stage="WALK";
         double closest=Double.MAX_VALUE;boolean requested;long nextAttempt;
     }
     public static final class State extends SavedData
@@ -33,6 +33,7 @@ public final class PilotReturnR39
             {
                 var n=(CompoundTag)raw;if(!n.hasUUID("Unit")||!n.hasUUID("Commander"))continue;
                 var o=new Order();o.variant=n.getInt("Variant");o.unit=n.getUUID("Unit");o.commander=n.getUUID("Commander");
+                if(n.hasUUID("ActualPilotR45"))o.pilot=n.getUUID("ActualPilotR45");
                 o.position=BlockPos.of(n.getLong("Position"));o.stage=n.getString("Stage");o.requested=n.getBoolean("Requested");
                 o.stalled=n.getInt("Stalled");o.closest=n.contains("Closest")?n.getDouble("Closest"):Double.MAX_VALUE;
                 state.orders.put(o.variant,o);
@@ -46,6 +47,7 @@ public final class PilotReturnR39
                 var n=new CompoundTag();n.putInt("Variant",o.variant);n.putUUID("Unit",o.unit);n.putUUID("Commander",o.commander);
                 n.putLong("Position",o.position.asLong());n.putString("Stage",o.stage);n.putBoolean("Requested",o.requested);
                 n.putInt("Stalled",o.stalled);n.putDouble("Closest",o.closest);list.add(n);
+                if(o.pilot!=null)n.putUUID("ActualPilotR45",o.pilot);
             }
             tag.put("Orders",list);return tag;
         }
@@ -56,7 +58,8 @@ public final class PilotReturnR39
     {
         if(!(unit.level() instanceof ServerLevel level)||unit.isExperimentalUnit())return false;
         var o=state(level).orders.get(unit.getUnitVariant());
-        return o!=null&&o.unit.equals(unit.getUUID())&&unit.getPilotEntity() instanceof TrainingPilotEntity;
+        return o!=null&&o.unit.equals(unit.getUUID())&&o.pilot!=null
+                &&unit.getPilotEntity() instanceof TrainingPilotEntity pilot&&o.pilot.equals(pilot.getUUID());
     }
     public static void enqueue(ServerLevel level,Collection<TvCampaignSavedData.Sortie> sorties)
     {
@@ -64,8 +67,9 @@ public final class PilotReturnR39
         for(var sortie:sorties)
         {
             if(!sortie.npc||sortie.unit>2)continue;
-            var entry=EvaFleetSavedData.get(level.getServer()).entry(sortie.unit).orElse(null);if(entry==null)continue;
-            var o=new Order();o.variant=sortie.unit;o.unit=entry.canonicalId();o.commander=sortie.commander;
+            var entry=EvaFleetSavedData.get(level.getServer()).entry(sortie.unit).orElse(null);
+            if(entry==null||sortie.eva==null||!entry.canonicalId().equals(sortie.eva)||sortie.pilotR45==null)continue;
+            var o=new Order();o.variant=sortie.unit;o.unit=entry.canonicalId();o.commander=sortie.commander;o.pilot=sortie.pilotR45;
             var unit=ServiceAircraftR32.payload(level,o.unit);
             o.position=unit!=null?unit.blockPosition():sortie.position!=null?sortie.position:BlockPos.containing(NervAirLiftR30.head(level,o.variant));
             state.orders.put(o.variant,o);
@@ -95,18 +99,27 @@ public final class PilotReturnR39
         retain(level,order.position);EvaLogisticsDirector.loadControlTarget(level,order.variant);
         var unit=ServiceAircraftR32.payload(level,order.unit);if(unit==null)return;
         var campaign=TvCampaignSavedData.get(level);
-        if(!campaign.active.isEmpty()&&campaign.sorties.containsKey(order.variant))
+        if(!campaign.active.isEmpty()&&campaign.sorties.containsKey(order.variant)&&!campaign.phase.equals("combat_victory"))
         {unit.stopAutonomousR30();state.orders.remove(order.variant);state.setDirty();return;}
         order.position=unit.blockPosition();state.setDirty();
         if(receipt.phase()==EvaFleetSavedData.Phase.PARKED)
         {
-            unit.stopAutonomousR30();TrainingPilotDirector.stop(level,order.variant);
-            radio(level,order,"back_in_bay");state.orders.remove(order.variant);return;
+            unit.stopAutonomousR30();
+            if(level.getGameTime()<order.nextAttempt)return;
+            order.nextAttempt=level.getGameTime()+20;
+            if(TrainingPilotDirector.stop(level,order.variant)<=0)
+            {
+                if(!order.stage.equals("PILOT_EXIT_WAIT")){order.stage="PILOT_EXIT_WAIT";state.setDirty();}
+                return;
+            }
+            radio(level,order,"back_in_bay");state.orders.remove(order.variant);state.setDirty();return;
         }
         if(receipt.phase()!=EvaFleetSavedData.Phase.DEPLOYED||unit.isFirstBattleActive()||unit.isLaunchSequenceActive()||unit.isBerserk())
         {unit.stopAutonomousR30();return;}
         if(!(unit.getPilotEntity() instanceof TrainingPilotEntity pilot))
         {unit.stopAutonomousR30();state.orders.remove(order.variant);return;}
+        if(order.pilot==null||!order.pilot.equals(pilot.getUUID()))
+        {unit.stopAutonomousR30();if(!order.stage.equals("IDENTITY_HOLD")){order.stage="IDENTITY_HOLD";state.setDirty();}return;}
         if(NervAirLiftR30.ownsMotion(unit)){unit.stopAutonomousR30();return;}
         Vec3 head=NervAirLiftR30.head(level,order.variant),delta=head.subtract(unit.position());
         double distance=delta.horizontalDistance();

@@ -25,7 +25,7 @@ public final class HangarContactSnapshotR44
     {
         if(!ENABLED||written||event.phase!=TickEvent.Phase.END)return;
         var server=event.getServer();var world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))throw new IllegalStateException("Contact snapshot refuses non-review world");
+        if(!world.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))throw new IllegalStateException("Contact snapshot refuses non-review world");
         if(++age<160)return;var level=server.getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;
         try
         {

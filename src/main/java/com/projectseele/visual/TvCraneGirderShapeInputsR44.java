@@ -36,7 +36,7 @@ public final class TvCraneGirderShapeInputsR44
     {
         if(!Boolean.getBoolean("projectseele.r44CraneGirderShapeExport")||written||event.phase!=TickEvent.Phase.END||++age<60)return;
         var server=event.getServer();var root=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!root.getFileName().toString().equals("SEELE_FIELD_R44_REVIEW"))throw new IllegalStateException("Girder export refuses another world");
+        if(!root.getFileName().toString().equals(com.projectseele.visual.NativeReviewWorldsR45.expectedName()))throw new IllegalStateException("Girder export refuses another world");
         var level=server.getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;
         var collision=new JsonObject();var outline=new JsonObject();var block=ModBlocks.NERV_CRANE_GIRDER_R44.get();
         for(var segment:TvCraneGirderR44.Segment.values())for(boolean joint:new boolean[]{false,true})

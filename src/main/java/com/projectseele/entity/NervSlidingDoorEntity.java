@@ -145,6 +145,8 @@ public final class NervSlidingDoorEntity extends Entity
         return Mth.lerp(partialTick, this.clientOpenO, this.clientOpen);
     }
     public float requestedOpenProgress(){return this.entityData.get(DATA_TARGET);}
+    /** Read-only actual server hold for the one-lane review witness. */
+    public int reviewHoldTicksR45(){return this.holdTicks;}
 
     public void requestOpen()
     {
@@ -155,7 +157,7 @@ public final class NervSlidingDoorEntity extends Entity
     /** Short renewable hold used by arbitrary buttons, levers and redstone. */
     public void requestRedstoneOpen()
     {
-        this.holdTicks = 12;
+        this.holdTicks = Math.max(this.holdTicks, 12);
         this.entityData.set(DATA_TARGET, 1.0F);
     }
 

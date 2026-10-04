@@ -208,6 +208,12 @@ public final class EvaHud
             return;
         }
 
+        if (!eva.isExperimentalUnit())
+        {
+            if(eva.isActivationCinematicActive())return;
+            EvaPilotDisplayR45.render(guiGraphics, gui.getFont(), eva, partialTick, width, height);
+            return;
+        }
         float damageFlash = ClientForgeEvents.damageFlash(partialTick);
         if (damageFlash > 0.0F)
         {
@@ -402,7 +408,7 @@ public final class EvaHud
         LocalPlayer player = minecraft.player;
         EvaUnit01Entity eva = player == null
                 ? null : EvaPilotResolver.controlTarget(player);
-        if (player == null || eva == null)
+        if (player == null || eva == null || !minecraft.options.getCameraType().isFirstPerson())
         {
             return;
         }
@@ -427,32 +433,9 @@ public final class EvaHud
         boolean ready = progress >= 1.0F;
         int lockColour = ready ? 0xFF66FF7A : NERV_ORANGE;
 
-        // Original entry-plug optical feed: cool LCL glass, sparse engineering
-        // grid and orange NERV instrumentation. No anime frame is copied.
-        guiGraphics.fill(0, 0, width, height, 0x4F020912);
-        int gridX = Math.max(48, width / 16);
-        int gridY = Math.max(36, height / 12);
-        for (int x = cx % gridX; x < width; x += gridX)
-        {
-            guiGraphics.fill(x, 0, x + 1, height, 0x2439D8E8);
-        }
-        for (int y = cy % gridY; y < height; y += gridY)
-        {
-            guiGraphics.fill(0, y, width, y + 1, 0x2439D8E8);
-        }
-        int edge = Math.max(10, width / 90);
-        guiGraphics.fill(0, 0, width, edge, 0xD006090D);
-        guiGraphics.fill(0, height - edge, width, height, 0xD006090D);
-        guiGraphics.fill(0, edge, edge, height - edge, 0xB006090D);
-        guiGraphics.fill(width - edge, edge, width, height - edge, 0xB006090D);
-
-        Component title = Component.translatable("hud.projectseele.yashima_fire_control")
-                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
-        guiGraphics.drawString(gui.getFont(), title, edge + 8, edge + 7, 0xFFFFFFFF);
-        String power = String.format("GRID LOAD %05.1f%%", progress * 100.0F);
-        guiGraphics.drawString(gui.getFont(), power,
-                width - edge - 8 - gui.getFont().width(power), edge + 7,
-                ready ? 0xFF66FF7A : 0xFFFFB000);
+        // The optical field stays clear under shaders. Telemetry already has
+        // a margin owner; a second title/grid used to cover it and the map.
+        int edge = Math.max(8, Math.min(16, width / 45));
 
         // Twin acquisition symbols converge on the optical axis as the
         // national-grid charge stabilises. Their overlap is the fire cue.
@@ -463,9 +446,7 @@ public final class EvaHud
         drawDiamond(guiGraphics, cx + offset, cy, 14 + pulse, lockColour);
         drawDiamond(guiGraphics, cx, cy, 5, ready ? 0xFFFFFFFF : AT_CYAN);
 
-        // Cover vanilla's crosshair and replace it with a mechanically clean
-        // boresight. The same player look vector is used by the server ray.
-        guiGraphics.fill(cx - 4, cy - 4, cx + 5, cy + 5, 0xFF020912);
+        // Vanilla's crosshair is suppressed by the piloting overlay hook.
         int reach = Math.max(42, Math.min(86, width / 12));
         int gap = ready ? 5 : 9;
         guiGraphics.fill(cx - reach, cy, cx - gap, cy + 1, lockColour);
@@ -473,20 +454,18 @@ public final class EvaHud
         guiGraphics.fill(cx, cy - reach, cx + 1, cy - gap, lockColour);
         guiGraphics.fill(cx, cy + gap, cx + 1, cy + reach, lockColour);
 
-        int bracket = Math.max(84, Math.min(138, Math.min(width, height) / 3));
+        int bracket = Math.max(30, Math.min(96, (Math.min(width,height)-104)/2));
         drawCornerBrackets(guiGraphics, cx, cy, bracket, 24, lockColour);
-        int scanY = cy - bracket + Math.floorMod(player.tickCount * 3, bracket * 2);
-        guiGraphics.fill(cx - bracket + 3, scanY, cx + bracket - 3, scanY + 1, 0x5539D8E8);
 
-        int barW = Math.max(180, Math.min(360, width / 3));
-        int by = Math.min(height - edge - 34, cy + bracket + 14);
-        guiGraphics.fill(cx - barW / 2, by, cx + barW / 2, by + 8, 0xFF202020);
-        guiGraphics.fill(cx - barW / 2, by, cx - barW / 2 + Math.round(barW * progress), by + 8,
+        int barW = Math.max(70, Math.min(180, width / 3));
+        int by = height-edge-49;
+        guiGraphics.fill(cx - barW / 2, by, cx + barW / 2, by + 3, 0xA0202020);
+        guiGraphics.fill(cx - barW / 2, by, cx - barW / 2 + Math.round(barW * progress), by + 3,
                 ready ? 0xFF35D435 : NERV_ORANGE);
         Component chargeText = ready
                 ? Component.translatable("hud.projectseele.charge_ready").withStyle(ChatFormatting.GREEN)
                 : Component.translatable("hud.projectseele.charging").withStyle(ChatFormatting.GOLD);
-        guiGraphics.drawCenteredString(gui.getFont(), chargeText, cx, by + 12, 0xFFFFFFFF);
+        guiGraphics.drawCenteredString(gui.getFont(), chargeText, cx, by + 6, 0xFFFFFFFF);
 
         scopeReadout(guiGraphics, gui.getFont(), player, eva, cx,
                 Math.max(edge + 24, cy - bracket - 26), ready,
@@ -498,26 +477,10 @@ public final class EvaHud
     {
         int cx = width / 2;
         int cy = height / 2;
-        int edge = Math.max(8, width / 120);
-        int sight = Math.max(72, Math.min(126, Math.min(width, height) / 3));
+        int sight = Math.max(30, Math.min(84, (Math.min(width,height)-112)/2));
         int green = 0xFF75F08A;
 
-        // Original entry-plug optical feed: a compact rifle director rather
-        // than a copied series frame. RMB switches to this camera feed while
-        // third person continues to see the physical two-hand shoulder pose.
-        graphics.fill(0, 0, width, height, 0x3600070B);
-        graphics.fill(0, 0, width, edge, 0xE0080B0F);
-        graphics.fill(0, height - edge, width, height, 0xE0080B0F);
-        graphics.fill(0, edge, edge, height - edge, 0xB0080B0F);
-        graphics.fill(width - edge, edge, width, height - edge, 0xB0080B0F);
-
-        Component title = Component.translatable("hud.projectseele.rifle_fire_control")
-                .withStyle(ChatFormatting.GOLD, ChatFormatting.BOLD);
-        graphics.drawString(font, title, edge + 8, edge + 7, 0xFFFFFFFF);
-        Component mode = Component.translatable("hud.projectseele.rifle_auto")
-                .withStyle(ChatFormatting.GREEN);
-        graphics.drawString(font, mode, width - edge - 8 - font.width(mode), edge + 7, 0xFFFFFFFF);
-
+        // Add the sight only; the main optical display owns status panels.
         drawCornerBrackets(graphics, cx, cy, sight, 20, green);
         drawDiamond(graphics, cx, cy, 9, NERV_ORANGE);
         graphics.fill(cx - sight - 28, cy, cx - 13, cy + 1, 0xB075F08A);
@@ -525,9 +488,7 @@ public final class EvaHud
         graphics.fill(cx, cy - sight - 18, cx + 1, cy - 13, 0xB075F08A);
         graphics.fill(cx, cy + 13, cx + 1, cy + sight + 18, 0xB075F08A);
 
-        int scanY = cy - sight + Math.floorMod(player.tickCount * 4, sight * 2);
-        graphics.fill(cx - sight + 4, scanY, cx + sight - 4, scanY + 1, 0x4039D8E8);
-        scopeReadout(graphics, font, player, eva, cx, cy + sight + 14,
+        scopeReadout(graphics, font, player, eva, cx, cy + sight + 8,
                 true, SeeleConfig.EVA_RIFLE_RANGE.get());
     }
 
@@ -602,22 +563,18 @@ public final class EvaHud
                                      LocalPlayer player, EvaUnit01Entity eva, int cx, int y,
                                      boolean ready, double range)
     {
-        Vec3 from = player.getEyePosition();
-        // Use the same clamped pilot rotation sampled by the server at trigger
-        // release. The synchronized skeleton pitch can trail local mouse input
-        // by one network frame and must not move the optical rangefinder left.
+        // Local prediction uses the real gun socket and mechanical limits.
+        // An eye-origin rangefinder could report a clear target while the
+        // barrel struck nearby cover. Server damage remains authoritative.
         Vec3 dir = Vec3.directionFromRotation(
-                Mth.clamp(player.getXRot(), EvaUnit01Entity.MIN_CANNON_AIM_PITCH,
-                        EvaUnit01Entity.MAX_CANNON_AIM_PITCH),
-                player.getYRot());
+                eva.clampPilotWeaponPitch(player.getXRot(),1),eva.clampPilotWeaponYaw(player.getYRot(),1));
+        Vec3 from = eva.getMuzzlePositionForPoseCapture(dir);
+        if(from==null)return;
         Vec3 farEnd = from.add(dir.scale(range));
         BlockHitResult blockHit = player.level().clip(
                 new ClipContext(from, farEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, player));
         Vec3 end = blockHit.getLocation();
-        EntityHitResult entityHit = ProjectileUtil.getEntityHitResult(player.level(), player, from, end,
-                new AABB(from, end).inflate(32,80,32),
-                e -> e instanceof LivingEntity && e != player && e != eva
-                        && !e.isSpectator() && e.isAlive());
+        EntityHitResult entityHit = com.projectseele.physics.CombatDamageTargetsR44.ray(player.level(),from,end,.3,eva,player);
 
         double distance = (entityHit != null ? entityHit.getLocation() : end).distanceTo(from);
         String distText = blockHit.getType() == HitResult.Type.MISS && entityHit == null
