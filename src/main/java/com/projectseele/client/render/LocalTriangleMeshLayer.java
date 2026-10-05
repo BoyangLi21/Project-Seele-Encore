@@ -273,6 +273,23 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         return mesh != null && mesh.parts().containsKey(boneName);
     }
 
+    /** Rigid attachments share the bone frame, but are not the actor's skin/contact surface. */
+    static void renderRigidAttachment(PoseStack poses,MultiBufferSource buffers,ResourceLocation resource,
+                                      ResourceLocation texture,String bone,int light,int overlay)
+    {
+        MeshData mesh=getMesh(resource);if(mesh==null)return;
+        MeshPart part=mesh.parts().get(bone);if(part==null)return;
+        float[] values=part.vertices();int stride=mesh.stride();
+        VertexConsumer buffer=buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
+        if((buffer instanceof com.mojang.blaze3d.vertex.BufferBuilder
+                ||buffer.getClass().getName().equals("me.jellysquid.mods.sodium.client.render.vertex.buffer.SodiumBufferBuilder"))
+                &&RigidCapsuleGpu.draw(part,values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),texture,poses,
+                    light,overlay,part.red(),part.green(),part.blue()))return;
+        for(int index=0;index+stride*3<=values.length;index+=stride*3)
+            for(int corner:new int[]{0,1,2,2})emitVertex(buffer,poses.last().pose(),poses.last().normal(),
+                    values,index+corner*stride,part,light,overlay);
+    }
+
     /**
      * Renders a local attachment mesh as one independent world object.
      * Weapon elevators use this path so the payload stays a real persistent

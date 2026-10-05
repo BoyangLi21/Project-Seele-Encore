@@ -13,8 +13,15 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--world',type=Path,required=True)
     parser.add_argument('--components',type=Path,nargs='+',required=True);parser.add_argument('--batch',required=True)
     parser.add_argument('--native-qa',action='store_true')
-    args=parser.parse_args();world=args.world.resolve();base=(ROOT/'artifacts/rebuild_r47').resolve()
-    native_sources={base/'native_qa/game/saves'/name for name in ('SEELE_R47_WORLD','SEELE_R47_RELEASE')}
+    parser.add_argument('--revision',type=int,choices=(47,48),default=47)
+    args=parser.parse_args();world=args.world.resolve();base=(ROOT/f'artifacts/rebuild_r{args.revision}').resolve()
+    native_sources={base/'native_qa/game/saves'/name for name in (f'SEELE_R{args.revision}_WORLD',f'SEELE_R{args.revision}_RELEASE')}
+    if args.revision==48:
+        receipt=base/'native_qa/COPY_ONCE.json'
+        if receipt.is_file():
+            copy_info=json.loads(receipt.read_text('utf-8-sig'));retained=(base/'native_qa/worlds/SEELE_R48_QA').resolve()
+            if copy_info.get('copied_once') is True and Path(copy_info['qa_world']).resolve()==retained:
+                native_sources.add(retained)
     allowed=world.is_relative_to(base/'construction') or args.native_qa and world in native_sources
     if not allowed:raise ValueError('Only Root construction or the explicit stopped native QA copy is writable')
     out=base/'applied'/args.batch
@@ -44,7 +51,7 @@ def main():
         before=None if row.get('before_nbt') is None else nbtlib.parse_nbt(row['before_nbt'])
         after=None if row.get('after_nbt') is None else nbtlib.parse_nbt(row['after_nbt'])
         if tags.get(point)!=before:raise ValueError(('Full device NBT changed',point))
-        painter.match((*point,*point),row['before'],row['after'],'r47/'+row.get('owner',row.get('reason','component')))
+        painter.match((*point,*point),row['before'],row['after'],f'r{args.revision}/'+row.get('owner',row.get('reason','component')))
         if row['before']==row['after'] and after is not None:
             painter.entity_updates[point]=(row['before'],copy.deepcopy(before),copy.deepcopy(after),'r47/full_device_nbt')
         if after is not None:painter.block_entities[point]=after

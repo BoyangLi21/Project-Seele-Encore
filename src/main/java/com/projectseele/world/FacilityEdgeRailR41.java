@@ -21,6 +21,20 @@ public final class FacilityEdgeRailR41 extends Block
             SOUTH=BooleanProperty.create("south"),WEST=BooleanProperty.create("west");
     private static final BooleanProperty[] SIDES={NORTH,EAST,SOUTH,WEST};
     private static final VoxelShape[] SHAPES=new VoxelShape[16];
+    private static final VoxelShape[] SLENDER=slenderShapes();
+    private final boolean slender;
+    private static VoxelShape[] slenderShapes()
+    {
+        VoxelShape[] result=new VoxelShape[16];
+        VoxelShape[] sides={
+            Shapes.or(box(0,0,0,.8,17.6,.8),box(15.2,0,0,16,17.6,.8),box(0,8,0,16,8.8,.8),box(0,16.8,0,16,17.6,.8)),
+            Shapes.or(box(15.2,0,0,16,17.6,.8),box(15.2,0,15.2,16,17.6,16),box(15.2,8,0,16,8.8,16),box(15.2,16.8,0,16,17.6,16)),
+            Shapes.or(box(0,0,15.2,.8,17.6,16),box(15.2,0,15.2,16,17.6,16),box(0,8,15.2,16,8.8,16),box(0,16.8,15.2,16,17.6,16)),
+            Shapes.or(box(0,0,0,.8,17.6,.8),box(0,0,15.2,.8,17.6,16),box(0,8,0,.8,8.8,16),box(0,16.8,0,.8,17.6,16))};
+        for(int mask=0;mask<16;mask++)
+        {VoxelShape shape=Shapes.empty();for(int i=0;i<4;i++)if((mask&(1<<i))!=0)shape=Shapes.or(shape,sides[i]);result[mask]=shape;}
+        return result;
+    }
     static
     {
         VoxelShape north=Shapes.or(box(0,0,0,2,22,2),box(14,0,0,16,22,2),box(0,10,0,16,12,2),box(0,20,0,16,22,2));
@@ -31,8 +45,10 @@ public final class FacilityEdgeRailR41 extends Block
         for(int mask=0;mask<16;mask++){VoxelShape shape=Shapes.empty();for(int i=0;i<4;i++)if((mask&(1<<i))!=0)shape=Shapes.or(shape,sides[i]);SHAPES[mask]=shape;}
     }
     public FacilityEdgeRailR41(Properties properties)
+    {this(properties,false);}
+    public FacilityEdgeRailR41(Properties properties,boolean slender)
     {
-        super(properties);registerDefaultState(stateDefinition.any().setValue(NORTH,true).setValue(EAST,false).setValue(SOUTH,false).setValue(WEST,false));
+        super(properties);this.slender=slender;registerDefaultState(stateDefinition.any().setValue(NORTH,true).setValue(EAST,false).setValue(SOUTH,false).setValue(WEST,false));
     }
     public static BooleanProperty side(Direction direction)
     {return switch(direction){case NORTH->NORTH;case EAST->EAST;case SOUTH->SOUTH;case WEST->WEST;default->throw new IllegalArgumentException("Horizontal rail side");};}
@@ -40,7 +56,7 @@ public final class FacilityEdgeRailR41 extends Block
     {return block.defaultBlockState().setValue(NORTH,false).setValue(EAST,false).setValue(SOUTH,false).setValue(WEST,false);}
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder){builder.add(SIDES);}
     @Override public VoxelShape getShape(BlockState state,BlockGetter level,BlockPos pos,CollisionContext context)
-    {int mask=0;for(int i=0;i<4;i++)if(state.getValue(SIDES[i]))mask|=1<<i;return SHAPES[mask];}
+    {int mask=0;for(int i=0;i<4;i++)if(state.getValue(SIDES[i]))mask|=1<<i;return (slender?SLENDER:SHAPES)[mask];}
     @Override public net.minecraft.world.level.pathfinder.BlockPathTypes getBlockPathType(
             BlockState state,BlockGetter level,BlockPos pos,net.minecraft.world.entity.Mob mob)
     {

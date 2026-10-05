@@ -161,6 +161,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 EvaHandSurfaceR45::mesh,
                 entity -> textureResourceForVariant(entity.getUnitVariant()),
                 (entity,bone) -> EvaHandSurfaceR45.applies(entity)&&(bone.getName().startsWith("hand_")||bone.getName().startsWith("r45_hand_"))));
+        this.addRenderLayer(new EvaChargingPlugLayerR48(this));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 EvaUnit01Renderer::meshResourceForEntity,
                 entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"textures/entity/"+entity.experimentalAssetName()+"_eyes.png"):EvaEyeMaterialsR42.texture(entity,eyeTextureResourceForVariant(entity.getUnitVariant())),
@@ -220,7 +221,10 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         LocalTriangleMeshLayer.prewarm(resourceManager,
                 MESH_00, MESH_01, MESH_02,
                 new ResourceLocation(ProjectSeele.MODID,"mesh/eva_prototype.mesh.json"),
-                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_un01.mesh.json"));
+                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_un01.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_charger_unit00_r48.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_charger_unit01_r48.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_charger_unit02_r48.mesh.json"));
     }
 
     @Override

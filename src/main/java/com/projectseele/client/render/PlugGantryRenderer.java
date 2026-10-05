@@ -63,7 +63,14 @@ public final class PlugGantryRenderer
             released=(float)Math.max(0,Math.min(1,rise/.65));
             rotation.slerp(stowedRotation,com.projectseele.entity.EvaDorsalMechanism.smooth((float)((rise-2)/Math.max(1,travel-2))));
         }
-        Vec3 yoke=lower.add(0,1.6,0);
+        Vec3 suppliedMount = TripoMachineryR48.clampMount();
+        Vec3 mount = lower;
+        if (suppliedMount != null)
+        {
+            Vector3f rotatedMount = rotation.transform(new Vector3f((float)suppliedMount.x,(float)suppliedMount.y,(float)suppliedMount.z));
+            mount = lower.add(rotatedMount.x,rotatedMount.y,rotatedMount.z);
+        }
+        Vec3 yoke=suppliedMount==null?lower.add(0,1.6,0):mount.add(0,.45,0);
         for(double x:new double[]{-2.4,2.4})for(double z:new double[]{-.78,.78})
         {
             Vec3 end=yoke.add(x,0,z);gpuRope(v(x,-.7,z),end,.065);
@@ -71,9 +78,17 @@ public final class PlugGantryRenderer
         }
         poses.pushPose();poses.translate(yoke.x,yoke.y,yoke.z);gpu(yokeMesh(),poses,light);poses.popPose();
         // The gimbal centre and its rotating collar derive from the capsule's exact render transform.
-        poses.pushPose();poses.translate(lower.x,lower.y,lower.z);gpu(linksMesh(),poses,light);poses.popPose();
+        if (suppliedMount == null)
+        {poses.pushPose();poses.translate(lower.x,lower.y,lower.z);gpu(linksMesh(),poses,light);poses.popPose();}
+        else
+        {
+            gpuRope(yoke.add(-1.8,-.2,0),mount.add(-.5,0,0),.10);
+            gpuRope(yoke.add(1.8,-.2,0),mount.add(.5,0,0),.10);
+        }
         poses.pushPose();poses.translate(lower.x,lower.y,lower.z);
         poses.mulPose(rotation);
+        if (TripoMachineryR48.clamp(poses,buffers,light,released))
+        {poses.popPose();return;}
         gpu(chuckMesh(),poses,light);
         for(double side:new double[]{-1,1})
         {

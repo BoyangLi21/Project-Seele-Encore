@@ -721,5 +721,57 @@ public final class Tokyo3RetractionDirector
 
     public record RequestResult(boolean accepted, String message) {}
 
-    public record Status(String phase, int depth, int targetDepth, int maximumDepth) {}
+    /** Endpoint depth is transaction metadata, not the distance travelled by a rigid building. */
+    public record Status(String phase, int depth, int targetDepth, int maximumDepth, Motion motion)
+    {
+        public Status(String phase, int depth, int targetDepth, int maximumDepth)
+        {
+            this(phase, depth, targetDepth, maximumDepth, Motion.UNAVAILABLE);
+        }
+
+        public String motionReport()
+        {
+            String direction = targetDepth > depth ? "下降" : "上升";
+            if (motion.total() > 0 && motion.observed() == motion.total())
+            {
+                direction = motion.descending() ? "下降" : "上升";
+                String distance = Math.abs(motion.maximumMetres() - motion.minimumMetres()) < .05
+                        ? String.format(java.util.Locale.ROOT, "%.1f", motion.minimumMetres())
+                        : String.format(java.util.Locale.ROOT, "%.1f～%.1f", motion.minimumMetres(), motion.maximumMetres());
+                String state = phase.contains("FAULT") ? "，故障停止"
+                        : phase.contains("OCCUPIED") ? "，受阻暂停"
+                        : phase.contains("HOLD") ? "，检查暂停"
+                        : phase.contains("MOVE") ? "，正在移动" : "，正在归位校验";
+                return "城市楼体实际已" + direction + " " + distance + " 米" + state + "。";
+            }
+            if (phase.contains("FAULT")) return "城市升降故障停止；实际楼体位置尚未完整核实。";
+            if (phase.equals("RIGID_IDLE") || phase.equals("DEPLOYED") || phase.equals("RETRACTED"))
+                return depth == 0 ? "城市已上升到地表。" : "城市已下降到地下。";
+            if (phase.contains("MOVE") || phase.contains("LOADING") || phase.contains("DISABLED"))
+                return "城市升降状态读取尚未就绪；实际楼体位置尚未完整核实。";
+            if (phase.contains("REPLAY") || phase.contains("RECONCILE"))
+                return "城市正在恢复升降事务；实际楼体位置尚未完整核实。";
+            if (phase.contains("PLACE") || phase.contains("COVER") || phase.contains("FLUSH") || phase.contains("COMMIT"))
+                return "城市楼体已到达" + (targetDepth == 0 ? "地表" : "地下") + "，正在归位校验。";
+            return "城市正在准备" + direction + (phase.contains("BLOCKED") ? "，请求受阻，楼体尚未开始移动。"
+                    : phase.contains("OCCUPIED") ? "，等待运动区域清空。" : "，楼体尚未开始移动。");
+        }
+
+        /** Mean of the 96 original owners' actual positions, only when all are observed. */
+        public float physicalRetractionFraction()
+        {
+            if (motion.total() > 0 && motion.observed() == motion.total())
+                return (float) motion.meanRetractionFraction();
+            if (phase.equals("RIGID_IDLE") || phase.equals("DEPLOYED") || phase.equals("RETRACTED"))
+                return depth == 0 ? 0F : 1F;
+            return -1F;
+        }
+    }
+
+    /** Metres come only from the original server-side moving owners' current Y positions. */
+    public record Motion(boolean descending, double minimumMetres, double maximumMetres, int observed, int total,
+                         double meanRetractionFraction)
+    {
+        public static final Motion UNAVAILABLE = new Motion(false, 0, 0, 0, 0, -1);
+    }
 }

@@ -43,6 +43,8 @@ public class ModSounds
     public static final RegistryObject<SoundEvent> PERSONNEL_DOOR_OPEN=register("personnel_door_open");
     public static final RegistryObject<SoundEvent> PERSONNEL_DOOR_CLOSE=register("personnel_door_close");
     public static final RegistryObject<SoundEvent> PRESSURE_DOOR_MOTION=register("pressure_door_motion");
+    public static final RegistryObject<SoundEvent> SURFACE_BULKHEAD_MOTION_R48=registerFixed("surface_bulkhead_motion_r48",80);
+    public static final RegistryObject<SoundEvent> SURFACE_BULKHEAD_STOP_R48=registerFixed("surface_bulkhead_stop_r48",64);
     public static final RegistryObject<SoundEvent> EVA_COCKPIT_CONFIRM=register("eva_cockpit_confirm");
     public static final RegistryObject<SoundEvent> EVA_COCKPIT_WARNING=register("eva_cockpit_warning");
     public static final RegistryObject<SoundEvent> EVA_DRIVE_LOOP=register("eva_drive_loop");
@@ -57,10 +59,14 @@ public class ModSounds
     private static java.util.Map<String,RegistryObject<SoundEvent>> facilitySounds()
     {
         var result=new java.util.LinkedHashMap<String,RegistryObject<SoundEvent>>();
-        for(String name:new String[]{"facility_rail_motion","facility_hydraulic","facility_hydraulic_launch","facility_lock","facility_catapult","facility_siren",
+        for(String name:new String[]{"facility_rail_motion","facility_hydraulic","facility_hydraulic_charge_r48","facility_hydraulic_launch","facility_lock","facility_catapult","facility_siren",
                 "pa_prepare","pa_insert","pa_lock","pa_drain","pa_transfer","pa_ready","pa_recover","pa_return","pa_fill","pa_standby","pa_fault","pa_3","pa_2","pa_1","pa_launch","pa_door_open","pa_door_close",
                 "pa_signal_r30","pa_blue_r30","pa_alert_r30","pa_combat_r31"})
-            result.put(name,SOUNDS.register(name,()->SoundEvent.createFixedRangeEvent(new ResourceLocation(ProjectSeele.MODID,name),220)));
+        {
+            float range=switch(name)
+            {case "facility_hydraulic_charge_r48" -> 96;case "facility_hydraulic_launch","facility_catapult" -> 128;default -> 220;};
+            result.put(name,registerFixed(name,range));
+        }
         return java.util.Collections.unmodifiableMap(result);
     }
 
@@ -85,4 +91,6 @@ public class ModSounds
                         ? SoundEvent.createFixedRangeEvent(new ResourceLocation(ProjectSeele.MODID,name),192)
                         : SoundEvent.createVariableRangeEvent(new ResourceLocation(ProjectSeele.MODID, name)));
     }
+    private static RegistryObject<SoundEvent> registerFixed(String name,float range)
+    {return SOUNDS.register(name,()->SoundEvent.createFixedRangeEvent(new ResourceLocation(ProjectSeele.MODID,name),range));}
 }

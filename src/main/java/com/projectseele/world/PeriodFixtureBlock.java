@@ -91,6 +91,8 @@ public final class PeriodFixtureBlock extends HorizontalDirectionalBlock impleme
             operator.sendSystemMessage(net.minecraft.network.chat.Component.literal("设施监视终端\n初号机："+NervStaffDialogue.readinessHint(operator.serverLevel(),1,"query")));
         if (!level.isClientSide && state.getValue(KIND) == Kind.PUBLIC_PHONE)
         {
+            if(player instanceof net.minecraft.server.level.ServerPlayer caller
+                    &&PilotRestroomServicesR47.handlePhoneR47(caller,pos))return InteractionResult.CONSUME;
             player.displayClientMessage(net.minecraft.network.chat.Component.literal("线路处于紧急管制。请按站内导向牌前往 NERV 接驳设施。"), false);
             level.playSound(null, pos, com.projectseele.registry.ModSounds.PERIOD_PHONE_BUSY.get(), net.minecraft.sounds.SoundSource.BLOCKS, .55F, 1);
         }

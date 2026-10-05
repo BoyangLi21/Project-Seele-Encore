@@ -26,6 +26,7 @@ public final class EvaRifleKinematics
         boolean posed=EvaAirTransportR31.active(entity)||EvaShutdownR30.displayed(entity);
         Vec3 position=posed?EvaAirTransportR31.framePosition(entity,partial):entity.level().isClientSide?entity.getPosition(partial):entity.position();
         float yaw=posed?EvaAirTransportR31.frameYaw(entity,partial):entity.level().isClientSide?Mth.rotLerp(partial,entity.yBodyRotO,entity.yBodyRot):entity.yBodyRot;
+        if(!posed&&!entity.isExperimentalUnit()&&entity.isNervLogisticsLocked())yaw=EvaUnit01Entity.SILO_BAY_YAW;
         return new Matrix4f().translation(position.toVector3f()).rotateY((180-yaw)*Mth.DEG_TO_RAD).scale(EvaScale.RENDER_SCALE);
     }
 
@@ -58,7 +59,7 @@ public final class EvaRifleKinematics
         boolean supported=EvaBodyPose.hasSupportedStances();
         double lateralOffset=supported?-2.3:switch(entity.getUnitVariant()){case 0->2.8;case 2->1.9;default->1.4;};
         double forwardOffset=EvaBodyPose.hasOwnUnRig(entity)?3.8:supported?5:2;
-        boolean measuredGrip=EvaAnatomicalHandsR45.enabled(entity)
+        boolean measuredGrip=EvaTripoHandsR48.enabled(entity,body)||EvaAnatomicalHandsR45.enabled(entity)
                 &&!EvaBodyPose.hasOwnUnRig(entity)
                 &&!EvaAnatomicalHandsR45.rig(entity.getUnitVariant()).grips().isEmpty();
         if(measuredGrip)

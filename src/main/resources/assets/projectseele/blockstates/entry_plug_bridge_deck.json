@@ -1,0 +1,45 @@
+{
+  "multipart": [
+    {
+      "apply": {
+        "model": "projectseele:block/entry_plug_bridge_deck"
+      }
+    },
+    {
+      "when": {
+        "north": "true"
+      },
+      "apply": {
+        "model": "projectseele:block/entry_plug_bridge_fascia",
+        "y": 0
+      }
+    },
+    {
+      "when": {
+        "east": "true"
+      },
+      "apply": {
+        "model": "projectseele:block/entry_plug_bridge_fascia",
+        "y": 90
+      }
+    },
+    {
+      "when": {
+        "south": "true"
+      },
+      "apply": {
+        "model": "projectseele:block/entry_plug_bridge_fascia",
+        "y": 180
+      }
+    },
+    {
+      "when": {
+        "west": "true"
+      },
+      "apply": {
+        "model": "projectseele:block/entry_plug_bridge_fascia",
+        "y": 270
+      }
+    }
+  ]
+}

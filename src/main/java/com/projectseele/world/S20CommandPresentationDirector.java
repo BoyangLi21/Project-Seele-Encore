@@ -613,6 +613,7 @@ public final class S20CommandPresentationDirector
                 new ClientboundPilotStatusPacket(units,
                         String.valueOf(city.phase()), city.depth(),
                         city.targetDepth(), city.maximumDepth(),
+                        city.physicalRetractionFraction(),
                         armament == null ? "OFFLINE" : armament.stateName(),
                         armament != null && armament.isStocked(),
                         armament == null ? 0 : armament.getLiftPercent()));

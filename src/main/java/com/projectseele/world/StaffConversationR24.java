@@ -171,6 +171,27 @@ public final class StaffConversationR24
             if(action.equals("start"))session.coordinationInstance=CityCoordinationR44.instance(player);
             send(player,npc,session,false);return;
         }
+        if(request.startsWith("ARMEDSORTIE:")||request.startsWith("UNDERGROUND:"))
+        {
+            try
+            {
+                String[] parts=request.split(":",-1);
+                if(parts.length!=3)throw new IllegalArgumentException();
+                int variant=Integer.parseInt(parts[1]);
+                boolean armed=parts[0].equals("ARMEDSORTIE");
+                if(armed&&(variant!=0&&variant!=2||!Set.of("human","npc").contains(parts[2]))
+                        ||!armed&&(variant<0||variant>2||!Set.of("open","close").contains(parts[2])))
+                    throw new IllegalArgumentException();
+                session.pilotContact=-1;
+                var result=armed
+                        ?StaffOperationsR48.armedSortie(player,npc,variant,parts[2].equals("npc"))
+                        :StaffOperationsR48.undergroundExit(player,npc,variant,parts[2].equals("open"));
+                session.reply=result.message();
+            }
+            catch(IllegalArgumentException error)
+            {session.reply="请选择有效的机体、驾驶员和操作。";}
+            send(player,npc,session,false);return;
+        }
         if (request.equals("WEAPONS"))
         {
             if (!NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc, "weapons"))
@@ -222,6 +243,21 @@ public final class StaffConversationR24
             }
             catch(IllegalArgumentException|IndexOutOfBoundsException error){session.reply="请填写有效的机体编号与整数 X、Z 坐标。";}
             send(player,npc,session,false);return;
+        }
+        if(request.startsWith("PILOTCHAT:"))
+        {
+            try
+            {
+                int unit=Integer.parseInt(request.substring(10));
+                if(unit<0||unit>2)return;
+                EvaLogisticsDirector.loadControlTarget(player.serverLevel(),unit);
+                var pilot=TrainingPilotDirector.existingPilotR45(player.serverLevel(),unit);
+                session.pilotContact=-1;
+                session.reply=com.projectseele.entity.TrainingPilotEntity.pilotName(unit)+"："
+                        +(pilot==null?"频道待接入。":PilotRadioR28.chat(player,pilot));
+                send(player,npc,session,false);return;
+            }
+            catch(NumberFormatException ignored){return;}
         }
         if (request.startsWith("BOARD:") || request.startsWith("PILOT:") || request.startsWith("STANDBY:"))
         {

@@ -44,7 +44,8 @@ public final class TvEncounterEquipmentControlR45 implements TvEncounterRulesR45
     @Override public boolean rangesReady(EvaUnit01Entity eva,double metres)
     {return Double.isFinite(metres)&&(Object)eva instanceof CannonAccess cannon&&cannon.effectiveCannonRangeR45()>=metres;}
     @Override public boolean shieldEquipped(EvaUnit01Entity eva)
-    {return shield!=null&&TvMissionEquipmentR45.shieldAuthorized(eva)&&shield.equipped(eva);}
+    {return shield!=null&&(TvMissionEquipmentR45.shieldLoanAuthorizedR48(eva)
+            ||EquipmentVaultsR47.physicalShieldLoanAuthorizedR48(eva))&&shield.equipped(eva);}
     @Override public boolean shieldRayIntersects(EvaUnit01Entity eva,Vec3 from,Vec3 to)
     {return shieldBeamContact(eva,from,to).isPresent();}
     @Override public java.util.Optional<Vec3> shieldBeamContact(EvaUnit01Entity eva,Vec3 from,Vec3 to)

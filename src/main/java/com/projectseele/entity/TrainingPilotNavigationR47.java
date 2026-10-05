@@ -2,6 +2,7 @@ package com.projectseele.entity;
 
 import com.projectseele.world.FacilityEdgeRailR41;
 import com.projectseele.world.CityPersonnelDoorR44;
+import com.projectseele.world.EntryPlugBridgeDeckR48;
 import com.projectseele.world.TrainingPilotDirector;
 import com.projectseele.world.TvPersonnelDeckR44;
 import com.projectseele.world.TvPersonnelGuardR44;
@@ -329,7 +330,8 @@ public final class TrainingPilotNavigationR47 extends GroundPathNavigation
             String id=BuiltInRegistries.BLOCK.getKey(block).toString();
             if(block instanceof TvPersonnelGuardR44||block instanceof FacilityEdgeRailR41
                     ||block instanceof com.projectseele.world.NervRoomPartitionR47
-                    ||block instanceof TvPersonnelDeckR44||id.equals("mtr:escalator_step"))return true;
+                    ||block instanceof TvPersonnelDeckR44||block instanceof EntryPlugBridgeDeckR48
+                    ||id.equals("mtr:escalator_step"))return true;
         }
         return false;
     }

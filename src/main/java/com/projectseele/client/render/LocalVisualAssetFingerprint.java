@@ -73,6 +73,7 @@ public final class LocalVisualAssetFingerprint
                 || R21_CONTRACTS.containsKey(assetName) && R21_CONTRACTS.get(assetName).matches(meshTag,mesh)
                 || R22_CONTRACTS.containsKey(assetName) && R22_CONTRACTS.get(assetName).matches(meshTag,mesh)
                 || R23_CONTRACTS.containsKey(assetName) && R23_CONTRACTS.get(assetName).matches(meshTag,mesh)
+                || matchesR48(assetName,sourcePack,meshTag)
                 || matchesR30(assetName,sourcePack,resources,meshTag)
                 || matchesR37(assetName,sourcePack,resources,meshTag));
         boolean valid = complete && sameSource && meshMatches;
@@ -84,6 +85,53 @@ public final class LocalVisualAssetFingerprint
                 sourcePack, valid, reason);
         ProjectSeele.LOGGER.info("Local visual asset fingerprint: {}", fingerprint.description());
         return fingerprint;
+    }
+    private static boolean matchesR48(String name,String pack,String tag)
+    {
+        if(!name.equals("eva_prototype")&&!name.equals("eva_un01"))return false;
+        var manager=Minecraft.getInstance().getResourceManager();
+        var manifest=manager.getResource(resource("eva/un_models_r48.json"));
+        if(manifest.isEmpty()||!manifest.get().sourcePackId().equals(pack))return false;
+        try(var reader=manifest.get().openAsReader())
+        {
+            var document=com.google.gson.JsonParser.parseReader(reader).getAsJsonObject();
+            if(!document.get("schema").getAsString().equals("projectseele.owner-tripo-r48.v1"))return false;
+            var model=document.getAsJsonObject("models").getAsJsonObject(name);
+            if(model==null)return false;
+            int count=model.get("triangles").getAsInt(),parts=model.get("parts").getAsInt();
+            if(count<100000||count>250000||parts<40||!tag.startsWith("triangle-mesh-"+count+"-p"+parts+"-"))return false;
+            var geo=manager.getResource(resource("geo/"+name+".geo.json"));
+            if(geo.isEmpty()||!geo.get().sourcePackId().equals(pack))return false;
+            var bones=new java.util.HashMap<String,String>();
+            try(var g=geo.get().openAsReader())
+            {
+                var rows=com.google.gson.JsonParser.parseReader(g).getAsJsonObject().getAsJsonArray("minecraft:geometry")
+                        .get(0).getAsJsonObject().getAsJsonArray("bones");
+                for(var row:rows)
+                {
+                    var b=row.getAsJsonObject();String key=b.get("name").getAsString();
+                    if(bones.containsKey(key))return false;
+                    bones.put(key,b.has("parent")?b.get("parent").getAsString():"");
+                }
+            }
+            if(!bones.containsKey("tripo_hand_adapter_r48"))return false;
+            for(String key:bones.keySet())
+            {
+                var visited=new java.util.HashSet<String>();String cursor=key;
+                while(!cursor.isEmpty())
+                {if(!visited.add(cursor)||!bones.containsKey(cursor))return false;cursor=bones.get(cursor);}
+            }
+            for(var key:model.getAsJsonArray("visible_parts"))
+                if(!bones.containsKey(key.getAsString())||!LocalTriangleMeshLayer.hasPart(resource("mesh/"+name+".mesh.json"),key.getAsString()))return false;
+            for(String side:new String[]{"l","r"})for(String digit:new String[]{"index","middle","ring","little","thumb"})
+                for(String joint:new String[]{"","_tip","_distal"})
+                    if(!bones.containsKey("finger_"+digit+joint+"_"+side))return false;
+            for(String path:new String[]{"textures/entity/"+name+"_n.png","textures/entity/"+name+"_s.png",
+                    "textures/entity/"+name+"_eyes.png","motion/un_finger_poses_r48.json"})
+            {var value=manager.getResource(resource(path));if(value.isEmpty()||!value.get().sourcePackId().equals(pack))return false;}
+            return true;
+        }
+        catch(Exception error){ProjectSeele.LOGGER.warn("R48 owner supplied UN model contract rejected for {}",name,error);return false;}
     }
     private static boolean matchesR30(String name,String pack,Map<String,ResourceDigest> resources,String tag)
     {

@@ -25,10 +25,11 @@ public final class EntryPlugPilotPoseR47
         if(!(rider.getVehicle() instanceof EntryPlugCarrierEntity plug)||plug.isLockedToEva()
                 ||!plug.hasCanonicalPose())return false;
         var frame=plug.getInterpolatedCanonicalTransform(partial);
-        // The existing seat/eye markers lean toward the insertion tip: +Y_P is
-        // the hatch, -Z_P the nose. Vanilla's seated upright torso ignores this.
+        // Cancel vanilla body yaw after applying the same backrest frame as
+        // the authoritative seat/eye markers. A negative recline put the head
+        // at the foot end of the capsule.
         var rotation=new Quaternionf(frame.qx(),frame.qy(),frame.qz(),frame.qw())
-                .rotateX(-51.34F*Mth.DEG_TO_RAD)
+                .rotateX(com.projectseele.world.EntryPlugKinematics.pilotReclineRadiansR48())
                 .rotateY(Mth.rotLerp(partial,rider.yBodyRotO,rider.yBodyRot)*Mth.DEG_TO_RAD);
         pose.pushPose();
         pose.translate(0,.75,0);

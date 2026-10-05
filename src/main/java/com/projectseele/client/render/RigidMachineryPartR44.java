@@ -18,11 +18,49 @@ final class RigidMachineryPartR44
     private static final int STRIDE = 11;
     private final float[] vertices;
     private final float[] bounds;
+    private final ResourceLocation texture;
 
     private RigidMachineryPartR44(float[] vertices, float[] bounds)
     {
+        this(vertices, bounds, PAINT);
+    }
+
+    private RigidMachineryPartR44(float[] vertices, float[] bounds, ResourceLocation texture)
+    {
         this.vertices = vertices;
         this.bounds = bounds;
+        this.texture = texture;
+    }
+
+    /** Imported rigid triangles keep their original UVs and smooth vertex normals. */
+    static RigidMachineryPartR44 textured(JsonArray encoded, ResourceLocation texture)
+    {
+        if (encoded.size() % 24 != 0) throw new IllegalArgumentException("Triangle XYZ/UV/normal layout required");
+        float[] vertices = new float[encoded.size() / 24 * 44];
+        float[] bounds = {Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY,
+                Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
+        int cursor = 0;
+        for (int triangle = 0; triangle < encoded.size(); triangle += 24)
+        {
+            for (int corner : new int[] {0, 1, 2, 2})
+            {
+                int offset = triangle + corner * 8;
+                float[] source = new float[8];
+                for (int i = 0; i < 8; i++)
+                {
+                    source[i] = encoded.get(offset + i).getAsFloat();
+                    if (!Float.isFinite(source[i])) throw new IllegalArgumentException("Non-finite imported machinery");
+                }
+                for (int axis = 0; axis < 3; axis++)
+                {
+                    bounds[axis] = Math.min(bounds[axis], source[axis]);
+                    bounds[axis + 3] = Math.max(bounds[axis + 3], source[axis]);
+                }
+                for (float value : new float[] {source[0], source[1], source[2], 1, 1, 1,
+                        source[5], source[6], source[7], source[3], source[4]}) vertices[cursor++] = value;
+            }
+        }
+        return new RigidMachineryPartR44(vertices, bounds, texture);
     }
 
     static RigidMachineryPartR44 triangles(JsonArray encoded)
@@ -56,18 +94,18 @@ final class RigidMachineryPartR44
     void draw(PoseStack poses, MultiBufferSource buffers, int light)
     {
         TvCraneMeshWitnessR44.part(vertices,poses);
-        if (RigidMachineryGpuR44.draw(this, vertices, PAINT, poses, buffers, light)) return;
-        VertexConsumer out = buffers.getBuffer(RenderType.entitySolid(PAINT));
+        if (RigidMachineryGpuR44.draw(this, vertices, texture, poses, buffers, light)) return;
+        VertexConsumer out = buffers.getBuffer(RenderType.entitySolid(texture));
         var frame = poses.last();
         boolean reflected = frame.pose().determinant() < 0;
         Vector3f normal = new Vector3f();
         for (int quad = 0; quad < vertices.length; quad += STRIDE * 4)
         {
-            normal.set(vertices[quad + 6], vertices[quad + 7], vertices[quad + 8]);
-            normal.mul(frame.normal()).normalize();
             for (int j = 0; j < 4; j++)
             {
                 int index = quad + (reflected ? 3 - j : j) * STRIDE;
+                normal.set(vertices[index + 6], vertices[index + 7], vertices[index + 8]);
+                normal.mul(frame.normal()).normalize();
                 out.vertex(frame.pose(), vertices[index], vertices[index + 1], vertices[index + 2])
                         .color(vertices[index + 3], vertices[index + 4], vertices[index + 5], 1)
                         .uv(vertices[index + 9], vertices[index + 10])

@@ -318,5 +318,7 @@
   "msg.projectseele.synch_test_ready": "Synchronization test ready. Check entry-plug and communications links.",
   "msg.projectseele.synch_test_run": "Synchronization test in progress. Maintain the connection.",
   "msg.projectseele.synch_test_result": "Synchronization test record: %s",
-  "subtitles.projectseele.pressure_door_motion": "Pressure door track moves"
+  "subtitles.projectseele.pressure_door_motion": "Pressure door track moves",
+  "block.projectseele.entry_plug_bridge_deck": "Entry Plug Inspection Deck",
+  "block.projectseele.entry_plug_bridge_guard": "Entry Plug Inspection Guard"
 }

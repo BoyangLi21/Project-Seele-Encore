@@ -39,6 +39,8 @@ public class ModItems
     public static final RegistryObject<Item> NERV_SHAFT_PANEL=ITEMS.register("nerv_shaft_panel",()->new BlockItem(ModBlocks.NERV_SHAFT_PANEL.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_MACHINE_EDGE=ITEMS.register("nerv_machine_edge",()->new BlockItem(ModBlocks.NERV_MACHINE_EDGE.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_EDGE_RAIL=ITEMS.register("nerv_edge_rail",()->new BlockItem(ModBlocks.NERV_EDGE_RAIL.get(),new Item.Properties()));
+    public static final RegistryObject<Item> ENTRY_PLUG_BRIDGE_DECK_R48=ITEMS.register("entry_plug_bridge_deck",()->new BlockItem(ModBlocks.ENTRY_PLUG_BRIDGE_DECK_R48.get(),new Item.Properties()));
+    public static final RegistryObject<Item> ENTRY_PLUG_BRIDGE_GUARD_R48=ITEMS.register("entry_plug_bridge_guard",()->new BlockItem(ModBlocks.ENTRY_PLUG_BRIDGE_GUARD_R48.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_MACHINE_HAZARD=ITEMS.register("nerv_machine_hazard",()->new BlockItem(ModBlocks.NERV_MACHINE_HAZARD.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_SERVER_RACK=ITEMS.register("nerv_server_rack",()->new BlockItem(ModBlocks.NERV_SERVER_RACK.get(),new Item.Properties()));
     public static final RegistryObject<Item> NERV_STORAGE_PANEL=ITEMS.register("nerv_storage_panel",()->new BlockItem(ModBlocks.NERV_STORAGE_PANEL.get(),new Item.Properties()));

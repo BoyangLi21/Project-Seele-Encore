@@ -57,6 +57,8 @@ import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid = ProjectSeele.MODID)
 public final class CityCreateDistrictR45
 {
+    static void validateLedgerStateR48(CompoundTag tag,int objects)
+    { State.load(tag).validate(objects); }
     private static final String JOB = System.getProperty("projectseele.r45CityCreateDistrict", "");
     private static final int WORK_LIMIT = 4096;
     private static final int PREPARE_READ_LIMIT = 16384;
@@ -80,7 +82,7 @@ public final class CityCreateDistrictR45
         if (active == null || active.level != level || !active.origin.equals(origin) || from + to != 312
                 || (from != 0 && from != 312) || tag.getInt("GroundContract") != 2
                 || !tag.contains("GroundContract", Tag.TAG_INT) || !tag.contains("InitialWorldImageCount", Tag.TAG_INT)
-                || !tag.contains("InitialWorldImageSHA256", Tag.TAG_STRING) || tag.getInt("Index") < 0 || tag.getInt("Index") >= 96
+                || !tag.contains("InitialWorldImageSHA256", Tag.TAG_STRING) || tag.getInt("Index") < 0 || tag.getInt("Index") >= active.towers.size()
                 || tag.getLong("Origin") != origin.asLong() || !active.world.equals(tag.getString("WorldUUID"))
                 || !active.state.journey.equals(tag.getUUID("Journey")))
             throw new IllegalStateException("Native new-plan witness requires the actual complete GroundContract2 producer");
@@ -224,12 +226,13 @@ public final class CityCreateDistrictR45
     public static Tokyo3RetractionDirector.Status status(ServerLevel level, BlockPos origin)
     {
         if (!owns(level, origin)) return null;
-        if (active == null) return new Tokyo3RetractionDirector.Status("RIGID_DISABLED", Tokyo3RetractionSavedData.get(level).get(origin).orElseThrow().depth(),
+        if (active == null || active.level != level || !active.origin.equals(origin)) return new Tokyo3RetractionDirector.Status("RIGID_DISABLED", Tokyo3RetractionSavedData.get(level).get(origin).orElseThrow().depth(),
                 Tokyo3RetractionSavedData.get(level).get(origin).orElseThrow().depth(), 312);
         if (active.loadingPlans) return new Tokyo3RetractionDirector.Status("RIGID_LOADING", active.state.depth, active.state.target, 312);
         if (active.state.phase.equals("IDLE") && active.state.queued >= 0 && active.state.queued != active.state.depth)
             return new Tokyo3RetractionDirector.Status("RIGID_QUEUED" + (!active.state.queueFault.isBlank() ? "_BLOCKED" : active.occupied ? "_OCCUPIED" : ""), active.state.depth, active.state.queued, 312);
-        return new Tokyo3RetractionDirector.Status("RIGID_" + active.state.phase + (active.occupied ? "_OCCUPIED" : ""), active.state.depth, active.state.target, 312);
+        return new Tokyo3RetractionDirector.Status("RIGID_" + active.state.phase + (active.occupied ? "_OCCUPIED" : "")
+                + (active.qualityHold ? "_HOLD" : ""), active.state.depth, active.state.target, 312, active.observedMotion());
     }
 
     /** Explicit retry/rollback only; foreign source/destination NBT never gets overwritten. */
@@ -475,6 +478,7 @@ public final class CityCreateDistrictR45
                 CompoundTag tag = NbtIo.readCompressed(file.toFile()).getCompound("data");
                 if (tag.getInt("Version") != 1 || !world.equals(tag.getString("WorldUUID")) || tag.getLong("Origin") != origin.asLong())
                     throw new IllegalStateException("Foreign/unknown city WAL authority");
+                CityLowriseAddonR48.validateRetainedLedger(CityRigidTopologyR45.declared(level,origin),tag);
                 state = State.load(tag);
                 state.validate(towers.size());
                 if (!state.phase.equals("IDLE"))
@@ -502,6 +506,8 @@ public final class CityCreateDistrictR45
             }
             else
             {
+                if(towers.size()==CityLowriseAddonR48.EXTENDED_COUNT)
+                    throw new IllegalStateException("Restored low-rise city lacks its original complete ledger");
                 var legacy = Tokyo3RetractionSavedData.get(level).get(origin).orElseThrow();
                 if (legacy.depth() != legacy.targetDepth() || legacy.cursor() != 0 || legacy.voxelCursor() != 0
                         || legacy.depth() != 0 && legacy.depth() != 312) throw new IllegalStateException("Finish legacy transaction before rigid topology handoff");
@@ -529,6 +535,9 @@ public final class CityCreateDistrictR45
             assemblyLimit = CityCreateBridgeR45.backendBlockLimit();
             spawnLimit = CityCreateBridgeR45.backendSpawnLimit();
             if (occupied()) throw new IllegalStateException("Clear full buildings/roofs/shaft envelopes before detachment");
+            if(towers.size()==CityLowriseAddonR48.EXTENDED_COUNT)
+                state.previousCommittedLedgerR48=CityLowriseAddonR48.captureCommittedLedger(
+                        CityRigidTopologyR45.declared(level,origin),NbtIo.readCompressed(file.toFile()).getCompound("data"));
             UUID nextJourney;
             do { nextJourney = UUID.randomUUID(); }
             while (Files.exists(directory.resolve("city_rigid_journal_r45").resolve(nextJourney.toString())));
@@ -811,7 +820,7 @@ public final class CityCreateDistrictR45
                         // Imported bodies park with their real floor at81.
                         // Restore the80 support/hatch after ascent as well;
                         // generated bodies park their complete floor at80.
-                        if (state.target == 312 || spec.index() >= 93) preparing.cover.add(new Write(pos, Image.AIR, cover));
+                        if (state.target == 312 || CityLowriseAddonR48.retainsRaisedStreetCover(spec)) preparing.cover.add(new Write(pos, Image.AIR, cover));
                     }
                     else preparing.cover.add(new Write(pos, Image.AIR, cover));
                 }
@@ -877,6 +886,33 @@ public final class CityCreateDistrictR45
                 entity.xo = entity.getX(); entity.yo = entity.getY(); entity.zo = entity.getZ();
             }
             entities.put(state.index, entity); state.index++; state.created = Math.max(state.created, state.index); persist();
+        }
+
+        Tokyo3RetractionDirector.Motion observedMotion()
+        {
+            if (!java.util.Set.of("MOVE", "PLACE", "COVER", "FAULT").contains(state.phase)
+                    || loadingPlans || plans.size() != towers.size())
+                return Tokyo3RetractionDirector.Motion.UNAVAILABLE;
+            double minimum = Double.POSITIVE_INFINITY, maximum = 0, retractionSum = 0;
+            int observed = 0;
+            for (Plan plan : plans)
+            {
+                Entity entity = entities.get(plan.spec.index());
+                if (entity == null || !entity.isAlive() || !entity.getUUID().equals(plan.owner)
+                        || !entity.getTags().contains(ownerTag())
+                        || !entity.getPersistentData().hasUUID("R45CityJourney")
+                        || !entity.getPersistentData().getUUID("R45CityJourney").equals(state.journey)) continue;
+                double signed = (entity.getY() - plan.sourceY) * Math.signum(plan.targetY - plan.sourceY);
+                double route = Math.abs(plan.targetY - plan.sourceY);
+                if (!Double.isFinite(signed) || signed < -1e-5 || signed > route + 1e-5) continue;
+                double metres = Math.max(0, Math.min(route, signed));
+                retractionSum += Math.max(0, Math.min(1, (plan.spec.centre().getY() - entity.getY())
+                        / (double) (plan.spec.centre().getY() - plan.spec.retractedY())));
+                minimum = Math.min(minimum, metres); maximum = Math.max(maximum, metres); observed++;
+            }
+            return new Tokyo3RetractionDirector.Motion(state.journeyTargetDepth > state.journeySourceDepth,
+                    observed == 0 ? 0 : minimum, maximum, observed, towers.size(),
+                    observed == towers.size() ? retractionSum / observed : -1);
         }
 
         void move() throws Exception
@@ -1148,6 +1184,7 @@ public final class CityCreateDistrictR45
         double progress;
         UUID journey = UUID.randomUUID();
         boolean rollback, worldTouched, allowMissingRecovery;
+        CompoundTag previousCommittedLedgerR48=new CompoundTag();
         CompoundTag save()
         {
             CompoundTag tag = new CompoundTag(); tag.putString("Phase", phase); tag.putString("Fault", fault);
@@ -1160,7 +1197,9 @@ public final class CityCreateDistrictR45
             tag.putInt("JourneySourceDepth", journeySourceDepth); tag.putInt("JourneyTargetDepth", journeyTargetDepth);
             ListTag hashes = new ListTag(); for (String hash : planHashes) hashes.add(net.minecraft.nbt.StringTag.valueOf(hash));
             tag.put("JournalSHA256s", hashes);
-            tag.putInt("MotionTick", motionTick); tag.putString("MotionProfile", "c1_trapezoid_v1"); return tag;
+            tag.putInt("MotionTick", motionTick); tag.putString("MotionProfile", "c1_trapezoid_v1");
+            if(!previousCommittedLedgerR48.isEmpty())tag.put("PreviousCommittedLedgerR48",previousCommittedLedgerR48.copy());
+            return tag;
         }
         static State load(CompoundTag tag)
         {
@@ -1171,6 +1210,7 @@ public final class CityCreateDistrictR45
             s.progress = tag.getDouble("Progress"); s.journey = tag.getUUID("Journey"); s.rollback = tag.getBoolean("Rollback"); s.worldTouched = tag.getBoolean("WorldTouched");
             s.faultPhase = tag.getString("FaultPhase"); s.created = tag.getInt("Created"); s.allowMissingRecovery = tag.getBoolean("AllowMissingRecovery");
             s.motionTick = tag.getInt("MotionTick");
+            s.previousCommittedLedgerR48=tag.getCompound("PreviousCommittedLedgerR48").copy();
             s.journeySourceDepth = tag.contains("JourneySourceDepth") ? tag.getInt("JourneySourceDepth") : s.depth;
             s.journeyTargetDepth = tag.contains("JourneyTargetDepth") ? tag.getInt("JourneyTargetDepth") : s.target;
             ListTag hashes = tag.getList("JournalSHA256s", Tag.TAG_STRING);
@@ -1337,7 +1377,7 @@ public final class CityCreateDistrictR45
             int ground = (spec.maxX() - spec.minX() + 1) * (spec.maxZ() - spec.minZ() + 1);
             boolean mustOpenGround = to == 0 || groundContract == 2 && sourceY > 80 && targetY < 80;
             if (detach.size() != cells.size() || place.size() != cells.size() || open.size() != (mustOpenGround ? ground : 0)
-                    || cover.size() != (to == 312 || spec.index() >= 93 ? ground : 0))
+                    || cover.size() != (to == 312 || CityLowriseAddonR48.retainsRaisedStreetCover(spec) ? ground : 0))
                 throw new IllegalStateException("Journal does not contain complete source/target/ground operations");
             for (int stage = 0; stage < 4; stage++)
             {

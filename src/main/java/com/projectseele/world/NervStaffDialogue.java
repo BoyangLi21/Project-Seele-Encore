@@ -79,6 +79,14 @@ public final class NervStaffDialogue
     }
     public static int converse(ServerPlayer player,NervStaffEntity npc,String text)
     {
+        if(text.equals("TOPIC:chat"))
+        {
+            var campaign=TvCampaignSavedData.get(player.serverLevel());
+            boolean busy=npc.busy()||!campaign.active.isEmpty()
+                    &&!Set.of("cancel","failure","combat_victory","episode_archived").contains(campaign.phase);
+            reply(player,npc,StaffDialogueCatalogR24.next(player,StaffDialogueCatalogR24.profile(npc),npc.staffRole(),busy?"chat_busy":"chat_idle"));
+            return 1;
+        }
         if(text.startsWith("ROUTE:"))
         {reply(player,npc,NervWayfindingR24.start(player,text.substring(6)));return 1;}
         if(text.startsWith("CAMPAIGN:"))
@@ -173,10 +181,10 @@ public final class NervStaffDialogue
                 else if(intent.subject().equals("city"))
                 {
                     var origin=IntegratedNervMapBuilder.tokyo3Origin(player.serverLevel());
-                    int depth=Tokyo3RetractionDirector.depth(player.serverLevel(),origin);
+                    String motion=Tokyo3RetractionDirector.status(player.serverLevel(),origin).motionReport();
                     reply(player,npc,npc.skin().equals("fuyutsuki")
-                            ?"碇，城市目前收纳了 "+depth+" 米。你要收纳，还是展开？"
-                            :"城市目前收纳了 "+depth+" 米。升降请联络冬月副司令。");
+                            ?"碇，"+motion+"你要上升，还是下降？"
+                            :motion+"升降请联络冬月副司令。");
                 }
                 else if(intent.subject().equals("directions"))
                     reply(player,npc,npc.staffRole().startsWith("un_")
@@ -221,7 +229,7 @@ public final class NervStaffDialogue
         if(op.startsWith("city_"))
         {
             npc.begin(player.getUUID(),op,variant,control,approach);
-            reply(player,npc,"知道了，碇。准备"+(op.equals("city_rise")?"展开城市。":"收纳城市。"));return 1;
+            reply(player,npc,"知道了，碇。准备"+(op.equals("city_rise")?"上升城市。":"下降城市。"));return 1;
         }
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),variant);
         npc.begin(player.getUUID(),op,variant,control,approach);reply(player,npc,"收到，司令。"+unitName(variant)+(op.equals("prepare")?"准备出击。":op.equals("launch")?"进入发射程序。":"开始回收。请让出运输通道。"));return 1;
@@ -290,7 +298,7 @@ public final class NervStaffDialogue
         if(city)
         {
             var result=handled?NervOperationsConsole.lastOutcome(level,player,control):null;
-            reply(player,npc,result!=null&&result.accepted()?"碇，控制台已收到"+(operation.equals("city_rise")?"展开":"收纳")+"指令。":"城市还不能升降。"+(result==null?"控制台没有响应。":result.message()));
+            reply(player,npc,result!=null&&result.accepted()?"碇，控制台已收到"+(operation.equals("city_rise")?"上升":"下降")+"指令。":"城市还不能升降。"+(result==null?"控制台没有响应。":result.message()));
             ProjectSeele.LOGGER.info("STAFF CITY actor={} operation={} button={} accepted={}",npc.memberId(),operation,control,result!=null&&result.accepted());
             npc.finishTask();return;
         }
@@ -304,7 +312,7 @@ public final class NervStaffDialogue
     }
     public static void pilot(ServerPlayer player,TrainingPilotEntity pilot)
     {
-        say(player,TrainingPilotEntity.pilotName(pilot.getAssignedVariant()),PilotRadioR28.response(player,pilot,true));
+        say(player,TrainingPilotEntity.pilotName(pilot.getAssignedVariant()),PilotRadioR28.chat(player,pilot));
     }
     private NervStaffDialogue() {}
 }

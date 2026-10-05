@@ -17,6 +17,8 @@ public final class FacilityAudioR21
 {
     private static final Map<EvaUnit01Entity,EvaFleetSavedData.Phase> PREVIOUS=new WeakHashMap<>();
     private static final Map<EvaUnit01Entity,Long> COUNTDOWN=new WeakHashMap<>();
+    private static final java.util.Set<EvaUnit01Entity> CHARGED_R48=java.util.Collections.newSetFromMap(new WeakHashMap<>());
+    private static final java.util.Set<EvaUnit01Entity> ASCENT_SOUNDED_R48=java.util.Collections.newSetFromMap(new WeakHashMap<>());
     private static final Map<ServerLevel,Map<String,MilitaryR07Director.Phase>> AUXILIARY=new WeakHashMap<>();
     public static void auxiliary(ServerLevel level,String id,MilitaryR07Director.Phase phase,Vec3 door)
     {
@@ -39,6 +41,8 @@ public final class FacilityAudioR21
     }
     public static void tick(ServerLevel level,int variant,EvaFleetSavedData.FleetEntry entry,EvaUnit01Entity unit,BlockPos cage,BlockPos silo)
     {
+        if(!unit.isLaunchCommandReleased()||unit.getLaunchPhase()!=EvaUnit01Entity.LAUNCH_LOCKED)CHARGED_R48.remove(unit);
+        if(unit.getLaunchPhase()!=EvaUnit01Entity.LAUNCH_ASCENT)ASCENT_SOUNDED_R48.remove(unit);
         if(!TvLaunchFacility.enabled(level))return;
         var phase=entry.phase();var previous=PREVIOUS.put(unit,phase);
         Vec3 machine=unit.position().add(0,25,0),speaker=unit.position().add(0,52,0);
@@ -79,9 +83,25 @@ public final class FacilityAudioR21
         else if(unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_ASCENT)
         {
             Long last=COUNTDOWN.put(unit,0L);
-            if(last==null||last!=0){FacilityPaR31.announce(level,speaker,"pa_launch");play(level,machine,ModSounds.FACILITY.get("facility_catapult").get(),1.65F);}
+            if(last==null||last!=0)FacilityPaR31.announce(level,speaker,"pa_launch");
         }
         else COUNTDOWN.remove(unit);
+    }
+    /** Called by the accepted command after its released flag and native countdown are set. */
+    public static void authorizedLaunchChargeR48(EvaUnit01Entity unit,int releaseTicks)
+    {
+        if(!(unit.level() instanceof ServerLevel level)||!TvLaunchFacility.enabled(level)||releaseTicks<80
+                ||!unit.isLaunchCommandReleased()||unit.getLaunchPhase()!=EvaUnit01Entity.LAUNCH_LOCKED
+                ||!CHARGED_R48.add(unit))return;
+        play(level,unit.position().add(0,2,0),ModSounds.FACILITY.get("facility_hydraulic_charge_r48").get(),1.0F);
+    }
+    /** The native ascent start owns both distinct mechanical layers, once per launch. */
+    public static void beginCatapultR48(EvaUnit01Entity unit)
+    {
+        if(!(unit.level() instanceof ServerLevel level)||!unit.isLaunchCommandReleased()
+                ||unit.getLaunchPhase()!=EvaUnit01Entity.LAUNCH_ASCENT||!ASCENT_SOUNDED_R48.add(unit))return;
+        play(level,unit.position().add(0,2,0),ModSounds.FACILITY.get("facility_hydraulic_launch").get(),1.8F);
+        if(TvLaunchFacility.enabled(level))play(level,unit.position().add(0,25,0),ModSounds.FACILITY.get("facility_catapult").get(),1.0F);
     }
     private static void play(ServerLevel level,Vec3 pos,SoundEvent sound,float volume)
     {

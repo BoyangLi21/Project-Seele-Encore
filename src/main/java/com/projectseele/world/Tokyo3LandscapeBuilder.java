@@ -55,6 +55,8 @@ public final class Tokyo3LandscapeBuilder
 
     public static LandscapeAudit build(ServerLevel level, BlockPos origin)
     {
+        if (CityLegacyOwnershipR48.inhibits(level, origin, "Tokyo3LandscapeBuilder.build"))
+            return inspect(level, origin);
         requireBuildHeight(level, origin);
         buildRetainingStructure(level, origin);
         buildOuterTerrainShell(level, origin);

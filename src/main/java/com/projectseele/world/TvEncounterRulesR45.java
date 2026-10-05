@@ -104,6 +104,8 @@ public final class TvEncounterRulesR45
     public static String equipmentBlocker(ServerLevel l,TvCampaignSavedData d)
     {
         if(!d.active.equals("ramiel"))return "";
+        if(d.phase.equals("combat"))
+            return com.projectseele.event.TvEncounterDirectorR45.combatEquipmentBlockerR48(l,d);
         var shooter=TvSortiesR32.assignedUnit(l,d,1);var cover=TvSortiesR32.assignedUnit(l,d,0);
         if(!d.sorties.containsKey(1)||!d.sorties.containsKey(0))return "屋岛编成需要初号机射手与零号机防护，可由玩家或驾驶员加入。";
         if(!TvSortiesR32.readyAssigned(l,d.sorties.get(1))||!TvSortiesR32.readyAssigned(l,d.sorties.get(0)))return "等待初号机与零号机完成整备、发射。";

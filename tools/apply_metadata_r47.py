@@ -6,11 +6,20 @@ ROOT=Path(__file__).resolve().parents[1]
 BASE=ROOT/'artifacts/rebuild_r47'
 
 def main():
+    global BASE
     parser=argparse.ArgumentParser();parser.add_argument('--world',type=Path,required=True)
     parser.add_argument('--patches',type=Path,nargs='+',required=True);parser.add_argument('--batch',required=True)
     parser.add_argument('--native-qa',action='store_true')
+    parser.add_argument('--revision',type=int,choices=(47,48),default=47)
     args=parser.parse_args();world=args.world.resolve()
-    native_sources={(BASE/'native_qa/game/saves'/name).resolve() for name in ('SEELE_R47_WORLD','SEELE_R47_RELEASE')}
+    BASE=ROOT/f'artifacts/rebuild_r{args.revision}'
+    native_sources={(BASE/'native_qa/game/saves'/name).resolve() for name in (f'SEELE_R{args.revision}_WORLD',f'SEELE_R{args.revision}_RELEASE')}
+    if args.revision==48:
+        receipt=BASE/'native_qa/COPY_ONCE.json'
+        if receipt.is_file():
+            copy_info=json.loads(receipt.read_text('utf-8-sig'));retained=(BASE/'native_qa/worlds/SEELE_R48_QA').resolve()
+            if copy_info.get('copied_once') is True and Path(copy_info['qa_world']).resolve()==retained:
+                native_sources.add(retained)
     if not(world.is_relative_to((BASE/'construction').resolve()) or args.native_qa and world in native_sources):raise ValueError('Only Root construction or explicit stopped native QA source')
     out=BASE/'applied'/args.batch
     if out.exists():raise ValueError('Do not replay a metadata batch')

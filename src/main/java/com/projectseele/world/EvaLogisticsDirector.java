@@ -399,6 +399,10 @@ public final class EvaLogisticsDirector
 
     public static ActionResult requestPrepare(ServerLevel level, int variant)
     {
+        if(variant<0||variant>2)return new ActionResult(false,"请指定原零号/初号/二号机。");
+        loadControlTarget(level,variant);
+        var rearFault=EntryPlugBridgeLayoutR48.retractionFaultR48(level,variant);
+        if(rearFault.isPresent())return new ActionResult(false,rearFault.get());
         var staffFault=TvPersonnelPlatformInterlockR44.prepareFault(level,variant);
         if(staffFault.isPresent())return new ActionResult(false,staffFault.get());
         if (!logisticsReady(level, variant))
@@ -499,6 +503,8 @@ public final class EvaLogisticsDirector
                     label(variant) + " is not linked to the command network.");
         }
         if(unit.refreshTvPersonnelClockHoldR44())return new ActionResult(false,unit.tvPersonnelClockFaultR44());
+        if(UndergroundSortieR48.reservesLaunchR48(level,variant,unit))
+            return new ActionResult(false,"地下出口正在开门/转移，未释放地表弹射。");
         if (entry.phase() != Phase.SILO_READY)
         {
             return new ActionResult(false, label(variant) + " is "
@@ -529,6 +535,64 @@ public final class EvaLogisticsDirector
         return new ActionResult(true,
                 label(variant) + " catapult release authorized.");
     }
+    /** Only the installed underground service may begin a bound original carrier trip. */
+    public static ActionResult requestUndergroundDepartureR48(ServerPlayer caller,int variant,UUID expected)
+    {
+        var level=caller.serverLevel();var unit=canonical(level,variant);var entry=entry(level,variant);
+        if(!logisticsReady(level,variant)||unit==null||entry==null||!entry.canonicalId().equals(expected)
+                ||!unit.getUUID().equals(expected)||entry.phase()!=Phase.SILO_READY
+                ||!UndergroundSortieR48.departureAuthorizedR48(caller,variant,unit))
+            return new ActionResult(false,"地下出击的原机体与准备许可已变化。");
+        var ready=FacilityReadinessService.read(level,FacilityReadinessService.Operation.LAUNCH,variant);
+        if(!ready.accepted())return new ActionResult(false,ready.faultCode()+": "+ready.message());
+        var bed=lowerLiftBed(level,variant);
+        if(unit.position().distanceToSqr(new Vec3(bed.getX()+.5,bed.getY()+1,bed.getZ()+.5))>.25
+                ||!EntryPlugDirector.hasLaunchLock(level,variant,unit)||unit.isLaunchCommandReleased())
+            return new ActionResult(false,"原插入栓/下层承载床尚未锁定。");
+        if(unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_IDLE&&UndergroundSortieR48.cancelledReservationR48(level,variant,unit))
+            return new ActionResult(true,"原地下弹射取消许可保持，承载板等待真实门全开。");
+        if(unit.getLaunchPhase()!=EvaUnit01Entity.LAUNCH_LOCKED&&!unit.armPreparedLaunch(bed))
+            return new ActionResult(false,"原下层预备锁尚未恢复。");
+        if(!unit.cancelPreparedLaunch())return new ActionResult(false,"弹射已释放，不能切换地下出口。");
+        unit.clearSortieDestination();unit.setNervLogisticsLocked(true);unit.setNoGravity(true);
+        return new ActionResult(true,"预备弹射已取消，原承载板转向地下接应平台。");
+    }
+    public static ActionResult completeUndergroundDepartureR48(ServerLevel level,int variant,UUID expected)
+    {
+        var unit=canonical(level,variant);var entry=entry(level,variant);
+        if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
+                ||entry.phase()!=Phase.SILO_READY||!UndergroundSortieR48.finishAuthorizedR48(level,variant,unit,false)
+                ||!EntryPlugDirector.hasLaunchLock(level,variant,unit))
+            return new ActionResult(false,"地下平台到达许可或原插入栓连接已变化。");
+        unit.endNervCarrierMotion();unit.clearSortieDestination();unit.setCarrierRiseProgress(0);
+        put(level,variant,entry.withPhase(Phase.DEPLOYED,0,lowerLiftBed(level,variant).getY(),0));
+        unit.setNervLogisticsLocked(false);unit.setNoGravity(false);
+        return new ActionResult(true,"原机体已到实心地下平台，可驾驶沿台阶驶向草地。");
+    }
+    public static ActionResult requestUndergroundRecoveryR48(ServerLevel level,int variant,UUID expected)
+    {
+        var unit=canonical(level,variant);var entry=entry(level,variant);
+        if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
+                ||entry.phase()!=Phase.DEPLOYED||!UndergroundSortieR48.recoveryAuthorizedR48(level,variant,unit)
+                ||!recoveryMotionSettled(unit)||!EntryPlugDirector.hasLaunchLock(level,variant,unit))
+            return new ActionResult(false,"原地下接应平台回收条件尚未满足。");
+        if(!HangarEmergencyR47.releaseForRecoveryR47(level,variant))
+            return new ActionResult(false,"湿舱后门仍在通行，地下回收暂缓。");
+        unit.prepareForNervRecovery();unit.setNervLogisticsLocked(true);
+        return new ActionResult(true,"地下承载板开始连续返回原下层床。");
+    }
+    public static ActionResult completeUndergroundRecoveryR48(ServerLevel level,int variant,UUID expected)
+    {
+        var unit=canonical(level,variant);var entry=entry(level,variant);var bed=lowerLiftBed(level,variant);
+        if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
+                ||entry.phase()!=Phase.DEPLOYED||!UndergroundSortieR48.finishAuthorizedR48(level,variant,unit,true)
+                ||unit.position().distanceToSqr(new Vec3(bed.getX()+.5,bed.getY()+1,bed.getZ()+.5))>.25)
+            return new ActionResult(false,"原下层床返回许可尚未满足。");
+        unit.endNervCarrierMotion();unit.clearSortieDestination();unit.setNervLogisticsLocked(true);
+        setGate(level,variant,true);put(level,variant,entry.withPhase(Phase.TO_HANGAR,0,bed.getZ(),0));
+        return new ActionResult(true,"已回到原下层床，沿正常通路返回同一湿舱。");
+    }
+
     public static boolean recoveryMotionSettled(EvaUnit01Entity unit)
     {
         Vec3 motion=unit.getDeltaMovement();
@@ -594,6 +658,8 @@ public final class EvaLogisticsDirector
             return new ActionResult(false, label(variant) + " is " + entry.phase()
                     + "; recovery requires DEPLOYED.");
         }
+        if(UndergroundSortieR48.deployedBindingR48(level,variant,unit))
+            return UndergroundSortieR48.recoverR48(level,variant,unit);
         BlockPos surface = surfaceLiftBed(level, variant);
         double dx = unit.getX() - (surface.getX() + 0.5D);
         double dz = unit.getZ() - (surface.getZ() + 0.5D);
@@ -1262,19 +1328,24 @@ public final class EvaLogisticsDirector
             }
             case BRIDGE_RETRACTING ->
             {
+                var rearFault=EntryPlugBridgeLayoutR48.retractionFaultR48(level,variant);
+                if(rearFault.isPresent())break;
                 unit.setNervLogisticsLocked(true);
                 int ticks = entry.ticks() + 1;
-                EntryPlugDirector.tickCabinPreparation(level, variant, unit,
-                        ticks, BRIDGE_RETRACTION_TICKS);
                 if (ticks % 5 == 0 || ticks >= BRIDGE_RETRACTION_TICKS)
                 {
                     int remaining = FacilityV2EvaRuntime.BRIDGE_SEGMENTS
                             - Mth.ceil(ticks
                             * FacilityV2EvaRuntime.BRIDGE_SEGMENTS
                             / (double) BRIDGE_RETRACTION_TICKS);
-                    setBoardingBridgeExtension(level, variant,
-                            Math.max(0, remaining));
+                    if(EntryPlugBridgeLayoutR48.enabled(level))
+                    {
+                        if(!EntryPlugBridgeLayoutR48.apply(level,hangar,Math.max(0,remaining)))break;
+                    }
+                    else setBoardingBridgeExtension(level,variant,Math.max(0,remaining));
                 }
+                // Cabin progress is committed only after the actual bridge write succeeds.
+                EntryPlugDirector.tickCabinPreparation(level,variant,unit,ticks,BRIDGE_RETRACTION_TICKS);
                 if (ticks >= BRIDGE_RETRACTION_TICKS)
                 {
                     if (EntryPlugDirector.beginInsertion(level, variant, unit))
@@ -1539,6 +1610,7 @@ public final class EvaLogisticsDirector
             }
             case SILO_READY ->
             {
+                if(UndergroundSortieR48.tickMotionR48(level,variant,unit))break;
                 unit.setNervLogisticsLocked(true);
                 EntryPlugDirector.ensureCraneStowed(level, variant);
                 if (!EntryPlugDirector.hasLaunchLock(level, variant, unit))
@@ -1562,6 +1634,7 @@ public final class EvaLogisticsDirector
             }
             case DEPLOYED ->
             {
+                if(UndergroundSortieR48.tickMotionR48(level,variant,unit))break;
                 if(NervAirLiftR30.ownsMotion(unit)||NervAirLiftR30.waitingAtHead(unit))break;
                 double dx = unit.getX() - (surface.getX() + 0.5D);
                 double dz = unit.getZ() - (surface.getZ() + 0.5D);

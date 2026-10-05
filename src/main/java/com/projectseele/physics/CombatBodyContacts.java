@@ -67,6 +67,7 @@ public final class CombatBodyContacts
     }
     public static Vec3 strikeAim(LivingEntity attacker,LivingEntity target)
     {
+        if(ShamshelPosedContactsR48.supports(target))return ShamshelPosedContactsR48.nearestSurfacePoint(target,attacker.getEyePosition());
         Vec3 centre=target.getBoundingBox().getCenter();var profile=CombatBodyProfiles.get(target);
         if(profile!=null)
         {
@@ -84,6 +85,7 @@ public final class CombatBodyContacts
     /** A downward strike aims at the posed surface nearest its actual foot. */
     public static Vec3 bearingAim(LivingEntity target,Vec3 foot)
     {
+        if(ShamshelPosedContactsR48.supports(target))return ShamshelPosedContactsR48.nearestSurfacePoint(target,foot);
         var profile=CombatBodyProfiles.get(target);if(profile==null)return target.getBoundingBox().getCenter();
         var pose=CombatBodyDynamics.active(target)?CombatBodyDynamics.sample(target,0):CombatBodyDynamics.raw(target,0);
         var matrices=CombatBodyProfiles.physicalMatrices(pose,profile);double best=Double.POSITIVE_INFINITY;Vec3 nearest=null;
@@ -123,6 +125,7 @@ public final class CombatBodyContacts
     }
     public static Optional<Vec3> clip(LivingEntity target,Vec3 from,Vec3 to,double radius)
     {
+        if(ShamshelPosedContactsR48.supports(target))return ShamshelPosedContactsR48.clip(target,from,to,radius);
         var profile=CombatBodyProfiles.get(target);
         boolean field=target instanceof Angel angel&&angel.getAtField()>0||target instanceof EvaUnit01Entity eva&&eva.isAtFieldOn()&&eva.getAtFieldEnergy()>0;
         if(field||profile==null||!(target instanceof EvaUnit01Entity||target instanceof SachielEntity))
@@ -154,6 +157,7 @@ public final class CombatBodyContacts
     /** Two triangles cover the entire previous/current blade strip, not only its tip path. */
     public static Optional<Vec3> clipBladeSweepR45(LivingEntity target,Vec3 a,Vec3 b,Vec3 c,Vec3 d,double radius)
     {
+        if(ShamshelPosedContactsR48.supports(target))return ShamshelPosedContactsR48.clipBladeSweep(target,a,b,c,d,radius);
         var profile=CombatBodyProfiles.get(target);
         if(fieldOrBox(target,profile))return clipBladeBoxR45(target.getBoundingBox().inflate(radius),a,b,c,d);
         var pose=CombatBodyDynamics.active(target)?CombatBodyDynamics.sample(target,0):CombatBodyDynamics.raw(target,0);
@@ -236,6 +240,7 @@ public final class CombatBodyContacts
     /** Volume attacks intersect posed convex parts, never only a standing box. */
     public static boolean overlap(LivingEntity target,net.minecraft.world.phys.AABB area)
     {
+        if(ShamshelPosedContactsR48.supports(target))return ShamshelPosedContactsR48.overlap(target,area);
         var profile=CombatBodyProfiles.get(target);if(fieldOrBox(target,profile))return target.getBoundingBox().intersects(area);
         var pose=CombatBodyDynamics.active(target)?CombatBodyDynamics.sample(target,0):CombatBodyDynamics.raw(target,0);
         AnatomicalLimbConstraints.apply(pose,profile);var matrices=CombatBodyProfiles.physicalMatrices(pose,profile);
@@ -263,6 +268,7 @@ public final class CombatBodyContacts
     /** The same attenuation curve uses the nearest real exposed body point. */
     public static Vec3 nearestSurfacePoint(LivingEntity target,Vec3 origin)
     {
+        if(ShamshelPosedContactsR48.supports(target))return ShamshelPosedContactsR48.nearestSurfacePoint(target,origin);
         var profile=CombatBodyProfiles.get(target);
         if(fieldOrBox(target,profile))
         {

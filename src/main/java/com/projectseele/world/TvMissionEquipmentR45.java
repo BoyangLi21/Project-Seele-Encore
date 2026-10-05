@@ -163,6 +163,8 @@ public final class TvMissionEquipmentR45
     /** Read during real Entity NBT load; requires original persisted fleet UUID. */
     public static boolean cannonAuthorized(EvaUnit01Entity eva)
     {return authorized(eva,1);}
+    public static boolean shieldLoanAuthorizedR48(EvaUnit01Entity eva)
+    {return authorized(eva,0);}
     public static boolean shieldAuthorized(EvaUnit01Entity eva)
     {return authorized(eva,0)||!eva.isExperimentalUnit()&&eva.getUnitVariant()==0
             &&eva.getPersistentData().getBoolean("R47PhysicalShieldIssued")

@@ -111,9 +111,15 @@ public final class NervSiloDoorEntity extends Entity
                 &&com.projectseele.world.TvLaunchFacility.enabled(serverLevel))
         {
             if(Math.abs(next-current)>1e-4F&&(current==0||current==1))
-                this.playSound(com.projectseele.registry.ModSounds.EVA_SERVO.get(),3.5F,.60F);
+            {
+                if(isTvBulkhead())this.playSound(com.projectseele.registry.ModSounds.EVA_SERVO.get(),3.5F,.60F);
+                else this.playSound(com.projectseele.registry.ModSounds.SURFACE_BULKHEAD_MOTION_R48.get(),1.3F,1);
+            }
             if(next!=current&&(next==0||next==1))
-                this.playSound(com.projectseele.registry.ModSounds.EVA_ARMOR_IMPACT.get(),2.0F,.64F);
+            {
+                if(isTvBulkhead())this.playSound(com.projectseele.registry.ModSounds.EVA_ARMOR_IMPACT.get(),2.0F,.64F);
+                else this.playSound(com.projectseele.registry.ModSounds.SURFACE_BULKHEAD_STOP_R48.get(),1.1F,1);
+            }
         }
         if (Math.abs(next - current) > 1.0E-4F)
         {

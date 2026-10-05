@@ -1232,7 +1232,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         BlockPos boarding = FacilityV2EvaRuntime.ready(server, variant)
                 ? FacilityV2EvaRuntime.boardingPosition(server, variant)
                 : EvaHangarBuilder.boardingPosition(
-                        IntegratedNervMapBuilder.GEOFRONT_ORIGIN, variant);
+                        com.projectseele.world.RegionalFacilityLayout.evaOrigin(server), variant);
         return Vec3.atBottomCenterOf(boarding);
     }
 

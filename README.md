@@ -12,6 +12,12 @@ An open-source **Neon Genesis Evangelion** universe mod for Minecraft **Forge 1.
 
 ## Status / 状态
 
+R48为当前收口候选：最新生产资源构建成功（50秒），五件新模型及UN3/4 rig已合入选中assets/runtime，64×64 NERV图标已备。实际原生证据仅为同QA冷启动、三原NPC生产登栓并返回原座椅/原UUID保持，以及正常保存停服；整备/出击/领装/地下/真人V/手动门/直梯/城市连续动画/听感/盾光束和全部观感仍由用户待验，不称全47项通过。
+
+C03四座既有规划中央低控制室已按原模板恢复并接入同城WAL，完整运动由用户验收；B03昼天使4%与F05实际门点击仍待原目标复核。默认交付目标为Server＋直接拖入PCL的Client_PCL，同协议56、Forge1.20.1/47.4.10、Java17、20G/eula=false。此快照包装未执行，R47保留，未宣称当前云端后续进度已合入。
+
+### R47 历史交付与验收记录
+
 R47 为当前人工验收候选，已生成并回读 **Server** 与 **Full Client** 两包：`Project_SEELE_Encore_R47_20261005_Server.zip`（618,645,000 字节）与 `Project_SEELE_Encore_R47_20261005_Client.zip`（376,629,795 字节）。Minecraft 1.20.1 / Forge 47.4.10 / Java 17，网络协议 **55**；服务端最大堆内存 **20G**。两端安装到新目录，使用同批模组、配置和 `SEELE_R47_WORLD`。个人交付包保存在本机 `D:/eva/delivery`，不作为公开源码仓库的素材下载。
 
 PCL 用户改用追加的 **`Project_SEELE_Encore_R47_20261005_Client_PCL.zip`**（368,596,492 字节），直接拖入 PCL 导入。它使用标准整合包清单，内置同批21个模组，不要求旧R46实例；首次启动准备本地光影，默认仍关闭光影。原 Client.zip 是手动实例文件包，不能直接拖入。服务器包无需更换，详见 [PCL 导入说明](docs/PCL_IMPORT_R47.md)。

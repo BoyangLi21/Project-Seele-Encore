@@ -214,6 +214,7 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     @Override
     public boolean hurt(DamageSource source, float amount)
     {
+        com.projectseele.physics.ShamshelDamageWitnessR48.record("hurt_enter",source.getEntity(),this,source,amount,"before_original_gate");
         if (this.getAtField() > 0.0F && !com.projectseele.combat.AtFieldRules.bypassesAtField(source))
         {
             if (source.getEntity() instanceof EvaUnit01Entity eva && eva.isMeleeWeapon())
@@ -223,11 +224,15 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
                 {
                     AtFieldFX.ripple(server, this.getBoundingBox().getCenter(), eva.getForward());
                 }
+                com.projectseele.physics.ShamshelDamageWitnessR48.record("at_melee_consumed",source.getEntity(),this,source,amount,"accepted=true; hull_not_called");
                 return true;
             }
+            com.projectseele.physics.ShamshelDamageWitnessR48.record("at_rejected",source.getEntity(),this,source,amount,"accepted=false; hull_not_called");
             return false;
         }
-        return super.hurt(source, amount);
+        boolean accepted=super.hurt(source,amount);
+        com.projectseele.physics.ShamshelDamageWitnessR48.record("super_hurt_return",source.getEntity(),this,source,amount,"accepted="+accepted);
+        return accepted;
     }
 
     @Override

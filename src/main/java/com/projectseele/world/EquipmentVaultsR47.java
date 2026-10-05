@@ -68,6 +68,25 @@ public final class EquipmentVaultsR47
         return plans(level).stream().filter(vault->vault.payload==payload&&state.ids.containsKey(vault.id))
                 .map(vault->BlockPos.containing(vault.x,vault.y,vault.z)).findFirst();
     }
+    /** A carried shield keeps its original saved loan while its distant well is unloaded. */
+    public static boolean physicalShieldLoanAuthorizedR48(EvaUnit01Entity eva)
+    {
+        if(!(eva.level() instanceof ServerLevel level)||eva.isExperimentalUnit()||eva.getUnitVariant()!=0)return false;
+        var fleet=EvaFleetSavedData.get(level.getServer()).entry(0).orElse(null);
+        if(fleet==null||!eva.getUUID().equals(fleet.canonicalId()))return false;
+        State state=level.getDataStorage().get(State::load,"projectseele_equipment_vaults_r47");
+        if(state==null)return false;
+        for(var vault:plans(level))if(vault.payload==EvaUnit01Entity.WEAPON_SHIELD_R45)
+        {
+            UUID original=state.ids.get(vault.id);
+            if(original==null||!eva.getUUID().equals(state.loans.get(vault.id)))continue;
+            var loaded=level.getEntity(original);
+            return loaded==null||loaded instanceof NervArmamentStationEntity station
+                    &&station.payloadR47()==vault.payload
+                    &&vault.id.equals(station.getPersistentData().getString("R47Vault"));
+        }
+        return false;
+    }
     /** Commands resolve the commissioned physical object, never spawn a substitute. */
     public static NervArmamentStationEntity recordedStationR47(ServerLevel level,int payload)
     {

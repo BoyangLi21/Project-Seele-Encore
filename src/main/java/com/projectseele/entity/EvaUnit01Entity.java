@@ -118,9 +118,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
     public void completeFirstBattle()
     {
+        boolean wasBerserk=this.isBerserk();
         var finalPose=FirstBattleClip.finalEvaPose(this);
         this.endFirstBattle();this.entityData.set(DATA_BERSERK,false);this.entityData.set(DATA_BERSERK_TICKS,0);this.berserkRecoveryTicks=0;
-        EvaBerserkMotionR34.clear(this);EvaDorsalMechanism.afterBerserk(this);
+        EvaBerserkMotionR34.clear(this);
+        if(wasBerserk)EvaDorsalMechanism.afterBerserk(this);
         if(this.isPowerDepleted())EvaShutdownR30.restAfterFirstBattle(this,finalPose);
     }
     public static final int WEAPON_FISTS = 0;
@@ -1851,13 +1853,24 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     /** World-space tail of the upper-back power plug, shared by cable and sever FX. */
     public Vec3 getUmbilicalSocketPosition()
     {
+        var fitted=EvaPowerPortsR48.of(this);
+        if(fitted!=null)return this.posedPowerMarkerR48(fitted.cableTailPixels());
         return this.posedPowerMarker(EvaScale.UMBILICAL_SOCKET_HEIGHT,this.powerSocketRearOffset());
     }
 
     /** Armour-side receptacle for the rigid upper-back umbilical plug. */
     public Vec3 getUmbilicalMountPosition()
     {
+        var fitted=EvaPowerPortsR48.of(this);
+        if(fitted!=null)return this.posedPowerMarkerR48(fitted.mountPixels());
         return this.posedPowerMarker(EvaScale.UMBILICAL_MOUNT_HEIGHT,this.powerMountRearOffset());
+    }
+
+    private Vec3 posedPowerMarkerR48(Vec3 nativeModelPixels)
+    {
+        var body=EvaBodyPose.sample(this,1);
+        var matrix=EvaRifleKinematics.world(this,1).mul(body.matrix("torso_upper"));
+        return new Vec3(matrix.transformPosition(nativeModelPixels.scale(1D/16).toVector3f()));
     }
 
     private Vec3 posedPowerMarker(double height,double rear)
@@ -1924,6 +1937,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         boolean training = occupant instanceof TrainingPilotEntity;
         if (this.level().isClientSide
                 || this.getLaunchPhase() != LAUNCH_LOCKED
+                || this.launchCommandReleased
                 || (!human && !training)
                 || this.launchBedPos == null)
         {
@@ -1936,6 +1950,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.launchCommandReleased = true;
         this.entityData.set(DATA_ACTIVATION_TICKS, releaseTicks);
         this.entityData.set(DATA_LAUNCH_TICKS, releaseTicks);
+        com.projectseele.world.FacilityAudioR21.authorizedLaunchChargeR48(this,releaseTicks);
         if (this.level() instanceof ServerLevel serverLevel
                 && this.sortieDestinationBed != null)
         {
@@ -2454,6 +2469,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     /** Clears combat/launch motion before the surface carrier descends. */
     public void prepareForNervRecovery()
     {
+        this.stowHandsForShutdownR30();
         if (this.isLaunchSequenceActive())
         {
             this.resetLaunchSequence();
@@ -3674,6 +3690,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private void reviewContactGateR45(String gate,@Nullable Entity target,@Nullable Vec3 from,Vec3 to,
             @Nullable Vec3 contact,double radius,float requested,int invulnerableBefore,float healthBefore,boolean accepted)
     {
+        if(com.projectseele.physics.ShamshelDamageWitnessR48.enabled())
+            com.projectseele.physics.ShamshelDamageWitnessR48.producerGate("contact_"+gate,this,target,requested,
+                    "from="+from+"; to="+to+"; contact="+contact+"; radius="+radius+"; accepted="+accepted
+                            +"; invulnerable_before="+invulnerableBefore+"; health_before="+healthBefore);
         if(!Boolean.getBoolean("projectseele.r45ContactTrace")||!com.projectseele.visual.CombatR31Review.ownsFixture(this)
                 ||contactReviewRowsR45++>=4096)return;
         var row=new com.google.gson.JsonObject();row.addProperty("gate",gate);row.addProperty("server_tick",this.level().getGameTime());
@@ -3724,8 +3744,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             if(bodyContact.isEmpty())
             {reviewContactGateR45("body_clip_miss",target,from,fxCenter,null,radius,damage,target.invulnerableTime,target instanceof LivingEntity living?living.getHealth():-1,false);continue;}
             Vec3 wallOrigin=from==null?this.position().add(0,Math.max(2,fxCenter.y-this.getY()),0):from;
-            if(this.level().clip(new net.minecraft.world.level.ClipContext(wallOrigin,fxCenter,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)
-            {reviewContactGateR45("wall_to_endpoint",target,from,fxCenter,bodyContact.get(),radius,damage,target.invulnerableTime,target instanceof LivingEntity living?living.getHealth():-1,false);continue;}
+            // The sweep may continue through the victim and end inside a wall.
+            // Only an obstruction before its first actual body contact rejects
+            // this hit; a wall behind the victim cannot absorb the whole attack.
+            if(this.level().clip(new net.minecraft.world.level.ClipContext(wallOrigin,bodyContact.get(),net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)
+            {reviewContactGateR45("wall_before_contact",target,from,fxCenter,bodyContact.get(),radius,damage,target.invulnerableTime,target instanceof LivingEntity living?living.getHealth():-1,false);continue;}
             if(from!=null&&this.level().clip(new net.minecraft.world.level.ClipContext(this.position().add(0,Math.max(2,from.y-this.getY()),0),from,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)
             {reviewContactGateR45("wall_to_start",target,from,fxCenter,bodyContact.get(),radius,damage,target.invulnerableTime,target instanceof LivingEntity living?living.getHealth():-1,false);continue;}
             // Damage sourced directly from the Unit: Angel A.T. Fields
@@ -3749,7 +3772,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             try
             {
                 DamageSource contactSource=ordinary?com.projectseele.registry.ModDamageTypesR45.ordinaryContact(this):this.damageSources().mobAttack(this);
-                accepted=com.projectseele.physics.CombatDamageTargetsR44.hurt(target,contactSource,damage,hitPoint,impulse,com.projectseele.physics.CombatDamageTargetsR44.Weapon.CONTACT);
+                accepted=com.projectseele.physics.CombatDamageTargetsR44.hurt(target,contactSource,damage,hitPoint,impulse,com.projectseele.physics.CombatDamageTargetsR44.Weapon.CONTACT,from!=null?from:wallOrigin);
             }
             finally
             {
@@ -4045,10 +4068,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // than dropping them at the airframe's feet. They then sneak to
             // dismount and climb down from the plug.
             if (this.level() instanceof ServerLevel serverLevel
-                    && this.isEntryPlugInserted()
-                    && EntryPlugDirector.ejectPilotToPlug(
-                            serverLevel, this.getUnitVariant(), this, pilot))
+                    && this.isEntryPlugInserted())
             {
+                if(!EntryPlugDirector.ejectPilotToPlug(
+                        serverLevel,this.getUnitVariant(),this,pilot))
+                    pilot.displayClientMessage(Component.literal("插入栓脱离条件未满足，请保持原位并联系整备部。"),true);
+                // A rejected physical extraction is not permission to perform
+                // an unrelated vanilla dismount and abandon the launch support.
                 return;
             }
             pilot.stopRiding();
@@ -4139,7 +4165,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             end = entityHit.getLocation();
             com.projectseele.physics.CombatDamageTargetsR44.hurt(entityHit.getEntity(),pilot instanceof Player human?this.damageSources().playerAttack(human):this.damageSources().mobAttack(pilot),
-                    SeeleConfig.EVA_RIFLE_DAMAGE.get().floatValue(),end,shotDirection,com.projectseele.physics.CombatDamageTargetsR44.Weapon.PROJECTILE);
+                    SeeleConfig.EVA_RIFLE_DAMAGE.get().floatValue(),end,shotDirection,com.projectseele.physics.CombatDamageTargetsR44.Weapon.PROJECTILE,muzzle);
         }
 
         SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
@@ -4763,7 +4789,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             else
             {
                 com.projectseele.physics.CombatDamageTargetsR44.hurt(entityHit.getEntity(),(pilot instanceof ServerPlayer player?this.damageSources().playerAttack(player):this.damageSources().mobAttack(pilot)),
-                        SeeleConfig.CANNON_MOB_DAMAGE.get().floatValue(),end,dir,com.projectseele.physics.CombatDamageTargetsR44.Weapon.PROJECTILE);
+                        SeeleConfig.CANNON_MOB_DAMAGE.get().floatValue(),end,dir,com.projectseele.physics.CombatDamageTargetsR44.Weapon.PROJECTILE,muzzle);
             }
         }
 
@@ -5268,7 +5294,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.entityData.set(DATA_N2_ARM_TICKS, 0);
         }
 
-        if (this.atRegenDelay > 0)
+        if(this.getPersistentData().getBoolean("R48YashimaFieldBurnout"))
+        {
+            this.entityData.set(DATA_AT_ON,false);
+            this.entityData.set(DATA_AT_ENERGY,0F);
+        }
+        else if (this.atRegenDelay > 0)
         {
             this.atRegenDelay--;
         }
@@ -5475,7 +5506,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.setDeltaMovement(Vec3.ZERO);
         ProjectSeele.LOGGER.info("NERV launch ascent: eva={} ticks={}",
                 this.getStringUUID(), ascentTicks);
-        this.level().playSound(null,this.getX(),this.getY()+2,this.getZ(),net.minecraft.sounds.SoundEvent.createFixedRangeEvent(ModSounds.FACILITY.get("facility_hydraulic_launch").get().getLocation(),256F),SoundSource.BLOCKS,3.2F,1);
+        com.projectseele.world.FacilityAudioR21.beginCatapultR48(this);
         if (serverLevel != null)
         {
             com.projectseele.world.LaunchSteamEffects.emit(serverLevel,this.launchBedPos,0);
@@ -6425,6 +6456,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public boolean hurt(DamageSource source, float amount)
     {
+        if(amount>0&&com.projectseele.world.ShieldCoverR48.blocksFallback(this,source))return false;
         if(this.isBerserk()&&!source.is(DamageTypeTags.BYPASSES_INVULNERABILITY))return false;
         if(EvaShutdownR30.wreck(this)&&source.is(DamageTypes.GENERIC_KILL)){remove(RemovalReason.KILLED);return true;}
         if(EvaShutdownR30.wreck(this)&&!source.is(DamageTypes.GENERIC_KILL))return false;
@@ -6488,6 +6520,43 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // Hull damage affects the airframe. Synchronization no longer copies
         // that damage into the protected cockpit occupant's vanilla health.
         return accepted;
+    }
+
+    private boolean actualYashimaRayR48(DamageSource source)
+    {
+        if(!(this.level() instanceof ServerLevel server)||!this.isAlive()||EvaShutdownR30.wreck(this)
+                ||this.isFirstBattleActive()||!(source.getEntity() instanceof RamielEntity ramiel)
+                ||ramiel.level()!=server||server.getEntity(ramiel.getUUID())!=ramiel
+                ||server.getEntity(this.getUUID())!=this)return false;
+        var mission=com.projectseele.world.TvCampaignSavedData.get(server);
+        return mission.phase.equals("combat")&&mission.generationR43>0
+                &&com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(ramiel)!=null;
+    }
+
+    /** Called only after the real shield surface intercepted one accepted mission shot. */
+    public boolean receiveYashimaShieldHitR48(DamageSource source,boolean second)
+    {
+        if(!actualYashimaRayR48(source)||!EvaShieldRigR47.equipped(this)
+                ||!(com.projectseele.world.TvMissionEquipmentR45.shieldLoanAuthorizedR48(this)
+                   ||com.projectseele.world.EquipmentVaultsR47.physicalShieldLoanAuthorizedR48(this)))return false;
+        float before=getHealth();
+        entityData.set(DATA_AT_ON,false);entityData.set(DATA_AT_ENERGY,0F);
+        getPersistentData().putBoolean("R48YashimaFieldBurnout",true);
+        if(second||before<=getMaxHealth()*.5F)EvaShutdownR30.fail(this);
+        else setHealth(before-getMaxHealth()*.5F);
+        ProjectSeele.LOGGER.info("Yashima shield impact: eva={} second={} health={} -> {}",getUUID(),second,before,getHealth());
+        return true;
+    }
+
+    /** An exposed hull is disabled, retaining its original entity and cockpit occupants. */
+    public boolean receiveUnshieldedYashimaBeamR48(DamageSource source)
+    {
+        if(!actualYashimaRayR48(source))return false;
+        entityData.set(DATA_AT_ON,false);entityData.set(DATA_AT_ENERGY,0F);
+        getPersistentData().putBoolean("R48YashimaFieldBurnout",true);
+        EvaShutdownR30.fail(this);
+        ProjectSeele.LOGGER.info("Yashima exposed hull disabled: eva={}",getUUID());
+        return true;
     }
 
     private void severUmbilicalFromDamage()

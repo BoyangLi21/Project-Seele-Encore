@@ -1,6 +1,6 @@
 """Original bevelled SEELE display housing; artwork remains the owner's unchanged file."""
 from pathlib import Path
-import itertools,json,shutil
+import argparse,itertools,json,shutil
 import numpy as np
 from scipy.spatial import ConvexHull
 
@@ -24,13 +24,21 @@ def bevel_box(half,centre,bevel=.035):
             p=vertices[index];raw.extend([*(-p[0]*16,p[1]*16,p[2]*16),.5,.5,*(-normal[0],normal[1],normal[2])])
     return raw
 
-def save(path,raw,description,height):
+def save(path,raw,description,height,revision=47):
     doc=dict(format_version=1,stride=8,source=description,model_height=height*16,triangle_count=len(raw)//24,
         parts={'body':dict(pivot=[0,0,0],vertices=raw)})
     path.parent.mkdir(parents=True,exist_ok=True);path.write_text(json.dumps(doc,separators=(',',':')),encoding='utf8')
-    target=ROOT/'artifacts/rebuild_r47/assets'/path.relative_to(ROOT/'src/main/resources');target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
+    target=ROOT/f'artifacts/rebuild_r{revision}/assets'/path.relative_to(ROOT/'src/main/resources');target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(path,target)
 
 def main():
+    parser=argparse.ArgumentParser();parser.add_argument('--r48-desk',action='store_true');args=parser.parse_args()
+    if args.r48_desk:
+        desk=[]
+        desk.extend(bevel_box([2.25,.055,.8],[0,.985,0],.035))
+        desk.extend(bevel_box([.34,.43,.38],[0,.45,0],.035))
+        desk.extend(bevel_box([.92,.035,.64],[0,.035,0],.025))
+        save(OUT.with_name('seele_desk_r48.mesh.json'),desk,'Original R48 white enlarged commander conference desk',1.04,48)
+        print('R48 desk only: 4.5m wide, 1.6m deep; R47 assets preserved');return
     raw=bevel_box([1.1,2.25,.175],[0,2.43,0]);save(OUT,raw,'Original R47 bevelled SEELE communication housing',4.5)
     desk=[]
     desk.extend(bevel_box([1.65,.055,.65],[0,.985,0],.025))

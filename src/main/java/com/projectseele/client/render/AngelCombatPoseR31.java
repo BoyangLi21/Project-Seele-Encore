@@ -21,6 +21,7 @@ public final class AngelCombatPoseR31
     private static boolean handles(LivingEntity actor){return actor instanceof SachielEntity||actor instanceof ShamshelEntity;}
     static boolean needsGroundSupport(LivingEntity actor)
     {
+        if(actor instanceof ShamshelEntity shamshel)return com.projectseele.physics.ShamshelContactPoseR48.groundSupport(shamshel);
         if(com.projectseele.physics.CombatBodyDynamics.active(actor))return false;
         var beat=CombatFeelR31.beat(actor);if(!handles(actor)||beat==null||beat.kind()!=CombatFeelR31.DOWN)return false;
         if(actor.onGround())return true;
@@ -44,6 +45,15 @@ public final class AngelCombatPoseR31
         {
             if(frame.beat!=beat.start()){frame.beat=beat.start();frame.held=frame.last;}
             if(!frame.held.isEmpty()){write(model,frame.held);return;}
+        }
+        if(actor instanceof ShamshelEntity shamshel)
+        {
+            model.topLevelBones().forEach(root->visit(root,b->{
+                var r=com.projectseele.physics.ShamshelContactPoseR48.reaction(shamshel,b.getName(),
+                        new Vector3f(b.getRotX(),b.getRotY(),b.getRotZ()),partial);
+                b.setRotX(r.x);b.setRotY(r.y);b.setRotZ(r.z);
+            }));
+            frame.last=capture(model);return;
         }
         if(EvaCombatR31.holds(actor))
         {

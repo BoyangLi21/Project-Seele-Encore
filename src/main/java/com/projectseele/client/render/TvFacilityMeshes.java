@@ -38,7 +38,7 @@ public final class TvFacilityMeshes
     }
     public static void clearCache()
     {
-        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();attempted=false;EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();};
+        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();attempted=false;EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TripoMachineryR48.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();};
         if(RenderSystem.isOnRenderThread())release.run();else RenderSystem.recordRenderCall(release::run);
     }
     private static void load()
@@ -109,6 +109,7 @@ public final class TvFacilityMeshes
     }
     public static void carrier(PoseStack poses,int light,EvaUnit01Entity unit,float partial)
     {
+        if (TripoMachineryR48.carrier(poses,currentBuffers(),light,unit,partial)) return;
         float opacity=1;
         poses.pushPose();
         if(unit.recoveryRackR39())poses.translate(0,-3*(1-unit.carrierRiseProgress(partial)),0);

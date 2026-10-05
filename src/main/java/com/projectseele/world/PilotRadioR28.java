@@ -75,6 +75,20 @@ public final class PilotRadioR28
                 : StaffDialogueCatalogR24.line(profile(pilot.getAssignedVariant()), "technician", topic, player.tickCount / 600);
     }
 
+    /** Explicit short conversation; observers never alter pilot or airframe state. */
+    public static String chat(ServerPlayer player, TrainingPilotEntity pilot)
+    {
+        String state=topic(pilot);
+        if(state.equals("silent"))return "……";
+        String topic=switch(state)
+        {
+            case "standby" -> "chat_idle";
+            case "return", "returning", "disembark" -> "chat_return";
+            default -> "chat_busy";
+        };
+        return StaffDialogueCatalogR24.next(player,profile(pilot.getAssignedVariant()),"technician",topic);
+    }
+
     public static void tick(TrainingPilotEntity pilot)
     {
         if (!(pilot.level() instanceof ServerLevel level) || pilot.tickCount % 20 != 0) return;

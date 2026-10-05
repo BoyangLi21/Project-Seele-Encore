@@ -18,9 +18,9 @@ public final class ShamshelWhipMotion
     public static float smooth(float x) {return (float)CombatMotionR29.ease(x);}
     public static float envelope(float age) { return age < 0 ? 0 : smooth(age/10)*(1-smooth((age-23)/11)); }
     public static float envelope(int mode,float age){return age<0?0:smooth(age/(mode==0?10:14))*(1-smooth((age-contactEnd(mode))/(cycle(mode)-contactEnd(mode))));}
-    public static Vector3f rotation(int side, int segment, int activeSide, float age, float clock)
+    public static Vector3f rotation(int side, int segment, int activeSide, float age, double clock)
     {return rotation(side,segment,activeSide,0,age,clock);}
-    public static Vector3f rotation(int side, int segment, int activeSide,int mode,float age,float clock)
+    public static Vector3f rotation(int side, int segment, int activeSide,int mode,float age,double clock)
     {
         float idle = (float)Math.sin(clock*.055-segment*.55+side)*.025F;
         if (age < 0 || side != activeSide) return new Vector3f(idle, 0, idle*.4F);
@@ -52,7 +52,7 @@ public final class ShamshelWhipMotion
         for(int i=0;i<4;i++)
         {
             Vector3f p=pivot(side,i); points.add(new Vec3(matrix.transformPosition(new Vector3f(p))));
-            rotate(matrix,p,rotation(side,i,side,actor.sweepMode(),age,actor.tickCount+partial));
+            rotate(matrix,p,rotation(side,i,side,actor.sweepMode(),age,actor.level().getGameTime()+(double)partial));
         }
         points.add(new Vec3(matrix.transformPosition(new Vector3f(-side*65,20,-78).div(16))));
         return points;

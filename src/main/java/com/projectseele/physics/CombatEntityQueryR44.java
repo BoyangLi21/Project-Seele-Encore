@@ -24,8 +24,10 @@ public final class CombatEntityQueryR44
     public static List<LivingEntity> candidates(Level level,AABB contact,Predicate<LivingEntity> filter)
     {
         return level.getEntitiesOfClass(LivingEntity.class,originSearch(contact),entity->
-                filter.test(entity)&&(entity instanceof EvaUnit01Entity||entity instanceof SachielEntity
-                        ||entity.getBoundingBox().intersects(contact)));
+                filter.test(entity)&&(ShamshelPosedContactsR48.supports(entity)
+                        ?ShamshelPosedContactsR48.bounds(entity).intersects(contact)
+                        :entity instanceof EvaUnit01Entity||entity instanceof SachielEntity
+                            ||entity.getBoundingBox().intersects(contact)));
     }
     public static List<LivingEntity> overlap(Level level,AABB contact,Predicate<LivingEntity> filter)
     {

@@ -56,6 +56,8 @@ public final class ModBlocks
     public static final RegistryObject<Block> NERV_CRANE_GIRDER_R44=BLOCKS.register("nerv_crane_girder_r44",
             ()->new com.projectseele.world.TvCraneGirderR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(8F).noOcclusion()));
     public static final RegistryObject<Block> NERV_EDGE_RAIL=BLOCKS.register("nerv_edge_rail",()->new com.projectseele.world.FacilityEdgeRailR41(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion()));
+    public static final RegistryObject<Block> ENTRY_PLUG_BRIDGE_DECK_R48=BLOCKS.register("entry_plug_bridge_deck",()->new com.projectseele.world.EntryPlugBridgeDeckR48(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(3F).noOcclusion()));
+    public static final RegistryObject<Block> ENTRY_PLUG_BRIDGE_GUARD_R48=BLOCKS.register("entry_plug_bridge_guard",()->new com.projectseele.world.FacilityEdgeRailR41(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion(),true));
     public static final RegistryObject<Block> NERV_TV_PERSONNEL_DECK_R44=BLOCKS.register("tv_personnel_deck_r44",()->new com.projectseele.world.TvPersonnelDeckR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(3F).noOcclusion()));
     public static final RegistryObject<Block> NERV_TV_PERSONNEL_GUARD_R44=BLOCKS.register("tv_personnel_guard_r44",()->new com.projectseele.world.TvPersonnelGuardR44(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion()));
     public static final RegistryObject<Block> NERV_MACHINE_HAZARD=structuralFinish("nerv_machine_hazard");

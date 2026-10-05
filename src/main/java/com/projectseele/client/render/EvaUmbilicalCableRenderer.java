@@ -85,10 +85,13 @@ public final class EvaUmbilicalCableRenderer
             Vec3 rear = attachment.rear();
             Vec3 right = attachment.right();
             Vec3 up = attachment.up();
-            Vec3 collarOuter = plugTail.add(rear.scale(0.35D));
+            boolean suppliedConnector=com.projectseele.entity.EvaPowerPortsR48.of(unit)!=null;
+            Vec3 collarOuter = suppliedConnector?plugTail:plugTail.add(rear.scale(0.35D));
 
             // Machined bayonet collar, tapered strain relief and separate
             // locking dogs share the final torso socket frame in every pose.
+            if(!suppliedConnector)
+            {
             sleeve(pose,consumer,armourMount.subtract(rear.scale(.12)),armourMount.add(rear.scale(.40)),right,up,.85F,.85F,.43F,.47F,.44F);
             sleeve(pose,consumer,armourMount.add(rear.scale(.40)),plugTail.subtract(rear.scale(.18)),right,up,.70F,.56F,.19F,.24F,.22F);
             sleeve(pose,consumer,plugTail.subtract(rear.scale(.20)),collarOuter,right,up,.60F,.32F,.58F,.37F,.09F);
@@ -103,9 +106,10 @@ public final class EvaUmbilicalCableRenderer
                 drawOrientedBox(pose,consumer,at,right,up,rear,.18F,.34F,.5F,.48F,.52F,.48F,1);
                 drawOrientedBox(pose,consumer,at.add(up.scale(.38)),right,up,rear,.12F,.065F,.24F,.12F,.75F,.40F,1);
             }
+            }
 
             var route=new java.util.ArrayList<Vec3>();route.add(collarOuter);
-            Vec3 exit=collarOuter.add(rear.scale(2.2));route.add(exit);
+            Vec3 exit=collarOuter.add((suppliedConnector?attachment.cableDirection():rear).scale(2.2));route.add(exit);
             var hull=unit.getBoundingBox().inflate(3);
             if(!rack&&hull.clip(exit,pylon).isPresent())
             {

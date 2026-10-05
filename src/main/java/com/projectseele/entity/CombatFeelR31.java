@@ -26,7 +26,7 @@ public final class CombatFeelR31
     public static boolean hitPaused(LivingEntity e){var b=beat(e);return b!=null&&age(e,0)<b.stopTicks;}
     public static void clear(LivingEntity e){BEATS.remove(e);POISE.remove(e);POISE_AT.remove(e);PHASES.remove(e);com.projectseele.physics.CombatBodyDynamics.cancel(e);}
     public static float frozenPhase(EvaUnit01Entity e){return PHASES.getOrDefault(e,e.combatPhaseR31());}
-    public static void receive(LivingEntity e,Beat beat,float phase){CombatReactionsR36.capture(e,beat);BEATS.put(e,beat);PHASES.put(e,phase);}
+    public static void receive(LivingEntity e,Beat beat,float phase){CombatReactionsR36.capture(e,beat);com.projectseele.physics.ShamshelPosedContactsR48.captureBeforeReaction(e);BEATS.put(e,beat);PHASES.put(e,phase);}
     public static void send(LivingEntity e,int kind,Vec3 direction,float strength,int duration,int stop)
     {
         if(!(e.level() instanceof ServerLevel))return;
@@ -34,7 +34,7 @@ public final class CombatFeelR31
         var current=beat(e);
         if(kind==CONTACT&&current!=null&&current.kind()!=CONTACT&&age(e,0)<current.duration())return;
         if(current!=null&&(current.kind==THROWN&&kind!=THROWN&&kind!=DOWN||current.kind==DOWN&&(kind==FLINCH||kind==STAGGER||kind==DOWN&&age(e,0)<current.duration-8)))return;
-        var beat=new Beat(kind,e.level().getGameTime(),duration,direction,strength,stop);CombatReactionsR36.capture(e,beat);BEATS.put(e,beat);
+        var beat=new Beat(kind,e.level().getGameTime(),duration,direction,strength,stop);CombatReactionsR36.capture(e,beat);com.projectseele.physics.ShamshelPosedContactsR48.captureBeforeReaction(e);BEATS.put(e,beat);
         float phase=e instanceof EvaUnit01Entity eva?eva.combatPhaseR31():0;PHASES.put(e,phase);
         if((kind==DOWN||kind==THROWN)&&e instanceof EvaPrototypeEntity un)un.stopUNFlight();
         SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(()->e),new ClientboundCombatFeelR31(e.getId(),beat,phase));
@@ -127,7 +127,7 @@ public final class CombatFeelR31
                 level.sendParticles(net.minecraft.core.particles.ParticleTypes.POOF,e.getX(),e.getY()+1,e.getZ(),28,6,.6,6,.15);
                 level.playSound(null,e.blockPosition(),com.projectseele.registry.ModSounds.EVA_IMPACT.get(),net.minecraft.sounds.SoundSource.HOSTILE,6,.62F);
             }
-            else BEATS.put(e,new Beat(DOWN,e.level().getGameTime(),46,b.direction.normalize(),1.2F,2));
+            else {com.projectseele.physics.ShamshelPosedContactsR48.captureBeforeReaction(e);BEATS.put(e,new Beat(DOWN,e.level().getGameTime(),46,b.direction.normalize(),1.2F,2));}
         }
         return true;
     }

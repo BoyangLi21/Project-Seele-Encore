@@ -10,6 +10,7 @@ public final class EvaHandsR41
 {
     public static void apply(EvaUnit01Entity eva, EvaBodyPose.Sample body, float partial)
     {
+        if(EvaTripoHandsR48.enabled(eva,body)){EvaTripoHandsR48.apply(eva,body,partial);return;}
         if(!body.rig.containsKey("finger_index_axis_l")||!body.rig.containsKey("finger_index_axis_r"))return;
         float stance=eva.rifleStanceLevel(partial);
         boolean rifle=eva.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE;

@@ -178,12 +178,26 @@ public final class CombatDamageTargetsR44
             double current=from.distanceToSqr(contact.get());
             if(current<distance){distance=current;first=new EntityHitResult(target,contact.get());}
         }
+        if(level instanceof net.minecraft.server.level.ServerLevel server)
+        {
+            var shield=com.projectseele.world.ShieldCoverR48.nearest(server,from,to,attacker);
+            if(shield.isPresent()&&from.distanceToSqr(shield.get().point())<distance)
+                first=new EntityHitResult(shield.get().holder(),shield.get().point());
+        }
         return first;
     }
     public static boolean hurt(Entity target,DamageSource source,float amount,Vec3 point,Vec3 direction,Weapon weapon)
+    {return hurt(target,source,amount,point,direction,weapon,source.getSourcePosition());}
+    public static boolean hurt(Entity target,DamageSource source,float amount,Vec3 point,Vec3 direction,Weapon weapon,Vec3 actualOrigin)
     {
         target=parent(target);
-        if(target instanceof LivingEntity living)return com.projectseele.event.EvaHitFeedback.hurt(living,source,amount,point,direction);
+        if(target instanceof LivingEntity living)
+        {
+            DamageSource incoming=source;
+            return com.projectseele.world.ShieldCoverR48.hurtDirect(living,incoming,amount,actualOrigin,point,
+                    ()->com.projectseele.event.EvaHitFeedback.hurt(living,incoming,amount,point,direction));
+        }
+        if(com.projectseele.world.ShieldCoverR48.blocksDirect(target,source,actualOrigin,point))return false;
         if(SbwStaticShapesR24.vehicle(target))
         {
             String id=switch(weapon){case CONTACT->"vehicle_strike";case PROJECTILE->"projectile_hit";case LASER->"laser_static";};

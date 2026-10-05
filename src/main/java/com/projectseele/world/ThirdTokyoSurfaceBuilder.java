@@ -188,6 +188,7 @@ public final class ThirdTokyoSurfaceBuilder
     public static void ensureLaunchControlQuarter(ServerLevel level,
                                                   BlockPos origin)
     {
+        if(CityLegacyOwnershipR48.inhibits(level,origin,"ThirdTokyoSurfaceBuilder.ensureLaunchControlQuarter"))return;
         if(BattlefieldR21.concealed(level))return;
         for (int x : new int[] {-40, 40})
         {
@@ -371,6 +372,7 @@ public final class ThirdTokyoSurfaceBuilder
 
     public static void refineTvFoundation(ServerLevel level, BlockPos origin)
     {
+        if(CityLegacyOwnershipR48.inhibits(level,origin,"ThirdTokyoSurfaceBuilder.refineTvFoundation"))return;
         if (!TvWorldPreviewTerrain.active(level)) throw new IllegalArgumentException("TV preview only");
         for (int depth = 1; depth <= 6; depth++)
             for (int span = -FOUNDATION_HALF_SIZE; span <= FOUNDATION_HALF_SIZE; span++)
@@ -1405,6 +1407,7 @@ public final class ThirdTokyoSurfaceBuilder
     /** Migrates the two old weatherable audit cores without rebuilding Tokyo-3. */
     public static void repairSubstationCores(ServerLevel level, BlockPos origin)
     {
+        if(CityLegacyOwnershipR48.inhibits(level,origin,"ThirdTokyoSurfaceBuilder.repairSubstationCores"))return;
         for (BlockPos core : new BlockPos[] {
                 origin.offset(0, 1, -80), origin.offset(80, 1, 0)})
         {
@@ -1573,6 +1576,7 @@ public final class ThirdTokyoSurfaceBuilder
                                             int gridX, int gridZ,
                                             boolean restoreGrass)
     {
+        if(CityLegacyOwnershipR48.inhibits(level,origin,"ThirdTokyoSurfaceBuilder.removeArmouredTower"))return;
         BlockPos centre = origin.offset(gridX, 0, gridZ);
         int height = towerHeight(gridX, gridZ) + 3;
         clearPrism(level, centre, LOT_HALF_SIZE, height, restoreGrass);
@@ -1583,6 +1587,7 @@ public final class ThirdTokyoSurfaceBuilder
                                              int gridX, int gridZ,
                                              boolean restoreGrass)
     {
+        if(CityLegacyOwnershipR48.inhibits(level,origin,"ThirdTokyoSurfaceBuilder.removeOuterWardTower"))return;
         BlockPos centre = origin.offset(gridX, 0, gridZ);
         int height = outerWardHeight(gridX, gridZ) + 2;
         clearPrism(level, centre, 9, height, restoreGrass);
@@ -1593,6 +1598,7 @@ public final class ThirdTokyoSurfaceBuilder
                                         int gridX, int gridZ,
                                         boolean restoreGrass)
     {
+        if(CityLegacyOwnershipR48.inhibits(level,origin,"ThirdTokyoSurfaceBuilder.removePowerPylon"))return;
         BlockPos centre = origin.offset(gridX, 0, gridZ);
         clearPrism(level, centre, 5, 29, restoreGrass);
     }

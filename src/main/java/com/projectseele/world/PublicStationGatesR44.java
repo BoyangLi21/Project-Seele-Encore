@@ -118,6 +118,7 @@ public final class PublicStationGatesR44
     public static boolean collision(ServerLevel level, BlockPos position,
                                     BlockState state, Entity actor)
     {
+        if (SecureStationGateR48.collision(level, position, state, actor)) return true;
         if (!owned(level, position, state))
         {
             return false;
@@ -145,6 +146,7 @@ public final class PublicStationGatesR44
 
     public static boolean scheduled(ServerLevel level, BlockPos position, BlockState state)
     {
+        if (SecureStationGateR48.scheduled(level, position, state)) return true;
         if (!owned(level, position, state))
         {
             return false;
@@ -251,7 +253,7 @@ public final class PublicStationGatesR44
         }
     }
 
-    private static BlockState withOpen(BlockState state, String value)
+    static BlockState withOpen(BlockState state, String value)
     {
         for (Property<?> property : state.getProperties())
         {

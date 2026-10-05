@@ -105,12 +105,34 @@ public final class NervPilotCombatR30
             }
             return;
         }
+        var selectedEquipment=StaffOperationsR48.npcSelection(l,eva,pilot);
+        if(selectedEquipment!=null)
+        {
+            String blocker=StaffOperationsR48.acquisitionBlocker(l,selectedEquipment,eva,pilot);
+            if(!blocker.isEmpty()){eva.stopAutonomousR30();d.notice=blocker;return;}
+            var station=StaffOperationsR48.selectedWell(l,selectedEquipment);
+            if(station==null){eva.stopAutonomousR30();d.notice="原专用武器井信号尚未接通，未选择替代武器井。";return;}
+            retain(l,station.blockPosition());
+            if(StaffOperationsR48.acquired(l,selectedEquipment,eva,station))
+            {eva.autonomousWeaponR30(pilot,selectedEquipment.payload());say(owner,pilot,b,"weapon_acquired");return;}
+            if(!station.isStocked()){eva.stopAutonomousR30();d.notice="原专用武器井空载，等待原装备归还。";return;}
+            if(!station.isReadyAndStocked())station.deploy();
+            if(eva.position().subtract(station.position()).horizontalDistance()>21)
+            {move(l,eva,pilot,b,station.position(),null,false);say(owner,pilot,b,"weapon_approach");return;}
+            eva.autonomousDriveR30(pilot,Vec3.ZERO,station.position().add(0,35,0),false);
+            if(station.issueToAssignedPilotR30(pilot,eva)&&StaffOperationsR48.acquired(l,selectedEquipment,eva,station))
+            {eva.autonomousWeaponR30(pilot,selectedEquipment.payload());say(owner,pilot,b,"weapon_acquired");}
+            return;
+        }
+        int selectedPayloadR48=StaffOperationsR48.carriesSelectedR48(l,eva,pilot)
+                ?ArmedSortieSavedDataR48.get(l).selection(sortie.unit).payload():-1;
+        if(selectedPayloadR48>=0)eva.autonomousWeaponR30(pilot,selectedPayloadR48);
         LivingEntity angel=d.angel!=null&&l.getEntity(d.angel) instanceof LivingEntity target?target:null;
         Vec3 goal=TvEncounterRulesR45.handles(d.active)?TvEncounterRulesR45.unitApproach(l,d,sortie.unit):TvCampaignDirector.approachPointR30(l);
         if(goal==null){eva.stopAutonomousR30();return;}
         if(d.active.equals("ramiel"))
         {
-            boolean held=sortie.unit==0?TvMissionEquipmentR45.shieldAuthorized(eva):sortie.unit==1?TvMissionEquipmentR45.cannonAuthorized(eva):true;
+            boolean held=sortie.unit==0?TvMissionEquipmentR45.shieldAuthorized(eva)||StaffOperationsR48.carriesSelectedR48(l,eva,pilot):sortie.unit==1?TvMissionEquipmentR45.cannonAuthorized(eva):true;
             if(!held)
             {
                 var depot=TvMissionEquipmentR45.nearestPhysicalCargo(l,eva);
@@ -183,7 +205,7 @@ public final class NervPilotCombatR30
         }
         boolean rifle=(eva.getArmamentMask()&(1<<EvaUnit01Entity.WEAPON_RIFLE))!=0;
         boolean shield=angel instanceof Angel a&&a.getAtField()>0;
-        if(rifle&&range>48&&(!shield||b.gunTicks<90))
+        if(selectedPayloadR48<0&&rifle&&range>48&&(!shield||b.gunTicks<90))
         {
             eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_RIFLE);b.gunTicks++;
             Vec3 direction=range>145?toward:toward.yRot((b.age/100%2==0?1:-1)*(float)Math.PI*.5F).scale(.38);
@@ -191,13 +213,15 @@ public final class NervPilotCombatR30
         }
         int cycle=(b.age/180)%3;
         boolean sword=sortie.unit==2&&(eva.getArmamentMask()&(1<<EvaUnit01Entity.WEAPON_SWORD_R45))!=0;
-        int weapon=sword?EvaUnit01Entity.WEAPON_SWORD_R45:shield||cycle==0?EvaUnit01Entity.WEAPON_KNIFE:EvaUnit01Entity.WEAPON_FISTS;
+        int weapon=selectedPayloadR48>=0?selectedPayloadR48:sword?EvaUnit01Entity.WEAPON_SWORD_R45:shield||cycle==0?EvaUnit01Entity.WEAPON_KNIFE:EvaUnit01Entity.WEAPON_FISTS;
         eva.autonomousWeaponR30(pilot,weapon);
         if(range>30){Vec3 flank=angel.position();
             var lead=angel instanceof net.minecraft.world.entity.Mob mob?mob.getTarget():null;if(lead!=eva&&lead!=null){Vec3 radial=eva.position().subtract(flank).multiply(1,0,1).normalize().yRot((sortie.unit%2==0?1:-1)*.6F);flank=flank.add(radial.scale(25));}
             move(l,eva,pilot,b,flank,angel,true);say(owner,pilot,b,"close_in");return;}
         Vec3 circle=range<18?toward.scale(-.6):Vec3.ZERO;
         eva.autonomousDriveR30(pilot,steer(l,eva,b,circle),aim,false);
+        if(weapon==EvaUnit01Entity.WEAPON_SHIELD_R45)
+        {eva.autonomousShieldBraceR47(pilot,true);say(owner,pilot,b,"melee");return;}
         if(b.age%12==0)eva.autonomousAttackR30(pilot,sword?0:weapon==EvaUnit01Entity.WEAPON_KNIFE?(b.age/48)%2:cycle==1?0:(b.age/48)%2==0?1:2);
         say(owner,pilot,b,"melee");
     }

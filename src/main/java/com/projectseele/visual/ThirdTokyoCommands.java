@@ -269,7 +269,8 @@ public final class ThirdTokyoCommands
         BlockPos origin = findOrigin(player);
         Status status = Tokyo3RetractionDirector.status(player.serverLevel(), origin);
         source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                "Tokyo-3 towers: %s depth=%d/%d target=%d",
+                "%s 城市状态=%s，事务终点=%d/%d，目标终点=%d（终点编号不代表实际米数）。",
+                status.motionReport(),
                 status.phase(), status.depth(), status.maximumDepth(),
                 status.targetDepth())), false);
         return 1;

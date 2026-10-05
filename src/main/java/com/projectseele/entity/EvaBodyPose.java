@@ -257,6 +257,28 @@ public final class EvaBodyPose
         }
         return result;
     }
+    /** Two complete foot projections in one supplied shared pose/world frame. */
+    public static List<net.minecraft.world.phys.AABB> posedFootSupportHullsR48(EvaUnit01Entity eva,Sample pose,Matrix4f world)
+    {
+        if(data==null)reload();var result=new ArrayList<net.minecraft.world.phys.AABB>();
+        var support=data.rigSupport().getOrDefault(rigKey(eva),data.support());
+        for(String name:List.of("foot_l","foot_r"))
+        {
+            var vertices=support.get(name);
+            if(vertices==null||vertices.length==0||!pose.rig.containsKey(name))return List.of();
+            var matrix=new Matrix4f(world).mul(pose.matrix(name));net.minecraft.world.phys.AABB box=null;
+            for(var vertex:vertices)
+            {
+                var p=matrix.transformPosition(new Vector3f(vertex));
+                if(!Float.isFinite(p.x)||!Float.isFinite(p.y)||!Float.isFinite(p.z))return List.of();
+                var point=new net.minecraft.world.phys.Vec3(p.x,p.y,p.z);
+                var cell=new net.minecraft.world.phys.AABB(point,point);box=box==null?cell:box.minmax(cell);
+            }
+            if(box==null||box.getXsize()<=0||box.getZsize()<=0)return List.of();
+            result.add(box);
+        }
+        return List.copyOf(result);
+    }
     /** Individual posed parts, in model-local metres; never a standing bounding box for a fallen body. */
     public static List<net.minecraft.world.phys.AABB> posedCarrierHulls(EvaUnit01Entity eva, Sample pose)
     {
@@ -389,6 +411,17 @@ public final class EvaBodyPose
                 return mixed;
             }
             return frozen;
+        }
+        if(!entity.isExperimentalUnit()&&entity.isNervLogisticsLocked()
+                &&!entity.isFirstBattleActive()&&!entity.isCrucified())
+        {
+            // Match EvaLockedCagePoseR44: a bolted airframe does not sample an
+            // idle/carry clip underneath its capsule and external-power ports.
+            var locked=new Sample(d.rigs().get(variant));
+            for(var bone:locked.rig.values())locked.rotations.put(bone.name(),new Quaternionf(bone.bindRotation()));
+            var head=locked.rotations.get("head");
+            if(head!=null)head.rotationX(.72F*EvaDorsalMechanism.bow(entity));
+            locked.dirty();return locked;
         }
         float time=((entity.level().getGameTime()%24000)+partial)/20;
         var idleClip=d.combatClips().getOrDefault(variant,Map.of()).getOrDefault("idle",d.clips().get("idle"));
@@ -574,7 +607,9 @@ public final class EvaBodyPose
         body=EvaWeaponHandlingR45.apply(entity,body,partial);
         if(!EvaWeaponHandlingR45.active(entity))EvaAnatomicalHandsR45.attachKnife(entity,body);
         EvaAnatomicalHandsR45.attachSwordR45(entity,body);
+        EvaShieldRigR47.applyCarryR48(entity,body);
         EvaShieldRigR47.attach(entity,body);
+        EvaTripoHandsR48.apply(entity,body,partial);
         EvaCombatSupportR33.rememberFinalFeetR44(entity,body,partial);
         com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;
@@ -587,7 +622,10 @@ public final class EvaBodyPose
         support=support*support*(3-2*support);if(support<=0)return;
         var matrix=body.matrix("torso_upper");var up=matrix.transformDirection(new Vector3f(0,1,0)).normalize();
         float elevation=(float)Math.asin(Mth.clamp(up.y,-1,1));
-        float minimum=12*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
+        // A twelve-degree chest left almost the entire prone look-up angle to
+        // the neck, swinging the helmet through its dorsal collar. Support the
+        // upper trunk first; the same chest drives both arm IK and gun optics.
+        float minimum=28*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
         var headWorld=body.matrix("head").getUnnormalizedRotation(new Quaternionf()).normalize();
         float horizontal=(float)Math.hypot(up.x,up.z);if(horizontal<1e-6F)return;
         float target=Mth.lerp(support,elevation,minimum),radius=(float)Math.cos(target);

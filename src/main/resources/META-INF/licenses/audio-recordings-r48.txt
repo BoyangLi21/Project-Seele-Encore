@@ -1,0 +1,18 @@
+R48 hydraulic launch and surface bulkhead recordings
+CC0 1.0: https://creativecommons.org/publicdomain/zero/1.0/
+HQ MP3 previews, not original WAV downloads. Mechanical-only edits/layering.
+No official anime recordings or character voice audio.
+
+kr15h: DikaiPumpSystem-2023-06-02a.wav
+https://freesound.org/people/kr15h/sounds/689263/
+lolamadeus: Large Metal Lift Door Opening.wav
+https://freesound.org/people/lolamadeus/sounds/161228/
+newagesoup: long-metal-hit-01.wav
+https://freesound.org/people/newagesoup/sounds/337832/
+Original shed-door recording by EpicWizard:
+https://freesound.org/people/EpicWizard/sounds/264889/
+Philipp Grzemba / Sheyvan: Metal Impact Container 1 5.wav
+https://freesound.org/people/Sheyvan/sounds/569413/
+
+Charge: pump. Release/endstop: steel and container.
+Acceleration: goods-lift and pump. Surface slide/heavy: goods-lift recording.

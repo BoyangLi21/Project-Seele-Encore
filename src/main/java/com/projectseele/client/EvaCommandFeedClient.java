@@ -183,6 +183,7 @@ public final class EvaCommandFeedClient
     private static int cityDepth;
     private static int cityTargetDepth;
     private static int cityMaximumDepth = 1;
+    private static float cityPhysicalRetractionFraction;
     private static String armamentState = "OFFLINE";
     private static boolean armamentStocked;
     private static int armamentLiftPercent;
@@ -486,6 +487,9 @@ public final class EvaCommandFeedClient
     public static void resetConnectionState()
     {
         captureDemanded = false;
+        cityPhysicalRetractionFraction = 0;
+        cityPhase = "STANDBY"; cityDepth = cityTargetDepth = 0; cityMaximumDepth = 1;
+        cityTextureDirty = true;
         CONNECTION_GENERATION.incrementAndGet();
         captureLevel = null;
         captureEvaId = Integer.MIN_VALUE;
@@ -794,6 +798,7 @@ public final class EvaCommandFeedClient
     public static void setPilotStatus(
             ClientboundPilotStatusPacket.Unit[] units,
             String phase, int depth, int targetDepth, int maximumDepth,
+            float physicalRetractionFraction,
             String towerState, boolean towerStocked, int towerLiftPercent)
     {
         pilotStatus = units;
@@ -802,14 +807,18 @@ public final class EvaCommandFeedClient
         armamentLiftPercent = Mth.clamp(towerLiftPercent, 0, 100);
         String safePhase = phase == null ? "UNKNOWN" : phase;
         int safeMaximum = Math.max(1, maximumDepth);
+        float safePhysicalFraction = Float.isFinite(physicalRetractionFraction) && physicalRetractionFraction >= 0
+                ? Mth.clamp(physicalRetractionFraction, 0, 1) : cityPhysicalRetractionFraction;
         if (!safePhase.equals(cityPhase) || cityDepth != depth
                 || cityTargetDepth != targetDepth
-                || cityMaximumDepth != safeMaximum)
+                || cityMaximumDepth != safeMaximum
+                || Float.compare(cityPhysicalRetractionFraction, safePhysicalFraction) != 0)
         {
             cityPhase = safePhase;
             cityDepth = Math.max(0, depth);
             cityTargetDepth = Math.max(0, targetDepth);
             cityMaximumDepth = safeMaximum;
+            cityPhysicalRetractionFraction = safePhysicalFraction;
             cityTextureDirty = true;
         }
     }
@@ -1078,8 +1087,7 @@ public final class EvaCommandFeedClient
             }
         }
 
-        float depthFraction = Math.min(1.0F,
-                cityDepth / (float) Math.max(1, cityMaximumDepth));
+        float depthFraction = cityPhysicalRetractionFraction;
         float targetFraction = Math.min(1.0F,
                 cityTargetDepth / (float) Math.max(1, cityMaximumDepth));
         int deckY = surfaceY + 5

@@ -45,6 +45,7 @@ public final class UNFlightPoseR29
     public static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva,BakedGeoModel model,float partial,Matrix4f root)
     {
         if(!(eva instanceof EvaPrototypeEntity un)||un.getUNSerial()!=1)return EvaMotionEngineV2.BoneWrites.empty();
+        boolean measured=model.getBone("tripo_thruster_measured_r48").isPresent();
         if(eva.isNervLogisticsLocked()||eva.hasActiveCarrierMotion()||eva.isLaunchSequenceActive())
         {POSES.remove(un);JETS.remove(un);return stowNozzles(model,65);}
         long now=System.nanoTime();var old=POSES.get(un);float target=un.isUNFlying()?1:0;
@@ -61,15 +62,17 @@ public final class UNFlightPoseR29
                 float goal=bind.getRotX()+(float)Math.toRadians(entry.getValue());bone.setRotX(bone.getRotX()+(goal-bone.getRotX())*weight);bone.setRotY(bone.getRotY()+(bind.getRotY()-bone.getRotY())*weight);bone.setRotZ(bone.getRotZ()+(bind.getRotZ()-bone.getRotZ())*weight);changed.add(name);
             }
             var shin=model.getBone("shin_"+side).orElse(null);if(shin!=null){EvaRigTransforms.hinge(shin,EvaRigTransforms.knee(shin));positions.add("shin_"+side);}
-            var nozzle=model.getBone("r30_thruster_"+side).orElse(null);if(nozzle!=null){nozzle.setRotX((float)Math.toRadians(gimbal));nozzle.setRotY(0);nozzle.setRotZ(0);changed.add(nozzle.getName());}
+            var nozzle=model.getBone("r30_thruster_"+side).orElse(null);if(nozzle!=null){nozzle.setRotX(measured?0:(float)Math.toRadians(gimbal));nozzle.setRotY(0);nozzle.setRotZ(0);changed.add(nozzle.getName());}
         }
         if(un.isUNFlying()&&root!=null)
         {
             var left=model.getBone("r30_thruster_l").orElse(null);var right=model.getBone("r30_thruster_r").orElse(null);
             if(left!=null&&right!=null)
             {
-                var a=EvaRigTransforms.point(left,EvaRigTransforms.pivot(left).add(0,0,6.25F/16),root);var b=EvaRigTransforms.point(right,EvaRigTransforms.pivot(right).add(0,0,6.25F/16),root);
-                var da=new Matrix4f(root).mul(EvaRigTransforms.model(left)).transformDirection(new Vector3f(0,0,1)).normalize();var db=new Matrix4f(root).mul(EvaRigTransforms.model(right)).transformDirection(new Vector3f(0,0,1)).normalize();
+                float tail=measured?0:6.25F/16;
+                var a=EvaRigTransforms.point(left,EvaRigTransforms.pivot(left).add(0,0,tail),root);var b=EvaRigTransforms.point(right,EvaRigTransforms.pivot(right).add(0,0,tail),root);
+                Vector3f direction=measured?new Vector3f(0,-(float)Math.sin(Math.toRadians(gimbal)),(float)Math.cos(Math.toRadians(gimbal))):new Vector3f(0,0,1);
+                var da=new Matrix4f(root).mul(EvaRigTransforms.model(left)).transformDirection(new Vector3f(direction)).normalize();var db=new Matrix4f(root).mul(EvaRigTransforms.model(right)).transformDirection(new Vector3f(direction)).normalize();
                 JETS.put(un,new Jets(new Vec3(a.x,a.y,a.z),new Vec3(b.x,b.y,b.z),new Vec3(da.x,da.y,da.z),new Vec3(db.x,db.y,db.z),now));
             }
             else
@@ -83,7 +86,8 @@ public final class UNFlightPoseR29
     private static EvaMotionEngineV2.BoneWrites stowNozzles(BakedGeoModel model,float degrees)
     {
         Set<String> changed=new HashSet<>();
-        for(String side:List.of("l","r"))model.getBone("r30_thruster_"+side).ifPresent(b->{b.setRotX((float)Math.toRadians(degrees));b.setRotY(0);b.setRotZ(0);changed.add(b.getName());});
+        boolean measured=model.getBone("tripo_thruster_measured_r48").isPresent();
+        for(String side:List.of("l","r"))model.getBone("r30_thruster_"+side).ifPresent(b->{b.setRotX(measured?0:(float)Math.toRadians(degrees));b.setRotY(0);b.setRotZ(0);changed.add(b.getName());});
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.of(),"MOTION_ENGINE_LIVE_ACTION");
     }
     @SubscribeEvent public static void render(RenderLevelStageEvent event)

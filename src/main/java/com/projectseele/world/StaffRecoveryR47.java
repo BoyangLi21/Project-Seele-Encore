@@ -166,6 +166,16 @@ public final class StaffRecoveryR47
                 if (eva.isFirstBattleActive() || eva.isLaunchSequenceActive() || eva.isBerserk())
                 { stage(state, job, "WAIT_SAFE_STATE"); continue; }
                 if (NervAirLiftR30.ownsMotion(eva)) { stage(state, job, "AIRLIFT"); continue; }
+                if(UndergroundSortieR48.recoveringR48(level,job.unit,eva))
+                {stage(state,job,"UNDERGROUND_RECOVERY");continue;}
+                if(UndergroundSortieR48.atDeployedPadR48(level,job.unit,eva))
+                {
+                    var reply=UndergroundSortieR48.requestRecoveryR48(owner,job.unit);
+                    boolean firstWait=!job.stage.equals("WAIT_UNDERGROUND_INTERLOCK");
+                    stage(state,job,reply.accepted()?"UNDERGROUND_RECOVERY":"WAIT_UNDERGROUND_INTERLOCK");
+                    if(!reply.accepted()&&firstWait)NervStaffDialogue.say(owner,"地下回收联络",reply.message());
+                    continue;
+                }
                 boolean atHead = NervAirLiftR30.waitingAtHead(eva)
                         || eva.position().distanceTo(NervAirLiftR30.head(level, job.unit)) < 8;
                 if (!atHead)

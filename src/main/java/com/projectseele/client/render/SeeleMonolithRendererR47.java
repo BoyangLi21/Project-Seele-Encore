@@ -20,19 +20,18 @@ public final class SeeleMonolithRendererR47 extends EntityRenderer<SeeleMonolith
     private static final ResourceLocation BLACK=new ResourceLocation("minecraft","textures/block/black_concrete.png");
     private static final ResourceLocation LOGO=new ResourceLocation(ProjectSeele.MODID,"textures/entity/seele_logo_supplied_r47.png");
     private static final ResourceLocation WHITE=new ResourceLocation("minecraft","textures/block/white_concrete.png");
-    private static final ResourceLocation DESK=new ResourceLocation(ProjectSeele.MODID,"mesh/seele_desk_r47.mesh.json");
+    private static final ResourceLocation DESK=new ResourceLocation(ProjectSeele.MODID,"mesh/seele_desk_r48.mesh.json");
     public SeeleMonolithRendererR47(EntityRendererProvider.Context context){super(context);shadowRadius=0;}
-    @Override public ResourceLocation getTextureLocation(SeeleMonolithEntityR47 entity){return BLACK;}
+    @Override public ResourceLocation getTextureLocation(SeeleMonolithEntityR47 entity){return entity.number()==0?WHITE:BLACK;}
     @Override public void render(SeeleMonolithEntityR47 entity,float yaw,float partial,PoseStack poses,MultiBufferSource buffers,int light)
     {
         poses.pushPose();poses.mulPose(Axis.YP.rotationDegrees(180.0F-yaw));
         if(entity.number()==0)
         {
-            // Deliberate conference-only colour wash; its rectangle is the
-            // declared interior floor, depth tested below the separate white seat pool.
-            var wash=buffers.getBuffer(RenderType.eyes(WHITE));var base=poses.last().pose();var basis=poses.last().normal();
-            for(float[] p:new float[][]{{-16.5F,.008F,-6},{-16.5F,.008F,7},{17.5F,.008F,7},{17.5F,.008F,-6}})
-                wash.vertex(base,p[0],p[1],p[2]).color(28,8,100,255).uv(.5F,.5F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(0xF000F0).normal(basis,0,1,0).endVertex();
+            // The real room circuit owns ambient light. A full-room emissive
+            // wash would remain visible even after the operator switched it off.
+            if(entity.meetingLightsR48())
+            {
             var halo=buffers.getBuffer(RenderType.eyes(WHITE));var floor=poses.last().pose();var norm=poses.last().normal();
             for(int i=0;i<64;i++)
             {
@@ -41,13 +40,17 @@ public final class SeeleMonolithRendererR47 extends EntityRenderer<SeeleMonolith
                         {(float)Math.cos(b)*2.65F,.013F,(float)Math.sin(b)*2.65F},{0,.013F,0}})
                     halo.vertex(floor,p[0],p[1],p[2]).color(240,245,255,255).uv(.5F,.5F).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(0xF000F0).normal(norm,0,1,0).endVertex();
             }
-            LocalTriangleMeshLayer.renderStandalone(poses,buffers,DESK,BLACK,light,OverlayTexture.NO_OVERLAY);
+            }
+            LocalTriangleMeshLayer.renderStandalone(poses,buffers,DESK,WHITE,entity.meetingLightsR48()?0xF000F0:light,OverlayTexture.NO_OVERLAY);
             poses.popPose();super.render(entity,yaw,partial,poses,buffers,light);return;
         }
         LocalTriangleMeshLayer.renderStandalone(poses,buffers,MESH,BLACK,light,OverlayTexture.NO_OVERLAY);
+        if(!entity.meetingLightsR48())
+        {
         var strip=buffers.getBuffer(RenderType.eyes(WHITE));var floor=poses.last().pose();var floorNormal=poses.last().normal();
         for(float[] p:new float[][]{{-1.12F,.016F,-.46F,0,0},{-1.12F,.016F,-.32F,0,1},{1.12F,.016F,-.32F,1,1},{1.12F,.016F,-.46F,1,0}})
             strip.vertex(floor,p[0],p[1],p[2]).color(180,205,255,255).uv(p[3],p[4]).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(0xF000F0).normal(floorNormal,0,1,0).endVertex();
+        }
         // UV selection uses the original PNG; no crop/repaint changes its supplied artwork.
         if(Minecraft.getInstance().getResourceManager().getResource(LOGO).isPresent())
             quad(poses,buffers,-.77F,2.80F,.77F,4.20F,-.177F,.02F,.23F,.98F,.85F);

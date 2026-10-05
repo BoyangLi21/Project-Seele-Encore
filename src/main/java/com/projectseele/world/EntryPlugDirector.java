@@ -1111,24 +1111,22 @@ public final class EntryPlugDirector
         return true;
     }
 
-    /**
-     * On exit, extracts the same persistent capsule from the dorsal socket, so
-     * the pilot remains inside one physical entry plug for the full sortie.
-     * The suspended plug was consumed on insertion, so a fresh one is spawned
-     * for the ejection — this is not the "don't spawn a second plug for
-     * insertion" case.
-     */
     /** Same hoist path for a correctly docked capsule whose driver disconnected. */
     public static boolean extractEmptyCapsule(ServerLevel level, int variant, EvaUnit01Entity unit)
     {
         if (unit.isExperimentalUnit() || !isInsideAssignedCage(level,unit,variant) || unit.getPilotEntity()!=null) return false;
-        EntryPlugCarrierEntity plug=canonical(level,variant);
+        EntryPlugCarrierEntity plug=unit.getLockedEntryPlug();
         if(plug==null||plug.isVehicle()||plug.getLinkedEva()!=unit||unit.getLockedEntryPlug()!=plug
                 ||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_LOCKED) return false;
         RigidTransform seated=EntryPlugKinematics.lockedTransform(unit);
         if(plug.getCanonicalTransform().translation().distanceToSqr(seated.translation())>.25) return false;
-        plug.unlockFromEva();plug.setCanonicalTransform(seated);
+        String blocker=EntryPlugEjectionR48.blocker(level,variant,unit,plug,null,true);
+        if(!blocker.isEmpty())
+        {ProjectSeele.LOGGER.warn("NERV empty capsule extraction held: eva={} plug={} reason={}",unit.getUUID(),plug.getUUID(),blocker);return false;}
+        var before=EntryPlugEjectionR48.snapshot(plug);
         if(!plug.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_LOCKED,plug.getInsertionEpoch(),EntryPlugCarrierEntity.STAGE_EJECTING)) return false;
+        if(!EntryPlugEjectionR48.detach(unit,plug,before))return false;
+        plug.setCanonicalTransform(seated);
         plug.setInsertionProgress(100);remember(level,variant,plug);
         level.playSound(null,plug.blockPosition(),SoundEvents.PISTON_EXTEND,SoundSource.BLOCKS,2.4F,.58F);
         ProjectSeele.LOGGER.info("NERV empty canonical capsule extraction started: eva={} plug={}",unit.getUUID(),plug.getUUID());
@@ -1139,7 +1137,7 @@ public final class EntryPlugDirector
                                            EvaUnit01Entity unit,
                                            LivingEntity pilot)
     {
-        if (level.isClientSide)
+        if (level.isClientSide || unit == null || pilot == null || unit.level() != level || pilot.level() != level)
         {
             return false;
         }
@@ -1151,7 +1149,6 @@ public final class EntryPlugDirector
         {
             outward = new Vec3(0.0D, 0.0D, 1.0D);
         }
-        RigidTransform seated = EntryPlugKinematics.lockedTransform(unit);
         // Reuse this cage's plug. The logistics tick re-suspends a capsule as
         // soon as the previous one is consumed, so spawning a second here left
         // two plugs in the cage — and made canonical() pick the one the pilot
@@ -1167,37 +1164,42 @@ public final class EntryPlugDirector
         }
         if (plug == null)
         {
-            plug = unit.isExperimentalUnit()?null:canonical(level, variant);
-        }
-        if (plug == null)
-        {
             ProjectSeele.LOGGER.error(
                     "NERV entry-plug ejection inhibited: EVA-0{} has no resolvable canonical capsule; replacement inhibited",
                     variant);
             return false;
         }
-        if (plug.getLinkedEva() == unit)
+        String blocker = EntryPlugEjectionR48.blocker(level, variant, unit, plug, pilot, inHangar);
+        if (!blocker.isEmpty())
         {
-            plug.unlockFromEva();
+            ProjectSeele.LOGGER.warn("NERV entry-plug ejection held without detaching: eva={} plug={} pilot={} stage={} epoch={} launch={} reason={}",
+                    unit.getUUID(), plug.getUUID(), pilot.getUUID(), plug.getInsertionStage(), plug.getInsertionEpoch(), unit.getLaunchPhase(), blocker);
+            return false;
         }
-        plug.setCanonicalTransform(seated);
-        if (pilot.getVehicle() != plug)
+        RigidTransform seated = plug.getCanonicalTransform();
+        int epoch = plug.getInsertionEpoch();
+        Vec3 escape = null, landing = null;
+        if (!inHangar)
         {
-            pilot.stopRiding();
-            if (plug.isVehicle() || !plug.boardPassenger(pilot))
+            Vec3 mouth = socket.add(outward.scale(EvaScale.ENTRY_PLUG_LENGTH * 0.54D))
+                    .add(0.0D, EvaScale.ENTRY_PLUG_LENGTH * 0.12D, 0.0D);
+            escape = mouth.add(outward.scale(12.0D)).add(0.0D, 9.0D, 0.0D);
+            Vec3 probe = unit.position().add(outward.scale(EvaScale.ENTRY_PLUG_LENGTH + 12.0D));
+            landing = findFieldLanding(level, probe, unit.getY(), seated);
+            if (landing == null || !fieldEjectionRouteClear(level, unit, plug, seated, escape, landing))
             {
-                ProjectSeele.LOGGER.error(
-                        "NERV entry-plug extraction refused occupied capsule: eva={} plug={}",
-                        unit.getStringUUID(), plug.getStringUUID());
+                ProjectSeele.LOGGER.warn("NERV field ejection held without detaching: eva={} plug={} reason=no_loaded_safe_landing_or_sweep",unit.getUUID(),plug.getUUID());
                 return false;
             }
         }
+        if (plug.getInsertionStage() != EntryPlugCarrierEntity.STAGE_LOCKED || plug.getInsertionEpoch() != epoch) return false;
+        var before = EntryPlugEjectionR48.snapshot(plug);
         if (inHangar)
         {
             // Play the insertion path backwards under the wet-cage hoist.
             if (!plug.transitionInsertionStage(
                     EntryPlugCarrierEntity.STAGE_LOCKED,
-                    plug.getInsertionEpoch(),
+                    epoch,
                     EntryPlugCarrierEntity.STAGE_EJECTING))
             {
                 ProjectSeele.LOGGER.error(
@@ -1206,8 +1208,11 @@ public final class EntryPlugDirector
                         plug.getInsertionStage(), plug.getInsertionEpoch());
                 return false;
             }
+            if (!EntryPlugEjectionR48.detach(unit,plug,before)) return false;
+            if (unit instanceof com.projectseele.entity.EvaPrototypeEntity un && plug.isIndependentUNPlug()) plug.assignIndependentEva(un);
+            plug.setCanonicalTransform(seated);
             plug.setInsertionProgress(100);
-            remember(level, variant, plug);
+            if (!plug.isIndependentUNPlug()) remember(level, variant, plug);
             level.playSound(null, plug.blockPosition(),
                     SoundEvents.PISTON_EXTEND, SoundSource.BLOCKS,
                     2.4F, 0.58F);
@@ -1217,14 +1222,6 @@ public final class EntryPlugDirector
         }
         else
         {
-            Vec3 mouth = socket.add(outward.scale(
-                            EvaScale.ENTRY_PLUG_LENGTH * 0.54D))
-                    .add(0.0D, EvaScale.ENTRY_PLUG_LENGTH * 0.12D, 0.0D);
-            Vec3 escape = mouth.add(outward.scale(12.0D))
-                    .add(0.0D, 9.0D, 0.0D);
-            Vec3 landingProbe = unit.position().add(outward.scale(
-                    EvaScale.ENTRY_PLUG_LENGTH + 12.0D));
-            Vec3 landing = findFieldLanding(level, landingProbe, unit.getY());
             if (!plug.beginFieldEjection(
                     seated.translation(), escape, landing))
             {
@@ -1234,6 +1231,9 @@ public final class EntryPlugDirector
                         plug.getInsertionStage(), plug.getInsertionEpoch());
                 return false;
             }
+            if (!EntryPlugEjectionR48.detach(unit,plug,before)) return false;
+            if (unit instanceof com.projectseele.entity.EvaPrototypeEntity un && plug.isIndependentUNPlug()) plug.assignIndependentEva(un);
+            plug.setCanonicalTransform(seated);
             level.playSound(null, plug.blockPosition(),
                     SoundEvents.GENERIC_EXPLODE, SoundSource.BLOCKS,
                     3.4F, 1.28F);
@@ -1500,7 +1500,7 @@ public final class EntryPlugDirector
      * In GeoFront the heightmap points at the cavern roof, not the floor.
      */
     private static Vec3 findFieldLanding(ServerLevel level, Vec3 probe,
-                                         double unitY)
+                                         double unitY, RigidTransform seated)
     {
         int x = Mth.floor(probe.x);
         int z = Mth.floor(probe.z);
@@ -1512,6 +1512,7 @@ public final class EntryPlugDirector
         for (int y = top; y >= bottom; y--)
         {
             floor.set(x, y, z);
+            if (!level.hasChunkAt(floor)) return null;
             if (!level.getBlockState(floor)
                     .isFaceSturdy(level, floor, Direction.UP))
             {
@@ -1528,10 +1529,60 @@ public final class EntryPlugDirector
             {
                 continue;
             }
-            return new Vec3(x + 0.5D, y + 2.4D, z + 0.5D);
+            Vec3 position = new Vec3(x + 0.5D, y + 2.4D, z + 0.5D);
+            RigidTransform pose = new RigidTransform(position, seated.qx(), seated.qy(), seated.qz(), seated.qw());
+            AABB bounds = EntryPlugKinematics.worldBounds(pose,
+                    EntryPlugKinematics.BODY_OBB_CENTRE_P, EntryPlugKinematics.BODY_OBB_HALF_EXTENTS);
+            position = position.add(0, y + 1.04D - bounds.minY, 0);
+            pose = new RigidTransform(position, seated.qx(), seated.qy(), seated.qz(), seated.qw());
+            bounds = EntryPlugKinematics.worldBounds(pose,
+                    EntryPlugKinematics.BODY_OBB_CENTRE_P, EntryPlugKinematics.BODY_OBB_HALF_EXTENTS).deflate(.04);
+            if (!EntryPlugEjectionR48.loaded(level, bounds.inflate(.1))) continue;
+            boolean clear = true;
+            for (var shape : level.getBlockCollisions(null, bounds)) if (!shape.isEmpty()) { clear = false; break; }
+            if (!clear) continue;
+            for (BlockPos point : BlockPos.betweenClosed(BlockPos.containing(bounds.minX,bounds.minY,bounds.minZ),
+                    BlockPos.containing(bounds.maxX,bounds.maxY,bounds.maxZ)))
+                if (!level.getFluidState(point).isEmpty()) { clear = false; break; }
+            if (clear) return position;
         }
-        return new Vec3(probe.x, Math.max(level.getMinBuildHeight() + 2.4D,
-                unitY + 1.0D), probe.z);
+        // A missing floor is not a permitted airborne "landed" endpoint.
+        return null;
+    }
+
+    /** Validate the same complete capsule arc before publishing its ejection stage. */
+    private static boolean fieldEjectionRouteClear(ServerLevel level, EvaUnit01Entity unit,
+                                                  EntryPlugCarrierEntity plug, RigidTransform seated,
+                                                  Vec3 escape, Vec3 landing)
+    {
+        AABB previous = EntryPlugKinematics.worldBounds(seated,
+                EntryPlugKinematics.BODY_OBB_CENTRE_P, EntryPlugKinematics.BODY_OBB_HALF_EXTENTS).deflate(.04);
+        for (int sample = 1; sample <= FIELD_EJECTION_TICKS; sample++)
+        {
+            double linear = sample / (double) FIELD_EJECTION_TICKS;
+            Vec3 position = linear <= .38 ? seated.translation().lerp(escape, smoothstep(linear / .38))
+                    : escape.lerp(landing, smoothstep((linear - .38) / .62))
+                        .add(0, Math.sin(Math.PI * smoothstep((linear - .38) / .62)) * 8, 0);
+            RigidTransform pose = new RigidTransform(position, seated.qx(), seated.qy(), seated.qz(), seated.qw());
+            AABB current = EntryPlugKinematics.worldBounds(pose,
+                    EntryPlugKinematics.BODY_OBB_CENTRE_P, EntryPlugKinematics.BODY_OBB_HALF_EXTENTS).deflate(.04);
+            if (!EntryPlugEjectionR48.loaded(level, previous.minmax(current).inflate(.1))) return false;
+            for (var shape : level.getBlockCollisions(plug, current))
+                for (AABB solid : shape.toAabbs())
+                    if (intersectionVolume(current,solid) > intersectionVolume(previous,solid) + 1e-4)
+                    {
+                        ProjectSeele.LOGGER.warn("NERV field ejection preflight obstruction: eva={} plug={} sample={} capsuleBounds={} nativeSolid={}",
+                                unit.getUUID(),plug.getUUID(),sample,current,solid);return false;
+                    }
+            var occupants = level.getEntities(plug,current,e -> e.isAlive() && e != unit && !plug.hasPassenger(e) && e.isPickable());
+            if (!occupants.isEmpty())
+            {
+                ProjectSeele.LOGGER.warn("NERV field ejection preflight occupant: eva={} plug={} sample={} obstacle={}",
+                        unit.getUUID(),plug.getUUID(),sample,occupants.get(0).getUUID());return false;
+            }
+            previous = current;
+        }
+        return true;
     }
 
     private static double smoothstep(double value)

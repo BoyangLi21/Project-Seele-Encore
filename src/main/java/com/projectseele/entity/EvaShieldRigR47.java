@@ -86,6 +86,47 @@ public final class EvaShieldRigR47
         body.positions.put("shield",local.transformPosition(new Vector3f(socket.pivot())).sub(socket.pivot()));body.dirty();
     }
 
+    /** Carry the full-size plate upright, with the real rear handrail in the palm.
+     * The library's generic shield hand is not calibrated to this tall rail. */
+    public static void applyCarryR48(EvaUnit01Entity entity,EvaBodyPose.Sample body)
+    {
+        if(!equipped(entity)||entity.isNervLogisticsLocked()||entity.isFirstBattleActive()
+                ||EvaShutdownR30.disabled(entity)||entity.hasLiveActionForRender(0))return;
+        var attachment=surface().attachment();if(attachment==null)return;
+        var physics=com.projectseele.physics.CombatBodyProfiles.get(entity);if(physics==null)return;
+        String upper="arm_l",lower="forearm_l",hand="hand_l";
+        var root=body.matrix("root");var forward=root.transformDirection(new Vector3f(0,0,-1));forward.y=0;
+        if(forward.lengthSquared()<1e-8F)return;forward.normalize();
+        var right=new Vector3f(forward).cross(new Vector3f(0,1,0)).normalize();
+        var shieldRotation=new Quaternionf().setFromNormalized(new Matrix3f()
+                .setColumn(0,right).setColumn(1,new Vector3f(0,1,0)).setColumn(2,new Vector3f(forward).negate()));
+        var shoulder=body.matrix(upper).transformPosition(new Vector3f(body.rig.get(upper).pivot()));
+        var other=body.matrix("arm_r").transformPosition(new Vector3f(body.rig.get("arm_r").pivot()));
+        var rail=shoulder.lerp(other,.5F).fma(2F,forward);
+        float minimumRail=attachment.source().y-(float)surface().bounds().minY/16F+.15F;
+        rail.y=Math.max(minimumRail,rail.y-1.5F);
+        var handRotation=new Quaternionf(shieldRotation).mul(new Quaternionf(attachment.rotation()).invert());
+        var target=new Vector3f(rail).sub(handRotation.transform(new Vector3f(attachment.target()).sub(body.rig.get(hand).pivot())));
+        var joint=com.projectseele.physics.AnatomicalLimbConstraints.elbowJoint(physics,"l",body.rig.get(lower).pivot());
+        var upperWorld=body.matrix(upper).getUnnormalizedRotation(new Quaternionf()).normalize();
+        var lowerWorld=body.matrix(lower).getUnnormalizedRotation(new Quaternionf()).normalize();
+        var origin=body.matrix(upper).transformPosition(new Vector3f(body.rig.get(upper).pivot()));
+        var middle=body.matrix(upper).transformPosition(new Vector3f(joint));
+        var end=body.matrix(hand).transformPosition(new Vector3f(body.rig.get(hand).pivot()));
+        var pole=new Vector3f(origin).fma(-.55F,right).add(0,-1.2F,.4F);
+        var solved=com.projectseele.physics.AuthoredTwoBoneIKR45.solveWithPole(origin,middle,end,target,pole,new Vector3f(right));
+        if(solved==null)return;
+        upperWorld=solved.upperSwing().mul(upperWorld);lowerWorld=solved.lowerSwing().mul(lowerWorld);
+        String parent=body.rig.get(upper).parent();
+        body.rotations.put(upper,body.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(upperWorld));body.dirty();
+        parent=body.rig.get(lower).parent();
+        var localLower=body.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(lowerWorld);
+        body.rotations.put(lower,localLower);
+        body.positions.put(lower,com.projectseele.physics.AuthoredJointCentreR45.translation(new Vector3f(joint).sub(body.rig.get(lower).pivot()),localLower));body.dirty();
+        parent=body.rig.get(hand).parent();
+        body.rotations.put(hand,body.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(handRotation));body.dirty();
+    }
+
     private static Vec3 local(Matrix4f inverse,Vec3 point,Vec3 pivot)
     {
         var p=inverse.transformPosition(point.toVector3f());

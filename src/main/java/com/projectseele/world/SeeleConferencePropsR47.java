@@ -49,7 +49,8 @@ public final class SeeleConferencePropsR47
                     out.add(new Prop(index,x,y,z,(float)Math.toDegrees(Math.atan2(-(cx-x),cz-z))));
                 }
                 if(out.size()!=12)throw new IllegalArgumentException("TV council layout is incomplete");
-                out.add(new Prop(0,cx,centre.get(1).getAsDouble(),cz,0));return List.copyOf(out);
+                var desk=room.has("table_centre_r48")?room.getAsJsonArray("table_centre_r48"):centre;
+                out.add(new Prop(0,desk.get(0).getAsDouble(),desk.get(1).getAsDouble(),desk.get(2).getAsDouble(),0));return List.copyOf(out);
             }
             catch(Exception error){throw new IllegalStateException("SEELE meeting props have no complete world plan",error);}
         });

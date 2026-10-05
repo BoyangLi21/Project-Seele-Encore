@@ -493,7 +493,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     private void fireBeam(LivingEntity target)
     {
         if(com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this)!=null
-                &&!com.projectseele.world.TvEncounterRulesR45.missionBeamAllowed(this))return;
+                &&!com.projectseele.world.ShieldCoverR48.missionBeamAllowed(this))return;
         Vec3 from = this.beamOrigin();
         Vec3 dir = target.getEyePosition().subtract(from).normalize();
         Vec3 farEnd = from.add(dir.scale(this.effectiveBeamRangeR45()));
@@ -501,39 +501,44 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                 new ClipContext(from, farEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
         Vec3 end = blockHit.getLocation();
 
-        // The beam detonates on the first body it meets (an EVA blocks it
-        // with its bulk) instead of lancing through to the far terrain.
+        // Compare the same complete terrain-clipped segment for shield and
+        // body contacts. The closest actual surface owns this one shot.
+        var shieldHit = this.level() instanceof ServerLevel shieldLevel
+                ? com.projectseele.world.ShieldCoverR48.nearest(shieldLevel, from, end, this)
+                : java.util.Optional.<com.projectseele.world.ShieldCoverR48.Contact>empty();
         EntityHitResult bodyHit = com.projectseele.physics.CombatEntityQueryR44.ray(this.level(),from,end,.3,
                 e -> e != this && e.isAlive()
                         && !(e instanceof Angel)
                         && !(e.getVehicle() instanceof EvaUnit01Entity));
-        if (bodyHit != null)
-        {
-            end = bodyHit.getLocation();
-        }
-        // Clip against the same measured physical shield used by the mission gate.
-        // Missing geometry never creates an imaginary shield or alters ordinary beams.
-        var shieldHit=com.projectseele.world.TvEncounterRulesR45.missionShieldContactR45(this,from,end);
-        if(shieldHit.isPresent())end=shieldHit.get();
+        boolean stoppedByShield = shieldHit.isPresent() && (bodyHit == null
+                || from.distanceToSqr(shieldHit.get().point()) <= from.distanceToSqr(bodyHit.getLocation()) + 1e-8);
+        if (stoppedByShield) end = shieldHit.get().point();
+        else if (bodyHit != null) end = bodyHit.getLocation();
         final Vec3 impact = end;
-
-        for (LivingEntity victim : com.projectseele.physics.CombatEntityQueryR44.candidates(this.level(),
-                new AABB(from, end).inflate(1.0D), e -> e != this && e.isAlive()))
+        boolean yashima = com.projectseele.world.ShieldCoverR48.yashima(this);
+        var source = this.damageSources().mobAttack(this);
+        if (stoppedByShield)
         {
-            // The entry plug shields the pilot; the Unit takes the hit instead.
-            if (victim.isPassenger()&&victim.getRootVehicle() instanceof EvaUnit01Entity)
+            if (yashima) com.projectseele.world.ShieldCoverR48.receiveYashima(shieldHit.get(), this,
+                    java.util.UUID.randomUUID(), source);
+        }
+        else if (bodyHit != null && bodyHit.getEntity() instanceof LivingEntity victim)
+        {
+            com.projectseele.world.ShieldCoverR48.hurtDirect(victim, source,
+                    SeeleConfig.BEAM_DAMAGE.get().floatValue(), from, impact, () ->
             {
-                continue;
-            }
-            Optional<Vec3> hit = com.projectseele.physics.CombatBodyContacts.clip(victim,from,end,.3);
-            if (hit.isPresent())
-            {
-                victim.hurt(this.damageSources().mobAttack(this),
-                        SeeleConfig.BEAM_DAMAGE.get().floatValue());
-            }
+                if (yashima && victim instanceof EvaUnit01Entity eva)
+                {
+                    return eva.receiveUnshieldedYashimaBeamR48(source);
+                }
+                return victim.hurt(source, yashima ? Float.MAX_VALUE : SeeleConfig.BEAM_DAMAGE.get().floatValue());
+            });
         }
 
-        this.level().explode(this, end.x, end.y, end.z,
+        // A stopped ray has no damaging explosion on the rear of the shield.
+        // Yashima applies its explicit chassis hit only, never blast damage to
+        // the protected plug/pilot. Ordinary unshielded beams retain their blast.
+        if (!stoppedByShield && !yashima) this.level().explode(this, end.x, end.y, end.z,
                 SeeleConfig.BEAM_EXPLOSION_RADIUS.get().floatValue(), Level.ExplosionInteraction.MOB);
         // The shell stays open after the shot — this is the sniping window.
         this.exposedTimer = EXPOSED_AFTER_FIRE_TICKS;

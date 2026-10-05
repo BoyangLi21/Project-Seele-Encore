@@ -1,0 +1,13 @@
+{
+  "minecraft": {
+    "version": "1.20.1",
+    "modLoaders": [{"id": "forge-47.4.10", "primary": true}]
+  },
+  "manifestType": "minecraftModpack",
+  "manifestVersion": 1,
+  "name": "Project_SEELE_Encore_R48_PCL_20261005",
+  "version": "R48-20261005-PCL1",
+  "author": "Boyang Li",
+  "files": [],
+  "overrides": "overrides"
+}

@@ -5,6 +5,20 @@
 > 合规基线：khara 二创指引（非商业、零官方素材）。本文件登记**所有**非代码资产的来源。
 > 任何新素材入库前先在这里登记。
 
+## R48 液压弹射与地表重门实录
+
+R48选用CC0 1.0实录的公开HQ MP3预览，并非原始WAV。没有喷气声层、官方音轨、角色配音或合成振荡器。来源及留存一级网页见`artifacts/rebuild_r48/audio/sources.json`；处理脚本和实际OGG回读见`build_audio_r48.py`及`metrics.json`。
+
+| 新录音 | 实际录音源（均CC0） |
+|---|---|
+| `r48_hydraulic_charge_recorded.ogg` | kr15h液压泵／阀门：https://freesound.org/people/kr15h/sounds/689263/ |
+| `r48_catapult_release_recorded.ogg` | newagesoup钢材撞击：https://freesound.org/people/newagesoup/sounds/337832/ ；Philipp Grzemba／Sheyvan集装箱：https://freesound.org/people/Sheyvan/sounds/569413/ |
+| `r48_catapult_acceleration_recorded.ogg` | lolamadeus货梯门：https://freesound.org/people/lolamadeus/sounds/161228/ ；上述kr15h液压泵 |
+| `r48_surface_door_slide_recorded.ogg`、`r48_surface_door_slide_heavy_recorded.ogg` | 上述lolamadeus货梯门；heavy层来自同份录音低频结构层，正式地表门只绑定heavy版 |
+| `r48_surface_door_endstop_recorded.ogg` | 上述newagesoup钢材撞击与Sheyvan集装箱 |
+
+newagesoup原棚门源EpicWizard https://freesound.org/people/EpicWizard/sounds/264889/ 同为CC0。CC0文本：https://creativecommons.org/publicdomain/zero/1.0/ 。地下18tick TV门不使用这份较长地表门录音。运行接线不代表已完成听觉或原生验收。
+
 ## 音效（原创合成与单列的语音生成）
 
 R10 新增的 15 个 `eva_*.ogg` 由 `tools/build_eva_audio_r10.py` 固定种子合成，无录音采样。用途包括落足、落地、关节、挥击、实体命中、刀切、装甲、核心、AT 侵蚀/撕裂、咆哮和驾驶反馈。波形参数、响度与 SHA-256 记录在 `artifacts/first_battle_world_r10/audio/manifest.json`。

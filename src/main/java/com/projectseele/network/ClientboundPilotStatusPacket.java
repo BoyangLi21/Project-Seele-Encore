@@ -37,6 +37,7 @@ public final class ClientboundPilotStatusPacket
     private final int cityDepth;
     private final int cityTargetDepth;
     private final int cityMaximumDepth;
+    private final float cityPhysicalRetractionFraction;
     private final String armamentState;
     private final boolean armamentStocked;
     private final int armamentLiftPercent;
@@ -44,6 +45,7 @@ public final class ClientboundPilotStatusPacket
     public ClientboundPilotStatusPacket(Unit[] units, String cityPhase,
                                         int cityDepth, int cityTargetDepth,
                                         int cityMaximumDepth,
+                                        float cityPhysicalRetractionFraction,
                                         String armamentState,
                                         boolean armamentStocked,
                                         int armamentLiftPercent)
@@ -53,6 +55,7 @@ public final class ClientboundPilotStatusPacket
         this.cityDepth = cityDepth;
         this.cityTargetDepth = cityTargetDepth;
         this.cityMaximumDepth = cityMaximumDepth;
+        this.cityPhysicalRetractionFraction = cityPhysicalRetractionFraction;
         this.armamentState = armamentState;
         this.armamentStocked = armamentStocked;
         this.armamentLiftPercent = armamentLiftPercent;
@@ -80,6 +83,7 @@ public final class ClientboundPilotStatusPacket
         this.cityDepth = buffer.readVarInt();
         this.cityTargetDepth = buffer.readVarInt();
         this.cityMaximumDepth = buffer.readVarInt();
+        this.cityPhysicalRetractionFraction = buffer.readFloat();
         this.armamentState = buffer.readUtf(32);
         this.armamentStocked = buffer.readBoolean();
         this.armamentLiftPercent = buffer.readVarInt();
@@ -112,6 +116,7 @@ public final class ClientboundPilotStatusPacket
         buffer.writeVarInt(this.cityDepth);
         buffer.writeVarInt(this.cityTargetDepth);
         buffer.writeVarInt(this.cityMaximumDepth);
+        buffer.writeFloat(this.cityPhysicalRetractionFraction);
         buffer.writeUtf(this.armamentState, 32);
         buffer.writeBoolean(this.armamentStocked);
         buffer.writeVarInt(this.armamentLiftPercent);
@@ -125,6 +130,7 @@ public final class ClientboundPilotStatusPacket
                         .setPilotStatus(this.units, this.cityPhase,
                                 this.cityDepth, this.cityTargetDepth,
                                 this.cityMaximumDepth,
+                                this.cityPhysicalRetractionFraction,
                                 this.armamentState, this.armamentStocked,
                                 this.armamentLiftPercent));
         context.setPacketHandled(true);

@@ -159,7 +159,11 @@ public final class PilotRestroomsR47
     public static void closeDoorWhenClear(ServerLevel level,TrainingPilotEntity pilot)
     {
         var optional=plan(level,pilot.getAssignedVariant());if(optional.isEmpty()||!original(optional.get(),pilot))return;
-        var p=optional.get();var state=level.getBlockState(p.doorLower);
+        var p=optional.get();
+        var holds=MANUAL_DOOR_HOLDS_R48.get(level);
+        if(holds!=null&&level.getGameTime()<holds.getOrDefault(p.variant,0L))return;
+        if(holds!=null)holds.remove(p.variant);
+        var state=level.getBlockState(p.doorLower);
         if(!(state.getBlock() instanceof CityPersonnelDoorR44))return;
         var expected=TvPersonnelPlatformRecipeR44.parse(p.doorState);
         for(BlockPos q:List.of(p.doorLower,p.doorLower.above()))
@@ -171,9 +175,51 @@ public final class PilotRestroomsR47
                     ||actual.getValue(DoorBlock.HALF)!=(q.equals(p.doorLower)?net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER:net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER))return;
         }
         if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
-                new AABB(p.doorLower).expandTowards(0,1,0),e->e.isAlive()&&!e.isSpectator()).isEmpty())return;
+                new AABB(p.doorLower).expandTowards(0,1,0).inflate(.15),e->e.isAlive()&&!e.isSpectator()).isEmpty())return;
         ((DoorBlock)state.getBlock()).setOpen(pilot,level,state,p.doorLower,false);
     }
+    private static final Map<ServerLevel,Map<Integer,Long>> MANUAL_DOOR_HOLDS_R48=new WeakHashMap<>();
+
+    /** A manual latch keeps its five-second lease through the original seated AI tick. */
+    public static boolean manualDoorR48(ServerLevel level,BlockPos clicked,net.minecraft.server.level.ServerPlayer player)
+    {
+        var room=plans(level).stream().filter(p->p.doorLower.equals(clicked)||p.doorLower.above().equals(clicked)).findFirst().orElse(null);
+        if(room==null)return false;
+        if(player.isSpectator()||!NervStaffDialogue.authorized(player)
+                ||player.distanceToSqr(Vec3.atCenterOf(room.doorLower))>36)
+        {player.displayClientMessage(net.minecraft.network.chat.Component.literal("驾驶员休息室需要NERV通行权限。"),true);return true;}
+        var expected=TvPersonnelPlatformRecipeR44.parse(room.doorState);
+        for(var q:List.of(room.doorLower,room.doorLower.above()))
+        {
+            var actual=level.getBlockState(q);
+            if(level.getBlockEntity(q)!=null||!(actual.getBlock() instanceof CityPersonnelDoorR44)
+                    ||actual.getValue(DoorBlock.FACING)!=expected.getValue(DoorBlock.FACING)
+                    ||actual.getValue(DoorBlock.HINGE)!=expected.getValue(DoorBlock.HINGE)
+                    ||actual.getValue(DoorBlock.HALF)!=(q.equals(room.doorLower)?net.minecraft.world.level.block.state.properties.DoubleBlockHalf.LOWER:net.minecraft.world.level.block.state.properties.DoubleBlockHalf.UPPER))
+            {player.displayClientMessage(net.minecraft.network.chat.Component.literal("休息室完整门框未就绪。"),true);return true;}
+        }
+        var block=level.getBlockState(room.doorLower);boolean opening=!block.getValue(DoorBlock.OPEN);
+        if(opening)
+        {
+            // The outside floor is a real bridge/pad. A retracted surface must
+            // never be replaced by permission or a saved navigation waypoint.
+            var fleet=EvaFleetSavedData.get(level.getServer()).entry(room.variant);
+            if(fleet.isEmpty()||fleet.get().phase()!=EvaFleetSavedData.Phase.PARKED
+                    ||!TrainingPilotDirector.safeActualFeetR47(level,room.outsideDoor)
+                    ||!level.noCollision(player,player.getDimensions(net.minecraft.world.entity.Pose.STANDING).makeBoundingBox(room.outsideDoor)))
+            {player.displayClientMessage(net.minecraft.network.chat.Component.literal("门外平台或登机桥尚未停稳，请等待。"),true);return true;}
+            MANUAL_DOOR_HOLDS_R48.computeIfAbsent(level,key->new HashMap<>()).put(room.variant,level.getGameTime()+100);
+        }
+        else
+        {
+            if(!level.getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,
+                    new AABB(room.doorLower).expandTowards(0,1,0).inflate(.15),e->e.isAlive()&&!e.isSpectator()).isEmpty())
+            {player.displayClientMessage(net.minecraft.network.chat.Component.literal("门口有人，请先让出门扇。"),true);return true;}
+            var holds=MANUAL_DOOR_HOLDS_R48.get(level);if(holds!=null)holds.remove(room.variant);
+        }
+        ((DoorBlock)block.getBlock()).setOpen(player,level,block,room.doorLower,opening);return true;
+    }
+
     /** First reassignment is an actual navigation order, never an install teleport. */
     public static void holdOrArrangePost(ServerLevel level,TrainingPilotEntity pilot)
     {

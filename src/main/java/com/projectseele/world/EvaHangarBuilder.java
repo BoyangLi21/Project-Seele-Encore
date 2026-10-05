@@ -2347,6 +2347,11 @@ public final class EvaHangarBuilder
         requireVariant(variant);
         int safeExtension = Math.max(0, Math.min(BRIDGE_SEGMENTS, extension));
         BlockPos bed = hangarBed(origin, variant);
+        if(EntryPlugBridgeLayoutR48.enabled(level))
+        {
+            EntryPlugBridgeLayoutR48.apply(level,bed,safeExtension);
+            return;
+        }
         BlockState accent = accent(variant);
         int floorY = bed.getY() + REAR_GANTRY_ABOVE_BED;
         for (int segment = 1; segment <= BRIDGE_SEGMENTS; segment++)
@@ -2500,7 +2505,8 @@ public final class EvaHangarBuilder
                     return "gantry " + failure;
                 }
             }
-            int centreOffset = z <= boardingEndZ + 1 ? 3 : 0;
+            if(EntryPlugBridgeLayoutR48.enabled(level)&&z>bed.getZ()+21)continue;
+            int centreOffset = z <= boardingEndZ + (EntryPlugBridgeLayoutR48.enabled(level)?2:1) ? 3 : 0;
             String failure = walkable(level,
                     new BlockPos(bed.getX() + centreOffset, gantryY, z));
             if (failure != null)

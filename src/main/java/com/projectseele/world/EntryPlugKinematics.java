@@ -51,15 +51,20 @@ public final class EntryPlugKinematics
     public static final Vec3 PILOT_SEAT_P =
             modelMarker(0.0D, -2.0D, 31.0D);
     public static final Vec3 PILOT_EYE_P =
-            modelMarker(0.0D, 0.8D, 27.5D);
+            modelMarker(0.0D, 0.8D, 34.5D);
     /**
-     * The seated pilot looks out through the hatch/top face.  The former
-     * {@code -Z_P} view followed the capsule's long axis; while the plug was
-     * hanging vertically that forced the pilot to stare at the floor and made
-     * the otherwise-correct crane rotation read as if it were upside down.
+     * The backrest rises towards the tail; feet point towards the insertion
+     * tip. View and visible torso use this same seat-to-eye basis, including
+     * when the crane turns the capsule away from its horizontal boarding pose.
      */
     public static final Vec3 PILOT_VIEW_FORWARD_P =
-            new Vec3(0.0D, 1.0D, 0.0D);
+            new Vec3(0.0D, 3.5D, -2.8D).normalize();
+
+    public static float pilotReclineRadiansR48()
+    {
+        Vec3 backrest=PILOT_EYE_P.subtract(PILOT_SEAT_P);
+        return (float)Math.atan2(backrest.z,backrest.y);
+    }
     public static final Vec3 PILOT_DISMOUNT_LEFT_P =
             modelMarker(-6.4D, 5.2D, 29.0D);
     public static final Vec3 PILOT_DISMOUNT_RIGHT_P =
@@ -96,7 +101,10 @@ public final class EntryPlugKinematics
     public static RigidTransform socketTransform(EvaUnit01Entity unit,float partial)
     {
         if(EvaAirTransportR31.active(unit)||EvaShutdownR30.displayed(unit))return posedSocketTransform(unit,unit.level().isClientSide?Mth.clamp(partial,0,1):1F);
-        Vec3 rear = unit.getRearDirection();
+        // The retained NERV plant is rendered in its surveyed rail heading.
+        // Looking around inside the capsule must not yaw the insertion axis.
+        Vec3 rear = !unit.isExperimentalUnit()&&unit.isNervLogisticsLocked()
+                ?rearDirectionForYaw(EvaUnit01Entity.SILO_BAY_YAW):unit.getRearDirection();
         var profile=EvaDorsalProfile.of(unit);Vec3 marker=profile.centreBlocks();
         RigidTransform orientation = verticalSocketOrientation(rear,profile);
         Vec3 origin = unit.position()

@@ -494,8 +494,9 @@
     "subtitle": "subtitles.projectseele.facility_catapult",
     "sounds": [
       {
-        "name": "projectseele:facility_catapult_r47",
-        "attenuation_distance": 256
+        "name": "projectseele:r48_catapult_acceleration_recorded",
+        "attenuation_distance": 128,
+        "stream": false
       }
     ]
   },
@@ -631,8 +632,9 @@
     "subtitle": "subtitles.projectseele.facility_hydraulic_launch",
     "sounds": [
       {
-        "name": "projectseele:facility_hydraulic_launch_r47",
-        "attenuation_distance": 256
+        "name": "projectseele:r48_catapult_release_recorded",
+        "attenuation_distance": 128,
+        "stream": false
       }
     ]
   },
@@ -938,6 +940,36 @@
       {
         "name": "projectseele:pressure_door_motion_r47",
         "attenuation_distance": 48
+      }
+    ]
+  },
+  "facility_hydraulic_charge_r48": {
+    "subtitle": "subtitles.projectseele.facility_hydraulic",
+    "sounds": [
+      {
+        "name": "projectseele:r48_hydraulic_charge_recorded",
+        "attenuation_distance": 96,
+        "stream": false
+      }
+    ]
+  },
+  "surface_bulkhead_motion_r48": {
+    "subtitle": "subtitles.projectseele.pressure_door_motion",
+    "sounds": [
+      {
+        "name": "projectseele:r48_surface_door_slide_heavy_recorded",
+        "attenuation_distance": 80,
+        "stream": false
+      }
+    ]
+  },
+  "surface_bulkhead_stop_r48": {
+    "subtitle": "subtitles.projectseele.facility_lock",
+    "sounds": [
+      {
+        "name": "projectseele:r48_surface_door_endstop_recorded",
+        "attenuation_distance": 64,
+        "stream": false
       }
     ]
   }

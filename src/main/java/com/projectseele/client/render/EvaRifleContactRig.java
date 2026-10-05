@@ -100,7 +100,8 @@ public final class EvaRifleContactRig
         float supportSlide=Math.min(2F,-along+(float)Math.sqrt(Math.max(0,discriminant)));
         Vector3f leftTarget=new Vector3f(supportBase).fma(supportSlide,forward);
         var measured = com.projectseele.entity.EvaRifleGripR45.contacts(eva, body, f.grip(), f.right(), f.forward(), f.up());
-        if (measured != null && EvaHandSurfaceR45.applies(eva))
+        boolean fittedGrip=EvaHandSurfaceR45.applies(eva)||com.projectseele.entity.EvaTripoHandsR48.enabled(eva,body);
+        if (measured != null && fittedGrip)
         {
             rightTarget = new Vector3f(measured.right().wrist());
             leftTarget = new Vector3f(measured.left().wrist());
@@ -162,10 +163,10 @@ public final class EvaRifleContactRig
         // Lean the gaze toward the existing sight line. This never moves the weapon.
         var head=model.getBone("head").orElseThrow();var headWorld=new Quaternionf(f.headRotation());
         EvaRigTransforms.rotate(head,EvaRigTransforms.rotation(EvaRigTransforms.parent(head,root)).invert().mul(headWorld));
-        if(!head.isHidden()&&!(eva instanceof com.projectseele.entity.EvaPrototypeEntity un&&un.isEyeLaserActive()))EvaHeadClearance.apply(eva,head,root,gun,headWorld,right,forward,partial);
+        if(!head.isHidden()&&!(eva instanceof com.projectseele.entity.EvaPrototypeEntity un&&un.isEyeLaserActive()))EvaHeadClearance.apply(eva,head,root,gun,headWorld,right,forward,partial,model);
         var shoulder=EvaRigTransforms.point(model.getBone("arm_r").orElseThrow(),EvaRigTransforms.pivot(model.getBone("arm_r").orElseThrow()),root);
         if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),new Witness(f.muzzle(),re,le,-1,f.stock(),new Vec3(shoulder.x,shoulder.y,shoulder.z),
-                armTrace(model,"l",leftPole,root),armTrace(model,"r",rightPole,root),measured!=null&&EvaHandSurfaceR45.applies(eva)));
+                armTrace(model,"l",leftPole,root),armTrace(model,"r",rightPole,root),measured!=null&&fittedGrip));
         rotations.addAll(Set.of("neck","head","arm_r","forearm_r","wrist_r","hand_r","arm_l","forearm_l","wrist_l","hand_l","cannon"));
         positions.addAll(Set.of("forearm_r","wrist_r","hand_r","forearm_l","wrist_l","hand_l","cannon"));
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),Set.copyOf(positions),"MOTION_ENGINE_LIVE_ACTION");

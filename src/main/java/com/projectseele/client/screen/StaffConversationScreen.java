@@ -67,38 +67,37 @@ public final class StaffConversationScreen extends Screen
         }
         panelWidth = Math.min(560, width - 16); panelHeight = Math.min(320, height - 16);
         x = (width - panelWidth) / 2; y = (height - panelHeight) / 2;
-        int tabWidth=(panelWidth-24)/6;
+        int tabWidth=(panelWidth-24)/5;
         addButton("交谈",x+12,y+29,tabWidth-3,()->switchTab(0),true);
         addButton("指挥",x+12+tabWidth,y+29,tabWidth-3,()->switchTab(1),view.canCommand());
         addButton("作战记录",x+12+tabWidth*2,y+29,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},true);
         addButton("通讯录",x+12+tabWidth*3,y+29,tabWidth-3,()->switchTab(4),view.radio());
         addButton("运输部门",x+12+tabWidth*4,y+29,tabWidth-3,()->{switchTab(6);send("TRANSPORT:status");},view.canCommand());
-        if(view.skin().equals("fuyutsuki"))addButton("城市",x+12+tabWidth*5,y+29,tabWidth-3,()->switchTab(5),permitted("city_rise"));
         addButton("关闭", x + panelWidth - 60, y + 8, 48, this::onClose, true);
         int controlsY = controlsTop();
         int column = (panelWidth - 32) / 3;
         if (tab == 0)
         {
             String[][] topics = {{"当前状态", "status"}, {"道路指引", "directions"}, {"同步与驾驶", "sync"},
-                    {"插入栓接入", "plug"}, {"供电与回收", "power"}, {"值班闲聊", "duty"}};
+                    {"插入栓接入", "plug"}, {"供电与回收", "power"}, {"聊一会儿", "chat"}};
             for (int i = 0; i < topics.length; i++)
             {
                 String request = "TOPIC:" + topics[i][1];
                 addButton(topics[i][0], x + 12 + (i % 3) * (column + 4), controlsY + (i / 3) * 22,
                         column, () -> { if(request.equals("TOPIC:directions"))switchTab(3);send(request); }, true);
             }
-            if (view.radio())
-            {
-                String[] contacts = {"美里", "律子", "冬月"};
-                for (int i = 0; i < contacts.length; i++)
-                {
-                    String person = contacts[i];
-                    addButton("联络" + person, x + 12 + i * (column + 4), controlsY + 44,
-                            column, () -> send("CONTACT:" + person), true);
-                }
-            }
+
         }
         else if (tab == 1)
+        {
+            int half=(panelWidth-28)/2;
+            addButton("机体整备与发射",x+12,controlsY,half,()->switchTab(8),view.canCommand());
+            addButton("驾驶员安排",x+16+half,controlsY,half,()->switchTab(9),permitted("board"));
+            addButton("武器井与装备",x+12,controlsY+22,half,()->switchTab(10),permitted("weapons"));
+            addButton("城市升降",x+16+half,controlsY+22,half,()->{switchTab(5);send("TOPIC:city");},permitted("city_rise"));
+            addButton("设施与地下出击控制",x+12,controlsY+44,panelWidth-24,()->switchTab(11),permitted("deploy"));
+        }
+        else if (tab == 8)
         {
             for (int i = 0; i < 3; i++)
             {
@@ -116,13 +115,36 @@ public final class StaffConversationScreen extends Screen
             int half = (panelWidth - 28) / 2;
             addButton("整备后发射", x + 12, controlsY + 44, half, () -> send("整备后发射 0" + unit), permitted("deploy"));
             addButton("取消后续操作", x + 16 + half, controlsY + 44, half, () -> send("停止操作"), true);
-            addButton("驾驶员登机", x + 12, controlsY + 66, column, () -> send("BOARD:" + unit), permitted("board"));
-            addButton("下机返回待命", x + 16 + column, controlsY + 66, column, () -> send("STANDBY:" + unit), permitted("board"));
-            addButton("部署武器井", x + 20 + column*2, controlsY + 66, column, () -> send("WEAPONS"), permitted("weapons"));
-            addButton("零号机 · 专用盾井",x+12,controlsY+88,half,()->send("WEAPONS:shield"),permitted("weapons"));
-            addButton("二号机 · 专用剑井",x+16+half,controlsY+88,half,()->send("WEAPONS:sword"),permitted("weapons"));
+        }
+        else if(tab==9)
+        {
+            selectUnit(controlsY,column);
+            int half=(panelWidth-28)/2;
+            addButton("驾驶员登机",x+12,controlsY+22,half,()->send("BOARD:"+unit),permitted("board"));
+            addButton("下机返回待命",x+16+half,controlsY+22,half,()->send("STANDBY:"+unit),permitted("board"));
+            addButton("询问驾驶员状态",x+12,controlsY+44,half,()->send("PILOT:"+unit),true);
+            addButton("与驾驶员聊一会儿",x+16+half,controlsY+44,half,()->send("PILOTCHAT:"+unit),true);
+        }
+        else if(tab==10)
+        {
+            addButton("部署就近步枪井",x+12,controlsY,panelWidth-24,()->send("WEAPONS"),permitted("weapons"));
+            addButton("部署零号机专用盾井",x+12,controlsY+22,panelWidth-24,()->send("WEAPONS:shield"),permitted("weapons"));
+            addButton("部署二号机专用剑井",x+12,controlsY+44,panelWidth-24,()->send("WEAPONS:sword"),permitted("weapons"));
+        }
+        else if(tab==11)
+        {
+            selectUnit(controlsY,column);
+            int half=(panelWidth-28)/2;
+            addButton("开启本机地下紧急门",x+12,controlsY+22,half,()->send("UNDERGROUND:"+unit+":open"),permitted("deploy"));
+            addButton("关闭本机地下紧急门",x+16+half,controlsY+22,half,()->send("UNDERGROUND:"+unit+":close"),permitted("deploy"));
         }
         else if(tab==2)
+        {
+            addButton("查看当前简报",x+12,controlsY,panelWidth-24,()->send("TOPIC:campaign"),true);
+            addButton("出击与增援编成",x+12,controlsY+22,panelWidth-24,()->switchTab(12),permitted("campaign"));
+            addButton("城市协同档案",x+12,controlsY+44,panelWidth-24,()->{switchTab(7);send("COORD:status");},view.canCommand());
+        }
+        else if(tab==12)
         {
             int half = (panelWidth - 28) / 2;
             int choice=(panelWidth-36)/4;
@@ -136,27 +158,40 @@ public final class StaffConversationScreen extends Screen
             for(int i=0;i<3;i++){int selection=i;addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),x+12+i*(column+4),controlsY+22,column,()->{unit=selection;rebuildWidgets();},true);}
             addButton((!npcSortie?"● ":"")+"亲自驾驶",x+12,controlsY+44,half,()->{npcSortie=false;rebuildWidgets();},true);
             addButton((npcSortie?"● ":"")+com.projectseele.entity.TrainingPilotEntity.pilotName(unit)+"出战",x+16+half,controlsY+44,half,()->{npcSortie=true;rebuildWidgets();},true);
-            addButton("驾驶员装备："+(sortieRifle?"先前往武器井取枪":"近战出击"),x+12,controlsY+66,panelWidth-24,()->{sortieRifle=!sortieRifle;rebuildWidgets();},npcSortie);
+            addButton("常规出击装备："+(npcSortie?(sortieRifle?"先前往武器井取枪":"近战出击"):"亲自到武器井领取"),x+12,controlsY+66,panelWidth-24,()->{sortieRifle=!sortieRifle;rebuildWidgets();},npcSortie);
             addButton("出击 / 加入增援",x+12,controlsY+88,half,()->send("CAMPAIGN:sortie:"+mission+":"+unit+":"+(npcSortie?"npc":"human")+":"+(sortieRifle?"rifle":"melee")),permitted("campaign"));
             addButton("撤销当前作战",x+16+half,controlsY+88,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
             addButton("查看所选简报",x+12,controlsY+110,half,()->send("TOPIC:campaign"),true);
-            addButton("城市协同档案",x+16+half,controlsY+110,half,()->{switchTab(7);send("COORD:status");},view.canCommand());
+            addButton(unit==0?"携盾出击":unit==2?"携剑出击":"初号机无专用盾／剑",x+16+half,controlsY+110,half,
+                    ()->send("ARMEDSORTIE:"+unit+":"+(npcSortie?"npc":"human")),unit!=1&&permitted("campaign"));
         }
         else if(tab==7)
         {
-            String[][] actions={{"接受档案","start"},{"当前状态","status"},{"撤销调度","cancel"},
-                    {"原页","read/page"},{"译注","read/annotation"},{"现场记录","read/field"},
-                    {"共享三份记录","share"},{"保留司令档案","private"},{"城市收纳 · 保电","evacuate/services"},
-                    {"城市收纳 · 蓄能","evacuate/storage"},{"委派远山复测","test/delegate"},{"亲自到站复测","test/onsite"},
-                    {"保电 · 等两轮","supply/services"},{"备用馈线 · 一轮","supply/reserve"},{"归档准备结果","finish"}};
-            for(int i=0;i<actions.length;i++){String action=actions[i][1];addButton(actions[i][0],x+12+(i%3)*(column+4),controlsY+(i/3)*22,column,()->send("COORD:"+action),view.canCommand());}
+            addButton("档案阅读与共享",x+12,controlsY,panelWidth-24,()->switchTab(13),view.canCommand());
+            addButton("城市供电与复测",x+12,controlsY+22,panelWidth-24,()->switchTab(14),view.canCommand());
+            addButton("参与机体与确认",x+12,controlsY+44,panelWidth-24,()->switchTab(15),view.canCommand());
+        }
+        else if(tab==13||tab==14)
+        {
+            String[][] actions=tab==13
+                    ?new String[][]{{"接受档案","start"},{"当前状态","status"},{"原页","read/page"},{"译注","read/annotation"},{"现场记录","read/field"},{"共享三份记录","share"},{"保留司令档案","private"},{"撤销调度","cancel"}}
+                    :new String[][]{{"城市下降 · 保电","evacuate/services"},{"城市下降 · 蓄能","evacuate/storage"},{"委派远山复测","test/delegate"},{"亲自到站复测","test/onsite"},{"保电 · 等两轮","supply/services"},{"备用馈线 · 一轮","supply/reserve"},{"归档准备结果","finish"},{"当前状态","status"}};
             int half=(panelWidth-28)/2;
-            addButton("编成机体："+com.projectseele.world.TvSortiesR32.name(unit),x+12,controlsY+110,half,()->{unit=(unit+1)%5;if(unit>=3)npcSortie=false;rebuildWidgets();},true);
+            for(int i=0;i<actions.length;i++)
+            {
+                String action=actions[i][1];
+                addButton(actions[i][0],x+12+(i%2)*(half+4),controlsY+(i/2)*22,half,()->send("COORD:"+action),view.canCommand());
+            }
+        }
+        else if(tab==15)
+        {
+            int half=(panelWidth-28)/2;
+            addButton("编成机体："+com.projectseele.world.TvSortiesR32.name(unit),x+12,controlsY,half,()->{unit=(unit+1)%5;if(unit>=3)npcSortie=false;rebuildWidgets();},true);
             String driverLabel=npcSortie?"驾驶员："+com.projectseele.entity.TrainingPilotEntity.pilotName(unit):"驾驶者："+humanPilotName();
-            addButton(driverLabel+" / 切换",x+16+half,controlsY+110,half,()->{cycleParticipant();rebuildWidgets();},true);
-            addButton("加入编成",x+12,controlsY+132,column,()->send("COORD:assign/"+unit+"/"+(unit<3&&npcSortie?"npc":"human/"+selectedHuman())),true);
-            addButton("确认说明与待命",x+16+column,controlsY+132,column,()->send("COORD:consent/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),view.coordinationFormationRevision()>0);
-            addButton("驾驶员撤回",x+20+column*2,controlsY+132,column,()->send("COORD:withdraw/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),view.coordinationFormationRevision()>0);
+            addButton(driverLabel+" / 切换",x+16+half,controlsY,half,()->{cycleParticipant();rebuildWidgets();},true);
+            addButton("加入编成",x+12,controlsY+22,column,()->send("COORD:assign/"+unit+"/"+(unit<3&&npcSortie?"npc":"human/"+selectedHuman())),true);
+            addButton("确认说明与待命",x+16+column,controlsY+22,column,()->send("COORD:consent/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),view.coordinationFormationRevision()>0);
+            addButton("驾驶员撤回",x+20+column*2,controlsY+22,column,()->send("COORD:withdraw/"+unit+"/"+view.coordinationFormationRevision()+"/"+view.coordinationEvidenceRevision()),view.coordinationFormationRevision()>0);
         }
         else if(tab==6)
         {
@@ -176,8 +211,8 @@ public final class StaffConversationScreen extends Screen
         else if (tab == 5)
         {
             int half=(panelWidth-28)/2;
-            addButton("城市升起",x+12,controlsY,half,()->send("城市升起"),permitted("city_rise"));
-            addButton("城市降下",x+16+half,controlsY,half,()->send("城市降下"),permitted("city_lower"));
+            addButton("城市上升",x+12,controlsY,half,()->send("城市上升"),permitted("city_rise"));
+            addButton("城市下降",x+16+half,controlsY,half,()->send("城市下降"),permitted("city_lower"));
             addButton("查询城市状态",x+12,controlsY+22,panelWidth-24,()->send("TOPIC:city"),true);
         }
         else if (tab == 4)
@@ -194,7 +229,7 @@ public final class StaffConversationScreen extends Screen
             {
                 int pilot = i;
                 addButton(com.projectseele.entity.TrainingPilotEntity.pilotName(i), x + 12 + i * (column + 4),
-                        controlsY + 44, column, () -> { unit=pilot; send("PILOT:" + pilot); }, true);
+                        controlsY + 44, column, () -> { unit=pilot; send("PILOTCHAT:" + pilot); }, true);
             }
         }
         else
@@ -207,6 +242,9 @@ public final class StaffConversationScreen extends Screen
             }
             addButton("停止步行引导",x+12,controlsY+66,panelWidth-24,()->send("ROUTE:stop"),true);
         }
+        int parent=parentTab();
+        if(parent>=0)addButton("← 返回"+(parent==0?"交谈":parent==1?"指挥分类":parent==2?"作战记录":"城市协同档案"),
+                x+12,y+panelHeight-45,panelWidth-24,()->switchTab(parent),true);
         input = new EditBox(font, x + 12, y + panelHeight - 21, panelWidth - 83, 17, Component.literal("输入交谈或指令"));
         input.setMaxLength(160); input.setHint(Component.literal("例如：初号机准备后发射")); addRenderableWidget(input);
         addButton("发送", x + panelWidth - 64, y + panelHeight - 22, 52, this::submitText, true);
@@ -246,10 +284,45 @@ public final class StaffConversationScreen extends Screen
         if(index+1<people.size())humanPilot=people.get(index+1).getProfile().getId();
         else if(unit<3){npcSortie=true;humanPilot=null;}else humanPilot=null;
     }
-    private void switchTab(int next) { tab = next; rebuildWidgets(); }
+    private void selectUnit(int top,int column)
+    {
+        for(int i=0;i<3;i++)
+        {
+            int selection=i;
+            addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),
+                    x+12+i*(column+4),top,column,()->{unit=selection;rebuildWidgets();},true);
+        }
+    }
+    private int parentTab()
+    {
+        return switch(tab)
+        {
+            case 3 -> 0;
+            case 5,8,9,10,11 -> 1;
+            case 7,12 -> 2;
+            case 13,14,15 -> 7;
+            default -> -1;
+        };
+    }
+    private void switchTab(int next)
+    {
+        if(next!=7&&next!=13&&next!=14&&next!=15)unit=Math.min(unit,2);
+        tab=next;rebuildWidgets();
+    }
     private boolean permitted(String action)
     { return view.canCommand() && com.projectseele.world.StaffAuthorityR25.allows("", view.skin(), action); }
-    private int controlsTop(){return y+panelHeight-(tab==7?179:tab==2?157:tab==3||tab==1||tab==6?113:91);}
+    private int controlsTop()
+    {
+        int reserved=switch(tab)
+        {
+            case 12 -> 179;
+            case 13,14 -> 157;
+            case 3,8 -> 135;
+            case 5,7,9,10,11,15,6 -> 113;
+            default -> 91;
+        };
+        return y+panelHeight-reserved;
+    }
     private void submitText() { if (!input.getValue().isBlank()) { send(input.getValue()); input.setValue(""); } }
     private void send(String request)
     {
@@ -283,7 +356,7 @@ public final class StaffConversationScreen extends Screen
             for (String row : view.units())
             { graphics.drawString(font, row, x + 12, rowY, 0xFF92C9AE, false); rowY += 11; }
         else
-        {graphics.drawString(font,tab==7&&view.participants().size()>unit?view.participants().get(unit):view.radio()?"指挥频道在线":"岗位通信在线",x+12,rowY,0xFF92C9AE,false);rowY+=11;}
+        {graphics.drawString(font,tab==15&&view.participants().size()>unit?view.participants().get(unit):view.radio()?"指挥频道在线":"岗位通信在线",x+12,rowY,0xFF92C9AE,false);rowY+=11;}
         if (!view.order().isBlank())
         { graphics.drawString(font, font.plainSubstrByWidth(view.order(), panelWidth - 24), x + 12, rowY + 2, 0xFFE2BB67, false); rowY += 15; }
         int bottom = controlsTop()-6;

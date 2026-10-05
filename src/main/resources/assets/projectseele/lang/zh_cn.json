@@ -320,5 +320,7 @@
   "msg.projectseele.synch_test_ready": "同步试验准备就绪，请确认插入栓与通信连接。",
   "msg.projectseele.synch_test_run": "同步试验进行中。请保持连接。",
   "msg.projectseele.synch_test_result": "同步试验记录：%s",
-  "subtitles.projectseele.pressure_door_motion": "舱门滑轨运转"
+  "subtitles.projectseele.pressure_door_motion": "舱门滑轨运转",
+  "block.projectseele.entry_plug_bridge_deck": "插入栓检修桥面",
+  "block.projectseele.entry_plug_bridge_guard": "插入栓检修桥护栏"
 }

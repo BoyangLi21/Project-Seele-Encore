@@ -16,9 +16,11 @@ import net.minecraftforge.network.NetworkHooks;
 public final class SeeleMonolithEntityR47 extends Entity
 {
     private static final EntityDataAccessor<Integer> NUMBER=SynchedEntityData.defineId(SeeleMonolithEntityR47.class,EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Boolean> MEETING=SynchedEntityData.defineId(SeeleMonolithEntityR47.class,EntityDataSerializers.BOOLEAN);
     public SeeleMonolithEntityR47(EntityType<? extends SeeleMonolithEntityR47> type,Level level)
     {super(type,level);this.noPhysics=true;this.setNoGravity(true);this.setInvulnerable(true);}
-    @Override protected void defineSynchedData(){entityData.define(NUMBER,1);}
+    @Override protected void defineSynchedData(){entityData.define(NUMBER,1);entityData.define(MEETING,false);}
+    public boolean meetingLightsR48(){return entityData.get(MEETING);}
     public int number(){return entityData.get(NUMBER);}
     public void setNumber(int value){if(value<0||value>12)throw new IllegalArgumentException("SEELE prop index");entityData.set(NUMBER,value);}
     @Override protected void readAdditionalSaveData(CompoundTag tag){setNumber(Math.max(0,Math.min(12,tag.getInt("CouncilNumber"))));}
@@ -27,7 +29,9 @@ public final class SeeleMonolithEntityR47 extends Entity
     @Override public void tick()
     {
         super.tick();setDeltaMovement(Vec3.ZERO);
-        boolean desk=number()==0;double halfX=desk?1.65:1.1,halfZ=desk?.65:.175;
+        if(level() instanceof net.minecraft.server.level.ServerLevel server)
+            entityData.set(MEETING,com.projectseele.world.SeeleLightingR48.meetingModeR48(server));
+        boolean desk=number()==0;double halfX=desk?2.25:1.1,halfZ=desk?.8:.175;
         double angle=Math.toRadians(getYRot()),x=Math.abs(Math.cos(angle))*halfX+Math.abs(Math.sin(angle))*halfZ,
                 z=Math.abs(Math.sin(angle))*halfX+Math.abs(Math.cos(angle))*halfZ;
         setBoundingBox(new net.minecraft.world.phys.AABB(getX()-x,getY()+(desk?0:.18),getZ()-z,getX()+x,getY()+(desk?1.04:4.68),getZ()+z));

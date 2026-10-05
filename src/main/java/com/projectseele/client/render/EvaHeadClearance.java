@@ -7,6 +7,7 @@ import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import software.bernie.geckolib.cache.object.GeoBone;
+import software.bernie.geckolib.cache.object.BakedGeoModel;
 import java.util.*;
 
 /** Keep the helmet clear of the shouldered rifle without moving the weapon. */
@@ -21,15 +22,17 @@ final class EvaHeadClearance
     }
 
     record Node(Vector3f min,Vector3f max,Node left,Node right,List<Triangle> triangles) {}
-    private record Correction(float lift,float roll,double time) {}
+    private record Correction(float lift,float roll,int side,double time) {}
     private static final Map<Integer,List<Triangle>> HEADS=new HashMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Correction> LAST=new com.projectseele.util.WeakIdentityMap<>();
     private static final List<float[]> CANDIDATES=candidates();
     private static Node rifle;
+    private record BodyObstacle(Node shape,Matrix4f inverseBone) {}
+    private static final Map<String,Node> BACKS=new HashMap<>();
 
     static void clear()
     {
-        HEADS.clear();LAST.clear();rifle=null;
+        HEADS.clear();LAST.clear();BACKS.clear();rifle=null;
     }
 
     private static List<float[]> candidates()
@@ -105,7 +108,7 @@ final class EvaHeadClearance
 
     private static boolean applyAndTest(GeoBone head,Matrix4f parent,Matrix4f world,Matrix4f inverseGun,
                                          Quaternionf base,Vector3f right,Vector3f forward,
-                                         float lift,float roll,List<Triangle> shape)
+                                         float lift,float roll,List<Triangle> shape,List<BodyObstacle> blockers)
     {
         EvaRigTransforms.rotate(head,EvaRigTransforms.rotation(parent).invert()
                 .mul(orientation(base,right,forward,lift,roll)));
@@ -117,15 +120,39 @@ final class EvaHeadClearance
                     transform.transformPosition(new Vector3f(triangle.c())));
             if(hits(rifle,posed))return true;
         }
+        for(var blocker:blockers)
+        {
+            var local=new Matrix4f(blocker.inverseBone()).mul(EvaRigTransforms.model(head));
+            for(var triangle:shape)
+                if(hits(blocker.shape(),new Triangle(local.transformPosition(new Vector3f(triangle.a())),
+                        local.transformPosition(new Vector3f(triangle.b())),local.transformPosition(new Vector3f(triangle.c())))))return true;
+        }
         return false;
     }
 
     static void apply(EvaUnit01Entity eva,GeoBone head,Matrix4f world,Matrix4f gun,
-                       Quaternionf desired,Vector3f right,Vector3f forward,float partial)
+                       Quaternionf desired,Vector3f right,Vector3f forward,float partial,BakedGeoModel model)
     {
-        var shape=HEADS.computeIfAbsent(eva.getUnitVariant(),v->triangles(new ResourceLocation(
-                ProjectSeele.MODID,"mesh/eva_unit0"+v+".mesh.json"),"head"));
+        int key=eva instanceof com.projectseele.entity.EvaPrototypeEntity un?3+un.getUNSerial():eva.getUnitVariant();
+        var shape=HEADS.computeIfAbsent(key,v->triangles(new ResourceLocation(
+                ProjectSeele.MODID,"mesh/"+(v==3?"eva_prototype":v==4?"eva_un01":"eva_unit0"+v)+".mesh.json"),"head"));
         if(shape.isEmpty())return;
+        var blockers=new ArrayList<BodyObstacle>();
+        if(eva.rifleStanceLevel(partial)>2.4F)
+        {
+            String asset=key==3?"eva_prototype":key==4?"eva_un01":"eva_unit0"+key;
+            for(String part:List.of("torso_upper","pylon_l","pylon_r","dorsal_cover"))
+            {
+                var bone=model.getBone(part).orElse(null);if(bone==null)continue;
+                String id=asset+"/"+part;Node tree=BACKS.get(id);
+                if(tree==null)
+                {
+                    var triangles=triangles(new ResourceLocation(ProjectSeele.MODID,"mesh/"+asset+".mesh.json"),part);
+                    if(triangles.isEmpty())continue;tree=tree(triangles);BACKS.put(id,tree);
+                }
+                blockers.add(new BodyObstacle(tree,new Matrix4f(EvaRigTransforms.model(bone)).invert()));
+            }
+        }
         if(rifle==null)
         {
             var triangles=triangles(new ResourceLocation(ProjectSeele.MODID,"mesh/eva_pallet_smg.mesh.json"),"cannon");
@@ -137,30 +164,41 @@ final class EvaHeadClearance
         var previous=LAST.get(eva);
         if(previous!=null&&(time<previous.time()||time-previous.time()>.5))previous=null;
         float oldLift=previous==null?0:previous.lift(),oldRoll=previous==null?0:previous.roll();
+        int rollSide=previous==null?0:previous.side();
         float lift=0,roll=0;boolean found=false;
         double best=Double.POSITIVE_INFINITY;
         // The equally good left/right solutions used to alternate every time
         // the sight passed a triangle edge. Prefer a continuous correction
         // from this actor, not the first discrete candidate in global order.
-        if(previous!=null&&!applyAndTest(head,parent,world,inverseGun,desired,right,forward,oldLift,oldRoll,shape))
+        if(previous!=null&&!applyAndTest(head,parent,world,inverseGun,desired,right,forward,oldLift,oldRoll,shape,blockers))
         {
             lift=oldLift;roll=oldRoll;found=true;
             best=.08*(lift*lift+2*roll*roll);
         }
         for(var candidate:CANDIDATES)
         {
-            if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,candidate[0],candidate[1],shape))
+            // Keep the same shoulder-side solution while the rifle is held.
+            // Contact/no-contact changes at a triangle edge must not make the
+            // helmet jump across the sight line to the other cheek each frame.
+            if(rollSide!=0&&candidate[1]*rollSide<0)continue;
+            if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,candidate[0],candidate[1],shape,blockers))
             {
                 double dl=candidate[0]-oldLift,dr=candidate[1]-oldRoll;
                 double score=dl*dl+2*dr*dr+.08*(candidate[0]*candidate[0]+2*candidate[1]*candidate[1]);
                 if(score<best){best=score;lift=candidate[0];roll=candidate[1];found=true;}
             }
         }
+        if(!found&&previous!=null)
+        {
+            // An unsolved frame does not authorize resetting the head to zero;
+            // that reset itself produced the visible side-to-side snap.
+            lift=oldLift;roll=oldRoll;
+        }
         if(previous!=null)
         {
             float relax=(float)Math.exp(-Math.max(0,time-previous.time())/.18);
             float restLift=oldLift*relax,restRoll=oldRoll*relax;
-            if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,restLift,restRoll,shape))
+            if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,restLift,restRoll,shape,blockers))
             {lift=restLift;roll=restRoll;found=true;}
         }
         if(found&&previous!=null&&time>previous.time()&&time-previous.time()<.5)
@@ -168,12 +206,13 @@ final class EvaHeadClearance
             float alpha=(float)(1-Math.exp(-(time-previous.time())/.06));
             float smoothedLift=previous.lift()+(lift-previous.lift())*alpha;
             float smoothedRoll=previous.roll()+(roll-previous.roll())*alpha;
-            if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,smoothedLift,smoothedRoll,shape))
+            if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,smoothedLift,smoothedRoll,shape,blockers))
             {
                 lift=smoothedLift;roll=smoothedRoll;
             }
         }
-        applyAndTest(head,parent,world,inverseGun,desired,right,forward,lift,roll,shape);
-        LAST.put(eva,new Correction(lift,roll,time));
+        applyAndTest(head,parent,world,inverseGun,desired,right,forward,lift,roll,shape,blockers);
+        if(rollSide==0&&Math.abs(roll)>1e-4F)rollSide=roll>0?1:-1;
+        LAST.put(eva,new Correction(lift,roll,rollSide,time));
     }
 }

@@ -47,6 +47,52 @@ public final class TvEncounterDirectorR45
         if(!Tokyo3RamielBattleSavedData.get(l).battles().isEmpty())return "已有行动占用战区，请先结束该行动。";
         return "";
     }
+
+    /** Setup needs a ready defender; live combat retains its originals even when that defender is damaged. */
+    public static String combatEquipmentBlockerR48(ServerLevel level, TvCampaignSavedData data)
+    {
+        if (!data.active.equals("ramiel") || !data.phase.equals("combat"))
+            return "屋岛作战尚未进入已授权交战阶段。";
+        var site = TvEncounterSitesR45.site(level, data.active).orElse(null);
+        if (data.owner == null || data.generationR43 <= 0 || data.targetDeathConfirmedR45
+                || data.angel == null || !(level.getEntity(data.angel) instanceof RamielEntity boss) || !owned(boss, data))
+            return "原作战目标或授权凭证尚未确认，行动暂停。";
+        if (site == null || !site.geometryValidated() || !site.modelReady()
+                || !site.id().equals(data.encounterSiteR45) || !site.fingerprint().equals(data.encounterLayoutR45))
+            return "原作战阵地正在重新确认，行动暂停。";
+        if (data.sorties.containsKey(2) && !site.supportReady())
+            return "二号机支援阵地仍在整备中。";
+        var defender = data.sorties.get(0); var shooterSortie = data.sorties.get(1);
+        if (defender == null || defender.eva == null || defender.pilotR45 == null
+                || shooterSortie == null || shooterSortie.eva == null || shooterSortie.pilotR45 == null)
+            return "原屋岛编成尚未完整确认，行动暂停。";
+        // The original defender's identity remains mandatory. Its current HP,
+        // pilot boarding, brace and shield loan are battle/recovery outcomes.
+        var originalDefender = EvaFleetSavedData.get(level.getServer()).entry(0).orElse(null);
+        if (originalDefender == null || !defender.eva.equals(originalDefender.canonicalId()))
+            return "零号机原出战身份不一致，行动暂停。";
+        var shooter = TvSortiesR32.assignedUnit(level, data, 1);
+        if (shooter == null || !shooter.isAlive() || shooter.isExperimentalUnit() || shooter.getUnitVariant() != 1
+                || !TvSortiesR32.readyAssigned(level, shooterSortie)
+                || !TvMissionEquipmentR45.operational(shooter))
+            return "等待原初号机与原驾驶员恢复有效炮击状态。";
+        var cannon = TvEncounterEquipmentControlR45.serverCargoAndCannonR45();
+        if (!TvMissionEquipmentR45.cannonAuthorized(shooter) || !cannon.cannonReady(shooter))
+            return "原初号机真实阳离子炮或任务借用凭证尚未确认。";
+        if (!cannon.rangesReady(shooter, Math.max(site.separation(), site.attackRange())))
+            return "原初号机远程火控仍在校准中。";
+        if (shooter.position().distanceTo(site.hero()) > 12)
+            return "初号机请保持原炮击阵地。";
+        if (boss.effectiveBeamRangeR45() < boss.getBoundingBox().getCenter().distanceTo(shooter.getEyePosition()))
+            return "原目标火控仍在校准中。";
+        return "";
+    }
+
+    private static String phaseEquipmentBlockerR48(ServerLevel level, TvCampaignSavedData data)
+    {
+        return data.active.equals("ramiel") && data.phase.equals("combat")
+                ? combatEquipmentBlockerR48(level, data) : TvEncounterRulesR45.equipmentBlocker(level, data);
+    }
     public static void tick(ServerLevel l,TvCampaignSavedData d,ServerPlayer commander,ServerBossEvent bar)
     {
         if(d.phase.equals("combat_victory")||d.phase.equals("episode_archived"))
@@ -71,7 +117,10 @@ public final class TvEncounterDirectorR45
         {d.phase="failure";d.notice="出战机体暂不可用，请完成回收整备后重试。";d.setDirty();}
         if(d.phase.equals("failure")){TvEncounterRulesR45.stopEquipment(l,d);if(d.angel!=null&&l.getEntity(d.angel) instanceof Mob m&&owned(m,d))m.setNoAi(true);return;}
         String blocked=commander==null||commander.level()!=l?"司令暂离战区，原目标与任务暂停。":TvEncounterRulesR45.obstruction(l,d);
-        if(blocked.isEmpty())blocked=TvEncounterRulesR45.equipmentBlocker(l,d);
+        if(blocked.isEmpty())
+        {
+            blocked=phaseEquipmentBlockerR48(l,d);
+        }
         if(blocked.isEmpty()&&!TvEncounterRulesR45.visibleToCommander(l,d,commander))
             blocked="远程观测仍在准备中，请保持阵地。";
         var lead=TvSortiesR32.assignedUnit(l,d,site.primaryUnit());
@@ -153,7 +202,8 @@ public final class TvEncounterDirectorR45
         if(!TvEncounterRulesR45.handles(d.active)||!boss.getUUID().equals(d.angel)||!owned(boss,d))return;
         var owner=d.owner==null?null:l.getServer().getPlayerList().getPlayer(d.owner);
         boolean valid=d.phase.equals("combat")&&owner!=null&&owner.level()==l
-                &&TvEncounterRulesR45.targetFrameReady(l,d,owner)&&TvEncounterRulesR45.equipmentBlocker(l,d).isEmpty();
+                &&TvEncounterRulesR45.targetFrameReady(l,d,owner)
+                &&TvEncounterRulesR45.obstruction(l,d).isEmpty()&&phaseEquipmentBlockerR48(l,d).isEmpty();
         // Evaluate live mission permission before the terminal fact revokes it.
         d.targetDeathConfirmedR45=true;d.setDirty();
         if(valid)TvCampaignDirector.encounterCompleteR45(l,d.active,d.owner,boss.getUUID());

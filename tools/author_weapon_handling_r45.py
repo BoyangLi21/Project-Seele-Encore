@@ -45,6 +45,8 @@ def main():
     p.add_argument('--hand', type=Path, required=True)
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--in-place', action='store_true', help='Author one rig into the supplied profile directory without copying the library')
+    p.add_argument('--ready-centre',type=float,nargs=3,default=[25,111,-30])
+    p.add_argument('--ready-pole',type=float,nargs=3,default=[1,0,-.5])
     a = p.parse_args()
     a.out.mkdir(parents=True, exist_ok=a.in_place)
     if a.in_place and a.out.resolve()!=a.profiles.resolve():
@@ -86,7 +88,7 @@ def main():
     # Reach around the hand's palmar side before docking. A direct diagonal
     # path intersects the presented handle while the fingers are still open.
     centres = np.array([start_centre, [12,140,-32],[-11,159,-35],
-                        dock+[7,0,0],dock,dock,dock+[0,-2,-16],[3,154,-55],[24,125,-42],[25,111,-30]])
+                        dock+[7,0,0],dock,dock,dock+[0,-2,-16],[3,154,-55],[24,125,-42],a.ready_centre])
     dock_rotation = knife_frame([0, 0, 1])*install.inv()
     extracted_rotation = knife_frame([0, .35, .94])*install.inv()
     ready_rotation = knife_frame([0, .94, -.34])*install.inv()
@@ -120,7 +122,7 @@ def main():
         wrist = centre-orientation.apply(grip-actor.P['hand_r'])
         release=float(ease((t-.70)/.30))
         reach=float(ease(t/.34))
-        pole=(rest_pole*(1-reach)+np.array([.3,-1,-.4])*reach)*(1-release)+np.array([1,0,-.5])*release
+        pole=(rest_pole*(1-reach)+np.array([.3,-1,-.4])*reach)*(1-release)+np.asarray(a.ready_pole)*release
         result = solve(pose, actor.P, 'arm_r', 'forearm_r', 'hand_r',
             actor.elbows['r'], wrist, pole, [1, 0, 0], orientation)
         # During free reach and recovery, the wrist is not a ball joint.
