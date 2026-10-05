@@ -28,7 +28,7 @@ public final class FacilityLiftsR25
         var west = new S20PhysicalElevatorDirector.LiftSpec(OBSERVATION,
                 new S20PhysicalElevatorDirector.Landing("机库登机层",new BlockPos(-29,-394,-278),Direction.NORTH),
                 new S20PhysicalElevatorDirector.Landing("三机观察廊",new BlockPos(-29,-367,-278),Direction.NORTH));
-        return List.of(east,west);
+        return ExperimentalLiftStopsR47.augment(level,List.of(east,west));
     }
 
     public static String floorName(int y)

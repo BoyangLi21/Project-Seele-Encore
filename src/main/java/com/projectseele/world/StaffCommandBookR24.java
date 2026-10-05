@@ -21,6 +21,7 @@ public final class StaffCommandBookR24
         public final UUID actor, owner;
         public final int unit;
         public final String requested;
+        public final String mission;
         public final long deadline;
         public Step step = Step.SIGNAL;
         public boolean automatic;
@@ -34,6 +35,7 @@ public final class StaffCommandBookR24
             actorName = npc.getName().getString(); lastPosition = npc.blockPosition();
             this.operation = operation.equals("deploy") ? "prepare" : operation;
             this.unit = unit; deadline = player.level().getGameTime() + 12000;
+            mission=AutoSortieR32.missionToken(player.serverLevel());
         }
     }
     private static final Map<ServerLevel, Map<UUID, Order>> ORDERS = new WeakHashMap<>();
@@ -68,10 +70,21 @@ public final class StaffCommandBookR24
     public static boolean validateAutomatic(NervStaffEntity npc)
     {
         var job=order(npc);
-        if(job==null||!job.automatic)return true;
+        if(job==null)return true;
         var level=(ServerLevel)npc.level();
+        if(!job.mission.isEmpty()&&!job.operation.equals("recover")&&!job.mission.equals(AutoSortieR32.missionToken(level)))
+        {
+            failed(npc,"作战已经取消或变更，后续整备与发射按键未执行。");npc.finishTask();return false;
+        }
+        if(!job.automatic)return true;
         if(AutoSortieR32.automaticAllowed(level,job.unit))return true;
         cancelAutomatic(level,job.unit);return false;
+    }
+    public static void cancelMissionActions(ServerLevel level)
+    {
+        var jobs=ORDERS.get(level);if(jobs==null)return;
+        for(var job:List.copyOf(jobs.values()))if(!job.mission.isEmpty()&&!job.operation.equals("recover"))
+        {jobs.remove(job.actor);if(level.getEntity(job.actor) instanceof NervStaffEntity npc)npc.finishTask();}
     }
 
     public static int request(ServerPlayer player, NervStaffEntity npc, String operation, int unit)

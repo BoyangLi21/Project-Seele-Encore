@@ -34,6 +34,13 @@ def sha(p):
 def floor_key(q):
     """Commissioned facility floors; local thresholds may differ in height."""
     x,y,z=map(int,q)
+    if -469<=y<=-467 and ((-37<=x<=-23 and -289<=z<=-117)
+            or (-34<=x<=7 and -123<=z<=-117)
+            or (8<=x<=86 and -140<=z<=-74)
+            or (90<=x<=106 and -57<=z<=-42)
+            or (100<=x<=106 and -87<=z<=-45)
+            or (87<=x<=106 and -87<=z<=-81)):
+        return 'r47_experiment/LCL_sync'
     if z < 0:
         for key,lo,hi in [('hangar_observation',-370,-366),('hangar_boarding',-395,-393),('hangar_launch',-443,-441)]:
             if lo<=y<=hi:return key

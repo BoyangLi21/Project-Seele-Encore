@@ -28,7 +28,7 @@ public final class NervWayfindingR24
     private static final Map<net.minecraft.server.MinecraftServer,Optional<Graph>> GRAPHS=new WeakHashMap<>();
     private static final Map<net.minecraft.server.MinecraftServer,Optional<Graph>> LOCAL_LIFT_GRAPHS=new WeakHashMap<>();
     private static final Map<net.minecraft.server.MinecraftServer,Map<UUID,Selection>> ACTIVE=new WeakHashMap<>();
-    public static final List<String> GOALS=List.of("command","hangars","station","pyramid_station","launch_station","observation","dogma","nearest_lift");
+    public static final List<String> GOALS=List.of("command","hangars","station","pyramid_station","launch_station","observation","dogma","experiment","nearest_lift");
     private static Graph graph(ServerPlayer player)
     {return loadGraph(player.server,"nerv_routes_r24.json.gz",GRAPHS);}
     private static Graph loadGraph(net.minecraft.server.MinecraftServer server,String filename,
@@ -218,7 +218,11 @@ public final class NervWayfindingR24
         if(y<=-384)return "综合服务层";return y<-355?"上层接待区":"总指挥层";
     }
     private static String zone(BlockPos at)
-    {return at.getZ()<0?(at.getY()>=-380?"机库观景层":at.getY()>=-405?"机库登机层":"发射区交通层"):zone(at.getY());}
+    {
+        if(at.getY()>=-469&&at.getY()<=-467&&at.getX()>=-37&&at.getX()<=106&&at.getZ()>=-289&&at.getZ()<=-42)
+            return "LCL 同步实验层";
+        return at.getZ()<0?(at.getY()>=-380?"机库观景层":at.getY()>=-405?"机库登机层":"发射区交通层"):zone(at.getY());
+    }
     private static String instruction(Graph graph,int from,int goal)
     {
         BlockPos start=graph.nodes[from];int cursor=graph.next[from][goal];if(cursor==from)return "已到达 "+graph.names[goal];

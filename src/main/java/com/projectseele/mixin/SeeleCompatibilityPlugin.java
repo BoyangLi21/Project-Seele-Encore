@@ -2,8 +2,10 @@ package com.projectseele.mixin;
 
 import java.util.*;
 import com.projectseele.compat.CityUnionActivationR45;
+import com.projectseele.compat.CityUnionPortableBootstrapR45;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.fml.loading.FMLLoader;
+import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.tree.*;
 import org.spongepowered.asm.mixin.extensibility.*;
@@ -11,22 +13,90 @@ import org.spongepowered.asm.mixin.extensibility.*;
 /** Keep optional-mod client receivers out of dedicated-server verification. */
 public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
 {
+    private Boolean cityAbiAccepted;
     @Override public void onLoad(String pkg) {}
     @Override public String getRefMapperConfig(){return null;}
     @Override public boolean shouldApplyMixin(String target,String mixin)
     {
         if (!mixin.endsWith("CityExactUnionCreateMixinR45") && !mixin.endsWith("CitySavedOwnerUnionMixinR45")) return true;
-        if (!Boolean.getBoolean("projectseele.r45CityBalancedUnion")) return false;
-        // No Create class initialization during transformation. Changed/absent backends retain their stock implementation.
-        try (var input=getClass().getClassLoader().getResourceAsStream("com/simibubi/create/content/contraptions/Contraption.class"))
+        if (!CityUnionPortableBootstrapR45.requested()) return false;
+        if(cityAbiAccepted!=null)return cityAbiAccepted;
+        // Inspect the actual producer contract without initializing Create or
+        // comparing mapped/native class bytes to historical QA resources.
+        try
         {
-            String actual=input==null?"":java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(input.readAllBytes()));
-            String expected=CityUnionActivationR45.expectedCreateSHA256();
-            boolean accepted=expected!=null && actual.equals(expected);
-            CityUnionActivationR45.backend(actual,accepted,accepted?"Exact configured producer accepted":"Absent/changed Create producer or invalid explicit SHA");
-            return accepted;
+            ClassNode base=readCityClass("Contraption"),owner=readCityClass("AbstractContraptionEntity");
+            String level="Lnet/minecraft/world/level/Level;",nbt="Lnet/minecraft/nbt/CompoundTag;";
+            MethodNode supplier=method(base,"lambda$gatherBBsOffThread$24","()Ljava/util/List;");
+            boolean accepted=supplier!=null && method(base,"getBlocks","()Ljava/util/Map;")!=null
+                    && method(base,"readNBT","("+level+nbt+"Z)V")!=null
+                    && method(base,"writeNBT","(Z)"+nbt)!=null
+                    && method(base,"gatherBBsOffThread","()V")!=null
+                    && field(base,"blocks","Ljava/util/Map;")
+                    && field(base,"collisionLevel","Lcom/simibubi/create/content/contraptions/ContraptionWorld;")
+                    && field(base,"simplifiedEntityColliderProvider","Ljava/util/concurrent/CompletableFuture;")
+                    && originalShapeBody(supplier)
+                    && hasCall(method(owner,"readAdditional","("+nbt+"Z)V"),
+                       "com/simibubi/create/content/contraptions/Contraption","fromNBT","("+level+nbt+"Z)Lcom/simibubi/create/content/contraptions/Contraption;");
+            var resource=getClass().getClassLoader().getResource("com/simibubi/create/content/contraptions/Contraption.class");
+            CityUnionActivationR45.backendAbi(String.valueOf(resource),accepted,
+                    accepted?"Actual complete input/OR supplier, NBT ownership and future ABI accepted":"Actual Create input/OR/future ABI differs; original implementation retained");
+            return cityAbiAccepted=accepted;
         }
-        catch (Exception unavailable) { CityUnionActivationR45.backend("",false,unavailable.toString()); return false; }
+        catch (Exception unavailable) { CityUnionActivationR45.backendAbi("",false,unavailable.toString());return cityAbiAccepted=false; }
+    }
+    private ClassNode readCityClass(String name)throws Exception
+    {
+        try(var stream=getClass().getClassLoader().getResourceAsStream("com/simibubi/create/content/contraptions/"+name+".class"))
+        {
+            if(stream==null)throw new IllegalStateException("Create producer absent: "+name);
+            var node=new ClassNode();new ClassReader(stream).accept(node,ClassReader.SKIP_DEBUG|ClassReader.SKIP_FRAMES);return node;
+        }
+    }
+    private static MethodNode method(ClassNode c,String name,String desc)
+    {for(var m:c.methods)if(m.name.equals(name)&&m.desc.equals(desc))return m;return null;}
+    private static boolean field(ClassNode c,String name,String desc)
+    {return c.fields.stream().anyMatch(f->f.name.equals(name)&&f.desc.equals(desc));}
+    private static boolean hasCall(MethodNode m,String owner,String name,String desc)
+    {
+        if(m==null)return false;
+        for(var i:m.instructions)if(i instanceof MethodInsnNode call&&call.owner.equals(owner)&&call.name.equals(name)&&call.desc.equals(desc))return true;
+        return false;
+    }
+    private static boolean originalShapeBody(MethodNode supplier)
+    {
+        String shapes="net/minecraft/world/phys/shapes/",shape="L"+shapes+"VoxelShape;";
+        Map<String,String> names=Map.of("m_83040_","empty","m_82749_","empty","m_60742_","getCollisionShape",
+                "m_83281_","isEmpty","m_83216_","move","m_83148_","joinUnoptimized","m_83296_","optimize","m_83299_","toAabbs");
+        Set<String> required=new HashSet<>(List.of("empty_shape","context_empty","actual_block_shape","isEmpty","move","joinUnoptimized","optimize","toAabbs","OR","view","original_map"));
+        for(var instruction:supplier.instructions)
+        {
+            if(instruction instanceof FieldInsnNode f)
+            {
+                if(f.owner.equals(shapes+"BooleanOp"))
+                {
+                    if(!f.name.equals("OR")&&!f.name.equals("f_82695_"))return false;
+                    required.remove("OR");
+                }
+                if(f.name.equals("collisionLevel"))required.remove("view");
+                if(f.owner.equals("com/simibubi/create/content/contraptions/Contraption")&&f.name.equals("blocks")&&f.desc.equals("Ljava/util/Map;"))required.remove("original_map");
+            }
+            if(!(instruction instanceof MethodInsnNode c))continue;
+            String name=names.getOrDefault(c.name,c.name);
+            if(c.owner.equals(shapes+"Shapes"))
+            {
+                if(name.equals("empty")&&c.desc.equals("()"+shape))required.remove("empty_shape");
+                else if(name.equals("joinUnoptimized")&&c.desc.equals("("+shape+shape+"L"+shapes+"BooleanOp;)"+shape))required.remove("joinUnoptimized");
+                else return false;
+            }
+            else if(c.owner.equals(shapes+"CollisionContext"))
+            {if(!name.equals("empty"))return false;required.remove("context_empty");}
+            else if(c.owner.equals(shapes+"VoxelShape"))
+            {if(!Set.of("isEmpty","move","optimize","toAabbs").contains(name))return false;required.remove(name);}
+            else if(c.owner.equals("net/minecraft/world/level/block/state/BlockState")&&name.equals("getCollisionShape")
+                    &&c.desc.equals("(Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;L"+shapes+"CollisionContext;)"+shape))required.remove("actual_block_shape");
+        }
+        return required.isEmpty();
     }
     @Override public void acceptTargets(Set<String> own,Set<String> others) {}
     @Override public List<String> getMixins(){return null;}

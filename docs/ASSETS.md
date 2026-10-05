@@ -406,5 +406,15 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 ## R46 既有素材的修复与派生
 
 - 18份机库 PA 混响：从已有本项目广播音源派生，只添加有限室内反射及响度整平。来源与台词许可沿用原音源，处理元数据见 `assets/projectseele/audio/hangar_pa_reverb_r46.json`。角色对白不新增语音。
-- 三机站姿右键重击候选：Mesh2Motion `human-addon-animations.glb` 的 `Attack_Ground_Pound`，沿用已登记 CC0-1.0 来源；它是手工关键帧动画，不标为真人动捕。保留完整动作顺序，重定向到各机原骨架；原创巨人双拳下砸解释，不宣称TV同一镜头复刻。生成器 `tools/author_heavy_ground_pound_r46.py`。
+
+## R47 广播、运输机与设施音效
+
+- 机库18段PA沿用已登记的本项目日语设施广播，仅加强早反射和2.6秒室内尾响。清晰直达声保留；角色交谈仍仅文字。
+- `transport_engine_r47.ogg` 改编自 [C-V: Jet Engine Start Cart.wav](https://freesound.org/people/C-V/sounds/704945/)，CC0 1.0，原作者实录J79启动设备。处理：截取稳定运转段、单声道48kHz、带通、首尾交叉淡化形成循环；两类运输机共用该实际发动机素材。
+- R47液压／弹射素材含 [kr15h: DikaiPumpSystem-2023-06-02a.wav](https://freesound.org/people/kr15h/sounds/689263/)，CC0 1.0，原作者液压泵及阀门实录。轨道、门锁与重载层沿用R36登记CC0钢材／集装箱录音。
+- EVA接触音强化沿用原R36石材／土壤／金属录音；短攻击吼截取原R40已登记的CC0呼吸表演，不引入官方音轨或角色配音。
+- 生成器 `tools/build_audio_r47.py`；许可页面、原下载地址、处理参数及成品时长保存在 `artifacts/rebuild_r47/audio_staff/audio/manifest.json`。现场听感交由用户验收，不将峰值和时长检查称为听感通过。
+- R47 三机站姿右键重击使用 Mesh2Motion `human-base-animations.glb` 的 `Melee_Hook` 与 `Melee_Hook_Rec` 连续动作，替换上一批双拳下砸；零号机持盾使用 `Idle_Shield`、`Shield_OneShot`、`Idle_Shield_Break`，二号机招架取 `Sword_Block` 的挡击姿态，初号机暴走待命使用 `Zombie_Idle`。来源沿用已登记 CC0-1.0，属于作者制作的关键帧，不能标为真人动捕或 TV 原镜头动作。生成器 `tools/prepare_motion_r47.py`，受力与巨人体态的修改属于项目原创。
+- R47 零号机与二号机手部适配复用已有 MakeHuman CC0 派生手面，按各自腕部局部坐标同时迁移骨架、逆绑定、蒙皮、手指控制与持握架。没有将初号机角度直接套在不同的手骨上。既有 EVA 机体与纹理许可保持；完整模块接入见 `tools/reuse_hand_module_r47.py`。
+- R47 曲面盾牌和同步实验栓支架为本项目原创程序网格及贴图，分别由 `tools/build_yashima_shield_r47.py`、`tools/build_synch_cradle_r47.py` 生成。巨盾造型参考 TV 第六话的比例和受力方式，支架是按现有插入栓接口设计的游戏设施；没有复制原画为纹理。
 - 萨基尔原有变形缓存重绑只修正元数据可移植化造成的字节指纹差异。严格证明网格/UV/蒙皮数据与全部变形帧未改变；没有放松运行时指纹验证。

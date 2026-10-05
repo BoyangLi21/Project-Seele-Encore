@@ -91,6 +91,12 @@ public class ClientEvents
                 NervCarrierPlatformRenderer::new);
         event.registerEntityRenderer(ModEntities.NERV_COMMAND_SEAT.get(),
                 NervCommandSeatRenderer::new);
+        event.registerEntityRenderer(ModEntities.PILOT_REST_SEAT_R47.get(),
+                NervCommandSeatRenderer::new);
+        event.registerEntityRenderer(com.projectseele.registry.SeeleConferenceEntitiesR47.MONOLITH.get(),
+                com.projectseele.client.render.SeeleMonolithRendererR47::new);
+        event.registerEntityRenderer(com.projectseele.registry.SeeleConferenceEntitiesR47.DESK.get(),
+                com.projectseele.client.render.SeeleMonolithRendererR47::new);
         event.registerEntityRenderer(ModEntities.NERV_ARMAMENT_STATION.get(),
                 NervArmamentStationRenderer::new);
         event.registerEntityRenderer(ModEntities.NERV_SILO_DOOR.get(),

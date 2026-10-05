@@ -146,7 +146,9 @@ public final class EvaLogisticsCommands
             {
                 continue;
             }
-            EvaUnit01Entity unit = EvaLogisticsDirector.forceReset(level, variant);
+            EvaUnit01Entity unit;
+            try{unit=EvaLogisticsDirector.forceReset(level,variant);}
+            catch(IllegalStateException held){source.sendFailure(Component.literal(held.getMessage()));continue;}
             int current = variant;
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
                     "EVA-%02d canonical airframe reset to wet cage: %s",
@@ -243,6 +245,11 @@ public final class EvaLogisticsCommands
                     pilot.getVehicle() == null ? "none"
                             : pilot.getVehicle().getStringUUID(),
                     pilot.blockPosition().toShortString())), false);
+            source.sendSuccess(()->Component.literal("DUMMY PATH "+TrainingPilotDirector.routeTraceR47(level,pilot)),false);
+            String fault=pilot.getPersistentData().getString("SeelePilotLastRouteFaultR47");
+            if(!fault.isEmpty())source.sendSuccess(()->Component.literal("DUMMY LAST FAULT "+fault),false);
+            String nativeFault=pilot.getPersistentData().getString("SeelePilotNativePathFailureR47");
+            if(!nativeFault.isEmpty())source.sendSuccess(()->Component.literal("DUMMY LAST NATIVE PATH "+nativeFault),false);
             count++;
         }
         if (count == 0)

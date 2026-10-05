@@ -22,8 +22,9 @@ public final class NervOfficeChairBlock extends net.minecraft.world.level.block.
         if(player.isSecondaryUseActive()||player.isPassenger())return net.minecraft.world.InteractionResult.PASS;
         if(!level.isClientSide)
         {
-            var seats=level.getEntitiesOfClass(com.projectseele.entity.NervCommandSeatEntity.class,new net.minecraft.world.phys.AABB(pos).inflate(.5),e->e.getTags().contains("seele_office_seat"));
-            if(seats.stream().anyMatch(net.minecraft.world.entity.Entity::isVehicle))return net.minecraft.world.InteractionResult.CONSUME;
+            var seats=level.getEntitiesOfClass(com.projectseele.entity.NervCommandSeatEntity.class,new net.minecraft.world.phys.AABB(pos).inflate(.5),e->e.getTags().contains("seele_office_seat")
+                    ||e.getType()==com.projectseele.registry.ModEntities.PILOT_REST_SEAT_R47.get());
+            if(seats.stream().anyMatch(e->e.isVehicle()||e.getType()==com.projectseele.registry.ModEntities.PILOT_REST_SEAT_R47.get()))return net.minecraft.world.InteractionResult.CONSUME;
             var seat=com.projectseele.registry.ModEntities.NERV_COMMAND_SEAT.get().create(level);
             if(seat!=null)
             {

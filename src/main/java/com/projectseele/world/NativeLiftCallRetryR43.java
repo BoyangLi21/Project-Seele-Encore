@@ -21,16 +21,20 @@ public final class NativeLiftCallRetryR43
     private static final Map<MinecraftServer,Map<String,Call>> PENDING=new WeakHashMap<>();
 
     public static void external(ServerPlayer player,String lift,BlockPos button)
-    {enqueue(player,lift,button.immutable(),null);}
+    {enqueue(player,lift,button.immutable(),null,80);}
     public static void gateway(ServerPlayer player,int target)
-    {enqueue(player,NervLiftPassengerSync.GATEWAY,null,target);}
-    private static void enqueue(ServerPlayer player,String lift,BlockPos button,Integer target)
+    {enqueue(player,NervLiftPassengerSync.GATEWAY,null,target,80);}
+    public static void externalWhileMovingR47(ServerPlayer player,String lift,BlockPos button)
+    {enqueue(player,lift,button.immutable(),null,2000);}
+    public static void gatewayWhileMovingR47(ServerPlayer player,int target)
+    {enqueue(player,NervLiftPassengerSync.GATEWAY,null,target,2000);}
+    private static void enqueue(ServerPlayer player,String lift,BlockPos button,Integer target,int lifetime)
     {
         var server=player.getServer();var jobs=PENDING.computeIfAbsent(server,k->new LinkedHashMap<>());
         String key=player.getUUID()+":"+lift;var previous=jobs.get(key);
         if(previous!=null&&Objects.equals(previous.button,button)&&Objects.equals(previous.gatewayTarget,target))return;
         var fake=player instanceof net.minecraftforge.common.util.FakePlayer?new java.lang.ref.WeakReference<ServerPlayer>(player):null;
-        int tick=server.getTickCount();jobs.put(key,new Call(player.getUUID(),fake,player.level().dimension(),lift,button,target,tick,tick+80));
+        int tick=server.getTickCount();jobs.put(key,new Call(player.getUUID(),fake,player.level().dimension(),lift,button,target,tick,tick+lifetime));
         player.displayClientMessage(Component.literal("呼叫已登记，请稍候。"),true);
         ProjectSeele.LOGGER.info("Lift call waiting for native initialization: lift={} target={}",lift,target==null?button:target);
     }
@@ -45,6 +49,14 @@ public final class NativeLiftCallRetryR43
             if(player==null&&call.fake!=null)player=call.fake.get();
             if(player==null||level==null||player.serverLevel()!=level){jobs.remove(entry.getKey());continue;}
             boolean ready=call.gatewayTarget!=null?RegionalGatewayDirector.controllersReadyR43(level):S20MovingElevatorsAdapter.callControllersReadyR43(level,call.lift);
+            if(ready)
+                for(var spec:NervLiftPassengerSync.managedLifts(level))if(spec.id().equals(call.lift))
+                {
+                    var at=S20MovingElevatorsAdapter.controllerPosition(spec,spec.lower());
+                    if(level.getBlockEntity(at) instanceof com.supermartijn642.movingelevators.blocks.ControllerBlockEntity block
+                            &&block.hasGroup()&&block.getGroup().isMoving())ready=false;
+                    break;
+                }
             if(!ready&&tick<call.expires)continue;
             jobs.remove(entry.getKey());
             if(!ready)

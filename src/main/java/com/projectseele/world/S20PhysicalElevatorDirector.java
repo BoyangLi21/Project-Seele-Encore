@@ -292,7 +292,8 @@ public final class S20PhysicalElevatorDirector
             lifts = List.of(commandRearLift(), observationHangarLift(),
                     oldCommandToCompactCageLift(), surfaceTransitLift(),
                     centralDogmaLift(), commanderOfficeLift());
-            return lifts.stream().map(spec -> transform(level, spec)).toList();
+            return SeeleConferenceAccessR47.augment(level,
+                    lifts.stream().map(spec -> transform(level, spec)).toList());
         }
         var result = new ArrayList<>(List.of(commandRearLift(), observationHangarLift(),
                 oldCommandToCompactCageLift(), surfaceTransitLift(level),
@@ -300,7 +301,8 @@ public final class S20PhysicalElevatorDirector
                 .filter(spec -> !FacilityLayoutR20.active(level.getServer()) || !spec.id().equals(OBSERVATION_HANGAR_LIFT_ID))
                 .map(spec -> RegionalFacilityLayout.personnelLift(level,spec)).toList());
         result.addAll(FacilityLiftsR25.installed(level));
-        return List.copyOf(result);
+        return SeeleConferenceAccessR47.augment(level,
+                ExperimentalLiftStopsR47.augment(level,List.copyOf(result)));
     }
 
     private static LiftSpec transform(ServerLevel level, LiftSpec spec)
@@ -2091,7 +2093,10 @@ public final class S20PhysicalElevatorDirector
                     ModBlocks.NERV_WALL_PANEL.get().defaultBlockState());
         }
         set(level, callBacking, LANDING_ACCENT);
-        set(level, callBacking.relative(callFacing), wallButton(callFacing));
+        if (!SeeleConferenceAccessR47.protectedReader(level, callBacking.relative(callFacing)))
+        {
+            set(level, callBacking.relative(callFacing), wallButton(callFacing));
+        }
         set(level, callBacking.above(), CABIN_PANEL);
         // One exterior call button only. Floor selection belongs inside the
         // car, where the proven R28 cabin has separate UP and DOWN buttons.
@@ -2103,6 +2108,7 @@ public final class S20PhysicalElevatorDirector
             ServerLevel level, Landing landing)
     {
         BlockPos call = exteriorCallPosition(landing);
+        if (SeeleConferenceAccessR47.protectedReader(level, call)) return;
         set(level, call, wallButton(exteriorCallFacing(landing)));
         set(level, call.above(), AIR);
     }
@@ -2115,6 +2121,11 @@ public final class S20PhysicalElevatorDirector
                 .findFirst().orElse(null);
         if (owner != null)
         {
+            if (open && SeeleConferenceAccessR47.office(level, owner)
+                    && landing.walkY() == SeeleConferenceAccessR47.MIDDLE)
+            {
+                open = SeeleConferenceAccessR47.canOpenLanding(level);
+            }
             // The smooth entity is visual-only.  Moving Elevators and this
             // legacy block interlock remain the sole owners of collision;
             // replacing this plane with barriers breaks cabin discovery.
@@ -2181,7 +2192,8 @@ public final class S20PhysicalElevatorDirector
                 {
                     continue;
                 }
-                set(level, position, open ? AIR : CABIN_DOOR);
+                set(level, position, open ? AIR
+                        : TvLiftFinishR45.cabinDoor(level,centre,exit,CABIN_DOOR));
             }
         }
     }
@@ -2275,6 +2287,10 @@ public final class S20PhysicalElevatorDirector
             ServerPlayer player, LiftSpec spec, Landing target,
             BlockPos acknowledgement)
     {
+        if (SeeleConferenceAccessR47.office(player.serverLevel(), spec))
+        {
+            return SeeleConferenceAccessR47.allowDestination(player, target.walkY());
+        }
         boolean restrictedDogma = (spec.id().equals(COMMAND_REAR_LIFT_ID)||spec.id().equals(CENTRAL_DOGMA_LIFT_ID))
                 && target.walkY()==spec.lower().walkY();
         boolean restrictedOffice = spec.id().equals(COMMANDER_OFFICE_LIFT_ID)

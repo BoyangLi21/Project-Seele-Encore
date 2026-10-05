@@ -26,6 +26,7 @@ public final class NervPilotCombatR30
     }
     public static boolean controls(EvaUnit01Entity e)
     {
+        if(e.level() instanceof ServerLevel level&&StaffRecoveryR47.pending(level,e.getUnitVariant()))return false;
         if(PilotReturnR39.controls(e))return true;
         if(!(e.level() instanceof ServerLevel l)||e.isExperimentalUnit())return false;var d=TvCampaignSavedData.get(l);
         var sortie=d.sorties.get(e.getUnitVariant());
@@ -64,6 +65,7 @@ public final class NervPilotCombatR30
         var eva=TvSortiesR32.assignedUnit(l,sortie);
         if(eva==null){EvaLogisticsDirector.loadControlTarget(l,sortie.unit);return;}
         if(owner==null||owner.level()!=l){eva.stopAutonomousR30();return;}
+        if(StaffRecoveryR47.pending(l,sortie.unit)){eva.stopAutonomousR30();return;}
         if(d.phase.equals("failure")){TvEncounterRulesR45.stopEquipment(l,d);eva.stopAutonomousR30();return;}
         retain(l,eva.blockPosition());var b=BRAINS.computeIfAbsent(eva,key->new Brain());b.age++;
         if(EvaShutdownR30.disabled(eva)){eva.stopAutonomousR30();d.notice="机体已关机。司令，可以通过运输部门请求回收。";return;}
@@ -73,9 +75,9 @@ public final class NervPilotCombatR30
             eva.stopAutonomousR30();if(l.getGameTime()<b.nextOrder)return;b.nextOrder=l.getGameTime()+100;
             if(phase.equals("PARKED"))
             {
-                var pilots=TrainingPilotDirector.pilots(l).stream().filter(p->p.getAssignedVariant()==sortie.unit).toList();
-                if(pilots.size()!=1){d.notice="原驾驶员尚未接通，机体保持待命。";return;}
-                var pilot=pilots.get(0);
+                TrainingPilotDirector.retainOriginalPilotR47(l,sortie.unit);
+                var pilot=TrainingPilotDirector.existingPilotR45(l,sortie.unit);
+                if(pilot==null){d.notice="正在接收原驾驶员的待命信号，机体保持原位。";return;}
                 if(sortie.pilotR45==null){sortie.pilotR45=pilot.getUUID();d.setDirty();}
                 if(!sortie.pilotR45.equals(pilot.getUUID())){d.notice="驾驶员身份与本次编成不符，未重新派遣。";return;}
                 AutoSortieR32.assignCommander(eva,owner);
@@ -112,12 +114,29 @@ public final class NervPilotCombatR30
             if(!held)
             {
                 var depot=TvMissionEquipmentR45.nearestPhysicalCargo(l,eva);
+                boolean physicalShield=false;
+                if(depot==null)
+                {
+                    var known=TvMissionEquipmentR45.knownCargoForUnitR47(l,sortie.unit)
+                            .filter(position->position.getY()>=eva.getBoundingBox().minY-4&&position.getY()<=eva.getBoundingBox().maxY+4);
+                    if(known.isEmpty()&&sortie.unit==0)
+                    {known=EquipmentVaultsR47.knownVaultPositionR47(l,EvaUnit01Entity.WEAPON_SHIELD_R45);physicalShield=known.isPresent();}
+                    if(known.isPresent())
+                    {
+                        var position=known.get();retain(l,position);
+                        if(eva.position().subtract(Vec3.atCenterOf(position)).horizontalDistance()>21)
+                        {move(l,eva,pilot,b,Vec3.atCenterOf(position),null,false);say(owner,pilot,b,"weapon_approach");return;}
+                        if(physicalShield)depot=l.getEntitiesOfClass(NervArmamentStationEntity.class,new AABB(position).inflate(4),
+                                station->station.payloadR47()==EvaUnit01Entity.WEAPON_SHIELD_R45&&station.isStocked()).stream().findFirst().orElse(null);
+                    }
+                }
                 if(depot==null){eva.stopAutonomousR30();d.notice=sortie.unit==0?"等待运输部门送达防护盾。":"等待运输部门送达阳离子炮。";return;}
                 retain(l,depot.blockPosition());if(!depot.isReadyAndStocked())depot.deploy();
                 if(eva.position().subtract(depot.position()).horizontalDistance()>21)
                 {move(l,eva,pilot,b,depot.position(),null,false);say(owner,pilot,b,"weapon_approach");return;}
                 eva.autonomousDriveR30(pilot,Vec3.ZERO,depot.position().add(0,35,0),false);
-                if(TvEncounterRulesR45.issueMissionAtStation(depot,eva,pilot))say(owner,pilot,b,"weapon_acquired");
+                boolean issued=physicalShield?depot.issueToAssignedPilotR30(pilot,eva):TvEncounterRulesR45.issueMissionAtStation(depot,eva,pilot);
+                if(issued){if(sortie.unit==0)eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45);say(owner,pilot,b,"weapon_acquired");}
                 return;
             }
             // Preserve collision-aware travel; never chase the distant boss or
@@ -170,14 +189,16 @@ public final class NervPilotCombatR30
             Vec3 direction=range>145?toward:toward.yRot((b.age/100%2==0?1:-1)*(float)Math.PI*.5F).scale(.38);
             eva.autonomousDriveR30(pilot,steer(l,eva,b,direction),aim,false);eva.autonomousAttackR30(pilot,3);say(owner,pilot,b,"ranged");return;
         }
-        int cycle=(b.age/180)%3;int weapon=shield||cycle==0?EvaUnit01Entity.WEAPON_KNIFE:EvaUnit01Entity.WEAPON_FISTS;
+        int cycle=(b.age/180)%3;
+        boolean sword=sortie.unit==2&&(eva.getArmamentMask()&(1<<EvaUnit01Entity.WEAPON_SWORD_R45))!=0;
+        int weapon=sword?EvaUnit01Entity.WEAPON_SWORD_R45:shield||cycle==0?EvaUnit01Entity.WEAPON_KNIFE:EvaUnit01Entity.WEAPON_FISTS;
         eva.autonomousWeaponR30(pilot,weapon);
         if(range>30){Vec3 flank=angel.position();
             var lead=angel instanceof net.minecraft.world.entity.Mob mob?mob.getTarget():null;if(lead!=eva&&lead!=null){Vec3 radial=eva.position().subtract(flank).multiply(1,0,1).normalize().yRot((sortie.unit%2==0?1:-1)*.6F);flank=flank.add(radial.scale(25));}
             move(l,eva,pilot,b,flank,angel,true);say(owner,pilot,b,"close_in");return;}
         Vec3 circle=range<18?toward.scale(-.6):Vec3.ZERO;
         eva.autonomousDriveR30(pilot,steer(l,eva,b,circle),aim,false);
-        if(b.age%12==0)eva.autonomousAttackR30(pilot,weapon==EvaUnit01Entity.WEAPON_KNIFE?(b.age/48)%2:cycle==1?0:(b.age/48)%2==0?1:2);
+        if(b.age%12==0)eva.autonomousAttackR30(pilot,sword?0:weapon==EvaUnit01Entity.WEAPON_KNIFE?(b.age/48)%2:cycle==1?0:(b.age/48)%2==0?1:2);
         say(owner,pilot,b,"melee");
     }
     private static void move(ServerLevel l,EvaUnit01Entity eva,TrainingPilotEntity pilot,Brain b,Vec3 goal,LivingEntity enemy,boolean run)

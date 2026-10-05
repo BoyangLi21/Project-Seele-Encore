@@ -30,12 +30,12 @@ public final class NervStaffDialogue
     public static void greet(ServerPlayer player,NervStaffEntity npc)
     {
         say(player,npc.getName().getString(),StaffDialogueCatalogR24.next(
-                player,npc.skin(),npc.staffRole(),"greeting"));
+                player,StaffDialogueCatalogR24.profile(npc),npc.staffRole(),"greeting"));
     }
     public static String commandRefusal(ServerPlayer player,NervStaffEntity npc,String operation)
     {
         if(!authorized(player))return "请先出示 NERV 通行证。";
-        return StaffDialogueCatalogR24.next(player,npc.skin(),npc.staffRole(),"command_denied");
+        return StaffDialogueCatalogR24.next(player,StaffDialogueCatalogR24.profile(npc),npc.staffRole(),"command_denied");
     }
     private static MutableComponent option(String text,String command)
     {return Component.literal("["+text+"] ").withStyle(s->s.withColor(ChatFormatting.GOLD).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,command)));}
@@ -56,7 +56,7 @@ public final class NervStaffDialogue
     { StaffConversationR24.open(player,npc,false); }
     public static void openChat(ServerPlayer player,NervStaffEntity npc)
     {
-        reply(player,npc,StaffDialogueCatalogR24.line(npc.skin(),npc.staffRole(),"greeting",player.tickCount / 100));
+        reply(player,npc,StaffDialogueCatalogR24.line(StaffDialogueCatalogR24.profile(npc),npc.staffRole(),"greeting",player.tickCount / 100));
         String prefix="/nerv talk \""+npc.memberId()+"\" ";var menu=option("战况",prefix+"状态");
         if(StaffAuthorityR25.commandContact(npc))
         {
@@ -115,7 +115,13 @@ public final class NervStaffDialogue
         var intent=StaffIntentR24.parse(text);
         switch(intent.kind())
         {
-            case CANCEL -> { return StaffCommandBookR24.cancel(player,npc,intent.unit()); }
+            case CANCEL ->
+            {
+                boolean recovery=StaffRecoveryR47.cancel(player,intent.unit());
+                int result=StaffCommandBookR24.cancel(player,npc,intent.unit());
+                if(recovery)reply(player,npc,"后续回收安排已取消。已开始的机械运输会继续到安全位置。");
+                return recovery?1:result;
+            }
             case ACTION ->
             {
                 if(intent.subject().startsWith("city_"))
@@ -127,6 +133,18 @@ public final class NervStaffDialogue
                 }
                 if(intent.subject().equals("board"))
                 {reply(player,npc,StaffPilotOrdersR25.request(player,npc,intent.unit()));return 1;}
+                if(intent.subject().equals("standby"))
+                {reply(player,npc,StaffPilotOrdersR25.returnToStandby(player,npc,intent.unit()));return 1;}
+                if(intent.subject().equals("recover"))
+                {reply(player,npc,StaffRecoveryR47.request(player,npc,intent.unit()));return StaffRecoveryR47.queuedBy(player,intent.unit())?1:0;}
+                if(intent.subject().equals("support"))
+                {
+                    if(!authorized(player)||!StaffAuthorityR25.allows(npc,"campaign"))
+                    {reply(player,npc,"支援编成请联络葛城部长或冬月副司令。");return 0;}
+                    if(TvCampaignSavedData.get(player.serverLevel()).active.isEmpty())
+                    {reply(player,npc,"当前没有已接受的作战。先选择目标并下达首次出击，再追加支援机体。");return 0;}
+                    return TvSortiesR32.reinforce(player,intent.unit(),true,false);
+                }
                 return StaffCommandBookR24.request(player,npc,intent.subject(),intent.unit());
             }
             case INVALID -> { reply(player,npc,intent.subject());return 0; }
@@ -151,18 +169,22 @@ public final class NervStaffDialogue
                 else if(intent.subject().equals("campaign"))
                     reply(player,npc,StaffAuthorityR25.allows(npc,"campaign")
                         ?com.projectseele.event.TvCampaignDirector.briefing(player)
-                        :StaffDialogueCatalogR24.next(player,npc.skin(),npc.staffRole(),"campaign"));
+                        :StaffDialogueCatalogR24.next(player,StaffDialogueCatalogR24.profile(npc),npc.staffRole(),"campaign"));
                 else if(intent.subject().equals("city"))
                 {
                     var origin=IntegratedNervMapBuilder.tokyo3Origin(player.serverLevel());
                     int depth=Tokyo3RetractionDirector.depth(player.serverLevel(),origin);
-                    reply(player,npc,"城市目前下沉了 "+depth+" 米。需要升降的话，用电话联络冬月副司令，选择「城市」。");
+                    reply(player,npc,npc.skin().equals("fuyutsuki")
+                            ?"碇，城市目前收纳了 "+depth+" 米。你要收纳，还是展开？"
+                            :"城市目前收纳了 "+depth+" 米。升降请联络冬月副司令。");
                 }
                 else if(intent.subject().equals("directions"))
                     reply(player,npc,npc.staffRole().startsWith("un_")
                         ?"去车辆区、航空区或试验机库，请沿人员标线走。滑行道上不要停留。地下总部的路线，要到总部以后才能引导。"
                         :NervWayfindingR24.describe(player));
-                else reply(player,npc,StaffDialogueCatalogR24.next(player,npc.skin(),npc.staffRole(),intent.subject()));
+                else if(intent.subject().equals("sync")&&Set.of("r47/experiment/researcher_0","r47/experiment/researcher_1").contains(npc.memberId()))
+                    reply(player,npc,SynchLabDirectorR47.staffReportR47(player,npc.memberId().endsWith("_0")?0:1));
+                else reply(player,npc,StaffDialogueCatalogR24.next(player,StaffDialogueCatalogR24.profile(npc),npc.staffRole(),intent.subject()));
                 return 1;
             }
         }

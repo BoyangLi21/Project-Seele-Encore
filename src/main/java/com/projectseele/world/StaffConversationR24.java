@@ -45,6 +45,7 @@ public final class StaffConversationR24
     public static boolean radioAllowed(ServerPlayer player)
     {
         if (!NervStaffDialogue.authorized(player)) return false;
+        if (PilotRestroomServicesR47.fixedPhoneAllowedR47(player)) return true;
         if (player.getInventory().items.stream().anyMatch(s -> s.is(com.projectseele.registry.ModItems.SATELLITE_PHONE.get()))
                 || player.getOffhandItem().is(com.projectseele.registry.ModItems.SATELLITE_PHONE.get())) return true;
         if (EvaPilotResolver.controlTarget(player) != null) return true;
@@ -68,7 +69,7 @@ public final class StaffConversationR24
     public static void open(ServerPlayer player, NervStaffEntity npc, boolean radio)
     {
         if (player.level() != npc.level() || radio && !radioAllowed(player) || !radio && player.distanceToSqr(npc) > 100) return;
-        var session = new Session(npc, radio, StaffDialogueCatalogR24.line(npc.skin(), npc.staffRole(), "greeting", player.tickCount / 100));
+        var session = new Session(npc, radio, StaffDialogueCatalogR24.line(StaffDialogueCatalogR24.profile(npc), npc.staffRole(), "greeting", player.tickCount / 100));
         sessions(player).put(player.getUUID(), session); send(player, npc, session, true);
     }
 
@@ -180,13 +181,29 @@ public final class StaffConversationR24
                 var centre = eva == null ? player.position() : eva.position();
                 var station = player.serverLevel().getEntitiesOfClass(com.projectseele.entity.NervArmamentStationEntity.class,
                         new net.minecraft.world.phys.AABB(centre,centre).inflate(768,40,768),
-                        rack->!TvMissionEquipmentR45.missionRack(rack)).stream()
+                        rack->rack.payloadR47()==com.projectseele.entity.EvaUnit01Entity.WEAPON_RIFLE&&!TvMissionEquipmentR45.missionRack(rack)).stream()
                         .min(Comparator.comparingDouble(rack->rack.position().subtract(centre).horizontalDistanceSqr())).orElse(null);
                 session.reply = station != null && station.deploy()
                         ? "就近武器井正在升起，坐标：" + station.blockPosition().toShortString() + "。"
                         : "附近没有可部署的武器井，或武器井已展开。";
             }
             send(player, npc, session, false); return;
+        }
+        if(request.equals("WEAPONS:shield")||request.equals("WEAPONS:sword"))
+        {
+            if(!NervStaffDialogue.authorized(player)||!StaffAuthorityR25.allows(npc,"weapons"))session.reply="专用武器井部署请联络作战指挥。";
+            else
+            {
+                boolean shield=request.endsWith("shield");
+                int payload=shield?com.projectseele.entity.EvaUnit01Entity.WEAPON_SHIELD_R45:com.projectseele.entity.EvaUnit01Entity.WEAPON_SWORD_R45;
+                var station=EquipmentVaultsR47.recordedStationR47(player.serverLevel(),payload);
+                String purpose=shield?"零号机专用盾井":"二号机专用长剑井";
+                session.reply=station==null?purpose+"信号尚未接通，请稍后查看。"
+                        :station.deploy()?purpose+"正在升起，坐标："+station.blockPosition().toShortString()+"。"
+                        :station.isReadyAndStocked()?purpose+"已展开，等待对应机体领取。"
+                        :!station.isStocked()?purpose+"当前空载，请联系整备部门。":purpose+"仍在进行机械作业，请保持净空。";
+            }
+            send(player,npc,session,false);return;
         }
         if(request.startsWith("TRANSPORT:"))
         {
@@ -249,7 +266,20 @@ public final class StaffConversationR24
         {
             player.sendSystemMessage(Component.literal("请携带 NERV 通行证和卫星电话，或在指挥台附近、已登上的插入栓及机体内使用指挥通信。")); return 0;
         }
-        String skin = switch (name.strip().toLowerCase(Locale.ROOT))
+        String contactName = name.strip().toLowerCase(Locale.ROOT).replaceFirst("^dummy[ :：]*", "");
+        int pilot = switch (contactName)
+        {
+            case "碇真嗣", "真嗣", "shinji" -> 1;
+            case "绫波丽", "绫波", "丽", "rei" -> 0;
+            case "明日香", "惣流明日香", "asuka" -> 2;
+            default -> -1;
+        };
+        if (pilot >= 0)
+        {
+            player.sendSystemMessage(Component.literal(pilotStatus(player, pilot)));
+            return 1;
+        }
+        String skin = switch (contactName)
         {
             case "美里", "葛城美里", "misato" -> "misato";
             case "律子", "赤木律子", "ritsuko" -> "ritsuko";

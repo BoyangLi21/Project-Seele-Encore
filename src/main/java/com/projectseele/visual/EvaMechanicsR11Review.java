@@ -39,7 +39,7 @@ public final class EvaMechanicsR11Review
             if(phase==0)
             {
                 pilot=server.getPlayerList().getPlayers().get(0);pilot.stopRiding();pilot.setGameMode(net.minecraft.world.level.GameType.SURVIVAL);pilot.getCapability(com.projectseele.capability.EvaPilotCapability.DATA).ifPresent(c->c.setSynchronization(100));server.setFlightAllowed(true);server.setDifficulty(net.minecraft.world.Difficulty.NORMAL,true);
-                var old=new java.util.ArrayList<net.minecraft.world.entity.Entity>();for(var e:l.getAllEntities())if(e instanceof EvaUnit01Entity||e instanceof EntryPlugCarrierEntity||e instanceof SachielEntity)old.add(e);old.forEach(net.minecraft.world.entity.Entity::discard);
+                var old=new java.util.ArrayList<net.minecraft.world.entity.Entity>();for(var e:l.getAllEntities())if(e instanceof EvaUnit01Entity||e instanceof EntryPlugCarrierEntity p&&p.laboratorySlotR47()<0&&!p.isIndependentUNPlug()||e instanceof SachielEntity)old.add(e);old.forEach(net.minecraft.world.entity.Entity::discard);
                 l.getGameRules().getRule(GameRules.RULE_DOMOBSPAWNING).set(false,server);l.getGameRules().getRule(GameRules.RULE_DAYLIGHT).set(false,server);l.setDayTime(6000);
                 for(BlockPos p:BlockPos.betweenClosed(-45,-60,-55,45,22,200))if(!l.getBlockState(p).isAir())l.setBlock(p,Blocks.AIR.defaultBlockState(),2);
                 for(BlockPos p:BlockPos.betweenClosed(-45,-61,-55,45,-61,200))l.setBlock(p,Blocks.GRAY_CONCRETE.defaultBlockState(),2);

@@ -31,6 +31,7 @@ public final class NervAirLiftR30
     {
         UUID unit,owner;int variant,age,duration,contactTicks;boolean touchdown;Phase phase=Phase.PREPARE;boolean returning,carrying,crew,rebase,paused,tilting;
         float landingYaw=EvaUnit01Entity.SILO_BAY_YAW;
+        long nextReport;
         Vec3 from=Vec3.ZERO,to=Vec3.ZERO,destination=Vec3.ZERO;String note="接收运输指令";
     }
     public static final class State extends SavedData
@@ -126,6 +127,28 @@ public final class NervAirLiftR30
     private static boolean ownsRegisteredCargo(State state)
     {return state.job!=null&&Set.of(Phase.APPROACH,Phase.CLAMP,Phase.ASCEND,Phase.CRUISE,Phase.DESCEND,Phase.RELEASE,Phase.HOLD).contains(state.job.phase);}
     public static String phaseName(ServerLevel l){var j=state(l).job;return j==null?"IDLE":j.phase.name();}
+    public static boolean busy(ServerLevel level){var s=state(level);return s.job!=null||s.forceRecovery;}
+    /** Called before a maintenance reset of this same registered airframe. */
+    public static boolean abortForMaintenanceR47(ServerLevel level,int variant,UUID original)
+    {
+        var s=state(level);var job=s.job;if(job==null)return true;
+        if(job.variant!=variant||original==null||!job.unit.equals(original))return false;
+        var unit=ServiceAircraftR32.payload(level,original);
+        if(unit==null||!ready(level,STAND,3)||!ready(level,s.aircraftAt,4))return false;
+        var plane=ServiceAircraftR32.find(level,s.aircraft);if(plane==null)return false;
+        unit.endNervCarrierMotion();EvaAirTransportR31.hold(unit);
+        plane.cargo(-1,false,0);plane.setPos(STAND);plane.setYRot(0);plane.setDeltaMovement(Vec3.ZERO);
+        s.aircraftAt=STAND;s.aircraftBackup=plane.saveWithoutId(new CompoundTag());s.job=null;s.forceRecovery=false;
+        s.last="运输后续已交由原机体维护复位，原运输机返回机场。";s.setDirty();return true;
+    }
+    private static void report(ServerLevel level,State s,Job job)
+    {
+        long now=System.currentTimeMillis();
+        if(job.nextReport==0||job.nextReport>now+10000){job.nextReport=now+10000;return;}
+        if(now<job.nextReport)return;job.nextReport=now+10000;
+        var owner=level.getServer().getPlayerList().getPlayer(job.owner);
+        if(owner!=null)owner.sendSystemMessage(Component.literal("[NERV 运输管制] "+BlockPos.containing(s.aircraftAt).toShortString()+" · "+job.note));
+    }
     public static String request(ServerPlayer p,int variant,boolean returning,int x,int z)
     {
         if(variant<0||variant>2||!NervStaffDialogue.authorized(p)||!StaffConversationR24.radioAllowed(p))return "需要 NERV 指挥通信权限。";
@@ -196,7 +219,7 @@ public final class NervAirLiftR30
             if(!ready(l,STAND,5))return;var plane=ModEntities.UN_TRANSPORT.get().create(l);if(plane==null)return;plane.configure(0,false);plane.setNerv();plane.setPos(STAND);if(!l.addFreshEntity(plane))return;s.aircraft=plane.getUUID();s.aircraftAt=STAND;s.setDirty();
         }
         if(s.forceRecovery){l.resetEmptyTime();completeForcedRecovery(l,s);return;}
-        if(s.job==null)return;l.resetEmptyTime();
+        if(s.job==null)return;l.resetEmptyTime();report(l,s,s.job);
         try{advance(l,s);}catch(Exception error){s.job.phase=Phase.HOLD;if(l.getEntity(s.job.unit) instanceof EvaUnit01Entity held){held.endNervCarrierMotion();EvaAirTransportR31.hold(held);}note(l,s.job,"运输暂停："+error.getMessage());s.setDirty();com.projectseele.ProjectSeele.LOGGER.error("NERV airlift held",error);}
     }
     private static void advance(ServerLevel l,State s)

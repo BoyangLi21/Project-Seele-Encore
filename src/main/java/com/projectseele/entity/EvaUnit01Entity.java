@@ -819,6 +819,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaDorsalMechanism.save(this,tag);
         tag.putInt("SeeleWeapon", this.getWeapon());
         tag.putInt("SeeleArmamentMask", this.getArmamentMask());
+        tag.putInt("SeeleWeaponCustodyVersion", 47);
         tag.putBoolean("SeeleCrucified", this.isCrucified());
         tag.putBoolean("SeeleEntryPlugInserted", this.isEntryPlugInserted());
         if (this.lockedEntryPlugUuid != null)
@@ -883,6 +884,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // built-in equipment unconditionally and preserve that one external
         // entitlement across a legitimate world/server reload.
         int restoredMask = intrinsicMask | (savedMask & ARMAMENT_MASK_RIFLE);
+        if(tag.getInt("SeeleWeaponCustodyVersion")>=47&&!this.isExperimentalUnit())
+        {
+            if(this.getUnitVariant()==UNIT_02)restoredMask|=savedMask&ARMAMENT_MASK_SWORD_R45;
+            if(this.getUnitVariant()==UNIT_00)restoredMask|=savedMask&ARMAMENT_MASK_SHIELD_R45;
+        }
         restoredMask = com.projectseele.world.TvMissionEquipmentR45.restoreCannonMask(this,restoredMask);
         if ((restoredMask & (1 << savedWeapon)) == 0
                 || !EvaEquipmentResourcesR45.ready(this,savedWeapon))
@@ -1004,11 +1010,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             mask |= ARMAMENT_MASK_N2;
         }
-        if(!this.isExperimentalUnit())
-        {
-            if(this.getUnitVariant()==UNIT_02)mask|=ARMAMENT_MASK_SWORD_R45;
-            if(this.getUnitVariant()==UNIT_00)mask|=ARMAMENT_MASK_SHIELD_R45;
-        }
         return mask;
     }
 
@@ -1116,6 +1117,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // Observers must not infer the control circuit from a temporarily
         // missing nested pilot, especially outside that passenger's tracking range.
         if(this.level().isClientSide)return this.entityData.get(DATA_POWERED_VISUAL_R46);
+        if(EvaAirTransportR31.active(this))return false;
         if(EvaBerserkMotionR34.silent(this))return false;
         if(EvaShutdownR30.wreck(this)||EvaBayRepairR33.active(this))return false;
         if(this.isBerserk())return true;
@@ -1143,6 +1145,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return;
         }
         EvaShutdownR30.stored(this);
+        com.projectseele.world.EquipmentVaultsR47.returnStoredR47(this);
         this.setUmbilicalAnchor(null);
         this.entityData.set(DATA_UMBILICAL_SEVERED, false);
         this.entityData.set(DATA_POWER_TICKS, 0);
@@ -1153,7 +1156,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // weapon selected made the dormant arm controller stop while the mesh
         // attachment remained visibly suspended in an open hand.
         this.selectWeapon(WEAPON_FISTS);
-        this.entityData.set(DATA_ARMAMENT_MASK,this.getArmamentMask()&~ARMAMENT_MASK_RIFLE);
+        this.entityData.set(DATA_ARMAMENT_MASK,this.getArmamentMask()
+                &~(ARMAMENT_MASK_RIFLE|ARMAMENT_MASK_SWORD_R45|ARMAMENT_MASK_SHIELD_R45));
+        this.getPersistentData().remove("R47PhysicalShieldIssued");
         this.entityData.set(DATA_CANNON_CHARGE, 0);
         this.entityData.set(DATA_N2_ARM_TICKS, 0);
         this.chargingHeld = false;
@@ -1506,13 +1511,24 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         this.refreshTvMissionEquipmentR45();
         if(com.projectseele.world.TvMissionEquipmentR45.cannonAuthorized(this))this.selectWeapon(WEAPON_CANNON);
+        else if(com.projectseele.world.TvMissionEquipmentR45.shieldAuthorized(this))
+        {this.entityData.set(DATA_ARMAMENT_MASK,this.getArmamentMask()|ARMAMENT_MASK_SHIELD_R45);this.selectWeapon(WEAPON_SHIELD_R45);}
     }
     public boolean hasEquippedYashimaShieldR45(){return this.entityData.get(DATA_MISSION_SHIELD_R45);}
+    public boolean autonomousShieldBraceR47(TrainingPilotEntity pilot,boolean brace)
+    {
+        if(this.level().isClientSide||this.getPilotEntity()!=pilot||pilot.getAssignedVariant()!=UNIT_00
+                ||!this.isPoweredOn()||!com.projectseele.entity.EvaShieldRigR47.equipped(this)||this.isNervLogisticsLocked()
+                ||this.isFirstBattleActive()||EvaShutdownR30.disabled(this))return false;
+        this.entityData.set(DATA_CROUCHING,brace);this.entityData.set(DATA_PRONE,false);
+        this.updatePoseDimensions();return true;
+    }
 
     /** Installs one server-authorized external weapon from a physical rack. */
     public boolean installExternalArmament(int weapon)
     {
-        if (this.level().isClientSide || weapon != WEAPON_RIFLE)
+        if (this.level().isClientSide || (weapon!=WEAPON_RIFLE&&weapon!=WEAPON_SWORD_R45&&weapon!=WEAPON_SHIELD_R45)
+                ||!EvaEquipmentResourcesR45.ready(this,weapon))
         {
             return false;
         }
@@ -1523,6 +1539,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return false;
         }
         this.entityData.set(DATA_ARMAMENT_MASK, mask | bit);
+        if(weapon==WEAPON_SHIELD_R45)this.getPersistentData().putBoolean("R47PhysicalShieldIssued",true);
         this.selectWeapon(weapon);
         return true;
     }
@@ -3063,6 +3080,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void beginOrdinaryGroupCAttack()
     {
+        com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"punch");
         EvaGameplayMotionR32.beginAction(this);
         if(EvaGameplayMotionR32.phrases(this))CombatFoleyR36.load(this);
         this.gameplayOrdinaryContactR32=false;
@@ -3187,6 +3205,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 ?this.fastMeleeCooldownR43(SMASH_COOLDOWN_TICKS):this.synchronizedCooldown(SMASH_COOLDOWN_TICKS);
         this.entityData.set(DATA_SMASH_SEQUENCE,
                 (this.entityData.get(DATA_SMASH_SEQUENCE) + 1) & Integer.MAX_VALUE);
+        com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,this.getWeapon()==WEAPON_KNIFE?"knife":"smash");
 
         boolean knife = this.getWeapon() == WEAPON_KNIFE;
         boolean lance = this.getWeapon() == WEAPON_LANCE;
@@ -3380,6 +3399,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void beginKnifeMotion(boolean reverse)
     {
+        com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"knife");
         EvaGameplayMotionR32.beginAction(this);
         this.entityData.set(DATA_KNIFE_TYPE, reverse ? 1 : 0);
         this.entityData.set(DATA_LIVE_ACTION_PHASE, 0.0F);
@@ -3897,7 +3917,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void pilotJump(ServerPlayer pilot)
     {
         if(CombatFeelR31.restrained(this)||EvaCombatR31.active(this))return;
-        if (this.getControllingPassenger() != pilot || this.isPilotProne())
+        if (this.getControllingPassenger() != pilot || this.isPilotProne()
+                ||this.rifleStanceLevel(0)>1.05F||EvaCapturedLocomotionR44.ownsMultiContactPoseR45(this))
         {
             this.jumpBufferTicks = 0;
             return;
@@ -3931,7 +3952,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         // Prone is a deliberate supported posture. Space must not silently
         // stand the airframe up or retain a jump for the next stance change.
-        if (this.isPilotProne())
+        if (this.isPilotProne()||this.rifleStanceLevel(0)>1.05F
+                ||EvaCapturedLocomotionR44.ownsMultiContactPoseR45(this))
         {
             this.jumpBufferTicks = 0;
             return false;
@@ -4044,7 +4066,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
     public boolean autonomousWeaponR30(TrainingPilotEntity pilot,int weapon)
     {
-        if(!autonomousPilotR30(pilot)||weapon<WEAPON_FISTS||weapon>WEAPON_RIFLE||(this.getArmamentMask()&(1<<weapon))==0)return false;
+        if(!autonomousPilotR30(pilot)||weapon<WEAPON_FISTS||weapon>WEAPON_SHIELD_R45
+                ||!this.armamentAvailable(weapon))return false;
         if(this.hasLiveActionForRender(0))return false;
         this.selectWeapon(weapon);return true;
     }
@@ -4095,6 +4118,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return;
         }
         this.rifleCooldown = this.synchronizedCooldown(SeeleConfig.EVA_RIFLE_INTERVAL_TICKS.get());
+        com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"rifle");
         if("r29-factory".equals(System.getProperty("projectseele.regionalBuild","")))com.projectseele.visual.FieldR28Review.rifleTicks.add(level.getGameTime());
         Vec3 look = this.pilotAimDirection(pilot);
         EvaRifleKinematics.Frame rifle = EvaRifleKinematics.sample(this,1,look);
@@ -4241,6 +4265,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             return;
         }
+        // Transport owns the captured inert pose. It neither consumes the
+        // onboard reserve nor reconnects a cable while the load is restrained.
+        if(EvaAirTransportR31.active(this))return;
         if (this.isExperimentalUnit())
         {
             this.setUmbilicalAnchor(null);
@@ -4704,6 +4731,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void fireCannon(ServerLevel level, LivingEntity pilot)
     {
+        com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"cannon");
         this.triggerAnim("strike", this.isPilotProne()
                 ? "prone_cannon_fire" : "cannon_fire");
         // Sample the authoritative pilot rotation at the release packet, not

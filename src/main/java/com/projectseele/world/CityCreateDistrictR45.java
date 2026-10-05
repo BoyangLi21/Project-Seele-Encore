@@ -59,6 +59,7 @@ public final class CityCreateDistrictR45
 {
     private static final String JOB = System.getProperty("projectseele.r45CityCreateDistrict", "");
     private static final int WORK_LIMIT = 4096;
+    private static final int PREPARE_READ_LIMIT = 16384;
     private static final long WORK_NANOS = 8_000_000L;
     private static final double SPEED = .25;
     private static final int RAMP_TICKS = 16;
@@ -429,6 +430,9 @@ public final class CityCreateDistrictR45
         final List<ChunkPos> chunks = new ArrayList<>();
         State state;
         Plan preparing;
+        CompletableFuture<List<Fold>> pendingInitialFold;
+        DataOutputStream initialImageSink;
+        final Map<BlockState, CompoundTag> initialImageStates = new HashMap<>();
         CompletableFuture<String> pending;
         CompletableFuture<Plan> pendingRead;
         final CityJournalReadExecutorR45 journalReader = new CityJournalReadExecutorR45();
@@ -519,6 +523,9 @@ public final class CityCreateDistrictR45
             clearReconcileFold();
             if (pending != null && !pending.isDone()) throw new IllegalStateException("The cancelled unplaced journal is still draining; original city remains untouched");
             pending = null;
+            pendingInitialFold = null;
+            if (initialImageSink != null) initialImageSink.close();
+            initialImageSink = null; initialImageStates.clear();
             assemblyLimit = CityCreateBridgeR45.backendBlockLimit();
             spawnLimit = CityCreateBridgeR45.backendSpawnLimit();
             if (occupied()) throw new IllegalStateException("Clear full buildings/roofs/shaft envelopes before detachment");
@@ -691,23 +698,35 @@ public final class CityCreateDistrictR45
             int width = spec.maxX() - spec.minX() + 1, depth = spec.maxZ() - spec.minZ() + 1;
             int body = width * depth * (spec.height() + 4), ground = width * depth;
             int scanned = 0;
-            while (scanned++ < WORK_LIMIT && System.nanoTime() - began < WORK_NANOS)
+            // Observation still yields at 8ms. Its cheap air/state reads must
+            // not inherit the lower per-tick world-mutation operation cap.
+            while (scanned++ < PREPARE_READ_LIMIT && System.nanoTime() - began < WORK_NANOS)
             {
                 if (prepStage == 3)
                 {
-                    List<Fold> initialImages = preparing.fold();
+                    // Plan images are fully captured and immutable here. Building
+                    // a whole imported tower's Fold exceeded the server's 8ms
+                    // budget before the first per-cell iteration could yield.
+                    if (pendingInitialFold == null)
+                    {
+                        Plan immutableImages = preparing;
+                        pendingInitialFold = CompletableFuture.supplyAsync(immutableImages::fold);
+                        return;
+                    }
+                    if (!pendingInitialFold.isDone()) return;
+                    List<Fold> initialImages = pendingInitialFold.join();
                     if (prepCursor < initialImages.size())
                     {
                         Fold row = initialImages.get(prepCursor++); Image actual = Image.read(level, row.pos);
                         if (!actual.equals(row.initial)) throw new IllegalStateException("Complete initial source/destination/Ground image changed before immutable WAL at " + row.pos);
-                        CompoundTag image = actual.save(); image.putLong("Pos", row.pos.asLong());
-                        try (var sink = new DataOutputStream(new java.security.DigestOutputStream(java.io.OutputStream.nullOutputStream(), initialImageDigest)))
-                        { NbtIo.write(image, sink); }
+                        CompoundTag image = actual.save(initialImageStates); image.putLong("Pos", row.pos.asLong());
+                        NbtIo.write(image, initialImageSink);
                         continue;
                     }
                     preparing.initialWorldImageCount = initialImages.size();
                     preparing.initialWorldImageSHA256 = java.util.HexFormat.of().formatHex(initialImageDigest.digest());
-                    preparing.folded = null; initialImageDigest = null; prepStage = 4;
+                    initialImageSink.close(); initialImageSink = null; initialImageStates.clear();
+                    preparing.folded = null; pendingInitialFold = null; initialImageDigest = null; prepStage = 4;
                 }
                 if (prepStage < 2)
                 {
@@ -743,6 +762,9 @@ public final class CityCreateDistrictR45
                         if (prepStage == 2)
                         {
                             initialImageDigest = java.security.MessageDigest.getInstance("SHA-256");
+                            initialImageSink = new DataOutputStream(new java.security.DigestOutputStream(
+                                    java.io.OutputStream.nullOutputStream(), initialImageDigest));
+                            initialImageStates.clear();
                             prepStage = 3; prepCursor = 0; continue;
                         }
                         if (preparing.cells.isEmpty()) throw new IllegalStateException("Empty damaged building requires explicit retirement, never synthetic cargo");
@@ -1243,11 +1265,17 @@ public final class CityCreateDistrictR45
                 try
                 {
                     var digest = java.security.MessageDigest.getInstance("SHA-256");
-                    for (var row : initial.entrySet())
+                    // This local encoding cache is read only and never escapes
+                    // into the plan/WAL. Only each image's separate Pos changes;
+                    // BE metadata is still copied by save(states).
+                    Map<BlockState, CompoundTag> states = new HashMap<>();
+                    try (var sink = new DataOutputStream(new java.security.DigestOutputStream(java.io.OutputStream.nullOutputStream(), digest)))
                     {
-                        CompoundTag image = row.getValue().save(); image.putLong("Pos", row.getKey());
-                        try (var sink = new DataOutputStream(new java.security.DigestOutputStream(java.io.OutputStream.nullOutputStream(), digest)))
-                        { NbtIo.write(image, sink); }
+                        for (var row : initial.entrySet())
+                        {
+                            CompoundTag image = row.getValue().save(states); image.putLong("Pos", row.getKey());
+                            NbtIo.write(image, sink);
+                        }
                     }
                     if (!initialWorldImageSHA256.equals(java.util.HexFormat.of().formatHex(digest.digest())))
                         throw new IllegalStateException("Complete source/destination/Ground first images differ from their actual native world snapshot");
@@ -1345,7 +1373,12 @@ public final class CityCreateDistrictR45
         static final Image AIR = new Image(Blocks.AIR.defaultBlockState(), null);
         static Image read(ServerLevel level, BlockPos pos)
         {
-            BlockState state = level.getBlockState(pos); BlockEntity entity = level.getBlockEntity(pos);
+            var chunk = level.getChunkAt(pos);
+            BlockState state = chunk.getBlockState(pos);
+            // Match Level's IMMEDIATE lookup even on non-BE states: this retains
+            // packed/lazy pending NBT and orphaned instantiated BE semantics.
+            BlockEntity entity = chunk.getBlockEntity(pos,
+                    net.minecraft.world.level.chunk.LevelChunk.EntityCreationType.IMMEDIATE);
             if (state.hasBlockEntity() && entity == null) throw new IllegalStateException("Complete source BE unavailable at " + pos);
             return state.equals(Blocks.AIR.defaultBlockState()) && entity == null ? AIR : new Image(state, entity == null ? null : entity.saveWithFullMetadata().copy());
         }

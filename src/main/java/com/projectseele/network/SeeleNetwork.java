@@ -12,7 +12,7 @@ import net.minecraftforge.network.simple.SimpleChannel;
  */
 public final class SeeleNetwork
 {
-    private static final String PROTOCOL_VERSION = "54";
+    private static final String PROTOCOL_VERSION = "55";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),
@@ -211,6 +211,9 @@ public final class SeeleNetwork
         CHANNEL.messageBuilder(ServerboundEncounterObserverReadyPacket.class,id++,NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ServerboundEncounterObserverReadyPacket::encode).decoder(ServerboundEncounterObserverReadyPacket::new)
                 .consumerMainThread(ServerboundEncounterObserverReadyPacket::handle).add();
+        CHANNEL.messageBuilder(ServerboundSynchLabExitR47.class,id++,NetworkDirection.PLAY_TO_SERVER)
+                .encoder(ServerboundSynchLabExitR47::encode).decoder(ServerboundSynchLabExitR47::new)
+                .consumerMainThread(ServerboundSynchLabExitR47::handle).add();
         com.projectseele.world.DeadSeaReadingR45.installBridge((player,challenge)->CHANNEL.send(
                 net.minecraftforge.network.PacketDistributor.PLAYER.with(()->player),new ClientboundDeadSeaReadChallengeR45(
                         challenge.nonce(),challenge.revision(),challenge.pages())));

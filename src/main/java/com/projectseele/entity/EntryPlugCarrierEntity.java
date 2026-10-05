@@ -168,6 +168,9 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
             SynchedEntityData.defineId(EntryPlugCarrierEntity.class,
                     EntityDataSerializers.BOOLEAN);
 
+    private static final EntityDataAccessor<Integer> DATA_LAB_SLOT_R47 =
+            SynchedEntityData.defineId(EntryPlugCarrierEntity.class,EntityDataSerializers.INT);
+    private RigidTransform laboratoryDockR47=RigidTransform.identity();
     private final AnimatableInstanceCache geoCache =
             GeckoLibUtil.createInstanceCache(this);
     private RigidTransform clientPreviousRotation = RigidTransform.identity();
@@ -204,6 +207,32 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                 .add(Attributes.KNOCKBACK_RESISTANCE, 1.0D);
     }
 
+    public int laboratorySlotR47(){return this.entityData.get(DATA_LAB_SLOT_R47);}
+    public void configureLaboratoryR47(int slot,int variant,RigidTransform dock)
+    {
+        if(this.level().isClientSide||slot<0||slot>1||this.getLinkedEva()!=null)
+            throw new IllegalStateException("Only independent laboratory fixtures can be configured");
+        this.entityData.set(DATA_LAB_SLOT_R47,slot);this.assignVariant(variant);
+        this.laboratoryDockR47=dock;this.setCanonicalTransform(dock);
+        this.entityData.set(DATA_STAGE,STAGE_SUSPENDED);this.setLabHatchR47(true);
+        this.setNoAi(true);this.setPersistenceRequired();
+    }
+    public void laboratoryMotionR47(float depth)
+    {
+        if(this.level().isClientSide||this.laboratorySlotR47()<0)return;
+        depth=Mth.clamp(depth,0,1.8F);var dock=this.laboratoryDockR47;
+        var point=dock.translation().add(dock.transformVector(new Vec3(0,0,-depth)));
+        this.setCanonicalTransform(new RigidTransform(point,dock.qx(),dock.qy(),dock.qz(),dock.qw()));
+    }
+    public void setLabHatchR47(boolean open)
+    {
+        if(!this.level().isClientSide&&this.laboratorySlotR47()>=0)
+        {
+            this.entityData.set(DATA_CABIN_STAGE,open?CABIN_OPEN:CABIN_SEALED_DARK);
+            this.entityData.set(DATA_CABIN_PROGRESS,0);
+        }
+    }
+
     @Override
     protected void registerGoals()
     {
@@ -215,6 +244,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     {
         super.defineSynchedData();
         this.entityData.define(DATA_VARIANT, EvaUnit01Entity.UNIT_01);
+        this.entityData.define(DATA_LAB_SLOT_R47,-1);
         this.entityData.define(DATA_INDEPENDENT_UN,false);
         this.entityData.define(DATA_STAGE, STAGE_SUSPENDED);
         this.entityData.define(DATA_TV_WET_EJECTION_HELD_R44,false);
@@ -730,6 +760,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
 
     public boolean isHatchOpen()
     {
+        if(this.laboratorySlotR47()>=0)
+            return this.getCabinStage()==CABIN_OPEN&&this.entityData.get(DATA_HATCH_OPEN)==100;
         return this.getCabinStage() == CABIN_OPEN && !this.isVehicle();
     }
 
@@ -845,7 +877,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         if (this.level() instanceof net.minecraft.server.level.ServerLevel
                 serverLevel)
         {
-            EntryPlugDirector.claimBoardedPlug(serverLevel, this);
+            if(this.laboratorySlotR47()<0)EntryPlugDirector.claimBoardedPlug(serverLevel, this);
         }
         this.sealCabin();
         this.level().playSound(null, this.blockPosition(),
@@ -970,6 +1002,11 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         // A client passenger-list refresh must not abort insertion, open the
         // cabin or change synchronized progress. The server owns those edges.
         if(this.level().isClientSide){passengerAuthorityTraceR44(passenger,"plug_after_client_graph_only");return;}
+        if(this.laboratorySlotR47()>=0)
+        {
+            com.projectseele.world.SynchLabDirectorR47.passengerRemovedR47(this,passenger);
+            return;
+        }
         if (this.getInsertionStage() == STAGE_INSERTING)
         {
             // Losing the pilot is an abort request, not permission to open a
@@ -1087,6 +1124,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public Vec3 getDismountLocationForPassenger(
             net.minecraft.world.entity.LivingEntity passenger)
     {
+        if(this.laboratorySlotR47()>=0)
+            return new Vec3(this.laboratoryDockR47.translation().x-4,-468,-117.5);
         /*
          * At the wet cage the reviewed boarding endpoint is authoritative.
          * Searching down from the capsule first used to find incidental solid
@@ -1256,7 +1295,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     @Override
     public void tick()
     {
-        if(this.level() instanceof ServerLevel level&&com.projectseele.world.EntryPlugDisposalR31.destroyed(level,this.getUUID()))
+        if(this.laboratorySlotR47()<0&&this.level() instanceof ServerLevel level&&com.projectseele.world.EntryPlugDisposalR31.destroyed(level,this.getUUID()))
         {this.discard();return;}
         super.tick();
         if(!this.level().isClientSide&&this.isIndependentUNPlug())
@@ -1273,6 +1312,17 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         for (Entity passenger : this.getPassengers())
         {
             this.positionRider(passenger, Entity::setPos);
+        }
+        if(this.laboratorySlotR47()>=0)
+        {
+            if(!this.level().isClientSide)
+            {
+                int hatch=this.entityData.get(DATA_HATCH_OPEN);
+                int target=this.getCabinStage()==CABIN_OPEN?100:0;
+                if(hatch!=target&&(target>hatch||!this.hatchClosingObstructed()))
+                    this.entityData.set(DATA_HATCH_OPEN,Mth.clamp(hatch+(target>hatch?8:-8),0,100));
+            }
+            return;
         }
         if (!this.level().isClientSide)
         {
@@ -1516,6 +1566,12 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public void addAdditionalSaveData(CompoundTag tag)
     {
         super.addAdditionalSaveData(tag);
+        if(this.laboratorySlotR47()>=0)
+        {
+            tag.putInt("LaboratorySlotR47",this.laboratorySlotR47());var dock=this.laboratoryDockR47;
+            tag.putDouble("LaboratoryX",dock.translation().x);tag.putDouble("LaboratoryY",dock.translation().y);tag.putDouble("LaboratoryZ",dock.translation().z);
+            tag.putFloat("LaboratoryQx",dock.qx());tag.putFloat("LaboratoryQy",dock.qy());tag.putFloat("LaboratoryQz",dock.qz());tag.putFloat("LaboratoryQw",dock.qw());
+        }
         tag.putBoolean("IndependentUN",isIndependentUNPlug());
         tag.putInt("EvaVariant", this.getAssignedVariant());
         tag.putInt("InsertionStage", this.getInsertionStage());
@@ -1548,6 +1604,10 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public void readAdditionalSaveData(CompoundTag tag)
     {
         super.readAdditionalSaveData(tag);
+        this.entityData.set(DATA_LAB_SLOT_R47,tag.contains("LaboratorySlotR47")?tag.getInt("LaboratorySlotR47"):-1);
+        if(this.laboratorySlotR47()>=0)
+            this.laboratoryDockR47=new RigidTransform(new Vec3(tag.getDouble("LaboratoryX"),tag.getDouble("LaboratoryY"),tag.getDouble("LaboratoryZ")),
+                    tag.getFloat("LaboratoryQx"),tag.getFloat("LaboratoryQy"),tag.getFloat("LaboratoryQz"),tag.getFloat("LaboratoryQw"));
         entityData.set(DATA_INDEPENDENT_UN,tag.getBoolean("IndependentUN"));
         if (tag.contains("EvaVariant"))
         {
@@ -1635,7 +1695,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         if(held)
         {
             this.setDeltaMovement(Vec3.ZERO);
-            com.projectseele.world.TvPersonnelOwnedMotionR44.keepWetMachines((ServerLevel)this.level(),this.getAssignedVariant());
+            if(this.laboratorySlotR47()<0)com.projectseele.world.TvPersonnelOwnedMotionR44.keepWetMachines((ServerLevel)this.level(),this.getAssignedVariant());
         }
         return held;
     }

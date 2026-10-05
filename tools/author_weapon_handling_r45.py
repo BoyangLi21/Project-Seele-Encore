@@ -44,10 +44,14 @@ def main():
     p.add_argument('--profiles', type=Path, required=True)
     p.add_argument('--hand', type=Path, required=True)
     p.add_argument('--out', type=Path, required=True)
+    p.add_argument('--in-place', action='store_true', help='Author one rig into the supplied profile directory without copying the library')
     a = p.parse_args()
-    a.out.mkdir(parents=True, exist_ok=False)
-    for f in a.profiles.glob('*.json'):
-        shutil.copy2(f, a.out/f.name)
+    a.out.mkdir(parents=True, exist_ok=a.in_place)
+    if a.in_place and a.out.resolve()!=a.profiles.resolve():
+        raise ValueError('--in-place requires --out to equal --profiles')
+    if not a.in_place:
+        for f in a.profiles.glob('*.json'):
+            shutil.copy2(f, a.out/f.name)
     body = json.loads(a.body.read_text(encoding='utf8'))
     hand = json.loads((a.hand/'hand_rig_contract.json').read_text(encoding='utf8'))
     common.BODY = body
@@ -58,7 +62,10 @@ def main():
                         if (a.out/f'eva_gameplay_r{rev}_{actor.key}.json').is_file())
     profile = json.loads(profile_path.read_text(encoding='utf8'))
     base_doc = body['stance_clips_by_rig'][str(actor.key)]
-    base = decode(actor, base_doc, base_doc['clips']['idle']['frames'][0])
+    reference = base_doc['clips'].get('idle', base_doc['clips'].get('unarmed_stance'))
+    if reference is None:
+        raise ValueError('Per-unit standing reference is missing')
+    base = decode(actor, base_doc, reference['frames'][0])
     maintain_joint_centres(actor, base)
     attachment = hand['knife_attachment_r45']
     grip = np.asarray(attachment['target_handle_centre'])*16
@@ -134,9 +141,9 @@ def main():
         grip_world = (pose.matrix('hand_r')@np.r_[grip, 1])[:3]
         # Until the fingers close, the rack retains the knife. Afterwards
         # its complete transform belongs to the actual hand, without a snap.
-        if t < .54:
+        if t < .54 and hand.get('knife_mechanism_r45'):
             present=float(ease((t-.12)/.16))
-            stored_pitch=np.radians(hand['knife_mechanism_r45'].get('carriage_stored_pitch_degrees',0))
+            stored_pitch=np.radians(hand.get('knife_mechanism_r45',{}).get('carriage_stored_pitch_degrees',0))
             carrier=Slerp([0,1],R.concatenate([knife_frame([0,-np.cos(stored_pitch),-np.sin(stored_pitch)]),knife_frame([0,0,1])]))(present)
             world_rotation = R.from_matrix(chest[:3,:3])*carrier
             stored=np.asarray(hand['knife_mechanism_r45']['bones'][1]['pivot'])*[-1,1,1]
@@ -176,7 +183,7 @@ def main():
         hand_contract_sha256=hashlib.sha256((a.hand/'hand_rig_contract.json').read_bytes()).hexdigest(),
         mechanism_geometry_complete=False, native_passed=False, visual_accepted=False)
     profile_path.write_text(json.dumps(profile,separators=(',',':')),encoding='utf8')
-    (a.out/'handling_authoring.json').write_text(json.dumps(dict(samples=rows,
+    (a.out/(f'handling_authoring_{actor.key}.json' if a.in_place else 'handling_authoring.json')).write_text(json.dumps(dict(samples=rows,
         maximum_hand_error_model=max(r['end_error_model'] for r in rows),
         reference=profile['weapon_handling_r45']),indent=2),encoding='utf8')
     print('Private draw/stow blocking exported; maximum hand target error:',max(r['end_error_model'] for r in rows))

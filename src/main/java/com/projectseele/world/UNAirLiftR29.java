@@ -63,10 +63,10 @@ public final class UNAirLiftR29
     public static void abortForMaintenance(ServerLevel l,int serial)
     {
         var s=state(l);UUID unit=UNRecoveryR22.identity(l,serial);
-        if(unit!=null&&l.getEntity(unit) instanceof EvaPrototypeEntity held){held.getPersistentData().remove("R31GroundHold");held.getPersistentData().remove("R31GroundHoldAt");}
+        if(unit!=null&&ServiceAircraftR32.payload(l,unit) instanceof EvaPrototypeEntity held){held.getPersistentData().remove("R31GroundHold");held.getPersistentData().remove("R31GroundHoldAt");}
         var job=s.jobs.remove(serial);if(job==null)return;
         var aircraft=ServiceAircraftR32.find(l,job.plane);if(aircraft!=null)aircraft.discard();
-        if(l.getEntity(job.unit) instanceof EvaPrototypeEntity eva){eva.endNervCarrierMotion();EvaAirTransportR31.clear(eva);eva.getPersistentData().putBoolean("UNTransportAutoload",false);}
+        if(ServiceAircraftR32.payload(l,job.unit) instanceof EvaPrototypeEntity eva){eva.endNervCarrierMotion();EvaAirTransportR31.hold(eva);eva.getPersistentData().putBoolean("UNTransportAutoload",false);}
         s.last.put(serial,"运输已由管理员维护复位接管");s.setDirty();
     }
     public static String phaseName(ServerLevel l,int serial){var j=state(l).jobs.get(serial);return j==null?"IDLE":j.phase.name();}
@@ -201,6 +201,22 @@ public final class UNAirLiftR29
         if(eva.position().distanceTo(apron(serial))>8&&!atReception(eva)&&!eva.isInsideTestHangar()&&!heldOnGround(eva))return "机体尚未抵达库外接应平台，请先呼叫运输机回收。";
         var j=new Job();j.serial=serial;j.owner=player.getUUID();j.unit=id;j.groundOnly=true;j.homebound=true;j.crew=eva.getPilotEntity()==player;
         s.jobs.put(serial,j);s.setDirty();return "库外接应已确认。等待机库排液、开门后，由地面载台送回库位。";
+    }
+    /** Ordinary recall uses the existing physical flight/intake routes, never home teleport. */
+    public static String requestRecoveryR47(ServerPlayer player,int serial)
+    {
+        var level=player.serverLevel();
+        if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return "请在第三新东京市呼叫 UN 回收。";
+        if(active(level,serial))return "原机体的运输任务仍在执行，请等待安全返回。";
+        UUID id=UNRecoveryR22.identity(level,serial);
+        if(id!=null&&ServiceAircraftR32.payload(level,id) instanceof EvaPrototypeEntity eva)
+        {
+            if(eva.position().distanceTo(UNRecoveryR22.home(serial))<5&&!waitingForDock(eva)&&!heldOnGround(eva))
+                return "原机体已在机库；请使用插入栓离栓操作，空载后才可维护复位。";
+            if(eva.position().distanceTo(apron(serial))<=8||atReception(eva)||heldOnGround(eva))
+                return requestDock(player,serial);
+        }
+        return request(player,serial,true,0,0);
     }
     private static double cruise(ServerLevel l){return l.getMaxBuildHeight()+224;}
     private static void retain(ServerLevel l,BlockPos p,int radius)

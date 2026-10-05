@@ -232,6 +232,12 @@ public final class EvaCombatSupportR33
     public static float gaitWeight(EvaUnit01Entity e,float partial)
     {
         if(!ready(e))return 0;
+        // R47 field travel keeps the base walk/run in the actual leg owner.
+        // Its clock cannot still use combat-advance stride/contact timing.
+        if(!(e instanceof EvaPrototypeEntity)&&!e.isBerserk()
+                &&(!EvaGameplayMotionR32.sharedWeapon(e)
+                   ||(e.pilotLocomotionRequestedR45()||e.rifleMoveBlend(partial)>.05F)
+                     &&e.rifleStanceLevel(partial)<.01F))return 0;
         float low=Mth.clamp(e.rifleStanceLevel(partial),0,1),run=Mth.clamp(e.rifleRunBlend(partial),0,1);
         low=low*low*(3-2*low);run=run*run*(3-2*run);
         return EvaGameplayMotionR32.guardWeight(e)*(1-low)*(1-run);

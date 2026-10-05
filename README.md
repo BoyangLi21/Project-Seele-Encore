@@ -12,9 +12,13 @@ An open-source **Neon Genesis Evangelion** universe mod for Minecraft **Forge 1.
 
 ## Status / 状态
 
-R46 为本轮人工验收候选，按负责人要求仅交付 **Server** 与 **Full Client** 两包。服务端包含 Forge 1.20.1 / 47.4.10 运行库及配套世界，内存上限20G；完整客户端包含模型、动作、材质和本地光影适配。两端协议54，采用新的独立目录和配套存档验收，不混入旧JAR/旧世界。
+R47 为当前人工验收候选，已生成并回读 **Server** 与 **Full Client** 两包：`Project_SEELE_Encore_R47_20261005_Server.zip`（618,645,000 字节）与 `Project_SEELE_Encore_R47_20261005_Client.zip`（376,629,795 字节）。Minecraft 1.20.1 / Forge 47.4.10 / Java 17，网络协议 **55**；服务端最大堆内存 **20G**。两端安装到新目录，使用同批模组、配置和 `SEELE_R47_WORLD`。个人交付包保存在本机 `D:/eva/delivery`，不作为公开源码仓库的素材下载。
 
-本轮修复生产平台/光影未启用、大直梯饰面识别、站台门实体、候乘模型显示、眼色同步、旧设施维护复发及一批通道、导视和地表坑洞。有限本机检查、未实测场景与未完成范围分别记录，不声明全域重构或零bug。见 [R46 安装与人工验收](docs/MANUAL_ACCEPTANCE_R46.md)、[修复证据](docs/REBUILD_R46.md)、[下一轮接续](docs/NEXT_ROUND_R46.md)。R45文档保留为历史记录。
+三名原驾驶员已改在机库干区休息室待命，正常起身、短线步行登栓、离栓返回坐席均通过；保存重载后仍保持原驾驶员与坐席身份。旧登机桥的维护清理曾删除新房间下半部，现已修正房间位置与维护边界。总指挥直梯新增 Y=-364 的 SEELE 会议层，配最高权限刷卡入口、十二座编号碑、中央桌椅和局部灯光；保存后实体仍在。刷卡乘梯的玩家操作、画面和远端服务器效果由用户验收。
+
+本轮加入零号机专用盾井、二号机专用剑井、独立12秒同步实验、原UUID回收与安全维护、NPC返程修补、指挥室灯总开关和运输/机库音效，并安装地形、围护、公共设施和旅客导视修补。Root最新八批应用汇总 **226,211条操作记录**，已包含48盏灯275格；这是分批状态/NBT记录，不是去重净差量。八地下精确平台ID已有20条实际自然停靠、96组四叶门及45份完整再生shard；五家北区住宅两层unknown=0，美里住宅全三宽楼梯与六份recipe、四店屋面维护结构已收束。实际开合、登车、步行和观感边界见 [世界覆盖事实](docs/R47_WORLD_COVERAGE.md)。
+
+三机持刀与二号机长剑的精确三角静态检查均为0穿插；动作连贯性、观感与听感仍由用户验收。城市生产碰撞管线已在两端启用，代表塔的碰撞优化已有原生记录；整条城市恢复最近实测 **171.684 秒**，新增只读准备预算尚未实测，整体速度问题仍未关闭，见 [性能实录](docs/CITY_PERFORMANCE_R47.md)。默认 Terrain128 包关闭光影时的 LCL 橙红已在原生画面确认；光影观感、手动科研操作和远端服务器仍待用户验收。完整屋岛和港口战役按用户要求延期，不把工程候选或任务菜单称为全战役可玩。详见 [R47安装与人工验收](docs/MANUAL_ACCEPTANCE_R47.md)；[R46手册](docs/MANUAL_ACCEPTANCE_R46.md)及接续文档保留为历史记录。
 
 进入配套世界：`/seele enter`。机库：`/seele tp hanger`。输入 `/seele tp` 查看全部传送地点。旧地图生成与原型实验指令不再出现在正式游戏中。
 
@@ -24,11 +28,12 @@ Development build with playable EVA piloting, physical entry-plug insertion, rai
 
 **Public source and the complete local demonstration world are different deliverables.** The repository includes code, project-authored resources and fallback visuals. Private evaluation maps, extracted models and uncleared third-party artwork are not bundled. / **公开源码不等于完整本机演示包。** 私有测试地图、提取模型及尚未确认公开许可的第三方素材不随仓库分发。参与和构建见 [CONTRIBUTING.md](CONTRIBUTING.md)，具体区别见 [公开准备](docs/OPEN_SOURCE_RELEASE_R24.md)。
 
-Pilot controls / 驾驶操作：`WASD` 移动、`Space` 跳跃、`Shift` 蹲姿、`Z` 趴下/匍匐、`Ctrl` 奔跑、`B` 踢击、`R` 切换武器、`G` 开关 A.T. Field、左键近战/步枪、右键空手或近战武器重击（炮模式蓄能，N² 模式保险流程）、`V` 弹出插入栓、`O` 驾驶通信。三台 NERV 机体空手/短刀站姿下，方向键配合 `C` 闪避，奔跑配合 `C` 翻滚；机械准备/发射期间 `C` 仍优先取消发射。零号机蹲姿不再强制举盾，完整独立盾装备尚未启用。
+Pilot controls / 驾驶操作：`WASD` 移动、`Space` 跳跃、`Shift` 蹲姿、`Z` 趴下/匍匐、`Ctrl` 奔跑、`B` 踢击、`R` 切换武器、`G` 开关 A.T. Field、左键近战/步枪、右键空手或近战武器重击（炮模式蓄能，N² 模式保险流程）、`V` 弹出插入栓、`O` 驾驶通信。三台 NERV 机体空手/短刀站姿下，方向键配合 `C` 闪避，奔跑配合 `C` 翻滚；机械准备/发射期间 `C` 仍优先取消发射。零号机盾牌与二号机长剑须从各自专用井实际领取，部署可用 /seele armament deploy shield / deploy sword 或卫星电话作战操作；错机不能领取。
 
 ## Docs / 文档
 
-- [R46 安装与人工验收](docs/MANUAL_ACCEPTANCE_R46.md) — 本轮Server/Client两包、实际修复与待验证项
+- [R47 安装与人工验收草稿](docs/MANUAL_ACCEPTANCE_R47.md) — 当前两包、实际操作、应用回执及未验证项
+- [R46 安装与人工验收（历史）](docs/MANUAL_ACCEPTANCE_R46.md)
 - [R45 安装与人工验收（历史）](docs/MANUAL_ACCEPTANCE_R45.md)
 - [Mesh2Motion 全部 178 条动作与接入状态](docs/MESH2MOTION_ACTION_PLAN_R45.md) — 来源、动作族、当前候选与真实检查边界
 - [R44 阶段操作与人工验收（历史）](docs/MANUAL_ACCEPTANCE_R44_STAGE.md) — 上一批安装与试玩记录
@@ -74,7 +79,7 @@ The mod jar is written to `build/libs/`.
 
 ## Local visual testing / 本机视觉测试
 
-本次人工试玩使用 **R45 的独立新实例**，不要混装旧 R44 的 mod、动作文件或 JVM 调试参数。网络协议为 **53**；Client、Client_Plain 与 Server 必须同批。完整 Client 带额外材质和光影，光影默认关闭；Client_Plain 去掉额外材质、光影与 Oculus，仍内嵌完整核心机体模型。保留旧实例和存档作为回退，具体导入方法见 R45 手册。
+当前人工试玩使用 **R47独立新实例**、协议 **55** 与同批Server/Full Client。Full Client是普通实例目录包，先解压并沿用现有R46安装器流程，或在PCL新建1.20.1/Forge47.4.10后将本批文件按原层级复制到实例游戏目录；具体见R47手册。完整客户端保留配套模型、动作、材质及光影资料，默认渲染与光影中的地下亮度、橙红LCL和透明度分别验收。旧R45/R46实例只用于历史回退，不混入本批。
 
 原生开发检查在专用副本运行，不能对玩家正式存档开启自动复核脚本。需要旧实验命令时显式设置 JVM 参数 `-Dprojectseele.developerCommands=true`。截图、检查记录及第三方评估素材不随公开源码分发；本轮具体检查范围见阶段手册。
 

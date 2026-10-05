@@ -7,7 +7,11 @@ import java.util.Set;
 public final class StaffAuthorityR25
 {
     public static boolean allows(NervStaffEntity npc, String operation)
-    { return allows(npc.staffRole(), npc.skin(), operation); }
+    {
+        if(operation.equals("synch_lab"))return npc.staffRole().equals("scientist")
+                &&(npc.memberId().equals("r47/experiment/researcher_0")||npc.memberId().equals("r47/experiment/researcher_1"));
+        return allows(npc.staffRole(), npc.skin(), operation);
+    }
 
     public static boolean allows(String role, String skin, String operation)
     {

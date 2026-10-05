@@ -173,7 +173,12 @@ public final class RegionalGatewayDirector
             {NativeLiftCallRetryR43.gateway(player,target);return true;}
         }
         ElevatorGroup group = group(level);
-        if (group == null || group.isMoving()) return rejected(target,"group unavailable or moving");
+        if (group == null) return rejected(target,"group unavailable");
+        if(group.isMoving())
+        {
+            NativeLiftCallRetryR43.gatewayWhileMovingR47(player,target);
+            return true;
+        }
         Runtime state = RUNTIMES.get(level);
         if(!state.ready&&!commission(level))return rejected(target,"native controller configuration incomplete");
         if (carAt(level, target)){state.doorsClosedUntil=0;return true;}

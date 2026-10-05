@@ -16,11 +16,17 @@ public final class CityPersonnelDoorR44 extends DoorBlock
     @Override public void setOpen(net.minecraft.world.entity.Entity actor,Level level,
                                   BlockState state,BlockPos pos,boolean opening)
     {
-        // Manual use is handled on the server only. Vanilla excludes the
-        // supplied player from the sound packet, assuming a client prediction
-        // which this metal hand-latch never performs. Broadcast this real use.
-        super.setOpen(!level.isClientSide&&actor instanceof Player?null:actor,
-                level,state,pos,opening);
+        if (!state.is(this) || state.getValue(OPEN) == opening) return;
+        level.setBlock(pos, state.setValue(OPEN, opening), 10);
+        if (!level.isClientSide)
+        {
+            level.playSound(null, pos, (opening
+                    ? com.projectseele.registry.ModSounds.PERSONNEL_DOOR_OPEN
+                    : com.projectseele.registry.ModSounds.PERSONNEL_DOOR_CLOSE).get(),
+                    net.minecraft.sounds.SoundSource.BLOCKS, .65F, 1F);
+            level.gameEvent(actor, opening ? net.minecraft.world.level.gameevent.GameEvent.BLOCK_OPEN
+                    : net.minecraft.world.level.gameevent.GameEvent.BLOCK_CLOSE, pos);
+        }
     }
     @Override public void neighborChanged(BlockState state,Level level,BlockPos pos,
                                          net.minecraft.world.level.block.Block block,BlockPos from,boolean moving)

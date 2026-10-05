@@ -13,7 +13,7 @@ import net.minecraftforge.fml.common.Mod;
 import java.nio.file.Files;
 import java.util.*;
 
-/** One labelled commander lever controls only the separately surveyed command-room fixtures. */
+/** One labelled commander lever controls every separately surveyed command-room fixture. */
 @Mod.EventBusSubscriber(modid="projectseele")
 public final class CommandLightingR30
 {
@@ -38,11 +38,14 @@ public final class CommandLightingR30
         if(event.phase!=TickEvent.Phase.END||event.getServer().getTickCount()%5!=0)return;
         var level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;var circuit=read(event.getServer());
         if(circuit.lamps.isEmpty()||!level.hasChunkAt(circuit.lever))return;
-        var lever=level.getBlockState(circuit.lever);boolean on=lever.is(Blocks.LEVER)&&lever.getValue(BlockStateProperties.POWERED);
+        var lever=level.getBlockState(circuit.lever);
+        if(!lever.is(Blocks.LEVER))return;
+        boolean on=lever.getValue(BlockStateProperties.POWERED);
         for(var pos:circuit.lamps)
         {
             if(!level.hasChunkAt(pos))continue;var state=level.getBlockState(pos);
-            if(state.is(ModBlocks.NERV_CEILING_LIGHT.get())&&state.getValue(BlockStateProperties.LIT)!=on)level.setBlock(pos,state.setValue(BlockStateProperties.LIT,on),3);
+            if((state.is(ModBlocks.NERV_CEILING_LIGHT.get())||state.is(ModBlocks.NERV_STRIP_LIGHT.get())||state.is(ModBlocks.NERV_ALERT_LIGHT.get()))
+                    &&state.getValue(BlockStateProperties.LIT)!=on)level.setBlock(pos,state.setValue(BlockStateProperties.LIT,on),3);
         }
     }
     private CommandLightingR30() {}

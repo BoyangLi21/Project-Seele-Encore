@@ -16,13 +16,16 @@ import org.spongepowered.asm.mixin.injection.callback.CallbackInfoReturnable;
 /** Changes only the opt-in marked city's union supplier body; stock provider lifecycle is untouched. */
 @Pseudo
 @Mixin(targets="com.simibubi.create.content.contraptions.Contraption",remap=false)
-public abstract class CityExactUnionCreateMixinR45
+public abstract class CityExactUnionCreateMixinR45 implements com.projectseele.compat.CityUnionOwnerR47
 {
     @Unique private boolean seele$fullCityFrame;
+    @Unique private volatile boolean seele$balancedSupplierUsed;
+    @Unique @Override public boolean seele$fullCityFrameR47(){return seele$fullCityFrame;}
+    @Unique @Override public boolean seele$balancedSupplierUsedR47(){return seele$balancedSupplierUsed;}
 
     @Inject(method="readNBT",at=@At("RETURN"),remap=false,require=1)
     private void seele$readFrame(Level level,CompoundTag tag,boolean spawnData,CallbackInfo callback)
-    { seele$fullCityFrame=tag.getBoolean(CityExactShapeUnionR45.MARKER); }
+    { seele$fullCityFrame=tag.getBoolean(CityExactShapeUnionR45.MARKER);seele$balancedSupplierUsed=false; }
 
     @Inject(method="writeNBT",at=@At("RETURN"),remap=false,require=1)
     private void seele$saveFrame(boolean spawnData,CallbackInfoReturnable<CompoundTag> callback)
@@ -31,8 +34,9 @@ public abstract class CityExactUnionCreateMixinR45
     @Inject(method="lambda$gatherBBsOffThread$24",at=@At("HEAD"),cancellable=true,remap=false,require=1)
     private void seele$exactUnion(CallbackInfoReturnable<List<AABB>> callback) throws Exception
     {
-        if (!seele$fullCityFrame || !CityExactShapeUnionR45.enabled()) return;
+        if (!seele$fullCityFrame || CityExactShapeUnionR45.nativeStockProbeR47() || !CityExactShapeUnionR45.enabled()) return;
         List<AABB> result=CityExactShapeUnionR45.calculate(this);
-        if (result!=null)callback.setReturnValue(result);
+        if (result!=null)
+        {seele$balancedSupplierUsed=CityExactShapeUnionR45.consumeBalancedCallR47();callback.setReturnValue(result);}
     }
 }

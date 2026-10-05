@@ -13,13 +13,13 @@ import net.minecraft.resources.ResourceLocation;
 import net.minecraftforge.client.extensions.common.IClientFluidTypeExtensions;
 import net.minecraftforge.fluids.FluidType;
 
-/** Orange-red LCL with the active resource pack's native water surface. */
+/** Orange-red LCL with dedicated, colour-neutral aliases of the native water surface. */
 public final class LclFluidType extends FluidType
 {
     private static final ResourceLocation STILL = new ResourceLocation(
-            "minecraft", "block/water_still");
+            "projectseele", "block/lcl_still");
     private static final ResourceLocation FLOW = new ResourceLocation(
-            "minecraft", "block/water_flow");
+            "projectseele", "block/lcl_flow");
     private static final ResourceLocation OVERLAY = new ResourceLocation(
             "minecraft", "block/water_overlay");
     // R45 inherits water animation, normals and transparency. Only the tint
@@ -70,6 +70,14 @@ public final class LclFluidType extends FluidType
 
             @Override
             public int getTintColor()
+            {
+                return TINT;
+            }
+
+            @Override
+            public int getTintColor(net.minecraft.world.level.material.FluidState state,
+                                    net.minecraft.world.level.BlockAndTintGetter level,
+                                    net.minecraft.core.BlockPos pos)
             {
                 return TINT;
             }

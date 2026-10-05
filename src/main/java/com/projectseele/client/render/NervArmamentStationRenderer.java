@@ -25,8 +25,6 @@ import org.joml.Matrix4f;
 public final class NervArmamentStationRenderer
         extends EntityRenderer<NervArmamentStationEntity>
 {
-    private static final double POD_TRAVEL = 43.0D;
-    private static final float POD_HEIGHT = 42.0F;
     private static final ResourceLocation RIFLE_MESH = new ResourceLocation(
             ProjectSeele.MODID, "mesh/eva_pallet_smg.mesh.json");
     private static final ResourceLocation RIFLE_TEXTURE = new ResourceLocation(
@@ -54,9 +52,9 @@ public final class NervArmamentStationRenderer
             int packedLight)
     {
         poses.pushPose();
-        renderSurfaceFrame(poses, buffers, packedLight);
+        renderSurfaceFrame(poses, buffers, packedLight,station.rackHalfWidthR47());
         renderHatch(poses, buffers, packedLight,
-                station.getHatchProgress(partialTick));
+                station.getHatchProgress(partialTick),station.rackHalfWidthR47(),station.payloadR47()==7);
 
         float lift = station.getLiftProgress(partialTick);
         if (lift > 0.001F || station.getStationState()
@@ -64,39 +62,46 @@ public final class NervArmamentStationRenderer
         {
             renderMovingRack(poses, buffers, packedLight, lift,
                     station.getDoorProgress(partialTick),
-                    station.isStocked());
+                    station.isStocked(),station.payloadR47(),station.rackHalfWidthR47(),station.podTravelR47(),station.podHeightR47());
         }
         poses.popPose();
         super.render(station, yaw, partialTick, poses, buffers, packedLight);
     }
 
     private static void renderSurfaceFrame(PoseStack poses,
-            MultiBufferSource buffers, int light)
+            MultiBufferSource buffers, int light,int half)
     {
-        for (int x = -5; x <= 5; x++)
+        for (int x = -half-1; x <= half+1; x++)
         {
-            for (int z = -5; z <= 5; z++)
+            for (int z = -half-1; z <= half+1; z++)
             {
-                if (Math.abs(x) == 5 || Math.abs(z) == 5)
+                if (Math.abs(x) == half+1 || Math.abs(z) == half+1)
                 {
                     renderBlock(poses, buffers, light, FRAME, x, 0.0D, z);
                 }
             }
         }
-        renderBlock(poses, buffers, light, WARNING, -5, 1.0D, -5);
-        renderBlock(poses, buffers, light, WARNING, 5, 1.0D, -5);
-        renderBlock(poses, buffers, light, WARNING, -5, 1.0D, 5);
-        renderBlock(poses, buffers, light, WARNING, 5, 1.0D, 5);
+        for(int x:new int[]{-half-1,half+1})for(int z:new int[]{-half-1,half+1})
+            renderBlock(poses,buffers,light,WARNING,x,1.0D,z);
     }
 
     private static void renderHatch(PoseStack poses,
-            MultiBufferSource buffers, int light, float progress)
+            MultiBufferSource buffers, int light, float progress,int half,boolean hinged)
     {
-        double slide = progress * 5.25D;
-        for (int x = -4; x <= 4; x++)
+        double slide = progress * (half+1.25D);
+        for (int x = -half; x <= half; x++)
         {
-            for (int z = -4; z <= 4; z++)
+            for (int z = -half; z <= half; z++)
             {
+                // The wide shield well folds its cover at the outer edges;
+                // a full sideways slide would sweep into the neighbouring well.
+                if(hinged)
+                {
+                    double hinge=x<0?-half-.5D:half+.5D;
+                    poses.pushPose();poses.translate(hinge,0,0);
+                    poses.mulPose(Axis.ZP.rotationDegrees((x<0?1:-1)*progress*90.0F));
+                    renderBlock(poses,buffers,light,ARMOUR,x-hinge,0.05D,z);poses.popPose();continue;
+                }
                 double shiftedX = x < 0 ? x - slide : x + slide;
                 renderBlock(poses, buffers, light, ARMOUR,
                         shiftedX, 0.05D, z);
@@ -106,12 +111,13 @@ public final class NervArmamentStationRenderer
 
     private static void renderMovingRack(PoseStack poses,
             MultiBufferSource buffers, int light, float progress,
-            float doorProgress, boolean stocked)
+            float doorProgress, boolean stocked,int payload,int half,float travel,float height)
     {
-        double baseY = -POD_TRAVEL + progress * POD_TRAVEL;
-        for (int x = -4; x <= 4; x++)
+        float span=half*2+1,inner=half*2-1;
+        double baseY = -travel + progress * travel;
+        for (int x = -half; x <= half; x++)
         {
-            for (int z = -4; z <= 4; z++)
+            for (int z = -half; z <= half; z++)
             {
                 renderBlock(poses, buffers, light, ARMOUR,
                         x, baseY, z);
@@ -122,41 +128,51 @@ public final class NervArmamentStationRenderer
         // block models rather than hundreds of individual world blocks, so
         // the motion remains cheap and visually continuous.
         renderPanel(poses, buffers, light, ARMOUR,
-                -4.5D, baseY + 1.0D, -4.5D, 1.0F, POD_HEIGHT, 9.0F);
+                -half-.5D, baseY + 1.0D, -half-.5D, 1.0F, height, span);
         renderPanel(poses, buffers, light, ARMOUR,
-                3.5D, baseY + 1.0D, -4.5D, 1.0F, POD_HEIGHT, 9.0F);
+                half-.5D, baseY + 1.0D, -half-.5D, 1.0F, height, span);
         renderPanel(poses, buffers, light, ARMOUR,
-                -3.5D, baseY + 1.0D, 3.5D, 7.0F, POD_HEIGHT, 1.0F);
+                -half+.5D, baseY + 1.0D, half-.5D, inner, height, 1.0F);
         renderPanel(poses, buffers, light, FRAME,
-                -3.5D, baseY + POD_HEIGHT, -3.5D,
-                7.0F, 1.0F, 7.0F);
+                -half+.5D, baseY + height, -half+.5D,
+                inner, 1.0F, inner);
 
-        // Two front armour leaves stay shut throughout the rise and slide
-        // sideways only after the pod has stopped at full height.
-        double doorSlide = doorProgress * 3.75D;
+        // Covers stay shut throughout the rise. The wide shield cover rolls
+        // into its own header; the narrower original pods retain sliding leaves.
+        double doorSlide = payload==7?0:doorProgress * (half-.25D);
+        float doorHeight=(height-1)*(payload==7?1-doorProgress:1);
+        double doorBase=baseY+1+(payload==7?(height-1)*doorProgress:0);
+        if(doorHeight>.001F)
+        {
         renderPanel(poses, buffers, light, ARMOUR,
-                -3.5D - doorSlide, baseY + 1.0D, -4.5D,
-                3.5F, POD_HEIGHT - 1.0F, 1.0F);
-        renderSplitDoorLogo(poses, buffers, baseY, doorSlide);
+                -half+.5D - doorSlide, doorBase, -half-.5D,
+                inner/2, doorHeight, 1.0F);
+        if(payload==7)
+        {
+            poses.pushPose();poses.translate(0,doorBase-(1-doorProgress)*(baseY+1),0);
+            poses.scale(1,1-doorProgress,1);renderSplitDoorLogo(poses,buffers,baseY,0,half);poses.popPose();
+        }
+        else renderSplitDoorLogo(poses, buffers, baseY, doorSlide,half);
         renderPanel(poses, buffers, light, ARMOUR,
-                doorSlide, baseY + 1.0D, -4.5D,
-                3.5F, POD_HEIGHT - 1.0F, 1.0F);
+                doorSlide, doorBase, -half-.5D,
+                inner/2, doorHeight, 1.0F);
+        }
 
         // Internal lift rails and rifle cradle become visible through the
         // opening; they never form the exterior silhouette during travel.
-        for (int y = 2; y <= 40; y++)
+        for (int y = 2; y <= height-2; y++)
         {
             renderBlock(poses, buffers, light, RAIL,
-                    -3, baseY + y, 3);
+                    -half+1, baseY + y, half-1);
             renderBlock(poses, buffers, light, RAIL,
-                    3, baseY + y, 3);
+                    half-1, baseY + y, half-1);
         }
-        for (int y = 3; y <= 39; y += 5)
+        for (int y = 3; y <= height-3; y += 5)
         {
             renderBlock(poses, buffers, light, CRADLE,
-                    -3, baseY + y, 0);
+                    -half+1, baseY + y, 0);
             renderBlock(poses, buffers, light, CRADLE,
-                    3, baseY + y, 0);
+                    half-1, baseY + y, 0);
         }
 
         if (stocked)
@@ -164,20 +180,23 @@ public final class NervArmamentStationRenderer
             poses.pushPose();
             poses.translate(0.5D, baseY + 1.0D, 0.5D);
             // The payload stays upright; only its front/back heading changes.
-            poses.mulPose(Axis.YP.rotationDegrees(180.0F));
+            poses.mulPose(Axis.YP.rotationDegrees(payload==7?0.0F:180.0F));
             // Use the exact same world scale as the rifle in an EVA's hands;
             // the former 3.6 scale made the station payload only 72% size.
             poses.scale(EvaScale.RENDER_SCALE, EvaScale.RENDER_SCALE,
                     EvaScale.RENDER_SCALE);
             LocalTriangleMeshLayer.renderStandalone(poses, buffers,
-                    RIFLE_MESH, RIFLE_TEXTURE, light,
+                    payload==7?new ResourceLocation(ProjectSeele.MODID,"mesh/yashima_shield_payload.mesh.json")
+                            :payload==6?new ResourceLocation(ProjectSeele.MODID,"mesh/eva02_longsword_payload_r47.mesh.json"):RIFLE_MESH,
+                    payload==7?new ResourceLocation(ProjectSeele.MODID,"textures/entity/yashima_shield.png")
+                            :payload==6?new ResourceLocation(ProjectSeele.MODID,"textures/entity/eva02_longsword.png"):RIFLE_TEXTURE,light,
                     OverlayTexture.NO_OVERLAY);
             poses.popPose();
         }
     }
 
     private static void renderSplitDoorLogo(PoseStack poses,
-            MultiBufferSource buffers, double baseY, double doorSlide)
+            MultiBufferSource buffers, double baseY, double doorSlide,int half)
     {
         ResourceLocation logo = TreeOfLifeWallClient.nervLogoTexture(
                 Minecraft.getInstance());
@@ -188,13 +207,13 @@ public final class NervArmamentStationRenderer
         VertexConsumer consumer = buffers.getBuffer(
                 RenderType.entityTranslucent(logo));
         renderLogoHalf(poses, consumer,
-                -3.5D - doorSlide, 0.0D - doorSlide,
+                -half+.5D - doorSlide, 0.0D - doorSlide,
                 baseY + 15.0D, baseY + 31.0D,
-                -4.515D, 1.0F, 0.5F);
+                -half-.515D, 1.0F, 0.5F);
         renderLogoHalf(poses, consumer,
-                0.0D + doorSlide, 3.5D + doorSlide,
+                0.0D + doorSlide, half-.5D + doorSlide,
                 baseY + 15.0D, baseY + 31.0D,
-                -4.515D, 0.5F, 0.0F);
+                -half-.515D, 0.5F, 0.0F);
     }
 
     private static void renderLogoHalf(PoseStack poses,

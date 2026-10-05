@@ -126,9 +126,9 @@ def runtime_owner_config(data):
   values[key]=value
  keys={'schema','weapon_handling','cannon_contact','captured_support','captured_locomotion_directory'}
  for side in ('client','server'):keys|={f'city.union.{side}.{suffix}' for suffix in ('enabled','required','create_class_sha256','proof_sha256')}
- optional={'tv_cage','personnel_platforms'}
+ optional={'tv_cage','personnel_platforms','city.union.activation'}
  if not keys.issubset(values) or not set(values).issubset(keys|optional) or values['schema']!='projectseele.runtime-owners.r45.v1':raise ContractError('Incomplete/unknown runtime owner config')
- for key in optional:
+ for key in optional-{'city.union.activation'}:
   if values.get(key,'false') not in ('true','false'):raise ContractError('Invalid explicit facility Boolean: '+key)
  if values.get('tv_cage','false')!=values.get('personnel_platforms','false'):raise ContractError('TV cage and personnel platform owners must deploy together')
  for key in ('weapon_handling','cannon_contact','captured_support','city.union.client.enabled','city.union.client.required','city.union.server.enabled','city.union.server.required'):
@@ -136,10 +136,14 @@ def runtime_owner_config(data):
  directory=values['captured_locomotion_directory']
  if directory and not relative(directory).startswith('projectseele-local-maps/'):raise ContractError('Captured owner directory must be portable inside its instance')
  if values['captured_support']=='true' and not directory:raise ContractError('Captured support owner lacks selected captured profiles')
+ for suffix in ('enabled','required'):
+  if values[f'city.union.client.{suffix}']!=values[f'city.union.server.{suffix}']:raise ContractError('Client/server exact union policies differ')
  for side in ('client','server'):
   prefix=f'city.union.{side}.'
-  if values[prefix+'enabled']=='true':raise ContractError('Published City proof is unmeasured; this candidate requires explicit disabled City profiles')
-  if values[prefix+'required']!='false' or values[prefix+'proof_sha256']:raise ContractError('Disabled City profile cannot claim a required proof')
+  enabled=values[prefix+'enabled']=='true'
+  if values[prefix+'required']!=str(enabled).lower():raise ContractError('Enabled portable union must require actual ABI/mixin activation')
+  if enabled and values.get('city.union.activation')!='exact_native_input_abi_r47':raise ContractError('Current complete-input native ABI activation policy missing')
+  if values[prefix+'proof_sha256'] or values[prefix+'create_class_sha256']:raise ContractError('Historical class/full96 QA byte hashes are not portable union admission')
  return values
 
 def check_memory(args):

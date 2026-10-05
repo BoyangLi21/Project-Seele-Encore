@@ -19,6 +19,9 @@ public final class PortableRuntimeOwnersR45
             "city.union.client.enabled","city.union.client.required","city.union.client.create_class_sha256","city.union.client.proof_sha256",
             "city.union.server.enabled","city.union.server.required","city.union.server.create_class_sha256","city.union.server.proof_sha256");
     private static final Set<String> FACILITY_KEYS=Set.of("tv_cage","personnel_platforms");
+    private static final Set<String> ACTIVATION_KEYS=Set.of("city.union.activation",
+            "city.union.client.activation","city.union.server.activation");
+    private static final Set<String> ACTIVATION_VALUES=Set.of("producer_proof_sha256","exact_native_input_abi_r47");
     private static Properties values;private static String hash="ABSENT";
     private static synchronized Properties values()
     {
@@ -39,9 +42,24 @@ public final class PortableRuntimeOwnersR45
                 parsed.load(new StringReader(text));
                 if(!"projectseele.runtime-owners.r45.v1".equals(parsed.getProperty("schema")))
                     throw new IllegalStateException("Unknown portable runtime owner schema");
-                var allowed=new java.util.HashSet<>(KEYS);allowed.addAll(FACILITY_KEYS);
-                if(!parsed.stringPropertyNames().containsAll(KEYS)||!allowed.containsAll(parsed.stringPropertyNames()))
-                    throw new IllegalStateException("Incomplete/unknown portable runtime owner keys");
+                var allowed=new java.util.HashSet<>(KEYS);allowed.addAll(FACILITY_KEYS);allowed.addAll(ACTIVATION_KEYS);
+                var missing=new java.util.TreeSet<>(KEYS);missing.removeAll(parsed.stringPropertyNames());
+                var unknown=new java.util.TreeSet<>(parsed.stringPropertyNames());unknown.removeAll(allowed);
+                if(!missing.isEmpty()||!unknown.isEmpty())
+                    throw new IllegalStateException("Portable runtime owner keys: missing="+missing+", unknown="+unknown);
+                for(String name:ACTIVATION_KEYS)
+                    if(parsed.containsKey(name)&&!ACTIVATION_VALUES.contains(parsed.getProperty(name).strip()))
+                        throw new IllegalStateException("Invalid activation field "+name+"="+parsed.getProperty(name)
+                                +"; expected producer_proof_sha256 or exact_native_input_abi_r47");
+                String shared=parsed.getProperty("city.union.activation","producer_proof_sha256").strip();
+                String client=parsed.getProperty("city.union.client.activation",shared).strip();
+                String server=parsed.getProperty("city.union.server.activation",shared).strip();
+                if(!client.equals(server))
+                    throw new IllegalStateException("City activation fields disagree: city.union.client.activation="+client
+                            +", city.union.server.activation="+server);
+                if(parsed.containsKey("city.union.activation")&&(!shared.equals(client)||!shared.equals(server)))
+                    throw new IllegalStateException("Shared city.union.activation="+shared+" conflicts with city.union.client.activation="
+                            +client+" or city.union.server.activation="+server);
                 for(String name:FACILITY_KEYS)
                     if(!Set.of("true","false").contains(parsed.getProperty(name,"false")))
                         throw new IllegalStateException("Invalid explicit facility Boolean: "+name);

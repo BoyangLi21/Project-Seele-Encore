@@ -2,12 +2,12 @@
   "sources": [
     {
       "type": "minecraft:single",
-      "resource": "minecraft:block/water_still",
+      "resource": "projectseele:block/lcl_still",
       "sprite": "projectseele:block/lcl_still"
     },
     {
       "type": "minecraft:single",
-      "resource": "minecraft:block/water_flow",
+      "resource": "projectseele:block/lcl_flow",
       "sprite": "projectseele:block/lcl_flow"
     },
     {

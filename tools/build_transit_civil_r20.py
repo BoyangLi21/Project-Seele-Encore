@@ -144,7 +144,13 @@ def main():
     OUT.mkdir(parents=True,exist_ok=True);vox.OUT=OUT;p=vox.Painter();old=load(SOURCE/'native_snapshot.json');native=load(SOURCE/'built1/native_commission.json');plan=load(SOURCE/'native_plan.json');assert native['passed'];terrain=arrays(vox.ROOT/'artifacts/world_quality_r02/terrain_target.npz');ox,oz=map(int,terrain['origin']);nz,nx=terrain['height'].shape
     print('R20 civil inputs loaded',flush=True)
     # Exact retained systems and occupied plots constrain every ground edit.
-    for name,box in [('core',(-194,32,-4,254,255,444)),('surface_cages',(-65,32,-175,195,255,20)),('NERV_gateway',(-420,79,700,-292,105,819)),('gateway_lift',(-369,-490,741,-351,100,759)),('public_lift',(122,-448,264,138,100,282))]:p.protect(box,name)
+    # R47: the retired surface cages no longer own the whole north forecourt.
+    # Keep the real launch mouths/power pads, not the obsolete80m rail beds.
+    for name,box in [('core',(-194,32,-4,254,255,444)),('surface_launches',(-65,32,-84,98,255,-16)),('original_rifle_vault',(109,35,-47,131,125,-25)),('NERV_gateway',(-420,79,700,-292,105,819)),('gateway_lift',(-369,-490,741,-351,100,759)),('public_lift',(122,-448,264,138,100,282))]:p.protect(box,name)
+    vaults=vox.WORLD/'r47_equipment_vaults.json'
+    if vaults.is_file():
+        for well in load(vaults)['vaults']:
+            a,b=well['shell_bounds'];p.protect((a[0],a[1],a[2],b[0],max(b[1],125),b[2]),well['id'])
     for b in load(vox.ROOT/'artifacts/world_quality_r02/surface_layout.json')['kept_plots']:
         x,X,z,Z=b['bounds'];p.protect((x,b['floor'],z,X,b['floor']+b.get('storeys',1)*5+6,Z),b['id'])
     # Remove ONLY the old rail-bed strip before restoring its terrain. Station

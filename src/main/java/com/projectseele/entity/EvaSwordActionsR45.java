@@ -66,6 +66,7 @@ public final class EvaSwordActionsR45
         if(heavy&&!e.swordHeavyAvailableR45())return false;
         String name=heavy?"sword_heavy":new String[]{"sword_a","sword_b","sword_c"}[runtime.nextStage];
         var authored=authored(e,name);if(authored==null)return false;
+        com.projectseele.world.CombatCommandBriefR47.attackCommitted(e,"sword");
         e.interruptCombatR31();EvaGameplayMotionR32.beginAction(e);
         var state=new CompoundTag();int sequence=runtime.sequence=(runtime.sequence+1)&Integer.MAX_VALUE;
         state.putString("clip",name);state.putInt("sequence",sequence);state.putLong("since",e.level().getGameTime());

@@ -119,12 +119,20 @@ public final class StaffConversationScreen extends Screen
             addButton("驾驶员登机", x + 12, controlsY + 66, column, () -> send("BOARD:" + unit), permitted("board"));
             addButton("下机返回待命", x + 16 + column, controlsY + 66, column, () -> send("STANDBY:" + unit), permitted("board"));
             addButton("部署武器井", x + 20 + column*2, controlsY + 66, column, () -> send("WEAPONS"), permitted("weapons"));
+            addButton("零号机 · 专用盾井",x+12,controlsY+88,half,()->send("WEAPONS:shield"),permitted("weapons"));
+            addButton("二号机 · 专用剑井",x+16+half,controlsY+88,half,()->send("WEAPONS:sword"),permitted("weapons"));
         }
         else if(tab==2)
         {
             int half = (panelWidth - 28) / 2;
-            addButton((mission.equals("sachiel")?"● ":"")+"萨基尔",x+12,controlsY,half,()->{mission="sachiel";send("CAMPAIGN:select:sachiel");rebuildWidgets();},permitted("campaign"));
-            addButton((mission.equals("shamshel")?"● ":"")+"夏姆榭尔",x+16+half,controlsY,half,()->{mission="shamshel";send("CAMPAIGN:select:shamshel");rebuildWidgets();},permitted("campaign"));
+            int choice=(panelWidth-36)/4;
+            String[] chapters={"sachiel","shamshel","ramiel","gaghiel"};String[] chapterNames={"萨基尔","夏姆榭尔","屋岛","港区"};
+            for(int i=0;i<chapters.length;i++)
+            {
+                String selected=chapters[i];
+                addButton((mission.equals(selected)?"● ":"")+chapterNames[i],x+12+i*(choice+4),controlsY,choice,
+                        ()->{mission=selected;send("CAMPAIGN:select:"+selected);rebuildWidgets();},permitted("campaign"));
+            }
             for(int i=0;i<3;i++){int selection=i;addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),x+12+i*(column+4),controlsY+22,column,()->{unit=selection;rebuildWidgets();},true);}
             addButton((!npcSortie?"● ":"")+"亲自驾驶",x+12,controlsY+44,half,()->{npcSortie=false;rebuildWidgets();},true);
             addButton((npcSortie?"● ":"")+com.projectseele.entity.TrainingPilotEntity.pilotName(unit)+"出战",x+16+half,controlsY+44,half,()->{npcSortie=true;rebuildWidgets();},true);

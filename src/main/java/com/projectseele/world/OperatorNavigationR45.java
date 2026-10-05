@@ -43,8 +43,6 @@ public final class OperatorNavigationR45
     private static final Map<MinecraftServer,Map<UUID,Selection>> ACTIVE=new WeakHashMap<>();
     public static final List<String> GOALS=List.of("operator_nearest_lift","operator_inspection_exit");
     private static final String SCHEMA="projectseele.r45-operator-return-graph.v1";
-    private static final String METADATA_SHA="4639b70111d26065402032f5a58b7ada2088960fba0566718dccd1e4e4d00d98";
-    private static final String MODEL_SHA="2a789960d2649118b12505be8d6c93888ed8e1cabe6beaef0c20f498b12551a3";
     private static Boolean modelMatches;
 
     private static String hash(byte[] bytes) throws Exception
@@ -53,8 +51,7 @@ public final class OperatorNavigationR45
     {
         // The cold-bound resource is immutable for this classloader/JVM epoch.
         if(modelMatches!=null)return modelMatches;
-        try(var stream=OperatorNavigationR45.class.getResourceAsStream("/assets/projectseele/mesh/tv_shoulder_shells_r44.json"))
-        { modelMatches=stream!=null&&MODEL_SHA.equals(hash(stream.readAllBytes()));return modelMatches; }
+        TvPersonnelSemanticEpochR47.requireModel();modelMatches=true;return true;
     }
     private static Vec3 feet(JsonArray row)
     {
@@ -95,7 +92,7 @@ public final class OperatorNavigationR45
             if(file.startsWith(root)||Files.size(file)>4_000_000)throw new IllegalArgumentException("Use a finite external graph artifact");
             byte[] bytes=Files.readAllBytes(file);
             if(!hash(bytes).equals(digest))throw new IllegalArgumentException("Operator graph bytes changed");
-            if(!METADATA_SHA.equals(hash(Files.readAllBytes(root.resolve("r44_tv_personnel_platforms.json"))))||!modelMatches())
+            if(!TvPersonnelPlatformInterlockR44.semanticReadyR47(level)||!modelMatches())
                 throw new IllegalArgumentException("Personnel metadata/model differs from source authority");
             if(old!=null&&old.level==level&&old.root.equals(root)&&old.input.equals(input)&&old.digest.equals(digest)&&old.value.isPresent())
             {
@@ -112,8 +109,8 @@ public final class OperatorNavigationR45
             // Path admission already proves the persisted UUID before world opening.
             // Do not call a SavedData identity factory that could create/save one here.
             CityAtomicCandidateBindingR45.admit(root,job);
-            if(!METADATA_SHA.equals(job.get("metadata_sha256").getAsString()))
-                throw new IllegalArgumentException("Personnel metadata differs from source authority");
+            if(job.has("personnel_semantic_epoch")&&!TvPersonnelSemanticEpochR47.EPOCH.equals(job.get("personnel_semantic_epoch").getAsString()))
+                throw new IllegalArgumentException("Personnel semantic epoch differs from source authority");
             boolean providerClass=false,dispatchClass=false;Set<String> classes=new HashSet<>();
             for(var raw:job.getAsJsonArray("runtime_classes"))
             {

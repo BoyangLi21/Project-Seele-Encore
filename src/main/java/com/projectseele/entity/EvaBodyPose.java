@@ -373,7 +373,7 @@ public final class EvaBodyPose
         if(com.projectseele.physics.CombatBodyDynamics.active(entity))
         {
             var physical=com.projectseele.physics.CombatBodyDynamics.sample(entity,partial);
-            EvaAnatomicalHandsR45.attachSwordR45(entity,physical);return physical;
+            EvaAnatomicalHandsR45.attachSwordR45(entity,physical);EvaShieldRigR47.attach(entity,physical);return physical;
         }
         if(data==null)reload();Data d=data;int variant=rigKey(entity);float phase=entity.rifleGaitPhase(partial);phase-=Mth.floor(phase);
         if(EvaAirTransportR31.active(entity))return EvaAirTransportR31.sample(entity,new Sample(d.rigs().get(variant)),partial);
@@ -574,6 +574,7 @@ public final class EvaBodyPose
         body=EvaWeaponHandlingR45.apply(entity,body,partial);
         if(!EvaWeaponHandlingR45.active(entity))EvaAnatomicalHandsR45.attachKnife(entity,body);
         EvaAnatomicalHandsR45.attachSwordR45(entity,body);
+        EvaShieldRigR47.attach(entity,body);
         EvaCombatSupportR33.rememberFinalFeetR44(entity,body,partial);
         com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;
@@ -581,13 +582,13 @@ public final class EvaBodyPose
     private static void supportProneFirearmChestR45(EvaUnit01Entity entity,Sample body,float partial)
     {
         if(entity.isExperimentalUnit()||entity.isNervLogisticsLocked()||entity.isFirstBattleActive()
-                ||EvaShutdownR30.disabled(entity)||entity.isVisuallyAirborneForRender()
-                ||(entity.getWeapon()!=EvaUnit01Entity.WEAPON_RIFLE&&entity.getWeapon()!=EvaUnit01Entity.WEAPON_CANNON))return;
+                ||EvaShutdownR30.disabled(entity)||entity.isVisuallyAirborneForRender())return;
         float support=Mth.clamp((entity.rifleStanceLevel(partial)-2.4F)/.6F,0,1);
         support=support*support*(3-2*support);if(support<=0)return;
         var matrix=body.matrix("torso_upper");var up=matrix.transformDirection(new Vector3f(0,1,0)).normalize();
         float elevation=(float)Math.asin(Mth.clamp(up.y,-1,1));
         float minimum=12*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
+        var headWorld=body.matrix("head").getUnnormalizedRotation(new Quaternionf()).normalize();
         float horizontal=(float)Math.hypot(up.x,up.z);if(horizontal<1e-6F)return;
         float target=Mth.lerp(support,elevation,minimum),radius=(float)Math.cos(target);
         var raised=new Vector3f(up.x*radius/horizontal,(float)Math.sin(target),up.z*radius/horizontal);
@@ -598,6 +599,14 @@ public final class EvaBodyPose
         // socket off its neck. The held gun/arms are solved from this same
         // shared chest on both sides, with the original limb lengths intact.
         body.rotations.put("torso_upper",rotation);body.dirty();
+        // Raising the chest must not add that same rotation to an already
+        // horizon-aligned head; doing so pushes the helmet back into the collar.
+        String headParent=body.rig.get("head").parent();
+        if(headParent!=null)
+        {
+            var parentWorld=body.matrix(headParent).getUnnormalizedRotation(new Quaternionf()).normalize();
+            body.rotations.put("head",parentWorld.invert().mul(headWorld));body.dirty();
+        }
     }
     private static void applyLocomotionContactGoalsR44(EvaUnit01Entity e,Sample pose,float partial)
     {

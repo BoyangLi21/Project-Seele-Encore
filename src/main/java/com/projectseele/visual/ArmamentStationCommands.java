@@ -34,8 +34,8 @@ public final class ArmamentStationCommands
         if(!DevelopmentCommandsR43.enabled())
         {
             dispatcher.register(Commands.literal("seele").then(Commands.literal("armament").requires(s->s.hasPermission(2))
-                    .then(Commands.literal("deploy").executes(c->change(c,true)))
-                    .then(Commands.literal("recall").executes(c->change(c,false)))
+                    .then(payloadBranches("deploy",true))
+                    .then(payloadBranches("recall",false))
                     .then(Commands.literal("status").executes(ArmamentStationCommands::status))));
             return;
         }
@@ -44,14 +44,34 @@ public final class ArmamentStationCommands
                         .requires(source -> source.hasPermission(2))
                         .then(Commands.literal("spawn_here")
                                 .executes(ArmamentStationCommands::spawnHere))
-                        .then(Commands.literal("deploy")
-                                .executes(context -> change(context, true)))
-                        .then(Commands.literal("recall")
-                                .executes(context -> change(context, false)))
+                        .then(payloadBranches("deploy",true))
+                        .then(payloadBranches("recall",false))
                         .then(Commands.literal("status")
                                 .executes(ArmamentStationCommands::status))
                         .then(Commands.literal("remove")
                                 .executes(ArmamentStationCommands::remove))));
+    }
+
+    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> payloadBranches(String name,boolean deploy)
+    {
+        return Commands.literal(name).executes(c->change(c,deploy))
+                .then(Commands.literal("rifle").executes(c->changePayload(c,deploy,4)))
+                .then(Commands.literal("sword").executes(c->changePayload(c,deploy,6)))
+                .then(Commands.literal("shield").executes(c->changePayload(c,deploy,7)));
+    }
+
+    private static int changePayload(CommandContext<CommandSourceStack> context,boolean deploy,int payload)
+    {
+        ServerLevel level=context.getSource().getServer().getLevel(GeoFrontCommands.GEOFRONT);
+        NervArmamentStationEntity station=level==null?null:payload==4?NervArmamentStationEntity.commandStation(level)
+                :com.projectseele.world.EquipmentVaultsR47.recordedStationR47(level,payload);
+        if(station==null||!(deploy?station.deploy():station.recall()))
+        {
+            context.getSource().sendFailure(Component.translatable("msg.projectseele.armament_command_rejected"));return 0;
+        }
+        String cargo=payload==7?"零号机专用盾牌":payload==6?"二号机专用长剑":"步枪";
+        context.getSource().sendSuccess(()->Component.literal(cargo+"武器井"+(deploy?"正在升起":"正在收回")+"："
+                +station.blockPosition().toShortString()),false);return 1;
     }
 
     private static int spawnHere(CommandContext<CommandSourceStack> context)

@@ -81,6 +81,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     private static final EntityDataAccessor<Float> DATA_DOOR =
             SynchedEntityData.defineId(NervArmamentStationEntity.class,
                     EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Integer> DATA_PAYLOAD_R47 =
+            SynchedEntityData.defineId(NervArmamentStationEntity.class,EntityDataSerializers.INT);
 
     private int phaseTicks;
     private float clientLift;
@@ -108,11 +110,13 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         this.entityData.define(DATA_HATCH, 0.0F);
         this.entityData.define(DATA_STOCKED, true);
         this.entityData.define(DATA_DOOR, 0.0F);
+        this.entityData.define(DATA_PAYLOAD_R47,EvaUnit01Entity.WEAPON_RIFLE);
     }
 
     @Override
     protected void readAdditionalSaveData(CompoundTag tag)
     {
+        this.setPayloadR47(tag.contains("PayloadR47")?tag.getInt("PayloadR47"):EvaUnit01Entity.WEAPON_RIFLE);
         this.entityData.set(DATA_STATE,
                 Mth.clamp(tag.getInt("StationState"), STOWED, DOOR_CLOSING));
         this.entityData.set(DATA_LIFT,
@@ -135,6 +139,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     @Override
     protected void addAdditionalSaveData(CompoundTag tag)
     {
+        tag.putInt("PayloadR47",this.payloadR47());
         tag.putInt("StationState", this.getStationState());
         tag.putFloat("LiftProgress", this.entityData.get(DATA_LIFT));
         tag.putFloat("HatchProgress", this.entityData.get(DATA_HATCH));
@@ -166,6 +171,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
             return;
         }
 
+        if(!com.projectseele.world.EquipmentVaultsR47.beforeMechanicalTick(this))return;
         this.phaseTicks++;
         if(this.level() instanceof ServerLevel server&&this.getStationState()!=STOWED&&this.getStationState()!=READY&&this.tickCount%40==0)
             keepCommandStationLoaded(server,this.blockPosition());
@@ -232,7 +238,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
                 if (this.phaseTicks >= HATCH_TICKS)
                 {
                     this.setHatch(0.0F);
-                    this.entityData.set(DATA_STOCKED, !com.projectseele.world.TvMissionEquipmentR45.missionRack(this)
+                    if(this.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE)this.entityData.set(DATA_STOCKED, !com.projectseele.world.TvMissionEquipmentR45.missionRack(this)
                     ||com.projectseele.world.TvMissionEquipmentR45.physicalStockPresent(this));
                     if (this.deployQueued)
                     {
@@ -314,6 +320,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
                 && level.getEntity(cached) instanceof
                 NervArmamentStationEntity station
                 && station.isAlive()
+                &&station.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE
                 && !com.projectseele.world.TvMissionEquipmentR45.missionRack(station))
         {
             return station;
@@ -323,6 +330,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         {
             if (entity instanceof NervArmamentStationEntity station
                     && station.isAlive()
+                    &&station.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE
                     && !com.projectseele.world.TvMissionEquipmentR45.missionRack(station)
                     && (selected == null || station.getUUID().compareTo(
                             selected.getUUID()) < 0))
@@ -347,6 +355,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         {
             return false;
         }
+        if(this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE&&!this.isStocked())return false;
         if (this.getStationState() == EMPTY
                 || this.getStationState() == DOOR_CLOSING
                 || this.getStationState() == LOWERING
@@ -359,7 +368,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         {
             return false;
         }
-        this.entityData.set(DATA_STOCKED, !com.projectseele.world.TvMissionEquipmentR45.missionRack(this)
+        if(this.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE)this.entityData.set(DATA_STOCKED, !com.projectseele.world.TvMissionEquipmentR45.missionRack(this)
                     ||com.projectseele.world.TvMissionEquipmentR45.physicalStockPresent(this));
         this.setDoor(0.0F);
         this.transition(OPENING);
@@ -387,7 +396,13 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         {
             return false;
         }
-        if (!eva.installExternalArmament(EvaUnit01Entity.WEAPON_RIFLE))
+        if(!EvaEquipmentPolicyR45.allowed(this.payloadR47(),eva.getUnitVariant(),eva.isExperimentalUnit()))
+        {
+            player.displayClientMessage(Component.translatable(this.payloadR47()==7
+                    ?"msg.projectseele.weapon_vault_unit00_only":"msg.projectseele.weapon_vault_unit02_only"),true);
+            return false;
+        }
+        if (!com.projectseele.world.EquipmentVaultsR47.issueR47(this,eva))
         {
             player.displayClientMessage(Component.translatable(
                     "msg.projectseele.armament_already_installed"), true);
@@ -396,7 +411,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         this.entityData.set(DATA_STOCKED, false);
         this.transition(EMPTY);
         player.displayClientMessage(Component.translatable(
-                "msg.projectseele.armament_rifle_acquired"), true);
+                this.payloadR47()==7?"msg.projectseele.shield_deployed":this.payloadR47()==6
+                        ?"msg.projectseele.sword_deployed":"msg.projectseele.armament_rifle_acquired"), true);
         return true;
     }
 
@@ -405,6 +421,13 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     {
         NervArmamentStationEntity station = nearest(level, eva.position(),
                 EVA_PICKUP_RANGE, true);
+        if(station!=null&&!EvaEquipmentPolicyR45.allowed(station.payloadR47(),eva.getUnitVariant(),eva.isExperimentalUnit()))
+            station=level.getEntitiesOfClass(NervArmamentStationEntity.class,
+                    eva.getBoundingBox().inflate(EVA_PICKUP_RANGE,40,EVA_PICKUP_RANGE),
+                    candidate->candidate.isReadyAndStocked()
+                            &&EvaEquipmentPolicyR45.allowed(candidate.payloadR47(),eva.getUnitVariant(),eva.isExperimentalUnit())
+                            &&horizontalDistanceSqr(candidate.position(),eva.position())<=EVA_PICKUP_RANGE*EVA_PICKUP_RANGE)
+                    .stream().min(Comparator.comparingDouble(eva::distanceToSqr)).orElse(null);
         var missionCargo=com.projectseele.world.TvMissionEquipmentR45.nearestPhysicalCargo(level,eva);
         if(missionCargo!=null)return missionCargo.issueTvMissionEquipmentR45(player,eva);
         return station != null && station.issueRifle(player, eva);
@@ -423,7 +446,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         if(this.level().isClientSide||eva.getPilotEntity()!=pilot||pilot.getAssignedVariant()!=eva.getUnitVariant()
                 ||!eva.isPoweredOn()||!this.isReadyAndStocked()
                 ||horizontalDistanceSqr(eva.position(),this.position())>EVA_PICKUP_RANGE*EVA_PICKUP_RANGE
-                ||!eva.installExternalArmament(EvaUnit01Entity.WEAPON_RIFLE))return false;
+                ||!com.projectseele.world.EquipmentVaultsR47.issueR47(this,eva))return false;
         this.entityData.set(DATA_STOCKED,false);this.transition(EMPTY);return true;
     }
 
@@ -483,8 +506,25 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     @Override
     public EntityDimensions getDimensions(Pose pose)
     {
-        float height = 1.0F + 43.0F * this.entityData.get(DATA_LIFT);
-        return EntityDimensions.fixed(11.0F, height);
+        float height = 1.0F + this.podTravelR47() * this.entityData.get(DATA_LIFT);
+        return EntityDimensions.fixed(this.rackHalfWidthR47()*2+3, height);
+    }
+
+    public int payloadR47(){return this.entityData.get(DATA_PAYLOAD_R47);}
+    public int rackHalfWidthR47(){return this.payloadR47()==7?14:4;}
+    public float podTravelR47(){return this.payloadR47()==7?53.0F:43.0F;}
+    public float podHeightR47(){return this.payloadR47()==7?52.0F:42.0F;}
+    public void setPayloadR47(int payload)
+    {this.entityData.set(DATA_PAYLOAD_R47,payload==6||payload==7?payload:EvaUnit01Entity.WEAPON_RIFLE);this.refreshDimensions();}
+    @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key)
+    {
+        super.onSyncedDataUpdated(key);
+        if(DATA_LIFT.equals(key)||DATA_PAYLOAD_R47.equals(key))this.refreshDimensions();
+    }
+    public void returnStoredPayloadR47()
+    {
+        if(!this.level().isClientSide&&this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE)
+            this.entityData.set(DATA_STOCKED,true);
     }
 
     @Override

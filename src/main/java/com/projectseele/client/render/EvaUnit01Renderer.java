@@ -202,6 +202,10 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 (entity,bone) -> !entity.isExperimentalUnit()&&entity.getUnitVariant()==2
                         &&entity.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45&&"lance".equals(bone.getName())));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
+                entity -> new ResourceLocation(ProjectSeele.MODID,"mesh/yashima_shield.mesh.json"),
+                entity -> new ResourceLocation(ProjectSeele.MODID,"textures/entity/yashima_shield.png"),
+                (entity,bone) -> com.projectseele.entity.EvaShieldRigR47.equipped(entity)&&"shield".equals(bone.getName())));
+        this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"mesh/entry_plug_un.mesh.json"):ENTRY_PLUG_MESH,
                 entity -> entity.isExperimentalUnit()?new ResourceLocation(ProjectSeele.MODID,"textures/entity/entry_plug_un.png"):ENTRY_PLUG_TEXTURE,
                 (entity, bone) -> !this.pilotView
@@ -286,6 +290,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
     @Override protected void applyRotations(EvaUnit01Entity entity,PoseStack pose,float age,float yaw,float partial)
     {
         if(entity.isFirstBattleActive())yaw=com.projectseele.entity.FirstBattleClip.yaw(entity.firstBattleSignals().spec(entity),true,entity.firstBattleSignals().time(entity,partial));
+        else if(!entity.isExperimentalUnit()&&entity.isNervLogisticsLocked()
+                &&!com.projectseele.entity.EvaAirTransportR31.active(entity))yaw=EvaUnit01Entity.SILO_BAY_YAW;
         super.applyRotations(entity,pose,age,yaw,partial);
     }
 
@@ -341,6 +347,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         }
         var retainedBounds=EvaRetainedRenderBoundsR46.bounds(entity,minecraft.getFrameTime());
         if(retainedBounds!=null)return frustum.isVisible(retainedBounds);
+        if(com.projectseele.entity.EvaShutdownR30.retainsPoseR45(entity))
+            return frustum.isVisible(entity.getBoundingBox().inflate(72));
         return super.shouldRender(entity, frustum, cameraX, cameraY, cameraZ);
     }
 
@@ -416,7 +424,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         setWeaponVisibility(model, "lance", animatable.getWeapon() == EvaUnit01Entity.WEAPON_LANCE
                 ||animatable.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45);
         setWeaponVisibility(model, "n2", animatable.getWeapon() == EvaUnit01Entity.WEAPON_N2);
-        setWeaponVisibility(model, "shield", false);
+        setWeaponVisibility(model, "shield", com.projectseele.entity.EvaShieldRigR47.equipped(animatable));
         // The external carrier owns the entire visible insertion. Once seated,
         // the capsule is inside the artificial spine and the dorsal armour
         // reseals; no duplicate capsule or generic hatch may protrude from the
@@ -512,8 +520,9 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         boolean swordMesh=entity!=null&&entity.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45
                 &&"lance".equals(bone.getName())&&LocalTriangleMeshLayer.hasPart(
                         new ResourceLocation(ProjectSeele.MODID,"mesh/eva02_longsword.mesh.json"),"lance");
+        boolean shieldMesh=entity!=null&&com.projectseele.entity.EvaShieldRigR47.equipped(entity)&&"shield".equals(bone.getName());
         if (bodyMesh || cannonMesh || rifleMesh || n2Mesh
-                || knifeMesh || lanceMesh || swordMesh || entryHardwareMesh)
+                || knifeMesh || lanceMesh || swordMesh || shieldMesh || entryHardwareMesh)
         {
             return;
         }

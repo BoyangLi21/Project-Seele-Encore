@@ -55,4 +55,13 @@ public final class TvPersonnelGuardR44 extends Block
     { int mask = 0; for (int i = 0; i < 4; i++) if (state.getValue(SIDES[i])) mask |= 1 << i; return SHAPES[mask][state.getValue(DROP)]; }
     @Override public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos position, CollisionContext context) { return getShape(state, level, position, context); }
     @Override public VoxelShape getOcclusionShape(BlockState state, BlockGetter level, BlockPos position) { return Shapes.empty(); }
+    @Override public net.minecraft.world.level.pathfinder.BlockPathTypes getBlockPathType(
+            BlockState state,BlockGetter level,BlockPos pos,net.minecraft.world.entity.Mob mob)
+    {
+        // Forge's ground evaluator passes a null mob here. These are actual
+        // guard barriers, not partial OPEN floors or a permitted jump target.
+        return getCollisionShape(state,level,pos,CollisionContext.empty()).isEmpty()?
+                net.minecraft.world.level.pathfinder.BlockPathTypes.OPEN:
+                net.minecraft.world.level.pathfinder.BlockPathTypes.FENCE;
+    }
 }

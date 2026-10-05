@@ -31,8 +31,8 @@ def main():
     config=a.out/'config/projectseele-runtime-r45.properties';config.parent.mkdir()
     # No captured high-knee replacement or unconnected draw clips are promoted.
     config.write_text('schema=projectseele.runtime-owners.r45.v1\nweapon_handling=false\ncannon_contact=true\ncaptured_support=false\ncaptured_locomotion_directory=\n'
-        'city.union.client.enabled=false\ncity.union.client.required=false\ncity.union.client.create_class_sha256=\ncity.union.client.proof_sha256=\n'
-        'city.union.server.enabled=false\ncity.union.server.required=false\ncity.union.server.create_class_sha256=\ncity.union.server.proof_sha256=\n','utf8')
+        'city.union.activation=exact_native_input_abi_r47\ncity.union.client.enabled=true\ncity.union.client.required=true\ncity.union.client.create_class_sha256=\ncity.union.client.proof_sha256=\n'
+        'city.union.server.enabled=true\ncity.union.server.required=true\ncity.union.server.create_class_sha256=\ncity.union.server.proof_sha256=\n','utf8')
     rows.append(dict(source='root explicit production owner choice',destination='config/projectseele-runtime-r45.properties',sha256=sha(config)))
     (a.out/'manifest.json').write_text(json.dumps(dict(schema='projectseele.selected-motion-delivery.r45.v1',files=rows,
         notes=['Body/ordinary walking/running retain the actually exercised base; no wholesale high-knee replacement.',

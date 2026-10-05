@@ -133,7 +133,9 @@ public final class ThirdTokyoSurfaceBuilder
         connectPowerGrid(level, origin, 100);
         buildSortieGate(level, origin.offset(0, 1, 52));
         ensureLaunchControlQuarter(level, origin);
-        buildObservationDeck(level, origin.offset(0, 0, OBSERVATION_Z));
+        // R47: the tall surface lookout is retired in the played TV city.
+        if (!TvWorldPreviewTerrain.active(level))
+            buildObservationDeck(level, origin.offset(0, 0, OBSERVATION_Z));
         set(level, origin.offset(REVISION_MARKER),
                 Blocks.NETHERITE_BLOCK.defaultBlockState());
         set(level, origin.offset(REVISION_MARKER).above(),
@@ -305,8 +307,9 @@ public final class ThirdTokyoSurfaceBuilder
         // The plaza builder no longer places a beacon, and played S20 worlds
         // repurpose that footprint. It is not part of the moving-city contract.
         boolean sortieLane = isRoad(level.getBlockState(origin.offset(0, 0, 60)));
-        boolean observationDeck = level.getBlockState(
-                origin.offset(0, OBSERVATION_Y, OBSERVATION_Z)).is(Blocks.LODESTONE);
+        boolean observationDeck = TvWorldPreviewTerrain.active(level)
+                ? level.getBlockState(origin.offset(0, OBSERVATION_Y, OBSERVATION_Z)).isAir()
+                : level.getBlockState(origin.offset(0, OBSERVATION_Y, OBSERVATION_Z)).is(Blocks.LODESTONE);
         boolean foundation = level.getBlockState(
                 origin.offset(FOUNDATION_HALF_SIZE, -4, 0)).is(Blocks.DEEPSLATE_BRICKS);
         boolean valid = roads == ROAD_AUDIT_POINTS.length

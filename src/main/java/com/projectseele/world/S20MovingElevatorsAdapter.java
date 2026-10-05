@@ -258,6 +258,7 @@ public final class S20MovingElevatorsAdapter
             {
                 continue;
             }
+            if (SeeleConferenceAccessR47.office(level, spec)) continue;
             boolean hasCard = hasHighestClearanceCard(player);
             if (hasCard)
             {
@@ -600,6 +601,7 @@ public final class S20MovingElevatorsAdapter
                 .movingElevatorLandingPanelPosition(landing);
         BlockPos call = S20PhysicalElevatorDirector
                 .exteriorCallPosition(landing);
+        if (SeeleConferenceAccessR47.protectedReader(level, call)) return;
         if (!replaceablePanelCell(level.getBlockState(wall))
                 || !replaceablePanelCell(level.getBlockState(call)))
         {
@@ -656,11 +658,17 @@ public final class S20MovingElevatorsAdapter
             {
                 continue;
             }
+            if (SeeleConferenceAccessR47.office(level, spec)
+                    && !SeeleConferenceAccessR47.allowDestination(player, landing.walkY()))
+            {
+                return true;
+            }
             // Calling the car from inside the restricted landing is egress.
             // Requiring the admission card here trapped occupants who had
             // already arrived in Dogma and then put the card away.
             boolean leavingRestrictedLanding = localLandingEgress(player, landing);
-            if (isSecureLift(spec) && restrictedLanding(spec, landing)
+            if (!SeeleConferenceAccessR47.office(level, spec)
+                    && isSecureLift(spec) && restrictedLanding(spec, landing)
                     && !leavingRestrictedLanding
                     && !accessUnlocked(level, spec))
             {
@@ -701,6 +709,11 @@ public final class S20MovingElevatorsAdapter
                 return true;
             }
             ElevatorGroup group = target.getGroup();
+            if(group.isMoving())
+            {
+                NativeLiftCallRetryR43.externalWhileMovingR47(player,spec.id(),clicked);
+                return true;
+            }
             if(Boolean.getBoolean("projectseele.r43LiftCallTrace"))
             {
                 var floors=new java.util.ArrayList<Integer>();for(int i=0;i<group.getFloorCount();i++)floors.add(group.getFloorYLevel(i));
@@ -1808,6 +1821,10 @@ public final class S20MovingElevatorsAdapter
                     || group.facing != controllerFacing(spec))
             {
                 continue;
+            }
+            if (SeeleConferenceAccessR47.office(level, spec))
+            {
+                return SeeleConferenceAccessR47.allowDestination(serverPlayer, targetY);
             }
             for (S20PhysicalElevatorDirector.Landing landing : spec.stops())
             {

@@ -30,7 +30,7 @@ public final class NervStaffDirector
                 List<Station> result=new ArrayList<>();Set<String> ids=new HashSet<>();
                 for(var item:json.getAsJsonArray("stations"))
                 {
-                    var d=item.getAsJsonObject();String id=d.get("id").getAsString();if(!id.matches("[a-z0-9_./-]{1,96}")||!ids.add(id))throw new IllegalArgumentException("Invalid staff identity");var p=d.getAsJsonArray("feet");
+                    var d=item.getAsJsonObject();String id=d.get("id").getAsString();if(!id.matches("[A-Za-z0-9_./-]{1,96}")||!ids.add(id))throw new IllegalArgumentException("Invalid staff identity");var p=d.getAsJsonArray("feet");
                     result.add(new Station(id,d.get("name").getAsString(),d.get("role").getAsString(),d.get("skin").getAsString(),new BlockPos(p.get(0).getAsInt(),p.get(1).getAsInt(),p.get(2).getAsInt()),d.get("yaw").getAsFloat()));
                 }
                 if(result.size()>400)throw new IllegalArgumentException("Roster budget exceeded");return List.copyOf(result);

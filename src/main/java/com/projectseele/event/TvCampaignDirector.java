@@ -86,6 +86,12 @@ public final class TvCampaignDirector
         var level = level(player); if (level == null) return message(player, "本世界尚未配置作战区域。", false);
         if(npc&&player.level()!=level)return message(player,"请进入第三新东京市后下达驾驶员出击指令。",false);
         var data = TvCampaignSavedData.get(level); var chapter = selected(player,data);
+        if(variant<3&&StaffRecoveryR47.pending(level,variant))
+            return message(player,"这台机体仍在执行回收入库与驾驶员交接。完成后再下达新的出击。",false);
+        var acceptedUnit=TvSortiesR32.unit(level,variant);
+        if(acceptedUnit!=null&&acceptedUnit.getPilotEntity()!=null
+                &&(npc?!(acceptedUnit.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==variant):acceptedUnit.getPilotEntity()!=player))
+            return message(player,"这台机体已有其他驾驶员。请确认当前驾驶员安排后再编入。",false);
         if(Set.of("cancel","failure","combat_victory").contains(data.phase)||data.targetDeathConfirmedR45)
             return message(player,"当前行动等待恢复或交接，不能追加出击或隐式重新发射。",false);
         if (!data.active.isEmpty()) return TvSortiesR32.reinforce(player,variant,npc,rifle);
@@ -93,6 +99,8 @@ public final class TvCampaignDirector
         if(TvEncounterRulesR45.handles(chapter.id()))
         {
             String blocker=TvEncounterDirectorR45.startBlocker(level,chapter.id());if(!blocker.isEmpty())return message(player,blocker,false);
+            String slotBlocker=TvEncounterRulesR45.formationSlotBlockerR47(level,chapter.id(),variant);
+            if(!slotBlocker.isEmpty())return message(player,slotBlocker,false);
         }
         var replay = FirstBattleSavedData.get(level);
         if (replay.active != null || replay.missionOwner != null) return message(player, "已有独立迎击或重播占用作战区，请先结束该行动。", false);
@@ -117,6 +125,7 @@ public final class TvCampaignDirector
         if(mission==null||!mission.playable())return message(player,"这份作战尚未开放。",false);
         var level=level(player);if(level==null)return message(player,"当前世界没有已交付的作战区。",false);
         if(!TvCampaignSavedData.get(level).active.isEmpty())return message(player,"请先结束或取消正在执行的作战。",false);
+        AutoSortieR32.invalidateMission(level);
         player.getPersistentData().putString("SeeleMissionChoiceR30",id);
         return message(player,"已选择："+mission.title()+" / "+mission.target()+"。\n"+briefing(player),true);
     }
@@ -126,6 +135,7 @@ public final class TvCampaignDirector
         var data = TvCampaignSavedData.get(level);
         if (data.active.isEmpty()) return message(player, "当前没有 TV 作战。", false);
         if (!player.getUUID().equals(data.owner) && !player.hasPermissions(2)) return message(player, "只能撤销自己的作战指令。", false);
+        AutoSortieR32.invalidateMission(level);
         if (data.active.equals("sachiel")) FirstBattleMission.cancel(player);
         TvMissionAlertR30.clear(level);
         TvMissionEquipmentR45.revokeMission(level);
@@ -213,12 +223,14 @@ public final class TvCampaignDirector
                 if(recordVictory)data.invalidateRecovery(sortie.unit);if(eva==null&&sortie.unit<3)EvaLogisticsDirector.loadControlTarget(level,sortie.unit);
                 return TvSortiesR32.name(sortie.unit)+(recordVictory?"还没完成回收。请把机体送回机库，并确认驾驶员安全离栓。":"还没完成回库整备，请先回收机体。");
             }
-            if(recordVictory&&data.originalRecoveryRecorded(sortie.unit))continue;
+            if(recordVictory&&data.originalRecoveryRecorded(sortie.unit)&&!sortie.npc)continue;
             if(sortie.pilotR45==null)return "驾驶员联络中断了，暂时无法完成交接。请联系整备部。";
             var pilot=sortie.npc?level.getEntity(sortie.pilotR45):level.getServer().getPlayerList().getPlayer(sortie.pilotR45);
             if(pilot==null||!pilot.isAlive()||pilot.level()!=level||sortie.npc&&!(pilot instanceof TrainingPilotEntity npc&&npc.getAssignedVariant()==sortie.unit)||pilot.getVehicle()==eva
                     ||pilot instanceof net.minecraft.world.entity.LivingEntity living&&living.getVehicle() instanceof EntryPlugCarrierEntity plug&&plug.getLinkedEva()==eva)
                 return TvSortiesR32.name(sortie.unit)+"的驾驶员还没完成安全交接，请先确认人已离开插入栓。";
+            if(sortie.npc&&!TrainingPilotDirector.atOriginalStandbyR47(level,sortie.unit))
+                return TvSortiesR32.name(sortie.unit)+"的驾驶员仍在返回待命。稍后再结束本次行动。";
             if(recordVictory&&!data.recordOriginalRecovery(data.owner,data.generationR43,sortie.unit,eva.getUUID(),pilot.getUUID()))return "机体和驾驶员的交接信息对不上，暂时无法结束行动。请联系整备部。";
         }return "";
     }

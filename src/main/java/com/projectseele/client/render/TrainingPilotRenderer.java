@@ -34,6 +34,16 @@ public final class TrainingPilotRenderer
         };
     }
 
+    @Override
+    public void render(TrainingPilotEntity entity,float yaw,float partial,
+                       com.mojang.blaze3d.vertex.PoseStack pose,
+                       net.minecraft.client.renderer.MultiBufferSource buffers,int light)
+    {
+        boolean reclined=com.projectseele.client.EntryPlugPilotPoseR47.push(pose,entity,partial);
+        try { super.render(entity,yaw,partial,pose,buffers,light); }
+        finally { if(reclined)pose.popPose(); }
+    }
+
     private static ResourceLocation texture(String pilot)
     {
         return new ResourceLocation(ProjectSeele.MODID,

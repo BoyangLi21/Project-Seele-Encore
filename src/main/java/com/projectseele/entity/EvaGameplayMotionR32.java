@@ -133,7 +133,7 @@ public final class EvaGameplayMotionR32
     {return lowAttackReadyR44(e)&&e.hasLiveActionForRender(0)&&actionStanceR44(e)>0;}
     public static boolean kickReady(EvaUnit01Entity e){return hasClip(e,"kick");}
     public static boolean sharedWeapon(EvaUnit01Entity e)
-    {return EvaSwordActionsR45.active(e)||EvaFieldActionsR45.active(e)||e.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45||EvaWeaponHandlingR45.active(e)||e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&(knifeReady(e)||EvaWeaponHandlingR45.available(e));}
+    {return EvaSwordActionsR45.active(e)||EvaFieldActionsR45.active(e)||e.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45||e.getWeapon()==EvaUnit01Entity.WEAPON_SHIELD_R45||EvaWeaponHandlingR45.active(e)||e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&(knifeReady(e)||EvaWeaponHandlingR45.available(e));}
     public static String activeGroundClip(EvaUnit01Entity e,float partial)
     {
         if(EvaFieldActionsR45.active(e))return EvaFieldActionsR45.clip(e);
@@ -463,16 +463,33 @@ public final class EvaGameplayMotionR32
     }
     private static EvaBodyPose.Sample groundLocomotion(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial,boolean capturedBase,boolean[] movementOwner)
     {
+        if(e.getWeapon()==EvaUnit01Entity.WEAPON_SHIELD_R45&&hasClip(e,"shield_idle"))
+        {
+            var guard=EvaBodyPose.gameplayClip(e,"shield_idle",(e.tickCount+partial)%100/100F);
+            if(e.isPilotCrouching()&&hasClip(e,"shield_brace"))
+                guard=EvaBodyPose.blend(guard,EvaBodyPose.gameplayClip(e,"shield_brace",.55F),e.rifleCrouchBlend(partial));
+            for(String name:java.util.List.of("clavicle_l","arm_l","forearm_l","wrist_l","hand_l"))
+                if(base.rig.containsKey(name))
+                {base.rotations.put(name,new Quaternionf(guard.rotations.get(name)));base.positions.put(name,new Vector3f(guard.positions.get(name)));}
+            base.dirty();if(movementOwner!=null)movementOwner[0]=capturedBase;return base;
+        }
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45&&hasClip(e,"sword_guard"))
         {
             var guard=EvaBodyPose.gameplayClip(e,"sword_guard",(e.tickCount+partial)%80/80F);
             // Locomotion keeps its pelvis and supports. The sword carry affects
             // only the captured shoulder/arm chain, never a frozen lower body.
-            for(String name:base.rig.keySet())if(name.startsWith("arm_")||name.startsWith("forearm_")||name.startsWith("wrist_")||name.startsWith("hand_"))
+            for(String name:base.rig.keySet())if(name.startsWith("clavicle_")||name.startsWith("arm_")||name.startsWith("forearm_")||name.startsWith("wrist_")||name.startsWith("hand_"))
             {base.rotations.put(name,new Quaternionf(guard.rotations.get(name)));base.positions.put(name,new Vector3f(guard.positions.get(name)));}
             base.dirty();if(movementOwner!=null)movementOwner[0]=capturedBase;return base;
         }
         reviewChoice(e,"owner_branch","ground_locomotion");reviewChoice(e,"effective_guard_clip","r32_guard");
+        // Field travel keeps the accepted locomotion's complete arm swing.
+        // The combat advance clips previously replaced it with a cupped guard.
+        if(e.pilotLocomotionRequestedR45()&&e.rifleStanceLevel(partial)<.01F)
+        {
+            if(movementOwner!=null)movementOwner[0]=capturedBase;
+            reviewChoice(e,"owner_branch","natural_field_locomotion");return base;
+        }
         reviewWeight(e,"guard_phase",(e.level().getGameTime()%120+partial)/120F);
         var guard=EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F);
         float low=Mth.clamp(e.rifleStanceLevel(partial),0,1);low=low*low*(3-2*low);

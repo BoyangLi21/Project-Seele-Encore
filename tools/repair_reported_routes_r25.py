@@ -18,6 +18,10 @@ def main(apply=False):
  # Retire exactly the obsolete lower-gallery envelope. Adjacent mechanical
  # foundations, elevated boarding gallery and live station are untouched.
  s.fill((102,-443,-290,114,-437,-50),'minecraft:air')
+ # The retired lower walk crossed active upper-gallery load paths. Its
+ # clearance mask may retire the corridor but must not cut these columns.
+ for z in range(-279,-41,24):s.fill((112,-443,z,113,-437,z+1),h.STRUCT)
+ for x in (112,114):s.fill((x,-443,-82,x,-437,-82),h.STRUCT)
  s.hall('station_west_connection',[(97,112,-49,-34),(108,116,-37,-25)],-443,6,
         [(98,-442,-49,100,-439,-49),(97,-442,-47,97,-439,-44),(116,-442,-34,116,-439,-28),(109,-442,-25,115,-439,-25)])
  # Clear the old turnback ballast only within the new pedestrian footprint.

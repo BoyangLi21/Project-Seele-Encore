@@ -1,0 +1,9 @@
+{
+  "parent": "minecraft:block/cube_bottom_top",
+  "textures": {
+    "side": "projectseele:block/nerv_floor_panel",
+    "bottom": "projectseele:block/nerv_wall_panel",
+    "top": "projectseele:block/nerv_wall_panel"
+  },
+  "ambientocclusion": true
+}

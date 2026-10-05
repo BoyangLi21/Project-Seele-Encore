@@ -17,6 +17,10 @@ from hangar_tv_design_r44 import (FINISHABLE, FULL_CUBE, wet_faces,
     wet_finish, transfer_faces, transfer_finish, launch_faces, launch_finish,
     upper_pressure_members, lower_pressure_seam_members)
 from plan_hangar_upper_enclosure_r44 import native_public_bearing, public_surface
+from hangar_pressure_envelope_r47 import (
+    mechanical_envelopes as mechanical_envelopes_r47,
+    membership as mechanical_membership_r47,
+    author_source as author_pressure_source_r47)
 
 OUT=vox.ROOT/'artifacts/world_rebuild_r20/factory'
 LO=(-48,-513,-302);HI=(164,-310,24)
@@ -113,6 +117,9 @@ def plan():
             for z in (-54,-18):s.fill((x-1,-467,z-1,x+1,LAUNCH_Y-2,z+1),STRUCT)
     # A complete inclined transfer hall with low cage pad, rounded grade,
     # level high loading pad and clear upright EVA envelopes.
+    for z in (-214,-213):
+        s.fill((-35,CAGE_Y-6,z,95,CAGE_Y-6,z),MACHINE)
+        for x in (-35,95):s.fill((x,CAGE_Y-5,z,x,CAGE_Y,z),STRUCT)
     for z in range(-212,-53):
         y=math.floor(guide_y(z));roof=y+86
         s.fill((-35,y-2,z,95,roof,z),STRUCT)
@@ -131,6 +138,10 @@ def plan():
             s.fill((cx-14,y-4,z,cx+14,y,z),'minecraft:air')
             s.fill((cx-14,y-5,z,cx+14,y-5,z),MACHINE)
             for dx in (-15,15):s.fill((cx+dx,y,z,cx+dx,y,z),EDGE)
+        # The three trenches share one sealed underside, below their full
+        # moving carrier envelope; partial individual pans left lateral leaks.
+        s.fill((-35,y-6,z,95,y-6,z),MACHINE)
+        for x in (-35,95):s.fill((x,y-5,z,x,y,z),STRUCT)
     # Gate frame reconnects to the untouched copied pressure-cell envelope.
     for cx in CENTRES:
         for x in (cx-18,cx+18):s.fill((x,-442,-214,x,-365,-213),EDGE)
@@ -194,7 +205,12 @@ def plan():
         finish(wet_faces(cx),lambda q,b,cx=cx:wet_finish(cx,q,b))
         finish(launch_faces(cx),lambda q,b,cx=cx:launch_finish(cx,q,b))
     finish(transfer_faces(guide_y),transfer_finish)
-    for q,after in (upper_pressure_members() | lower_pressure_seam_members()).items():
+    pressure_members=upper_pressure_members() | lower_pressure_seam_members()
+    pressure_masks=mechanical_envelopes_r47(vox.ROOT)
+    pressure_points=list(pressure_members)
+    pressure_no_fill={pressure_points[i] for i in mechanical_membership_r47(pressure_points,pressure_masks)}
+    for q,after in pressure_members.items():
+        if q in pressure_no_fill:continue
         public_column = False
         for feet in (-394, -367):
             if feet - 1 <= q[1] <= feet + 2:
@@ -213,10 +229,13 @@ def plan():
         if shapes.get(after)!=FULL_CUBE:raise RuntimeError(('Unknown pressure material',after))
         s.after[yy,zz,xx]=s.state(after)
     author_upper_observer_r44(s,p.block_entities)
+    # R47 outer shell surrounds the retained common galleries, instead of
+    # rebuilding individual wet south faces through real gate pockets.
+    exterior_cells=author_pressure_source_r47(s,p.block_entities,guide_y,pressure_masks)
     # Keep every protected cage cell exactly as measured, including absence.
     assert np.array_equal(s.before[s.protected],s.after[s.protected])
     changed=s.delta(p,'r20/factory_civil_reconstruction')
-    p.meta.update(source_box=SOURCE,cage_delta=[0,0,DZ],cages=[[x,CAGE_Y,CAGE_Z] for x in CENTRES],launches=[[x,LAUNCH_Y,LAUNCH_Z] for x in CENTRES],surface_shafts_unchanged=True,operator_galleries=s.descriptions,retired_lift_group='97;-15',preserved_observation=[91,-369,-61],changed_cells=changed)
+    p.meta.update(source_box=SOURCE,cage_delta=[0,0,DZ],cages=[[x,CAGE_Y,CAGE_Z] for x in CENTRES],launches=[[x,LAUNCH_Y,LAUNCH_Z] for x in CENTRES],surface_shafts_unchanged=True,operator_galleries=s.descriptions,retired_lift_group='97;-15',preserved_observation=[91,-369,-61],changed_cells=changed,r47_exterior_pressure_cells=exterior_cells)
     (OUT/'layout.json').write_text(json.dumps({'installed':False,'cage_shift_z':DZ,'launch_rise':32,'cages':p.meta['cages'],'launches':p.meta['launches'],'ramp_low_pad':28,'ramp_high_pad':16,'ramp_blend':6,'retired_lift_group':'97;-15'},indent=2))
     np.savez_compressed(OUT/'review_geometry.npz',before=s.before,after=s.after,palette=np.asarray(s.palette),lo=LO,hi=HI)
     return p

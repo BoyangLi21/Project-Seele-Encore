@@ -47,10 +47,16 @@ public final class UNRecoveryR22
     public static int request(CommandSourceStack source,int serial,boolean reset)
     {
         var l=source.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null||identity(l,serial)==null){source.sendFailure(Component.literal("没有该 UN 机体的已登记身份，未生成替代机"));return 0;}
+        if(!reset)
+        {
+            var caller=source.getPlayer();
+            if(caller==null){source.sendFailure(Component.literal("正常回收需要实际通信操作员；请由玩家呼叫原运输机与地面接应载台。"));return 0;}
+            String reply=UNAirLiftR29.requestRecoveryR47(caller,serial);
+            source.sendSuccess(()->Component.literal("EVA-UN-0"+serial+"："+reply),false);return 1;
+        }
         if(UNAirLiftR29.active(l,serial))
         {
-            if(reset)UNAirLiftR29.abortForMaintenance(l,serial);
-            else {source.sendFailure(Component.literal("运输任务仍在执行，请先取消运输并等待安全返回；管理员可用 reset 紧急复位。"));return 0;}
+            if(!reset){source.sendFailure(Component.literal("运输任务仍在执行，请先取消运输并等待安全返回。"));return 0;}
         }
         JOBS.computeIfAbsent(l,k->new HashMap<>()).put(serial,new Job(serial,reset,source,source.getServer().getTickCount()));
         source.sendSuccess(()->Component.literal("EVA-UN-0"+serial+"：正在定位原机体与插入栓"),false);return 1;
@@ -65,7 +71,6 @@ public final class UNRecoveryR22
             load(l,locations(l).positions.getOrDefault(id,BlockPos.containing(home)));load(l,BlockPos.containing(home));
             if(event.getServer().getTickCount()-job.started()>200){job.source().sendFailure(Component.literal("原机体或插入栓仍未加载，未删除或复制实体"));it.remove();continue;}
             if(!(l.getEntity(id) instanceof EvaPrototypeEntity eva))continue;
-            eva.stopUNFlight();
             load(l,eva.blockPosition());var data=eva.getPersistentData();
             if(data.hasUUID("UNPlug"))
             {
@@ -74,6 +79,10 @@ public final class UNRecoveryR22
             var plug=UNPlugDirector.capsule(eva);
             boolean destroyed=plug==null&&EntryPlugDisposalR31.replacementAuthorized(eva);
             if(plug==null&&!destroyed)continue;
+            if(eva.getPilotEntity()!=null||eva.getPassengers().stream().anyMatch(person->!(person instanceof EntryPlugCarrierEntity))||plug!=null&&!plug.getPassengers().isEmpty())
+            {job.source().sendFailure(Component.literal("原驾驶员仍在机体或插入栓中，维护复位已取消；请先正常离栓。"));it.remove();continue;}
+            if(UNAirLiftR29.active(l,job.serial()))UNAirLiftR29.abortForMaintenance(l,job.serial());
+            eva.stopUNFlight();
             var pilot=eva.getPilotEntity();var passengers=new ArrayList<net.minecraft.world.entity.Entity>();if(plug!=null)passengers.addAll(plug.getPassengers());passengers.addAll(eva.getPassengers());
             eva.normalizeAfterTransportR30(true);UNPlugDirector.resetCraneR30(eva);
             eva.teleportTo(home.x,home.y,home.z);eva.moveOnNervCarrier(home.x,home.y,home.z,0);eva.resetFallDistance();
@@ -82,7 +91,7 @@ public final class UNRecoveryR22
             eva.setNervLogisticsLocked(false);eva.setNervLogisticsLocked(true);
             data.putDouble("UNHomeX",home.x);data.putDouble("UNHomeY",home.y);data.putDouble("UNHomeZ",home.z);data.putFloat("UNHomeYaw",0);
             if(destroyed){plug=UNPlugDirector.replaceDestroyedAtDockR31(eva);if(plug==null)continue;}
-            boolean extracting=!job.reset()&&pilot!=null&&plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_LOCKED;
+            boolean extracting=pilot!=null&&plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_LOCKED;
             if(extracting)
             {
                 plug.snapCanonicalTransformR31(EntryPlugKinematics.lockedTransform(eva));
@@ -94,8 +103,8 @@ public final class UNRecoveryR22
                 {
                     if(person instanceof EntryPlugCarrierEntity)continue;
                     person.stopRiding();person.setInvisible(false);person.setDeltaMovement(Vec3.ZERO);person.resetFallDistance();
-                    if(person instanceof ServerPlayer p)p.teleportTo(l,home.x+4,127,home.z-12,90,0);
-                    else {person.teleportTo(home.x+4,127,home.z-12);if(person instanceof TrainingPilotEntity dummy)dummy.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);}
+                    // Original crew use the actual capsule's native safe exit.
+                    // Their existing return controller owns walking/standby.
                 }
                 if(job.reset()){EvaBayRepairR33.resetForMaintenance(eva);eva.setHealth(eva.getMaxHealth());}
                 plug.resetIndependentAtDock(eva);eva.enterHangarStandby();EvaDorsalMechanism.set(eva,0,0);

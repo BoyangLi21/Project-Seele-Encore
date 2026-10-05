@@ -96,6 +96,7 @@ public final class PilotReturnR39
         var receipt=EvaFleetSavedData.get(level.getServer()).entry(order.variant).orElse(null);
         if(receipt==null||!receipt.canonicalId().equals(order.unit))
         {state.orders.remove(order.variant);state.setDirty();return;}
+        if(StaffRecoveryR47.pending(level,order.variant))return;
         retain(level,order.position);EvaLogisticsDirector.loadControlTarget(level,order.variant);
         var unit=ServiceAircraftR32.payload(level,order.unit);if(unit==null)return;
         var campaign=TvCampaignSavedData.get(level);
@@ -110,6 +111,13 @@ public final class PilotReturnR39
             if(TrainingPilotDirector.stop(level,order.variant)<=0)
             {
                 if(!order.stage.equals("PILOT_EXIT_WAIT")){order.stage="PILOT_EXIT_WAIT";state.setDirty();}
+                return;
+            }
+            var originalPilot=TrainingPilotDirector.existingPilotR45(level,order.variant);
+            if(originalPilot==null||order.pilot==null||!order.pilot.equals(originalPilot.getUUID())
+                    ||!TrainingPilotDirector.atOriginalStandbyR47(level,order.variant))
+            {
+                if(!order.stage.equals("PILOT_RETURN_WALK")){order.stage="PILOT_RETURN_WALK";state.setDirty();}
                 return;
             }
             radio(level,order,"back_in_bay");state.orders.remove(order.variant);state.setDirty();return;

@@ -38,6 +38,11 @@ public class ModSounds
     public static final RegistryObject<SoundEvent> EVA_AT_PRESSURE=register("eva_at_pressure");
     public static final RegistryObject<SoundEvent> EVA_AT_TEAR=register("eva_at_tear");
     public static final RegistryObject<SoundEvent> EVA_BERSERK_ROAR=register("eva_berserk_roar");
+    public static final RegistryObject<SoundEvent> EVA_ATTACK_ROAR=register("eva_attack_roar");
+    public static final RegistryObject<SoundEvent> TRANSPORT_ENGINE=register("transport_engine");
+    public static final RegistryObject<SoundEvent> PERSONNEL_DOOR_OPEN=register("personnel_door_open");
+    public static final RegistryObject<SoundEvent> PERSONNEL_DOOR_CLOSE=register("personnel_door_close");
+    public static final RegistryObject<SoundEvent> PRESSURE_DOOR_MOTION=register("pressure_door_motion");
     public static final RegistryObject<SoundEvent> EVA_COCKPIT_CONFIRM=register("eva_cockpit_confirm");
     public static final RegistryObject<SoundEvent> EVA_COCKPIT_WARNING=register("eva_cockpit_warning");
     public static final RegistryObject<SoundEvent> EVA_DRIVE_LOOP=register("eva_drive_loop");

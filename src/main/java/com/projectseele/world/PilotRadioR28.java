@@ -102,11 +102,18 @@ public final class PilotRadioR28
         if (now > voice.expires) voice.pending = "";
         if (voice.pending.isEmpty() && eva != null && topic.equals("field")) voice.pending = "field";
         if (voice.pending.isEmpty()) return;
-        // Early TV missions have no Rei/Asuka co-pilot radio. Their physical
-        // standby NPCs remain available for free-play interactions.
         var campaign = TvCampaignSavedData.get(level);
-        if (FirstBattleSavedData.get(level).active != null) { voice.pending = ""; return; }
-        if (!campaign.active.isEmpty() && campaign.chapter < 2 && pilot.getAssignedVariant() != 1)
+        var assignment=campaign.sorties.get(pilot.getAssignedVariant());
+        boolean seated=eva!=null&&assignment!=null&&eva.getUUID().equals(assignment.eva)
+                ||pilot.getVehicle() instanceof EntryPlugCarrierEntity capsule
+                  &&capsule==EntryPlugDirector.canonical(level,pilot.getAssignedVariant())
+                  &&capsule.getFirstPassenger()==pilot&&assignment!=null&&TvSortiesR32.assignedUnit(level,assignment)!=null;
+        boolean assigned=assignment!=null&&assignment.npc&&assignment.pilotR45!=null
+                &&assignment.pilotR45.equals(pilot.getUUID())&&seated;
+        // An explicitly accepted support pilot is present even when the save's
+        // progression index still precedes the selected chapter.
+        if (FirstBattleSavedData.get(level).active != null&&!assigned) { voice.pending = ""; return; }
+        if (!campaign.active.isEmpty() && !assigned && pilot.getAssignedVariant() != 1)
         { voice.pending = ""; return; }
         String line = StaffDialogueCatalogR24.line(profile(pilot.getAssignedVariant()), "technician", voice.pending, voice.variation++);
         boolean heard = false;

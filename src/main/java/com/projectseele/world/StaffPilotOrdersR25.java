@@ -25,6 +25,13 @@ public final class StaffPilotOrdersR25
         return ORDERS.getOrDefault(level,Map.of()).values().stream()
                 .map(job->new Pending(job.caller(),job.officer(),job.unit(),job.deadline(),job.standby())).toList();
     }
+    public static void invalidateMission(ServerLevel level)
+    {
+        var jobs=ORDERS.get(level);if(jobs==null)return;
+        // Explicit safe leave-plug/standby orders remain valid. Mission-bound
+        // boarding that has not reached the native dispatcher cannot run late.
+        jobs.values().removeIf(job->!job.standby()&&!job.mission().isEmpty());
+    }
     public static Cancellation cancel(ServerPlayer player,NervStaffEntity npc,int unit)
     {
         var jobs=ORDERS.get(player.serverLevel());if(jobs==null)return Cancellation.NONE;
@@ -45,6 +52,7 @@ public final class StaffPilotOrdersR25
     {
         if (unit<0 || unit>2 || !NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc,"board"))
             return "本岗位无权调遣驾驶员，请联络美里、律子或冬月。";
+        if(StaffRecoveryR47.pending(player.serverLevel(),unit))return "这台机体仍在回收与驾驶员交接，完成原路线后再安排登机。";
         var jobs=ORDERS.computeIfAbsent(player.serverLevel(),l->new HashMap<>());
         var command=StaffCommandBookR24.unitOrder(player.serverLevel(),unit);
         if(command!=null&&!command.owner.equals(player.getUUID()))return "这台机体已有其他指挥员的待执行指令，请先联系下令人。";

@@ -1,7 +1,10 @@
 {
   "variants": {
-    "": {
+    "lit=true": {
       "model": "projectseele:block/nerv_strip_light"
+    },
+    "lit=false": {
+      "model": "projectseele:block/nerv_strip_light_off"
     }
   }
 }

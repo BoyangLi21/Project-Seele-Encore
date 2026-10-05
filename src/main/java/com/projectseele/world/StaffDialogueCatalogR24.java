@@ -71,5 +71,15 @@ public final class StaffDialogueCatalogR24
         return line(skin, role, topic, index);
     }
 
+    public static String profile(com.projectseele.entity.NervStaffEntity npc)
+    {
+        // Named operators share a clothing skin, but retain their original jobs and identities.
+        if (java.util.Set.of("hyuga", "aoba").contains(npc.memberId())) return npc.memberId();
+        if (npc.memberId().startsWith("r47/restroom/security_")) return "restroom_security";
+        if (npc.memberId().startsWith("r47/yashima/power_monitor_")) return "yashima_power";
+        if (npc.staffRole().equals("scientist") && !npc.skin().equals("ritsuko")) return "scientist";
+        return npc.skin();
+    }
+
     private StaffDialogueCatalogR24() {}
 }

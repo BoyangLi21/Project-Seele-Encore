@@ -29,6 +29,8 @@ def main(apply=False):
   for side in (-1,1):
    face=('south' if side<0 else 'north') if horizontal else ('east' if side<0 else 'west')
    # Glass waiting room, clearly outside the continuous boarding aisle.
+   fill(-12,y-2,side*13,12,y-1,side*17,f.STRUCT)
+   fill(-12,y,side*13,12,y,side*17,f.FLOOR)
    fill(-12,y+1,side*13,12,y+4,side*17,'projectseele:clear_glass');fill(-11,y+1,side*14,11,y+4,side*16,'minecraft:air')
    fill(-12,y+5,side*13,12,y+5,side*17,'minecraft:light_gray_concrete')
    fill(-2,y+1,side*13,2,y+3,side*13,'minecraft:air')

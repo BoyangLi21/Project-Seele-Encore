@@ -8,6 +8,20 @@ def author(b,state,put,protected):
     x,z,X,Z=b['bounds'];f=b['floor']+10;L=x+10;N=Z-14;S=Z-1;owner=b['id'];changed_walls=[];ceilings=[];headers=[];doors=[]
     walls={'minecraft:white_concrete','minecraft:light_gray_concrete','minecraft:smooth_quartz',PLASTER}
     def emit(q,s,why):put(q,s,owner,why)
+    protected=set(protected);stair_heads=set()
+    # Original five-step three-wide common flights are positive structural
+    # ownership. A0.6m sampled centreline does not protect their two side lanes.
+    for level in range(b.get('storeys',len(b.get('floor_feet',[])))):
+        y=b['floor']+level*5;north=level%2==0;sx=x+(3 if north else 7);sz=z+(10 if north else 4);direction=-1 if north else 1
+        for i in range(5):
+            yy=y+i+1;zz=sz+direction*i
+            for xx in range(sx-1,sx+2):
+                for Y in range(yy+1,yy+5):stair_heads.add((xx,Y,zz))
+    protected.update(stair_heads)
+    restored_stair_heads=[]
+    for q in sorted(stair_heads):
+        if q[1]==f+4 and state(q)in{'minecraft:smooth_quartz',PLASTER}:
+            emit(q,'minecraft:air','Restore complete existing three-wide rising flight where the communal ceiling had covered its side lanes');restored_stair_heads.append(q)
     for xx in range(x+1,X):
         for zz in range(z+1,Z):
             # Stair flights/head apertures retain their complete actual
@@ -51,4 +65,4 @@ def author(b,state,put,protected):
         emit((xx,f+2,N),'minecraft:oak_planks','Grounded upper kitchen cabinet row against the retained rear wall')
     # Bedroom furniture occupies side/rear corners outside each true door.
     for xx,zz in [(L+11,N),(L+5,S),(X-1,S)]:emit((xx,f+1,zz),'minecraft:oak_planks','Real grounded bedside/dresser surface alongside the retained household bed')
-    return dict(wall_and_header_cells=headers,wood_door_cells=doors,whole_ceiling_cells=ceilings,actual_furniture_states=[TABLE,CHAIR]+SOFAS,stairs_full_capsule_preserved=True,world_written=False)
+    return dict(wall_and_header_cells=headers,wood_door_cells=doors,whole_ceiling_cells=ceilings,actual_furniture_states=[TABLE,CHAIR]+SOFAS,stairs_full_capsule_preserved=True,full_declared_three_wide_stair_head_mask=sorted(stair_heads),restored_side_lane_ceiling_cells=restored_stair_heads,world_written=False)

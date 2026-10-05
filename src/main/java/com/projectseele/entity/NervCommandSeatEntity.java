@@ -70,6 +70,10 @@ public final class NervCommandSeatEntity extends Entity
     @Override
     protected boolean canAddPassenger(Entity passenger)
     {
+        if(this.getType()==com.projectseele.registry.ModEntities.PILOT_REST_SEAT_R47.get())
+            return passenger instanceof TrainingPilotEntity pilot&&this.getPassengers().isEmpty()
+                    &&(level().isClientSide||level() instanceof net.minecraft.server.level.ServerLevel server
+                    &&com.projectseele.world.PilotRestroomsR47.ownsSeat(server,this,pilot));
         return passenger instanceof Player && this.getPassengers().isEmpty();
     }
 
@@ -86,6 +90,9 @@ public final class NervCommandSeatEntity extends Entity
     @Override
     public Vec3 getDismountLocationForPassenger(LivingEntity passenger)
     {
+        if(this.getType()==com.projectseele.registry.ModEntities.PILOT_REST_SEAT_R47.get()
+                &&passenger instanceof TrainingPilotEntity pilot&&level() instanceof net.minecraft.server.level.ServerLevel server)
+            return com.projectseele.world.PilotRestroomsR47.safeDismount(server,this,pilot).orElse(passenger.position());
         if(this.getTags().contains("seele_office_seat"))
         {
             var p=net.minecraft.core.BlockPos.of(this.getPersistentData().getLong("OfficeChair"));

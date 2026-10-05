@@ -63,7 +63,21 @@ public final class TvEncounterRulesR45
     }
     public static boolean issueMissionAtStation(com.projectseele.entity.NervArmamentStationEntity station,EvaUnit01Entity eva,net.minecraft.world.entity.LivingEntity actualPilot)
     {return equipment.issueMissionAtStation(station,eva,actualPilot);}
+    public static void pauseNpcUnitForRecoveryR47(EvaUnit01Entity eva)
+    {
+        if(!(eva.getPilotEntity() instanceof TrainingPilotEntity pilot))return;
+        equipment.cannonInput(eva,pilot,eva.getEyePosition().add(eva.getForward().scale(16)),false,false);
+        equipment.shieldInput(eva,pilot,false);
+    }
     public static boolean handles(String id){return id.equals("ramiel")||id.equals("gaghiel");}
+    public static String formationSlotBlockerR47(ServerLevel level,String chapter,int unit)
+    {
+        if(!handles(chapter)||unit>=3)return "";
+        var site=TvEncounterSitesR45.site(level,chapter).orElse(null);
+        if(site==null)return "当前作战阵地尚未接入。";
+        boolean needsSupport=chapter.equals("ramiel")?unit==2:unit!=site.primaryUnit();
+        return needsSupport&&!site.supportReady()?"这台机体的支援阵地尚未开放，请先保持现有编成。":"";
+    }
     public static String obstruction(ServerLevel l,TvCampaignSavedData d)
     {
         if(!handles(d.active))return CityBattlefieldR29.obstruction(l);
@@ -104,8 +118,7 @@ public final class TvEncounterRulesR45
         Vec3 to=shooter.getEyePosition();
         if(boss!=null&&(!(boss instanceof BeamRangeSource range)||range.effectiveBeamRangeR45()<from.distanceTo(to)))
             return "目标火控仍在校准中，请保持阵地。";
-        if(!cover.getBoundingBox().inflate(.3).clip(from,to).isPresent()
-                ||!equipment.shieldRayIntersects(cover,from,to))return "零号机请调整盾面，遮挡目标到初号机的射线。";
+        if(!equipment.shieldRayIntersects(cover,from,to))return "零号机请调整盾面，遮挡目标到初号机的射线。";
         return "";
     }
     /** Pure role intent; uses the same real root equipment API as human inputs. */
@@ -121,8 +134,12 @@ public final class TvEncounterRulesR45
         eva.autonomousDriveR30(pilot,Vec3.ZERO,aim,false);
         if(d.active.equals("ramiel"))
         {
-            if(eva.getUnitVariant()==0)equipment.shieldInput(eva,pilot,TvMissionEquipmentR45.operational(eva)
+            if(eva.getUnitVariant()==0)
+            {
+                eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45);
+                equipment.shieldInput(eva,pilot,TvMissionEquipmentR45.operational(eva)
                     &&TvMissionEquipmentR45.shieldAuthorized(eva)&&equipment.shieldEquipped(eva));
+            }
             else if(eva.getUnitVariant()==1)
             {
                 var commander=d.owner==null?null:l.getServer().getPlayerList().getPlayer(d.owner);

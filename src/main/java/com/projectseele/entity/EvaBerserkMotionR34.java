@@ -72,7 +72,11 @@ public final class EvaBerserkMotionR34
             float now=phase(e,0),before=Math.max(0,now-1F/duration(e));String clip=name(e),side=EvaGameplayMotionR32.side(e,clip);
             e.moveCombatRootR34(EvaGameplayMotionR32.root(e,clip,now).subtract(EvaGameplayMotionR32.root(e,clip,before)));
             var state=STROKES.get(e);Vec3 hand=EvaGameplayMotionR32.hand(e,side,0);
-            if(age==Math.max(3,Math.round(duration(e)*.24F)))EvaMovementSounds.swing(e,3);
+            if(age==Math.max(3,Math.round(duration(e)*.24F)))
+            {
+                EvaMovementSounds.swing(e,3);
+                EvaMovementSounds.play(e,e.position().add(0,e.getBbHeight()*.85,0),ModSounds.EVA_ATTACK_ROAR.get(),2.4F,1);
+            }
             if(state!=null&&state.victim!=null&&state.victim.isAlive()&&!state.hit&&EvaGameplayMotionR32.inContactWindowR45(e,clip,now))
             {
                 Vec3 from=state.previous==null?hand:state.previous;

@@ -14,8 +14,8 @@ def main(apply=False):
     if apply:
         from release_combat_r36 import guard
         guard()
-    OUT.mkdir(exist_ok=True);w=MeasuredWorld(WORLD);w.box((222,79,298),(234,86,306));w.load()
-    tags=dict(iter_block_entities(WORLD,v.DIM,(222,79,298),(234,86,306)));v.WORLD=WORLD;v.OUT=OUT;p=v.Painter();changes={}
+    OUT.mkdir(exist_ok=True);w=MeasuredWorld(WORLD);w.box((220,79,298),(234,86,306));w.load()
+    tags=dict(iter_block_entities(WORLD,v.DIM,(220,79,298),(234,86,306)));v.WORLD=WORLD;v.OUT=OUT;p=v.Painter();changes={}
     def put(q,state,role):
         before=w.block(q);assert before is not None,q
         assert q not in tags or q==(226,83,304),('Existing device',q)
@@ -23,6 +23,9 @@ def main(apply=False):
     for x in (224,228):
         for y in range(81,86):put((x,y,302),'projectseele:nerv_machine_edge','jamb')
     for x in range(224,229):put((x,84,302),'projectseele:nerv_machine_edge','lintel')
+    for x in (*range(221,224),*range(229,232)):
+        for y in range(81,84):put((x,y,302),'projectseele:clear_glass','complete_side_wing_r47')
+    for x in range(221,232):put((x,84,302),'projectseele:nerv_machine_edge','full_width_lintel_r47')
     for x in range(225,228):
         for y in range(81,84):put((x,y,302),'minecraft:barrier','complete_personnel_aperture')
     reader=(228,82,303);put(reader,'projectseele:nerv_access_reader[facing=south]','reader')

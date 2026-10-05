@@ -56,6 +56,7 @@ public final class EntryPlugCarrierRenderer
         {
             return;
         }
+        SynchCradleRendererR47.render(poseStack,bufferSource,animatable,partialTick,packedLight);
         super.render(animatable, entityYaw, partialTick, poseStack,
                 bufferSource, packedLight);
     }

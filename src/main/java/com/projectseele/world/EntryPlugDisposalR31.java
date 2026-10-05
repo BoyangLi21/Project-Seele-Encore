@@ -50,7 +50,7 @@ public final class EntryPlugDisposalR31
 
     public static Optional<Vec3> hit(Player player,EntryPlugCarrierEntity plug)
     {
-        if(plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_FIELD_LANDED||plug.isVehicle()||plug.isPassenger()||plug.isRemoved())return Optional.empty();
+        if(plug.laboratorySlotR47()>=0||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_FIELD_LANDED||plug.isVehicle()||plug.isPassenger()||plug.isRemoved())return Optional.empty();
         Vec3 start=player.getEyePosition(),end=start.add(player.getLookAngle().scale(player.isCreative()?5:3));
         var pose=plug.getCanonicalTransform();var inverse=pose.inverse();
         var centre=EntryPlugKinematics.BODY_OBB_CENTRE_P;var half=EntryPlugKinematics.BODY_OBB_HALF_EXTENTS;
@@ -65,7 +65,7 @@ public final class EntryPlugDisposalR31
 
     public static boolean destroyLanded(EntryPlugCarrierEntity plug)
     {
-        if(!(plug.level() instanceof ServerLevel level)||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_FIELD_LANDED
+        if(plug.laboratorySlotR47()>=0||!(plug.level() instanceof ServerLevel level)||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_FIELD_LANDED
                 ||plug.isVehicle()||plug.isPassenger()||plug.isRemoved())return false;
         var ledger=ledger(level);CompoundTag receipt=new CompoundTag();
         receipt.putBoolean("IndependentUN",plug.isIndependentUNPlug());receipt.putInt("Variant",plug.getAssignedVariant());

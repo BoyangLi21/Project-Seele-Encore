@@ -11,6 +11,33 @@ GLASS='minecraft:gray_stained_glass'
 SITE_SOIL={'minecraft:stone','minecraft:dirt','minecraft:grass_block','minecraft:gravel','minecraft:sand','minecraft:sandstone','minecraft:clay','minecraft:coarse_dirt','minecraft:rooted_dirt','minecraft:podzol','minecraft:mud','minecraft:andesite','minecraft:diorite','minecraft:granite'}
 
 
+def low_shop_maintenance_roof(b,state,put):
+    targets={'r44/tokyo_north_new/08':'east','r44/tokyo_north_new/11':'east',
+             'r44/tokyo_north_new/13':'west','r44/tokyo_north_new/27':'west'}
+    side=targets.get(b['id'])
+    if side is None:return None
+    x,z,X,Z=b['bounds'];f=b['floor'];roof=b['roof'];feet=f+1
+    if b['kind']!='local_shop' or b['floor_feet']!=[feet] or roof!=f+4:
+        return dict(building=b['id'],status='HOLD_CHANGED_NAMED_LOW_SHOP_ENVELOPE')
+    lx,lz,dx,dz,facing=(X-1,Z-2,1,0,'west')if side=='east'else(x+1,z+5,-1,0,'east')
+    masonry=WALLS|{'minecraft:white_terracotta','minecraft:terracotta','minecraft:smooth_stone',
+                   'minecraft:polished_deepslate','minecraft:polished_andesite','minecraft:smooth_quartz'}
+    name=lambda q:(state(q)or'').partition('[')[0]
+    if any(name((lx,y,lz))not in{'minecraft:air','minecraft:cave_air'}for y in range(feet,roof)):
+        return dict(building=b['id'],status='HOLD_EXISTING_INTERIOR_OBJECT')
+    if any(name((lx+dx,y,lz+dz))not in masonry for y in range(feet,roof+1)):
+        return dict(building=b['id'],status='HOLD_NO_FULL_ACTUAL_MASONRY_SUPPORT')
+    if any(name(q)not in masonry for q in[(lx,f,lz),(lx,roof,lz),(lx-dx,f,lz-dz),(lx-dx,roof,lz-dz)]):
+        return dict(building=b['id'],status='HOLD_INCOMPLETE_TWO_LANDINGS')
+    if any(name((lx-dx,y,lz-dz))not in{'minecraft:air','minecraft:cave_air'}for y in(feet,feet+1,roof+1,roof+2)):
+        return dict(building=b['id'],status='HOLD_ACTUAL_LANDING_BODY_OBSTRUCTION')
+    for y in range(feet,roof):
+        put((lx,y,lz),f'minecraft:ladder[facing={facing},waterlogged=false]',b['id'],'R47 finite named low-shop masonry-supported roof maintenance ladder')
+    put((lx,roof,lz),f'minecraft:oak_trapdoor[facing={facing},half=top,open=false,powered=false,waterlogged=false]',b['id'],'R47 matching-facing manually opened weather-sealed maintenance hatch')
+    b['roof_role']='Weather roof with manual maintenance ladder/hatch; no public roof route'
+    return dict(building=b['id'],status='AUTHORED_MAINTENANCE_COMPONENT_NATIVE_USE_PENDING',ladder=[lx,feet,lz],hatch=[lx,roof,lz],facing=facing,world_written=False)
+
+
 def complete_shop_front(b,state,put):
     x,z,X,Z=b['bounds'];f=b['floor'];dx,_,_=b['door'];owner=b['id']
     assert b.get('facing','south')=='south'
@@ -148,4 +175,5 @@ def author(b,number,street,state,put,protected_route_cells):
                 item='minecraft:bookshelf' if kind in ['local_shop','shophouse','book_office','civic'] else 'minecraft:smooth_quartz' if kind=='clinic' else 'minecraft:spruce_planks'
                 emit(q,item,'Actual '+kind+' storage/reception/reading bay outside every retained declared route');furnishing.append(list(q))
     shopfront=complete_shop_front(b,state,put) if heading=='south' and kind in ['local_shop','shophouse','coffee_house','book_office'] else None
-    return {'building':owner,'oriented_window_cells':window_bays,'main_door_material':'oak' if domestic else 'manual steel','entry_normal':[nx,nz],'solid_eye_height_plaque':list(signq),'canopy_clear_feet':f+3.5,'actual_interior_furnishings':furnishing,'shopfront':shopfront,'native_use_verified':False}
+    maintenance=low_shop_maintenance_roof(b,state,put)
+    return {'building':owner,'oriented_window_cells':window_bays,'main_door_material':'oak' if domestic else 'manual steel','entry_normal':[nx,nz],'solid_eye_height_plaque':list(signq),'canopy_clear_feet':f+3.5,'actual_interior_furnishings':furnishing,'shopfront':shopfront,'maintenance_roof':maintenance,'native_use_verified':False}

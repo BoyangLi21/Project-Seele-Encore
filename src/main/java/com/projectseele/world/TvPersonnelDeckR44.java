@@ -89,6 +89,13 @@ public final class TvPersonnelDeckR44 extends HorizontalDirectionalBlock
     @Override public VoxelShape getCollisionShape(BlockState state, BlockGetter level, BlockPos position, CollisionContext context)
     { return getShape(state, level, position, context); }
     @Override public VoxelShape getOcclusionShape(BlockState state, BlockGetter level, BlockPos position) { return Shapes.empty(); }
+    @Override public boolean isPathfindable(BlockState state,BlockGetter level,BlockPos position,
+            net.minecraft.world.level.pathfinder.PathComputationType type)
+    {
+        // Like a vanilla stair/slab, this partial collision is a real floor,
+        // not an OPEN voxel through which the ground evaluator searches down.
+        return false;
+    }
     @Override public BlockState rotate(BlockState state, Rotation rotation) { return state.setValue(FACING, rotation.rotate(state.getValue(FACING))); }
     @Override public BlockState mirror(BlockState state, Mirror mirror) { return rotate(state, mirror.getRotation(state.getValue(FACING))); }
 }

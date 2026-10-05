@@ -32,6 +32,7 @@ public final class TvSortiesR32
     {
         if(sortie==null)return false;var eva=assignedUnit(level,sortie);
         if(!ready(eva))return false;
+        if(sortie.unit<3&&StaffRecoveryR47.pending(level,sortie.unit))return false;
         // UN work is paused; retain its existing readiness behavior.
         return sortie.unit>=3||AutoSortieR32.assignedPilotR45(level,sortie.unit,eva.getPilotEntity());
     }
@@ -63,11 +64,15 @@ public final class TvSortiesR32
     {
         var l=TvCampaignDirector.level(caller);
         if(l==null||l!=caller.level()||!NervStaffDialogue.authorized(caller)||unit<0||unit>4||npc&&unit>2)return 0;
+        if(unit<3&&StaffRecoveryR47.pending(l,unit))
+        {caller.sendSystemMessage(Component.literal("这台机体仍在回收入库，驾驶员交接完成后再加入支援。"));return 0;}
         var d=TvCampaignSavedData.get(l);if(d.active.isEmpty()||Set.of("cancel","failure","combat_victory","episode_archived").contains(d.phase)||d.targetDeathConfirmedR45)return 0;
+        String supportBlocker=TvEncounterRulesR45.formationSlotBlockerR47(l,d.active,unit);
+        if(!supportBlocker.isEmpty()){caller.sendSystemMessage(Component.literal(supportBlocker));return 0;}
         var current=d.sorties.get(unit);
         if(current!=null){caller.sendSystemMessage(Component.literal(name(unit)+"已经在出击编成中。"));return 1;}
         var e=unit(l,unit);
-        if(e!=null&&e.getPilotEntity()!=null&&(npc?!(e.getPilotEntity() instanceof TrainingPilotEntity):e.getPilotEntity()!=caller))
+        if(e!=null&&e.getPilotEntity()!=null&&(npc?!(e.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==unit):e.getPilotEntity()!=caller))
         {caller.sendSystemMessage(Component.literal("这台机体已有其他驾驶员，不能接管。"));return 0;}
         d.assign(unit,caller.getUUID(),npc,rifle&&npc);
         NervStaffDialogue.say(caller,"葛城美里 · 作战通信",name(unit)+"加入迎击。正在交战的机体继续牵制，支援机到达后从侧面接应。");
@@ -101,8 +106,9 @@ public final class TvSortiesR32
             var eva=EvaPilotResolver.controlTarget(player);if(eva==null||!NervStaffDialogue.authorized(player))continue;
             int unit=slot(eva);var assigned=d.sorties.get(unit);
             if(assigned!=null&&assigned.eva!=null&&!assigned.eva.equals(eva.getUUID()))continue;
-            if(unit(l,unit)==eva&&(assigned==null||assigned.npc||!player.getUUID().equals(assigned.commander)))
-                d.assign(unit,player.getUUID(),false,false);
+            // Physical boarding alone does not join or overwrite an accepted
+            // mission assignment. Use the explicit support/formation request.
+            if(assigned==null||assigned.npc||!player.getUUID().equals(assigned.commander))continue;
         }
         for(var s:d.sorties.values())
         {

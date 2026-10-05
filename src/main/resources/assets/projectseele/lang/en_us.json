@@ -215,6 +215,7 @@
   "block.projectseele.nerv_medical_panel": "NERV Medical Monitor",
   "hud.projectseele.pilot_link_ready": "NEURAL LINK READY · Shift kneel / Z prone / V eject",
   "block.projectseele.nerv_office_chair": "NERV Office Chair",
+  "block.projectseele.nerv_room_partition": "NERV Room Partition",
   "block.projectseele.nerv_briefing_tile": "NERV Tactical Display",
   "key.projectseele.un_eye_laser": "EVA-UN optical laser",
   "block.projectseele.nerv_structural_panel": "NERV Structural Panel",
@@ -305,5 +306,17 @@
   "msg.projectseele.weapon_shield": "Unit-00 Shield",
   "block.projectseele.tv_staff_lift_panel_r45": "TV Staff Lift Wall Panel",
   "block.projectseele.tv_staff_lift_band_r45": "TV Staff Lift Purple Datum Panel",
-  "block.projectseele.tv_utility_lift_ceiling_r45": "TV Utility Lift Ceiling Grille"
+  "block.projectseele.tv_utility_lift_ceiling_r45": "TV Utility Lift Ceiling Grille",
+  "subtitles.projectseele.transport_engine": "Transport aircraft engine",
+  "subtitles.projectseele.personnel_door_open": "Metal door unlatches",
+  "subtitles.projectseele.personnel_door_close": "Metal door latches",
+  "subtitles.projectseele.eva_attack_roar": "EVA attack roar",
+  "msg.projectseele.weapon_vault_unit00_only": "Only Unit-00 can collect this shield.",
+  "msg.projectseele.weapon_vault_unit02_only": "Only Unit-02 can collect this longsword.",
+  "msg.projectseele.shield_deployed": "Unit-00 shield is ready.",
+  "msg.projectseele.sword_deployed": "Unit-02 longsword is ready.",
+  "msg.projectseele.synch_test_ready": "Synchronization test ready. Check entry-plug and communications links.",
+  "msg.projectseele.synch_test_run": "Synchronization test in progress. Maintain the connection.",
+  "msg.projectseele.synch_test_result": "Synchronization test record: %s",
+  "subtitles.projectseele.pressure_door_motion": "Pressure door track moves"
 }

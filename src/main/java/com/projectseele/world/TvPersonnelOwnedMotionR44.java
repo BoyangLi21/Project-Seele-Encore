@@ -76,7 +76,7 @@ public final class TvPersonnelOwnedMotionR44
     public static Decision wetPlug(EntryPlugCarrierEntity plug)
     {
         if(!(plug.level() instanceof ServerLevel level)||!TvPersonnelPlatformInterlockR44.enabled(level)
-                ||plug.isIndependentUNPlug()||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_EJECTING)return outside();
+                ||plug.laboratorySlotR47()>=0||plug.isIndependentUNPlug()||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_EJECTING)return outside();
         int v=plug.getAssignedVariant();if(v<0||v>2)return outside();
         var fleet=EvaFleetSavedData.get(level.getServer()).entry(v);
         if(fleet.isEmpty())return plug.hasSavedTvPersonnelOwnershipR44()?unknown(WET_EJECT,"保存的湿舱弹出栓归属尚未附着。"):outside();

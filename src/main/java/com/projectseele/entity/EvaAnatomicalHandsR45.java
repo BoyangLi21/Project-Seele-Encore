@@ -225,10 +225,12 @@ public final class EvaAnatomicalHandsR45
         });
         return actual.equals(sword.meshSha256());
     }
+
     public static boolean shieldAttachmentReadyR45(EvaUnit01Entity e)
     {
-        // The independent shield remains unavailable until its real grip and surface are authored.
-        return false;
+        return !e.isExperimentalUnit()&&e.getUnitVariant()==0&&enabled(e)
+                &&EvaBodyPose.neutralForTransportR32(e).rig.containsKey("shield")
+                &&EvaAnatomicalHandsR45.class.getResource("/assets/projectseele/mesh/yashima_shield.mesh.json")!=null;
     }
     /** Natural empty-hand carry is a base-pose adjustment. Actions and weapon
      * grips are composed afterwards, so release blending keeps its real origin. */
@@ -302,9 +304,10 @@ public final class EvaAnatomicalHandsR45
         if(side.equals("r")&&e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&EvaWeaponHandlingR45.available(e))return "knife";
         if(e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e))return "relaxed";
         if(e.isBerserk()&&!EvaBerserkMotionR34.silent(e))
-            return EvaBerserkMotionR34.introduction(e)?"spread":"grab";
+            return EvaBerserkMotionR34.introduction(e)?"spread":EvaBerserkMotionR34.striking(e)?"grab":"relaxed";
         if(!e.isPoweredOn())return "relaxed";
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45)return side.equals("r")?"sword_right":"relaxed";
+        if(e.getWeapon()==EvaUnit01Entity.WEAPON_SHIELD_R45)return side.equals("l")?"knife":"relaxed";
         if(EvaFieldActionsR45.active(e)&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS)return "relaxed";
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_CANNON&&rig(e.getUnitVariant()).poses.has("cannon_"+(side.equals("r")?"right":"left")))
             return "cannon_"+(side.equals("r")?"right":"left");
@@ -322,7 +325,7 @@ public final class EvaAnatomicalHandsR45
             if(!strike.isEmpty()&&!strike.equals("kick")&&EvaGameplayMotionR32.side(e,strike).equals(side))return "fist";
             return "support";
         }
-        if(e.hasLiveActionForRender(0)||EvaGameplayMotionR32.guardWeight(e)>.12F)return "fist";
+        if(e.hasLiveActionForRender(0)||!e.pilotLocomotionRequestedR45()&&EvaGameplayMotionR32.guardWeight(e)>.12F)return "fist";
         return "relaxed";
     }
     private static Map<String,float[]> controls(Rig rig,String left,String right)

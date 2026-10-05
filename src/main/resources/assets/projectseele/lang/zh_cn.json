@@ -213,6 +213,7 @@
   "block.projectseele.nerv_medical_panel": "NERV 医疗监护面板",
   "hud.projectseele.pilot_link_ready": "神经连接完成 · Shift 蹲姿 / Z 卧倒 / V 弹出",
   "block.projectseele.nerv_office_chair": "NERV 工作椅",
+  "block.projectseele.nerv_room_partition": "NERV 室内薄隔墙",
   "block.projectseele.nerv_briefing_tile": "NERV 作战地图屏",
   "key.projectseele.un_eye_laser": "EVA-UN 眼部激光",
   "block.projectseele.nerv_structural_panel": "NERV 涂装结构板",
@@ -307,5 +308,17 @@
   "msg.projectseele.weapon_shield": "零号机盾牌",
   "block.projectseele.tv_staff_lift_panel_r45": "TV人员电梯浅绿壁板",
   "block.projectseele.tv_staff_lift_band_r45": "TV人员电梯薄紫腰线壁板",
-  "block.projectseele.tv_utility_lift_ceiling_r45": "TV勤务电梯顶棚格栅"
+  "block.projectseele.tv_utility_lift_ceiling_r45": "TV勤务电梯顶棚格栅",
+  "subtitles.projectseele.transport_engine": "运输机发动机运转",
+  "subtitles.projectseele.personnel_door_open": "金属门解锁开启",
+  "subtitles.projectseele.personnel_door_close": "金属门关闭锁定",
+  "subtitles.projectseele.eva_attack_roar": "EVA攻击吼叫",
+  "msg.projectseele.weapon_vault_unit00_only": "仅零号机可领取这面盾牌。",
+  "msg.projectseele.weapon_vault_unit02_only": "仅二号机可领取这把长剑。",
+  "msg.projectseele.shield_deployed": "零号机盾牌已就位。",
+  "msg.projectseele.sword_deployed": "二号机长剑已就位。",
+  "msg.projectseele.synch_test_ready": "同步试验准备就绪，请确认插入栓与通信连接。",
+  "msg.projectseele.synch_test_run": "同步试验进行中。请保持连接。",
+  "msg.projectseele.synch_test_result": "同步试验记录：%s",
+  "subtitles.projectseele.pressure_door_motion": "舱门滑轨运转"
 }

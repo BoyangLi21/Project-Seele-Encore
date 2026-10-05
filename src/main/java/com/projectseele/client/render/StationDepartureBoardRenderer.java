@@ -54,8 +54,9 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
             float rearWidth=2.64F/rearScale;
             line(board.title(),0,0xffedbd55,rearWidth,poses,buffers);
             line(board.station(),11,0xffdbe4e6,rearWidth,poses,buffers);
-            if(direction)for(int i=0;i<Math.min(3,board.rows().size());i++)
-                line(board.routeMap()?board.rows().get(i):reverseArrow(board.rows().get(i)),25+i*13,
+            var rearRows=board.rearGuideBound()?board.rearRows():board.rows().stream().map(StationDepartureBoardRenderer::reverseArrow).toList();
+            if(direction)for(int i=0;i<Math.min(3,rearRows.size());i++)
+                line(board.routeMap()?board.rows().get(i):rearRows.get(i),25+i*13,
                         i==0?0xffe9efde:0xffa9d9ae,rearWidth,poses,buffers);
             poses.popPose();
         }

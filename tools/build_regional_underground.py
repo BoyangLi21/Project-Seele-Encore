@@ -88,6 +88,22 @@ def gateway(p):
     corridor(p,(-309,768),(-330,768),-467,'nerv/arrival_platform_join',9,7,'new')
     opening(p,-330,770,-467,name,'south',7,5)
     p.sign(-346,-462,735,['地下到着ロビー','U1 : NERV 本部','本部・実験棟方面',''],name)
+    surface_entry_checkpoint_r47(p)
+
+
+def surface_entry_checkpoint_r47(p):
+    """Complete real outer opening, not an isolated pair in an open hall."""
+    import nbtlib,zlib
+    from install_access_r44 import packed
+    owner='nerv/gateway/complete_outer_checkpoint_r47'
+    for x in range(-368,-351):
+        for y in range(81,95):
+            state='minecraft:barrier' if -363<=x<=-357 and y<=85 else 'projectseele:nerv_machine_edge' if x in(-368,-364,-356,-352) or y in(81,86,94) else 'projectseele:clear_glass'
+            p.put(x,y,701,state,owner)
+    reader=(-355,82,700);release=(-355,82,702);label='NERV · 地面入口闸门'
+    p.put(*reader,'projectseele:nerv_access_reader[facing=north]',owner)
+    p.put(*release,'minecraft:stone_button[face=wall,facing=south,powered=false]',owner)
+    p.block_entities[reader]=nbtlib.Compound(dict(id=nbtlib.String('projectseele:nerv_access_reader'),x=nbtlib.Int(reader[0]),y=nbtlib.Int(reader[1]),z=nbtlib.Int(reader[2]),Gate=nbtlib.Long(packed((-363,81,701))),Exit=nbtlib.Long(packed(release)),Width=nbtlib.Int(7),Height=nbtlib.Int(5),Clearance=nbtlib.Int(1),Style=nbtlib.Int(1),DoorId=nbtlib.Int(zlib.crc32(label.encode())&0x7fffffff),AlongX=nbtlib.Byte(1),Linked=nbtlib.Byte(1),Label=nbtlib.String(label),OpenUntil=nbtlib.Long(0),SwipeAt=nbtlib.Long(-1),IndicateUntil=nbtlib.Long(0),Presented=nbtlib.Int(0),Status=nbtlib.Int(0),OffHand=nbtlib.Byte(0)))
 
 
 def pyramid(p):

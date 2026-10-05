@@ -1,0 +1,8 @@
+{
+  "parent":"minecraft:block/block",
+  "textures":{"particle":"projectseele:block/nerv_wall_panel","wall":"projectseele:block/nerv_wall_panel"},
+  "elements":[{"from":[0,0,0],"to":[16,16,2],"faces":{
+    "north":{"texture":"#wall"},"south":{"texture":"#wall"},"east":{"texture":"#wall"},
+    "west":{"texture":"#wall"},"up":{"texture":"#wall"},"down":{"texture":"#wall"}
+  }}]
+}

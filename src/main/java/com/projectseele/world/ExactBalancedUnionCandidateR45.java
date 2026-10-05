@@ -10,7 +10,7 @@ import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
-/** Offline/native-harness candidate only; not registered, mixed in, or enabled in production. */
+/** Deterministic exact OR tree; runtime caller retains near-coordinate stock order. */
 public final class ExactBalancedUnionCandidateR45
 {
     private ExactBalancedUnionCandidateR45() {}

@@ -609,6 +609,8 @@ public final class EvaLogisticsDirector
             return new ActionResult(false, label(variant)
                     + " must be motionless before surface command authorizes recovery.");
         }
+        if(!HangarEmergencyR47.releaseForRecoveryR47(level,variant))
+            return new ActionResult(false,"机库后门正在通行，请清空门域后回收。");
         unit.getPersistentData().remove("R30AwaitingNervRecovery");
         unit.getPersistentData().putBoolean("RecoveryRiseR39",true);
         unit.setCarrierRiseProgress(0);
@@ -689,158 +691,42 @@ public final class EvaLogisticsDirector
                 + " launch cancelled; airframe returning to its wet cage.");
     }
 
+    /** Maintenance of the original empty wet-cage assembly, never replacement actors. */
     public static EvaUnit01Entity forceReset(ServerLevel level, int variant)
     {
-        if (FacilityV2EvaRuntime.ready(level, variant))
-        {
-            return forceResetV2(level, variant);
-        }
         requireCompactLogistics(level, "forceReset");
-        MinecraftServer server = level.getServer();
-        FleetEntry previousEntry = entry(level, variant);
-        if (previousEntry != null)
-        {
-            maintainRouteChunks(level, variant,
-                    previousEntry.canonicalId(), false);
-            ROUTE_TICKET_STATE.remove(previousEntry.canonicalId());
-        }
-        for (ServerLevel dimension : server.getAllLevels())
-        {
-            for (EvaUnit01Entity unit : loadedFleet(dimension))
-            {
-                if (unit.getUnitVariant() == variant)
-                {
-                    for (Entity passenger : List.copyOf(unit.getPassengers()))
-                    {
-                        passenger.stopRiding();
-                        if (passenger instanceof ServerPlayer player)
-                        {
-                            BlockPos gallery = RegionalFacilityLayout.evaOrigin(level).offset(
-                                    IntegratedNervMapBuilder.LIFT_X[variant],
-                                    EvaHangarBuilder.GALLERY_Y + 1,
-                                    EvaHangarBuilder.GALLERY_Z + 2);
-                            player.teleportTo(level, gallery.getX() + 0.5D,
-                                    gallery.getY(), gallery.getZ() + 0.5D,
-                                    180.0F, 0.0F);
-                        }
-                    }
-                    NervCarrierVisuals.removeAll(dimension, unit);
-                    unit.discard();
-                }
-            }
-        }
-        EvaUnit01Entity replacement = createUnit(level, variant);
-        if (replacement == null)
-        {
-            throw new IllegalStateException("Failed to reset " + label(variant));
-        }
-        BlockPos bed = hangarBed(level, variant);
-        placeAt(replacement, bed);
-        replacement.setPersistenceRequired();
-        replacement.setHealth(replacement.getMaxHealth());
-        replacement.setNervLogisticsLocked(true);
-        EvaFleetSavedData.get(server).put(variant, new FleetEntry(
-                replacement.getUUID(), Phase.PARKED, 0, bed.getZ(),
-                EvaHangarBuilder.LCL_SHOULDER_LAYERS));
-        if (!level.addFreshEntity(replacement))
-        {
-            throw new IllegalStateException("Server rejected reset " + label(variant));
-        }
-        EntryPlugDirector.reset(level, variant, replacement);
-        EvaHangarBuilder.setBoardingBridgeExtension(level,
-                RegionalFacilityLayout.evaOrigin(level), variant,
-                EvaHangarBuilder.BRIDGE_SEGMENTS);
-        EvaHangarBuilder.setGate(level, RegionalFacilityLayout.evaOrigin(level),
-                variant, false);
-        EvaHangarBuilder.setLclLevel(level, RegionalFacilityLayout.evaOrigin(level),
-                variant, EvaHangarBuilder.LCL_SHOULDER_LAYERS);
-        EvaHangarBuilder.restoreStaticCarrier(level,
-                RegionalFacilityLayout.evaOrigin(level), variant, bed);
-        replacement.setSortieDestination(level.dimension(),
-                surfaceLiftBed(level, variant));
-        replacement.setSortieParkingBed(bed);
-        TrainingPilotDirector.resetToStandby(level, variant);
-        ProjectSeele.LOGGER.warn("NERV forced canonical reset: {} uuid={} bed={}",
-                label(variant), replacement.getStringUUID(), bed.toShortString());
-        return replacement;
-    }
-
-    private static EvaUnit01Entity forceResetV2(
-            ServerLevel level, int variant)
-    {
-        MinecraftServer server = level.getServer();
-        FleetEntry previous = entry(level, variant);
-        if (previous != null)
-        {
-            maintainRouteChunks(level, variant,
-                    previous.canonicalId(), false);
-            ROUTE_TICKET_STATE.remove(previous.canonicalId());
-        }
-        BlockPos exit = FacilityV2EvaRuntime.statusControl(level, variant)
-                .above();
-        for (ServerLevel dimension : server.getAllLevels())
-        {
-            for (EvaUnit01Entity unit : loadedFleet(dimension))
-            {
-                if (unit.getUnitVariant() != variant)
-                {
-                    continue;
-                }
-                for (Entity passenger : List.copyOf(unit.getPassengers()))
-                {
-                    passenger.stopRiding();
-                    if (passenger instanceof ServerPlayer player)
-                    {
-                        player.teleportTo(level,
-                                exit.getX() + 0.5D, exit.getY(),
-                                exit.getZ() + 0.5D,
-                                180.0F, 0.0F);
-                    }
-                }
-                NervCarrierVisuals.removeAll(dimension, unit);
-                unit.discard();
-            }
-        }
-
-        BlockPos bed = hangarBed(level, variant);
-        EvaUnit01Entity replacement = createUnit(level, variant);
-        if (replacement == null)
-        {
-            throw new IllegalStateException(
-                    "Failed to reset " + label(variant));
-        }
-        placeAt(replacement, bed);
-        replacement.setPersistenceRequired();
-        replacement.setHealth(replacement.getMaxHealth());
-        replacement.setNervLogisticsLocked(true);
-        replacement.enterHangarStandby();
-        replacement.setSortieDestination(level.dimension(),
-                surfaceLiftBed(level, variant));
-        replacement.setSortieParkingBed(bed);
-        EvaFleetSavedData.get(server).put(variant, new FleetEntry(
-                replacement.getUUID(), Phase.PARKED, 0, bed.getZ(),
-                FacilityV2EvaRuntime.LCL_SHOULDER_LAYERS));
-        if (!level.addFreshEntity(replacement))
-        {
-            throw new IllegalStateException(
-                    "Server rejected reset " + label(variant));
-        }
-        EntryPlugDirector.reset(level, variant, replacement);
-        setBoardingBridgeExtension(level, variant,
-                FacilityV2EvaRuntime.BRIDGE_SEGMENTS);
-        setGate(level, variant, false);
-        FacilityV2EvaRuntime.restoreLclEnvelope(level, variant);
-        restoreStaticCarrier(level, variant, bed);
-        restoreStaticCarrier(level, variant,
-                lowerLiftBed(level, variant));
-        restoreStaticCarrier(level, variant,
-                surfaceLiftBed(level, variant));
-        TrainingPilotDirector.resetToStandby(level, variant);
-        ProjectSeele.LOGGER.warn(
-                "NERV S19 forced canonical reset: {} uuid={} bed={}",
-                label(variant), replacement.getStringUUID(),
-                bed.toShortString());
-        return replacement;
+        FleetEntry previous=entry(level,variant);
+        EvaUnit01Entity unit=canonical(level,variant);
+        EntryPlugCarrierEntity plug=EntryPlugDirector.canonical(level,variant);
+        if(previous==null||unit==null||plug==null||!previous.canonicalId().equals(unit.getUUID()))
+            throw new IllegalStateException(label(variant)+"：原机体或插入栓尚未加载，未创建替代对象。");
+        BlockPos bed=hangarBed(level,variant);
+        if(unit.level()!=level||unit.distanceToSqr(Vec3.atBottomCenterOf(bed.above()))>36
+                ||com.projectseele.entity.EvaAirTransportR31.active(unit)||NervAirLiftR30.ownsMotion(unit))
+            throw new IllegalStateException(label(variant)+"：请先回收至原机库；运输中的机体不能直接复位。");
+        if(unit.getPilotEntity()!=null||plug.getFirstPassenger()!=null)
+            throw new IllegalStateException(label(variant)+"：请先让驾驶员离栓，再维护复位。");
+        if(!NervAirLiftR30.abortForMaintenanceR47(level,variant,unit.getUUID()))
+            throw new IllegalStateException("原运输机未就绪，维护复位等待运输收尾。");
+        maintainRouteChunks(level,variant,previous.canonicalId(),false);
+        ROUTE_TICKET_STATE.remove(previous.canonicalId());
+        NervCarrierVisuals.removeAll(level,unit);
+        placeAt(unit,bed);unit.setPersistenceRequired();unit.setHealth(unit.getMaxHealth());unit.deathTime=0;
+        unit.setNervLogisticsLocked(true);unit.enterHangarStandby();
+        int lcl=FacilityV2EvaRuntime.ready(level,variant)?FacilityV2EvaRuntime.LCL_SHOULDER_LAYERS:EvaHangarBuilder.LCL_SHOULDER_LAYERS;
+        put(level,variant,new FleetEntry(unit.getUUID(),Phase.PARKED,0,bed.getZ(),lcl));
+        EntryPlugDirector.reset(level,variant,unit);
+        setBoardingBridgeExtension(level,variant,FacilityV2EvaRuntime.ready(level,variant)?FacilityV2EvaRuntime.BRIDGE_SEGMENTS:EvaHangarBuilder.BRIDGE_SEGMENTS);
+        setGate(level,variant,false);
+        if(FacilityV2EvaRuntime.ready(level,variant))FacilityV2EvaRuntime.restoreLclEnvelope(level,variant);
+        else EvaHangarBuilder.setLclLevel(level,RegionalFacilityLayout.evaOrigin(level),variant,lcl);
+        restoreStaticCarrier(level,variant,bed);
+        restoreStaticCarrier(level,variant,lowerLiftBed(level,variant));
+        restoreStaticCarrier(level,variant,surfaceLiftBed(level,variant));
+        unit.setSortieDestination(level.dimension(),surfaceLiftBed(level,variant));unit.setSortieParkingBed(bed);
+        TrainingPilotDirector.stop(level,variant);
+        ProjectSeele.LOGGER.info("NERV original assembly maintained: eva={} plug={} bed={}",unit.getUUID(),plug.getUUID(),bed);
+        return unit;
     }
 
     public static Status status(ServerLevel level, int variant)
@@ -898,6 +784,7 @@ public final class EvaLogisticsDirector
         {
             return false;
         }
+        if(HangarEmergencyR47.handleUse(player,position))return true;
         var installedControl = HangarOperationsR44.match(level, position);
         if (installedControl.isPresent())
         {
@@ -1826,7 +1713,7 @@ public final class EvaLogisticsDirector
                 bed.getY() + 1.0D,
                 EvaHangarBuilder.gateZ(
                         RegionalFacilityLayout.evaOrigin(level)) + 0.5D);
-        NervHangarDoorEntity.reconcile(level, variant, centre, moving);
+        NervHangarDoorEntity.reconcile(level,variant,centre,HangarEmergencyR47.desiredOpenR47(level,variant,centre,moving));
     }
 
     private static void requireCompactLogistics(

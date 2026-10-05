@@ -63,6 +63,9 @@ def main(apply=False):
     # and destination permissions are reused by S20SurfaceAccessGate.
     for z in range(271,276):
         for y in range(75,79):put(120,y,z,'minecraft:barrier','security_aperture')
+    for z in (270,276):
+        for y in range(75,79):put(120,y,z,WALL,'security_lateral_closure_r47')
+    for z in range(269,278):put(120,79,z,STRUCT,'security_lintel_closure_r47')
     for x,face in [(119,'west'),(121,'east')]:
         put(120,76,270,'minecraft:black_concrete','reader_backing')
         put(x,76,270,f'minecraft:polished_blackstone_button[face=wall,facing={face},powered=false]','reader')

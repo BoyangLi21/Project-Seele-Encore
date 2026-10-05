@@ -41,6 +41,15 @@ public final class FacilityEdgeRailR41 extends Block
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder){builder.add(SIDES);}
     @Override public VoxelShape getShape(BlockState state,BlockGetter level,BlockPos pos,CollisionContext context)
     {int mask=0;for(int i=0;i<4;i++)if(state.getValue(SIDES[i]))mask|=1<<i;return SHAPES[mask];}
+    @Override public net.minecraft.world.level.pathfinder.BlockPathTypes getBlockPathType(
+            BlockState state,BlockGetter level,BlockPos pos,net.minecraft.world.entity.Mob mob)
+    {
+        // Empty stored rail states remain empty. A live 22/16 edge rail is
+        // a fence, so native NPC paths use its real openings instead of its top.
+        return getShape(state,level,pos,CollisionContext.empty()).isEmpty()?
+                net.minecraft.world.level.pathfinder.BlockPathTypes.OPEN:
+                net.minecraft.world.level.pathfinder.BlockPathTypes.FENCE;
+    }
     @Override public BlockState getStateForPlacement(BlockPlaceContext context)
     {return empty(this).setValue(side(context.getHorizontalDirection()),true);}
     @Override public BlockState rotate(BlockState state,Rotation rotation)

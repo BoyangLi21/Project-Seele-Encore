@@ -44,6 +44,12 @@ public final class TrainingPilotEntity extends PathfinderMob
     }
 
     @Override
+    protected net.minecraft.world.entity.ai.navigation.PathNavigation createNavigation(Level level)
+    {
+        return new TrainingPilotNavigationR47(this,level);
+    }
+
+    @Override
     protected void defineSynchedData()
     {
         super.defineSynchedData();

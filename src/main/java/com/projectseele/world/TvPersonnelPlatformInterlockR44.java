@@ -24,12 +24,11 @@ public final class TvPersonnelPlatformInterlockR44
 {
     private record Gate(int variant, BlockPos first, BlockPos second) { }
     private record Contract(Map<Integer, List<AABB>> areas, Map<BlockPos, Gate> gates,
-                            Map<Integer, Map<BlockPos, net.minecraft.world.level.block.state.BlockState>> installed) { }
-    private record Cached(int tick, String digest, Optional<Contract> value) { }
+                            Map<Integer, Map<BlockPos, net.minecraft.world.level.block.state.BlockState>> installed,
+                            Map<Integer,List<BlockPos>> boardingApproaches) { }
+    private record Cached(int tick, byte[] bytes, Optional<Contract> value) { }
     private static final Map<MinecraftServer, Cached> CACHE = new WeakHashMap<>();
     private static final Map<MinecraftServer, Boolean> MODEL_CACHE=new WeakHashMap<>();
-    private static final String METADATA_SHA256="4639b70111d26065402032f5a58b7ada2088960fba0566718dccd1e4e4d00d98";
-    private static final String MODEL_SHA256="2a789960d2649118b12505be8d6c93888ed8e1cabe6beaef0c20f498b12551a3";
     private static final TicketType<ChunkPos> STAFF_REVIEW_TICKET=TicketType.create(
             "r44_staff_clearance",Comparator.comparingLong(ChunkPos::toLong),40);
     private static final Set<BlockPos> EXPECTED = new HashSet<>();
@@ -62,6 +61,7 @@ public final class TvPersonnelPlatformInterlockR44
         try
         {
             var document = JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            TvPersonnelSemanticEpochR47.requireMetadata(document);
             if (document.get("schema").getAsInt() != 44
                     || !document.get("dimension").getAsString().equals("projectseele:geofront"))
                 throw new IllegalArgumentException("Wrong staff-platform contract");
@@ -123,7 +123,23 @@ public final class TvPersonnelPlatformInterlockR44
                 installed.computeIfAbsent(variant,ignored->new HashMap<>()).put(pos,after);
             }
             if(floors!=202||guards!=201||doors!=24||owned.size()!=427)throw new IllegalArgumentException("Incomplete427 installed source owners");
-            return Optional.of(new Contract(areas,gates,installed));
+            var approaches=new HashMap<Integer,List<BlockPos>>();
+            for(var route:document.getAsJsonArray("crew_exit_routes"))
+            {
+                var row=route.getAsJsonObject();String id=row.get("id").getAsString();
+                for(int variant=0;variant<3;variant++)if(id.equals("tv_operator/"+variant+"/-1/entry"))
+                {
+                    var points=new ArrayList<BlockPos>();
+                    for(var raw:row.getAsJsonArray("waypoints_for_native_refinement"))
+                    {
+                        var q=raw.getAsJsonArray();var point=BlockPos.containing(q.get(0).getAsDouble(),q.get(1).getAsDouble(),q.get(2).getAsDouble());
+                        if(points.isEmpty()||!points.get(points.size()-1).equals(point))points.add(point);
+                    }
+                    approaches.put(variant,List.copyOf(points));
+                }
+            }
+            if(approaches.size()!=3)throw new IllegalArgumentException("Incomplete original pilot boarding approaches");
+            return Optional.of(new Contract(areas,gates,installed,approaches));
         }
         catch (Exception failure)
         {
@@ -136,18 +152,21 @@ public final class TvPersonnelPlatformInterlockR44
     {
         var server=level.getServer();int tick=server.getTickCount();var cached=CACHE.get(server);
         if(cached!=null&&cached.tick==tick)return cached.value;
-        byte[] bytes=null;String digest="missing";
+        byte[] bytes=null;
         try
         {
             var path=server.getWorldPath(LevelResource.ROOT).resolve("r44_tv_personnel_platforms.json");
-            if(Files.isRegularFile(path)){bytes=Files.readAllBytes(path);digest=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));}
+            if(Files.isRegularFile(path))
+            {if(Files.size(path)>1_000_000)throw new IllegalArgumentException("Oversize finite personnel metadata");bytes=Files.readAllBytes(path);}
         }
-        catch(Exception ignored){digest="unavailable";}
-        if(cached!=null&&cached.digest.equals(digest)){CACHE.put(server,new Cached(tick,digest,cached.value));return cached.value;}
-        Optional<Contract> value=digest.equals(METADATA_SHA256)?load(bytes):Optional.empty();
+        catch(Exception failure){ProjectSeele.LOGGER.warn("Personnel metadata read rejected: {}",failure.toString());}
+        if(cached!=null&&Arrays.equals(cached.bytes,bytes)){CACHE.put(server,new Cached(tick,bytes,cached.value));return cached.value;}
+        Optional<Contract> value=bytes==null?Optional.empty():load(bytes);
         if(value.isEmpty())ProjectSeele.LOGGER.warn("R44 finite personnel metadata missing, changed or invalid; owned equipment remains inhibited");
-        CACHE.put(server,new Cached(tick,digest,value));return value;
+        CACHE.put(server,new Cached(tick,bytes,value));return value;
     }
+    /** Shared semantic admission only; real installation/occupancy checks remain separate. */
+    public static boolean semanticReadyR47(ServerLevel level){return contract(level).isPresent();}
 
     private static boolean crew(ServerLevel level, Entity actor, int variant)
     {
@@ -165,6 +184,14 @@ public final class TvPersonnelPlatformInterlockR44
                 ||!actor.getRootVehicle().getUUID().equals(fleet.get().entryPlugId());
     }
 
+    /** Installed fixed ramps supersede the former bedX-19 level catwalk. */
+    public static List<BlockPos> boardingApproachR47(ServerLevel level,int variant)
+    {
+        if(!enabled(level))return List.of();
+        return contract(level).map(c->c.boardingApproaches.getOrDefault(variant,List.of()))
+                .orElse(List.of());
+    }
+
     public static Optional<String> movementFault(ServerLevel level, int variant)
     {
         return crewFault(level,variant,true);
@@ -180,8 +207,7 @@ public final class TvPersonnelPlatformInterlockR44
     {
         return MODEL_CACHE.computeIfAbsent(server,ignored->
         {
-            try(var model=TvPersonnelPlatformInterlockR44.class.getResourceAsStream("/assets/projectseele/mesh/tv_shoulder_shells_r44.json"))
-            {return model!=null&&java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(model.readAllBytes())).equals(MODEL_SHA256);}
+            try{TvPersonnelSemanticEpochR47.requireModel();return true;}
             catch(Exception failure){return false;}
         });
     }

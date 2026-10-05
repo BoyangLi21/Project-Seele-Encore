@@ -104,6 +104,17 @@ public final class TvLiftFinishR45
                 &&"tv12_hangar_utility".equals(styles(level).get(spec.id()));
     }
 
+    public static BlockState cabinDoor(ServerLevel level,BlockPos centre,
+            net.minecraft.core.Direction exit,BlockState original)
+    {
+        if(exit!=net.minecraft.core.Direction.SOUTH)return original;
+        for(var spec:S20PhysicalElevatorDirector.s20Lifts(level))
+            if(compactWindowContract(level,spec)&&spec.stops().stream()
+                    .anyMatch(stop->stop.cabinCentre().equals(centre)))
+                return ModBlocks.CLEAR_GLASS.get().defaultBlockState();
+        return original;
+    }
+
     /** A single interior hole is distinct from an absent/misidentified platform. */
     public static boolean mayRepairSingleInteriorFloorHole(int missing,boolean completeRoof,
             boolean originalLinkedSelector,boolean clearRegisteredDoorway,boolean foreignFloor,

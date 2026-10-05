@@ -2703,6 +2703,7 @@ public final class EvaHangarBuilder
     private static void set(ServerLevel level, BlockPos position, BlockState state)
     {
         if (TvPersonnelPlatformRecipeR44.owns(level, position)) return;
+        if (PilotRestroomsR47.ownsRoomMaintenanceSpaceR47(level, position)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

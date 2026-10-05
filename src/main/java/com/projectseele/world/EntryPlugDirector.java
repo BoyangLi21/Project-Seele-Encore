@@ -165,7 +165,7 @@ public final class EntryPlugDirector
             Entity saved = level.getEntity(savedId);
             if (saved instanceof EntryPlugCarrierEntity plug
                     && plug.isAlive()
-                    && plug.getAssignedVariant() == variant)
+                    && nervOwnedCarrierR47(plug) && plug.getAssignedVariant() == variant)
             {
                 dimensionCache.put(variant, savedId);
                 return plug;
@@ -182,7 +182,7 @@ public final class EntryPlugDirector
         {
             Entity cached = level.getEntity(cachedId);
             if (cached instanceof EntryPlugCarrierEntity plug
-                    && plug.isAlive() && plug.getAssignedVariant() == variant)
+                    && plug.isAlive() && nervOwnedCarrierR47(plug) && plug.getAssignedVariant() == variant)
             {
                 return plug;
             }
@@ -196,7 +196,7 @@ public final class EntryPlugDirector
         {
             if (entity instanceof EntryPlugCarrierEntity plug
                     && plug.isAlive()
-                    && plug.getAssignedVariant() == variant
+                    && nervOwnedCarrierR47(plug) && plug.getAssignedVariant() == variant
                     && plug.isLockedToEva())
             {
                 remember(level, variant, plug);
@@ -212,7 +212,7 @@ public final class EntryPlugDirector
         List<EntryPlugCarrierEntity> matches = new ArrayList<>(
                 level.getEntitiesOfClass(EntryPlugCarrierEntity.class, search,
                         plug -> plug.isAlive()
-                                && plug.getAssignedVariant() == variant));
+                                && nervOwnedCarrierR47(plug) && plug.getAssignedVariant() == variant));
         if (matches.isEmpty())
         {
             return null;
@@ -242,6 +242,12 @@ public final class EntryPlugDirector
         }
         remember(level, variant, keep);
         return keep;
+    }
+
+    private static boolean nervOwnedCarrierR47(EntryPlugCarrierEntity plug)
+    {
+        return plug.laboratorySlotR47()<0 && !plug.isIndependentUNPlug()
+                && plug.getAssignedVariant()>=0 && plug.getAssignedVariant()<3;
     }
 
     private static int canonicalPriority(EntryPlugCarrierEntity plug)
@@ -380,6 +386,7 @@ public final class EntryPlugDirector
             {
                 if (!(entity instanceof EntryPlugCarrierEntity plug)
                         || !plug.isAlive()
+                        || !nervOwnedCarrierR47(plug)
                         || plug.getAssignedVariant() != variant)
                 {
                     continue;
@@ -495,6 +502,7 @@ public final class EntryPlugDirector
         {
             if (entity instanceof EntryPlugCarrierEntity occupied
                     && occupied.isAlive()
+                    && nervOwnedCarrierR47(occupied)
                     && occupied.getAssignedVariant() == variant
                     && isSupportedPilot(occupied.getFirstPassenger()))
             {
@@ -518,7 +526,7 @@ public final class EntryPlugDirector
     public static void claimBoardedPlug(ServerLevel level,
                                         EntryPlugCarrierEntity boarded)
     {
-        if(boarded.isIndependentUNPlug())return;
+        if(!nervOwnedCarrierR47(boarded))return;
         int variant = boarded.getAssignedVariant();
         EntryPlugCarrierEntity former = canonical(level, variant);
         if (former != null && former != boarded
@@ -1150,8 +1158,13 @@ public final class EntryPlugDirector
         // was not in, which is why a later prepare refused to start.
         EntryPlugCarrierEntity plug =
                 pilot.getVehicle() instanceof EntryPlugCarrierEntity ridden
+                        && ridden.laboratorySlotR47()<0
                         && ridden.getLinkedEva() == unit
                         ? ridden : unit.getLockedEntryPlug();
+        if (plug != null && plug.laboratorySlotR47()>=0)
+        {
+            return false; // Generic EVA extraction never adopts an independent lab owner.
+        }
         if (plug == null)
         {
             plug = unit.isExperimentalUnit()?null:canonical(level, variant);
@@ -1242,6 +1255,7 @@ public final class EntryPlugDirector
      */
     public static void tickEjection(EntryPlugCarrierEntity plug, int ticks)
     {
+        if(plug.laboratorySlotR47()>=0)return;
         if(plug.isIndependentUNPlug()){UNPlugDirector.extract(plug,ticks);return;}
         if (!(plug.level() instanceof ServerLevel level))
         {
@@ -1304,6 +1318,7 @@ public final class EntryPlugDirector
      */
     public static void tickFieldEjection(EntryPlugCarrierEntity plug, int ticks)
     {
+        if(plug.laboratorySlotR47()>=0)return;
         if (!(plug.level() instanceof ServerLevel level))
         {
             return;
@@ -1387,17 +1402,11 @@ public final class EntryPlugDirector
                              EvaUnit01Entity unit)
     {
         EntryPlugCarrierEntity plug = canonical(level, variant);
-        if (plug != null)
-        {
-            for (Entity passenger : List.copyOf(plug.getPassengers()))
-            {
-                passenger.stopRiding();
-            }
-            plug.discard();
-        }
-        forget(level, variant);
-        clearSavedPlug(level, variant);
-        ensureSuspended(level, variant, unit);
+        if(plug==null||plug.laboratorySlotR47()>=0||plug.getFirstPassenger()!=null)
+            throw new IllegalStateException("Original empty capsule is required for maintenance");
+        plug.unlockFromEva();plug.clearInsertionAbortRequest();plug.setInsertionProgress(0);
+        plug.transitionInsertionStage(plug.getInsertionStage(),plug.getInsertionEpoch(),EntryPlugCarrierEntity.STAGE_SUSPENDED);
+        positionSuspended(plug,unit);plug.openCabin();remember(level,variant,plug);
     }
 
     public static void remove(ServerLevel level, int variant)
@@ -1413,6 +1422,7 @@ public final class EntryPlugDirector
 
     public static void keepPassengerState(EntryPlugCarrierEntity plug)
     {
+        if(plug.laboratorySlotR47()>=0)return;
         Entity passenger = plug.getFirstPassenger();
         if (passenger != null
                 && plug.getCabinStage() == EntryPlugCarrierEntity.CABIN_OPEN)
@@ -1774,7 +1784,7 @@ public final class EntryPlugDirector
     private static void remember(ServerLevel level, int variant,
                                  EntryPlugCarrierEntity plug)
     {
-        if(plug.isIndependentUNPlug())return;
+        if(!nervOwnedCarrierR47(plug)||plug.getAssignedVariant()!=variant)return;
         CACHED_PLUGS.computeIfAbsent(level.dimension(), ignored -> new HashMap<>())
                 .put(variant, plug.getUUID());
         EvaFleetSavedData data = EvaFleetSavedData.get(level.getServer());

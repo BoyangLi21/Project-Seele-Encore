@@ -5,6 +5,7 @@ import regional_voxels as v
 from measure_world_r40 import MeasuredWorld,WORLD,ROOT,properties
 from query_blocks import AIR,iter_block_entities
 from build_station_boards_r19 import packed
+from native_platform_alignment_r47 import bank as observed_bank,door_part,floor_link
 
 OUT=ROOT/'artifacts/world_combat_r40/station_completion'
 EMPTY=AIR|{'minecraft:light'}
@@ -52,27 +53,43 @@ def main(apply=False):
             edge=r['edges'].get(offset,[])
             if not edge:held.append(dict(platform=r['id'],reason='no native platform edge',offset=offset));continue
             side=int(offset)//2;axis=0 if horizontal else 2;centre=x if horizontal else z
+            measured,measured_bank=observed_bank(WORLD,r['id'],int(offset))if y<0 else(None,None)
+            if measured:
+                assert measured['floor_y']==y and measured['axis']==r['axis']and measured['rail_lateral']==(z if horizontal else x),'Actual8 authority geometry differs; do not reuse a stopping phase'
             # The installed Eidan vehicles have 5-metre door spacing (native
             # positionDefinitions door offsets ±40/±120 sixteenths).
             edge_points={tuple(c['pos']) for c in edge}
             for c in edge:
                 q=tuple(c['pos']);face=properties(c['state'])['facing'];lower=(q[0],q[1]+1,q[2]);upper=(q[0],q[1]+2,q[2])
+                absolute_u=q[axis]
+                if measured and not(measured['native_limits'][0]<=absolute_u<=measured['native_limits'][1]):continue
+                if measured:assert face==measured_bank['facing'],'Actual native bank facing changed'
                 if not empty(lower) or not empty(upper):continue
                 # Require a real boarding apron behind the edge. A legacy
                 # platform marker hanging over a void is not a gate site.
                 outward=(0,side) if horizontal else (side,0)
                 reader=(q[0]+outward[0],q[1],q[2]+outward[1])
-                if not supported(reader):held.append(dict(platform=r['id'],pos=q,reason='missing boarding apron'));continue
-                u=q[axis]-centre;phase=(u-2)%5;isdoor=phase in (0,1)
+                if measured and shapes.get(w.block(reader))is None:raise RuntimeError(('Unmeasured actual underground apron',r['id'],reader,w.block(reader)))
+                if not supported(reader):
+                    if measured:raise RuntimeError(('Refuse partial actual underground bank with missing apron',r['id'],reader))
+                    held.append(dict(platform=r['id'],pos=q,reason='missing boarding apron'));continue
+                u=q[axis]-centre;phase=(u-2)%5
+                actual_part=door_part(measured_bank['actual_mouth_centres'],absolute_u,face)if measured else None
+                isdoor=actual_part is not None if measured else phase in (0,1)
                 if isdoor:
-                    partner=list(q);partner[axis]+=1 if phase==0 else -1
-                    isdoor=tuple(partner) in edge_points
-                part=phase if isdoor else u%2
-                if face in ('south','west'):part=1-part
-                base=c['state'].replace('door_type=none','door_type=apg');put(q,base,'native_apg_base')
+                    partner=list(q)
+                    if measured:
+                        partner[axis]+=1 if absolute_u+1 in measured_bank['actual_mouth_centres']else-1
+                        assert tuple(partner)in edge_points and measured['native_limits'][0]<=partner[axis]<=measured['native_limits'][1],'Incomplete actual four-leaf pair'
+                    else:
+                        partner[axis]+=1 if phase==0 else-1
+                        isdoor=tuple(partner) in edge_points
+                part=actual_part if measured and isdoor else absolute_u%2 if measured else phase if isdoor else u%2
+                if face in ('south','west')and not(measured and isdoor):part=1-part
+                base=f'mtr:platform[door_type=apg,facing={face},side={floor_link(measured_bank["actual_mouth_centres"],absolute_u,face)}]'if measured else c['state'].replace('door_type=none','door_type=apg');put(q,base,'native_apg_base')
                 for half,at in [('lower',lower),('upper',upper)]:
                     props=f'facing={face},half={half},side={"left" if part==0 else "right"}'
-                    state=f'mtr:apg_door[end=false,{props},unlocked=true]' if isdoor else f'mtr:apg_glass[{props}]'
+                    state=f'mtr:apg_door[end=false,{props},unlocked=true]' if isdoor else f'mtr:apg_glass[{props},propagate_property=0]'if measured else f'mtr:apg_glass[{props}]'
                     put(at,state,'native_apg_door' if isdoor else 'native_apg_glass')
                 gates.append(dict(platform=r['id'],base=q,door=isdoor))
             # Wall maps follow the lane actually adjacent to this rail. Find

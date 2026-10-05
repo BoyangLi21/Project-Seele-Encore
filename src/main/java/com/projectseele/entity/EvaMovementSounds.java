@@ -50,7 +50,9 @@ public final class EvaMovementSounds
         {SOLES.remove(eva);return;}
         if(GEOMETRIC_CONTACTS&&!eva.isExperimentalUnit()
                 &&(eva.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||eva.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE
-                   ||eva.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||EvaCannonFrameR45.enabled(eva)))
+                   ||eva.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE
+                   ||eva.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45||eva.getWeapon()==EvaUnit01Entity.WEAPON_SHIELD_R45
+                   ||EvaCannonFrameR45.enabled(eva)))
         {
             // Mounted position updates can skip a tick while the visible gait
             // remains in motion. Do not forget a raised foot in that interval.

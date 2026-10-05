@@ -127,6 +127,11 @@ public class ModEntities
                             .setShouldReceiveVelocityUpdates(false)
                             .build("nerv_command_seat"));
 
+    public static final RegistryObject<EntityType<NervCommandSeatEntity>> PILOT_REST_SEAT_R47=ENTITY_TYPES.register(
+            "pilot_rest_seat_r47",()->EntityType.Builder.of(NervCommandSeatEntity::new,MobCategory.MISC)
+                    .sized(.55F,.35F).clientTrackingRange(12).updateInterval(20).setShouldReceiveVelocityUpdates(false)
+                    .build("pilot_rest_seat_r47"));
+
     public static final RegistryObject<EntityType<NervArmamentStationEntity>>
             NERV_ARMAMENT_STATION = ENTITY_TYPES.register(
                     "nerv_armament_station",

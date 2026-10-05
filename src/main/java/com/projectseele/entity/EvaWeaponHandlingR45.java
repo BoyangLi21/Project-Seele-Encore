@@ -52,8 +52,8 @@ public final class EvaWeaponHandlingR45
                 ||e.rifleStanceLevel(0)>.01F||!e.isPoweredOn()||e.isNervLogisticsLocked()
                 ||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)||e.getPilotEntity()==null)return false;
         int old=e.getWeapon();
-        boolean draw=old==EvaUnit01Entity.WEAPON_FISTS&&weapon==EvaUnit01Entity.WEAPON_KNIFE;
-        boolean stow=old==EvaUnit01Entity.WEAPON_KNIFE&&weapon==EvaUnit01Entity.WEAPON_FISTS;
+        boolean draw=old!=EvaUnit01Entity.WEAPON_KNIFE&&weapon==EvaUnit01Entity.WEAPON_KNIFE;
+        boolean stow=old==EvaUnit01Entity.WEAPON_KNIFE&&weapon!=EvaUnit01Entity.WEAPON_KNIFE;
         if(!draw&&!stow)return false;
         var state=new CompoundTag();
         state.put("from_pose",EvaShutdownR30.encode(EvaBodyPose.sample(e,0)));
@@ -88,7 +88,8 @@ public final class EvaWeaponHandlingR45
     public static boolean knifeVisible(EvaUnit01Entity e,float partial)
     {
         if(available(e)&&e.isNervLogisticsLocked())return false;
-        return active(e)?drawPhase(e,partial)>=.08F:e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE;
+        return active(e)?drawPhase(e,partial)>=(EvaAnatomicalHandsR45.knifeMechanism(e)==null?.54F:.08F)
+                :e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE;
     }
     public static void tick(EvaUnit01Entity e)
     {
@@ -97,7 +98,10 @@ public final class EvaWeaponHandlingR45
         if(!e.isPoweredOn()||e.getPilotEntity()==null||e.isNervLogisticsLocked()||e.isFirstBattleActive()
                 ||EvaShutdownR30.disabled(e)||com.projectseele.physics.CombatBodyDynamics.active(e))
         {e.getEntityData().set(STATE,new CompoundTag());return;}
-        float t=phase(e,0),handoff=state.getBoolean("draw")?.54F:.46F;
+        // A different held prop must wait until the knife hand has returned
+        // from the rack. Publishing it at the stow contact made a sword/gun
+        // appear in the still-open knife retrieval hand.
+        float t=phase(e,0),handoff=state.getBoolean("draw")?.54F:1F;
         if(t>=handoff&&!state.getBoolean("committed"))
         {
             e.commitHandledWeaponR45(state.getInt("after"));

@@ -164,7 +164,17 @@ public final class TvMissionEquipmentR45
     public static boolean cannonAuthorized(EvaUnit01Entity eva)
     {return authorized(eva,1);}
     public static boolean shieldAuthorized(EvaUnit01Entity eva)
-    {return authorized(eva,0);}
+    {return authorized(eva,0)||!eva.isExperimentalUnit()&&eva.getUnitVariant()==0
+            &&eva.getPersistentData().getBoolean("R47PhysicalShieldIssued")
+            &&(eva.getArmamentMask()&EvaUnit01Entity.ARMAMENT_MASK_SHIELD_R45)!=0;}
+    public static java.util.Optional<net.minecraft.core.BlockPos> knownCargoForUnitR47(ServerLevel level,int unit)
+    {
+        if(unit!=0&&unit!=1)return java.util.Optional.empty();
+        return state(level).physical.values().stream()
+                .filter(stock->stock.carrier==null&&stock.rack!=null&&stock.position!=null
+                        &&cargoUnit(ItemStack.of(stock.item))==unit)
+                .map(stock->stock.position.immutable()).findFirst();
+    }
     private static boolean authorized(EvaUnit01Entity eva,int unit)
     {
         if(!(eva.level() instanceof ServerLevel l)||eva.getUnitVariant()!=unit)return false;

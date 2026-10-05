@@ -32,10 +32,14 @@ public final class AutoSortieR32
     }
     public static boolean automaticAllowed(ServerLevel level,int unit)
     {
+        if(StaffRecoveryR47.pending(level,unit))return false;
         String token=missionToken(level);var eva=EvaLogisticsDirector.canonicalUnit(level,unit);
         var plug=EntryPlugDirector.canonical(level,unit);
         var pilot=plug==null?null:plug.getFirstPassenger();if(pilot==null&&eva!=null)pilot=eva.getPilotEntity();
-        boolean occupied=assignedPilotR45(level,unit,pilot);
+        boolean occupied=assignedPilotR45(level,unit,pilot)
+                &&plug!=null&&plug.getAssignedVariant()==unit&&plug.getLinkedEva()==eva
+                &&plug.getFirstPassenger()==pilot&&plug.isHatchFullySealed()
+                &&(!(pilot instanceof TrainingPilotEntity npc)||seatedStage(npc));
         return !token.isEmpty()&&eva!=null&&!eva.getPersistentData().getBoolean("R32AutoCancelled")
                 &&occupied
                 &&token.equals(eva.getPersistentData().getString("R43AutoMission"));
@@ -45,6 +49,25 @@ public final class AutoSortieR32
         StaffCommandBookR24.cancelAutomatic(level,unit);
         var eva=EvaLogisticsDirector.canonicalUnit(level,unit);if(eva==null)return;
         var tag=eva.getPersistentData();tag.remove("R32AutoStep");tag.remove("R32AutoNext");tag.remove("R43AutoMission");
+    }
+    private static boolean seatedStage(TrainingPilotEntity pilot)
+    {
+        int stage=pilot.getTrainingStage();
+        return stage==TrainingPilotEntity.STAGE_IN_PLUG||stage==TrainingPilotEntity.STAGE_LINKED;
+    }
+    /** Selection/cancellation invalidate queued physical presses immediately, before the next staff tick. */
+    public static void invalidateMission(ServerLevel level)
+    {
+        for(int unit=0;unit<3;unit++)clearAutomatic(level,unit);
+        StaffCommandBookR24.cancelMissionActions(level);
+        StaffPilotOrdersR25.invalidateMission(level);
+    }
+    public static void suspendAutomaticForRecovery(ServerLevel level,int unit)
+    {
+        clearAutomatic(level,unit);
+        var eva=EvaLogisticsDirector.canonicalUnit(level,unit);if(eva==null)return;
+        eva.getPersistentData().putBoolean("R32AutoCancelled",true);
+        eva.getPersistentData().putString("R43AutoMission",missionToken(level));
     }
     public static void assignCommander(EvaUnit01Entity eva,ServerPlayer player)
     {if(eva!=null)eva.getPersistentData().putUUID("R32SortieCommander",player.getUUID());}
@@ -77,6 +100,7 @@ public final class AutoSortieR32
             var eva=EvaLogisticsDirector.canonicalUnit(level,unit);if(eva==null)continue;
             String mission=missionToken(level);
             if(mission.isEmpty()){clearAutomatic(level,unit);continue;}
+            if(StaffRecoveryR47.pending(level,unit)){StaffCommandBookR24.cancelAutomatic(level,unit);continue;}
             var tag=eva.getPersistentData();var plug=EntryPlugDirector.canonical(level,unit);
             var pilot=plug==null?null:plug.getFirstPassenger();if(pilot==null)pilot=eva.getPilotEntity();
             String phase=EvaLogisticsDirector.status(level,unit).phase();
@@ -89,6 +113,10 @@ public final class AutoSortieR32
                 continue;
             }
             if(!assignedPilotR45(level,unit,pilot)){clearAutomatic(level,unit);continue;}
+            // Boarding acceptance is a walking order. Wait for the same pilot
+            // in the canonical plug and the actual pressure hatch to finish closing.
+            if(plug==null||plug.getFirstPassenger()!=pilot||plug.getLinkedEva()!=eva||!plug.isHatchFullySealed()
+                    ||pilot instanceof TrainingPilotEntity npc&&!seatedStage(npc))continue;
             if(Set.of("PARKED","SILO_READY").contains(phase)&&(!tag.hasUUID("R32BoardingPilot")||!tag.getUUID("R32BoardingPilot").equals(pilot.getUUID())
                     ||!mission.equals(tag.getString("R43AutoMission"))))
             {

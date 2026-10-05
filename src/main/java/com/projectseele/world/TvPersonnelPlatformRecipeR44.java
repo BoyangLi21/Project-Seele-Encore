@@ -19,9 +19,6 @@ import java.security.MessageDigest;
 public final class TvPersonnelPlatformRecipeR44
 {
     private record Cell(BlockPos position, String before, BlockState after) { }
-    private static final String RECIPE_SHA256 = "b7402c2a1cd005e340320eb6afcf9b13dd26be1ca54c95b5b5a82c74d1a8f937";
-    private static final String METADATA_SHA256 = "4639b70111d26065402032f5a58b7ada2088960fba0566718dccd1e4e4d00d98";
-    private static final String MODEL_SHA256 = "2a789960d2649118b12505be8d6c93888ed8e1cabe6beaef0c20f498b12551a3";
     private static final Set<BlockPos> OWNERS = new HashSet<>();
     static
     {
@@ -98,23 +95,10 @@ public final class TvPersonnelPlatformRecipeR44
             return Optional.of("Personnel recipe cannot generate during equipment motion");
         var fault=TvPersonnelPlatformInterlockR44.constructionFault(level,v);
         if(fault.isPresent())return fault;
-        try(var stream=TvPersonnelPlatformRecipeR44.class.getResourceAsStream("/data/projectseele/worldgen/authored/tv_personnel_recipe_r44.json"))
+        try
         {
-            if(stream==null)return Optional.of("Personnel recipe unavailable");
-            byte[] bytes=stream.readAllBytes();
-            if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(RECIPE_SHA256))
-                return Optional.of("Personnel recipe hash changed");
-            var metadata=level.getServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT)
-                .resolve("r44_tv_personnel_platforms.json");
-            if(!java.nio.file.Files.isRegularFile(metadata)
-                ||!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(java.nio.file.Files.readAllBytes(metadata))).equals(METADATA_SHA256))
-                return Optional.of("Personnel metadata epoch changed");
-            try(var model=TvPersonnelPlatformRecipeR44.class.getResourceAsStream("/assets/projectseele/mesh/tv_shoulder_shells_r44.json"))
-            {
-                if(model==null||!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(model.readAllBytes())).equals(MODEL_SHA256))
-                    return Optional.of("Personnel model epoch changed");
-            }
-            var document=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();
+            if(!TvPersonnelPlatformInterlockR44.semanticReadyR47(level))return Optional.of("Personnel finite semantic epoch unavailable");
+            var document=TvPersonnelSemanticEpochR47.recipe();
             var rows=document.getAsJsonArray("operations");
             if(rows.size()!=427)return Optional.of("Personnel recipe incomplete");
             var cells=new ArrayList<Cell>();var seen=new HashSet<BlockPos>();

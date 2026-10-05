@@ -25,6 +25,9 @@ public final class MovingWalkwayBlock extends HorizontalDirectionalBlock
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder){builder.add(FACING);}
     @Override public BlockState getStateForPlacement(BlockPlaceContext context){return defaultBlockState().setValue(FACING,context.getHorizontalDirection());}
     @Override public VoxelShape getShape(BlockState state,BlockGetter level,BlockPos pos,CollisionContext context){return SHAPE;}
+    @Override public boolean isPathfindable(BlockState state,BlockGetter level,BlockPos pos,
+            net.minecraft.world.level.pathfinder.PathComputationType type)
+    {return false;}
     @Override public void entityInside(BlockState state,Level level,BlockPos pos,Entity entity)
     {
         if(!(entity instanceof LivingEntity)||entity instanceof com.projectseele.entity.NervStaffEntity||entity.getBbWidth()>1.1F||entity.isPassenger()||entity.isShiftKeyDown())return;
