@@ -8,6 +8,8 @@ R47 是同批 Server / Full Client 两包的人工验收候选。Minecraft **1.2
 
 ## 两包与安装
 
+**PCL 直接导入：** 使用后续追加的 `D:/eva/delivery/Project_SEELE_Encore_R47_20261005_Client_PCL.zip`，将 ZIP 拖入 PCL 主窗口并安装到新版本。全部21个模组随包提供；PCL 负责 Minecraft 1.20.1／Forge 47.4.10 的基础安装。此版不要求保留R46、不需要下面的手动复制脚本，服务器包不变。首次启动自动准备本实例的个人光影，默认关闭；详见 [PCL 导入说明](PCL_IMPORT_R47.md)。下列原 Client.zip 步骤仍保留给手动实例安装。
+
 | 交付项 | 最终 ZIP 路径 | 实际字节数 |
 |---|---|---:|
 | Server | `D:/eva/delivery/Project_SEELE_Encore_R47_20261005_Server.zip` | 618,645,000 |
