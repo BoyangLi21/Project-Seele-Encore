@@ -48,10 +48,16 @@ public final class EvaBayRepairR33
             if(active(e)){data.remove("R33Repair");e.getEntityData().set(ELAPSED,-1);}
             return;
         }
-        if(!data.contains("R33Repair")&&e.getHealth()<e.getMaxHealth()
+        // A finished service can wait for the same original shield's real
+        // cabinet slot. Never repair a loaned/carried stack remotely.
+        TvMissionEquipmentR45.applyCompletedShieldBayServiceR50(e);
+        var shieldService=data.contains("R33Repair")?new CompoundTag():
+                TvMissionEquipmentR45.shieldBayServiceTargetR50(e,e.getHealth()>=e.getMaxHealth());
+        if(!data.contains("R33Repair")&&(e.getHealth()<e.getMaxHealth()||!shieldService.isEmpty())
                 &&EvaDorsalMechanism.bow(e)<=.001F&&EvaDorsalMechanism.open(e)<=.001F)
         {
             var job=new CompoundTag();job.putLong("start",e.level().getGameTime());job.putFloat("health",e.getHealth());data.put("R33Repair",job);
+            if(!shieldService.isEmpty())job.put("ShieldServiceR50",shieldService);
             e.getEntityData().set(ELAPSED,0);e.setNervLogisticsLocked(true);
             ProjectSeele.LOGGER.info("EVA bay repair started: eva={} health={} duration={}",e.getUUID(),e.getHealth(),DURATION);
         }
@@ -67,6 +73,7 @@ public final class EvaBayRepairR33
 
         if(elapsed>=DURATION)
         {
+            TvMissionEquipmentR45.completeShieldBayServiceR50(e,job.getCompound("ShieldServiceR50"));
             data.remove("R48YashimaFieldBurnout");
             data.remove("R48YashimaShieldHits");
             e.setHealth(e.getMaxHealth());data.remove("R33Repair");e.getEntityData().set(ELAPSED,-1);

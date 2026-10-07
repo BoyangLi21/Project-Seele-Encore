@@ -2,6 +2,11 @@
   "sources": [
     {
       "type": "minecraft:single",
+      "resource": "projectseele:entity/yashima_shield",
+      "sprite": "projectseele:entity/yashima_shield"
+    },
+    {
+      "type": "minecraft:single",
       "resource": "projectseele:block/lcl_still",
       "sprite": "projectseele:block/lcl_still"
     },

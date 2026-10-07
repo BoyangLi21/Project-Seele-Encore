@@ -8,7 +8,11 @@ from prepare_facilities_r48 import Author,FLOOR,WALL,FRAME
 ROOT=Path(__file__).resolve().parents[1]
 NATURAL=AIR|{'minecraft:stone','minecraft:dirt','minecraft:grass_block','minecraft:gravel','minecraft:andesite','minecraft:diorite','minecraft:granite','minecraft:deepslate','minecraft:tuff'}
 def main():
- p=argparse.ArgumentParser();p.add_argument('--world',type=Path,required=True);args=p.parse_args();out=ROOT/'artifacts/rebuild_r48/underground';out.mkdir(parents=True,exist_ok=True);a=Author(args.world.resolve(),out)
+ p=argparse.ArgumentParser();p.add_argument('--world',type=Path,required=True);args=p.parse_args()
+ airport=args.world/'r50_underground_airport.json'
+ if airport.is_file()and json.loads(airport.read_text('utf8')).get('installed')is True:
+  raise RuntimeError('R50 receivers and side crew access own this frontage; do not regenerate retired R48 upper stairs over the current rail. Use the complete current airport source.')
+ out=ROOT/'artifacts/rebuild_r48/underground';out.mkdir(parents=True,exist_ok=True);a=Author(args.world.resolve(),out)
  m=MeasuredWorld(a.world);m.box((-48,-520,-58),(107,-344,142));m.load();assert set(m.status.values())=={'full'}
  tags=dict(iter_block_entities(a.world,m.dimension,(-48,-520,-20),(107,-344,142)));a.t=tags
  door={};civil={};trees={};conflicts=[];plans=[]
