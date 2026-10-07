@@ -110,7 +110,7 @@ public final class ShieldCoverR48
         if (!(boss.level() instanceof ServerLevel level)) return false;
         TvCampaignSavedData data = TvCampaignSavedData.get(level);
         var site = TvEncounterSitesR45.site(level, data.active).orElse(null);
-        return data.active.equals("ramiel") && data.phase.equals("combat") && data.generationR43 > 0
+        return data.active.equals("ramiel") && Set.of("alert","approach","combat").contains(data.phase) && data.generationR43 > 0
                 && site != null && site.geometryValidated() && site.modelReady()
                 && !data.targetDeathConfirmedR45 && boss.getUUID().equals(data.angel)
                 && com.projectseele.event.TvEncounterDirectorR45.owned(boss, data)
@@ -120,13 +120,7 @@ public final class ShieldCoverR48
     /** Keep all the original firing gates except a missing/mis-aimed shield after combat starts. */
     public static boolean missionBeamAllowed(RamielEntity boss)
     {
-        if (!yashima(boss)) return false;
-        if (TvEncounterRulesR45.missionBeamAllowed(boss)) return true;
-        if (!(boss.level() instanceof ServerLevel level)) return false;
-        TvCampaignSavedData data = TvCampaignSavedData.get(level);
-        var owner = data.owner == null ? null : level.getServer().getPlayerList().getPlayer(data.owner);
-        if (owner == null || owner.level() != level || !TvEncounterRulesR45.targetFrameReady(level, data, owner)) return false;
-        return shieldOnlyBlockerAfterCombat(level, data, TvEncounterRulesR45.equipmentBlocker(level, data));
+        return yashima(boss)&&TvEncounterRulesR45.missionBeamAllowed(boss);
     }
 
     /** Shared with the mission director's live-combat hold, never with setup or victory admission. */
@@ -161,7 +155,7 @@ public final class ShieldCoverR48
             hits = new CompoundTag(); hits.putUUID("Boss", boss.getUUID()); hits.putLong("Generation", generation);
         }
         ListTag shots = hits.getList("Shots", Tag.TAG_STRING);
-        if (shots.stream().anyMatch(entry -> entry.getAsString().equals(shot.toString())) || hits.getInt("Hits") >= 2) return;
+        if (shots.stream().anyMatch(entry -> entry.getAsString().equals(shot.toString()))) return;
         int count = Math.min(2, hits.getInt("Hits") + 1);
         Boolean previous = EXACT_DAMAGE.get(); EXACT_DAMAGE.set(true);
         try
@@ -169,6 +163,7 @@ public final class ShieldCoverR48
             if (holder.receiveYashimaShieldHitR48(source, count >= 2))
             {
                 shots.add(StringTag.valueOf(shot.toString())); hits.put("Shots", shots);
+                while(shots.size()>16)shots.remove(0);
                 hits.putUUID("LastShot", shot); hits.putInt("Hits", count);
                 holder.getPersistentData().put("R48YashimaShieldHits", hits);
             }

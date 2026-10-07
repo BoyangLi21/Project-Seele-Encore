@@ -20,7 +20,8 @@ public final class PilotRoomDoorR48
         if(event.getHand()!=InteractionHand.MAIN_HAND
                 ||!(event.getEntity() instanceof ServerPlayer player)
                 ||!(event.getLevel() instanceof ServerLevel level))return;
-        if(PilotRestroomsR47.manualDoorR48(level,event.getPos(),player))
+        if(FacilityDoorControlsR49.pilotDoorUse(level,event.getPos(),player)
+                ||PilotRestroomsR47.manualDoorR48(level,event.getPos(),player))
         {
             event.setCanceled(true);
             event.setCancellationResult(InteractionResult.CONSUME);

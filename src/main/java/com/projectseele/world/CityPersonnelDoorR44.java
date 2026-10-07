@@ -32,7 +32,8 @@ public final class CityPersonnelDoorR44 extends DoorBlock
                                          net.minecraft.world.level.block.Block block,BlockPos from,boolean moving)
     {
         if(level instanceof net.minecraft.server.level.ServerLevel server
-                && TvPersonnelPlatformInterlockR44.ownsManualDoor(server,pos))return;
+                && (TvPersonnelPlatformInterlockR44.ownsManualDoor(server,pos)
+                ||FacilityDoorControlsR49.ownsDoor(server,pos)))return;
         super.neighborChanged(state,level,pos,block,from,moving);
     }
     @Override public InteractionResult use(BlockState state,Level level,BlockPos pos,Player player,InteractionHand hand,BlockHitResult hit)

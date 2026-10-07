@@ -17,6 +17,9 @@ public final class EvaAirTransportR31
     public static boolean bootstrap() { return true; }
     public static void define(SynchedEntityData data) { data.define(FRAME, new CompoundTag()); }
     public static boolean active(EvaUnit01Entity eva) { return eva.getEntityData().get(FRAME).getBoolean("Active"); }
+    public static CompoundTag cradleStateR50(EvaUnit01Entity eva) { return eva.getEntityData().get(FRAME).copy(); }
+    public static void cradleStateR50(EvaUnit01Entity eva, CompoundTag state)
+    { if (!eva.level().isClientSide) eva.getEntityData().set(FRAME, state.copy()); }
     public static void save(EvaUnit01Entity eva, CompoundTag tag) { tag.put("R31AirCradle", eva.getEntityData().get(FRAME).copy()); }
     public static void load(EvaUnit01Entity eva, CompoundTag tag) { eva.getEntityData().set(FRAME, tag.getCompound("R31AirCradle").copy()); }
     public static void clear(EvaUnit01Entity eva) { if (!eva.level().isClientSide){eva.getEntityData().set(FRAME, new CompoundTag());eva.getPersistentData().remove("R31AirAcceptedPitch");} }
@@ -38,6 +41,7 @@ public final class EvaAirTransportR31
         eva.getEntityData().set(FRAME, tag);
         eva.getPersistentData().putFloat("R31AirAcceptedPitch",0);
         eva.disconnectForAirliftR32();
+        eva.stowHandsForShutdownR30();
     }
 
     private static void seedFrame(CompoundTag tag,EvaBodyPose.Sample pose)
@@ -149,6 +153,8 @@ public final class EvaAirTransportR31
     public static EvaBodyPose.Sample sample(EvaUnit01Entity eva, EvaBodyPose.Sample result, float partial)
     {
         var tag=eva.getEntityData().get(FRAME);
+        if(tag.getBoolean("GroundReceiverR50"))return EvaGroundReceiverR50.sample(eva,result,tag,
+                Mth.lerp(eva.level().isClientSide?partial:1,tag.getInt("GroundPreviousAgeR50"),tag.getInt("GroundAgeR50")));
         if(tag.getBoolean("Release"))
         {
             EvaShutdownR30.decode(tag.getCompound("ReleaseFrom"),result);var target=new EvaBodyPose.Sample(result.rig);EvaShutdownR30.decode(tag.getCompound("ReleaseTo"),target);

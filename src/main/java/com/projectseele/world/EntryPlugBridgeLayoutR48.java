@@ -16,6 +16,7 @@ import java.util.*;
 public final class EntryPlugBridgeLayoutR48
 {
     private static final Map<ServerLevel,Boolean> ENABLED=new WeakHashMap<>();
+    private static final Set<ServerLevel> THROUGH_R49=Collections.newSetFromMap(new WeakHashMap<>());
     public static boolean enabled(ServerLevel level)
     {
         if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return false;
@@ -25,8 +26,14 @@ public final class EntryPlugBridgeLayoutR48
             try
             {
                 var d=JsonParser.parseString(Files.readString(path)).getAsJsonObject();
-                return d.get("schema").getAsInt()==48&&d.get("installed").getAsBoolean()
-                        &&d.get("layout").getAsString().equals("rear_crosswalk_19_21_capsule_branches_16_18");
+                if(d.get("schema").getAsInt()!=48||!d.get("installed").getAsBoolean())return false;
+                String layout=d.get("layout").getAsString();
+                if(layout.equals("rear_crosswalk_19_21_through_sides_14_24_boarding_stairs_r49"))
+                {
+                    if(!d.has("topology_revision")||d.get("topology_revision").getAsInt()!=49)return false;
+                    THROUGH_R49.add(l);return true;
+                }
+                return layout.equals("rear_crosswalk_19_21_capsule_branches_16_18");
             }
             catch(Exception failure){ProjectSeele.LOGGER.error("R48 rear bridge installation record rejected",failure);return false;}
         });
@@ -49,6 +56,7 @@ public final class EntryPlugBridgeLayoutR48
     public static Optional<String> retractionFaultR48(ServerLevel level,int variant)
     {
         if(!enabled(level))return Optional.empty();
+        if(THROUGH_R49.contains(level))return EntryPlugBridgeTopologyR49.fault(level,variant);
         if(variant<0||variant>2)return Optional.of("原后桥编号无效。");
         var bed=EvaLogisticsDirector.assignedHangarBedR33(level,variant);
         if(bed.getX()!=-12+42*variant||bed.getY()!=-443||bed.getZ()!=-240)
@@ -118,6 +126,7 @@ public final class EntryPlugBridgeLayoutR48
     {
         if(!enabled(level)||bed.getY()!=-443||bed.getZ()!=-240
                 ||!Set.of(-12,30,72).contains(bed.getX()))return false;
+        if(THROUGH_R49.contains(level))return EntryPlugBridgeTopologyR49.apply(level,bed,extension);
         int amount=Math.max(0,Math.min(9,extension));
         var fault=retractionFaultR48(level,(bed.getX()+12)/42);
         if(fault.isPresent()){ProjectSeele.LOGGER.warn("R48 original rear bridge held {}: {}",bed,fault.get());return false;}

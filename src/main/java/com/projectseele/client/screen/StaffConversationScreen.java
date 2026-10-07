@@ -204,8 +204,8 @@ public final class StaffConversationScreen extends Screen
             transportX.setMaxLength(10);transportZ.setMaxLength(10);transportX.setFilter(s->s.matches("-?\\d*"));transportZ.setFilter(s->s.matches("-?\\d*"));
             transportX.setValue(Integer.toString(minecraft.player.getBlockX()));transportZ.setValue(Integer.toString(minecraft.player.getBlockZ()));addRenderableWidget(transportX);addRenderableWidget(transportZ);
             addButton("投放至 X / Z",x+12,controlsY+48,column,()->send("TRANSPORT:deliver:"+unit+":"+transportX.getValue()+":"+transportZ.getValue()),true);
-            addButton("空运回原发射井",x+16+column,controlsY+48,column,()->send("TRANSPORT:recover:"+unit),true);
-            addButton("取消 / 安全返回",x+20+column*2,controlsY+48,column,()->send("TRANSPORT:cancel"),true);
+            addButton("空运回库 · 自动选路",x+16+column,controlsY+48,column,()->send("TRANSPORT:recover:"+unit),true);
+            addButton("取消本机 / 安全返回",x+20+column*2,controlsY+48,column,()->send("TRANSPORT:cancel:"+unit),true);
             addButton("运输状态",x+12,controlsY+72,panelWidth-24,()->send("TRANSPORT:status"),true);
         }
         else if (tab == 5)

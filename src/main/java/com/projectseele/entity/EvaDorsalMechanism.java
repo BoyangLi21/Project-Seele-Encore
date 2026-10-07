@@ -39,9 +39,12 @@ public final class EvaDorsalMechanism
     public static boolean eyesEnabled(EvaUnit01Entity eva)
     {
         if(eva.isFirstBattleActive()&&!eva.isBerserk())return open(eva)<.001F&&bow(eva)<.001F;
+        // Autonomous activity survives exhausted batteries. A dormant plant
+        // flag or stale socket interpolation must not turn its active optics off.
+        if(eva.isBerserk())return !EvaBerserkMotionR34.silent(eva)
+                &&!(eva.isFirstBattleActive()
+                &&eva.firstBattleSignals().time(eva,0)>=FirstBattleClip.DEATH_TICK/20F);
         if (eva.getEntityData().get(OPTICS_DORMANT) && !eva.isBerserk()) return false;
-        if (eva.isFirstBattleActive() && eva.isBerserk()
-                && eva.firstBattleSignals().time(eva, 0) >= FirstBattleClip.DEATH_TICK / 20F) return false;
         return eva.isPoweredOn() && open(eva) < .001F && bow(eva) < .001F;
     }
     /** A cold or silent Unit-01 has a dark optic surface; activation restores
@@ -50,11 +53,11 @@ public final class EvaDorsalMechanism
     {
         if(eva.getUnitVariant()!=EvaUnit01Entity.UNIT_01||eva.isExperimentalUnit())return 0;
         if(eva.isFirstBattleActive()&&!eva.isBerserk())return 0;
+        if(eva.isBerserk())return EvaBerserkMotionR34.silent(eva)
+                ||eva.isFirstBattleActive()&&eva.firstBattleSignals().time(eva,0)>=FirstBattleClip.DEATH_TICK/20F?1:2;
         if(!eva.isPoweredOn()||EvaBerserkMotionR34.silent(eva)||EvaShutdownR30.wreck(eva)
-                ||dormantAfterBerserk(eva)&&!eva.isBerserk()
-                ||eva.isFirstBattleActive()&&eva.isBerserk()
-                  &&eva.firstBattleSignals().time(eva,0)>=FirstBattleClip.DEATH_TICK/20F)return 1;
-        return eva.isBerserk()?2:0;
+                ||dormantAfterBerserk(eva))return 1;
+        return 0;
     }
     public static void afterBerserk(EvaUnit01Entity eva)
     {

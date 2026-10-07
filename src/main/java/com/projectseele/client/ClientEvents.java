@@ -70,6 +70,7 @@ public class ClientEvents
     {
         event.registerBlockEntityRenderer(com.projectseele.registry.ModBlockEntities.DEAD_SEA_ARCHIVE.get(),com.projectseele.client.render.DeadSeaArchiveRendererR45::new);
         event.registerEntityRenderer(ModEntities.RAMIEL.get(), RamielRenderer::new);
+        event.registerEntityRenderer(ModEntities.GAGHIEL.get(), com.projectseele.client.render.GaghielRendererR50::new);
         event.registerEntityRenderer(ModEntities.EVA_UNIT01.get(), EvaUnit01Renderer::new);
         event.registerEntityRenderer(ModEntities.EVA_UNIT00.get(), EvaUnit01Renderer::new);
         event.registerEntityRenderer(ModEntities.EVA_UNIT02.get(), EvaUnit01Renderer::new);
@@ -155,6 +156,7 @@ public class ClientEvents
     public static void onRegisterKeyMappings(RegisterKeyMappingsEvent event)
     {
         event.register(Keybinds.CYCLE_WEAPON);
+        event.register(Keybinds.EVA_DASH);
         event.register(Keybinds.COMMAND_RADIO);
         event.register(Keybinds.TOGGLE_AT_FIELD);
         event.register(Keybinds.EXIT_EVA);

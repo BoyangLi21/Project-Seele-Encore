@@ -21,7 +21,7 @@ public final class PilotReturnR39
     private static final class Order
     {
         int variant,stalled;UUID unit,commander,pilot;BlockPos position;String stage="WALK";
-        double closest=Double.MAX_VALUE;boolean requested;long nextAttempt;
+        double closest=Double.MAX_VALUE;boolean requested,walkAfterBlockedPrepare;long nextAttempt;
     }
     public static final class State extends SavedData
     {
@@ -36,6 +36,7 @@ public final class PilotReturnR39
                 if(n.hasUUID("ActualPilotR45"))o.pilot=n.getUUID("ActualPilotR45");
                 o.position=BlockPos.of(n.getLong("Position"));o.stage=n.getString("Stage");o.requested=n.getBoolean("Requested");
                 o.stalled=n.getInt("Stalled");o.closest=n.contains("Closest")?n.getDouble("Closest"):Double.MAX_VALUE;
+                o.walkAfterBlockedPrepare=n.getBoolean("R50WalkAfterBlockedPrepare");
                 state.orders.put(o.variant,o);
             }
             return state;
@@ -47,6 +48,7 @@ public final class PilotReturnR39
                 var n=new CompoundTag();n.putInt("Variant",o.variant);n.putUUID("Unit",o.unit);n.putUUID("Commander",o.commander);
                 n.putLong("Position",o.position.asLong());n.putString("Stage",o.stage);n.putBoolean("Requested",o.requested);
                 n.putInt("Stalled",o.stalled);n.putDouble("Closest",o.closest);list.add(n);
+                n.putBoolean("R50WalkAfterBlockedPrepare",o.walkAfterBlockedPrepare);
                 if(o.pilot!=null)n.putUUID("ActualPilotR45",o.pilot);
             }
             tag.put("Orders",list);return tag;
@@ -60,6 +62,26 @@ public final class PilotReturnR39
         var o=state(level).orders.get(unit.getUnitVariant());
         return o!=null&&o.unit.equals(unit.getUUID())&&o.pilot!=null
                 &&unit.getPilotEntity() instanceof TrainingPilotEntity pilot&&o.pilot.equals(pilot.getUUID());
+    }
+    public static boolean pending(ServerLevel level,int unit)
+    {return state(level).orders.containsKey(unit);}
+    /** A live original return order owns mechanical handoff after the battle record closes. */
+    public static boolean ownsRecoveryR50(ServerLevel level,EvaUnit01Entity unit,UUID commander)
+    {
+        if(unit==null||commander==null||unit.level()!=level||!unit.isAlive()||unit.isExperimentalUnit()
+                ||unit.getUnitVariant()<0||unit.getUnitVariant()>2)return false;
+        int variant=unit.getUnitVariant();var order=state(level).orders.get(variant);
+        var fleet=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
+        if(order==null||order.variant!=variant||!unit.getUUID().equals(order.unit)||!commander.equals(order.commander)
+                ||order.pilot==null||!Set.of("WALK","AIR","DOCK").contains(order.stage)
+                ||fleet==null||!unit.getUUID().equals(fleet.canonicalId())||fleet.phase()!=EvaFleetSavedData.Phase.DEPLOYED)return false;
+        if(!(unit.getPilotEntity() instanceof TrainingPilotEntity pilot)||!pilot.isAlive()||pilot.level()!=level
+                ||pilot.getAssignedVariant()!=variant||!order.pilot.equals(pilot.getUUID())
+                ||!(pilot.getVehicle() instanceof EntryPlugCarrierEntity plug)||!plug.isAlive()
+                ||!plug.getUUID().equals(fleet.entryPlugId())||plug.getLinkedEva()!=unit||plug.getFirstPassenger()!=pilot)return false;
+        var campaign=TvCampaignSavedData.get(level);
+        return campaign.active.isEmpty()||!campaign.sorties.containsKey(variant)
+                ||Set.of("combat_victory","failure","cancel").contains(campaign.phase);
     }
     public static void enqueue(ServerLevel level,Collection<TvCampaignSavedData.Sortie> sorties)
     {
@@ -100,7 +122,8 @@ public final class PilotReturnR39
         retain(level,order.position);EvaLogisticsDirector.loadControlTarget(level,order.variant);
         var unit=ServiceAircraftR32.payload(level,order.unit);if(unit==null)return;
         var campaign=TvCampaignSavedData.get(level);
-        if(!campaign.active.isEmpty()&&campaign.sorties.containsKey(order.variant)&&!campaign.phase.equals("combat_victory"))
+        if(!campaign.active.isEmpty()&&campaign.sorties.containsKey(order.variant)
+                &&!Set.of("combat_victory","failure","cancel").contains(campaign.phase))
         {unit.stopAutonomousR30();state.orders.remove(order.variant);state.setDirty();return;}
         order.position=unit.blockPosition();state.setDirty();
         if(receipt.phase()==EvaFleetSavedData.Phase.PARKED)
@@ -129,6 +152,21 @@ public final class PilotReturnR39
         if(order.pilot==null||!order.pilot.equals(pilot.getUUID()))
         {unit.stopAutonomousR30();if(!order.stage.equals("IDENTITY_HOLD")){order.stage="IDENTITY_HOLD";state.setDirty();}return;}
         if(NervAirLiftR30.ownsMotion(unit)){unit.stopAutonomousR30();return;}
+        String yielded=NervAirLiftR30.yieldBlockedPrepareToGroundR50(level,unit,order.commander,true);
+        // A real return order also supersedes its own old unstarted sortie
+        // request. The helper still checks its exact false-returning identity.
+        if(yielded.isEmpty())yielded=NervAirLiftR30.yieldBlockedPrepareToGroundR50(level,unit,order.commander,false);
+        if(!yielded.isEmpty())
+        {
+            order.stage="WALK";order.walkAfterBlockedPrepare=true;order.stalled=0;order.closest=Double.MAX_VALUE;
+            order.nextAttempt=level.getGameTime()+100;state.setDirty();
+        }
+        if(order.walkAfterBlockedPrepare&&level.getGameTime()>=order.nextAttempt)
+        {
+            order.nextAttempt=level.getGameTime()+100;
+            if(TransportClearanceR30.pickupProblem(level,unit).isEmpty())
+            {order.walkAfterBlockedPrepare=false;order.stage="WALK";order.stalled=0;state.setDirty();}
+        }
         Vec3 head=NervAirLiftR30.head(level,order.variant),delta=head.subtract(unit.position());
         double distance=delta.horizontalDistance();
         if((distance<1.5&&Math.abs(delta.y)<8)||NervAirLiftR30.waitingAtHead(unit))
@@ -140,7 +178,8 @@ public final class PilotReturnR39
             return;
         }
         if(distance<order.closest-1){order.closest=distance;order.stalled=0;}else order.stalled++;
-        boolean air=order.stage.equals("AIR")||distance>640||Math.abs(delta.y)>16||EvaShutdownR30.disabled(unit)||order.stalled>240;
+        boolean air=EvaShutdownR30.disabled(unit)||unit.isPowerDepleted()
+                ||!order.walkAfterBlockedPrepare&&(order.stage.equals("AIR")||distance>640||Math.abs(delta.y)>16||order.stalled>240);
         if(air)
         {
             unit.stopAutonomousR30();order.stage="AIR";

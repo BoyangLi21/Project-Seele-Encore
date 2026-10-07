@@ -322,5 +322,7 @@
   "msg.projectseele.synch_test_result": "同步试验记录：%s",
   "subtitles.projectseele.pressure_door_motion": "舱门滑轨运转",
   "block.projectseele.entry_plug_bridge_deck": "插入栓检修桥面",
-  "block.projectseele.entry_plug_bridge_guard": "插入栓检修桥护栏"
+  "block.projectseele.entry_plug_bridge_guard": "插入栓检修桥护栏",
+  "key.projectseele.eva_dash": "疾跑（TV）",
+  "entity.projectseele.gaghiel": "鱼天使"
 }

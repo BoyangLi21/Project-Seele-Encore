@@ -179,6 +179,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     private Vec3 clientPreviousPosePosition=Vec3.ZERO;
     private Vec3 clientCurrentPosePosition=Vec3.ZERO;
     private boolean clientPoseInitialized;
+    private boolean clientPoseBatchDirtyR49,clientStageBatchDirtyR49,clientHardBatchDirtyR49,clientCabinBatchDirtyR49;
     private float clientPreviousCabinProgress;
     private float clientCurrentCabinProgress;
     private int clientCabinProgressUpdateTick = Integer.MIN_VALUE;
@@ -267,7 +268,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     }
 
     private static final net.minecraft.network.syncher.EntityDataAccessor<Boolean> DATA_INDEPENDENT_UN=net.minecraft.network.syncher.SynchedEntityData.defineId(EntryPlugCarrierEntity.class,net.minecraft.network.syncher.EntityDataSerializers.BOOLEAN);
-    // Declared last so the hard-boundary callback sees the complete pose packet.
+    // An explicit geometric discontinuity, committed after the complete metadata batch.
     private static final EntityDataAccessor<Integer> DATA_HARD_POSE_R31=
             SynchedEntityData.defineId(EntryPlugCarrierEntity.class,EntityDataSerializers.INT);
     public boolean isIndependentUNPlug(){return entityData.get(DATA_INDEPENDENT_UN);}
@@ -1780,75 +1781,62 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public void onSyncedDataUpdated(EntityDataAccessor<?> key)
     {
         super.onSyncedDataUpdated(key);
-        if(DATA_HARD_POSE_R31.equals(key)&&this.level().isClientSide)
+        if(!this.level().isClientSide)return;
+        // SynchedEntityData packs its hash-map values, not accessor-ID order.
+        // A sequence/epoch callback can therefore precede its quaternion fields.
+        if(DATA_POSE_SEQUENCE.equals(key)||DATA_POSE_TRANSLATION.equals(key)||DATA_CANONICAL_POSE.equals(key)
+                ||DATA_POSE_QX.equals(key)||DATA_POSE_QY.equals(key)||DATA_POSE_QZ.equals(key)||DATA_POSE_QW.equals(key))
+            this.clientPoseBatchDirtyR49=true;
+        if(DATA_STAGE_EPOCH.equals(key))this.clientStageBatchDirtyR49=true;
+        if(DATA_HARD_POSE_R31.equals(key))this.clientHardBatchDirtyR49=true;
+        if(DATA_CABIN_PROGRESS.equals(key))this.clientCabinBatchDirtyR49=true;
+    }
+
+    @Override
+    public void onSyncedDataUpdated(java.util.List<SynchedEntityData.DataValue<?>> values)
+    {
+        super.onSyncedDataUpdated(values);
+        if(!this.level().isClientSide)return;
+        boolean poseChanged=this.clientPoseBatchDirtyR49;
+        boolean hard=this.clientHardBatchDirtyR49;
+        this.clientPoseBatchDirtyR49=this.clientStageBatchDirtyR49=this.clientHardBatchDirtyR49=false;
+        if(this.clientCabinBatchDirtyR49)
         {
-            RigidTransform pose=this.getCanonicalTransform();
+            this.clientCabinBatchDirtyR49=false;
+            if(this.clientCabinProgressUpdateTick!=this.tickCount)
+                this.clientPreviousCabinProgress=this.clientCurrentCabinProgress;
+            this.clientCurrentCabinProgress=this.entityData.get(DATA_CABIN_PROGRESS);
+            this.clientCabinProgressUpdateTick=this.tickCount;
+        }
+        // A stage label alone has no geometric displacement. Preserve the
+        // current shell/camera blend; an explicit hard-pose generation snaps it.
+        if(!this.hasCanonicalPose()||!poseChanged&&!hard)return;
+        RigidTransform pose=this.getCanonicalTransform();
+        RigidTransform rotation=new RigidTransform(Vec3.ZERO,pose.qx(),pose.qy(),pose.qz(),pose.qw());
+        if(hard||!this.clientPoseInitialized)
+        {
+            this.clientPreviousPosePosition=this.clientCurrentPosePosition=pose.translation();
+            this.clientPreviousRotation=this.clientCurrentRotation=rotation;
+            this.clientRotationUpdateTick=Integer.MIN_VALUE;
             this.setPos(pose.translation());this.lerpSteps=0;
             this.xo=this.xOld=this.getX();this.yo=this.yOld=this.getY();this.zo=this.zOld=this.getZ();
-            this.clientPreviousPosePosition=this.clientCurrentPosePosition=pose.translation();
             this.clientPoseInitialized=true;
-            this.clientPreviousRotation=this.clientCurrentRotation=new RigidTransform(Vec3.ZERO,pose.qx(),pose.qy(),pose.qz(),pose.qw());
-            this.clientRotationUpdateTick=Integer.MIN_VALUE;
-            return;
         }
-        if (DATA_STAGE_EPOCH.equals(key))
+        else
         {
-            /*
-             * A stage epoch is a hard mechanical boundary (dock, insertion,
-             * lock or rollback), not another animation sample.  Blending a
-             * newly loaded/reattached plug from the final quaternion of the
-             * previous stage is what produced the visible reverse sweep and
-             * occasional full turn after reload.  Collapse the interpolation
-             * frame here; ordinary pose-sequence updates still blend below.
-             */
-            RigidTransform current = this.getCanonicalTransform();
-            RigidTransform rotation = new RigidTransform(Vec3.ZERO,
-                    current.qx(), current.qy(), current.qz(), current.qw());
-            this.clientPreviousRotation = rotation;
-            this.clientCurrentRotation = rotation;
-            this.clientRotationUpdateTick = Integer.MIN_VALUE;
-            // Stage changes are labels, not translation teleports. Preserve
-            // xo/yo/zo so shell, crane and camera finish the same blend.
-            return;
-        }
-        if (DATA_CABIN_PROGRESS.equals(key))
-        {
-            if (this.level().isClientSide)
+            // Several complete batches can arrive in one client tick. They
+            // replace one target while retaining the same tick-start sample.
+            if(this.clientRotationUpdateTick!=this.tickCount)
             {
-                this.clientPreviousCabinProgress =
-                        this.clientCurrentCabinProgress;
-                this.clientCurrentCabinProgress =
-                        this.entityData.get(DATA_CABIN_PROGRESS);
-                this.clientCabinProgressUpdateTick = this.tickCount;
+                this.clientPreviousPosePosition=this.clientCurrentPosePosition;
+                this.clientPreviousRotation=this.clientCurrentRotation;
             }
-            return;
+            this.clientCurrentPosePosition=pose.translation();this.clientCurrentRotation=rotation;
+            this.clientRotationUpdateTick=this.tickCount;
+            this.setPos(pose.translation());this.lerpSteps=0;
+            this.xo=this.clientPreviousPosePosition.x;this.yo=this.clientPreviousPosePosition.y;this.zo=this.clientPreviousPosePosition.z;
         }
-        if (DATA_POSE_SEQUENCE.equals(key))
-        {
-            if (this.level().isClientSide)
-            {
-                double oldX = this.getX();
-                double oldY = this.getY();
-                double oldZ = this.getZ();
-                RigidTransform pose = this.getCanonicalTransform();
-                this.clientPreviousPosePosition=this.clientPoseInitialized?this.clientCurrentPosePosition:pose.translation();
-                this.clientCurrentPosePosition=pose.translation();this.clientPoseInitialized=true;
-                this.setPos(pose.translation());
-                this.xo = oldX;
-                this.yo = oldY;
-                this.zo = oldZ;
-                this.lerpSteps = 0;
-                for (Entity passenger : this.getPassengers())
-                {
-                    this.positionRider(passenger, Entity::setPos);
-                }
-            }
-            this.clientPreviousRotation = this.clientCurrentRotation;
-            RigidTransform current = this.getCanonicalTransform();
-            this.clientCurrentRotation = new RigidTransform(Vec3.ZERO,
-                    current.qx(), current.qy(), current.qz(), current.qw());
-            this.clientRotationUpdateTick = this.tickCount;
-        }
+        for(Entity passenger:this.getPassengers())this.positionRider(passenger,Entity::setPos);
     }
 
     @Override

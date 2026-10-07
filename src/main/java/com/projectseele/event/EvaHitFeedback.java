@@ -24,7 +24,8 @@ public final class EvaHitFeedback
         float health=target.getHealth(),field=target instanceof Angel angel?angel.getAtField():target instanceof EvaUnit01Entity eva?eva.getAtFieldEnergy():0;
         try
         {
-            boolean accepted=target.hurt(source,amount);
+            boolean accepted=target instanceof GaghielEntity marine
+                    ? marine.hurtAt(source,amount,point) : target.hurt(source,amount);
             float after=target instanceof Angel angel?angel.getAtField():target instanceof EvaUnit01Entity eva?eva.getAtFieldEnergy():0;
             if(target.getHealth()>=health&&after<field&&source.getEntity() instanceof LivingEntity attacker)
             {

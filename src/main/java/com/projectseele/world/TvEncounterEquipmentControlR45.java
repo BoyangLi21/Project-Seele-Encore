@@ -1,6 +1,7 @@
 package com.projectseele.world;
 
 import com.projectseele.entity.EvaUnit01Entity;
+import com.projectseele.entity.EvaShieldRigR47;
 import com.projectseele.entity.NervArmamentStationEntity;
 import com.projectseele.entity.TrainingPilotEntity;
 import net.minecraft.world.entity.LivingEntity;
@@ -28,9 +29,22 @@ public final class TvEncounterEquipmentControlR45 implements TvEncounterRulesR45
     }
     private final ShieldGeometry shield;
     private TvEncounterEquipmentControlR45(ShieldGeometry shield){this.shield=shield;}
-    /** Physical inventory and real cannon work before a measured shield is installed. */
+    /** Both sides consume the production shield triangles and the fitted hand frame. */
     public static TvEncounterRulesR45.EquipmentControl serverCargoAndCannonR45()
-    {return new TvEncounterEquipmentControlR45(null);}
+    {return new TvEncounterEquipmentControlR45(new ShieldGeometry()
+        {
+            @Override public boolean equipped(EvaUnit01Entity eva){return EvaShieldRigR47.equipped(eva);}
+            @Override public boolean intersects(EvaUnit01Entity eva,Vec3 from,Vec3 to)
+            {return EvaShieldRigR47.intercept(eva,from,to).isPresent();}
+            @Override public java.util.Optional<Vec3> firstIntersection(EvaUnit01Entity eva,Vec3 from,Vec3 to)
+            {return EvaShieldRigR47.intercept(eva,from,to);}
+            @Override public boolean input(EvaUnit01Entity eva,TrainingPilotEntity pilot,boolean brace)
+            {
+                if(eva.getPilotEntity()!=pilot)return false;
+                if(brace&&!eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45))return false;
+                return eva.autonomousShieldBraceR47(pilot,brace);
+            }
+        });}
     public static void install(ShieldGeometry actualShield)
     {TvEncounterRulesR45.installEquipmentControl(new TvEncounterEquipmentControlR45(actualShield));}
     @Override public boolean issueMissionAtStation(NervArmamentStationEntity station,EvaUnit01Entity eva,LivingEntity pilot)

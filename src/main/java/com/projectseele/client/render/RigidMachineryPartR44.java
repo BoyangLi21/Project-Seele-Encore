@@ -95,7 +95,7 @@ final class RigidMachineryPartR44
     {
         TvCraneMeshWitnessR44.part(vertices,poses);
         if (RigidMachineryGpuR44.draw(this, vertices, texture, poses, buffers, light)) return;
-        VertexConsumer out = buffers.getBuffer(RenderType.entitySolid(texture));
+        VertexConsumer out = buffers.getBuffer(ModelRenderTypesR49.solid(texture));
         var frame = poses.last();
         boolean reflected = frame.pose().determinant() < 0;
         Vector3f normal = new Vector3f();

@@ -100,7 +100,13 @@ public final class EntryPlugKinematics
     /** Only the locked aerial assembly samples its shared render-time body frame. */
     public static RigidTransform socketTransform(EvaUnit01Entity unit,float partial)
     {
-        if(EvaAirTransportR31.active(unit)||EvaShutdownR30.displayed(unit))return posedSocketTransform(unit,unit.level().isClientSide?Mth.clamp(partial,0,1):1F);
+        // A bolted wet-cage airframe renders its mechanical rest pose. Its
+        // retained EMPTY/field snapshot is not the plant's current socket.
+        // Sampling that snapshot here tilted the plug independently of the
+        // visible EVA until pilot activation cleared the shutdown state.
+        if(EvaAirTransportR31.active(unit)
+                ||!unit.isNervLogisticsLocked()&&EvaShutdownR30.displayed(unit))
+            return posedSocketTransform(unit,unit.level().isClientSide?Mth.clamp(partial,0,1):1F);
         // The retained NERV plant is rendered in its surveyed rail heading.
         // Looking around inside the capsule must not yaw the insertion axis.
         Vec3 rear = !unit.isExperimentalUnit()&&unit.isNervLogisticsLocked()
@@ -301,7 +307,7 @@ public final class EntryPlugKinematics
 
     public static RigidTransform lockedTransform(EvaUnit01Entity unit,float partial)
     {
-        RigidTransform socket=EvaShutdownR30.displayed(unit)
+        RigidTransform socket=EvaShutdownR30.displayed(unit)&&!unit.isNervLogisticsLocked()
                 ?posedSocketTransform(unit,unit.level().isClientSide?Mth.clamp(partial,0,1):1F)
                 :socketTransform(unit,partial);
         return socket.compose(new RigidTransform(

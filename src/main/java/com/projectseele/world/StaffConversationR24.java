@@ -235,7 +235,11 @@ public final class StaffConversationR24
                 session.reply=switch(parts[1])
                 {
                     case "status" -> NervAirLiftR30.status(player.serverLevel());
-                    case "cancel" -> NervAirLiftR30.cancel(player);
+                    case "cancel" -> {
+                        if(parts.length==2)yield NervAirLiftR30.cancel(player);
+                        if(parts.length!=3)throw new IllegalArgumentException("Ambiguous transport cancellation");
+                        yield NervAirLiftR30.cancel(player,Integer.parseInt(parts[2]));
+                    }
                     case "recover" -> NervAirLiftR30.request(player,Integer.parseInt(parts[2]),true,0,0);
                     case "deliver" -> NervAirLiftR30.request(player,Integer.parseInt(parts[2]),false,Integer.parseInt(parts[3]),Integer.parseInt(parts[4]));
                     default -> "请选择运输操作。";

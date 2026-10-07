@@ -63,7 +63,7 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
         p.add(0,EvaAirTransportR31.HIP_HEIGHT+EvaAirTransportR31.lift(pitch)-offset,0);
         return p.rotateY((float)Math.PI);
     }
-    private static boolean rod(PoseStack poses,MultiBufferSource buffers,int light,Vector3f a,Vector3f b,float radius,int colour)
+    static boolean rod(PoseStack poses,MultiBufferSource buffers,int light,Vector3f a,Vector3f b,float radius,int colour)
     {
         var axis=new Vector3f(b).sub(a);if(axis.lengthSquared()<1e-6)return false;axis.normalize();
         var x=new Vector3f(axis).cross(Math.abs(axis.y)<.95?new Vector3f(0,1,0):new Vector3f(1,0,0)).normalize();

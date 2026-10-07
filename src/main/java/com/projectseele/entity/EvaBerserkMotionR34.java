@@ -42,7 +42,14 @@ public final class EvaBerserkMotionR34
     public static float mouth(EvaUnit01Entity e,float partial)
     {
         if(!e.isBerserk()&&!e.isFirstBattleActive())return 0;
+        if(e.isFirstBattleActive()&&!e.isBerserk())return 0;
         if(silent(e))return 0;
+        if(e.isFirstBattleActive())
+        {
+            float time=e.firstBattleSignals().time(e,partial);
+            if(time>=FirstBattleClip.DEATH_TICK/20F)
+                return .72F*(1-EvaDorsalMechanism.smooth((time-FirstBattleClip.DEATH_TICK/20F)/.6F));
+        }
         if(active(e)&&kind(e)==1)return EvaDorsalMechanism.smooth((e.getEntityData().get(AGE)+partial-7)/15F);
         return .72F;
     }
@@ -81,12 +88,16 @@ public final class EvaBerserkMotionR34
             {
                 Vec3 from=state.previous==null?hand:state.previous;
                 var contact=com.projectseele.physics.CombatBodyContacts.clip(state.victim,from,hand,1.8);
-                boolean unobstructed=e.level().clip(new net.minecraft.world.level.ClipContext(from,hand,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,e)).getType()==net.minecraft.world.phys.HitResult.Type.MISS;
+                // A sweep can touch the victim before its trailing fist meets
+                // the floor. Occlusion ends at that first real contact.
+                Vec3 point=contact.orElse(hand);
+                boolean unobstructed=e.level().clip(new net.minecraft.world.level.ClipContext(from,point,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,e)).getType()==net.minecraft.world.phys.HitResult.Type.MISS;
                 if(unobstructed&&contact.isPresent())
                 {
                     float multiplier=SeeleConfig.COMMON_SPEC.isLoaded()?SeeleConfig.EVA_BERSERK_DAMAGE_MULTIPLIER.get().floatValue():2.5F;
-                    Vec3 point=contact.orElse(hand),direction=state.victim.position().subtract(e.position()).normalize();
-                    state.hit=com.projectseele.event.EvaHitFeedback.hurt(state.victim,e.damageSources().mobAttack(e),20*multiplier,point,direction);
+                    Vec3 direction=state.victim.position().subtract(e.position()).normalize();
+                    state.hit=com.projectseele.physics.CombatDamageTargetsR44.hurt(state.victim,e.damageSources().mobAttack(e),20*multiplier,point,direction,
+                            com.projectseele.physics.CombatDamageTargetsR44.Weapon.CONTACT,from);
                     if(state.hit)EvaMovementSounds.play(e,point,ModSounds.EVA_IMPACT.get(),5,1);
                 }
             }

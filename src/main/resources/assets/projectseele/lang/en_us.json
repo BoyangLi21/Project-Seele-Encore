@@ -320,5 +320,7 @@
   "msg.projectseele.synch_test_result": "Synchronization test record: %s",
   "subtitles.projectseele.pressure_door_motion": "Pressure door track moves",
   "block.projectseele.entry_plug_bridge_deck": "Entry Plug Inspection Deck",
-  "block.projectseele.entry_plug_bridge_guard": "Entry Plug Inspection Guard"
+  "block.projectseele.entry_plug_bridge_guard": "Entry Plug Inspection Guard",
+  "key.projectseele.eva_dash": "Dash (TV)",
+  "entity.projectseele.gaghiel": "Gaghiel"
 }

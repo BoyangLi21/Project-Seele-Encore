@@ -17,12 +17,18 @@ public final class PoseSnapshotCodecR45Test
     public static void main(String[] args)
     {
         var random=new Random(45);double oldMaximum=0,newMaximum=0;
+        var rig=java.util.Map.of("root",new EvaBodyPose.Bone("root",null,new Vector3f(),new Quaternionf()));
         for(int i=0;i<2400;i++)
         {
             float x=(random.nextFloat()*2-1)*(float)Math.PI,z=(random.nextFloat()*2-1)*(float)Math.PI;
             float y=i<1200?(i%2==0?1:-1)*(float)(Math.PI/2+(i%3-1)*1e-6):(random.nextFloat()*2-1)*(float)Math.PI;
-            var q=new Quaternionf().rotationZYX(z,y,x);var old=legacy(q);var channels=QuaternionChannelsR45.euler(q);
-            var bad=new Quaternionf().rotationZYX(old.z,old.y,old.x);var good=new Quaternionf().rotationZYX(channels.z,channels.y,channels.x);
+            var q=new Quaternionf().rotationZYX(z,y,x);var old=legacy(q);
+            var snapshot=new EvaBodyPose.Sample(rig);snapshot.rotations.put("root",new Quaternionf(q));
+            snapshot.positions.put("root",new Vector3f(x,y,z));
+            var restored=new EvaBodyPose.Sample(rig);EvaPoseSnapshotR50.decode(EvaPoseSnapshotR50.encode(snapshot),restored);
+            if(restored.positions.get("root").distance(snapshot.positions.get("root"))>1e-6F)
+                throw new AssertionError("Snapshot root translation changed");
+            var bad=new Quaternionf().rotationZYX(old.z,old.y,old.x);var good=restored.rotations.get("root");
             for(var axis:new Vector3f[]{new Vector3f(1,0,0),new Vector3f(0,1,0),new Vector3f(0,0,1)})
             {
                 oldMaximum=Math.max(oldMaximum,q.transform(new Vector3f(axis)).distance(bad.transform(new Vector3f(axis))));

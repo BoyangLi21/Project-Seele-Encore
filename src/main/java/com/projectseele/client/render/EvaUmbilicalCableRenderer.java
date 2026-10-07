@@ -69,16 +69,14 @@ public final class EvaUmbilicalCableRenderer
             {
                 continue;
             }
-            Vec3 pylon = rack?unit.carrierRenderPosition(event.getPartialTick()).add(0,47,0)
-                    .add(unit.getRearDirection().scale(9.3))
+            Vec3 rackAnchor=TripoMachineryR48.carrierPowerAnchor(unit,event.getPartialTick());
+            if(rackAnchor==null)rackAnchor=unit.carrierRenderPosition(event.getPartialTick()).add(0,47,0)
+                    .add(unit.getRearDirection().scale(9.3));
+            Vec3 pylon = rack?rackAnchor
                     :Vec3.atCenterOf(anchor).add(0.0D, 0.65D, 0.0D);
-            if(!rack&&unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR)
-            {
-                float handoff=net.minecraft.util.Mth.clamp((18-unit.getLaunchTicks()+event.getPartialTick())/18F,0,1);
-                handoff=handoff*handoff*(3-2*handoff);
-                Vec3 travelling=unit.carrierRenderPosition(event.getPartialTick()).add(0,47,0).add(unit.getRearDirection().scale(9.3));
-                pylon=travelling.lerp(pylon,handoff);
-            }
+            // The endpoint belongs to either the rack reel or the real
+            // surface reel. Blending between them leaves a cable suspended
+            // in empty space; any visual easing belongs to the slack below.
             var attachment=EvaPowerAttachmentR25.frame(unit,event.getPartialTick());
             Vec3 armourMount = attachment.mount();
             Vec3 plugTail = attachment.socket();

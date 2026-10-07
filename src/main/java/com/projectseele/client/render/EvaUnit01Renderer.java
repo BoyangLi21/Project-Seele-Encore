@@ -268,6 +268,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                     nervFloodlit ? LightTexture.FULL_BRIGHT : packedLight,
                     entity,partialTick);
         }
+        if(com.projectseele.entity.EvaGroundReceiverR50.active(entity))
+            EvaGroundReceiverRendererR50.render(poseStack,bufferSource,packedLight,entity,partialTick);
         TvFacilityMeshes.withBuffers(bufferSource,()->EvaBayMachineryR33.render(poseStack,entity,partialTick));
         boolean recording = EvaPoseRuntimeRecorder.wants(entity);
         if (recording)
@@ -458,7 +460,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
             this.pendingPoseModel = null;
             this.pendingPoseEntity = null;
             org.joml.Matrix4f world=software.bernie.geckolib.util.RenderUtils.invertAndMultiplyMatrices(poseStack.last().pose(),this.entityRenderTranslations);
-            Vec3 origin=com.projectseele.entity.EvaAirTransportR31.active(animatable)||com.projectseele.entity.EvaShutdownR30.displayed(animatable)?renderedOrigin(animatable,partialTick):animatable.getPosition(partialTick);
+            Vec3 origin=renderedOrigin(animatable,partialTick);
             world.m30(world.m30()+(float)origin.x).m31(world.m31()+(float)origin.y).m32(world.m32()+(float)origin.z);
             EvaPoseGraph.commit(animatable, poseModel,this.pendingPosePartialTick,world);
         }

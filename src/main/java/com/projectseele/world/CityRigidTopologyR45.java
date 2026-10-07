@@ -84,7 +84,7 @@ public final class CityRigidTopologyR45
                     row.getLongArray("NegativeDomeAnchorMask"), minX, maxX, minZ, maxZ,
                     row.contains("RetractedBaseY") ? row.getInt("RetractedBaseY") : undergroundBaseY(height)));
         }
-        if (result.size() != 96) throw new IllegalStateException("Production topology must own 93 generated plus all3 imported towers");
+        CityLowriseAddonR48.validate(data,result);
         return result;
     }
 

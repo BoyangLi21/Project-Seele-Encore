@@ -102,9 +102,14 @@ public final class EquipmentVaultsR47
         }
         return null;
     }
+    public static boolean physicalHandoffFloorR49(NervArmamentStationEntity station,EvaUnit01Entity eva)
+    {
+        var rack=station.getBoundingBox();var hull=eva.getBoundingBox();
+        return station.level()==eva.level()&&rack.maxY>=hull.minY-4&&rack.minY<=hull.maxY+4;
+    }
     public static boolean issueR47(NervArmamentStationEntity station,EvaUnit01Entity eva)
     {
-        if(!(station.level() instanceof ServerLevel level)||eva.level()!=level)return false;
+        if(!(station.level() instanceof ServerLevel level)||eva.level()!=level||!physicalHandoffFloorR49(station,eva))return false;
         String id=station.getPersistentData().getString("R47Vault");
         if(id.isEmpty())return eva.installExternalArmament(station.payloadR47());
         State state=level.getDataStorage().get(State::load,"projectseele_equipment_vaults_r47");

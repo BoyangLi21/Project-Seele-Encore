@@ -732,7 +732,7 @@ public final class Tokyo3RetractionDirector
         public String motionReport()
         {
             String direction = targetDepth > depth ? "下降" : "上升";
-            if (motion.total() > 0 && motion.observed() == motion.total())
+            if (motion.total() > 0 && motion.observed() > 0)
             {
                 direction = motion.descending() ? "下降" : "上升";
                 String distance = Math.abs(motion.maximumMetres() - motion.minimumMetres()) < .05
@@ -741,8 +741,12 @@ public final class Tokyo3RetractionDirector
                 String state = phase.contains("FAULT") ? "，故障停止"
                         : phase.contains("OCCUPIED") ? "，受阻暂停"
                         : phase.contains("HOLD") ? "，检查暂停"
-                        : phase.contains("MOVE") ? "，正在移动" : "，正在归位校验";
-                return "城市楼体实际已" + direction + " " + distance + " 米" + state + "。";
+                        : phase.contains("MOVE") ? "，正在移动"
+                        : phase.contains("REPLAY") ? "，正在恢复升降事务"
+                        : phase.contains("SPAWN") || phase.contains("READY") ? "，正在接入升降机构" : "，正在归位校验";
+                String coverage = motion.observed() == motion.total() ? ""
+                        : "（已核实 " + motion.observed() + "/" + motion.total() + " 栋，其余待确认）";
+                return "城市楼体实际已" + direction + " " + distance + " 米" + coverage + state + "。";
             }
             if (phase.contains("FAULT")) return "城市升降故障停止；实际楼体位置尚未完整核实。";
             if (phase.equals("RIGID_IDLE") || phase.equals("DEPLOYED") || phase.equals("RETRACTED"))
@@ -751,8 +755,10 @@ public final class Tokyo3RetractionDirector
                 return "城市升降状态读取尚未就绪；实际楼体位置尚未完整核实。";
             if (phase.contains("REPLAY") || phase.contains("RECONCILE"))
                 return "城市正在恢复升降事务；实际楼体位置尚未完整核实。";
-            if (phase.contains("PLACE") || phase.contains("COVER") || phase.contains("FLUSH") || phase.contains("COMMIT"))
+            if (phase.contains("FLUSH") || phase.contains("COMMIT"))
                 return "城市楼体已到达" + (targetDepth == 0 ? "地表" : "地下") + "，正在归位校验。";
+            if (phase.contains("PLACE") || phase.contains("COVER"))
+                return "城市楼体正在归位校验；实际楼体位置尚未完整核实。";
             return "城市正在准备" + direction + (phase.contains("BLOCKED") ? "，请求受阻，楼体尚未开始移动。"
                     : phase.contains("OCCUPIED") ? "，等待运动区域清空。" : "，楼体尚未开始移动。");
         }

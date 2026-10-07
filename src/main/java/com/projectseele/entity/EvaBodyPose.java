@@ -181,17 +181,18 @@ public final class EvaBodyPose
     {var c=locomotionContractR43(e,"walk");return c!=null&&c.has("support_mask_r44");}
     public static boolean locomotionPlantedR44(EvaUnit01Entity e,String side,float partial)
     {
-        float phase=e.rifleGaitPhase(partial);phase-=Mth.floor(phase);float run=e.rifleRunBlend(partial),weight=0;
-        for(String name:List.of("walk","run"))
+        float phase=e.rifleGaitPhase(partial);phase-=Mth.floor(phase);float run=e.rifleRunBlend(partial),dash=EvaSprintR50.blend(e,partial),weight=0;
+        for(String name:List.of("walk","run","dash_run"))
         {
-            var c=locomotionContractR43(e,name);if(c==null||!c.has("support_mask_r44"))return false;
+            var c=locomotionContractR43(e,name);if(c==null||!c.has("support_mask_r44")){if(name.equals("dash_run"))continue;return false;}
             var frames=c.getAsJsonArray("support_mask_r44");int at=Math.min(frames.size()-1,Math.round(phase*(frames.size()-1)));
-            if(frames.get(at).getAsJsonArray().get(side.equals("l")?0:1).getAsBoolean())weight+=name.equals("walk")?1-run:run;
+            if(frames.get(at).getAsJsonArray().get(side.equals("l")?0:1).getAsBoolean())weight+=name.equals("walk")?1-run:name.equals("run")?run*(1-dash):run*dash;
         }
         return weight>.5F;
     }
     public static float locomotionContactR43(EvaUnit01Entity e,String clip,String side,boolean backwards,float fallback)
     {
+        if(clip.equals("run")&&EvaSprintR50.blend(e,1)>.5F&&locomotionContractR43(e,"dash_run")!=null)clip="dash_run";
         var contract=locomotionContractR43(e,clip);if(contract==null)return fallback;
         var values=contract.getAsJsonObject("contacts").getAsJsonObject(side).getAsJsonArray(backwards?"reverse":"forward");
         if(values.isEmpty())return fallback;float value=values.get(0).getAsFloat();
@@ -428,6 +429,9 @@ public final class EvaBodyPose
         float idlePhase=(float)((((double)entity.level().getGameTime()+partial)/20.0/idleClip.duration())%1.0);
         float move=entity.rifleMoveBlend(partial),run=entity.rifleRunBlend(partial),crouch=entity.rifleCrouchBlend(partial),prone=entity.rifleProneBlend(partial);prone=prone*prone*prone*(10+prone*(-15+6*prone));
         var gait=mix(clip(d,variant,"walk",phase),clip(d,variant,"run",phase),run);
+        float dash=EvaSprintR50.blend(entity,partial);
+        if(dash>0&&d.combatClips().getOrDefault(variant,Map.of()).containsKey("dash_run"))
+            gait=mix(gait,clip(d,variant,"dash_run",phase),dash);
         boolean supported=d.clips().containsKey("rifle_stance");float stance=entity.rifleStanceLevel(partial);
         Sample body;
         if(supported)
@@ -605,6 +609,7 @@ public final class EvaBodyPose
         supportProneFirearmChestR45(entity,body,partial);
         EvaOriginalHandsR45.apply(entity,body);
         body=EvaWeaponHandlingR45.apply(entity,body,partial);
+        EvaMarineBraceR50.apply(entity,body,partial);
         if(!EvaWeaponHandlingR45.active(entity))EvaAnatomicalHandsR45.attachKnife(entity,body);
         EvaAnatomicalHandsR45.attachSwordR45(entity,body);
         EvaShieldRigR47.applyCarryR48(entity,body);

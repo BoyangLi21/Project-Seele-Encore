@@ -69,7 +69,15 @@ public final class EvaGameplayMotionR32
         var target=e.level().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,e.getBoundingBox().inflate(36),a->a instanceof Angel&&a.isAlive()
                 &&a.position().subtract(e.position()).multiply(1,0,1).normalize().dot(e.getForward())>.35)
                 .stream().min(java.util.Comparator.comparingDouble(e::distanceToSqr)).orElse(null);
-        e.getEntityData().set(LOW_TARGET,phrases(e)&&target!=null&&com.projectseele.physics.CombatBodyDynamics.active(target)&&target.getBoundingBox().getYsize()<36);
+        e.getEntityData().set(LOW_TARGET,phrases(e)&&lowContactTargetR49(target,36));
+    }
+    /** The actual grounded surface owns attack height even without a physics-profile rig. */
+    public static boolean lowContactTargetR49(net.minecraft.world.entity.LivingEntity target,double height)
+    {
+        if(target==null)return false;
+        if(com.projectseele.physics.ShamshelPosedContactsR48.supports(target))
+            return com.projectseele.physics.ShamshelPosedContactsR48.bounds(target).getYsize()<height;
+        return com.projectseele.physics.CombatBodyDynamics.active(target)&&target.getBoundingBox().getYsize()<height;
     }
     public static synchronized JsonObject profile(int variant)
     {

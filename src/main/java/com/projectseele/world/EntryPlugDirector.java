@@ -20,6 +20,7 @@ import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.network.chat.Component;
 import net.minecraft.resources.ResourceKey;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.sounds.SoundEvents;
 import net.minecraft.sounds.SoundSource;
 import net.minecraft.util.Mth;
@@ -50,6 +51,8 @@ public final class EntryPlugDirector
     /** Process-local pose of the transient S20 crane visual. */
     private static final Map<ResourceKey<Level>, CranePose[]> S20_CRANE_POSES =
             new HashMap<>();
+    private static final Map<ServerLevel, java.util.Set<UUID>> EXPECTED_FIELD_WAITING_R50 =
+            new java.util.WeakHashMap<>();
 
     private EntryPlugDirector() {}
 
@@ -75,6 +78,17 @@ public final class EntryPlugDirector
             UUID savedId = savedPlugId(level, variant);
             if (savedId != null)
             {
+                var receipt = unit.getPersistentData();
+                if (!unit.isEntryPlugInserted() && receipt.hasUUID("R49EjectedPlug")
+                        && savedId.equals(receipt.getUUID("R49EjectedPlug")))
+                {
+                    if (EXPECTED_FIELD_WAITING_R50.computeIfAbsent(level,
+                            ignored -> new java.util.HashSet<>()).add(savedId))
+                        ProjectSeele.LOGGER.info(
+                                "NERV original emergency capsule awaiting loaded field entity or explicit disposal: EVA-0{} plug={}; no replacement created",
+                                variant, savedId);
+                    return null;
+                }
                 ProjectSeele.LOGGER.error(
                         "NERV entry-plug authority fault: EVA-0{} saved capsule {} cannot be resolved; replacement inhibited",
                         variant, savedId);
@@ -105,6 +119,13 @@ public final class EntryPlugDirector
                     variant, plug.getStringUUID(), plug.blockPosition().toShortString());
         }
         int stage = plug.getInsertionStage();
+        if (stage == EntryPlugCarrierEntity.STAGE_FIELD_EJECTING
+                || stage == EntryPlugCarrierEntity.STAGE_FIELD_LANDED)
+        {
+            // PARKED may already have been saved by the previous runtime;
+            // its remote emergency capsule still cannot own a cage crane.
+            retireEmergencyCraneR50(level, variant);
+        }
         if (stage != EntryPlugCarrierEntity.STAGE_INSERTING
                 && stage != EntryPlugCarrierEntity.STAGE_EJECTING
                 && stage != EntryPlugCarrierEntity.STAGE_FIELD_EJECTING
@@ -278,6 +299,7 @@ public final class EntryPlugDirector
         CACHED_PLUGS.clear();
         CRANE_SIGNATURE.clear();
         S20_CRANE_POSES.clear();
+        EXPECTED_FIELD_WAITING_R50.clear();
         EvaHangarBuilder.resetRuntime();
         FacilityV2EvaRuntime.resetRuntime();
     }
@@ -537,6 +559,11 @@ public final class EntryPlugDirector
             former.discard();
         }
         remember(level, variant, boarded);
+        if(boarded.getFirstPassenger() instanceof ServerPlayer actual)
+        {
+            var unit=EvaLogisticsDirector.canonicalUnit(level,variant);
+            if(unit!=null)AutoSortieR32.acceptOriginalHumanBoardingR50(level,unit,actual);
+        }
         ProjectSeele.LOGGER.info(
                 "NERV entry-plug pilot authority claimed: eva={} plug={} pilot={}",
                 variant, boarded.getStringUUID(),
@@ -1185,8 +1212,8 @@ public final class EntryPlugDirector
                     .add(0.0D, EvaScale.ENTRY_PLUG_LENGTH * 0.12D, 0.0D);
             escape = mouth.add(outward.scale(12.0D)).add(0.0D, 9.0D, 0.0D);
             Vec3 probe = unit.position().add(outward.scale(EvaScale.ENTRY_PLUG_LENGTH + 12.0D));
-            landing = findFieldLanding(level, probe, unit.getY(), seated);
-            if (landing == null || !fieldEjectionRouteClear(level, unit, plug, seated, escape, landing))
+            landing = findClearFieldEjectionLandingR50(level,unit,plug,seated,escape,probe);
+            if (landing == null)
             {
                 ProjectSeele.LOGGER.warn("NERV field ejection held without detaching: eva={} plug={} reason=no_loaded_safe_landing_or_sweep",unit.getUUID(),plug.getUUID());
                 return false;
@@ -1471,6 +1498,18 @@ public final class EntryPlugDirector
     {
         return EntryPlugKinematics.cageDockTransform(suspendedPosition(unit));
     }
+    /** The uninserted original is owned by its real cage dock, before a host ride link exists. */
+    public static boolean originalCageDockR50(ServerLevel level,int variant,EvaUnit01Entity unit,EntryPlugCarrierEntity plug)
+    {
+        var fleet=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
+        if(fleet==null||!fleet.canonicalId().equals(unit.getUUID())||fleet.entryPlugId()==null
+                ||!fleet.entryPlugId().equals(plug.getUUID())||canonical(level,variant)!=plug||!nervOwnedCarrierR47(plug)
+                ||plug.getAssignedVariant()!=variant||plug.getVehicle()!=null||!plug.hasCanonicalPose()
+                ||plug.getLinkedEva()!=null&&plug.getLinkedEva()!=unit)return false;
+        var actual=plug.getCanonicalTransform();var dock=cageDockTransform(unit);
+        return actual.translation().distanceToSqr(dock.translation())<=1.0D/(1024.0D*1024.0D)
+                &&actual.rotationErrorDegrees(dock)<=.1D;
+    }
 
     /**
      * Resting point of the suspended plug — always its cage crane.
@@ -1499,6 +1538,33 @@ public final class EntryPlugDirector
      * Finds solid ground near the EVA instead of using the dimension heightmap.
      * In GeoFront the heightmap points at the cavern roof, not the floor.
      */
+    private static Vec3 findClearFieldEjectionLandingR50(ServerLevel level,EvaUnit01Entity unit,
+                                                        EntryPlugCarrierEntity plug,RigidTransform seated,Vec3 escape,Vec3 probe)
+    {
+        List<FieldLandingR50> candidates=new ArrayList<>();
+        Vec3 original=findFieldLanding(level,probe,unit.getY(),seated);
+        if(original!=null)candidates.add(new FieldLandingR50(original,0,0));
+        // A rear-facing probe may fall outside a commissioned underground pad
+        // and hit its surrounding wall. Search only this finite local ring;
+        // each endpoint retains the same full-volume and native arc admission.
+        for(int radius:new int[]{4,8,12})
+            for(int[] offset:new int[][]{{radius,0},{-radius,0},{0,radius},{0,-radius},
+                    {radius,radius},{radius,-radius},{-radius,radius},{-radius,-radius}})
+            {
+                Vec3 candidate=findFieldLanding(level,probe.add(offset[0],0,offset[1]),unit.getY(),seated);
+                if(candidate!=null)candidates.add(new FieldLandingR50(candidate,offset[0],offset[1]));
+            }
+        candidates.sort(Comparator.comparingDouble((FieldLandingR50 c)->Math.abs(c.position().y-unit.getY()))
+                .thenComparingDouble(c->c.position().subtract(probe).horizontalDistanceSqr()));
+        for(var candidate:candidates)
+        {
+            if(!fieldEjectionRouteClear(level,unit,plug,seated,escape,candidate.position()))continue;
+            ProjectSeele.LOGGER.info("NERV field ejection local landing admitted: eva={} plug={} offset=[{},{}] landing={}",
+                    unit.getUUID(),plug.getUUID(),candidate.dx(),candidate.dz(),candidate.position());return candidate.position();
+        }
+        return null;
+    }
+    private record FieldLandingR50(Vec3 position,int dx,int dz) {}
     private static Vec3 findFieldLanding(ServerLevel level, Vec3 probe,
                                          double unitY, RigidTransform seated)
     {
@@ -1785,13 +1851,69 @@ public final class EntryPlugDirector
     public static void maintainCraneAtCurrentPlug(
             ServerLevel level, int variant, EntryPlugCarrierEntity plug)
     {
-        if (plug == null || !plug.isAlive())
+        if (plug == null || !plug.isAlive() || plug.level() != level
+                || variant < 0 || variant > 2 || !nervOwnedCarrierR47(plug)
+                || plug.getAssignedVariant() != variant || !plug.hasCanonicalPose())
         {
             return;
+        }
+        int stage = plug.getInsertionStage();
+        // Emergency capsules are no longer crane payloads, even though their
+        // original UUID remains the fleet's authority until explicit disposal.
+        if (stage == EntryPlugCarrierEntity.STAGE_FIELD_EJECTING
+                || stage == EntryPlugCarrierEntity.STAGE_FIELD_LANDED)
+        {
+            var original = EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
+            if (original != null && plug.getUUID().equals(original.entryPlugId()))
+                retireEmergencyCraneR50(level, variant);
+            return;
+        }
+        var fleet = EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
+        if (fleet == null || !plug.getUUID().equals(fleet.entryPlugId())
+                || !(level.getEntity(fleet.canonicalId()) instanceof EvaUnit01Entity unit)
+                || !unit.isAlive() || unit.isExperimentalUnit() || unit.getUnitVariant() != variant
+                || !isInsideAssignedCage(level, unit, variant))return;
+        if (stage == EntryPlugCarrierEntity.STAGE_SUSPENDED
+                || stage == EntryPlugCarrierEntity.STAGE_OCCUPIED
+                || stage == EntryPlugCarrierEntity.STAGE_ABORT_DOCKED)
+        {
+            if (!originalCageDockR50(level, variant, unit, plug))return;
+        }
+        else
+        {
+            if (stage != EntryPlugCarrierEntity.STAGE_INSERTING
+                    && stage != EntryPlugCarrierEntity.STAGE_EJECTING
+                    && stage != EntryPlugCarrierEntity.STAGE_ABORT_RETURNING)return;
+            if (plug.getVehicle() != null && plug.getVehicle() != unit
+                    || plug.getLinkedEva() != null && plug.getLinkedEva() != unit)return;
+            var dock = cageDockTransform(unit);
+            var socket = EntryPlugKinematics.socketTransform(unit);
+            var approach = socket.transformPoint(new Vec3(0, 0, 3));
+            var locked = EntryPlugKinematics.lockedTransform(unit);
+            // The authored insertion curve stays inside these actual endpoint
+            // and mouth-approach bounds; a stage label cannot extend the crane
+            // to a capsule outside its own cage's mechanical travel domain.
+            var domain = new AABB(dock.translation(), approach)
+                    .minmax(new AABB(socket.translation(), locked.translation())).inflate(.001);
+            if (!domain.contains(plug.getCanonicalTransform().translation()))return;
         }
         Vec3 craneEye = plug.getCanonicalTransform().transformPoint(
                 EntryPlugKinematics.CRANE_ATTACHMENT_P);
         updateCables(level, variant, craneEye.y, craneEye.z, true);
+    }
+
+    /** Stop only existing display machinery; the ordinary stow path may create a new crane. */
+    private static void retireEmergencyCraneR50(ServerLevel level, int variant)
+    {
+        CRANE_SIGNATURE.remove(variant);
+        CranePose[] poses = S20_CRANE_POSES.get(level.dimension());
+        if (poses != null)poses[variant] = null;
+        List<com.projectseele.entity.NervCarrierPlatformEntity> obsolete = new ArrayList<>();
+        for (Entity entity : level.getAllEntities())
+            if (entity instanceof com.projectseele.entity.NervCarrierPlatformEntity crane
+                    && crane.isAlive() && crane.isPlugCrane() && crane.getUnitVariant() == variant
+                    && !crane.isVehicle() && !crane.isPassenger())obsolete.add(crane);
+        for (var crane : obsolete)crane.discard();
     }
 
     private static BlockPos hangarBed(ServerLevel level, int variant)

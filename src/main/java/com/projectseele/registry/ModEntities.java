@@ -39,8 +39,15 @@ public class ModEntities
             () -> EntityType.Builder.of(RamielEntity::new, MobCategory.MONSTER)
                     .sized(15.0F, 15.0F)
                     .fireImmune()
-                    .clientTrackingRange(12)
+                    // The real positron ray reaches 512 blocks. Tracking must
+                    // survive a hit pushing the target past the old 192 limit;
+                    // native player view-distance caps still apply.
+                    .clientTrackingRange(32)
                     .build("ramiel"));
+
+    public static final RegistryObject<EntityType<com.projectseele.entity.GaghielEntity>> GAGHIEL = ENTITY_TYPES.register("gaghiel",
+            () -> EntityType.Builder.of(com.projectseele.entity.GaghielEntity::new, MobCategory.MONSTER)
+                    .sized(32F, 26F).fireImmune().clientTrackingRange(24).updateInterval(1).build("gaghiel"));
 
     // Tracking ranges below are wide because scenario staging can park these
     // entities hundreds of blocks up the Tree of Life.

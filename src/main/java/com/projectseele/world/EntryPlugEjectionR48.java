@@ -76,6 +76,34 @@ public final class EntryPlugEjectionR48
         return "";
     }
 
+    public static String recoveryCallerBlocker(net.minecraft.server.level.ServerPlayer caller, EvaUnit01Entity unit)
+    {
+        if (unit == null) return "原机体尚未加载，等待原身份信号。";
+        var pilot = unit.getPilotEntity();
+        if (pilot instanceof net.minecraft.server.level.ServerPlayer actual && actual != caller)
+            return "请由当前驾驶员请求原机体回收。";
+        var receipt = unit.getPersistentData();
+        AutoSortieR32.releaseRecoveredDelegationR50(caller.serverLevel(),unit);
+        AutoSortieR32.acceptOriginalHumanBoardingR50(caller.serverLevel(),unit,caller);
+        if (pilot == null && receipt.hasUUID("R49RecoveryOwner")
+                && !caller.getUUID().equals(receipt.getUUID("R49RecoveryOwner")))
+            return "弹出后的原机体仍属于原驾驶员/指挥员，请联系原操作者回收。";
+        if (receipt.hasUUID("R32SortieCommander") && !caller.getUUID().equals(receipt.getUUID("R32SortieCommander")))
+            return "这台原机体仍由另一位指挥员受托，请联系原下令人。";
+        return "";
+    }
+
+    public static boolean originalFieldEjection(ServerLevel level, int variant, EvaUnit01Entity unit, UUID pilot)
+    {
+        var receipt = unit.getPersistentData();
+        var fleet = EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
+        return unit.getPilotEntity() == null && pilot != null && fleet != null
+                && unit.getUUID().equals(fleet.canonicalId()) && receipt.hasUUID("R49EjectedPilot")
+                && pilot.equals(receipt.getUUID("R49EjectedPilot")) && receipt.hasUUID("R49EjectedPlug")
+                && receipt.getUUID("R49EjectedPlug").equals(fleet.entryPlugId())
+                && (com.projectseele.entity.EvaShutdownR30.disabled(unit));
+    }
+
     private static boolean nativeSupport(ServerLevel level, EvaUnit01Entity unit)
     {
         AABB body = unit.getBoundingBox();
@@ -104,10 +132,24 @@ public final class EntryPlugEjectionR48
     /** Only a cancelled unmount with the original graph still intact may undo the stage publication. */
     public static boolean detach(EvaUnit01Entity unit, EntryPlugCarrierEntity plug, Snapshot before)
     {
+        boolean field = plug.getInsertionStage() == EntryPlugCarrierEntity.STAGE_FIELD_EJECTING;
+        if(field)com.projectseele.entity.EvaShutdownR30.captureFieldEjectionPoseR49(unit);
         plug.unlockFromEva();
         if (plug.getVehicle() == null && before.plug().equals(plug.getUUID()) && !plug.isRemoved()
                 && plug.level() == unit.level()
-                && plug.getPassengers().stream().map(entity -> entity.getUUID()).toList().equals(before.passengers())) return true;
+                && plug.getPassengers().stream().map(entity -> entity.getUUID()).toList().equals(before.passengers()))
+        {
+            if (plug.getInsertionStage() == EntryPlugCarrierEntity.STAGE_FIELD_EJECTING && before.passengers().size() == 1)
+            {
+                com.projectseele.entity.EvaShutdownR30.ensureUnpilotedR31(unit);
+                var receipt = unit.getPersistentData();
+                receipt.putUUID("R49EjectedPilot", before.passengers().get(0));
+                receipt.putUUID("R49EjectedPlug", before.plug());
+                receipt.putUUID("R49RecoveryOwner", receipt.hasUUID("R32SortieCommander")
+                        ? receipt.getUUID("R32SortieCommander") : before.passengers().get(0));
+            }
+            return true;
+        }
         if (plug.getVehicle() == unit && unit.getUUID().equals(before.host()) && before.plug().equals(plug.getUUID())
                 && plug.getPassengers().stream().map(entity -> entity.getUUID()).toList().equals(before.passengers())
                 && plug.getInsertionEpoch() == (before.epoch() == Integer.MAX_VALUE ? 1 : before.epoch() + 1)

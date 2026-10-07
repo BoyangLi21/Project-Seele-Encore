@@ -7,7 +7,10 @@ import regional_voxels as vox
 import quality_structures as qs
 from build_r07_installations import ramp,CASES
 
-OUT=vox.ROOT/'artifacts/world_expansion_r07';vox.OUT=OUT;p=vox.Painter()
+OUT=vox.ROOT/'artifacts/world_expansion_r07';vox.OUT=OUT
+if (vox.WORLD/'native_transit_r22.json').is_file():
+    raise RuntimeError('The installed R22 through-service retired original P1. Do not rebuild its stations, approach, signs or piers; use the complete current R50 public reuse and active native transit source.')
+p=vox.Painter()
 plan=json.loads((OUT/'port_transit_plan.json').read_text(encoding='utf8'))
 samples=json.loads((OUT/'port_native_transit/track_samples.json').read_text(encoding='utf8'))
 bed=defaultdict(set);sweeps=set()

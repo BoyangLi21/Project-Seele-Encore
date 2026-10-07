@@ -185,6 +185,7 @@ public final class NervStaffDialogue
                     reply(player,npc,npc.skin().equals("fuyutsuki")
                             ?"碇，"+motion+"你要上升，还是下降？"
                             :motion+"升降请联络冬月副司令。");
+                    if(npc.skin().equals("fuyutsuki"))CityMotionReportsR49.watch(player,npc,origin);
                 }
                 else if(intent.subject().equals("directions"))
                     reply(player,npc,npc.staffRole().startsWith("un_")
@@ -299,6 +300,7 @@ public final class NervStaffDialogue
         {
             var result=handled?NervOperationsConsole.lastOutcome(level,player,control):null;
             reply(player,npc,result!=null&&result.accepted()?"碇，控制台已收到"+(operation.equals("city_rise")?"上升":"下降")+"指令。":"城市还不能升降。"+(result==null?"控制台没有响应。":result.message()));
+            if(result!=null&&result.accepted())CityMotionReportsR49.watch(player,npc,IntegratedNervMapBuilder.tokyo3Origin(level));
             ProjectSeele.LOGGER.info("STAFF CITY actor={} operation={} button={} accepted={}",npc.memberId(),operation,control,result!=null&&result.accepted());
             npc.finishTask();return;
         }

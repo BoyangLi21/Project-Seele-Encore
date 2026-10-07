@@ -29,6 +29,24 @@ public final class LocalVisualAssetFingerprint
     private static final Map<String,MeshContract> R21_CONTRACTS=Map.of("eva_prototype",new MeshContract(242686,62,false));
     private static final Map<String,MeshContract> R22_CONTRACTS=Map.of("eva_prototype",new MeshContract(243758,62,false),"eva_un01",new MeshContract(228610,62,false));
     private static final Map<String,MeshContract> R23_CONTRACTS=Map.of("eva_prototype",new MeshContract(239090,64,false),"eva_un01",new MeshContract(222409,64,false));
+    // Exact selected identities copied from artifacts/rebuild_r49/assets/ASSET_FROZEN.json.
+    // R50 SELECTED_INPUTS recipe SHA-256: ae74338b82fe4640e07e129e566a6f14d540a2ca3d6224156a03b8ea8171fe9c.
+    private static final Map<String, SelectedR50Contract> R50_CONTRACTS = Map.of(
+            "eva_unit00", new SelectedR50Contract(new MeshContract(11_028, 45, true), Map.of(
+                    "mesh", "7ceb58db1cb718da3edd274c62d30cef92caf2b21efa0469076f6fa49c931d45",
+                    "geo", "1c358e7eb47ce0f3f3571886097187905e935e167a42fbb2c63dee793eeaf231",
+                    "animation", "d34a7908a2e424b7ac180ab2d5c61c24b354fb3d93cb1ebd8f42c8451915f6cc",
+                    "texture", "c61ab087d6277210635b958a9073ab32c58172396ba1584ed3171585e8f527f9")),
+            "eva_unit01", new SelectedR50Contract(new MeshContract(15_998, 49, true), Map.of(
+                    "mesh", "eda48d1bf2d3956d4d790035887794b5a895115c0a61ce59281a5b893078d20e",
+                    "geo", "bf91f7d08e1d12e3e927c05f80bd9e7c34ed549e679ef7a5899b04323f153dc0",
+                    "animation", "9d9f909d6ced3c6531f448c136e5ad5ec46a2a1187bff4cddc85beb9b985a145",
+                    "texture", "8e261921b6e94023d9c9e774bbdc8fbef96df8a442ac6c3986820d754e6845ea")),
+            "eva_unit02", new SelectedR50Contract(new MeshContract(11_262, 45, true), Map.of(
+                    "mesh", "e995fdc036899619a4632cff6f06d88dcf826a80ceeaa72ea10d2bce7aeee0fc",
+                    "geo", "d404f4c76e46a6d61cdb88f56ee0aa8fbd2423fd53a888afbc49576cdc4ee407",
+                    "animation", "d34a7908a2e424b7ac180ab2d5c61c24b354fb3d93cb1ebd8f42c8451915f6cc",
+                    "texture", "dbb7fd6384596550dae8944b879c935be53b4d7ccf54f187661a9e0ceb7041fe")));
     private static final Map<String, Fingerprint> CACHE = new ConcurrentHashMap<>();
 
     private LocalVisualAssetFingerprint() {}
@@ -75,7 +93,8 @@ public final class LocalVisualAssetFingerprint
                 || R23_CONTRACTS.containsKey(assetName) && R23_CONTRACTS.get(assetName).matches(meshTag,mesh)
                 || matchesR48(assetName,sourcePack,meshTag)
                 || matchesR30(assetName,sourcePack,resources,meshTag)
-                || matchesR37(assetName,sourcePack,resources,meshTag));
+                || matchesR37(assetName,sourcePack,resources,meshTag)
+                || matchesR50(assetName,sourcePack,resources,meshTag,mesh));
         boolean valid = complete && sameSource && meshMatches;
         String reason = !complete ? "missing-resource"
                 : !sameSource ? "mixed-resource-packs"
@@ -85,6 +104,17 @@ public final class LocalVisualAssetFingerprint
                 sourcePack, valid, reason);
         ProjectSeele.LOGGER.info("Local visual asset fingerprint: {}", fingerprint.description());
         return fingerprint;
+    }
+    private record SelectedR50Contract(MeshContract mesh, Map<String, String> sha256) {}
+
+    /** Only this frozen three-body selection may extend the unchanged historical strict contracts. */
+    private static boolean matchesR50(String name,String pack,Map<String,ResourceDigest> resources,String tag,ResourceLocation mesh)
+    {
+        SelectedR50Contract expected=R50_CONTRACTS.get(name);
+        if(expected==null||!pack.equals("mod_resources")||!resources.keySet().equals(expected.sha256().keySet())
+                ||!expected.mesh().matches(tag,mesh))return false;
+        return resources.entrySet().stream().allMatch(entry->entry.getValue().present()
+                &&pack.equals(entry.getValue().sourcePack())&&expected.sha256().get(entry.getKey()).equals(entry.getValue().sha256()));
     }
     private static boolean matchesR48(String name,String pack,String tag)
     {

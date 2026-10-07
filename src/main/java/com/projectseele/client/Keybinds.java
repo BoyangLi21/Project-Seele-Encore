@@ -8,6 +8,8 @@ import org.lwjgl.glfw.GLFW;
 public final class Keybinds
 {
     public static final String CATEGORY = "key.categories.projectseele";
+    public static final KeyMapping EVA_DASH = new KeyMapping(
+            "key.projectseele.eva_dash", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_LEFT_ALT, CATEGORY);
     public static final KeyMapping COMMAND_RADIO = new KeyMapping(
             "key.projectseele.command_radio", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_O, CATEGORY);
 

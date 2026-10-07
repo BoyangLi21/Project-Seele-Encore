@@ -14,6 +14,7 @@ import java.util.UUID;
 import com.projectseele.ProjectSeele;
 import com.projectseele.config.SeeleConfig;
 import com.projectseele.entity.EntryPlugCarrierEntity;
+import com.projectseele.entity.EvaAirTransportR31;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.NervSiloDoorEntity;
 import com.projectseele.entity.NervHangarDoorEntity;
@@ -574,7 +575,8 @@ public final class EvaLogisticsDirector
         var unit=canonical(level,variant);var entry=entry(level,variant);
         if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
                 ||entry.phase()!=Phase.DEPLOYED||!UndergroundSortieR48.recoveryAuthorizedR48(level,variant,unit)
-                ||!recoveryMotionSettled(unit)||!EntryPlugDirector.hasLaunchLock(level,variant,unit))
+                ||!recoveryMotionSettled(unit)||!EntryPlugDirector.hasLaunchLock(level,variant,unit)
+                    &&!UndergroundSortieR48.emptyRecoveryR49(level,variant,unit))
             return new ActionResult(false,"原地下接应平台回收条件尚未满足。");
         if(!HangarEmergencyR47.releaseForRecoveryR47(level,variant))
             return new ActionResult(false,"湿舱后门仍在通行，地下回收暂缓。");
@@ -612,6 +614,35 @@ public final class EvaLogisticsDirector
         }
         return supported>=3;
     }
+
+    /** A naturally faulted empty original already at its own bay can use the normal hoist, never a reset. */
+    public static boolean emptyFaultBayRecoveryReadyR50(ServerLevel level,EvaUnit01Entity unit)
+    {
+        int variant=unit.getUnitVariant();var receipt=entry(level,variant);var plug=EntryPlugDirector.canonical(level,variant);
+        if(receipt==null||receipt.phase()!=Phase.PLUG_FAULT||!receipt.canonicalId().equals(unit.getUUID())
+                ||canonical(level,variant)!=unit||unit.getPilotEntity()!=null||unit.isLaunchSequenceActive()
+                ||unit.hasActiveCarrierMotion()||EvaAirTransportR31.active(unit)||!recoveryMotionSettled(unit)
+                ||unit.position().distanceToSqr(Vec3.atBottomCenterOf(hangarBed(level,variant).above()))>.25D
+                ||plug==null||plug.isVehicle()||receipt.entryPlugId()==null||!receipt.entryPlugId().equals(plug.getUUID())
+                ||plug.getVehicle()!=unit||plug.getLinkedEva()!=unit||unit.getLockedEntryPlug()!=plug
+                ||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_LOCKED||plug.getInsertionProgress()!=100
+                ||!plug.isHatchFullySealed())return false;
+        var actual=plug.getCanonicalTransform();var expected=EntryPlugKinematics.lockedTransform(unit);
+        return actual.translation().distanceToSqr(expected.translation())<=.04D&&actual.rotationErrorDegrees(expected)<=.5D;
+    }
+    public static ActionResult recoverEmptyFaultAtBayR50(ServerPlayer caller,int variant)
+    {
+        var level=caller.serverLevel();
+        var unit=canonical(level,variant);var receipt=entry(level,variant);
+        if(unit==null||receipt==null||!AutoSortieR32.releaseEmptyFaultBayDelegationR50(caller,unit))
+            return new ActionResult(false,"故障原机尚未在所属湿舱停稳，原空栓或实际锁姿不符，未复位或替换。");
+        if(!HangarEmergencyR47.releaseForRecoveryR47(level,variant)||!EntryPlugDirector.extractEmptyCapsule(level,variant,unit))
+            return new ActionResult(false,"原空栓的正常抽出联锁尚未满足，机体与原栓保持当前状态。");
+        unit.setNervLogisticsLocked(true);unit.setNoGravity(true);unit.setDeltaMovement(Vec3.ZERO);
+        unit.getPersistentData().putBoolean("R50EmptyFaultBayRecovery",true);
+        put(level,variant,receipt.withPhase(Phase.FILLING,0,hangarBed(level,variant).getZ(),receipt.lclLayers()));
+        return new ActionResult(true,"原空栓沿现有吊架抽出，回到原吊位后按正常湿舱注液与栈桥流程完成回收。");
+    }
     public static ActionResult requestRecovery(ServerLevel level, int variant)
     {
         if (!logisticsReady(level, variant))
@@ -628,13 +659,8 @@ public final class EvaLogisticsDirector
          */
         loadControlTarget(level, variant);
         FleetEntry parkedFault=entry(level,variant);
-        EvaUnit01Entity faultUnit=canonical(level,variant);
-        if(parkedFault!=null&&parkedFault.phase()==Phase.PLUG_FAULT&&faultUnit!=null
-                &&EntryPlugDirector.extractEmptyCapsule(level,variant,faultUnit))
-        {
-            put(level,variant,parkedFault.withPhase(Phase.FILLING,0,hangarBed(level,variant).getZ(),parkedFault.lclLayers()));
-            return new ActionResult(true,label(variant)+" empty capsule recovery resumed under the original hoist.");
-        }
+        if(parkedFault!=null&&parkedFault.phase()==Phase.PLUG_FAULT)
+            return new ActionResult(false,"故障原机回收需要原调用者与完整借用联锁，请通过电话美里或律子的正常回收入口请求；未执行旁路抽栓。");
         FacilityReadinessService.FacilityReadiness readiness =
                 FacilityReadinessService.read(level,
                         FacilityReadinessService.Operation.RECOVERY, variant);
@@ -1482,6 +1508,7 @@ public final class EvaLogisticsDirector
                 // teleport, an open pressure hatch or continued catapult
                 // motion.  Force-reset remains the explicit recovery path.
                 unit.setNervLogisticsLocked(true);
+                unit.setNoGravity(true);unit.setDeltaMovement(Vec3.ZERO);unit.getNavigation().stop();unit.stopAutonomousR30();
                 if (level.getServer().getTickCount() % 200 == 0)
                 {
                     ProjectSeele.LOGGER.error(
@@ -1619,17 +1646,21 @@ public final class EvaLogisticsDirector
                             "pilot/plug lock opened in the launch cage");
                     break;
                 }
+                if (!unit.isLaunchSequenceActive() && unit.getY() >= surface.getY() - 2.0D)
+                {
+                    // Launch completion must not re-arm the old underground
+                    // parking lease before publishing the deployed receipt.
+                    unit.clearSortieDestination();
+                    unit.setNervLogisticsLocked(false);
+                    put(level, variant, entry.withPhase(Phase.DEPLOYED,
+                            0, surface.getY(), 0));
+                    break;
+                }
                 unit.setSortieDestination(level.dimension(), surface);
                 unit.setSortieParkingBed(silo);
                 if (unit.isLaunchSequenceActive())
                 {
                     return;
-                }
-                if (unit.getY() >= surface.getY() - 2.0D)
-                {
-                    unit.setNervLogisticsLocked(false);
-                    put(level, variant, entry.withPhase(Phase.DEPLOYED,
-                            0, surface.getY(), 0));
                 }
             }
             case DEPLOYED ->
@@ -1665,6 +1696,13 @@ public final class EvaLogisticsDirector
             case FILLING ->
             {
                 unit.setNervLogisticsLocked(true);
+                if(unit.getPersistentData().getBoolean("R50EmptyFaultBayRecovery"))
+                {
+                    var returningPlug=EntryPlugDirector.canonical(level,variant);
+                    if(returningPlug==null||returningPlug.isVehicle()||returningPlug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_SUSPENDED
+                            ||!EntryPlugDirector.originalCageDockR50(level,variant,unit,returningPlug))break;
+                    unit.getPersistentData().remove("R50EmptyFaultBayRecovery");
+                }
                 setGate(level, variant, false);
                 setBoardingBridgeExtension(level, variant, 0);
                 int ticks = entry.ticks() + 1;
@@ -2679,7 +2717,7 @@ public final class EvaLogisticsDirector
         return switch (phase)
         {
             case PARKED, BRIDGE_RETRACTING, PLUG_INSERTING,
-                    PLUG_ABORT_RETURNING, PLUG_ABORT_DOCKED, PLUG_FAULT,
+                    PLUG_ABORT_RETURNING, PLUG_ABORT_DOCKED,
                     PLUG_LOCKING, DRAINING, FILLING -> true;
             default -> false;
         };

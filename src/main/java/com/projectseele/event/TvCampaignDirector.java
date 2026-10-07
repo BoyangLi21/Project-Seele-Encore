@@ -26,6 +26,13 @@ public final class TvCampaignDirector
 {
     private static final TicketType<ChunkPos> TICKET = TicketType.create("tv_campaign_r24", Comparator.comparingLong(ChunkPos::toLong), 60);
     private static final Map<ServerLevel, ServerBossEvent> BARS = new WeakHashMap<>();
+    private static void clearCombatBar(ServerLevel level)
+    {
+        ServerBossEvent bar = BARS.remove(level);
+        if (bar == null) return;
+        bar.removeAllPlayers();
+        bar.setVisible(false);
+    }
     private static final Map<ServerLevel, Integer> MISSING = new WeakHashMap<>();
     private record Site(Vec3 hero, Vec3 angel, float yaw) {}
     private static final Map<ServerLevel, Optional<Site>> SITES = new WeakHashMap<>();
@@ -86,9 +93,11 @@ public final class TvCampaignDirector
         var level = level(player); if (level == null) return message(player, "本世界尚未配置作战区域。", false);
         if(npc&&player.level()!=level)return message(player,"请进入第三新东京市后下达驾驶员出击指令。",false);
         var data = TvCampaignSavedData.get(level); var chapter = selected(player,data);
-        if(variant<3&&StaffRecoveryR47.pending(level,variant))
+        if(variant<3&&(StaffRecoveryR47.pending(level,variant)||PilotReturnR39.pending(level,variant)))
             return message(player,"这台机体仍在执行回收入库与驾驶员交接。完成后再下达新的出击。",false);
         var acceptedUnit=TvSortiesR32.unit(level,variant);
+        if(acceptedUnit!=null&&TvMissionEquipmentR45.awaitingPhysicalReturn(acceptedUnit))
+            return message(player,"原任务炮盾仍需完成实际回收入库，不能直接编入下一场。",false);
         if(acceptedUnit!=null&&acceptedUnit.getPilotEntity()!=null
                 &&(npc?!(acceptedUnit.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==variant):acceptedUnit.getPilotEntity()!=player))
             return message(player,"这台机体已有其他驾驶员。请确认当前驾驶员安排后再编入。",false);
@@ -111,6 +120,9 @@ public final class TvCampaignDirector
         data.rayPreloadCursorR45=data.missingTicksR45=0;
         data.encounterSiteR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::id).orElse("");
         data.encounterLayoutR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::fingerprint).orElse("");
+        if(chapter.id().equals("ramiel")&&!TvYashimaDirectorR50.begin(level,data))
+        {data.phase="failure";data.setDirty();return message(player,data.notice+" 本场未进入已接受交战；请取消后确认目标区。",false);}
+        if(chapter.id().equals("gaghiel"))TvMarineDirectorR50.begin(level,data);
         return message(player, "作战已接受。" + chapter.briefing().replace("东北迎击大道", CityBattlefieldR29.name(level)) + "\n" + TvEncounterRulesR45.obstruction(level,data), true);
     }
     private static TvCampaignCatalog.Chapter selected(ServerPlayer player,TvCampaignSavedData data)
@@ -140,7 +152,10 @@ public final class TvCampaignDirector
         TvMissionAlertR30.clear(level);
         TvMissionEquipmentR45.revokeMission(level);
         TvEncounterRulesR45.stopEquipment(level,data);
+        if(data.active.equals("gaghiel"))TvMarineDirectorR50.cancel(level,data);
+        PilotReturnR39.enqueue(level,java.util.List.copyOf(data.sorties.values()));
         data.phase = "cancel"; data.setDirty();
+        clearCombatBar(level);
         return message(player, "作战已撤销，不计通关。机体仍需按正常流程回收。", true);
     }
     private static int message(ServerPlayer player, String text, boolean accepted)
@@ -172,7 +187,12 @@ public final class TvCampaignDirector
                     &&EvaLogisticsDirector.status(l,sortie.unit).phase().equals("PARKED"))
                 sortie.dispatchRequested=false;
         }
-        d.phase="approach";d.missingTicksR45=0;d.rayPreloadCursorR45=0;d.notice="重新确认目标与机体状态，请保持通信。";d.setDirty();return 1;
+        d.phase="approach";d.missingTicksR45=0;d.rayPreloadCursorR45=0;d.notice="重新确认目标与机体状态，请保持通信。";d.setDirty();
+        if(d.active.equals("ramiel")&&!TvYashimaDirectorR50.begin(l,d))
+        {d.phase="failure";d.notice="原拉米尔尚未恢复确认，未生成替代目标。";d.setDirty();return message(player,d.notice,false);}
+        if(d.active.equals("ramiel"))TvYashimaSavedDataR50.get(l).resetFireControlForRetry(d);
+        if(d.active.equals("gaghiel"))TvMarineDirectorR50.retry(l,d);
+        return 1;
     }
     public static void firstBattleBound(ServerLevel level, UUID owner, UUID angel)
     {
@@ -189,6 +209,9 @@ public final class TvCampaignDirector
         TvMissionEquipmentR45.revokeMission(level);
         TvEncounterRulesR45.stopEquipment(level,data);
         if(!data.finish(chapter,owner,angel))return;
+        // Combat has ended; recovery/episode handover must never keep the
+        // last health sample visible while its own workflow remains active.
+        clearCombatBar(level);
         for(var sortie:returning)if(sortie.unit<3)AutoSortieR32.clearAutomatic(level,sortie.unit);
         com.projectseele.world.PilotReturnR39.enqueue(level,returning);
         var player = level.getServer().getPlayerList().getPlayer(owner);
@@ -250,7 +273,8 @@ public final class TvCampaignDirector
             ProjectSeele.LOGGER.info("TV EPISODE ARCHIVED={} owner={} generation={}",chapter,owner,generation);
         }
     }
-    @SubscribeEvent public static void death(LivingDeathEvent event)
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+    public static void death(LivingDeathEvent event)
     {
         if (!(event.getEntity() instanceof ShamshelEntity angel) || !(angel.level() instanceof ServerLevel level)) return;
         var data = TvCampaignSavedData.get(level);
@@ -276,8 +300,11 @@ public final class TvCampaignDirector
         for (var level : event.getServer().getAllLevels())
         {
             var pending=TvCampaignSavedData.get(level);
+            if(pending.active.isEmpty()||pending.targetDeathConfirmedR45||pending.phase.equals("combat_victory"))
+                clearCombatBar(level);
             if(pending.phase.equals("combat_victory"))
             {if(event.getServer().getTickCount()%10==0)episodeHandover(level,pending);continue;}
+            if(pending.targetDeathConfirmedR45&&!pending.phase.equals("cancel"))continue;
             Site site = site(level); if (site == null) continue;
             var data = TvCampaignSavedData.get(level);
             pilotContinuity(level,data);
@@ -286,6 +313,11 @@ public final class TvCampaignDirector
             bar.removeAllPlayers();
             if (data.active.isEmpty()) continue;
             TvSortiesR32.updateTarget(level,data);
+            if(TvEncounterRulesR45.handles(data.active)&&!data.phase.equals("cancel"))
+            {
+                TvEncounterDirectorR45.tick(level,data,event.getServer().getPlayerList().getPlayer(data.owner),bar);
+                continue;
+            }
             if(data.phase.equals("alert"))
             {
                 var commander=event.getServer().getPlayerList().getPlayer(data.owner);
@@ -353,6 +385,12 @@ public final class TvCampaignDirector
             load(level, data.lastPosition == null ? BlockPos.containing(site.angel) : data.lastPosition);
             if (level.getEntity(data.angel) instanceof ShamshelEntity angel)
             {
+                if(!angel.isAlive())
+                {
+                    clearCombatBar(level);
+                    if(angel.getTags().contains("seele_tv_shamshel_r24"))complete(level,"shamshel",data.owner,angel.getUUID());
+                    continue;
+                }
                 MISSING.remove(level);
                 if (!angel.blockPosition().equals(data.lastPosition)) { data.lastPosition = angel.blockPosition(); data.setDirty(); }
                 TvSortiesR32.updateTarget(level,data);
@@ -360,13 +398,34 @@ public final class TvCampaignDirector
                 bar.setName(Component.literal("第4使徒 夏姆榭尔 · " + (field > 0 ? "AT 力场 " + Math.round(field) : "核心 " + Math.round(100 * angel.getHealth() / angel.getMaxHealth()) + "%")));
                 bar.setProgress(Math.max(0, Math.min(1, field > 0 ? field / 700 : angel.getHealth() / angel.getMaxHealth())));
             }
-            else if (MISSING.merge(level, 1, Integer::sum) > 40)
-            { data.clear("目标实体已丢失。本章未完成；确认世界状态后可重新接受作战。"); MISSING.remove(level); }
+            else
+            {
+                // An unloaded/unresolved original is not a live health sample
+                // and is not proof of a death. Resume its bar only after the
+                // same persisted UUID resolves to a living target again.
+                clearCombatBar(level);
+                if(MISSING.merge(level, 1, Integer::sum) > 40)
+                { data.clear("目标实体已丢失。本章未完成；确认世界状态后可重新接受作战。"); MISSING.remove(level); }
+                else if(!data.notice.equals("正在确认目标信号，请保持通信。"))
+                { data.notice="正在确认目标信号，请保持通信。";data.setDirty(); }
+            }
         }
+    }
+    @SubscribeEvent
+    public static void unloaded(net.minecraftforge.event.level.LevelEvent.Unload event)
+    {
+        if(!(event.getLevel() instanceof ServerLevel level))return;
+        clearCombatBar(level);MISSING.remove(level);SITES.remove(level);
     }
     @SubscribeEvent public static void commands(RegisterCommandsEvent event)
     {
         event.getDispatcher().register(Commands.literal("seele").then(Commands.literal("tv")
+                .then(Commands.literal("collect_equipment").then(Commands.argument("unit",com.mojang.brigadier.arguments.IntegerArgumentType.integer(0,1)).executes(c->{
+                    var player=c.getSource().getPlayerOrException();var unit=com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c,"unit");
+                    var eva=TvSortiesR32.unit(player.serverLevel(),unit);
+                    boolean collected=eva!=null&&TvMissionEquipmentR45.collectRecoveredCargo(eva,player,net.minecraft.world.InteractionHand.MAIN_HAND);
+                    return message(player,collected?"原任务装备已交到你手中。沿正常人员路线运输，并右键原空载任务架归还。":"请空手站在已回库且驾驶员安全离栓的原机体旁；装备须已等待归还。",collected);
+                })))
                 .then(Commands.literal("status").executes(c -> message(c.getSource().getPlayerOrException(), briefing(c.getSource().getPlayerOrException()), true)))
                 .then(Commands.literal("begin").executes(c -> begin(c.getSource().getPlayerOrException())))
                 .then(Commands.literal("select").then(Commands.literal("sachiel").executes(c->select(c.getSource().getPlayerOrException(),"sachiel"))).then(Commands.literal("shamshel").executes(c->select(c.getSource().getPlayerOrException(),"shamshel")))

@@ -138,6 +138,16 @@ public final class GeoFrontCommands
         {
             return;
         }
+        // Vanilla restores RootVehicle/Attach before PlayerLoggedIn. A live
+        // restored ride (including EVA -> original plug -> pilot or MTR) is
+        // manual play, not a detached Visual Lab camera. Explicit developer
+        // teleport commands still call restoreManualPlayerPhysics themselves.
+        if (player.isPassenger())
+        {
+            ProjectSeele.LOGGER.info("Preserved restored login vehicle: player={} vehicle={}",
+                    player.getUUID(),player.getVehicle().getUUID());
+            return;
+        }
         restoreManualPlayerPhysics(player);
         ServerLevel current = player.serverLevel();
         if (unsafeOverviewLogin(player, current))

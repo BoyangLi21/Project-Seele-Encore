@@ -284,7 +284,7 @@ public final class MilitaryR07Director
             boolean supplied=data.power&&(data.baseGenerator&&e.getX()>6300&&e.getX()<6900&&e.getZ()>-7090&&e.getZ()<-5900
                     ||data.portGenerator&&e.getX()>1200&&e.getX()<1656&&e.getZ()>280&&e.getZ()<640);
             if(supplied)e.getCapability(ForgeCapabilities.ENERGY).ifPresent(storage->storage.receiveEnergy(2000,false));
-            if(e.getTags().contains("seele_r07_defense"))
+            if(e.getTags().contains("seele_r07_defense")&&!TvMarineDirectorR50.marineCannonControlledR50(e))
             {
                 try { e.getClass().getMethod("setActive",boolean.class).invoke(e,data.defense); }
                 catch(ReflectiveOperationException error){throw new IllegalStateException("SBW defense interface changed",error);}

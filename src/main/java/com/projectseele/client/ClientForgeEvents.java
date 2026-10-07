@@ -60,6 +60,7 @@ public final class ClientForgeEvents
     private static int rifleAimEntityR45=-1;
     private static boolean crouchHeld;
     private static boolean sprintHeld;
+    private static boolean dashHeldR50;
     private static boolean jumpHeld;
     /** A held jump stays pending until the EVA's synchronized sequence acknowledges it. */
     private static boolean jumpRequestPending;
@@ -160,6 +161,7 @@ public final class ClientForgeEvents
                 cabinSequenceProgress = -1.0F;
                 crouchHeld = false;
                 sprintHeld = false;
+                dashHeldR50 = false;
                 chargeHeld = false;
                 rifleAimHeld = false;
                 clearJumpRequest();
@@ -311,7 +313,8 @@ public final class ClientForgeEvents
             // Respect the player's configured sprint binding. The raw Ctrl
             // fallback remains for installs where vanilla consumes the key
             // while the player is mounted in the entry plug.
-            boolean rawSprint = minecraft.options.keySprint.isDown()
+            boolean rawDash=Keybinds.EVA_DASH.isDown();
+            boolean rawSprint = rawDash || minecraft.options.keySprint.isDown()
                     || rawKey(minecraft, GLFW.GLFW_KEY_LEFT_CONTROL,
                             GLFW.GLFW_KEY_RIGHT_CONTROL);
             boolean rawJump = minecraft.options.keyJump.isDown();
@@ -335,6 +338,11 @@ public final class ClientForgeEvents
                 // after authority unlock so run cannot silently remain walk.
                 send(rawSprint ? ServerboundEvaControlPacket.ACTION_SPRINT_START
                         : ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+            }
+            if(rawDash!=dashHeldR50||player.tickCount%5==0&&rawDash!=com.projectseele.entity.EvaSprintR50.held(eva))
+            {
+                dashHeldR50=rawDash;
+                send(rawDash?ServerboundEvaControlPacket.ACTION_DASH_START_R50:ServerboundEvaControlPacket.ACTION_DASH_STOP_R50);
             }
             if(eva instanceof com.projectseele.entity.EvaPrototypeEntity un&&un.isUNFlying())
             {
@@ -364,9 +372,11 @@ public final class ClientForgeEvents
                 {
                     send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
                 }
+                if(dashHeldR50)send(ServerboundEvaControlPacket.ACTION_DASH_STOP_R50);
             }
             crouchHeld = false;
             sprintHeld = false;
+            dashHeldR50 = false;
             clearJumpRequest();
         }
 

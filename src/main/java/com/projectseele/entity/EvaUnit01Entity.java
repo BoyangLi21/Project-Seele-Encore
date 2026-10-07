@@ -123,7 +123,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.endFirstBattle();this.entityData.set(DATA_BERSERK,false);this.entityData.set(DATA_BERSERK_TICKS,0);this.berserkRecoveryTicks=0;
         EvaBerserkMotionR34.clear(this);
         if(wasBerserk)EvaDorsalMechanism.afterBerserk(this);
-        if(this.isPowerDepleted())EvaShutdownR30.restAfterFirstBattle(this,finalPose);
+        if(wasBerserk||this.isPowerDepleted())EvaShutdownR30.restAfterFirstBattle(this,finalPose);
     }
     public static final int WEAPON_FISTS = 0;
     public static final int WEAPON_KNIFE = 1;
@@ -723,6 +723,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaShutdownR30.define(this.entityData);
         EvaAirTransportR31.define(this.entityData);
         EvaGameplayMotionR32.define(this.entityData);
+        EvaSprintR50.define(this.entityData);
         EvaWeaponHandlingR45.define(this.entityData);
         EvaCombatSupportR33.define(this.entityData);
         EvaBerserkMotionR34.define(this.entityData);
@@ -1213,7 +1214,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         };
     }
 
-    /** Unit-00's kneeling shield posture, used to cover the firing Unit. */
+    /** The retired kneeling shield clip is not used by the upright physical plate. */
     public boolean isShieldBraced()
     {
         return false;
@@ -1365,6 +1366,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 double standingStride=Mth.lerp(run,
                         EvaBodyPose.locomotionRuntimeStrideR44(this,"walk",EvaBodyPose.locomotionStrideR43(this,"walk",25.8334D*WALK_CADENCE_GAIN)/WALK_CADENCE_GAIN),
                         EvaBodyPose.locomotionRuntimeStrideR44(this,"run",EvaBodyPose.locomotionStrideR43(this,"run",31.3944D*RUN_CADENCE_GAIN)/RUN_CADENCE_GAIN));
+                standingStride=Mth.lerp(EvaSprintR50.blend(this,1),standingStride,
+                        EvaBodyPose.locomotionRuntimeStrideR44(this,"dash_run",standingStride));
                 double stride=stance<=1?Mth.lerp(stance,standingStride,15D):Mth.lerp((stance-1)/2,15D,12D);
                 stride=EvaCombatSupportR33.stride(this,dx,dz,(float)stride);
                 double sign=EvaCombatSupportR33.gaitWeight(this,1)>.5F?1:dx*this.getForward().x+dz*this.getForward().z<0?-1:1;
@@ -1517,12 +1520,26 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {this.entityData.set(DATA_ARMAMENT_MASK,this.getArmamentMask()|ARMAMENT_MASK_SHIELD_R45);this.selectWeapon(WEAPON_SHIELD_R45);}
     }
     public boolean hasEquippedYashimaShieldR45(){return this.entityData.get(DATA_MISSION_SHIELD_R45);}
+    /** Only the verified physical ground-crew transfer removes a returned mission plate. */
+    public void returnedTvMissionCargoR50(int unit)
+    {
+        if(this.level().isClientSide)return;
+        this.refreshTvMissionEquipmentR45();
+        if(unit==0&&!com.projectseele.world.TvMissionEquipmentR45.shieldLoanAuthorizedR48(this)
+                &&!com.projectseele.world.EquipmentVaultsR47.physicalShieldLoanAuthorizedR48(this))
+        {
+            this.entityData.set(DATA_ARMAMENT_MASK,this.getArmamentMask()&~ARMAMENT_MASK_SHIELD_R45);
+            if(this.getWeapon()==WEAPON_SHIELD_R45)this.selectWeapon(WEAPON_FISTS);
+        }
+    }
     public boolean autonomousShieldBraceR47(TrainingPilotEntity pilot,boolean brace)
     {
         if(this.level().isClientSide||this.getPilotEntity()!=pilot||pilot.getAssignedVariant()!=UNIT_00
                 ||!this.isPoweredOn()||!com.projectseele.entity.EvaShieldRigR47.equipped(this)||this.isNervLogisticsLocked()
                 ||this.isFirstBattleActive()||EvaShutdownR30.disabled(this))return false;
-        this.entityData.set(DATA_CROUCHING,brace);this.entityData.set(DATA_PRONE,false);
+        // The tall rear-handled plate is carried upright. The old NPC crouch
+        // lowered its chest behind a different, no-longer-selected shield rig.
+        this.entityData.set(DATA_CROUCHING,false);this.entityData.set(DATA_PRONE,false);
         this.updatePoseDimensions();return true;
     }
 
@@ -2212,26 +2229,38 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public boolean hasActiveCarrierMotion()
     {
         return this.entityData.get(DATA_CARRIER_MOTION_ACTIVE)||this.tvPersonnelClockHeldR44()
-                ||this.level().isClientSide&&this.clientCarrierFramePendingR35;
+                ||this.level().isClientSide&&this.clientCarrierFramePendingR35&&this.clientCarrierObservedLiveR50;
     }
     private boolean clientCarrierFramePendingR35;
+    private boolean clientCarrierObservedLiveR50;
     /** Can run outside chunk-gated AI ticks: the server already owns this path. */
     public void syncClientCarrierFrameR35()
     {
         if(!this.level().isClientSide)return;
         if(this.entityData.get(DATA_CARRIER_MOTION_ACTIVE)||this.tvPersonnelClockHeldR44())
         {
+            this.clientCarrierObservedLiveR50=true;
             Vec3 previous=this.sampleCarrierMotion(-1),current=this.sampleCarrierMotion(0);
             this.setPos(current.x,current.y,current.z);
             this.xOld=this.xo=previous.x;this.yOld=this.yo=previous.y;this.zOld=this.zo=previous.z;
         }
-        else if(this.clientCarrierFramePendingR35&&this.entityData.get(DATA_CARRIER_MOTION_START)!=0)
+        else if(this.clientCarrierFramePendingR35&&this.clientCarrierObservedLiveR50
+                &&this.entityData.get(DATA_CARRIER_MOTION_START)!=0)
         {
             double x=this.entityData.get(DATA_CARRIER_TO_X),y=this.entityData.get(DATA_CARRIER_TO_Y),z=this.entityData.get(DATA_CARRIER_TO_Z);
             super.lerpTo(x,y,z,this.getYRot(),this.getXRot(),1,true);this.setPos(x,y,z);
             this.xOld=this.xo=x;this.yOld=this.yo=y;this.zOld=this.zo=z;
+            this.clientCarrierObservedLiveR50=false;
         }
-        else return;
+        else
+        {
+            // Initial entity metadata may contain the endpoint of a transfer
+            // completed before tracking began. Vanilla's current entity
+            // position owns that case; it is not a newly completed motion.
+            this.clientCarrierFramePendingR35=false;
+            this.clientCarrierObservedLiveR50=false;
+            return;
+        }
         this.clientCarrierFramePendingR35=false;this.setDeltaMovement(Vec3.ZERO);this.syncPassengerAssembly();
     }
 
@@ -2382,6 +2411,21 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.tvPersonnelOwnedKindR44=kind;this.tvPersonnelClockSessionR44=saved.getLong("Session");this.tvPersonnelHeldElapsedR44=elapsed;
             this.entityData.set(DATA_TV_PERSONNEL_SESSION_R44,Long.toString(this.tvPersonnelClockSessionR44));
             this.entityData.set(DATA_TV_PERSONNEL_ELAPSED_R44,elapsed);
+            if(kind==0&&!saved.getBoolean("Active")&&!saved.getBoolean("Held")
+                    &&!com.projectseele.world.TvPersonnelOwnedMotionR44.unit(this).owned())
+            {
+                // A deployed EVA can have walked away from its last launch
+                // pad. Never publish that retired endpoint as a fresh frame.
+                Vec3 current=this.position();
+                this.entityData.set(DATA_CARRIER_FROM_X,(float)current.x);this.entityData.set(DATA_CARRIER_TO_X,(float)current.x);
+                this.entityData.set(DATA_CARRIER_FROM_Y,(float)current.y);this.entityData.set(DATA_CARRIER_TO_Y,(float)current.y);
+                this.entityData.set(DATA_CARRIER_FROM_Z,(float)current.z);this.entityData.set(DATA_CARRIER_TO_Z,(float)current.z);
+                this.entityData.set(DATA_CARRIER_MOTION_DURATION,1);this.entityData.set(DATA_CARRIER_MOTION_START,0);
+                this.entityData.set(DATA_CARRIER_MOTION_ACTIVE,false);this.entityData.set(DATA_CARRIER_FRAME_R39,false);
+                this.entityData.set(DATA_TV_PERSONNEL_FROZEN_R44,tvPersonnelPositionKeyR44(current));
+                this.entityData.set(DATA_TV_PERSONNEL_ELAPSED_R44,0);this.tvPersonnelHeldElapsedR44=0;
+                return;
+            }
             this.entityData.set(DATA_CARRIER_FROM_X,(float)saved.getDouble("FromX"));this.entityData.set(DATA_CARRIER_FROM_Y,(float)saved.getDouble("FromY"));this.entityData.set(DATA_CARRIER_FROM_Z,(float)saved.getDouble("FromZ"));
             this.entityData.set(DATA_CARRIER_TO_X,(float)saved.getDouble("ToX"));this.entityData.set(DATA_CARRIER_TO_Y,(float)saved.getDouble("ToY"));this.entityData.set(DATA_CARRIER_TO_Z,(float)saved.getDouble("ToZ"));
             this.entityData.set(DATA_CARRIER_MOTION_DURATION,duration);this.entityData.set(DATA_CARRIER_MOTION_START,(int)(this.level().getGameTime()-elapsed));
@@ -2953,7 +2997,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     public void setChargingHeld(boolean held)
     {
-        this.chargingHeld = held && !this.isPilotControlLocked();
+        this.chargingHeld = held && !this.isPilotControlLocked()
+                &&(this.getWeapon()!=WEAPON_CANNON||com.projectseele.world.TvEncounterRulesR45.cannonPermissionR50(this));
     }
 
     /** Left-click from the plug: Tiger-reviewed strikes and weapon clips. */
@@ -3864,7 +3909,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         boolean full = this.getCannonCharge() >= SeeleConfig.CANNON_CHARGE_TICKS.get();
         this.entityData.set(DATA_CANNON_CHARGE, 0);
         if(this.getPersistentData().getBoolean("TvMissionCannonAppliedR45")
-                &&!com.projectseele.world.TvMissionEquipmentR45.operational(this))return;
+                &&(!com.projectseele.world.TvMissionEquipmentR45.operational(this)
+                ||!com.projectseele.world.TvEncounterRulesR45.cannonPermissionR50(this)))return;
+        if(this.getWeapon()==WEAPON_CANNON&&!this.missionCannonRayClearR50(pilot))
+        {
+            if(pilot instanceof ServerPlayer player)player.sendSystemMessage(Component.literal("阳电子炮真实火线被己方盾面挡住，等待盾机侧移后再充能起射。"));
+            return;
+        }
         if (this.isPilotControlLocked() || !full || this.getWeapon() != WEAPON_CANNON
                 || this.getCannonCooldown() > 0)
         {
@@ -3874,6 +3925,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if (this.level() instanceof ServerLevel serverLevel)
         {
             this.fireCannon(serverLevel, pilot);
+            com.projectseele.world.TvYashimaDirectorR50.cannonFired(this);
         }
     }
 
@@ -4095,7 +4147,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(!autonomousPilotR30(pilot)||weapon<WEAPON_FISTS||weapon>WEAPON_SHIELD_R45
                 ||!this.armamentAvailable(weapon))return false;
         if(this.hasLiveActionForRender(0))return false;
-        this.selectWeapon(weapon);return true;
+        // The NPC reasserts its loadout every tick. Re-selecting the same
+        // weapon resets charge/hold and prevents a cannon from ever firing.
+        if(this.getWeapon()!=weapon)this.selectWeapon(weapon);
+        return true;
     }
     public void autonomousDriveR30(TrainingPilotEntity pilot,Vec3 movement,Vec3 aim,boolean sprint)
     {
@@ -4111,6 +4166,15 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(this.hasLiveActionForRender(0)&&!EvaGameplayMotionR32.movementMayComposeR45(this))local=Vec3.ZERO;
         this.autonomousInputR30=local;this.autonomousInputAtR30=this.level().getGameTime();
         this.xxa=(float)local.x;this.zza=(float)local.z;this.setSpeed(this.drivingSpeedR30());
+    }
+    public boolean autonomousMarineBraceR50(TrainingPilotEntity pilot,boolean brace)
+    {
+        if(!autonomousPilotR30(pilot)||this.getUnitVariant()!=UNIT_02
+                ||this.isNervLogisticsLocked()||this.isFirstBattleActive()
+                ||EvaShutdownR30.disabled(this))return false;
+        this.entityData.set(DATA_CROUCHING,brace);this.entityData.set(DATA_PRONE,false);
+        if(brace)this.stopAutonomousR30();
+        this.updatePoseDimensions();return true;
     }
     public void autonomousAttackR30(TrainingPilotEntity pilot,int action)
     {
@@ -4347,11 +4411,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.entityData.set(DATA_UMBILICAL_SEVERED,false);
             this.powerCheckCooldown=0;return;
         }
-        boolean surfacePower = this.getY() >= 64 && this.getLaunchPhase() != LAUNCH_ASCENT
+        boolean surfacePower = (this.getY() >= 64 || com.projectseele.world.TvMarineDirectorR50.marinePowerAllowed(this)) && this.getLaunchPhase() != LAUNCH_ASCENT
                 && (!this.isNervLogisticsLocked() || this.getY() >= 80);
         int range = SeeleConfig.COMMON_SPEC.isLoaded()
                 ? SeeleConfig.UMBILICAL_RANGE.get() : 768;
         BlockPos anchor = this.getUmbilicalAnchor();
+        anchor = com.projectseele.world.TvYashimaDirectorR50.missionPowerAnchor(this,anchor,range);
+        anchor = com.projectseele.world.TvMarineDirectorR50.missionPowerAnchor(this,anchor,range);
         if (!surfacePower || anchor != null && anchor.getY()<32) anchor=null;
         if (anchor != null && this.position().distanceToSqr(Vec3.atCenterOf(anchor)) <= (double) range * range)
             com.projectseele.world.EvaPowerLinkR25.retain(server, anchor);
@@ -4653,7 +4719,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         if(EvaGameplayMotionR32.directed(this))
         {
-            boolean low=com.projectseele.physics.CombatBodyDynamics.active(target)&&target.getBoundingBox().getYsize()<32;
+            boolean low=EvaGameplayMotionR32.lowContactTargetR49(target,32);
             int kind=low?6:new int[]{2,3,4,3,5,2}[this.berserkPatternR37++%6];
             EvaBerserkMotionR34.begin(this,kind,target);this.berserkAttackCooldown=EvaBerserkMotionR34.duration(this)+2;return;
         }
@@ -4702,6 +4768,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             return;
         }
+        var stoppedPose=EvaBodyPose.sample(this,0);
         this.entityData.set(DATA_BERSERK, false);
         this.entityData.set(DATA_BERSERK_TICKS, 0);
         EvaBerserkMotionR34.clear(this);
@@ -4712,6 +4779,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.setTarget(null);
         this.setDeltaMovement(Vec3.ZERO);
         this.entityData.set(DATA_WEAPON, WEAPON_FISTS);
+        EvaShutdownR30.restAfterFirstBattle(this,stoppedPose);
         this.playSound(SoundEvents.REDSTONE_TORCH_BURNOUT, 3.0F, 0.42F);
         ProjectSeele.LOGGER.warn(
                 "EVA Unit-01 berserk ended: eva={} recoveryTicks={}",
@@ -4820,6 +4888,35 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     @Override public double effectiveCannonRangeR45()
     {return SeeleConfig.CANNON_RANGE.get();}
+    private long lastFriendlyCannonTraceR50=Long.MIN_VALUE;
+    private void friendlyCannonTraceR50(String kind,EvaUnit01Entity blocker,Vec3 contact,Vec3 from,Vec3 to)
+    {
+        long now=this.level().getGameTime();
+        if(lastFriendlyCannonTraceR50!=Long.MIN_VALUE&&now-lastFriendlyCannonTraceR50<40)return;
+        lastFriendlyCannonTraceR50=now;
+        ProjectSeele.LOGGER.info("NERV cannon physical obstruction: shooter={} kind={} blocker={} blockerRoot={} blockerYaw={} contact={} muzzle={} end={}",
+                this.getUUID(),kind,blocker.getUUID(),blocker.position(),blocker.getYRot(),contact,from,to);
+    }
+    /** The same measured muzzle and terrain/body endpoint admit a real friendly plate. */
+    public boolean missionCannonRayClearR50(LivingEntity pilot)
+    {
+        if(!(this.level() instanceof ServerLevel level)||pilot==null||this.getPilotEntity()!=pilot)return false;
+        if(!this.getPersistentData().getBoolean("TvMissionCannonAppliedR45")&&!com.projectseele.world.TvMissionEquipmentR45.cannonAuthorized(this))return true;
+        Vec3 direction=this.pilotAimDirection(pilot),from=this.cannonMuzzlePosition(direction);
+        Vec3 to=level.clip(new ClipContext(from,from.add(direction.scale(this.effectiveCannonRangeR45())),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this)).getLocation();
+        var body=com.projectseele.physics.CombatDamageTargetsR44.ray(level,from,to,.3,this,pilot);
+        if(body!=null&&com.projectseele.physics.CombatDamageTargetsR44.parent(body.getEntity()) instanceof EvaUnit01Entity friendly)
+        {
+            var mission=com.projectseele.world.TvCampaignSavedData.get(level);
+            if(mission.sorties.values().stream().anyMatch(sortie->friendly.getUUID().equals(sortie.eva)))
+            {friendlyCannonTraceR50("body",friendly,body.getLocation(),from,to);return false;}
+        }
+        if(body!=null)to=body.getLocation();
+        var shield=com.projectseele.world.ShieldCoverR48.nearest(level,from,to,this);
+        if(shield.isPresent())
+        {var contact=shield.get();friendlyCannonTraceR50("shield",contact.holder(),contact.point(),from,to);return false;}
+        return true;
+    }
 
     /** NPCs use the real barrel ray, real charge and real pilot damage source. */
     @Override public boolean missionCannonInputR45(TrainingPilotEntity pilot,Vec3 actualAim,boolean hold,boolean release)
@@ -4878,6 +4975,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaSwordActionsR45.tick(this);
         EvaWeaponHandlingR45.tick(this);
         EvaGameplayMotionR32.tick(this);
+        EvaSprintR50.tick(this);
         if(!this.level().isClientSide&&this.getPilotEntity() instanceof ServerPlayer player
                 &&(player.zza<-.15F||Math.abs(player.xxa)>.15F)
                 &&this.entityData.get(DATA_LIVE_ACTION_PHASE)>=.72F
@@ -5262,7 +5360,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         int charge = this.getCannonCharge();
         boolean canCharge = !this.isPilotControlLocked()
                 && this.chargingHeld && this.getWeapon() == WEAPON_CANNON
-                && this.getCannonCooldown() <= 0 && this.getControllingPassenger() != null;
+                && this.getCannonCooldown() <= 0 && this.getControllingPassenger() != null
+                &&com.projectseele.world.TvEncounterRulesR45.cannonPermissionR50(this);
         if (canCharge)
         {
             if (charge < SeeleConfig.CANNON_CHARGE_TICKS.get())
@@ -5270,7 +5369,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 this.entityData.set(DATA_CANNON_CHARGE, charge + 1);
             }
         }
-        else if (charge > 0 && !this.chargingHeld)
+        else if (charge > 0 && (!this.chargingHeld||!com.projectseele.world.TvEncounterRulesR45.cannonPermissionR50(this)))
         {
             this.entityData.set(DATA_CANNON_CHARGE, 0);
         }
@@ -5414,6 +5513,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if (this.sortieParkingBed == null || !this.hasSortieDestination()
                 || this.isLaunchSequenceActive() || this.getControllingPassenger() != null)
         {
+            return;
+        }
+        // A saved lower-bed address is not a lease to move a deployed hull.
+        // Ejection removes the controlling passenger while this address can
+        // still name the old launch cage, including after a cold reload.
+        Vec3 feet = Vec3.atBottomCenterOf(this.sortieParkingBed.above());
+        if (!this.isNervLogisticsLocked() || this.hasActiveCarrierMotion() || EvaShutdownR30.disabled(this)
+                || this.position().distanceToSqr(feet) > .25D)
+        {
+            this.sortieParkingBed = null;
             return;
         }
         if (!this.level().getBlockState(this.sortieParkingBed).is(Blocks.LODESTONE))
@@ -6529,7 +6638,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 ||ramiel.level()!=server||server.getEntity(ramiel.getUUID())!=ramiel
                 ||server.getEntity(this.getUUID())!=this)return false;
         var mission=com.projectseele.world.TvCampaignSavedData.get(server);
-        return mission.phase.equals("combat")&&mission.generationR43>0
+        return java.util.Set.of("alert","approach","combat").contains(mission.phase)&&mission.generationR43>0
                 &&com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(ramiel)!=null;
     }
 
@@ -6819,6 +6928,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public boolean isControlledByLocalInstance()
     {
+        if(EvaShutdownR30.disabled(this))return !this.level().isClientSide;
         if(EvaSwordActionsR45.active(this)||EvaFieldActionsR45.active(this))return !this.level().isClientSide;
         if(this.isBerserk()||com.projectseele.physics.CombatBodyDynamics.active(this)||com.projectseele.physics.CombatBodyDynamics.ownsGroundAction(this))return !this.level().isClientSide;
         if(!this.level().isClientSide&&!this.isNervLogisticsLocked()&&!this.isLaunchSequenceActive()&&!this.isFirstBattleActive()
@@ -7022,6 +7132,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
 
     @Override
+    protected void doPush(Entity other)
+    {
+        // Vanilla selects players using the entire giant bounding box, then
+        // calls player.push(this). Empty space between a wreck's limbs must
+        // not repel a crew member as though the whole box were solid.
+        if(other instanceof Player&&!com.projectseele.physics.CombatBodyContacts.overlap(this,other.getBoundingBox()))return;
+        super.doPush(other);
+    }
+
+    @Override
     public boolean isPushable()
     {
         // A sixty-block airframe is not a vanilla shoulder-to-shoulder mob.
@@ -7083,7 +7203,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.setDeltaMovement(Vec3.ZERO);
             return;
         }
-        super.travel(input);
+        if(!EvaImmersionR50.travel(this,input))super.travel(input);
         EvaCombatR31.approach(this);
         if (this.level().isClientSide)
         {
@@ -7170,7 +7290,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         };
         float stance=this.rifleStanceInitialized?this.entityData.get(DATA_RIFLE_STANCE):this.isPilotProne()?3:this.isPilotCrouching()?1:0;
         float speed=stance<=1?Mth.lerp(stance,variantSpeed,CROUCH_SPEED):Mth.lerp(Mth.clamp((stance-1)/2,0,1),CROUCH_SPEED,PRONE_SPEED);
-        return speed * synchronizationSpeed;
+        return speed * synchronizationSpeed * EvaSprintR50.speed(this);
     }
 
     @Override

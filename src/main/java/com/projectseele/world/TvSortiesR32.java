@@ -64,7 +64,7 @@ public final class TvSortiesR32
     {
         var l=TvCampaignDirector.level(caller);
         if(l==null||l!=caller.level()||!NervStaffDialogue.authorized(caller)||unit<0||unit>4||npc&&unit>2)return 0;
-        if(unit<3&&StaffRecoveryR47.pending(l,unit))
+        if(unit<3&&(StaffRecoveryR47.pending(l,unit)||PilotReturnR39.pending(l,unit)))
         {caller.sendSystemMessage(Component.literal("这台机体仍在回收入库，驾驶员交接完成后再加入支援。"));return 0;}
         var d=TvCampaignSavedData.get(l);if(d.active.isEmpty()||Set.of("cancel","failure","combat_victory","episode_archived").contains(d.phase)||d.targetDeathConfirmedR45)return 0;
         String supportBlocker=TvEncounterRulesR45.formationSlotBlockerR47(l,d.active,unit);
@@ -72,6 +72,8 @@ public final class TvSortiesR32
         var current=d.sorties.get(unit);
         if(current!=null){caller.sendSystemMessage(Component.literal(name(unit)+"已经在出击编成中。"));return 1;}
         var e=unit(l,unit);
+        if(e!=null&&TvMissionEquipmentR45.awaitingPhysicalReturn(e))
+        {caller.sendSystemMessage(Component.literal("原任务装备仍需完成实际回收入库，不能追加新的出击。"));return 0;}
         if(e!=null&&e.getPilotEntity()!=null&&(npc?!(e.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==unit):e.getPilotEntity()!=caller))
         {caller.sendSystemMessage(Component.literal("这台机体已有其他驾驶员，不能接管。"));return 0;}
         d.assign(unit,caller.getUUID(),npc,rifle&&npc);

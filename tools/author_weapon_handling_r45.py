@@ -47,7 +47,11 @@ def main():
     p.add_argument('--in-place', action='store_true', help='Author one rig into the supplied profile directory without copying the library')
     p.add_argument('--ready-centre',type=float,nargs=3,default=[25,111,-30])
     p.add_argument('--ready-pole',type=float,nargs=3,default=[1,0,-.5])
+    p.add_argument('--calibrated-arm-r49',action='store_true')
     a = p.parse_args()
+    solver=solve
+    if a.calibrated_arm_r49:
+        from calibrated_arm_r49 import solve as solver
     a.out.mkdir(parents=True, exist_ok=a.in_place)
     if a.in_place and a.out.resolve()!=a.profiles.resolve():
         raise ValueError('--in-place requires --out to equal --profiles')
@@ -123,7 +127,7 @@ def main():
         release=float(ease((t-.70)/.30))
         reach=float(ease(t/.34))
         pole=(rest_pole*(1-reach)+np.array([.3,-1,-.4])*reach)*(1-release)+np.asarray(a.ready_pole)*release
-        result = solve(pose, actor.P, 'arm_r', 'forearm_r', 'hand_r',
+        result = solver(pose, actor.P, 'arm_r', 'forearm_r', 'hand_r',
             actor.elbows['r'], wrist, pole, [1, 0, 0], orientation)
         # During free reach and recovery, the wrist is not a ball joint.
         # Keep the handle trajectory but allow its free orientation to follow
@@ -138,7 +142,7 @@ def main():
                 axis=np.cross(palm_direction,forearm);axis/=np.linalg.norm(axis)
                 orientation=R.from_rotvec(axis*(angle-np.radians(45)))*orientation
                 wrist=centre-orientation.apply(grip-actor.P['hand_r'])
-                result=solve(pose,actor.P,'arm_r','forearm_r','hand_r',actor.elbows['r'],wrist,pole,[1,0,0],orientation)
+                result=solver(pose,actor.P,'arm_r','forearm_r','hand_r',actor.elbows['r'],wrist,pole,[1,0,0],orientation)
         maintain_joint_centres(actor, pose)
         grip_world = (pose.matrix('hand_r')@np.r_[grip, 1])[:3]
         # Until the fingers close, the rack retains the knife. Afterwards

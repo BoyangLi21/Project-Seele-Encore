@@ -119,6 +119,20 @@ final class AirCradleClearanceR31
         }
         EvaAirTransportR31.acceptPitch(eva,endPitch);return true;
     }
+    /** Complete posed cargo sweep for airspace admission and dynamic occupants. */
+    static AABB envelopeR50(EvaUnit01Entity eva,Vec3 delta,float targetYaw)
+    {
+        float a=EvaAirTransportR31.acceptedPitch(eva),b=EvaAirTransportR31.pitch(eva,0);
+        var root=eva.position();AABB result=null;
+        for(var part:sections(eva))for(float pitch:new float[]{a,b})for(float yaw:new float[]{eva.getYRot(),targetYaw})
+        {
+            var box=transformed(eva,part,root,pitch,yaw).minmax(transformed(eva,part,root.add(delta),pitch,yaw));
+            result=result==null?box:result.minmax(box);
+        }
+        double arc=(Math.abs(b-a)*2+Math.abs(Mth.wrapDegrees(targetYaw-eva.getYRot())))*Mth.DEG_TO_RAD;
+        if(result==null)throw new IllegalStateException("Original cargo geometry is unavailable");
+        return result.inflate(.02+140*arc*arc/8);
+    }
     /** Position the lowest measured carried part above the receiving surface. */
     static Vec3 landingRoot(EvaUnit01Entity eva,Vec3 floor,float yaw)
     {

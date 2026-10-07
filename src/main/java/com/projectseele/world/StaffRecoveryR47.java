@@ -80,11 +80,21 @@ public final class StaffRecoveryR47
         if (state.jobs.containsKey(unit)) return "这台机体的回收已经在安排，请查看运输状态。";
         var receipt = EvaFleetSavedData.get(level.getServer()).entry(unit).orElse(null);
         if (receipt == null) return "原机体登记尚未接通，不能安排回收。";
-        if (receipt.phase() != EvaFleetSavedData.Phase.DEPLOYED && receipt.phase() != EvaFleetSavedData.Phase.PARKED)
+        if (receipt.phase() != EvaFleetSavedData.Phase.DEPLOYED && receipt.phase() != EvaFleetSavedData.Phase.PARKED
+                &&receipt.phase()!=EvaFleetSavedData.Phase.PLUG_FAULT)
             return "机体仍在机库运输过程中。请等它到安全位置，再安排回收。";
         var eva = EvaLogisticsDirector.canonicalUnit(level, unit);
+        boolean emptyFault=receipt.phase()==EvaFleetSavedData.Phase.PLUG_FAULT;
+        if(emptyFault&&(eva==null||!AutoSortieR32.releaseEmptyFaultBayDelegationR50(caller,eva)))
+            return "故障原机须已经在原湿舱停稳、原栓空置锁定，且无活作战、待指令、运输或未归还装备，才能正常抽栓回收。";
         if (eva != null && eva.getPilotEntity() instanceof ServerPlayer pilot && pilot != caller)
             return "请由当前驾驶员请求回收，或先让驾驶员按原流程离栓。";
+        String ownership=EntryPlugEjectionR48.recoveryCallerBlocker(caller,eva);if(!ownership.isEmpty())return ownership;
+        if(emptyFault)
+        {
+            var recovering=EvaLogisticsDirector.recoverEmptyFaultAtBayR50(caller,unit);
+            if(!recovering.accepted())return recovering.message();
+        }
         var job = new Job(); job.unit = unit; job.eva = receipt.canonicalId(); job.owner = caller.getUUID();
         if(eva!=null&&eva.getPilotEntity() instanceof TrainingPilotEntity pilot){job.npc=true;job.pilot=pilot.getUUID();}
         var sortie=TvCampaignSavedData.get(level).sorties.get(unit);
@@ -93,7 +103,8 @@ public final class StaffRecoveryR47
         job.officer = officer.getUUID(); job.expires = level.getGameTime() + 20 * 60 * 12;
         state.jobs.put(unit, job); state.setDirty(); AutoSortieR32.suspendAutomaticForRecovery(level,unit);
         if(eva!=null){eva.stopAutonomousR30();TvEncounterRulesR45.pauseNpcUnitForRecoveryR47(eva);}
-        return "收到。先安排机体返回所属发射井，再按常规流程回库。驾驶员保持通信。";
+        return emptyFault?"收到。故障原机已在原湿舱，原空栓正沿正常吊架抽出；回吊位后恢复注液和登机桥，未复位或替换机体。"
+                :"收到。先安排机体返回所属发射井，再按常规流程回库。驾驶员保持通信。";
     }
 
     public static boolean cancel(ServerPlayer caller, int unit)
@@ -165,10 +176,12 @@ public final class StaffRecoveryR47
                 if (!phase.equals("DEPLOYED")) { stage(state, job, "MECHANICAL_RECOVERY"); continue; }
                 if (eva.isFirstBattleActive() || eva.isLaunchSequenceActive() || eva.isBerserk())
                 { stage(state, job, "WAIT_SAFE_STATE"); continue; }
-                if (NervAirLiftR30.ownsMotion(eva)) { stage(state, job, "AIRLIFT"); continue; }
                 if(UndergroundSortieR48.recoveringR48(level,job.unit,eva))
                 {stage(state,job,"UNDERGROUND_RECOVERY");continue;}
-                if(UndergroundSortieR48.atDeployedPadR48(level,job.unit,eva))
+                if(NervUndergroundAirLiftR50.pending(level,eva))
+                {stage(state,job,"UNDERGROUND_AIRLIFT");continue;}
+                boolean undergroundRoute=UndergroundSortieR48.undergroundRecoveryRouteR50(level,job.unit,eva);
+                if(undergroundRoute&&NervUndergroundAirLiftR50.directReceiver(level,job.unit,eva))
                 {
                     var reply=UndergroundSortieR48.requestRecoveryR48(owner,job.unit);
                     boolean firstWait=!job.stage.equals("WAIT_UNDERGROUND_INTERLOCK");
@@ -176,6 +189,15 @@ public final class StaffRecoveryR47
                     if(!reply.accepted()&&firstWait)NervStaffDialogue.say(owner,"地下回收联络",reply.message());
                     continue;
                 }
+                if(undergroundRoute||NervUndergroundAirLiftR50.registeredPickup(level,eva))
+                {
+                    String reply=NervAirLiftR30.request(owner,job.unit,true,0,0);
+                    boolean started=NervUndergroundAirLiftR50.pending(level,eva),firstWait=!job.stage.equals("WAIT_UNDERGROUND_AIRPORT");
+                    stage(state,job,started?"UNDERGROUND_AIRLIFT":"WAIT_UNDERGROUND_AIRPORT");
+                    if(!started&&firstWait)NervStaffDialogue.say(owner,"地下运输联络",reply);
+                    continue;
+                }
+                if (NervAirLiftR30.ownsMotion(eva)) { stage(state, job, "AIRLIFT"); continue; }
                 boolean atHead = NervAirLiftR30.waitingAtHead(eva)
                         || eva.position().distanceTo(NervAirLiftR30.head(level, job.unit)) < 8;
                 if (!atHead)

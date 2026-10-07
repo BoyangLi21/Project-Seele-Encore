@@ -32,6 +32,9 @@ public final class TvEncounterRulesR45
     private static final Map<ServerLevel,Set<java.util.UUID>> REMOTE_OBSERVERS=new WeakHashMap<>();
     private record Seen(java.util.UUID target,long generation,long observedAt){}
     private static final Map<ServerLevel,Map<java.util.UUID,Seen>> SEEN=new WeakHashMap<>();
+    private record CannonRefusal(String reason,String phase,boolean frame,String equipment,String cannon,boolean ready,String ray){}
+    private record CannonDiagnostic(long checkedAt,java.util.UUID target,long generation,CannonRefusal refusal){}
+    private static final Map<ServerLevel,Map<java.util.UUID,CannonDiagnostic>> CANNON_DIAGNOSTICS=new WeakHashMap<>();
     public static void installEquipmentControl(EquipmentControl realControl)
     {equipment=java.util.Objects.requireNonNull(realControl);}
     /** Root's real client capability/observer handshake calls this, not a command. */
@@ -96,16 +99,29 @@ public final class TvEncounterRulesR45
     }
     public static boolean visibleToCommander(ServerLevel l,TvCampaignSavedData d,ServerPlayer commander)
     {
-        var site=TvEncounterSitesR45.site(l,d.active).orElse(null);if(site==null||commander==null)return false;
-        if(site.visibility().equals("native_tracking"))return commander.position().distanceTo(site.angel())<=160;
+        var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
+        if(site==null||commander==null||commander.level()!=l||d.angel==null)return false;
+        if(site.visibility().equals("native_tracking"))
+        {
+            var target=l.getEntity(d.angel);
+            boolean participant=commander.getUUID().equals(d.owner)
+                    ||d.sorties.values().stream().anyMatch(s->commander.getUUID().equals(s.commander)
+                        ||!s.npc&&commander.getUUID().equals(s.pilotR45));
+            return participant&&site.geometryValidated()&&site.modelReady()
+                    &&site.id().equals(d.encounterSiteR45)&&site.fingerprint().equals(d.encounterLayoutR45)
+                    &&target instanceof net.minecraft.world.entity.Mob mob&&mob.isAlive()
+                    &&com.projectseele.event.TvEncounterDirectorR45.owned(mob,d)
+                    &&TvEncounterTrackingR50.tracks(l,commander,mob);
+        }
         return site.visibility().equals("remote_actual_entity_v1")
                 &&REMOTE_OBSERVERS.getOrDefault(l,Set.of()).contains(commander.getUUID());
     }
     public static String equipmentBlocker(ServerLevel l,TvCampaignSavedData d)
     {
         if(!d.active.equals("ramiel"))return "";
-        if(d.phase.equals("combat"))
+        if(d.phase.equals("combat")||d.phase.equals("approach"))
             return com.projectseele.event.TvEncounterDirectorR45.combatEquipmentBlockerR48(l,d);
+        if(d.phase.equals("alert"))return "识别与编成确认中；原拉米尔正在钻进。";
         var shooter=TvSortiesR32.assignedUnit(l,d,1);var cover=TvSortiesR32.assignedUnit(l,d,0);
         if(!d.sorties.containsKey(1)||!d.sorties.containsKey(0))return "屋岛编成需要初号机射手与零号机防护，可由玩家或驾驶员加入。";
         if(!TvSortiesR32.readyAssigned(l,d.sorties.get(1))||!TvSortiesR32.readyAssigned(l,d.sorties.get(0)))return "等待初号机与零号机完成整备、发射。";
@@ -126,11 +142,26 @@ public final class TvEncounterRulesR45
     /** Pure role intent; uses the same real root equipment API as human inputs. */
     public static boolean npcTactic(ServerLevel l,TvCampaignSavedData d,EvaUnit01Entity eva,TrainingPilotEntity pilot)
     {
+        if(d.active.equals("gaghiel"))return TvMarineDirectorR50.npcTacticR50(l,d,eva,pilot);
         if(!d.active.equals("ramiel"))return false;
         var goal=unitApproach(l,d,eva.getUnitVariant());if(goal==null){eva.stopAutonomousR30();return true;}
         var boss=d.angel==null?null:l.getEntity(d.angel);
         var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
         Vec3 aim=boss==null?(site==null?goal:site.angel().add(0,7.5,0)):boss.getBoundingBox().getCenter();
+        if(eva.getUnitVariant()==0)
+        {
+            var side=TvYashimaArrivalR50.shieldSide(l);
+            if(side==null||site==null){eva.stopAutonomousR30();d.notice="原盾侧待命通路尚未确认。";return true;}
+            boolean counterattack=boss instanceof com.projectseele.entity.RamielEntity ramiel&&ramiel.isCharging();
+            Vec3 shieldGoal=counterattack?site.cover():side;
+            eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45);
+            // Clearing the gun line is as urgent as entering cover; ordinary
+            // walking across this lane consumes almost the entire core window.
+            NervPilotCombatR30.tacticalMoveR50(eva,pilot,shieldGoal,aim,true);
+            boolean atCover=eva.position().subtract(site.cover()).horizontalDistance()<=1.2&&Math.abs(eva.getY()-site.cover().y)<=1.35;
+            equipment.shieldInput(eva,pilot,counterattack&&atCover&&TvMissionEquipmentR45.operational(eva)&&equipment.shieldEquipped(eva));
+            return true;
+        }
         Vec3 delta=goal.subtract(eva.position()).multiply(1,0,1);
         if(delta.length()>7)return false; // Existing collision-aware travel owns approach.
         eva.autonomousDriveR30(pilot,Vec3.ZERO,aim,false);
@@ -144,16 +175,46 @@ public final class TvEncounterRulesR45
             }
             else if(eva.getUnitVariant()==1)
             {
+                if(TvMissionEquipmentR45.cannonAuthorized(eva))eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_CANNON);
                 var commander=d.owner==null?null:l.getServer().getPlayerList().getPlayer(d.owner);
+                diagnoseCannonRefusalR50(l,d,eva,pilot,commander,boss);
                 if(!d.phase.equals("combat")||!targetFrameReady(l,d,commander)||!equipmentBlocker(l,d).isEmpty())
                 {equipment.cannonInput(eva,pilot,aim,false,false);return true;}
                 if(!equipment.cannonReady(eva))return true;
                 boolean full=eva.getCannonCharge()>=com.projectseele.config.SeeleConfig.CANNON_CHARGE_TICKS.get();
                 boolean exposed=boss instanceof com.projectseele.entity.RamielEntity r&&r.isExposed();
-                equipment.cannonInput(eva,pilot,aim,boss!=null&&!(full&&exposed),full&&exposed);
+                boolean clear=eva.missionCannonRayClearR50(pilot);
+                if(full&&exposed&&!clear)d.notice="阳电子炮真实火线被己方盾面挡住，等待零号机退到侧位。";
+                equipment.cannonInput(eva,pilot,aim,boss!=null&&!(full&&exposed&&clear),full&&exposed&&clear);
             }
         }
         return true;
+    }
+    /** Diagnostics sample the real gates; they never grant fire permission. */
+    private static void diagnoseCannonRefusalR50(ServerLevel level,TvCampaignSavedData data,EvaUnit01Entity eva,
+            TrainingPilotEntity pilot,ServerPlayer commander,net.minecraft.world.entity.Entity boss)
+    {
+        var map=CANNON_DIAGNOSTICS.computeIfAbsent(level,ignored->new java.util.HashMap<>());
+        var previous=map.get(eva.getUUID());long now=level.getGameTime();
+        if(previous!=null&&now>=previous.checkedAt()&&now-previous.checkedAt()<20)return;
+        boolean frame=targetFrameReady(level,data,commander);
+        String equipmentReason=equipmentBlocker(level,data),cannonReason=TvYashimaDirectorR50.cannonBlocker(eva);
+        boolean ready=equipment.cannonReady(eva);
+        // Evaluate the same current physical ray even when the frame gate is
+        // blocked. An unissued cannon has no meaningful cannon ray to report.
+        boolean evaluated=ready&&TvMissionEquipmentR45.cannonAuthorized(eva);
+        boolean clear=evaluated&&eva.missionCannonRayClearR50(pilot);
+        boolean release=eva.getCannonCharge()>=com.projectseele.config.SeeleConfig.CANNON_CHARGE_TICKS.get()
+                &&boss instanceof com.projectseele.entity.RamielEntity ramiel&&ramiel.isExposed();
+        String reason=!data.phase.equals("combat")?"phase":!frame?"target_frame":!equipmentReason.isEmpty()?"equipment"
+                :!cannonReason.isEmpty()?"cannon_service":!ready?"cannon_not_ready":release&&!clear?"friendly_ray":"";
+        var refusal=reason.isEmpty()?null:new CannonRefusal(reason,data.phase,frame,equipmentReason,cannonReason,ready,
+                evaluated?Boolean.toString(clear):"not_evaluated");
+        map.put(eva.getUUID(),new CannonDiagnostic(now,data.angel,data.generationR43,refusal));
+        if(refusal!=null&&(previous==null||previous.generation()!=data.generationR43
+                ||!java.util.Objects.equals(previous.target(),data.angel)||!refusal.equals(previous.refusal())))
+            com.projectseele.ProjectSeele.LOGGER.info("NERV TV06 NPC cannon held unit={} target={} generation={} reason={} phase={} targetFrameReady={} equipmentBlocker={} cannonBlocker={} cannonReady={} actualFriendlyShieldRayClear={}",
+                    eva.getUUID(),data.angel,data.generationR43,reason,data.phase,frame,equipmentReason,cannonReason,ready,refusal.ray());
     }
     /** Root calls this only from the real Ramiel beam-range consumer. */
     public static double missionAttackRange(net.minecraft.world.entity.LivingEntity boss,double configured)
@@ -182,16 +243,33 @@ public final class TvEncounterRulesR45
     {
         if(!(boss.level() instanceof ServerLevel l))return false;
         var d=TvCampaignSavedData.get(l);
-        if(!d.phase.equals("combat")||missionRamielAnchor(boss)==null||d.owner==null)return false;
+        if(!Set.of("alert","approach","combat").contains(d.phase)||d.targetDeathConfirmedR45
+                ||missionRamielAnchor(boss)==null||d.owner==null)return false;
         var owner=l.getServer().getPlayerList().getPlayer(d.owner);
-        return owner!=null&&owner.level()==l&&targetFrameReady(l,d,owner)&&equipmentBlocker(l,d).isEmpty();
+        var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
+        var shooter=TvSortiesR32.assignedUnit(l,d,1);
+        var exposure=TvYashimaSavedDataR50.get(l);
+        // Once exposed, putting the cannon down or leaving its crown does not
+        // remove the threat. Actual beam range and world LOS still own reach.
+        return owner!=null&&owner.level()==l&&site!=null&&site.geometryValidated()&&site.modelReady()
+                &&site.id().equals(d.encounterSiteR45)&&site.fingerprint().equals(d.encounterLayoutR45)
+                &&exposure.matches(d)&&exposure.fireControlLocked&&shooter!=null&&shooter.isAlive()
+                &&shooter.getUUID().equals(exposure.fireTarget)&&boss.getTarget()==shooter;
+    }
+    public static boolean cannonPermissionR50(EvaUnit01Entity eva)
+    {
+        if(!eva.getPersistentData().getBoolean("TvMissionCannonAppliedR45")&&!TvMissionEquipmentR45.cannonAuthorized(eva))return true;
+        if(!(eva.level() instanceof ServerLevel l))return false;
+        var d=TvCampaignSavedData.get(l);var owner=d.owner==null?null:l.getServer().getPlayerList().getPlayer(d.owner);
+        return owner!=null&&owner.level()==l&&d.phase.equals("combat")&&targetFrameReady(l,d,owner)
+                &&obstruction(l,d).isEmpty()&&equipmentBlocker(l,d).isEmpty()&&TvYashimaDirectorR50.cannonBlocker(eva).isEmpty();
     }
     /** Real incoming ray consumer: only this original mission defender can intercept. */
     public static java.util.Optional<Vec3> missionShieldContactR45(net.minecraft.world.entity.Mob boss,Vec3 from,Vec3 to)
     {
         if(!(boss.level() instanceof ServerLevel l)||missionRamielAnchor(boss)==null)return java.util.Optional.empty();
         var d=TvCampaignSavedData.get(l);var cover=TvSortiesR32.assignedUnit(l,d,0);
-        if(!d.phase.equals("combat")||cover==null||!TvMissionEquipmentR45.operational(cover))return java.util.Optional.empty();
+        if(!Set.of("alert","approach","combat").contains(d.phase)||cover==null||!TvMissionEquipmentR45.operational(cover))return java.util.Optional.empty();
         return equipment.shieldBeamContact(cover,from,to);
     }
     /** A tactical hold stops firing while the defender keeps its physical shield posture. */
@@ -213,7 +291,9 @@ public final class TvEncounterRulesR45
             {equipment.cannonInput(eva,pilot,eva.position(),false,false);equipment.shieldInput(eva,pilot,false);eva.stopAutonomousR30();}
         }
     }
-    public static void clearSession(ServerLevel l){REMOTE_OBSERVERS.remove(l);SEEN.remove(l);}
+    public static void clearSession(ServerLevel l){REMOTE_OBSERVERS.remove(l);SEEN.remove(l);CANNON_DIAGNOSTICS.remove(l);}
+    public static void forgetTargetFrameR50(ServerPlayer player,java.util.UUID target)
+    {for(var map:SEEN.values()){var seen=map.get(player.getUUID());if(seen!=null&&seen.target().equals(target))map.remove(player.getUUID());}}
     public static void logout(ServerPlayer player)
     {for(var set:REMOTE_OBSERVERS.values())set.remove(player.getUUID());for(var map:SEEN.values())map.remove(player.getUUID());}
     private TvEncounterRulesR45(){}

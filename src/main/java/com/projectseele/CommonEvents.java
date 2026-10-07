@@ -24,6 +24,7 @@ public class CommonEvents
     public static void onEntityAttributeCreation(EntityAttributeCreationEvent event)
     {
         event.put(ModEntities.RAMIEL.get(), RamielEntity.createAttributes().build());
+        event.put(ModEntities.GAGHIEL.get(), com.projectseele.entity.GaghielEntity.createAttributes().build());
         event.put(ModEntities.EVA_UNIT01.get(), EvaUnit01Entity.createAttributes().build());
         event.put(ModEntities.EVA_UNIT00.get(), EvaUnit01Entity.createAttributes().build());
         event.put(ModEntities.EVA_UNIT02.get(), EvaUnit01Entity.createAttributes().build());

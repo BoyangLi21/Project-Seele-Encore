@@ -24,7 +24,7 @@ final class EvaLockedCagePoseR44
     {
         return !entity.isExperimentalUnit() && entity.isNervLogisticsLocked() && !entity.isFirstBattleActive()
                 && !entity.isCrucified() && !com.projectseele.physics.CombatBodyDynamics.active(entity)
-                && !com.projectseele.entity.EvaShutdownR30.disabled(entity)
+                && !com.projectseele.entity.EvaShutdownR30.displayed(entity)
                 && !com.projectseele.entity.EvaAirTransportR31.active(entity);
     }
 

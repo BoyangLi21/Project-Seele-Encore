@@ -55,7 +55,7 @@ public final class RigidCapsuleGpu
             mesh=new VertexBuffer(VertexBuffer.Usage.STATIC);mesh.bind();mesh.upload(builder.end());VertexBuffer.unbind();PARTS.put(key,mesh);
             if(PARTS.size()==1)ProjectSeele.LOGGER.info("Rigid local-mesh GPU draw path active; first part vertices={}",count);
         }
-        var type=RenderType.entityCutoutNoCull(texture);type.setupRenderState();RenderSystem.setShader(()->shader);
+        var type=ModelRenderTypesR49.entity(texture);type.setupRenderState();RenderSystem.setShader(()->shader);
         shader.safeGetUniform("BoneMat").set(poses.last().pose());shader.safeGetUniform("BoneNormal").set(poses.last().normal());
         shader.safeGetUniform("FrameLight").set((float)(light&65535),(float)(light>>>16&65535));
         shader.safeGetUniform("FrameOverlay").set((float)(overlay&65535),(float)(overlay>>>16&65535));
@@ -67,7 +67,7 @@ public final class RigidCapsuleGpu
     }
     private static boolean drawExternal(Object key,float[] vertices,int stride,float px,float py,float pz,ResourceLocation texture,PoseStack poses,int light,int overlay,float r,float g,float b)
     {
-        var type=RenderType.entityCutoutNoCull(texture);type.setupRenderState();var active=RenderSystem.getShader();
+        var type=ModelRenderTypesR49.entity(texture);type.setupRenderState();var active=RenderSystem.getShader();
         if(active==null||!active.getClass().getName().contains("ExtendedShader")){type.clearRenderState();return false;}
         var layers=EXTERNAL_PARTS.computeIfAbsent(key,k->new java.util.HashMap<>());var cached=layers.get(texture);
         if(cached==null||cached.light()!=light||cached.overlay()!=overlay)

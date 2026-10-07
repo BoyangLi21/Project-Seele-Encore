@@ -231,8 +231,9 @@ public final class CityCreateDistrictR45
         if (active.loadingPlans) return new Tokyo3RetractionDirector.Status("RIGID_LOADING", active.state.depth, active.state.target, 312);
         if (active.state.phase.equals("IDLE") && active.state.queued >= 0 && active.state.queued != active.state.depth)
             return new Tokyo3RetractionDirector.Status("RIGID_QUEUED" + (!active.state.queueFault.isBlank() ? "_BLOCKED" : active.occupied ? "_OCCUPIED" : ""), active.state.depth, active.state.queued, 312);
+        int finishingTarget = active.state.rollback ? active.state.journeySourceDepth : active.state.target;
         return new Tokyo3RetractionDirector.Status("RIGID_" + active.state.phase + (active.occupied ? "_OCCUPIED" : "")
-                + (active.qualityHold ? "_HOLD" : ""), active.state.depth, active.state.target, 312, active.observedMotion());
+                + (active.qualityHold ? "_HOLD" : ""), active.state.depth, finishingTarget, 312, active.observedMotion());
     }
 
     /** Explicit retry/rollback only; foreign source/destination NBT never gets overwritten. */
@@ -890,14 +891,17 @@ public final class CityCreateDistrictR45
 
         Tokyo3RetractionDirector.Motion observedMotion()
         {
-            if (!java.util.Set.of("MOVE", "PLACE", "COVER", "FAULT").contains(state.phase)
+            if (!java.util.Set.of("SPAWN", "READY", "MOVE", "PLACE", "COVER", "FAULT", "REPLAY_OPEN", "REPLAY_DETACH").contains(state.phase)
                     || loadingPlans || plans.size() != towers.size())
                 return Tokyo3RetractionDirector.Motion.UNAVAILABLE;
             double minimum = Double.POSITIVE_INFINITY, maximum = 0, retractionSum = 0;
             int observed = 0;
             for (Plan plan : plans)
             {
+                // Recovered owners can already be resident before SPAWN has
+                // rebuilt the runtime map. Read their original UUID only.
                 Entity entity = entities.get(plan.spec.index());
+                if (entity == null) entity = level.getEntity(plan.owner);
                 if (entity == null || !entity.isAlive() || !entity.getUUID().equals(plan.owner)
                         || !entity.getTags().contains(ownerTag())
                         || !entity.getPersistentData().hasUUID("R45CityJourney")

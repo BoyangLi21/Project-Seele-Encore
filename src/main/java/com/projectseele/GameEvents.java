@@ -339,6 +339,11 @@ public class GameEvents
         if (event.getHand() == InteractionHand.MAIN_HAND
                 && event.getEntity() instanceof ServerPlayer player)
         {
+            // These finite handlers also run at HIGHEST. Preserve their
+            // actual swipe/manual input regardless of listener registration order.
+            if (com.projectseele.world.SeeleConferenceAccessR47.protectedReader(player.serverLevel(), event.getPos())
+                    || com.projectseele.world.FacilityDoorControlsR49.protectedReader(player.serverLevel(), event.getPos())
+                    || com.projectseele.world.FacilityDoorControlsR49.ownsDoor(player.serverLevel(), event.getPos())) return;
             // Reserve the authored door's passage hold before the vanilla
             // button pulse. Keep vanilla use uncancelled for click/animation.
             if (!player.isSpectator()

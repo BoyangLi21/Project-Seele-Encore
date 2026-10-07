@@ -187,9 +187,11 @@ public final class NervArmamentStationRenderer
                     EvaScale.RENDER_SCALE);
             LocalTriangleMeshLayer.renderStandalone(poses, buffers,
                     payload==7?new ResourceLocation(ProjectSeele.MODID,"mesh/yashima_shield_payload.mesh.json")
-                            :payload==6?new ResourceLocation(ProjectSeele.MODID,"mesh/eva02_longsword_payload_r47.mesh.json"):RIFLE_MESH,
+                            :payload==6?new ResourceLocation(ProjectSeele.MODID,"mesh/eva02_longsword_payload_r47.mesh.json")
+                            :payload==2?new ResourceLocation(ProjectSeele.MODID,"mesh/positron_cannon_payload_r50.mesh.json"):RIFLE_MESH,
                     payload==7?new ResourceLocation(ProjectSeele.MODID,"textures/entity/yashima_shield.png")
-                            :payload==6?new ResourceLocation(ProjectSeele.MODID,"textures/entity/eva02_longsword.png"):RIFLE_TEXTURE,light,
+                            :payload==6?new ResourceLocation(ProjectSeele.MODID,"textures/entity/eva02_longsword.png")
+                            :payload==2?new ResourceLocation(ProjectSeele.MODID,"textures/entity/positron_cannon.png"):RIFLE_TEXTURE,light,
                     OverlayTexture.NO_OVERLAY);
             poses.popPose();
         }

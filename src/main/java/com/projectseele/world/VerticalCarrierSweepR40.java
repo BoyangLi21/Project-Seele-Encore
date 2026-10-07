@@ -7,6 +7,7 @@ import com.bulletphysics.util.ObjectArrayList;
 import com.projectseele.entity.*;
 import com.projectseele.physics.CombatBodyProfiles;
 import com.google.gson.JsonArray;
+import java.lang.ref.WeakReference;
 import java.util.*;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.*;
@@ -19,7 +20,52 @@ public final class VerticalCarrierSweepR40
 {
     private static final float SCALE=CombatBodyProfiles.BLOCK_TO_PHYSICS;
     private record Part(String name,ConvexHullShape shape,AABB bounds) {}
+    private static final class MeasuredHull extends ConvexHullShape
+    {
+        final CarrierSupportEscapeR50 support;
+        MeasuredHull(ObjectArrayList<javax.vecmath.Vector3f> points,List<Vec3> vertices)
+        {super(points);support=new CarrierSupportEscapeR50(vertices);}
+    }
     private static final Map<ServerLevel,Map<String,Long>> REPORTED=new WeakHashMap<>();
+    private static final int CACHE_INSTANCES=6;
+    private record CachedParts(WeakReference<EvaUnit01Entity> owner,CombatBodyProfiles.Profile profile,
+                               JsonArray bodies,int[] state,List<Part> parts) {}
+    // One exact geometry per real instance; no world positions, obstacles or
+    // collision results are retained. Values do not retain their level/entity.
+    private static final Map<ServerLevel,Map<UUID,CachedParts>> LOCAL_PARTS=new WeakHashMap<>();
+    private static Map<UUID,CachedParts> localCache(ServerLevel level)
+    {
+        return LOCAL_PARTS.computeIfAbsent(level,ignored->new LinkedHashMap<UUID,CachedParts>(8,.75F,true)
+        {
+            @Override protected boolean removeEldestEntry(Map.Entry<UUID,CachedParts> entry)
+            {return size()>CACHE_INSTANCES;}
+        });
+    }
+    private static boolean sameDefinition(com.google.gson.JsonElement a,com.google.gson.JsonElement b)
+    {
+        if(a==b)return true;
+        if(a==null||b==null||a.getClass()!=b.getClass())return false;
+        if(a.isJsonPrimitive())
+        {
+            var x=a.getAsJsonPrimitive();var y=b.getAsJsonPrimitive();
+            if(x.isNumber()&&y.isNumber())return Double.doubleToRawLongBits(x.getAsDouble())
+                    ==Double.doubleToRawLongBits(y.getAsDouble());
+            return x.equals(y);
+        }
+        if(a.isJsonArray())
+        {
+            var x=a.getAsJsonArray();var y=b.getAsJsonArray();if(x.size()!=y.size())return false;
+            for(int n=0;n<x.size();n++)if(!sameDefinition(x.get(n),y.get(n)))return false;
+            return true;
+        }
+        if(a.isJsonObject())
+        {
+            var x=a.getAsJsonObject();var y=b.getAsJsonObject();if(!x.keySet().equals(y.keySet()))return false;
+            for(var entry:x.entrySet())if(!sameDefinition(entry.getValue(),y.get(entry.getKey())))return false;
+            return true;
+        }
+        return a.equals(b);
+    }
 
     private static Matrix4f matrix(JsonArray values)
     {
@@ -47,7 +93,10 @@ public final class VerticalCarrierSweepR40
     {
         var points=new ObjectArrayList<javax.vecmath.Vector3f>();
         for(var p:vertices)points.add(new javax.vecmath.Vector3f((float)p.x*SCALE,(float)p.y*SCALE,(float)p.z*SCALE));
-        var shape=new ConvexHullShape(points);shape.setMargin(.003F);return shape;
+        // This is a clearance query, not the simulation's contact skin. The
+        // old .003 physics-unit margin inflated limbs by 7.5 cm and produced
+        // false penetration at a real fallen foot beside a platform corner.
+        var shape=new MeasuredHull(points,vertices);shape.setMargin(.001F*SCALE);return shape;
     }
 
     /** Standalone geometry entry used by the regression tests. */
@@ -75,6 +124,11 @@ public final class VerticalCarrierSweepR40
         if(!initial.hasResult)return true;
         if(initial.distance<.0041F)
         {
+            if(body instanceof MeasuredHull measured&&CarrierSupportEscapeR50.pureUp(delta))
+            {
+                if(measured.support.separatesUp(obstacle,delta))return false;
+                if(initial.distance<=0)return true;
+            }
             double separation=initial.normalOnBInWorld.x*delta.x+initial.normalOnBInWorld.y*delta.y+initial.normalOnBInWorld.z*delta.z;
             if(separation>1e-7)return false;
             if(initial.distance>-.0041F&&initial.normalOnBInWorld.y>.9F&&delta.y>=0)return false;
@@ -96,31 +150,61 @@ public final class VerticalCarrierSweepR40
                                      float pitch,float yaw,Vec3 origin,Vec3 delta)
     {
         var profile=CombatBodyProfiles.get(eva);if(profile==null)return null;
-        var parts=new ArrayList<Part>();float heading=(float)Math.toRadians(180-yaw);
-        for(var entry:profile.definition().getAsJsonArray("bodies"))
+        var bodies=profile.definition().getAsJsonArray("bodies");
+        var deformations=new ArrayList<Matrix4f>(bodies.size());
+        // All resolved body matrices include the complete effective pose and
+        // its ancestors. Raw float bits preserve even sub-frame differences.
+        int[] state=new int[14+17*bodies.size()];int at=0;
+        state[at++]=Float.floatToRawIntBits(pitch);state[at++]=Float.floatToRawIntBits(yaw);
+        boolean airborne=EvaAirTransportR31.active(eva);state[at++]=airborne?1:0;
+        var frame=airborne?EvaAirTransportR31.cradleStateR50(eva):null;
+        state[at++]=frame!=null&&frame.getBoolean("Adaptive")?1:0;
+        for(String channel:List.of("HipX","HipY","HipZ","TurnX","TurnY","TurnZ","TurnW"))
+            state[at++]=Float.floatToRawIntBits(frame==null?0:frame.getFloat(channel));
+        state[at++]=Float.floatToRawIntBits(EvaScale.RENDER_SCALE);
+        state[at++]=Float.floatToRawIntBits(CombatBodyProfiles.MODEL_TO_PHYSICS);
+        state[at++]=Float.floatToRawIntBits(SCALE);
+        float[] values=new float[16];
+        for(var entry:bodies)
         {
             var row=entry.getAsJsonObject();String name=row.get("name").getAsString();
             if(!pose.rig.containsKey(name)||!row.has("hulls")||row.getAsJsonArray("hulls").isEmpty())return null;
-            var bind=matrix(row.getAsJsonArray("bind"));var deformation=pose.matrix(name);
-            int piece=0;
-            for(var hull:row.getAsJsonArray("hulls"))
+            var deformation=pose.matrix(name);deformations.add(deformation);deformation.get(values);
+            state[at++]=deformation.properties();
+            for(float value:values)state[at++]=Float.floatToRawIntBits(value);
+        }
+        var cache=localCache(level);var previous=cache.get(eva.getUUID());List<Part> parts;
+        if(previous!=null&&previous.owner().get()==eva&&previous.profile()==profile
+                &&Arrays.equals(previous.state(),state)&&sameDefinition(previous.bodies(),bodies))parts=previous.parts();
+        else
+        {
+            var rebuilt=new ArrayList<Part>();float heading=(float)Math.toRadians(180-yaw);int bodyIndex=0;
+            for(var entry:bodies)
             {
-                var vertices=new ArrayList<Vec3>();AABB bounds=null;
-                for(var vertex:hull.getAsJsonArray())
+                var row=entry.getAsJsonObject();String name=row.get("name").getAsString();
+                var bind=matrix(row.getAsJsonArray("bind"));var deformation=deformations.get(bodyIndex++);
+                int piece=0;
+                for(var hull:row.getAsJsonArray("hulls"))
                 {
-                    var p=bind.transformPosition(CombatBodyProfiles.vector(vertex.getAsJsonArray())).div(CombatBodyProfiles.MODEL_TO_PHYSICS);
-                    deformation.transformPosition(p).mul(EvaScale.RENDER_SCALE);
-                    Vec3 local=new Vec3(p.x,p.y,p.z);
-                    if(EvaAirTransportR31.active(eva))p.set(EvaAirTransportR31.transformLocal(eva,local,pitch));
-                    p.rotateY(heading);
-                    local=new Vec3(p.x,p.y,p.z);vertices.add(local);
-                    var point=new AABB(local,local);bounds=bounds==null?point:bounds.minmax(point);
+                    var vertices=new ArrayList<Vec3>();AABB bounds=null;
+                    for(var vertex:hull.getAsJsonArray())
+                    {
+                        var p=bind.transformPosition(CombatBodyProfiles.vector(vertex.getAsJsonArray())).div(CombatBodyProfiles.MODEL_TO_PHYSICS);
+                        deformation.transformPosition(p).mul(EvaScale.RENDER_SCALE);
+                        Vec3 local=new Vec3(p.x,p.y,p.z);
+                        if(airborne)p.set(EvaAirTransportR31.transformLocal(eva,local,pitch));
+                        p.rotateY(heading);
+                        local=new Vec3(p.x,p.y,p.z);vertices.add(local);
+                        var point=new AABB(local,local);bounds=bounds==null?point:bounds.minmax(point);
+                    }
+                    if(vertices.size()<4)return null;
+                    // The upper torso is a compound of chest and shoulder shells.
+                    // Joining their vertices would fill the gaps between armour.
+                    rebuilt.add(new Part(name+"#"+piece++,shape(vertices),bounds.inflate(.10)));
                 }
-                if(vertices.size()<4)return null;
-                // The upper torso is a compound of chest and shoulder shells.
-                // Joining their vertices would fill the gaps between armour.
-                parts.add(new Part(name+"#"+piece++,shape(vertices),bounds.inflate(.10)));
             }
+            parts=List.copyOf(rebuilt);
+            cache.put(eva.getUUID(),new CachedParts(new WeakReference<>(eva),profile,bodies.deepCopy(),state,parts));
         }
         for(var part:parts)
         {
@@ -130,12 +214,13 @@ public final class VerticalCarrierSweepR40
                 if(!obstacle.intersects(sweep))continue;
                 if(obstructed(part.shape(),obstacle.move(origin.scale(-1)),delta))
                 {
-                    if("r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
+                    // First real obstruction is diagnostic in ordinary play too;
+                    // a repeated blocked frame must not fill the server log.
                     {
                         var seen=REPORTED.computeIfAbsent(level,k->new HashMap<>());if(seen.size()>512)seen.clear();
-                        String key=part.name()+net.minecraft.core.BlockPos.containing(origin)+obstacle.toString();long now=level.getGameTime();
-                        if(now-seen.getOrDefault(key,Long.MIN_VALUE/2)>100)
-                        {seen.put(key,now);com.projectseele.ProjectSeele.LOGGER.info("R40 convex carrier obstruction: part={} root={} delta={} yaw={} obstacle={}",part.name(),origin,delta,yaw,obstacle);}
+                        String key=eva.getUUID()+":"+part.name()+":"+obstacle;long now=level.getGameTime();
+                        if(!seen.containsKey(key))
+                        {seen.put(key,now);com.projectseele.ProjectSeele.LOGGER.info("Carrier obstruction: eva={} part={} root={} delta={} yaw={} obstacle={}",eva.getUUID(),part.name(),origin,delta,yaw,obstacle);}
                     }
                     return false;
                 }

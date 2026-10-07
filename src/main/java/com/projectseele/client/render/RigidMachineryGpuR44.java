@@ -67,7 +67,7 @@ public final class RigidMachineryGpuR44
         ShaderInstance custom = RigidCapsuleGpu.machineryShader();
         if (!external && custom == null || external && !resolveIrisState()) return false;
         BufferUploader.reset();
-        var type = RenderType.entitySolid(texture);
+        var type = ModelRenderTypesR49.solid(texture);
         type.setupRenderState();
         try
         {

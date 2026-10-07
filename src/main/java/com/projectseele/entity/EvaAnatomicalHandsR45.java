@@ -300,12 +300,21 @@ public final class EvaAnatomicalHandsR45
     {
         String forced=System.getProperty("projectseele.handPoseR45","");
         if(!forced.isBlank())return forced;
+        if(e.isFirstBattleActive())
+        {
+            float time=e.firstBattleSignals().time(e,0);
+            if(time>=FirstBattleClip.DEATH_TICK/20F)return "relaxed";
+            if(time>=16.3F)return "grab";
+            if(time>=11.05F)return side.equals("r")?"fist":"support";
+            return time>=5.1F?"grab":"spread";
+        }
         if(EvaWeaponHandlingR45.active(e))return side.equals("r")?"knife":"relaxed";
         if(side.equals("r")&&e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&EvaWeaponHandlingR45.available(e))return "knife";
         if(e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e))return "relaxed";
         if(e.isBerserk()&&!EvaBerserkMotionR34.silent(e))
             return EvaBerserkMotionR34.introduction(e)?"spread":EvaBerserkMotionR34.striking(e)?"grab":"relaxed";
         if(!e.isPoweredOn())return "relaxed";
+        if(EvaMarineBraceR50.target(e)!=null)return "support";
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45)return side.equals("r")?"sword_right":"relaxed";
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_SHIELD_R45)return side.equals("l")?"knife":"relaxed";
         if(EvaFieldActionsR45.active(e)&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS)return "relaxed";

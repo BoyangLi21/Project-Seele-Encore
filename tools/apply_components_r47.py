@@ -13,13 +13,13 @@ def main():
     parser=argparse.ArgumentParser();parser.add_argument('--world',type=Path,required=True)
     parser.add_argument('--components',type=Path,nargs='+',required=True);parser.add_argument('--batch',required=True)
     parser.add_argument('--native-qa',action='store_true')
-    parser.add_argument('--revision',type=int,choices=(47,48),default=47)
+    parser.add_argument('--revision',type=int,choices=(47,48,49),default=47)
     args=parser.parse_args();world=args.world.resolve();base=(ROOT/f'artifacts/rebuild_r{args.revision}').resolve()
     native_sources={base/'native_qa/game/saves'/name for name in (f'SEELE_R{args.revision}_WORLD',f'SEELE_R{args.revision}_RELEASE')}
-    if args.revision==48:
+    if args.revision in(48,49):
         receipt=base/'native_qa/COPY_ONCE.json'
         if receipt.is_file():
-            copy_info=json.loads(receipt.read_text('utf-8-sig'));retained=(base/'native_qa/worlds/SEELE_R48_QA').resolve()
+            copy_info=json.loads(receipt.read_text('utf-8-sig'));retained=(base/f'native_qa/worlds/SEELE_R{args.revision}_QA').resolve()
             if copy_info.get('copied_once') is True and Path(copy_info['qa_world']).resolve()==retained:
                 native_sources.add(retained)
     allowed=world.is_relative_to(base/'construction') or args.native_qa and world in native_sources
@@ -29,7 +29,11 @@ def main():
     rows={};owners=defaultdict(int)
     for component in args.components:
         component=component.resolve()
-        if not component.is_relative_to(base):raise ValueError('Foreign component')
+        r50_airport=(ROOT/'artifacts/rebuild_r50/underground_airport/candidates').resolve()
+        r50_yashima=(ROOT/'artifacts/rebuild_r50/yashima/attempt07_approach').resolve()
+        if not(component.is_relative_to(base)or args.revision==49 and
+                (component.is_relative_to(r50_airport)or component.is_relative_to(r50_yashima))):
+            raise ValueError('Foreign component')
         with gzip.open(component/'forward.jsonl.gz','rt',encoding='utf-8') as stream:
             for line in stream:
                 row=json.loads(line);point=tuple(row['pos']);owners[component.name]+=1

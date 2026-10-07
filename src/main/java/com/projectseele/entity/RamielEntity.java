@@ -117,6 +117,14 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     private int exposedTimer;
     private int rippleCooldown;
 
+    /** The mission armour controller is the only writer of the accepted drilling front. */
+    public void missionDrillR50(boolean active,float depth)
+    {
+        if(this.level().isClientSide)return;
+        this.entityData.set(DATA_DRILLING,active);
+        this.entityData.set(DATA_DRILL_DEPTH,active&&Float.isFinite(depth)?Math.max(0,depth):0F);
+    }
+
     // Players this Angel ever managed to hurt — the flawless-kill bonus
     // (hidden advancement) goes to a slayer who is not on this list.
     private final Set<UUID> hurtPlayers = new HashSet<>();
@@ -761,7 +769,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             LivingEntity target = this.ramiel.getTarget();
             double range = this.ramiel.effectiveBeamRangeR45();
             return this.ramiel.beamCooldown <= 0
-                    && !this.ramiel.isDrilling()
+                    && com.projectseele.world.TvYashimaDirectorR50.fireAiAllowedR50(this.ramiel)
+                    && (!this.ramiel.isDrilling()||com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this.ramiel)!=null)
                     && target != null && target.isAlive()
                     && this.ramiel.distanceToSqr(target) < range * range
                     && this.ramiel.beamLineOfSightR45(target);
@@ -771,7 +780,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         public boolean canContinueToUse()
         {
             LivingEntity target = this.ramiel.getTarget();
-            return this.chargeTicks > 0 && target != null && target.isAlive();
+            return this.chargeTicks > 0 && target != null && target.isAlive()
+                    && com.projectseele.world.TvYashimaDirectorR50.fireAiAllowedR50(this.ramiel);
         }
 
         @Override

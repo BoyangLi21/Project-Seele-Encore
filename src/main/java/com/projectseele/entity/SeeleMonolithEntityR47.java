@@ -39,7 +39,7 @@ public final class SeeleMonolithEntityR47 extends Entity
     @Override public boolean canBeCollidedWith(){return true;}
     @Override public net.minecraft.world.phys.AABB getBoundingBoxForCulling()
     {
-        return number()==0?new net.minecraft.world.phys.AABB(getX()-17.5,getY(),getZ()-7,getX()+17.5,getY()+1.1,getZ()+7):getBoundingBox();
+        return number()==0?new net.minecraft.world.phys.AABB(getX()-2.3,getY(),getZ()-.9,getX()+2.3,getY()+7.3,getZ()+.9):getBoundingBox();
     }
     @Override public boolean isPickable(){return false;}
     @Override public boolean isPushable(){return false;}

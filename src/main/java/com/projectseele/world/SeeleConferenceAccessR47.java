@@ -104,7 +104,7 @@ public final class SeeleConferenceAccessR47
         return player.getItemInHand(hand).getItem() instanceof NervAccessCardR44 card && card.clearance() >= 3;
     }
 
-    private static boolean meetingEgress(ServerPlayer player)
+    private static boolean insideMeetingArea(ServerPlayer player)
     {
         if (Math.abs(player.getY() - MIDDLE) > 2) return false;
         double x = player.getX(), z = player.getZ();
@@ -114,7 +114,7 @@ public final class SeeleConferenceAccessR47
 
     private static boolean withinLiftOrRoom(ServerPlayer player)
     {
-        if (meetingEgress(player)) return true;
+        if (insideMeetingArea(player)) return true;
         return player.getX() >= 22 && player.getX() <= 34 && player.getZ() >= 312 && player.getZ() <= 329
                 && player.getY() >= -390 && player.getY() <= -332;
     }
@@ -126,7 +126,15 @@ public final class SeeleConferenceAccessR47
         return lease != null && lease.until() > player.serverLevel().getGameTime() && withinLiftOrRoom(player);
     }
 
-    /** Ordinary endpoints and safe egress never consume or require admission. */
+    public static void grantRoomSwipeR49(ServerPlayer player,InteractionHand hand)
+    {
+        if(!FacilityDoorControlsR49.installed(player.serverLevel())||!withinLiftOrRoom(player)
+                ||player.isSpectator()||!highest(player,hand))return;
+        LEASES.computeIfAbsent(player.serverLevel().getServer(),ignored->new HashMap<>())
+                .put(player.getUUID(),new Lease(player.serverLevel().getGameTime()+600));
+    }
+
+    /** Ordinary lift endpoints stay public; the meeting stop always needs an actual swipe. */
     public static boolean allowDestination(ServerPlayer player, int targetY)
     {
         if (targetY != MIDDLE)
@@ -134,16 +142,15 @@ public final class SeeleConferenceAccessR47
             if (Math.abs(player.getY() - MIDDLE) < 2) revoke(player);
             return true;
         }
-        if (meetingEgress(player) || leased(player)) return true;
+        if (leased(player)) return true;
         player.displayClientMessage(Component.literal("SEELE 会议室需先刷最高权限卡；请使用本层读卡器。"), true);
         return false;
     }
 
-    /** Gates this fixed landing while allowing an already-present occupant to leave. */
+    /** The room's two-sided card door supplies a fresh egress lease. Presence never grants one. */
     public static boolean canOpenLanding(ServerLevel level)
     {
-        return level.players().stream().anyMatch(player -> meetingEgress(player)
-                || leased(player) && Math.abs(player.getY() - MIDDLE) < 3
+        return level.players().stream().anyMatch(player -> leased(player) && Math.abs(player.getY() - MIDDLE) < 3
                 && player.getX() >= 25 && player.getX() <= 32 && player.getZ() >= 315 && player.getZ() <= 325);
     }
 
@@ -177,11 +184,6 @@ public final class SeeleConferenceAccessR47
                 : highest(player, InteractionHand.MAIN_HAND) ? InteractionHand.MAIN_HAND : event.getHand();
         if (!highest(player, hand))
         {
-            if (event.getPos().equals(MID_READER) && meetingEgress(player))
-            {
-                S20MovingElevatorsAdapter.handleExternalCall(player, MID_READER);
-                return;
-            }
             visual(player.serverLevel(), event.getPos(), -1, 3, 0);
             player.displayClientMessage(Component.literal("权限不足：需要最高权限NERV卡。"), true);
             return;

@@ -171,6 +171,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
             return;
         }
 
+        if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
+        {this.maintainSurfaceSupplyR50();return;}
         if(!com.projectseele.world.EquipmentVaultsR47.beforeMechanicalTick(this))return;
         this.phaseTicks++;
         if(this.level() instanceof ServerLevel server&&this.getStationState()!=STOWED&&this.getStationState()!=READY&&this.tickCount%40==0)
@@ -355,6 +357,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         {
             return false;
         }
+        if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
+        {this.maintainSurfaceSupplyR50();return this.isStocked();}
         if(this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE&&!this.isStocked())return false;
         if (this.getStationState() == EMPTY
                 || this.getStationState() == DOOR_CLOSING
@@ -377,6 +381,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
 
     public boolean recall()
     {
+        if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
+        {if(!this.level().isClientSide)this.maintainSurfaceSupplyR50();return false;}
         if (this.level().isClientSide
                 || (this.getStationState() != READY
                 && this.getStationState() != DOOR_OPENING))
@@ -438,6 +444,19 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         if(!com.projectseele.world.TvMissionEquipmentR45.issueFromStation(this,eva,actualPilot))return false;
         this.entityData.set(DATA_STOCKED,false);this.transition(EMPTY);
         eva.acceptIssuedTvMissionEquipmentR45();return true;
+    }
+    /** One committed new supply receipt updates the same physical rack's real stock. */
+    public boolean commissionTvMissionSupplyR50(int unit,String receipt)
+    {
+        if(!com.projectseele.world.TvMissionEquipmentR45.commissionNewSupply(this,unit,receipt))return false;
+        this.entityData.set(DATA_STOCKED,true);return true;
+    }
+    /** The declared open surface frame stays above ground; this never replenishes an item. */
+    private void maintainSurfaceSupplyR50()
+    {
+        boolean stocked=com.projectseele.world.TvMissionEquipmentR45.physicalStockPresent(this);
+        this.entityData.set(DATA_STOCKED,stocked);this.setLift(1F);this.setHatch(1F);this.setDoor(1F);
+        this.entityData.set(DATA_STATE,stocked?READY:EMPTY);this.phaseTicks=0;this.deployQueued=false;
     }
 
     public boolean issueToAssignedPilotR30(TrainingPilotEntity pilot,EvaUnit01Entity eva)
@@ -515,7 +534,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     public float podTravelR47(){return this.payloadR47()==7?53.0F:43.0F;}
     public float podHeightR47(){return this.payloadR47()==7?52.0F:42.0F;}
     public void setPayloadR47(int payload)
-    {this.entityData.set(DATA_PAYLOAD_R47,payload==6||payload==7?payload:EvaUnit01Entity.WEAPON_RIFLE);this.refreshDimensions();}
+    {this.entityData.set(DATA_PAYLOAD_R47,payload==2||payload==6||payload==7?payload:EvaUnit01Entity.WEAPON_RIFLE);this.refreshDimensions();}
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key)
     {
         super.onSyncedDataUpdated(key);
@@ -523,6 +542,8 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     }
     public void returnStoredPayloadR47()
     {
+        if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
+        {if(!this.level().isClientSide)this.maintainSurfaceSupplyR50();return;}
         if(!this.level().isClientSide&&this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE)
             this.entityData.set(DATA_STOCKED,true);
     }

@@ -73,9 +73,12 @@ public final class CityRigidGenerationR45
             // cannot safely define future generation on their own.
             Path ledgerFile = binding.root.resolve("projectseele_city_rigid_control_r45_" + Long.toUnsignedString(binding.origin.asLong()) + ".dat");
             CompoundTag ledger = Files.isRegularFile(ledgerFile) ? NbtIo.readCompressed(ledgerFile.toFile()).getCompound("data") : new CompoundTag();
+            CompoundTag declared=CityRigidTopologyR45.declared(binding.level,binding.origin);
+            CityLowriseAddonR48.validateRetainedLedger(declared,ledger);
             if (!ledger.isEmpty() && !binding.world.equals(ledger.getString("WorldUUID"))) throw new IllegalStateException("Foreign future-cargo ledger");
             int depth = ledger.isEmpty() ? data.getInt("InitialDepth") : ledger.getInt("Depth");
             boolean detached = !ledger.isEmpty() && ledger.getBoolean("WorldTouched") && !ledger.getString("Phase").equals("IDLE");
+            CompoundTag recipeEpoch=detached?new CompoundTag():CityLowriseAddonR48.recipeLedger(declared,ledger);
             var palette = data.getList("Palette", Tag.TAG_COMPOUND);
             BlockState[] statePalette = new BlockState[palette.size()];
             for (int i = 0; i < statePalette.length; i++) statePalette[i] = NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), palette.getCompound(i));
@@ -83,18 +86,20 @@ public final class CityRigidGenerationR45
             {
                 CompoundTag cell = ((CompoundTag) raw).copy();
                 if (cell.contains("StateId") && !palette.getCompound(cell.getInt("StateId")).getString("Name").equals("projectseele:retractable_building_core"))
-                { write(chunk, cell, statePalette[cell.getInt("StateId")]); continue; }
+                { write(binding.level,chunk, cell, statePalette[cell.getInt("StateId")]); continue; }
                 if (cell.contains("StateId")) cell.put("State", palette.getCompound(cell.getInt("StateId")).copy());
                 if (cell.getCompound("State").getString("Name").equals("projectseele:retractable_building_core"))
                     cell.getCompound("State").getCompound("Properties").putString("armed", Boolean.toString(depth > 0));
-                write(chunk, cell);
+                write(binding.level,chunk, cell);
             }
             if (detached) return; // Source/target chunks are leased during travel; never duplicate held cargo.
             for (Tag raw : data.getList("Ground", Tag.TAG_COMPOUND))
             {
                 CompoundTag cell = ((CompoundTag) raw).copy();
-                if (depth > 0 || cell.getInt("Object") >= 93)
-                { write(chunk, cell, statePalette[cell.getInt("StateId")]); }
+                int object=cell.getInt("Object");
+                if(object<0||object>=binding.towers.size())throw new IllegalStateException("Foreign ground owner in installed city recipe");
+                if (depth > 0 || CityLowriseAddonR48.retainsRaisedStreetCover(binding.towers.get(object)))
+                { write(binding.level,chunk, cell, statePalette[cell.getInt("StateId")]); }
             }
             for (int index = 0; index < binding.towers.size(); index++)
             {
@@ -109,9 +114,9 @@ public final class CityRigidGenerationR45
                 CompoundTag building = cargo.getList("Buildings", Tag.TAG_COMPOUND).getCompound(0);
                 // After a completed trip, use its immutable last observed full
                 // cells rather than restoring an older install inventory.
-                if (!ledger.isEmpty() && ledger.getInt("SavedPlans") == 96)
+                if (!recipeEpoch.isEmpty() && CityLowriseAddonR48.hasCommittedRecipeJournal(recipeEpoch.getInt("SavedPlans"),index,binding.towers.size()))
                 {
-                    Path journal = binding.root.resolve("city_rigid_journal_r45").resolve(ledger.getUUID("Journey").toString()).resolve(index + ".dat");
+                    Path journal = binding.root.resolve("city_rigid_journal_r45").resolve(recipeEpoch.getUUID("Journey").toString()).resolve(index + ".dat");
                     CompoundTag plan = NbtIo.readCompressed(journal.toFile());
                     if (!binding.world.equals(plan.getString("WorldUUID"))) throw new IllegalStateException("Foreign future journey cargo");
                     List<CompoundTag> converted = new java.util.ArrayList<>();
@@ -129,7 +134,7 @@ public final class CityRigidGenerationR45
                     CompoundTag cell = (CompoundTag) raw; BlockPos local = BlockPos.of(cell.getLong("Pos"));
                     BlockPos pos = new BlockPos(tower.centre().getX() + local.getX(), base + local.getY(), tower.centre().getZ() + local.getZ());
                     if ((pos.getX() >> 4) != chunk.getPos().x || (pos.getZ() >> 4) != chunk.getPos().z) continue;
-                    CompoundTag value = cell.copy(); value.putLong("Pos", pos.asLong()); write(chunk, value);
+                    CompoundTag value = cell.copy(); value.putLong("Pos", pos.asLong()); write(binding.level,chunk, value);
                 }
             }
             chunk.setUnsaved(true);
@@ -137,15 +142,16 @@ public final class CityRigidGenerationR45
         catch (Exception failure) { throw new IllegalStateException("Failed exact future96 topology/cargo; no legacy generation fallback", failure); }
     }
 
-    private static void write(ChunkAccess chunk, CompoundTag cell)
+    private static void write(ServerLevel level,ChunkAccess chunk, CompoundTag cell)
     {
-        write(chunk, cell, NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), cell.getCompound("State")));
+        write(level,chunk, cell, NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), cell.getCompound("State")));
     }
 
-    private static void write(ChunkAccess chunk, CompoundTag cell, BlockState state)
+    private static void write(ServerLevel level,ChunkAccess chunk, CompoundTag cell, BlockState state)
     {
         BlockPos pos = BlockPos.of(cell.getLong("Pos"));
         if ((pos.getX() >> 4) != chunk.getPos().x || (pos.getZ() >> 4) != chunk.getPos().z) throw new IllegalStateException("Future shard crosses chunk identity");
+        if(!NervArmorColumnR50.permitsGenerationR50(level,pos,state))return;
         chunk.removeBlockEntity(pos);
         chunk.setBlockState(pos, state, false);
         if (cell.contains("NBT", Tag.TAG_COMPOUND))

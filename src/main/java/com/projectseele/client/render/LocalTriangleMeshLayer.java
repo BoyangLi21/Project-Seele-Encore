@@ -139,7 +139,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             }
         }
         VertexConsumer targetBuffer = this.textureSelector == null ? buffer
-                : bufferSource.getBuffer(RenderType.entityCutoutNoCull(
+                : bufferSource.getBuffer(ModelRenderTypesR49.entity(
                         this.textureSelector.apply(animatable)));
         float[] values = skinVertices(mesh,part,bone);
         int stride = mesh.stride();
@@ -225,6 +225,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     {
         EvaEyeMaterialsR42.reload();
         RigidCapsuleGpu.clear();
+        ModelRenderTypesR49.clear();
         CACHE.clear();
         LOAD_ATTEMPTED.clear();
         EvaHeadClearance.clear();

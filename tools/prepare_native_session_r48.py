@@ -15,13 +15,18 @@ def same(a,b):
 def main():
  p=argparse.ArgumentParser();p.add_argument('--jar',type=Path,required=True);p.add_argument('--overlay',type=Path,required=True);p.add_argument('--runtime',type=Path,required=True)
  p.add_argument('--source-world',type=Path,required=True);p.add_argument('--qa-world',type=Path,required=True);p.add_argument('--server-root',type=Path,required=True)
- p.add_argument('--copy-receipt',type=Path,required=True);p.add_argument('--launch-template',type=Path,default=DEFAULT);p.add_argument('--out',type=Path,required=True);p.add_argument('--run',action='store_true');p.add_argument('--hold-open',action='store_true');p.add_argument('--timeout',type=int,default=1200);a=p.parse_args()
+ p.add_argument('--copy-receipt',type=Path,required=True);p.add_argument('--launch-template',type=Path,default=DEFAULT);p.add_argument('--out',type=Path,required=True);p.add_argument('--run',action='store_true');p.add_argument('--hold-open',action='store_true');p.add_argument('--timeout',type=int,default=1200)
+ p.add_argument('--revision',type=int,choices=(48,49),default=48);a=p.parse_args()
  for k in('jar','overlay','runtime','source_world','qa_world','server_root','copy_receipt','out'):setattr(a,k,getattr(a,k).resolve())
- assert a.source_world==(ROOT/'artifacts/rebuild_r48/construction/SEELE_R48_WORLD').resolve(),'Only the confirmed R48 construction source is allowed'
- assert a.qa_world.is_relative_to((ROOT/'artifacts/rebuild_r48/native_qa').resolve())and a.server_root.is_relative_to((ROOT/'artifacts/rebuild_r48/native_qa').resolve()),'Root QA server and world must stay in the named R48 native_qa workspace'
+ base=ROOT/f'artifacts/rebuild_r{a.revision}'
+ assert a.source_world==(base/f'construction/SEELE_R{a.revision}_WORLD').resolve(),'Only the confirmed construction source is allowed'
+ assert a.qa_world.is_relative_to((base/'native_qa').resolve())and a.server_root.is_relative_to((base/'native_qa').resolve()),'Root QA server and world must stay in the named native_qa workspace'
  assert a.source_world!=a.qa_world and not a.qa_world.is_relative_to(a.source_world)and not a.source_world.is_relative_to(a.qa_world),'QA must be a distinct Root-only once-copied directory'
  assert(a.source_world/'level.dat').is_file()and a.jar.is_file()and a.overlay.is_dir()and a.runtime.is_dir()
- from r48_selected_payload import validate_selected_payload,validate_identity_coverage
+ if a.revision==49:
+  from r49_selected_payload import validate_selected_payload,validate_identity_coverage
+ else:
+  from r48_selected_payload import validate_selected_payload,validate_identity_coverage
  identity_coverage=validate_identity_coverage(a.overlay,a.runtime)
  selected_payload=validate_selected_payload(a.jar,a.overlay)
  with zipfile.ZipFile(a.jar)as z:

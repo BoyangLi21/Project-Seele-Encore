@@ -41,6 +41,8 @@ public class ServerboundEvaControlPacket
     public static final int ACTION_GRAPPLE=22;
     public static final int ACTION_RIFLE_SIGHT_START_R45=23;
     public static final int ACTION_RIFLE_SIGHT_STOP_R45=24;
+    public static final int ACTION_DASH_START_R50=25;
+    public static final int ACTION_DASH_STOP_R50=26;
 
     public final int action;
     public final int requestId;
@@ -103,6 +105,8 @@ public class ServerboundEvaControlPacket
                     case ACTION_CROUCH_STOP -> eva.setPilotCrouching(sender, false);
                     case ACTION_SPRINT_START -> eva.setPilotSprinting(sender, true);
                     case ACTION_SPRINT_STOP -> eva.setPilotSprinting(sender, false);
+                    case ACTION_DASH_START_R50 -> com.projectseele.entity.EvaSprintR50.request(eva,sender,true);
+                    case ACTION_DASH_STOP_R50 -> com.projectseele.entity.EvaSprintR50.request(eva,sender,false);
                     case ACTION_JUMP -> {
                         if (this.requestId >= 0)
                         {

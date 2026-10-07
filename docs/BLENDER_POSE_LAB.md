@@ -1,5 +1,7 @@
 # Project SEELE 初号机 Blender 动作台使用手册
 
+> R50入口更新：旧 `start_pose_lab.bat` / `rebuild_pose_lab.bat` 已归档退休，底层Python动作台保留。本页记录旧动作台的功能与素材范围，当前游戏制作入口见 [启动入口清理](LAUNCHER_CLEANUP_R50.md)。
+
 这套动作台的目的不是在 Blender 里重新建模，而是让人类能直接看到并调整
 Minecraft 实际使用的初号机骨架。它读取本机 `eva_real_model` 资源包里的：
 
@@ -15,32 +17,36 @@ Minecraft 实际使用的初号机骨架。它读取本机 `eva_real_model` 资�
 
 ## 1. 正确启动方式
 
-双击：
+先设置 `BLENDER_EXE` 为所选Blender可执行文件，再显式打开已经保存的实验文件并加载面板：
 
-```text
-D:\eva\tools\start_pose_lab.bat
+```powershell
+& $env:BLENDER_EXE 'D:/eva/external-assets/work/pose-lab/Project_SEELE_Unit01_PoseLab.blend' --python 'D:/eva/tools/blender_pose_lab.py' -- --interactive
 ```
 
-第一次启动如果动作台还不存在，脚本会先在后台构建：
+实验文件位置：
 
 ```text
 D:\eva\external-assets\work\pose-lab\Project_SEELE_Unit01_PoseLab.blend
 ```
 
 以后不要直接双击 `.blend`。直接双击虽然能看到模型，但不会注册右侧的
-`Project SEELE` 工具面板。始终从 `start_pose_lab.bat` 进入。
+`Project SEELE` 工具面板。用上面的Python面板加载命令进入，文件不存在时先显式构建，不再自动覆盖实验文件。
 
 动作台、参考图、截图和导出的 JSON 全在 `external-assets/` 中，已经被 Git
 忽略，不会误提交第三方模型或参考图。
 
 ### 不要随便运行重建脚本
 
-`D:\eva\tools\rebuild_pose_lab.bat` 会重新生成固定的 `.blend`，因此会覆盖尚未
+`tools/blender_pose_lab.py --build` 会重新生成固定的 `.blend`，因此会覆盖尚未
 导出的人工姿势。只有以下情况才运行它：
 
 1. Codex 修改了导入器或骨架结构并明确让你重建；
 2. `.blend` 已经损坏；
 3. 你的重要姿势都已点过“导出当前动作 JSON”。
+
+```powershell
+& $env:BLENDER_EXE --background --python 'D:/eva/tools/blender_pose_lab.py' -- --build --validate --render-check 'D:/eva/external-assets/work/pose-lab/build_check.png'
+```
 
 ## 2. 第一次进入 Blender 后
 
@@ -51,7 +57,7 @@ D:\eva\external-assets\work\pose-lab\Project_SEELE_Unit01_PoseLab.blend
 5. 点击“正”机位，确认整台初号机面向你、脚底在地面线上。
 
 如果没看到面板，说明你是直接打开了 `.blend`；关闭 Blender，然后用
-`start_pose_lab.bat` 重开。
+第1节的Python面板加载命令重开。
 
 ## 3. Blender 界面中只需要认识的部分
 
@@ -510,7 +516,7 @@ D:\eva\external-assets\work\pose-lab\captures\<姿势_时间>\
 - 骨骼不见了：在 Outliner 选 `SEELE_Unit01_Rig`，再进入 Pose Mode；
 - 误入 Edit Mode：立刻按 `Tab` 返回，不要保存骨架结构修改；
 - 左右搞混：记住 `_l` 是 EVA 自己的左侧，正面看位于屏幕右侧；
-- 模型彻底改乱：先确认重要动作已导出，再运行 `rebuild_pose_lab.bat`。
+- 模型彻底改乱：先确认重要动作已导出，再显式执行第1节的Python重建命令。
 
 ## 16. 人工与 Codex 的协作闭环
 

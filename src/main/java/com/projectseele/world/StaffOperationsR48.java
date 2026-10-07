@@ -27,6 +27,22 @@ public final class StaffOperationsR48
         if(operator.busy()||StaffCommandBookR24.order(operator)!=null)return "本岗位仍在执行上一项指令，请完成后再安排。";
         return "";
     }
+    private static boolean ownAutomaticLaunch(ServerPlayer caller,NervStaffEntity operator,int variant)
+    {
+        var queued=operator==null?null:StaffCommandBookR24.order(operator);
+        return queued!=null&&queued.automatic&&queued.unit==variant&&queued.operation.equals("launch")
+                &&queued.owner.equals(caller.getUUID())&&operator.isAlive()&&operator.level()==caller.level()
+                &&NervStaffDialogue.authorized(caller)&&StaffAuthorityR25.allows(operator,"deploy")
+                &&EvaLogisticsDirector.status(caller.serverLevel(),variant).phase().equals("SILO_READY");
+    }
+    private static boolean ownAutomaticEquipmentOrder(ServerPlayer caller,NervStaffEntity operator,int variant)
+    {
+        var queued=operator==null?null:StaffCommandBookR24.order(operator);
+        return queued!=null&&queued.automatic&&queued.unit==variant
+                &&Set.of("prepare","launch").contains(queued.operation)&&queued.owner.equals(caller.getUUID())
+                &&operator.isAlive()&&operator.level()==caller.level()&&NervStaffDialogue.authorized(caller)
+                &&StaffAuthorityR25.allows(operator,"campaign");
+    }
     private static boolean canonical(ServerLevel level,EvaUnit01Entity eva,int variant)
     {
         return eva!=null&&eva.isAlive()&&!eva.isExperimentalUnit()&&eva.level()==level&&eva.getUnitVariant()==variant
@@ -35,17 +51,38 @@ public final class StaffOperationsR48
     }
     private static String targetBlocker(ServerPlayer caller,EvaUnit01Entity eva,int variant,UUID expectedPilot,boolean npcPilot)
     {
+        return targetBlocker(caller,eva,variant,expectedPilot,npcPilot,true,true);
+    }
+    private static String targetBlocker(ServerPlayer caller,EvaUnit01Entity eva,int variant,UUID expectedPilot,boolean npcPilot,boolean preparedLaunchChoice)
+    {
+        return targetBlocker(caller,eva,variant,expectedPilot,npcPilot,preparedLaunchChoice,false);
+    }
+    private static String targetBlocker(ServerPlayer caller,EvaUnit01Entity eva,int variant,UUID expectedPilot,boolean npcPilot,
+                                        boolean preparedLaunchChoice,boolean equipmentChoice)
+    {
         var level=caller.serverLevel();
         if(!canonical(level,eva,variant))return "原机体信号尚未接通，未替换或接管其他机体。";
         var assignment=TvCampaignSavedData.get(level).sorties.get(variant);
         if(assignment!=null&&(!caller.getUUID().equals(assignment.commander)||assignment.npc!=npcPilot
                 ||assignment.eva!=null&&!eva.getUUID().equals(assignment.eva)
                 ||assignment.pilotR45!=null&&!expectedPilot.equals(assignment.pilotR45)))return "这台机体已有其他驾驶员或指挥员的编成。";
+        String phase=EvaLogisticsDirector.status(level,variant).phase();
+        boolean gearPreparing=equipmentChoice&&assignment!=null&&eva.getUUID().equals(assignment.eva)
+                &&Set.of("PARKED","BRIDGE_RETRACTING","PLUG_INSERTING","PLUG_LOCKING","DRAINING","TO_SILO","SILO_READY").contains(phase);
         var tag=eva.getPersistentData();
+        if(equipmentChoice&&AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),
+                tag.getString("R43AutoMission"),AutoSortieR32.missionToken(level)))
+            return "本次原机体的后续出击已取消，请先重新确认原出击编成，再安排专用装备。";
+        AutoSortieR32.acceptOriginalHumanBoardingR50(level,eva,caller);
         if(tag.hasUUID("R32SortieCommander")&&!caller.getUUID().equals(tag.getUUID("R32SortieCommander")))return "机体仍由另一位指挥员受托，请先联系原下令人。";
         var order=StaffCommandBookR24.unitOrder(level,variant);
-        if(order!=null)return "这台机体仍有待执行的整备指令，请完成后再安排。";
-        if(StaffPilotOrdersR25.pending(level).stream().anyMatch(p->p.unit()==variant))return "驾驶员已有待执行的登机或下机指令。";
+        if(order!=null&&!(order.automatic&&order.owner.equals(caller.getUUID())
+                &&(preparedLaunchChoice&&order.operation.equals("launch")&&phase.equals("SILO_READY")
+                    ||gearPreparing&&Set.of("prepare","launch").contains(order.operation))))
+            return "这台机体仍有待执行的整备指令，请完成后再安排。";
+        if(StaffPilotOrdersR25.pending(level).stream().anyMatch(p->p.unit()==variant
+                &&!(gearPreparing&&!p.standby()&&p.caller().equals(caller.getUUID()))))
+            return "驾驶员已有待执行的登机或下机指令。";
         if(StaffRecoveryR47.pending(level,variant)||PilotReturnR39.controls(eva)||EvaAirTransportR31.active(eva))return "原机体正在回收或运输，暂时不能追加出击。";
         var actual=eva.getPilotEntity();var plug=EntryPlugDirector.canonical(level,variant);
         if(plug==null||plug.getAssignedVariant()!=variant||plug.getLinkedEva()!=eva)return "原插入栓与机体对应关系未确认。";
@@ -53,10 +90,12 @@ public final class StaffOperationsR48
         if(actual!=null&&!expectedPilot.equals(actual.getUUID())||occupant!=null&&!expectedPilot.equals(occupant.getUUID()))return "原插入栓或机体已有其他驾驶员，不能接管。";
         var controlled=EvaPilotResolver.controlTarget(caller);
         if(!npcPilot&&controlled!=null&&controlled!=eva)return "您正在控制另一台机体，请先确认目标。";
-        String phase=EvaLogisticsDirector.status(level,variant).phase();
-        if(!Set.of("PARKED","SILO_READY","DEPLOYED").contains(phase)||eva.isLaunchSequenceActive()
+        if(!Set.of("PARKED","SILO_READY","DEPLOYED").contains(phase)&&!gearPreparing
+                ||eva.isLaunchSequenceActive()&&!(preparedLaunchChoice&&phase.equals("SILO_READY")
+                    &&eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_LOCKED&&!eva.isLaunchCommandReleased())
                 ||eva.isFirstBattleActive()||EvaShutdownR30.wreck(eva)||EvaBayRepairR33.active(eva)
-                ||!phase.equals("PARKED")&&EvaShutdownR30.disabled(eva))return "原机体当前仍在机械作业或停机阶段，未追加出击。";
+                ||!phase.equals("PARKED")&&EvaShutdownR30.disabled(eva)
+                    &&!(gearPreparing&&EvaShutdownR30.mode(eva)==EvaShutdownR30.EMPTY))return "原机体当前仍在机械作业或停机阶段，未追加出击。";
         return "";
     }
     private static EquipmentVaultsR47.State vaultState(ServerLevel level)
@@ -75,7 +114,9 @@ public final class StaffOperationsR48
     public static EvaLogisticsDirector.ActionResult armedSortie(ServerPlayer caller,NervStaffEntity operator,int variant,boolean npcPilot)
     {
         if(variant!=0&&variant!=2)return result(false,"携盾对应零号机，携剑对应二号机。");
-        String blocked=callerBlocker(caller,operator,"campaign");if(!blocked.isEmpty())return result(false,blocked);
+        String blocked=callerBlocker(caller,operator,"campaign");
+        if(!blocked.isEmpty()&&!ownAutomaticEquipmentOrder(caller,operator,variant))
+            return result(false,blocked);
         var level=caller.serverLevel();
         if(TvCampaignDirector.level(caller)!=level)return result(false,"请进入已配置的NERV作战区域。");
         EvaLogisticsDirector.loadControlTarget(level,variant);var eva=EvaLogisticsDirector.canonicalUnit(level,variant);
@@ -95,6 +136,8 @@ public final class StaffOperationsR48
         UUID borrowed=loan(level,well);
         if(borrowed!=null&&!borrowed.equals(eva.getUUID()))return result(false,"这件装备仍由其他原机体借用，等待归还。");
         if(borrowed!=null&&(eva.getArmamentMask()&(1<<payload))==0)return result(false,"原装备借用记录与机体库存不一致，请先检查原交接。");
+        if(borrowed==null&&(eva.getArmamentMask()&(1<<payload))!=0)
+            return result(false,"机体已有专用装备，但原武器井没有对应借用记录，请核对原交接后再出击。");
         if(borrowed==null&&!well.isStocked())return result(false,"对应原武器井当前空载，请等待装备归还。");
         var saved=ArmedSortieSavedDataR48.get(level);var prior=saved.selection(variant);
         String before=AutoSortieR32.missionToken(level);
@@ -115,11 +158,26 @@ public final class StaffOperationsR48
                 :npcPilot?"携"+equipment+"出击已安排。驾驶员发射后会先到原武器井实际领取，再前往迎击区。"
                 :"携"+equipment+"出击已登记。请亲自驾驶原机体，发射后到 "+well.blockPosition().toShortString()+" 的原武器井领取；尚未领取装备。");
     }
+    public static String undergroundEquipmentBlockerR49(ServerLevel level,EvaUnit01Entity eva)
+    {
+        var saved=level.getDataStorage().get(ArmedSortieSavedDataR48::load,"projectseele_armed_sorties_r48");
+        var selected=saved==null?null:saved.selection(eva.getUnitVariant());
+        if(selected==null||!selected.phase().equals("pending")||!selected.eva().equals(eva.getUUID())
+                ||!bindingCurrent(level,selected))return "";
+        var well=selectedWell(level,selected);
+        boolean sameFloor=well!=null&&EquipmentVaultsR47.physicalHandoffFloorR49(well,eva);
+        var known=EquipmentVaultsR47.knownVaultPositionR47(level,selected.payload());
+        if(!sameFloor&&(well!=null&&well.getY()>=64||known.isPresent()&&known.get().getY()>=64))
+            return "本机已预选地表专用武器井领用，地下出口不能代替该实体交接。领用任务保留，请先走地表出击到原井领取。";
+        return "";
+    }
     /** Strict caller ownership is retained even when the account has administrator permission. */
     public static EvaLogisticsDirector.ActionResult undergroundExit(ServerPlayer caller,NervStaffEntity operator,int variant,boolean open)
     {
         if(variant<0||variant>2)return result(false,"请指定零号机、初号机或二号机。");
-        String blocked=callerBlocker(caller,operator,"deploy");if(!blocked.isEmpty())return result(false,blocked);
+        String blocked=callerBlocker(caller,operator,"deploy");
+        boolean replacingOwnAutomaticLaunch=open&&ownAutomaticLaunch(caller,operator,variant);
+        if(!blocked.isEmpty()&&!replacingOwnAutomaticLaunch)return result(false,blocked);
         var level=caller.serverLevel();EvaLogisticsDirector.loadControlTarget(level,variant);
         var eva=EvaLogisticsDirector.canonicalUnit(level,variant);var sortie=TvCampaignSavedData.get(level).sorties.get(variant);
         boolean physical=canonical(level,eva,variant)&&eva.getPilotEntity()==caller&&EvaPilotResolver.controlTarget(caller)==eva;
@@ -127,8 +185,10 @@ public final class StaffOperationsR48
                 &&canonical(level,eva,variant)&&eva.getUUID().equals(sortie.eva)&&!AutoSortieR32.missionToken(level).isEmpty();
         if(!physical&&!assigned)return result(false,"您没有控制这台原机体，未改变其地下门。");
         UUID pilot=physical?caller.getUUID():sortie.pilotR45;
-        blocked=targetBlocker(caller,eva,variant,pilot,assigned&&sortie.npc);if(!blocked.isEmpty())return result(false,blocked);
-        return UndergroundSortieR48.request(caller,variant,open);
+        blocked=targetBlocker(caller,eva,variant,pilot,assigned&&sortie.npc,true);if(!blocked.isEmpty())return result(false,blocked);
+        var action=UndergroundSortieR48.request(caller,variant,open);
+        if(action.accepted()&&open)StaffCommandBookR24.cancelAutomatic(level,variant);
+        return action;
     }
     /** The NPC brain sees the bound request, never a nearest replacement well. */
     public static ArmedSortieSavedDataR48.Selection npcSelection(ServerLevel level,EvaUnit01Entity eva,TrainingPilotEntity pilot)
@@ -155,6 +215,8 @@ public final class StaffOperationsR48
         var tag=eva.getPersistentData();
         if(tag.hasUUID("R32SortieCommander")&&!selection.owner().equals(tag.getUUID("R32SortieCommander")))return "原机体指挥权已变化，未领用装备。";
         if(AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),selection.mission()))return "原后续出击安排已取消，未领用装备。";
+        if(!EvaEquipmentResourcesR45.ready(eva,selection.payload()))
+            return "原专用装备的共同握持或动作资源尚未就绪，原武器井库存保持，未领用替代装备。";
         if(StaffCommandBookR24.unitOrder(level,selection.variant())!=null||StaffRecoveryR47.pending(level,selection.variant())
                 ||PilotReturnR39.controls(eva)||EvaAirTransportR31.active(eva)||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()
                 ||eva.isFirstBattleActive()||!eva.isPoweredOn()||!EvaLogisticsDirector.status(level,selection.variant()).phase().equals("DEPLOYED"))return "原机体当前不能领用，等待机械作业完成。";

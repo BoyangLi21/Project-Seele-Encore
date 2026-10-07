@@ -27,7 +27,7 @@ import java.util.*;
 public final class SeeleLightingR48
 {
     private static final BlockPos BUTTON=new BlockPos(17,-363,312);
-    private record Circuit(List<BlockPos> ambient,List<BlockPos> table) { }
+    private record Circuit(List<BlockPos> ambient,List<BlockPos> table,boolean overheadOnly) { }
     private static final Map<MinecraftServer,Optional<Circuit>> CACHE=new WeakHashMap<>();
     private static final class State extends SavedData
     {
@@ -61,7 +61,10 @@ public final class SeeleLightingR48
                     (focus?table:ambient).add(pos);
                 }
                 if(table.size()!=5||ambient.size()!=18)return Optional.empty();
-                return Optional.of(new Circuit(List.copyOf(ambient),List.copyOf(table)));
+                boolean overheadOnly=root.has("meeting_all_block_lights_zero_r49")
+                        &&root.get("meeting_all_block_lights_zero_r49").getAsBoolean()
+                        &&FacilityDoorControlsR49.installed(level);
+                return Optional.of(new Circuit(List.copyOf(ambient),List.copyOf(table),overheadOnly));
             }
             catch(Exception failure){ProjectSeele.LOGGER.error("R48 finite SEELE lighting receipt rejected",failure);return Optional.empty();}
         });
@@ -84,7 +87,7 @@ public final class SeeleLightingR48
     private static void update(ServerLevel level,Circuit circuit,boolean meeting)
     {
         for(var pos:circuit.ambient)light(level,pos,meeting?0:14);
-        for(var pos:circuit.table)light(level,pos,pos.getX()==34?14:12);
+        for(var pos:circuit.table)light(level,pos,meeting?(circuit.overheadOnly?0:pos.getX()==34?14:12):14);
     }
     private static void light(ServerLevel level,BlockPos pos,int value)
     {

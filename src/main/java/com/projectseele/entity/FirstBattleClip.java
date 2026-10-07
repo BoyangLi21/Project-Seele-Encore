@@ -68,8 +68,8 @@ public final class FirstBattleClip
     {
             if(stream==null)throw new IllegalStateException("Missing first-battle authored clip");
             JsonObject root=JsonParser.parseReader(new InputStreamReader(stream,StandardCharsets.UTF_8)).getAsJsonObject();float fps=root.get("fps").getAsFloat();
-            if(fps!=30||root.get("duration_ticks").getAsInt()!=DURATION_TICKS)throw new IllegalArgumentException("First-battle clock mismatch");
-            int count=691;
+            if((fps!=30&&fps!=60)||root.get("duration_ticks").getAsInt()!=DURATION_TICKS)throw new IllegalArgumentException("First-battle clock mismatch");
+            int count=Math.round(DURATION_TICKS/20F*fps)+1;
             Map<String,Role> roles=new HashMap<>();
             for(String name:List.of("eva","angel"))
             {

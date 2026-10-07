@@ -67,6 +67,19 @@ final class TripoMachineryR48
         return assembly == null ? null : assembly.anchors.get("mount");
     }
 
+    /** Cable endpoint on a real imported upright, in the carrier's shared frame. */
+    static Vec3 carrierPowerAnchor(EvaUnit01Entity unit,float partial)
+    {
+        var assembly=load("carrier");
+        if(assembly==null||!assembly.anchors.containsKey("power_reel"))return null;
+        var at=assembly.anchors.get("power_reel");
+        Vec3 rear=Vec3.directionFromRotation(0,EvaUnit01Entity.SILO_BAY_YAW).scale(-1);
+        Vec3 right=new Vec3(rear.z,0,-rear.x);
+        float rise=unit.carrierRiseProgress(partial);
+        return unit.carrierRenderPosition(partial).add(right.scale(at.x)).add(rear.scale(at.z))
+                .add(0,at.y-64*(1-rise),0);
+    }
+
     static boolean clamp(PoseStack poses, MultiBufferSource buffers, int light, float open)
     {
         var assembly = load("gripper");

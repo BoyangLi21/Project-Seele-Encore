@@ -121,6 +121,9 @@ public final class TrainingPilotDirector
         {
             return new ActionResult(false, label(variant) + " is not loaded.");
         }
+        if(com.projectseele.entity.EvaShutdownR30.wreck(unit)||unit.getHealth()<=0
+                ||com.projectseele.entity.EvaBayRepairR33.active(unit))
+            return new ActionResult(false,"原机体仍有损毁或检修，驾驶员保持原位，等待真实整备完成。");
         level.getChunkAt(requestedStandby(level,variant));
         TrainingPilotEntity pilot = existingPilotR45(level,variant);
         if (pilot == null)

@@ -62,6 +62,15 @@ public final class EvaShutdownR30
     }
     public static void ensureUnpilotedR31(EvaUnit01Entity e)
     {if(!e.level().isClientSide&&e.getPilotEntity()==null&&mode(e)==ACTIVE)begin(e,EMPTY);}
+    /** Called before the original field capsule leaves the passenger graph. */
+    public static void captureFieldEjectionPoseR49(EvaUnit01Entity e)
+    {
+        if(e.level().isClientSide||e.isNervLogisticsLocked()||e.isLaunchSequenceActive()
+                ||e.hasActiveCarrierMotion()||EvaAirTransportR31.active(e)||mode(e)!=ACTIVE)return;
+        var memory=MEMORY.computeIfAbsent(e,k->new Memory());
+        memory.last=encode(EvaBodyPose.sample(e,0));
+        if(e.getPilotEntity()!=null)memory.lastPilot=e.getPilotEntity().getUUID();
+    }
     public static void fail(EvaUnit01Entity e)
     {
         if(e.level().isClientSide)return;begin(e,WRECK);e.setHealth(0);e.setPersistenceRequired();
@@ -96,7 +105,7 @@ public final class EvaShutdownR30
         if(e instanceof EvaPrototypeEntity un)un.stopUNFlight();
         if(!e.isNervLogisticsLocked()&&!e.hasActiveCarrierMotion())e.setNoGravity(false);
         e.refreshDimensions();
-        if(e.getPilotEntity() instanceof ServerPlayer pilot)pilot.sendSystemMessage(net.minecraft.network.chat.Component.literal(mode==POWER_LOCK?"主电源耗尽，机体姿态锁止。通信电源仍可呼叫运输回收。":"机体损毁，驱动系统已关闭。可通过电话请求回收，或弹出插入栓。"));
+        if(mode!=EMPTY&&e.getPilotEntity() instanceof ServerPlayer pilot)pilot.sendSystemMessage(net.minecraft.network.chat.Component.literal(mode==POWER_LOCK?"主电源耗尽，机体姿态锁止。通信电源仍可呼叫运输回收。":"机体损毁，驱动系统已关闭。可通过电话请求回收，或弹出插入栓。"));
     }
     public static void tick(EvaUnit01Entity e)
     {
@@ -154,18 +163,8 @@ public final class EvaShutdownR30
         return com.projectseele.util.QuaternionChannelsR45.euler(q);
     }
     public static CompoundTag encode(EvaBodyPose.Sample sample)
-    {
-        CompoundTag out=new CompoundTag();for(String name:sample.rotations.keySet())
-        {
-            var r=euler(sample.rotations.get(name));var p=sample.positions.get(name);ListTag values=new ListTag();
-            for(float v:new float[]{r.x,r.y,r.z,-p.x*16,p.y*16,p.z*16,1,1,1})values.add(FloatTag.valueOf(v));out.put(name,values);
-        }return out;
-    }
+    {return EvaPoseSnapshotR50.encode(sample);}
     public static void decode(CompoundTag tag,EvaBodyPose.Sample sample)
-    {
-        for(String name:tag.getAllKeys())if(sample.rotations.containsKey(name))
-        {var a=tag.getList(name,Tag.TAG_FLOAT);if(a.size()!=9)continue;sample.rotations.put(name,new Quaternionf().rotationZYX(a.getFloat(2),a.getFloat(1),a.getFloat(0)));sample.positions.put(name,new Vector3f(-a.getFloat(3),a.getFloat(4),a.getFloat(5)).div(16));}
-        sample.dirty();
-    }
+    {EvaPoseSnapshotR50.decode(tag,sample);}
     private EvaShutdownR30() {}
 }
