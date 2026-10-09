@@ -1,0 +1,16 @@
+{
+  "schema": "projectseele.r51.nonmap-root-selection.v1",
+  "baseline_commit": "de1dc4824c28de90f216205f5b596478839de7cf",
+  "maps_and_new_battles_cancelled": true,
+  "root_selected_final_nonmap_jar": false,
+  "resource_selection_receipt": null,
+  "jar": {
+    "path": "build/libs/projectseele-0.1.0-all.jar",
+    "sha256": "ROOT_FINAL_NONMAP_JAR_PENDING"
+  },
+  "jar_resource_allowlist": [],
+  "archive_resource_overrides": [],
+  "nonmap_changes": [],
+  "native_results": [],
+  "native_test_completed": false
+}

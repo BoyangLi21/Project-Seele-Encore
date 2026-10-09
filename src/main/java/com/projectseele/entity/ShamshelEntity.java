@@ -90,6 +90,11 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     public void tick()
     {
         super.tick();
+        if(this.isDeadOrDying())
+        {
+            if(!level().isClientSide){cancelSweepR31();setTarget(null);setDeltaMovement(Vec3.ZERO);}
+            return;
+        }
         var reaction=CombatFeelR31.beat(this);
         this.setNoGravity(reaction==null||reaction.kind()!=CombatFeelR31.THROWN&&reaction.kind()!=CombatFeelR31.DOWN);
         if(level().isClientSide)return;
@@ -238,10 +243,11 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     @Override
     public void die(DamageSource source)
     {
-        if (this.level() instanceof ServerLevel server)
+        super.die(source);
+        if (this.isDeadOrDying()&&this.level() instanceof ServerLevel server)
         {
+            cancelSweepR31();setTarget(null);setDeltaMovement(Vec3.ZERO);
             CrossExplosionFX.spawn(server, this.position(), 1.25F);
         }
-        super.die(source);
     }
 }

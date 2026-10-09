@@ -22,9 +22,12 @@ public final class VerticalCarrierSweepR40
     private record Part(String name,ConvexHullShape shape,AABB bounds) {}
     private static final class MeasuredHull extends ConvexHullShape
     {
-        final CarrierSupportEscapeR50 support;
+        private final List<Vec3> supportVertices;
+        private CarrierSupportEscapeR50 support;
         MeasuredHull(ObjectArrayList<javax.vecmath.Vector3f> points,List<Vec3> vertices)
-        {super(points);support=new CarrierSupportEscapeR50(vertices);}
+        {super(points);supportVertices=List.copyOf(vertices);}
+        CarrierSupportEscapeR50 support()
+        {if(support==null)support=new CarrierSupportEscapeR50(supportVertices);return support;}
     }
     private static final Map<ServerLevel,Map<String,Long>> REPORTED=new WeakHashMap<>();
     private static final int CACHE_INSTANCES=6;
@@ -126,7 +129,7 @@ public final class VerticalCarrierSweepR40
         {
             if(body instanceof MeasuredHull measured&&CarrierSupportEscapeR50.pureUp(delta))
             {
-                if(measured.support.separatesUp(obstacle,delta))return false;
+                if(measured.support().separatesUp(obstacle,delta))return false;
                 if(initial.distance<=0)return true;
             }
             double separation=initial.normalOnBInWorld.x*delta.x+initial.normalOnBInWorld.y*delta.y+initial.normalOnBInWorld.z*delta.z;
@@ -206,13 +209,17 @@ public final class VerticalCarrierSweepR40
             parts=List.copyOf(rebuilt);
             cache.put(eva.getUUID(),new CachedParts(new WeakReference<>(eva),profile,bodies.deepCopy(),state,parts));
         }
+        var sweeps=new ArrayList<AABB>(parts.size());for(var part:parts)sweeps.add(part.bounds().expandTowards(delta).move(origin));
+        var query=new CarrierCollisionBatchR51.Query(sweeps,bounds->
+        {var obstacles=new ArrayList<AABB>();for(var collision:level.getBlockCollisions(eva,bounds))obstacles.addAll(collision.toAabbs());return obstacles;});
+        int partIndex=0;var reverseOrigin=origin.scale(-1);
         for(var part:parts)
         {
-            var sweep=part.bounds().expandTowards(delta).move(origin);
-            for(var collision:level.getBlockCollisions(eva,sweep))for(var obstacle:collision.toAabbs())
+            var sweep=sweeps.get(partIndex);var obstacles=query.forPart(partIndex++);
+            for(var obstacle:obstacles)
             {
                 if(!obstacle.intersects(sweep))continue;
-                if(obstructed(part.shape(),obstacle.move(origin.scale(-1)),delta))
+                if(obstructed(part.shape(),obstacle.move(reverseOrigin),delta))
                 {
                     // First real obstruction is diagnostic in ordinary play too;
                     // a repeated blocked frame must not fill the server log.

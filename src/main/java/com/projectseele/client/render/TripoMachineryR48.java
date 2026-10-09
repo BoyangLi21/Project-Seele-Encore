@@ -1,6 +1,7 @@
 package com.projectseele.client.render;
 
-import com.google.gson.JsonParser;
+import com.google.gson.stream.JsonReader;
+import com.google.gson.stream.JsonToken;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.math.Axis;
 import com.projectseele.ProjectSeele;
@@ -31,19 +32,43 @@ final class TripoMachineryR48
         try (var input = Minecraft.getInstance().getResourceManager().open(resource);
              var reader = new InputStreamReader(input, StandardCharsets.UTF_8))
         {
-            var json = JsonParser.parseReader(reader).getAsJsonObject();
-            var texture = new ResourceLocation(json.get("texture").getAsString());
+            var json = new JsonReader(reader);json.setLenient(true);
+            Map<String, RigidMachineryPartR44> parts = new HashMap<>();
+            Map<String, Vec3> anchors = new HashMap<>();
+            String textureName = null;boolean hasParts = false,hasAnchors = false;
+            json.beginObject();
+            while(json.hasNext())
+            {
+                switch(json.nextName())
+                {
+                    case "texture" -> textureName = json.nextString();
+                    case "parts" ->
+                    {
+                        hasParts = true;parts.clear();json.beginObject();
+                        while(json.hasNext()){String part = json.nextName();parts.put(part,RigidMachineryPartR44.readTextured(json));}
+                        json.endObject();
+                    }
+                    case "anchors" ->
+                    {
+                        hasAnchors = true;anchors.clear();json.beginObject();
+                        while(json.hasNext())
+                        {
+                            String anchor = json.nextName();json.beginArray();
+                            double x = Double.parseDouble(json.nextString()),y = Double.parseDouble(json.nextString()),z = Double.parseDouble(json.nextString());
+                            while(json.hasNext())json.skipValue();json.endArray();anchors.put(anchor,new Vec3(x,y,z));
+                        }
+                        json.endObject();
+                    }
+                    default -> json.skipValue();
+                }
+            }
+            json.endObject();
+            if(json.peek()!=JsonToken.END_DOCUMENT)throw new IllegalArgumentException("Trailing imported machinery document");
+            if(!hasParts||!hasAnchors||textureName == null)throw new IllegalArgumentException("Incomplete imported machinery document");
+            var texture = new ResourceLocation(textureName);
             if (Minecraft.getInstance().getResourceManager().getResource(texture).isEmpty())
                 throw new IllegalStateException("Missing imported texture " + texture);
-            Map<String, RigidMachineryPartR44> parts = new HashMap<>();
-            for (var row : json.getAsJsonObject("parts").entrySet())
-                parts.put(row.getKey(), RigidMachineryPartR44.textured(row.getValue().getAsJsonArray(), texture));
-            Map<String, Vec3> anchors = new HashMap<>();
-            for (var row : json.getAsJsonObject("anchors").entrySet())
-            {
-                var p = row.getValue().getAsJsonArray();
-                anchors.put(row.getKey(), new Vec3(p.get(0).getAsDouble(), p.get(1).getAsDouble(), p.get(2).getAsDouble()));
-            }
+            parts.replaceAll((part,mesh)->mesh.withTexture(texture));
             if (!parts.containsKey("body")) throw new IllegalArgumentException("No machinery body");
             if (name.equals("gripper") && (!parts.keySet().containsAll(java.util.Set.of("jaw_left", "jaw_right"))
                     || !anchors.keySet().containsAll(java.util.Set.of("mount", "jaw_left", "jaw_right"))))

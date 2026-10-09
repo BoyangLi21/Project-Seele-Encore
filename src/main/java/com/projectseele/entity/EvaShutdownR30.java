@@ -73,7 +73,9 @@ public final class EvaShutdownR30
     }
     public static void fail(EvaUnit01Entity e)
     {
-        if(e.level().isClientSide)return;begin(e,WRECK);e.setHealth(0);e.setPersistenceRequired();
+        // Scripted hit paths use this method directly instead of hurt().
+        // They must respect the same protected berserk state as ordinary hits.
+        if(e.level().isClientSide||e.isBerserk())return;begin(e,WRECK);e.setHealth(0);e.setPersistenceRequired();
     }
     public static void restAfterFirstBattle(EvaUnit01Entity e,EvaBodyPose.Sample finalPose)
     {

@@ -211,8 +211,7 @@ public final class EvaPoseGraph
             com.projectseele.visual.BodyPoseLayersR40.begin(entity,partialTick);
             var body=EvaCombatPoseR31.apply(entity,model,partialTick,modelToWorld);
             var hands=EvaHandPoseR28.apply(entity,model,partialTick);
-            var exit=Boolean.getBoolean("projectseele.r45SharedExitReview")&&!entity.isExperimentalUnit()
-                    ?EvaPoseTransition.applySharedExitR45(entity,model,partialTick):EvaMotionEngineV2.BoneWrites.empty();
+            var exit=EvaMotionEngineV2.BoneWrites.empty();
             if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
                 for(String name:com.projectseele.visual.BodyPoseLayersR40.BONES)
                     model.getBone(name).ifPresent(b->com.projectseele.visual.BodyPoseLayersR40.rendered(name,EvaRigTransforms.model(b)));
@@ -317,6 +316,12 @@ public final class EvaPoseGraph
         var mouth=EvaMouthR37.apply(entity,model,partialTick);
         if(!mouth.rotationBones().isEmpty())
         {var names=new java.util.HashSet<>(motionWrites.rotationBones());names.addAll(mouth.rotationBones());var positions=new java.util.HashSet<>(motionWrites.positionBones());positions.addAll(mouth.positionBones());motionWrites=new EvaMotionEngineV2.BoneWrites(Set.copyOf(names),Set.copyOf(positions),"MOTION_ENGINE_LIVE_ACTION");}
+        if(!entity.isFirstBattleActive()&&!com.projectseele.physics.CombatBodyDynamics.active(entity)
+                &&com.projectseele.entity.EvaCombatSupportR33.ready(entity)
+                &&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(entity,partialTick)
+                &&(com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity)
+                    ||com.projectseele.entity.EvaGameplayMotionR32.sharedJumpActive(entity,partialTick)))
+            transitions=EvaPoseTransition.applySharedExitR45(entity,model,partialTick);
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         JointAuditR38.capture(entity,model,partialTick);

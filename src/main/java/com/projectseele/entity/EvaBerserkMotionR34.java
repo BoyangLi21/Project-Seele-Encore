@@ -82,7 +82,6 @@ public final class EvaBerserkMotionR34
             if(age==Math.max(3,Math.round(duration(e)*.24F)))
             {
                 EvaMovementSounds.swing(e,3);
-                EvaMovementSounds.play(e,e.position().add(0,e.getBbHeight()*.85,0),ModSounds.EVA_ATTACK_ROAR.get(),2.4F,1);
             }
             if(state!=null&&state.victim!=null&&state.victim.isAlive()&&!state.hit&&EvaGameplayMotionR32.inContactWindowR45(e,clip,now))
             {

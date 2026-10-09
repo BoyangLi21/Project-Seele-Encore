@@ -606,6 +606,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private int smashCooldown;
     private int heavyTicks, heavyDuration, heavyElapsed;
     private boolean heavyContact, queuedHeavy, queuedMeleeAfterHeavy, queuedKickAfterHeavy;
+    static final int RECOVERY_INPUT_BUFFER_TICKS_R51=8;
+    private UUID queuedHeavyPilotR51;
+    private int queuedHeavyWeaponR51;
+    private int queuedHeavyStanceR51;
+    private long queuedHeavyUntilR51,queuedHeavyWallUntilR51;
+    private RecoveryInputStampR51 queuedHeavyStampR51;
+    private enum LegacyRecoveryQueueR51 { MELEE, HEAVY_MELEE, HEAVY_KICK, KNIFE, KICK_MELEE, MELEE_KICK }
+    private record RecoveryStrikeInputR51(UUID pilot,int weapon,int stance,RecoveryInputStampR51 stamp,long until,long wallUntil) {}
+    private final java.util.EnumMap<LegacyRecoveryQueueR51,RecoveryStrikeInputR51> legacyRecoveryInputsR51=
+            new java.util.EnumMap<>(LegacyRecoveryQueueR51.class);
     private int stompCooldown;
     private int kickVisualTicks;
     private int kickElapsedTicks;
@@ -1134,7 +1144,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     public boolean isPowerDepleted()
     {
-        return !this.isUmbilicalConnected() && this.getPowerTicks() <= 0;
+        // Autonomous activity has no battery supply, but it is not a depleted
+        // drive. All consumers (HUD, recovery and missions) share this meaning.
+        return !this.isBerserk() && !this.isUmbilicalConnected() && this.getPowerTicks() <= 0;
     }
 
     /**
@@ -1445,7 +1457,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         float low = this.rifleProneBlend(partialTick);
         return Mth.clamp(Mth.lerp(partialTick, pilot.xRotO,
-                pilot.getXRot()), Mth.lerp(low, -38.0F, -10.0F),
+                pilot.getXRot()), Mth.lerp(low, -24.0F, 0.0F),
                 Mth.lerp(low, 42.0F, 16.0F));
     }
 
@@ -3016,7 +3028,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         if (this.isHeavyMotionActive())
         {
-            this.queuedMeleeAfterHeavy = true;
+            if(this.queueLegacyRecoveryR51(LegacyRecoveryQueueR51.HEAVY_MELEE,pilot))this.queuedMeleeAfterHeavy = true;
             return;
         }
         boolean prone = this.isPilotProne();
@@ -3028,17 +3040,18 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 && this.knifeVisualTicks > 0)
         {
             // Holding LMB cannot overwrite an explicitly buffered RMB.
-            if (this.queuedKnifeInput != 1) this.queuedKnifeInput = 0;
+            if ((this.queuedKnifeInput != 1||!this.legacyRecoveryValidR51(LegacyRecoveryQueueR51.KNIFE,pilot))
+                    &&this.queueLegacyRecoveryR51(LegacyRecoveryQueueR51.KNIFE,pilot))this.queuedKnifeInput = 0;
             return;
         }
         if (liveOrdinaryAttack && this.kickVisualTicks > 0)
         {
-            this.ordinaryAfterKickBufferTicks = CROSS_ACTION_BUFFER_TICKS;
+            if(this.queueLegacyRecoveryR51(LegacyRecoveryQueueR51.KICK_MELEE,pilot))this.ordinaryAfterKickBufferTicks = CROSS_ACTION_BUFFER_TICKS;
             return;
         }
         if (this.meleeCooldown > 0)
         {
-            this.meleeInputBufferTicks = MELEE_INPUT_BUFFER_TICKS;
+            if(this.queueLegacyRecoveryR51(LegacyRecoveryQueueR51.MELEE,pilot))this.meleeInputBufferTicks = MELEE_INPUT_BUFFER_TICKS;
             if (this.getTags().contains("seele_motion_lab"))
             {
                 ProjectSeele.LOGGER.info(
@@ -3054,6 +3067,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.beginOrdinaryGroupCAttack();
             return;
         }
+        this.clearLegacyRecoveryR51();
         boolean lance = this.getWeapon() == WEAPON_LANCE;
         boolean knife = this.getWeapon() == WEAPON_KNIFE;
         boolean liveKnife = knife && ((!prone && !crouching) || EvaGameplayMotionR32.lowAttackReadyR44(this));
@@ -3141,6 +3155,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void beginOrdinaryGroupCAttack()
     {
+        this.clearLegacyRecoveryR51();
         com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"punch");
         EvaGameplayMotionR32.beginAction(this);
         if(EvaGameplayMotionR32.phrases(this))CombatFoleyR36.load(this);
@@ -3238,19 +3253,22 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(this.getWeapon()==WEAPON_SWORD_R45){EvaSwordActionsR45.request(this,pilot,true);return;}
         if(CombatFeelR31.restrained(this)){EvaCombatIntentR32.offer(this,pilot,1);return;}
         if(EvaCombatR31.attack(this,true))return;
-        if(this.heavyTicks>0){this.queuedHeavy=true;return;}
+        if(this.heavyTicks>0){this.queueHeavyR51(pilot);return;}
         if (this.getWeapon() == WEAPON_FISTS && ((!this.isPilotProne() && !this.isPilotCrouching()) || EvaGameplayMotionR32.lowAttackReadyR44(this))
                 && !this.isPilotControlLocked() && this.smashCooldown == 0
                 && (this.ordinaryAttackVisualTicks > 0 || this.kickVisualTicks > 0))
         {
-            this.queuedHeavy = true;
+            this.queueHeavyR51(pilot);
             return;
         }
+        if(!this.isPilotControlLocked()&&this.getWeapon()==WEAPON_FISTS&&this.smashCooldown>0
+                &&this.smashCooldown<=RECOVERY_INPUT_BUFFER_TICKS_R51)
+        {this.queueHeavyR51(pilot);return;}
         if (!this.isPilotControlLocked() && this.getWeapon() == WEAPON_KNIFE
                 && ((!this.isPilotCrouching() && !this.isPilotProne()) || EvaGameplayMotionR32.lowAttackReadyR44(this))
                 && this.knifeVisualTicks > 0)
         {
-            this.queuedKnifeInput = 1;
+            if(this.queueLegacyRecoveryR51(LegacyRecoveryQueueR51.KNIFE,pilot))this.queuedKnifeInput = 1;
             return;
         }
         if (this.isPilotControlLocked() || this.smashCooldown > 0
@@ -3258,6 +3276,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             return;
         }
+        this.clearLegacyRecoveryR51();
         EvaGameplayMotionR32.beginAction(this);
         this.cancelOrdinaryGroupCAttack();
         this.cancelSideKick();
@@ -3306,6 +3325,67 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
 
     public boolean isHeavyMotionActive() { return this.entityData.get(DATA_HEAVY_ACTIVE); }
+    private void queueHeavyR51(LivingEntity pilot)
+    {
+        if(pilot==null||pilot!=this.getPilotEntity()||this.isPilotControlLocked())return;
+        this.queuedHeavy=true;this.queuedHeavyPilotR51=pilot.getUUID();this.queuedHeavyWeaponR51=this.getWeapon();
+        this.queuedHeavyStanceR51=this.isPilotProne()?3:this.isPilotCrouching()?1:0;
+        this.queuedHeavyUntilR51=this.level().getGameTime()+RECOVERY_INPUT_BUFFER_TICKS_R51;
+        this.queuedHeavyWallUntilR51=System.nanoTime()+400_000_000L;this.queuedHeavyStampR51=this.recoveryInputStampR51();
+    }
+    private boolean queuedHeavyValidR51(LivingEntity pilot)
+    {
+        return this.recoveryStrikeValidR51(pilot,this.queuedHeavyPilotR51,this.queuedHeavyWeaponR51,this.queuedHeavyStanceR51,
+                this.queuedHeavyStampR51,this.queuedHeavyUntilR51,this.queuedHeavyWallUntilR51);
+    }
+    private boolean recoveryStrikeValidR51(LivingEntity pilot,UUID owner,int weapon,int stance,
+                                           RecoveryInputStampR51 stamp,long until,long wallUntil)
+    {
+        return this.isAlive()&&this.isPoweredOn()&&pilot!=null&&pilot==this.getPilotEntity()&&pilot.getUUID().equals(owner)
+                &&this.getWeapon()==weapon&&this.level().getGameTime()<=until
+                &&(this.isPilotProne()?3:this.isPilotCrouching()?1:0)==stance
+                &&System.nanoTime()<=wallUntil&&this.recoveryInputStampR51().equals(stamp)
+                &&!this.isPilotControlLocked()&&!CombatFeelR31.restrained(this);
+    }
+    private boolean queueLegacyRecoveryR51(LegacyRecoveryQueueR51 queue,LivingEntity pilot)
+    {
+        if(pilot==null||pilot!=this.getPilotEntity()||this.isPilotControlLocked())return false;
+        // Existing counters still serve combo/sword compatibility. This
+        // request's independent tick and monotonic deadlines bound execution.
+        this.legacyRecoveryInputsR51.put(queue,new RecoveryStrikeInputR51(pilot.getUUID(),this.getWeapon(),
+                this.isPilotProne()?3:this.isPilotCrouching()?1:0,this.recoveryInputStampR51(),
+                this.level().getGameTime()+RECOVERY_INPUT_BUFFER_TICKS_R51,System.nanoTime()+400_000_000L));
+        return true;
+    }
+    private boolean legacyRecoveryValidR51(LegacyRecoveryQueueR51 queue,LivingEntity pilot)
+    {
+        var input=this.legacyRecoveryInputsR51.get(queue);
+        return input!=null&&this.recoveryStrikeValidR51(pilot,input.pilot(),input.weapon(),input.stance(),input.stamp(),input.until(),input.wallUntil());
+    }
+    private void expireLegacyRecoveryR51()
+    {
+        if(this.legacyRecoveryInputsR51.isEmpty())return;
+        var pilot=this.getPilotEntity();var entries=this.legacyRecoveryInputsR51.entrySet().iterator();
+        while(entries.hasNext())
+        {
+            var entry=entries.next();if(this.legacyRecoveryValidR51(entry.getKey(),pilot))continue;
+            switch(entry.getKey())
+            {
+                case MELEE->this.meleeInputBufferTicks=0;
+                case HEAVY_MELEE->this.queuedMeleeAfterHeavy=false;
+                case HEAVY_KICK->this.queuedKickAfterHeavy=false;
+                case KNIFE->this.queuedKnifeInput=-1;
+                case KICK_MELEE->this.ordinaryAfterKickBufferTicks=0;
+                case MELEE_KICK->this.kickAfterOrdinaryBufferTicks=0;
+            }
+            entries.remove();
+        }
+    }
+    private void clearLegacyRecoveryR51()
+    {
+        this.legacyRecoveryInputsR51.clear();this.meleeInputBufferTicks=0;this.queuedMeleeAfterHeavy=false;this.queuedKickAfterHeavy=false;
+        this.queuedKnifeInput=-1;this.ordinaryAfterKickBufferTicks=0;this.kickAfterOrdinaryBufferTicks=0;
+    }
     public float heavyMotionProgress(float partial) { return this.liveActionProgress(partial); }
     private void cancelHeavyMotion()
     {
@@ -3353,7 +3433,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(CombatFeelR31.restrained(this)||EvaCombatR31.active(this))return;
         if (this.isHeavyMotionActive())
         {
-            this.queuedKickAfterHeavy = true;
+            if(this.queueLegacyRecoveryR51(LegacyRecoveryQueueR51.HEAVY_KICK,pilot))this.queuedKickAfterHeavy = true;
             return;
         }
         if (this.isPilotControlLocked() || this.isPilotProne()
@@ -3367,7 +3447,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             if (this.stompCooldown == 0)
             {
-                this.kickAfterOrdinaryBufferTicks =
+                if(this.queueLegacyRecoveryR51(LegacyRecoveryQueueR51.MELEE_KICK,pilot))this.kickAfterOrdinaryBufferTicks =
                         CROSS_ACTION_BUFFER_TICKS;
             }
             return;
@@ -3381,6 +3461,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.beginSideKick();
             return;
         }
+        this.clearLegacyRecoveryR51();
         this.cancelOrdinaryGroupCAttack();
         this.cancelSideKick();
         this.stompCooldown = this.fastMeleeCooldownR43(STOMP_COOLDOWN_TICKS);
@@ -3391,6 +3472,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void beginSideKick()
     {
+        this.clearLegacyRecoveryR51();
         EvaGameplayMotionR32.beginAction(this);
         this.cancelOrdinaryGroupCAttack();
         this.cancelKnifeMotion();
@@ -3460,6 +3542,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void beginKnifeMotion(boolean reverse)
     {
+        this.clearLegacyRecoveryR51();
         com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"knife");
         EvaGameplayMotionR32.beginAction(this);
         this.entityData.set(DATA_KNIFE_TYPE, reverse ? 1 : 0);
@@ -3523,6 +3606,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void cancelLiveActionsForStanceChange()
     {
+        this.clearLegacyRecoveryR51();
         this.cancelOrdinaryGroupCAttack();
         this.cancelHeavyMotion();
         this.cancelSideKick();
@@ -3634,6 +3718,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     void swordContactSoundR45(Vec3 point){EvaMovementSounds.play(this,point,ModSounds.EVA_KNIFE_CUT.get(),3.8F,1);}
     float fieldActionProgressR45(float partial){return this.liveActionProgress(partial);}
     void fieldActionPhaseR45(float phase){this.entityData.set(DATA_LIVE_ACTION_PHASE,Mth.clamp(phase,0,1));}
+    record RecoveryInputStampR51(int melee,int smash,int kick){}
+    RecoveryInputStampR51 recoveryInputStampR51()
+    {return new RecoveryInputStampR51(this.entityData.get(DATA_MELEE_SEQUENCE),this.entityData.get(DATA_SMASH_SEQUENCE),this.entityData.get(DATA_KICK_SEQUENCE));}
+    boolean recoveryInputTailR51()
+    {return this.ordinaryAttackVisualTicks>0&&this.ordinaryAttackVisualTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
+            ||this.heavyTicks>0&&this.heavyTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
+            ||this.kickVisualTicks>0&&this.kickVisualTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
+            ||this.knifeVisualTicks>0&&this.knifeVisualTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51;}
     void finishCapturedActionEndpointR45()
     {
         if(this.level().isClientSide||!(this.getPilotEntity() instanceof ServerPlayer pilot))return;
@@ -4193,6 +4285,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void settleAutonomousAttackR30(TrainingPilotEntity pilot)
     {
         if(!autonomousPilotR30(pilot))return;
+        this.clearLegacyRecoveryR51();
         this.queuedKnifeInput=-1;this.queuedHeavy=false;this.queuedKickAfterHeavy=false;this.queuedMeleeAfterHeavy=false;
         this.meleeInputBufferTicks=0;this.ordinaryAfterKickBufferTicks=0;this.kickAfterOrdinaryBufferTicks=0;
     }
@@ -4570,7 +4663,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return;
         }
 
-        int remaining = this.getBerserkTicks() - 1;
+        // The configured interval must not shut the airframe down in the
+        // middle of its protected encounter. Target loss/defeat and the
+        // authored finale still own the real stop transition below.
+        boolean fighting = this.getTarget() instanceof Angel && this.getTarget().isAlive();
+        int remaining = Math.max(fighting || this.isFirstBattleActive() ? 1 : 0,
+                this.getBerserkTicks() - 1);
         this.entityData.set(DATA_BERSERK_TICKS, Math.max(0, remaining));
         if(com.projectseele.physics.CombatBodyDynamics.active(this))
         {EvaBerserkMotionR34.clear(this);this.getNavigation().stop();if(remaining<=0)this.finishBerserk();return;}
@@ -4745,7 +4843,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     target.getZ(), 4, 1.8D, 1.8D, 1.8D, 0.0D);
         }
         this.berserkAttackCooldown = 10;
-        this.playSound(SoundEvents.RAVAGER_ATTACK, 3.5F, 0.72F);
+        EvaMovementSounds.swing(this,3);
     }
 
     private void emitBerserkEyes(ServerLevel server)
@@ -4967,6 +5065,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public void aiStep()
     {
+        if(!this.level().isClientSide)this.expireLegacyRecoveryR51();
         this.refreshTvPersonnelClockHoldR44();
         com.projectseele.visual.RuntimeR44ServerProbe.firstActorTick(this,"first_before_ai_step");
         EvaBayRepairR33.tick(this);
@@ -5153,7 +5252,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // Buffered follow-ups leave from the braking pose. Waiting for the
             // full neutral release made every attack restart the whole body.
             if(EvaGameplayMotionR32.phrases(this)&&this.entityData.get(DATA_LIVE_ACTION_PHASE)>=EvaGameplayMotionR32.releasePhase(this)
-                    &&this.meleeInputBufferTicks>0&&!this.queuedHeavy&&this.kickAfterOrdinaryBufferTicks==0
+                    &&this.meleeInputBufferTicks>0&&this.legacyRecoveryValidR51(LegacyRecoveryQueueR51.MELEE,combatPilot)
+                    &&!this.queuedHeavy&&this.kickAfterOrdinaryBufferTicks==0
                     &&combatPilot!=null&&!this.isPilotControlLocked())
             {
                 this.meleeInputBufferTicks=0;
@@ -5206,18 +5306,24 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if (combatPilot != null
                 && !this.isPilotControlLocked() && this.isMeleeWeapon())
         {
-            if (this.queuedHeavy && this.ordinaryAttackVisualTicks == 0 && this.kickVisualTicks == 0 && !this.isHeavyMotionActive())
+            // Natural source completion changes active/stage flags, not its
+            // sequence. Validate before the new action increments that stamp.
+            this.expireLegacyRecoveryR51();
+            if(this.queuedHeavy&&!this.queuedHeavyValidR51(combatPilot))this.queuedHeavy=false;
+            if (this.queuedHeavy && this.smashCooldown==0 && this.ordinaryAttackVisualTicks == 0 && this.kickVisualTicks == 0 && !this.isHeavyMotionActive())
             {
                 this.queuedHeavy = false;
                 this.smashAttack(combatPilot);
             }
-            else if (heavyEnded && this.queuedKickAfterHeavy)
+            else if (this.queuedKickAfterHeavy && this.heavyTicks==0 && this.ordinaryAttackVisualTicks==0
+                    &&this.kickVisualTicks==0&&this.knifeVisualTicks==0&&this.stompCooldown==0)
             {
                 this.queuedKickAfterHeavy = false;
                 this.queuedMeleeAfterHeavy = false;
                 this.stompAttack(combatPilot);
             }
-            else if (heavyEnded && this.queuedMeleeAfterHeavy)
+            else if (this.queuedMeleeAfterHeavy && this.heavyTicks==0 && this.ordinaryAttackVisualTicks==0
+                    &&this.kickVisualTicks==0&&this.knifeVisualTicks==0&&this.meleeCooldown==0)
             {
                 this.queuedMeleeAfterHeavy = false;
                 this.meleeAttack(combatPilot);
@@ -5231,11 +5337,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 if (queued == 1) this.smashAttack(combatPilot);
                 else this.meleeAttack(combatPilot);
             }
-            else if (ordinaryEnded && this.kickAfterOrdinaryBufferTicks > 0)
+            else if (this.kickAfterOrdinaryBufferTicks > 0 && this.ordinaryAttackVisualTicks==0
+                    &&this.heavyTicks==0&&this.kickVisualTicks==0&&this.knifeVisualTicks==0&&this.stompCooldown==0)
             {
                 this.stompAttack(combatPilot);
             }
-            else if (kickEnded && this.ordinaryAfterKickBufferTicks > 0)
+            else if (this.ordinaryAfterKickBufferTicks > 0 && this.kickVisualTicks==0
+                    &&this.heavyTicks==0&&this.ordinaryAttackVisualTicks==0&&this.knifeVisualTicks==0&&this.meleeCooldown==0)
             {
                 this.meleeAttack(combatPilot);
             }
@@ -6661,6 +6769,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public boolean receiveUnshieldedYashimaBeamR48(DamageSource source)
     {
         if(!actualYashimaRayR48(source))return false;
+        if(this.isBerserk())return true;
         entityData.set(DATA_AT_ON,false);entityData.set(DATA_AT_ENERGY,0F);
         getPersistentData().putBoolean("R48YashimaFieldBurnout",true);
         EvaShutdownR30.fail(this);

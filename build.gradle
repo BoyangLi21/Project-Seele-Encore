@@ -518,6 +518,15 @@ tasks.register('verifyBiomeCornerCache', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyBiomeCornerCache' }
 
+tasks.register('verifyBiomeCornerMainThreadR51', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.util.BiomeCornerMainThreadR51Test'
+    workingDir = file('.Codex/biome-corner-main-thread-r51-test')
+    doFirst { workingDir.mkdirs() }
+}
+tasks.named('check').configure { dependsOn 'verifyBiomeCornerMainThreadR51' }
+
 tasks.register('verifyCombatMotionR29', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath

@@ -7,6 +7,9 @@ import java.util.Set;
 import java.util.WeakHashMap;
 
 import com.projectseele.entity.EvaUnit01Entity;
+import com.projectseele.entity.EvaBodyPose;
+import com.projectseele.entity.EvaGameplayMotionR32;
+import com.projectseele.entity.FirstBattleSignals;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import software.bernie.geckolib.cache.object.BakedGeoModel;
@@ -71,8 +74,11 @@ public final class EvaPoseTransition
             STATES.remove(entity);
             return EvaMotionEngineV2.BoneWrites.empty();
         }
-        double time = (entity.tickCount + (double)partialTick) / 20.0D;
-        String key = entity.poseTransitionKey(partialTick);
+        double time = sharedExit?FirstBattleSignals.clientFrameTime()/1_000_000_000D
+                :(entity.tickCount + (double)partialTick) / 20.0D;
+        String clip=EvaGameplayMotionR32.activeGroundClip(entity,partialTick);
+        float actionPhase=clip.isEmpty()?0:EvaGameplayMotionR32.activeGroundPhase(entity,partialTick);
+        String key = entity.poseTransitionKey(partialTick)+":"+EvaGameplayMotionR32.resolvedGroundClipR44(entity,partialTick);
         State state = STATES.computeIfAbsent(entity, ignored -> new State());
         double dt = time - state.time;
         if (dt < 0.0D || dt > 0.5D)
@@ -80,7 +86,8 @@ public final class EvaPoseTransition
             state = new State();
             STATES.put(entity, state);
         }
-        boolean changed = !key.equals(state.key);
+        boolean changed = !key.equals(state.key)||(sharedExit&&!clip.isEmpty()
+                &&state.liveAction&&actionPhase+.15F<state.actionPhase);
         if (changed)
         {
             boolean leavingAction=state.liveAction&&!entity.hasLiveActionForRender(partialTick);
@@ -91,7 +98,17 @@ public final class EvaPoseTransition
                     || state.lowStance ? 0.28D
                     : entity.isHeavyMotionActive() ? 0.18D
                     : entity.hasLiveActionForRender(partialTick) ? 0.10D : 0.20D;
-            if(sharedExit&&!leavingAction)state.duration=0;
+            state.entryCorrection=false;
+            if(sharedExit)
+            {
+                state.duration=leavingAction?.12D:0;
+                if(!clip.isEmpty()&&entity.hasLiveActionForRender(partialTick))
+                {
+                    state.entryStart=actionPhase;state.entryEnd=EvaGameplayMotionR32.actionEntryEndR51(entity,clip);
+                    state.entryCorrection=state.entryEnd>state.entryStart;
+                    state.duration=state.entryCorrection?.06D:0;
+                }
+            }
             state.lowStance = entity.isPilotCrouching() || entity.isPilotProne();
             for (Track track : state.bones.values())
             {
@@ -99,6 +116,11 @@ public final class EvaPoseTransition
             }
         }
         double age = time - state.start;
+        if(sharedExit&&state.entryCorrection)
+        {
+            double fraction=Math.max(0,Math.min(1,(actionPhase-state.entryStart)/(state.entryEnd-state.entryStart)));
+            age=Math.max(age,state.duration*fraction);
+        }
         boolean blending = age < state.duration;
         Set<String> rotations = new LinkedHashSet<>();
         Set<String> positions = new LinkedHashSet<>();
@@ -116,6 +138,11 @@ public final class EvaPoseTransition
                 state.bones.put(name, new Track(target));
                 continue;
             }
+            // A small last-presented residual ends in the source entry segment,
+            // before its contact phase. No attack clock is resampled or held;
+            // pelvis, feet and their authoritative support remain untouched.
+            if(sharedExit&&(!blending||EvaBodyPose.locomotionBoneR51(name)
+                    ||name.equals("knife")||name.equals("lance")||name.equals("shield")||name.contains("_axis_")))continue;
             Pose result = blending ? track.sample(target, age, state.duration) : target;
             result.write(bone);
             if (blending)
@@ -126,21 +153,41 @@ public final class EvaPoseTransition
         }
         if(sharedExit&&blending)
         {
-            var pose=com.projectseele.entity.EvaBodyPose.neutralForTransportR32(entity);
+            var pose=EvaBodyPose.neutralForTransportR32(entity);
             for(String name:pose.rig.keySet())
-                model.getBone(name).ifPresent(b->pose.rotations.put(name,new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX())));
+                model.getBone(name).ifPresent(b->{
+                    pose.rotations.put(name,new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX()));
+                    pose.positions.put(name,new Vector3f(-b.getPosX(),b.getPosY(),b.getPosZ()).div(16));
+                });
             // The offset of a bent hinge is nonlinear in its rotation.
-            // Lerp'ing old and new offsets separated the knee/elbow sockets
+            // Lerp'ing old and new offsets separated the elbow sockets
             // even when both endpoint poses were individually assembled.
-            com.projectseele.entity.EvaBodyPose.preserveJointCentres(pose);
-            for(String side:new String[]{"l","r"})for(String family:new String[]{"shin_","forearm_"})
+            EvaBodyPose.preserveJointCentres(pose);
+            for(String side:new String[]{"l","r"})for(String family:new String[]{"forearm_"})
             {
                 String name=family+side;var offset=pose.positions.get(name);
                 if(offset!=null)model.getBone(name).ifPresent(b->{b.setPosX(-offset.x*16);b.setPosY(offset.y*16);b.setPosZ(offset.z*16);});
             }
+            // Fitted weapons follow the final hand, never a separately lerped
+            // weapon transform (the sword's parent is not its gripping hand).
+            String attachment=entity.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE?"knife"
+                    :entity.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45?"lance"
+                    :entity.getWeapon()==EvaUnit01Entity.WEAPON_SHIELD_R45?"shield":"";
+            if(attachment.equals("knife"))com.projectseele.entity.EvaAnatomicalHandsR45.attachKnife(entity,pose);
+            else if(attachment.equals("lance"))com.projectseele.entity.EvaAnatomicalHandsR45.attachSwordR45(entity,pose);
+            else if(attachment.equals("shield"))com.projectseele.entity.EvaShieldRigR47.attach(entity,pose);
+            if(!attachment.isEmpty())
+            {
+                var q=pose.rotations.get(attachment);var p=pose.positions.get(attachment);
+                if(q!=null&&p!=null)model.getBone(attachment).ifPresent(b->{
+                    EvaRigTransforms.rotate(b,q);b.setPosX(-p.x*16);b.setPosY(p.y*16);b.setPosZ(p.z*16);
+                    rotations.add(attachment);positions.add(attachment);
+                });
+            }
         }
         state.time = time;
-        state.pendingDt = dt;
+        state.actionPhase=actionPhase;
+        if(dt>1e-6)state.pendingDt = dt;
         state.frameOpen = true;
         state.evaluatedThisFrame = true;
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),
@@ -160,6 +207,9 @@ public final class EvaPoseTransition
         private boolean finalInitialized;
         private boolean evaluatedThisFrame;
         private boolean frameOpen;
+        private long recordedFrame=Long.MIN_VALUE;
+        private float actionPhase,entryStart,entryEnd;
+        private boolean entryCorrection;
     }
 
     public static void recordFinal(EvaUnit01Entity entity,BakedGeoModel model)
@@ -169,11 +219,14 @@ public final class EvaPoseTransition
         state.frameOpen=false;
         if(!state.evaluatedThisFrame){STATES.remove(entity);return;}
         state.evaluatedThisFrame=false;
+        long frame=FirstBattleSignals.clientFrameTime();
+        if(state.recordedFrame==frame)return;
+        state.recordedFrame=frame;
         state.bones.forEach((name,track)->model.getBone(name).ifPresent(bone->{
             Pose pose=Pose.read(bone);
             if(!state.finalInitialized){track.last=pose;track.source=pose;}
             else if(state.pendingDt>1e-6)track.update(pose,state.pendingDt);
-            else{track.last=pose;track.linearVelocity.zero();track.angularVelocity.zero();}
+            else track.last=pose;
         }));
         state.pendingDt=0;
         state.finalInitialized=true;
@@ -282,13 +335,10 @@ public final class EvaPoseTransition
         private void write(GeoBone bone)
         {
             // Rz Ry Rx, matching RenderUtils and Blender's authored XYZ.
-            Quaternionf q = this.rotation;
-            bone.setRotX((float)Math.atan2(2.0D * (q.w * q.x + q.y * q.z),
-                    1.0D - 2.0D * (q.x * q.x + q.y * q.y)));
-            bone.setRotY((float)Math.asin(Math.max(-1.0D, Math.min(1.0D,
-                    2.0D * (q.w * q.y - q.z * q.x)))));
-            bone.setRotZ((float)Math.atan2(2.0D * (q.w * q.z + q.x * q.y),
-                    1.0D - 2.0D * (q.y * q.y + q.z * q.z)));
+            Vector3f channels = QuaternionChannels.euler(this.rotation);
+            bone.setRotX(channels.x);
+            bone.setRotY(channels.y);
+            bone.setRotZ(channels.z);
             bone.setPosX(this.position.x);
             bone.setPosY(this.position.y);
             bone.setPosZ(this.position.z);

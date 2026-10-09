@@ -53,6 +53,7 @@
     "client.TransportPassengerPacketDiagnosticsMixin",
     "client.AircraftPositionSmoothingMixin",
     "client.MtrFrameClockR21Mixin",
+    "client.MtrRailMathCacheR51Mixin",
     "client.MtrAnnouncementPronunciationMixin",
     "client.MtrSpokenAnnouncementR25Mixin",
     "client.MtrSpokenPlatformR25Mixin",

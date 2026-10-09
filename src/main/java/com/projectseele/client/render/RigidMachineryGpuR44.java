@@ -20,7 +20,7 @@ import java.util.Map;
 /** Reuses exact rigid vertices in the selected entity/shadow shader, without a lower-detail substitute. */
 public final class RigidMachineryGpuR44
 {
-    private record Key(ShaderInstance pipeline, boolean external, boolean mirror,
+    private record Key(ShaderInstance pipeline, boolean external, boolean mirror,boolean triangles,
                        int light, int entity, int blockEntity, int item) { }
     private record Mesh(VertexBuffer buffer, int bytes) { }
     private static final Map<Object, LinkedHashMap<Key, Mesh>> PARTS = new IdentityHashMap<>();
@@ -59,7 +59,7 @@ public final class RigidMachineryGpuR44
     }
 
     static boolean draw(Object identity, float[] vertices, ResourceLocation texture,
-                        PoseStack poses, MultiBufferSource buffers, int light)
+                        PoseStack poses, MultiBufferSource buffers, int light,boolean triangles)
     {
         if (!enabled() || buffers instanceof OutlineBufferSource)
             return false;
@@ -67,7 +67,7 @@ public final class RigidMachineryGpuR44
         ShaderInstance custom = RigidCapsuleGpu.machineryShader();
         if (!external && custom == null || external && !resolveIrisState()) return false;
         BufferUploader.reset();
-        var type = ModelRenderTypesR49.solid(texture);
+        var type = triangles?ModelRenderTypesR49.solidTriangles(texture):ModelRenderTypesR49.solid(texture);
         type.setupRenderState();
         try
         {
@@ -85,19 +85,20 @@ public final class RigidMachineryGpuR44
                 }
                 catch (ReflectiveOperationException failure) { return false; }
             }
-            var key = new Key(active, external, mirror, external ? light : 0, entity, blockEntity, item);
+            var key = new Key(active, external, mirror,triangles, external ? light : 0, entity, blockEntity, item);
             var variants = PARTS.computeIfAbsent(identity, ignored -> new LinkedHashMap<>(16, .75F, true));
             Mesh mesh = variants.get(key);
             if (mesh == null)
             {
-                int count = vertices.length / 11;
+                int count = triangles?vertices.length/44*3:vertices.length/11;
                 var builder = new BufferBuilder(Math.max(1024, count * 96 + 64));
-                builder.begin(VertexFormat.Mode.QUADS, DefaultVertexFormat.NEW_ENTITY);
+                builder.begin(triangles?VertexFormat.Mode.TRIANGLES:VertexFormat.Mode.QUADS, DefaultVertexFormat.NEW_ENTITY);
                 for (int quad = 0; quad < vertices.length; quad += 44)
                 {
-                    for (int corner = 0; corner < 4; corner++)
+                    int corners=triangles?3:4;
+                    for (int corner = 0; corner < corners; corner++)
                     {
-                        int offset = quad + (mirror ? 3 - corner : corner) * 11;
+                        int offset = quad + (mirror ? corners-1-corner : corner) * 11;
                         float sign = mirror ? -1 : 1;
                         // Bake the reflection as well as reversing winding. The remaining
                         // matrix is proper, so Iris's generated face normal transforms correctly.

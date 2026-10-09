@@ -39,7 +39,7 @@ public final class CombatBodyDynamics
         Vec3 origin,position;float yaw;AABB bounds,terrainCoverage;long started;int age,stable,pendingTerrain,recoveryAge=-1;float recoveryStart,recoveryYaw,groundY;Vector3f recoveryOffset,endShift;
     }
     private static final class ClientState
-    {EvaBodyPose.Sample previous,current;Vec3 previousPosition,position;AABB bounds;float yaw;long at;int mode;}
+    {EvaBodyPose.Sample previous,current;Vec3 previousPosition,position;AABB bounds;float yaw;int mode;final EvaPoseSignalClock blendClock=new EvaPoseSignalClock(100_000_000L);}
     public static boolean active(LivingEntity entity)
     {return !scripted(entity)&&!SAMPLING.get().contains(entity)&&(entity.level().isClientSide?CLIENT.get(entity)!=null:SERVER.containsKey(entity));}
     private static boolean scripted(LivingEntity entity)
@@ -84,7 +84,7 @@ public final class CombatBodyDynamics
     public static EvaBodyPose.Sample sample(LivingEntity entity,float partial)
     {
         if(!entity.level().isClientSide)return CombatBodyProfiles.copy(SERVER.get(entity).pose);
-        var state=CLIENT.get(entity);float alpha=Mth.clamp((entity.level().getGameTime()-state.at+partial)/2F,0,1);
+        var state=CLIENT.get(entity);float alpha=state.blendClock.sample(FirstBattleSignals.clientFrameTime());
         var pose=CombatBodyProfiles.copy(state.previous);
         for(String n:pose.rig.keySet()){pose.rotations.get(n).slerp(state.current.rotations.get(n),alpha);pose.positions.get(n).lerp(state.current.positions.get(n),alpha);}
         Vec3 target=state.previousPosition.lerp(state.position,alpha),actual=entity.getPosition(partial);
@@ -383,7 +383,11 @@ public final class CombatBodyDynamics
         if(packet.mode()==0){CLIENT.remove(entity);entity.setPos(packet.position().x,packet.position().y,packet.position().z);entity.setYRot(packet.yaw());entity.yBodyRot=entity.yHeadRot=packet.yaw();entity.setDeltaMovement(Vec3.ZERO);entity.resetFallDistance();entity.refreshDimensions();entity.setOnGround(true);return;}
         var profile=CombatBodyProfiles.get(entity);if(profile==null)return;var pose=new EvaBodyPose.Sample(profile.rig());EvaShutdownR30.decode(packet.pose(),pose);
         ClientState s=CLIENT.get(entity);if(s==null){s=new ClientState();s.current=pose;s.position=packet.position();CLIENT.put(entity,s);if(entity instanceof EvaUnit01Entity eva)eva.beginPhysicalControlR35();}
-        s.previous=s.current;s.previousPosition=s.position;s.current=pose;s.position=packet.position();s.bounds=packet.bounds();s.yaw=packet.yaw();s.mode=packet.mode();s.at=entity.level().getGameTime();
+        float alpha=s.blendClock.sample(System.nanoTime());
+        s.previous=s.previous==null?s.current:mix(s.previous,s.current,alpha);
+        s.previousPosition=s.previousPosition==null?s.position:s.previousPosition.lerp(s.position,alpha);
+        s.current=pose;s.position=packet.position();s.bounds=packet.bounds();s.yaw=packet.yaw();s.mode=packet.mode();
+        s.blendClock.snap(0);s.blendClock.accept(1,false,false);
         entity.setYRot(s.yaw);entity.yBodyRot=entity.yHeadRot=s.yaw;
     }
     private CombatBodyDynamics(){}

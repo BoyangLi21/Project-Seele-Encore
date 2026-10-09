@@ -23,6 +23,7 @@ import com.projectseele.entity.EvaUnit01Entity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.OutlineBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.packs.resources.Resource;
@@ -45,6 +46,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     private static final Map<ResourceLocation, MeshData> CACHE = new HashMap<>();
     private static final Set<ResourceLocation> LOAD_ATTEMPTED = new HashSet<>();
     private static final Set<Class<?>> GPU_DIAGNOSTICS = new HashSet<>();
+    private static final Map<MeshData, PosedMeshCacheR52> SKIN_POSES = new java.util.IdentityHashMap<>();
     private final Function<T, ResourceLocation> meshSelector;
     private final Function<T, ResourceLocation> textureSelector;
     private final BiPredicate<T, GeoBone> partVisibility;
@@ -138,10 +140,33 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 com.projectseele.client.visual.UNR29Client.captureRifle(eva,muzzle);
             }
         }
-        VertexConsumer targetBuffer = this.textureSelector == null ? buffer
-                : bufferSource.getBuffer(ModelRenderTypesR49.entity(
-                        this.textureSelector.apply(animatable)));
-        float[] values = skinVertices(mesh,part,bone);
+        ResourceLocation selectedTexture=this.textureSelector==null?null:this.textureSelector.apply(animatable);
+        boolean optics=selectedTexture!=null&&ModelRenderTypesR49.opticTexture(selectedTexture);
+        // The vanilla outline companion is QUADS. Its combined consumer and
+        // inherited Gecko buffers retain the original four-point contract.
+        boolean triangles=selectedTexture!=null&&!(bufferSource instanceof OutlineBufferSource);
+        VertexConsumer targetBuffer = selectedTexture == null ? buffer
+                : bufferSource.getBuffer(optics
+                ?(triangles?ModelRenderTypesR49.opticsTriangles(selectedTexture,this.fullBright)
+                :ModelRenderTypesR49.optics(selectedTexture,this.fullBright))
+                :(triangles?ModelRenderTypesR49.entityTriangles(selectedTexture):ModelRenderTypesR49.entity(selectedTexture)));
+        var skin = mesh.joints().get(bone.getName());
+        PosedMeshCacheR52 skinPose = null;
+        float[] values;
+        if (skin == null) values = part.vertices();
+        else
+        {
+            var root = bone;
+            while (root.getParent() != null) root = root.getParent();
+            skinPose = SKIN_POSES.computeIfAbsent(mesh, ignored -> new PosedMeshCacheR52());
+            skinPose.prepare(animatable, root, com.projectseele.entity.FirstBattleSignals.clientFrameTime(), partialTick);
+            if (skinPose.sampled(skin)) values = skin.scratch();
+            else
+            {
+                values = skinVertices(mesh,part,bone);
+                if (values == skin.scratch()) skinPose.remember(skin);
+            }
+        }
         int stride = mesh.stride();
         if(SharedHandContactWitnessR44.ENABLED&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
                 &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
@@ -188,11 +213,12 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         }
         if(GPU_DIAGNOSTICS.add(animatable.getClass()))com.projectseele.ProjectSeele.LOGGER.info(
                 "Rigid mesh dispatch: entity={} rigid={} buffer={} texture={}",animatable.getClass().getSimpleName(),values==part.vertices(),targetBuffer.getClass().getName(),this.textureSelector!=null);
-        if(values==part.vertices()&&this.textureSelector!=null
+        if(triangles&&!optics
                 &&(targetBuffer instanceof com.mojang.blaze3d.vertex.BufferBuilder
                     ||targetBuffer.getClass().getName().equals("me.jellysquid.mods.sodium.client.render.vertex.buffer.SodiumBufferBuilder"))
-                &&RigidCapsuleGpu.draw(part,values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
-                this.textureSelector.apply(animatable),poseStack,vertexLight,packedOverlay,part.red(),part.green(),part.blue()))return;
+                &&RigidCapsuleGpu.drawPosed(values==part.vertices()?part:skin,
+                values==part.vertices()?0:skinPose.revision(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
+                selectedTexture,poseStack,vertexLight,packedOverlay,part.red(),part.green(),part.blue()))return;
         for (int index = 0; index + stride * 3 <= values.length; index += stride * 3)
         {
             emitVertex(targetBuffer, pose, normal, values, index, part,
@@ -201,10 +227,9 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                     vertexLight, packedOverlay);
             emitVertex(targetBuffer, pose, normal, values, index + stride * 2, part,
                     vertexLight, packedOverlay);
-            // Gecko's entity cutout buffer is QUADS. A repeated third point
-            // makes each OBJ triangle an independent degenerate quad.
-            emitVertex(targetBuffer, pose, normal, values, index + stride * 2, part,
-                    vertexLight, packedOverlay);
+            if(!triangles)
+                emitVertex(targetBuffer, pose, normal, values, index + stride * 2, part,
+                        vertexLight, packedOverlay);
         }
     }
 
@@ -227,6 +252,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         RigidCapsuleGpu.clear();
         ModelRenderTypesR49.clear();
         CACHE.clear();
+        SKIN_POSES.clear();
         LOAD_ATTEMPTED.clear();
         EvaHeadClearance.clear();
     }
@@ -281,14 +307,16 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         MeshData mesh=getMesh(resource);if(mesh==null)return;
         MeshPart part=mesh.parts().get(bone);if(part==null)return;
         float[] values=part.vertices();int stride=mesh.stride();
-        VertexConsumer buffer=buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
-        if((buffer instanceof com.mojang.blaze3d.vertex.BufferBuilder
+        boolean triangles=!(buffers instanceof OutlineBufferSource);
+        VertexConsumer buffer=buffers.getBuffer(triangles?ModelRenderTypesR49.entityTriangles(texture,false)
+                :RenderType.entityCutoutNoCull(texture));
+        if(triangles&&(buffer instanceof com.mojang.blaze3d.vertex.BufferBuilder
                 ||buffer.getClass().getName().equals("me.jellysquid.mods.sodium.client.render.vertex.buffer.SodiumBufferBuilder"))
                 &&RigidCapsuleGpu.draw(part,values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),texture,poses,
                     light,overlay,part.red(),part.green(),part.blue()))return;
         for(int index=0;index+stride*3<=values.length;index+=stride*3)
-            for(int corner:new int[]{0,1,2,2})emitVertex(buffer,poses.last().pose(),poses.last().normal(),
-                    values,index+corner*stride,part,light,overlay);
+            for(int corner=0;corner<(triangles?3:4);corner++)emitVertex(buffer,poses.last().pose(),poses.last().normal(),
+                    values,index+Math.min(corner,2)*stride,part,light,overlay);
     }
 
     /**
@@ -309,8 +337,9 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         {
             return false;
         }
-        VertexConsumer target = bufferSource.getBuffer(
-                RenderType.entityCutoutNoCull(textureResource));
+        boolean triangles=!(bufferSource instanceof OutlineBufferSource);
+        VertexConsumer target = bufferSource.getBuffer(triangles
+                ?ModelRenderTypesR49.entityTriangles(textureResource,false):RenderType.entityCutoutNoCull(textureResource));
         Matrix4f pose = poseStack.last().pose();
         Matrix3f normal = poseStack.last().normal();
         for (MeshPart part : mesh.parts().values())
@@ -327,9 +356,10 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 emitStandaloneVertex(target, pose, normal, values,
                         index + mesh.stride() * 2, part, mesh,
                         packedLight, packedOverlay);
-                emitStandaloneVertex(target, pose, normal, values,
-                        index + mesh.stride() * 2, part, mesh,
-                        packedLight, packedOverlay);
+                if(!triangles)
+                    emitStandaloneVertex(target, pose, normal, values,
+                            index + mesh.stride() * 2, part, mesh,
+                            packedLight, packedOverlay);
             }
         }
         return true;

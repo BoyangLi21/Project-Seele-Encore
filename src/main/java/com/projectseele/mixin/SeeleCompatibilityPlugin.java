@@ -18,6 +18,8 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
     @Override public String getRefMapperConfig(){return null;}
     @Override public boolean shouldApplyMixin(String target,String mixin)
     {
+        if(mixin.endsWith("client.MtrRailMathCacheR51Mixin"))return FMLLoader.getDist()==Dist.CLIENT
+                &&com.projectseele.compat.MtrRailMathCompatibilityR51.accepted(getClass().getClassLoader());
         if (!mixin.endsWith("CityExactUnionCreateMixinR45") && !mixin.endsWith("CitySavedOwnerUnionMixinR45")) return true;
         if (!CityUnionPortableBootstrapR45.requested()) return false;
         if(cityAbiAccepted!=null)return cityAbiAccepted;
@@ -103,6 +105,8 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
     @Override public void preApply(String name,ClassNode node,String mixin,IMixinInfo info) {}
     @Override public void postApply(String name,ClassNode node,String mixin,IMixinInfo info)
     {
+        if(mixin.endsWith("client.MtrRailMathCacheR51Mixin"))
+        {com.projectseele.compat.MtrRailMathCompatibilityR51.apply(node);return;}
         CityUnionActivationR45.applied(mixin);
         if(FMLLoader.getDist()!=Dist.DEDICATED_SERVER||!name.equals("com.solvane.grandpiano.network.PianoSyncPacket"))return;
         int changed=0;

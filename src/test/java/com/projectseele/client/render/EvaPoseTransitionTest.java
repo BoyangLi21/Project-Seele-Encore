@@ -4,6 +4,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
+import software.bernie.geckolib.cache.object.GeoBone;
 
 /** Checks the actual production transition kernel without a game client. */
 public final class EvaPoseTransitionTest
@@ -16,6 +17,7 @@ public final class EvaPoseTransitionTest
     private static final Method SAMPLE;
     private static final Method POSITION;
     private static final Method ROTATION;
+    private static final Method WRITE;
 
     static
     {
@@ -30,8 +32,9 @@ public final class EvaPoseTransitionTest
             SAMPLE = track.getDeclaredMethod("sample", POSE, double.class, double.class);
             POSITION = POSE.getDeclaredMethod("position");
             ROTATION = POSE.getDeclaredMethod("rotation");
+            WRITE = POSE.getDeclaredMethod("write", GeoBone.class);
             POSE_CTOR.setAccessible(true); TRACK_CTOR.setAccessible(true);
-            for (Method method : new Method[] {BEGIN, UPDATE, SAMPLE, POSITION, ROTATION})
+            for (Method method : new Method[] {BEGIN, UPDATE, SAMPLE, POSITION, ROTATION, WRITE})
                 method.setAccessible(true);
         }
         catch (Exception exception)
@@ -59,21 +62,22 @@ public final class EvaPoseTransitionTest
             throw new AssertionError("Pose discontinuity or unsettled endpoint");
     }
 
-    private static void quaternionChannels()
+    private static void quaternionChannels() throws Exception
     {
         var random=new java.util.Random(360041);
+        var bone=new GeoBone(null,"arm_r",false,0D,false,false);
         for(int i=0;i<2400;i++)
         {
             float x=(random.nextFloat()*2-1)*(float)Math.PI,z=(random.nextFloat()*2-1)*(float)Math.PI;
             float y=i<1200?(i%2==0?1:-1)*(float)(Math.PI/2+(i%3-1)*1e-6):(random.nextFloat()*2-1)*(float)Math.PI;
             var original=new Quaternionf().rotationZYX(z,y,x);
-            var channels=QuaternionChannels.euler(original);
-            var restored=new Quaternionf().rotationZYX(channels.z,channels.y,channels.x);
+            WRITE.invoke(POSE_CTOR.newInstance(original,new Vector3f(),new Vector3f(1)),bone);
+            var restored=new Quaternionf().rotationZYX(bone.getRotZ(),bone.getRotY(),bone.getRotX());
             for(var axis:new Vector3f[]{new Vector3f(1,0,0),new Vector3f(0,1,0),new Vector3f(0,0,1)})
                 if(original.transform(new Vector3f(axis)).distance(restored.transform(new Vector3f(axis)))>2e-4F)
                     throw new AssertionError("Rendered rotation changed near a vertical axis: "+i);
         }
-        System.out.println("Quaternion channels: 2400 regular and gimbal-axis orientations retain all three basis vectors PASS");
+        System.out.println("Actual pose write: 2400 regular and gimbal-axis orientations retain all three basis vectors PASS");
     }
 
     public static void main(String[] args) throws Exception

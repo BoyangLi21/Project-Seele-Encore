@@ -1,15 +1,20 @@
 package com.projectseele.client.render;
 
 import com.google.gson.JsonArray;
+import com.google.gson.stream.JsonReader;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.OutlineBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
 import java.util.Arrays;
+import java.util.ArrayList;
+import java.util.List;
+import java.io.IOException;
 
 /** Cached rigid geometry emitted through the ordinary entity material and shadow pass. */
 final class RigidMachineryPartR44
@@ -19,6 +24,7 @@ final class RigidMachineryPartR44
     private final float[] vertices;
     private final float[] bounds;
     private final ResourceLocation texture;
+    private final boolean importedTriangles;
 
     private RigidMachineryPartR44(float[] vertices, float[] bounds)
     {
@@ -27,40 +33,84 @@ final class RigidMachineryPartR44
 
     private RigidMachineryPartR44(float[] vertices, float[] bounds, ResourceLocation texture)
     {
+        this(vertices,bounds,texture,false);
+    }
+
+    private RigidMachineryPartR44(float[] vertices,float[] bounds,ResourceLocation texture,boolean importedTriangles)
+    {
         this.vertices = vertices;
         this.bounds = bounds;
         this.texture = texture;
+        this.importedTriangles=importedTriangles;
     }
 
     /** Imported rigid triangles keep their original UVs and smooth vertex normals. */
     static RigidMachineryPartR44 textured(JsonArray encoded, ResourceLocation texture)
     {
         if (encoded.size() % 24 != 0) throw new IllegalArgumentException("Triangle XYZ/UV/normal layout required");
-        float[] vertices = new float[encoded.size() / 24 * 44];
-        float[] bounds = {Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY, Float.POSITIVE_INFINITY,
-                Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY, Float.NEGATIVE_INFINITY};
-        int cursor = 0;
-        for (int triangle = 0; triangle < encoded.size(); triangle += 24)
+        var builder = new TexturedBuilder();
+        float[] triangle = new float[24];
+        for (int start = 0; start < encoded.size(); start += 24)
         {
-            for (int corner : new int[] {0, 1, 2, 2})
-            {
-                int offset = triangle + corner * 8;
-                float[] source = new float[8];
-                for (int i = 0; i < 8; i++)
-                {
-                    source[i] = encoded.get(offset + i).getAsFloat();
-                    if (!Float.isFinite(source[i])) throw new IllegalArgumentException("Non-finite imported machinery");
-                }
-                for (int axis = 0; axis < 3; axis++)
-                {
-                    bounds[axis] = Math.min(bounds[axis], source[axis]);
-                    bounds[axis + 3] = Math.max(bounds[axis + 3], source[axis]);
-                }
-                for (float value : new float[] {source[0], source[1], source[2], 1, 1, 1,
-                        source[5], source[6], source[7], source[3], source[4]}) vertices[cursor++] = value;
-            }
+            for (int i = 0; i < 24; i++) triangle[i] = encoded.get(start + i).getAsFloat();
+            builder.triangle(triangle);
         }
-        return new RigidMachineryPartR44(vertices, bounds, texture);
+        return builder.finish(texture);
+    }
+
+    /** Texture may follow parts in a resource document. Bind only after the
+     * whole assembly is validated; the primitive vertices are never copied. */
+    RigidMachineryPartR44 withTexture(ResourceLocation material)
+    {return new RigidMachineryPartR44(vertices,bounds,material,importedTriangles);}
+
+    static RigidMachineryPartR44 readTextured(JsonReader encoded) throws IOException
+    {
+        var builder = new TexturedBuilder();
+        float[] triangle = new float[24];int count = 0;
+        encoded.beginArray();
+        while(encoded.hasNext())
+        {
+            // Gson's numeric JsonPrimitive.getAsFloat uses this same decimal
+            // to-float conversion. Reading as double first changes rounding.
+            triangle[count++] = Float.parseFloat(encoded.nextString());
+            if(count == 24){builder.triangle(triangle);count = 0;}
+        }
+        encoded.endArray();
+        if(count != 0)throw new IllegalArgumentException("Triangle XYZ/UV/normal layout required");
+        return builder.finish(null);
+    }
+
+    private static final class TexturedBuilder
+    {
+        private static final int CHUNK = STRIDE * 4 * 1024;
+        private final List<float[]> chunks = new ArrayList<>();
+        private final float[] box = {Float.POSITIVE_INFINITY,Float.POSITIVE_INFINITY,Float.POSITIVE_INFINITY,
+                Float.NEGATIVE_INFINITY,Float.NEGATIVE_INFINITY,Float.NEGATIVE_INFINITY};
+        private int size;
+        void triangle(float[] source)
+        {
+            for(int i = 0;i < 24;i++)if(!Float.isFinite(source[i]))throw new IllegalArgumentException("Non-finite imported machinery");
+            int cursor = size % CHUNK;if(cursor == 0)chunks.add(new float[CHUNK]);
+            float[] out = chunks.get(chunks.size()-1);
+            for(int corner = 0;corner < 4;corner++)
+            {
+                int offset = (corner == 3?2:corner)*8;
+                float x = source[offset],y = source[offset+1],z = source[offset+2];
+                box[0] = Math.min(box[0],x);box[1] = Math.min(box[1],y);box[2] = Math.min(box[2],z);
+                box[3] = Math.max(box[3],x);box[4] = Math.max(box[4],y);box[5] = Math.max(box[5],z);
+                out[cursor++] = x;out[cursor++] = y;out[cursor++] = z;
+                out[cursor++] = 1;out[cursor++] = 1;out[cursor++] = 1;
+                out[cursor++] = source[offset+5];out[cursor++] = source[offset+6];out[cursor++] = source[offset+7];
+                out[cursor++] = source[offset+3];out[cursor++] = source[offset+4];
+            }
+            size = Math.addExact(size,STRIDE*4);
+        }
+        RigidMachineryPartR44 finish(ResourceLocation material)
+        {
+            float[] values = new float[size];int copied = 0;
+            for(var chunk:chunks){int length = Math.min(CHUNK,size-copied);System.arraycopy(chunk,0,values,copied,length);copied += length;}
+            return new RigidMachineryPartR44(values,box,material,true);
+        }
     }
 
     static RigidMachineryPartR44 triangles(JsonArray encoded)
@@ -94,16 +144,20 @@ final class RigidMachineryPartR44
     void draw(PoseStack poses, MultiBufferSource buffers, int light)
     {
         TvCraneMeshWitnessR44.part(vertices,poses);
-        if (RigidMachineryGpuR44.draw(this, vertices, texture, poses, buffers, light)) return;
-        VertexConsumer out = buffers.getBuffer(ModelRenderTypesR49.solid(texture));
+        // Keep the source arrays unchanged. Only imported smooth triangles
+        // omit their duplicated fourth point; vanilla outlines remain quads.
+        boolean triangles=importedTriangles&&!(buffers instanceof OutlineBufferSource);
+        if (RigidMachineryGpuR44.draw(this, vertices, texture, poses, buffers, light,triangles)) return;
+        VertexConsumer out = buffers.getBuffer(triangles?ModelRenderTypesR49.solidTriangles(texture):ModelRenderTypesR49.solid(texture));
         var frame = poses.last();
         boolean reflected = frame.pose().determinant() < 0;
         Vector3f normal = new Vector3f();
         for (int quad = 0; quad < vertices.length; quad += STRIDE * 4)
         {
-            for (int j = 0; j < 4; j++)
+            int corners=triangles?3:4;
+            for (int j = 0; j < corners; j++)
             {
-                int index = quad + (reflected ? 3 - j : j) * STRIDE;
+                int index = quad + (reflected ? corners-1-j : j) * STRIDE;
                 normal.set(vertices[index + 6], vertices[index + 7], vertices[index + 8]);
                 normal.mul(frame.normal()).normalize();
                 out.vertex(frame.pose(), vertices[index], vertices[index + 1], vertices[index + 2])

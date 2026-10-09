@@ -33,7 +33,8 @@ public final class EvaWeaponHandlingR45
     public static boolean holding(EvaUnit01Entity e,float partial)
     {
         return available(e)&&e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&!active(e)&&!EvaFieldActionsR45.active(e)
-                &&!e.hasLiveActionForRender(partial)&&!e.hasLegacyStrikeForRender()
+                &&!e.hasLiveActionForRender(partial)&&(!e.hasLegacyStrikeForRender()
+                ||EvaBodyPose.hasTerrainStances()&&EvaGameplayMotionR32.sharedWeapon(e))
                 &&!e.isNervLogisticsLocked()&&!e.isFirstBattleActive()&&!EvaShutdownR30.disabled(e);
     }
     private static EvaBodyPose.Sample hold(EvaUnit01Entity e,EvaBodyPose.Sample body)
@@ -58,7 +59,7 @@ public final class EvaWeaponHandlingR45
         var state=new CompoundTag();
         state.put("from_pose",EvaShutdownR30.encode(EvaBodyPose.sample(e,0)));
         state.putInt("before",old);state.putInt("after",weapon);state.putBoolean("draw",draw);
-        state.putLong("started",e.level().getGameTime());state.putInt("duration",40);
+        state.putLong("started",e.level().getGameTime());state.putInt("duration",draw?26:40);
         e.getEntityData().set(STATE,state);
         return true;
     }

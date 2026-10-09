@@ -352,6 +352,37 @@ public final class EvaBodyPose
     {if(data==null)reload();return clip(data,rigKey(e),"r32_"+clip,phase);}
     public static Sample blend(Sample a,Sample b,float amount)
     {var result=mix(a,b,Mth.clamp(amount,0,1));preserveJointCentres(result);result.dirty();return result;}
+
+    public static Sample copy(Sample source)
+    {
+        var result=new Sample(source.rig);
+        source.rotations.forEach((name,q)->result.rotations.put(name,new Quaternionf(q)));
+        source.positions.forEach((name,p)->result.positions.put(name,new Vector3f(p)));
+        source.contactGoals.forEach((name,p)->result.contactGoals.put(name,new Vector3f(p)));
+        source.contactOffsets.forEach((name,p)->result.contactOffsets.put(name,new Vector3f(p)));
+        return result;
+    }
+
+    public static boolean locomotionBoneR51(String name)
+    {
+        return name.equals("root")||name.equals("torso_lower")||name.startsWith("leg_")
+                ||name.startsWith("shin_")||name.startsWith("ankle_")||name.startsWith("foot_")||name.startsWith("toe_");
+    }
+
+    public static Sample blendUpperKeepingLocomotionR51(Sample base,Sample upper,float amount)
+    {
+        Map<String,Quaternionf> rotations=new HashMap<>();Map<String,Vector3f> positions=new HashMap<>();
+        for(String name:base.rig.keySet())if(locomotionBoneR51(name))
+        {
+            rotations.put(name,new Quaternionf(base.rotations.get(name)));
+            positions.put(name,new Vector3f(base.positions.get(name)));
+        }
+        var goals=new HashMap<>(base.contactGoals);var offsets=new HashMap<>(base.contactOffsets);
+        var result=blend(base,upper,amount);result.rotations.putAll(rotations);result.positions.putAll(positions);
+        result.contactGoals.clear();result.contactGoals.putAll(goals);
+        result.contactOffsets.clear();result.contactOffsets.putAll(offsets);
+        result.dirty();return result;
+    }
     private static Quaternionf mocap(Data d,String name,float phase)
     {
         if(!d.mocap().has("clips"))return new Quaternionf().rotationXYZ(-.20F,-.25F,0);
@@ -507,9 +538,11 @@ public final class EvaBodyPose
         }
         // Authored support clips already include the deformed ankle surfaces.
         // Applying the rigid-foot correction again would lift the prone belly.
-        if(Float.isFinite(floor)&&(variant>=3||!(supported&&(stance>1.01F||move<.05F))))
+        if(Float.isFinite(floor))
         {
-            body.positions.get("root").y-=floor;body.dirty();
+            float groundWeight=variant>=3||!supported?1
+                    :EvaPoseBlendR51.smooth(move/.12F)*(1-EvaPoseBlendR51.smooth((stance-1)/.5F));
+            body.positions.get("root").y-=floor*groundWeight;body.dirty();
         }
         }
         com.projectseele.visual.BodyPoseLayersR40.capture("initial_ground",body);
@@ -538,6 +571,9 @@ public final class EvaBodyPose
         }
         if(!capturedLocomotionOwns)EvaHandsR41.apply(entity,body,partial);
         EvaAnatomicalHandsR45.naturalCarryR45(entity,body,partial);
+        // The fitted ready arm is the action/release target. Applying it after
+        // release blending replaced the recovering knife arm in one frame.
+        if(EvaWeaponHandlingR45.holding(entity,partial))body=EvaWeaponHandlingR45.apply(entity,body,partial);
         var gameplayApplied=EvaGameplayMotionR32.applyWithCapturedBaseR44(entity,body,partial,capturedLocomotionOwns);
         body=gameplayApplied.pose();
         boolean capturedSupport=capturedLocomotionOwns&&!entity.hasLiveActionForRender(partial)&&!entity.isVisuallyAirborneForRender()
@@ -607,8 +643,9 @@ public final class EvaBodyPose
             EvaCombatSupportR33.preventFreeFootPenetrationR44(entity,body,partial);
         }
         supportProneFirearmChestR45(entity,body,partial);
+        EvaCervicalKinematicsR25.apply(entity,body,partial);
         EvaOriginalHandsR45.apply(entity,body);
-        body=EvaWeaponHandlingR45.apply(entity,body,partial);
+        if(EvaWeaponHandlingR45.active(entity))body=EvaWeaponHandlingR45.apply(entity,body,partial);
         EvaMarineBraceR50.apply(entity,body,partial);
         if(!EvaWeaponHandlingR45.active(entity))EvaAnatomicalHandsR45.attachKnife(entity,body);
         EvaAnatomicalHandsR45.attachSwordR45(entity,body);
@@ -630,7 +667,7 @@ public final class EvaBodyPose
         // A twelve-degree chest left almost the entire prone look-up angle to
         // the neck, swinging the helmet through its dorsal collar. Support the
         // upper trunk first; the same chest drives both arm IK and gun optics.
-        float minimum=28*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
+        float minimum=52*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
         var headWorld=body.matrix("head").getUnnormalizedRotation(new Quaternionf()).normalize();
         float horizontal=(float)Math.hypot(up.x,up.z);if(horizontal<1e-6F)return;
         float target=Mth.lerp(support,elevation,minimum),radius=(float)Math.cos(target);
@@ -654,7 +691,7 @@ public final class EvaBodyPose
     private static void applyLocomotionContactGoalsR44(EvaUnit01Entity e,Sample pose,float partial)
     {
         if(pose.contactGoals.isEmpty()||!EvaGameplayMotionR32.sharedWeapon(e)||e.hasLiveActionForRender(partial)
-                ||e.isVisuallyAirborneForRender()||e.rifleStanceLevel(partial)>.01F||e.rifleMoveBlend(partial)<.04F
+                ||e.isVisuallyAirborneForRender()||e.rifleStanceLevel(partial)>=1F||e.rifleMoveBlend(partial)<=0
                 ||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)
                 ||EvaCombatR31.action(e)!=EvaCombatR31.NONE||CombatReactionsR36.active(e))return;
         var profile=com.projectseele.physics.CombatBodyProfiles.get(e);
@@ -666,7 +703,10 @@ public final class EvaBodyPose
             var actual=matrix.transformPosition(new Vector3f(pose.rig.get(name).pivot()).add(offset));
             // Keep the final terrain height and captured heel roll. Correct the
             // end effector after quaternion blending, not its individual bones.
-            var target=new Vector3f(goal.x,actual.y,goal.z).sub(orientation.transform(new Vector3f(offset)));
+            var target=new Vector3f(actual).lerp(new Vector3f(goal.x,actual.y,goal.z),
+                    EvaPoseBlendR51.smooth(e.rifleMoveBlend(partial)/.16F)
+                            *(1-EvaPoseBlendR51.smooth(e.rifleStanceLevel(partial))))
+                    .sub(orientation.transform(new Vector3f(offset)));
             com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(pose,profile,side,target,orientation);
         }
         preserveJointCentres(pose);

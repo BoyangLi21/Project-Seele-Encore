@@ -61,6 +61,7 @@ public final class CityCreateDistrictR45
     { State.load(tag).validate(objects); }
     private static final String JOB = System.getProperty("projectseele.r45CityCreateDistrict", "");
     private static final int WORK_LIMIT = 4096;
+    private static final int ENDPOINT_OWNER_LIMIT = 4;
     private static final int PREPARE_READ_LIMIT = 16384;
     private static final long WORK_NANOS = 8_000_000L;
     private static final double SPEED = .25;
@@ -103,6 +104,12 @@ public final class CityCreateDistrictR45
         report.addProperty("saved_plans", c.state.savedPlans); report.addProperty("created", c.state.created);
         report.addProperty("index", c.state.index); report.addProperty("cursor", c.state.cursor);
         report.addProperty("motion_tick", c.state.motionTick); report.addProperty("progress", c.state.progress);
+        if (c.endpointFinalizer != null)
+        {
+            report.addProperty("endpoint_owners", c.endpointFinalizer.size());
+            report.addProperty("endpoint_owners_verified", c.endpointFinalizer.verified());
+            report.addProperty("endpoint_owners_removed", c.endpointFinalizer.removed());
+        }
         report.addProperty("loading_plans", c.loadingPlans); report.addProperty("occupied", c.occupied);
         report.add("exact_union", CityExactShapeUnionR45.diagnostics());
         report.addProperty("quality_hold", c.qualityHold); report.addProperty("current_phase_elapsed_ms", (now - c.phaseStartedNanos) / 1e6);
@@ -256,6 +263,7 @@ public final class CityCreateDistrictR45
             }
             context.state.rollback = rollback;
             context.clearReconcileFold();
+            context.endpointFinalizer = null;
             context.state.allowMissingRecovery = true;
             context.state.phase = !rollback && java.util.Set.of("OPEN", "DETACH", "SPAWN", "READY", "MOVE").contains(context.state.faultPhase)
                     ? "REPLAY_OPEN" : "RECONCILE";
@@ -430,6 +438,7 @@ public final class CityCreateDistrictR45
         final List<CityRigidTopologyR45.Tower> towers;
         final List<Plan> plans = new ArrayList<>();
         final Map<Integer, Entity> entities = new HashMap<>();
+        CityEndpointFinalizerR51<EndpointOwner> endpointFinalizer;
         final java.util.Set<UUID> ownerIds = new java.util.HashSet<>();
         final List<ChunkPos> chunks = new ArrayList<>();
         State state;
@@ -528,6 +537,7 @@ public final class CityCreateDistrictR45
             String activationFailure = CityExactShapeUnionR45.requiredActivationFailure();
             if (activationFailure != null) throw new IllegalStateException("Required release union not ready before next journey: " + activationFailure);
             clearReconcileFold();
+            endpointFinalizer = null;
             if (pending != null && !pending.isDone()) throw new IllegalStateException("The cancelled unplaced journal is still draining; original city remains untouched");
             pending = null;
             pendingInitialFold = null;
@@ -844,13 +854,13 @@ public final class CityCreateDistrictR45
             }
             if (state.index == plans.size())
             {
-                state.phase = next; state.index = state.cursor = 0;
                 if (next.equals("FLUSH"))
                 {
-                    for (var entry : entities.entrySet()) CityCreateBridgeR45.verify(entry.getValue(), plans.get(entry.getKey()).cargo());
-                    for (Entity entity : entities.values()) entity.discard();
+                    if (System.nanoTime() - began >= WORK_NANOS) { checkpoint(); return; }
+                    if (!finishEndpointOwners(false, began)) { checkpoint(); return; }
                     entities.clear();
                 }
+                state.phase = next; state.index = state.cursor = 0;
             }
             checkpoint();
         }
@@ -1022,15 +1032,8 @@ public final class CityCreateDistrictR45
             {
                 // Recovery resumes at a static authoritative endpoint. It
                 // never teleports an occupant or duplicates moving inventory.
-                for (Plan plan : plans)
-                {
-                    Entity entity = level.getEntity(plan.owner);
-                    if (entity != null)
-                    {
-                        if (!entity.getTags().contains(ownerTag())) throw new IllegalStateException("Foreign entity at recovered UUID");
-                        CityCreateBridgeR45.verify(entity, plan.cargo()); entity.discard();
-                    }
-                }
+                if (System.nanoTime() - began >= WORK_NANOS) { checkpoint(); return; }
+                if (!finishEndpointOwners(true, began)) { checkpoint(); return; }
                 entities.clear(); state.phase = "FLUSH"; state.index = state.cursor = 0;
             }
             checkpoint();
@@ -1042,9 +1045,44 @@ public final class CityCreateDistrictR45
             pendingFold = null; currentReconcileFold = null; reconcileFoldIndex = -1;
         }
 
+        boolean finishEndpointOwners(boolean recovery, long began) throws Exception
+        {
+            if (endpointFinalizer == null)
+            {
+                List<EndpointOwner> owners = new ArrayList<>();
+                for (Plan plan : plans)
+                {
+                    Entity entity = recovery ? level.getEntity(plan.owner) : entities.get(plan.spec.index());
+                    if (entity == null)
+                    {
+                        if (!recovery) throw new IllegalStateException("Original endpoint owner missing before complete verification");
+                        continue;
+                    }
+                    owners.add(new EndpointOwner(plan, entity));
+                }
+                endpointFinalizer = new CityEndpointFinalizerR51<>(owners);
+            }
+            // Keep COVER/RECONCILE and their complete original WAL unchanged.
+            // A restart already replays RECONCILE from index zero, where an
+            // owner removed after exact endpoint placement may be absent.
+            // Check remaining controller time before each owner and cap each
+            // tick's work/removals. The indivisible stock save/verify can
+            // itself exceed WORK_NANOS.
+            return endpointFinalizer.step(owner ->
+            {
+                Entity entity = owner.entity;
+                if (!entity.isAlive() || !entity.getUUID().equals(owner.plan.owner)
+                        || level.getEntity(owner.plan.owner) != entity || !ownsActor(entity))
+                    throw new IllegalStateException("Original endpoint owner authority changed before removal");
+                CityCreateBridgeR45.verify(entity, owner.plan.cargo());
+            }, owner -> owner.entity.discard(), ENDPOINT_OWNER_LIMIT,
+                    () -> System.nanoTime() - began < WORK_NANOS);
+        }
+
         void commit() throws Exception
         {
             clearReconcileFold();
+            endpointFinalizer = null;
             int endpoint = state.rollback ? state.journeySourceDepth : state.journeyTargetDepth;
             int queued = state.queued;
             state.depth = state.target = endpoint; state.phase = "IDLE";
@@ -1145,6 +1183,8 @@ public final class CityCreateDistrictR45
                     || level.getGameTime() - lastPersistTick >= 20) persist();
         }
     }
+
+    private record EndpointOwner(Plan plan, Entity entity) {}
 
     private static int duration(Plan plan)
     {

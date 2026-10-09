@@ -16,9 +16,10 @@ public final class StaffConversationScreen extends Screen
     private EditBox input;
     private EditBox transportX,transportZ;
     private String mission="sachiel";
-    private boolean npcSortie,sortieRifle=true;
+    private boolean npcSortie;
+    private String sortieEquipment="rifle";
     private int x, y, panelWidth, panelHeight, tab, unit = 1, age, savedScale = -1, replyScroll, replyTop;
-    private boolean restoring;
+    private boolean restoring,scaling;
     private UUID humanPilot;
 
     private StaffConversationScreen(ClientboundStaffConversationPacket view)
@@ -51,19 +52,36 @@ public final class StaffConversationScreen extends Screen
         {
             var replacement = new StaffConversationScreen(packet);
             if (mc.screen instanceof StaffConversationScreen old)
-            { replacement.unit = old.unit; replacement.tab = packet.canCommand() ? old.tab : 0;replacement.mission=old.mission;replacement.npcSortie=old.npcSortie;replacement.sortieRifle=old.sortieRifle; }
+            { replacement.unit = old.unit; replacement.tab = packet.canCommand() ? old.tab : 0;replacement.mission=old.mission;replacement.npcSortie=old.npcSortie;replacement.sortieEquipment=old.sortieEquipment; }
             mc.setScreen(replacement);
             mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(com.projectseele.registry.ModSounds.STAFF_RADIO_CONNECT.get(),1,.4F));
         }
     }
     public ClientboundStaffConversationPacket snapshot() { return view; }
 
+    static int readableGuiScale(int preferredScale,int windowWidth,int windowHeight,boolean unicode)
+    {
+        int fit=Math.max(1,Math.min(windowWidth/430,windowHeight/300));
+        int selected=Math.max(1,Math.min(preferredScale,fit));
+        if(unicode&&selected>1&&selected%2!=0)selected--;
+        return selected;
+    }
+
     @Override protected void init()
     {
-        if ((width < 430 || height < 300) && savedScale < 0 && minecraft.options.guiScale().get() != 1)
+        if(savedScale<0)savedScale=minecraft.options.guiScale().get();
+        if(!restoring&&!scaling)
         {
-            savedScale = minecraft.options.guiScale().get(); minecraft.options.guiScale().set(2);
-            minecraft.resizeDisplay(); return;
+            var window=minecraft.getWindow();boolean unicode=minecraft.isEnforceUnicode();
+            int preferred=window.calculateScale(savedScale,unicode);
+            int selected=readableGuiScale(preferred,window.getWidth(),window.getHeight(),unicode);
+            if(minecraft.options.guiScale().get()!=selected)
+            {
+                scaling=true;
+                try{minecraft.options.guiScale().set(selected);minecraft.resizeDisplay();}
+                finally{scaling=false;}
+                return;
+            }
         }
         panelWidth = Math.min(560, width - 16); panelHeight = Math.min(320, height - 16);
         x = (width - panelWidth) / 2; y = (height - panelHeight) / 2;
@@ -158,12 +176,10 @@ public final class StaffConversationScreen extends Screen
             for(int i=0;i<3;i++){int selection=i;addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),x+12+i*(column+4),controlsY+22,column,()->{unit=selection;rebuildWidgets();},true);}
             addButton((!npcSortie?"● ":"")+"亲自驾驶",x+12,controlsY+44,half,()->{npcSortie=false;rebuildWidgets();},true);
             addButton((npcSortie?"● ":"")+com.projectseele.entity.TrainingPilotEntity.pilotName(unit)+"出战",x+16+half,controlsY+44,half,()->{npcSortie=true;rebuildWidgets();},true);
-            addButton("常规出击装备："+(npcSortie?(sortieRifle?"先前往武器井取枪":"近战出击"):"亲自到武器井领取"),x+12,controlsY+66,panelWidth-24,()->{sortieRifle=!sortieRifle;rebuildWidgets();},npcSortie);
-            addButton("出击 / 加入增援",x+12,controlsY+88,half,()->send("CAMPAIGN:sortie:"+mission+":"+unit+":"+(npcSortie?"npc":"human")+":"+(sortieRifle?"rifle":"melee")),permitted("campaign"));
+            addButton("常规出击装备："+equipmentLabel()+" / 切换",x+12,controlsY+66,panelWidth-24,()->{cycleEquipment();rebuildWidgets();},true);
+            addButton("出击 / 加入增援",x+12,controlsY+88,half,()->send(sortieRequest(mission,unit,npcSortie,sortieEquipment)),permitted("campaign"));
             addButton("撤销当前作战",x+16+half,controlsY+88,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
             addButton("查看所选简报",x+12,controlsY+110,half,()->send("TOPIC:campaign"),true);
-            addButton(unit==0?"携盾出击":unit==2?"携剑出击":"初号机无专用盾／剑",x+16+half,controlsY+110,half,
-                    ()->send("ARMEDSORTIE:"+unit+":"+(npcSortie?"npc":"human")),unit!=1&&permitted("campaign"));
         }
         else if(tab==7)
         {
@@ -293,6 +309,23 @@ public final class StaffConversationScreen extends Screen
                     x+12+i*(column+4),top,column,()->{unit=selection;rebuildWidgets();},true);
         }
     }
+    private String equipmentLabel()
+    {
+        if(sortieEquipment.equals("special")&&unit==0)return "零号机盾 · 到盾井领取";
+        if(sortieEquipment.equals("special")&&unit==2)return "二号机长剑 · 到剑井领取";
+        return sortieEquipment.equals("rifle")?"步枪 · 到武器井领取":"近战";
+    }
+    private void cycleEquipment()
+    {
+        String current=sortieEquipment.equals("special")&&unit!=0&&unit!=2?"melee":sortieEquipment;
+        sortieEquipment=switch(current){case "melee" -> "rifle";case "rifle" -> unit==0||unit==2?"special":"melee";default -> "melee";};
+    }
+    static String sortieRequest(String mission,int unit,boolean npc,String equipment)
+    {
+        String driver=npc?"npc":"human";
+        if(equipment.equals("special")&&(unit==0||unit==2))return "ARMEDSORTIE:"+unit+":"+driver;
+        return "CAMPAIGN:sortie:"+mission+":"+unit+":"+driver+":"+(equipment.equals("rifle")?"rifle":"melee");
+    }
     private int parentTab()
     {
         return switch(tab)
@@ -374,9 +407,11 @@ public final class StaffConversationScreen extends Screen
     @Override public void onClose() { send("CLOSE"); super.onClose(); }
     @Override public void removed()
     {
-        if (savedScale >= 0 && !restoring)
+        if (savedScale >= 0 && !restoring && minecraft.options.guiScale().get()!=savedScale)
         {
-            restoring = true; minecraft.options.guiScale().set(savedScale); minecraft.resizeDisplay();
+            restoring = true;
+            try{minecraft.options.guiScale().set(savedScale);minecraft.resizeDisplay();}
+            finally{restoring=false;}
         }
         super.removed();
     }
