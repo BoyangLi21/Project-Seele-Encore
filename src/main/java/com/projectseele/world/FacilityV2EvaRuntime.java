@@ -82,6 +82,7 @@ public final class FacilityV2EvaRuntime
 
     public static boolean ready(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         if (!FacilityWorldPolicy.isCleanRebuild(level.getServer())
                 || variant < 0 || variant >= LINE_X.length)
         {
@@ -113,6 +114,7 @@ public final class FacilityV2EvaRuntime
      */
     public static boolean supportsPlugCrane(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         return FacilityWorldPolicy.isCleanRebuild(level.getServer())
                 && variant >= 0 && variant < LINE_X.length;
     }
@@ -199,6 +201,7 @@ public final class FacilityV2EvaRuntime
      */
     public static void ensureControls(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (!supportsPlugCrane(level, variant))
         {
             return;
@@ -272,6 +275,7 @@ public final class FacilityV2EvaRuntime
 
     public static int lclLevel(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return -1;
         BlockPos bed = hangarBed(level, variant);
         int visible = 0;
         for (int y = LCL_BOTTOM_Y; y <= LCL_TOP_Y; y++)
@@ -294,6 +298,7 @@ public final class FacilityV2EvaRuntime
     public static void setLclLayer(ServerLevel level, int variant,
                                    int layer, boolean filled)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         int y = LCL_BOTTOM_Y + layer - 1;
         if (!ready(level, variant) || y < LCL_BOTTOM_Y || y > LCL_TOP_Y)
         {
@@ -323,6 +328,7 @@ public final class FacilityV2EvaRuntime
 
     public static int drainLclEnvelope(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return -1;
         int remaining = 0;
         for (int layer = LCL_SHOULDER_LAYERS; layer >= 1; layer--)
         {
@@ -352,6 +358,7 @@ public final class FacilityV2EvaRuntime
      */
     public static void restoreLclEnvelope(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (!ready(level, variant))
         {
             return;
@@ -402,6 +409,7 @@ public final class FacilityV2EvaRuntime
     public static void setBoardingBridgeExtension(
             ServerLevel level, int variant, int segments)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (!ready(level, variant))
         {
             return;
@@ -446,6 +454,7 @@ public final class FacilityV2EvaRuntime
     public static void setCarrier(ServerLevel level, int variant,
                                   BlockPos centre, boolean present)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (!ready(level, variant))
         {
             return;
@@ -491,6 +500,7 @@ public final class FacilityV2EvaRuntime
     public static void restoreStaticCarrier(ServerLevel level, int variant,
                                             BlockPos centre)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         setCarrier(level, variant, centre, true);
     }
 
@@ -498,6 +508,7 @@ public final class FacilityV2EvaRuntime
     public static void ensureTransportGuideway(ServerLevel level, int variant,
                                                BlockPos start, BlockPos end)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (!ready(level, variant) || start.getX() != end.getX()
                 || start.getY() != end.getY())
         {
@@ -558,6 +569,7 @@ public final class FacilityV2EvaRuntime
                                     double craneEyeY, double craneEyeZ,
                                     boolean travelling)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (!ready(level, variant))
         {
             return;
@@ -587,6 +599,7 @@ public final class FacilityV2EvaRuntime
 
     public static void stowPlugCrane(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (!ready(level, variant))
         {
             return;
@@ -983,6 +996,7 @@ public final class FacilityV2EvaRuntime
                                  FacilitySchemaV2.IntBox[] owners,
                                  BlockPos position, BlockState state)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         boolean owned = false;
         for (FacilitySchemaV2.IntBox owner : owners)
         {

@@ -7,6 +7,7 @@ public final class EvaPoseSignalClock
     private long start,lastAccepted,window;
     private final long minimumWindow,maximumWindow;
     private boolean initialized;
+    private Object actionSourceR52;
     public EvaPoseSignalClock(){this(50_000_000L,100_000_000L);}
     public EvaPoseSignalClock(long fixedWindow){this(fixedWindow,fixedWindow);}
     private EvaPoseSignalClock(long minimum,long maximum)
@@ -22,9 +23,20 @@ public final class EvaPoseSignalClock
     {
         acceptAt(value,cyclic,restartOnBackward,System.nanoTime());
     }
+    /** Apply one complete metadata snapshot, after both source and phase updates. */
+    public void acceptAction(Object source,float value,boolean phaseUpdated)
+    {acceptActionAt(source,value,phaseUpdated,System.nanoTime());}
+    void acceptActionAt(Object source,float value,boolean phaseUpdated,long now)
+    {
+        if(!initialized||!java.util.Objects.equals(actionSourceR52,source))
+        {actionSourceR52=source;snapAt(value,now);}
+        else if(phaseUpdated)acceptAt(value,false,true,now);
+    }
     void acceptAt(float value,boolean cyclic,boolean restartOnBackward,long now)
     {
-        if(!initialized||restartOnBackward&&value<raw-.05F)
+        // Zero is the explicit start of a new action. An interrupted first
+        // tick can be below the jitter threshold but cannot seed its next clip.
+        if(!initialized||restartOnBackward&&(value<raw-.05F||value==0F&&raw>0F))
         {snapAt(value,now);return;}
         // Redirect from the old window's actual value before changing cadence.
         // This never predicts beyond an accepted endpoint and stops after at

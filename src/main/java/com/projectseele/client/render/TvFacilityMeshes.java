@@ -22,6 +22,8 @@ public final class TvFacilityMeshes
 {
     private static final Map<String,RigidMachineryPartR44> PARTS=new HashMap<>();
     private static final Map<Integer,float[][]> CARRIER_MOUNTS=new HashMap<>();
+    private static final Map<SiloHatchMechanism.Spec,Map<String,RigidMachineryPartR44>> DECLARED_HATCH_PARTS=new HashMap<>();
+    private static final Map<com.projectseele.world.NervHangarGateGeometryR52.Spec,Map<String,RigidMachineryPartR44>> DECLARED_STACK_PARTS=new HashMap<>();
     private static final ThreadLocal<MultiBufferSource> ACTIVE_BUFFERS=new ThreadLocal<>();
     private static boolean attempted;
     /** Preserve the caller's normal/shadow/outline pass for nested machinery. */
@@ -38,7 +40,7 @@ public final class TvFacilityMeshes
     }
     public static void clearCache()
     {
-        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();attempted=false;EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TripoMachineryR48.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();};
+        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();DECLARED_HATCH_PARTS.clear();DECLARED_STACK_PARTS.clear();attempted=false;R52FixedGuideRenderer.clearCache();EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TripoMachineryR48.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();};
         if(RenderSystem.isOnRenderThread())release.run();else RenderSystem.recordRenderCall(release::run);
     }
     private static void load()
@@ -75,9 +77,11 @@ public final class TvFacilityMeshes
     public static void cage(PoseStack poses,int light,float closed)
     {cage(poses,light,closed,-1);}
     public static void cage(PoseStack poses,int light,float closed,int variant)
+    {cage(poses,light,closed,variant,Float.NaN);}
+    public static void cage(PoseStack poses,int light,float closed,int variant,float lowerProgress)
     {
         float opening=1-closed;
-        boolean tvEnclosure=TvCageEnclosureR44.render(variant,opening,poses,light);
+        boolean tvEnclosure=TvCageEnclosureR44.render(variant,opening,poses,light,lowerProgress);
         if(!tvEnclosure)draw("cage_frame",poses,light);
         boolean measuredShoulders=TvShoulderRestraintsR44.render(variant,opening,poses,light,!tvEnclosure);
         for(int side:new int[]{-1,1})
@@ -109,6 +113,7 @@ public final class TvFacilityMeshes
     }
     public static void carrier(PoseStack poses,int light,EvaUnit01Entity unit,float partial)
     {
+        if(com.projectseele.entity.EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(unit))return;
         if (TripoMachineryR48.carrier(poses,currentBuffers(),light,unit,partial)) return;
         float opacity=1;
         poses.pushPose();
@@ -162,6 +167,21 @@ public final class TvFacilityMeshes
             }
             poses.popPose();
         }
+    }
+    public static void shaftHatchDeclared(PoseStack poses,int light,float open,SiloHatchMechanism.Spec spec)
+    {
+        var baked=DECLARED_HATCH_PARTS.computeIfAbsent(spec,k->new HashMap<>());com.projectseele.world.NervSiloHatchGeometryR52 geometry;
+        try{geometry=com.projectseele.world.NervSiloHatchGeometryR52.loadClasspath(spec);}catch(java.io.IOException missing){throw new IllegalStateException("Declared hatch source missing",missing);}
+        for(var piece:geometry.pieces(open))
+        {
+            var mesh=baked.computeIfAbsent(piece.part().name(),name->{var a=new com.google.gson.JsonArray();for(double value:piece.part().vertices())a.add(value);return RigidMachineryPartR44.triangles(a);});
+            poses.pushPose();var p=piece.local().translation();poses.translate(p.x,p.y,p.z);poses.mulPose(piece.local().rotation());mesh.draw(poses,currentBuffers(),light);poses.popPose();
+        }
+    }
+    public static void hangarStackDeclared(PoseStack poses,int light,float open,com.projectseele.world.NervHangarGateGeometryR52.Spec spec)
+    {
+        var baked=DECLARED_STACK_PARTS.computeIfAbsent(spec,k->new HashMap<>());com.projectseele.world.NervHangarGateGeometryR52 geometry;try{geometry=com.projectseele.world.NervHangarGateGeometryR52.loadClasspath(spec);}catch(java.io.IOException missing){throw new IllegalStateException("Declared side-stack source missing",missing);}
+        for(var piece:geometry.pieces(open)){var mesh=baked.computeIfAbsent(piece.part().name(),name->{var a=new com.google.gson.JsonArray();for(double value:piece.part().vertices())a.add(value);return RigidMachineryPartR44.triangles(a);});poses.pushPose();var p=piece.local().translation();poses.translate(p.x,p.y,p.z);mesh.draw(poses,currentBuffers(),light);poses.popPose();}
     }
     private TvFacilityMeshes() {}
 }

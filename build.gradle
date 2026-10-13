@@ -527,6 +527,48 @@ tasks.register('verifyBiomeCornerMainThreadR51', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyBiomeCornerMainThreadR51' }
 
+tasks.register('verifyFootSupportFrameR52', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.FootSupportFrameR52Test'
+    workingDir = file('.Codex/foot-support-frame-r52-test')
+    doFirst { workingDir.mkdirs() }
+}
+tasks.named('check').configure { dependsOn 'verifyFootSupportFrameR52' }
+
+tasks.register('verifyRigidTransformPrecisionR52', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.RigidTransformPrecisionR52Test'
+    workingDir = file('.Codex/rigid-transform-precision-r52-test')
+    doFirst { workingDir.mkdirs() }
+}
+tasks.named('check').configure { dependsOn 'verifyRigidTransformPrecisionR52' }
+
+tasks.register('verifyStaticSpatialIndexR52', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.NervStaticSpatialIndexR52Test'
+}
+tasks.named('check').configure { dependsOn 'verifyStaticSpatialIndexR52' }
+
+tasks.register('verifyWayfindingTransitR52', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.NervWayfindingTransitR52Test'
+}
+tasks.named('check').configure { dependsOn 'verifyWayfindingTransitR52' }
+
+tasks.register('verifyGeoFrontHeightR52', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.GeoFrontHeightR52Test'
+    workingDir = file('.Codex/geofront-height-r52-test')
+    maxHeapSize = '384m'
+    doFirst { workingDir.mkdirs() }
+}
+tasks.named('check').configure { dependsOn 'verifyGeoFrontHeightR52' }
+
 tasks.register('verifyCombatMotionR29', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
@@ -625,6 +667,9 @@ tasks.named('processResources').configure {
                 if (!(name.startsWith('assets/') || name.startsWith('data/')) || name.contains('..') || name.contains('\\') || name.contains(':')) {
                     throw new GradleException('Unsafe frozen asset path: ' + name)
                 }
+                // A selected visual bundle can contain historical data from
+                // its baseline JAR. Runtime/worldgen data belongs to source.
+                if (name.startsWith('data/')) return
                 def input = new File(overlay, name)
                 def actual = java.security.MessageDigest.getInstance('SHA-256').digest(input.bytes).encodeHex().toString()
                 if (actual != expected) throw new GradleException('Frozen selected asset changed: ' + name)
@@ -641,17 +686,57 @@ tasks.named('processResources').configure {
         def overlay = file(project.property('r47FinalAssets'))
         inputs.dir(overlay)
         doLast {
-            if (!new File(overlay, 'assets/projectseele/sounds.json').isFile() ||
-                !new File(overlay, 'data/projectseele/dimension_type/geofront.json').isFile()) {
-                throw new GradleException('Complete selected R47 asset overlay required')
+            if (!new File(overlay, 'assets/projectseele/sounds.json').isFile()) {
+                throw new GradleException('Selected R47 visual asset overlay required')
             }
             copy {
                 from overlay
                 into destinationDir
                 // Registration metadata must remain the processed current
                 // source, never a template or an older private snapshot.
-                include 'assets/**', 'data/**', 'META-INF/licenses/**'
+                include 'assets/**', 'META-INF/licenses/**'
             }
+        }
+    }
+    if (project.hasProperty('r52ReviewedAssets')) {
+        def overlay = file(project.property('r52ReviewedAssets'))
+        def receipt = new File(overlay.parentFile, 'FINAL_OVERLAY_RECEIPT.json')
+        inputs.dir(overlay)
+        inputs.file(receipt)
+        doLast {
+            def reviewed = new groovy.json.JsonSlurper().parse(receipt)
+            if (reviewed.schema != 'projectseele.r52.reviewed-assets-overlay.v1'
+                    || reviewed.files.size() != reviewed.expected_member_count) {
+                throw new GradleException('Explicit complete R52 asset repair receipt required')
+            }
+            def seen = new HashSet<String>()
+            reviewed.files.each { row ->
+                String name = row.path
+                if (!name.startsWith('assets/projectseele/mesh/') || name.contains('..')
+                        || name.contains('\\') || name.contains(':') || !seen.add(name)) {
+                    throw new GradleException('Invalid reviewed R52 asset member: ' + name)
+                }
+                def source = new File(overlay, name)
+                def target = new File(destinationDir, name)
+                def hash = { f -> java.security.MessageDigest.getInstance('SHA-256').digest(f.bytes).encodeHex().toString() }
+                if (hash(source) != row.sha256) throw new GradleException('Reviewed R52 asset changed: ' + name)
+                if (!target.isFile() || !(hash(target) in [row.baseline_sha256, row.sha256])) {
+                    throw new GradleException('R52 repair does not match selected base asset: ' + name)
+                }
+                java.nio.file.Files.copy(source.toPath(), target.toPath(), java.nio.file.StandardCopyOption.REPLACE_EXISTING)
+            }
+        }
+    }
+    // This block model belongs to the current UNIT_R52 paint-state contract.
+    // The frozen R51 base has an un-tinted red warning strip; do not let that
+    // legacy model overwrite the current block's declared paint faces.
+    def r52BridgeModel = 'assets/projectseele/models/block/entry_plug_bridge_fascia.json'
+    inputs.file(file('src/main/resources/' + r52BridgeModel))
+    doLast {
+        copy {
+            from file('src/main/resources')
+            into destinationDir
+            include r52BridgeModel
         }
     }
 }

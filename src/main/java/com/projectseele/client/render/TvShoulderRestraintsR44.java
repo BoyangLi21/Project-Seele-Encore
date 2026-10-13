@@ -33,7 +33,7 @@ final class TvShoulderRestraintsR44
     private static void load()
     {
         if(attempted)return;attempted=true;
-        var path=new ResourceLocation(ProjectSeele.MODID,"mesh/hangar_shoulder_contacts_r44.json");
+        var path=new ResourceLocation(ProjectSeele.MODID,com.projectseele.world.NervShoulderBearingR52.SOURCE);
         try(var stream=Minecraft.getInstance().getResourceManager().open(path);var reader=new InputStreamReader(stream,StandardCharsets.UTF_8))
         {
             var resource=JsonParser.parseReader(reader).getAsJsonObject();
@@ -65,7 +65,7 @@ final class TvShoulderRestraintsR44
         for(var pad:PADS)
         {
             if(pad.variant!=variant)continue;
-            Vec3 move=pad.normal.scale(2.1*ramp(opening,0,.25F)).add(pad.side*5.35*ramp(opening,.23F,.88F),0,0);
+            Vec3 move=com.projectseele.world.NervShoulderBearingR52.movement(pad.variant,pad.side,opening);
             poses.pushPose();poses.translate(move.x,move.y,move.z);draw(pad.part,poses,light);poses.popPose();
             for(int i=0;i<2;i++)
             {

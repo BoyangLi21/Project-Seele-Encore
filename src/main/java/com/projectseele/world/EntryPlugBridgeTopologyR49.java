@@ -70,16 +70,13 @@ final class EntryPlugBridgeTopologyR49
             if(cells.containsKey(floor))cells.put(floor,next);
             cells.put(at,edge?guard:actual.is(Blocks.LIGHT)?actual:Blocks.AIR.defaultBlockState());
         }
-        // Both stair mouths stay open north/south. Upper side rails are at
-        // the landing height; the old lower guard must not fence the ascent.
+        // Both boarding stairs remain completely free of handrails.
+        // Keep the surrounding gallery guards and the under-deck fascia.
         for(int x:new int[]{-2,2})for(int z=16;z<=18;z++)
         {
             var p=bed.offset(x,49,z);var at=p.above();
             if(amount!=9){cells.put(at,Blocks.AIR.defaultBlockState());continue;}
-            var flags=FacilityEdgeRailR41.empty(ModBlocks.ENTRY_PLUG_BRIDGE_GUARD_R48.get())
-                    .setValue(FacilityEdgeRailR41.WEST,true).setValue(FacilityEdgeRailR41.EAST,true)
-                    .setValue(FacilityEdgeRailR41.NORTH,z==16);
-            cells.put(at,flags);
+            cells.put(at,Blocks.AIR.defaultBlockState());
             if(z==16)
             {
                 var deck=FacilityEdgeRailR41.empty(ModBlocks.ENTRY_PLUG_BRIDGE_DECK_R48.get())

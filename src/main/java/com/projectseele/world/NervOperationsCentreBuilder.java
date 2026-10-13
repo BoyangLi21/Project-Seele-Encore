@@ -52,6 +52,7 @@ public final class NervOperationsCentreBuilder
 
     public static void build(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         PerformanceCounters.recordBuilderCall();
         boolean localCommand =
                 LocalMapAssetLoader.placeCommandModule(level, origin);
@@ -125,6 +126,7 @@ public final class NervOperationsCentreBuilder
      */
     public static void linkFacilities(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         BlockState magi = Blocks.PURPLE_CONCRETE.defaultBlockState();
         BlockState terminal = Blocks.RED_CONCRETE.defaultBlockState();
 
@@ -170,6 +172,7 @@ public final class NervOperationsCentreBuilder
     public static OperationsAudit repairRuntimeAccess(ServerLevel level,
                                                        BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         if (!hasConnectedHangarRoutes(level, origin))
         {
             linkHangars(level, origin);
@@ -1519,6 +1522,7 @@ public final class NervOperationsCentreBuilder
 
     public static void linkHangars(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         linkHangarRoutes(level, origin);
         // The climbing ramp above clears headroom straight through each cage's
         // +X ladder shaft, so the boarding ladders are the last thing written.
@@ -2130,6 +2134,7 @@ public final class NervOperationsCentreBuilder
 
     private static void set(ServerLevel level, BlockPos position, BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

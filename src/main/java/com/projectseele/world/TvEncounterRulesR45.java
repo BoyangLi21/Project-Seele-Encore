@@ -94,7 +94,7 @@ public final class TvEncounterRulesR45
         var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
         if(site==null)return null;
         if(d.active.equals("ramiel"))return switch(unit)
-        {case 0->site.cover();case 1->site.hero();case 2->site.supportReady()?site.support():null;default->null;};
+        {case 0->site.cover();case 1->TvYashimaStationR52.operatorPositionR52(l);case 2->site.supportReady()?site.support():null;default->null;};
         return unit==site.primaryUnit()?site.hero():site.supportReady()?site.support():null;
     }
     public static boolean visibleToCommander(ServerLevel l,TvCampaignSavedData d,ServerPlayer commander)

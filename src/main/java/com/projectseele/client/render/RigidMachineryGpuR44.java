@@ -24,6 +24,7 @@ public final class RigidMachineryGpuR44
                        int light, int entity, int blockEntity, int item) { }
     private record Mesh(VertexBuffer buffer, int bytes) { }
     private static final Map<Object, LinkedHashMap<Key, Mesh>> PARTS = new IdentityHashMap<>();
+    private static final Map<Object,Integer> STATE_LIMITS_R52=new IdentityHashMap<>();
     private static Object irisState;
     private static Method entityId, blockEntityId, itemId;
     private static boolean resolved, logged;
@@ -117,7 +118,7 @@ public final class RigidMachineryGpuR44
                 uploads++;
                 uploadedVertices += count;
                 // Moving machinery may cross several light levels. Bound its GPU cache.
-                if (variants.size() > 16)
+                if (variants.size() > STATE_LIMITS_R52.getOrDefault(identity,16))
                 {
                     var iterator = variants.entrySet().iterator();
                     var oldest = iterator.next();
@@ -177,8 +178,12 @@ public final class RigidMachineryGpuR44
         releasedBytes += PARTS.values().stream().flatMap(m -> m.values().stream()).mapToLong(Mesh::bytes).sum();
         PARTS.values().forEach(m -> m.values().forEach(p -> p.buffer.close()));
         PARTS.clear();
+        STATE_LIMITS_R52.clear();
         clears++;
     }
+    static boolean cachedR52(Object identity){return PARTS.containsKey(identity)&&!PARTS.get(identity).isEmpty();}
+    static void stateLimitR52(Object identity,int limit){if(limit<1||limit>16)throw new IllegalArgumentException("Bounded real GPU state cache required");STATE_LIMITS_R52.put(identity,limit);}
+    static void releaseR52(Object identity){Runnable release=()->{STATE_LIMITS_R52.remove(identity);var values=PARTS.remove(identity);if(values!=null)for(var mesh:values.values()){releasedBytes+=mesh.bytes();mesh.buffer().close();}};if(RenderSystem.isOnRenderThread())release.run();else RenderSystem.recordRenderCall(release::run);}
 
     private RigidMachineryGpuR44() { }
 }

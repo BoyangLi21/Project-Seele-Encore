@@ -83,11 +83,51 @@ public final class NervCarrierPlatformEntity extends Entity
             }
         }
         this.entityData.set(DATA_CRANE_PLUG,coupled?plug.getId():-1);
+        if(hasDeclaredMachineFrameR52()){if(coupled)getPersistentData().putUUID("R52CranePlug",plug.getUUID());else getPersistentData().remove("R52CranePlug");}
     }
-    public EntryPlugCarrierEntity getCranePlug(){var e=level().getEntity(entityData.get(DATA_CRANE_PLUG));return e instanceof EntryPlugCarrierEntity p?p:null;}
+    public EntryPlugCarrierEntity getCranePlug(){var e=level().getEntity(entityData.get(DATA_CRANE_PLUG));if(e==null&&level() instanceof net.minecraft.server.level.ServerLevel server&&getPersistentData().hasUUID("R52CranePlug"))e=server.getEntity(getPersistentData().getUUID("R52CranePlug"));return e instanceof EntryPlugCarrierEntity p?p:null;}
     public boolean hasCraneReference(){return entityData.get(DATA_CRANE_REFERENCE);}
     public Vec3 getCraneReferenceAnchor(){var p=entityData.get(DATA_CRANE_ANCHOR);return new Vec3(p.x,p.y,p.z);}
     public Quaternionf getCraneReferenceRotation(){return new Quaternionf(entityData.get(DATA_CRANE_ROTATION));}
+    /** Ground owner records the observed capsule pose before an uncoupled
+     * approach. Publishing this reference performs no motion or attachment. */
+    public void setCraneReferenceR52(com.projectseele.world.RigidTransform pose)
+    {if(level().isClientSide||!hasDeclaredMachineFrameR52()||!isPlugCrane())throw new IllegalStateException("Actual declared ground crane required");var anchor=pose.transformPoint(com.projectseele.world.EntryPlugKinematics.CRANE_ATTACHMENT_P).subtract(position());entityData.set(DATA_CRANE_ANCHOR,new Vector3f((float)anchor.x,(float)anchor.y,(float)anchor.z));entityData.set(DATA_CRANE_ROTATION,pose.rotation());entityData.set(DATA_CRANE_REFERENCE,true);}
+    private static final EntityDataAccessor<Boolean> DATA_DECLARED_MACHINE_R52=SynchedEntityData.defineId(NervCarrierPlatformEntity.class,EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Quaternionf> DATA_DECLARED_MACHINE_Q_R52=SynchedEntityData.defineId(NervCarrierPlatformEntity.class,EntityDataSerializers.QUATERNION);
+    private static final EntityDataAccessor<String> DATA_DECLARED_COLLISION_SHA_R52=SynchedEntityData.defineId(NervCarrierPlatformEntity.class,EntityDataSerializers.STRING);
+    private static final EntityDataAccessor<CompoundTag> DATA_LOWER_FRAME_R52=SynchedEntityData.defineId(NervCarrierPlatformEntity.class,EntityDataSerializers.COMPOUND_TAG);
+    public CompoundTag footGuideStationStateR52(){return entityData.get(DATA_LOWER_FRAME_R52).getCompound("FootGuideStation").copy();}
+    public void acceptFootGuideStationStateR52(com.projectseele.world.NervFootGuideStationR52.DeclaredState proof){if(proof==null||!proof.current(this))throw new IllegalStateException("Current checked fixed station state required");var tag=entityData.get(DATA_LOWER_FRAME_R52).copy();tag.put("FootGuideStation",proof.next());entityData.set(DATA_LOWER_FRAME_R52,tag);}
+    public CompoundTag originalCarrierStateR52(){return entityData.get(DATA_LOWER_FRAME_R52).getCompound("OriginalCarrier").copy();}
+    public void acceptOriginalCarrierStateR52(com.projectseele.world.NervOriginalCarrierR52.DeclaredState proof){if(proof==null||!proof.current(this))throw new IllegalStateException("Current checked original carrier state required");var tag=entityData.get(DATA_LOWER_FRAME_R52).copy();tag.put("OriginalCarrier",proof.next());entityData.set(DATA_LOWER_FRAME_R52,tag);}
+    public boolean lowerFrameDeclaredR52(){return entityData.get(DATA_LOWER_FRAME_R52).getString("Source").equals(com.projectseele.world.NervLowerFrameR52.SOURCE_SHA);}
+    public float lowerFrameProgressR52(float partial){var t=entityData.get(DATA_LOWER_FRAME_R52);if(!lowerFrameDeclaredR52())return Float.NaN;float p=t.getInt("Progress")/1000F;if(!level().isClientSide)return p;return net.minecraft.util.Mth.lerp((float)net.minecraft.util.Mth.clamp(level().getGameTime()-t.getLong("At")+(double)partial,0,1),t.getInt("Previous")/1000F,p);}
+    public void declareLowerFrameR52(){if(level().isClientSide||!isRestraintGantry()||!hasDeclaredMachineFrameR52()||!entityData.get(DATA_LOWER_FRAME_R52).isEmpty())throw new IllegalStateException("Only a new actual original-bay gantry admits the lower-frame source");var t=new CompoundTag();t.putString("Source",com.projectseele.world.NervLowerFrameR52.SOURCE_SHA);t.putInt("Progress",0);t.putInt("Previous",0);t.putLong("At",level().getGameTime());entityData.set(DATA_LOWER_FRAME_R52,t);}
+    public void setLowerFrameProgressR52(float progress){if(level().isClientSide||!lowerFrameDeclaredR52()||!Float.isFinite(progress)||progress<0||progress>1)throw new IllegalStateException("Actual server lower-frame source required");var t=entityData.get(DATA_LOWER_FRAME_R52).copy();t.putInt("Previous",t.getInt("Progress"));t.putInt("Progress",Math.round(progress*1000));t.putLong("At",level().getGameTime());entityData.set(DATA_LOWER_FRAME_R52,t);}
+    private static CompoundTag serviceDriveFrameR52(com.projectseele.world.RigidTransform f){var t=new CompoundTag();t.putDouble("X",f.translation().x);t.putDouble("Y",f.translation().y);t.putDouble("Z",f.translation().z);t.putFloat("Qx",f.qx());t.putFloat("Qy",f.qy());t.putFloat("Qz",f.qz());t.putFloat("Qw",f.qw());return t;}
+    private static com.projectseele.world.RigidTransform serviceDriveFrameR52(CompoundTag t){return new com.projectseele.world.RigidTransform(new Vec3(t.getDouble("X"),t.getDouble("Y"),t.getDouble("Z")),t.getFloat("Qx"),t.getFloat("Qy"),t.getFloat("Qz"),t.getFloat("Qw"));}
+    public com.projectseele.world.NervServiceFootDriveR52.Spec declaredServiceFootDriveR52(){var t=entityData.get(DATA_LOWER_FRAME_R52).getCompound("FootDrive");if(!lowerFrameDeclaredR52()||!t.getString("RigSource").equals(com.projectseele.world.NervFootGuideRigR52.SOURCE_SHA))return null;return new com.projectseele.world.NervServiceFootDriveR52.Spec(getUnitVariant(),serviceDriveFrameR52(t.getCompound("Bay")),serviceDriveFrameR52(t.getCompound("Hatch")),t.getDouble("Tier"),t.getDouble("FoundationTop"));}
+    public void declareServiceFootDriveR52(com.projectseele.world.NervServiceFootDriveR52.Spec s){if(level().isClientSide||!lowerFrameDeclaredR52()||s.variant()!=getUnitVariant())throw new IllegalStateException("Actual lower-frame controller required for service foot drive");var old=declaredServiceFootDriveR52();if(old!=null){if(!old.equals(s))throw new IllegalStateException("Existing physical foot drive cannot be relocated or reset");return;}var all=entityData.get(DATA_LOWER_FRAME_R52).copy();if(all.contains("FootDrive"))throw new IllegalStateException("Existing foot-drive source requires explicit commissioning repair");var t=new CompoundTag();t.putString("RigSource",com.projectseele.world.NervFootGuideRigR52.SOURCE_SHA);t.put("Bay",serviceDriveFrameR52(s.bay()));t.put("Hatch",serviceDriveFrameR52(s.hatch()));t.putDouble("Tier",s.firstTier());t.putDouble("FoundationTop",s.foundationTop());t.putInt("Progress",0);t.putInt("Previous",0);t.putLong("At",level().getGameTime());t.putFloat("LeadRise",0);t.putFloat("PreviousLeadRise",0);t.putLong("LeadAt",level().getGameTime());all.put("FootDrive",t);entityData.set(DATA_LOWER_FRAME_R52,all);}
+    public float serviceGuideBridgeR52(float partial){if(declaredServiceFootDriveR52()==null)return Float.NaN;var t=entityData.get(DATA_LOWER_FRAME_R52).getCompound("FootDrive");float p=t.getInt("Progress")/1000F;return level().isClientSide?net.minecraft.util.Mth.lerp((float)net.minecraft.util.Mth.clamp(level().getGameTime()-t.getLong("At")+(double)partial,0,1),t.getInt("Previous")/1000F,p):p;}
+    /** Fixed bay running heads retain their own real lift sample after the
+     * original carrier leaves. A distant carrier never drives this hardware. */
+    public CompoundTag serviceLeadStateR52(){return entityData.get(DATA_LOWER_FRAME_R52).getCompound("FootDrive").copy();}
+    public void acceptServiceLeadStateR52(com.projectseele.world.NervOriginalCarrierR52.DeclaredLeadState proof){if(proof==null||!proof.current(this))throw new IllegalStateException("Current coupled original-carrier lead proof required");var all=entityData.get(DATA_LOWER_FRAME_R52).copy();all.put("FootDrive",proof.next());entityData.set(DATA_LOWER_FRAME_R52,all);}
+    public long serviceLeadAtR52(){var t=serviceLeadStateR52();return t.contains("LeadAt")?Math.max(t.getLong("LeadAt"),t.getLong("At")):Long.MIN_VALUE;}
+    public float serviceLeadRiseR52(float partial){var t=serviceLeadStateR52();if(declaredServiceFootDriveR52()==null||!t.contains("LeadRise")||!t.contains("PreviousLeadRise")||!t.contains("LeadAt"))return Float.NaN;float rise=t.getFloat("LeadRise"),before=t.getFloat("PreviousLeadRise");if(!Float.isFinite(rise+before)||rise<0||rise>1||before<0||before>1)return Float.NaN;return level().isClientSide?net.minecraft.util.Mth.lerp((float)net.minecraft.util.Mth.clamp(level().getGameTime()-t.getLong("LeadAt")+(double)partial,0,1),before,rise):rise;}
+    public void setServiceGuideBridgeR52(float p){if(level().isClientSide||declaredServiceFootDriveR52()==null||!Float.isFinite(p)||p<0||p>1)throw new IllegalStateException("Actual bounded service bridge sample required");var all=entityData.get(DATA_LOWER_FRAME_R52).copy();var t=all.getCompound("FootDrive").copy();t.putInt("Previous",t.getInt("Progress"));t.putInt("Progress",Math.round(p*1000));t.putLong("At",level().getGameTime());all.put("FootDrive",t);entityData.set(DATA_LOWER_FRAME_R52,all);}
+    public String declaredCollisionSourceR52(){return this.entityData.get(DATA_DECLARED_COLLISION_SHA_R52);}
+    public void configureDeclaredCollisionSourceR52(String sha){if(level().isClientSide||!sha.matches("[0-9a-f]{64}"))throw new IllegalStateException("Actual Root collision source required");this.entityData.set(DATA_DECLARED_COLLISION_SHA_R52,sha);}
+    public boolean hasDeclaredMachineFrameR52(){return this.entityData.get(DATA_DECLARED_MACHINE_R52);}
+    public Quaternionf declaredMachineRotationR52(){return new Quaternionf(this.entityData.get(DATA_DECLARED_MACHINE_Q_R52));}
+    /** Explicit controller data after physical frame readback; no position or
+     * collision changes are performed by this synchronization. */
+    public void configureDeclaredMachineFrameR52(Quaternionf rotation)
+    {
+        if(!(this.level() instanceof net.minecraft.server.level.ServerLevel level)||!com.projectseele.world.NervRouteRuntimeR52.claimed(level)||!Float.isFinite(rotation.lengthSquared())||Math.abs(rotation.lengthSquared()-1)>.0001F)throw new IllegalStateException("Claimed measured machine quaternion required");
+        this.entityData.set(DATA_DECLARED_MACHINE_Q_R52,new Quaternionf(rotation));this.entityData.set(DATA_DECLARED_MACHINE_R52,true);
+    }
     private static final int CONTROL_TIMEOUT_TICKS = 40;
     public static final int LIFT_IDLE_OPEN = 0;
     public static final int LIFT_DOOR_CLOSING = 1;
@@ -142,6 +182,7 @@ public final class NervCarrierPlatformEntity extends Entity
     @Override
     protected void defineSynchedData()
     {
+        this.entityData.define(DATA_DECLARED_COLLISION_SHA_R52,"");this.entityData.define(DATA_DECLARED_MACHINE_R52,false);this.entityData.define(DATA_DECLARED_MACHINE_Q_R52,new Quaternionf());this.entityData.define(DATA_LOWER_FRAME_R52,new CompoundTag());
         this.entityData.define(DATA_VARIANT, EvaUnit01Entity.UNIT_01);
         this.entityData.define(DATA_REPAIR_R33,-1F);
         this.entityData.define(DATA_PERSONNEL_LIFT, false);
@@ -257,6 +298,8 @@ public final class NervCarrierPlatformEntity extends Entity
     {
         return this.entityData.get(DATA_PLUG_CRANE);
     }
+
+    public float actualCraneBottomOffsetR52(){return this.entityData.get(DATA_CRANE_BOTTOM_OFFSET)/1000F;}
 
     public float getCraneBottomOffset(float partialTick)
     {
@@ -655,6 +698,7 @@ public final class NervCarrierPlatformEntity extends Entity
         this.setDeltaMovement(Vec3.ZERO);
         if (!this.level().isClientSide
                 && !this.isPersistentLift()
+                && !this.hasDeclaredMachineFrameR52()
                 && ++this.ticksWithoutControl > CONTROL_TIMEOUT_TICKS)
         {
             this.discard();
@@ -668,6 +712,15 @@ public final class NervCarrierPlatformEntity extends Entity
     @Override
     protected void readAdditionalSaveData(CompoundTag tag)
     {
+        entityData.set(DATA_LOWER_FRAME_R52,tag.getCompound("LowerFrameR52").copy());
+        if(tag.getBoolean("DeclaredMechanicalR52"))
+        {
+            var q=readFloatsR52(tag,"MechanicalRotationR52");if(q.length!=4)throw new IllegalStateException("Incomplete saved declared machine quaternion");var rotation=new Quaternionf(q[0],q[1],q[2],q[3]);if(!Float.isFinite(rotation.lengthSquared())||Math.abs(rotation.lengthSquared()-1)>.0001F)throw new IllegalStateException("Invalid saved declared machine quaternion");
+            entityData.set(DATA_DECLARED_MACHINE_Q_R52,rotation);entityData.set(DATA_DECLARED_MACHINE_R52,true);entityData.set(DATA_DECLARED_COLLISION_SHA_R52,tag.getString("MechanicalSourceR52"));
+            if(tag.getBoolean("PlugCraneR52"))configurePlugCrane(tag.getInt("EvaVariant"),tag.getInt("CraneBottomMilliR52")/1000D);
+            entityData.set(DATA_RESTRAINT_PROGRESS,tag.getInt("RestraintMilliR52"));entityData.set(DATA_LCL_LEVEL_MILLI,tag.getInt("LclMilliR52"));
+            if(tag.getBoolean("CraneReferenceR52")){var a=readDoublesR52(tag,"CraneAnchorR52");var r=readFloatsR52(tag,"CraneRotationR52");if(a.length!=3||r.length!=4)throw new IllegalStateException("Incomplete saved hoist reference");entityData.set(DATA_CRANE_REFERENCE,true);entityData.set(DATA_CRANE_ANCHOR,new Vector3f((float)a[0],(float)a[1],(float)a[2]));entityData.set(DATA_CRANE_ROTATION,new Quaternionf(r[0],r[1],r[2],r[3]));}
+        }
         if (tag.contains("EvaVariant"))
         {
             this.assignVariant(tag.getInt("EvaVariant"));
@@ -716,6 +769,9 @@ public final class NervCarrierPlatformEntity extends Entity
     @Override
     protected void addAdditionalSaveData(CompoundTag tag)
     {
+        tag.put("LowerFrameR52",entityData.get(DATA_LOWER_FRAME_R52).copy());
+        if(hasDeclaredMachineFrameR52())
+        {tag.putBoolean("DeclaredMechanicalR52",true);var q=declaredMachineRotationR52();writeFloatsR52(tag,"MechanicalRotationR52",new float[]{q.x,q.y,q.z,q.w});tag.putString("MechanicalSourceR52",declaredCollisionSourceR52());tag.putBoolean("PlugCraneR52",isPlugCrane());tag.putInt("CraneBottomMilliR52",entityData.get(DATA_CRANE_BOTTOM_OFFSET));tag.putInt("RestraintMilliR52",entityData.get(DATA_RESTRAINT_PROGRESS));tag.putInt("LclMilliR52",entityData.get(DATA_LCL_LEVEL_MILLI));tag.putBoolean("CraneReferenceR52",hasCraneReference());if(hasCraneReference()){var a=getCraneReferenceAnchor();var r=getCraneReferenceRotation();writeDoublesR52(tag,"CraneAnchorR52",new double[]{a.x,a.y,a.z});writeFloatsR52(tag,"CraneRotationR52",new float[]{r.x,r.y,r.z,r.w});}}
         tag.putInt("EvaVariant", this.getUnitVariant());
         tag.putBoolean("PersonnelLift", this.isPersonnelLift());
         tag.putBoolean("RestraintGantry", this.isRestraintGantry());
@@ -740,6 +796,11 @@ public final class NervCarrierPlatformEntity extends Entity
                 this.persistentLiftLastMotionEpoch);
     }
 
+    private static void writeFloatsR52(CompoundTag tag,String key,float[] values){var list=new net.minecraft.nbt.ListTag();for(float v:values)list.add(net.minecraft.nbt.FloatTag.valueOf(v));tag.put(key,list);}
+    private static void writeDoublesR52(CompoundTag tag,String key,double[] values){var list=new net.minecraft.nbt.ListTag();for(double v:values)list.add(net.minecraft.nbt.DoubleTag.valueOf(v));tag.put(key,list);}
+    private static float[] readFloatsR52(CompoundTag tag,String key){var list=tag.getList(key,net.minecraft.nbt.Tag.TAG_FLOAT);var out=new float[list.size()];for(int i=0;i<out.length;i++)out[i]=list.getFloat(i);return out;}
+    private static double[] readDoublesR52(CompoundTag tag,String key){var list=tag.getList(key,net.minecraft.nbt.Tag.TAG_DOUBLE);var out=new double[list.size()];for(int i=0;i<out.length;i++)out[i]=list.getDouble(i);return out;}
+
     @Override
     public boolean shouldBeSaved()
     {
@@ -747,7 +808,7 @@ public final class NervCarrierPlatformEntity extends Entity
         // gantries are reconstructed by their runtime owners after loading;
         // serialising them used to leave an unowned copy behind and the next
         // runtime copy then z-fought with it every frame.
-        return this.isPersistentLift();
+        return this.isPersistentLift()||this.hasDeclaredMachineFrameR52();
     }
 
     @Override

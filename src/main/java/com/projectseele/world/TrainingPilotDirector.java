@@ -74,6 +74,7 @@ public final class TrainingPilotDirector
 
     public static ActionResult start(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.requestPilot(level,variant,"board");
         if(PilotRestroomsR47.configured(level)&&PilotRestroomsR47.plan(level,variant).isEmpty())
             return new ActionResult(false,"原驾驶员待命室元数据未接通，登机保持原位。");
         if(!parkedR45(level,variant))
@@ -219,6 +220,7 @@ public final class TrainingPilotDirector
     /** A missing/unloaded or duplicate NPC is never replaced by a dispatch. */
     public static TrainingPilotEntity existingPilotR45(ServerLevel level,int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervOriginalActorsR52.pilot(level,variant);
         if(PilotRestroomsR47.configured(level))
         {
             var plan=PilotRestroomsR47.plan(level,variant);if(plan.isEmpty())return null;
@@ -239,6 +241,7 @@ public final class TrainingPilotDirector
     /** Request original known actor/route sections; never dispatch, spawn or move an actor. */
     public static void retainOriginalPilotR47(ServerLevel level,int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level)){NervOriginalActorsR52.retainPilot(level,variant);return;}
         if(variant<0||variant>2||!level.dimension().equals(GeoFrontCommands.GEOFRONT))return;
         EvaLogisticsDirector.loadControlTarget(level,variant);
         var points=new java.util.LinkedHashSet<BlockPos>();
@@ -270,6 +273,8 @@ public final class TrainingPilotDirector
 
     public static int stop(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))
+        {int accepted=0;for(int v=0;v<3;v++)if((variant<0||variant==v)&&NervRouteRuntimeR52.requestPilot(level,v,"return").accepted())accepted++;return accepted;}
         int returning=0;
         for(int candidate=0;candidate<3;candidate++)
         {
@@ -301,6 +306,7 @@ public final class TrainingPilotDirector
 
     public static List<TrainingPilotEntity> pilots(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level)){var result=new ArrayList<TrainingPilotEntity>();for(int v=0;v<3;v++){var p=NervOriginalActorsR52.pilot(level,v);if(p!=null)result.add(p);}return List.copyOf(result);}
         PerformanceCounters.recordGlobalEntityScan();
         List<TrainingPilotEntity> result = new ArrayList<>();
         for (Entity entity : level.getAllEntities())
@@ -321,7 +327,9 @@ public final class TrainingPilotDirector
             return;
         }
         int variant = pilot.getAssignedVariant();
-        TvPersonnelPlatformInterlockR44.tickPilotDoorClosureR46(level,pilot);
+        if(NervRouteRuntimeR52.claimed(level))
+        {NervRouteRuntimeR52.pilotRouting(level,pilot,"tick");return;}
+        if(!NervRouteRuntimeR52.claimed(level))TvPersonnelPlatformInterlockR44.tickPilotDoorClosureR46(level,pilot);
         if(pilot.getVehicle() instanceof EntryPlugCarrierEntity savedPlug&&savedPlug.getAssignedVariant()==variant
                 ||pilot.getVehicle() instanceof EvaUnit01Entity savedEva&&savedEva.getUnitVariant()==variant)
             ACTIVE_REMOTE_PILOTS.add(variant);
@@ -436,6 +444,7 @@ public final class TrainingPilotDirector
     /** Keeps one visible off-duty pilot on each EVA face-side observation deck. */
     public static void ensureStandby(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level)){var original=existingPilotR45(level,variant);if(original!=null&&original.getVehicle()==null)NervRouteRuntimeR52.pilotRouting(level,original,"standby");return;}
         if (ACTIVE_REMOTE_PILOTS.contains(variant)
                 || RETURNING_PILOTS.contains(variant))
         {
@@ -449,6 +458,7 @@ public final class TrainingPilotDirector
     public static TrainingPilotEntity resetToStandby(ServerLevel level,
                                                        int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level)){var original=existingPilotR45(level,variant);if(original!=null)NervRouteRuntimeR52.pilotRouting(level,original,"return");return original;}
         if(PilotRestroomsR47.configured(level))
         {
             var original=existingPilotR45(level,variant);
@@ -578,6 +588,7 @@ public final class TrainingPilotDirector
 
     public static boolean requestRestroomReturnR47(ServerLevel level,TrainingPilotEntity pilot)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.pilotRouting(level,pilot,"return");
         int v=pilot.getAssignedVariant();var optional=PilotRestroomsR47.plan(level,v);
         if(optional.isEmpty())return rejectPilotReturnR47(level,pilot,"room:metadata_plan_absent",null);
         if(!PilotRestroomsR47.original(optional.get(),pilot))return rejectPilotReturnR47(level,pilot,"room:foreign_or_dead_actor",null);
@@ -1014,6 +1025,7 @@ public final class TrainingPilotDirector
     /** Held-in-place STANDBY is distinct from actually returning to the original post. */
     public static boolean atOriginalStandbyR47(ServerLevel level,int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.pilotStandby(level,variant);
         var pilot=existingPilotR45(level,variant);
         if(PilotRestroomsR47.configured(level))return pilot!=null&&PilotRestroomsR47.isSeated(level,pilot)
                 &&pilot.getTrainingStage()==TrainingPilotEntity.STAGE_STANDBY

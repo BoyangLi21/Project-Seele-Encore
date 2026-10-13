@@ -46,6 +46,7 @@ public final class FacilityV2StagedBuildDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (server.getTickCount() % INTERVAL_TICKS != 0
                 || !FacilityWorldPolicy.stagedBuildAuthorized(server))
         {
@@ -99,6 +100,7 @@ public final class FacilityV2StagedBuildDirector
         }
         if (!complete(facility, EVA_ZONES))
         {
+            if(NervLegacyGenerationGuardR52.retired(level)){stage(server,"ROOT_R52_EVA_OWNER");return;}
             FacilityV2ProgrammeDirector.startEvaBackbone(level);
             stage(server, "EVA_BACKBONE");
             return;

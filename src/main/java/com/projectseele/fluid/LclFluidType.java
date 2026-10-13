@@ -79,7 +79,7 @@ public final class LclFluidType extends FluidType
                                     net.minecraft.world.level.BlockAndTintGetter level,
                                     net.minecraft.core.BlockPos pos)
             {
-                return TINT;
+                return com.projectseele.client.HangarCoolantVisualR52.tint(level,pos);
             }
 
             @Override
@@ -88,7 +88,7 @@ public final class LclFluidType extends FluidType
                                            float darkenWorldAmount,
                                            Vector3f fluidFogColor)
             {
-                return new Vector3f(0.86F, 0.33F, 0.125F);
+                return com.projectseele.client.HangarCoolantVisualR52.fogColor(level,camera.getBlockPosition());
             }
 
             @Override

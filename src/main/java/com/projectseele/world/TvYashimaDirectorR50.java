@@ -72,7 +72,8 @@ public final class TvYashimaDirectorR50
     {
         var plan=controls(level);
         if(plan==null||!plan.recovery().containsKey(0)||!plan.recovery().containsKey(1))return "屋岛供电、炮务与机库回收库存尚未完成交接。";
-        return NervArmorColumnR50.startBlocker(level);
+        String fixed=TvYashimaStationR52.startBlocker(level);if(!fixed.isEmpty())return fixed;
+        String shield=TvYashimaArrivalR50.startBlockerR52(level);return shield.isEmpty()?NervArmorColumnR50.startBlocker(level):shield;
     }
     public static Optional<BlockPos> recoveryStorage(ServerLevel level,int unit)
     {var plan=controls(level);return plan==null?Optional.empty():Optional.ofNullable(plan.recovery().get(unit));}
@@ -92,6 +93,9 @@ public final class TvYashimaDirectorR50
     /** Only the accepted mission creates this one boss; fleet/equipment are never fabricated. */
     public static boolean begin(ServerLevel level,TvCampaignSavedData data)
     {
+        var resource=RamielRemoteResourcesR52.classpathHash().orElse(null);
+        if(resource==null){data.notice="原拉米尔远距离绘制资源未接通，未接受盲射作战。";return false;}
+        EncounterObserverR45.installRamielResourceContract(resource);
         var site=TvEncounterSitesR45.site(level,"ramiel").orElse(null);
         if(site==null||data.owner==null||!data.active.equals("ramiel"))return false;
         var plan=controls(level);if(plan!=null)supply(level,plan);
@@ -108,6 +112,7 @@ public final class TvYashimaDirectorR50
             return false;
         }
         var boss=ModEntities.RAMIEL.get().create(level);if(boss==null)return false;
+        boss.configureScaleR52(site.modelScale());
         boss.moveTo(site.angel().x,site.angel().y,site.angel().z,site.yaw()+180,0);
         boss.finalizeSpawn(level,level.getCurrentDifficultyAt(boss.blockPosition()),MobSpawnType.EVENT,null,null);
         if(!level.noCollision(boss,boss.getBoundingBox())){data.notice="拉米尔原目标区被占用，作战暂停；未生成替代目标。";data.setDirty();return false;}
@@ -145,6 +150,7 @@ public final class TvYashimaDirectorR50
         var data=TvCampaignSavedData.get(level);
         boolean missionGun=eva.getPersistentData().getBoolean("TvMissionCannonAppliedR45")||TvMissionEquipmentR45.cannonAuthorized(eva);
         if(!missionGun)return "";
+        String fixed=TvYashimaStationR52.fireBlocker(eva);if(!fixed.isEmpty())return fixed;
         if(!data.active.equals("ramiel")||!data.phase.equals("combat")||data.targetDeathConfirmedR45
                 ||!TvMissionEquipmentR45.operational(eva))return "原炮击任务尚未允许开火。";
         var plan=controls(level);var state=TvYashimaSavedDataR50.get(level);
@@ -164,9 +170,10 @@ public final class TvYashimaDirectorR50
     {
         if(!(eva.level() instanceof ServerLevel level)||!TvMissionEquipmentR45.operational(eva))return current;
         var data=TvCampaignSavedData.get(level);var site=TvEncounterSitesR45.site(level,"ramiel").orElse(null);var plan=controls(level);
+        var role=site==null?null:eva.getUnitVariant()==0?site.cover():TvYashimaStationR52.operatorPositionR52(level);
         if(site==null||plan==null||!data.active.equals("ramiel")||data.targetDeathConfirmedR45
                 ||!java.util.Set.of("approach","combat").contains(data.phase)||eva.isUmbilicalSevered()
-                ||eva.position().distanceTo(site.hero())>90)return current;
+                ||role==null||eva.position().distanceTo(role)>90)return current;
         return plan.pylons().stream().filter(p->level.hasChunkAt(p)&&level.getBlockEntity(p) instanceof UmbilicalPylonBlockEntity
                 &&eva.position().distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(p))<=(double)range*range)
                 .min(Comparator.comparingDouble(p->eva.position().distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(p)))).orElse(current);
@@ -179,15 +186,14 @@ public final class TvYashimaDirectorR50
         state.shots++;state.coolantReady=state.reloadReady=false;
         state.coolantPressed=pressed(level,plan.coolant(),false);state.reloadPressed=pressed(level,plan.reload(),false);state.setDirty();
     }
-    /** A compressed playable setup stands in for the TV remote concealed emplacement. */
+    /** The actual fixed emplacement requires both original units and their real equipment. */
     private static String firstFireLockBlocker(ServerLevel level,TvCampaignSavedData data,TvEncounterSitesR45.Site site,EvaUnit01Entity shooter)
     {
         if(shooter==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(1))||!TvMissionEquipmentR45.operational(shooter))
             return "等待初号机抵达炮位。";
         var equipment=TvEncounterEquipmentControlR45.serverCargoAndCannonR45();
-        if(!TvMissionEquipmentR45.cannonAuthorized(shooter)||!equipment.cannonReady(shooter))return "初号机尚未领取阳电子炮。";
-        if(data.sorties.get(1).npc?!TvYashimaArrivalR50.npcCannonEmplacementReadyR50(level,data,shooter)
-                :shooter.position().distanceTo(site.hero())>12)
+        if(!TvMissionEquipmentR45.cannonAuthorized(shooter)||!equipment.cannonReady(shooter))return "原预装阳电子炮与本场借用登记尚未接通。";
+        if(!TvYashimaStationR52.fireBlocker(shooter).isEmpty())
             return "射手尚未在炮位停稳，等待到场交接。";
         var cover=TvSortiesR32.assignedUnit(level,data,0);
         if(cover==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(0))||!TvMissionEquipmentR45.operational(cover)
@@ -274,7 +280,7 @@ public final class TvYashimaDirectorR50
         if(data.phase.equals("alert")&&TvMissionAlertR30.tick(level,data,owner)){data.phase="approach";data.setDirty();}
         if(data.phase.equals("approach")&&boss.getTarget()==shooter&&shooter!=null
                 &&TvMissionEquipmentR45.cannonAuthorized(shooter)&&TvEncounterEquipmentControlR45.serverCargoAndCannonR45().cannonReady(shooter)
-                &&shooter.position().distanceTo(site.hero())<=12&&TvEncounterRulesR45.targetFrameReady(level,data,owner))
+                &&TvYashimaStationR52.atPlatformR52(shooter)&&TvEncounterRulesR45.targetFrameReady(level,data,owner))
         {data.phase="combat";data.setDirty();}
         String blocked=data.phase.equals("alert")?"识别与编成确认中；原拉米尔正在钻进。":TvEncounterRulesR45.equipmentBlocker(level,data);
         if(!service.fireControlLocked&&!setup.isEmpty())blocked=setup;

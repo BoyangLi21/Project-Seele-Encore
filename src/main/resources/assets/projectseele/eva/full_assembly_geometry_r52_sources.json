@@ -1,0 +1,15 @@
+{
+  "schema": "projectseele.r52.full-assembly-geometry-sources.v1",
+  "resources": {
+    "mesh/tripo_carrier_r48.json": "cd7b910958bcf1a5ab1be121855172ad73731200f3f6de12e0bbc5318d1546ae",
+    "mesh/entry_plug_unit00.mesh.json": "51a20931c29ccb8c7885bdf992a83910e37cb3229cd096bb95f98c17c3d5357b",
+    "mesh/entry_plug_unit01.mesh.json": "c08cee86bbb0302823b67af401384b18ac876c3f62a5e26ea709088467870e02",
+    "mesh/entry_plug_unit02.mesh.json": "177b445ae285ec2c6f3768a7cbbad72a306badd097ec1a091feee380abd91e3c",
+    "geo/entry_plug_carrier.geo.json": "b4726e85a8fcf9107becb6e7ba50bd9f0df10242c011b4bff73d3bace3aa7240",
+    "mesh/carrier_sole_bearings_r52.json": "0df11b4e208e3f6b3f21999bf292f111aa9a5b72c316e2364dc78c78794432e5",
+    "mesh/carrier_body_trimmed_r52.json": "11f1eef455abee6d943547130d9bc740d71b12ac7df7459502657e5d8d1e6b39",
+    "mesh/carrier_service_stow_r52.json": "339f7f574c719bc79042915cb8d5584df54540f8b533357575b2ac424b3c7554",
+    "mesh/carrier_running_deck_r52.json": "6708e3a6db4396721b857121acddf75baab5af8d35455c33af5a8b2e5e2454ce",
+    "mesh/legacy_running_heads_r52.json": "63fa3c8c4140a34557ee7a07f47a7bc82485900b68d669b11457ba6b1aee3f97"
+  }
+}

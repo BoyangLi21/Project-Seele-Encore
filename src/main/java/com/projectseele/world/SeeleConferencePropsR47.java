@@ -58,7 +58,12 @@ public final class SeeleConferencePropsR47
     @SubscribeEvent public static void tick(TickEvent.LevelTickEvent event)
     {
         if(event.phase!=TickEvent.Phase.END||!(event.level instanceof ServerLevel level)||!level.dimension().equals(FacilitySchemaV2.DIMENSION)||level.getGameTime()%40!=0)return;
+        var office=NervLegacyGenerationGuardR52.retired(level)?S20LiftDirectoryR52.office(level):null;
+        if(NervLegacyGenerationGuardR52.retired(level)&&office==null)return;
         var props=plans(level);if(props.isEmpty())return;
+        // Root-listed room bounds admit the moved presentation; inherited
+        // metadata may never restore a council at the retired coordinates.
+        if(office!=null&&props.stream().anyMatch(prop->office.meeting().stream().noneMatch(box->box.contains(prop.x,prop.y,prop.z))))return;
         var state=level.getDataStorage().computeIfAbsent(State::load,State::new,"projectseele_seele_conference_r47");
         for(var prop:props)
         {

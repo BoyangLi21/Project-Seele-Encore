@@ -52,6 +52,9 @@ public final class NervHangarDoorRenderer
             int packedLight)
     {
         int facilityLight = packedLight;
+        if(door.declaredGeometryMissingR52())return;
+        if(door.declaredStackR52()!=null)
+        {float open=door.getOpenProgress(partialTick);poses.pushPose();poses.mulPose(door.actualFrameR52().rotation());TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.hangarStackDeclared(poses,facilityLight,open,door.declaredStackR52()));stackLogo(door,poses,buffers,open,facilityLight);poses.popPose();super.render(door,yaw,partialTick,poses,buffers,packedLight);return;}
         if(door.isSectionalUNGate())
         {
             sectionalUN(door,partialTick,poses,buffers,facilityLight);
@@ -60,7 +63,7 @@ public final class NervHangarDoorRenderer
         }
         double slide = door.getOpenProgress(partialTick) * 17.0D;
         poses.pushPose();
-        poses.scale(1,door.visualHeight()/65F,1);
+        poses.scale(1,door.visualHeight()/65F,door.visualDepthScale());
         TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.pressureDoors(poses,facilityLight,door.getOpenProgress(partialTick)));
         splitLogo(poses, buffers, slide,door.getVariant()==3,facilityLight);
         poses.popPose();
@@ -127,6 +130,10 @@ public final class NervHangarDoorRenderer
         // reads the same word instead of seeing the reverse of an inner decal.
         logoHalf(poses,consumer,-slide,-12.0D-slide,bottom,top,.61D,.5F,0F,light);
         logoHalf(poses,consumer,12.0D+slide,slide,bottom,top,.61D,1F,.5F,light);
+    }
+    private static void stackLogo(NervHangarDoorEntity door,PoseStack poses,MultiBufferSource buffers,float open,int light)
+    {
+        var texture=TreeOfLifeWallClient.nervLogoTexture(Minecraft.getInstance());if(texture==null)return;var out=buffers.getBuffer(RenderType.entityCutout(texture));var geo=door.declaredGeometryR52();double width=geo.spec().panelWidth(),middle=geo.spec().height()*.5;for(int side:new int[]{-1,1})for(int index=0;index<4;index++){double a=index*width,b=Math.min(12,a+width);if(a>=b)continue;var panel=geo.panel(index,open);double x0=side<0?-b:a,x1=side<0?-a:b,shift=side*(panel.x()-a);logoHalf(poses,out,x0+shift,x1+shift,middle-14,middle+14,panel.z()+.995,(float)(.5+x0/24),(float)(.5+x1/24),light);}
     }
 
     private static void logoHalf(PoseStack poses, VertexConsumer consumer,

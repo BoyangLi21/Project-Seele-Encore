@@ -31,6 +31,9 @@ public class ModEntities
 {
     public static final DeferredRegister<EntityType<?>> ENTITY_TYPES =
             DeferredRegister.create(ForgeRegistries.ENTITY_TYPES, ProjectSeele.MODID);
+    public static final RegistryObject<EntityType<com.projectseele.entity.YashimaCannonEntityR52>> YASHIMA_CANNON_R52=ENTITY_TYPES.register("yashima_cannon_r52",
+            ()->EntityType.Builder.<com.projectseele.entity.YashimaCannonEntityR52>of(com.projectseele.entity.YashimaCannonEntityR52::new,MobCategory.MISC)
+                    .sized(1,1).clientTrackingRange(64).updateInterval(1).fireImmune().build("yashima_cannon_r52"));
     public static final RegistryObject<EntityType<com.projectseele.entity.UNTransportEntity>> UN_TRANSPORT=ENTITY_TYPES.register("un_transport",
             ()->EntityType.Builder.<com.projectseele.entity.UNTransportEntity>of(com.projectseele.entity.UNTransportEntity::new,MobCategory.MISC)
                     .sized(8,8).clientTrackingRange(48).updateInterval(1).fireImmune().build("un_transport"));
@@ -103,7 +106,6 @@ public class ModEntities
                     "nerv_carrier_platform",
                     () -> EntityType.Builder.of(NervCarrierPlatformEntity::new,
                                     MobCategory.MISC)
-                            .noSave()
                             .sized(EvaScale.CARRIER_WIDTH, 0.6F)
                             .clientTrackingRange(32)
                             .updateInterval(1)
@@ -157,7 +159,6 @@ public class ModEntities
                     "nerv_silo_door",
                     () -> EntityType.Builder.of(NervSiloDoorEntity::new,
                                     MobCategory.MISC)
-                            .noSave()
                             // Visual leaves are non-pickable and no-cull; a
                             // 64-block server AABB only bloats entity-section
                             // bookkeeping without affecting their renderer.
@@ -173,7 +174,6 @@ public class ModEntities
                     "nerv_hangar_door",
                     () -> EntityType.Builder.of(NervHangarDoorEntity::new,
                                     MobCategory.MISC)
-                            .noSave()
                             .sized(1.0F, 1.0F)
                             .fireImmune()
                             .clientTrackingRange(64)

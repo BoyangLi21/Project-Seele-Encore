@@ -1,0 +1,6 @@
+{
+  "schema": "projectseele.r52.cage-collision-source.v1",
+  "resource": "mesh/tv_shoulder_shells_r44.json",
+  "sha256": "3b2ea3f2ee5742a56e5ad9c6c5a83d0262b0148dd6e23bc438c72407ad44e1d9",
+  "broadphase_radius_m": 78.24696619038974
+}

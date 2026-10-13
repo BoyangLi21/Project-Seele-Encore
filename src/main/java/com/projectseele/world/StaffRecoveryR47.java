@@ -176,6 +176,12 @@ public final class StaffRecoveryR47
                 if (!phase.equals("DEPLOYED")) { stage(state, job, "MECHANICAL_RECOVERY"); continue; }
                 if (eva.isFirstBattleActive() || eva.isLaunchSequenceActive() || eva.isBerserk())
                 { stage(state, job, "WAIT_SAFE_STATE"); continue; }
+                if(NervRouteRuntimeR52.claimed(level))
+                {
+                    if(!NervAirTransportRuntimeR52.pending(level,eva)){var ground=NervRouteRuntimeR52.recover(owner,job.unit);if(!ground.accepted())NervAirTransportRuntimeR52.request(owner,job.unit,true,0,0);}
+                    stage(state,job,"R52_ACTUAL_RECOVERY");continue;
+                }
+
                 if(UndergroundSortieR48.recoveringR48(level,job.unit,eva))
                 {stage(state,job,"UNDERGROUND_RECOVERY");continue;}
                 if(NervUndergroundAirLiftR50.pending(level,eva))

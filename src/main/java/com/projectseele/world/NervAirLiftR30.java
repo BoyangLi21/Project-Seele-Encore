@@ -61,28 +61,32 @@ public final class NervAirLiftR30
     private static Vec3 vec(CompoundTag t,String k){return new Vec3(t.getDouble(k+"X"),t.getDouble(k+"Y"),t.getDouble(k+"Z"));}
     private static void put(CompoundTag t,String k,Vec3 v){t.putDouble(k+"X",v.x);t.putDouble(k+"Y",v.y);t.putDouble(k+"Z",v.z);}
     public static State state(ServerLevel l){return l.getDataStorage().computeIfAbsent(State::load,State::new,"projectseele_nerv_airlift_r30");}
-    public static Vec3 head(ServerLevel l,int unit){var p=EvaLogisticsDirector.surfaceTransportBedR30(l,unit);return new Vec3(p.getX()+.5,p.getY()+2,p.getZ()+.5);}
-    public static boolean waitingAtHead(EvaUnit01Entity e){return e.level() instanceof ServerLevel l&&!e.isExperimentalUnit()&&e.getPersistentData().getBoolean("R30AwaitingNervRecovery")&&e.position().distanceToSqr(head(l,e.getUnitVariant()).add(0,e.getPersistentData().getDouble("R39LandingLift"),0))<.25;}
+    public static Vec3 head(ServerLevel l,int unit){if(NervRouteRuntimeR52.claimed(l))throw new IllegalStateException("R52 requires a typed actual receiver; legacy silo head is retired");var p=EvaLogisticsDirector.surfaceTransportBedR30(l,unit);return new Vec3(p.getX()+.5,p.getY()+2,p.getZ()+.5);}
+    public static boolean waitingAtHead(EvaUnit01Entity e){if(e.level() instanceof ServerLevel r52&&NervRouteRuntimeR52.claimed(r52))return NervAirTransportRuntimeR52.atReceiver(r52,e);return e.level() instanceof ServerLevel l&&!e.isExperimentalUnit()&&e.getPersistentData().getBoolean("R30AwaitingNervRecovery")&&e.position().distanceToSqr(head(l,e.getUnitVariant()).add(0,e.getPersistentData().getDouble("R39LandingLift"),0))<.25;}
     public static boolean ownsMotion(EvaUnit01Entity e)
     {
+        if(e.level() instanceof ServerLevel r52&&NervRouteRuntimeR52.claimed(r52))return NervAirTransportRuntimeR52.ownsMotion(e);
         if(NervUndergroundAirLiftR50.ownsMotion(e))return true;
         if(!(e.level() instanceof ServerLevel l))return false;var j=state(l).job;
         return j!=null&&j.unit.equals(e.getUUID())&&Set.of(Phase.APPROACH,Phase.CLAMP,Phase.ASCEND,Phase.CRUISE,Phase.DESCEND,Phase.RELEASE,Phase.HOLD).contains(j.phase);
     }
     public static String status(ServerLevel l)
     {
+        if(NervRouteRuntimeR52.claimed(l))return NervAirTransportRuntimeR52.status(l);
         var s=state(l);String surface=s.forceRecovery?s.last:s.job==null?s.last:NervStaffDialogue.unitName(s.job.variant)+"："+s.job.note;
         String underground=NervUndergroundTransportSiteR50.get(l)==null?"本轮 GeoFront 地下机场尚未交付":NervUndergroundAirLiftR50.status(l);
         return "地表运输："+surface+" ｜ 地下运输："+underground;
     }
     public static String forceRecover(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.forceRecover(level);
         if(!Files.isRegularFile(level.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_transport_r30.json")))return "此存档尚未安装 NERV 重型运输设施。";
         var s=state(level);s.forceRecovery=true;s.last="强制回收已受理，正在加载原运输机和载荷。";s.setDirty();return s.last;
     }
-    public static CompoundTag inspectionR38(ServerLevel level){return state(level).save(new CompoundTag());}
+    public static CompoundTag inspectionR38(ServerLevel level){if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.state(level).save(new CompoundTag());return state(level).save(new CompoundTag());}
     public static boolean stageCarriedReviewR38(ServerLevel level,int variant,UUID owner)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         if(!"r38-recovery".equals(System.getProperty("projectseele.regionalBuild"))||!level.getServer().getWorldPath(LevelResource.ROOT).normalize().getFileName().toString().equals("SEELE_FIELD_R38_REVIEW"))throw new IllegalStateException("Isolated cargo fixture only");
         var s=state(level);boolean airport=ready(level,STAND,4);var known=s.locations.get(variant);if(known!=null)ready(level,Vec3.atCenterOf(known),4);
         EvaLogisticsDirector.loadControlTarget(level,variant);var receipt=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
@@ -132,18 +136,20 @@ public final class NervAirLiftR30
     }
     private static boolean ownsRegisteredCargo(State state)
     {return state.job!=null&&Set.of(Phase.APPROACH,Phase.CLAMP,Phase.ASCEND,Phase.CRUISE,Phase.DESCEND,Phase.RELEASE,Phase.HOLD).contains(state.job.phase);}
-    public static String phaseName(ServerLevel l){var j=state(l).job;return j==null?"IDLE":j.phase.name();}
-    public static boolean busy(ServerLevel level){var s=state(level);return s.job!=null||s.forceRecovery;}
+    public static String phaseName(ServerLevel l){if(NervRouteRuntimeR52.claimed(l))return NervAirTransportRuntimeR52.phaseName(l);var j=state(l).job;return j==null?"IDLE":j.phase.name();}
+    public static boolean busy(ServerLevel level){if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.busy(level);var s=state(level);return s.job!=null||s.forceRecovery;}
     public static boolean deliveryPendingR50(ServerLevel level,EvaUnit01Entity eva,UUID commander)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.deliveryPending(level,eva,commander);
         var job=state(level).job;
         return job!=null&&!job.returning&&job.unit.equals(eva.getUUID())&&job.owner.equals(commander);
     }
     public static boolean originalJobPendingR50(ServerLevel level,EvaUnit01Entity eva)
-    {var job=state(level).job;return job!=null&&job.unit.equals(eva.getUUID())||NervUndergroundAirLiftR50.pending(level,eva);}
+    {if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.pending(level,eva);var job=state(level).job;return job!=null&&job.unit.equals(eva.getUUID())||NervUndergroundAirLiftR50.pending(level,eva);}
     /** A blocked, unstarted same-owner request may yield to the original NPC's real ground route. */
     public static String yieldBlockedPrepareToGroundR50(ServerLevel level,EvaUnit01Entity eva,UUID commander,boolean expectedReturning)
     {
+        if(NervRouteRuntimeR52.claimed(level))return "";
         var s=state(level);var j=s.job;
         if(eva==null||commander==null||j==null||s.forceRecovery||j.phase!=Phase.PREPARE||j.carrying
                 ||j.returning!=expectedReturning||!j.unit.equals(eva.getUUID())||!j.owner.equals(commander)
@@ -199,6 +205,7 @@ public final class NervAirLiftR30
     /** Called before a maintenance reset of this same registered airframe. */
     public static boolean abortForMaintenanceR47(ServerLevel level,int variant,UUID original)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.abortForMaintenance(level,variant,original);
         var s=state(level);var job=s.job;if(job==null)return true;
         if(job.variant!=variant||original==null||!job.unit.equals(original))return false;
         var unit=ServiceAircraftR32.payload(level,original);
@@ -219,6 +226,7 @@ public final class NervAirLiftR30
     }
     public static String request(ServerPlayer p,int variant,boolean returning,int x,int z)
     {
+        if(NervRouteRuntimeR52.claimed(p.serverLevel()))return NervAirTransportRuntimeR52.request(p,variant,returning,x,z);
         if(variant<0||variant>2||!NervStaffDialogue.authorized(p)||!StaffConversationR24.radioAllowed(p))return "需要 NERV 指挥通信权限。";
         var l=p.serverLevel();if(!l.dimension().equals(FacilitySchemaV2.DIMENSION))return "请先进入第三新东京市。";
         var original=EvaLogisticsDirector.canonicalUnit(l,variant);
@@ -245,6 +253,7 @@ public final class NervAirLiftR30
     /** Called only by a persisted, completed NPC sortie; it does not require the commander online. */
     public static boolean requestPilotReturnR39(ServerLevel level,EvaUnit01Entity unit,UUID commander)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.requestPilotReturn(level,unit,commander);
         if(UndergroundSortieR48.recoveringR48(level,unit.getUnitVariant(),unit))return true;
         if(NervUndergroundAirLiftR50.directReceiver(level,unit.getUnitVariant(),unit))
         {
@@ -265,6 +274,7 @@ public final class NervAirLiftR30
 
     public static String cancel(ServerPlayer p)
     {
+        if(NervRouteRuntimeR52.claimed(p.serverLevel()))return NervAirTransportRuntimeR52.cancel(p,-1);
         // Legacy same-protocol callers omit the unit. Resolve only a unique
         // original job belonging to this caller; never prefer one airport.
         var s=state(p.serverLevel());var j=s.job;boolean surface=j!=null&&j.owner.equals(p.getUUID());
@@ -275,6 +285,7 @@ public final class NervAirLiftR30
     }
     public static String cancel(ServerPlayer p,int variant)
     {
+        if(NervRouteRuntimeR52.claimed(p.serverLevel()))return NervAirTransportRuntimeR52.cancel(p,variant);
         if(variant<0||variant>2)return "请选择零号机、初号机或二号机后取消运输。";
         var s=state(p.serverLevel());var j=s.job;var fleet=EvaFleetSavedData.get(p.server).entry(variant).orElse(null);
         boolean surface=j!=null&&j.variant==variant&&j.owner.equals(p.getUUID())&&fleet!=null&&fleet.canonicalId().equals(j.unit);
@@ -314,7 +325,7 @@ public final class NervAirLiftR30
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
-        if(event.phase!=TickEvent.Phase.END)return;var l=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return;
+        if(event.phase!=TickEvent.Phase.END)return;var l=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null||NervRouteRuntimeR52.claimed(l))return;
         if(!Files.isRegularFile(l.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_transport_r30.json")))return;
         var s=state(l);
         if(event.getServer().getTickCount()%20==0)for(int i=0;i<3;i++){var e=EvaLogisticsDirector.canonicalUnit(l,i);if(e!=null&&!e.blockPosition().equals(s.locations.get(i))){s.locations.put(i,e.blockPosition());s.setDirty();}}

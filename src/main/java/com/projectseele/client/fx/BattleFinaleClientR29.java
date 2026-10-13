@@ -39,7 +39,7 @@ public final class BattleFinaleClientR29
         if(BLASTS.size()>=4)BLASTS.remove(0);
         BLASTS.add(new Blast(point,mc.level.getGameTime()));
         ClientFxManager.addNukeFx(new ClientboundNukeFxPacket(p.x(),p.y()+12,p.z(),4.8F,false),false);
-        ClientFxManager.addCrossExplosion(new ClientboundCrossExplosionPacket(p.x(),p.y(),p.z(),2.2F));
+        ClientFxManager.addDirectedBattleCross(new ClientboundCrossExplosionPacket(p.x(),p.y(),p.z(),2.2F));
         mc.level.playLocalSound(p.x(),p.y()+25,p.z(),SoundEvent.createVariableRangeEvent(new ResourceLocation("projectseele","angel_nuclear_finale")),SoundSource.HOSTILE,5F,1F,false);
     }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent event)

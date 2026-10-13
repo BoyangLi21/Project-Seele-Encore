@@ -114,6 +114,7 @@ public final class EvaLogisticsDirector
     /** Migrates an old three-airframe map into the new canonical wet cages. */
     public static List<EvaUnit01Entity> ensureFleet(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.loadedOriginals(level);
         if (FacilityV2EvaRuntime.readyAll(level))
         {
             if (!fleetStationEntitiesSettled(level))
@@ -401,6 +402,7 @@ public final class EvaLogisticsDirector
     public static ActionResult requestPrepare(ServerLevel level, int variant)
     {
         if(variant<0||variant>2)return new ActionResult(false,"请指定原零号/初号/二号机。");
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.prepare(level,variant);
         loadControlTarget(level,variant);
         var rearFault=EntryPlugBridgeLayoutR48.retractionFaultR48(level,variant);
         if(rearFault.isPresent())return new ActionResult(false,rearFault.get());
@@ -481,6 +483,7 @@ public final class EvaLogisticsDirector
      */
     public static ActionResult requestLaunch(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.launch(level,variant);
         var staffFault=TvPersonnelPlatformInterlockR44.prepareFault(level,variant);
         if(staffFault.isPresent())return new ActionResult(false,staffFault.get());
         if (!logisticsReady(level, variant))
@@ -539,6 +542,7 @@ public final class EvaLogisticsDirector
     /** Only the installed underground service may begin a bound original carrier trip. */
     public static ActionResult requestUndergroundDepartureR48(ServerPlayer caller,int variant,UUID expected)
     {
+        if(NervRouteRuntimeR52.claimed(caller.serverLevel()))return new ActionResult(false,"R52 原编队由统一路线 owner 控制；旧地下承载入口未调用。");
         var level=caller.serverLevel();var unit=canonical(level,variant);var entry=entry(level,variant);
         if(!logisticsReady(level,variant)||unit==null||entry==null||!entry.canonicalId().equals(expected)
                 ||!unit.getUUID().equals(expected)||entry.phase()!=Phase.SILO_READY
@@ -560,6 +564,7 @@ public final class EvaLogisticsDirector
     }
     public static ActionResult completeUndergroundDepartureR48(ServerLevel level,int variant,UUID expected)
     {
+        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"R52 必须由真实整组 owner 确认完成。");
         var unit=canonical(level,variant);var entry=entry(level,variant);
         if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
                 ||entry.phase()!=Phase.SILO_READY||!UndergroundSortieR48.finishAuthorizedR48(level,variant,unit,false)
@@ -572,6 +577,7 @@ public final class EvaLogisticsDirector
     }
     public static ActionResult requestUndergroundRecoveryR48(ServerLevel level,int variant,UUID expected)
     {
+        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"R52 原编队由统一逆向路线 owner 控制。");
         var unit=canonical(level,variant);var entry=entry(level,variant);
         if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
                 ||entry.phase()!=Phase.DEPLOYED||!UndergroundSortieR48.recoveryAuthorizedR48(level,variant,unit)
@@ -585,6 +591,7 @@ public final class EvaLogisticsDirector
     }
     public static ActionResult completeUndergroundRecoveryR48(ServerLevel level,int variant,UUID expected)
     {
+        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"R52 必须由真实整组 owner 确认回库完成。");
         var unit=canonical(level,variant);var entry=entry(level,variant);var bed=lowerLiftBed(level,variant);
         if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
                 ||entry.phase()!=Phase.DEPLOYED||!UndergroundSortieR48.finishAuthorizedR48(level,variant,unit,true)
@@ -645,6 +652,7 @@ public final class EvaLogisticsDirector
     }
     public static ActionResult requestRecovery(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.recover(level,variant);
         if (!logisticsReady(level, variant))
         {
             return v2MigrationInhibit("recovery");
@@ -730,6 +738,7 @@ public final class EvaLogisticsDirector
      */
     public static ActionResult requestCancel(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.cancel(level,variant);
         if (!logisticsReady(level, variant))
         {
             return v2MigrationInhibit("launch cancel");
@@ -786,6 +795,7 @@ public final class EvaLogisticsDirector
     /** Maintenance of the original empty wet-cage assembly, never replacement actors. */
     public static EvaUnit01Entity forceReset(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))throw new IllegalStateException("R52 原编队须经真实机械回收/维护；未按旧坐标复位或替换。");
         requireCompactLogistics(level, "forceReset");
         FleetEntry previous=entry(level,variant);
         EvaUnit01Entity unit=canonical(level,variant);
@@ -823,6 +833,7 @@ public final class EvaLogisticsDirector
 
     public static Status status(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.status(level,variant);
         FleetEntry entry = entry(level, variant);
         EvaUnit01Entity unit = canonical(level, variant);
         return entry == null
@@ -1006,6 +1017,7 @@ public final class EvaLogisticsDirector
         {
             return;
         }
+        if(NervRouteRuntimeR52.claimed(level)){NervRouteRuntimeR52.tick(level);return;}
         boolean modern = FacilityWorldPolicy.isCleanRebuild(
                 event.getServer());
         boolean compactS20 = FacilityWorldPolicy.isS20Rebuild(
@@ -2549,6 +2561,7 @@ public final class EvaLogisticsDirector
     /** Loads one requested EVA line and its pilot waiting area. */
     public static void loadControlTarget(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (variant < EvaUnit01Entity.UNIT_00
                 || variant > EvaUnit01Entity.UNIT_02)
         {

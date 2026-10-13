@@ -296,6 +296,8 @@ public final class ServerboundEvaVideoFramePacket
 
     private static boolean isCommandViewer(ServerLevel level, Vec3 position)
     {
+        if(com.projectseele.world.NervRouteRuntimeR52.claimed(level))
+        {var frame=com.projectseele.world.NervHeadquartersFrameR52.frame(level);return frame!=null&&frame.apply(legacyCommandArea()).contains(position);}
         if (legacyCommandArea().contains(position))
         {
             return true;

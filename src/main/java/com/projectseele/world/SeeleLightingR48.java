@@ -26,8 +26,7 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
 public final class SeeleLightingR48
 {
-    private static final BlockPos BUTTON=new BlockPos(17,-363,312);
-    private record Circuit(List<BlockPos> ambient,List<BlockPos> table,boolean overheadOnly) { }
+    private record Circuit(BlockPos button,List<BlockPos> ambient,List<BlockPos> table,boolean overheadOnly) { }
     private static final Map<MinecraftServer,Optional<Circuit>> CACHE=new WeakHashMap<>();
     private static final class State extends SavedData
     {
@@ -49,12 +48,16 @@ public final class SeeleLightingR48
                 var root=JsonParser.parseString(Files.readString(path)).getAsJsonObject();
                 if(root.get("schema").getAsInt()!=48||!root.get("installed").getAsBoolean()
                         ||!root.get("dimension").getAsString().equals("projectseele:geofront"))return Optional.empty();
+                var buttonRow=root.getAsJsonArray("button");if(buttonRow==null||buttonRow.size()!=3)return Optional.empty();
+                var button=new BlockPos(buttonRow.get(0).getAsInt(),buttonRow.get(1).getAsInt(),buttonRow.get(2).getAsInt());
+                if(button.getX()!=17||button.getZ()!=312)return Optional.empty();
+                int floorY=button.getY()-1;
                 var ambient=new ArrayList<BlockPos>();var table=new ArrayList<BlockPos>();var seen=new HashSet<BlockPos>();
                 for(String group:List.of("ambient","table"))for(var raw:root.getAsJsonArray(group))
                 {
                     var a=raw.getAsJsonArray();if(a.size()!=3)return Optional.empty();
                     var pos=new BlockPos(a.get(0).getAsInt(),a.get(1).getAsInt(),a.get(2).getAsInt());
-                    if(pos.getX()<17||pos.getX()>50||pos.getY()<-364||pos.getY()>-363
+                    if(pos.getX()<17||pos.getX()>50||pos.getY()<floorY||pos.getY()>floorY+1
                             ||pos.getZ()<301||pos.getZ()>314||!seen.add(pos))return Optional.empty();
                     boolean focus=pos.getX()>=32&&pos.getX()<=36&&pos.getZ()>=307&&pos.getZ()<=309;
                     if(group.equals("table")!=focus)return Optional.empty();
@@ -64,24 +67,25 @@ public final class SeeleLightingR48
                 boolean overheadOnly=root.has("meeting_all_block_lights_zero_r49")
                         &&root.get("meeting_all_block_lights_zero_r49").getAsBoolean()
                         &&FacilityDoorControlsR49.installed(level);
-                return Optional.of(new Circuit(List.copyOf(ambient),List.copyOf(table),overheadOnly));
+                return Optional.of(new Circuit(button,List.copyOf(ambient),List.copyOf(table),overheadOnly));
             }
             catch(Exception failure){ProjectSeele.LOGGER.error("R48 finite SEELE lighting receipt rejected",failure);return Optional.empty();}
         });
     }
     @SubscribeEvent public static void use(PlayerInteractEvent.RightClickBlock event)
     {
-        if(event.getHand()!=InteractionHand.MAIN_HAND||!event.getPos().equals(BUTTON)
+        if(event.getHand()!=InteractionHand.MAIN_HAND
                 ||!(event.getEntity() instanceof ServerPlayer player)
                 ||!(event.getLevel() instanceof ServerLevel level)||!level.dimension().equals(FacilitySchemaV2.DIMENSION)
                 ||!SeeleConferenceAccessR47.enabled(level)||circuit(level).isEmpty())return;
-        if(player.isSpectator()||!NervStaffDialogue.authorized(player)||player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(BUTTON))>36)
+        var actual=circuit(level).orElseThrow();var position=actual.button();if(!event.getPos().equals(position))return;
+        if(player.isSpectator()||!NervStaffDialogue.authorized(player)||player.distanceToSqr(net.minecraft.world.phys.Vec3.atCenterOf(position))>36)
         {event.setCanceled(true);return;}
-        var button=level.getBlockState(BUTTON);
+        var button=level.getBlockState(position);
         if(!button.is(Blocks.POLISHED_BLACKSTONE_BUTTON)||button.getValue(ButtonBlock.POWERED)
                 ||button.getValue(ButtonBlock.FACE)!=AttachFace.WALL||button.getValue(ButtonBlock.FACING)!=Direction.EAST
-                ||!button.canSurvive(level,BUTTON))return;
-        var state=state(level);state.meeting=!state.meeting;state.setDirty();update(level,circuit(level).orElseThrow(),state.meeting);
+                ||!button.canSurvive(level,position))return;
+        var state=state(level);state.meeting=!state.meeting;state.setDirty();update(level,actual,state.meeting);
         player.displayClientMessage(net.minecraft.network.chat.Component.literal(state.meeting?"SEELE · 会议暗场，桌面重点照明。":"SEELE · 日常照明。"),true);
     }
     private static void update(ServerLevel level,Circuit circuit,boolean meeting)

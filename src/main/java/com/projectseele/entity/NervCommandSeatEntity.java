@@ -73,7 +73,7 @@ public final class NervCommandSeatEntity extends Entity
         if(this.getType()==com.projectseele.registry.ModEntities.PILOT_REST_SEAT_R47.get())
             return passenger instanceof TrainingPilotEntity pilot&&this.getPassengers().isEmpty()
                     &&(level().isClientSide||level() instanceof net.minecraft.server.level.ServerLevel server
-                    &&com.projectseele.world.PilotRestroomsR47.ownsSeat(server,this,pilot));
+                    &&(com.projectseele.world.NervRouteRuntimeR52.claimed(server)?com.projectseele.world.NervOriginalActorsR52.originalSeatAllowed(server,this,pilot):com.projectseele.world.PilotRestroomsR47.ownsSeat(server,this,pilot)));
         return passenger instanceof Player && this.getPassengers().isEmpty();
     }
 
@@ -92,7 +92,7 @@ public final class NervCommandSeatEntity extends Entity
     {
         if(this.getType()==com.projectseele.registry.ModEntities.PILOT_REST_SEAT_R47.get()
                 &&passenger instanceof TrainingPilotEntity pilot&&level() instanceof net.minecraft.server.level.ServerLevel server)
-            return com.projectseele.world.PilotRestroomsR47.safeDismount(server,this,pilot).orElse(passenger.position());
+            {if(com.projectseele.world.NervRouteRuntimeR52.claimed(server)){var at=com.projectseele.world.NervOriginalActorsR52.originalSeatStand(server,this,pilot);return at==null?passenger.position():at;}return com.projectseele.world.PilotRestroomsR47.safeDismount(server,this,pilot).orElse(passenger.position());}
         if(this.getTags().contains("seele_office_seat"))
         {
             var p=net.minecraft.core.BlockPos.of(this.getPersistentData().getLong("OfficeChair"));

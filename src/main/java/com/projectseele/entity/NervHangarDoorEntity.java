@@ -1,9 +1,18 @@
 package com.projectseele.entity;
 
 import com.projectseele.registry.ModEntities;
+import com.projectseele.world.NervHangarGateGeometryR52;
+import com.projectseele.world.RigidTransform;
+import java.util.*;
+import net.minecraft.core.BlockPos;
+import net.minecraft.world.phys.shapes.CollisionContext;
+import org.joml.Quaternionf;
 import java.util.Comparator;
 import java.util.List;
 import net.minecraft.nbt.CompoundTag;
+import net.minecraft.nbt.DoubleTag;
+import net.minecraft.nbt.ListTag;
+import net.minecraft.nbt.Tag;
 import net.minecraft.network.protocol.Packet;
 import net.minecraft.network.protocol.game.ClientGamePacketListener;
 import net.minecraft.network.syncher.EntityDataAccessor;
@@ -33,9 +42,14 @@ public final class NervHangarDoorEntity extends Entity
             SynchedEntityData.defineId(NervHangarDoorEntity.class,
                     EntityDataSerializers.FLOAT);
 
+    private boolean declaredClockR52;private long declaredAcceptedAtR52=Long.MIN_VALUE;
     private float clientOpen;
     private static final EntityDataAccessor<Float> DATA_HEIGHT = SynchedEntityData.defineId(NervHangarDoorEntity.class, EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> DATA_WIDTH = SynchedEntityData.defineId(NervHangarDoorEntity.class, EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<CompoundTag> DATA_STACK_R52=SynchedEntityData.defineId(NervHangarDoorEntity.class,EntityDataSerializers.COMPOUND_TAG);
+    private CompoundTag savedStackR52=new CompoundTag();private boolean invalidStackR52;private float clockStartR52,clockGoalR52=Float.NaN;private int clockStepR52,clockDurationR52;
+    private static final EntityDataAccessor<Float> DATA_DEPTH_SCALE=SynchedEntityData.defineId(NervHangarDoorEntity.class,EntityDataSerializers.FLOAT);
+    public float visualDepthScale(){return entityData.get(DATA_DEPTH_SCALE);}
     public float visualHeight(){return entityData.get(DATA_HEIGHT);}
     public float visualWidth(){return entityData.get(DATA_WIDTH);}
     public boolean isSectionalUNGate(){return getVariant()==3&&visualWidth()>40;}
@@ -60,10 +74,17 @@ public final class NervHangarDoorEntity extends Entity
         this.entityData.define(DATA_TARGET, 0.0F);
         this.entityData.define(DATA_HEIGHT, 65.0F);
         this.entityData.define(DATA_WIDTH, 33.0F);
+        this.entityData.define(DATA_DEPTH_SCALE, 1.0F);
+        this.entityData.define(DATA_STACK_R52,new CompoundTag());
     }
 
-    @Override protected void readAdditionalSaveData(CompoundTag tag) {}
-    @Override protected void addAdditionalSaveData(CompoundTag tag) {}
+    @Override protected void readAdditionalSaveData(CompoundTag tag)
+    {if(!tag.contains("R52SideStack"))return;savedStackR52=tag.getCompound("R52SideStack").copy();declaredClockR52=true;try{if(savedStackR52.getInt("Version")!=52)throw new IllegalStateException("Unknown side-stack sample");var spec=savedStackR52.getCompound("Spec");var measured=readSpec(spec);float raw=savedStackR52.getFloat("Raw"),target=savedStackR52.getFloat("Target");if(measured==null||!Float.isFinite(raw+target)||raw<0||raw>1||target<0||target>1)throw new IllegalStateException("Unknown side-stack progress");entityData.set(DATA_STACK_R52,spec);entityData.set(DATA_OPEN,raw);entityData.set(DATA_TARGET,target);entityData.set(DATA_VARIANT,savedStackR52.getInt("Variant"));entityData.set(DATA_WIDTH,measured.width());entityData.set(DATA_HEIGHT,measured.height());clockStartR52=savedStackR52.getFloat("ClockStart");clockGoalR52=savedStackR52.getFloat("ClockGoal");clockStepR52=savedStackR52.getInt("ClockStep");clockDurationR52=savedStackR52.getInt("ClockDuration");if(clockStepR52<0||clockDurationR52<0||clockStepR52>clockDurationR52)throw new IllegalStateException("Unknown side-stack clock");setBoundingBox(com.projectseele.world.NervRigidMeshSweepR52.transformed(declaredGeometryR52().bounds(actualOpenProgressR52()),actualFrameR52()));}catch(RuntimeException bad){invalidStackR52=true;holdSavedVisualR52();}}
+    @Override protected void addAdditionalSaveData(CompoundTag tag)
+    {if(invalidStackR52){tag.put("R52SideStack",savedStackR52.copy());return;}if(declaredStackR52()==null)return;var data=savedStackR52.copy();data.putInt("Version",52);data.put("Spec",entityData.get(DATA_STACK_R52).copy());data.putFloat("Raw",entityData.get(DATA_OPEN));data.putFloat("Target",entityData.get(DATA_TARGET));data.putInt("Variant",getVariant());data.putFloat("ClockStart",clockStartR52);data.putFloat("ClockGoal",clockGoalR52);data.putInt("ClockStep",clockStepR52);data.putInt("ClockDuration",clockDurationR52);tag.put("R52SideStack",data);}
+
+    /** Only declared Root machinery survives a save; legacy runtime leaves remain transient. */
+    @Override public boolean shouldBeSaved(){return declaredClockR52&&super.shouldBeSaved();}
 
     @Override
     public Packet<ClientGamePacketListener> getAddEntityPacket()
@@ -82,6 +103,7 @@ public final class NervHangarDoorEntity extends Entity
             this.clientOpen = this.entityData.get(DATA_OPEN);
             return;
         }
+        if(declaredClockR52)return;
         float current = this.entityData.get(DATA_OPEN);
         float next = Mth.approach(current,
                 this.entityData.get(DATA_TARGET), this.getVariant()==3?0.0125F:0.075F);
@@ -102,13 +124,20 @@ public final class NervHangarDoorEntity extends Entity
 
     public float getOpenProgress(float partialTick)
     {
+        if(declaredStackR52()!=null){if(!level().isClientSide)return actualOpenProgressR52();var data=entityData.get(DATA_STACK_R52);double t=Mth.clamp(level().getGameTime()-data.getLong("At")+(double)partialTick,0,1);return EvaDorsalMechanism.smooth(Mth.lerp((float)t,data.getFloat("PreviousRaw"),data.getFloat("CurrentRaw")));}
         if(!this.level().isClientSide)return this.entityData.get(DATA_OPEN);
         return Mth.lerp(partialTick, this.clientOpenO, this.clientOpen);
     }
 
-    public static void reconcile(ServerLevel level, int variant,
-            Vec3 centre, boolean open)
+    public static void reconcile(ServerLevel level,int variant,Vec3 centre,boolean open)
+    {reconcile(level,variant,centre,open,1F);}
+    /** Rear leaves occupy separate shallow tracks inside the original three-metre wall. */
+    public static void reconcileRear(ServerLevel level,int variant,Vec3 centre,boolean open)
+    {reconcile(level,variant,centre,open,.35F);}
+    private static void reconcile(ServerLevel level,int variant,Vec3 centre,boolean open,float depthScale)
     {
+        if(com.projectseele.world.NervRouteRuntimeR52.claimed(level))
+        {com.projectseele.world.NervRouteRuntimeR52.hangarDoor(level,variant,open);return;}
         AABB search = new AABB(centre, centre).inflate(3.0D);
         List<NervHangarDoorEntity> matches = level.getEntitiesOfClass(
                 NervHangarDoorEntity.class, search,
@@ -139,6 +168,7 @@ public final class NervHangarDoorEntity extends Entity
                 matches.get(index).discard();
             }
         }
+        door.entityData.set(DATA_DEPTH_SCALE,depthScale);
         float target = open ? 1.0F : 0.0F;
         door.entityData.set(DATA_HEIGHT, variant < 3 && com.projectseele.world.FacilityLayoutR29.active(level.getServer())
                 ? (float)Math.max(65,-370-centre.y) : 65.0F);
@@ -147,6 +177,75 @@ public final class NervHangarDoorEntity extends Entity
         {
             door.entityData.set(DATA_TARGET, target);
         }
+    }
+
+    public float proposedDeclaredProgressR52(boolean open)
+    {return declaredStackR52()==null?Mth.approach(this.entityData.get(DATA_OPEN),open?1:0,.075F):EvaDorsalMechanism.smooth(proposedRawR52(open));}
+    private float proposedRawR52(boolean open){if(invalidStackR52)throw new IllegalStateException("Saved side-stack held");var spec=declaredStackR52();float goal=open?1:0,current=entityData.get(DATA_OPEN);boolean changed=clockGoalR52!=goal;float start=changed?current:clockStartR52;int duration=changed?Math.max(1,(int)Math.ceil(Math.abs(goal-current)*(open?spec.openTicks():spec.closeTicks()))):clockDurationR52;int step=changed?1:Math.min(duration,clockStepR52+1);return step>=duration?goal:start+(goal-start)*step/duration;}
+    public void advanceDeclaredR52(boolean open)
+    {if(!(level() instanceof ServerLevel level)||!com.projectseele.world.NervRouteRuntimeR52.claimed(level))throw new IllegalStateException("Explicit claimed controller required");declaredClockR52=true;if(declaredAcceptedAtR52==level.getGameTime())return;var spec=declaredStackR52();float current=entityData.get(DATA_OPEN),goal=open?1:0,next=spec==null?proposedDeclaredProgressR52(open):proposedRawR52(open);if(spec!=null){if(clockGoalR52!=goal){clockStartR52=current;clockGoalR52=goal;clockDurationR52=Math.max(1,(int)Math.ceil(Math.abs(goal-current)*(open?spec.openTicks():spec.closeTicks())));clockStepR52=0;}clockStepR52=Math.min(clockDurationR52,clockStepR52+1);var data=entityData.get(DATA_STACK_R52).copy();data.putFloat("PreviousRaw",current);data.putFloat("CurrentRaw",next);data.putLong("At",level.getGameTime());entityData.set(DATA_STACK_R52,data);}declaredAcceptedAtR52=level.getGameTime();entityData.set(DATA_OPEN,next);entityData.set(DATA_TARGET,goal);if(spec!=null)setBoundingBox(com.projectseele.world.NervRigidMeshSweepR52.transformed(declaredGeometryR52().bounds(actualOpenProgressR52()),actualFrameR52()));}
+    /** Only an installed Root directory configures its existing original UUID. */
+    public void applyDeclaredR52(int variant,float width,float height,boolean open)
+    {
+        if(level().isClientSide)return;
+        if(variant<0||variant>2||!Float.isFinite(width)||!Float.isFinite(height)||width<=0||height<=0)
+            throw new IllegalArgumentException("Explicit Root door dimensions required");
+        declaredClockR52=true;entityData.set(DATA_VARIANT,variant);entityData.set(DATA_WIDTH,width);entityData.set(DATA_HEIGHT,height);entityData.set(DATA_TARGET,open?1F:0F);
+    }
+    public void applyDeclaredR52(int variant,NervHangarGateGeometryR52.Spec spec,boolean open)
+    {if(invalidStackR52||spec==null||declaredStackR52()!=null&&!declaredStackR52().equals(spec))throw new IllegalStateException("Actual side-stack specification required");applyDeclaredR52(variant,spec.width(),spec.height(),open);var data=entityData.get(DATA_STACK_R52).copy();writeSpecR52(data,spec);if(!data.contains("CurrentRaw")){data.putFloat("CurrentRaw",entityData.get(DATA_OPEN));data.putFloat("PreviousRaw",entityData.get(DATA_OPEN));data.putLong("At",level().getGameTime());}entityData.set(DATA_STACK_R52,data);setBoundingBox(com.projectseele.world.NervRigidMeshSweepR52.transformed(declaredGeometryR52().bounds(actualOpenProgressR52()),actualFrameR52()));}
+    private static void writeSpecR52(CompoundTag data,NervHangarGateGeometryR52.Spec spec)
+    {
+        data.putFloat("Width",spec.width());data.putFloat("Height",spec.height());data.putInt("OpenTicks",spec.openTicks());data.putInt("CloseTicks",spec.closeTicks());data.putInt("DepthDirection",spec.depthDirection());
+        if(spec.bottomSeal()==null){data.remove("FloorSeal");return;}
+        var seal=new CompoundTag();seal.putInt("Version",1);seal.putDouble("DropM",spec.bottomSeal().dropM());seal.putDouble("RetreatLocalZ",spec.bottomSeal().retreatLocalZ());var rows=new ListTag();
+        for(var b:spec.bottomSeal().closedBoxes()){var row=new ListTag();for(double v:new double[]{b.minX(),b.minY(),b.minZ(),b.maxX(),b.maxY(),b.maxZ()})row.add(DoubleTag.valueOf(v));rows.add(row);}seal.put("ClosedBoxes",rows);data.put("FloorSeal",seal);
+    }
+    private static NervHangarGateGeometryR52.BottomSeal readFloorSealR52(CompoundTag data)
+    {
+        if(!data.contains("FloorSeal"))return null;
+        if(!data.contains("FloorSeal",Tag.TAG_COMPOUND))throw new IllegalStateException("Unknown actual floor-seal tag");var t=data.getCompound("FloorSeal");
+        if(t.getInt("Version")!=1||!t.contains("DropM",Tag.TAG_ANY_NUMERIC)||!t.contains("RetreatLocalZ",Tag.TAG_ANY_NUMERIC)||!t.contains("ClosedBoxes",Tag.TAG_LIST))throw new IllegalStateException("Unknown actual floor-seal version/fields");
+        var rows=t.getList("ClosedBoxes",Tag.TAG_LIST);if(rows.isEmpty()||rows.size()>256)throw new IllegalStateException("Missing or unbounded actual floor-seal boxes");var boxes=new ArrayList<NervHangarGateGeometryR52.SealBox>();
+        for(var value:rows){var r=(ListTag)value;if(r.size()!=6||r.getElementType()!=Tag.TAG_DOUBLE)throw new IllegalStateException("Unknown actual floor-seal bounds");boxes.add(new NervHangarGateGeometryR52.SealBox(r.getDouble(0),r.getDouble(1),r.getDouble(2),r.getDouble(3),r.getDouble(4),r.getDouble(5)));}
+        return new NervHangarGateGeometryR52.BottomSeal(boxes,t.getDouble("DropM"),t.getDouble("RetreatLocalZ"));
+    }
+    private static NervHangarGateGeometryR52.Spec readSpec(CompoundTag t){return t.isEmpty()||t.getBoolean("GeometryMissing")?null:new NervHangarGateGeometryR52.Spec(t.getFloat("Width"),t.getFloat("Height"),t.getInt("OpenTicks"),t.getInt("CloseTicks"),t.contains("DepthDirection")?t.getInt("DepthDirection"):1,readFloorSealR52(t));}
+    public boolean declaredGeometryMissingR52(){return entityData.get(DATA_STACK_R52).getBoolean("GeometryMissing");}
+    private void holdSavedVisualR52(){var held=savedStackR52.getCompound("Spec").copy();held.putBoolean("Held",true);try{var spec=readSpec(held);float raw=savedStackR52.getFloat("Raw");if(spec==null||!Float.isFinite(raw)||raw<0||raw>1)throw new IllegalStateException("No held stack source sample");held.putFloat("PreviousRaw",raw);held.putFloat("CurrentRaw",raw);held.putLong("At",level().getGameTime());entityData.set(DATA_OPEN,raw);entityData.set(DATA_WIDTH,spec.width());entityData.set(DATA_HEIGHT,spec.height());}catch(RuntimeException missing){held=new CompoundTag();held.putBoolean("Held",true);held.putBoolean("GeometryMissing",true);}entityData.set(DATA_STACK_R52,held);}
+    public NervHangarGateGeometryR52.Spec declaredStackR52(){return readSpec(entityData.get(DATA_STACK_R52));}
+    public boolean matchesDeclaredR52(NervHangarGateGeometryR52.Spec spec){return !invalidStackR52&&spec!=null&&spec.equals(declaredStackR52())&&visualWidth()==spec.width()&&visualHeight()==spec.height();}
+    public float actualOpenProgressR52(){return EvaDorsalMechanism.smooth(entityData.get(DATA_OPEN));}
+    public RigidTransform actualFrameR52(){return RigidTransform.of(position(),new Quaternionf().rotationY((float)Math.toRadians(-getYRot())));}
+    public NervHangarGateGeometryR52 declaredGeometryR52(){try{return NervHangarGateGeometryR52.loadClasspath(declaredStackR52());}catch(java.io.IOException missing){throw new IllegalStateException("Side-stack source absent",missing);}}
+    private static boolean actualWetSealFaceR52(Vec3 p,Vec3 n,List<AABB> boxes)
+    {
+        int axis=Math.abs(n.x)>.999999?0:Math.abs(n.y)>.999999?1:Math.abs(n.z)>.999999?2:-1;if(axis<0)return false;
+        double[] point={p.x,p.y,p.z},normal={n.x,n.y,n.z};int first=(axis+1)%3,second=(axis+2)%3;
+        for(double a:new double[]{-.10,0,.10})for(double b:new double[]{-.10,0,.10})
+        {var sample=point.clone();sample[first]+=a;sample[second]+=b;boolean bearing=false;
+            for(var w:boxes){double[] bounds={w.minX,w.minY,w.minZ,w.maxX,w.maxY,w.maxZ};double face=normal[axis]<0?bounds[axis]:bounds[axis+3];if(Math.abs(sample[axis]-face)<=.0002&&sample[first]>=bounds[first]-.0002&&sample[first]<=bounds[first+3]+.0002&&sample[second]>=bounds[second]-.0002&&sample[second]<=bounds[second+3]+.0002)bearing=true;}
+            if(!bearing)return false;}
+        return true;
+    }
+    private boolean actualWetSealWallBearingsR52(ServerLevel level,NervHangarGateGeometryR52 geo,RigidTransform frame,Set<BlockPos> supports)
+    {
+        if(geo.bottomSealBearingPointsR52().isEmpty())return true;var boxes=new ArrayList<AABB>();
+        for(var at:supports){if(!level.hasChunkAt(at))return false;for(var shape:level.getBlockState(at).getCollisionShape(level,at,CollisionContext.of(this)).toAabbs())boxes.add(shape.move(at));}
+        for(var local:geo.bottomSealBearingPointsR52())if(!actualWetSealFaceR52(frame.transformPoint(local),frame.transformVector(new Vec3(-Math.signum(local.x),0,0)),boxes))return false;
+        return true;
+    }
+    public boolean declaredSupportsBearR52(ServerLevel level,Set<BlockPos> supports)
+    {
+        if(invalidStackR52||declaredStackR52()==null)return false;var geo=declaredGeometryR52();var frame=actualFrameR52();
+        for(var local:geo.bearingPoints()){var p=frame.transformPoint(local);boolean bearing=false;for(var at:supports){if(!level.hasChunkAt(at))return false;for(var box:level.getBlockState(at).getCollisionShape(level,at,CollisionContext.of(this)).toAabbs()){var actual=box.move(at);if(p.x>actual.minX&&p.x<actual.maxX&&p.z>actual.minZ&&p.z<actual.maxZ&&Math.abs(p.y-actual.maxY)<=.002)bearing=true;}}if(!bearing)return false;}
+        return actualWetSealWallBearingsR52(level,geo,frame,supports);
+    }
+    public boolean clearDeclaredSweepR52(ServerLevel level,float from,float to,Set<UUID> own,Set<BlockPos> moving,Set<BlockPos> supports)
+    {
+        if(invalidStackR52||declaredStackR52()==null||actualOpenProgressR52()!=from)return false;var geo=declaredGeometryR52();var frame=actualFrameR52();var detached=com.projectseele.world.NervFlightProofR52.detachedCarrierObstacles(level);if(detached==null)return false;for(var mesh:detached)if(geo.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame()))return false;if(to<from&&!com.projectseele.world.NervGateClosureR52.clearActualActors(level,this,moving))return false;
+        if(!declaredSupportsBearR52(level,supports))return false;
+        var seen=new HashSet<BlockPos>();var actorsSeen=new HashSet<UUID>();for(var box:geo.envelopes(frame,from,to)){if(!com.projectseele.world.EntryPlugEjectionR48.loaded(level,box))return false;for(var at:BlockPos.betweenClosed(BlockPos.containing(box.minX,box.minY,box.minZ),BlockPos.containing(box.maxX,box.maxY,box.maxZ))){var key=at.immutable();if(!seen.add(key)||moving.contains(key))continue;var state=level.getBlockState(key);if(state.isAir())continue;for(var shape:state.getCollisionShape(level,key,CollisionContext.of(this)).toAabbs())if(geo.intersects(frame,from,to,shape.move(key)))return false;}for(var actor:level.getEntities(this,box.inflate(200),e->e.isAlive()&&!e.isSpectator()&&(e instanceof net.minecraft.world.entity.LivingEntity||e.canBeCollidedWith()||e instanceof UNTransportEntity||e instanceof EntryPlugCarrierEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof NervCarrierPlatformEntity))){if(!actorsSeen.add(actor.getUUID()))continue;var meshes=com.projectseele.world.NervFlightProofR52.actualObstacleMeshes(actor);if(meshes==null){var bounds=actor instanceof UNTransportEntity aircraft?aircraft.getBoundingBoxForCulling():actor.getBoundingBox();if(geo.intersects(frame,from,to,bounds))return false;}else if(meshes.isEmpty()){if(geo.intersects(frame,from,to,actor.getBoundingBox()))return false;}else for(var mesh:meshes)if(geo.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame()))return false;}}return true;
     }
 
     @Override public boolean isPickable() { return false; }

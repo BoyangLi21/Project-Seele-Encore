@@ -118,6 +118,7 @@ public final class S20CommandRoomRepairs
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (!FacilityWorldPolicy.isS20Rebuild(server)
                 || server.getTickCount() % 40 != 0 || allDone())
         {

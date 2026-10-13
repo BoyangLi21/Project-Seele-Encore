@@ -20,6 +20,7 @@ public final class SachielBodyPoseR35
             for(String n:pose.rig.keySet()){pose.rotations.get(n).slerp(strike.rotations.get(n),blend);pose.positions.get(n).lerp(strike.positions.get(n),blend);}pose.dirty();
         }
         else pose=SachielGameplayMotionR32.released(actor,pose,partial);
+        SachielArmorBeamR52.pose(actor,pose,partial);
         if(EvaCombatR31.holds(actor))
         {
             float held=AngelGrappleSurfaceR31.heldWeight(actor,partial);

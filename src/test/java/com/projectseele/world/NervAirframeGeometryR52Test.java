@@ -1,0 +1,35 @@
+package com.projectseele.world;
+import java.nio.file.*;
+import java.security.MessageDigest;
+import java.util.*;
+import com.google.gson.*;
+import net.minecraft.world.phys.*;
+import org.joml.Quaternionf;
+import com.projectseele.world.NervAirTransportManifestR52.*;
+
+/** Actual selected resource geometry; no installed world/native clearance claim. */
+public final class NervAirframeGeometryR52Test
+{
+    private static int checks;
+    private static void check(boolean b,String text){checks++;if(!b)throw new AssertionError(text);}
+    private static String sha(byte[] b)throws Exception{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(b));}
+    public static void main(String[] args)throws Exception
+    {
+        var assets=Path.of(args.length==0?"src/main/resources/assets/projectseele":args[0]);var hashes=new HashMap<String,String>();for(String path:List.of("mesh/tv_facilities_r16.json","mesh/air_cradle_r31.json"))hashes.put(path,sha(Files.readAllBytes(assets.resolve(path))));
+        var source=NervAirframeGeometryR52.load(path->Files.readAllBytes(assets.resolve(path)),hashes);var frame=new Frame(RigidTransform.identity(),null,new Rig(84,0,1));var parts=source.parts(frame,List.of(),0);check(parts.size()==5,"Actual stowed draw is the R16 body and four rotors; no phantom rods below apron");
+        var body=new NervRigidMeshSweepR52(parts.get(0).xyz());var bounds=body.bounds();check(bounds.minX==-69&&bounds.minY==-11&&bounds.minZ==-56&&bounds.maxX==69&&bounds.maxY==19&&bounds.maxZ==58,"Selected R16 body exact raw bounds retained");
+        var sweep=source.sweep(frame,frame,List.of(),0,1,.005);var corner=new AABB(68,17,56.8,68.5,17.5,57.3);check(bounds.intersects(corner),"Empty-wing-corner witness lies inside broad aircraft AABB");check(!sweep.intersects(corner),"Actual parts permit empty corner; whole AABB never acts as narrow collider");
+        var support=new AABB(-70,-12,-57,70,-11,59);check(!sweep.intersects(support),"Actual original gear floor contact is bearing, not penetration");check(sweep.intersects(new AABB(-70,-12,-57,70,-10.998,59)),"A real two millimetre apron penetration is still blocked");
+        var end=new Frame(new RigidTransform(new Vec3(10,0,0),0,0,0,1),null,new Rig(84,0,1));check(!source.sweep(frame,end,List.of(),0,1,.005).intersects(support),"Pure translation preserves exact gear bearing without phantom float inflation");
+        var yawFrame=new Frame(RigidTransform.of(Vec3.ZERO,new Quaternionf().rotationY((float)Math.PI/2)),null,new Rig(84,0,1));check(!source.sweep(frame,yawFrame,List.of(),0,1,.005).intersects(support),"Yaw-only actual curves preserve exact Y bearing instead of isotropic pad below the floor");check(source.sweep(frame,yawFrame,List.of(),0,1,.005).intersects(new AABB(-100,-12,-100,100,-10.998,100)),"Yaw bearing proof still blocks real penetration");
+        var raw=JsonParser.parseString(Files.readString(assets.resolve("mesh/tv_facilities_r16.json"))).getAsJsonObject().getAsJsonObject("parts").getAsJsonArray("un_transport_rotor_0");double[] xyz=new double[raw.size()/2];for(int i=0;i<raw.size()/6;i++)for(int a=0;a<3;a++)xyz[i*3+a]=raw.get(i*6+a).getAsFloat();var rotor=new NervRigidMeshSweepR52(xyz);var top=new Vec3(-29,4.8,-11);var a=RigidTransform.of(top,new Quaternionf());var b=RigidTransform.of(top,new Quaternionf().rotationY((float)Math.toRadians(47)));var mid=a.interpolate(b,.5);boolean continuous=false;
+        for(int i=0;i<xyz.length;i+=3){var p=mid.transformPoint(new Vec3(xyz[i],xyz[i+1],xyz[i+2]));var probe=new AABB(p.add(-.0001,-.0001,-.0001),p.add(.0001,.0001,.0001));if(!rotor.intersects(a,a,probe,.005)&&!rotor.intersects(b,b,probe,.005)&&rotor.intersects(a,b,probe,.005)){continuous=true;break;}}
+        check(continuous,"Actual rotor blade intermediate sweep detects an obstacle missed by both endpoint shapes");
+        check(source.bearingPatches().size()==4&&source.bearingPatches().stream().allMatch(p->p.minY==-11&&Math.abs(p.getXsize()-2.6)<1e-5&&Math.abs(p.getZsize()-2.6)<1e-5),"Positive apron support uses all four actual 2.6m original gear soles");
+        var anchors=List.of(new Vec3(-12,80,0),new Vec3(12,80,0),new Vec3(-10,40,0),new Vec3(10,40,0),new Vec3(-8,10,0),new Vec3(8,10,0));var cargo0=new Frame(RigidTransform.identity(),new RigidTransform(new Vec3(0,-112,0),0,0,0,1),new Rig(112,1,0));var cargo1=new Frame(RigidTransform.identity(),RigidTransform.of(new Vec3(0,-112,0),new Quaternionf().rotationY((float)Math.PI/2)),new Rig(112,1,0));var turn=source.sweep(cargo0,cargo1,anchors,0,1,.005);check(!turn.intersects(new AABB(40,-50,0,40.1,-49.9,.1)),"Full actual cargo/cradle turn subdivides its curve rather than inflating a distant empty corner by fifty metres");
+        boolean cradleMiddle=false;var middle=cargo0.interpolate(cargo1,.5);for(var part:source.parts(middle,anchors,0))if(part.name().startsWith("jaw/")){var actual=part.xyz();for(int i=0;i<actual.length;i+=3){var q=new Vec3(actual[i],actual[i+1],actual[i+2]);var probe=new AABB(q.add(-.0001,-.0001,-.0001),q.add(.0001,.0001,.0001));if(!source.sweep(cargo0,cargo0,anchors,0,0,.005).intersects(probe)&&!source.sweep(cargo1,cargo1,anchors,0,0,.005).intersects(probe)&&turn.intersects(probe)){cradleMiddle=true;break;}}if(cradleMiddle)break;}check(cradleMiddle,"Actual cradle intermediate skin jaw is covered even when both endpoint shapes miss it");
+        var rawBody=parts.get(0).xyz();int triangle=0;Vec3 va,vb,vc,normal;do{va=new Vec3(rawBody[triangle],rawBody[triangle+1],rawBody[triangle+2]);vb=new Vec3(rawBody[triangle+3],rawBody[triangle+4],rawBody[triangle+5]);vc=new Vec3(rawBody[triangle+6],rawBody[triangle+7],rawBody[triangle+8]);normal=vb.subtract(va).cross(vc.subtract(va));triangle+=9;}while(normal.lengthSqr()<1e-12);var centre=va.add(vb).add(vc).scale(1D/3);normal=normal.normalize();Vec3 p0=centre.add(normal.scale(.02)),p1=centre.subtract(normal.scale(.02)).add(vb.subtract(va).normalize().scale(.02)),p2=centre.subtract(normal.scale(.02)).subtract(vb.subtract(va).normalize().scale(.02));var intruder=new NervRigidMeshSweepR52(new double[]{p0.x,p0.y,p0.z,p1.x,p1.y,p1.z,p2.x,p2.y,p2.z});check(sweep.airframeIntersectsCargo(List.of(intruder),RigidTransform.identity(),RigidTransform.identity()),"Payload crossing the actual original body surface cannot be hidden by own-member exclusion");var far=new RigidTransform(new Vec3(0,-200,0),0,0,0,1);check(!sweep.airframeIntersectsCargo(List.of(intruder),far,far),"Remote held cargo does not become fake aircraft carriage or an own-body intersection");
+        var bad=new HashMap<>(hashes);bad.put("mesh/tv_facilities_r16.json","0".repeat(64));boolean rejected=false;try{NervAirframeGeometryR52.load(path->Files.readAllBytes(assets.resolve(path)),bad);}catch(IllegalStateException changed){rejected=true;}check(rejected,"Renderer/proof cannot silently select a different actual aircraft resource");
+        System.out.println("PASS R52 actual R16 mesh, empty corner, floor and continuous rotor checks: "+checks+" source="+source.fingerprint());
+    }
+}

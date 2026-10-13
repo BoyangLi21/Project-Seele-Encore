@@ -184,6 +184,8 @@ public final class TvCageCollisionR44
     /** Ordinary vanilla motion receives the same physical geometry on both logical sides. */
     public static List<VoxelShape> append(Level level, Entity actor, AABB query, List<VoxelShape> original)
     {
+        if(level instanceof ServerLevel server&&NervRouteRuntimeR52.claimed(server))return NervRouteRuntimeR52.cageCollisions(server,actor,query,original);
+        if(level.isClientSide){var declared=NervPlantMotionR52.declaredClientCollisions(level,actor,query,original);if(declared!=original)return declared;}
         if (!enabled() || !level.dimension().equals(FacilitySchemaV2.DIMENSION)
                 || actor instanceof EvaUnit01Entity || actor instanceof NervCarrierPlatformEntity) return original;
         long began=METRICS?System.nanoTime():0;

@@ -45,6 +45,7 @@ public final class S20EvaPlantDirector
         {
             return;
         }
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
         {
             return;

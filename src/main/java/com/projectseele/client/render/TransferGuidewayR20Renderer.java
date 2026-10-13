@@ -22,6 +22,7 @@ public final class TransferGuidewayR20Renderer
     {
         if(event.getStage()!=RenderLevelStageEvent.Stage.AFTER_ENTITIES)return;
         var level=Minecraft.getInstance().level;if(level==null||!level.dimension().location().toString().equals("projectseele:geofront"))return;
+        if(R52FixedGuideRenderer.draw(event,level))return;
         var camera=event.getCamera().getPosition();if(camera.y> -260||camera.y< -510||Math.abs(camera.x-30)>260||Math.abs(camera.z+140)>310)return;
         if(!VERIFIED.containsKey(level))
         {

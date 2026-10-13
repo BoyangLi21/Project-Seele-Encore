@@ -8,6 +8,7 @@ import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 import net.minecraft.util.Mth;
+import net.minecraft.world.phys.Vec3;
 import org.joml.Matrix4f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
@@ -231,6 +232,30 @@ public final class EvaBodyPose
     {if(data==null)reload();return data.carrierHulls().getOrDefault(rigKey(eva),List.of());}
     public static Sample neutralForTransportR32(EvaUnit01Entity eva)
     {if(data==null)reload();return new Sample(data.rigs().get(rigKey(eva)));}
+    /** Original posed sole bearings in model metre space, before world yaw.
+     * Both belong to the same supplied pose; missing geometry is a hard hold. */
+    public static List<Vec3> pairedFootContactsR52(EvaUnit01Entity eva,Sample pose)
+    {
+        if(data==null)reload();var support=data.rigSupport().getOrDefault(rigKey(eva),data.support());
+        var result=new ArrayList<Vec3>();
+        for(String name:List.of("foot_l","foot_r"))
+        {
+            var vertices=support.get(name);
+            if(vertices==null||vertices.length==0||!pose.rig.containsKey(name))
+                throw new IllegalStateException("Original paired foot geometry unavailable: "+name);
+            var matrix=pose.matrix(name);var points=new ArrayList<Vector3f>();float low=Float.POSITIVE_INFINITY;
+            for(var vertex:vertices)
+            {
+                var point=matrix.transformPosition(new Vector3f(vertex)).mul(EvaScale.RENDER_SCALE);
+                if(!Float.isFinite(point.x+point.y+point.z))throw new IllegalStateException("Nonfinite original foot geometry");
+                points.add(point);low=Math.min(low,point.y);
+            }
+            var centre=new Vector3f();int count=0;
+            for(var point:points)if(point.y<=low+.02F){centre.add(point);count++;}
+            centre.div(count);centre.y=low;result.add(new Vec3(centre.x,centre.y,centre.z));
+        }
+        return List.copyOf(result);
+    }
     public static List<net.minecraft.world.phys.Vec3> carrierVerticesR40(EvaUnit01Entity eva,Sample pose)
     {
         if(data==null)reload();var result=new ArrayList<net.minecraft.world.phys.Vec3>();
@@ -422,52 +447,17 @@ public final class EvaBodyPose
         body.dirty();
         var p=new Matrix4f(EvaRifleKinematics.world(eva,partial)).mul(body.matrix("head")).transformPosition(eyePoint(eva));return new net.minecraft.world.phys.Vec3(p.x,p.y,p.z);
     }
-    public static Sample sample(EvaUnit01Entity entity,float partial)
+    private static Sample ordinaryClipBaseR52(Data d,int variant,float phase,float idlePhase,float move,float run,float crouch,float prone,float stance,float dash,boolean rifle)
     {
-        if(com.projectseele.physics.CombatBodyDynamics.active(entity))
-        {
-            var physical=com.projectseele.physics.CombatBodyDynamics.sample(entity,partial);
-            EvaAnatomicalHandsR45.attachSwordR45(entity,physical);EvaShieldRigR47.attach(entity,physical);return physical;
-        }
-        if(data==null)reload();Data d=data;int variant=rigKey(entity);float phase=entity.rifleGaitPhase(partial);phase-=Mth.floor(phase);
-        if(EvaAirTransportR31.active(entity))return EvaAirTransportR31.sample(entity,new Sample(d.rigs().get(variant)),partial);
-        if(EvaShutdownR30.displayed(entity)&&!EvaShutdownR30.pose(entity).isEmpty())
-        {
-            var frozen=new Sample(d.rigs().get(variant));EvaShutdownR30.decode(EvaShutdownR30.pose(entity),frozen);
-            if(!EvaShutdownR30.retainsPoseR45(entity))com.projectseele.physics.CombatBodyDynamics.alignJoints(entity,frozen);
-            float blend=EvaShutdownR30.collapse(entity,partial);
-            if(blend<1&&!EvaShutdownR30.origin(entity).isEmpty())
-            {
-                var old=new Sample(d.rigs().get(variant));EvaShutdownR30.decode(EvaShutdownR30.origin(entity),old);var mixed=mix(old,frozen,blend);
-                if(!EvaShutdownR30.retainsPoseR45(entity))com.projectseele.physics.CombatBodyDynamics.alignJoints(entity,mixed);
-                return mixed;
-            }
-            return frozen;
-        }
-        if(!entity.isExperimentalUnit()&&entity.isNervLogisticsLocked()
-                &&!entity.isFirstBattleActive()&&!entity.isCrucified())
-        {
-            // Match EvaLockedCagePoseR44: a bolted airframe does not sample an
-            // idle/carry clip underneath its capsule and external-power ports.
-            var locked=new Sample(d.rigs().get(variant));
-            for(var bone:locked.rig.values())locked.rotations.put(bone.name(),new Quaternionf(bone.bindRotation()));
-            var head=locked.rotations.get("head");
-            if(head!=null)head.rotationX(.72F*EvaDorsalMechanism.bow(entity));
-            locked.dirty();return locked;
-        }
-        float time=((entity.level().getGameTime()%24000)+partial)/20;
-        var idleClip=d.combatClips().getOrDefault(variant,Map.of()).getOrDefault("idle",d.clips().get("idle"));
-        float idlePhase=(float)((((double)entity.level().getGameTime()+partial)/20.0/idleClip.duration())%1.0);
-        float move=entity.rifleMoveBlend(partial),run=entity.rifleRunBlend(partial),crouch=entity.rifleCrouchBlend(partial),prone=entity.rifleProneBlend(partial);prone=prone*prone*prone*(10+prone*(-15+6*prone));
         var gait=mix(clip(d,variant,"walk",phase),clip(d,variant,"run",phase),run);
-        float dash=EvaSprintR50.blend(entity,partial);
+
         if(dash>0&&d.combatClips().getOrDefault(variant,Map.of()).containsKey("dash_run"))
             gait=mix(gait,clip(d,variant,"dash_run",phase),dash);
-        boolean supported=d.clips().containsKey("rifle_stance");float stance=entity.rifleStanceLevel(partial);
+        boolean supported=d.clips().containsKey("rifle_stance");
         Sample body;
         if(supported)
         {
-            boolean armed=entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE;
+            boolean armed=rifle;
             String stanceClip=!armed&&d.clips().containsKey("unarmed_stance")?"unarmed_stance":"rifle_stance";
             body=clip(d,variant,stanceClip,stance/3);
             // The old zero-stance branch switched to an unrelated idle pose in
@@ -503,6 +493,79 @@ public final class EvaBodyPose
             body=mix(standing,low,crouch);
             if(move<.05F&&crouch>.001F&&crouch<.999F)body=clip(d,variant,"stand_to_crouch",crouch);
         }
+        return body;
+    }
+
+    public static final class OrdinaryReleaseInputsR52
+    {
+        private final UUID original;private final int variant;private final long epoch;private final float phase,crouch,prone,stance,ready;private final Vector3f terrain;private final EvaGameplayMotionR32.OrdinaryIdleInputsR52 idle;
+        private OrdinaryReleaseInputsR52(EvaUnit01Entity e,float partial)
+        {
+            if(data==null)reload();if(e.isExperimentalUnit()||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||!e.isPoweredOn()||e.isBerserk()||e.isFirstBattleActive()||e.isCrucified()||e.hasLiveActionForRender(partial)||com.projectseele.physics.CombatBodyDynamics.active(e)||e.rifleMoveBlend(partial)>.01F||e.rifleRunBlend(partial)>.01F)throw new IllegalStateException("Actual stationary powered original FISTS ordinary target required");
+            original=e.getUUID();variant=e.getUnitVariant();epoch=EvaMechanicalFrameR52.epoch(e);var source=EvaMechanicalFrameR52.originalStanceR52(e);if(source.isEmpty())throw new IllegalStateException("Actual captured stance provenance is absent");
+            phase=e.rifleGaitPhase(partial);crouch=source.getFloat("CrouchBlend");prone=source.getFloat("ProneBlend");stance=source.getFloat("StanceLevel");ready=e.rifleReadyBlend(partial);terrain=EvaTerrainSupport.sample(e);idle=EvaGameplayMotionR32.ordinaryIdleInputsR52(e,partial,stance);
+            if(!Float.isFinite(phase+crouch+prone+stance+ready)||crouch<0||crouch>1||prone<0||prone>1||stance<0||stance>3)throw new IllegalStateException("Actual original stance channels invalid");
+        }
+        public UUID original(){return original;}public long epoch(){return epoch;}public int variant(){return variant;}public float stance(){return stance;}public boolean prone(){return prone>.5F;}public float guard(){return idle.guard();}
+        public boolean current(EvaUnit01Entity e){return original.equals(e.getUUID())&&variant==e.getUnitVariant()&&epoch==EvaMechanicalFrameR52.epoch(e)&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&e.isPoweredOn()&&!e.hasLiveActionForRender(1)&&!e.isBerserk()&&!e.isFirstBattleActive()&&!com.projectseele.physics.CombatBodyDynamics.active(e);}
+    }
+    public static OrdinaryReleaseInputsR52 ordinaryReleaseInputsR52(EvaUnit01Entity e,float partial){return new OrdinaryReleaseInputsR52(e,partial);}
+    /** Explicit clock and frozen normal inputs; no call to the captured,
+     * contact, gameplay-state or final-feet cache writers is made here. */
+    public static Sample ordinaryReleaseTargetR52(EvaUnit01Entity e,OrdinaryReleaseInputsR52 input,double clock)
+    {
+        if(!input.current(e)||!Double.isFinite(clock))throw new IllegalStateException("Original ordinary target identity changed");Data d=data;int variant=input.variant;float phase=input.phase-Mth.floor(input.phase),time=(float)((clock%24000)/20);
+        var idleClip=d.combatClips().getOrDefault(variant,Map.of()).getOrDefault("idle",d.clips().get("idle"));float idlePhase=(float)((clock/20/idleClip.duration())%1);boolean supported=d.clips().containsKey("rifle_stance");float prone=input.prone;prone=prone*prone*prone*(10+prone*(-15+6*prone));
+        var body=ordinaryClipBaseR52(d,variant,phase,idlePhase,0,0,input.crouch,prone,input.stance,0,false);
+        var bareChest=new Quaternionf(body.rotations.get("torso_lower")).mul(body.rotations.get("torso_upper"));var chest=new Quaternionf(bareChest);if(!supported)chest.rotateY(-.22F);
+        var captured=mocap(d,"idle",(time/4)%1);captured.slerp(chest,supported?Math.min(1,input.stance):input.crouch);float ready=input.ready*input.ready*(3-2*input.ready);captured=bareChest.slerp(captured,ready);body.rotations.put("torso_upper",new Quaternionf(body.rotations.get("torso_lower")).invert().mul(captured));body.dirty();
+        if(!supported&&prone>0&&!d.prone().entrySet().isEmpty())
+        {var lying=new Sample(body.rig);for(var entry:d.prone().entrySet()){if(!lying.rig.containsKey(entry.getKey()))continue;var channels=entry.getValue().getAsJsonObject();if(channels.has("rotation")){var v=first(channels.get("rotation")).mul(Mth.DEG_TO_RAD);lying.rotations.put(entry.getKey(),new Quaternionf().rotationZYX(v.z,-v.y,-v.x));}if(channels.has("position"))lying.positions.put(entry.getKey(),first(channels.get("position")).mul(-1,1,1).div(16));}body=mix(body,lying,prone);}
+        float floor=Float.POSITIVE_INFINITY;for(var entry:d.rigSupport().getOrDefault(variant,d.support()).entrySet()){if(!body.rig.containsKey(entry.getKey()))continue;var matrix=body.matrix(entry.getKey());for(var v:entry.getValue())floor=Math.min(floor,matrix.m01()*v.x+matrix.m11()*v.y+matrix.m21()*v.z+matrix.m31());}if(Float.isFinite(floor)&&!supported){body.positions.get("root").y-=floor;body.dirty();}
+        for(var bone:body.rig.values())if(bone.name().contains("_axis_"))body.rotations.put(bone.name(),new Quaternionf(bone.bindRotation()));
+        EvaAnatomicalHandsR45.naturalCarryTargetR52(variant,body,input.stance);body=EvaGameplayMotionR32.ordinaryIdleTargetR52(e,body,input.idle);preserveJointCentres(body);body.rotations.get("root").rotateX(input.terrain.x).rotateZ(input.terrain.y);body.positions.get("root").y+=input.terrain.z/5;body.dirty();EvaProneLegSupportR52.apply(variant,body,input.stance,input.terrain);return body;
+    }
+    public static Sample ordinaryReleaseTargetR52(EvaUnit01Entity e,float partial){return ordinaryReleaseTargetR52(e,ordinaryReleaseInputsR52(e,partial),e.level().getGameTime()+partial);}
+    public static Sample sample(EvaUnit01Entity entity,float partial)
+    {
+        if(com.projectseele.physics.CombatBodyDynamics.active(entity))
+        {
+            var physical=com.projectseele.physics.CombatBodyDynamics.sample(entity,partial);
+            EvaAnatomicalHandsR45.attachSwordR45(entity,physical);EvaShieldRigR47.attach(entity,physical);return physical;
+        }
+        if(data==null)reload();Data d=data;int variant=rigKey(entity);float phase=entity.rifleGaitPhase(partial);phase-=Mth.floor(phase);
+        if(EvaMechanicalFrameR52.serviceSourceHeldR52(entity))return EvaMechanicalFrameR52.serviceBodyR52(entity);
+        if(EvaAirTransportR31.active(entity))return EvaAirTransportR31.sample(entity,new Sample(d.rigs().get(variant)),partial);
+        if(EvaShutdownR30.displayed(entity)&&!EvaShutdownR30.pose(entity).isEmpty())
+        {
+            var frozen=new Sample(d.rigs().get(variant));EvaShutdownR30.decode(EvaShutdownR30.pose(entity),frozen);
+            if(!EvaShutdownR30.retainsPoseR45(entity))com.projectseele.physics.CombatBodyDynamics.alignJoints(entity,frozen);
+            float blend=EvaShutdownR30.collapse(entity,partial);
+            if(blend<1&&!EvaShutdownR30.origin(entity).isEmpty())
+            {
+                var old=new Sample(d.rigs().get(variant));EvaShutdownR30.decode(EvaShutdownR30.origin(entity),old);var mixed=mix(old,frozen,blend);
+                if(!EvaShutdownR30.retainsPoseR45(entity))com.projectseele.physics.CombatBodyDynamics.alignJoints(entity,mixed);
+                return mixed;
+            }
+            return frozen;
+        }
+        if(!entity.isExperimentalUnit()&&entity.isNervLogisticsLocked()
+                &&!entity.isFirstBattleActive()&&!entity.isCrucified())
+        {
+            // Match EvaLockedCagePoseR44: a bolted airframe does not sample an
+            // idle/carry clip underneath its capsule and external-power ports.
+            var locked=new Sample(d.rigs().get(variant));
+            for(var bone:locked.rig.values())locked.rotations.put(bone.name(),new Quaternionf(bone.bindRotation()));
+            var head=locked.rotations.get("head");
+            if(head!=null)head.rotationX(.72F*EvaDorsalMechanism.bow(entity));
+            locked.dirty();return locked;
+        }
+        float time=((entity.level().getGameTime()%24000)+partial)/20;
+        var idleClip=d.combatClips().getOrDefault(variant,Map.of()).getOrDefault("idle",d.clips().get("idle"));
+        float idlePhase=(float)((((double)entity.level().getGameTime()+partial)/20.0/idleClip.duration())%1.0);
+        float move=entity.rifleMoveBlend(partial),run=entity.rifleRunBlend(partial),crouch=entity.rifleCrouchBlend(partial),prone=entity.rifleProneBlend(partial);prone=prone*prone*prone*(10+prone*(-15+6*prone));
+        float dash=EvaSprintR50.blend(entity,partial);boolean supported=d.clips().containsKey("rifle_stance");float stance=entity.rifleStanceLevel(partial);
+        Sample body=ordinaryClipBaseR52(d,variant,phase,idlePhase,move,run,crouch,prone,stance,dash,entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE);
         var capturedLocomotion=EvaCapturedLocomotionR44.sample(entity,variant,d.rigs().get(variant),partial);
         boolean capturedLocomotionOwns=capturedLocomotion!=null;
         if(capturedLocomotionOwns)body=capturedLocomotion;
@@ -652,6 +715,9 @@ public final class EvaBodyPose
         EvaShieldRigR47.applyCarryR48(entity,body);
         EvaShieldRigR47.attach(entity,body);
         EvaTripoHandsR48.apply(entity,body,partial);
+        EvaOrdinaryStandingSupportR52.apply(entity,body,partial);
+        EvaProneLegSupportR52.apply(entity,body,partial);
+        FixedCannonPoseR52.apply(entity,body,partial);
         EvaCombatSupportR33.rememberFinalFeetR44(entity,body,partial);
         com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;

@@ -63,6 +63,7 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         // ----- crystal body (spins around Y) -----
         poseStack.pushPose();
         poseStack.translate(0.0D, coreHeight, 0.0D);
+        poseStack.scale(entity.modelScaleR52(),entity.modelScaleR52(),entity.modelScaleR52());
         poseStack.mulPose(Axis.YP.rotationDegrees(entity.getSpin(partialTick)));
 
         VertexConsumer body = buffer.getBuffer(RenderType.entityTranslucent(TEXTURE));
@@ -122,6 +123,34 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         }
 
         super.render(entity, entityYaw, partialTick, poseStack, buffer, packedLight);
+        com.projectseele.client.EncounterObserverCacheR45.markNormalDrawn(entity);
+    }
+
+    /** The same original primitives, drawn from the sole real server UUID snapshot. No client entity is spawned. */
+    public static void renderObservedR52(com.projectseele.network.ClientboundEncounterObserverPacket.Snapshot state,
+            float partial,PoseStack poses,MultiBufferSource buffers)
+    {
+        float scale=state.height()/15F,center=state.height()*.5F;
+        boolean exposed=(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.EXPOSED)!=0;
+        boolean charging=(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.CHARGING)!=0;
+        var body=buffers.getBuffer(RenderType.entityTranslucent(TEXTURE));var glow=buffers.getBuffer(RenderType.lightning());
+        float time=state.poseTick()+partial,gap=exposed?3.75F:0;
+        poses.pushPose();poses.translate(0,center,0);poses.scale(scale,scale,scale);poses.mulPose(Axis.YP.rotationDegrees(time*.75F));
+        float core=(exposed?4F:2.6F)*(charging?1.1F+.3F*Mth.sin(time*.5F):.95F);
+        drawOctahedron(poses,body,core,1,.3F,.28F,1,LightTexture.FULL_BRIGHT);
+        poses.pushPose();poses.translate(0,gap,0);drawOctahedronFaces(poses,body,8.25F,0,4,.45F,.72F,1,.7F,LightTexture.FULL_BRIGHT);
+        drawOctahedronEdgeSet(poses,glow,8.25F,.11F,TOP_EDGES,.75F,.92F,1,.8F);poses.popPose();
+        poses.pushPose();poses.translate(0,-gap,0);drawOctahedronFaces(poses,body,8.25F,4,8,.45F,.72F,1,.7F,LightTexture.FULL_BRIGHT);
+        drawOctahedronEdgeSet(poses,glow,8.25F,.11F,BOTTOM_EDGES,.75F,.92F,1,.8F);poses.popPose();poses.popPose();
+        if(state.beamTicks()>0)
+        {
+            Vec3 delta=state.beamEnd().subtract(state.position());var start=new Vector3f(0,center,0);var end=delta.toVector3f();
+            float alpha=Mth.clamp((state.beamTicks()-partial)/10F,0,1);
+            drawStarRibbon(poses.last().pose(),glow,start,end,2.6F,1.5F,.95F,.45F,.9F,alpha*.55F);
+            drawStarRibbon(poses.last().pose(),glow,start,end,1.05F,.62F,1,.98F,.96F,alpha*.95F);
+        }
+        if((state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.DRILLING)!=0&&state.drillDepth()>0)
+            drawStarRibbon(poses.last().pose(),glow,new Vector3f(0,center,0),new Vector3f(0,center-state.drillDepth(),0),2.6F,2.6F,.35F,.65F,1,.75F);
     }
 
     // =====================================================================

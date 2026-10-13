@@ -166,10 +166,11 @@ public class GameEvents
                 && !FacilityWorldPolicy.isS22MigrationFrozen(
                 event.getServer()))
         {
-            boolean spatialFrozen =
-                    FacilityWorldPolicy.isSpatialPreviewFrozen(
-                            event.getServer());
-            if (event.getServer().getTickCount() % 100 == 0)
+            ServerLevel r52FacilityLevel=event.getServer().getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
+            boolean r52Claimed=r52FacilityLevel!=null&&com.projectseele.world.NervRouteRuntimeR52.claimed(r52FacilityLevel);
+            boolean spatialFrozen = r52Claimed||
+                    FacilityWorldPolicy.isSpatialPreviewFrozen(event.getServer());
+            if (!r52Claimed&&event.getServer().getTickCount() % 100 == 0)
             {
                 MagiDeepLabBuilder.retireS20DuplicatePresentation(
                         event.getServer());
@@ -179,12 +180,12 @@ public class GameEvents
             // exact legacy Tokyo-3 roof/hatch signatures.  Keeping them
             // outside the spatial gate is what lets an immutable human-edited
             // save receive the requested runtime repairs.
-            S20CommandPresentationDirector.tickRuntimePresentation(
-                    event.getServer());
+            S20CommandPresentationDirector.tickRuntimePresentation(event.getServer());
+            if(r52Claimed)S20CommandPresentationDirector.tick(event.getServer());
             // Same exemption, same discipline: one shot per server run over an
             // explicit coordinate list, and every cell must still hold the
             // state it was measured with.
-            S20CommandRoomRepairs.tick(event.getServer());
+            if(!r52Claimed)S20CommandRoomRepairs.tick(event.getServer());
             if (event.getServer().getTickCount() % 20 == 0)
             {
                 ServerLevel surface = event.getServer().getLevel(
@@ -209,7 +210,7 @@ public class GameEvents
             if (geoFront != null)
             {
                 CommandRoomSlidingDoorDirector.tick(geoFront);
-                if (!terminalDogmaSpecimenChecked
+                if (!r52Claimed&&!terminalDogmaSpecimenChecked
                         && event.getServer().getTickCount() % 100 == 0)
                 {
                     terminalDogmaSpecimenChecked =
@@ -230,7 +231,7 @@ public class GameEvents
                     */
                     S20MovingElevatorsAdapter.reconcile(geoFront, lift);
                 }
-                S20SurfaceAccessGate.tick(geoFront);
+                if(!r52Claimed)S20SurfaceAccessGate.tick(geoFront);
             }
             /*
              * The S20 freeze marker protects authored blocks; it must not
@@ -638,28 +639,30 @@ public class GameEvents
                     + index % TOKYO3_SNOW_DIAMETER;
             int z = origin.getZ() - TOKYO3_SNOW_RADIUS
                     + index / TOKYO3_SNOW_DIAMETER;
-            BlockPos probe = new BlockPos(x, origin.getY(), z);
-            if (!level.hasChunkAt(probe))
+            // A ticket/holder can exist while its FULL future is still pending.
+            // Do not follow that with Level height/state calls which may join it.
+            var chunk = level.getChunkSource().getChunkNow(x >> 4, z >> 4);
+            if (chunk == null)
             {
                 continue;
             }
-            clearTokyo3SnowColumn(level, x, z);
+            clearTokyo3SnowColumn(level, chunk, x, z);
         }
     }
 
-    private static void clearTokyo3SnowColumn(ServerLevel level, int x, int z)
+    private static void clearTokyo3SnowColumn(ServerLevel level,
+            net.minecraft.world.level.chunk.LevelChunk chunk, int x, int z)
     {
-        // Call only from the server-tick sweep after hasChunkAt().  Invoking
-        // getHeight() from ChunkEvent.Load recursively waits for the chunk
-        // currently firing that event and deadlocks a dedicated server.
-        int top = level.getHeight(
+        // Keep the exact Level.getHeight result (+1) and five-cell snow mask,
+        // but read the already available chunk without a synchronous load.
+        int top = chunk.getHeight(
                 net.minecraft.world.level.levelgen.Heightmap.Types
-                        .MOTION_BLOCKING, x, z);
+                        .MOTION_BLOCKING, x & 15, z & 15) + 1;
         for (int y = top + 1; y >= top - 3; y--)
         {
             BlockPos position = new BlockPos(x, y, z);
             net.minecraft.world.level.block.state.BlockState state =
-                    level.getBlockState(position);
+                    chunk.getBlockState(position);
             if (state.is(net.minecraft.world.level.block.Blocks.SNOW)
                     || state.is(net.minecraft.world.level.block.Blocks
                     .SNOW_BLOCK)

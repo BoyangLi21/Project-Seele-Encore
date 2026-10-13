@@ -56,7 +56,7 @@ public final class EncounterObserverR45
     private static boolean live(TvCampaignSavedData data)
     {
         return "ramiel".equals(data.active) && data.owner != null && data.generationR43 > 0
-                && !data.phase.equals("cancel") && !data.phase.equals("failure") && !data.phase.equals("idle");
+                && !java.util.Set.of("cancel","failure","idle","combat_victory","episode_archived").contains(data.phase)&&!data.targetDeathConfirmedR45;
     }
 
     private static boolean participant(ServerLevel level, TvCampaignSavedData data, ServerPlayer player)

@@ -98,6 +98,7 @@ public final class NervFacilityTopologyBuilder
 
     public static TopologyAudit ensure(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         TopologyAudit audit = inspect(level, origin);
         if (!audit.valid()
                 && FacilityWorldPolicy.legacyGenerationAllowed(level.getServer()))
@@ -110,6 +111,7 @@ public final class NervFacilityTopologyBuilder
 
     public static TopologyAudit build(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "NervFacilityTopologyBuilder");
         PerformanceCounters.recordBuilderCall();
@@ -148,8 +150,9 @@ public final class NervFacilityTopologyBuilder
         openRoomThreshold(level, origin, -43, -27, 12, Direction.WEST, 2);
         openRoomThreshold(level, origin, 34, 1, -23, Direction.EAST, 2);
         openRoomThreshold(level, origin, 24, -123, -10, Direction.SOUTH, 2);
-        openRoomThreshold(level, origin, 62, 49,
-                EvaHangarBuilder.GALLERY_Z - 7, Direction.WEST, 3);
+        if(!NervLegacyGenerationGuardR52.retired(level))
+            openRoomThreshold(level, origin, 62, 49,
+                    EvaHangarBuilder.GALLERY_Z - 7, Direction.WEST, 3);
 
         set(level, origin.offset(REVISION_MARKER),
                 Blocks.NETHERITE_BLOCK.defaultBlockState());
@@ -252,6 +255,7 @@ public final class NervFacilityTopologyBuilder
      */
     public static boolean handleUse(ServerPlayer player, BlockPos position)
     {
+        if (NervLegacyGenerationGuardR52.retired(player.serverLevel())) return false;
         ServerLevel level = player.serverLevel();
         BlockPos origin = IntegratedNervMapBuilder.GEOFRONT_ORIGIN;
         for (LiftSpec lift : LIFTS)
@@ -267,6 +271,13 @@ public final class NervFacilityTopologyBuilder
                             destinationStop).equals(position))
                     {
                         continue;
+                    }
+                    if(lift==CAGE_LIFT&&NervLegacyGenerationGuardR52.retired(level))
+                    {
+                        player.displayClientMessage(Component.literal(
+                                "R52 EVA ACCESS  DECLARED FACILITY REQUIRED")
+                                .withStyle(ChatFormatting.RED),true);
+                        return true;
                     }
                     FacilityReadinessService.FacilityReadiness readiness =
                             FacilityReadinessService.read(level,
@@ -334,6 +345,7 @@ public final class NervFacilityTopologyBuilder
      */
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (ACTIVE_RIDES.isEmpty())
         {
             return;
@@ -455,6 +467,8 @@ public final class NervFacilityTopologyBuilder
     private static NervCarrierPlatformEntity spawnCabin(
             ServerLevel level, BlockPos origin, LiftSpec lift, int floorY)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return null;
+        if(lift==CAGE_LIFT&&NervLegacyGenerationGuardR52.retired(level))return null;
         NervCarrierPlatformEntity cabin =
                 ModEntities.NERV_CARRIER_PLATFORM.get().create(level);
         if (cabin == null)
@@ -547,6 +561,7 @@ public final class NervFacilityTopologyBuilder
 
     private static void buildCageConnection(ServerLevel level, BlockPos origin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         Set<Long> route = new LinkedHashSet<>();
         addLineZ(route, 78, EvaHangarBuilder.GALLERY_Z - 7, -108);
         addLineX(route, 62, 78, EvaHangarBuilder.GALLERY_Z - 7);
@@ -1221,6 +1236,7 @@ public final class NervFacilityTopologyBuilder
     private static void buildLift(ServerLevel level, BlockPos origin,
                                   LiftSpec lift)
     {
+        if(lift==CAGE_LIFT&&NervLegacyGenerationGuardR52.retired(level))return;
         int lowerY = lift.minimumFloor();
         int upperY = lift.maximumFloor();
         for (int y = lowerY; y <= upperY + 5; y++)
@@ -1297,6 +1313,7 @@ public final class NervFacilityTopologyBuilder
                                     LiftSpec lift, int floorY,
                                     Direction direction)
     {
+        if(lift==CAGE_LIFT&&NervLegacyGenerationGuardR52.retired(level))return;
         int boundaryX = lift.x() + direction.getStepX() * LIFT_RADIUS;
         int boundaryZ = lift.z() + direction.getStepZ() * LIFT_RADIUS;
         Direction lateral = direction.getClockWise();
@@ -1345,6 +1362,7 @@ public final class NervFacilityTopologyBuilder
     private static void installLiftControls(ServerLevel level,
                                             BlockPos origin, LiftSpec lift)
     {
+        if(lift==CAGE_LIFT&&NervLegacyGenerationGuardR52.retired(level))return;
         BlockState button = Blocks.STONE_BUTTON.defaultBlockState()
                 .setValue(ButtonBlock.FACE, AttachFace.FLOOR)
                 .setValue(ButtonBlock.FACING, Direction.NORTH);
@@ -1441,6 +1459,7 @@ public final class NervFacilityTopologyBuilder
                                        LiftSpec lift, int stop,
                                        boolean closed)
     {
+        if(lift==CAGE_LIFT&&NervLegacyGenerationGuardR52.retired(level))return;
         int floorY = lift.floor(stop);
         Direction direction = lift.door(stop);
         Direction lateral = direction.getClockWise();
@@ -1589,6 +1608,7 @@ public final class NervFacilityTopologyBuilder
     private static void set(ServerLevel level, BlockPos position,
                             BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

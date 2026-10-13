@@ -26,6 +26,7 @@ public final class EvaCannonFrameR45
     public static boolean enabled(EvaUnit01Entity eva)
     {
         return com.projectseele.config.PortableRuntimeOwnersR45.cannonContact()
+                && !eva.hasFixedCannonR52()
                 && !eva.isExperimentalUnit() && eva.getUnitVariant()==1
                 && eva.getWeapon()==EvaUnit01Entity.WEAPON_CANNON;
     }

@@ -33,7 +33,7 @@ public final class StaffCommandBookR24
         {
             actor = npc.getUUID(); owner = player.getUUID(); requested = operation;
             actorName = npc.getName().getString(); lastPosition = npc.blockPosition();
-            this.operation = operation.equals("deploy") ? "prepare" : operation;
+            this.operation = StaffUndergroundChoiceR52.initialOperation(operation);
             this.unit = unit; deadline = player.level().getGameTime() + 12000;
             mission=AutoSortieR32.missionToken(player.serverLevel());
         }
@@ -89,10 +89,11 @@ public final class StaffCommandBookR24
 
     public static int request(ServerPlayer player, NervStaffEntity npc, String operation, int unit)
     {
-        if (unit < 0 || unit > 2 || !Set.of("prepare", "launch", "recover", "deploy").contains(operation)) return 0;
-        if (!NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc, operation))
+        if (unit < 0 || unit > 2 || !Set.of("prepare", "launch", "recover", "deploy",StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY).contains(operation)) return 0;
+        String authority=operation.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY)?"deploy":operation;
+        if (!NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc, authority))
         {
-            NervStaffDialogue.reply(player, npc, NervStaffDialogue.commandRefusal(player,npc,operation));
+            NervStaffDialogue.reply(player, npc, NervStaffDialogue.commandRefusal(player,npc,authority));
             return 0;
         }
         ServerLevel level = player.serverLevel();
@@ -105,7 +106,9 @@ public final class StaffCommandBookR24
         var order = new Order(npc, player, operation, unit); orders.put(npc.getUUID(), order);
         StaffOperationsTraceR45.event(level,"staff_order_accepted",player.getUUID(),npc.getUUID(),unit,operation,order.step.name());
         EvaLogisticsDirector.loadControlTarget(level, unit);
-        NervStaffDialogue.reply(player, npc, operation.equals("deploy")
+        NervStaffDialogue.reply(player, npc, operation.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY)
+                ? "准备＋地下紧急部署已安排。驾驶员接入并完成准备，机体在发射井停稳待命后，再由承载板送出地下出口。"
+                :operation.equals("deploy")
                 ? "收到，司令。驾驶员接入后开始整备，机体抵达发射台以后，我再确认发射时机。"
                 : "收到，司令。我先确认机库状态，随后向您报告。");
         return 1;
@@ -226,7 +229,9 @@ public final class StaffCommandBookR24
                     if (Set.of("PARKED", "PLUG_ABORT_RETURNING", "PLUG_ABORT_DOCKED", "DEPLOYED").contains(status.phase()))
                     { failed(npc, "整备状态已被其他操作改变，后续发射已取消。请重新核对机体状态。"); continue; }
                     if (!status.phase().equals("SILO_READY")) continue;
-                    if (job.requested.equals("deploy")) { job.operation = "launch"; job.step = Step.SIGNAL; }
+                    String next=StaffUndergroundChoiceR52.readyContinuation(job.requested,status.phase());
+                    if(next.equals("underground")){dispatchUndergroundR52(owner,npc,job);continue;}
+                    if (next.equals("launch")) { job.operation = "launch"; job.step = Step.SIGNAL; }
                     else { jobs.remove(job.actor); NervStaffDialogue.reply(owner, npc, "整备完成，机体已到达发射台。等待你的发射指令。"); continue; }
                 }
                 if (job.step == Step.RECOVERING)
@@ -242,7 +247,9 @@ public final class StaffCommandBookR24
                 }
                 if (job.operation.equals("prepare"))
                 {
-                    if (job.requested.equals("deploy") && status.phase().equals("SILO_READY")) job.operation = "launch";
+                    String next=StaffUndergroundChoiceR52.readyContinuation(job.requested,status.phase());
+                    if(next.equals("underground")){dispatchUndergroundR52(owner,npc,job);continue;}
+                    if (next.equals("launch")) job.operation = "launch";
                     else if (!status.phase().equals("PARKED")) { failed(npc, "机体尚未回到整备待命状态。当前：" + NervStaffDialogue.stage(status.phase()) + "。"); continue; }
                     else if (!NervStaffDialogue.boarded(level, job.unit))
                     {
@@ -261,5 +268,18 @@ public final class StaffCommandBookR24
         }
     }
 
+    private static void dispatchUndergroundR52(ServerPlayer owner,NervStaffEntity npc,Order job)
+    {
+        if(npc.busy()){job.message="准备完成，等待操作人员完成当前按键。";return;}
+        var level=owner.serverLevel();var jobs=ORDERS.get(level);
+        if(jobs==null||jobs.get(job.actor)!=job||!job.owner.equals(owner.getUUID()))return;
+        // Remove this completed preparation before the existing strict operator
+        // and airframe checks; it must not block itself or bypass another order.
+        jobs.remove(job.actor);
+        var result=StaffOperationsR48.undergroundDeploymentR52(owner,npc,job.unit);
+        StaffOperationsTraceR45.event(level,result.accepted()?"staff_underground_deploy_accepted":"staff_underground_deploy_rejected",
+                job.owner,job.actor,job.unit,"underground",result.message());
+        NervStaffDialogue.reply(owner,npc,result.message());
+    }
     private StaffCommandBookR24() {}
 }

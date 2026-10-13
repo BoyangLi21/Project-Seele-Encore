@@ -1,0 +1,18 @@
+{
+  "schema": "projectseele.r52.actual-rendered-mesh-selection.v1",
+  "resources": {
+    "mesh/eva_unit00.mesh.json": "a079c7a5f2a36fff0f3b5675212dc5ba75cc47d9744202a9eceb73b2ec4022db",
+    "mesh/eva_unit00_anatomical_hands_r45.mesh.json": "75195305331a5fa822a4b8f1418d1169fd0d3e3f2cd1922a3da2c1fc8f6c6255",
+    "geo/eva_unit00.geo.json": "1c358e7eb47ce0f3f3571886097187905e935e167a42fbb2c63dee793eeaf231",
+    "hand_rigs/unit00/hand_rig_contract.json": "540e621ad1656e79eba1235e0851430380924b23a7536142f41e718539053e0a",
+    "mesh/eva_unit01.mesh.json": "3f28daaf6c64044e1625d6b18755f634c8fa8e2d6c40c4ae9bf93304dd90d910",
+    "mesh/eva_unit01_anatomical_hands_r45.mesh.json": "bff3dce92255a0c12744abe45acbb082ec3ab3b04b399d2206bb9d1e4897ada5",
+    "geo/eva_unit01.geo.json": "bf91f7d08e1d12e3e927c05f80bd9e7c34ed549e679ef7a5899b04323f153dc0",
+    "hand_rigs/unit01/hand_rig_contract.json": "478664851ecfcf575822fae8b402e315aa34780e2cf663b7d401713b792803fa",
+    "mesh/eva_unit02.mesh.json": "1e3c574bf969dcb3a695783e8e398b10bb3f6935b9b582add4fec5be9a85684f",
+    "mesh/eva_unit02_anatomical_hands_r45.mesh.json": "89d78a8016342b34fa6ffc9a5e8b0f438cf648fcb69d11c7e05f148c8ab9a329",
+    "geo/eva_unit02.geo.json": "d404f4c76e46a6d61cdb88f56ee0aa8fbd2423fd53a888afbc49576cdc4ee407",
+    "hand_rigs/unit02/hand_rig_contract.json": "c36b1d177defd56944f53a89cf9b624931ddaaacfbeffc350cba22f698c25ed7"
+  },
+  "scope": "Actual original EVA factory-frozen triangles; classpath resources remain in the existing asset bundle."
+}

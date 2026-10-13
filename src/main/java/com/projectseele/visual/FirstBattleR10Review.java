@@ -31,7 +31,15 @@ public final class FirstBattleR10Review
 {
     public static final boolean ENABLED="r10-firstbattle".equals(System.getProperty("projectseele.regionalBuild",""));
     private static final boolean MOVIE_ONLY=Boolean.getBoolean("projectseele.firstBattleMovieOnly");
+    private static final boolean BERSERK_R52=Boolean.getBoolean("projectseele.firstBattleBerserkReviewR52");
+    private static final boolean FOLLOWUP_ORDINARY_R52=Boolean.getBoolean("projectseele.firstBattleFollowupOrdinaryReviewR52");
+    private static final boolean CONTROL_CAPTURE_R52=Boolean.getBoolean("projectseele.firstBattleControlRecoveryCaptureR52");
+    public static volatile int reviewSequenceR52;
+    private static boolean berserkFixtureR52(){return BERSERK_R52&&reviewSequenceR52==0;}
     public static volatile boolean clientTracked,clientMounted,clientCameraRestored,finished,reloadRequested,captureMovie,warming;
+    public static volatile boolean capturePostStopR52;
+    public static volatile boolean captureControlRecoveryR52;
+    public static volatile int ordinaryOpticFramesR52,ordinaryDarkFramesR52,controlFramesR52,lockedControlFramesR52;
     public static volatile int heroId,action=-1,actionSerial,forward;
     public static volatile int clientFrames,droppedFrames;
     private static int age,stage,ticks,stageStart;
@@ -42,6 +50,11 @@ public final class FirstBattleR10Review
     private static float pilotHealth,hullHealth;
     private static Vec3 position;
     private static final JsonArray checks=new JsonArray();
+    public static boolean ownsBerserkFixtureR52(EvaUnit01Entity unit)
+    {
+        return ENABLED&&berserkFixtureR52()&&unit==hero&&unit.isFirstBattleActive()&&unit.level() instanceof ServerLevel level
+                &&level==level.getServer().overworld()&&level.getServer().getWorldPath(LevelResource.ROOT).normalize().getFileName().toString().equals("SEELE_FIRST_BATTLE_REVIEW_R10");
+    }
     private static void check(String name,boolean passed,String detail)
     {
         JsonObject item=new JsonObject();item.addProperty("name",name);item.addProperty("passed",passed);item.addProperty("detail",detail);checks.add(item);
@@ -111,6 +124,13 @@ public final class FirstBattleR10Review
             }
             else if(stage==3)
             {
+                if(berserkFixtureR52()&&data.active!=null&&data.active.age==60)
+                {
+                    hero.reviewBerserkR34();EvaBerserkMotionR34.clear(hero);FirstBattleClip.applyKinematics(hero);hullHealth=hero.getHealth();
+                    check("real_berserk_entry_r52",hero.isBerserk()&&hero.getPowerTicks()==0,"real beginBerserk; introduction hands pose ownership to active first-battle clip at age60");
+                }
+                if(data.active!=null&&data.active.age==FirstBattleClip.RETURN_TICK)
+                    ProjectSeele.LOGGER.info("R52 RETURN WINDOW age={} firstBattleActive={} pilotControlLocked={} powered={} berserk={} reviewSequence={}",data.active.age,hero.isFirstBattleActive(),hero.pilotControlLockedForReviewR52(),hero.isPoweredOn(),hero.isBerserk(),reviewSequenceR52);
                 if(data.active!=null&&data.active.age==40)
                 {
                     pilot.hurt(level.damageSources().generic(),5);hero.hurt(level.damageSources().generic(),20);
@@ -121,13 +141,47 @@ public final class FirstBattleR10Review
                     captureMovie=false;check("normal_completion",data.completedPilots.contains(pilot.getUUID())&&!angel.isAlive(),"first victory recorded");
                     check("original_hero_identity",hero.getUUID().equals(heroUuid),"no duplicate/replacement airframe");
                     check("restored_physics",!hero.isFirstBattleActive()&&!hero.noPhysics&&!hero.isNoGravity(),"normal collision and gravity");
-                    check("pilot_still_mounted",EvaPilotResolver.controlTarget(pilot)==hero,"same rider");stage=4;ticks=0;
+                    check("pilot_still_mounted",EvaPilotResolver.controlTarget(pilot)==hero,"same rider");
+                    if(berserkFixtureR52()){check("actual_berserk_stop_r52",!hero.isBerserk()&&hero.isPowerDepleted(),"EVA actual stop at complete; no movement pass inferred from ordinary powered mode");capturePostStopR52=true;}
+                    else if(reviewSequenceR52==1)
+                    {
+                        check("followup_ordinary_completion_r52",hero.isPoweredOn()&&!hero.isBerserk()&&!hero.pilotControlLockedForReviewR52(),"second complete native clip releases powered pilot control");
+                        if(CONTROL_CAPTURE_R52)
+                        {
+                            check("ordinary_client_optics_r52",ordinaryOpticFramesR52>0&&ordinaryDarkFramesR52==0,"actual ordinary client render frames="+ordinaryOpticFramesR52+" dark="+ordinaryDarkFramesR52);
+                            captureControlRecoveryR52=true;
+                        }
+                    }
+                    stage=4;ticks=0;
                 }
             }
             else if(stage==4)
             {
-                if(ticks==30){check("camera_restored",clientCameraRestored,"pilot camera returned");position=hero.position();forward=1;}
-                if(ticks==65){forward=0;check("movement_after_film",hero.position().subtract(position).horizontalDistanceSqr()>4,"real W input moves the same EVA");if(MOVIE_ONLY){write(world,true,"");finished=true;return;}stage=5;forceEncounter(level);}
+                if(ticks==30){check("camera_restored",clientCameraRestored,"pilot camera returned");position=hero.position();forward=berserkFixtureR52()?0:1;}
+                if(ticks==65)
+                {
+                    forward=0;
+                    if(berserkFixtureR52())check("stopped_airframe_retains_rider_r52",!hero.isFirstBattleActive()&&EvaPilotResolver.controlTarget(pilot)==hero,"cinematic ownership released; stopped EVA is not falsely required to walk on depleted power");
+                    else check("movement_after_film",hero.position().subtract(position).horizontalDistanceSqr()>4,"real W input moves the same EVA from "+position+" to "+hero.position());
+                    if(reviewSequenceR52==1&&CONTROL_CAPTURE_R52)
+                    {
+                        captureControlRecoveryR52=false;
+                        check("client_control_recovery_r52",controlFramesR52>0&&lockedControlFramesR52==0,"actual W render frames="+controlFramesR52+" locked or unpowered="+lockedControlFramesR52);
+                    }
+                    if(MOVIE_ONLY&&berserkFixtureR52()&&FOLLOWUP_ORDINARY_R52)
+                    {
+                        // Re-arm only this disposable review actor after its real stop
+                        // was recorded. The next full clip uses ordinary powered mode.
+                        reviewSequenceR52=1;hero.prepareForMotionLab();EvaShutdownR30.clear(hero);
+                        hero.setDeltaMovement(Vec3.ZERO);hero.moveTo(0,-60,0,0,0);hero.setOnGround(true);
+                        pilotHealth=pilot.getHealth();hullHealth=hero.getHealth();stage=3;
+                        forceEncounter(level);captureMovie=true;
+                        check("followup_ordinary_fixture_r52",hero.getUUID().equals(heroUuid)&&hero.isPoweredOn()&&!hero.isBerserk(),"same actor re-armed explicitly in disposable lab for separate ordinary full-completion/W check");
+                        return;
+                    }
+                    if(MOVIE_ONLY){write(world,true,"");finished=true;return;}
+                    stage=5;forceEncounter(level);
+                }
             }
             else if(stage==5)
             {

@@ -539,6 +539,20 @@ public final class EvaGameplayMotionR32
     }
     private static EvaBodyPose.Sample groundLocomotion(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial,boolean capturedBase,boolean[] movementOwner)
     {
+        if(e.rifleMoveBlend(partial)==0F&&!e.pilotLocomotionRequestedR45())
+        {
+            var inputs=ordinaryIdleInputsR52(e,partial,e.getEntityData().get(GUARD),e.rifleStanceLevel(partial));
+            if(inputs.ordinaryOwner()&&(inputs.fieldLocomotion()||!capturedBase||!EvaCapturedLocomotionR44.SUPPORT_OWNERSHIP_CANDIDATE))
+            {
+            if(movementOwner!=null)movementOwner[0]=capturedBase;
+            reviewChoice(e,"owner_branch",inputs.fieldLocomotion()?"continuous_field_locomotion":"ground_locomotion");
+            reviewChoice(e,"effective_guard_clip",inputs.weapon()==EvaUnit01Entity.WEAPON_SHIELD_R45?"r32_shield_idle"
+                    :inputs.weapon()==EvaUnit01Entity.WEAPON_SWORD_R45?"r32_sword_guard":"r32_guard");
+            reviewWeight(e,"guard_phase",inputs.guardPhase());
+            reviewWeight(e,"captured_upper_guard_weight",inputs.guard()*(1-EvaPoseBlendR51.smooth(inputs.stance())));
+            return ordinaryIdleTargetR52(e,base,inputs);
+            }
+        }
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_SHIELD_R45&&hasClip(e,"shield_idle"))
         {
             var guard=EvaBodyPose.gameplayClip(e,"shield_idle",(e.tickCount+partial)%100/100F);
@@ -613,6 +627,64 @@ public final class EvaGameplayMotionR32
         for(String n:base.rig.keySet())if(n.equals("root")||n.startsWith("leg_")||n.startsWith("shin_")||n.startsWith("ankle_")||n.startsWith("foot_"))
         {guard.rotations.get(n).slerp(base.rotations.get(n),e.rifleMoveBlend(partial));guard.positions.get(n).lerp(base.positions.get(n),e.rifleMoveBlend(partial));}
         guard.dirty();return EvaBodyPose.blend(base,guard,guardBlend);
+    }
+    /** Freeze the genuine stationary guard inputs once for a mechanical target.
+     * The typed release owner binds these inputs to its entity/epoch. */
+    public record OrdinaryIdleInputsR52(int weapon,float guard,float stance,float crouch,float run,
+            float guardPhase,float shieldPhase,float swordPhase,boolean crouching,
+            boolean ordinaryOwner,boolean fieldLocomotion,boolean combatSupport,boolean knifeHolding) {}
+    public static OrdinaryIdleInputsR52 ordinaryIdleInputsR52(EvaUnit01Entity e,float partial,float actualStance)
+    {return ordinaryIdleInputsR52(e,partial,e.getEntityData().get(GUARD),actualStance);}
+    public static OrdinaryIdleInputsR52 ordinaryIdleInputsR52(EvaUnit01Entity e,float partial,float actualGuard,float actualStance)
+    {
+        if(!Float.isFinite(partial)||!Float.isFinite(actualGuard)||!Float.isFinite(actualStance))
+            throw new IllegalArgumentException("Non-finite ordinary guard inputs");
+        int weapon=e.getWeapon();boolean shared=sharedWeapon(e),support=EvaCombatSupportR33.ready(e);
+        boolean owner=ready(e)&&!legacyPoseVetoR51(e)&&(support&&shared&&actualStance<1
+                ||shared&&!e.isPilotProne()&&!e.isPilotCrouching()&&actualGuard>.01F);
+        boolean field=!(e instanceof EvaPrototypeEntity)&&!e.isBerserk()
+                &&EvaBodyPose.runtimeLocomotionR44(e)&&actualStance<1;
+        boolean knife=EvaWeaponHandlingR45.available(e)&&weapon==EvaUnit01Entity.WEAPON_KNIFE
+                &&!EvaWeaponHandlingR45.active(e)&&!EvaFieldActionsR45.active(e)&&!e.hasLiveActionForRender(partial)
+                &&(!e.hasLegacyStrikeForRender()||EvaBodyPose.hasTerrainStances()&&shared);
+        return new OrdinaryIdleInputsR52(weapon,actualGuard,actualStance,e.rifleCrouchBlend(partial),e.rifleRunBlend(partial),
+                (e.level().getGameTime()%120+partial)/120F,(e.tickCount+partial)%100/100F,(e.tickCount+partial)%80/80F,
+                e.isPilotCrouching(),owner,field,support,knife);
+    }
+    public static EvaBodyPose.Sample ordinaryIdleTargetR52(EvaUnit01Entity e,EvaBodyPose.Sample source,float partial,float actualGuard,float actualStance)
+    {return ordinaryIdleTargetR52(e,source,ordinaryIdleInputsR52(e,partial,actualGuard,actualStance));}
+    /** Construct only; never run action/release state, contact caches or review writers. */
+    public static EvaBodyPose.Sample ordinaryIdleTargetR52(EvaUnit01Entity e,EvaBodyPose.Sample source,OrdinaryIdleInputsR52 inputs)
+    {
+        var base=EvaBodyPose.copy(source);
+        if(!inputs.ordinaryOwner())return base;
+        if(inputs.weapon()==EvaUnit01Entity.WEAPON_SHIELD_R45&&hasClip(e,"shield_idle"))
+        {
+            var guard=EvaBodyPose.gameplayClip(e,"shield_idle",inputs.shieldPhase());
+            if(inputs.crouching()&&hasClip(e,"shield_brace"))
+                guard=EvaBodyPose.blend(guard,EvaBodyPose.gameplayClip(e,"shield_brace",.55F),inputs.crouch());
+            for(String name:List.of("clavicle_l","arm_l","forearm_l","wrist_l","hand_l"))
+                if(base.rig.containsKey(name))
+                {base.rotations.put(name,new Quaternionf(guard.rotations.get(name)));base.positions.put(name,new Vector3f(guard.positions.get(name)));}
+            base.dirty();return base;
+        }
+        if(inputs.weapon()==EvaUnit01Entity.WEAPON_SWORD_R45&&hasClip(e,"sword_guard"))
+        {
+            var guard=EvaBodyPose.gameplayClip(e,"sword_guard",inputs.swordPhase());
+            for(String name:base.rig.keySet())if(name.startsWith("clavicle_")||name.startsWith("arm_")||name.startsWith("forearm_")||name.startsWith("wrist_")||name.startsWith("hand_"))
+            {base.rotations.put(name,new Quaternionf(guard.rotations.get(name)));base.positions.put(name,new Vector3f(guard.positions.get(name)));}
+            base.dirty();return base;
+        }
+        float low=EvaPoseBlendR51.smooth(inputs.stance()),weight=inputs.guard()*(1-low);
+        if(inputs.fieldLocomotion()&&weight<=0)return base;
+        var guard=EvaBodyPose.gameplayClip(e,"guard",inputs.guardPhase());
+        if(inputs.knifeHolding())for(String name:List.of("arm_r","forearm_r","wrist_r","hand_r"))
+            if(base.rig.containsKey(name))
+            {guard.rotations.put(name,new Quaternionf(base.rotations.get(name)));guard.positions.put(name,new Vector3f(base.positions.get(name)));}
+        guard.dirty();
+        if(inputs.fieldLocomotion())return EvaBodyPose.blendUpperKeepingLocomotionR51(base,guard,weight);
+        if(inputs.combatSupport())weight*=1-EvaPoseBlendR51.smooth(inputs.run());
+        return EvaBodyPose.blend(base,guard,weight);
     }
     private static EvaBodyPose.Sample actionPose(EvaUnit01Entity e,String name,float progress,EvaBodyPose.Sample base,float partial)
     {

@@ -183,6 +183,8 @@ public final class EvaPoseGraph
             var physical=PhysicalBodyRenderer.apply(entity,model,partialTick);
             return finish(entity,model,partialTick,modelToWorld,physical,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         }
+        if(com.projectseele.entity.EvaMechanicalFrameR52.serviceSourceHeldR52(entity))
+            return finish(entity,model,partialTick,modelToWorld,EvaMechanicalServicePoseR52.apply(entity,model,partialTick),EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         if(EvaLockedCagePoseR44.applies(entity))
         {
             EvaLockedCagePoseR44.witness(entity,model,"after_gecko");
@@ -312,11 +314,12 @@ public final class EvaPoseGraph
                                    EvaMotionEngineV2.BoneWrites motionWrites,EvaMotionEngineV2.BoneWrites transitions,EvaMotionEngineV2.BoneWrites firearm)
     {
         EvaCannonContactRigR45.apply(entity,model,partialTick,modelToWorld);
-        EvaAnatomicalHandPoseR45.apply(entity,model,partialTick);
+        if(!entity.isFirstBattleActive()||!com.projectseele.entity.FirstBattleClip.ownsAnatomicalHandsR52(entity.getUnitVariant()))
+            EvaAnatomicalHandPoseR45.apply(entity,model,partialTick);
         var mouth=EvaMouthR37.apply(entity,model,partialTick);
         if(!mouth.rotationBones().isEmpty())
         {var names=new java.util.HashSet<>(motionWrites.rotationBones());names.addAll(mouth.rotationBones());var positions=new java.util.HashSet<>(motionWrites.positionBones());positions.addAll(mouth.positionBones());motionWrites=new EvaMotionEngineV2.BoneWrites(Set.copyOf(names),Set.copyOf(positions),"MOTION_ENGINE_LIVE_ACTION");}
-        if(!entity.isFirstBattleActive()&&!com.projectseele.physics.CombatBodyDynamics.active(entity)
+        if(!com.projectseele.entity.EvaMechanicalFrameR52.serviceSourceHeldR52(entity)&&!entity.isFirstBattleActive()&&!com.projectseele.physics.CombatBodyDynamics.active(entity)
                 &&com.projectseele.entity.EvaCombatSupportR33.ready(entity)
                 &&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(entity,partialTick)
                 &&(com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity)
@@ -337,6 +340,7 @@ public final class EvaPoseGraph
             LAST_COMMITS.clear();
         }
         LAST_COMMITS.put(entity.getId(), committed);
+        FirstBattleRuntimeWitnessR52.finalWriter(entity,model,"EvaPoseGraph.finish");
         if (!firstCommitLogged)
         {
             firstCommitLogged = true;
@@ -448,7 +452,9 @@ public final class EvaPoseGraph
 
         if(com.projectseele.entity.EvaAnatomicalHandsR45.enabled(entity)&&EvaHandSurfaceR45.applies(entity))
         {
-            String owner=com.projectseele.entity.EvaAnatomicalHandsR45.OWNER;activeLayers.add(owner);
+            String owner=entity.isFirstBattleActive()&&com.projectseele.entity.FirstBattleClip.ownsAnatomicalHandsR52(entity.getUnitVariant())
+                    ?motionOwner:com.projectseele.entity.EvaAnatomicalHandsR45.OWNER;
+            if(!activeLayers.contains(owner))activeLayers.add(owner);
             for(var joint:com.projectseele.entity.EvaAnatomicalHandsR45.rig(entity.getUnitVariant()).joints())
             {rotationOwners.put(joint.name(),owner);positionOwners.put(joint.name(),owner);scaleOwners.put(joint.name(),owner);}
         }

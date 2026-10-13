@@ -30,6 +30,13 @@ public final class StationDepartureBoardRenderer implements BlockEntityRenderer<
         poses.translate(0,0,compact?-.27:.205);poses.scale(scale,-scale,scale);
         if(compact&&direction&&!board.routeMap())
         {
+            if(board.roomPlaqueR52())
+            {
+                line(board.station(),8,0xffe2e5df,width,poses,buffers);
+                for(int i=0;i<Math.min(3,board.rows().size());i++)
+                    line(board.rows().get(i),25+i*13,i==0?0xffc77764:0xffaab7b6,width,poses,buffers);
+                poses.popPose();return;
+            }
             boolean lift=!board.rows().isEmpty()&&board.rows().stream().allMatch(s->s.endsWith(" · 直梯"));
             line(lift?"乘电梯换层":board.station(),0,0xffedbd55,width,poses,buffers);
             for(int i=0;i<Math.min(3,board.rows().size());i++)line(compactDestination(board.rows().get(i),lift),18+i*16,

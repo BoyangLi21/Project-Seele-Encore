@@ -14,6 +14,7 @@ import net.minecraft.world.phys.Vec3;
 /** Exact wall-image/portal state only: no lift model, book rendering or actor relocation. */
 public final class DeadSeaChamberR45
 {
+    private static final java.util.Map<ServerLevel,String> LOGGED_FAULTS=new java.util.WeakHashMap<>();
     private DeadSeaChamberR45() {}
     public static boolean handles(NervAccessReaderEntityR44 reader)
     {return DeadSeaChamberSavedDataR45.KEY.equals(reader.chamberId());}
@@ -22,6 +23,13 @@ public final class DeadSeaChamberR45
         var data=DeadSeaChamberSavedDataR45.get(level);data.validate();
         if(!data.configured||!data.world.equals(Tokyo3BuildingWorldIdentityR44.get(level)))
             throw new IllegalStateException("Complete original chamber configuration is not installed in this world");
+        if(data.frameOffsetY!=0)
+        {
+            var frame=NervHeadquartersFrameR52.frame(level);
+            if(frame==null)return null;
+            if(!frame.apply(new BlockPos(32,-329,340)).equals(data.gate))
+                throw new IllegalStateException("Moved highest-room chamber requires the installed headquarters frame");
+        }
         boolean valid=data.readers.stream().anyMatch(r->r.pos().equals(reader.getBlockPos())&&r.role().equals(reader.chamberRole())
                 &&reader.getBlockState().hasProperty(NervAccessReaderR44.FACING)
                 &&reader.getBlockState().getValue(NervAccessReaderR44.FACING)==Direction.byName(r.facing()));
@@ -32,7 +40,7 @@ public final class DeadSeaChamberR45
     {
         try
         {
-            var data=bound(level,reader);long now=level.getGameTime();
+            var data=bound(level,reader);if(data==null)return 0;long now=level.getGameTime();
             if(data.lastTick!=now)
             {
                 data.lastTick=now;
@@ -55,7 +63,7 @@ public final class DeadSeaChamberR45
         try
         {
             var data=bound(level,reader);
-            if(data.mode.equals("FAULT")||player==null||!player.isAlive()||player.distanceToSqr(Vec3.atCenterOf(reader.getBlockPos()))>=16
+            if(data==null||data.mode.equals("FAULT")||player==null||!player.isAlive()||player.distanceToSqr(Vec3.atCenterOf(reader.getBlockPos()))>=16
                     ||!(player.getItemInHand(hand).getItem() instanceof NervAccessCardR44 card)||card.clearance()<3)return false;
             if(!data.images.stream().allMatch(i->level.hasChunkAt(i.pos())))return false;
             data.openUntil=level.getGameTime()+200;data.safetyHeld=false;
@@ -85,8 +93,10 @@ public final class DeadSeaChamberR45
     }
     private static void hold(ServerLevel level,Exception failure)
     {
-        ProjectSeele.LOGGER.error("Highest-room chamber held; retain original wall/artwork images and all identities",failure);
-        try{var data=DeadSeaChamberSavedDataR45.get(level);if(data.configured){data.mode="FAULT";data.fault=failure.toString();data.durable(level);}}
+        String reason=failure.toString();
+        if(!reason.equals(LOGGED_FAULTS.put(level,reason)))
+            ProjectSeele.LOGGER.error("Highest-room chamber held; retain original wall/artwork images and all identities",failure);
+        try{var data=DeadSeaChamberSavedDataR45.get(level);if(data.configured&&(!data.mode.equals("FAULT")||!reason.equals(data.fault))){data.mode="FAULT";data.fault=reason;data.durable(level);}}
         catch(Exception persistence){failure.addSuppressed(persistence);}
     }
 }

@@ -261,6 +261,7 @@ public final class S20PhysicalElevatorDirector
 
     public static List<LiftSpec> s20Lifts(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))return S20LiftDirectoryR52.specs(level);
         MinecraftServer server = level.getServer();
         Path root = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
         String name = server.getWorldData().getLevelName();
@@ -282,10 +283,12 @@ public final class S20PhysicalElevatorDirector
     public static void invalidateLiftSpecs(MinecraftServer server)
     {
         synchronized (LIFT_SPECS) { LIFT_SPECS.keySet().removeIf(level -> level.getServer() == server); }
+        S20LiftDirectoryR52.invalidate(server);
     }
 
     private static List<LiftSpec> buildCurrentLiftSpecs(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))return S20LiftDirectoryR52.specs(level);
         List<LiftSpec> lifts;
         if (FacilityWorldPolicy.isS22Coastal(level.getServer()))
         {
@@ -427,6 +430,7 @@ public final class S20PhysicalElevatorDirector
      */
     public static boolean install(ServerLevel level, LiftSpec spec)
     {
+        if(NervRouteRuntimeR52.claimed(level))return S20LiftDirectoryR52.current(level,spec);
         RuntimeData data = RuntimeData.get(level);
         Optional<LiftRuntime> existing = data.find(spec.id());
         if (existing.isPresent())
@@ -625,6 +629,7 @@ public final class S20PhysicalElevatorDirector
      */
     public static void tick(ServerLevel level, LiftSpec spec)
     {
+        if(NervRouteRuntimeR52.claimed(level)){S20MovingElevatorsAdapter.reconcile(level,spec);return;}
         if (!FacilityWorldPolicy.isS20Rebuild(level.getServer()))
         {
             return;
@@ -698,6 +703,7 @@ public final class S20PhysicalElevatorDirector
             ServerPlayer player, BlockPos clicked, LiftSpec spec)
     {
         ServerLevel level = player.serverLevel();
+        if(NervRouteRuntimeR52.claimed(level))return S20MovingElevatorsAdapter.handleExternalCall(player,clicked);
         if (!FacilityWorldPolicy.isS20Rebuild(level.getServer())
                 || !level.dimension().equals(FacilitySchemaV2.DIMENSION))
         {
@@ -2324,6 +2330,7 @@ public final class S20PhysicalElevatorDirector
 
     public static BlockPos exteriorCallPosition(Landing landing)
     {
+        if(landing.r52()!=null)return landing.r52().callButton();
         if (internalEastLanding(landing))
         {
             return landing.cabinCentre().offset(-1, 1, 6);
@@ -2333,6 +2340,7 @@ public final class S20PhysicalElevatorDirector
 
     public static Direction exteriorCallFacing(Landing landing)
     {
+        if(landing.r52()!=null)return landing.r52().callFacing();
         return internalEastLanding(landing) ? Direction.EAST : landing.exit();
     }
 
@@ -2358,6 +2366,7 @@ public final class S20PhysicalElevatorDirector
      */
     public static BlockPos movingElevatorLandingPanelPosition(Landing landing)
     {
+        if(landing.r52()!=null)return landing.r52().callButton();
         return exteriorCallPosition(landing).relative(
                 exteriorCallFacing(landing).getOpposite());
     }
@@ -2591,6 +2600,7 @@ public final class S20PhysicalElevatorDirector
             ServerLevel level, LiftSpec spec, double currentY,
             boolean moving)
     {
+        if(NervRouteRuntimeR52.claimed(level)){S20LiftDirectoryR52.synchronizeDoors(level,spec,currentY,moving);return;}
         Landing current = null;
         if (!moving)
         {
@@ -2643,6 +2653,7 @@ public final class S20PhysicalElevatorDirector
     /** Exact owned apertures for server-state replay, not an inferred whole doorway box. */
     public static java.util.Set<BlockPos> movingDoorCells(LiftSpec spec,Landing current)
     {
+        if(current.r52()!=null){var cells=new java.util.HashSet<BlockPos>(current.r52().landingDoors().keySet());cells.addAll(current.r52().cabinDoors().keySet());return java.util.Set.copyOf(cells);}
         var cells=new java.util.LinkedHashSet<BlockPos>();
         int distance=spec.id().equals(SURFACE_TRANSIT_LIFT_ID)?CABIN_DOOR_DISTANCE+1:CABIN_DOOR_DISTANCE;
         for(Direction exit:spec.stops().stream().map(Landing::exit).distinct().toList())
@@ -2804,10 +2815,12 @@ public final class S20PhysicalElevatorDirector
     }
 
     public record Landing(
-            String label, BlockPos cabinCentre, Direction exit, int approachWalkY)
+            String label, BlockPos cabinCentre, Direction exit, int approachWalkY,S20LiftManifestR52.Floor r52)
     {
         public Landing(String label,BlockPos cabinCentre,Direction exit)
-        {this(label,cabinCentre,exit,cabinCentre.getY());}
+        {this(label,cabinCentre,exit,cabinCentre.getY(),null);}
+        public Landing(String label,BlockPos cabinCentre,Direction exit,int approachWalkY)
+        {this(label,cabinCentre,exit,approachWalkY,null);}
 
         public Landing
         {
@@ -2842,7 +2855,7 @@ public final class S20PhysicalElevatorDirector
      * extreme-of-travel check keep reading the way they always did; only the
      * places that must visit every floor were changed.</p>
      */
-    public record LiftSpec(String id, List<Landing> stops)
+    public record LiftSpec(String id, List<Landing> stops,S20LiftManifestR52.Binding r52)
     {
         public LiftSpec
         {
@@ -2880,8 +2893,9 @@ public final class S20PhysicalElevatorDirector
 
         public LiftSpec(String id, Landing lower, Landing upper)
         {
-            this(id, List.of(lower, upper));
+            this(id, List.of(lower, upper),null);
         }
+        public LiftSpec(String id,List<Landing> stops){this(id,stops,null);}
 
         public Landing lower()
         {

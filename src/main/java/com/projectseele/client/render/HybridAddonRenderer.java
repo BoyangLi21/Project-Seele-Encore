@@ -7,6 +7,7 @@ import com.projectseele.entity.MassProductionEvaEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
+import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
@@ -175,6 +176,14 @@ public class HybridAddonRenderer<T extends LivingEntity & GeoEntity> extends Ent
         {
             if(!rerender)AngelCombatPoseR31.restoreBeforeGecko(entity,model);
             super.preRender(pose,entity,model,buffers,vertex,rerender,partial,light,overlay,red,green,blue,alpha);
+        }
+
+        @Override public void renderRecursively(PoseStack pose,T entity,GeoBone bone,RenderType type,
+                MultiBufferSource buffers,VertexConsumer vertex,boolean rerender,float partial,int light,int overlay,
+                float red,float green,float blue,float alpha)
+        {
+            super.renderRecursively(pose,entity,bone,type,buffers,vertex,rerender,partial,light,overlay,red,green,blue,alpha);
+            if(!rerender&&bone.getParent()==null)FirstBattleRuntimeWitnessR52.finish(entity,bone);
         }
 
         @Override

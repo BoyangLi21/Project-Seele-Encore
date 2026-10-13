@@ -33,6 +33,7 @@
     "CitySavedOwnerUnionMixinR45"
   ],
   "client": [
+    "client.RamielDistantProjectionR52Mixin",
     "client.SbwPhantomLoadR24Mixin",
     "client.ChunkSkySourceR24Mixin",
     "client.NervChestFinishR24Mixin",
@@ -43,6 +44,7 @@
     "client.AbstractClientPlayerSkinMixin",
     "client.MinecraftRenderTargetMixin",
     "client.GameRendererFeedProjectionMixin",
+    "client.FirstBattleContactDrawWitnessR52Mixin",
     "client.LargeStructureRenderMixin",
     "client.PlayerModelGendoPoseMixin",
     "client.MovingElevatorDisplayMixin",

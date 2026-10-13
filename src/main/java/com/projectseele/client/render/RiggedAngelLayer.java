@@ -73,6 +73,9 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
     {
         if(!root.getName().equals("root")||root.isHidden())return;
         Model model=load(resource);if(model==null)return;
+        Matrix4f runtimeWorld=entity instanceof net.minecraft.world.entity.Entity actor
+                &&FirstBattleRuntimeWitnessR52.wants(actor,"root")&&getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer
+                ?renderer.renderedMeshTransform(stack.last().pose(),actor,partial):null;
         Map<String,GeoBone> bones=new HashMap<>();collect(root,bones);
         Matrix4f inverseRoot=EvaRigTransforms.model(root).invert();
         Matrix4f witnessWorld=RiggedAngelSkinWitnessR44.ENABLED&&entity instanceof net.minecraft.world.entity.Entity actor&&getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer?renderer.renderedMeshTransform(stack.last().pose(),actor,partial):null;
@@ -102,6 +105,7 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
                     emit(target,stack,p,n,surface.u(vertex),surface.v(vertex),light,overlay);
                     if(vertex%3==2)emit(target,stack,p,n,surface.u(vertex),surface.v(vertex),light,overlay);
                 }
+                if(runtimeWorld!=null)FirstBattleRuntimeWitnessR52.angelSubmission(worldEntity,"actual-wrap-cache",stack.last().pose(),runtimeWorld,null,null,surface.a(),surface.b(),surface.blend());
                 if(skinWitness!=null)skinWitness.finish("wrap-cache");return;
             }
         }
@@ -117,6 +121,8 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             dual[i]=new Quaternionf(translation.x,translation.y,translation.z,0).mul(real[i]).mul(.5F);
         }
         if(skinWitness!=null)skinWitness.palette(model.bones,matrices,scaled,real,dual);
+        if(runtimeWorld!=null&&entity instanceof net.minecraft.world.entity.Entity actor)
+            FirstBattleRuntimeWitnessR52.angelSubmission(actor,"actual-weighted-palette",stack.last().pose(),runtimeWorld,model.bones,matrices,-1,-1,0);
         Quaternionf q=new Quaternionf(),d=new Quaternionf(),translation=new Quaternionf(),conjugate=new Quaternionf();
         Vector3f point=new Vector3f(),normal=new Vector3f(),work=new Vector3f();
         boolean grounded=entity instanceof net.minecraft.world.entity.LivingEntity living&&AngelCombatPoseR31.needsGroundSupport(living);

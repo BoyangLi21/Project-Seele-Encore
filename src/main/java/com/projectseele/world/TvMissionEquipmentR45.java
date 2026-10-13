@@ -45,7 +45,7 @@ public final class TvMissionEquipmentR45
     private static final TicketType<ChunkPos> STOCK_TICKET=TicketType.create("tv_mission_stock_r50",java.util.Comparator.comparingLong(ChunkPos::toLong),100);
     private static final class Loan
     {
-        UUID cargo,source,eva,owner,pilot;long generation;int unit,shotsAtIssue;
+        UUID cargo,source,eva,owner,pilot,fixedCannonR52;long generation;int unit,shotsAtIssue;
         String episode=EPISODE,chapter="ramiel",dimension,status=LOANED;
         CompoundTag item=new CompoundTag();
     }
@@ -66,6 +66,7 @@ public final class TvMissionEquipmentR45
                 var loan=new Loan();loan.cargo=n.getUUID("Cargo");loan.source=n.getUUID("Source");
                 loan.eva=n.getUUID("Eva");loan.owner=n.getUUID("Owner");loan.generation=n.getLong("Generation");
                 if(n.hasUUID("ActualPilotR45"))loan.pilot=n.getUUID("ActualPilotR45");
+                if(n.hasUUID("FixedCannonR52"))loan.fixedCannonR52=n.getUUID("FixedCannonR52");
                 loan.unit=n.getInt("Unit");loan.chapter=n.getString("Chapter");loan.episode=n.getString("Episode");
                 loan.shotsAtIssue=n.getInt("ShotsAtIssueR50");
                 loan.dimension=n.getString("Dimension");loan.status=n.getString("Status");loan.item=n.getCompound("Item").copy();
@@ -96,6 +97,7 @@ public final class TvMissionEquipmentR45
             for(var l:loans.values())
             {
                 var n=new CompoundTag();n.putUUID("Cargo",l.cargo);n.putUUID("Source",l.source);
+                if(l.fixedCannonR52!=null)n.putUUID("FixedCannonR52",l.fixedCannonR52);
                 n.putUUID("Eva",l.eva);n.putUUID("Owner",l.owner);n.putLong("Generation",l.generation);
                 n.putInt("Unit",l.unit);n.putString("Chapter",l.chapter);n.putString("Episode",l.episode);
                 n.putInt("ShotsAtIssueR50",l.shotsAtIssue);
@@ -511,6 +513,50 @@ public final class TvMissionEquipmentR45
                 :pilot instanceof ServerPlayer player&&!s.npc&&s.commander.equals(player.getUUID()));
     }
     /** Called only by root's physical station handoff, after the rack is READY. */
+    /** Atomic reservation of the existing preloaded item, without a portable pickup or a second item. */
+    public static boolean fixedCannonAuthorizedR52(EvaUnit01Entity eva,com.projectseele.entity.YashimaCannonEntityR52 gun)
+    {
+        if(!(eva.level() instanceof ServerLevel level)||gun.level()!=level)return false;
+        var state=state(level);var loan=loanFor(state,eva);if(loan==null||!live(loan,level,eva)||!gun.getUUID().equals(loan.fixedCannonR52))return false;
+        var stock=state.physical.get(loan.cargo);var held=gun.getPersistentData();
+        return stock!=null&&stock.carrier==null&&!stock.container&&gun.getUUID().equals(stock.rack)&&stock.item.equals(loan.item)
+                &&held.hasUUID(CARGO_ID)&&loan.cargo.equals(held.getUUID(CARGO_ID))&&held.getCompound(CARGO).equals(loan.item);
+    }
+    public static boolean reserveFixedCannonR52(ServerLevel level,EvaUnit01Entity eva,UUID pilot,
+            com.projectseele.entity.YashimaCannonEntityR52 gun,NervArmamentStationEntity source,UUID cargo)
+    {
+        if(!context(level,eva)||eva.getUnitVariant()!=1||gun.level()!=level||source.level()!=level||pilot==null)return false;
+        var data=TvCampaignSavedData.get(level);var sortie=data.sorties.get(1);
+        if(sortie==null||sortie.pilotR45==null||!sortie.pilotR45.equals(pilot))return false;
+        var state=state(level);var existing=state.loans.get(cargo);
+        if(existing!=null&&gun.getUUID().equals(existing.fixedCannonR52))
+            return existing.source.equals(source.getUUID())&&existing.pilot.equals(pilot)&&!source.getPersistentData().contains(CARGO)
+                    &&!source.getPersistentData().hasUUID(CARGO_ID)&&fixedCannonAuthorizedR52(eva,gun);
+        var slot=source.getPersistentData();if(!physicalStockPresent(source)||!slot.hasUUID(CARGO_ID)||!cargo.equals(slot.getUUID(CARGO_ID))||loanFor(state,eva)!=null)return false;
+        var item=slot.getCompound(CARGO).copy();if(cargoUnit(ItemStack.of(item))!=1||!rackOwns(state,source,cargo,item))return false;
+        if(existing!=null&&!existing.status.equals(STORED))return false;
+        var stock=state.physical.get(cargo);if(stock==null||stock.carrier!=null||stock.container||!source.getUUID().equals(stock.rack))return false;
+        var loan=new Loan();loan.cargo=cargo;loan.source=source.getUUID();loan.eva=eva.getUUID();loan.owner=data.owner;loan.pilot=pilot;
+        loan.fixedCannonR52=gun.getUUID();loan.generation=data.generationR43;loan.unit=1;loan.dimension=level.dimension().location().toString();loan.item=item;
+        sampleIssueCounter(loan,level);state.loans.put(cargo,loan);stock.rack=gun.getUUID();stock.position=gun.blockPosition();
+        gun.getPersistentData().put(CARGO,item.copy());gun.getPersistentData().putUUID(CARGO_ID,cargo);
+        slot.remove(CARGO);slot.remove(CARGO_ID);state.setDirty();source.refreshFiniteMissionStockR52();eva.refreshTvMissionEquipmentR45();
+        com.projectseele.ProjectSeele.LOGGER.info("R52 preloaded original cannon reserved atomically: cargo={} source={} fixedActor={} eva={}",cargo,source.getUUID(),gun.getUUID(),eva.getUUID());return true;
+    }
+    /** Only the lowered original fixed body returns its exact item to its original empty source. */
+    public static boolean returnFixedCannonR52(ServerLevel level,EvaUnit01Entity eva,
+            com.projectseele.entity.YashimaCannonEntityR52 gun,NervArmamentStationEntity source)
+    {
+        var state=state(level);var loan=loanFor(state,eva);
+        if(loan==null||!gun.getUUID().equals(loan.fixedCannonR52)||!loan.source.equals(source.getUUID())||!loan.status.equals(RETURN_PENDING))return false;
+        var slot=source.getPersistentData();var held=gun.getPersistentData();var stock=state.physical.get(loan.cargo);
+        if(slot.contains(CARGO)||slot.hasUUID(CARGO_ID)||stock==null||!gun.getUUID().equals(stock.rack)||!held.hasUUID(CARGO_ID)
+                ||!loan.cargo.equals(held.getUUID(CARGO_ID))||!held.getCompound(CARGO).equals(loan.item))return false;
+        loan.item=returnedItem(loan,eva);loan.status=STORED;loan.fixedCannonR52=null;
+        stock.item=loan.item.copy();stock.rack=source.getUUID();stock.position=source.blockPosition();
+        slot.putInt(RACK_UNIT,1);slot.putUUID(CARGO_ID,loan.cargo);slot.put(CARGO,loan.item.copy());held.remove(CARGO);held.remove(CARGO_ID);
+        state.setDirty();source.refreshFiniteMissionStockR52();eva.returnedTvMissionCargoR50(1);gun.loadedR52(false);return true;
+    }
     public static boolean issueFromStation(NervArmamentStationEntity station,EvaUnit01Entity eva,LivingEntity pilot)
     {
         if(!(station.level() instanceof ServerLevel l)||!context(l,eva)||!operational(eva)||!assignedPilot(l,eva,pilot)

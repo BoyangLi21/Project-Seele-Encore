@@ -26,6 +26,7 @@ public final class PlugGantryRenderer
     private static final int GREEN=0x566a51, EDGE=0x8d9a86, STEEL=0xadb7bb, DARK=0x222d32, GOLD=0xb69347;
     private final PoseStack poses; private final VertexConsumer buffer; private final int light;private final RigidMachineryPartR44.Builder baking;
     private final MultiBufferSource buffers;
+    private boolean declaredRigR52;
     private static RigidMachineryPartR44 TOP,YOKE,CHUCK,JAW_LEFT,JAW_RIGHT,HOSES_CLOSED,HOSES_OPEN,ROPE,SHEAVE,LINKS,WHEEL;
     private PlugGantryRenderer(PoseStack poses, MultiBufferSource buffers, int light)
     {this.poses=poses;this.buffers=buffers;this.buffer=buffers.getBuffer(RenderType.entitySolid(PAINT));this.light=light;this.baking=null;}
@@ -34,12 +35,13 @@ public final class PlugGantryRenderer
     {TvCraneMeshWitnessR44.begin(entity,partial,poses);try{new PlugGantryRenderer(poses,buffers,light).draw(entity,partial);}finally{TvCraneMeshWitnessR44.end();}}
     private void draw(NervCarrierPlatformEntity entity,float partial)
     {
+        declaredRigR52=entity.hasDeclaredMachineFrameR52();
         gpu(topMesh(),poses,light);
         // The two surveyed runways run along Z at X = body axis +/- 4.
         // Wheel bottoms meet their Y=-373 running surface; no floating bogies.
         for(double x:new double[]{-4,4})for(double z:new double[]{-2.8,2.8})
         {
-            poses.pushPose();poses.translate(x,.38,z);
+            poses.pushPose();poses.translate(x,declaredRigR52?com.projectseele.world.NervCraneGeometryR52.wheelBearingOffset(entity.getPosition(partial).z/.38):.38,z);
             poses.mulPose(new Quaternionf().rotationX((float)(entity.getPosition(partial).z/.38)));
             gpu(wheelMesh(),poses,light);poses.popPose();
         }
@@ -48,9 +50,11 @@ public final class PlugGantryRenderer
         com.projectseele.world.RigidTransform transform=plug==null?null:plug.getInterpolatedCanonicalTransform(partial);
         Quaternionf stowedRotation=new Quaternionf().rotationX((float)-Math.PI/2),rotation=new Quaternionf(stowedRotation);
         Vec3 anchor=entity.hasCraneReference()?entity.getCraneReferenceAnchor():lower;
-        boolean coupled=transform!=null&&!(plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_EJECTING&&plug.getInsertionProgress()>=99);
+        boolean coupled=transform!=null&&(declaredRigR52||!(plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_EJECTING&&plug.getInsertionProgress()>=99));
         if(transform!=null){anchor=transform.transformPoint(EntryPlugKinematics.CRANE_ATTACHMENT_P).subtract(entity.getPosition(partial));rotation=transform.rotation();}
         else if(entity.hasCraneReference())rotation=entity.getCraneReferenceRotation();
+        if(entity.hasDeclaredMachineFrameR52()&&(transform!=null||entity.hasCraneReference()))
+        {var local=com.projectseele.world.NervMachineFrameR52.worldToLocal(entity.getPosition(partial),entity.declaredMachineRotationR52(),anchor.add(entity.getPosition(partial)),rotation);anchor=local.translation();rotation=local.rotation();}
         float released=1;
         if(coupled){lower=anchor;released=0;}
         else if(transform!=null||entity.hasCraneReference())
@@ -64,6 +68,12 @@ public final class PlugGantryRenderer
             rotation.slerp(stowedRotation,com.projectseele.entity.EvaDorsalMechanism.smooth((float)((rise-2)/Math.max(1,travel-2))));
         }
         Vec3 suppliedMount = TripoMachineryR48.clampMount();
+        if(declaredRigR52)
+        {
+            var machine=com.projectseele.world.RigidTransform.of(entity.getPosition(partial),entity.declaredMachineRotationR52());
+            var state=com.projectseele.world.NervCranePoseR52.evaluate(machine,entity.getCraneBottomOffset(partial),transform,coupled,entity.hasCraneReference()?entity.getPosition(partial).add(entity.getCraneReferenceAnchor()):null,entity.hasCraneReference()?entity.getCraneReferenceRotation():null,suppliedMount);
+            lower=state.grip().translation();rotation=state.grip().rotation();released=state.released();
+        }
         Vec3 mount = lower;
         if (suppliedMount != null)
         {
@@ -138,7 +148,7 @@ public final class PlugGantryRenderer
     private void gpuRope(Vec3 a,Vec3 b,double radius)
     {
         if(ROPE==null)ROPE=bake(r->r.cylinder(v(0,0,0),v(0,1,0),1,0,STEEL,12));Vec3 delta=b.subtract(a);double length=delta.length();if(length<1e-6)return;
-        poses.pushPose();poses.translate(a.x,a.y,a.z);poses.mulPose(new Quaternionf().rotationTo(new Vector3f(0,1,0),new Vector3f((float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length))));poses.scale((float)radius,(float)length,(float)radius);gpu(ROPE,poses,light);poses.popPose();
+        poses.pushPose();poses.translate(a.x,a.y,a.z);poses.mulPose(declaredRigR52?com.projectseele.world.NervCranePoseR52.ropeFrame(a,b).rotation():new Quaternionf().rotationTo(new Vector3f(0,1,0),new Vector3f((float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length))));poses.scale((float)radius,(float)length,(float)radius);gpu(ROPE,poses,light);poses.popPose();
     }
     private void gpu(RigidMachineryPartR44 mesh,PoseStack poses,int light)
     {

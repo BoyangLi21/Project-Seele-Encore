@@ -38,6 +38,7 @@ public final class FacilityV2BootstrapDirector
 
     public static StartResult start(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return new StartResult(false, "R52 Root owns the claimed facility");
         if (!FacilityWorldPolicy.isCleanRebuild(level.getServer()))
         {
             return new StartResult(false,
@@ -91,6 +92,7 @@ public final class FacilityV2BootstrapDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) { JOBS.remove(server); return; }
         if (!FacilityWorldPolicy.isCleanRebuild(server))
         {
             JOBS.remove(server);

@@ -458,6 +458,9 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         this.entityData.set(DATA_STOCKED,stocked);this.setLift(1F);this.setHatch(1F);this.setDoor(1F);
         this.entityData.set(DATA_STATE,stocked?READY:EMPTY);this.phaseTicks=0;this.deployQueued=false;
     }
+    /** Atomic fixed-gun transfer updates this same finite rack's display without replenishing a payload. */
+    public void refreshFiniteMissionStockR52()
+    {if(!this.level().isClientSide&&com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))this.maintainSurfaceSupplyR50();}
 
     public boolean issueToAssignedPilotR30(TrainingPilotEntity pilot,EvaUnit01Entity eva)
     {

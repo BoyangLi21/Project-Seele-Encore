@@ -182,7 +182,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                         && "knife".equals(bone.getName())));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 entity -> POSITRON_MESH, entity -> POSITRON_TEXTURE,
-                (entity, bone) -> entity.getWeapon() == EvaUnit01Entity.WEAPON_CANNON
+                (entity, bone) -> entity.getWeapon() == EvaUnit01Entity.WEAPON_CANNON&&!entity.hasFixedCannonR52()
                         && "cannon".equals(bone.getName())));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 entity -> RIFLE_MESH, entity -> RIFLE_TEXTURE,
@@ -259,14 +259,23 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         boolean nervFloodlit = entity.isNervLogisticsLocked()
                 || entity instanceof com.projectseele.entity.EvaPrototypeEntity prototype && prototype.isInsideTestHangar()
                 || entity.getLaunchPhase() == EvaUnit01Entity.LAUNCH_ASCENT;
-        if (!entity.isExperimentalUnit() && !com.projectseele.entity.EvaAirTransportR31.active(entity) && (entity.hasActiveCarrierMotion()
-                || entity.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR || entity.carrierRiseProgress(partialTick)>.001F))
+        boolean carrierVisible = com.projectseele.entity.EvaMechanicalFrameR52.flightCustody(entity)
+                ? com.projectseele.entity.EvaMechanicalFrameR52.flightCarrierVisible(entity)
+                : (!com.projectseele.entity.EvaAirTransportR31.active(entity)||com.projectseele.entity.EvaMechanicalFrameR52.active(entity))
+                    && (entity.hasActiveCarrierMotion() || com.projectseele.entity.EvaMechanicalFrameR52.active(entity)
+                    || com.projectseele.entity.EvaMechanicalFrameR52.plantCarrierDeclaredR52(entity)
+                    || entity.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR || entity.carrierRiseProgress(partialTick)>.001F);
+        if (!entity.isExperimentalUnit() && carrierVisible)
         {
             // The deck is one rigid piece of the rendered EVA assembly.  It
             // has no independent entity, packet clock or culling lifetime.
+            poseStack.pushPose();
+            if(com.projectseele.entity.EvaMechanicalFrameR52.detachedCarrierR52(entity)){var frame=com.projectseele.entity.EvaMechanicalFrameR52.carrierFrameR52(entity,partialTick);var offset=frame.translation().subtract(renderedOrigin(entity,partialTick));poseStack.translate(offset.x,offset.y,offset.z);poseStack.mulPose(frame.rotation());}
+            else if(com.projectseele.entity.EvaMechanicalFrameR52.active(entity))poseStack.mulPose(com.projectseele.entity.EvaMechanicalFrameR52.frame(entity,partialTick).rotation());
             NervMovingCarrierRenderer.render(poseStack, bufferSource,
                     nervFloodlit ? LightTexture.FULL_BRIGHT : packedLight,
                     entity,partialTick);
+            poseStack.popPose();
         }
         if(com.projectseele.entity.EvaGroundReceiverR50.active(entity))
             EvaGroundReceiverRendererR50.render(poseStack,bufferSource,packedLight,entity,partialTick);
@@ -295,9 +304,10 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
 
     @Override protected void applyRotations(EvaUnit01Entity entity,PoseStack pose,float age,float yaw,float partial)
     {
-        if(entity.isFirstBattleActive())yaw=com.projectseele.entity.FirstBattleClip.yaw(entity.firstBattleSignals().spec(entity),true,entity.firstBattleSignals().time(entity,partial));
+        if(com.projectseele.entity.EvaMechanicalFrameR52.active(entity))yaw=com.projectseele.entity.EvaMechanicalFrameR52.baseYaw(entity);
+        else if(entity.isFirstBattleActive())yaw=com.projectseele.entity.FirstBattleClip.yaw(entity.firstBattleSignals().spec(entity),true,entity.firstBattleSignals().time(entity,partial));
         else if(!entity.isExperimentalUnit()&&entity.isNervLogisticsLocked()
-                &&!com.projectseele.entity.EvaAirTransportR31.active(entity))yaw=EvaUnit01Entity.SILO_BAY_YAW;
+                &&!com.projectseele.entity.EvaAirTransportR31.active(entity))yaw=entity.mechanicalYawR52();
         super.applyRotations(entity,pose,age,yaw,partial);
     }
 
@@ -305,6 +315,12 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
     public Vec3 getRenderOffset(EvaUnit01Entity entity, float partialTick)
     {
         Vec3 base = super.getRenderOffset(entity, partialTick);
+        if(com.projectseele.entity.EvaMechanicalFrameR52.active(entity))
+        {
+            var exact=com.projectseele.entity.EvaMechanicalFrameR52.frame(entity,partialTick).translation();
+            return base.add(exact.subtract(new Vec3(Mth.lerp((double)partialTick,entity.xOld,entity.getX()),
+                    Mth.lerp((double)partialTick,entity.yOld,entity.getY()),Mth.lerp((double)partialTick,entity.zOld,entity.getZ()))));
+        }
         if (entity.isFirstBattleActive()) return base.add(com.projectseele.entity.FirstBattleClip.renderOffset(entity,partialTick));
         if (!entity.hasActiveCarrierMotion())
         {
@@ -425,7 +441,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         }
         // Weapon visibility applies on top in every view.
         setWeaponVisibility(model, "knife", com.projectseele.entity.EvaWeaponHandlingR45.knifeVisible(animatable,partialTick));
-        setWeaponVisibility(model, "cannon", animatable.getWeapon() == EvaUnit01Entity.WEAPON_CANNON
+        setWeaponVisibility(model, "cannon", animatable.getWeapon() == EvaUnit01Entity.WEAPON_CANNON&&!animatable.hasFixedCannonR52()
                 || animatable.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE);
         setWeaponVisibility(model, "lance", animatable.getWeapon() == EvaUnit01Entity.WEAPON_LANCE
                 ||animatable.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45);
@@ -471,6 +487,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         EvaPoseRuntimeRecorder.captureBone(animatable, bone, isReRender);
         if (!isReRender && bone.getParent() == null)
         {
+            FirstBattleRuntimeWitnessR52.finish(animatable,bone);
             com.projectseele.client.visual.EvaConnectedActionReview.recordPose(animatable,
                     this.getGeoModel().getBakedModel(this.getGeoModel().getModelResource(animatable)), partialTick);
             EvaWeightedInnerProxy.renderAfterRoot(

@@ -44,6 +44,7 @@ public final class SeeleConferenceAccessR47
     public static boolean enabled(ServerLevel level)
     {
         if (!level.dimension().equals(FacilitySchemaV2.DIMENSION)) return false;
+        if(NervRouteRuntimeR52.claimed(level))return S20LiftDirectoryR52.office(level)!=null;
         return ENABLED.computeIfAbsent(level.getServer(), server ->
         {
             var file = server.getWorldPath(LevelResource.ROOT).resolve("r47_seele_conference.json");
@@ -77,6 +78,7 @@ public final class SeeleConferenceAccessR47
 
     public static boolean office(ServerLevel level, S20PhysicalElevatorDirector.LiftSpec spec)
     {
+        if(NervRouteRuntimeR52.claimed(level)){var office=S20LiftDirectoryR52.office(level);return office!=null&&spec.id().equals(office.liftId());}
         return enabled(level) && spec.id().equals(S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID)
                 && spec.lower().cabinCentre().equals(new BlockPos(28, -388, 321))
                 && spec.upper().cabinCentre().equals(new BlockPos(28, -340, 321));
@@ -84,6 +86,7 @@ public final class SeeleConferenceAccessR47
 
     public static List<S20PhysicalElevatorDirector.LiftSpec> augment(ServerLevel level, List<S20PhysicalElevatorDirector.LiftSpec> specs)
     {
+        if(NervRouteRuntimeR52.claimed(level))return specs;
         return specs.stream().map(spec ->
         {
             if (!office(level, spec) || spec.stops().stream().anyMatch(stop -> stop.walkY() == MIDDLE)) return spec;
@@ -96,8 +99,14 @@ public final class SeeleConferenceAccessR47
 
     public static boolean protectedReader(ServerLevel level, BlockPos pos)
     {
-        return enabled(level) && READERS.contains(pos);
+        if(NervRouteRuntimeR52.claimed(level)){var office=S20LiftDirectoryR52.declaredOffice(level);return office!=null&&office.readers().contains(pos);}
+        return enabled(level) && readers(level).contains(pos);
     }
+    private static Set<BlockPos> readers(ServerLevel level){var office=S20LiftDirectoryR52.office(level);return office!=null?office.readers():NervRouteRuntimeR52.claimed(level)?Set.of():READERS;}
+    private static int middle(ServerLevel level){var office=S20LiftDirectoryR52.office(level);return office!=null?office.middleY():MIDDLE;}
+    private static BlockPos middleReader(ServerLevel level){var office=S20LiftDirectoryR52.office(level);return office!=null?office.middleReader():MID_READER;}
+    private static boolean inside(net.minecraft.world.phys.AABB box,Vec3 point)
+    {return point.x>=box.minX&&point.x<=box.maxX&&point.y>=box.minY&&point.y<=box.maxY&&point.z>=box.minZ&&point.z<=box.maxZ;}
 
     private static boolean highest(ServerPlayer player, InteractionHand hand)
     {
@@ -106,6 +115,7 @@ public final class SeeleConferenceAccessR47
 
     private static boolean insideMeetingArea(ServerPlayer player)
     {
+        if(NervRouteRuntimeR52.claimed(player.serverLevel())){var office=S20LiftDirectoryR52.office(player.serverLevel());return office!=null&&office.meeting().stream().anyMatch(box->inside(box,player.position()));}
         if (Math.abs(player.getY() - MIDDLE) > 2) return false;
         double x = player.getX(), z = player.getZ();
         return x >= 16 && x <= 52 && z >= 300 && z <= 316
@@ -114,6 +124,7 @@ public final class SeeleConferenceAccessR47
 
     private static boolean withinLiftOrRoom(ServerPlayer player)
     {
+        if(NervRouteRuntimeR52.claimed(player.serverLevel())){var office=S20LiftDirectoryR52.office(player.serverLevel());return office!=null&&(office.meeting().stream().anyMatch(box->inside(box,player.position()))||office.liftRoom().stream().anyMatch(box->inside(box,player.position())));}
         if (insideMeetingArea(player)) return true;
         return player.getX() >= 22 && player.getX() <= 34 && player.getZ() >= 312 && player.getZ() <= 329
                 && player.getY() >= -390 && player.getY() <= -332;
@@ -137,9 +148,14 @@ public final class SeeleConferenceAccessR47
     /** Ordinary lift endpoints stay public; the meeting stop always needs an actual swipe. */
     public static boolean allowDestination(ServerPlayer player, int targetY)
     {
-        if (targetY != MIDDLE)
+        int middle=middle(player.serverLevel());
+        if (targetY != middle)
         {
-            if (Math.abs(player.getY() - MIDDLE) < 2) revoke(player);
+            if(NervRouteRuntimeR52.claimed(player.serverLevel()))
+                for(var spec:S20LiftDirectoryR52.specs(player.serverLevel()))if(office(player.serverLevel(),spec))
+                    for(var floor:spec.r52().floors())if(floor.cabin().getY()==targetY&&floor.restricted()
+                            &&!highest(player,InteractionHand.MAIN_HAND)&&!highest(player,InteractionHand.OFF_HAND))return false;
+            if (Math.abs(player.getY() - middle) < 2) revoke(player);
             return true;
         }
         if (leased(player)) return true;
@@ -150,6 +166,7 @@ public final class SeeleConferenceAccessR47
     /** The room's two-sided card door supplies a fresh egress lease. Presence never grants one. */
     public static boolean canOpenLanding(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level)){var office=S20LiftDirectoryR52.office(level);return office!=null&&level.players().stream().anyMatch(p->leased(p)&&inside(office.landingLease(),p.position())&&p.getY()>office.landingLease().minY&&p.getY()<office.landingLease().maxY);}
         return level.players().stream().anyMatch(player -> leased(player) && Math.abs(player.getY() - MIDDLE) < 3
                 && player.getX() >= 25 && player.getX() <= 32 && player.getZ() >= 315 && player.getZ() <= 325);
     }
@@ -178,6 +195,7 @@ public final class SeeleConferenceAccessR47
         if (!(event.getEntity() instanceof ServerPlayer player) || !protectedReader(player.serverLevel(), event.getPos())
                 || !player.serverLevel().getBlockState(event.getPos()).is(ModBlocks.NERV_ACCESS_READER.get())) return;
         event.setCanceled(true); event.setCancellationResult(InteractionResult.SUCCESS);
+        if(!enabled(player.serverLevel()))return;
         if (player.distanceToSqr(Vec3.atCenterOf(event.getPos())) >= 16 || player.isSpectator()) return;
         InteractionHand hand = highest(player, event.getHand()) ? event.getHand()
                 : highest(player, InteractionHand.OFF_HAND) ? InteractionHand.OFF_HAND
@@ -202,9 +220,9 @@ public final class SeeleConferenceAccessR47
         if (event.phase != TickEvent.Phase.END) return;
         var level = event.getServer().getLevel(FacilitySchemaV2.DIMENSION);
         if (level == null || !enabled(level)) return;
-        if (READERS.stream().allMatch(level::hasChunkAt) && VISUALS_READY.add(event.getServer()))
+        if (readers(level).stream().allMatch(level::hasChunkAt) && VISUALS_READY.add(event.getServer()))
         {
-            for (var pos : READERS) visual(level, pos, -1, 0, 0);
+            for (var pos : readers(level)) visual(level, pos, -1, 0, 0);
         }
         var leases = LEASES.computeIfAbsent(event.getServer(), ignored -> new HashMap<>());
         leases.entrySet().removeIf(entry ->
@@ -231,7 +249,7 @@ public final class SeeleConferenceAccessR47
                 player.displayClientMessage(Component.literal(permit ? "SEELE 会议室许可已确认：30秒内进梯选择该层。" : "刷卡未完成，请保持最高卡与读卡距离。"), true);
                 level.playSound(null, swipe.reader(), permit ? SoundEvents.NOTE_BLOCK_PLING.value() : SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.BLOCKS, .35F, permit ? 1.3F : .75F);
                 entry.setValue(new Swipe(swipe.reader(), swipe.hand(), swipe.started(), true));
-                if (permit && swipe.reader().equals(MID_READER)) S20MovingElevatorsAdapter.handleExternalCall(player, MID_READER);
+                if (permit && swipe.reader().equals(middleReader(level))) S20MovingElevatorsAdapter.handleExternalCall(player, middleReader(level));
             }
             if (age >= 32) { visual(level, swipe.reader(), -1, 0, 0); iterator.remove(); }
         }
@@ -254,5 +272,7 @@ public final class SeeleConferenceAccessR47
     {
         ENABLED.remove(event.getServer()); LEASES.remove(event.getServer()); SWIPES.remove(event.getServer()); VISUALS_READY.remove(event.getServer());
     }
+    public static void invalidateR52(ServerLevel level)
+    {LEASES.remove(level.getServer());SWIPES.remove(level.getServer());VISUALS_READY.remove(level.getServer());}
     private SeeleConferenceAccessR47() { }
 }

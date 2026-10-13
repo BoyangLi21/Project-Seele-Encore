@@ -179,8 +179,14 @@ public record RigidTransform(Vec3 translation,
 
     public double rotationErrorDegrees(RigidTransform other)
     {
-        double dot = Math.abs(this.qx * other.qx + this.qy * other.qy
-                + this.qz * other.qz + this.qw * other.qw);
+        // Quaternion components are stored as floats. Even a quaternion
+        // compared with itself can have a dot slightly below one, inventing
+        // a 0.04-degree change and repeatedly restarting capsule interpolation.
+        double dot = Math.abs((double)this.qx * other.qx + (double)this.qy * other.qy
+                + (double)this.qz * other.qz + (double)this.qw * other.qw);
+        double a=(double)this.qx*this.qx+(double)this.qy*this.qy+(double)this.qz*this.qz+(double)this.qw*this.qw;
+        double b=(double)other.qx*other.qx+(double)other.qy*other.qy+(double)other.qz*other.qz+(double)other.qw*other.qw;
+        dot/=Math.sqrt(a*b);
         return Math.toDegrees(2.0D
                 * Math.acos(Mth.clamp(dot, -1.0D, 1.0D)));
     }

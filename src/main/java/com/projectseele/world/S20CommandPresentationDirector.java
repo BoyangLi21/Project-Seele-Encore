@@ -191,6 +191,14 @@ public final class S20CommandPresentationDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server))
+        {
+            var declared=server.getLevel(FacilitySchemaV2.DIMENSION);
+            if(!NervHeadquartersFrameR52.bound(declared))return;
+            if(server.getTickCount()%200==0&&hasNearbyViewer(declared))
+                for(var seat:seatSpecs(declared))installSeat(declared,seat);
+            return;
+        }
         if (!FacilityWorldPolicy.isS20Rebuild(server))
         {
             return;
@@ -233,13 +241,14 @@ public final class S20CommandPresentationDirector
     public static boolean handleSeatUse(
             ServerPlayer player, BlockPos clicked)
     {
+        if (NervLegacyGenerationGuardR52.retired(player.serverLevel()) && !NervHeadquartersFrameR52.bound(player.serverLevel())) return false;
         ServerLevel level = player.serverLevel();
         if (!FacilityWorldPolicy.isS20Rebuild(level.getServer())
                 || !level.dimension().equals(FacilitySchemaV2.DIMENSION))
         {
             return false;
         }
-        for (SeatSpec spec : SEATS)
+        for (SeatSpec spec : seatSpecs(level))
         {
             if (!isSeatHit(spec.block(), clicked))
             {
@@ -271,6 +280,7 @@ public final class S20CommandPresentationDirector
 
     private static void install(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!Files.isRegularFile(COMMAND_MODULE))
         {
             logSourceFailure("missing private command NBT " + COMMAND_MODULE);
@@ -468,14 +478,21 @@ public final class S20CommandPresentationDirector
 
     private static boolean hasNearbyViewer(ServerLevel level)
     {
+        var frame=NervHeadquartersFrameR52.frame(level);
+        if(NervRouteRuntimeR52.claimed(level)&&frame==null)return false;
+        Vec3 centre=new Vec3(28.0D,-416.0D,300.0D);if(frame!=null)centre=frame.apply(centre);
+        final Vec3 actual=centre;
         return level.players().stream().anyMatch(player ->
-                player.distanceToSqr(28.0D, -416.0D, 300.0D)
+                player.distanceToSqr(actual)
                         <= 160.0D * 160.0D);
     }
 
     private static NervCommandSeatEntity installSeat(
             ServerLevel level, SeatSpec spec)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)
+                && (!NervHeadquartersFrameR52.bound(level)||!seatSpecs(level).contains(spec)
+                ||level.getBlockState(spec.block()).isAir())) return null;
         String tag = SEAT_TAG_PREFIX + spec.id();
         AABB search = new AABB(
                 spec.x() - 1.0D, spec.y() - 1.0D, spec.z() - 1.0D,
@@ -515,6 +532,14 @@ public final class S20CommandPresentationDirector
         return seat;
     }
 
+    private static List<SeatSpec> seatSpecs(ServerLevel level)
+    {
+        if(!NervRouteRuntimeR52.claimed(level))return SEATS;
+        var frame=NervHeadquartersFrameR52.frame(level);if(frame==null)return List.of();
+        return SEATS.stream().map(spec->{var point=frame.apply(new Vec3(spec.x(),spec.y(),spec.z()));
+            return new SeatSpec(spec.id(),frame.apply(spec.block()),point.x,point.y,point.z,spec.yaw(),spec.messageKey());}).toList();
+    }
+
     private static boolean isSeatHit(BlockPos chair, BlockPos clicked)
     {
         int dx = Math.abs(clicked.getX() - chair.getX());
@@ -542,6 +567,7 @@ public final class S20CommandPresentationDirector
      */
     public static void tickRuntimePresentation(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server) && !NervHeadquartersFrameR52.bound(server.getLevel(FacilitySchemaV2.DIMENSION))) return;
         if (!FacilityWorldPolicy.isS20Rebuild(server))
         {
             return;
@@ -555,6 +581,13 @@ public final class S20CommandPresentationDirector
 
     private static void tickRuntimePresentation(ServerLevel level, int tick)
     {
+        if (NervLegacyGenerationGuardR52.retired(level))
+        {
+            if(!NervHeadquartersFrameR52.bound(level))return;
+            if(tick%40==0&&hasNearbyViewer(level))ensureCityStatusDisplay(level);
+            if(tick%5==0&&hasNearbyViewer(level))broadcastPilotStatus(level);
+            return;
+        }
         if (tick % 40 == 0 && hasNearbyViewer(level))
         {
             removeRetiredSeatAnchors(level);
@@ -644,6 +677,8 @@ public final class S20CommandPresentationDirector
     {
         Vec3 anchor = new Vec3(CITY_STATUS_CENTRE_X, cityStatusBaseY(),
                 CITY_STATUS_Z);
+        var headquarters=NervHeadquartersFrameR52.frame(level);if(headquarters!=null)anchor=headquarters.apply(anchor);
+        else if(NervRouteRuntimeR52.claimed(level))return;
         AABB bounds = AABB.ofSize(anchor, 96.0D, 48.0D, 24.0D);
         for (Display.TextDisplay stale : level.getEntitiesOfClass(
                 Display.TextDisplay.class, bounds,

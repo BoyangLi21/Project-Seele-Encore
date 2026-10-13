@@ -130,6 +130,9 @@ final class RigidMachineryPartR44
         }
         return builder.finish();
     }
+    /** New upright model/path schema stores RGB in0..1, unlike old TV byte RGB. */
+    static RigidMachineryPartR44 trianglesNormalizedR52(double[] rgb)
+    {if(rgb.length%18!=0)throw new IllegalArgumentException("Actual normalized triangle RGB required");var b=new Builder();for(int i=0;i<rgb.length;i+=18)b.triangleNormalizedR52(rgb,i,com.projectseele.world.RigidTransform.identity(),Vec3.ZERO);return b.finish();}
 
     private static Vec3 point(JsonArray data, int index)
     {
@@ -142,12 +145,15 @@ final class RigidMachineryPartR44
     }
 
     void draw(PoseStack poses, MultiBufferSource buffers, int light)
+    {drawWithProofR52(poses,buffers,light);}
+    /** True means the real cached GPU mesh was submitted in this shader pass. */
+    boolean drawWithProofR52(PoseStack poses, MultiBufferSource buffers, int light)
     {
         TvCraneMeshWitnessR44.part(vertices,poses);
         // Keep the source arrays unchanged. Only imported smooth triangles
         // omit their duplicated fourth point; vanilla outlines remain quads.
         boolean triangles=importedTriangles&&!(buffers instanceof OutlineBufferSource);
-        if (RigidMachineryGpuR44.draw(this, vertices, texture, poses, buffers, light,triangles)) return;
+        if (RigidMachineryGpuR44.draw(this, vertices, texture, poses, buffers, light,triangles)) return true;
         VertexConsumer out = buffers.getBuffer(triangles?ModelRenderTypesR49.solidTriangles(texture):ModelRenderTypesR49.solid(texture));
         var frame = poses.last();
         boolean reflected = frame.pose().determinant() < 0;
@@ -167,6 +173,7 @@ final class RigidMachineryPartR44
                         .normal(normal.x, normal.y, normal.z).endVertex();
             }
         }
+        return false;
     }
 
     static final class Builder
@@ -215,5 +222,15 @@ final class RigidMachineryPartR44
             if (size == 0) Arrays.fill(box, 0);
             return new RigidMachineryPartR44(Arrays.copyOf(data, size), box.clone());
         }
+        void triangleNormalizedR52(double[] source,int offset,com.projectseele.world.RigidTransform frame,Vec3 origin)
+        {
+            var a=frame.transformPoint(new Vec3(source[offset],source[offset+1],source[offset+2])).subtract(origin);
+            var b=frame.transformPoint(new Vec3(source[offset+6],source[offset+7],source[offset+8])).subtract(origin);
+            var c=frame.transformPoint(new Vec3(source[offset+12],source[offset+13],source[offset+14])).subtract(origin);
+            var normal=b.subtract(a).cross(c.subtract(a));if(normal.lengthSqr()<1e-12)return;normal=normal.normalize();
+            normalizedVertexR52(a,normal,source,offset,0,0);normalizedVertexR52(b,normal,source,offset+6,1,0);normalizedVertexR52(c,normal,source,offset+12,1,1);normalizedVertexR52(c,normal,source,offset+12,1,1);
+        }
+        private void normalizedVertexR52(Vec3 p,Vec3 normal,double[] source,int offset,float u,float v)
+        {for(int i=3;i<6;i++)if(!Double.isFinite(source[offset+i])||source[offset+i]<0||source[offset+i]>1)throw new IllegalArgumentException("Actual upright normalized RGB outside0..1");vertex(p,normal,(float)source[offset+3],(float)source[offset+4],(float)source[offset+5],u,v);}
     }
 }

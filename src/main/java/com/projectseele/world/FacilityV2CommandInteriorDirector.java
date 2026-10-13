@@ -138,6 +138,7 @@ public final class FacilityV2CommandInteriorDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(server))
         {
             return;
@@ -175,6 +176,7 @@ public final class FacilityV2CommandInteriorDirector
 
     public static void reset(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         FacilityWorldPolicy.requireCleanRebuild(level.getServer(),
                 "FacilityV2CommandInteriorDirector.reset");
         FacilityV2CommandInteriorSavedData.get(level).reset();
@@ -182,6 +184,7 @@ public final class FacilityV2CommandInteriorDirector
 
     public static boolean handleSeatUse(ServerPlayer player, BlockPos clicked)
     {
+        if (NervLegacyGenerationGuardR52.retired(player.serverLevel())) return false;
         ServerLevel level = player.serverLevel();
         if (!FacilityWorldPolicy.isCleanRebuild(level.getServer())
                 || !level.dimension().equals(FacilitySchemaV2.DIMENSION))

@@ -60,6 +60,7 @@ public final class FacilityDoorControlsR49
     public static boolean installed(ServerLevel level)
     {
         if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return false;
+        if(NervRouteRuntimeR52.claimed(level))return S20LiftDirectoryR52.office(level)!=null;
         return ENABLED.computeIfAbsent(level.getServer(),server->
         {
             var file=server.getWorldPath(LevelResource.ROOT).resolve("r49_facility_controls.json");
@@ -88,9 +89,19 @@ public final class FacilityDoorControlsR49
         });
     }
     public static boolean ownsDoor(ServerLevel level,BlockPos pos)
-    {return installed(level)&&java.util.stream.Stream.concat(GATE.stream(),PILOT.stream()).anyMatch(p->pos.equals(p)||pos.equals(p.above()));}
+    {
+        if(NervRouteRuntimeR52.claimed(level)&&S20LiftDirectoryR52.declaredOffice(level)==null)
+            return level.getBlockState(pos).getBlock() instanceof CityPersonnelDoorR44;
+        return (installed(level)||NervRouteRuntimeR52.claimed(level))&&java.util.stream.Stream.concat(gate(level).stream(),pilot(level).stream()).anyMatch(p->pos.equals(p)||pos.equals(p.above()));
+    }
     public static boolean protectedReader(ServerLevel level,BlockPos pos)
-    {return installed(level)&&READERS.contains(pos);}
+    {return (installed(level)||NervRouteRuntimeR52.claimed(level))&&readers(level).contains(pos);}
+    private static S20LiftManifestR52.RoomControls controls(ServerLevel level){var office=S20LiftDirectoryR52.declaredOffice(level);return office==null?null:office.controls();}
+    private static List<BlockPos> gate(ServerLevel level){var c=controls(level);return c!=null?c.gate().stream().map(S20LiftManifestR52.Door::lower).toList():NervRouteRuntimeR52.claimed(level)?List.of():GATE;}
+    private static List<BlockPos> pilot(ServerLevel level){var c=controls(level);return c!=null?c.pilot().stream().map(S20LiftManifestR52.Door::lower).toList():NervRouteRuntimeR52.claimed(level)?List.of():PILOT;}
+    private static Set<BlockPos> readers(ServerLevel level){var c=controls(level);return c!=null?c.gateReaders().stream().map(S20LiftManifestR52.Reader::position).collect(java.util.stream.Collectors.toSet()):NervRouteRuntimeR52.claimed(level)?Set.of():READERS;}
+    private static S20LiftManifestR52.Door doorBinding(ServerLevel level,BlockPos lower){var c=controls(level);return c==null?null:java.util.stream.Stream.concat(c.gate().stream(),c.pilot().stream()).filter(d->d.lower().equals(lower)).findFirst().orElse(null);}
+    private static S20LiftManifestR52.Reader readerBinding(ServerLevel level,BlockPos pos){var c=controls(level);return c==null?null:c.gateReaders().stream().filter(r->r.position().equals(pos)).findFirst().orElse(null);}
     private static boolean validDoor(ServerLevel level,BlockPos lower,DoorHingeSide hinge)
     {
         if(!level.hasChunkAt(lower))return false;
@@ -98,7 +109,7 @@ public final class FacilityDoorControlsR49
         {
             var s=level.getBlockState(p);
             if(!(s.getBlock() instanceof CityPersonnelDoorR44)||level.getBlockEntity(p)!=null
-                    ||s.getValue(DoorBlock.FACING)!=Direction.SOUTH||s.getValue(DoorBlock.HINGE)!=hinge
+                    ||s.getValue(DoorBlock.FACING)!=(doorBinding(level,lower)==null?Direction.SOUTH:doorBinding(level,lower).facing())||s.getValue(DoorBlock.HINGE)!=(doorBinding(level,lower)==null?hinge:doorBinding(level,lower).hinge())
                     ||s.getValue(DoorBlock.HALF)!=(p.equals(lower)?DoubleBlockHalf.LOWER:DoubleBlockHalf.UPPER))return false;
         }
         return true;
@@ -109,8 +120,10 @@ public final class FacilityDoorControlsR49
     {var s=level.getBlockState(p);((DoorBlock)s.getBlock()).setOpen(null,level,s,p,open);}
     public static boolean pilotDoorUse(ServerLevel level,BlockPos clicked,ServerPlayer player)
     {
+        if(NervRouteRuntimeR52.claimed(level)&&!installed(level)&&ownsDoor(level,clicked))
+        {player.displayClientMessage(Component.literal("门控原生绑定尚未确认，请等待设施检查。"),true);return true;}
         if(!installed(level))return false;
-        var p=PILOT.stream().filter(q->clicked.equals(q)||clicked.equals(q.above())).findFirst().orElse(null);
+        var p=pilot(level).stream().filter(q->clicked.equals(q)||clicked.equals(q.above())).findFirst().orElse(null);
         if(p==null)return false;
         if(player.isSpectator()||!NervStaffDialogue.authorized(player)||player.distanceToSqr(Vec3.atCenterOf(p))>36)
         {player.displayClientMessage(Component.literal("驾驶员休息室需要NERV通行权限。"),true);return true;}
@@ -119,7 +132,7 @@ public final class FacilityDoorControlsR49
         var state=STATES.computeIfAbsent(level,key->new State());
         if(open)
         {
-            for(var feet:List.of(new Vec3(p.getX()+.5,p.getY(),-221.5),new Vec3(p.getX()+.5,p.getY(),-223.5)))
+            for(var feet:doorBinding(level,p)==null?List.of(new Vec3(p.getX()+.5,p.getY(),-221.5),new Vec3(p.getX()+.5,p.getY(),-223.5)):doorBinding(level,p).approachFeet())
                 if(!TrainingPilotDirector.safeActualFeetR47(level,feet)||!level.noCollision(player,player.getDimensions(net.minecraft.world.entity.Pose.STANDING).makeBoundingBox(feet)))
                 {player.displayClientMessage(Component.literal("卫兵侧通道净空不足，请先清理门外。"),true);return true;}
             state.pilotUntil.put(p,level.getGameTime()+100);
@@ -135,15 +148,16 @@ public final class FacilityDoorControlsR49
     {return player.getItemInHand(hand).getItem() instanceof NervAccessCardR44 card&&card.clearance()>=3;}
     private static boolean readerValid(ServerLevel level,BlockPos p)
     {
+        var binding=readerBinding(level,p);
         var s=level.getBlockState(p);
-        if(!s.is(ModBlocks.NERV_ACCESS_READER.get())||s.getValue(NervAccessReaderR44.FACING)!=(p.getZ()==314?Direction.NORTH:Direction.SOUTH)
+        if(!s.is(ModBlocks.NERV_ACCESS_READER.get())||s.getValue(NervAccessReaderR44.FACING)!=(binding!=null?binding.facing():p.getZ()==314?Direction.NORTH:Direction.SOUTH)
                 ||!(level.getBlockEntity(p) instanceof NervAccessReaderEntityR44 reader))return false;
         var tag=reader.saveWithoutMetadata();
         return !tag.getBoolean("Linked")&&tag.getInt("Clearance")==3
-                &&level.getBlockState(new BlockPos(27,-363,315)).is(net.minecraft.world.level.block.Blocks.BLACK_CONCRETE);
+                &&level.getBlockState(binding==null?new BlockPos(27,-363,315):binding.backing()).is(net.minecraft.world.level.block.Blocks.BLACK_CONCRETE);
     }
     private static boolean completeGate(ServerLevel level)
-    {return validDoor(level,GATE.get(0),DoorHingeSide.RIGHT)&&validDoor(level,GATE.get(1),DoorHingeSide.LEFT)&&READERS.stream().allMatch(p->readerValid(level,p));}
+    {var gate=gate(level);return gate.size()==2&&validDoor(level,gate.get(0),DoorHingeSide.RIGHT)&&validDoor(level,gate.get(1),DoorHingeSide.LEFT)&&readers(level).stream().allMatch(p->readerValid(level,p));}
     private static void visual(ServerLevel level,BlockPos pos,long start,int status)
     {
         if(!(level.getBlockEntity(pos) instanceof NervAccessReaderEntityR44 reader))return;
@@ -154,11 +168,15 @@ public final class FacilityDoorControlsR49
     @SubscribeEvent(priority=EventPriority.HIGHEST)
     public static void use(PlayerInteractEvent.RightClickBlock event)
     {
+        if(event.getEntity() instanceof ServerPlayer caller&&NervRouteRuntimeR52.claimed(caller.serverLevel())&&!installed(caller.serverLevel())&&ownsDoor(caller.serverLevel(),event.getPos()))
+        {event.setCanceled(true);event.setCancellationResult(InteractionResult.CONSUME);return;}
+        if(event.getEntity() instanceof ServerPlayer caller&&NervRouteRuntimeR52.claimed(caller.serverLevel())&&!installed(caller.serverLevel())&&protectedReader(caller.serverLevel(),event.getPos()))
+        {event.setCanceled(true);event.setCancellationResult(InteractionResult.CONSUME);return;}
         if(!(event.getEntity() instanceof ServerPlayer player)||!installed(player.serverLevel()))return;
         var level=player.serverLevel();var p=event.getPos();
-        if(GATE.stream().anyMatch(q->p.equals(q)||p.equals(q.above())))
+        if(gate(level).stream().anyMatch(q->p.equals(q)||p.equals(q.above())))
         {event.setCanceled(true);event.setCancellationResult(InteractionResult.CONSUME);player.displayClientMessage(Component.literal("SEELE门内外均需在读卡器刷最高权限卡。"),true);return;}
-        if(!READERS.contains(p))return;
+        if(!readers(level).contains(p))return;
         event.setCanceled(true);event.setCancellationResult(InteractionResult.CONSUME);
         if(player.isSpectator()||player.distanceToSqr(Vec3.atCenterOf(p))>=16||!completeGate(level))return;
         var hand=highest(player,event.getHand())?event.getHand():highest(player,InteractionHand.OFF_HAND)?InteractionHand.OFF_HAND:InteractionHand.MAIN_HAND;
@@ -179,7 +197,7 @@ public final class FacilityDoorControlsR49
             var player=event.getServer().getPlayerList().getPlayer(swipe.player());
             boolean permit=player!=null&&player.serverLevel()==level&&!player.isSpectator()&&highest(player,swipe.hand())
                     &&player.distanceToSqr(Vec3.atCenterOf(swipe.reader()))<16&&completeGate(level)
-                    &&(swipe.reader().getZ()==314?player.getZ()<315:player.getZ()>316);
+                    &&readerSide(level,swipe.reader(),player.position());
             if(permit){state.gateUntil=now+120;SeeleConferenceAccessR47.grantRoomSwipeR49(player,swipe.hand());}
             visual(level,swipe.reader(),swipe.at(),permit?2:3);
             level.playSound(null,swipe.reader(),permit?SoundEvents.NOTE_BLOCK_PLING.value():SoundEvents.NOTE_BLOCK_BASS.value(),SoundSource.BLOCKS,.35F,permit?1.3F:.75F);
@@ -187,19 +205,42 @@ public final class FacilityDoorControlsR49
         }
         if(completeGate(level))
         {
-            boolean wasOpen=GATE.stream().allMatch(p->level.getBlockState(p).getValue(DoorBlock.OPEN));
-            if(wasOpen&&now>=state.gateUntil&&occupied(level,GATE.get(0),2))state.gateUntil=now+15;
-            for(var p:GATE)door(level,p,now<state.gateUntil);
+            boolean wasOpen=gate(level).stream().allMatch(p->level.getBlockState(p).getValue(DoorBlock.OPEN));
+            if(wasOpen&&now>=state.gateUntil&&occupied(level,gate(level).get(0),2))state.gateUntil=now+15;
+            for(var p:gate(level))door(level,p,now<state.gateUntil);
         }
-        for(var p:PILOT)
+        for(var p:pilot(level))
         {
             if(!validDoor(level,p,DoorHingeSide.RIGHT)||!level.getBlockState(p).getValue(DoorBlock.OPEN))continue;
             if(now>=state.pilotUntil.getOrDefault(p,0L)&&!occupied(level,p,1)){door(level,p,false);state.pilotUntil.remove(p);}
         }
-        for(var p:READERS)
+        for(var p:readers(level))
             if(level.hasChunkAt(p)&&!state.swipes.containsKey(p)&&level.getBlockEntity(p) instanceof NervAccessReaderEntityR44 reader
                     &&reader.indicator()!=0&&now>reader.saveWithoutMetadata().getLong("IndicateUntil"))visual(level,p,-1,0);
     }
+    public static boolean rootControlsValid(ServerLevel level,S20LiftManifestR52.RoomControls controls)
+    {
+        // A remote pilot room is verified by validDoor on use/tick; it cannot hold the SEELE lift.
+        for(var door:controls.gate())
+            for(var p:List.of(door.lower(),door.lower().above()))
+            {
+                if(!level.hasChunkAt(p))return false;
+                var state=level.getBlockState(p);if(!(state.getBlock() instanceof CityPersonnelDoorR44)||level.getBlockEntity(p)!=null
+                        ||state.getValue(DoorBlock.FACING)!=door.facing()||state.getValue(DoorBlock.HINGE)!=door.hinge()
+                        ||state.getValue(DoorBlock.HALF)!=(p.equals(door.lower())?DoubleBlockHalf.LOWER:DoubleBlockHalf.UPPER))return false;
+            }
+        for(var reader:controls.gateReaders())
+        {
+            if(!level.hasChunkAt(reader.position())||!level.hasChunkAt(reader.backing()))return false;
+            var state=level.getBlockState(reader.position());if(!state.is(ModBlocks.NERV_ACCESS_READER.get())||state.getValue(NervAccessReaderR44.FACING)!=reader.facing()
+                    ||!(level.getBlockEntity(reader.position()) instanceof NervAccessReaderEntityR44 entity)||!level.getBlockState(reader.backing()).is(net.minecraft.world.level.block.Blocks.BLACK_CONCRETE))return false;
+            var tag=entity.saveWithoutMetadata();if(tag.getBoolean("Linked")||tag.getInt("Clearance")!=3)return false;
+        }
+        return true;
+    }
+    public static void invalidateR52(ServerLevel level){STATES.remove(level);}
+    private static boolean readerSide(ServerLevel level,BlockPos position,Vec3 player)
+    {var reader=readerBinding(level,position);if(reader==null)return position.getZ()==314?player.z<315:player.z>316;double value=reader.sideAxis()==Direction.Axis.X?player.x:player.z;return reader.less()?value<reader.boundary():value>reader.boundary();}
     @SubscribeEvent public static void stopped(ServerStoppedEvent event)
     {ENABLED.remove(event.getServer());STATES.keySet().removeIf(level->level.getServer()==event.getServer());}
     private FacilityDoorControlsR49() { }

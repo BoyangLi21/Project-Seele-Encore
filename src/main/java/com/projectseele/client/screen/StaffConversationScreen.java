@@ -113,7 +113,7 @@ public final class StaffConversationScreen extends Screen
             addButton("驾驶员安排",x+16+half,controlsY,half,()->switchTab(9),permitted("board"));
             addButton("武器井与装备",x+12,controlsY+22,half,()->switchTab(10),permitted("weapons"));
             addButton("城市升降",x+16+half,controlsY+22,half,()->{switchTab(5);send("TOPIC:city");},permitted("city_rise"));
-            addButton("设施与地下出击控制",x+12,controlsY+44,panelWidth-24,()->switchTab(11),permitted("deploy"));
+            addButton("地下出口门控",x+12,controlsY+44,panelWidth-24,()->switchTab(11),permitted("deploy"));
         }
         else if (tab == 8)
         {
@@ -124,15 +124,20 @@ public final class StaffConversationScreen extends Screen
                         x + 12 + i * (column + 4), controlsY, column, () -> { unit = selection; rebuildWidgets(); }, true);
             }
             String[] commands = {"整备", "发射", "回收"};
+            String[] labels = {"准备", "地表发射", "回收"};
             for (int i = 0; i < commands.length; i++)
             {
                 String action = commands[i];
-                addButton(action, x + 12 + i * (column + 4), controlsY + 22, column,
+                addButton(labels[i], x + 12 + i * (column + 4), controlsY + 22, column,
                         () -> send(action + " 0" + unit), permitted(new String[]{"prepare","launch","recover"}[i]));
             }
             int half = (panelWidth - 28) / 2;
-            addButton("整备后发射", x + 12, controlsY + 44, half, () -> send("整备后发射 0" + unit), permitted("deploy"));
-            addButton("取消后续操作", x + 16 + half, controlsY + 44, half, () -> send("停止操作"), true);
+            addButton("准备＋地表发射", x + 12, controlsY + 44, half, () -> send("整备后发射 0" + unit), permitted("deploy"));
+            addButton("准备＋地下紧急部署", x + 16 + half, controlsY + 44, half,
+                    () -> send(com.projectseele.world.StaffUndergroundChoiceR52.request(unit,true)), permitted("deploy"));
+            addButton("地下紧急部署", x + 12, controlsY + 66, half,
+                    () -> send(com.projectseele.world.StaffUndergroundChoiceR52.request(unit,false)), permitted("deploy"));
+            addButton("取消后续操作", x + 16 + half, controlsY + 66, half, () -> send("停止操作"), true);
         }
         else if(tab==9)
         {
@@ -153,7 +158,7 @@ public final class StaffConversationScreen extends Screen
         {
             selectUnit(controlsY,column);
             int half=(panelWidth-28)/2;
-            addButton("开启本机地下紧急门",x+12,controlsY+22,half,()->send("UNDERGROUND:"+unit+":open"),permitted("deploy"));
+            addButton("开启已出动机体地下门",x+12,controlsY+22,half,()->send("UNDERGROUND:"+unit+":door_open"),permitted("deploy"));
             addButton("关闭本机地下紧急门",x+16+half,controlsY+22,half,()->send("UNDERGROUND:"+unit+":close"),permitted("deploy"));
         }
         else if(tab==2)
@@ -348,9 +353,9 @@ public final class StaffConversationScreen extends Screen
     {
         int reserved=switch(tab)
         {
-            case 12 -> 179;
+            case 8,12 -> 179;
             case 13,14 -> 157;
-            case 3,8 -> 135;
+            case 3 -> 135;
             case 5,7,9,10,11,15,6 -> 113;
             default -> 91;
         };

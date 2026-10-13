@@ -44,7 +44,11 @@ final class EvaMechanicalResetR30
                 var manager=eva.getAnimatableInstanceCache().getManagerForId(eva.getId());
                 manager.clearSnapshotCache();
                 manager.getAnimationControllers().values().forEach(controller->{controller.stop();controller.forceAnimationReset();controller.getBoneAnimationQueues().clear();});
-                EvaMotionEngineV2.resetEntityR30(eva);EvaPoseTransition.resetEntityR30(eva);
+                EvaMotionEngineV2.resetEntityR30(eva);
+                // The new weapon's source still replaces controller state,
+                // while its ordinary guard starts from the last rendered arms.
+                // Full mechanical/complete-owner resets below remain absolute.
+                if(!EvaPoseTransition.retainNormalWeaponHistoryR52(eva))EvaPoseTransition.resetEntityR30(eva);
                 EvaRifleProneBody.resetEntityR31(eva);EvaRifleMocap.resetEntityR31(eva);
             }
             return;

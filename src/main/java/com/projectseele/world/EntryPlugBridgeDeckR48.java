@@ -6,6 +6,7 @@ import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.block.state.StateDefinition;
+import net.minecraft.world.level.block.state.properties.IntegerProperty;
 import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
@@ -13,15 +14,16 @@ import net.minecraft.world.phys.shapes.VoxelShape;
 /** A continuous top plate and real under-deck steel, with exposed-edge warning fascia. */
 public final class EntryPlugBridgeDeckR48 extends Block
 {
+    public static final IntegerProperty UNIT_R52=IntegerProperty.create("unit",0,2);
     private static final VoxelShape BASE=Shapes.or(box(0,13.5,0,16,16,16),
             box(1,0,1,3,13.5,15),box(13,0,1,15,13.5,15),box(3,2,7,13,4,9));
     public EntryPlugBridgeDeckR48(Properties properties)
     {
         super(properties);
-        registerDefaultState(FacilityEdgeRailR41.empty(this));
+        registerDefaultState(FacilityEdgeRailR41.empty(this).setValue(UNIT_R52,1));
     }
     @Override protected void createBlockStateDefinition(StateDefinition.Builder<Block,BlockState> builder)
-    {builder.add(FacilityEdgeRailR41.NORTH,FacilityEdgeRailR41.EAST,FacilityEdgeRailR41.SOUTH,FacilityEdgeRailR41.WEST);}
+    {builder.add(FacilityEdgeRailR41.NORTH,FacilityEdgeRailR41.EAST,FacilityEdgeRailR41.SOUTH,FacilityEdgeRailR41.WEST,UNIT_R52);}
     @Override public VoxelShape getShape(BlockState state,BlockGetter level,BlockPos pos,CollisionContext context)
     {
         VoxelShape shape=BASE;

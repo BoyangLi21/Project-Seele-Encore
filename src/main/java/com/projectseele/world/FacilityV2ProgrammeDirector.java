@@ -82,6 +82,7 @@ public final class FacilityV2ProgrammeDirector
 
     public static void startCommandCore(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         requireClean(level, "startCommandCore");
         FacilityV2SavedData facility = FacilityV2SavedData.get(level);
         if (!facility.commissioned())
@@ -94,6 +95,7 @@ public final class FacilityV2ProgrammeDirector
 
     public static void startPublicBackbone(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         requireClean(level, "startPublicBackbone");
         FacilityV2SavedData facility = FacilityV2SavedData.get(level);
         if (!facility.commissioned())
@@ -106,6 +108,7 @@ public final class FacilityV2ProgrammeDirector
 
     public static void startExteriorLoop(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         requireClean(level, "startExteriorLoop");
         FacilityV2SavedData facility = FacilityV2SavedData.get(level);
         if (!facility.commissioned())
@@ -118,6 +121,7 @@ public final class FacilityV2ProgrammeDirector
 
     public static void startDogmaBackbone(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         requireClean(level, "startDogmaBackbone");
         FacilityV2SavedData facility = FacilityV2SavedData.get(level);
         if (!facility.commissioned())
@@ -130,11 +134,13 @@ public final class FacilityV2ProgrammeDirector
 
     public static void startUnit01Backbone(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         startEvaBackbone(level);
     }
 
     public static void startEvaBackbone(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         requireClean(level, "startEvaBackbone");
         FacilityV2SavedData facility = FacilityV2SavedData.get(level);
         if (!facility.commissioned())
@@ -147,6 +153,7 @@ public final class FacilityV2ProgrammeDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(server))
         {
             return;
@@ -187,6 +194,7 @@ public final class FacilityV2ProgrammeDirector
         else if (UNIT01_BACKBONE.equals(programme.programme())
                 || EVA_BACKBONE.equals(programme.programme()))
         {
+            if(NervLegacyGenerationGuardR52.retired(level))return;
             zones = UNIT01_BACKBONE_ZONES;
         }
         else

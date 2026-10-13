@@ -113,21 +113,28 @@ final class EvaHeadClearance
         EvaRigTransforms.rotate(head,EvaRigTransforms.rotation(parent).invert()
                 .mul(orientation(base,right,forward,lift,roll)));
         var transform=new Matrix4f(inverseGun).mul(world).mul(EvaRigTransforms.model(head));
+        // The BVH query only reads this triangle during the call; it never
+        // retains it. Keep all original vertices/tests while reusing the
+        // candidate-local destination instead of allocating five vectors and
+        // a Triangle for every transformed source triangle.
+        var posed=new Triangle(new Vector3f(),new Vector3f(),new Vector3f(),new Vector3f(),new Vector3f());
         for(var triangle:shape)
         {
-            var posed=new Triangle(transform.transformPosition(new Vector3f(triangle.a())),
-                    transform.transformPosition(new Vector3f(triangle.b())),
-                    transform.transformPosition(new Vector3f(triangle.c())));
+            transformTriangle(triangle,transform,posed);
             if(hits(rifle,posed))return true;
         }
         for(var blocker:blockers)
         {
             var local=new Matrix4f(blocker.inverseBone()).mul(EvaRigTransforms.model(head));
             for(var triangle:shape)
-                if(hits(blocker.shape(),new Triangle(local.transformPosition(new Vector3f(triangle.a())),
-                        local.transformPosition(new Vector3f(triangle.b())),local.transformPosition(new Vector3f(triangle.c())))))return true;
+            {transformTriangle(triangle,local,posed);if(hits(blocker.shape(),posed))return true;}
         }
         return false;
+    }
+    private static void transformTriangle(Triangle source,Matrix4f transform,Triangle destination)
+    {
+        transform.transformPosition(source.a(),destination.a());transform.transformPosition(source.b(),destination.b());transform.transformPosition(source.c(),destination.c());
+        destination.min().set(destination.a()).min(destination.b()).min(destination.c());destination.max().set(destination.a()).max(destination.b()).max(destination.c());
     }
 
     static void apply(EvaUnit01Entity eva,GeoBone head,Matrix4f world,Matrix4f gun,
@@ -181,10 +188,15 @@ final class EvaHeadClearance
             // Contact/no-contact changes at a triangle edge must not make the
             // helmet jump across the sight line to the other cheek each frame.
             if(rollSide!=0&&candidate[1]*rollSide<0)continue;
+            double dl=candidate[0]-oldLift,dr=candidate[1]-oldRoll;
+            double score=dl*dl+2*dr*dr+.08*(candidate[0]*candidate[0]+2*candidate[1]*candidate[1]);
+            // A candidate whose unchanged exact score cannot win needs no
+            // geometric trial. Equal scores never replaced the winner before.
+            // The selected/relaxed/smoothed/final pose still receives the full
+            // original rifle and body triangle clearance tests below.
+            if(score>=best)continue;
             if(!applyAndTest(head,parent,world,inverseGun,desired,right,forward,candidate[0],candidate[1],shape,blockers))
             {
-                double dl=candidate[0]-oldLift,dr=candidate[1]-oldRoll;
-                double score=dl*dl+2*dr*dr+.08*(candidate[0]*candidate[0]+2*candidate[1]*candidate[1]);
                 if(score<best){best=score;lift=candidate[0];roll=candidate[1];found=true;}
             }
         }

@@ -18,6 +18,7 @@ public final class FacilityLiftsR25
 
     public static List<S20PhysicalElevatorDirector.LiftSpec> installed(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))return List.of();
         if (!level.dimension().equals(FacilitySchemaV2.DIMENSION)
                 || !FacilityWorldPolicy.markerPresent(level.getServer(), "facility_lifts_r25.json")) return List.of();
         boolean internal=FacilityWorldPolicy.markerPresent(level.getServer(), "facility_lifts_r26.json");

@@ -22,7 +22,8 @@ import java.util.zip.GZIPInputStream;
 public final class NervWayfindingR24
 {
     private record LiftRoute(int next,BlockPos landing,double walkingMetres,boolean floorTransfer){}
-    private record Graph(String dimension,List<String> ids,String[] names,BlockPos[] nodes,boolean[] active,int[][] next,Map<Long,List<Integer>> columns,LiftRoute[] nearestLifts){}
+    public record Transit(String line,String destination){}
+    private record Graph(String dimension,List<String> ids,String[] names,BlockPos[] nodes,boolean[] active,int[][] next,Map<Long,List<Integer>> columns,LiftRoute[] nearestLifts,Map<Long,Transit> transit,Map<BlockPos,String> landingLabels,boolean relocated){}
     private record Selection(ServerLevel level,String goal){}
     public record Guide(String destination,BlockPos here,BlockPos next,String instruction,boolean arrived){}
     private static final Map<net.minecraft.server.MinecraftServer,Optional<Graph>> GRAPHS=new WeakHashMap<>();
@@ -66,11 +67,34 @@ public final class NervWayfindingR24
                 }
                 for(int i=0;i<nodes.length;i++)for(int g=0;g<count;g++)
                     if(!active[i]&&next[i][g]!=i||active[i]&&!active[next[i][g]])throw new IllegalArgumentException("Routing edge uses an inactive node");
-                return Optional.of(new Graph(json.get("dimension").getAsString(),List.copyOf(ids),names,nodes,active,next,columns,loadNearestLifts(path,nodes,active)));
+                var labels=new HashMap<BlockPos,String>();
+                if(json.has("named_lift_landings"))for(var raw:json.getAsJsonArray("named_lift_landings"))
+                {var row=raw.getAsJsonObject();int node=row.get("node").getAsInt();String label=row.get("label").getAsString();
+                    if(node<0||node>=nodes.length||!active[node]||label.isBlank()||label.length()>100)throw new IllegalArgumentException("Actual named lift landing required");labels.put(nodes[node],label);}
+                return Optional.of(new Graph(json.get("dimension").getAsString(),List.copyOf(ids),names,nodes,active,next,columns,loadNearestLifts(path,nodes,active),readTransit(json,active),Map.copyOf(labels),json.has("r52_navigation")&&json.get("r52_navigation").getAsBoolean()));
             }
             catch(Exception failure){ProjectSeele.LOGGER.error("Measured wayfinding resource rejected",failure);return Optional.empty();}
         }).orElse(null);
     }
+    public static Map<Long,Transit> readTransit(JsonObject root,boolean[] active)
+    {
+        var result=new HashMap<Long,Transit>();if(!root.has("transport_edges"))return Map.of();
+        var rows=root.getAsJsonArray("transport_edges");if(rows.size()>128)throw new IllegalArgumentException("Bounded actual transit connections required");
+        for(var raw:rows)
+        {
+            var row=raw.getAsJsonObject();int from=row.get("from").getAsBigDecimal().intValueExact(),to=row.get("to").getAsBigDecimal().intValueExact();
+            String kind=row.get("kind").getAsString(),line=row.get("line").getAsString(),destination=row.get("destination").getAsString();
+            if(!kind.equals("TRAIN")||from==to||from<0||to<0||from>=active.length||to>=active.length||!active[from]||!active[to]
+                    ||line.isBlank()||line.length()>80||destination.isBlank()||destination.length()>100
+                    ||row.get("source_station_id").getAsString().equals(row.get("destination_station_id").getAsString()))
+                throw new IllegalArgumentException("Real distinct station-to-station transit edge required");
+            if(result.putIfAbsent(edge(from,to),new Transit(line,destination))!=null)throw new IllegalArgumentException("Duplicate transit direction");
+        }
+        return Map.copyOf(result);
+    }
+    private static long edge(int from,int to){return((long)from<<32)|(to&0xffffffffL);}
+    private static String zone(Graph graph,BlockPos at)
+    {return graph.landingLabels.getOrDefault(at,graph.relocated?"Y="+at.getY()+" 层":zone(at));}
     private static LiftRoute[] loadNearestLifts(Path graphPath,BlockPos[] nodes,boolean[] active)
     {
         Path path=graphPath.resolveSibling(graphPath.getFileName().toString().equals("local_lift_routes_r45.json.gz")
@@ -152,7 +176,7 @@ public final class NervWayfindingR24
     {
         var graph=graph(player);if(graph==null||!player.level().dimension().location().toString().equals(graph.dimension))return "请沿现场导向牌行走。指挥室、机库和总部火车站采用同一套目的地名称。";
         int start=nearest(player,graph);if(start<0)return "你现在不在已测绘的公共通道上。先从本房间的正式出入口回到走廊，再选择目的地。";
-        return "这里是"+zone(graph.nodes[start])+"。请选择目的地；引导沿实测通道、车站接驳和直梯连接更新。终极教条仍按现场门禁验证通行权限。";
+        return "这里是"+zone(graph,graph.nodes[start])+"。请选择目的地；引导沿实测通道、车站接驳和直梯连接更新。终极教条仍按现场门禁验证通行权限。";
     }
     public static Optional<Guide> guide(ServerPlayer player,String goal)
     {
@@ -162,7 +186,7 @@ public final class NervWayfindingR24
         int node=nearest(player,graph);if(node<0)return Optional.empty();
         int next=graph.next[node][index];String cue=instruction(graph,node,index);
         var target=graph.nodes[next];
-        if(player.level().hasChunkAt(target))
+        if(!graph.transit.containsKey(edge(node,next))&&player.level().hasChunkAt(target))
         {
             var state=player.level().getBlockState(target);
             boolean sameLanding=Math.abs(target.getY()-graph.nodes[node].getY())<=1;
@@ -195,7 +219,7 @@ public final class NervWayfindingR24
             int dy=Integer.signum(next.getY()-here.getY()),dx=Integer.signum(next.getX()-here.getX()),dz=Integer.signum(next.getZ()-here.getZ());
             String direction=dx>0?"东":dx<0?"西":dz>0?"南":"北";
             cue=(dy==0?"向"+direction+"沿廊前行":"沿楼梯"+(dy>0?"上行":"下行"))+" · 距层门约 "+Math.max(1,Math.round(route.walkingMetres))+" m";
-            if(route.floorTransfer)cue="本处需循原有通道与阶梯到"+zone(route.landing)+" · "+cue;
+            if(route.floorTransfer)cue="本处需循原有通道与阶梯到"+zone(graph,route.landing)+" · "+cue;
         }
         if(!arrived&&player.level().hasChunkAt(next))
         {
@@ -208,7 +232,7 @@ public final class NervWayfindingR24
                     next.getX()+.75,next.getY()+.01,next.getZ()+.75)).iterator().hasNext())
                 cue="前方踏面暂不可用，请等待机械到位或循现场导向绕行";
         }
-        return Optional.of(new Guide("最近电梯 · "+zone(route.landing),here,next,cue,arrived));
+        return Optional.of(new Guide("最近电梯 · "+zone(graph,route.landing),here,next,cue,arrived));
     }
     public static String zone(int y)
     {
@@ -226,12 +250,14 @@ public final class NervWayfindingR24
     private static String instruction(Graph graph,int from,int goal)
     {
         BlockPos start=graph.nodes[from];int cursor=graph.next[from][goal];if(cursor==from)return "已到达 "+graph.names[goal];
+        var transit=graph.transit.get(edge(from,cursor));if(transit!=null)return "按站牌乘 "+transit.line()+"，在 "+transit.destination()+" 下车后继续步行";
         BlockPos first=graph.nodes[cursor];int dx=Integer.signum(first.getX()-start.getX()),dy=Integer.signum(first.getY()-start.getY()),dz=Integer.signum(first.getZ()-start.getZ());
-        if(Math.abs(first.getY()-start.getY())>1)return "乘直梯"+(dy>0?"上行":"下行")+"至"+zone(first);
+        if(Math.abs(first.getY()-start.getY())>1)return "乘直梯"+(dy>0?"上行":"下行")+"至"+zone(graph,first);
         double metres=start.distSqr(first)==0?0:Math.sqrt(start.distSqr(first));
         for(int i=0;i<60;i++)
         {
             int next=graph.next[cursor][goal];if(next==cursor)break;BlockPos a=graph.nodes[cursor],b=graph.nodes[next];
+            if(graph.transit.containsKey(edge(cursor,next)))break;
             if(Integer.signum(b.getX()-a.getX())!=dx||Integer.signum(b.getY()-a.getY())!=dy||Integer.signum(b.getZ()-a.getZ())!=dz||Math.abs(b.getY()-a.getY())>1)break;
             metres+=Math.sqrt(a.distSqr(b));cursor=next;
         }
@@ -247,7 +273,7 @@ public final class NervWayfindingR24
             var player=event.getServer().getPlayerList().getPlayer(entry.getKey());
             if(player==null||player.level()!=entry.getValue().level){selections.remove(entry.getKey());continue;}
             var guidance=guide(player,entry.getValue().goal);
-            if(guidance.isEmpty()){player.displayClientMessage(Component.literal("步行引导：请回到公共通道，或等待直梯到层"),true);continue;}
+            if(guidance.isEmpty()){boolean train=player.isPassenger()&&player.getRootVehicle().getType().builtInRegistryHolder().key().location().getNamespace().equals("mtr");player.displayClientMessage(Component.literal(train?"乘车途中，请留意站内导向与到站播报，下车后继续引导":"步行引导：请回到公共通道，或等待直梯到层"),true);continue;}
             var guide=guidance.get();player.displayClientMessage(Component.literal(guide.destination+"  ·  "+guide.instruction),true);
             if(guide.arrived)selections.remove(entry.getKey());
         }

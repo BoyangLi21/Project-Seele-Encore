@@ -19,6 +19,16 @@ final class EvaRigTransforms
         Collections.reverse(chain);var pose=new PoseStack();for(var b:chain)RenderUtils.prepMatrixForBone(pose,b);
         return new Matrix4f(pose.last().pose());
     }
+    static Matrix4f model(GeoBone bone,GeoBone excludedAncestor)
+    {
+        var pose=new PoseStack();prepBelow(bone,excludedAncestor,pose);return new Matrix4f(pose.last().pose());
+    }
+    private static void prepBelow(GeoBone bone,GeoBone excludedAncestor,PoseStack pose)
+    {
+        if(bone==excludedAncestor)return;
+        if(bone.getParent()!=null)prepBelow(bone.getParent(),excludedAncestor,pose);
+        software.bernie.geckolib.util.RenderUtils.prepMatrixForBone(pose,bone);
+    }
     static Matrix4f parent(GeoBone bone,Matrix4f root) { return bone.getParent()==null?new Matrix4f(root):new Matrix4f(root).mul(model(bone.getParent())); }
     static Quaternionf rotation(Matrix4f matrix) { return matrix.getUnnormalizedRotation(new Quaternionf()).normalize(); }
     static void rotate(GeoBone bone,Quaternionf q)

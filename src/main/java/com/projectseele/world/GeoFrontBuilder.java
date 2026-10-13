@@ -57,6 +57,7 @@ public final class GeoFrontBuilder
 
     public static void build(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         build(level, origin, false);
     }
 
@@ -64,6 +65,7 @@ public final class GeoFrontBuilder
     public static void build(ServerLevel level, BlockPos origin,
                              boolean preservePrivateShell)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "GeoFrontBuilder.build");
         PerformanceCounters.recordBuilderCall();
@@ -563,6 +565,7 @@ public final class GeoFrontBuilder
      */
     public static boolean ensurePyramidRevision(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return false;
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "GeoFrontBuilder.ensurePyramidRevision");
         BlockPos baseMarker = origin.offset(-PYRAMID_BASE_HALF_X,
@@ -1436,6 +1439,7 @@ public final class GeoFrontBuilder
      */
     public static void repairCavernLighting(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "GeoFrontBuilder.repairCavernLighting");
         int floorDeltaY = origin.getY() - cavernCentre(origin).getY();
@@ -1833,6 +1837,7 @@ public final class GeoFrontBuilder
 
     private static void set(ServerLevel level, BlockPos position, BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

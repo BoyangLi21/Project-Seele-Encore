@@ -41,8 +41,6 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
 public final class TvMarineDirectorR50
 {
-    public static final UUID[] ORIGINAL_CANNONS={UUID.fromString("a2f5ffe8-278c-4fd2-8edd-2a4f378fca5f"),UUID.fromString("4e33b3e4-051f-46de-8935-673c7afabe49")};
-    private static final Vec3[] CANNON_POS={new Vec3(1420.5,65,350.5),new Vec3(1471.5,65,392.5)};
     private static final TicketType<ChunkPos> TICKET=TicketType.create("tv_marine_r50",Comparator.comparingLong(ChunkPos::toLong),200);
     private static final int CHARGE_TICKS=80,RELOAD_TICKS=200,DOUBLE_WINDOW=120;
     private static final String SHOT="TvMarineCannonR50",GEN="TvMarineShotGenerationR50";
@@ -51,7 +49,7 @@ public final class TvMarineDirectorR50
     private static void retainSite(ServerLevel level,TvMarineSiteR50.Site site)
     {
         retain(level,BlockPos.containing(site.spawn()));retain(level,site.powerBlock());retain(level,site.powerControl());
-        for(var pos:CANNON_POS)retain(level,BlockPos.containing(pos));
+        for(var cannon:site.cannons())retain(level,BlockPos.containing(cannon.position()));
         for(var pos:site.cannonControls())retain(level,pos);
         for(var pos:site.pylons())retain(level,pos);
         var boss=TvMarineSavedDataR50.get(level).boss;
@@ -63,8 +61,9 @@ public final class TvMarineDirectorR50
             for(double x:new double[]{box.minX,box.maxX})for(double z:new double[]{box.minZ,box.maxZ})retain(level,BlockPos.containing(x,end.y,z));
         }
         // Only this local encounter's two physical shot paths are retained.
-        for(Vec3 cannon:CANNON_POS)
+        for(var installed:site.cannons())
         {
+            Vec3 cannon=installed.position();
             int segments=Math.max(1,(int)Math.ceil(cannon.distanceTo(end)/16));
             for(int n=0;n<=segments;n++)retain(level,BlockPos.containing(cannon.lerp(end,n/(double)segments)));
         }
@@ -260,7 +259,7 @@ public final class TvMarineDirectorR50
                 ||!(level.getEntity(campaign.angel) instanceof GaghielEntity boss)||!damageAllowed(level,boss))return false;
         var site=TvMarineSiteR50.site(level).orElse(null);if(site==null||eva.position().distanceTo(site.center())>180)return false;
         var sortie=campaign.sorties.get(2);if(sortie==null||!eva.getUUID().equals(sortie.eva)||!pilot.getUUID().equals(sortie.pilotR45))return false;
-        Vec3 mouth=boss.mouthWorldPos(1),gunAxis=CANNON_POS[0].add(CANNON_POS[1]).scale(.5).subtract(boss.position()).multiply(1,0,1).normalize();
+        Vec3 mouth=boss.mouthWorldPos(1),gunAxis=site.cannons().get(0).position().add(site.cannons().get(1).position()).scale(.5).subtract(boss.position()).multiply(1,0,1).normalize();
         Vec3 intercept=boss.position().add(gunAxis.scale(49));
         Vec3 destination=TvMarineWalkR50.approachGoal(level,campaign,eva,intercept);
         if(destination==null)
@@ -288,14 +287,15 @@ public final class TvMarineDirectorR50
     }
     private static Entity originalCannon(ServerLevel level,int index)
     {
-        var cannon=level.getEntity(ORIGINAL_CANNONS[index]);
+        var site=TvMarineSiteR50.site(level).orElse(null);if(site==null||index<0||index>=site.cannons().size())return null;
+        var installed=site.cannons().get(index);var cannon=level.getEntity(installed.uuid());
         if(cannon!=null)
         {
             try {if((Boolean)cannon.getClass().getMethod("isWreck").invoke(cannon)||((Number)cannon.getClass().getMethod("getHealth").invoke(cannon)).floatValue()<=0)return null;}
             catch(ReflectiveOperationException failure){return null;}
         }
-        return cannon!=null&&cannon.isAlive()&&cannon.getTags().contains("seele_r07_owned")&&cannon.position().distanceTo(CANNON_POS[index])<4
-                &&BuiltInRegistries.ENTITY_TYPE.getKey(cannon.getType()).toString().equals(index==0?"superbwarfare:mk_42":"superbwarfare:hpj_11")?cannon:null;
+        return cannon!=null&&cannon.isAlive()&&cannon.getTags().contains("seele_r07_owned")&&cannon.position().distanceTo(installed.position())<4
+                &&BuiltInRegistries.ENTITY_TYPE.getKey(cannon.getType()).toString().equals(installed.type())?cannon:null;
     }
     private static boolean takeCannon(ServerLevel level,TvMarineSavedDataR50 state,int index)
     {
@@ -335,8 +335,9 @@ public final class TvMarineDirectorR50
         for(int i=0;i<2;i++)
         {
             var before=state.cannonBefore[i];if(before.isEmpty())continue;
-            Entity cannon=level.getEntity(ORIGINAL_CANNONS[i]);
-            if(cannon==null){retain(level,BlockPos.containing(CANNON_POS[i]));pending=true;continue;}
+            // Restoration belongs to the receipt, even if the installed map is unavailable or changed.
+            Entity cannon=before.hasUUID("Original")?level.getEntity(before.getUUID("Original")):null;
+            if(cannon==null){if(site!=null)retain(level,BlockPos.containing(site.cannons().get(i).position()));pending=true;continue;}
             if(!before.hasUUID("Original")||!before.getUUID("Original").equals(cannon.getUUID())){pending=true;continue;}
             try
             {
@@ -359,7 +360,7 @@ public final class TvMarineDirectorR50
     private static void clearOwnedShots(ServerLevel level,TvMarineSavedDataR50 state)
     {
         var site=TvMarineSiteR50.site(level).orElse(null);if(site==null)return;
-        var area=new net.minecraft.world.phys.AABB(CANNON_POS[0],CANNON_POS[1]).minmax(new net.minecraft.world.phys.AABB(site.spawn(),site.spawn())).inflate(160);
+        var area=new net.minecraft.world.phys.AABB(site.cannons().get(0).position(),site.cannons().get(1).position()).minmax(new net.minecraft.world.phys.AABB(site.spawn(),site.spawn())).inflate(160);
         for(Entity entity:level.getEntities((Entity)null,area,e->e instanceof Projectile&&e.getPersistentData().contains(SHOT)&&e.getPersistentData().getLong(GEN)==state.generation))entity.discard();
         for(int i=0;i<2;i++){state.shotTagBudget[i]=0;state.cannonOperator[i]=null;}
     }

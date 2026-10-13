@@ -32,6 +32,7 @@ public final class SeeleTravelCommandsR43
         new Destination("hakone","新箱根中央车站",new Vec3(-1484.5,131,649.5),180),
         new Destination("port","港口登舰栈桥",new Vec3(1471.5,65,582.5),180),
         new Destination("airport","NERV 航空基地航站楼",new Vec3(420.5,73,75.5),180),
+        new Destination("geofront_airport","地下运输机场控制区",new Vec3(-353.5,-475,-299.5),90),
         new Destination("un","联合国军事基地",new Vec3(6560.5,75,-5968.5),180),
         new Destination("un_hangar","联合国试验机库人员走廊",new Vec3(6394.5,77,-6192.5),90),
         new Destination("rei","绫波丽公寓门外",new Vec3(-2848.5,86,-1108.5),0),

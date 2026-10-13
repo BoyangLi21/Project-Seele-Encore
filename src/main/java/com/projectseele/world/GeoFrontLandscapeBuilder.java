@@ -50,11 +50,13 @@ public final class GeoFrontLandscapeBuilder
 
     public static LandscapeAudit build(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level);
         return build(level, IntegratedNervMapBuilder.GEOFRONT_ORIGIN);
     }
 
     public static LandscapeAudit build(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         PerformanceCounters.recordBuilderCall();
         buildLclShore(level, origin);
         buildServiceRoad(level, origin);
@@ -70,6 +72,7 @@ public final class GeoFrontLandscapeBuilder
     /** Bounded upgrade path for old saves; never rebuilds the 640-block shell. */
     public static LandscapeAudit ensure(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         LandscapeAudit audit = inspect(level, origin);
         if (!audit.valid())
         {
@@ -1173,6 +1176,7 @@ public final class GeoFrontLandscapeBuilder
 
     private static void set(ServerLevel level, BlockPos position, BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

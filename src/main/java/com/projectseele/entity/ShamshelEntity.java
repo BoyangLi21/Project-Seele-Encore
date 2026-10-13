@@ -35,6 +35,7 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     private static final EntityDataAccessor<Integer> SIDE=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Float> YAW=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Integer> SWEEP_MODE=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.INT);
+    private static final EntityDataAccessor<org.joml.Vector3f> ARMOR_AIM_R52=SynchedEntityData.defineId(ShamshelEntity.class,EntityDataSerializers.VECTOR3);
     private final EvaPoseSignalClock sweepClock=new EvaPoseSignalClock();
     private final Set<UUID> hitVictims=new HashSet<>();
     @Override public float getAtField(){return entityData.get(FIELD);}
@@ -42,9 +43,10 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     public int sweepSide(){return entityData.get(SIDE);}
     public int sweepMode(){return entityData.get(SWEEP_MODE);}
     public float sweepYaw(){return entityData.get(YAW);}
+    public Vec3 armorAimR52(){return new Vec3(entityData.get(ARMOR_AIM_R52));}
     public float sweepAge(float partial){return level().isClientSide?sweepClock.sample(FirstBattleSignals.clientFrameTime()):entityData.get(SWEEP);}
     @Override protected void defineSynchedData()
-    {super.defineSynchedData();entityData.define(FIELD,700F);entityData.define(SWEEP,-1);entityData.define(SIDE,-1);entityData.define(YAW,0F);entityData.define(SWEEP_MODE,0);}
+    {super.defineSynchedData();entityData.define(FIELD,700F);entityData.define(SWEEP,-1);entityData.define(SIDE,-1);entityData.define(YAW,0F);entityData.define(SWEEP_MODE,0);entityData.define(ARMOR_AIM_R52,new org.joml.Vector3f());}
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key)
     {super.onSyncedDataUpdated(key);if(key.equals(SWEEP)&&sweepClock!=null&&level().isClientSide)sweepClock.accept(entityData.get(SWEEP),false,true);}
     private int sweepCooldown = 30;
@@ -79,6 +81,14 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
     public void cancelSweepR31()
     {if(isSweeping()){entityData.set(SWEEP,-1);hitVictims.clear();sweepCooldown=Math.max(sweepCooldown,16);}getNavigation().stop();}
 
+    /** Independent visible ground sweep keeps the original root, shoulder and segment lengths. */
+    public boolean beginArmorSweepR52(Vec3 aim)
+    {
+        if(level().isClientSide||aim==null||!Double.isFinite(aim.lengthSqr())||isSweeping()||sweepCooldown>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        entityData.set(ARMOR_AIM_R52,aim.toVector3f());entityData.set(SWEEP,0);entityData.set(SIDE,-sweepSide());entityData.set(SWEEP_MODE,ShamshelWhipMotion.GROUND);
+        entityData.set(YAW,getYRot());hitVictims.clear();sweepChoice++;
+        playSound(com.projectseele.registry.ModSounds.SHAMSHEL_WHIP_CHARGE.get(),1.3F,1);return true;
+    }
     @Override public void aiStep()
     {
         if(!level().isClientSide&&(EvaCombatR31.constrainVictim(this)||CombatFeelR31.travel(this)))return;
@@ -148,7 +158,7 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
         int age=entityData.get(SWEEP)+1;entityData.set(SWEEP,age);setDeltaMovement(getDeltaMovement().scale(.6));
         setYRot(sweepYaw());yBodyRot=yHeadRot=getYRot();
         if(age==ShamshelWhipMotion.contactStart(sweepMode()))playSound(com.projectseele.registry.ModSounds.SHAMSHEL_WHIP_CRACK.get(),1.6F,sweepMode()==1?1.15F:.92F);
-        if(age>=ShamshelWhipMotion.contactStart(sweepMode())&&age<=ShamshelWhipMotion.contactEnd(sweepMode()))
+        if(sweepMode()!=ShamshelWhipMotion.GROUND&&age>=ShamshelWhipMotion.contactStart(sweepMode())&&age<=ShamshelWhipMotion.contactEnd(sweepMode()))
         {
             // Sample the same rendered chain through time. The old invisible
             // thirteen-block damage box also hit behind walls and through EVA.
@@ -195,6 +205,7 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
         tag.putFloat("AtField",getAtField());tag.putInt("SweepCooldown",sweepCooldown);tag.putInt("SweepAge",entityData.get(SWEEP));
         tag.putInt("SweepSide",sweepSide());tag.putFloat("SweepYaw",sweepYaw());
         tag.putInt("SweepModeR31",sweepMode());tag.putInt("SweepChoiceR31",sweepChoice);
+        var armor=armorAimR52();tag.putDouble("ArmorAimX_R52",armor.x);tag.putDouble("ArmorAimY_R52",armor.y);tag.putDouble("ArmorAimZ_R52",armor.z);
         var hits=new net.minecraft.nbt.ListTag();hitVictims.forEach(id->hits.add(net.minecraft.nbt.StringTag.valueOf(id.toString())));tag.put("SweepHits",hits);
         if (this.siegeBeacon != null)
         {
@@ -208,9 +219,10 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
         super.readAdditionalSaveData(tag);
         if(tag.contains("AtField"))entityData.set(FIELD,Math.max(0,Math.min(700,tag.getFloat("AtField"))));
         if(tag.contains("SweepCooldown"))sweepCooldown=Math.max(0,Math.min(34,tag.getInt("SweepCooldown")));
-        if(tag.contains("SweepAge"))entityData.set(SWEEP,Math.max(-1,Math.min(ShamshelWhipMotion.CYCLE-1,tag.getInt("SweepAge"))));
+        int savedMode=Math.max(0,Math.min(ShamshelWhipMotion.GROUND,tag.getInt("SweepModeR31")));
+        if(tag.contains("SweepAge"))entityData.set(SWEEP,Math.max(-1,Math.min(ShamshelWhipMotion.cycle(savedMode)-1,tag.getInt("SweepAge"))));
         entityData.set(SIDE,tag.getInt("SweepSide")<0?-1:1);entityData.set(YAW,tag.getFloat("SweepYaw"));
-        entityData.set(SWEEP_MODE,Math.max(0,Math.min(2,tag.getInt("SweepModeR31"))));sweepChoice=Math.max(0,tag.getInt("SweepChoiceR31"));
+        entityData.set(SWEEP_MODE,savedMode);entityData.set(ARMOR_AIM_R52,new org.joml.Vector3f((float)tag.getDouble("ArmorAimX_R52"),(float)tag.getDouble("ArmorAimY_R52"),(float)tag.getDouble("ArmorAimZ_R52")));sweepChoice=Math.max(0,tag.getInt("SweepChoiceR31"));
         hitVictims.clear();for(var hit:tag.getList("SweepHits",8))try{hitVictims.add(UUID.fromString(hit.getAsString()));}catch(IllegalArgumentException ignored){}
         this.siegeBeacon = tag.contains("SiegeBeacon")
                 ? BlockPos.of(tag.getLong("SiegeBeacon")) : null;

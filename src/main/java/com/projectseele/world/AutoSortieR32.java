@@ -32,7 +32,7 @@ public final class AutoSortieR32
                 :pilot instanceof ServerPlayer player&&!assignment.npc&&player.getUUID().equals(assignment.commander));
     }
     public static boolean automaticAllowed(ServerLevel level,int unit)
-    {return automaticBlockerR50(level,unit).isEmpty();}
+    {return NervRouteRuntimeR52.claimed(level)?NervRouteRuntimeR52.ready(level):automaticBlockerR50(level,unit).isEmpty();}
     private static String automaticBlockerR50(ServerLevel level,int unit)
     {
         if(StaffRecoveryR47.pending(level,unit))return "original_recovery_pending";
@@ -84,6 +84,7 @@ public final class AutoSortieR32
     /** Historical delegation ends only after actual return/boarding and every live original lease has closed. */
     private static boolean originalLeaseFreeR50(ServerLevel level,EvaUnit01Entity eva)
     {
+        if(NervRouteRuntimeR52.pending(level,eva.getUnitVariant()))return false;
         int unit=eva.getUnitVariant();var fleet=EvaFleetSavedData.get(level.getServer()).entry(unit).orElse(null);
         if(eva.isExperimentalUnit()||unit<0||unit>2||fleet==null||!fleet.canonicalId().equals(eva.getUUID())
                 ||EvaLogisticsDirector.canonicalUnit(level,unit)!=eva||!eva.isAlive()||eva.isFirstBattleActive()
@@ -157,6 +158,7 @@ public final class AutoSortieR32
     /** Selection/cancellation invalidate queued physical presses immediately, before the next staff tick. */
     public static void invalidateMission(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))NervRouteRuntimeR52.invalidateMission(level);
         for(int unit=0;unit<3;unit++)clearAutomatic(level,unit);
         StaffCommandBookR24.cancelMissionActions(level);
         StaffPilotOrdersR25.invalidateMission(level);
@@ -173,6 +175,7 @@ public final class AutoSortieR32
     public static void cancel(ServerPlayer player,int unit)
     {
         var level=player.serverLevel();
+        if(NervRouteRuntimeR52.claimed(level))NervRouteRuntimeR52.cancelOwner(level,player.getUUID(),unit);
         for(int i=0;i<3;i++)if(unit<0||i==unit)
         {
             var e=EvaLogisticsDirector.canonicalUnit(level,i);if(e==null)continue;var tag=e.getPersistentData();
@@ -196,6 +199,8 @@ public final class AutoSortieR32
         var level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;
         for(int unit=0;unit<3;unit++)
         {
+            if(TvYashimaTransitR52.automatic(level,unit))continue;
+            if(NervRouteRuntimeR52.claimed(level)){NervRouteRuntimeR52.automatic(level,unit);continue;}
             var eva=EvaLogisticsDirector.canonicalUnit(level,unit);if(eva==null)continue;
             String mission=missionToken(level);
             if(mission.isEmpty())

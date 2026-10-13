@@ -220,7 +220,8 @@ public final class FacilityWorldPolicy
 
     public static boolean legacyGenerationAllowed(MinecraftServer server)
     {
-        return !isCleanRebuild(server)
+        return !NervLegacyGenerationGuardR52.retired(server)
+                && !isCleanRebuild(server)
                 && !isS20Rebuild(server)
                 && !isReadOnlyBrokenArchive(server)
                 && !isSpatialPreviewFrozen(server)
@@ -230,6 +231,7 @@ public final class FacilityWorldPolicy
     /** Regional receipts retire the original S20 civil templates as a whole. */
     public static boolean unmigratedS20CivilGenerationAllowed(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return false;
         MinecraftServer server = level.getServer();
         return isS20Rebuild(server)
                 && !isSpatialPreviewFrozen(server)

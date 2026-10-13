@@ -56,6 +56,9 @@ public final class FirstBattleMission
     public static boolean begin(ServerPlayer player)
     {
         ServerLevel level=missionLevel(player);if(level==null){player.displayClientMessage(Component.literal("当前世界尚未设置迎击区域。"),false);return false;}
+        var campaign=com.projectseele.world.TvCampaignSavedData.get(level);
+        if(com.projectseele.world.SurfaceAngelPlanR52.handles(campaign.active))
+        {player.displayClientMessage(Component.literal("本次地表作战已接受，原使徒按登记远端路线接近；无需重复生成迎击目标。"),false);return false;}
         var data=FirstBattleSavedData.get(level);if(data.active!=null||data.missionOwner!=null){player.displayClientMessage(Component.literal("迎击任务已下达，请先完成当前行动。"),false);return false;}
         Site existingSite=site(level);
         if(!level.getEntitiesOfClass(SachielEntity.class,new net.minecraft.world.phys.AABB(existingSite.angel,existingSite.angel).inflate(220),
@@ -102,6 +105,10 @@ public final class FirstBattleMission
         for(ServerLevel level:event.getServer().getAllLevels())
         {
             Site s=site(level);if(s==null)continue;var data=FirstBattleSavedData.get(level);var bar=BARS.computeIfAbsent(level,l->new ServerBossEvent(Component.literal("NERV 迎撃指令"),BossEvent.BossBarColor.YELLOW,BossEvent.BossBarOverlay.PROGRESS));bar.removeAllPlayers();
+            // The TV surface director already owns spawn, approach, live bar and original UUID retention.
+            // Independent development replays keep their separate lifecycle.
+            if(com.projectseele.world.SurfaceAngelPlanR52.handles(com.projectseele.world.TvCampaignSavedData.get(level).active))
+            {bar.setVisible(false);continue;}
             if(data.missionOwner==null)continue;
             if(data.missionAngel!=null)
             {

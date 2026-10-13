@@ -22,6 +22,7 @@ public final class NervStaffDirector
     private static final Map<ServerLevel,Map<Long,Integer>> LOADED=new WeakHashMap<>();
     public static List<Station> roster(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervOriginalActorsR52.roster(level);
         return ROSTERS.computeIfAbsent(level,key->{
             var path=level.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_staff_r15.json");if(!Files.isRegularFile(path))return List.of();
             try
@@ -43,6 +44,9 @@ public final class NervStaffDirector
         if(event.phase!=TickEvent.Phase.END)return;
         for(var level:event.getServer().getAllLevels())
         {
+            // Existing actors continue their ordinary behaviour. Only the
+            // old-coordinate replacement spawner waits for Root roster data.
+            if(NervRouteRuntimeR52.claimed(level)){NervOriginalActorsR52.tickStaff(level);continue;}
             if(level.getGameTime()%20!=0)continue;var roster=roster(level);if(roster.isEmpty())continue;var state=NervStaffSavedData.get(level);var age=LOADED.computeIfAbsent(level,l->new HashMap<>());
             Set<Long> visible=new HashSet<>();for(var station:roster)
             {

@@ -198,6 +198,7 @@ public final class NervOperationsConsole
     /** Backfills the console into both local-map and clean-room command halls. */
     public static void install(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         level.getChunkAt(controlPosition(origin, 0));
         removeLegacyRow(level, origin);
         buildControlPlatform(level, origin);
@@ -277,6 +278,7 @@ public final class NervOperationsConsole
     public static void installImportedV2Controls(ServerLevel level,
                                                  BlockPos centre)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         BlockState button = Blocks.POLISHED_BLACKSTONE_BUTTON
                 .defaultBlockState()
                 .setValue(ButtonBlock.FACE, AttachFace.FLOOR)
@@ -493,6 +495,14 @@ public final class NervOperationsConsole
             return false;
         }
         ServerLevel level = player.serverLevel();
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            var frame=NervHeadquartersFrameR52.frame(level);if(frame==null)return false;
+            int action=authoredS20ActionAt(frame.inverse(position));
+            var actual=level.getBlockState(position);
+            return action>=0&&actual.getBlock() instanceof ButtonBlock&&actual.canSurvive(level,position)
+                    &&level.getBlockEntity(position)==null&&handleS20Action(player,level,action,position);
+        }
         if (FacilityWorldPolicy.isS20Rebuild(level.getServer()))
         {
             int s20Action = s20ActionAt(S24CoordinateTransform.inverse(
@@ -578,6 +588,19 @@ public final class NervOperationsConsole
                 result.accepted(), position.toShortString(), result.message());
         return true;
     }
+
+    /** Source device identity; Root applies the headquarters frame once. */
+    public static BlockPos authoredS20Control(int action)
+    {
+        if(action>=0&&action<S20_AUTHORED_CONTROLS.length)return S20_AUTHORED_CONTROLS[action];
+        if(action==S20_CITY_SCREEN_ACTION)return S20_CITY_SCREEN_CONTROL;
+        if(action>=S20_CANCEL_UNIT02_ACTION&&action<=S20_CANCEL_UNIT00_ACTION)return S20_CANCEL_CONTROLS[action-S20_CANCEL_UNIT02_ACTION];
+        if(action==S20_ARMAMENT_DEPLOY_ACTION)return S20_ARMAMENT_DEPLOY_CONTROL;
+        if(action==S20_ARMAMENT_RECALL_ACTION)return S20_ARMAMENT_RECALL_CONTROL;
+        throw new IllegalArgumentException("Unknown authored command action");
+    }
+    private static int authoredS20ActionAt(BlockPos position)
+    {for(int action=0;action<S20_CONTROL_COUNT;action++)if(authoredS20Control(action).equals(position))return action;return -1;}
 
     private static int s20ActionAt(BlockPos position)
     {

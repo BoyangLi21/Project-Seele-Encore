@@ -83,6 +83,10 @@ public final class NervSlidingDoorEntity extends Entity
             return;
         }
 
+        if(this.level() instanceof ServerLevel declared&&com.projectseele.world.NervLegacyGenerationGuardR52.retired(declared)
+                &&!CommandRoomSlidingDoorDirector.declaredDoor(declared,this.getDoorId(),this.entityData.get(DATA_AXIS_X),this.position()))
+        {this.discard();return;}
+
         float current = this.entityData.get(DATA_OPEN);
         float target = this.entityData.get(DATA_TARGET);
         if (target > 0.5F && current >= 0.995F)
@@ -164,6 +168,8 @@ public final class NervSlidingDoorEntity extends Entity
     public static NervSlidingDoorEntity reconcile(
             ServerLevel level, int doorId, boolean axisX, Vec3 centre)
     {
+        if (com.projectseele.world.NervLegacyGenerationGuardR52.retired(level)
+                &&!CommandRoomSlidingDoorDirector.declaredDoor(level,doorId,axisX,centre)) return null;
         AABB search = new AABB(centre, centre).inflate(2.5D);
         List<NervSlidingDoorEntity> matches = level.getEntitiesOfClass(
                 NervSlidingDoorEntity.class, search,

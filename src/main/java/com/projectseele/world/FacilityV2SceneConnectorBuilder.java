@@ -45,6 +45,7 @@ public final class FacilityV2SceneConnectorBuilder
     public static boolean ensure(ServerLevel level,
                                  FacilitySchemaV2.ResolvedManifest manifest)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return installed(level, manifest);
         BlockPos centre = manifest.centre();
         if (installed(level, manifest))
         {
@@ -791,6 +792,7 @@ public final class FacilityV2SceneConnectorBuilder
     private static void set(ServerLevel level, BlockPos position,
                             BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

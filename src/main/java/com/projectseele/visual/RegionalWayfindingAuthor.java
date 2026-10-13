@@ -32,7 +32,9 @@ public final class RegionalWayfindingAuthor
     public static void tick(TickEvent.ServerTickEvent event)
     {
         if(!ENABLED||done||event.phase!=TickEvent.Phase.END)return;
-        var server=event.getServer();var world=server.getWorldPath(LevelResource.ROOT).normalize();
+        var server=event.getServer();
+        if(com.projectseele.world.NervLegacyGenerationGuardR52.retired(server))return;
+        var world=server.getWorldPath(LevelResource.ROOT).normalize();
         if(!world.getFileName().toString().equals("SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong wayfinding world");
         try
         {

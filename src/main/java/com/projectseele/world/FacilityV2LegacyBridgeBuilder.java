@@ -60,6 +60,7 @@ public final class FacilityV2LegacyBridgeBuilder
 
     public static boolean ensure(ServerLevel level, BlockPos facilityCentre)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return installed(level, facilityCentre);
         boolean mechanicalReady =
                 FacilityV2RescueDirector.isTargetWorld(level.getServer())
                         ? IntegratedNervMapBuilder.rescueMechanicalReady(level)
@@ -431,6 +432,7 @@ public final class FacilityV2LegacyBridgeBuilder
     private static void set(ServerLevel level, BlockPos position,
                             BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!level.getBlockState(position).equals(state)
                 && level.setBlock(position, state, UPDATE_CLIENTS))
         {

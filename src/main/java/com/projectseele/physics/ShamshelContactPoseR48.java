@@ -28,7 +28,7 @@ public final class ShamshelContactPoseR48
         {
             int side = name.startsWith("whip_l_") ? 1 : -1;
             int segment = Integer.parseInt(name.substring(name.lastIndexOf('_') + 1));
-            return ShamshelWhipMotion.rotation(side, segment, actor.sweepSide(), actor.sweepMode(), age, clock);
+            return ShamshelWhipMotion.rotation(actor, side, segment, age, partial);
         }
         if (name.length() == 6 && name.startsWith("tail_") && name.charAt(5) >= '0' && name.charAt(5) <= '3')
             result.x = (float) Math.sin(clock * .038 - Integer.parseInt(name.substring(5)) * .6) * .025F;

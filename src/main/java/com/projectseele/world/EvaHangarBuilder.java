@@ -83,6 +83,7 @@ public final class EvaHangarBuilder
 
     public static HangarAudit ensure(ServerLevel level, BlockPos origin)
     {
+        if(NervRouteRuntimeR52.claimed(level))return new HangarAudit(false,0,0,0,0,0,0,0,0,false);
         if (!FacilityWorldPolicy.legacyGenerationAllowed(level.getServer()))
         {
             return inspect(level, origin);
@@ -115,6 +116,7 @@ public final class EvaHangarBuilder
 
     public static HangarAudit build(ServerLevel level, BlockPos origin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return inspect(level,origin);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "EvaHangarBuilder");
         HangarAudit audit = buildMechanicalOnly(level, origin);
@@ -130,6 +132,7 @@ public final class EvaHangarBuilder
     public static HangarAudit buildMechanicalOnly(ServerLevel level,
                                                    BlockPos origin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return inspect(level,origin);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "EvaHangarBuilder.buildMechanicalOnly");
         PerformanceCounters.recordBuilderCall();
@@ -156,6 +159,7 @@ public final class EvaHangarBuilder
     public static void buildS20Cage(ServerLevel level, BlockPos origin,
                                     int variant)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         requireVariant(variant);
         if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
         {
@@ -236,6 +240,7 @@ public final class EvaHangarBuilder
     public static void buildS20ObservationGallery(
             ServerLevel level, BlockPos origin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
         {
             return;
@@ -292,6 +297,7 @@ public final class EvaHangarBuilder
     public static void buildS20TransportLine(ServerLevel level,
                                              BlockPos origin, int variant)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         requireVariant(variant);
         if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
         {
@@ -351,6 +357,7 @@ public final class EvaHangarBuilder
     public static void buildS20LaunchControlSpine(ServerLevel level,
                                                    BlockPos origin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
         {
             return;
@@ -472,6 +479,7 @@ public final class EvaHangarBuilder
      */
     public static void buildS20LaunchWellFoundations(ServerLevel level)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (!FacilityWorldPolicy.unmigratedS20CivilGenerationAllowed(level))
         {
             return;
@@ -590,6 +598,7 @@ public final class EvaHangarBuilder
     public static void repairS20BoardingRoutes(ServerLevel level,
                                                 BlockPos origin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         PerformanceCounters.recordBuilderCall();
         clearGalleryConcourse(level, origin);
         for (int variant = 0; variant < 3; variant++)
@@ -871,6 +880,7 @@ public final class EvaHangarBuilder
                                                    BlockPos origin,
                                                    int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         BlockPos position = hangarPowerPylonPosition(origin, variant);
         if (level.getBlockEntity(position)
                 instanceof UmbilicalPylonBlockEntity)
@@ -978,6 +988,7 @@ public final class EvaHangarBuilder
     public static void setGate(ServerLevel level, BlockPos origin,
                                int variant, boolean open)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         BlockPos bed = hangarBed(origin, variant);
         // A recalled or administratively recovered hull can have a stale wet
         // bay even when its logical sortie gauge is zero. The pressure gate
@@ -1033,6 +1044,7 @@ public final class EvaHangarBuilder
     public static void setLclLevel(ServerLevel level, BlockPos origin,
                                    int variant, int layers)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         BlockPos bed = hangarBed(origin, variant);
         int safeLayers = Math.max(0, Math.min(LCL_SHOULDER_LAYERS, layers));
         // LCL is a fluid: sources placed on the inner footprint flow outward
@@ -1071,6 +1083,7 @@ public final class EvaHangarBuilder
     public static void setLclLayer(ServerLevel level, BlockPos origin,
                                    int variant, int layer, boolean filled)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (layer < 1 || layer > LCL_SHOULDER_LAYERS)
         {
             return;
@@ -1176,6 +1189,7 @@ public final class EvaHangarBuilder
 
     private static void clearLcl(ServerLevel level, BlockPos position)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         // Notify the fluid descendants as well as the renderer. UPDATE_CLIENTS
         // alone leaves orphaned flowing LCL below the door apron indefinitely.
         if (level.getFluidState(position).getFluidType() == ModFluids.LCL_TYPE.get())
@@ -1189,6 +1203,7 @@ public final class EvaHangarBuilder
     public static void setCarrier(ServerLevel level, BlockPos origin,
                                   int variant, int centreZ, boolean present)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         BlockPos hangar = hangarBed(origin, variant);
         int y = hangar.getY();
         int centreX = hangar.getX();
@@ -1227,6 +1242,7 @@ public final class EvaHangarBuilder
     public static void moveCarrier(ServerLevel level, BlockPos origin,
                                    int variant, int oldCentreZ, int newCentreZ)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (oldCentreZ == newCentreZ)
         {
             return;
@@ -1264,6 +1280,7 @@ public final class EvaHangarBuilder
     public static void restoreStaticCarrier(ServerLevel level, BlockPos origin,
                                             int variant, BlockPos station)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         setCarrier(level, origin, variant, station.getZ(), true);
     }
 
@@ -1277,6 +1294,8 @@ public final class EvaHangarBuilder
                                                BlockPos origin, int variant,
                                                BlockPos start, BlockPos end)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
+        if(NervRouteRuntimeR52.claimed(level))return;
         requireVariant(variant);
         BlockPos hangar = hangarBed(origin, variant);
         if (start.getX() != hangar.getX() || end.getX() != hangar.getX()
@@ -1536,6 +1555,7 @@ public final class EvaHangarBuilder
     public static void buildRearLadders(ServerLevel level, BlockPos origin,
                                          int variant)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         requireVariant(variant);
         BlockPos bed = hangarBed(origin, variant);
         for (int side : new int[] {-1, 1})
@@ -1606,6 +1626,7 @@ public final class EvaHangarBuilder
     public static void clearTransferEnvelope(ServerLevel level,
                                              BlockPos origin, int variant)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         requireVariant(variant);
         BlockPos bed = hangarBed(origin, variant);
         BlockPos silo = IntegratedNervMapBuilder.lowerLiftBed(origin, variant);
@@ -1779,6 +1800,7 @@ public final class EvaHangarBuilder
      */
     public static void clearGalleryConcourse(ServerLevel level, BlockPos origin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         int minX = IntegratedNervMapBuilder.LIFT_X[0] - HALF_WIDTH
                 - GALLERY_SIDE_MARGIN + 1;
         int maxX = IntegratedNervMapBuilder.LIFT_X[2] + HALF_WIDTH
@@ -1925,6 +1947,7 @@ public final class EvaHangarBuilder
                                      int variant, double plugY, double plugZ,
                                      boolean withArm)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         requireVariant(variant);
         BlockPos bed = hangarBed(origin, variant);
         int railY = craneRailAboveBed();
@@ -1942,6 +1965,7 @@ public final class EvaHangarBuilder
     public static void stowPlugCrane(ServerLevel level, BlockPos origin,
                                       int variant)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         requireVariant(variant);
         BlockPos bed = hangarBed(origin, variant);
         int railY = craneRailAboveBed();
@@ -2344,6 +2368,7 @@ public final class EvaHangarBuilder
                                                    int variant,
                                                    int extension)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         requireVariant(variant);
         int safeExtension = Math.max(0, Math.min(BRIDGE_SEGMENTS, extension));
         BlockPos bed = hangarBed(origin, variant);
@@ -2708,6 +2733,7 @@ public final class EvaHangarBuilder
 
     private static void set(ServerLevel level, BlockPos position, BlockState state)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (TvPersonnelPlatformRecipeR44.owns(level, position)) return;
         if (PilotRestroomsR47.ownsRoomMaintenanceSpaceR47(level, position)) return;
         if (!level.getBlockState(position).equals(state))

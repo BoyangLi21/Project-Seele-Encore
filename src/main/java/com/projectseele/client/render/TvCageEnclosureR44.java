@@ -116,12 +116,15 @@ final class TvCageEnclosureR44
     }
 
     static boolean render(int variant, float opening, PoseStack poses, int light)
+    {return render(variant,opening,poses,light,Float.NaN);}
+    static boolean render(int variant,float opening,PoseStack poses,int light,float lowerProgress)
     {
         if (!com.projectseele.world.TvCageCollisionR44.enabled() || variant < 0 || variant > 2) return false;
         load();
         if (COMPONENTS.isEmpty()) return false;
         // Fixed supports are generated as complete members, never triangle-clipped by height.
-        PARTS.get("cage_frame_lower_r44").draw(poses, TvFacilityMeshes.currentBuffers(), light);
+        if(Float.isFinite(lowerProgress))NervLowerFrameRendererR52.render(poses,light,lowerProgress);
+        else PARTS.get("cage_frame_lower_r44").draw(poses, TvFacilityMeshes.currentBuffers(), light);
         for (var component : COMPONENTS)
         {
             if (component.variant >= 0 && component.variant != variant) continue;

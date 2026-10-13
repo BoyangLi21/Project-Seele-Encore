@@ -64,7 +64,7 @@ public final class TvEncounterDirectorR45
             return "原初号机真实阳离子炮或任务借用凭证尚未确认。";
         if (!cannon.rangesReady(shooter, Math.max(site.separation(), site.attackRange())))
             return "原初号机远程火控仍在校准中。";
-        if (shooter.position().distanceTo(site.hero()) > 12)
+        if (!TvYashimaStationR52.atPlatformR52(shooter))
             return "初号机请保持原炮击阵地。";
         if (boss.effectiveBeamRangeR45() < boss.getBoundingBox().getCenter().distanceTo(shooter.getEyePosition()))
             return "原目标火控仍在校准中。";

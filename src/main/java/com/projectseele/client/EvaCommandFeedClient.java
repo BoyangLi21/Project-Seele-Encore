@@ -662,6 +662,8 @@ public final class EvaCommandFeedClient
             PerformanceCounters.leaveClientScenario();
             return;
         }
+        boolean r52Headquarters=FacilityFrameClientR52.claimed(level);
+        if(r52Headquarters&&!FacilityFrameClientR52.headquartersBound(level))return;
         PerformanceCounters.recordClientFrame();
         if (activeLevel != level)
         {
@@ -678,10 +680,10 @@ public final class EvaCommandFeedClient
                 FacilityV2CommandInteriorDirector.MARKER_X,
                 FacilityV2CommandInteriorDirector.MARKER_Y,
                 FacilityV2CommandInteriorDirector.MARKER_Z);
-        boolean facilityV2 = level.getBlockState(v2Marker)
+        boolean facilityV2 = !r52Headquarters && level.getBlockState(v2Marker)
                 .is(Blocks.RED_NETHER_BRICKS);
         boolean s20Marker = level.getBlockState(
-                S20CommandPresentationDirector.COMMAND_MARKER)
+                FacilityFrameClientR52.headquarters(level,S20CommandPresentationDirector.COMMAND_MARKER))
                 .is(Blocks.STRUCTURE_VOID);
         /*
          * The marker lives six chunks behind the command seats and may reach
@@ -691,10 +693,11 @@ public final class EvaCommandFeedClient
          * window.
          */
         boolean s20Controls = level.getBlockState(
-                new net.minecraft.core.BlockPos(32, -407, 286))
+                FacilityFrameClientR52.headquarters(level,new net.minecraft.core.BlockPos(32, -407, 286)))
                 .getBlock()
                 instanceof net.minecraft.world.level.block.ButtonBlock;
         boolean s20 = s20Marker || s20Controls;
+        if(r52Headquarters&&!s20)return;
 
         var origin = IntegratedNervMapBuilder.GEOFRONT_ORIGIN;
         var importedAnchor = origin.offset(0, 17, 58);
@@ -702,10 +705,10 @@ public final class EvaCommandFeedClient
                 importedAnchor.offset(0, 4, -1)).is(Blocks.BLACK_CONCRETE)
                 && level.getBlockState(importedAnchor.offset(-18, 4, -1))
                 .is(Blocks.POLISHED_DEEPSLATE);
-        var anchor = s20 ? new net.minecraft.core.BlockPos(
+        var anchor = s20 ? FacilityFrameClientR52.headquarters(level,new net.minecraft.core.BlockPos(
                 (int) S20CommandPresentationDirector.UPPER_SCREEN_X,
                 (int) S20CommandPresentationDirector.UPPER_SCREEN_Y,
-                (int) S20CommandPresentationDirector.UPPER_SCREEN_Z)
+                (int) S20CommandPresentationDirector.UPPER_SCREEN_Z))
                 : facilityV2 ? v2Centre.offset(1, -320, -36)
                 : importedVideoWall ? importedAnchor
                 : origin.offset(0, 7,
@@ -734,10 +737,10 @@ public final class EvaCommandFeedClient
                     : STANDBY_TEXTURE_IDS[variant];
             if (s20)
             {
-                Vec3 centre = new Vec3(
+                Vec3 centre = FacilityFrameClientR52.headquarters(level,new Vec3(
                         S20_SCREEN_X[variant],
                         S20_SCREEN_Y[variant],
-                        S20_SCREEN_Z[variant]);
+                        S20_SCREEN_Z[variant]));
                 renderScreen(event.getPoseStack(), camera, centre,
                         texture, minecraft, 15.0F,
                         15.0F * ServerboundEvaVideoFramePacket.FRAME_HEIGHT
@@ -771,10 +774,10 @@ public final class EvaCommandFeedClient
         }
         if (s20 && tacticalTexture != null)
         {
-            renderScreen(event.getPoseStack(), camera, new Vec3(
+            renderScreen(event.getPoseStack(), camera, FacilityFrameClientR52.headquarters(level,new Vec3(
                             S20CommandPresentationDirector.LOWER_SCREEN_X,
                             S20CommandPresentationDirector.LOWER_SCREEN_Y,
-                            S20CommandPresentationDirector.LOWER_SCREEN_Z),
+                            S20CommandPresentationDirector.LOWER_SCREEN_Z)),
                     TACTICAL_TEXTURE_ID, minecraft, 15.0F, 40.5F,
                     S20_SCREEN_YAW, S20_LOWER_SCREEN_PITCH,
                     SCREEN_VISIBILITY[3]);
@@ -783,12 +786,12 @@ public final class EvaCommandFeedClient
         }
         if (s20 && cityTexture != null)
         {
-            renderScreen(event.getPoseStack(), camera, new Vec3(
+            renderScreen(event.getPoseStack(), camera, FacilityFrameClientR52.headquarters(level,new Vec3(
                             S20CommandPresentationDirector.CITY_STATUS_CENTRE_X,
                             (S20CommandPresentationDirector.CITY_STATUS_FACE_TOP
                                     + S20CommandPresentationDirector
                                     .CITY_STATUS_FACE_BOTTOM) * 0.5D,
-                            S20CommandPresentationDirector.CITY_STATUS_Z),
+                            S20CommandPresentationDirector.CITY_STATUS_Z)),
                     CITY_TEXTURE_ID, minecraft, 38.0F, 12.5F,
                     180.0F, 0.0F, SCREEN_VISIBILITY[4]);
         }
@@ -862,10 +865,10 @@ public final class EvaCommandFeedClient
             return;
         }
         poseStack.pushPose();
-        poseStack.translate(
-                S20CommandPresentationDirector.LOWER_SCREEN_X - camera.x,
-                S20CommandPresentationDirector.LOWER_SCREEN_Y - camera.y,
-                S20CommandPresentationDirector.LOWER_SCREEN_Z - camera.z);
+        Vec3 actual=FacilityFrameClientR52.headquarters(minecraft.level,new Vec3(
+                S20CommandPresentationDirector.LOWER_SCREEN_X,S20CommandPresentationDirector.LOWER_SCREEN_Y,
+                S20CommandPresentationDirector.LOWER_SCREEN_Z));
+        poseStack.translate(actual.x-camera.x,actual.y-camera.y,actual.z-camera.z);
         /*
          * The raster plane is built as yaw 180 then pitch.  Conjugating that
          * pair by the yaw leaves a single opposite X rotation, which lands the

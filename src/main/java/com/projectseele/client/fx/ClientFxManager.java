@@ -57,11 +57,15 @@ public final class ClientFxManager
     private ClientFxManager() {}
 
     public static void addCrossExplosion(ClientboundCrossExplosionPacket packet)
+    {addCross(packet,false);}
+    public static void addDirectedBattleCross(ClientboundCrossExplosionPacket packet)
+    {addCross(packet,true);}
+    private static void addCross(ClientboundCrossExplosionPacket packet,boolean directedBattle)
     {
         // fxIntensity 0 disables the visual entirely; the sound still plays.
         if (com.projectseele.config.SeeleConfig.FX_INTENSITY.get() > 0.0D)
         {
-            ACTIVE.add(new CrossExplosion(new Vec3(packet.x, packet.y, packet.z), packet.scale));
+            ACTIVE.add(new CrossExplosion(new Vec3(packet.x, packet.y, packet.z), packet.scale,directedBattle));
         }
         Minecraft minecraft = Minecraft.getInstance();
         if (minecraft.level != null)
@@ -317,18 +321,22 @@ public final class ClientFxManager
         private static final int HOLD_END = 34;
 
         final float scale;
+        final int activeLifetime,activeHoldEnd;
 
         CrossExplosion(Vec3 pos, float scale)
+        {this(pos,scale,false);}
+        CrossExplosion(Vec3 pos, float scale,boolean directedBattle)
         {
             super(pos);
             // Angel crosses are skyline-scale, not ordinary particle bursts.
             this.scale = scale * 5.0F;
+            this.activeLifetime=directedBattle?42:LIFETIME;this.activeHoldEnd=directedBattle?18:HOLD_END;
         }
 
         @Override
         int lifetime()
         {
-            return LIFETIME;
+            return activeLifetime;
         }
 
         @Override
@@ -338,8 +346,8 @@ public final class ClientFxManager
             Matrix4f pose = poseStack.last().pose();
 
             float expand = easeOutCubic(Mth.clamp(t / EXPAND_END, 0.0F, 1.0F));
-            float fade = t <= HOLD_END ? 1.0F
-                    : Mth.clamp(1.0F - (t - HOLD_END) / (LIFETIME - HOLD_END), 0.0F, 1.0F);
+            float fade = t <= activeHoldEnd ? 1.0F
+                    : Mth.clamp(1.0F - (t - activeHoldEnd) / (activeLifetime - activeHoldEnd), 0.0F, 1.0F);
             // Slight breathing while the cross holds.
             float pulse = 1.0F + 0.06F * Mth.sin(t * 0.6F);
             float alpha = fade * pulse * fxIntensity();

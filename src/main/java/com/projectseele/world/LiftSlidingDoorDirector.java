@@ -52,6 +52,7 @@ public final class LiftSlidingDoorDirector
             S20PhysicalElevatorDirector.LiftSpec lift,
             S20PhysicalElevatorDirector.Landing landing, boolean open)
     {
+        if (NervLegacyGenerationGuardR52.retired(level) && lift.r52() == null) return false;
         if (!enabled(level))
         {
             return false;

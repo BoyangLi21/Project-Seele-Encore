@@ -1,0 +1,59 @@
+package com.projectseele.world;
+import com.projectseele.entity.*;
+import com.projectseele.world.NervRouteReservationsR52.Original;
+import com.projectseele.world.TransportMembershipR52.Kind;
+import java.util.*;
+import net.minecraft.server.level.ServerLevel;
+import net.minecraft.world.entity.*;
+import net.minecraft.world.phys.*;
+import org.joml.Quaternionf;
+
+/** Concrete current full-source placement during a leased mechanical
+ * handoff. Unlike route custody, the same capsule may already be on its
+ * hoist; only this stationary finishing proof accepts that real graph. */
+public final class NervOwnerPlacementR52
+{
+    private record Surface(NervRigidMeshSweepR52 mesh,RigidTransform frame,String name){Surface(NervRigidMeshSweepR52 mesh,RigidTransform frame){this(mesh,frame,"");}}
+    public static final class Proof
+    {
+        private final Original original;private final Kind kind;private final RigidTransform root;private final String source;private final List<Surface> surfaces;private final List<AABB> boxes;private final RigidTransform capsule;private final AABB pilot;private final int capsuleStage;private final UUID hardware;private final net.minecraft.nbt.CompoundTag hardwareState;private final EvaOriginalMeshGeometryR52.Geometry geometry;
+        private Proof(Original o,Kind k,RigidTransform root,String source,List<Surface> surfaces,List<AABB> boxes,RigidTransform capsule,AABB pilot,int capsuleStage,UUID hardware,net.minecraft.nbt.CompoundTag hardwareState,EvaOriginalMeshGeometryR52.Geometry geometry)
+        {original=o;kind=k;this.root=root;this.source=source;this.surfaces=List.copyOf(surfaces);this.boxes=List.copyOf(boxes);this.capsule=capsule;this.pilot=pilot;this.capsuleStage=capsuleStage;this.hardware=hardware;this.hardwareState=hardwareState.copy();this.geometry=geometry;}
+        public List<AABB> envelopes(){return boxes;}
+        public Set<UUID> originalIds(){return TransportMembershipR52.members(original,kind);}
+        public boolean matches(Original o,Kind k,RigidTransform expectedRoot){return original.equals(o)&&kind==k&&same(root,expectedRoot);}
+        private boolean namedGuideContact(ServerLevel l,Surface surface,NervServiceFootDriveR52.Piece guide)throws java.io.IOException {if(hardware==null||!surface.name.startsWith("guide/")||!(l.getEntity(hardware) instanceof NervCarrierPlatformEntity c))return false;for(var d:NervFootGuideRigR52.draws(NervOriginalCarrierR52.nominalBinding(c.getUnitVariant()),NervOriginalCarrierR52.actualRoot(c,1),NervOriginalCarrierR52.progress(c,1),NervOriginalCarrierR52.guideUp(c)))if(d.part().name().equals(surface.name.substring(6))&&same(d.frame(),surface.frame))return NervFootGuideRigR52.namedGuideContactR52(d,d,guide);return false;}
+        public boolean clear(ServerLevel l)
+        {
+            if(!(l.getEntity(original.eva()) instanceof EvaUnit01Entity e)||!e.isAlive()||!same(actualRoot(e),root)||!EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52().sourceFingerprint().equals(source))return false;
+            if(hardware!=null&&(!(l.getEntity(hardware) instanceof NervCarrierPlatformEntity c)||!NervOriginalCarrierR52.declared(c)||!c.originalCarrierStateR52().equals(hardwareState)))return false;
+            if(kind==Kind.OCCUPIED){if(!(l.getEntity(original.plug()) instanceof EntryPlugCarrierEntity p)||p.getInsertionStage()!=capsuleStage||!same(p.getCanonicalTransform(),capsule)||!p.isHatchFullySealed()||p.getFirstPassenger()==null||!p.getFirstPassenger().getUUID().equals(original.pilot())||!p.getFirstPassenger().getBoundingBox().equals(pilot))return false;}
+            else if(!EntryPlugEjectionR48.originalFieldEjection(l,original.variant(),e,original.pilot())||e.isEntryPlugInserted()||!e.getPassengers().isEmpty())return false;
+            for(var s:surfaces){var box=s.mesh.envelope(s.frame,s.frame);for(var shape:l.getBlockCollisions(e,box))for(var b:shape.toAabbs())if(s.mesh.intersects(s.frame,s.frame,b,.003)){boolean sole=(s.name.startsWith("foot_")||s.name.startsWith("toe_"))&&Math.abs(b.maxY-box.minY)<.0021&&EvaMechanicalReleaseR52.actualGroundBearingR52(l,e,geometry,root);if(!sole)return false;}
+                for(var actor:l.getEntities((Entity)null,box.inflate(200),a->!originalIds().contains(a.getUUID())&&a.isAlive()&&(a instanceof LivingEntity||a.canBeCollidedWith()||a instanceof NervCarrierPlatformEntity||a instanceof NervSiloDoorEntity||a instanceof NervHangarDoorEntity||a instanceof UNTransportEntity))){if(hardware!=null&&actor.getUUID().equals(hardware))continue;if(actor instanceof NervCarrierPlatformEntity station&&NervFootGuideStationR52.declared(station))try{var view=NervFootGuideStationR52.view(station);var pose=NervFootGuideStationR52.currentPose(station);for(var part:NervFootGuideStationR52.actualPartsR52(station,1)){var source=new NervOriginalCarrierR52.Part(s.name,s.name.startsWith("guide/")?NervOriginalCarrierR52.Role.GUIDE:NervOriginalCarrierR52.Role.STRUCTURE,s.mesh,s.frame);if(NervFootGuideDockR52.namedStationContactR52(source,source,view,pose,pose,part))continue;if(s.mesh.intersects(s.frame,s.frame,part.mesh(),part.frame(),part.frame(),.003,Vec3.ZERO))return false;}continue;}catch(java.io.IOException unavailable){return false;}java.util.List<NervFlightProofR52.ObstacleMesh> actual;try{actual=actor instanceof NervCarrierPlatformEntity g&&g.isRestraintGantry()&&g.hasDeclaredMachineFrameR52()?NervPlantMotionR52.actualStructuralMeshesR52(g):NervFlightProofR52.actualObstacleMeshes(actor);}catch(java.io.IOException unavailable){return false;}if(actual==null)return false;if(actual.isEmpty()){if(s.mesh.intersects(s.frame,s.frame,actor.getBoundingBox(),.003))return false;}else for(var mesh:actual)if(s.mesh.intersects(s.frame,s.frame,mesh.mesh(),mesh.frame(),mesh.endFrame(),.003,Vec3.ZERO)){boolean pad=false;if(actor instanceof NervCarrierPlatformEntity g&&g.isRestraintGantry()&&g.hasDeclaredMachineFrameR52()&&g.getRestraintProgress()==1)try{pad=NervShoulderBearingR52.permitsPadContactR52(geometry,root,RigidTransform.of(g.position(),g.declaredMachineRotationR52()),e.getUnitVariant(),s.name,mesh);}catch(java.io.IOException unavailable){return false;}if(!pad)return false;}
+                    if(actor instanceof NervCarrierPlatformEntity g&&g.isRestraintGantry()&&g.hasDeclaredMachineFrameR52()&&g.declaredServiceFootDriveR52()!=null)try{for(var guide:NervServiceFootDriveR52.pieces(g.declaredServiceFootDriveR52(),g.serviceGuideBridgeR52(1))){if(namedGuideContact(l,s,guide))continue;if(s.mesh.intersects(s.frame,s.frame,guide.mesh(),guide.frame(),guide.frame(),.003,Vec3.ZERO))return false;}if(NervMappedPlugMechanicsR52.selectedMachinery().selectedRunningDeckR52()){var lead=NervOriginalCarrierR52.actualLeadSampleR52(g,1);if(lead==null)return false;var source=new NervOriginalCarrierR52.Part(s.name,s.name.startsWith("ride/")?NervOriginalCarrierR52.Role.RUNNING_BOGIE:NervOriginalCarrierR52.Role.STRUCTURE,s.mesh,s.frame);for(var head:NervLegacyCarrierRideR52.actualLeadPartsR52(lead)){if(NervLegacyCarrierRideR52.namedLeadPadContactR52(source,source,head,head))continue;if(s.mesh.intersects(s.frame,s.frame,head.mesh(),head.frame(),head.frame(),.003,Vec3.ZERO))return false;}}}catch(java.io.IOException missing){return false;}}
+                try{for(var guide:NervFixedFootGuidesR52.actualPieces(l,box)){if(namedGuideContact(l,s,guide))continue;if(s.mesh.intersects(s.frame,s.frame,guide.mesh(),guide.frame(),guide.frame(),.003,Vec3.ZERO))return false;}
+                    var source=new NervOriginalCarrierR52.Part(s.name,s.name.startsWith("ride/")?NervOriginalCarrierR52.Role.RUNNING_BOGIE:NervOriginalCarrierR52.Role.STRUCTURE,s.mesh,s.frame);
+                    for(var head:NervLegacyCarrierRideR52.fixedPartsR52()){if(!box.intersects(head.mesh().envelope(head.frame(),head.frame())))continue;if(NervLegacyCarrierRideR52.namedHeadContactR52(source,source,head)||NervLegacyCarrierRideR52.namedDeckHeadContactR52(source,source,head)||NervLegacyCarrierRideR52.namedSoleHeadContactR52(source,source,head))continue;if(s.mesh.intersects(s.frame,s.frame,head.mesh(),head.frame(),head.frame(),.003,Vec3.ZERO))return false;}
+                }catch(java.io.IOException missing){return false;}
+            }
+            return pilot==null||!l.getBlockCollisions(l.getEntity(original.pilot()),pilot).iterator().hasNext()&&l.getEntities((Entity)null,pilot,a->!originalIds().contains(a.getUUID())&&a.isAlive()&&(a instanceof LivingEntity||a.canBeCollidedWith())).isEmpty();
+        }
+    }
+    public static Proof capture(ServerLevel l,Original o,Kind kind,FullAssemblyGeometryR52.Provider machinery)
+    {
+        if(!(l.getEntity(o.eva()) instanceof EvaUnit01Entity e)||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isBerserk()||e.isFirstBattleActive()||EvaShieldRigR47.equipped(e)||EvaBerserkMotionR34.mouth(e,1)!=0)return null;
+        var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();EvaOriginalMeshGeometryR52.Geometry geometry;
+        if(EvaMechanicalFrameR52.active(e))geometry=EvaMechanicalFrameR52.capturedGeometry(e);
+        else {var body=EvaShutdownR30.displayed(e)&&!EvaShutdownR30.pose(e).isEmpty()?NervServiceBodyPoseR52.applyDorsal(EvaBodyPose.sample(e,1),EvaDorsalProfile.of(e),EvaDorsalMechanism.open(e),EvaDorsalMechanism.bow(e)):NervServiceBodyPoseR52.sample(e);var hands=EvaFrozenHandsR52.capture(e,1);geometry=provider.evaluateMechanicalService(e.getUnitVariant(),body,EvaFrozenHandsR52.decode(e.getUnitVariant(),provider.handContractFingerprint(e.getUnitVariant()),provider.handJoints(e.getUnitVariant()),hands),EvaDorsalMechanism.open(e)>=.002F);}
+        var root=actualRoot(e);var surfaces=new ArrayList<Surface>();for(var p:geometry.parts())surfaces.add(new Surface(new NervRigidMeshSweepR52(p.triangles()),root,p.bone()));UUID hardware=null;var hardwareState=new net.minecraft.nbt.CompoundTag();
+        if(EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(e)){var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier==null||!NervOriginalCarrierR52.declared(carrier))return null;hardware=carrier.getUUID();hardwareState=carrier.originalCarrierStateR52();try{for(var p:NervOriginalCarrierR52.actualPartsR52(carrier))surfaces.add(new Surface(p.mesh(),p.frame(),p.name()));}catch(java.io.IOException unavailable){return null;}}
+        else if(NervMappedPlugMechanicsR52.actualCarrierVisibleR52(e))machinery.carrierParts(e.getUnitVariant(),e.carrierRiseProgress(1),e.recoveryRackR39(),0,EvaMechanicalFrameR52.carrierDeckTravelR52(e)).forEach((n,p)->surfaces.add(new Surface(new NervRigidMeshSweepR52(p),EvaMechanicalFrameR52.carrierFrameR52(e,1),n)));
+        RigidTransform capsule=null;AABB pilot=null;int stage=-1;
+        if(kind==Kind.OCCUPIED){if(!(l.getEntity(o.plug()) instanceof EntryPlugCarrierEntity p)||!p.isHatchFullySealed()||p.getFirstPassenger()==null||!p.getFirstPassenger().getUUID().equals(o.pilot()))return null;capsule=p.getCanonicalTransform();stage=p.getInsertionStage();pilot=p.getFirstPassenger().getBoundingBox();for(var mesh:machinery.closedPlugParts(o.variant()).values())surfaces.add(new Surface(new NervRigidMeshSweepR52(mesh),capsule));}
+        var boxes=new ArrayList<AABB>();for(var s:surfaces)boxes.add(s.mesh.envelope(s.frame,s.frame));if(pilot!=null)boxes.add(pilot);return new Proof(o,kind,root,geometry.sourceFingerprint(),surfaces,boxes,capsule,pilot,stage,hardware,hardwareState,geometry);
+    }
+    public static RigidTransform actualRoot(EvaUnit01Entity e){return EvaMechanicalFrameR52.active(e)?EvaMechanicalFrameR52.frame(e,1):RigidTransform.of(e.position(),new Quaternionf().rotationY((float)Math.toRadians(180-e.mechanicalYawR52())));}
+    private static boolean same(RigidTransform a,RigidTransform b){return a.translation().distanceToSqr(b.translation())<=4e-6&&a.rotationErrorDegrees(b)<=.04;}
+    private NervOwnerPlacementR52(){}
+}

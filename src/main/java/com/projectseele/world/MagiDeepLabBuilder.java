@@ -75,6 +75,7 @@ public final class MagiDeepLabBuilder
 
     public static MagiAudit build(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "MagiDeepLabBuilder.build");
         PerformanceCounters.recordBuilderCall();
@@ -109,6 +110,7 @@ public final class MagiDeepLabBuilder
     public static MagiAudit repairRuntimeLabels(ServerLevel level,
                                                 BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         if (FacilityWorldPolicy.isS20Rebuild(level.getServer()))
         {
             return inspect(level, origin);
@@ -129,6 +131,7 @@ public final class MagiDeepLabBuilder
     /** Restores missing cosmetic labels only while the deep lab is active. */
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (FacilityWorldPolicy.isS20Rebuild(server))
         {
             return;
@@ -224,6 +227,7 @@ public final class MagiDeepLabBuilder
     /** Handles only the three exact maintenance buttons. */
     public static boolean handleUse(ServerPlayer player, BlockPos position)
     {
+        if (NervLegacyGenerationGuardR52.retired(player.serverLevel())) return false;
         if (FacilityWorldPolicy.isS20Rebuild(player.getServer()))
         {
             return false;
@@ -272,6 +276,7 @@ public final class MagiDeepLabBuilder
      */
     public static void retireS20DuplicatePresentation(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (!FacilityWorldPolicy.isR28Approved(server))
         {
             return;
@@ -589,6 +594,7 @@ public final class MagiDeepLabBuilder
 
     private static void installLabels(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         for (int index = 0; index < CORE_NAMES.length; index++)
         {
             String tagName = LABEL_TAG_PREFIX + CORE_IDS[index];
@@ -759,6 +765,7 @@ public final class MagiDeepLabBuilder
     private static void set(ServerLevel level, BlockPos position,
                             BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (level.setBlock(position, state, UPDATE_CLIENTS))
         {
             PerformanceCounters.recordWorldBlockWrites(1);

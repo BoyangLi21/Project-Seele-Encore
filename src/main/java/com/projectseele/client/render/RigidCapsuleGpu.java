@@ -35,7 +35,8 @@ public final class RigidCapsuleGpu
         final BoundedRenderStatesR52<ExternalKey,ExternalMesh> variants;
         ExternalKey last;
         long geometryRevision=Long.MIN_VALUE;
-        ExternalStates(int limit){variants=new BoundedRenderStatesR52<>(limit,value->value.buffer().close());}
+        ExternalStates(int limit){this(limit,value->value.buffer().close());}
+        ExternalStates(int limit,java.util.function.Consumer<ExternalMesh> release){variants=new BoundedRenderStatesR52<>(limit,release);}
     }
     private static final Map<Object,ExternalStates> EXTERNAL_PARTS=new IdentityHashMap<>();
     private static boolean externalReadyLogged;
@@ -56,6 +57,9 @@ public final class RigidCapsuleGpu
     public static long posedMaterialUploads,posedLightUploads,posedOverlayUploads,posedTintUploads,posedPassChangedUploads;
     public static long posedStateHits,posedStateMisses,posedOldStateReleases;
     private static int posedDiagnostics;
+    record WitnessSubmission(long revision,boolean uploaded,String shader,Matrix4f modelView) {}
+    static WitnessSubmission lastWitnessSubmission;
+    static boolean captureWitnessSubmission;
     static ShaderInstance machineryShader(){return shader;}
     @SubscribeEvent public static void register(RegisterShadersEvent event)throws IOException
     {
@@ -75,6 +79,7 @@ public final class RigidCapsuleGpu
                 ||revision>0&&Boolean.getBoolean("projectseele.disablePosedMeshGpuR52"))return false;
         if(externalShaderActive())return drawExternal(key,revision,vertices,stride,px,py,pz,texture,poses,light,overlay,r,g,b);
         Mesh mesh=PARTS.get(key);
+        boolean uploaded=false;
         if(mesh==null||mesh.revision()!=revision||mesh.red()!=r||mesh.green()!=g||mesh.blue()!=b)
         {
             int count=vertices.length/stride;
@@ -86,6 +91,7 @@ public final class RigidCapsuleGpu
             var buffer=mesh==null?new VertexBuffer(revision==0?VertexBuffer.Usage.STATIC:VertexBuffer.Usage.DYNAMIC):mesh.buffer();
             if(!upload(buffer,builder)){if(mesh==null)buffer.close();return false;}
             mesh=new Mesh(buffer,revision,r,g,b);PARTS.put(key,mesh);
+            uploaded=true;
             if(revision>0)posedUploads++;
             if(PARTS.size()==1)ProjectSeele.LOGGER.info("Rigid local-mesh GPU draw path active; first part vertices={}",count);
         }
@@ -93,7 +99,9 @@ public final class RigidCapsuleGpu
         shader.safeGetUniform("BoneMat").set(poses.last().pose());shader.safeGetUniform("BoneNormal").set(poses.last().normal());
         shader.safeGetUniform("FrameLight").set((float)(light&65535),(float)(light>>>16&65535));
         shader.safeGetUniform("FrameOverlay").set((float)(overlay&65535),(float)(overlay>>>16&65535));
-        mesh.buffer().bind();mesh.buffer().drawWithShader(RenderSystem.getModelViewMatrix(),RenderSystem.getProjectionMatrix(),shader);VertexBuffer.unbind();type.clearRenderState();drawCalls++;posedDraw(revision);return true;
+        mesh.buffer().bind();mesh.buffer().drawWithShader(RenderSystem.getModelViewMatrix(),RenderSystem.getProjectionMatrix(),shader);VertexBuffer.unbind();type.clearRenderState();drawCalls++;posedDraw(revision);
+        if(captureWitnessSubmission)lastWitnessSubmission=new WitnessSubmission(mesh.revision(),uploaded,"rigid_capsule",new Matrix4f(RenderSystem.getModelViewMatrix()).mul(poses.last().pose()));
+        return true;
     }
     private static void vertex(BufferBuilder b,float[] a,int i,float px,float py,float pz,float r,float g,float blue)
     {
@@ -108,18 +116,8 @@ public final class RigidCapsuleGpu
         boolean shadow=ShaderShadowPassR44.active();
         var state=new ExternalKey(texture,shadow,light,overlay,
                 Float.floatToRawIntBits(r),Float.floatToRawIntBits(g),Float.floatToRawIntBits(b),material);
-        var cached=states.variants.get(state);
-        if(revision>0)
-        {
-            if(cached==null)posedStateMisses++;else posedStateHits++;
-            if(states.geometryRevision!=revision)
-            {
-                // Other shading slots belong to the old evaluated geometry.
-                // Keep the selected VBO for an in-place update; release the rest.
-                posedOldStateReleases+=states.variants.retain(state);
-                states.geometryRevision=revision;
-            }
-        }
+        var cached=selectPosedState(states,state,revision);
+        boolean uploaded=false;
         if(revision==0)
         {
             if(cached==null)rigidExternalMisses++;else rigidExternalHits++;
@@ -137,7 +135,7 @@ public final class RigidCapsuleGpu
             }
         }
         states.last=state;
-        if(cached==null||cached.revision()!=revision||cached.light()!=light||cached.overlay()!=overlay
+        if(geometryUploadNeeded(cached,revision)||cached.light()!=light||cached.overlay()!=overlay
                 ||cached.red()!=r||cached.green()!=g||cached.blue()!=b||!cached.material().equals(material))
         {
             int count=vertices.length/stride;
@@ -171,13 +169,29 @@ public final class RigidCapsuleGpu
                 }
             }
             cached=new ExternalMesh(buffer,revision,light,overlay,r,g,b,material,shadow);
+            uploaded=true;
             if(states.variants.put(state,cached))externalStateEvictions++;
             if(revision>0)posedUploads++;
         }
         var combined=new Matrix4f(RenderSystem.getModelViewMatrix()).mul(poses.last().pose());cached.buffer().bind();cached.buffer().drawWithShader(combined,RenderSystem.getProjectionMatrix(),active);EvaMaterialAuditR37.capture(texture,active);VertexBuffer.unbind();type.clearRenderState();drawCalls++;posedDraw(revision);
+        if(captureWitnessSubmission)lastWitnessSubmission=new WitnessSubmission(cached.revision(),uploaded,active.getClass().getSimpleName(),new Matrix4f(combined));
         if(!externalReadyLogged){externalReadyLogged=true;ProjectSeele.LOGGER.info("R30 rigid GPU buffers active inside the Oculus entity pipeline");}
         return true;
     }
+    private static ExternalMesh selectPosedState(ExternalStates states,ExternalKey state,long revision)
+    {
+        var cached=states.variants.get(state);
+        if(revision>0)
+        {
+            if(cached==null)posedStateMisses++;else posedStateHits++;
+            // A pose update keeps both pass buffers; each selected slot is
+            // validated and re-uploaded before its next actual GPU draw.
+            states.geometryRevision=revision;
+        }
+        return cached;
+    }
+    private static boolean geometryUploadNeeded(ExternalMesh cached,long revision)
+    {return cached==null||cached.revision()!=revision;}
     public static void clear()
     {
         Runnable release=()->{PARTS.values().forEach(p->p.buffer().close());PARTS.clear();EXTERNAL_PARTS.values().forEach(v->v.variants.clear());EXTERNAL_PARTS.clear();if(uploadBuilder!=null)uploadBuilder.clear();};

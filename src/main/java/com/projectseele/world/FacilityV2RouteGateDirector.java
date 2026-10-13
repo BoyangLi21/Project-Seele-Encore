@@ -25,6 +25,7 @@ public final class FacilityV2RouteGateDirector
 
     public static void refresh(ServerLevel level, FacilityV2SavedData data)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(level.getServer())
                 || !data.commissioned())
         {
@@ -33,6 +34,7 @@ public final class FacilityV2RouteGateDirector
         FacilitySchemaV2.ResolvedManifest manifest = data.manifest();
         for (FacilitySchemaV2.PortSpec port : manifest.ports())
         {
+            if(NervLegacyGenerationGuardR52.evaPort(level,port))continue;
             if (!isManagedProfile(port) || isPublicLiftLanding(port))
             {
                 continue;
@@ -73,6 +75,7 @@ public final class FacilityV2RouteGateDirector
             ServerLevel level, FacilityV2SavedData facility,
             GeoFrontFabricSavedData fabric)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(level.getServer())
                 || fabric.westSeamOpen()
                 || !complete(facility, "WEST_SUPPORT")
@@ -145,6 +148,7 @@ public final class FacilityV2RouteGateDirector
                                     FacilitySchemaV2.IntBox aperture,
                                     BlockState target)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         for (int y = aperture.minY(); y < aperture.maxY(); y++)
         {
             for (int z = aperture.minZ(); z < aperture.maxZ(); z++)

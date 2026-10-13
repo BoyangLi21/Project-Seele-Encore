@@ -38,6 +38,7 @@ public final class FacilityV2ArchitectureDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(server))
         {
             return;
@@ -252,6 +253,7 @@ public final class FacilityV2ArchitectureDirector
             ServerLevel level, FacilityV2SavedData facility,
             FacilityV2ArchitectureSavedData data)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (!data.needs(EVA_TRANSPORT_CLEARANCE,
                 EVA_TRANSPORT_CLEARANCE_REVISION))
         {
@@ -324,6 +326,7 @@ public final class FacilityV2ArchitectureDirector
             ServerLevel level, FacilitySchemaV2.IntBox owner,
             BlockPos position, BlockState target)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return 0;
         if (!contains(owner, position))
         {
             throw new IllegalStateException(

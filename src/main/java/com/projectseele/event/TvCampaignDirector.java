@@ -56,6 +56,7 @@ public final class TvCampaignDirector
     public static Vec3 approachPointR30(ServerLevel level)
     {
         var d=TvCampaignSavedData.get(level);
+        if(SurfaceAngelPlanR52.handles(d.active))return SurfaceAngelPlanR52.site(level,d.active).map(SurfaceAngelPlanR52.Site::intercept).orElse(null);
         if(TvEncounterRulesR45.handles(d.active))return TvEncounterSitesR45.site(level,d.active).map(TvEncounterSitesR45.Site::hero).orElse(null);
         var configured=site(level);return configured==null?null:configured.hero;
     }
@@ -77,7 +78,7 @@ public final class TvCampaignDirector
     {
         var level = level(player); if (level == null) return "本世界尚未配置 TV 作战区域。";
         var data = TvCampaignSavedData.get(level); var chapter = selected(player,data);
-        String constraint=TvEncounterRulesR45.handles(chapter.id())?TvEncounterDirectorR45.startBlocker(level,chapter.id()):CityBattlefieldR29.obstruction(level);
+        String constraint=SurfaceAngelPlanR52.handles(chapter.id())?SurfaceAngelPlanR52.startBlocker(level,chapter.id()):TvEncounterRulesR45.handles(chapter.id())?TvEncounterDirectorR45.startBlocker(level,chapter.id()):CityBattlefieldR29.obstruction(level);
         String activity = data.active.isEmpty() ? "尚未下达本章指令" : switch (data.phase)
         { case "alert" -> "使徒信号确认中 · 总部进入战斗配置";case "approach" -> "作战已接受，等待出击机体抵达"; case "combat" -> "目标正在交战";case "combat_victory" -> "目标已击破 · 等待回收与交接";case "episode_archived" -> "本次行动已结束"; case "cancel" -> "正在结束本次行动";case "failure" -> "作战暂停 · 回收整备后可重新出击"; default -> "等待下一步指令"; };
         return "TV 1995 · 第 " + chapter.episode() + " 话 / " + chapter.title() + "\n"
@@ -85,7 +86,7 @@ public final class TvCampaignDirector
                 + activity + "\n" + TvSortiesR32.roster(data) + "\n" + chapter.briefing().replace("东北迎击大道", CityBattlefieldR29.name(level)) + "\n" + constraint + "\n" + data.notice;
     }
     public static int begin(ServerPlayer player)
-    {return beginAssigned(player,1,false,false);}
+    {var level=level(player);return beginAssigned(player,1,level!=null&&selected(player,TvCampaignSavedData.get(level)).id().equals("ramiel"),false);}
     public static int beginAssigned(ServerPlayer player,int variant,boolean npc,boolean rifle)
     {
         if(variant<0||variant>4||npc&&variant>2)return message(player,"NPC 驾驶员对应零号机、初号机、二号机；UN 机体可由玩家加入。",false);
@@ -93,6 +94,8 @@ public final class TvCampaignDirector
         var level = level(player); if (level == null) return message(player, "本世界尚未配置作战区域。", false);
         if(npc&&player.level()!=level)return message(player,"请进入第三新东京市后下达驾驶员出击指令。",false);
         var data = TvCampaignSavedData.get(level); var chapter = selected(player,data);
+        String preparation=TvCampaignCatalog.preparationBlockerR52(data.active.isEmpty()?chapter.id():data.active);
+        if(!preparation.isEmpty())return message(player,preparation,false);
         if(variant<3&&(StaffRecoveryR47.pending(level,variant)||PilotReturnR39.pending(level,variant)))
             return message(player,"这台机体仍在执行回收入库与驾驶员交接。完成后再下达新的出击。",false);
         var acceptedUnit=TvSortiesR32.unit(level,variant);
@@ -105,6 +108,10 @@ public final class TvCampaignDirector
             return message(player,"当前行动等待恢复或交接，不能追加出击或隐式重新发射。",false);
         if (!data.active.isEmpty()) return TvSortiesR32.reinforce(player,variant,npc,rifle);
         if (!chapter.playable()) return message(player, "这一章仍在准备中。", false);
+        if(SurfaceAngelPlanR52.handles(chapter.id()))
+        {String blocker=SurfaceAngelPlanR52.startBlocker(level,chapter.id());if(!blocker.isEmpty())return message(player,blocker,false);}
+        if(chapter.id().equals("ramiel"))
+        {String blocker=yashimaDefaultFormationBlocker(level,variant);if(!blocker.isEmpty())return message(player,blocker,false);}
         if(TvEncounterRulesR45.handles(chapter.id()))
         {
             String blocker=TvEncounterDirectorR45.startBlocker(level,chapter.id());if(!blocker.isEmpty())return message(player,blocker,false);
@@ -117,13 +124,29 @@ public final class TvCampaignDirector
         data.episodeStateR45="";data.equipmentReturnedR45=false;data.targetDeathConfirmedR45=false;
         data.owner = player.getUUID(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = "出击编成："+TvSortiesR32.name(variant)+" · "+(npc?TrainingPilotEntity.pilotName(variant):"司令亲自驾驶"); data.angel = null; data.lastPosition = null; data.setDirty();
         data.assign(variant,player.getUUID(),npc,npc&&rifle);
+        if(chapter.id().equals("ramiel"))
+            for(int unit:new int[]{0,1})if(!data.sorties.containsKey(unit))data.assign(unit,player.getUUID(),true,false);
         data.rayPreloadCursorR45=data.missingTicksR45=0;
         data.encounterSiteR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::id).orElse("");
         data.encounterLayoutR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::fingerprint).orElse("");
+        if(SurfaceAngelPlanR52.handles(chapter.id())&&!SurfaceAngelAssaultR52.begun(level,data))
+        {data.phase="failure";data.setDirty();return message(player,"本场远端使徒与原装甲井尚未接通，未使用旧出生点。",false);}
         if(chapter.id().equals("ramiel")&&!TvYashimaDirectorR50.begin(level,data))
         {data.phase="failure";data.setDirty();return message(player,data.notice+" 本场未进入已接受交战；请取消后确认目标区。",false);}
         if(chapter.id().equals("gaghiel"))TvMarineDirectorR50.begin(level,data);
         return message(player, "作战已接受。" + chapter.briefing().replace("东北迎击大道", CityBattlefieldR29.name(level)) + "\n" + TvEncounterRulesR45.obstruction(level,data), true);
+    }
+    private static String yashimaDefaultFormationBlocker(ServerLevel level,int selected)
+    {
+        for(int unit:new int[]{0,1})if(unit!=selected)
+        {
+            if(StaffRecoveryR47.pending(level,unit)||PilotReturnR39.pending(level,unit))return TvSortiesR32.name(unit)+"仍在回收，完成原驾驶员交接后再接受屋岛双机出击。";
+            var eva=TvSortiesR32.unit(level,unit);
+            if(eva!=null&&(TvMissionEquipmentR45.awaitingPhysicalReturn(eva)
+                    ||eva.getPilotEntity()!=null&&!(eva.getPilotEntity() instanceof TrainingPilotEntity p&&p.getAssignedVariant()==unit)))
+                return TvSortiesR32.name(unit)+"仍有原装备待归还或已有其他驾驶员，默认双机编成不能接管。";
+        }
+        return "";
     }
     private static TvCampaignCatalog.Chapter selected(ServerPlayer player,TvCampaignSavedData data)
     {
@@ -167,6 +190,8 @@ public final class TvCampaignDirector
     public static int retry(ServerPlayer player)
     {
         var l=level(player);if(l==null)return 0;var d=TvCampaignSavedData.get(l);
+        String preparation=TvCampaignCatalog.preparationBlockerR52(d.active);
+        if(!preparation.isEmpty())return message(player,preparation,false);
         if(!player.getUUID().equals(d.owner)&&!player.hasPermissions(2))return message(player,"只能重试自己受托的作战。",false);
         if(!TvEncounterRulesR45.handles(d.active)||!d.phase.equals("failure"))return message(player,"当前没有等待恢复的遭遇战。",false);
         if(d.targetDeathConfirmedR45)return message(player,"目标已经不在了，不能重试这场战斗。先回收机体，再取消这次行动。",false);
@@ -308,6 +333,26 @@ public final class TvCampaignDirector
             Site site = site(level); if (site == null) continue;
             var data = TvCampaignSavedData.get(level);
             pilotContinuity(level,data);
+            if(SurfaceAngelPlanR52.handles(data.active)&&!Set.of("cancel","failure").contains(data.phase))
+            {
+                var boss=SurfaceAngelAssaultR52.tick(level,data);
+                if(boss==null||!boss.isAlive())
+                {
+                    clearCombatBar(level);
+                    if(boss!=null&&data.phase.equals("combat"))complete(level,data.active,data.owner,boss.getUUID());
+                    continue;
+                }
+                if(event.getServer().getTickCount()%10==0)
+                {
+                    var surfaceBar=BARS.computeIfAbsent(level,key->new ServerBossEvent(Component.literal("地表迎击"),BossEvent.BossBarColor.RED,BossEvent.BossBarOverlay.PROGRESS));
+                    surfaceBar.removeAllPlayers();surfaceBar.setVisible(!(boss instanceof SachielEntity s&&s.isFirstBattleActive()));
+                    for(var sortie:data.sorties.values()){var p=event.getServer().getPlayerList().getPlayer(sortie.commander);if(p!=null&&p.level()==level)surfaceBar.addPlayer(p);}
+                    float field=boss instanceof Angel a?a.getAtField():0,max=data.active.equals("sachiel")?900:700;
+                    surfaceBar.setName(Component.literal((data.active.equals("sachiel")?"第3使徒 萨基尔":"第4使徒 夏姆榭尔")+" · "+(data.phase.equals("combat")?"地表交战":data.phase.equals("alert")?"远端信号确认，原使徒已进攻地表":"原使徒正在进攻地表装甲井")));
+                    surfaceBar.setProgress(Math.max(0,Math.min(1,field>0?field/max:boss.getHealth()/boss.getMaxHealth())));
+                }
+                continue;
+            }
             if(event.getServer().getTickCount()%10!=0)continue;
             var bar = BARS.computeIfAbsent(level, key -> new ServerBossEvent(Component.literal("TV 作战"), BossEvent.BossBarColor.RED, BossEvent.BossBarOverlay.PROGRESS));
             bar.removeAllPlayers();
@@ -415,7 +460,7 @@ public final class TvCampaignDirector
     public static void unloaded(net.minecraftforge.event.level.LevelEvent.Unload event)
     {
         if(!(event.getLevel() instanceof ServerLevel level))return;
-        clearCombatBar(level);MISSING.remove(level);SITES.remove(level);
+        clearCombatBar(level);MISSING.remove(level);SITES.remove(level);SurfaceAngelPlanR52.clear(level);
     }
     @SubscribeEvent public static void commands(RegisterCommandsEvent event)
     {

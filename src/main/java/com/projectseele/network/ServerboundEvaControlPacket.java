@@ -43,6 +43,7 @@ public class ServerboundEvaControlPacket
     public static final int ACTION_RIFLE_SIGHT_STOP_R45=24;
     public static final int ACTION_DASH_START_R50=25;
     public static final int ACTION_DASH_STOP_R50=26;
+    public static final int ACTION_FIXED_CANNON_R52=27;
 
     public final int action;
     public final int requestId;
@@ -99,6 +100,8 @@ public class ServerboundEvaControlPacket
                     case ACTION_MELEE -> eva.meleeAttack(sender);
                     case ACTION_GRAPPLE -> com.projectseele.entity.EvaCombatR31.grapple(eva,sender);
                     case ACTION_SMASH -> eva.smashAttack(sender);
+                    case ACTION_FIXED_CANNON_R52 ->
+                    {var gun=eva.fixedCannonBodyR52();if(gun!=null&&gun.getId()==this.requestId)sender.sendSystemMessage(net.minecraft.network.chat.Component.literal(com.projectseele.world.TvYashimaStationR52.interact(sender,gun)));}
                     case ACTION_CHARGE_START -> eva.setChargingHeld(true);
                     case ACTION_CHARGE_STOP -> eva.releaseCannon(sender);
                     case ACTION_CROUCH_START -> eva.setPilotCrouching(sender, true);

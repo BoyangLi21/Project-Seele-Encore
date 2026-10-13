@@ -34,6 +34,14 @@ public final class NervCarrierPlatformRenderer
                        float partialTick, PoseStack poses,
                        MultiBufferSource buffers, int packedLight)
     {
+        if(com.projectseele.world.NervFootGuideStationR52.declared(entity)){NervFootGuideStationRendererR52.render(entity,partialTick,poses,buffers,packedLight);super.render(entity,yaw,partialTick,poses,buffers,packedLight);return;}
+        if(com.projectseele.world.NervOriginalCarrierR52.declared(entity)){NervOriginalCarrierRendererR52.render(entity,partialTick,poses,buffers,packedLight);return;}
+        boolean declared=entity.hasDeclaredMachineFrameR52()&&(entity.isRestraintGantry()||entity.isPlugCrane());
+        if(declared){poses.pushPose();poses.mulPose(entity.declaredMachineRotationR52());}
+        try{renderAuthored(entity,yaw,partialTick,poses,buffers,packedLight);}finally{if(declared)poses.popPose();}
+    }
+    private void renderAuthored(NervCarrierPlatformEntity entity,float yaw,float partialTick,PoseStack poses,MultiBufferSource buffers,int packedLight)
+    {
         if (entity.isRestraintGantry() && hasEarlierGantryCopy(entity))
         {
             return;
@@ -67,7 +75,7 @@ public final class NervCarrierPlatformRenderer
         // state this transient entity contributes only the animated restraint
         // towers; drawing a second carrier deck causes z-fighting. A moving
         // carrier has no restraints and keeps the full rail-platform mesh.
-        if (entity.isRestraintGantry() || entity.isPlugCrane())
+        if (entity.isRestraintGantry() || entity.isPlugCrane()||com.projectseele.world.NervOriginalCarrierR52.declared(entity))
         {
             if (entity.isRestraintGantry())
             {
@@ -77,7 +85,8 @@ public final class NervCarrierPlatformRenderer
             float service=entity.repairProgressR33();
             TvFacilityMeshes.withBuffers(buffers,()->
             {
-                TvFacilityMeshes.cage(poses,packedLight,entity.getRestraintProgress(partialTick),entity.getUnitVariant());
+                TvFacilityMeshes.cage(poses,packedLight,entity.getRestraintProgress(partialTick),entity.getUnitVariant(),entity.lowerFrameProgressR52(partialTick));
+                NervServiceFootDriveRendererR52.render(poses,packedLight,entity,partialTick);
                 EvaBayMachineryR33.render(poses,service<0?-1:Math.min(1,service+partialTick/2400F),entity.tickCount+partialTick,15.2F,false,entity.getUnitVariant());
             });
             super.render(entity, yaw, partialTick, poses, buffers,
@@ -186,12 +195,15 @@ public final class NervCarrierPlatformRenderer
                                 double cameraX, double cameraY,
                                 double cameraZ)
     {
-        if (entity.isRestraintGantry() || entity.isPlugCrane())
+        if (entity.isRestraintGantry() || entity.isPlugCrane()
+                ||com.projectseele.world.NervOriginalCarrierR52.declared(entity)
+                ||com.projectseele.world.NervFootGuideStationR52.declared(entity))
         {
             // These mechanisms are much larger than the entity's tiny
             // physical AABB.  Frustum-testing only that origin box made fixed
             // gantries blink and made a suspended plug crane disappear while
-            // its lower spreader was still plainly in view.
+            // its lower spreader was still plainly in view. Original carriers
+            // and persistent turn stations have the same small-origin issue.
             return true;
         }
         return super.shouldRender(entity, frustum, cameraX, cameraY,

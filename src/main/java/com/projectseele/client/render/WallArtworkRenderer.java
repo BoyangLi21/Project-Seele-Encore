@@ -1,7 +1,6 @@
 package com.projectseele.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.math.Axis;
 import com.projectseele.client.TreeOfLifeWallClient;
 import com.projectseele.world.WallArtworkBlockEntity;
 import net.minecraft.client.Minecraft;
@@ -19,30 +18,31 @@ public final class WallArtworkRenderer implements BlockEntityRenderer<WallArtwor
     @Override public void render(WallArtworkBlockEntity panel,float partial,PoseStack poses,MultiBufferSource buffers,int light,int overlay)
     {
         if(!panel.supported())return;
-        var mc=Minecraft.getInstance();Vec3 normal=Vec3.atLowerCornerOf(panel.facing().getNormal());
+        var mc=Minecraft.getInstance();var basis=panel.surfaceBasisR52();Vec3 normal=basis.normal();
         if(mc.gameRenderer.getMainCamera().getPosition().subtract(panel.centre()).dot(normal)<=.001)return;
         var texture=TreeOfLifeWallClient.artworkTexture(panel.artwork());if(texture==null)return;
         float halfWidth=Math.min(panel.width(),panel.height()*TreeOfLifeWallClient.artworkAspect(panel.artwork()))*.5F,h=panel.height()*.5F;
         poses.pushPose();var offset=panel.offset();poses.translate(offset.x,offset.y,offset.z);
-        poses.mulPose(Axis.YP.rotationDegrees(-panel.facing().toYRot()));
-        var pose=poses.last().pose();var normals=poses.last().normal();var consumer=buffers.getBuffer(RenderType.entityCutoutNoCull(texture));
+        var pose=poses.last().pose();var normals=poses.last().normal();
+        var consumer=buffers.getBuffer(panel.artwork().equals("tree_ink")?RenderType.entityTranslucent(texture):RenderType.entityCutoutNoCull(texture));
+        int tint=panel.tintR52();int red=tint>>>16&255,green=tint>>>8&255,blue=tint&255,alpha=tint>>>24;
         // A mural has to follow its real supporting wall. Checking only the
         // centre let a twelve-metre sheet cover doors and new wall openings.
-        double coordinate=panel.facing().getAxis()==net.minecraft.core.Direction.Axis.Z?panel.centre().x:panel.centre().z;
-        double sign=panel.facing().getAxis()==net.minecraft.core.Direction.Axis.Z?normal.z:-normal.x;
-        for(float bottom=-h;bottom<h;)
+        double horizontalCentre=panel.centre().dot(basis.right()),verticalCentre=panel.centre().dot(basis.up());
+        for(double bottom=-h;bottom<h;)
         {
-            float top=Math.min(h,(float)(Math.floor(panel.centre().y+bottom+1e-5)+1-panel.centre().y));
-            for(float left=-halfWidth;left<halfWidth;)
+            double top=WallArtworkBlockEntity.nextTileBoundaryR52(verticalCentre,bottom,h);
+            for(double left=-halfWidth;left<halfWidth;)
             {
-                double global=coordinate+sign*left;
-                double boundary=sign>0?Math.floor(global+1e-5)+1:Math.ceil(global-1e-5)-1;
-                float right=Math.min(halfWidth,(float)((boundary-coordinate)/sign));
+                double right=WallArtworkBlockEntity.nextTileBoundaryR52(horizontalCentre,left,halfWidth);
                 if(panel.supportsTile((left+right)*.5,(bottom+top)*.5))
                 {
-                    float u0=(left+halfWidth)/(2*halfWidth),u1=(right+halfWidth)/(2*halfWidth),v0=(h-top)/(2*h),v1=(h-bottom)/(2*h);
-                    for(float[] v:new float[][]{{left,bottom,u0,v1},{right,bottom,u1,v1},{right,top,u1,v0},{left,top,u0,v0}})
-                        consumer.vertex(pose,v[0],v[1],0).color(255,255,255,255).uv(v[2],v[3]).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(normals,0,0,1).endVertex();
+                    float u0=(float)((left+halfWidth)/(2*halfWidth)),u1=(float)((right+halfWidth)/(2*halfWidth)),v0=(float)((h-top)/(2*h)),v1=(float)((h-bottom)/(2*h));
+                    for(float[] v:new float[][]{{(float)left,(float)bottom,u0,v1},{(float)right,(float)bottom,u1,v1},{(float)right,(float)top,u1,v0},{(float)left,(float)top,u0,v0}})
+                    {
+                        var point=basis.right().scale(v[0]).add(basis.up().scale(v[1]));
+                        consumer.vertex(pose,(float)point.x,(float)point.y,(float)point.z).color(red,green,blue,alpha).uv(v[2],v[3]).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(normals,(float)normal.x,(float)normal.y,(float)normal.z).endVertex();
+                    }
                 }
                 left=right;
             }

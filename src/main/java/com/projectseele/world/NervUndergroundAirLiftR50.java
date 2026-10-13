@@ -71,32 +71,35 @@ public final class NervUndergroundAirLiftR50
     private static Vec3 vec(CompoundTag tag,String k){var v=new Vec3(tag.getDouble(k+"X"),tag.getDouble(k+"Y"),tag.getDouble(k+"Z"));if(!Double.isFinite(v.x+v.y+v.z))throw new IllegalArgumentException("Nonfinite flight coordinate");return v;}
     private static void put(CompoundTag tag,String k,Vec3 v){tag.putDouble(k+"X",v.x);tag.putDouble(k+"Y",v.y);tag.putDouble(k+"Z",v.z);}
     public static boolean registeredPickup(ServerLevel level,EvaUnit01Entity eva)
-    {var site=NervUndergroundTransportSiteR50.get(level);return site!=null&&eva!=null&&eva.level()==level&&site.pickupContains(eva.position())
+    {if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.registeredPickup(level,eva);var site=NervUndergroundTransportSiteR50.get(level);return site!=null&&eva!=null&&eva.level()==level&&site.pickupContains(eva.position())
             &&site.airContains(planeBox(eva.position().add(0,NervUndergroundTransportSiteR50.HOIST,0),eva.getYRot()));}
     public static boolean pending(ServerLevel level,EvaUnit01Entity eva)
-    {var j=state(level).job;return j!=null&&eva!=null&&j.eva.equals(eva.getUUID())&&!Set.of(Phase.RETREAT,Phase.RETURN,Phase.LAND).contains(j.phase);}
+    {if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.pending(level,eva);var j=state(level).job;return j!=null&&eva!=null&&j.eva.equals(eva.getUUID())&&!Set.of(Phase.RETREAT,Phase.RETURN,Phase.LAND).contains(j.phase);}
     public static boolean ownsMotion(EvaUnit01Entity eva)
     {
-        if(!(eva.level() instanceof ServerLevel level))return false;var j=state(level).job;
+        if(!(eva.level() instanceof ServerLevel level))return false;if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.ownsMotion(eva);var j=state(level).job;
         return j!=null&&j.eva.equals(eva.getUUID())&&(j.carrying||Set.of(Phase.APPROACH,Phase.CLAMP).contains(j.phase))
                 &&!EvaGroundReceiverR50.active(eva);
     }
-    public static boolean busy(ServerLevel level){return state(level).job!=null;}
-    public static String status(ServerLevel level){var s=state(level);return s.job==null?s.last:NervStaffDialogue.unitName(s.job.variant)+"："+s.job.note;}
+    public static boolean busy(ServerLevel level){if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.busy(level);return state(level).job!=null;}
+    public static String status(ServerLevel level){if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.status(level);var s=state(level);return s.job==null?s.last:NervStaffDialogue.unitName(s.job.variant)+"："+s.job.note;}
     public static boolean directReceiver(ServerLevel level,int variant,EvaUnit01Entity eva)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.atReceiver(level,eva);
         return eva!=null&&UndergroundSortieR48.undergroundRecoveryRouteR50(level,variant,eva)
                 &&(eva.position().distanceToSqr(UndergroundSortieR48.padFeet(variant))<=36
                     ||eva.position().distanceToSqr(UndergroundSortieR48.airReceiverFeetR50(variant))<=.25);
     }
     public static int ownedCancelVariantR50(ServerPlayer caller)
     {
+        if(NervRouteRuntimeR52.claimed(caller.serverLevel()))return NervAirTransportRuntimeR52.ownedCancelVariant(caller);
         var j=state(caller.serverLevel()).job;if(j==null||!j.owner.equals(caller.getUUID()))return -1;
         var fleet=EvaFleetSavedData.get(caller.server).entry(j.variant).orElse(null);
         return fleet!=null&&fleet.canonicalId().equals(j.eva)?j.variant:-1;
     }
     public static String cancel(ServerPlayer caller,int variant)
     {
+        if(NervRouteRuntimeR52.claimed(caller.serverLevel()))return NervAirTransportRuntimeR52.cancel(caller,variant);
         var s=state(caller.serverLevel());var j=s.job;if(j==null)return null;
         if(variant<0||variant>2||ownedCancelVariantR50(caller)!=variant)return "本机没有由您下达的地下运输任务，请核对机体编号。";
         if(j.phase==Phase.PREPARE){s.job=null;s.last="运输指令已取消，机体与运输机保持待命。";s.setDirty();return s.last;}
@@ -123,6 +126,7 @@ public final class NervUndergroundAirLiftR50
     }
     public static String request(ServerPlayer caller,int variant)
     {
+        if(NervRouteRuntimeR52.claimed(caller.serverLevel()))return NervAirTransportRuntimeR52.request(caller,variant,true,0,0);
         if(variant<0||variant>2||!NervStaffDialogue.authorized(caller)||!StaffConversationR24.radioAllowed(caller))return "请由机体操作者使用 NERV 指挥通信呼叫运输。";
         var level=caller.serverLevel();EvaLogisticsDirector.loadControlTarget(level,variant);var eva=EvaLogisticsDirector.canonicalUnit(level,variant);
         String ownership=EntryPlugEjectionR48.recoveryCallerBlocker(caller,eva);if(!ownership.isEmpty())return ownership;
@@ -130,12 +134,14 @@ public final class NervUndergroundAirLiftR50
     }
     public static boolean requestPilotReturn(ServerLevel level,EvaUnit01Entity eva,UUID commander)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.requestPilotReturn(level,eva,commander);
         if(eva==null||!(eva.getPilotEntity() instanceof TrainingPilotEntity pilot)||commander==null)return false;
         return PilotReturnR39.ownsRecoveryR50(level,eva,commander)
                 &&schedule(level,eva,commander).startsWith("地下运输部门收到");
     }
     private static String schedule(ServerLevel level,EvaUnit01Entity eva,UUID commander)
     {
+        if(NervRouteRuntimeR52.claimed(level))return eva==null?NervAirTransportRuntimeR52.status(level):NervAirTransportRuntimeR52.request(level,eva.getUnitVariant(),commander,NervAirTransportManifestR52.Intent.RECOVER,0,0);
         var site=NervUndergroundTransportSiteR50.get(level);if(site==null)return "地下机场尚未就绪，请保持位置，等待运输管制通知。";
         if(eva==null||eva.isExperimentalUnit()||!registeredPickup(level,eva))return "此处不能安全接载，请驶入开阔接载区后再呼叫运输。";
         var fleet=EvaFleetSavedData.get(level.getServer()).entry(eva.getUnitVariant()).orElse(null);
@@ -289,8 +295,8 @@ public final class NervUndergroundAirLiftR50
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
-        if(event.phase!=TickEvent.Phase.END)return;var level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;var site=NervUndergroundTransportSiteR50.get(level);if(site==null)return;
-        var s=state(level);if(s.job==null&&event.getServer().getTickCount()%20!=0)return;
+        if(event.phase!=TickEvent.Phase.END)return;var level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(level==null||NervRouteRuntimeR52.claimed(level))return;var site=NervUndergroundTransportSiteR50.get(level);if(site==null)return;
+        var s=state(level);if(s.job==null)return;
         if(s.aircraft==null){s.aircraft=site.aircraft;s.planeAt=site.stand;s.setDirty();}if(!s.aircraft.equals(site.aircraft))return;
         var probe=new AABB(s.planeAt,s.planeAt).inflate(100);loaded(level,probe);var plane=ServiceAircraftR32.find(level,s.aircraft);
         if(plane==null){if(s.job!=null)note(level,s,s.job,"地下机场正在接通运输机信号。");return;}

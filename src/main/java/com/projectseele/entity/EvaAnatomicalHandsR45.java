@@ -239,13 +239,18 @@ public final class EvaAnatomicalHandsR45
         if(!enabled(e)||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isBerserk()||!e.isPoweredOn()
                 ||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)
                 ||e.isVisuallyAirborneForRender()||e.getActivationTicks()>0)return;
-        float low=Mth.clamp(e.rifleStanceLevel(partial)/.75F,0,1),weight=1-low*low*(3-2*low);
+        naturalCarryTargetR52(e.getUnitVariant(),body,e.rifleStanceLevel(partial));
+    }
+    /** Same relaxed wrist FK with explicit prospective ordinary input. */
+    public static void naturalCarryTargetR52(int variant,EvaBodyPose.Sample body,float stance)
+    {
+        float low=Mth.clamp(stance/.75F,0,1),weight=1-low*low*(3-2*low);
         if(weight<=0)return;
         for(String side:List.of("l","r"))
         {
             String hand="hand_"+side,forearm="forearm_"+side;
             if(!body.rig.containsKey(hand)||!body.rig.containsKey(forearm))continue;
-            var frame=rig(e.getUnitVariant()).carry().get(side);
+            var frame=rig(variant).carry().get(side);
             var along=body.matrix(forearm).transformDirection(new Vector3f(body.rig.get(hand).pivot()).sub(body.rig.get(forearm).pivot())).normalize();
             var inward=body.matrix("torso_upper").transformDirection(new Vector3f(side.equals("l")?1:-1,0,0));
             inward.fma(-inward.dot(along),along);
@@ -357,8 +362,21 @@ public final class EvaAnatomicalHandsR45
         }
         return values;
     }
+    /** Pure normal stopped FISTS controls. It reads the real selected rig and
+     * constructs all 34 joints without touching the live hand-state cache. */
+    public static Pose ordinaryReleaseTargetR52(int variant,boolean prone)
+    {return ordinaryReleaseTargetR52(variant,prone,0);}
+    public static Pose ordinaryReleaseTargetR52(int variant,boolean prone,float guard)
+    {
+        var rig=rig(variant);String selection=prone?"support":guard>.12F?"fist":"relaxed";var values=controls(rig,selection,selection);var rotations=new LinkedHashMap<String,Quaternionf>();
+        for(Joint joint:rig.joints){var v=values.get(joint.name);rotations.put(joint.name,rotation(joint,v[0],v[1],v[2]));}return new Pose(selection,selection,Map.copyOf(rotations));
+    }
     public static Pose sample(EvaUnit01Entity e,float partial)
     {
+        if(EvaMechanicalFrameR52.serviceSourceHeldR52(e))return EvaMechanicalFrameR52.serviceHandsR52(e);
+        // The existing final renderer and server hand contacts consume the
+        // same immutable 34-joint sample while Root owns a rigid carrier.
+        if(EvaAirTransportR31.active(e)&&EvaAirTransportR31.cradleStateR50(e).getBoolean("MechanicalFrameR52"))return EvaFrozenHandsR52.frozen(e);
         Rig rig=rig(e.getUnitVariant());String left=selection(e,"l"),right=selection(e,"r");
         Map<String,float[]> wanted=controls(rig,left,right);
         if(System.getProperty("projectseele.handPoseR45","").isBlank()

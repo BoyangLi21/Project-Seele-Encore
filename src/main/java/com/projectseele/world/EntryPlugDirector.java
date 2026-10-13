@@ -72,6 +72,7 @@ public final class EntryPlugDirector
     public static EntryPlugCarrierEntity ensureSuspended(
             ServerLevel level, int variant, EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return null;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null)
         {
@@ -178,6 +179,7 @@ public final class EntryPlugDirector
     public static EntryPlugCarrierEntity canonical(ServerLevel level,
                                                     int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return originalUuidOnlyR52(level,variant);
         Map<Integer, UUID> dimensionCache = CACHED_PLUGS.computeIfAbsent(
                 level.dimension(), ignored -> new HashMap<>());
         UUID savedId = savedPlugId(level, variant);
@@ -265,6 +267,14 @@ public final class EntryPlugDirector
         return keep;
     }
 
+    private static EntryPlugCarrierEntity originalUuidOnlyR52(ServerLevel level,int variant)
+    {
+        if(variant<0||variant>2)return null;
+        Entity original=NervOriginalActorsR52.originalOnly(savedPlugId(level,variant),level::getEntity,
+                e->e instanceof EntryPlugCarrierEntity plug&&plug.isAlive()&&nervOwnedCarrierR47(plug)&&plug.getAssignedVariant()==variant);
+        return original instanceof EntryPlugCarrierEntity plug?plug:null;
+    }
+
     private static boolean nervOwnedCarrierR47(EntryPlugCarrierEntity plug)
     {
         return plug.laboratorySlotR47()<0 && !plug.isIndependentUNPlug()
@@ -316,6 +326,7 @@ public final class EntryPlugDirector
     public static boolean releaseEmptyTrainingPlugAtDock(
             ServerLevel level, int variant, EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null || !plug.getPassengers().isEmpty())
         {
@@ -393,6 +404,7 @@ public final class EntryPlugDirector
      */
     public static int sweepStrayPlugs(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))return 0;
         int removed = 0;
         // Entry plugs are intentionally unique (one per EVA), so iterating the
         // already-loaded entity list is much cheaper and more reliable than a
@@ -431,23 +443,18 @@ public final class EntryPlugDirector
             {
                 continue;
             }
-            candidates.sort(Comparator
+            candidates.sort(OriginalIdentityOrderR52.comparator(savedId, Entity::getUUID, Comparator
                     .comparingInt(EntryPlugDirector::canonicalPriority)
-                    .thenComparingInt(plug -> plug.getUUID().equals(savedId)
-                            ? 0 : 1)
                     .thenComparingDouble(plug ->
                             plug.position().distanceToSqr(rest))
-                    .thenComparing(Entity::getUUID));
+                    .thenComparing(Entity::getUUID)));
             EntryPlugCarrierEntity keep = candidates.get(0);
             for (int index = 1; index < candidates.size(); index++)
             {
                 EntryPlugCarrierEntity duplicate = candidates.get(index);
-                for (Entity passenger
-                        : List.copyOf(duplicate.getPassengers()))
-                {
-                    passenger.stopRiding();
-                    keep.boardPassenger(passenger);
-                }
+                // Cleanup cannot migrate an occupied or mechanically attached
+                // graph into the original capsule just to remove a duplicate.
+                if (duplicate.isVehicle() || duplicate.isPassenger() || duplicate.isLockedToEva()) continue;
                 duplicate.discard();
                 removed++;
             }
@@ -462,10 +469,22 @@ public final class EntryPlugDirector
         return removed;
     }
 
+    /** The saved original remains authoritative after field ejection, even when empty. */
+    static final class OriginalIdentityOrderR52
+    {
+        static <T> Comparator<T> comparator(UUID saved,
+                java.util.function.Function<T, UUID> identity, Comparator<T> fallback)
+        {
+            return Comparator.comparingInt((T candidate) -> identity.apply(candidate).equals(saved) ? 0 : 1)
+                    .thenComparing(fallback);
+        }
+    }
+
     /** Seals the boarded capsule and starts its local PREPARE sequence. */
     public static void beginCabinPreparation(ServerLevel level, int variant,
                                              EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         EntryPlugCarrierEntity plug = ensureSuspended(level, variant, unit);
         if (plug != null)
         {
@@ -482,6 +501,7 @@ public final class EntryPlugDirector
                                             EvaUnit01Entity unit, int ticks,
                                             int totalTicks)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         // PREPARE owns the exact occupied capsule that requestPrepare
         // authenticated. Never manufacture a replacement midway through the
         // sealed-cabin sequence if that entity temporarily cannot be resolved.
@@ -507,6 +527,7 @@ public final class EntryPlugDirector
     public static boolean hasBoardedPilot(ServerLevel level, int variant,
                                           EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level)){var original=originalUuidOnlyR52(level,variant);return original!=null&&isSupportedPilot(original.getFirstPassenger())&&(original.getLinkedEva()==null||original.getLinkedEva()==unit);}
         if (isSupportedPilot(unit.getPilotEntity()))
         {
             return true;
@@ -548,6 +569,7 @@ public final class EntryPlugDirector
     public static void claimBoardedPlug(ServerLevel level,
                                         EntryPlugCarrierEntity boarded)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if(!nervOwnedCarrierR47(boarded))return;
         int variant = boarded.getAssignedVariant();
         EntryPlugCarrierEntity former = canonical(level, variant);
@@ -574,6 +596,7 @@ public final class EntryPlugDirector
     public static boolean beginInsertion(ServerLevel level, int variant,
                                          EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null || !plug.isVehicle()
                 || !plug.isHatchFullySealed()
@@ -632,6 +655,7 @@ public final class EntryPlugDirector
     public static boolean tickInsertion(ServerLevel level, int variant,
                                         EvaUnit01Entity unit, int ticks)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null)
         {
@@ -926,6 +950,7 @@ public final class EntryPlugDirector
         {
             return false;
         }
+        if(NervRouteRuntimeR52.claimed(level))return NervOriginalActorsR52.launchLock(level,variant,unit,plug);
         RigidTransform expected = EntryPlugKinematics.lockedTransform(unit);
         RigidTransform actual = plug.getCanonicalTransform();
         return actual.translation().distanceToSqr(expected.translation())
@@ -941,6 +966,7 @@ public final class EntryPlugDirector
     public static boolean abortInsertionToDock(ServerLevel level, int variant,
                                                EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null)
         {
@@ -1008,6 +1034,7 @@ public final class EntryPlugDirector
     public static boolean abortDockedPreparation(ServerLevel level, int variant,
                                                  EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null
                 || plug.getInsertionStage()
@@ -1044,6 +1071,7 @@ public final class EntryPlugDirector
                                           EvaUnit01Entity unit,
                                           int abortTicks)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null)
         {
@@ -1097,6 +1125,7 @@ public final class EntryPlugDirector
     public static boolean completeAbortDocking(ServerLevel level, int variant,
                                                EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug == null || plug.getInsertionStage()
                 != EntryPlugCarrierEntity.STAGE_ABORT_DOCKED
@@ -1141,6 +1170,7 @@ public final class EntryPlugDirector
     /** Same hoist path for a correctly docked capsule whose driver disconnected. */
     public static boolean extractEmptyCapsule(ServerLevel level, int variant, EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         if (unit.isExperimentalUnit() || !isInsideAssignedCage(level,unit,variant) || unit.getPilotEntity()!=null) return false;
         EntryPlugCarrierEntity plug=unit.getLockedEntryPlug();
         if(plug==null||plug.isVehicle()||plug.getLinkedEva()!=unit||unit.getLockedEntryPlug()!=plug
@@ -1164,6 +1194,7 @@ public final class EntryPlugDirector
                                            EvaUnit01Entity unit,
                                            LivingEntity pilot)
     {
+        if(NervRouteRuntimeR52.claimed(level)&&!(unit instanceof com.projectseele.entity.EvaPrototypeEntity))return NervOriginalActorsR52.requestEjection(level,variant,unit,pilot);
         if (level.isClientSide || unit == null || pilot == null || unit.level() != level || pilot.level() != level)
         {
             return false;
@@ -1282,6 +1313,7 @@ public final class EntryPlugDirector
      */
     public static void tickEjection(EntryPlugCarrierEntity plug, int ticks)
     {
+        if(NervOriginalActorsR52.managed(plug))return;
         if(plug.laboratorySlotR47()>=0)return;
         if(plug.isIndependentUNPlug()){UNPlugDirector.extract(plug,ticks);return;}
         if (!(plug.level() instanceof ServerLevel level))
@@ -1343,7 +1375,33 @@ public final class EntryPlugDirector
      * deterministic landing arc. The landed capsule remains in the world and
      * is never registered as the wet cage's canonical spare.
      */
+    /** Existing field mechanism with an explicitly mapped original caller;
+     * no hangar coordinates, canonical adoption or replacement are consulted. */
+    public static boolean beginMappedFieldEjectionR52(ServerLevel level,EvaUnit01Entity unit,EntryPlugCarrierEntity plug,LivingEntity pilot)
+    {
+        if(!NervOriginalActorsR52.managed(plug)||unit.level()!=level||pilot.level()!=level||unit.getLockedEntryPlug()!=plug||plug.getVehicle()!=unit||plug.getFirstPassenger()!=pilot
+                ||unit.getPilotEntity()!=pilot||unit.isNervLogisticsLocked()||unit.isLaunchSequenceActive()||unit.hasActiveCarrierMotion()||com.projectseele.entity.EvaAirTransportR31.active(unit)||!plug.isHatchFullySealed())return false;
+        var seated=plug.getCanonicalTransform();var socket=unit.getEntryPlugSocketPosition();var outward=unit.getForward().multiply(-1,0,-1).normalize();if(outward.lengthSqr()<1e-4)return false;
+        Vec3 escape=socket.add(outward.scale(EvaScale.ENTRY_PLUG_LENGTH*.54)).add(0,EvaScale.ENTRY_PLUG_LENGTH*.12,0).add(outward.scale(12)).add(0,9,0);
+        var landing=findClearFieldEjectionLandingR50(level,unit,plug,seated,escape,unit.position().add(outward.scale(EvaScale.ENTRY_PLUG_LENGTH+12)));if(landing==null||!NervMappedPlugMechanicsR52.clearFieldArc(level,unit,plug,seated,escape,landing))return false;
+        var before=EntryPlugEjectionR48.snapshot(plug);if(!plug.beginFieldEjection(seated.translation(),escape,landing)||!EntryPlugEjectionR48.detach(unit,plug,before))return false;
+        plug.setCanonicalTransform(seated);plug.getPersistentData().putInt("MappedFieldEjectionAgeR52",0);return true;
+    }
+    public static RigidTransform mappedFieldPoseR52(RigidTransform start,Vec3 escape,Vec3 landing,int ticks)
+    {double t=Mth.clamp(ticks/(double)FIELD_EJECTION_TICKS,0,1);var point=t<=.38?start.translation().lerp(escape,smoothstep(t/.38)):escape.lerp(landing,smoothstep((t-.38)/.62)).add(0,Math.sin(Math.PI*smoothstep((t-.38)/.62))*8,0);return new RigidTransform(point,start.qx(),start.qy(),start.qz(),start.qw());}
+    public static boolean tickMappedFieldEjectionR52(EntryPlugCarrierEntity plug)
+    {
+        if(!NervOriginalActorsR52.managed(plug)||!(plug.level() instanceof ServerLevel level)||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_FIELD_EJECTING)return false;
+        var fleet=EvaFleetSavedData.get(level.getServer()).entry(plug.getAssignedVariant()).orElse(null);if(fleet==null||!(level.getEntity(fleet.canonicalId()) instanceof EvaUnit01Entity unit))return false;
+        int age=plug.getPersistentData().getInt("MappedFieldEjectionAgeR52")+1;var current=plug.getCanonicalTransform();var start=new RigidTransform(plug.getFieldEjectionStart(),current.qx(),current.qy(),current.qz(),current.qw());var target=mappedFieldPoseR52(start,plug.getFieldEjectionEscape(),plug.getFieldEjectionLanding(),age);
+        if(!NervMappedPlugMechanicsR52.clearCapsule(level,unit,plug,current,target,null))return false;tickFieldEjectionCommon(plug,age);plug.getPersistentData().putInt("MappedFieldEjectionAgeR52",age);plug.syncPilotPositionNow();return true;
+    }
     public static void tickFieldEjection(EntryPlugCarrierEntity plug, int ticks)
+    {
+        if(NervOriginalActorsR52.managed(plug))return;
+        tickFieldEjectionCommon(plug,ticks);
+    }
+    private static void tickFieldEjectionCommon(EntryPlugCarrierEntity plug,int ticks)
     {
         if(plug.laboratorySlotR47()>=0)return;
         if (!(plug.level() instanceof ServerLevel level))
@@ -1428,6 +1486,7 @@ public final class EntryPlugDirector
     public static void reset(ServerLevel level, int variant,
                              EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if(plug==null||plug.laboratorySlotR47()>=0||plug.getFirstPassenger()!=null)
             throw new IllegalStateException("Original empty capsule is required for maintenance");
@@ -1438,6 +1497,7 @@ public final class EntryPlugDirector
 
     public static void remove(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         EntryPlugCarrierEntity plug = canonical(level, variant);
         if (plug != null)
         {
@@ -1449,6 +1509,7 @@ public final class EntryPlugDirector
 
     public static void keepPassengerState(EntryPlugCarrierEntity plug)
     {
+        if(NervOriginalActorsR52.managed(plug)){NervOriginalActorsR52.tickPlug((ServerLevel)plug.level(),plug);return;}
         if(plug.laboratorySlotR47()>=0)return;
         Entity passenger = plug.getFirstPassenger();
         if (passenger != null
@@ -1506,6 +1567,7 @@ public final class EntryPlugDirector
                 ||!fleet.entryPlugId().equals(plug.getUUID())||canonical(level,variant)!=plug||!nervOwnedCarrierR47(plug)
                 ||plug.getAssignedVariant()!=variant||plug.getVehicle()!=null||!plug.hasCanonicalPose()
                 ||plug.getLinkedEva()!=null&&plug.getLinkedEva()!=unit)return false;
+        if(NervRouteRuntimeR52.claimed(level))return NervOriginalActorsR52.cageDock(level,variant,unit,plug);
         var actual=plug.getCanonicalTransform();var dock=cageDockTransform(unit);
         return actual.translation().distanceToSqr(dock.translation())<=1.0D/(1024.0D*1024.0D)
                 &&actual.rotationErrorDegrees(dock)<=.1D;
@@ -1668,6 +1730,7 @@ public final class EntryPlugDirector
     /** Keeps the visible suspension in step with the capsule it carries. */
     private static void updateCables(ServerLevel level, int variant, double plugY)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         updateCables(level, variant, plugY, Double.NaN, false);
     }
 
@@ -1679,6 +1742,7 @@ public final class EntryPlugDirector
                                      double plugY, double plugZ,
                                      boolean travelling)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         BlockPos bed = hangarBed(level, variant);
         if (!level.hasChunkAt(bed))
         {
@@ -1756,6 +1820,7 @@ public final class EntryPlugDirector
     /** Retracts the crane once the capsule is no longer in the cage's hands. */
     private static void stowCrane(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         BlockPos bed = hangarBed(level, variant);
         if (FacilityV2EvaRuntime.supportsPlugCrane(level, variant))
         {
@@ -1844,6 +1909,7 @@ public final class EntryPlugDirector
      */
     public static void ensureCraneStowed(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         stowCrane(level, variant);
     }
 
@@ -1851,6 +1917,7 @@ public final class EntryPlugDirector
     public static void maintainCraneAtCurrentPlug(
             ServerLevel level, int variant, EntryPlugCarrierEntity plug)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         if (plug == null || !plug.isAlive() || plug.level() != level
                 || variant < 0 || variant > 2 || !nervOwnedCarrierR47(plug)
                 || plug.getAssignedVariant() != variant || !plug.hasCanonicalPose())
@@ -1905,6 +1972,7 @@ public final class EntryPlugDirector
     /** Stop only existing display machinery; the ordinary stow path may create a new crane. */
     private static void retireEmergencyCraneR50(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         CRANE_SIGNATURE.remove(variant);
         CranePose[] poses = S20_CRANE_POSES.get(level.dimension());
         if (poses != null)poses[variant] = null;
@@ -1928,6 +1996,7 @@ public final class EntryPlugDirector
 
     public static Vec3 plugRestPosition(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level)){var dock=NervOriginalActorsR52.dockPose(level,variant);return dock==null?null:dock.translation();}
         if (FacilityV2EvaRuntime.ready(level, variant))
         {
             return FacilityV2EvaRuntime.plugRestPosition(level, variant);

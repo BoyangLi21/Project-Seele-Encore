@@ -41,16 +41,18 @@ public final class NervSiloDoorRenderer
             float partialTick, PoseStack poses, MultiBufferSource buffers,
             int packedLight)
     {
+        if(door.declaredGeometryMissingR52())return;
         float open = door.getOpenProgress(partialTick);
         poses.pushPose();
-        TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.shaftHatch(poses,packedLight,open));
-        if(!door.isTvBulkhead())renderSplitLogo(poses, buffers, open);
+        var spec=door.declaredSpecR52();if(spec!=null)poses.mulPose(door.actualFrameR52().rotation());
+        TvFacilityMeshes.withBuffers(buffers,()->{if(spec==null)TvFacilityMeshes.shaftHatch(poses,packedLight,open);else TvFacilityMeshes.shaftHatchDeclared(poses,packedLight,open,spec);});
+        if(!door.isTvBulkhead())renderSplitLogo(poses, buffers, open,spec);
         poses.popPose();
         super.render(door, yaw, partialTick, poses, buffers, packedLight);
     }
 
     private static void renderSplitLogo(PoseStack poses,
-            MultiBufferSource buffers, float open)
+            MultiBufferSource buffers, float open,SiloHatchMechanism.Spec spec)
     {
         ResourceLocation texture = TreeOfLifeWallClient.nervLogoTexture(
                 Minecraft.getInstance());
@@ -62,10 +64,10 @@ public final class NervSiloDoorRenderer
                 RenderType.entityTranslucent(texture));
         for(int side:new int[]{-1,1})for(int index=0;index<SiloHatchMechanism.PANELS;index++)
         {
-            double a=index*SiloHatchMechanism.WIDTH;
-            double b=Math.min(10,a+SiloHatchMechanism.WIDTH);
+            double width=spec==null?SiloHatchMechanism.WIDTH:spec.panelWidth();double a=index*width;
+            double b=Math.min(10,a+width);
             if(a>=b)continue;
-            var panel=SiloHatchMechanism.panel(index,open);
+            var panel=SiloHatchMechanism.panel(index,open,spec);
             double x0=side<0?-b:a,x1=side<0?-a:b;
             double shift=side*(panel.x()-a);
             // Rotate both UV axes through 180 degrees to face the northern

@@ -142,17 +142,20 @@ public final class EvaAirTransportR31
     /** Matches the rendered body, not its independently eased position packets. */
     public static Vec3 framePosition(EvaUnit01Entity eva,float partial)
     {
+        if(EvaMechanicalFrameR52.active(eva))return EvaMechanicalFrameR52.frame(eva,partial).translation();
         if(!eva.level().isClientSide)return eva.position();
         if(eva.hasActiveCarrierMotion())return eva.carrierRenderPosition(partial);
         return new Vec3(Mth.lerp((double)partial,eva.xOld,eva.getX()),Mth.lerp((double)partial,eva.yOld,eva.getY()),Mth.lerp((double)partial,eva.zOld,eva.getZ()));
     }
     public static float frameYaw(EvaUnit01Entity eva,float partial)
-    {return eva.level().isClientSide?Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot):eva.yBodyRot;}
+    {return EvaMechanicalFrameR52.active(eva)?EvaMechanicalFrameR52.baseYaw(eva):eva.level().isClientSide?Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot):eva.yBodyRot;}
 
     /** Used by the CPU socket/capsule path as well as the final Gecko bone writer. */
     public static EvaBodyPose.Sample sample(EvaUnit01Entity eva, EvaBodyPose.Sample result, float partial)
     {
         var tag=eva.getEntityData().get(FRAME);
+        if(tag.getBoolean("MechanicalFrameR52")&&EvaMechanicalFrameR52.active(eva))
+            return EvaMechanicalFrameR52.sample(eva,result,partial,tag.getCompound("Origin"));
         if(tag.getBoolean("GroundReceiverR50"))return EvaGroundReceiverR50.sample(eva,result,tag,
                 Mth.lerp(eva.level().isClientSide?partial:1,tag.getInt("GroundPreviousAgeR50"),tag.getInt("GroundAgeR50")));
         if(tag.getBoolean("Release"))
@@ -178,6 +181,7 @@ public final class EvaAirTransportR31
     /** Cradle-local metres to the actual moving assembly's world coordinates. */
     public static Vec3 point(EvaUnit01Entity eva, Vec3 local, float partial)
     {
+        if(EvaMechanicalFrameR52.active(eva))return EvaMechanicalFrameR52.frame(eva,partial).transformPoint(local);
         Vector3f p = transformLocal(eva,local,pitch(eva,partial));
         p.rotateY((180-frameYaw(eva,partial))*Mth.DEG_TO_RAD);
         Vec3 root = framePosition(eva,partial);

@@ -14,21 +14,30 @@ import java.util.Optional;
 /** Installed measured encounter sites; neither terrain nor story-progress writer. */
 public final class TvEncounterSitesR45
 {
+    public record Landing(Vec3 point,String receiver){}
     public record Site(String id,Vec3 hero,Vec3 angel,Vec3 cover,float yaw,
             boolean cityInterlock,boolean geometryValidated,boolean modelReady,
-            String visibility,double attackRange,int primaryUnit,Vec3 support,boolean supportValidated)
+            String visibility,double attackRange,int primaryUnit,Vec3 support,boolean supportValidated,float modelScale,Map<Integer,Landing> landings)
     {
+        public Site{landings=Map.copyOf(landings);}
         public Site(String id,Vec3 hero,Vec3 angel,Vec3 cover,float yaw,
                 boolean cityInterlock,boolean geometryValidated,boolean modelReady,
                 String visibility,double attackRange,int primaryUnit)
-        {this(id,hero,angel,cover,yaw,cityInterlock,geometryValidated,modelReady,visibility,attackRange,primaryUnit,null,false);}
+        {this(id,hero,angel,cover,yaw,cityInterlock,geometryValidated,modelReady,visibility,attackRange,primaryUnit,null,false,1,Map.of());}
+        public Site(String id,Vec3 hero,Vec3 angel,Vec3 cover,float yaw,boolean cityInterlock,boolean geometryValidated,boolean modelReady,
+                String visibility,double attackRange,int primaryUnit,Vec3 support,boolean supportValidated)
+        {this(id,hero,angel,cover,yaw,cityInterlock,geometryValidated,modelReady,visibility,attackRange,primaryUnit,support,supportValidated,1,Map.of());}
+        public Site(String id,Vec3 hero,Vec3 angel,Vec3 cover,float yaw,boolean cityInterlock,boolean geometryValidated,boolean modelReady,
+                String visibility,double attackRange,int primaryUnit,Vec3 support,boolean supportValidated,float modelScale)
+        {this(id,hero,angel,cover,yaw,cityInterlock,geometryValidated,modelReady,visibility,attackRange,primaryUnit,support,supportValidated,modelScale,Map.of());}
         public double separation(){return hero.distanceTo(angel);}
         public boolean supportReady()
         {return supportValidated&&support!=null&&finite(support)&&support.distanceTo(hero)>=30&&support.distanceTo(cover)>=30;}
         public String fingerprint()
         {
-            String value=id+"|"+hero+"|"+angel+"|"+cover+"|"+yaw+"|"+cityInterlock+"|"+visibility+"|"+attackRange+"|"+primaryUnit;
+            String value=id+"|"+hero+"|"+angel+"|"+cover+"|"+yaw+"|"+cityInterlock+"|"+visibility+"|"+attackRange+"|"+primaryUnit+"|scale="+modelScale;
             if(support!=null)value+="|support="+support;
+            for(int unit:new int[]{0,1})if(landings.containsKey(unit))value+="|landing"+unit+"="+landings.get(unit);
             try{return java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256")
                     .digest(value.getBytes(java.nio.charset.StandardCharsets.UTF_8)));}
             catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
@@ -37,6 +46,15 @@ public final class TvEncounterSitesR45
     private static final Map<ServerLevel,Map<String,Site>> CACHE=new WeakHashMap<>();
     private static Vec3 vec(com.google.gson.JsonArray row)
     {return new Vec3(row.get(0).getAsDouble(),row.get(1).getAsDouble(),row.get(2).getAsDouble());}
+    public static Map<Integer,Landing> readLandingsR52(com.google.gson.JsonObject row)
+    {
+        var values=row.getAsJsonObject("landings");if(values==null||values.size()!=2)throw new IllegalArgumentException("Two original independent Yashima landing roots required");
+        var result=new HashMap<Integer,Landing>();for(int unit:new int[]{0,1})
+        {var r=values.getAsJsonObject(Integer.toString(unit));var point=vec(r.getAsJsonArray("point"));String receiver=r.get("receiver_id").getAsString();
+            if(!finite(point)||!receiver.matches("[a-z0-9_./-]{1,128}"))throw new IllegalArgumentException("Explicit upright landing root/receiver rejected");result.put(unit,new Landing(point,receiver));}
+        if(result.get(0).receiver().equals(result.get(1).receiver())||result.get(0).point().distanceTo(result.get(1).point())<48)
+            throw new IllegalArgumentException("Original two EVA deliveries must use independent real ports");return Map.copyOf(result);
+    }
     public static Optional<Site> site(ServerLevel level,String chapter)
     {
         return Optional.ofNullable(CACHE.computeIfAbsent(level,l ->
@@ -58,8 +76,10 @@ public final class TvEncounterSitesR45
                             r.get("geometry_validated").getAsBoolean(),r.get("model_ready").getAsBoolean(),r.get("visibility").getAsString(),
                             r.get("attack_range").getAsDouble(),r.get("primary_unit").getAsInt(),
                             r.has("support_port")?vec(r.getAsJsonArray("support_port")):null,
-                            r.has("support_port_validated")&&r.get("support_port_validated").getAsBoolean());
+                            r.has("support_port_validated")&&r.get("support_port_validated").getAsBoolean(),
+                            r.has("model_scale")?r.get("model_scale").getAsFloat():1F,entry.getKey().equals("ramiel")?readLandingsR52(r):Map.of());
                     if(!finite(site.hero())||!finite(site.angel())||!finite(site.cover())||!Float.isFinite(site.yaw())
+                            ||!Float.isFinite(site.modelScale())||site.modelScale()<(entry.getKey().equals("ramiel")?4:1)||site.modelScale()>16
                             ||!Double.isFinite(site.separation())||site.separation()<30||site.separation()>4096
                             ||!Double.isFinite(site.attackRange())||site.attackRange()<8||site.attackRange()>4096
                             ||site.primaryUnit()!=(entry.getKey().equals("ramiel")?1:2)

@@ -87,6 +87,15 @@ public final class S20MovingElevatorsAdapter
     public static boolean reconcile(
             ServerLevel level, S20PhysicalElevatorDirector.LiftSpec spec)
     {
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            if(S20LiftDirectoryR52.current(level,spec))
+            {
+                var base=controller(level,controllerPosition(spec,spec.lower()));
+                if(base!=null&&base.hasGroup())synchronizeDoorsFromPhysicalCage(level,spec,base.getGroup());
+            }
+            return true; // Pending claims never enter old repair/retirement/cabin generation.
+        }
         if (!allStopsLoaded(level, spec))
         {
             return false;
@@ -361,6 +370,7 @@ public final class S20MovingElevatorsAdapter
             S20PhysicalElevatorDirector.LiftSpec spec,
             S20PhysicalElevatorDirector.Landing landing)
     {
+        if(landing.r52()!=null)return landing.r52().controller();
         if(spec.id().equals(NervLiftPassengerSync.GATEWAY))return RegionalGatewayDirector.controllerPos(landing.walkY());
         /*
          * The controller must never share a plane with either landing door.
@@ -378,6 +388,7 @@ public final class S20MovingElevatorsAdapter
     private static Direction controllerSide(
             S20PhysicalElevatorDirector.LiftSpec spec)
     {
+        if(spec.r52()!=null)return spec.r52().controllerSide();
         if (spec.id().equals(
                 S20PhysicalElevatorDirector.OBSERVATION_HANGAR_LIFT_ID))
         {
@@ -400,6 +411,7 @@ public final class S20MovingElevatorsAdapter
     private static Direction controllerFacing(
             S20PhysicalElevatorDirector.LiftSpec spec)
     {
+        if(spec.r52()!=null)return spec.r52().controllerFacing();
         if(spec.id().equals(NervLiftPassengerSync.GATEWAY))return Direction.EAST;
         return controllerSide(spec).getOpposite();
     }
@@ -658,6 +670,11 @@ public final class S20MovingElevatorsAdapter
             {
                 continue;
             }
+            if(NervRouteRuntimeR52.claimed(level)&&!S20LiftDirectoryR52.current(level,spec))
+            {
+                player.displayClientMessage(Component.literal("电梯原生绑定尚未确认，请等待设施检查。"),true);
+                return true;
+            }
             if (SeeleConferenceAccessR47.office(level, spec)
                     && !SeeleConferenceAccessR47.allowDestination(player, landing.walkY()))
             {
@@ -772,6 +789,7 @@ public final class S20MovingElevatorsAdapter
     {
         for (S20PhysicalElevatorDirector.Landing landing : spec.stops())
         {
+            if(landing.r52()!=null&&landing.r52().callAliases().contains(clicked))return landing;
             if (clicked.equals(S20PhysicalElevatorDirector
                     .exteriorCallPosition(landing)))
             {
@@ -1742,6 +1760,7 @@ public final class S20MovingElevatorsAdapter
     private static boolean isSecureLift(
             S20PhysicalElevatorDirector.LiftSpec spec)
     {
+        if(spec.r52()!=null)return spec.r52().floors().stream().anyMatch(S20LiftManifestR52.Floor::restricted);
         return spec.id().equals(
                 S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID)
                 || spec.id().equals(
@@ -1754,6 +1773,7 @@ public final class S20MovingElevatorsAdapter
             S20PhysicalElevatorDirector.LiftSpec spec,
             S20PhysicalElevatorDirector.Landing landing)
     {
+        if(landing.r52()!=null)return landing.r52().restricted();
         // Access policy follows the registered lift/stop identity, never its
         // translated display name.
         return (spec.id().equals(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID)
@@ -1800,6 +1820,7 @@ public final class S20MovingElevatorsAdapter
         {
             return true;
         }
+        if(NervRouteRuntimeR52.claimed(level)&&!S20LiftDirectoryR52.displayAllowed(level,group))return false;
         int targetY = floorLevel;
         if (floorOffset != 0)
         {
@@ -1897,6 +1918,7 @@ public final class S20MovingElevatorsAdapter
             S20PhysicalElevatorDirector.LiftSpec spec, BlockPos centre,
             Direction fixedExit)
     {
+        if(spec.r52()!=null)return centre.offset(spec.r52().insideButtonOffset());
         /*
          * DisplayBlock is the selector the passenger actually presses.  The
          * dependency still requires an ElevatorInputBlockEntity immediately

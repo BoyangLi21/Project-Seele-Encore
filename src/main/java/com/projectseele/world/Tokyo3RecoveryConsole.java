@@ -43,6 +43,7 @@ public final class Tokyo3RecoveryConsole
 
     public static RecoveryConsoleAudit ensure(ServerLevel level, BlockPos cityOrigin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return inspect(level,cityOrigin);
         if (CityLegacyOwnershipR48.inhibits(level, cityOrigin, "Tokyo3RecoveryConsole.ensure"))
             return inspect(level, cityOrigin);
         RecoveryConsoleAudit audit = inspect(level, cityOrigin);
@@ -56,6 +57,7 @@ public final class Tokyo3RecoveryConsole
 
     public static RecoveryConsoleAudit build(ServerLevel level, BlockPos cityOrigin)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return inspect(level,cityOrigin);
         if (CityLegacyOwnershipR48.inhibits(level, cityOrigin, "Tokyo3RecoveryConsole.build"))
             return inspect(level, cityOrigin);
         level.getChunkAt(cityOrigin.offset(0, 0, CENTRE_Z));

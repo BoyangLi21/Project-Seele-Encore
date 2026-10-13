@@ -1,0 +1,5 @@
+package com.projectseele.world;
+public final class NervAssemblyClocksR52Test
+{
+ public static void main(String[] args){int checks=0;double previous=0;for(int age=0;age<=190;age++){double now=NervAssemblyClocksR52.insertionProgress(age);if(now<previous||now<0||now>1)throw new AssertionError("Original insertion clock reversal");previous=now;checks++;}if(NervAssemblyClocksR52.insertionProgress(36)!=0||NervAssemblyClocksR52.insertionProgress(190)!=1||NervAssemblyClocksR52.extractionProgress(36)!=1||NervAssemblyClocksR52.extractionProgress(141)!=0||NervAssemblyClocksR52.extractionProgress(197)!=0)throw new AssertionError("Original capsule timings changed");checks+=5;for(int age=0;age<=176;age++){if(NervAssemblyClocksR52.drainedLayers(44,age)!=age/4)throw new AssertionError("Physical LCL removed before its real four-tick step");checks++;}if(NervAssemblyClocksR52.bridgeRemaining(0)!=9||NervAssemblyClocksR52.bridgeRemaining(40)!=0)throw new AssertionError("Original nine bridge members changed");System.out.println("R52 original mechanical clocks PASS checks="+(checks+2));}
+}

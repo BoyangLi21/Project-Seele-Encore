@@ -27,9 +27,14 @@ public final class EvaRifleKinematics
         Vec3 position=posed?EvaAirTransportR31.framePosition(entity,partial):entity.level().isClientSide?entity.getPosition(partial):entity.position();
         if(!posed&&entity.hasActiveCarrierMotion())position=entity.carrierRenderPosition(partial);
         float yaw=posed?EvaAirTransportR31.frameYaw(entity,partial):entity.level().isClientSide?Mth.rotLerp(partial,entity.yBodyRotO,entity.yBodyRot):entity.yBodyRot;
-        if(!posed&&!entity.isExperimentalUnit()&&entity.isNervLogisticsLocked())yaw=EvaUnit01Entity.SILO_BAY_YAW;
-        return new Matrix4f().translation(position.toVector3f()).rotateY((180-yaw)*Mth.DEG_TO_RAD).scale(EvaScale.RENDER_SCALE);
+        // The actual locked heading also owns stopped/fallen CPU sockets;
+        // the renderer applies this same heading before the captured joints.
+        if(!entity.isExperimentalUnit()&&entity.isNervLogisticsLocked())yaw=entity.mechanicalYawR52();
+        return frameWorldR52(position,yaw);
     }
+    /** Shared outer frame for independently checked pre-lock body sockets. */
+    public static Matrix4f frameWorldR52(Vec3 position,float yaw)
+    {return new Matrix4f().translation(position.toVector3f()).rotateY((180-yaw)*Mth.DEG_TO_RAD).scale(EvaScale.RENDER_SCALE);}
 
     public static Frame sample(EvaUnit01Entity entity,float partial,Vec3 direction)
     {

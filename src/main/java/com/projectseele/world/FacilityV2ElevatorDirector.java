@@ -55,6 +55,7 @@ public final class FacilityV2ElevatorDirector
             ServerLevel level, FacilitySchemaV2.ResolvedManifest manifest,
             String zoneId)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(level.getServer()))
         {
             return;
@@ -85,6 +86,7 @@ public final class FacilityV2ElevatorDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(server))
         {
             return;
@@ -295,6 +297,7 @@ public final class FacilityV2ElevatorDirector
 
     public static boolean handleUse(ServerPlayer player, BlockPos position)
     {
+        if (NervLegacyGenerationGuardR52.retired(player.serverLevel())) return false;
         ServerLevel level = player.serverLevel();
         if (!FacilityWorldPolicy.isCleanRebuild(level.getServer())
                 || !level.dimension().equals(FacilitySchemaV2.DIMENSION))
@@ -851,6 +854,7 @@ public final class FacilityV2ElevatorDirector
             int relativeX, double initialY, int relativeZ,
             int accent, float yaw)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return null;
         BlockPos centre = manifest.centre();
         BlockPos shaft = centre.offset(relativeX, (int) initialY, relativeZ);
         if (!level.hasChunkAt(shaft))
@@ -1114,6 +1118,7 @@ public final class FacilityV2ElevatorDirector
                                              int bottomY, int relativeZ,
                                              boolean open)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         BlockState target = open ? OPEN_DOOR : CLOSED_DOOR;
         for (int x = -3; x <= 2; x++)
         {
@@ -1134,6 +1139,7 @@ public final class FacilityV2ElevatorDirector
                                         int bottomY, int minRelativeZ,
                                         boolean open)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         BlockState target = open ? OPEN_DOOR : CLOSED_DOOR;
         for (int z = minRelativeZ; z < minRelativeZ + 6; z++)
         {
@@ -1154,6 +1160,7 @@ public final class FacilityV2ElevatorDirector
                                         int bottomY, int relativeZ,
                                         boolean open)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         BlockState target = open ? OPEN_DOOR : CLOSED_DOOR;
         for (int x = minRelativeX; x < minRelativeX + 6; x++)
         {

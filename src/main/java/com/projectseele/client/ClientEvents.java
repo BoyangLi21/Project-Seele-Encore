@@ -68,6 +68,7 @@ public class ClientEvents
     @SubscribeEvent
     public static void onRegisterRenderers(EntityRenderersEvent.RegisterRenderers event)
     {
+        event.registerEntityRenderer(ModEntities.YASHIMA_CANNON_R52.get(),com.projectseele.client.render.YashimaCannonRendererR52::new);
         event.registerBlockEntityRenderer(com.projectseele.registry.ModBlockEntities.DEAD_SEA_ARCHIVE.get(),com.projectseele.client.render.DeadSeaArchiveRendererR45::new);
         event.registerEntityRenderer(ModEntities.RAMIEL.get(), RamielRenderer::new);
         event.registerEntityRenderer(ModEntities.GAGHIEL.get(), com.projectseele.client.render.GaghielRendererR50::new);

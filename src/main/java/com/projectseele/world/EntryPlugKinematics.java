@@ -110,7 +110,7 @@ public final class EntryPlugKinematics
         // The retained NERV plant is rendered in its surveyed rail heading.
         // Looking around inside the capsule must not yaw the insertion axis.
         Vec3 rear = !unit.isExperimentalUnit()&&unit.isNervLogisticsLocked()
-                ?rearDirectionForYaw(EvaUnit01Entity.SILO_BAY_YAW):unit.getRearDirection();
+                ?rearDirectionForYaw(unit.mechanicalYawR52()):unit.getRearDirection();
         var profile=EvaDorsalProfile.of(unit);Vec3 marker=profile.centreBlocks();
         RigidTransform orientation = verticalSocketOrientation(rear,profile);
         Vec3 origin = unit.position()

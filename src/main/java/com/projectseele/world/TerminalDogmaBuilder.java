@@ -57,6 +57,7 @@ public final class TerminalDogmaBuilder
 
     public static TerminalDogmaAudit build(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         PerformanceCounters.recordBuilderCall();
         BlockPos facilityOrigin = origin.offset(0, FACILITY_Y_OFFSET, 0);
         buildChamber(level, facilityOrigin);
@@ -85,6 +86,7 @@ public final class TerminalDogmaBuilder
     public static TerminalDogmaAudit ensureRevision(ServerLevel level,
                                                     BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         if(TvDetailR04Layout.active(level))return inspect(level,origin);
         if (FacilityWorldPolicy.isS22Coastal(level.getServer()))
         {
@@ -109,6 +111,7 @@ public final class TerminalDogmaBuilder
     public static TerminalDogmaAudit repairRuntimeAccess(ServerLevel level,
                                                           BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         if(TvDetailR04Layout.active(level)){repairRuntimeSpecimen(level,origin);return inspect(level,origin);}
         if (FacilityWorldPolicy.isS22Coastal(level.getServer()))
         {
@@ -165,6 +168,7 @@ public final class TerminalDogmaBuilder
     public static boolean repairRuntimeSpecimen(ServerLevel level,
                                                 BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return false;
         BlockPos facilityOrigin = origin.offset(0, FACILITY_Y_OFFSET, 0);
         // Entity queries only see loaded sections. Runtime repairs used to
         // interpret an unloaded specimen chunk as "Lilith missing" and create
@@ -883,6 +887,7 @@ public final class TerminalDogmaBuilder
 
     private static void spawnLilith(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         BlockPos anchor = specimenAnchor(level, origin);
         level.getChunkAt(anchor);
         AABB bounds = specimenBounds(level,origin);
@@ -923,6 +928,7 @@ public final class TerminalDogmaBuilder
     private static void moveSpecimens(ServerLevel level, BlockPos origin,
                                       java.util.List<LilithEntity> specimens)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         BlockPos anchor = specimenAnchor(level, origin);
         LilithEntity specimen = specimens.get(0);
         for (int index = 1; index < specimens.size(); index++)
@@ -1002,6 +1008,7 @@ public final class TerminalDogmaBuilder
     private static void set(ServerLevel level, BlockPos position,
                             BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

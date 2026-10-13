@@ -89,6 +89,7 @@ public final class GeoFrontFabricDirector
 
     public static void commit(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         FacilityWorldPolicy.requireCleanRebuild(
                 level.getServer(), "GeoFrontFabricDirector.commit");
         FacilityV2SavedData facility = FacilityV2SavedData.get(level);
@@ -106,6 +107,7 @@ public final class GeoFrontFabricDirector
 
     public static void startAll(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         FacilityWorldPolicy.requireCleanRebuild(
                 level.getServer(), "GeoFrontFabricDirector.startAll");
         FacilityV2SavedData facility = FacilityV2SavedData.get(level);
@@ -126,6 +128,7 @@ public final class GeoFrontFabricDirector
     public static void start(ServerLevel level,
                              GeoFrontFabricPlan.Feature feature)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         FacilityWorldPolicy.requireCleanRebuild(
                 level.getServer(), "GeoFrontFabricDirector.start");
         FacilityV2SavedData facility = FacilityV2SavedData.get(level);
@@ -145,6 +148,7 @@ public final class GeoFrontFabricDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(server))
         {
             return;
@@ -210,6 +214,7 @@ public final class GeoFrontFabricDirector
                                 GeoFrontFabricSavedData data,
                                 GeoFrontFabricPlan.Feature feature)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         GeoFrontFabricSavedData.FeatureRecord record =
                 data.requireFeature(feature);
         long cursor = record.cursor();
@@ -378,6 +383,7 @@ public final class GeoFrontFabricDirector
             GeoFrontFabricSavedData.FeatureRecord record,
             FacilitySchemaV2.ResolvedManifest manifest)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         int radius = GeoFrontFabricPlan.CAVERN_RADIUS_XZ;
         int minChunkX = Math.floorDiv(
                 manifest.centre().getX() - radius, 16);
@@ -727,6 +733,7 @@ public final class GeoFrontFabricDirector
             ServerLevel level, FacilityV2SavedData facility,
             GeoFrontFabricSavedData data)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         GeoFrontFabricSavedData.ReconciliationProgress progress =
                 data.reconciliationProgress();
         int pass = progress.pass();

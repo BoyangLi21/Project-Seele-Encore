@@ -15,7 +15,7 @@ public final class LclTintR47
     @SubscribeEvent
     public static void blockColors(RegisterColorHandlersEvent.Block event)
     {
-        event.register((state, level, pos, index) -> LclFluidType.TINT, ModBlocks.LCL_BLOCK.get());
+        event.register((state, level, pos, index) -> HangarCoolantVisualR52.tint(level,pos), ModBlocks.LCL_BLOCK.get());
     }
 
     private LclTintR47() {}

@@ -171,6 +171,21 @@ public final class StaffOperationsR48
             return "本机已预选地表专用武器井领用，地下出口不能代替该实体交接。领用任务保留，请先走地表出击到原井领取。";
         return "";
     }
+    public static EvaLogisticsDirector.ActionResult undergroundDeploymentR52(ServerPlayer caller,NervStaffEntity operator,int variant)
+    {
+        if(variant<0||variant>2)return result(false,"请指定零号机、初号机或二号机。");
+        EvaLogisticsDirector.loadControlTarget(caller.serverLevel(),variant);
+        if(!StaffUndergroundChoiceR52.deploymentReady(EvaLogisticsDirector.status(caller.serverLevel(),variant).phase()))
+            return result(false,"请先完成准备，等机体在发射井停稳待命后，再选择地下紧急部署。");
+        return undergroundExit(caller,operator,variant,true);
+    }
+    public static EvaLogisticsDirector.ActionResult undergroundDoorOpenR52(ServerPlayer caller,NervStaffEntity operator,int variant)
+    {
+        if(variant<0||variant>2)return result(false,"请指定零号机、初号机或二号机。");
+        if(!StaffUndergroundChoiceR52.deployedDoorReady(EvaLogisticsDirector.status(caller.serverLevel(),variant).phase()))
+            return result(false,"此门控用于已出动机体。要从发射井出库，请在准备与发射中选择地下紧急部署。");
+        return undergroundExit(caller,operator,variant,true);
+    }
     /** Strict caller ownership is retained even when the account has administrator permission. */
     public static EvaLogisticsDirector.ActionResult undergroundExit(ServerPlayer caller,NervStaffEntity operator,int variant,boolean open)
     {

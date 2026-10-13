@@ -27,6 +27,8 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID,value=Dist.CLIENT)
 public final class FirstBattleClient
 {
+    private static final boolean REVIEW_CAMERA_R52="r10-firstbattle".equals(System.getProperty("projectseele.regionalBuild",""))&&Boolean.getBoolean("projectseele.firstBattleAuthoredCameraR52");
+    private static final boolean REVIEW_CLOSE_R52=REVIEW_CAMERA_R52&&Boolean.getBoolean("projectseele.firstBattleCloseViewsR52");
     private static CameraType savedCamera;
     private static UUID savedActor;
     private static Vec3 entryPosition,entryTarget,lastPosition,lastTarget,returnPosition,returnTarget;
@@ -65,14 +67,16 @@ public final class FirstBattleClient
     }
     public static FirstBattleClip.CameraPose camera(Camera camera,float partial)
     {
-        var eva=actor();if(eva==null)return null;var mc=Minecraft.getInstance();var signals=eva.firstBattleSignals();var spec=signals.spec(eva);float time=signals.time(eva,partial);
+        var eva=actor();var mc=Minecraft.getInstance();
+        if(eva==null&&REVIEW_CLOSE_R52&&com.projectseele.visual.FirstBattleR10Review.capturePostStopR52&&mc.level!=null
+                &&mc.level.getEntity(com.projectseele.visual.FirstBattleR10Review.heroId) instanceof EvaUnit01Entity stopped)
+        {mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);return reviewShotR52(stopped,23,true);}
+        if(eva==null)return null;var signals=eva.firstBattleSignals();var spec=signals.spec(eva);float time=signals.time(eva,partial);
         if(EvaCommandFeedClient.isOpticalRenderPass())
             return new FirstBattleClip.CameraPose(FirstBattleClip.point(spec,true,"eye_blocks",time),FirstBattleClip.point(spec,true,"look_blocks",time),70);
         capture(eva,camera);var shot=FirstBattleClip.camera(spec,time);Vec3 p=shot.position(),target=shot.target();
-        // Cut on the detonation flash to a wide skyline view. The return
-        // below still hands control back through the original camera blend.
-        if(time>=FirstBattleClip.DEATH_TICK/20F&&time<FirstBattleClip.RETURN_TICK/20F)
-        {p=FirstBattleClip.world(spec,new Vec3(0,90,-205));target=FirstBattleClip.world(spec,new Vec3(0,140,25));}
+        // The authored shot covers the actors and the single blast. Replacing
+        // it with a fixed skyline hid the actual recovery and return pose.
         if(time<1.2F)
         {
             float mix=FirstBattleClip.smooth(time/1.2F);p=entryPosition.lerp(p,mix);target=entryTarget.lerp(target,mix);
@@ -85,7 +89,44 @@ public final class FirstBattleClient
             Vec3 look=normal.add(new Vec3(camera.getLookVector()).scale(40));float mix=FirstBattleClip.smooth((time-21.6F)/1.4F);
             p=returnPosition.lerp(normal,mix);target=returnTarget.lerp(look,mix);
         }
+        if(REVIEW_CLOSE_R52)
+        {
+            var close=reviewShotR52(eva,time,false);
+            if(close!=null){p=close.position();target=close.target();}
+        }
         p=clearCamera(target,p);lastPosition=p;lastTarget=target;return new FirstBattleClip.CameraPose(p,target,shot.fov());
+    }
+    public static String reviewViewR52(float time,boolean stopped)
+    {
+        if(!REVIEW_CLOSE_R52)return REVIEW_CAMERA_R52?"authored-wide":"production-directed";
+        if(stopped)return "actual-stop-eye-close";
+        if(time>=2.25F&&time<=2.8F)return "ordinary-eye-close";
+        if(time>=8.15F&&time<=8.65F)return "core-side";
+        if(time>=9F&&time<=9.45F)return "berserk-eye-jaw-close";
+        if(time>=13.55F&&time<=14.3F)return "rise-side";
+        if(time>=16F&&time<=16.7F)return "step-side";
+        if(time>=17.65F&&time<=18.3F)return "embrace-side";
+        if(time>=21.9F&&time<=22.35F)return "post-angel-death-eye-close";
+        return "authored-wide";
+    }
+    private static FirstBattleClip.CameraPose reviewShotR52(EvaUnit01Entity eva,float time,boolean stopped)
+    {
+        String view=reviewViewR52(time,stopped);if(view.equals("authored-wide")||view.equals("production-directed"))return null;
+        var spec=eva.firstBattleSignals().spec(eva);
+        if(view.contains("eye")||view.contains("jaw"))
+        {
+            Vec3 eye=FirstBattleClip.point(spec,true,"eye_blocks",time),look=FirstBattleClip.point(spec,true,"look_blocks",time);
+            Vec3 forward=look.subtract(eye).normalize(),side=new Vec3(forward.z,0,-forward.x).normalize();
+            return new FirstBattleClip.CameraPose(eye.add(forward.scale(13)).add(side.scale(18)).add(0,4,0),eye.add(0,-1.5,0),45);
+        }
+        Vec3 p,target;
+        // Exact visible-skin bounds over each finite window keep the furthest
+        // point below95 blocks even with the R10 shader's far uniform128.
+        if(view.equals("core-side")){p=new Vec3(-53.844,27.017,95.945);target=new Vec3(-11.409,7.2,61.831);}
+        else if(view.equals("rise-side")){p=new Vec3(7.105,33.897,110.558);target=new Vec3(-7.247,29.045,56.996);}
+        else if(view.equals("step-side")){p=new Vec3(-3.347,49.557,113.858);target=new Vec3(-22.441,29.237,61.396);}
+        else {p=new Vec3(37.963,29.197,71.420);target=new Vec3(-26.303,29.197,60.088);}
+        return new FirstBattleClip.CameraPose(FirstBattleClip.world(spec,p),FirstBattleClip.world(spec,target),80);
     }
     private static Vec3 clearCamera(Vec3 target,Vec3 desired)
     {
@@ -108,9 +149,11 @@ public final class FirstBattleClient
     }
     @SubscribeEvent public static void fov(ViewportEvent.ComputeFov event)
     {
-        var eva=actor();if(eva==null)return;float time=eva.firstBattleSignals().time(eva,1);
+        var eva=actor();if(eva==null){if(REVIEW_CLOSE_R52&&com.projectseele.visual.FirstBattleR10Review.capturePostStopR52)event.setFOV(45);return;}float time=eva.firstBattleSignals().time(eva,1);
         if(EvaCommandFeedClient.isOpticalRenderPass()){event.setFOV(70);return;}
-        double mix=FirstBattleClip.smooth(time/1.2F)*(1-FirstBattleClip.smooth((time-21.6F)/1.4F));double directed=70+10*FirstBattleClip.smooth((time-18.3F)/.3F);event.setFOV(event.getFOV()*(1-mix)+directed*mix);
+        if(REVIEW_CLOSE_R52){var close=reviewShotR52(eva,time,false);if(close!=null){event.setFOV(close.fov());return;}}
+        double mix=FirstBattleClip.smooth(time/1.2F)*(1-FirstBattleClip.smooth((time-21.6F)/1.4F));
+        double directed=FirstBattleClip.camera(eva.firstBattleSignals().spec(eva),time).fov();event.setFOV(event.getFOV()*(1-mix)+directed*mix);
     }
     @SubscribeEvent public static void key(InputEvent.Key event)
     {

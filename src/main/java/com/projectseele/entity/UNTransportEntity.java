@@ -14,6 +14,7 @@ import net.minecraftforge.network.NetworkHooks;
 /** One persistent service aircraft per active airlift, owned by the server job. */
 public final class UNTransportEntity extends Entity
 {
+    private static final boolean R52_FRAME=com.projectseele.world.NervAircraftFrameR52.bootstrap();
     private static final EntityDataAccessor<Integer> SERIAL=SynchedEntityData.defineId(UNTransportEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> CARGO=SynchedEntityData.defineId(UNTransportEntity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Integer> KIND=SynchedEntityData.defineId(UNTransportEntity.class,EntityDataSerializers.INT);
@@ -27,7 +28,7 @@ public final class UNTransportEntity extends Entity
     private Vec3 flightFrom,flightTo;private float flightYawFrom,flightYawTo;private long flightSince;
     public UNTransportEntity(EntityType<? extends UNTransportEntity> type,Level level)
     {super(type,level);noPhysics=true;noCulling=true;setNoGravity(true);setInvulnerable(true);}
-    @Override protected void defineSynchedData(){entityData.define(SERIAL,0);entityData.define(CARGO,false);entityData.define(KIND,0);entityData.define(CARGO_ID,-1);entityData.define(DEPLOY,0F);entityData.define(NERV,false);entityData.define(HOIST,84F);}
+    @Override protected void defineSynchedData(){entityData.define(SERIAL,0);entityData.define(CARGO,false);entityData.define(KIND,0);entityData.define(CARGO_ID,-1);entityData.define(DEPLOY,0F);entityData.define(NERV,false);entityData.define(HOIST,84F);com.projectseele.world.NervAircraftFrameR52.define(entityData);}
     public float hoistDistance(){return entityData.get(HOIST);}
     public void setHoistDistance(float length){entityData.set(HOIST,Mth.clamp(length,84,144));}
     public boolean isNerv(){return entityData.get(NERV);}
@@ -98,10 +99,11 @@ public final class UNTransportEntity extends Entity
                 cargo(eva.getId(),false,targetDeployment());
         }
         if(!level().isClientSide&&!groundCart()&&getTags().contains("seele_un_airlift")&&tickCount>200
+                &&!com.projectseele.world.NervRouteRuntimeR52.claimed((net.minecraft.server.level.ServerLevel)level())
                 &&!com.projectseele.world.UNAirLiftR29.ownsAircraft((net.minecraft.server.level.ServerLevel)level(),getUUID())){discard();return;}
     }
-    @Override protected void addAdditionalSaveData(CompoundTag tag){tag.putInt("UNSerial",serial());tag.putBoolean("Cargo",carrying());tag.putInt("Kind",entityData.get(KIND));tag.putFloat("Deploy",entityData.get(DEPLOY));tag.putBoolean("NervAircraft",isNerv());tag.putFloat("HoistDistance",hoistDistance());}
-    @Override protected void readAdditionalSaveData(CompoundTag tag){configure(tag.getInt("UNSerial"),tag.getBoolean("Cargo"));entityData.set(KIND,tag.getInt("Kind"));entityData.set(DEPLOY,tag.getFloat("Deploy"));entityData.set(NERV,tag.getBoolean("NervAircraft"));setHoistDistance(tag.contains("HoistDistance")?tag.getFloat("HoistDistance"):84);}
+    @Override protected void addAdditionalSaveData(CompoundTag tag){tag.putInt("UNSerial",serial());tag.putBoolean("Cargo",carrying());tag.putInt("Kind",entityData.get(KIND));tag.putFloat("Deploy",entityData.get(DEPLOY));tag.putBoolean("NervAircraft",isNerv());tag.putFloat("HoistDistance",hoistDistance());com.projectseele.world.NervAircraftFrameR52.save(this,tag);}
+    @Override protected void readAdditionalSaveData(CompoundTag tag){configure(tag.getInt("UNSerial"),tag.getBoolean("Cargo"));entityData.set(KIND,tag.getInt("Kind"));entityData.set(DEPLOY,tag.getFloat("Deploy"));entityData.set(NERV,tag.getBoolean("NervAircraft"));setHoistDistance(tag.contains("HoistDistance")?tag.getFloat("HoistDistance"):84);com.projectseele.world.NervAircraftFrameR52.load(this,tag);}
     @Override public Packet<ClientGamePacketListener> getAddEntityPacket(){return NetworkHooks.getEntitySpawningPacket(this);}
     @Override public boolean isPickable(){return false;}
     @Override public boolean isPushable(){return false;}

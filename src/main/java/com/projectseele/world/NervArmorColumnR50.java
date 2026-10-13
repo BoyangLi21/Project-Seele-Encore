@@ -139,6 +139,28 @@ public final class NervArmorColumnR50
         if(hit.getType()!=HitResult.Type.BLOCK||!inLayer(p,layer,hit.getBlockPos())||!level.getBlockState(hit.getBlockPos()).is(layer.block()))return false;
         damageLayer(level,p,s,layer,Math.min(damage,layer.hp()),hit.getLocation());return true;
     }
+    /** Only the original surface plate is vulnerable to the first two Angels. They never drill deeper. */
+    public static Optional<Vec3> surfaceAimR52(ServerLevel level)
+    {
+        var p=plan(level).orElse(null);if(p==null||!p.installed())return Optional.empty();
+        var layer=p.layers().get(0);var state=initialized(level,p);
+        if(state.integrity.getOrDefault(layer.id(),layer.hp())<=0)return Optional.empty();
+        return Optional.of(new Vec3((p.min().getX()+p.max().getX()+1)*.5,layer.maxY()+.5,(p.min().getZ()+p.max().getZ()+1)*.5));
+    }
+    /** The visible sole/lance/whip must intersect the actual top plate before its ledger changes. */
+    public static boolean surfaceImpactR52(ServerLevel level,LivingEntity attacker,Vec3 from,Vec3 to,float damage)
+    {
+        if(!(attacker instanceof com.projectseele.entity.SachielEntity||attacker instanceof com.projectseele.entity.ShamshelEntity)
+                ||from==null||to==null||!Double.isFinite(from.lengthSqr())||!Double.isFinite(to.lengthSqr())||!Float.isFinite(damage)||damage<=0)return false;
+        var p=plan(level).orElse(null);if(p==null||!p.installed())return false;
+        var s=initialized(level,p);if(!s.column.equals(p.id()))return false;var layer=p.layers().get(0);
+        if(s.integrity.getOrDefault(layer.id(),layer.hp())<=0)return false;
+        var hit=level.clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,attacker));
+        if(hit.getType()!=HitResult.Type.BLOCK||!inLayer(p,layer,hit.getBlockPos())||!level.getBlockState(hit.getBlockPos()).is(layer.block()))return false;
+        damageLayer(level,p,s,layer,Math.min(damage,layer.hp()),hit.getLocation());
+        ProjectSeele.LOGGER.info("R52 real surface armor contact: actor={} plate={} point={} damage={}",attacker.getUUID(),layer.id(),hit.getLocation(),damage);
+        return true;
+    }
     private static boolean inLayer(Plan p,Layer layer,BlockPos at)
     {return at.getX()>=p.min().getX()&&at.getX()<=p.max().getX()&&at.getZ()>=p.min().getZ()&&at.getZ()<=p.max().getZ()&&at.getY()>=layer.minY()&&at.getY()<=layer.maxY()&&at.getY()>p.protectedBelow();}
     private static void damageLayer(ServerLevel level,Plan p,NervArmorSavedDataR50 s,Layer layer,float damage,Vec3 point)

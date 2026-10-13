@@ -64,6 +64,15 @@ import org.joml.Vector3f;
  */
 public class RamielEntity extends FlyingMob implements Enemy, Angel, com.projectseele.world.TvEncounterRulesR45.BeamRangeSource
 {
+    private static final EntityDataAccessor<Float> DATA_MODEL_SCALE_R52=SynchedEntityData.defineId(RamielEntity.class,EntityDataSerializers.FLOAT);
+    private float modelScaleR52=1;
+    public float modelScaleR52(){return modelScaleR52>0?modelScaleR52:1;}
+    public void configureScaleR52(float scale)
+    {if(this.level().isClientSide||!Float.isFinite(scale)||scale<1||scale>16)throw new IllegalArgumentException("Measured Ramiel scale required");this.entityData.set(DATA_MODEL_SCALE_R52,scale);}
+    @Override public net.minecraft.world.entity.EntityDimensions getDimensions(net.minecraft.world.entity.Pose pose)
+    {return super.getDimensions(pose).scale(modelScaleR52());}
+    @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key)
+    {super.onSyncedDataUpdated(key);if(key==DATA_MODEL_SCALE_R52){modelScaleR52=this.entityData.get(DATA_MODEL_SCALE_R52);this.refreshDimensions();}}
     private static final EntityDataAccessor<Boolean> DATA_CHARGING =
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.BOOLEAN);
     // Beam presentation state, synced so every client renders the same shot.
@@ -174,13 +183,14 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     public void addAdditionalSaveData(CompoundTag tag)
     {
         super.addAdditionalSaveData(tag);
-        tag.putFloat("AtFieldEnergy", this.getAtFieldEnergy());
+        tag.putFloat("AtFieldEnergy", this.getAtFieldEnergy());tag.putFloat("ModelScaleR52",this.modelScaleR52());
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag)
     {
         super.readAdditionalSaveData(tag);
+        this.entityData.set(DATA_MODEL_SCALE_R52,tag.contains("ModelScaleR52")?net.minecraft.util.Mth.clamp(tag.getFloat("ModelScaleR52"),1,16):1F);
         this.entityData.set(DATA_AT_ENERGY,
                 tag.contains("AtFieldEnergy") ? tag.getFloat("AtFieldEnergy") : this.getAtFieldMax());
     }
@@ -212,6 +222,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     protected void defineSynchedData()
     {
         super.defineSynchedData();
+        this.entityData.define(DATA_MODEL_SCALE_R52,1F);
         this.entityData.define(DATA_CHARGING, false);
         this.entityData.define(DATA_BEAM_TICKS, 0);
         this.entityData.define(DATA_BEAM_END, new Vector3f());
@@ -266,7 +277,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             return false;
         }
         double missSqr = toCore.lengthSqr() - along * along;
-        return missSqr <= CORE_RADIUS * CORE_RADIUS;
+        return missSqr <= CORE_RADIUS * CORE_RADIUS * this.modelScaleR52() * this.modelScaleR52();
     }
 
     /** Eased 0..1 shell separation for the renderer. */
@@ -384,7 +395,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                 ? origin.subtract(core).normalize()
                 : new Vec3(this.random.nextDouble() - 0.5D, this.random.nextDouble() - 0.5D,
                         this.random.nextDouble() - 0.5D).normalize();
-        this.spawnAtFieldRipple(core.add(dir.scale(SHELL_SURFACE_RADIUS)), dir);
+        this.spawnAtFieldRipple(core.add(dir.scale(SHELL_SURFACE_RADIUS*this.modelScaleR52())), dir);
         this.playSound(ModSounds.CRYSTAL_HIT.get(), 2.0F, 0.55F);
     }
 

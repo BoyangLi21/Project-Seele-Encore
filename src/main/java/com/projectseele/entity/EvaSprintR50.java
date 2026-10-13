@@ -13,6 +13,8 @@ public final class EvaSprintR50
     private static final EntityDataAccessor<Boolean> HELD=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> BLEND=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     private static final WeakIdentityMap<EvaUnit01Entity,Float> PREVIOUS=new WeakIdentityMap<>();
+    /** Register base accessors before any subclass allocates its own IDs. */
+    public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData data){data.define(HELD,false);data.define(BLEND,0F);}
     public static boolean held(EvaUnit01Entity e){return e.getEntityData().get(HELD);}
     public static void request(EvaUnit01Entity e,ServerPlayer pilot,boolean value)

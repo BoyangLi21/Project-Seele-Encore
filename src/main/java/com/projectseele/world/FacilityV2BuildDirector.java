@@ -25,6 +25,8 @@ public final class FacilityV2BuildDirector
 
     public static void start(ServerLevel level, FacilityZonePlan plan)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
+        if(NervLegacyGenerationGuardR52.evaZone(level,plan.zoneId()))return;
         FacilityWorldPolicy.requireCleanRebuild(
                 level.getServer(), "FacilityV2BuildDirector.start");
         FacilityV2SavedData data = FacilityV2SavedData.get(level);
@@ -44,6 +46,7 @@ public final class FacilityV2BuildDirector
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(server))
         {
             return;
@@ -66,7 +69,9 @@ public final class FacilityV2BuildDirector
                                 Map.Entry<String,
                                         FacilityV2SavedData.ZoneRecord> active)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         String zoneId = active.getKey();
+        if(NervLegacyGenerationGuardR52.evaZone(level,zoneId))return;
         FacilityV2SavedData.ZoneRecord record = active.getValue();
         try
         {

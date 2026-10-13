@@ -777,6 +777,20 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                 && this.entityData.get(DATA_HATCH_OPEN) == 0;
     }
 
+    /** Same physical leaf rate and obstruction gate as legacy tick; mapped owner calls once per server entity tick. */
+    public boolean tickMappedHatchR52()
+    {
+        if(!(this.level() instanceof ServerLevel server)
+                ||!com.projectseele.world.NervOriginalActorsR52.managed(this)
+                ||!com.projectseele.world.NervOriginalActorsR52.riderUpdatesAllowed(server,this))return false;
+        int hatch=this.entityData.get(DATA_HATCH_OPEN);
+        int target=this.getCabinStage()==CABIN_OPEN&&!this.isVehicle()?100:0;
+        if(hatch==target)return true;
+        if(target==0&&hatch>0&&this.hatchClosingObstructed())return false;
+        this.entityData.set(DATA_HATCH_OPEN,Mth.clamp(hatch+(target>hatch?8:-8),0,100));
+        return true;
+    }
+
     public void sealCabin()
     {
         this.entityData.set(DATA_CABIN_STAGE, CABIN_SEALED_DARK);
@@ -841,6 +855,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
 
     public boolean boardPassenger(Entity passenger)
     {
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this)&&!com.projectseele.world.NervOriginalActorsR52.boardingAllowed((ServerLevel)this.level(),this,passenger))return false;
         int stage = this.getInsertionStage();
         if (this.level().isClientSide
                 || (stage != STAGE_SUSPENDED
@@ -921,6 +936,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         {
             return InteractionResult.SUCCESS;
         }
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this)&&!com.projectseele.world.NervOriginalActorsR52.boardingAllowed((ServerLevel)this.level(),this,player))
+        {player.displayClientMessage(Component.literal("原插入栓登机接口尚未确认，请保持当前位置。"),true);return InteractionResult.CONSUME;}
         if ((isIndependentUNPlug() && getLinkedEva()!=null && getLinkedEva().isNervLogisticsLocked()) || !this.isHatchOpen() || this.getInsertionStage() != STAGE_SUSPENDED
                 || this.isVehicle() || player.isPassenger())
         {
@@ -1003,6 +1020,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         // A client passenger-list refresh must not abort insertion, open the
         // cabin or change synchronized progress. The server owns those edges.
         if(this.level().isClientSide){passengerAuthorityTraceR44(passenger,"plug_after_client_graph_only");return;}
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this))return;
         if(this.laboratorySlotR47()>=0)
         {
             com.projectseele.world.SynchLabDirectorR47.passengerRemovedR47(this,passenger);
@@ -1053,9 +1071,18 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         com.projectseele.visual.PassengerAuthorityWitnessR44.capture(this,passenger,stage,fields);
     }
 
+    /** Mechanical transport keeps the original person in the capsule. The
+     * optical CameraMixin already follows the separate EVA eye frame. */
+    public boolean usesPhysicalPilotSeatR52()
+    {
+        var eva=this.getLinkedEva();
+        return this.isLockedToEva()&&this.hasCanonicalPose()&&eva!=null&&EvaMechanicalFrameR52.active(eva);
+    }
+
     @Override
     protected void positionRider(Entity passenger, Entity.MoveFunction move)
     {
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this)&&!com.projectseele.world.NervOriginalActorsR52.riderUpdatesAllowed((ServerLevel)this.level(),this))return;
         if (!this.hasPassenger(passenger))
         {
             return;
@@ -1064,12 +1091,13 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                 ? this.transformPlugMarker(EntryPlugKinematics.PILOT_SEAT_P)
                 : this.position().add(0.0D, 0.35D, 0.0D);
         EvaUnit01Entity linkedEva = this.getLinkedEva();
-        if (this.isLockedToEva() && linkedEva != null)
+        boolean opticalAnchor=this.isLockedToEva()&&linkedEva!=null&&!this.usesPhysicalPilotSeatR52()&&!com.projectseele.world.NervOriginalActorsR52.managed(this);
+        if (opticalAnchor)
         {
             seat = linkedEva.getPilotCameraSeatPosition(passenger);
         }
         move.accept(passenger, seat.x,
-                this.isLockedToEva() && linkedEva != null
+                opticalAnchor
                         ? seat.y : seat.y - passenger.getBbHeight() * 0.5D,
                 seat.z);
         if (this.isLockedToEva())
@@ -1125,6 +1153,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public Vec3 getDismountLocationForPassenger(
             net.minecraft.world.entity.LivingEntity passenger)
     {
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this))
+        {var mapped=com.projectseele.world.NervOriginalActorsR52.dismountAnchor((ServerLevel)this.level(),this,passenger);return mapped!=null?mapped:passenger.position();}
         if(this.laboratorySlotR47()>=0)
             return new Vec3(this.laboratoryDockR47.translation().x-4,-468,-117.5);
         /*
@@ -1194,6 +1224,14 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         return boarding != null ? boarding : passenger.position();
     }
 
+    /** The original field-local native landing search, with no dock fallback. */
+    @Nullable public Vec3 mappedFieldDismountR52(LivingEntity passenger)
+    {
+        if(!com.projectseele.world.NervOriginalActorsR52.managed(this)||this.getInsertionStage()!=STAGE_FIELD_LANDED||!this.hasPassenger(passenger))return null;
+        var left=findDryDismount(passenger,transformPlugMarker(EntryPlugKinematics.PILOT_DISMOUNT_LEFT_P));if(left!=null)return left;
+        var right=findDryDismount(passenger,transformPlugMarker(EntryPlugKinematics.PILOT_DISMOUNT_RIGHT_P));return right!=null?right:findDryDismount(passenger,this.position(),12);
+    }
+
     @Nullable
     private Vec3 findDockBoardingDismount(LivingEntity passenger,
                                           int horizontalRadius)
@@ -1218,6 +1256,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     @Nullable
     private Vec3 formalDockBoardingAnchor()
     {
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this))return com.projectseele.world.NervOriginalActorsR52.boardingAnchor((ServerLevel)this.level(),this);
         if(isIndependentUNPlug())
         {
             EvaUnit01Entity host=getLinkedEva();
@@ -1305,6 +1344,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         this.setNoGravity(true);
         this.setDeltaMovement(Vec3.ZERO);
         this.fallDistance = 0.0F;
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this))
+        {com.projectseele.world.NervOriginalActorsR52.tickPlug((ServerLevel)this.level(),this);return;}
         if (!this.level().isClientSide
                 && this.entityData.get(DATA_SHELL_VISIBLE))
         {

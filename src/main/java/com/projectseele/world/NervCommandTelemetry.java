@@ -74,6 +74,7 @@ public final class NervCommandTelemetry
 
     public static void tick(MinecraftServer server)
     {
+        if (NervLegacyGenerationGuardR52.retired(server)) return;
         if (FacilityWorldPolicy.isS20Rebuild(server))
         {
             // S20 renders its live feeds directly on the two measured sloped
@@ -111,6 +112,7 @@ public final class NervCommandTelemetry
     /** Creates missing screens and refreshes every value from live entities. */
     public static void install(ServerLevel level, BlockPos origin)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (FacilityWorldPolicy.isS20Rebuild(level.getServer()))
         {
             return;

@@ -17,7 +17,25 @@ public final class TvMarineSiteR50
 {
     public record Site(String id,Vec3 spawn,Vec3 center,double radiusX,double radiusZ,double seabed,double water,
             float scale,float yaw,BlockPos powerBlock,BlockPos powerControl,BlockPos[] cannonControls,
-            Vec3 escape,int cargoHealth,int deadline,boolean geometryValidated,boolean modelReady,java.util.List<BlockPos> pylons) {}
+            Vec3 escape,int cargoHealth,int deadline,boolean geometryValidated,boolean modelReady,java.util.List<BlockPos> pylons,
+            java.util.List<Cannon> cannons) {}
+    public record Cannon(java.util.UUID uuid,Vec3 position,String type) {}
+    /** The original map already records these identities. There is no coordinate fallback. */
+    public static java.util.List<Cannon> readCannons(JsonObject o)
+    {
+        var ids=o.getAsJsonArray("original_cannon_UUIDs");var positions=o.getAsJsonArray("original_cannon_positions");
+        if(ids==null||positions==null||ids.size()!=2||positions.size()!=2)throw new IllegalArgumentException("Two explicit original cannon identities and seats required");
+        var out=new java.util.ArrayList<Cannon>();
+        for(int i=0;i<2;i++)
+        {
+            var a=positions.get(i).getAsJsonArray();if(a.size()!=3)throw new IllegalArgumentException("Original cannon position");
+            var at=new Vec3(a.get(0).getAsDouble(),a.get(1).getAsDouble(),a.get(2).getAsDouble());
+            if(!finite(at))throw new IllegalArgumentException("Non-finite original cannon seat");
+            out.add(new Cannon(java.util.UUID.fromString(ids.get(i).getAsString()),at,i==0?"superbwarfare:mk_42":"superbwarfare:hpj_11"));
+        }
+        if(out.get(0).uuid().equals(out.get(1).uuid()))throw new IllegalArgumentException("Duplicate original cannon identity");
+        return java.util.List.copyOf(out);
+    }
     private static final Map<ServerLevel,Optional<Site>> CACHE=new WeakHashMap<>();
     private static Vec3 vec(JsonObject object,String key)
     {var a=object.getAsJsonArray(key);return new Vec3(a.get(0).getAsDouble(),a.get(1).getAsDouble(),a.get(2).getAsDouble());}
@@ -39,7 +57,7 @@ public final class TvMarineSiteR50
                 {var a=raw.getAsJsonArray();pylons.add(new BlockPos(a.get(0).getAsInt(),a.get(1).getAsInt(),a.get(2).getAsInt()));}
                 else if(o.has("new_umbilical_pylon"))pylons.add(BlockPos.containing(vec(o,"new_umbilical_pylon")));
                 if(pylons.isEmpty()||pylons.size()>4||pylons.stream().distinct().count()!=pylons.size())throw new IllegalArgumentException("Finite installed marine cable pylons required");
-                var s=new Site(o.get("id").getAsString(),vec(o,"spawn"),vec(o,"arena_center"),o.get("radius_x").getAsDouble(),o.get("radius_z").getAsDouble(),o.get("seabed_y").getAsDouble(),o.get("water_y").getAsDouble(),o.get("model_scale").getAsFloat(),o.get("yaw").getAsFloat(),BlockPos.containing(vec(o,"power_block")),BlockPos.containing(vec(o,"power_control")),controls,vec(o,"escape_point"),o.get("cargo_health").getAsInt(),o.get("deadline_ticks").getAsInt(),o.get("geometry_validated").getAsBoolean(),o.get("model_ready").getAsBoolean(),java.util.List.copyOf(pylons));
+                var s=new Site(o.get("id").getAsString(),vec(o,"spawn"),vec(o,"arena_center"),o.get("radius_x").getAsDouble(),o.get("radius_z").getAsDouble(),o.get("seabed_y").getAsDouble(),o.get("water_y").getAsDouble(),o.get("model_scale").getAsFloat(),o.get("yaw").getAsFloat(),BlockPos.containing(vec(o,"power_block")),BlockPos.containing(vec(o,"power_control")),controls,vec(o,"escape_point"),o.get("cargo_health").getAsInt(),o.get("deadline_ticks").getAsInt(),o.get("geometry_validated").getAsBoolean(),o.get("model_ready").getAsBoolean(),java.util.List.copyOf(pylons),readCannons(o));
                 if(!finite(s.spawn())||!finite(s.center())||!finite(s.escape())||!Float.isFinite(s.scale())||!Float.isFinite(s.yaw())
                         ||s.scale()<.2||s.scale()>1.25||s.radiusX()<8||s.radiusX()>160||s.radiusZ()<8||s.radiusZ()>160
                         ||!Double.isFinite(s.seabed())||!Double.isFinite(s.water())||s.water()-s.seabed()<39*s.scale()+1

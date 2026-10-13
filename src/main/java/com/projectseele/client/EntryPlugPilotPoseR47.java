@@ -22,7 +22,7 @@ public final class EntryPlugPilotPoseR47
 
     public static boolean push(PoseStack pose,LivingEntity rider,float partial)
     {
-        if(!(rider.getVehicle() instanceof EntryPlugCarrierEntity plug)||plug.isLockedToEva()
+        if(!(rider.getVehicle() instanceof EntryPlugCarrierEntity plug)||(plug.isLockedToEva()&&!plug.usesPhysicalPilotSeatR52())
                 ||!plug.hasCanonicalPose())return false;
         var frame=plug.getInterpolatedCanonicalTransform(partial);
         // Cancel vanilla body yaw after applying the same backrest frame as

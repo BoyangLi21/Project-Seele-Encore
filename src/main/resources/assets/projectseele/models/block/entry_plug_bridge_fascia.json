@@ -2,10 +2,10 @@
   "parent": "minecraft:block/block",
   "ambientocclusion": true,
   "textures": {
-    "paint": "projectseele:block/nerv_machine_panel",
+    "paint": "minecraft:block/white_concrete",
     "steel": "projectseele:block/nerv_machine_edge",
     "dark": "minecraft:block/black_concrete",
-    "hazard": "projectseele:entity/nerv_pressure_hazard_r45",
+    "hazard": "projectseele:block/nerv_machine_hazard",
     "particle": "projectseele:block/nerv_machine_panel"
   },
   "elements": [
@@ -17,7 +17,8 @@
       ],
       "faces": {
         "up": {
-          "texture": "#hazard",
+          "texture": "#paint",
+          "tintindex": 0,
           "uv": [
             0,
             0,
@@ -26,7 +27,8 @@
           ]
         },
         "down": {
-          "texture": "#hazard",
+          "texture": "#paint",
+          "tintindex": 0,
           "uv": [
             0,
             0,
@@ -35,7 +37,8 @@
           ]
         },
         "north": {
-          "texture": "#hazard",
+          "texture": "#paint",
+          "tintindex": 0,
           "uv": [
             0,
             0,
@@ -44,7 +47,8 @@
           ]
         },
         "south": {
-          "texture": "#hazard",
+          "texture": "#paint",
+          "tintindex": 0,
           "uv": [
             0,
             0,
@@ -53,7 +57,8 @@
           ]
         },
         "east": {
-          "texture": "#hazard",
+          "texture": "#paint",
+          "tintindex": 0,
           "uv": [
             0,
             0,
@@ -62,7 +67,8 @@
           ]
         },
         "west": {
-          "texture": "#hazard",
+          "texture": "#paint",
+          "tintindex": 0,
           "uv": [
             0,
             0,

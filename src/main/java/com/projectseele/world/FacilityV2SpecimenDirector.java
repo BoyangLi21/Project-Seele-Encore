@@ -21,6 +21,7 @@ public final class FacilityV2SpecimenDirector
                                        FacilityV2SavedData data,
                                        String zoneId)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!FacilityWorldPolicy.isCleanRebuild(level.getServer()))
         {
             return;

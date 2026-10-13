@@ -78,7 +78,10 @@ public final class TreeOfLifeWallClient
     private static float nervImageAspect = 1.0F;
     private static final double RANGE_SQR = 96.0D * 96.0D;
 
-    private static DynamicTexture treeTexture;
+    private static DynamicTexture treeTexture,treeInkTexture;
+    private static final ResourceLocation TREE_INK_TEXTURE_ID=new ResourceLocation(ProjectSeele.MODID,"dynamic/tree_of_life_ink_r52");
+    private static boolean treeInkChecked;
+    private static float treeInkAspect=.75F;
     private static DynamicTexture nervTexture;
     private static boolean treeSourceChecked;
     private static boolean nervSourceChecked;
@@ -228,6 +231,27 @@ public final class TreeOfLifeWallClient
         }
     }
 
+    /** White ink with coverage alpha; original image/tree texture and all files remain unchanged. */
+    public static int treeInkPixelR52(int pixel)
+    {
+        int red=pixel&255,green=pixel>>>8&255,blue=pixel>>>16&255,alpha=pixel>>>24;
+        int luminance=(54*red+183*green+19*blue+128)>>>8;
+        int coverage=Math.max(0,245-luminance)*255/245;
+        return (alpha*coverage/255)<<24|0x00ffffff;
+    }
+    private static boolean ensureTreeInkR52(Minecraft minecraft)
+    {
+        if(treeInkTexture!=null)return true;if(treeInkChecked)return false;treeInkChecked=true;
+        if(!Files.isRegularFile(TREE_SOURCE))return false;
+        try(InputStream stream=Files.newInputStream(TREE_SOURCE))
+        {
+            var image=NativeImage.read(stream);treeInkAspect=image.getWidth()/(float)image.getHeight();
+            for(int y=0;y<image.getHeight();y++)for(int x=0;x<image.getWidth();x++)image.setPixelRGBA(x,y,treeInkPixelR52(image.getPixelRGBA(x,y)));
+            treeInkTexture=new DynamicTexture(image);minecraft.getTextureManager().register(TREE_INK_TEXTURE_ID,treeInkTexture);return true;
+        }
+        catch(IOException|RuntimeException error){ProjectSeele.LOGGER.warn("Local tree ink image unavailable",error);return false;}
+    }
+
     private static boolean ensureNervTexture(Minecraft minecraft)
     {
         if (nervTexture != null)
@@ -274,10 +298,10 @@ public final class TreeOfLifeWallClient
     public static ResourceLocation artworkTexture(String artwork)
     {
         Minecraft mc=Minecraft.getInstance();
-        return artwork.equals("tree")?(ensureTreeTexture(mc)?TREE_TEXTURE_ID:null):nervLogoTexture(mc);
+        return artwork.equals("tree_ink")?(ensureTreeInkR52(mc)?TREE_INK_TEXTURE_ID:null):artwork.equals("tree")?(ensureTreeTexture(mc)?TREE_TEXTURE_ID:null):nervLogoTexture(mc);
     }
     public static float artworkAspect(String artwork)
-    {return artwork.equals("tree")?treeImageAspect:nervImageAspect;}
+    {return artwork.equals("tree_ink")?treeInkAspect:artwork.equals("tree")?treeImageAspect:nervImageAspect;}
 
     /**
      * The supplied logo has a light checkerboard baked into its RGB pixels.

@@ -94,6 +94,9 @@ public final class TrainingPilotEntity extends PathfinderMob
     @Override
     public void tick()
     {
+        if(level() instanceof net.minecraft.server.level.ServerLevel server&&com.projectseele.world.NervRouteRuntimeR52.claimed(server)
+                &&!com.projectseele.world.NervRouteRuntimeR52.personnelBindingsReady(server))
+        {getNavigation().stop();setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);}
         super.tick();
         if (!this.level().isClientSide)
         {

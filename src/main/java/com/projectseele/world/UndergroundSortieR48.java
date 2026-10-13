@@ -36,7 +36,8 @@ import java.util.*;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
 public final class UndergroundSortieR48
 {
-    private static final int[] X={-12,30,72},DOOR_Z={-13,-10,-7};
+    private static final int[] X={-12,30,72};
+    private static final double[] DOOR_Z={-18.5,-17.75,-17};
     private static final Set<String> MODES=Set.of("IDLE","OPENING","OUTBOUND","DEPLOYED","RECEIVING","RECOVER_OPENING","RETURNING");
     private static final Map<MinecraftServer,Boolean> ENABLED=new WeakHashMap<>();
     private static final Map<ServerLevel,Map<Integer,UUID>> RECOVERY_CALLERS=new WeakHashMap<>();
@@ -105,9 +106,10 @@ public final class UndergroundSortieR48
         catch(Exception failure){ProjectSeele.LOGGER.warn("R50 underground receiver receipt could not be read: {}",failure.toString());}
         return false;
     }
-    private static int[] planes(int v){return new int[]{-19,-18,-17,DOOR_Z[v]};}
+    private static int[] planes(int v){return new int[]{-19,-18,-17};}
     private static boolean enabled(ServerLevel level)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return false;
         return ENABLED.computeIfAbsent(level.getServer(),server->{
             var file=server.getWorldPath(LevelResource.ROOT).resolve("r48_underground_sortie.json");if(!Files.isRegularFile(file))return false;
@@ -162,6 +164,7 @@ public final class UndergroundSortieR48
     {return row.owner==null?null:level.getServer().getPlayerList().getPlayer(row.owner);}
     private static void retain(ServerLevel level,int v)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         int end=row(level,v).extra.getBoolean("AirReceiverR50")?119:17;
         for(int x=(X[v]-35)>>4;x<=(X[v]+35)>>4;x++)for(int z=-52>>4;z<=end>>4;z++)
         {var p=new ChunkPos(x,z);level.getChunkSource().addRegionTicket(TICKET,p,2,p);level.getChunk(x,z);}
@@ -179,6 +182,7 @@ public final class UndergroundSortieR48
     }
     public static boolean emptyRecoveryR49(ServerLevel level,int v,EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         var binding=row(level,v);
         return binding.eva!=null&&binding.eva.equals(unit.getUUID())
                 &&Set.of("DEPLOYED","RECEIVING","RECOVER_OPENING","RETURNING").contains(binding.mode)
@@ -401,6 +405,7 @@ public final class UndergroundSortieR48
     private static EvaLogisticsDirector.ActionResult result(boolean accepted,String text){return new EvaLogisticsDirector.ActionResult(accepted,text);}
     public static EvaLogisticsDirector.ActionResult request(ServerPlayer caller,int v,boolean open)
     {
+        if(NervRouteRuntimeR52.claimed(caller.serverLevel()))return NervRouteRuntimeR52.underground(caller,v,open);
         var level=caller.serverLevel();if(v<0||v>2||!enabled(level))return result(false,"地下出口尚未开放，请联系整备部门。");
         EvaLogisticsDirector.loadControlTarget(level,v);retain(level,v);var unit=EvaLogisticsDirector.canonicalUnit(level,v);
         if(!canonical(level,v,unit)||!authority(caller,v,unit))return result(false,"请由本机驾驶员或指挥员操作地下出口。");
@@ -448,17 +453,18 @@ public final class UndergroundSortieR48
         return result(true,"地下出口正在开启，门全开后由承载板送往外侧平台。");
     }
     public static boolean departureAuthorizedR48(ServerPlayer caller,int v,EvaUnit01Entity unit)
-    {var level=caller.serverLevel();var row=row(level,v);return bound(level,v,unit,row)&&row.mode.equals("OPENING")
+    {var level=caller.serverLevel();if(NervRouteRuntimeR52.claimed(level))return false;var row=row(level,v);return bound(level,v,unit,row)&&row.mode.equals("OPENING")
             &&caller.getUUID().equals(row.owner)&&authority(caller,v,unit)&&neighbourReady(level,v,true)&&dryPlant(level,v,unit).isEmpty();}
     public static boolean reservesLaunchR48(ServerLevel level,int v,EvaUnit01Entity unit)
     {if(v<0||v>2||!enabled(level))return false;var row=row(level,v);return bound(level,v,unit,row)&&Set.of("OPENING","OUTBOUND").contains(row.mode);}
     public static boolean cancelledReservationR48(ServerLevel level,int v,EvaUnit01Entity unit)
     {return reservesLaunchR48(level,v,unit)&&row(level,v).launchCancelled;}
     public static boolean recoveryAuthorizedR48(ServerLevel level,int v,EvaUnit01Entity unit)
-    {var row=row(level,v);return bound(level,v,unit,row)&&row.mode.equals("RECOVER_OPENING")&&authority(owner(level,row),v,unit)
+    {if(NervRouteRuntimeR52.claimed(level))return false;var row=row(level,v);return bound(level,v,unit,row)&&row.mode.equals("RECOVER_OPENING")&&authority(owner(level,row),v,unit)
             &&doorReady(level,v)&&neighbourReady(level,v,true)&&padSupported(level,v,unit)&&dryPlant(level,v,unit).isEmpty();}
     public static boolean finishAuthorizedR48(ServerLevel level,int v,EvaUnit01Entity unit,boolean returning)
     {
+        if(NervRouteRuntimeR52.claimed(level))return false;
         var row=row(level,v);return bound(level,v,unit,row)&&row.mode.equals(returning?"RETURNING":"OUTBOUND")&&row.age>=row.duration
                 &&doorReady(level,v)&&authority(owner(level,row),v,unit)&&unit.position().distanceToSqr(returning?bedFeet(v):padFeet(v))<.01
                 &&(returning||padSupported(level,v,unit));
@@ -492,6 +498,7 @@ public final class UndergroundSortieR48
     /** A fresh explicit caller context, or an already accepted same-owner staff job, owns recovery. */
     public static EvaLogisticsDirector.ActionResult requestRecoveryR48(ServerPlayer caller,int v)
     {
+        if(NervRouteRuntimeR52.claimed(caller.serverLevel()))return NervRouteRuntimeR52.recover(caller,v);
         var level=caller.serverLevel();if(v<0||v>2||!enabled(level))return result(false,"地下接应平台尚未开放，请联系整备部门。");
         EvaLogisticsDirector.loadControlTarget(level,v);var unit=EvaLogisticsDirector.canonicalUnit(level,v);var row=row(level,v);
         if(!canonical(level,v,unit)||!bound(level,v,unit,row)||!caller.getUUID().equals(row.owner)||!authority(caller,v,unit))
@@ -501,6 +508,7 @@ public final class UndergroundSortieR48
     }
     public static EvaLogisticsDirector.ActionResult recoverR48(ServerLevel level,int v,EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.recover(level,v);
         var row=row(level,v);var caller=owner(level,row);
         if(!bound(level,v,unit,row)||!authority(caller,v,unit))return result(false,"本机指挥员或驾驶员信息有变化，请重新确认回收许可。");
         boolean explicit=caller.getUUID().equals(RECOVERY_CALLERS.getOrDefault(level,Map.of()).get(v));
@@ -553,6 +561,7 @@ public final class UndergroundSortieR48
     }
     public static boolean tickMotionR48(ServerLevel level,int v,EvaUnit01Entity unit)
     {
+        if(NervRouteRuntimeR52.claimed(level))return true;
         if(!enabled(level))return false;var row=row(level,v);if(!motion(row))return false;
         if(!bound(level,v,unit,row))return true;retain(level,v);maintainDoor(level,v);unit.setNervLogisticsLocked(true);unit.setNoGravity(true);
         if(!authority(owner(level,row),v,unit)){hold(level,row,"操作员或驾驶员许可尚未确认，承载板暂停，请联系指挥部门。");return true;}
@@ -613,11 +622,12 @@ public final class UndergroundSortieR48
     }
     private static void maintainDoor(ServerLevel level,int v)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         var row=row(level,v);var centre=new Vec3(X[v]+.5,-410,DOOR_Z[v]);
         if(!level.hasChunkAt(BlockPos.containing(centre)))return;
         var unit=row.eva==null?null:level.getEntity(row.eva) instanceof EvaUnit01Entity eva?eva:null;
         boolean open=row.requested||motion(row)||row.collisionOpen&&occupied(level,v,null);
-        NervHangarDoorEntity.reconcile(level,v,centre,open);
+        NervHangarDoorEntity.reconcileRear(level,v,centre,open);
         var doors=level.getEntitiesOfClass(NervHangarDoorEntity.class,new AABB(centre,centre).inflate(1),e->e.getVariant()==v);
         if(doors.size()!=1)return;float progress=doors.get(0).getOpenProgress(1);
         boolean clear=open&&progress>=.999F,closed=!open&&progress<=.001F;

@@ -66,6 +66,7 @@ public final class IntegratedNervMapBuilder
      */
     public static boolean restoreLegacyMechanicalOnly(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return false;
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "restoreLegacyMechanicalOnly");
         if (level.getBlockState(RESCUE_MECHANICAL_MARKER_A)
@@ -144,6 +145,7 @@ public final class IntegratedNervMapBuilder
     /** Builds the city first, GeoFront second, then cuts the shafts last. */
     public static IntegratedAudit build(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "IntegratedNervMapBuilder.build");
         PerformanceCounters.recordBuilderCall();
@@ -208,6 +210,7 @@ public final class IntegratedNervMapBuilder
     /** Rebuilds only when the complete physical-map audit fails. */
     public static IntegratedAudit ensure(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "IntegratedNervMapBuilder.ensure");
         ensureLowerBayWindows(level);
@@ -1050,6 +1053,7 @@ public final class IntegratedNervMapBuilder
      */
     public static void restoreS20LowerLaunchShells(ServerLevel level)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         if (!FacilityWorldPolicy.isS20Rebuild(level.getServer()))
         {
             throw new IllegalStateException(
@@ -1101,6 +1105,7 @@ public final class IntegratedNervMapBuilder
      */
     public static void repairLowerSortieInterfaces(ServerLevel level)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(),
                 "IntegratedNervMapBuilder.repairLowerSortieInterfaces");
@@ -1110,6 +1115,7 @@ public final class IntegratedNervMapBuilder
     /** Repairs only the requested EVA's lower carrier/shaft hand-off. */
     public static boolean ensureLowerSortieInterface(ServerLevel level, int index)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return false;
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(),
                 "IntegratedNervMapBuilder.ensureLowerSortieInterface");
@@ -1497,6 +1503,7 @@ public final class IntegratedNervMapBuilder
 
     private static void set(ServerLevel level, BlockPos position, BlockState state)
     {
+        if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);

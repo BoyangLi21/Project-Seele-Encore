@@ -170,12 +170,45 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
             com.projectseele.client.visual.MechanicsR31Client.captureCradle(plane,actual,partial,segments*24,segments);
         }
     }
+    private void identity(UNTransportEntity entity,PoseStack poses,MultiBufferSource buffers,int light)
+    {
+        var texture=getTextureLocation(entity);
+        if(texture!=null)
+        {
+            var out=buffers.getBuffer(RenderType.entityCutoutNoCull(texture));var m=poses.last().pose();var n=poses.last().normal();
+            for(int side:new int[]{-1,1})
+            {
+                float x=side*12.04F;
+                out.vertex(m,x,4,-8).color(255,255,255,255).uv(0,0).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(n,side,0,0).endVertex();
+                out.vertex(m,x,4,5).color(255,255,255,255).uv(1,0).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(n,side,0,0).endVertex();
+                out.vertex(m,x,-3,5).color(255,255,255,255).uv(1,1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(n,side,0,0).endVertex();
+                out.vertex(m,x,-3,-8).color(255,255,255,255).uv(0,1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(n,side,0,0).endVertex();
+            }
+        }
+    }
     @Override public ResourceLocation getTextureLocation(UNTransportEntity entity){return entity.isNerv()?com.projectseele.client.TreeOfLifeWallClient.nervLogoTexture(net.minecraft.client.Minecraft.getInstance()):com.projectseele.client.UNIdentityClient.logoTexture();}
     @Override public void render(UNTransportEntity entity,float yaw,float partial,PoseStack poses,MultiBufferSource buffers,int light)
     {
         Matrix4f submittedEntityFrame=new Matrix4f(poses.last().pose());
         Vec3 dispatcher=new Vec3(Mth.lerp((double)partial,entity.xOld,entity.getX()),Mth.lerp((double)partial,entity.yOld,entity.getY()),Mth.lerp((double)partial,entity.zOld,entity.getZ()));
         poses.pushPose();
+        if(com.projectseele.world.NervAircraftFrameR52.active(entity))
+        {
+            var frame=com.projectseele.world.NervAircraftFrameR52.frame(entity,partial);var wanted=frame.plane().translation();
+            poses.translate(wanted.x-dispatcher.x,wanted.y-dispatcher.y,wanted.z-dispatcher.z);poses.mulPose(frame.plane().rotation());
+            var out=buffers.getBuffer(RenderType.entityCutoutNoCull(PAINT));var m=poses.last().pose();var normal=poses.last().normal();
+            for(var part:com.projectseele.world.NervAircraftFrameR52.renderParts(entity,partial))
+            {
+                var v=part.vertices();for(int i=0;i<v.length;i+=18)
+                {
+                    var a=new Vector3f((float)(v[i+6]-v[i]),(float)(v[i+7]-v[i+1]),(float)(v[i+8]-v[i+2]));var b=new Vector3f((float)(v[i+12]-v[i]),(float)(v[i+13]-v[i+1]),(float)(v[i+14]-v[i+2]));var n=a.cross(b);if(n.lengthSquared()<1e-12)continue;n.normalize();
+                    for(int j:TRIANGLE_AS_QUAD){int k=i+j*6;out.vertex(m,(float)v[k],(float)v[k+1],(float)v[k+2]).color((int)v[k+3],(int)v[k+4],(int)v[k+5],255).uv(j==0?0:1,j<2?0:1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(normal,n.x,n.y,n.z).endVertex();}
+                }
+            }
+            identity(entity,poses,buffers,light);
+            if(com.projectseele.visual.MechanicsR31Review.ENABLED){var actual=software.bernie.geckolib.util.RenderUtils.invertAndMultiplyMatrices(poses.last().pose(),submittedEntityFrame);actual.m30(actual.m30()+(float)dispatcher.x).m31(actual.m31()+(float)dispatcher.y).m32(actual.m32()+(float)dispatcher.z);com.projectseele.client.visual.MechanicsR31Client.captureAircraft(entity,actual,partial);}
+            poses.popPose();super.render(entity,yaw,partial,poses,buffers,light);return;
+        }
         if(entity.carrying()&&entity.level().getEntity(entity.cargoEntityId()) instanceof com.projectseele.entity.EvaUnit01Entity eva)
         {
             var wanted=EvaAirTransportR31.framePosition(eva,partial);
@@ -221,19 +254,7 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
             poses.pushPose();poses.translate(rotor[0],4.8,rotor[1]);poses.mulPose(Axis.YP.rotationDegrees(((entity.level().getGameTime()%3600)+partial)*47*(i%2==0?1:-1)));
             draw("un_transport_rotor_"+i++,poses,buffers,light);poses.popPose();
         }
-        var texture=getTextureLocation(entity);
-        if(texture!=null)
-        {
-            var out=buffers.getBuffer(RenderType.entityCutoutNoCull(texture));var m=poses.last().pose();var n=poses.last().normal();
-            for(int side:new int[]{-1,1})
-            {
-                float x=side*12.04F;
-                out.vertex(m,x,4,-8).color(255,255,255,255).uv(0,0).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(n,side,0,0).endVertex();
-                out.vertex(m,x,4,5).color(255,255,255,255).uv(1,0).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(n,side,0,0).endVertex();
-                out.vertex(m,x,-3,5).color(255,255,255,255).uv(1,1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(n,side,0,0).endVertex();
-                out.vertex(m,x,-3,-8).color(255,255,255,255).uv(0,1).overlayCoords(OverlayTexture.NO_OVERLAY).uv2(light).normal(n,side,0,0).endVertex();
-            }
-        }
+        identity(entity,poses,buffers,light);
         poses.popPose();super.render(entity,yaw,partial,poses,buffers,light);
     }
 }

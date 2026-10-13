@@ -46,7 +46,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     private static final Map<ResourceLocation, MeshData> CACHE = new HashMap<>();
     private static final Set<ResourceLocation> LOAD_ATTEMPTED = new HashSet<>();
     private static final Set<Class<?>> GPU_DIAGNOSTICS = new HashSet<>();
-    private static final Map<MeshData, PosedMeshCacheR52> SKIN_POSES = new java.util.IdentityHashMap<>();
+    private static final Map<JointSkin, PosedMeshCacheR52> SKIN_POSES = new java.util.IdentityHashMap<>();
     private final Function<T, ResourceLocation> meshSelector;
     private final Function<T, ResourceLocation> textureSelector;
     private final BiPredicate<T, GeoBone> partVisibility;
@@ -152,18 +152,21 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 :(triangles?ModelRenderTypesR49.entityTriangles(selectedTexture):ModelRenderTypesR49.entity(selectedTexture)));
         var skin = mesh.joints().get(bone.getName());
         PosedMeshCacheR52 skinPose = null;
+        boolean skinReused = false;
         float[] values;
         if (skin == null) values = part.vertices();
         else
         {
             var root = bone;
             while (root.getParent() != null) root = root.getParent();
-            skinPose = SKIN_POSES.computeIfAbsent(mesh, ignored -> new PosedMeshCacheR52());
+            skinPose = SKIN_POSES.computeIfAbsent(skin, ignored -> new PosedMeshCacheR52(bone.getName(),
+                    skin.influences().isEmpty()?Set.of(skin.other()):skin.influences().keySet(),
+                    skin.corrective()==null?Set.of():skin.corrective().targets().keySet()));
             skinPose.prepare(animatable, root, com.projectseele.entity.FirstBattleSignals.clientFrameTime(), partialTick);
-            if (skinPose.sampled(skin)) values = skin.scratch();
+            if (skinPose.sampled(skin)) { values = skin.scratch(); skinReused = true; }
             else
             {
-                values = skinVertices(mesh,part,bone);
+                values = skinVertices(mesh,part,bone,skinPose.commonAncestor());
                 if (values == skin.scratch()) skinPose.remember(skin);
             }
         }
@@ -213,12 +216,31 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         }
         if(GPU_DIAGNOSTICS.add(animatable.getClass()))com.projectseele.ProjectSeele.LOGGER.info(
                 "Rigid mesh dispatch: entity={} rigid={} buffer={} texture={}",animatable.getClass().getSimpleName(),values==part.vertices(),targetBuffer.getClass().getName(),this.textureSelector!=null);
-        if(triangles&&!optics
+        boolean runtimeWitness=!this.fullBright&&animatable instanceof net.minecraft.world.entity.Entity actor
+                &&FirstBattleRuntimeWitnessR52.wants(actor,bone.getName());
+        boolean gpu;
+        RigidCapsuleGpu.captureWitnessSubmission=runtimeWitness;
+        try
+        {
+            gpu=triangles&&!optics
                 &&(targetBuffer instanceof com.mojang.blaze3d.vertex.BufferBuilder
                     ||targetBuffer.getClass().getName().equals("me.jellysquid.mods.sodium.client.render.vertex.buffer.SodiumBufferBuilder"))
                 &&RigidCapsuleGpu.drawPosed(values==part.vertices()?part:skin,
                 values==part.vertices()?0:skinPose.revision(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
-                selectedTexture,poseStack,vertexLight,packedOverlay,part.red(),part.green(),part.blue()))return;
+                selectedTexture,poseStack,vertexLight,packedOverlay,part.red(),part.green(),part.blue());
+        }
+        finally { RigidCapsuleGpu.captureWitnessSubmission=false; }
+        if(runtimeWitness&&animatable instanceof net.minecraft.world.entity.Entity actor)
+        {
+            Matrix4f world=this.getRenderer() instanceof EvaUnit01Renderer renderer&&actor instanceof EvaUnit01Entity eva
+                    ?renderer.renderedMeshTransform(pose,eva,partialTick)
+                    :this.getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer
+                    ?renderer.renderedMeshTransform(pose,actor,partialTick):null;
+            if(world!=null)FirstBattleRuntimeWitnessR52.localSubmission(actor,bone,pose,world,
+                    values==part.vertices()?0:skinPose.revision(),skinReused,gpu,values,stride,
+                    part.pivotX(),part.pivotY(),part.pivotZ());
+        }
+        if(gpu)return;
         for (int index = 0; index + stride * 3 <= values.length; index += stride * 3)
         {
             emitVertex(targetBuffer, pose, normal, values, index, part,
@@ -803,11 +825,13 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
 
     /** Dual-quaternion blending keeps both copies of every seam vertex coincident. */
     private static float[] skinVertices(MeshData mesh,MeshPart part,GeoBone bone)
+    {return skinVertices(mesh,part,bone,null);}
+    private static float[] skinVertices(MeshData mesh,MeshPart part,GeoBone bone,GeoBone commonAncestor)
     {
         var skin=mesh.joints().get(bone.getName());if(skin==null)return part.vertices();
-        if(!skin.influences().isEmpty())return skinAuthored(mesh,part,bone,skin);
+        if(!skin.influences().isEmpty())return skinAuthored(mesh,part,bone,skin,commonAncestor);
         var root=bone;while(root.getParent()!=null)root=root.getParent();var other=findBone(root,skin.other());if(other==null)return part.vertices();
-        var matrix=EvaRigTransforms.model(bone).invert().mul(EvaRigTransforms.model(other));
+        var matrix=EvaRigTransforms.model(bone,commonAncestor).invert().mul(EvaRigTransforms.model(other,commonAncestor));
         var q=EvaRigTransforms.rotation(matrix);if(q.w<0)q.mul(-1);
         var dual=new org.joml.Quaternionf(matrix.m30(),matrix.m31(),matrix.m32(),0).mul(q).mul(.5F);
         float[] source=skin.rest(),out=skin.scratch();int stride=mesh.stride();
@@ -831,17 +855,17 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
 
     /** Generated bodies can have three-way shoulder/hip junctions. All
      * copies share the complete authored weights, avoiding pairwise tears. */
-    private static float[] skinAuthored(MeshData mesh,MeshPart part,GeoBone bone,JointSkin skin)
+    private static float[] skinAuthored(MeshData mesh,MeshPart part,GeoBone bone,JointSkin skin,GeoBone commonAncestor)
     {
         var root=bone;while(root.getParent()!=null)root=root.getParent();
-        var inverse=EvaRigTransforms.model(bone).invert();var inverseRotation=EvaRigTransforms.rotation(inverse);int palette=skin.influences().size(),slot=0;
+        var inverse=EvaRigTransforms.model(bone,commonAncestor).invert();var inverseRotation=EvaRigTransforms.rotation(inverse);int palette=skin.influences().size(),slot=0;
         float[][] transforms=new float[palette][8],weights=new float[palette][];
         int[] stableBones=new int[palette];
         var stableNames=skin.influences().keySet().stream().sorted().toList();
         for(var entry:skin.influences().entrySet())
         {
             var other=findBone(root,entry.getKey());if(other==null)throw new IllegalStateException("Authored seam bone missing: "+entry.getKey());
-            var model=EvaRigTransforms.model(other);
+            var model=EvaRigTransforms.model(other,commonAncestor);
             var bind=skin.inverseBind().get(entry.getKey());if(bind!=null)model.mul(bind);
             var global=EvaRigTransforms.rotation(model);if(global.w<0)global.mul(-1);
             var relative=new Matrix4f(inverse).mul(model);var q=EvaRigTransforms.rotation(relative);

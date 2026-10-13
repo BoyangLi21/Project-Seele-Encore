@@ -64,6 +64,7 @@ public final class FirstBattlePoseRenderer
             model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
             model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
         }
+        FirstBattleRuntimeWitnessR52.writer(entity,model,partial,pose);
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),Set.copyOf(positions),EvaMotionEngineV2.OWNER_LIVE_ACTION);
     }
     private FirstBattlePoseRenderer() {}

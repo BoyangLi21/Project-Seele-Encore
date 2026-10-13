@@ -171,6 +171,18 @@ public final class StaffConversationR24
             if(action.equals("start"))session.coordinationInstance=CityCoordinationR44.instance(player);
             send(player,npc,session,false);return;
         }
+        if(request.startsWith(StaffUndergroundChoiceR52.PREFIX))
+        {
+            try
+            {
+                var choice=StaffUndergroundChoiceR52.parse(request);session.pilotContact=-1;
+                if(choice.prepareFirst())
+                {StaffCommandBookR24.request(player,npc,StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY,choice.unit());return;}
+                session.reply=StaffOperationsR48.undergroundDeploymentR52(player,npc,choice.unit()).message();
+            }
+            catch(IllegalArgumentException error){session.reply="请选择有效的机体与地下部署方式。";}
+            send(player,npc,session,false);return;
+        }
         if(request.startsWith("ARMEDSORTIE:")||request.startsWith("UNDERGROUND:"))
         {
             try
@@ -180,11 +192,12 @@ public final class StaffConversationR24
                 int variant=Integer.parseInt(parts[1]);
                 boolean armed=parts[0].equals("ARMEDSORTIE");
                 if(armed&&(variant!=0&&variant!=2||!Set.of("human","npc").contains(parts[2]))
-                        ||!armed&&(variant<0||variant>2||!Set.of("open","close").contains(parts[2])))
+                        ||!armed&&(variant<0||variant>2||!Set.of("open","close","door_open").contains(parts[2])))
                     throw new IllegalArgumentException();
                 session.pilotContact=-1;
                 var result=armed
                         ?StaffOperationsR48.armedSortie(player,npc,variant,parts[2].equals("npc"))
+                        :parts[2].equals("door_open")?StaffOperationsR48.undergroundDoorOpenR52(player,npc,variant)
                         :StaffOperationsR48.undergroundExit(player,npc,variant,parts[2].equals("open"));
                 session.reply=result.message();
             }

@@ -13,7 +13,7 @@ final class EvaCannonContactRigR45
 {
     static void apply(EvaUnit01Entity eva,BakedGeoModel model,float partial,Matrix4f renderedRoot)
     {
-        if(!EvaCannonFrameR45.enabled(eva)||renderedRoot==null||!EvaHandSurfaceR45.applies(eva)
+        if(eva.hasFixedCannonR52()||!EvaCannonFrameR45.enabled(eva)||renderedRoot==null||!EvaHandSurfaceR45.applies(eva)
                 ||!eva.isPoweredOn()||eva.isNervLogisticsLocked()||eva.isFirstBattleActive()
                 ||eva.isBerserk()||eva.getActivationTicks()>0||EvaShutdownR30.displayed(eva)
                 ||EvaAirTransportR31.active(eva)||com.projectseele.physics.CombatBodyDynamics.active(eva))return;

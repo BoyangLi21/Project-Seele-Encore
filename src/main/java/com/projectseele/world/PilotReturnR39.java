@@ -73,7 +73,7 @@ public final class PilotReturnR39
         int variant=unit.getUnitVariant();var order=state(level).orders.get(variant);
         var fleet=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
         if(order==null||order.variant!=variant||!unit.getUUID().equals(order.unit)||!commander.equals(order.commander)
-                ||order.pilot==null||!Set.of("WALK","AIR","DOCK").contains(order.stage)
+                ||order.pilot==null||!Set.of("WALK","AIR","DOCK","R52_ACTUAL_RECOVERY").contains(order.stage)
                 ||fleet==null||!unit.getUUID().equals(fleet.canonicalId())||fleet.phase()!=EvaFleetSavedData.Phase.DEPLOYED)return false;
         if(!(unit.getPilotEntity() instanceof TrainingPilotEntity pilot)||!pilot.isAlive()||pilot.level()!=level
                 ||pilot.getAssignedVariant()!=variant||!order.pilot.equals(pilot.getUUID())
@@ -93,6 +93,7 @@ public final class PilotReturnR39
             if(entry==null||sortie.eva==null||!entry.canonicalId().equals(sortie.eva)||sortie.pilotR45==null)continue;
             var o=new Order();o.variant=sortie.unit;o.unit=entry.canonicalId();o.commander=sortie.commander;o.pilot=sortie.pilotR45;
             var unit=ServiceAircraftR32.payload(level,o.unit);
+            if(NervRouteRuntimeR52.claimed(level)&&unit==null&&sortie.position==null)continue;
             o.position=unit!=null?unit.blockPosition():sortie.position!=null?sortie.position:BlockPos.containing(NervAirLiftR30.head(level,o.variant));
             state.orders.put(o.variant,o);
             radio(level,o,"mission_return");
@@ -166,6 +167,12 @@ public final class PilotReturnR39
             order.nextAttempt=level.getGameTime()+100;
             if(TransportClearanceR30.pickupProblem(level,unit).isEmpty())
             {order.walkAfterBlockedPrepare=false;order.stage="WALK";order.stalled=0;state.setDirty();}
+        }
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            unit.stopAutonomousR30();if(level.getGameTime()<order.nextAttempt)return;order.nextAttempt=level.getGameTime()+20;
+            if(!NervAirTransportRuntimeR52.pending(level,unit)){var ground=NervRouteRuntimeR52.recover(level,order.variant);if(!ground.accepted())NervAirTransportRuntimeR52.requestPilotReturn(level,unit,order.commander);}
+            order.stage="R52_ACTUAL_RECOVERY";state.setDirty();return;
         }
         Vec3 head=NervAirLiftR30.head(level,order.variant),delta=head.subtract(unit.position());
         double distance=delta.horizontalDistance();

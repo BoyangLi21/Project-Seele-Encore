@@ -26,6 +26,7 @@ public final class FirstBattleClip
     private record Data(float fps,Map<String,Role> roles,Vec3[] cameras,Vec3[] targets,float[] fov,Set<Integer> cuts,String surfaceHash,int landingTick,Map<Integer,Integer> eventTicks,float[] referenceSeconds) {}
     private static String loadedFingerprint="";
     private static final Data DATA=load();
+    private static final Map<Integer,Boolean> HAND_OWNERS_R52=new HashMap<>();
     private static Vec3 vector(JsonArray p){return new Vec3(p.get(0).getAsDouble(),p.get(1).getAsDouble(),p.get(2).getAsDouble());}
     private static Vec3[] vectors(JsonArray rows)
     {
@@ -154,6 +155,21 @@ public final class FirstBattleClip
         }
     }
     public static boolean ready(){return DATA!=null;}
+    /** Only a complete admitted 34-joint hand performance replaces gameplay fingers. */
+    public static boolean ownsAnatomicalHandsR52(int variant)
+    {
+        if(DATA==null)return false;
+        return HAND_OWNERS_R52.computeIfAbsent(variant,key->{
+            var rig=EvaAnatomicalHandsR45.rig(key);
+            return rig!=null&&ownsCompleteHandBoneSetR52(DATA.roles.get("eva").bones,
+                    rig.joints().stream().map(EvaAnatomicalHandsR45.Joint::name).toList());
+        });
+    }
+    static boolean ownsCompleteHandBoneSetR52(String[] authored,Collection<String> handBones)
+    {
+        Set<String> required=new HashSet<>(handBones);
+        return required.size()==34&&handBones.size()==34&&new HashSet<>(Arrays.asList(authored)).containsAll(required);
+    }
     public static String surfaceHash(){return DATA==null?"":DATA.surfaceHash;}
     public static int landingTick(){return DATA==null?234:DATA.landingTick;}
     public static String fingerprint(){return loadedFingerprint;}
@@ -194,14 +210,17 @@ public final class FirstBattleClip
     }
     public static Vec3 localPoint(FirstBattleSignals.Spec spec,boolean eva,String curve,float seconds)
     {
-        if(DATA==null)return Vec3.ZERO;Vec3 p=sample(DATA.roles.get(eva?"eva":"angel").curves.get(curve),seconds);
-        Vec3 correction=eva?Vec3.ZERO:new Vec3(0,spec.initialHeight()*(1-smooth(seconds/1.2F)),(spec.initialDistance()-34)*(1-smooth(seconds/1.2F)));
+        if(DATA==null)return Vec3.ZERO;Role role=DATA.roles.get(eva?"eva":"angel");
+        Vec3 p=sample(role.curves.get(curve),seconds);
+        // Match each real actor at entry; every authored curve follows the same rebase.
+        Vec3 initial=eva?Vec3.ZERO:new Vec3(0,spec.initialHeight(),spec.initialDistance());
+        Vec3 correction=initial.subtract(role.curves.get("root_blocks")[0]).scale(1-smooth(seconds/1.2F));
         p=p.add(correction);
         if(!curve.equals("root_blocks"))
         {
             // Socket, sole and eye curves follow the same initial heading
             // blend as the actual body, around that actor's moving origin.
-            Vec3 origin=sample(DATA.roles.get(eva?"eva":"angel").curves.get("root_blocks"),seconds).add(correction);
+            Vec3 origin=sample(role.curves.get("root_blocks"),seconds).add(correction);
             float delta=yaw(spec,eva,seconds)-spec.yaw()-(eva?0:180);
             p=origin.add(p.subtract(origin).yRot((float)Math.toRadians(-delta)));
         }
