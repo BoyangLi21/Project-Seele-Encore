@@ -47,7 +47,7 @@ public final class CityBattlefieldR29
         if (!required(level)) return false;
         var first = FirstBattleSavedData.get(level);
         var tv = TvCampaignSavedData.get(level);
-        return first.active != null || first.missionAngel != null&&!SurfaceAngelPlanR52.handles(tv.active) || tv.phase.equals("combat");
+        return first.active != null || first.missionAngel != null&&!SurfaceAngelPlanR52.handles(level,tv.active) || tv.phase.equals("combat");
     }
     public static boolean loweringRequested(ServerLevel level)
     {

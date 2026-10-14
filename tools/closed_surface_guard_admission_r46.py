@@ -24,6 +24,8 @@ def validate_closed_surface_guards(painter,world,dimension):
     if floor not in checked:checked[floor]=read_box(Path(world),dimension,floor,floor).get(floor)
     # A separately measured exact excavation explicitly transfers ownership
     # of this ground. Historical replay without such a plan must fail.
-    excavation=any(edit.mode=='match'and edit.box==(*floor,*floor)and edit.extra[0]==expected and edit.state in{'minecraft:air','minecraft:cave_air','minecraft:void_air'}for edit in painter.ops)
+    excavation=any((edit.mode=='match'and edit.box==(*floor,*floor)
+                    or edit.mode=='exact'and all(edit.box[i]<=floor[i]<=edit.box[i+3]for i in range(3)))
+                   and edit.extra[0]==expected and edit.state in{'minecraft:air','minecraft:cave_air','minecraft:void_air'}for edit in painter.ops)
     if checked[floor]==expected and not excavation:
      raise RuntimeError(f'Closed pit guard {q}/{side} would block its restored full ground {floor}; retire the old recipe or measure a new actual drop')

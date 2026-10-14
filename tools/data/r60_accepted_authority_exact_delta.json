@@ -1,0 +1,436 @@
+{
+  "schema": "projectseele.r60.exact-reviewed-accepted-authority-delta.v1",
+  "accepted55_jar_sha256": "7c41f36d5b1a4bf281a0f631e388dcd1be699b734cf1f0fbb0fb9329c66be9aa",
+  "measurement56_jar_sha256": "99c737b8b2942e84b25d89355139169a91dca6459e39d65b35eec697284aabf2",
+  "source_delta": {
+    "build.gradle": {
+      "before_sha256": "0714b590608753617018a0d3a5ff3340f408708d91c9fe83b653f3046e42f58c",
+      "after_sha256": "03a5168740d806406d9916a0266a5ca836287a88be8066710f85db899b7e1456"
+    },
+    "src/main/java/com/projectseele/client/render/LocalVisualAssetFingerprint.java": {
+      "before_sha256": "8fcdc3a63462390cd3c44ed68edcc07561972f9067b17455dd56be101285d935",
+      "after_sha256": "4b9a2ff0acf1e09d460b85b14b674da62b9a4139e85dcbcbe23c244773260396"
+    },
+    "src/main/java/com/projectseele/client/render/NervLowerFrameRendererR52.java": {
+      "before_sha256": "55d3357131ea086af6956c1599239f0d9ec66bc10f1dd4e5d171e3c48cc2d180",
+      "after_sha256": "af69c4d9a8fb66d99075b18fd7a4d318381892162a275c805260f6009974048b"
+    },
+    "src/main/java/com/projectseele/client/render/RigidMachineryPartR44.java": {
+      "before_sha256": "51b2c7632e44bfea2a5e8ba073690e80498d4077ee295bd8f4e4f0c9903fe616",
+      "after_sha256": "ee4ddc99afacd7c9fac3158b104af5c70f04520b992f623981757f2d01566ec1"
+    },
+    "src/main/java/com/projectseele/world/NervAssemblyOwnerR52.java": {
+      "before_sha256": "c5368ee1933dc89d74d772c804837a66056a90e59cf009f3487b9008b8f3fc40",
+      "after_sha256": "fddfac3bd019a86db8ef3e86dc6dcf7556bacb55f60dcccfa90c4492f837c9fc"
+    },
+    "src/main/java/com/projectseele/world/NervFootGuideDockR52.java": {
+      "before_sha256": "a15039d0e27d13c20888fd0ee120d8a5e5408cd1c60c304d8f466371f22edcd2",
+      "after_sha256": "f594c28c08bc2ddf740446b78d52cf1b11239a1ee75795c7ed5e9fbb32db5136"
+    },
+    "src/main/java/com/projectseele/world/NervLowerFrameR52.java": {
+      "before_sha256": "2abfb58cecb90f2f37bcd0a1c608b812fd13932ca6682dd393d5c169c5009b30",
+      "after_sha256": "a21e59624fdc3ea3fef93b9492c1d51ab7fa1a3836215c87c4571c5fcacc383e"
+    },
+    "src/main/java/com/projectseele/world/NervPlantMotionR52.java": {
+      "before_sha256": "5767a285f0d04efa4fd79651d59024a26f026ad4398ca3305437c5fb4673896b",
+      "after_sha256": "454618f978cef3a35a43872606a0d0df916d6313b37b2eca3271894e1fe94624"
+    },
+    "src/main/java/com/projectseele/world/NervRouteNativeR52.java": {
+      "before_sha256": "165ce381b7136999b0811784ad729b84c02a51bb08542089983ce18eec0312d2",
+      "after_sha256": "96bb18bbbc53694850953373c94e8817d56a520026775c8c1b621d423b45eaa3"
+    },
+    "src/main/java/com/projectseele/world/NervRouteRuntimeR52.java": {
+      "before_sha256": "fb653e840ffe3b20d7aa3950dd2b9f7cae260898d83616be37be1ff104edcbd9",
+      "after_sha256": "99a21b2f5a2ecc91a5cb00e99c458dc11aac1b5f38185501114657057ff6d46e"
+    }
+  },
+  "reviewed_change_evidence": {
+    "performance_install": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\cage_collision_perf_r57\\SOURCE_INSTALL_RECEIPT.json",
+      "sha256": "7344f9315462339c47cb6b341a85483fd5161e19fe8a183cf30b6b5457b25896"
+    },
+    "collision_checks": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\plant_near_collision_perf_r58\\CURRENT_PLANT_BBOX_QUERY_CHECKS.json",
+      "sha256": "9dc3b342496f538c675e61537fb3da39140d8737bdb42b22e19d1cb08093f0ba"
+    },
+    "parameter_boundary_semantics": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\cage_collision_perf_r57\\SEMANTIC_OUTPUT_EQUIVALENCE_SOURCE_REPORT.json",
+      "sha256": "0397f64f23322db34fd0a801c186ab547eab4ce4b825a66a03f0c5cec9a66e1d"
+    },
+    "actual_saved_specs": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\cage_collision_perf_r57\\ACTUAL_SAVED_FOOT_DRIVE_SPECS.json",
+      "sha256": "ac9ab8d3a1282fb141532ba33077addb79963a5a91d9c9befb12e1ebe6677341"
+    },
+    "exact56_to57_performance_diff": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\client_visual_contract_current56\\APPROVED_CURRENT56_TO57_PERF_DELTA.diff",
+      "sha256": "f804852c19e4e8e3f91c1a321f5f5db1249ced140903a949762baf9d6b238ac5"
+    },
+    "reviewed_visual_fix": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\client_visual_contract_current56\\AUTHORIZED_SOURCE_FIX_RECEIPT.json",
+      "sha256": "f08e80be687d6040480d639aa9f77f4d9727e6095e9939f6d80785a1c51b1ada"
+    },
+    "reviewed_uv_only_geometry": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\client_visual_contract_current56\\ASSOCIATION.json",
+      "sha256": "a6a47acf2b55ed8cb5a5448dfaa1d5a2e35f24755982cd486fc6b4a1bedc72e2"
+    },
+    "foot_guide_eof_only": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\route_audit\\pre_build57_whitespace.json",
+      "sha256": "0ab292c9871ef50da75720836529f624080b24681186ee2e4c4356a5c8c0d216"
+    },
+    "plant_cache_install": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\plant_near_collision_perf_r58\\SOURCE_INSTALL_RECEIPT.json",
+      "sha256": "8de325d0f03fe35c78c88e0875a5b2bc488add65b8e0db441b2722234a3d8fa4"
+    },
+    "plant_cache_candidate_semantics": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\plant_near_collision_perf_r58\\CANDIDATE_RECEIPT.json",
+      "sha256": "3f84168f9f8930af3765311fe7b5b3d0eefe7fc5ccf65d2f752f051574c25891"
+    },
+    "plant_cache_exact57_to58_diff": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\plant_near_collision_perf_r58\\SOURCE_ONE_FILE.diff",
+      "sha256": "ac1582e2193fc6f0d0be7b3cf55cfff002e871dc19d63c417f8049cfa3b2ffd9"
+    },
+    "previous57_fresh_source_equivalence": {
+      "path": "D:\\eva\\artifacts\\map_complete_20261013\\current_runtime_bundle_release57_accepted_authority_final\\CURRENT57_SOURCE_EQUIVALENCE.json",
+      "sha256": "f1db7e46c3ba38a766d12bd94f0a83139c48ac9323bab2b8f432be6f26be436f"
+    },
+    "exact90_sounds_catalog_guard": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\delivery_finish\\SOUND_CATALOG_EXPECTED_GUARD_R59.json",
+      "sha256": "03eda8ac15ca580245ba272f08bed97d8f917424212faef364cf926ebcf71478"
+    },
+    "manual_original_npc_install": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\route_audit\\manual_original_npc_r60\\SOURCE_INSTALL_RECEIPT.json",
+      "sha256": "dacd369190964a83dcfacd7d404314bfe8d0a29464d849a5a8189bac2b182272"
+    },
+    "actual59_ordinary_original_boarding": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\route_audit\\manual_original_npc_r60\\ACTUAL59_ORDINARY_BOARDING_FACTS.json",
+      "sha256": "164f8d80d575f06a267150fba47119321a8ad7b72021b5807dcbe214a2ac3252"
+    },
+    "manual_strict_and_saved_job_cold_checks": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\route_audit\\manual_original_npc_r60\\MANUAL_NPC_STRICT_AND_COLD_CHECKS.json",
+      "sha256": "6b23bab5fa2eb8d154e5636fb3fccb22c679380478cab08b488157d1d72ab197"
+    },
+    "manual_exact_source_delta": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\route_audit\\manual_original_npc_r60\\ROOT_APPROVED_TWO_SOURCE_DELTA.diff",
+      "sha256": "c62d436a5e138b91c273634da928f68275ae03c2caddc9b340f271b7e5c2038a"
+    },
+    "render_install": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\render_source_fix_r60\\SOURCE_INSTALL_RECEIPT.json",
+      "sha256": "62ddc0d4b55fc19342310782321e4b8c34ca0e2e8e5db6d033c7cbfe5b92e037"
+    },
+    "render_cpu_checks": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\render_source_fix_r60\\CPU_CLIP_ROPE_EXACT_CHECKS.json",
+      "sha256": "75b1066b935407a7d88f7a4670e5cdbb07af895a943020535e47d9c2c692e70b"
+    },
+    "render_exact_source_delta": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\render_source_fix_r60\\SOURCE_TWO_RENDER_FILES.diff",
+      "sha256": "76bca7e28be5b2361b94c2ea2f83702dcdc5517915f60c626cb297c6564b0a49"
+    },
+    "locale_original_values_and_two_keys": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\render_source_fix_r60\\SOURCE_LOCALE_TWO_KEY_PROOF.json",
+      "sha256": "0b3eb8e1b43eb8eea62c7ad3923166ffebcb9f54694921dc0ca782e9bc48117e"
+    },
+    "locale_exact_build_excludes": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\render_source_fix_r60\\BUILD_TWO_LOCALE_EXCLUDE.diff",
+      "sha256": "c034bcede0c3fde01565463f33cc59902efed89e7b55f89e8c7e2075e6a9c223"
+    },
+    "locale_expected_guard": {
+      "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\delivery_finish\\LAUNCH_SUBTITLE_EXPECTED_GUARD_R60.json",
+      "sha256": "d93c2408ef3376f753220b37016cf95afc976f64d798e9a4e3f8d07b285465ba"
+    }
+  },
+  "foot_guide_named_class_unchanged": true,
+  "all_assets_and_nonreviewed_classes_exact": true,
+  "previous57_jar_sha256": "fe8fbbf0ce009daa0e13a781265089294fc0de18a7e4f14d34df4bda8faba1fc",
+  "previous58_jar_sha256": "266f853a3cca54f2de8fbc8f722fa96d882f4dd0dfe9e9358de3ec6ed15608cc",
+  "source_sounds_catalog": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\src\\main\\resources\\assets\\projectseele\\sounds.json",
+    "source_sha256": "8872f82650ad766cf5bb51f94c5dc5b99d70aee5655372f65845d2c14c2f4016",
+    "baseline_sha256": "14a8462fa889f18704134c5ff93561c4dadc54b0782109a525a773924dbd08d3",
+    "original_definitions_unchanged": 88,
+    "source_definitions": 90,
+    "exact_added_definitions": {
+      "launch_electric_burst_r53": {
+        "subtitle": "subtitles.projectseele.launch_electric_burst_r53",
+        "sounds": [
+          {
+            "name": "projectseele:launch_electric_burst_r53",
+            "stream": false
+          }
+        ]
+      },
+      "launch_rail_friction_r53": {
+        "subtitle": "subtitles.projectseele.launch_rail_friction_r53",
+        "sounds": [
+          {
+            "name": "projectseele:launch_rail_friction_r53_0",
+            "stream": false
+          },
+          {
+            "name": "projectseele:launch_rail_friction_r53_1",
+            "stream": false
+          },
+          {
+            "name": "projectseele:launch_rail_friction_r53_2",
+            "stream": false
+          }
+        ]
+      }
+    }
+  },
+  "named_delta": {
+    "com/projectseele/client/render/LocalVisualAssetFingerprint$Fingerprint.class": {
+      "before_sha256": "b17af8e78fefe2f1192c85e43200ec58b735aa247528a75952f2bd0e5afb5f8f",
+      "after_sha256": "55fa6c0ab9b8400832439e8a98ce11e445cc242b265f2a766848d287083172ff"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint$MeshContract.class": {
+      "before_sha256": "4a764a8b353ad31321d3c757b2b6840ae908f8553c4ae2b4d62e13d06699715f",
+      "after_sha256": "c62f01b7825eb47af72a75022fc03412641a963bbf8e9200f90029e59df46a66"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint$ResourceDigest.class": {
+      "before_sha256": "ffbdd5fed09de512de0b1f235fd5c95fdacb65e1a2edf7d82c051c25d7ff86cc",
+      "after_sha256": "fb5c7405cbe94753bdf30c7de0bbb2f3586c6fcfb7c5fb5962b39211a47760f6"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint$SelectedR50Contract.class": {
+      "before_sha256": "9f1bcfbc78c79765060f0d222477507cad0e80a51fcd801aeb3ae3ca67d32173",
+      "after_sha256": "891d10317cb79fb98ee0151319844831de635695d8c2c88bc1c10aaf4173d4d6"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint.class": {
+      "before_sha256": "4a64ad69a08893a25bbc75b0bf8c4092a6ec880b6d47efd4d1ee08bd7c741ae0",
+      "after_sha256": "acffd03e51fe16c0202bad9e747c6ae78aab25379fabd241ca63f0b9261b128b"
+    },
+    "com/projectseele/client/render/NervLowerFrameRendererR52.class": {
+      "before_sha256": "ed2032a01e3fc1923631f4fbd853c15f1c27404f240a98effd15ce340ab4f93d",
+      "after_sha256": "449544dd5bf1448ded753d6c4789c6f916bf9bcdc9224f61388b690c4b09ca36"
+    },
+    "com/projectseele/client/render/RigidMachineryPartR44$Builder.class": {
+      "before_sha256": "137151e77bca6db0136e7c802ede518e7c5abc286b66617b898dbcb087e02fb1",
+      "after_sha256": "180fa971419cb001f44b7c774b5698520ada4d5228391430fe3cb5735a577613"
+    },
+    "com/projectseele/client/render/RigidMachineryPartR44$TexturedBuilder.class": {
+      "before_sha256": "8da8547613779b7ad56ab7018348bc2ac129e352faf7695b408c857b975eaf78",
+      "after_sha256": "186cf7ed05e5490cc96ec843ac657f018ca2b93cd2ae9a2f93aa4d2f813c5084"
+    },
+    "com/projectseele/client/render/RigidMachineryPartR44.class": {
+      "before_sha256": "113bff39813859ba08e2ad4ee093a50bd9ac8ee208f8bb5f66bd278d9389a3e6",
+      "after_sha256": "b16b586cdb01ffb85fb953344e07c27e66021f3cc601a66a7f8155a65652caed"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52.class": {
+      "before_sha256": "7e1ce5c7e2975c54a81b9a48e4ae194ecddf61441a2c655cefe2adbe93a5fcd0",
+      "after_sha256": "c9b190bbee1bc055dea09a29a327694f3758e296217d9a02983390fa2efa124d"
+    },
+    "com/projectseele/world/NervLowerFrameR52.class": {
+      "before_sha256": "6585241e7472bc062236d379cabcd5b9486cb21174434e27df78bcb20983c88a",
+      "after_sha256": "1052db78cf808c3b73496126536c10040069c522fc80cb3a925685ae4867a946"
+    },
+    "com/projectseele/world/NervPlantMotionR52.class": {
+      "before_sha256": "225e805a869b027d40367e4bb1ad9b5e1186d26ea6ce4743e1f24248c1513c30",
+      "after_sha256": "2b4730d4cbd2df2c85cb9b9df80a03c29bcdd03649c00c035342fbaea65c82cd"
+    },
+    "com/projectseele/world/NervRouteNativeR52$CheckedContinuousTraversalR52.class": {
+      "before_sha256": "bc7cdfae7016bf2724f16c7be130c51cbe23fb1d40a628f5c2265c2f26d16116",
+      "after_sha256": "fb4e20693be9dba219165dc4b6a9f743a9f86a52b66e4974adabc2f5aa7f70b7"
+    },
+    "com/projectseele/world/NervRouteNativeR52.class": {
+      "before_sha256": "b425661887802bd66c7f312766ac83a9eb5b83e2ad6269ea3904ef7d164e9d1e",
+      "after_sha256": "760cf55034414b70fc54e32ce2807100b466d5363416a7e2254b1f304e0ff513"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$Controller$1.class": {
+      "before_sha256": "841d820d83960e978b31c5ca7b1bcf577b1015bd6caf0fd6a9c35ff15dae90fa",
+      "after_sha256": "0ccc1e82556dee18f6165534e0a9db483791af7f34dde52e45ddb919c461cd91"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$Controller$2.class": {
+      "before_sha256": "b9592cb428b69a3911523e014dfa19bd7c7189801a172128f1fe955678a68740",
+      "after_sha256": "d84782de03b1d93200635428bd5b71041a780726ad339c167a584540f27b5d7b"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$Controller$3.class": {
+      "before_sha256": "9382c79219474691d130a90d49b78037da7ec8ac98b555a8498a48814487e012",
+      "after_sha256": "e61e037b1e8fd0fb31c7e1b9ad2322eca9b55d83bdefe911bc75f8724e1958ed"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$Controller.class": {
+      "before_sha256": "421cc8b012c3059dc1138e2a0ed85a8ca04872cc15e5c5ceae0a94ee19349ec4",
+      "after_sha256": "4d23539441a61d05ee966d874f2d6a11102c12704c933efd1db9bec4026fe975"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$FlightContext.class": {
+      "before_sha256": "8cc41f7227f59eb520e87767ca03fac1d3aa81bd42afa98f34ef42f7d6ae1476",
+      "after_sha256": "826d00ff20041e36d461d277a1dcecf3d1b3fc111256b170fa13ee8b8386a324"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52.class": {
+      "before_sha256": "d11b557082440a7421b79a12b1b5108ddcec014f77f20e28dc302573f30c5bd1",
+      "after_sha256": "c8829cbfc315007f67ed3aa44d8f10af17376a26c8ca24c5b8efb9919bd56505"
+    }
+  },
+  "named_added": {
+    "com/projectseele/client/render/NervLowerFrameRendererR52$RopeKeyR60.class": "0e87549682fc2ac417fd91eefdd5c7c3ddcfcaafc3b54fe4c5a470db7e9951ca",
+    "com/projectseele/mixin/SbwDefenseLoadedLosR56Mixin.class": "824515c27926b8e207d947b6d3c196f311b4decdd9f7b9e0f27ee7940aac64c2",
+    "com/projectseele/world/NervAssemblyOwnerR52$CageDomainKeyR57.class": "602c39a0801b48150f778899acca32b56dadec04e4a2f3a1381e5cfdb3270287",
+    "com/projectseele/world/NervLowerFrameR52$CollisionPoseR57.class": "193b6aa98d9577dd72c2b7901c69775b92f0fa7506d84bdf0e23ee710bd46022",
+    "com/projectseele/world/NervPlantMotionR52$CollisionPoseR58.class": "410d074c0c722f827e4c24cace049de604828b1a53cff5bf17f5325db0bb229d"
+  },
+  "jar_delta": {
+    "assets/projectseele/lang/en_us.json": {
+      "before_sha256": "8c4a55ce0c66341ec796704356a5b7748d9f181b782b1a067e703811f1210e6e",
+      "after_sha256": "91855638c578e79569b31816a1174113c9f84be0efe264274fe76effb50723a4"
+    },
+    "assets/projectseele/lang/zh_cn.json": {
+      "before_sha256": "709fb392799782a4e7b13d161b5c9d47c5911e118b94248ffe81185ec52f8d56",
+      "after_sha256": "0cd4e92c8d3169523546ab474c8dcc81111fe7d5cf9e2047e650788842dd891f"
+    },
+    "assets/projectseele/sounds.json": {
+      "before_sha256": "14a8462fa889f18704134c5ff93561c4dadc54b0782109a525a773924dbd08d3",
+      "after_sha256": "8872f82650ad766cf5bb51f94c5dc5b99d70aee5655372f65845d2c14c2f4016"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint$Fingerprint.class": {
+      "before_sha256": "f212a4cdd51297e076416a1b1e8bc70b138251d6703a466d92cd482e5b737065",
+      "after_sha256": "61a0d260184718c07e7412c51a1ed1149f49f78be97a380616076420338697c7"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint$MeshContract.class": {
+      "before_sha256": "dcb6626d31a6313dd78cc226b2f9915aef69390be00de36567a98b4094c299b9",
+      "after_sha256": "01f21009bbaf4445695ab87754115b82ece39c65ce1a4ee4afd4299a2809825c"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint$ResourceDigest.class": {
+      "before_sha256": "b132e25b7a62ae07e6506fc5948c8d5118699ae55503a0bede11a84410f64561",
+      "after_sha256": "06e9eb44e102809cb4f5bcfe76c05a0e11560ff51a447e050beeb790647d8388"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint$SelectedR50Contract.class": {
+      "before_sha256": "f1219cb673cb0b83a5dba2ee2b3c7c4cb4382aefd33768b811b37fb913c1e12f",
+      "after_sha256": "cb5691869c0f3dd04ede148ba305bf2000eb91e9c8cd85f5a4f730b9eef3a36c"
+    },
+    "com/projectseele/client/render/LocalVisualAssetFingerprint.class": {
+      "before_sha256": "f4f340d50b5efd08e36beba8acba0f6a8efce149229be406fd32428d25df55a5",
+      "after_sha256": "c916532d6ad0010bd62bf4bf62f3a7286c7e3bb984c35c03bb6f6f2a1dd3566e"
+    },
+    "com/projectseele/client/render/NervLowerFrameRendererR52.class": {
+      "before_sha256": "21f7ee6bae844162592e2f192bb7f560a9db7213cf491ffbd9ca795387ef7429",
+      "after_sha256": "085573fcc99035ead78fdf478a099b6665840c54e3ba67b1713d921fd7a49b4e"
+    },
+    "com/projectseele/client/render/RigidMachineryPartR44$Builder.class": {
+      "before_sha256": "22345e7396079105e2a9b45d4c46c9e481a2a694bca2c1c0e89cdc2811f3de08",
+      "after_sha256": "333d5388f380e389df40e19054305a1bef1c59fbe192ee3d57a8fe778371e522"
+    },
+    "com/projectseele/client/render/RigidMachineryPartR44$TexturedBuilder.class": {
+      "before_sha256": "2d38a83c2d7efe6dc67a80bd7a54d0f2e996a4a1ce1334664cfff07bc2534a27",
+      "after_sha256": "b709deeb78f48e58a8d66b70dd5b47ca62c1ca303666776bc94638b2956fba8c"
+    },
+    "com/projectseele/client/render/RigidMachineryPartR44.class": {
+      "before_sha256": "b42306cb33efb69d52d38c53431b2efc09e569e037c94e92648776d41b2c4692",
+      "after_sha256": "30bea3038523f1f4cfc049db539af8a703075bfb62ff48bf007e0f1b96be1217"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52.class": {
+      "before_sha256": "f312169a526dce43038f8014d9d356a15ca5d2618c98c9fea6cd459d482f90e0",
+      "after_sha256": "86bb985036c8b4a4098b66825021b5212aba781735127ac673084d45e9ca9bf0"
+    },
+    "com/projectseele/world/NervLowerFrameR52.class": {
+      "before_sha256": "c1fab05f4301225e0a2981b4678ea3724d86ac7f077e4e045418035d7136ddee",
+      "after_sha256": "487f622cf2d4a732310d2d43412a6e40c51f2dcc673a160da59937028561e3e8"
+    },
+    "com/projectseele/world/NervPlantMotionR52.class": {
+      "before_sha256": "da725d9d0a285bed809b5fa085aea2bfe178b79d344976331993aec20502574b",
+      "after_sha256": "3cad5ba4ac32a45020130cbe807dda1f4d098387faf4ed2119d4f4dd151f8c6b"
+    },
+    "com/projectseele/world/NervRouteNativeR52$CheckedContinuousTraversalR52.class": {
+      "before_sha256": "608167095cb9468ce670a9e00fbfccb7179fe601bdeabcce2997157f4a1bb2cc",
+      "after_sha256": "63fe1e5c36e9cfb72aab8ead2a9a896534124cffc97968bf5b14fa76aef5d2fe"
+    },
+    "com/projectseele/world/NervRouteNativeR52.class": {
+      "before_sha256": "8f6374630ccc3380f19d3ba4b22fff81007c248c45792a14175b1fe8ec7afcf2",
+      "after_sha256": "fcd5fee06d1829b82e8b6f7566073edf35a5e7368a961c8cf1ddd1b90e9bb5ad"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$Controller$1.class": {
+      "before_sha256": "72ecf88304a7da0db279e87fbd0b6e838760a7154db351bea5bf57e51a4ad860",
+      "after_sha256": "5f6683c52ac06713a7bdf99145d937b493e1deb2b72c1572bba80c3d61a73701"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$Controller$2.class": {
+      "before_sha256": "3248efba4f5c9ee82dea78759ab21b314b3a6a5fb637f9db3ffef1d96a8c6ce3",
+      "after_sha256": "a9d50191a739cc59422b9fc03dced157809c29cea9a4db31dbcb50801502ed33"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$Controller$3.class": {
+      "before_sha256": "b71f8995329117e3920a1ae57f2b57baf7b9c4ed33fe90da1d5e88b79ba8ce03",
+      "after_sha256": "a5a6ee1cda2aa6e1e914e6a37028ac0bc7062ac6fcd4142136999cf5f3a9429b"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$Controller.class": {
+      "before_sha256": "26c42900dc05f1eec5df9e2fdf5f23a28214df1771772d748f67db1ee63b2630",
+      "after_sha256": "358b3e897cef2064a16ec44e6264075d74dc6337ceae42a6d7b90aa09fc7af78"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52$FlightContext.class": {
+      "before_sha256": "e548a720b71caa6d6ecca870716370986c29c60920e1a679faa785fea3136093",
+      "after_sha256": "2a0404f83e2f85aa524ad3967422ad4bb1ebe3901bd033f32fda31a13f51f8ca"
+    },
+    "com/projectseele/world/NervRouteRuntimeR52.class": {
+      "before_sha256": "04463802020c26fa06aafd32e51bce551e7e088dd404e551ec1f2277c326e4b9",
+      "after_sha256": "5cab3885f86bd8374fcc590e3ef210025c292546d332468538b96bbe8b9592b1"
+    }
+  },
+  "jar_added": {
+    "com/projectseele/client/render/NervLowerFrameRendererR52$RopeKeyR60.class": "630d961eef6f8e2e6e9dc795871942993b1c21aa13e01514451897e88c525912",
+    "com/projectseele/mixin/SbwDefenseLoadedLosR56Mixin.class": "7d32fc5b29f07b9f44c6a1b946bca1acdbe97a01e04d1a6984295f4de3e2c259",
+    "com/projectseele/world/NervAssemblyOwnerR52$CageDomainKeyR57.class": "5eb88fd685fd0862f40c24db4950fbb29f9b2b559ad417f343ef90c65cdfed50",
+    "com/projectseele/world/NervLowerFrameR52$CollisionPoseR57.class": "39d14c9b55bfbcdde30b8f4155d3a597e06058091ee2c4ec01d4cfe5cae05b2d",
+    "com/projectseele/world/NervPlantMotionR52$CollisionPoseR58.class": "a545e60c826e4859f004925b94b9b3daaa775b16342fce0f179e4a02441645ac"
+  },
+  "restored_launch_sound_files_unchanged": [
+    {
+      "member": "assets/projectseele/sounds/launch_electric_burst_r53.ogg",
+      "sha256": "35039436d4cbcf655240094f9fed67994a96d59eec70bed615aad673a2f79622",
+      "bytes": 22376
+    },
+    {
+      "member": "assets/projectseele/sounds/launch_rail_friction_r53_0.ogg",
+      "sha256": "c5d66c5a6eb405af300d57bdbec33177262e42085c8c445eba15462e1e7bd0a4",
+      "bytes": 8102
+    },
+    {
+      "member": "assets/projectseele/sounds/launch_rail_friction_r53_1.ogg",
+      "sha256": "935e48de13571cb16e659b32bf0536bd8d6ab58a0c09faad9325997bab771913",
+      "bytes": 7762
+    },
+    {
+      "member": "assets/projectseele/sounds/launch_rail_friction_r53_2.ogg",
+      "sha256": "b19860c09142447e82f8eabfbc8e31027af112cab94f1faade60bbf2a255d7da",
+      "bytes": 8035
+    }
+  ],
+  "native60_pass_claimed": false,
+  "current60_jar_sha256": "6f8db5d002c84d759ccc5be236b922eeb58ae40da235c59872da1d0bf90f71f7",
+  "previous59_jar_sha256": "80f81bdc89930130ef783afd82e05040329fb01bda9d50be243b87178b97a0c9",
+  "source_launch_subtitles": {
+    "files": {
+      "assets/projectseele/lang/en_us.json": {
+        "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\src\\main\\resources\\assets\\projectseele\\lang\\en_us.json",
+        "source_sha256": "91855638c578e79569b31816a1174113c9f84be0efe264274fe76effb50723a4",
+        "baseline_sha256": "8c4a55ce0c66341ec796704356a5b7748d9f181b782b1a067e703811f1210e6e",
+        "original_definitions_unchanged": 324,
+        "source_definitions": 326,
+        "exact_added_definitions": {
+          "subtitles.projectseele.launch_electric_burst_r53": "Launch rails discharge",
+          "subtitles.projectseele.launch_rail_friction_r53": "Launch rails spark and scrape"
+        }
+      },
+      "assets/projectseele/lang/zh_cn.json": {
+        "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\src\\main\\resources\\assets\\projectseele\\lang\\zh_cn.json",
+        "source_sha256": "0cd4e92c8d3169523546ab474c8dcc81111fe7d5cf9e2047e650788842dd891f",
+        "baseline_sha256": "709fb392799782a4e7b13d161b5c9d47c5911e118b94248ffe81185ec52f8d56",
+        "original_definitions_unchanged": 326,
+        "source_definitions": 328,
+        "exact_added_definitions": {
+          "subtitles.projectseele.launch_electric_burst_r53": "发射轨道：电流爆发",
+          "subtitles.projectseele.launch_rail_friction_r53": "发射轨道：高速摩擦"
+        }
+      }
+    },
+    "actual_jar_readbacks": {
+      "assets/projectseele/lang/en_us.json": "91855638c578e79569b31816a1174113c9f84be0efe264274fe76effb50723a4",
+      "assets/projectseele/lang/zh_cn.json": "0cd4e92c8d3169523546ab474c8dcc81111fe7d5cf9e2047e650788842dd891f"
+    },
+    "exact_source_readbacks": true
+  },
+  "functional_policy_change": {
+    "empty_mission_manual_npc_only": true,
+    "current_phone_R32_boarding_receipt_required": true,
+    "new_admission_online_authorized_required": true,
+    "persistent_saved_identity_offline_preserved": true,
+    "nonempty_campaign_checks_unchanged": true,
+    "actors_missions_owners_progress_rewritten": false,
+    "mechanical_geometry_unchanged": true,
+    "native_functional_fresh_required": true
+  }
+}

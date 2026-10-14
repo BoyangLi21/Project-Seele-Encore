@@ -213,7 +213,7 @@ public final class S20LiftDirectoryR52
     public static List<S20PhysicalElevatorDirector.LiftSpec> specs(ServerLevel level)
     {if(!NervRouteRuntimeR52.claimed(level))return List.of();var state=state(level);return state.ready?state.specs:List.of();}
     public static boolean current(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec)
-    {var state=state(level);var office=state.document==null?null:state.document.office();return spec.r52()!=null&&state.ready&&state.nativeReady.contains(spec.id())
+    {if(!NervRouteRuntimeR52.claimed(level))return false;var state=state(level);var office=state.document==null?null:state.document.office();return spec.r52()!=null&&state.ready&&state.nativeReady.contains(spec.id())
             &&(office==null||!office.liftId().equals(spec.id())||state.officeReady)&&state.specs.stream().anyMatch(spec::equals);}
     public static boolean ready(ServerLevel level){return NervRouteRuntimeR52.claimed(level)&&state(level).ready;}
     public static S20LiftManifestR52.Office office(ServerLevel level)
@@ -225,7 +225,14 @@ public final class S20LiftDirectoryR52
         if(independentGateway(RegionalGatewayDirector.active(level),group.x,group.z,group.facing))return true;
         State state=state(level);if(!state.ready)return false;
         for(var spec:state.specs){var p=spec.r52().floors().get(0).controller();if(group.x==p.getX()&&group.z==p.getZ()&&group.facing==spec.r52().controllerFacing())return current(level,spec);}
-        return true; // Other player-owned native groups are outside the Root lift directory.
+        return !retiredControllerAxis(group.x,group.z); // Independent player-owned groups remain outside this directory.
+    }
+    static boolean retiredControllerAxis(int x,int z)
+    {
+        // These are observed original/failed facility groups, not proximity bounds.
+        // An installed replacement must explicitly own its surviving native groups.
+        return Set.of("9;253","63;302","31;321","130;269","96;-52","-26;-278","86;366","108;410","70;253","97;-15")
+                .contains(x+";"+z);
     }
     static boolean independentGateway(boolean active,int x,int z,net.minecraft.core.Direction facing)
     {return active&&x==RegionalGatewayDirector.X-8&&z==RegionalGatewayDirector.Z&&facing==net.minecraft.core.Direction.EAST;}

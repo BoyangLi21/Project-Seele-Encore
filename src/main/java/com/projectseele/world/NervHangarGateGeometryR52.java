@@ -12,8 +12,11 @@ public final class NervHangarGateGeometryR52
 {
     public record SealBox(double minX,double minY,double minZ,double maxX,double maxY,double maxZ)
     {public SealBox{if(!Double.isFinite(minX+minY+minZ+maxX+maxY+maxZ)||minX>=maxX||minY>=maxY||minZ>=maxZ)throw new IllegalArgumentException("Actual finite sealed floor boxes required");}public AABB bounds(){return new AABB(minX,minY,minZ,maxX,maxY,maxZ);}}
-    public record BottomSeal(List<SealBox> closedBoxes,double dropM,double retreatLocalZ)
-    {public BottomSeal{closedBoxes=List.copyOf(closedBoxes);if(closedBoxes.isEmpty()||closedBoxes.size()>64||!Double.isFinite(dropM+retreatLocalZ)||dropM<=0||dropM>6||retreatLocalZ<=0||retreatLocalZ>32)throw new IllegalArgumentException("Finite actual bay floor seal and real bounded travel required");}}
+    public record BottomSeal(List<SealBox> closedBoxes,double dropM,double retreatLocalZ,int version,int retainedBoxCount)
+    {
+        public BottomSeal(List<SealBox> boxes,double drop,double retreat){this(boxes,drop,retreat,1,0);}
+        public BottomSeal{closedBoxes=List.copyOf(closedBoxes);if(closedBoxes.isEmpty()||closedBoxes.size()>(version==1?64:512)||!Double.isFinite(dropM+retreatLocalZ)||dropM<=0||dropM>6||retreatLocalZ<=0||retreatLocalZ>32||version!=1&&version!=2||version==1&&retainedBoxCount!=0||version==2&&(retainedBoxCount<=0||retainedBoxCount>=closedBoxes.size()||retainedBoxCount>64))throw new IllegalArgumentException("Finite actual bay floor seal, explicit version and retained original mechanism required");}
+    }
     public record Spec(float width,float height,int openTicks,int closeTicks,int depthDirection,BottomSeal bottomSeal)
     {
         public Spec(float width,float height,int openTicks,int closeTicks){this(width,height,openTicks,closeTicks,1);}

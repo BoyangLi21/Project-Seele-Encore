@@ -21,6 +21,12 @@ public final class NervCranePoseR52
      * frame is used for draw and sweep, avoiding rotationTo's antipodal branch. */
     public static RigidTransform ropeFrame(Vec3 first,Vec3 last)
     {var y=last.subtract(first).normalize();var projection=new Vec3(1,0,0).subtract(y.scale(y.x));var x=projection.length()>1e-7?projection.normalize():new Vec3(0,0,1);return RigidTransform.fromAxes(first,x,y,x.cross(y));}
+    /** Original R50 cylinder rotationTo. Kept separate from ropeFrame:
+     * fixed ground-guide brackets retain their existing stable basis. */
+    public static Quaternionf originalHoistRopeRotationR63(Vec3 first,Vec3 last)
+    {var delta=last.subtract(first);double length=delta.length();if(length<1e-6)throw new IllegalArgumentException("Original hoist rope cannot vanish");return new Quaternionf().rotationTo(new Vector3f(0,1,0),new Vector3f((float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length)));}
+    public static RigidTransform originalHoistRopeFrameR63(Vec3 first,Vec3 last)
+    {return RigidTransform.of(first,originalHoistRopeRotationR63(first,last));}
     public record Pose(RigidTransform machine,RigidTransform grip,Vec3 mount,Vec3 yoke,float released)
     {public Pose{if(released<0||released>1||!Float.isFinite(released))throw new IllegalArgumentException("Actual jaw channel required");}}
     public static Pose evaluate(RigidTransform machine,double bottom,RigidTransform actualPlug,boolean coupled,Vec3 referenceWorld,Quaternionf referenceRotation,Vec3 suppliedMount)

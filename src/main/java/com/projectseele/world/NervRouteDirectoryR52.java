@@ -11,6 +11,13 @@ import org.joml.Quaternionf;
 public final class NervRouteDirectoryR52
 {
     public static final String SCHEMA="projectseele.r52.route-directory.v1";
+    public static final String EXPLICIT_BANK_SCHEMA="projectseele.r52.route-directory.v2";
+    public record BankRole(int bank,String intent)
+    {
+        public BankRole{require(bank>=1&&bank<=3&&Set.of("geofront","surface","hakone").contains(intent),"Explicit bank1..3 and known departure intent required");}
+        public Region region(){return intent.equals("geofront")?Region.GEOFRONT:Region.SURFACE;}
+        public List<Motion> legacyLaunchSequence(){return intent.equals("geofront")?List.of(Motion.VERTICAL):List.of(Motion.VERTICAL,Motion.LAUNCH_INCLINE,Motion.VERTICAL);}
+    }
     public enum Region { SURFACE,GEOFRONT }
     public enum Role { BAY,BANK,PATH,EXIT }
     public enum ResourceKind { RAIL,DOOR,SUPPORT,SPACE }
@@ -49,9 +56,21 @@ public final class NervRouteDirectoryR52
         }
         public Set<String> resources(){var all=new HashSet<>(occupancy);all.addAll(rails);all.addAll(doors);all.add(support);return Set.copyOf(all);}
     }
-    public record MotionProfile(String type,double cruiseMps,double accelerationMps2,double decelerationMps2,String readyNode)
+    public record SpeedProfile(double cruiseMps,double accelerationMps2,double decelerationMps2)
     {
-        public MotionProfile {require("continuous_upright".equals(type),"Explicit continuous_upright profile required");require(Double.isFinite(cruiseMps)&&Double.isFinite(accelerationMps2)&&Double.isFinite(decelerationMps2)&&cruiseMps>0&&accelerationMps2>0&&decelerationMps2>0,"Explicit positive cruise/acceleration/deceleration required");readyNode=identifier(readyNode);}
+        public SpeedProfile{require(Double.isFinite(cruiseMps)&&Double.isFinite(accelerationMps2)&&Double.isFinite(decelerationMps2)&&cruiseMps>0&&accelerationMps2>0&&decelerationMps2>0,"Explicit positive cruise/acceleration/deceleration required");}
+    }
+    public record MotionProfile(String type,double cruiseMps,double accelerationMps2,double decelerationMps2,String readyNode,int phaseVersion,SpeedProfile prelaunch)
+    {
+        public MotionProfile(String type,double cruise,double acceleration,double deceleration,String ready){this(type,cruise,acceleration,deceleration,ready,0,null);}
+        public MotionProfile
+        {
+            require("continuous_upright".equals(type),"Explicit continuous_upright profile required");
+            new SpeedProfile(cruiseMps,accelerationMps2,decelerationMps2);readyNode=identifier(readyNode);
+            require(phaseVersion==0&&prelaunch==null||phaseVersion==1&&prelaunch!=null,"Explicit supported phase version and prelaunch profile required");
+            if(prelaunch!=null)require(prelaunch.cruiseMps()<cruiseMps,"Prelaunch speed must be lower than launch speed");
+        }
+        public SpeedProfile launch(){return new SpeedProfile(cruiseMps,accelerationMps2,decelerationMps2);}
     }
     public record LegSpan(String id,double from,double to)
     {public LegSpan {id=identifier(id);require(Double.isFinite(from)&&Double.isFinite(to)&&from>=0&&to<=1&&to>=from,"Bounded monotone actual leg span required");}}
@@ -67,6 +86,7 @@ public final class NervRouteDirectoryR52
         public double accelerationMps2(){return profile().accelerationMps2();}
         public double decelerationMps2(){return profile().decelerationMps2();}
         public String readyNode(){return profile().readyNode();}
+        public boolean phased(){return motionProfile!=null&&motionProfile.phaseVersion()==1;}
     }
     public record Port(String id,Region region,String node,Map<Integer,String> reverseRoutes)
     {public Port{id=identifier(id);Objects.requireNonNull(region);node=identifier(node);reverseRoutes=Map.copyOf(reverseRoutes);}}
@@ -85,16 +105,27 @@ public final class NervRouteDirectoryR52
     private final NervDynamicAirspaceR52 dynamicSpaces;
     private final Map<Leg,RampArc> rampArcs=new HashMap<>();
     private final Set<String> continuousLegs;
+    private final int schemaVersion;
+    private final Map<Integer,BankRole> bankRoles;
     private NervRouteDirectoryR52(long epoch,boolean installed,String fingerprint,Map<Integer,Unit> units,Map<String,Node> nodes,
-                                 Map<String,Resource> resources,Map<String,Leg> legs,Map<String,Route> routes,Map<String,Port> ports,NervDynamicAirspaceR52 dynamicSpaces)
+                                 Map<String,Resource> resources,Map<String,Leg> legs,Map<String,Route> routes,Map<String,Port> ports,NervDynamicAirspaceR52 dynamicSpaces,int schemaVersion,Map<Integer,BankRole> bankRoles)
     {
         require(epoch>0,"Root commissioning epoch required");this.epoch=epoch;this.installed=installed;this.fingerprint=fingerprint;
+        this.schemaVersion=schemaVersion;this.bankRoles=Map.copyOf(bankRoles);
         this.units=Map.copyOf(units);this.nodes=Map.copyOf(nodes);this.resources=Map.copyOf(resources);this.legs=Map.copyOf(legs);this.routes=Map.copyOf(routes);this.ports=Map.copyOf(ports);this.continuousLegs=routes.values().stream().filter(Route::continuousUpright).flatMap(r->r.legs().stream()).collect(java.util.stream.Collectors.toUnmodifiableSet());this.dynamicSpaces=Objects.requireNonNull(dynamicSpaces);validate();for(var domain:dynamicSpaces.domains())require(knowsDimension(domain.dimension()),"Dynamic SPACE domain must use an actual Root directory dimension");
         if(!dynamicSpaces.domains().isEmpty())for(var resource:resources.values())if(resource.kind()==ResourceKind.SPACE)require(NervDynamicAirspaceR52.canonicalBox(resource.id())!=null&&resource.component().equals(resource.id()),"Ground and dynamic air SPACE must use the same canonical32m identity");
     }
     public long epoch(){return epoch;}
     public boolean installed(){return installed;}
     public String fingerprint(){return fingerprint;}
+    public int schemaVersionR52(){return schemaVersion;}
+    public BankRole bankRoleR52(int bank){var role=bankRoles.get(bank);require(role!=null,"Undeclared launch bank");return role;}
+    public int bankForIntentR52(String intent){return bankRoles.values().stream().filter(r->r.intent().equals(intent)).findFirst().orElseThrow(()->new IllegalArgumentException("Undeclared departure intent")).bank();}
+    public void validateCompactLaunchContractR52()
+    {
+        require(schemaVersion==2&&bankForIntentR52("geofront")==1&&bankForIntentR52("surface")==2&&bankForIntentR52("hakone")==3,"Current compact launch contract requires explicit bank1=geofront, bank2=surface, bank3=hakone");
+        require(routes.values().stream().allMatch(Route::phased),"Current compact launch contract requires explicit stopped prelaunch/launch phases");
+    }
     public Unit unit(int variant){return units.get(variant);}
     public Node node(String id){return nodes.get(id);}
     public Leg leg(String id){return legs.get(id);}
@@ -150,6 +181,7 @@ public final class NervRouteDirectoryR52
                 if(prior!=null)require(prior.to().equals(leg.from())&&same(prior.evaTo().quaternion(),leg.evaFrom().quaternion()),"Disconnected endpoint or instantaneous body turn");
                 prior=leg;
             }
+            if(schemaVersion==2)require(route.phased(),"Current v2 directory requires explicit phase_version=1 and slow prelaunch");
             if(route.continuousUpright())validateContinuous(route);
             if(route.recovery())validateReverse(route);
             else
@@ -157,6 +189,11 @@ public final class NervRouteDirectoryR52
                 require(departures.add(route.variant()+"/"+route.bank()+"/"+route.lane()),"Duplicate unit/bank/lane departure");
                 validateDeparture(route);require(prior.to().equals(port.node()),"Departure is not bound to the physical intake endpoint");
             }
+        }
+        if(schemaVersion==2)
+        {
+            require(departures.size()==9&&routes.size()==18,"Explicit bank roles require all nine original-unit departures and nine complete recoveries");
+            for(var out:routes.values())if(!out.recovery())require(routes.values().stream().filter(back->back.reverseOf().equals(out.id())).count()==1,"Each departure requires exactly one original-unit reverse route");
         }
         for(var port:ports.values())
         {
@@ -181,7 +218,8 @@ public final class NervRouteDirectoryR52
             require(a.role()==Role.BANK&&b.role()==Role.BANK&&a.bank()==current&&b.bank()==current+1&&a.lane()==route.lane()&&b.lane()==route.lane(),"Banks must transfer serially 1->2->3 on explicit same-lane rails");current++;
         }
         require(current==route.bank(),"Departure skipped a serial bank");
-        if(route.continuousUpright()) {require(index<route.legs().size(),"Actual bank-to-port launch curve required");require(node(leg(route.legs().get(route.legs().size()-1)).to()).footFrame().translation().y>node(leg(route.legs().get(index)).from()).footFrame().translation().y,"Continuous launch must reach the actual higher port");require(route.region()==(route.bank()==2?Region.GEOFRONT:Region.SURFACE),"Wrong continuous bank region");return;}
+        var bankRole=bankRoleR52(route.bank());require(route.region()==bankRole.region(),"Route region differs from its explicit bank role");
+        if(route.continuousUpright()) {require(index<route.legs().size(),"Actual bank-to-port launch curve required");require(node(leg(route.legs().get(route.legs().size()-1)).to()).footFrame().translation().y>node(leg(route.legs().get(index)).from()).footFrame().translation().y,"Continuous launch must reach the actual higher port");return;}
         var sequence=new ArrayList<Motion>();
         for(;index<route.legs().size();index++)
         {
@@ -189,13 +227,13 @@ public final class NervRouteDirectoryR52
             if(m!=Motion.FOOT_BEARING_TURN){require(node(leg.to()).footFrame().translation().y>node(leg.from()).footFrame().translation().y,"Departure launch travel must rise");sequence.add(m);}
             if(m==Motion.LAUNCH_INCLINE)require(node(leg.to()).footFrame().translation().subtract(node(leg.from()).footFrame().translation()).horizontalDistanceSqr()>0,"Inclined launch has no actual horizontal track");
         }
-        require(sequence.equals(route.bank()==2?List.of(Motion.VERTICAL):List.of(Motion.VERTICAL,Motion.LAUNCH_INCLINE,Motion.VERTICAL)),"Wrong bank launch sequence");
-        require(route.region()==(route.bank()==2?Region.GEOFRONT:Region.SURFACE),"Bank2 returns to underground; bank1/3 to surface");
+        require(sequence.equals(bankRole.legacyLaunchSequence()),"Launch sequence differs from the explicit bank role");
     }
     private void validateReverse(Route route)
     {
         Route original=route(route.reverseOf());require(original!=null&&!original.recovery()&&original.variant()==route.variant()&&original.bank()==route.bank()
                 &&original.lane()==route.lane()&&original.region()==route.region()&&original.port().equals(route.port())&&original.legs().size()==route.legs().size(),"Recovery must bind the same unit/port and complete actual departure");
+        require(Objects.equals(original.motionProfile(),route.motionProfile()),"Recovery must retain the same stopped bank and explicit speed profiles");
         for(int i=0;i<route.legs().size();i++)
         {
             Leg back=leg(route.legs().get(i)),out=leg(original.legs().get(original.legs().size()-1-i));
@@ -213,10 +251,40 @@ public final class NervRouteDirectoryR52
         for(String id:route.legs()) {
             var current=leg(id);require(current.motion()!=Motion.FOOT_BEARING_TURN,"Continuous routes cannot contain stationary turn stations");
             require(fixed(basis,node(current.from()).footFrame().rotation())&&fixed(basis,node(current.to()).footFrame().rotation())&&fixed(relative,current.evaFrom().quaternion())&&fixed(relative,current.evaTo().quaternion()),"Continuous route changed prepared EVA/bearing orientation");
-            if(prior!=null)require(tangent(prior,1).distanceTo(tangent(current,0))<=1e-7,"Continuous route tangent is disconnected");
+            if(prior!=null&&!(route.phased()&&current.from().equals(route.readyNode())))require(tangent(prior,1).distanceTo(tangent(current,0))<=1e-7,"Continuous route tangent is disconnected");
             ready|=current.to().equals(route.readyNode());prior=current;
         }
         require(ready,"Explicit ready_node is not on this actual route");
+        if(route.phased())
+        {
+            var bank=node(route.readyNode());require(bank!=null&&bank.role()==Role.BANK&&bank.bank()==route.bank()&&bank.lane()==route.lane(),"READY must be the selected physical bank");
+            require(readyDistanceR53(route)>0&&readyDistanceR53(route)<routeLength(route),"Both stopped motion phases require actual nonzero travel");
+            if(!route.recovery())validateAscendingLaunchR53(route);
+        }
+    }
+    public double readyDistanceR53(Route route)
+    {
+        double metres=0;for(String id:route.legs()){var leg=leg(id);if(leg.from().equals(route.readyNode()))return metres;metres+=legLength(leg);if(leg.to().equals(route.readyNode()))return metres;}
+        throw new IllegalArgumentException("READY is not on actual route");
+    }
+    private void validateAscendingLaunchR53(Route route)
+    {
+        boolean launch=false,first=true;
+        for(String id:route.legs())
+        {
+            var leg=leg(id);if(leg.from().equals(route.readyNode()))launch=true;if(!launch)continue;
+            require(leg.rampProfile()==null&&(leg.motion()==Motion.VERTICAL||leg.motion()==Motion.LAUNCH_INCLINE),"Launch phase cannot contain bank transfer, original ramp or turn station");
+            var segments=leg.centreCurve()==null?List.of(new NervCentrelineCurveR52.Segment(NervCentrelineCurveR52.Type.LINE,List.of(node(leg.from()).footFrame().translation(),node(leg.to()).footFrame().translation()))):leg.centreCurve().segments();
+            for(var segment:segments)
+            {
+                var controls=segment.controls();
+                for(int i=1;i<controls.size();i++)require(controls.get(i).y>controls.get(i-1).y,"Every launch control derivative must strictly rise; horizontal/descent segments are forbidden");
+                boolean vertical=controls.stream().allMatch(v->v.x==controls.get(0).x&&v.z==controls.get(0).z);
+                require(!first||vertical,"Launch starts with an actual nonzero pure vertical segment");
+                require(!bankRoleR52(route.bank()).intent().equals("geofront")||vertical,"GeoFront launch must remain purely vertical");first=false;
+            }
+        }
+        require(!first,"Actual ascending launch phase required");
     }
     private static boolean fixed(Quaternionf a,Quaternionf b)
     {return a.x==b.x&&a.y==b.y&&a.z==b.z&&a.w==b.w||a.x==-b.x&&a.y==-b.y&&a.z==-b.z&&a.w==-b.w;}
@@ -302,7 +370,9 @@ public final class NervRouteDirectoryR52
     {
         require(!root.has("air_transport")&&!root.has("directory_fingerprint")&&!root.has("fingerprint"),
                 "Directory identity cannot contain its own fingerprint or dependent air manifest");
-        require(SCHEMA.equals(text(root,"schema"))&&"root".equals(text(root,"map_author")),"Root runtime-directory schema required; spatial draft is not a runtime installation");
+        String schema=text(root,"schema");int schemaVersion=EXPLICIT_BANK_SCHEMA.equals(schema)?2:SCHEMA.equals(schema)?1:0;
+        require(schemaVersion!=0&&"root".equals(text(root,"map_author")),"Root runtime-directory schema required; spatial draft is not a runtime installation");
+        var bankRoles=parseBankRolesR52(root,schemaVersion);
         String status=text(root,"status");require(status.equals("design")||status.equals("installed"),"Explicit design/installed status required");
         boolean installed=status.equals("installed");if(installed)require(text(root,"installation_receipt_sha256").matches("[0-9a-f]{64}"),"Explicit Root installation receipt required");
         long epoch=whole(root,"epoch");var units=new LinkedHashMap<Integer,Unit>();var nodes=new LinkedHashMap<String,Node>();var resources=new LinkedHashMap<String,Resource>();var legs=new LinkedHashMap<String,Leg>();var routes=new LinkedHashMap<String,Route>();var ports=new LinkedHashMap<String,Port>();
@@ -325,11 +395,25 @@ public final class NervRouteDirectoryR52
             var o=value.getAsJsonObject();var reverse=new LinkedHashMap<Integer,String>();for(var entry:o.getAsJsonObject("reverse_routes").entrySet()){int v=Integer.parseInt(entry.getKey());checkVariant(v);unique(reverse,v,entry.getValue().getAsString());}
             var p=new Port(text(o,"id"),Region.valueOf(text(o,"region")),text(o,"node"),reverse);unique(ports,p.id(),p);
         }
-        try{return new NervRouteDirectoryR52(epoch,installed,HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(root.toString().getBytes(StandardCharsets.UTF_8))),units,nodes,resources,legs,routes,ports,NervDynamicAirspaceR52.parse(root));}
+        try{return new NervRouteDirectoryR52(epoch,installed,HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(root.toString().getBytes(StandardCharsets.UTF_8))),units,nodes,resources,legs,routes,ports,NervDynamicAirspaceR52.parse(root),schemaVersion,bankRoles);}
         catch(java.security.NoSuchAlgorithmException failure){throw new IllegalStateException(failure);}
     }
+    private static Map<Integer,BankRole> parseBankRolesR52(JsonObject root,int version)
+    {
+        if(version==1){require(!root.has("bank_roles")&&!root.has("bank_roles_version"),"Legacy v1 cannot silently reinterpret explicit bank roles");return Map.of(1,new BankRole(1,"surface"),2,new BankRole(2,"geofront"),3,new BankRole(3,"hakone"));}
+        require(integer(root,"bank_roles_version")==1&&root.has("bank_roles")&&root.get("bank_roles").isJsonArray(),"Versioned explicit bank roles required");
+        var roles=new LinkedHashMap<Integer,BankRole>();var intents=new HashSet<String>();
+        for(var raw:root.getAsJsonArray("bank_roles")){require(raw.isJsonObject(),"Explicit bank role object required");var row=raw.getAsJsonObject();require(row.keySet().equals(Set.of("bank","intent")),"Exact bank role fields required");var role=new BankRole(integer(row,"bank"),text(row,"intent"));unique(roles,role.bank(),role);require(intents.add(role.intent()),"Each departure intent must name exactly one bank");}
+        require(roles.keySet().equals(Set.of(1,2,3))&&intents.equals(Set.of("surface","geofront","hakone")),"Complete bijective bank role declaration required");return Map.copyOf(roles);
+    }
     private static MotionProfile motionProfile(JsonObject route)
-    {if(!route.has("motion_profile"))return null;require(route.get("motion_profile").isJsonObject(),"Explicit motion_profile object required");var o=route.getAsJsonObject("motion_profile");require(o.keySet().equals(Set.of("type","cruise_mps","acceleration_mps2","deceleration_mps2","ready_node")),"Complete explicit continuous profile fields required");return new MotionProfile(text(o,"type"),o.get("cruise_mps").getAsDouble(),o.get("acceleration_mps2").getAsDouble(),o.get("deceleration_mps2").getAsDouble(),text(o,"ready_node"));}
+    {
+        if(!route.has("motion_profile"))return null;require(route.get("motion_profile").isJsonObject(),"Explicit motion_profile object required");var o=route.getAsJsonObject("motion_profile");
+        var fields=new HashSet<>(Set.of("type","cruise_mps","acceleration_mps2","deceleration_mps2","ready_node"));int version=0;SpeedProfile prelaunch=null;
+        if(o.has("phase_version")){fields.add("phase_version");fields.add("prelaunch");version=integer(o,"phase_version");require(version==1&&o.has("prelaunch")&&o.get("prelaunch").isJsonObject(),"Explicit phase_version=1 and prelaunch required");var p=o.getAsJsonObject("prelaunch");require(p.keySet().equals(Set.of("cruise_mps","acceleration_mps2","deceleration_mps2")),"Exact prelaunch profile fields required");prelaunch=new SpeedProfile(p.get("cruise_mps").getAsDouble(),p.get("acceleration_mps2").getAsDouble(),p.get("deceleration_mps2").getAsDouble());}
+        require(o.keySet().equals(fields),"Complete explicit continuous profile fields required");
+        return new MotionProfile(text(o,"type"),o.get("cruise_mps").getAsDouble(),o.get("acceleration_mps2").getAsDouble(),o.get("deceleration_mps2").getAsDouble(),text(o,"ready_node"),version,prelaunch);
+    }
     private static Rotation rotation(JsonArray a){require(a!=null&&a.size()==4,"Measured quaternion required");return new Rotation(a.get(0).getAsFloat(),a.get(1).getAsFloat(),a.get(2).getAsFloat(),a.get(3).getAsFloat());}
     private static String text(JsonObject o,String key){require(o.has(key)&&o.get(key).isJsonPrimitive()&&o.getAsJsonPrimitive(key).isString(),"Explicit string required: "+key);return o.get(key).getAsString();}
     private static long whole(JsonObject o,String key){require(o.has(key)&&o.getAsJsonPrimitive(key).isNumber(),"Explicit integer required: "+key);return o.get(key).getAsBigDecimal().longValueExact();}

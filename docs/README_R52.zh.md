@@ -1,13 +1,29 @@
-# R52 原地图快修版（2026-10-13）
+# R53 地图迁移与运输验收包
 
-当前版本使用金字塔下沉前的原 R50 世界，保留已经授权的旧机库小修复。新地图重构取消并转为代办。源码位于 `C:/Users/liboy/.codex/worktrees/r51-nonmap/eva`，当前入口以 `.Codex/R52_ACTIVE_CURRENT.json` 的 `authoritative_latest` 为准。
+2026-10-14 本批为私有固定人工验收版本。已完成代码审查与构建验证；实际运行功能、画面及性能仍待人工验收。本机 CPU 降频期间停止额外游戏压力检查，已有观察记录保留。
 
-已安装前一批回退修复包时，正常停服、退出游戏，将两端 `mods` 中旧 Project SEELE JAR 移出，再放入 `D:/eva/delivery/Project_SEELE_Encore_R52_NonMapUnified_20261013.jar`。每端仅保留一个该模组 JAR；沿用当前试玩存档、配置、玩家、交通和任务进度。
+本批客户端和服务端包含同一份迁移世界，存档名为 `SEELE_R52_WORLD`。Minecraft 1.20.1、Forge 47.4.10、Java 17 保持不变。请解压到新目录，保留原试玩目录备份，使用本批存档；仅更换 JAR 不能迁移旧地图。
 
-新安装可使用同批 `Project_SEELE_Encore_R52_NonMapUnified_20261013_Client_PCL.zip` 与 `Project_SEELE_Encore_R52_NonMapUnified_20261013_Server.zip`。完整服务器包的世界名为 `SEELE_R50_WORLD`。Minecraft 1.20.1 / Forge 47.4.10 / Java 17 保持。
+本轮范围包括九条发射通道、机库整备与回库、原飞机空运、全地下通道的完整通行宽度、金字塔十个实际楼面的完整回型通道和双主梯互通，以及废弃通道、路口和旧机库造型的完整清理。GeoFront 仅金字塔总部站位于其地表以下，列车从地表直接下降进站后再升回地表；本轮也检查实际快速运输。炮库作战与无关全局配置留到之后。
 
-修复前两使徒被新地图远端路线阻挡的问题，以及插入栓桥侧缺失贴图和旧方块三机库配色。三门归位、幽灵碰撞清理、楼梯无栏杆和原地下运输修复全部保留，数值平衡未改。
+人工湖与金字塔为同向正方形，湖接西南角并扩大交叠。完整机库、原准备坡道和 Terminal Dogma 向下迁移。金字塔两部主梯都连接机库，原办公室短程电梯保留。
 
-源码增量编译、完整 Forge 重混淆、编译分支检查和实际交付包逐成员回读已通过；未再启动游戏，不宣称实际出击、最终画面或性能已经验收。[发行说明](R52_RELEASE_NOTES.zh.md)和[人工检查](R52_USER_ACCEPTANCE.zh.md)使用同一口径。
+三个发射区在机库内紧凑排列，每区三机独立线路。一号直升地下地表，二号先垂直上升再斜接原城市井，三号先垂直上升再持续斜升至箱根。整备低速移动，机体在选定区停稳、换轨后高速发射。
 
-已完成非地图改动的统一范围见 [收束说明](R52_NONMAP_INTEGRATION_20261013.zh.md)。
+管理员公开指令如下，机型可用 `unit00`、`unit01` 或 `unit02`：
+
+```text
+/seele tp
+/seele eva status all
+/seele eva prepare unit00 geofront
+/seele eva prepare unit00 surface
+/seele eva prepare unit00 hakone
+/seele eva cancel unit00
+/seele eva launch unit00
+/seele eva recover unit00
+/nerv transport status
+```
+
+先正常安排原驾驶员登机，再选择整备目的地；停稳后发射。取消和回库使用实际机构路线。`/seele tp` 列表与到达点来自本批实际存档，可点击列表中的地点。详细步骤见 `R52_USER_ACCEPTANCE.zh.md`。
+
+本说明描述安装和操作。交付回读收据核对双端存档、JAR、运行资产及三份导航缓存；字节一致不代表实际功能或画面已经验收。请优先检查原驾驶员登机、封舱和吊机送栓，再检查乘梯及本轮地图。

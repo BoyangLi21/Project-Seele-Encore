@@ -30,13 +30,21 @@ public final class NervMechanicalRailBindingR52 {
         return found;
     }
     public static Spec parse(JsonObject row,String resource,NervRouteDirectoryR52 d,List<NervRouteNativeR52.Cell> cells) {
-        var allowed=Set.of("kind","leg","source_sha256","guide_source_sha256","controller_uuid","foundation_top_m","floor_overlay_sha256");
+        var allowed=Set.of("kind","leg","source_sha256","guide_source_sha256","controller_uuid","foundation_top_m","floor_overlay_sha256","service_overlay_sha256","level_overlay_sha256","deep_frame_sha256");
         if(!allowed.containsAll(row.keySet()))throw new IllegalArgumentException("Unknown mechanical rail source field");
         var s=new Spec(Kind.valueOf(row.get("kind").getAsString()),row.get("leg").getAsString(),row.get("source_sha256").getAsString(),row.get("guide_source_sha256").getAsString(),row.has("controller_uuid")&&!row.get("controller_uuid").isJsonNull()?UUID.fromString(row.get("controller_uuid").getAsString()):null,row.has("foundation_top_m")&&!row.get("foundation_top_m").isJsonNull()?row.get("foundation_top_m").getAsDouble():null);
         boolean continuous=d.routes().values().stream().anyMatch(r->r.continuousUpright()&&r.legs().contains(s.leg()));
         if(row.has("floor_overlay_sha256")) {
             if(s.kind()!=Kind.LEGACY_RUNNING_HEAD||row.get("floor_overlay_sha256").isJsonNull()||!NervLegacyCarrierRideR52.FLOOR_OVERLAY_SHA.equals(row.get("floor_overlay_sha256").getAsString()))throw new IllegalArgumentException("Exact independent original floor overlay belongs only to a legacy running head");
         } else if(continuous&&s.kind()==Kind.LEGACY_RUNNING_HEAD)throw new IllegalArgumentException("Continuous original running head requires its actual floor overlay source");
+        if(s.kind()==Kind.LEGACY_RUNNING_HEAD)
+        {if(!row.has("service_overlay_sha256")||!NervLegacyServiceBypassR52.SOURCE_SHA.equals(row.get("service_overlay_sha256").getAsString()))throw new IllegalArgumentException("Exact selected original service-pipe bypass source is required");}
+        else if(row.has("service_overlay_sha256"))throw new IllegalArgumentException("Service-pipe overlay belongs only to the original running-head binding");
+        if(s.kind()==Kind.LEGACY_RUNNING_HEAD)
+        {if(!row.has("level_overlay_sha256")||!NervLegacyCompactLevelR52.SOURCE_SHA.equals(row.get("level_overlay_sha256").getAsString()))throw new IllegalArgumentException("Exact selected finite compact level rail source is required");}
+        else if(row.has("level_overlay_sha256"))throw new IllegalArgumentException("Compact level overlay belongs only to the original running-head binding");
+        if(s.kind()==Kind.LEGACY_RUNNING_HEAD){if(!row.has("deep_frame_sha256")||!NervLegacyDeepFrameR53.SOURCE_SHA.equals(row.get("deep_frame_sha256").getAsString()))throw new IllegalArgumentException("Exact rigid deep frame source required");}
+        else if(row.has("deep_frame_sha256"))throw new IllegalArgumentException("Deep frame belongs only to original running steel");
         var leg=d.leg(s.leg());
         if(leg==null||s.leg().endsWith("/reverse")||!leg.rails().equals(List.of(resource)))throw new IllegalArgumentException("Unique canonical mechanical rail path/resource required");
         var uses=new HashSet<String>();
@@ -96,7 +104,7 @@ public final class NervMechanicalRailBindingR52 {
                 case UPRIGHT_CAPTURED_GUIDEWAY -> s.sourceSha().equals(NervUprightGuidewayR52.sourceSha256())&&NervUprightGuidewayR52.enabledForDirectoryR52(l,d)&&NervUprightGuidewayR52.matchesDirectory(d)&&NervUprightGuidewayR52.pathAnchorsBearR52(l,s.leg());
                 case FIXED_FOOT_GUIDE -> s.sourceSha().equals(NervFixedFootGuidesR52.SOURCE_SHA)&&NervFixedFootGuidesR52.enabledForDirectoryR52(l,d)&&NervFixedFootGuidesR52.matchesDirectory(d)&&NervFixedFootGuidesR52.pathAnchorsBearR52(l,s.leg());
                 case FOOT_TURN_STATION -> {var spec=stationSpec(d,s);var actor=NervFootGuideStationR52.controller(l,spec);yield s.sourceSha().equals(NervFootGuideDockR52.SOURCE_SHA)&&actor!=null&&actor.isAlive()&&actor.getUUID().equals(s.controller())&&NervFootGuideStationR52.finiteFeetBear(l,spec);}
-                case LEGACY_RUNNING_HEAD -> s.sourceSha().equals(NervLegacyCarrierRideR52.SOURCE_SHA)&&(NervFixedFootGuidesR52.enabledForDirectoryR52(l,d)||NervUprightGuidewayR52.enabledForDirectoryR52(l,d))&&l.getEntity(s.controller()) instanceof NervCarrierPlatformEntity g&&g.isAlive()&&g.isRestraintGantry()&&g.hasDeclaredMachineFrameR52()&&g.lowerFrameDeclaredR52()&&g.declaredServiceFootDriveR52()!=null&&g.getUnitVariant()==variant(d,s.leg());
+                case LEGACY_RUNNING_HEAD -> s.sourceSha().equals(NervLegacyCarrierRideR52.SOURCE_SHA)&&NervLegacyServiceBypassR52.nativeFacesBear(l)&&(NervFixedFootGuidesR52.enabledForDirectoryR52(l,d)||NervUprightGuidewayR52.enabledForDirectoryR52(l,d))&&l.getEntity(s.controller()) instanceof NervCarrierPlatformEntity g&&g.isAlive()&&g.isRestraintGantry()&&g.hasDeclaredMachineFrameR52()&&g.lowerFrameDeclaredR52()&&g.declaredServiceFootDriveR52()!=null&&g.getUnitVariant()==variant(d,s.leg());
             };
         } catch(IOException|IllegalArgumentException|IllegalStateException invalid) {return false;}
     }

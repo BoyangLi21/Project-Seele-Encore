@@ -1,11 +1,14 @@
 package com.projectseele.visual;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.arguments.StringArgumentType;
 import com.projectseele.ProjectSeele;
 import com.projectseele.world.FacilitySchemaV2;
 import com.projectseele.world.RegionalGatewayDirector;
+import com.projectseele.world.NervTravelDirectoryR52;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
@@ -42,17 +45,32 @@ public final class SeeleTravelCommandsR43
     @SubscribeEvent public static void register(RegisterCommandsEvent event)
     {
         var root=Commands.literal("seele").requires(s->s.hasPermission(2));
-        root.then(Commands.literal("enter").executes(c->teleport(c.getSource(),DESTINATIONS.get(0))));
+        root.then(Commands.literal("enter").executes(c->teleport(c.getSource(),"entrance")));
         var travel=Commands.literal("tp").executes(c->list(c.getSource()));
-        travel.then(Commands.literal("hanger").executes(c->EvaLogisticsCommands.enterHangar(c.getSource())));
-        for(var destination:DESTINATIONS)travel.then(Commands.literal(destination.key()).executes(c->teleport(c.getSource(),destination)));
+        travel.then(Commands.argument("destination",StringArgumentType.word())
+                .suggests((context,builder)->SharedSuggestionProvider.suggest(destinations(context.getSource()).stream().map(Destination::key),builder))
+                .executes(c->teleport(c.getSource(),StringArgumentType.getString(c,"destination"))));
         root.then(travel);event.getDispatcher().register(root);
+    }
+    private static List<Destination> destinations(CommandSourceStack source)
+    {
+        var level=source.getServer().getLevel(FacilitySchemaV2.DIMENSION);
+        if(NervTravelDirectoryR52.applies(level))
+        {
+            var directory=NervTravelDirectoryR52.installed(level);
+            return directory==null?List.of():directory.arrivals().stream()
+                    .map(a->new Destination(a.key(),a.label(),a.position(),a.yaw())).toList();
+        }
+        var result=new java.util.ArrayList<>(DESTINATIONS);
+        result.add(new Destination("hangar","EVA 机库登机廊",Vec3.ZERO,0));
+        return List.copyOf(result);
     }
     private static int list(CommandSourceStack source)
     {
+        var destinations=destinations(source);
+        if(destinations.isEmpty())return unavailable(source);
         source.sendSuccess(()->Component.literal("SEELE 传送地点（可点击）："),false);
-        source.sendSuccess(()->link("hanger","EVA 机库登机廊"),false);
-        for(var destination:DESTINATIONS)source.sendSuccess(()->link(destination.key(),destination.label()),false);
+        for(var destination:destinations)source.sendSuccess(()->link(destination.key(),destination.label()),false);
         return 1;
     }
     private static Component link(String key,String label)
@@ -62,12 +80,42 @@ public final class SeeleTravelCommandsR43
     }
     public static int teleport(CommandSourceStack source,Destination destination)throws CommandSyntaxException
     {
+        return teleport(source,destination.key());
+    }
+    public static int teleport(CommandSourceStack source,String key)throws CommandSyntaxException
+    {
+        key=NervTravelDirectoryR52.canonicalKey(key);
         var player=source.getPlayerOrException();var level=source.getServer().getLevel(FacilitySchemaV2.DIMENSION);
         if(level==null||!RegionalGatewayDirector.active(level))
         {
             source.sendFailure(Component.literal("当前存档尚未安装这套 NERV 设施，请先导入配套 SEELE 存档。"));return 0;
         }
+        Destination destination=null;
+        if(NervTravelDirectoryR52.applies(level))
+        {
+            var directory=NervTravelDirectoryR52.installed(level);
+            if(directory==null)return unavailable(source);
+            var arrival=directory.arrival(key);
+            if(arrival!=null)destination=new Destination(arrival.key(),arrival.label(),arrival.position(),arrival.yaw());
+        }
+        else
+        {
+            if(key.equals("hangar"))return EvaLogisticsCommands.enterHangar(source);
+            for(var arrival:DESTINATIONS)if(arrival.key().equals(key)){destination=arrival;break;}
+        }
+        if(destination==null)
+        {source.sendFailure(Component.literal("当前地图没有这个到达入口，请用 /seele tp 查看已安装地点。"));return 0;}
+        return arrive(source,player,level,destination);
+    }
+    private static int unavailable(CommandSourceStack source)
+    {source.sendFailure(Component.literal("新地图的到达目录尚未安装或与当前地图不一致，请完成配套地图安装。"));return 0;}
+    private static int arrive(CommandSourceStack source,net.minecraft.server.level.ServerPlayer player,
+            net.minecraft.server.level.ServerLevel level,Destination destination)
+    {
         Vec3 p=destination.point();BlockPos cell=BlockPos.containing(p);
+        if(cell.getY()<=level.getMinBuildHeight()||cell.getY()+2>=level.getMaxBuildHeight()
+                ||!level.getWorldBorder().isWithinBounds(cell))
+        {source.sendFailure(Component.literal("到达入口超出当前地图范围，未执行传送。"));return 0;}
         for(int x=(cell.getX()-1)>>4;x<=(cell.getX()+1)>>4;x++)
             for(int z=(cell.getZ()-1)>>4;z<=(cell.getZ()+1)>>4;z++)level.getChunk(x,z);
         AABB body=new AABB(p.x-.30,p.y+.01,p.z-.30,p.x+.30,p.y+1.80,p.z+.30);

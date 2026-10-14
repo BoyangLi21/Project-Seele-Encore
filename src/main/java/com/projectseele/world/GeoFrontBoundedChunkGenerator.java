@@ -10,12 +10,15 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.core.Holder;
 import net.minecraft.server.level.WorldGenRegion;
 import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.LevelHeightAccessor;
+import net.minecraft.world.level.NoiseColumn;
 import net.minecraft.world.level.StructureManager;
 import net.minecraft.world.level.biome.BiomeManager;
 import net.minecraft.world.level.biome.BiomeSource;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.GenerationStep;
+import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseBasedChunkGenerator;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
@@ -144,8 +147,30 @@ public final class GeoFrontBoundedChunkGenerator
                 .thenApply(generated ->
                 {
                     this.carveBoundedBaseline(generated);
+                    GeoFrontHeightR52.fillFoundation(generated);
                     return generated;
                 });
+    }
+
+    /** The accessor controls the added foundation; generator noise and
+     * surface-rule coordinates retain their original -672..320 interval. */
+    @Override
+    public NoiseColumn getBaseColumn(int x,int z,LevelHeightAccessor bounds,RandomState state)
+    {
+        return GeoFrontHeightR52.extendColumn(super.getBaseColumn(x,z,bounds,state),bounds);
+    }
+
+    @Override
+    public int getBaseHeight(int x,int z,Heightmap.Types type,LevelHeightAccessor bounds,RandomState state)
+    {
+        if(bounds.getMaxBuildHeight()<=GeoFrontHeightR52.LEGACY_MIN_Y)
+            return bounds.getMaxBuildHeight()>Math.max(GeoFrontHeightR52.MIN_Y,bounds.getMinBuildHeight())
+                    ?bounds.getMaxBuildHeight():bounds.getMinBuildHeight();
+        int from=Math.max(GeoFrontHeightR52.LEGACY_MIN_Y,bounds.getMinBuildHeight());
+        // The vanilla no-match result otherwise uses the expanded accessor
+        // minimum even though its sampled noise still starts at -672.
+        var legacy=LevelHeightAccessor.create(from,Math.max(0,bounds.getMaxBuildHeight()-from));
+        return super.getBaseHeight(x,z,type,legacy,state);
     }
 
     /**

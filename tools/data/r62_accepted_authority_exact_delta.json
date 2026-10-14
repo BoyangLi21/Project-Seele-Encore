@@ -1,0 +1,136 @@
+{
+  "schema": "projectseele.r62.exact-publisher-deadband-accepted-authority-delta.v1",
+  "status": "PINNED_ACTUAL62_AWAITING_ROOT_REVIEW",
+  "case": "r62-reviewed-publisher-deadband-preserve-epoch53-and-insert42",
+  "current_build_receipt": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate62\\BUILD_RECEIPT.json",
+    "sha256": "3320aef7b9c63c948a04cea6ce56db8659089b986bb6e4b82beb2603577fb9b7"
+  },
+  "current62_jar_sha256": "d1b4e41f51cd097c0ac23a5349e372f725b4cfb6d188dc559179bfb7caec04af",
+  "previous_build_receipt": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate61\\BUILD_RECEIPT.json",
+    "sha256": "09176ba0786c95e504a53e696e5a629823cfb236811f5f77b74245da6e01ee79"
+  },
+  "previous61_jar_sha256": "a10e6686c4f553c142ee4946c3410e257e1e9358aa53af3bb31c39a8d201d59f",
+  "previous_pipeline": {
+    "path": "D:\\eva\\artifacts\\map_complete_20261013\\current_runtime_bundle_release61_accepted_authority_final\\CURRENT_BUNDLE_PIPELINE_RECEIPT.json",
+    "sha256": "0b041e4923795a82a56fed63deb0e739b02e96bda2e1dd1cac2c8ecbd6b4e32d"
+  },
+  "previous_compatibility": {
+    "path": "D:\\eva\\artifacts\\map_complete_20261013\\current_runtime_bundle_release61_accepted_authority_final\\CURRENT_R61_ACCEPTED_AUTHORITY_COMPATIBILITY.json",
+    "sha256": "0cf526933d65fd51aa6f485a780d6c5f74139b143f11c6be09fa16449b642a0d"
+  },
+  "historical61_source_association": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\delivery_finish\\r61_proposals\\actual61_fresh\\CURRENT61_SOURCE_ASSOCIATION.json",
+    "sha256": "032eab3c864a4cd4701f08c70eb6cdc47154db40654f4bb29749c0a553628cfd"
+  },
+  "historical61_mechanical_loader": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\delivery_finish\\r61_proposals\\actual61_fresh\\CURRENT61_MECHANICAL_LOADER_CHECK.json",
+    "sha256": "361760ce43448b4e7bc98f8983d2520cdf218f742384332167747a211d03220e"
+  },
+  "source_before": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate61\\SOURCE_BEFORE.json",
+    "sha256": "9229005e1734d822f32e7da92b905a673d4bd0c3928a4a76014b35b04ab31a5f"
+  },
+  "source_after": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate62\\SOURCE_BEFORE.json",
+    "sha256": "20151b91be3289b4c96e9d3c2ee6197c90de4995e2eb2b3e61cc8ffe3e4f57c2"
+  },
+  "named_before": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate61\\NAMED_PRODUCTION_CLASSES.json",
+    "sha256": "177425da989082190a0af651d59c06856b0c6798c5f52287eb38e52988270eb7"
+  },
+  "named_after": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate62\\NAMED_PRODUCTION_CLASSES.json",
+    "sha256": "577c05fdbe766b1dc2e4416b952b4a257aa61bdfe83ca36622bef4cc61791c20"
+  },
+  "source_delta": {
+    "src/main/java/com/projectseele/entity/EntryPlugCarrierEntity.java": {
+      "before_sha256": "de6c00fe00f727378f08056c37cfe8c2c41ecf331e0ff5a0c3dcddc8e97b1327",
+      "after_sha256": "da6839645781f346fde7348c010195d15d1120aa81248143621ee9456032842c"
+    }
+  },
+  "expected_named_delta": [
+    "com/projectseele/entity/EntryPlugCarrierEntity.class"
+  ],
+  "expected_jar_delta": [
+    "META-INF/MANIFEST.MF",
+    "com/projectseele/entity/EntryPlugCarrierEntity.class"
+  ],
+  "named_delta": {
+    "com/projectseele/entity/EntryPlugCarrierEntity.class": {
+      "before_sha256": "7d2e96a35d245148a8f8895dc31673a4a0ab05ace1fb3da5d237c7ce5836dc64",
+      "after_sha256": "056dae5309b99f3e7e33adbc7c03cd676d817a3c428b2b22be8cc5933834c3bb"
+    }
+  },
+  "jar_delta": {
+    "META-INF/MANIFEST.MF": {
+      "before_sha256": "6b993e06a8dd3fd3294ed17f020174e70a01b925bc417b34fcbc3d7fa9361825",
+      "after_sha256": "54f0bb2329c632d0535d4f07f9daf138755fba5dd990fef3d8dbb04aa91a9950"
+    },
+    "com/projectseele/entity/EntryPlugCarrierEntity.class": {
+      "before_sha256": "4aae7624cfcf9eefe56832940098c90f97fc7342d217897954588f5582a1bf25",
+      "after_sha256": "17616cfed99e7502a1833304d1a2ad217cab359d471c623827cf4f06315f3779"
+    }
+  },
+  "source_mechanical_crane_r61": {
+    "source": {
+      "member": "assets/projectseele/eva/actual_crane_procedural_triangles_r52.json.gz",
+      "source_path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\src\\main\\resources\\assets\\projectseele\\eva\\actual_crane_procedural_triangles_r52.json.gz",
+      "source_gzip_sha256": "a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b",
+      "source_json_sha256": "6e2f2aba5d3f70ebd418ad0606394a86c9b21bf049eb65bd9425d124de25f8aa",
+      "source_geometry_delta": true,
+      "model_scope": "Only reviewed top motors and first hose; all other parts/anchors unchanged"
+    },
+    "actual_jar_readbacks": {
+      "gzip_sha256": "a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b",
+      "json_sha256": "6e2f2aba5d3f70ebd418ad0606394a86c9b21bf049eb65bd9425d124de25f8aa"
+    },
+    "exact_source_readbacks": true
+  },
+  "root_install_receipt": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\prepare_insert43_witness_r61\\ROOT_INSTALLED_PUBLISHER_FIX_R62.json",
+    "sha256": "8596150307470837883ff9c2298f8a915d06296bdb0732063d2ef68efa7a04f8"
+  },
+  "deadband_proof": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\prepare_insert43_witness_r61\\EXACT_DEADBAND_NATIVE_PROOF_AND_CANDIDATE.json",
+    "sha256": "3297af7111a1a86827cc8351efdafd2d61412348709caa20321793352f39a955"
+  },
+  "pure_java_deadband_regression": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\prepare_insert43_witness_r61\\PURE_JAVA_DEADBAND_AND_FLOAT_ROUNDTRIP_CHECKS.json",
+    "sha256": "75332b22a1ac98819fdb0c47667d8d9d2e27bea301b1f6479d5c910ab45eb179"
+  },
+  "normal_saved_frontier": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\transit_finish\\prepare_insert43_witness_r61\\CURRENT61_NORMAL_SAVE_FRONTIER_FOR62.json",
+    "sha256": "6324a54c18e9d23d350e2b356cfbf8e77d61cd70f950e79a4a33ad8fdac7f3a3"
+  },
+  "saved_data_sha256": "15a910e8920f88b8dab1dbb44d7f856c84fd87c59514c0b22c0c16e3781c8df0",
+  "jobs_snbt_sha256": "0f699bb784fc20a30543134b39c384443b5525debaa43a3fb6fd67bf34ea051b",
+  "normal_exit61": {
+    "path": "D:\\eva\\artifacts\\map_complete_20261013\\native_client_current61\\RESULT.json",
+    "sha256": "70464546e3db5e914cebde47b88d2a8f85ebabdb9b87c0dd13e6f51b12229000"
+  },
+  "accepted_authority": {
+    "epoch": 53,
+    "directory_fingerprint": "f70fceb95ee4ec70d075208ad6538383c3e599fef409f42aefb5b8f0c3c54f23",
+    "bundle_relative": "ROOT_ASSEMBLY_BUNDLE.json",
+    "bundle_sha256": "098081c5afbd481732937e0079da4457f1dfabb822f52d509cbfdb36012ece85",
+    "guide_sha256": "28201ce1bbdca6b742b925cb6a2675b8a895b47bec6b122bfcb86e48e2d3eee8"
+  },
+  "behavior_delta": {
+    "publisher_noop_translation_squared_before": "<= 1/(4096*4096)",
+    "publisher_noop_translation_squared_after": "< 1e-8",
+    "publisher_noop_rotation_degrees_before": "<= 0.01",
+    "publisher_noop_rotation_degrees_after": "< 0.01",
+    "mapped_same_postcondition_changed": false,
+    "geometry_or_clock_changed": false,
+    "collision_or_seat_proof_loosened": false
+  },
+  "mechanical_geometry_delta_from60_retained": true,
+  "mechanical_geometry_changed_from61": false,
+  "all_geometry_equal_from60": false,
+  "native62_pass_imported": false,
+  "native62_functional_pass": false,
+  "world_written": false,
+  "geometry_producer_classes_and_all_jar_resources_byteexact_from61": true
+}

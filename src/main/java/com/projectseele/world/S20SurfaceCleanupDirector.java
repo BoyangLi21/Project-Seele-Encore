@@ -38,6 +38,7 @@ public final class S20SurfaceCleanupDirector
 
     public static void tick(MinecraftServer server)
     {
+        if(NervLegacyGenerationGuardR52.retired(server))return;
         if (!FacilityWorldPolicy.isS20Rebuild(server)
                 || server.getTickCount() % PHASE_INTERVAL_TICKS != 0)
         {

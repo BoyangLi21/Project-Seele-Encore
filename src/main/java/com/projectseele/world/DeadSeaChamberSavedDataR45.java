@@ -62,17 +62,18 @@ public final class DeadSeaChamberSavedDataR45 extends SavedData
             throw new IllegalStateException("Foreign or incomplete highest-room chamber authority");
         var positions=new java.util.HashSet<BlockPos>();
         for(Image image:images)if(!positions.add(image.pos))throw new IllegalStateException("Duplicate chamber image");
+        var art=images.stream().filter(i->i.pos.equals(original(30,-322,339))).findFirst().orElseThrow();
+        boolean originalWhiteTree=art.nbt!=null&&"tree".equals(art.nbt.getString("Artwork"));
         for(int x=32;x<=34;x++)for(int y=-329;y<=-327;y++)
         {
             BlockPos cell=original(x,y,340);
             var image=images.stream().filter(i->i.pos.equals(cell)).findFirst().orElseThrow();
-            // R52's explicitly translated highest room owns the installed black
-            // wall image. The untransferred R45 chamber retains its white wall.
-            if(!image.state.is(frameOffsetY==-93?Blocks.BLACK_CONCRETE:Blocks.WHITE_CONCRETE)||image.nbt!=null)
+            // A rigidly moved original room retains its white wall and Tree.
+            // The earlier explicitly authored black/ink variant remains compatible.
+            if(!image.state.is(frameOffsetY==-93&&!originalWhiteTree?Blocks.BLACK_CONCRETE:Blocks.WHITE_CONCRETE)||image.nbt!=null)
                 throw new IllegalStateException("Foreign portal image");
         }
-        var art=images.stream().filter(i->i.pos.equals(original(30,-322,339))).findFirst().orElseThrow();
-        if(images.size()!=10||art.nbt==null||!(frameOffsetY==-93?"tree_ink":"tree").equals(art.nbt.getString("Artwork"))
+        if(images.size()!=10||art.nbt==null||!(frameOffsetY==-93&&!originalWhiteTree?"tree_ink":"tree").equals(art.nbt.getString("Artwork"))
                 ||!"projectseele:wall_artwork".equals(art.nbt.getString("id"))
                 ||!"projectseele:wall_artwork".equals(BuiltInRegistries.BLOCK.getKey(art.state.getBlock()).toString())
                 ||art.nbt.getInt("x")!=30||art.nbt.getInt("y")!=-322+frameOffsetY||art.nbt.getInt("z")!=339)

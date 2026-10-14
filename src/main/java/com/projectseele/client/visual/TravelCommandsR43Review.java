@@ -43,6 +43,8 @@ public final class TravelCommandsR43Review
         {
             if(++age>2200)throw new IllegalStateException("Travel review deadline");
             if(age<100)return;
+            if(com.projectseele.world.NervTravelDirectoryR52.applies(server.getLevel(FacilitySchemaV2.DIMENSION)))
+                throw new IllegalStateException("Legacy R43 fixed-arrival review cannot validate a migrated map; use the installed arrival directory and current-map acceptance");
             if(age==100)
             {
                 var root=server.getCommands().getDispatcher().getRoot().getChild("seele");

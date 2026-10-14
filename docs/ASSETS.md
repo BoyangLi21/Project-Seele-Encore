@@ -432,3 +432,8 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 - R47 零号机与二号机手部适配复用已有 MakeHuman CC0 派生手面，按各自腕部局部坐标同时迁移骨架、逆绑定、蒙皮、手指控制与持握架。没有将初号机角度直接套在不同的手骨上。既有 EVA 机体与纹理许可保持；完整模块接入见 `tools/reuse_hand_module_r47.py`。
 - R47 曲面盾牌和同步实验栓支架为本项目原创程序网格及贴图，分别由 `tools/build_yashima_shield_r47.py`、`tools/build_synch_cradle_r47.py` 生成。巨盾造型参考 TV 第六话的比例和受力方式，支架是按现有插入栓接口设计的游戏设施；没有复制原画为纹理。
 - 萨基尔原有变形缓存重绑只修正元数据可移植化造成的字节指纹差异。严格证明网格/UV/蒙皮数据与全部变形帧未改变；没有放松运行时指纹验证。
+
+## R53 发射轨道电流与摩擦
+
+- `launch_electric_burst_r53.ogg` 与三段 `launch_rail_friction_r53_*.ogg` 为本项目原创数学合成，没有采样录音、官方音轨或角色配音。生成器为 `tools/build_launch_feedback_r53.py`，使用固定随机种子、带限噪声、低频衰减及有限隧道反射；48 kHz 单声道用于游戏内定位。
+- 文件哈希、时长和解码测量见 `assets/projectseele/audio/launch_feedback_r53.json`。启动电流声只绑定正式发射的首次实际运动提交；摩擦声与火花绑定真实轨道接触点和实际速度。离线解码通过不代表实际场景听感已验收。

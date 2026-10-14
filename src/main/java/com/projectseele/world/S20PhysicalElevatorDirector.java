@@ -261,7 +261,7 @@ public final class S20PhysicalElevatorDirector
 
     public static List<LiftSpec> s20Lifts(ServerLevel level)
     {
-        if(NervRouteRuntimeR52.claimed(level))return S20LiftDirectoryR52.specs(level);
+        if(NervTravelDirectoryR52.applies(level))return S20LiftDirectoryR52.specs(level);
         MinecraftServer server = level.getServer();
         Path root = server.getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
         String name = server.getWorldData().getLevelName();
@@ -288,7 +288,7 @@ public final class S20PhysicalElevatorDirector
 
     private static List<LiftSpec> buildCurrentLiftSpecs(ServerLevel level)
     {
-        if(NervRouteRuntimeR52.claimed(level))return S20LiftDirectoryR52.specs(level);
+        if(NervTravelDirectoryR52.applies(level))return S20LiftDirectoryR52.specs(level);
         List<LiftSpec> lifts;
         if (FacilityWorldPolicy.isS22Coastal(level.getServer()))
         {
@@ -430,7 +430,7 @@ public final class S20PhysicalElevatorDirector
      */
     public static boolean install(ServerLevel level, LiftSpec spec)
     {
-        if(NervRouteRuntimeR52.claimed(level))return S20LiftDirectoryR52.current(level,spec);
+        if(NervTravelDirectoryR52.applies(level))return S20LiftDirectoryR52.current(level,spec);
         RuntimeData data = RuntimeData.get(level);
         Optional<LiftRuntime> existing = data.find(spec.id());
         if (existing.isPresent())
@@ -540,6 +540,7 @@ public final class S20PhysicalElevatorDirector
      */
     public static void repairLandingHardware(ServerLevel level, LiftSpec spec)
     {
+        if(NervTravelDirectoryR52.applies(level))return;
         for (Landing landing : spec.stops())
         {
             buildLanding(level, landing);
@@ -629,7 +630,7 @@ public final class S20PhysicalElevatorDirector
      */
     public static void tick(ServerLevel level, LiftSpec spec)
     {
-        if(NervRouteRuntimeR52.claimed(level)){S20MovingElevatorsAdapter.reconcile(level,spec);return;}
+        if(NervTravelDirectoryR52.applies(level)){S20MovingElevatorsAdapter.reconcile(level,spec);return;}
         if (!FacilityWorldPolicy.isS20Rebuild(level.getServer()))
         {
             return;
@@ -703,7 +704,7 @@ public final class S20PhysicalElevatorDirector
             ServerPlayer player, BlockPos clicked, LiftSpec spec)
     {
         ServerLevel level = player.serverLevel();
-        if(NervRouteRuntimeR52.claimed(level))return S20MovingElevatorsAdapter.handleExternalCall(player,clicked);
+        if(NervTravelDirectoryR52.applies(level))return S20MovingElevatorsAdapter.handleExternalCall(player,clicked);
         if (!FacilityWorldPolicy.isS20Rebuild(level.getServer())
                 || !level.dimension().equals(FacilitySchemaV2.DIMENSION))
         {
@@ -2600,7 +2601,7 @@ public final class S20PhysicalElevatorDirector
             ServerLevel level, LiftSpec spec, double currentY,
             boolean moving)
     {
-        if(NervRouteRuntimeR52.claimed(level)){S20LiftDirectoryR52.synchronizeDoors(level,spec,currentY,moving);return;}
+        if(NervTravelDirectoryR52.applies(level)){S20LiftDirectoryR52.synchronizeDoors(level,spec,currentY,moving);return;}
         Landing current = null;
         if (!moving)
         {

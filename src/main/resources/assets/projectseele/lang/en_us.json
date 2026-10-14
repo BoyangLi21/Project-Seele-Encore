@@ -322,5 +322,7 @@
   "block.projectseele.entry_plug_bridge_deck": "Entry Plug Inspection Deck",
   "block.projectseele.entry_plug_bridge_guard": "Entry Plug Inspection Guard",
   "key.projectseele.eva_dash": "Dash (TV)",
-  "entity.projectseele.gaghiel": "Gaghiel"
+  "entity.projectseele.gaghiel": "Gaghiel",
+  "subtitles.projectseele.launch_electric_burst_r53": "Launch rails discharge",
+  "subtitles.projectseele.launch_rail_friction_r53": "Launch rails spark and scrape"
 }

@@ -24,7 +24,8 @@ public final class NervSiloHatchGeometryR52
     {
         this.spec=Objects.requireNonNull(spec);var parts=new ArrayList<NervAirframeGeometryR52.Part>();
         var frame=warp(source.get("hatch_frame"),"frame",0);
-        parts.add(spec.serviceColumnPorts()?serviceCarrierExit(frame):frame);for(int side:new int[]{-1,1})parts.add(mirror(warp(source.get("hatch_cassette"),"cassette/"+side,1),side));
+        parts.add(spec.serviceColumnPorts()?serviceCarrierExit(serviceFrameReliefs(frame)):frame);
+        for(int side:new int[]{-1,1}){var cassette=mirror(warp(source.get("hatch_cassette"),"cassette/"+side,1),side);parts.add(spec.serviceColumnPorts()?serviceCassetteReliefs(cassette):cassette);}
         // Every explicit R52 spec has grounded cassette beams, including
         // the 31m aperture. Undeclared legacy doors use their old renderer.
         for(int side:new int[]{-1,1})for(int end:new int[]{-1,1})parts.add(beam(side,end));
@@ -75,24 +76,79 @@ public final class NervSiloHatchGeometryR52
         for(int t=0;t<xyz.length;t+=9){var poly=new ArrayList<double[]>();for(int n=0;n<3;n++)poly.add(new double[]{xyz[t+n*3],xyz[t+n*3+1],xyz[t+n*3+2],0,0,0});poly=clip(poly,1,1.05,false);if(poly.isEmpty())continue;double x=0,z=0;for(var p:poly){x+=p[0];z+=p[2];}int group=(x>=0?2:0)+(z>=0?1:0);for(var p:poly){var at=new Vec3(p[0],0,p[2]);groups[group]=groups[group]==null?new AABB(at,at):groups[group].minmax(new AABB(at,at));}}
         var out=new ArrayList<AABB>();for(var b:groups){if(b==null||b.getXsize()<=0||b.getZsize()<=0)throw new IllegalStateException("Four exact original column foot ports required");out.add(b.inflate(.03,0,.03));}return COLUMN_PORTS=List.copyOf(out);
     }
+    private List<AABB> columnPortsInHatchFrame()
+    {var ports=columnPortsSource();return spec.serviceGantryYawDegrees()==180?ports.stream().map(b->new AABB(-b.maxX,b.minY,-b.maxZ,-b.minX,b.maxY,-b.minZ)).toList():ports;}
+    private List<AABB> lowerFixedReliefs(boolean feet)
+    {
+        var out=new ArrayList<AABB>();try{for(var piece:NervLowerFrameR52.pieces(0))
+        {
+            if(feet&&!piece.name().startsWith("permanent_column_foot_seat_")||!feet&&!piece.name().endsWith("_cassette_hanger"))continue;
+            var frame=spec.serviceGantryRelativeFrame().compose(piece.local());
+            if(!feet){if(piece.mesh().triangles().length!=108)throw new IllegalStateException("Actual twelve-triangle rectangular hanger required");out.add(NervRigidMeshSweepR52.transformed(piece.mesh().bounds(),frame));continue;}
+            var declaration=piece.declaration();var point=declaration.getAsJsonArray("bearing_point_local");var p=new Vec3(point.get(0).getAsDouble(),point.get(1).getAsDouble(),point.get(2).getAsDouble());var xyz=piece.mesh().triangles();AABB contact=null;int faces=0;
+            for(int i=0;i<xyz.length;i+=9){boolean bottom=true;for(int c=0;c<9;c+=3)bottom&=Math.abs(xyz[i+c+1]-p.y)<1e-6&&Math.abs(xyz[i+c]-p.x)<.21&&Math.abs(xyz[i+c+2]-p.z)<.21;if(!bottom)continue;faces++;for(int c=0;c<9;c+=3){var at=frame.transformPoint(new Vec3(xyz[i+c],xyz[i+c+1],xyz[i+c+2]));contact=contact==null?new AABB(at,at):contact.minmax(new AABB(at,at));}}
+            if(faces!=2||contact==null||contact.getXsize()*contact.getZsize()<.15)throw new IllegalStateException("Actual finite original floor-pad bottom required for frame recess");
+            out.add(new AABB(contact.minX-.003,contact.minY,contact.minZ-.003,contact.maxX+.003,contact.minY+2,contact.maxZ+.003));
+            // These named permanent pads stand on complete native floor
+            // cells. Their fixed collar pockets must clear that full cell,
+            // rather than only the smaller rendered 0.4m pad footprint.
+            double x=Math.floor((contact.minX+contact.maxX)/2+.5)-.5,z=Math.floor((contact.minZ+contact.maxZ)/2+.5)-.5;
+            out.add(new AABB(x-.004,contact.minY-1-.004,z-.004,x+1+.004,contact.minY+.004,z+1+.004));
+        }}catch(IOException missing){throw new IllegalStateException("Actual current lower source required for fixed service joints",missing);}if(out.size()!=(feet?8:4))throw new IllegalStateException("Four exact original service interfaces required");return List.copyOf(out);
+    }
+    private NervAirframeGeometryR52.Part serviceFrameReliefs(NervAirframeGeometryR52.Part frame)
+    {
+        if(frame.vertices().length!=240*18)throw new IllegalStateException("Exact R16 frame primitive layout required");
+        return primitiveReliefs(frame,Map.of(0,new Relief(12,lowerFixedReliefs(true)),108,new Relief(12,lowerFixedReliefs(true))));
+    }
+    private NervAirframeGeometryR52.Part serviceCassetteReliefs(NervAirframeGeometryR52.Part cassette)
+    {
+        var vertices=cassette.vertices();if(vertices.length!=876*18)throw new IllegalStateException("Exact R16 cassette primitive layout required");var ports=new ArrayList<AABB>(columnPortsInHatchFrame().stream().map(b->new AABB(b.minX,-2,b.minZ,b.maxX,2,b.maxZ)).toList());ports.addAll(lowerFixedReliefs(true));
+        double lower=Double.POSITIVE_INFINITY,upper=Double.NEGATIVE_INFINITY;for(int i=44*18+1;i<56*18;i+=6){lower=Math.min(lower,vertices[i]);upper=Math.max(upper,vertices[i]);}final double bottom=lower-.001,top=upper+.001;
+        // The 0.19m solid floor and its lower housing edge alone receive the
+        // actual 40x200mm hanger opening. The upper wall remains unchanged.
+        var hangers=lowerFixedReliefs(false).stream().map(b->new AABB(b.minX,bottom,b.minZ,b.maxX,top,b.maxZ)).toList();
+        return primitiveReliefs(cassette,Map.of(0,new Relief(12,ports),12,new Relief(32,hangers,true),44,new Relief(12,hangers)));
+    }
+    private record Relief(int triangles,List<AABB> cuts,boolean surface){Relief(int triangles,List<AABB> cuts){this(triangles,cuts,false);}}
+    private static NervAirframeGeometryR52.Part primitiveReliefs(NervAirframeGeometryR52.Part source,Map<Integer,Relief> requests)
+    {
+        var original=source.vertices();var pieces=new ArrayList<double[]>();for(int t=0;t<original.length/18;){var request=requests.get(t);if(request==null){pieces.add(Arrays.copyOfRange(original,t*18,(t+1)*18));t++;}else{var primitive=Arrays.copyOfRange(original,t*18,(t+request.triangles())*18);pieces.add(request.surface()?NervConvexReliefR53.subtractSurface(primitive,request.cuts()):NervConvexReliefR53.subtract(primitive,request.cuts()));t+=request.triangles();}}int count=pieces.stream().mapToInt(a->a.length).sum(),at=0;var result=new double[count];for(var a:pieces){System.arraycopy(a,0,result,at,a.length);at+=a.length;}return new NervAirframeGeometryR52.Part(source.name(),result);
+    }
     private static ArrayList<double[]> clip(List<double[]> source,int axis,double value,boolean above)
     {var out=new ArrayList<double[]>();if(source.isEmpty())return out;var previous=source.get(source.size()-1);boolean old=above?previous[axis]>=value:previous[axis]<=value;for(var current:source){boolean now=above?current[axis]>=value:current[axis]<=value;if(old!=now){double t=(value-previous[axis])/(current[axis]-previous[axis]);var p=new double[6];for(int n=0;n<6;n++)p[n]=previous[n]+(current[n]-previous[n])*t;out.add(p);}if(now)out.add(current.clone());previous=current;old=now;}return out;}
     private NervAirframeGeometryR52.Part columnPorts(NervAirframeGeometryR52.Part source,int side,int index)
-    {return cutPorts(source,side,index,columnPortsSource(),"column_ported_panel");}
+    {
+        return cutPorts(source,side,index,columnPortsInHatchFrame(),"column_ported_panel");
+    }
     /** Exact31m gate-local steel footprint of the two approved outer rails.
      * No opening, collar, original frame or unrelated shutter is enlarged. */
     public static List<AABB> uprightGuideSteelPortsR52()
     {
-        // Actual0262/66F authored triangles clipped in all27 real gate frames,
-        // complete shutter working band Y=0..5.38, plus existing5mm guard.
-        return List.of(new AABB(-15.30500001192093,0.0,-15.39105704443201,-14.69499998807907,0.0,-15.150566214918328),
-            new AABB(-15.105000001490117,0.0,-15.74171907613406,-14.894999998509883,0.0,-15.270770630570178),
-            new AABB(14.69499998807907,0.0,14.168942955567978,15.30500001192093,0.0,14.409433785081731),
-            new AABB(14.894999998509883,0.0,13.818280923865956,15.105000001490117,0.0,14.289229369429654));
+        // The opposite-corner layout translates each unchanged rail section
+        // by29.56m in Z. Keep the original measured working-band/5mm fit.
+        return List.of(new AABB(-15.30500001192093,0.0,14.168942955567978,-14.69499998807907,0.0,14.409433785081731),
+            new AABB(-15.105000001490117,0.0,13.818280923865956,-14.894999998509883,0.0,14.289229369429654),
+            new AABB(14.69499998807907,0.0,-15.39105704443201,15.30500001192093,0.0,-15.150566214918328),
+            new AABB(14.894999998509883,0.0,-15.74171907613406,15.105000001490117,0.0,-15.270770630570178));
+    }
+    public static List<AABB> uprightGuideSteelPortsR52(int earlyVariant)
+    {
+        var original=uprightGuideSteelPortsR52();if(earlyVariant==-1)return original;
+        if(earlyVariant<0||earlyVariant>2)throw new IllegalArgumentException("Explicit early guide variant required");
+        // Real rail facets clipped at the three declared hatch working bands,
+        // plus the original 5mm fitting allowance. All other gates keep -1.
+        double[][] measuredMin={
+            {-15.300000011920929,14.089968461005123,-15.100000001490116,13.737660724747258,14.699999988079071,-15.470031538994876,14.899999998509884,-15.82233927525274},
+            {-15.33271235874349,14.093606019888554,-15.133711438932943,13.741413182823884,14.66728764125651,-15.466393980111453,14.866288561067066,-15.81858681717611},
+            {-15.360978943596338,14.103032231542505,-15.162587493760205,13.751123938073453,14.639021056403665,-15.45696776845749,14.837412506239792,-15.808876061926547}};
+        var out=new ArrayList<AABB>();var row=measuredMin[earlyVariant];
+        for(int i=0;i<original.size();i++){var b=original.get(i);out.add(new AABB(Math.min(b.minX,row[i*2]-.005),b.minY,Math.min(b.minZ,row[i*2+1]-.005),b.maxX,b.maxY,b.maxZ));}
+        return List.copyOf(out);
     }
     public List<AABB> uprightGuideRigidLeafSlotsR52(int side,int index)
     {
-        if(!spec.uprightGuidePorts()||side<0||side>1||index<0||index>=4)return List.of();double sign=side==0?-1:1,travel=sign*(spec.pocketX()-index*spec.panelWidth());var out=new ArrayList<AABB>();for(var port:uprightGuideSteelPortsR52()){if(Math.signum(port.getCenter().x)!=sign)continue;out.add(port.minmax(port.move(-travel,0,0)));}return List.copyOf(out);
+        if(!spec.uprightGuidePorts()||side<0||side>1||index<0||index>=4)return List.of();double sign=side==0?-1:1,travel=sign*(spec.pocketX()-index*spec.panelWidth());var out=new ArrayList<AABB>();for(var port:uprightGuideSteelPortsR52(spec.uprightGuideEarlyVariant())){if(Math.signum(port.getCenter().x)!=sign)continue;out.add(port.minmax(port.move(-travel,0,0)));}return List.copyOf(out);
     }
     private NervAirframeGeometryR52.Part uprightGuidePorts(NervAirframeGeometryR52.Part source,int side,int index)
     {return cutPorts(source,side,index,uprightGuideRigidLeafSlotsR52(side,index),"upright_guide_ported_panel");}

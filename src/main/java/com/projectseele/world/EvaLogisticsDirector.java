@@ -872,6 +872,8 @@ public final class EvaLogisticsDirector
     /** Hangar preparation controls plus three supported Tokyo-3 recovery keys. */
     public static boolean handleUse(ServerPlayer player, BlockPos position)
     {
+        int mappedControl = NervHangarControlsR53.handleUse(player, position);
+        if (mappedControl >= 0) return mappedControl == 1;
         ServerLevel level = player.serverLevel();
         boolean modern = FacilityWorldPolicy.isCleanRebuild(
                 level.getServer());

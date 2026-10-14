@@ -54,6 +54,13 @@ public final class LocalVisualAssetFingerprint
                     "geo", "bf91f7d08e1d12e3e927c05f80bd9e7c34ed549e679ef7a5899b04323f153dc0",
                     "animation", "9d9f909d6ced3c6531f448c136e5ad5ec46a2a1187bff4cddc85beb9b985a145",
                     "texture", "8e261921b6e94023d9c9e774bbdc8fbef96df8a442ac6c3986820d754e6845ea")));
+    // Reviewed revision 3 changes only UVs; the authored geometry and native hand split stay exact.
+    private static final Map<String, SelectedR50Contract> R52_REVIEWED_CONTRACTS = Map.of(
+            "eva_unit01", new SelectedR50Contract(new MeshContract(15_998, 49, true), Map.of(
+                    "mesh", "3f28daaf6c64044e1625d6b18755f634c8fa8e2d6c40c4ae9bf93304dd90d910",
+                    "geo", "bf91f7d08e1d12e3e927c05f80bd9e7c34ed549e679ef7a5899b04323f153dc0",
+                    "animation", "9d9f909d6ced3c6531f448c136e5ad5ec46a2a1187bff4cddc85beb9b985a145",
+                    "texture", "8e261921b6e94023d9c9e774bbdc8fbef96df8a442ac6c3986820d754e6845ea")));
     private static final Map<String, Fingerprint> CACHE = new ConcurrentHashMap<>();
 
     private LocalVisualAssetFingerprint() {}
@@ -101,6 +108,7 @@ public final class LocalVisualAssetFingerprint
                 || matchesR48(assetName,sourcePack,meshTag)
                 || matchesR30(assetName,sourcePack,resources,meshTag)
                 || matchesR37(assetName,sourcePack,resources,meshTag)
+                || matchesR52Reviewed(assetName,sourcePack,resources,meshTag,mesh)
                 || matchesR51(assetName,sourcePack,resources,meshTag,mesh)
                 || matchesR50(assetName,sourcePack,resources,meshTag,mesh));
         boolean valid = complete && sameSource && meshMatches;
@@ -114,6 +122,15 @@ public final class LocalVisualAssetFingerprint
         return fingerprint;
     }
     private record SelectedR50Contract(MeshContract mesh, Map<String, String> sha256) {}
+
+    private static boolean matchesR52Reviewed(String name,String pack,Map<String,ResourceDigest> resources,String tag,ResourceLocation mesh)
+    {
+        SelectedR50Contract expected=R52_REVIEWED_CONTRACTS.get(name);
+        if(expected==null||!pack.equals("mod_resources")||!resources.keySet().equals(expected.sha256().keySet())
+                ||!expected.mesh().matches(tag,mesh))return false;
+        return resources.entrySet().stream().allMatch(entry->entry.getValue().present()
+                &&pack.equals(entry.getValue().sourcePack())&&expected.sha256().get(entry.getKey()).equals(entry.getValue().sha256()));
+    }
 
     private static boolean matchesR51(String name,String pack,Map<String,ResourceDigest> resources,String tag,ResourceLocation mesh)
     {

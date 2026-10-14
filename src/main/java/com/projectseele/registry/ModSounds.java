@@ -54,6 +54,8 @@ public class ModSounds
     public static final RegistryObject<SoundEvent> PERIOD_PHONE_BUSY=register("period_phone_busy");
     public static final RegistryObject<SoundEvent> STAFF_RADIO_CONNECT=register("staff_radio_connect");
     public static final RegistryObject<SoundEvent> STAFF_RADIO_ACK=register("staff_radio_ack");
+    public static final RegistryObject<SoundEvent> LAUNCH_ELECTRIC_BURST_R53=registerFixed("launch_electric_burst_r53",192);
+    public static final RegistryObject<SoundEvent> LAUNCH_RAIL_FRICTION_R53=registerFixed("launch_rail_friction_r53",128);
 
     public static final java.util.Map<String,RegistryObject<SoundEvent>> FACILITY=facilitySounds();
     private static java.util.Map<String,RegistryObject<SoundEvent>> facilitySounds()

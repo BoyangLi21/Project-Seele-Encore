@@ -11,6 +11,14 @@ public final class NervSourcePreparationR52 {
     private static final Map<String,CompletableFuture<?>> JOBS=new LinkedHashMap<>();
     private static final int MAX_SELECTIONS=8;
 
+    /** Only an explicit same-authority retry may discard a failed result.
+     * Successful selections and running immutable reads remain shared. */
+    public static synchronized boolean retryFailedR52(String key)
+    {
+        var existing=JOBS.get(key);if(existing==null||!existing.isCompletedExceptionally())return false;
+        JOBS.remove(key);return true;
+    }
+
     public static synchronized <T> Poll<T> poll(String key,Callable<T> loader) {
         @SuppressWarnings("unchecked") var existing=(CompletableFuture<T>)JOBS.get(key);
         if(existing==null){

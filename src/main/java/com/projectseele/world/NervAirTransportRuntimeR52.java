@@ -116,7 +116,9 @@ public final class NervAirTransportRuntimeR52
             var data=new CompoundTag();data.putString("AssemblyKindR52",kind.name());data.putBoolean("Returning",intent==Intent.RECOVER);data.putString("Intent",intent.name());var preview=ground.owner().previewFlight(level,original,kind,data);if(preview==null)return "原机体须在真实支撑上停稳；空运不能替换原姿势、乘员或夹具。";
             Vec3 actualFoot=preview.root().transformPoint(preview.binding().contactCentre());var region=manifest.region(actualFoot);if(region==null)return "当前位置尚未开放空运接载。";
             var candidates=manifest.missions().values().stream().filter(m->(m.intent()==intent||intent==Intent.DELIVER&&m.intent()==Intent.FAR_MOUNTAIN)&&m.variants().contains(variant)&&m.region()==region&&m.pickupDomain().contains(actualFoot))
-                    .filter(m->receiverId!=null?m.receiver().equals(receiverId):intent==Intent.RECOVER||nearDestination(m,x,z)).sorted(Comparator.comparingDouble(m->receiverDistance(m,preview,data,actualFoot))).toList();
+                    .filter(m->receiverId!=null?m.receiver().equals(receiverId):intent==Intent.RECOVER||nearDestination(m,x,z))
+                    .sorted(Comparator.<Mission>comparingDouble(m->receiverDistance(m,preview,data,actualFoot))
+                            .thenComparingLong(this::totalClockTicks).thenComparing(Mission::id)).toList();
             for(var m:candidates)
             {
                 if(manifest.receiver(m.receiver()).delivery()&&kind!=Kind.OCCUPIED)continue;data.putString("Intent",m.intent().name());var aircraft=manifest.aircraft().get(m.aircraft());if(saved.aircraft(aircraft.entity())!=null||!(level.getEntity(aircraft.entity()) instanceof UNTransportEntity plane)||!aircraftSupported(aircraft)||plane.carrying()||!NervAirTransportManifestR52.same(NervAircraftFrameR52.actual(plane),manifest.node(aircraft.stand()).frame().plane()))continue;
@@ -132,6 +134,10 @@ public final class NervAirTransportRuntimeR52
             return "暂时无法接载，等待运输机和航路可用。";
         }
         double receiverDistance(Mission m,NervFlightProofR52.FlightPickupPreview p,CompoundTag data,Vec3 foot){var r=resolvedReceiver(m,p,data);return r==null?Double.POSITIVE_INFINITY:r.stopped().transformPoint(p.binding().contactCentre()).distanceToSqr(foot);}
+        long totalClockTicks(Mission m)
+        {
+            long ticks=0;for(var chain:List.of(m.outbound(),m.loaded(),m.retreat()))for(String id:chain)ticks+=manifest.corridor(id).ticks();return ticks;
+        }
         boolean nearDestination(Mission m,int x,int z){var p=manifest.receiver(m.receiver()).stopped().translation();return Math.abs(p.x-x)<=.5&&Math.abs(p.z-z)<=.5;}
         boolean cells(List<Cell> cells){for(var c:cells)if(!level.hasChunkAt(c.position())||!BlockStateParser.serialize(level.getBlockState(c.position())).equals(c.state()))return false;return true;}
         boolean aircraftSupported(Aircraft aircraft)

@@ -168,9 +168,10 @@ public class GameEvents
         {
             ServerLevel r52FacilityLevel=event.getServer().getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
             boolean r52Claimed=r52FacilityLevel!=null&&com.projectseele.world.NervRouteRuntimeR52.claimed(r52FacilityLevel);
-            boolean spatialFrozen = r52Claimed||
+            boolean r52Declared=r52FacilityLevel!=null&&com.projectseele.world.NervLegacyGenerationGuardR52.retired(r52FacilityLevel);
+            boolean spatialFrozen = r52Declared||
                     FacilityWorldPolicy.isSpatialPreviewFrozen(event.getServer());
-            if (!r52Claimed&&event.getServer().getTickCount() % 100 == 0)
+            if (!r52Declared&&event.getServer().getTickCount() % 100 == 0)
             {
                 MagiDeepLabBuilder.retireS20DuplicatePresentation(
                         event.getServer());
@@ -185,7 +186,7 @@ public class GameEvents
             // Same exemption, same discipline: one shot per server run over an
             // explicit coordinate list, and every cell must still hold the
             // state it was measured with.
-            if(!r52Claimed)S20CommandRoomRepairs.tick(event.getServer());
+            if(!r52Declared)S20CommandRoomRepairs.tick(event.getServer());
             if (event.getServer().getTickCount() % 20 == 0)
             {
                 ServerLevel surface = event.getServer().getLevel(
@@ -210,7 +211,7 @@ public class GameEvents
             if (geoFront != null)
             {
                 CommandRoomSlidingDoorDirector.tick(geoFront);
-                if (!r52Claimed&&!terminalDogmaSpecimenChecked
+                if (!r52Declared&&!terminalDogmaSpecimenChecked
                         && event.getServer().getTickCount() % 100 == 0)
                 {
                     terminalDogmaSpecimenChecked =
@@ -231,7 +232,7 @@ public class GameEvents
                     */
                     S20MovingElevatorsAdapter.reconcile(geoFront, lift);
                 }
-                if(!r52Claimed)S20SurfaceAccessGate.tick(geoFront);
+                if(!r52Declared)S20SurfaceAccessGate.tick(geoFront);
             }
             /*
              * The S20 freeze marker protects authored blocks; it must not
@@ -427,7 +428,7 @@ public class GameEvents
                     return;
                 }
                 boolean handled = false;
-                boolean spatialFrozen =
+                boolean spatialFrozen = com.projectseele.world.NervLegacyGenerationGuardR52.retired(player.serverLevel())||
                         FacilityWorldPolicy.isSpatialPreviewFrozen(
                                 player.getServer());
                 for (S20PhysicalElevatorDirector.LiftSpec lift

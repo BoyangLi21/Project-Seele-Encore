@@ -3,49 +3,113 @@ package com.projectseele.world;
 import com.google.gson.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;
-import java.nio.file.*;
-import java.lang.reflect.Method;
 
-/** Root-supplied shared planes and parser semantics; no level, groups, installation or writes. */
+/** Synthetic parser regressions; no world, native installation or geometry acceptance. */
 public final class S20LiftManifestR52Test
 {
+    private static int checks;
+    private static void check(boolean value,String label)
+    {checks++;if(!value)throw new AssertionError(label);}
     private static void rejected(JsonObject json,String label)
-    {boolean rejected=false;try{S20LiftManifestR52.parse(json);}catch(RuntimeException expected){rejected=true;}if(!rejected)throw new AssertionError(label);}
+    {boolean rejected=false;try{S20LiftManifestR52.parse(json);}catch(RuntimeException expected){rejected=true;}check(rejected,label);}
+    private static JsonArray array(int... values)
+    {var result=new JsonArray();for(int value:values)result.add(value);return result;}
+    private static JsonObject floor(int x,int z,int controllerX,int y,boolean restricted)
+    {
+        var floor=new JsonObject();floor.addProperty("label","test floor "+y);
+        floor.add("cabin",array(x,y,z));floor.add("controller",array(controllerX,y,z));
+        floor.addProperty("exit","south");floor.addProperty("approach_y",y);floor.addProperty("restricted",restricted);
+        var call=new JsonObject();call.addProperty("kind","vanilla_button");call.add("position",array(x+3,y+1,z+5));
+        call.addProperty("state","minecraft:polished_blackstone_button[face=wall,facing=south,powered=false]");
+        call.addProperty("facing","south");call.add("target_controller",array(controllerX,y,z));
+        var calls=new JsonArray();calls.add(call);floor.add("calls",calls);
+        for(String key:new String[]{"landing_doors","cabin_doors"})
+        {var cells=new JsonArray();var cell=new JsonObject();cell.add("pos",array(x,y,z+(key.equals("landing_doors")?4:2)));
+         cell.addProperty("closed_state","minecraft:gray_stained_glass");cells.add(cell);floor.add(key,cells);}
+        return floor;
+    }
+    private static JsonObject lift(String id,int x,int z,int controllerX,int... ys)
+    {
+        var lift=new JsonObject();lift.addProperty("id",id);lift.addProperty("controller_side","west");lift.addProperty("controller_facing","east");
+        lift.add("inside_button_offset",array(-2,1,0));lift.add("inside_display_offset",array(-2,2,0));
+        var floors=new JsonArray();for(int y:ys)floors.add(floor(x,z,controllerX,y,y==-846));lift.add("floors",floors);return lift;
+    }
+    private static JsonObject main(String id,int hangar,Integer terminal,int... headquarters)
+    {
+        var role=new JsonObject();role.addProperty("lift_id",id);role.addProperty("hangar_floor",hangar);
+        var axis=new JsonObject();boolean rear=id.equals(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID);
+        axis.add("cabin",array(rear?12:66,rear?253:302));axis.add("controller",array(rear?9:63,rear?253:302));
+        role.add("source_axis",axis);role.add("shaft_translation",array(0,0));
+        if(terminal!=null)role.addProperty("terminal_floor",terminal);role.add("headquarters_floors",array(headquarters));return role;
+    }
+    private static JsonObject candidate()
+    {
+        var root=new JsonObject();root.addProperty("schema",S20LiftManifestR52.SCHEMA);root.addProperty("scope","s20_personnel_only");
+        root.addProperty("complete_replacement",true);root.addProperty("ready",true);root.addProperty("epoch",53);root.addProperty("directory_fingerprint","a".repeat(64));
+        var lifts=new JsonArray();lifts.add(lift(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,12,253,9,-846,-630,-541,-502));
+        lifts.add(lift(FacilityLiftsR25.EAST,66,302,63,-630,-554,-499,-457));root.add("lifts",lifts);
+        var roles=new JsonObject();roles.add("command_rear",main(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,-630,-846,-541,-502));
+        roles.add("east_gallery",main(FacilityLiftsR25.EAST,-630,null,-554,-499,-457));root.add("main_lifts",roles);
+        var office=lift(S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID,28,321,31,-481,-457,-433);
+        office.addProperty("controller_side","east");office.addProperty("controller_facing","west");
+        office.add("inside_button_offset",array(2,1,0));office.add("inside_display_offset",array(2,2,0));
+        office.getAsJsonArray("floors").get(1).getAsJsonObject().addProperty("restricted",true);
+        office.getAsJsonArray("floors").get(2).getAsJsonObject().addProperty("restricted",true);lifts.add(office);
+        root.add("office_access",JsonParser.parseString("""
+                {"lift_id":"s23-commander-office-x28-z321-v1","middle_y":-457,
+                 "readers":[[25,-480,316],[31,-456,316],[25,-432,316]],"middle_reader":[31,-456,316],
+                 "meeting_boxes":[[16,-459,300,52,-455,316]],"lift_room_boxes":[[22,-483,312,34,-425,329]],
+                 "landing_lease_box":[25,-460,315,32,-454,325],"room_controls":{
+                   "gate":[{"lower":[28,-457,315],"facing":"south","hinge":"right"},{"lower":[29,-457,315],"facing":"south","hinge":"left"}],
+                   "gate_readers":[{"position":[27,-456,314],"facing":"north","backing":[27,-456,315],"side_axis":"z","side_boundary":315,"less_than":true},
+                                   {"position":[27,-456,316],"facing":"south","backing":[27,-456,315],"side_axis":"z","side_boundary":316,"less_than":false}],
+                   "pilot_guard_doors":[{"lower":[53,-630,311],"facing":"north","hinge":"right","approach_feet":[[53.5,-630,310.5],[53.5,-630,312.5]]},
+                                         {"lower":[11,-630,311],"facing":"north","hinge":"right","approach_feet":[[11.5,-630,310.5],[11.5,-630,312.5]]},
+                                         {"lower":[-31,-630,311],"facing":"north","hinge":"right","approach_feet":[[-30.5,-630,310.5],[-30.5,-630,312.5]]}]}}
+                """));return root;
+    }
     public static void main(String[] args)throws Exception
     {
-        JsonObject candidate=JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonObject();
-        var document=S20LiftManifestR52.parse(candidate);if(document.ready())throw new AssertionError("Candidate unexpectedly ready");
-        var lift=document.lifts().get(0);var spec=lift.spec();
-        if(lift.floors().size()!=5||lift.controllerSide()!=Direction.SOUTH||lift.controllerFacing()!=Direction.NORTH)throw new AssertionError("Root shared binding lost");
-        for(var floor:spec.stops())
+        var source=candidate();var document=S20LiftManifestR52.parse(source);
+        check(document.ready()&&document.mainLifts().commandRear().terminalFloor()==-846,"Two original main-lift roles lost");
+        check(document.lifts().size()==3,"Parser invented additional groups beyond two main lifts and the retained office");
+        var rear=document.lifts().get(0);var spec=rear.spec();
+        for(var landing:spec.stops())
+        {check(S20MovingElevatorsAdapter.controllerPosition(spec,landing).equals(new BlockPos(9,landing.walkY(),253)),"Original controller axis changed");
+         check(landing.r52().callDisplay()==null,"Original vanilla calls required invented native displays");}
+        var invalid=source.deepCopy();invalid.remove("main_lifts");rejected(invalid,"Ready allowed missing main-lift roles");
+        invalid=source.deepCopy();invalid.remove("office_access");invalid.getAsJsonArray("lifts").remove(2);rejected(invalid,"Ready discarded the user-retained original office lift");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").get(2).getAsJsonObject().getAsJsonArray("floors").get(2).getAsJsonObject().addProperty("restricted",false);rejected(invalid,"Original office highest-card admission was weakened");
+        invalid=source.deepCopy();invalid.getAsJsonObject("main_lifts").getAsJsonObject("east_gallery").addProperty("hangar_floor",-554);rejected(invalid,"East lift stopped at headquarters instead of hangar");
+        invalid=source.deepCopy();invalid.getAsJsonObject("main_lifts").getAsJsonObject("command_rear").remove("terminal_floor");rejected(invalid,"Main lift lost Terminal access");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors").get(0).getAsJsonObject().addProperty("restricted",false);rejected(invalid,"Terminal admitted without access control");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").add(lift("r52-hq-hangar-terminal-shared",108,407,105,-846,-630,-554));rejected(invalid,"Failed third headquarters lift restored");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").add(lift("renamed-third-main-lift",108,407,105,-846,-630,-554));rejected(invalid,"Third main lift bypassed retirement by renaming");
+        invalid=source.deepCopy();invalid.getAsJsonObject("main_lifts").getAsJsonObject("east_gallery").addProperty("lift_id",S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID);rejected(invalid,"Both main roles pointed at same lift");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().addProperty("controller_side","east");rejected(invalid,"Opposite native controller side accepted");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").add(invalid.getAsJsonArray("lifts").get(0).deepCopy());rejected(invalid,"Duplicate shaft accepted");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors").get(0).getAsJsonObject().addProperty("exit","up");rejected(invalid,"Vertical landing exit accepted");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors").get(1).getAsJsonObject().getAsJsonArray("calls").get(0).getAsJsonObject().add("target_controller",array(9,-846,253));rejected(invalid,"Call accepted another floor controller");
+        invalid=source.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors").get(0).getAsJsonObject().getAsJsonArray("calls").get(0).getAsJsonObject().addProperty("kind","seele_reader");rejected(invalid,"Unowned reader acquired office authority");
+        var optional=source.deepCopy();optional.getAsJsonArray("lifts").add(lift(S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,93,-52,90,-468,-442));
+        check(S20LiftManifestR52.parse(optional).lifts().size()==4,"Optional surviving original group forced a global group count");
+        var draft=source.deepCopy();draft.addProperty("ready",false);draft.remove("main_lifts");check(!S20LiftManifestR52.parse(draft).ready(),"Draft parsing silently installed it");
+        invalid=source.deepCopy();invalid.getAsJsonObject("main_lifts").getAsJsonObject("command_rear").add("shaft_translation",array(12,0));rejected(invalid,"Undeclared actual axis shift admitted");
+        var shifted=source.deepCopy();shifted.getAsJsonObject("main_lifts").getAsJsonObject("command_rear").add("shaft_translation",array(12,0));
+        var shiftedFloors=shifted.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors");
+        for(var raw:shiftedFloors)
         {
-            int y=floor.walkY();
-            if(!S20MovingElevatorsAdapter.controllerPosition(spec,floor).equals(new BlockPos(108,y,410)))throw new AssertionError("Shared controller guessed from NORTH clockwise");
-            if(!floor.r52().callButton().equals(new BlockPos(111,y+1,403)))throw new AssertionError("Root fixed call position changed");
-            if(java.util.stream.Stream.concat(floor.r52().landingDoors().keySet().stream(),floor.r52().cabinDoors().keySet().stream()).anyMatch(p->p.getX()==108&&p.getZ()==401))throw new AssertionError("Root door plane reached preserved HQ escalator");
-            if(floor.r52().restricted()!=(y==-766))throw new AssertionError("Lilith/public stop permissions changed");
+            var f=raw.getAsJsonObject();for(String key:new String[]{"cabin","controller"})shiftX(f.getAsJsonArray(key),12);
+            for(var call:f.getAsJsonArray("calls")){shiftX(call.getAsJsonObject().getAsJsonArray("position"),12);shiftX(call.getAsJsonObject().getAsJsonArray("target_controller"),12);}
+            for(String key:new String[]{"landing_doors","cabin_doors"})for(var door:f.getAsJsonArray(key))shiftX(door.getAsJsonObject().getAsJsonArray("pos"),12);
         }
-        var invalid=candidate.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().addProperty("controller_side","east");rejected(invalid,"Default EAST accepted for actual SOUTH controllers");
-        invalid=candidate.deepCopy();invalid.getAsJsonArray("lifts").add(invalid.getAsJsonArray("lifts").get(0).deepCopy());rejected(invalid,"Duplicate lift/shaft accepted");
-        invalid=candidate.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors").get(0).getAsJsonObject().addProperty("exit","up");rejected(invalid,"Vertical landing exit accepted");
-        var two=candidate.deepCopy();var floors=two.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors");while(floors.size()>2)floors.remove(1);
-        if(S20LiftManifestR52.parse(two).lifts().get(0).floors().size()!=2)throw new AssertionError("Parser forced obsolete four-stop compact lift");
-        var vanilla=candidate.deepCopy();
-        for(var row:vanilla.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors"))
-        {var call=row.getAsJsonObject().getAsJsonArray("calls").get(0).getAsJsonObject();call.addProperty("kind","vanilla_button");call.addProperty("state","minecraft:polished_blackstone_button[face=wall,facing=north,powered=false]");call.remove("display");}
-        var originalCalls=S20LiftManifestR52.parse(vanilla).lifts().get(0).floors();
-        if(originalCalls.stream().anyMatch(f->f.calls().get(0).kind()!=S20LiftManifestR52.CallKind.VANILLA_BUTTON||f.callDisplay()!=null))throw new AssertionError("Original vanilla calls required invented native displays");
-        invalid=vanilla.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors").get(1).getAsJsonObject().getAsJsonArray("calls").get(0).getAsJsonObject().add("target_controller",candidate.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors").get(0).getAsJsonObject().getAsJsonArray("controller").deepCopy());rejected(invalid,"Call allowed a different native floor controller");
-        invalid=candidate.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().addProperty("id","regional_gateway");rejected(invalid,"Independent gateway duplicated in S20 list");
-        invalid=candidate.deepCopy();invalid.addProperty("ready",true);rejected(invalid,"Partial candidate became complete ready S20 replacement");
-        invalid=vanilla.deepCopy();invalid.getAsJsonArray("lifts").get(0).getAsJsonObject().getAsJsonArray("floors").get(0).getAsJsonObject().getAsJsonArray("calls").get(0).getAsJsonObject().addProperty("kind","seele_reader");rejected(invalid,"Unowned reader granted office authority");
-        if(!S20LiftDirectoryR52.independentGateway(true,-368,750,Direction.EAST)
-                ||S20LiftDirectoryR52.independentGateway(false,-368,750,Direction.EAST)
-                ||S20LiftDirectoryR52.independentGateway(true,-367,750,Direction.EAST)
-                ||S20LiftDirectoryR52.independentGateway(true,-368,750,Direction.WEST))throw new AssertionError("Independent native gateway confused with pending S20 claim");
-        var legacy=new S20PhysicalElevatorDirector.LiftSpec("legacy-test",new S20PhysicalElevatorDirector.Landing("lower",new BlockPos(0,0,0),Direction.NORTH),new S20PhysicalElevatorDirector.Landing("upper",new BlockPos(0,10,0),Direction.NORTH));
-        Method side=S20MovingElevatorsAdapter.class.getDeclaredMethod("controllerSide",S20PhysicalElevatorDirector.LiftSpec.class);side.setAccessible(true);
-        if(legacy.r52()!=null||side.invoke(null,legacy)!=Direction.EAST)throw new AssertionError("Legacy default controller rule changed");
-        System.out.println("PASS: Root shared5 stops/SOUTH controllers/NORTH calls and explicit doors; exact native ownership; original vanilla calls need no display; wrong floor/unowned reader/independent gateway/partial ready rejected; HQ escalator untouched; Lilith-only restricted; arbitrary2 stops and legacy default retained; parsing alone did not install");
+        check(S20LiftManifestR52.parse(shifted).mainLifts().commandRear().liftId().equals(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID),"Rigidly moved original main lift lost its identity");
+        check(S20LiftDirectoryR52.retiredControllerAxis(108,410)&&!S20LiftDirectoryR52.retiredControllerAxis(1000,1000),"Retired group confused with independent player group");
+        check(S20LiftDirectoryR52.independentGateway(true,-368,750,Direction.EAST),"Independent gateway denied");
+        if(args.length>0)rejected(JsonParser.parseString(java.nio.file.Files.readString(java.nio.file.Path.of(args[0]))).getAsJsonObject(),
+                "Actual frozen failed shared-lift manifest was accepted");
+        System.out.println("PASS original two-main-lift contract checks="+checks+"; parser only, no world acceptance");
     }
+    private static void shiftX(JsonArray point,int delta)
+    {point.set(0,new JsonPrimitive(point.get(0).getAsInt()+delta));}
 }

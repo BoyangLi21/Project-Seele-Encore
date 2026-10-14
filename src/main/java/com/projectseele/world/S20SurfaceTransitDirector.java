@@ -75,6 +75,7 @@ public final class S20SurfaceTransitDirector
 
     public static void tick(MinecraftServer server)
     {
+        if(NervLegacyGenerationGuardR52.retired(server))return;
         if (!authorised(server)
                 || server.getTickCount() % PHASE_INTERVAL_TICKS != 0)
         {

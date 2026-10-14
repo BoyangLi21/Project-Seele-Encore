@@ -4,6 +4,7 @@ import com.google.gson.JsonArray;
 import com.google.gson.stream.JsonReader;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
+import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.OutlineBufferSource;
 import net.minecraft.client.renderer.RenderType;
@@ -11,6 +12,8 @@ import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Vector3f;
+import org.joml.Vector4f;
+import org.joml.Matrix4f;
 import java.util.Arrays;
 import java.util.ArrayList;
 import java.util.List;
@@ -145,7 +148,32 @@ final class RigidMachineryPartR44
     }
 
     void draw(PoseStack poses, MultiBufferSource buffers, int light)
-    {drawWithProofR52(poses,buffers,light);}
+    {
+        if(RigidMachineryGpuR44.enabled()&&!(buffers instanceof OutlineBufferSource)
+                &&!ShaderShadowPassR44.active()&&!ShaderShadowPassR44.enabled()&&!Boolean.getBoolean("projectseele.r44NativeCraneMeshWitness")
+                &&outsideClipR60(bounds,RenderSystem.getProjectionMatrix(),RenderSystem.getModelViewMatrix(),poses.last().pose()))return;
+        drawWithProofR52(poses,buffers,light);
+    }
+    private static double[] absoluteProductR60(Matrix4f matrix,double[] v)
+    {
+        var result=new double[4];for(int row=0;row<4;row++)for(int column=0;column<4;column++)result[row]+=Math.abs((double)matrix.get(column,row))*v[column];return result;
+    }
+    /** Reject only when every actual float bound corner lies strictly outside one homogeneous clip plane. */
+    static boolean outsideClipR60(float[] b,Matrix4f projection,Matrix4f modelView,Matrix4f pose)
+    {
+        if(b.length!=6)return false;for(float value:b)if(!Float.isFinite(value))return false;if(b[0]>b[3]||b[1]>b[4]||b[2]>b[5])return false;
+        var magnitude=absoluteProductR60(projection,absoluteProductR60(modelView,absoluteProductR60(pose,new double[]{Math.max(Math.abs(b[0]),Math.abs(b[3])),Math.max(Math.abs(b[1]),Math.abs(b[4])),Math.max(Math.abs(b[2]),Math.abs(b[5])),1})));
+        double absolute=1;for(double value:magnitude){if(!Double.isFinite(value))return false;absolute=Math.max(absolute,value);}
+        // Three float matrix products have at most21 dot-product rounding stages.
+        // A128-unit-roundoff envelope also covers association/FMA differences.
+        double epsilon=128*Math.scalb(1D,-24)*absolute;var viewProjection=new Matrix4f(projection).mul(modelView);boolean[] outside={true,true,true,true,true,true};
+        for(int corner=0;corner<8;corner++){
+            var p=new Vector4f(b[(corner&1)==0?0:3],b[(corner&2)==0?1:4],b[(corner&4)==0?2:5],1);pose.transform(p);viewProjection.transform(p);
+            if(!Float.isFinite(p.x)||!Float.isFinite(p.y)||!Float.isFinite(p.z)||!Float.isFinite(p.w))return false;
+            outside[0]&=(double)p.x+p.w<-epsilon;outside[1]&=(double)p.w-p.x<-epsilon;outside[2]&=(double)p.y+p.w<-epsilon;outside[3]&=(double)p.w-p.y<-epsilon;outside[4]&=(double)p.z+p.w<-epsilon;outside[5]&=(double)p.w-p.z<-epsilon;
+        }
+        for(boolean plane:outside)if(plane)return true;return false;
+    }
     /** True means the real cached GPU mesh was submitted in this shader pass. */
     boolean drawWithProofR52(PoseStack poses, MultiBufferSource buffers, int light)
     {

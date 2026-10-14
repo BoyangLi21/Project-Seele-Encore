@@ -1,0 +1,1278 @@
+{
+  "type": "object",
+  "properties": {
+    "ground_guides": {
+      "type": "object",
+      "properties": {
+        "source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "paths_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "dock_source_sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "dock_foundations": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "leg": {
+                "type": "string",
+                "pattern": "^[A-Za-z0-9_./:-]{1,160}$"
+              },
+              "foundation_top_m": {
+                "type": "number"
+              }
+            },
+            "required": [
+              "leg",
+              "foundation_top_m"
+            ],
+            "additionalProperties": false
+          },
+          "minItems": 1
+        },
+        "mode": {
+          "const": "continuous_upright"
+        }
+      },
+      "required": [
+        "source_sha256",
+        "paths_sha256"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "required": [
+              "mode"
+            ]
+          },
+          "then": {
+            "not": {
+              "anyOf": [
+                {
+                  "required": [
+                    "dock_source_sha256"
+                  ]
+                },
+                {
+                  "required": [
+                    "dock_foundations"
+                  ]
+                }
+              ]
+            }
+          }
+        }
+      ]
+    },
+    "schema": {
+      "const": "projectseele.r52.mechanical-owner.v1"
+    },
+    "map_author": {
+      "const": "root"
+    },
+    "status": {
+      "enum": [
+        "design",
+        "installed"
+      ]
+    },
+    "epoch": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "directory_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "commissioning_receipt_sha256": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "mechanism_sources": {
+      "type": "object",
+      "required": [
+        "mesh/tv_shoulder_shells_r44.json"
+      ],
+      "additionalProperties": {
+        "type": "string",
+        "pattern": "^[0-9a-f]{64}$"
+      }
+    },
+    "units": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/unit"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "gates": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/gate"
+      },
+      "minItems": 1
+    },
+    "resources": {
+      "type": "object",
+      "additionalProperties": {
+        "$ref": "#/$defs/fixed_cells"
+      }
+    },
+    "receivers": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/receiver"
+      },
+      "minItems": 1
+    },
+    "staff": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/staff"
+      },
+      "minItems": 0
+    }
+  },
+  "required": [
+    "schema",
+    "map_author",
+    "status",
+    "epoch",
+    "directory_fingerprint",
+    "commissioning_receipt_sha256",
+    "mechanism_sources",
+    "units",
+    "gates",
+    "resources",
+    "receivers"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "projectseele:r52:mechanical-owner",
+  "$defs": {
+    "point": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "cell_position": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 3,
+      "maxItems": 3
+    },
+    "quaternion": {
+      "type": "array",
+      "items": {
+        "type": "number"
+      },
+      "minItems": 4,
+      "maxItems": 4
+    },
+    "frame": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/point"
+        },
+        "quaternion": {
+          "$ref": "#/$defs/quaternion"
+        }
+      },
+      "required": [
+        "position",
+        "quaternion"
+      ],
+      "additionalProperties": false
+    },
+    "fixed_cell": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/cell_position"
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "position",
+        "state"
+      ],
+      "additionalProperties": false
+    },
+    "gate_support_cell": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/cell_position"
+        },
+        "state": {
+          "type": "string",
+          "minLength": 1
+        },
+        "normal": {
+          "$ref": "#/$defs/point"
+        },
+        "source_contact": {
+          "type": "object",
+          "properties": {
+            "x": {
+              "type": "number"
+            },
+            "y": {
+              "type": "number"
+            },
+            "z": {
+              "type": "number"
+            }
+          },
+          "required": [
+            "x",
+            "y",
+            "z"
+          ],
+          "additionalProperties": false
+        },
+        "half_width_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "contact_half_width_m": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "source_contact_kind": {
+          "enum": [
+            "native_top_face",
+            "native_side_wall"
+          ]
+        },
+        "source_contact_triangle_witnesses": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "minLength": 1
+          },
+          "minItems": 1,
+          "uniqueItems": true
+        }
+      },
+      "required": [
+        "position",
+        "state"
+      ],
+      "dependentRequired": {
+        "normal": [
+          "source_contact"
+        ],
+        "source_contact": [
+          "normal"
+        ],
+        "half_width_m": [
+          "normal",
+          "source_contact",
+          "contact_half_width_m",
+          "source_contact_kind",
+          "source_contact_triangle_witnesses"
+        ],
+        "contact_half_width_m": [
+          "normal",
+          "source_contact",
+          "half_width_m",
+          "source_contact_kind",
+          "source_contact_triangle_witnesses"
+        ],
+        "source_contact_kind": [
+          "normal",
+          "source_contact",
+          "half_width_m",
+          "contact_half_width_m",
+          "source_contact_triangle_witnesses"
+        ],
+        "source_contact_triangle_witnesses": [
+          "normal",
+          "source_contact",
+          "half_width_m",
+          "contact_half_width_m",
+          "source_contact_kind"
+        ]
+      },
+      "additionalProperties": false
+    },
+    "moving_cell": {
+      "type": "object",
+      "properties": {
+        "position": {
+          "$ref": "#/$defs/cell_position"
+        },
+        "closed": {
+          "type": "string",
+          "minLength": 1
+        },
+        "open": {
+          "type": "string",
+          "minLength": 1
+        }
+      },
+      "required": [
+        "position",
+        "closed",
+        "open"
+      ],
+      "additionalProperties": false
+    },
+    "fixed_cells": {
+      "type": "array",
+      "items": {
+        "$ref": "#/$defs/fixed_cell"
+      },
+      "minItems": 1
+    },
+    "moving_steps": {
+      "type": "array",
+      "items": {
+        "type": "array",
+        "items": {
+          "$ref": "#/$defs/moving_cell"
+        },
+        "minItems": 1
+      },
+      "minItems": 1
+    },
+    "gzip_table": {
+      "type": "object",
+      "properties": {
+        "cells_file": {
+          "type": "string",
+          "pattern": "^(?!.*(?:\\.\\.|:|^[\\\\/])).+\\.json\\.gz$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "cells_file",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "visual": {
+      "type": "object",
+      "properties": {
+        "id": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "frame": {
+          "$ref": "#/$defs/frame"
+        },
+        "supports": {
+          "$ref": "#/$defs/fixed_cells"
+        }
+      },
+      "required": [
+        "id",
+        "frame",
+        "supports"
+      ],
+      "additionalProperties": false
+    },
+    "crane": {
+      "type": "object",
+      "properties": {
+        "visual": {
+          "$ref": "#/$defs/visual"
+        },
+        "stow_frame": {
+          "$ref": "#/$defs/frame"
+        },
+        "initial_bottom": {
+          "type": "number",
+          "exclusiveMaximum": 0
+        },
+        "stow_bottom": {
+          "type": "number",
+          "exclusiveMaximum": 0
+        },
+        "rail_axis_local": {
+          "$ref": "#/$defs/point"
+        },
+        "rail_min": {
+          "type": "number"
+        },
+        "rail_max": {
+          "type": "number"
+        },
+        "hoist_step": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "frame_cells": {
+          "$ref": "#/$defs/fixed_cells"
+        }
+      },
+      "required": [
+        "visual",
+        "stow_frame",
+        "initial_bottom",
+        "stow_bottom",
+        "rail_axis_local",
+        "rail_min",
+        "rail_max",
+        "hoist_step",
+        "frame_cells"
+      ],
+      "additionalProperties": false
+    },
+    "hull_handoff": {
+      "type": "object",
+      "properties": {
+        "supports": {
+          "$ref": "#/$defs/fixed_cells"
+        },
+        "lower_ticks": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "supports",
+        "lower_ticks"
+      ],
+      "additionalProperties": false
+    },
+    "bridge_states": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/gzip_table"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/fixed_cell"
+            },
+            "minItems": 1
+          },
+          "minItems": 10,
+          "maxItems": 10
+        }
+      ]
+    },
+    "lcl": {
+      "oneOf": [
+        {
+          "$ref": "#/$defs/gzip_table"
+        },
+        {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/moving_cell"
+            },
+            "minItems": 1
+          },
+          "minItems": 44,
+          "maxItems": 44
+        }
+      ]
+    },
+    "unit": {
+      "type": "object",
+      "properties": {
+        "carrier_controller": {
+          "type": "object",
+          "properties": {
+            "id": {
+              "type": "string",
+              "format": "uuid"
+            },
+            "source_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            }
+          },
+          "required": [
+            "id",
+            "source_sha256"
+          ],
+          "additionalProperties": false
+        },
+        "service_pit": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_./:-]{1,160}$"
+        },
+        "lower_frame": {
+          "type": "object",
+          "properties": {
+            "source_sha256": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$"
+            },
+            "open_ticks": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "close_ticks": {
+              "type": "integer",
+              "minimum": 1
+            }
+          },
+          "required": [
+            "source_sha256",
+            "open_ticks",
+            "close_ticks"
+          ],
+          "additionalProperties": false
+        },
+        "variant": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "eva": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "plug": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "original_npc": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "original_seat": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "bay_frame": {
+          "$ref": "#/$defs/frame"
+        },
+        "dock_frame": {
+          "$ref": "#/$defs/frame"
+        },
+        "boarding": {
+          "$ref": "#/$defs/point"
+        },
+        "dismount": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/point"
+          },
+          "minItems": 1
+        },
+        "bridge_states": {
+          "$ref": "#/$defs/bridge_states"
+        },
+        "lcl": {
+          "$ref": "#/$defs/lcl"
+        },
+        "gantry": {
+          "$ref": "#/$defs/visual"
+        },
+        "crane": {
+          "$ref": "#/$defs/crane"
+        },
+        "carrier_support": {
+          "$ref": "#/$defs/fixed_cells"
+        },
+        "carrier_raise_ticks": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "seat_frame": {
+          "$ref": "#/$defs/frame"
+        },
+        "chair": {
+          "$ref": "#/$defs/fixed_cells"
+        },
+        "phone": {
+          "$ref": "#/$defs/point"
+        },
+        "standby": {
+          "$ref": "#/$defs/point"
+        },
+        "board_path": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/point"
+          },
+          "minItems": 1
+        },
+        "return_path": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/point"
+          },
+          "minItems": 1
+        },
+        "boarding_radius": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "maximum": 8
+        },
+        "hull_handoff": {
+          "$ref": "#/$defs/hull_handoff"
+        },
+        "personnel_doors": {
+          "type": "array",
+          "items": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/moving_cell"
+            },
+            "minItems": 2,
+            "maxItems": 2
+          },
+          "minItems": 1
+        }
+      },
+      "required": [
+        "variant",
+        "eva",
+        "plug",
+        "original_npc",
+        "original_seat",
+        "bay_frame",
+        "dock_frame",
+        "boarding",
+        "dismount",
+        "bridge_states",
+        "lcl",
+        "gantry",
+        "crane",
+        "carrier_support",
+        "carrier_raise_ticks",
+        "seat_frame",
+        "chair",
+        "phone",
+        "standby",
+        "board_path",
+        "return_path",
+        "boarding_radius",
+        "personnel_doors"
+      ],
+      "additionalProperties": false
+    },
+    "gate": {
+      "type": "object",
+      "properties": {
+        "resource": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_./:-]{1,160}$"
+        },
+        "visual": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "kind": {
+          "enum": [
+            "HANGAR",
+            "SILO"
+          ]
+        },
+        "variant": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 2
+        },
+        "stage": {
+          "type": "integer",
+          "minimum": -1
+        },
+        "frame": {
+          "$ref": "#/$defs/frame"
+        },
+        "width": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "height": {
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "collision_steps": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/moving_steps"
+            },
+            {
+              "$ref": "#/$defs/gzip_table"
+            }
+          ]
+        },
+        "supports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gate_support_cell"
+          },
+          "minItems": 1
+        },
+        "floor_seal_original_cells": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/cell_position"
+          },
+          "minItems": 1,
+          "maxItems": 512,
+          "uniqueItems": true
+        },
+        "silo_hatch": {
+          "type": "object",
+          "properties": {
+            "opening_x": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "opening_z": {
+              "type": "number",
+              "exclusiveMinimum": 0
+            },
+            "open_ticks": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "close_ticks": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "separation_sign": {
+              "enum": [
+                -1,
+                1
+              ]
+            },
+            "beam_bottom": {
+              "type": "number",
+              "exclusiveMaximum": -0.35
+            },
+            "service_column_ports": {
+              "type": "boolean"
+            },
+            "upright_guide_ports": {
+              "type": "boolean"
+            },
+            "service_gantry_yaw_degrees": {
+              "enum": [
+                0,
+                180
+              ]
+            },
+            "upright_guide_early_variant": {
+              "type": "integer",
+              "minimum": -1,
+              "maximum": 2
+            }
+          },
+          "required": [
+            "opening_x",
+            "opening_z",
+            "open_ticks",
+            "close_ticks"
+          ],
+          "additionalProperties": false,
+          "allOf": [
+            {
+              "if": {
+                "properties": {
+                  "upright_guide_ports": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "upright_guide_ports"
+                ]
+              },
+              "then": {
+                "properties": {
+                  "opening_x": {
+                    "const": 31
+                  },
+                  "opening_z": {
+                    "const": 31
+                  },
+                  "separation_sign": {
+                    "const": 1
+                  },
+                  "service_column_ports": {
+                    "const": false
+                  },
+                  "service_gantry_yaw_degrees": {
+                    "enum": [
+                      0,
+                      180
+                    ]
+                  }
+                },
+                "required": [
+                  "separation_sign"
+                ],
+                "allOf": [
+                  {
+                    "if": {
+                      "properties": {
+                        "service_column_ports": {
+                          "const": true
+                        }
+                      },
+                      "required": [
+                        "service_column_ports"
+                      ]
+                    },
+                    "then": {
+                      "required": [
+                        "service_gantry_yaw_degrees"
+                      ]
+                    },
+                    "else": {
+                      "properties": {
+                        "service_gantry_yaw_degrees": {
+                          "const": 0
+                        }
+                      }
+                    }
+                  }
+                ]
+              }
+            },
+            {
+              "if": {
+                "properties": {
+                  "service_column_ports": {
+                    "const": true
+                  }
+                },
+                "required": [
+                  "service_column_ports"
+                ]
+              },
+              "then": {
+                "required": [
+                  "service_gantry_yaw_degrees"
+                ]
+              },
+              "else": {
+                "properties": {
+                  "service_gantry_yaw_degrees": {
+                    "const": 0
+                  }
+                }
+              }
+            }
+          ]
+        },
+        "hangar_stack": {
+          "type": "object",
+          "properties": {
+            "open_ticks": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "close_ticks": {
+              "type": "integer",
+              "minimum": 1
+            },
+            "depth_direction": {
+              "enum": [
+                -1,
+                1
+              ]
+            },
+            "floor_seal": {
+              "type": "object",
+              "properties": {
+                "closed_boxes": {
+                  "type": "array",
+                  "minItems": 1,
+                  "maxItems": 512,
+                  "items": {
+                    "type": "array",
+                    "minItems": 6,
+                    "maxItems": 6,
+                    "items": {
+                      "type": "number"
+                    }
+                  }
+                },
+                "drop_m": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 6
+                },
+                "retreat_local_z_m": {
+                  "type": "number",
+                  "exclusiveMinimum": 0,
+                  "maximum": 32
+                },
+                "version": {
+                  "type": "integer",
+                  "enum": [
+                    1,
+                    2
+                  ]
+                },
+                "retained_box_count": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 64
+                }
+              },
+              "required": [
+                "closed_boxes",
+                "drop_m",
+                "retreat_local_z_m"
+              ],
+              "additionalProperties": false,
+              "allOf": [
+                {
+                  "if": {
+                    "properties": {
+                      "version": {
+                        "const": 2
+                      }
+                    },
+                    "required": [
+                      "version"
+                    ]
+                  },
+                  "then": {
+                    "required": [
+                      "retained_box_count"
+                    ]
+                  },
+                  "else": {
+                    "not": {
+                      "required": [
+                        "retained_box_count"
+                      ]
+                    }
+                  }
+                }
+              ]
+            }
+          },
+          "required": [
+            "open_ticks",
+            "close_ticks"
+          ],
+          "additionalProperties": false
+        }
+      },
+      "required": [
+        "resource",
+        "visual",
+        "kind",
+        "variant",
+        "stage",
+        "frame",
+        "width",
+        "height",
+        "collision_steps",
+        "supports"
+      ],
+      "additionalProperties": false,
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "SILO"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "silo_hatch"
+            ]
+          }
+        },
+        {
+          "if": {
+            "properties": {
+              "kind": {
+                "const": "HANGAR"
+              }
+            }
+          },
+          "then": {
+            "required": [
+              "hangar_stack"
+            ]
+          }
+        },
+        {
+          "if": {
+            "required": [
+              "silo_hatch"
+            ],
+            "properties": {
+              "silo_hatch": {
+                "required": [
+                  "upright_guide_early_variant"
+                ],
+                "properties": {
+                  "upright_guide_early_variant": {
+                    "minimum": 0
+                  }
+                }
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "kind": {
+                "const": "SILO"
+              },
+              "stage": {
+                "const": 3
+              },
+              "silo_hatch": {
+                "required": [
+                  "upright_guide_ports",
+                  "service_column_ports"
+                ],
+                "properties": {
+                  "upright_guide_ports": {
+                    "const": true
+                  },
+                  "service_column_ports": {
+                    "const": false
+                  }
+                }
+              }
+            },
+            "oneOf": [
+              {
+                "properties": {
+                  "resource": {
+                    "const": "bank_3_upper_lane_2"
+                  },
+                  "variant": {
+                    "const": 0
+                  },
+                  "silo_hatch": {
+                    "properties": {
+                      "upright_guide_early_variant": {
+                        "const": 0
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "resource": {
+                    "const": "bank_3_upper_lane_1"
+                  },
+                  "variant": {
+                    "const": 1
+                  },
+                  "silo_hatch": {
+                    "properties": {
+                      "upright_guide_early_variant": {
+                        "const": 1
+                      }
+                    }
+                  }
+                }
+              },
+              {
+                "properties": {
+                  "resource": {
+                    "const": "bank_3_upper_lane_0"
+                  },
+                  "variant": {
+                    "const": 2
+                  },
+                  "silo_hatch": {
+                    "properties": {
+                      "upright_guide_early_variant": {
+                        "const": 2
+                      }
+                    }
+                  }
+                }
+              }
+            ]
+          }
+        }
+      ]
+    },
+    "receiver": {
+      "type": "object",
+      "properties": {
+        "port": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_./:-]{1,160}$"
+        },
+        "region": {
+          "enum": [
+            "SURFACE",
+            "GEOFRONT"
+          ]
+        },
+        "domain": {
+          "type": "array",
+          "items": {
+            "type": "number"
+          },
+          "minItems": 6,
+          "maxItems": 6
+        },
+        "stopped_frame": {
+          "$ref": "#/$defs/frame"
+        },
+        "supports": {
+          "type": "array",
+          "items": {
+            "$ref": "#/$defs/gate_support_cell"
+          },
+          "minItems": 1
+        },
+        "gates": {
+          "type": "array",
+          "items": {
+            "type": "string",
+            "pattern": "^[A-Za-z0-9_./:-]{1,160}$"
+          },
+          "minItems": 0
+        },
+        "carrier_ticks": {
+          "type": "integer",
+          "minimum": 1
+        }
+      },
+      "required": [
+        "port",
+        "region",
+        "domain",
+        "stopped_frame",
+        "supports",
+        "gates",
+        "carrier_ticks"
+      ],
+      "additionalProperties": false
+    },
+    "staff": {
+      "type": "object",
+      "properties": {
+        "original_uuid": {
+          "type": "string",
+          "format": "uuid"
+        },
+        "id": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_./:-]{1,160}$"
+        },
+        "name": {
+          "type": "string",
+          "minLength": 1
+        },
+        "role": {
+          "type": "string",
+          "minLength": 1
+        },
+        "skin": {
+          "type": "string",
+          "minLength": 1
+        },
+        "feet": {
+          "$ref": "#/$defs/cell_position"
+        },
+        "yaw": {
+          "type": "number"
+        },
+        "support": {
+          "$ref": "#/$defs/fixed_cells"
+        }
+      },
+      "required": [
+        "original_uuid",
+        "id",
+        "name",
+        "role",
+        "skin",
+        "feet",
+        "yaw",
+        "support"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "description": "Structure only; production parser additionally checks same full bridge footprint/ten unique states, original 44/90947 LCL, actual quaternion/UUID/resource provenance and native world commissioning.",
+  "allOf": [
+    {
+      "if": {
+        "properties": {
+          "status": {
+            "const": "installed"
+          }
+        },
+        "required": [
+          "status"
+        ]
+      },
+      "then": {
+        "required": [
+          "ground_guides"
+        ],
+        "properties": {
+          "ground_guides": {
+            "if": {
+              "properties": {
+                "mode": {
+                  "const": "continuous_upright"
+                }
+              },
+              "required": [
+                "mode"
+              ]
+            },
+            "then": {
+              "required": [
+                "mode",
+                "source_sha256",
+                "paths_sha256"
+              ]
+            },
+            "else": {
+              "required": [
+                "dock_source_sha256",
+                "dock_foundations"
+              ]
+            }
+          },
+          "units": {
+            "items": {
+              "required": [
+                "service_pit",
+                "lower_frame",
+                "carrier_controller"
+              ]
+            }
+          }
+        }
+      }
+    }
+  ]
+}

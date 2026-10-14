@@ -18,6 +18,19 @@ public final class NervRouteRuntimeStateR52 extends SavedData
     private boolean claimed;
     private long epoch;
     private String fingerprint="",fault="",personnelLiftManifest="",installationBundle="",installationBundleSHA="",uprightGuideSourceSHA="";
+    public record PendingInstallationR52(String bundle,String sha,long epoch,String directory,boolean restoring)
+    {
+        public PendingInstallationR52
+        {
+            bundle=relativeBundleR52(bundle);
+            if(sha==null||!sha.matches("[0-9a-f]{64}")||epoch<=0||directory==null||!directory.matches("[0-9a-f]{64}"))throw new IllegalArgumentException("Exact pending bundle SHA, epoch and directory required");
+        }
+    }
+    private PendingInstallationR52 pendingInstallation;
+    private String pendingInstallationHold="";
+    private String pendingInstallationPreviousHold="";
+    private int pendingInstallationAttempts;
+    private boolean pendingInstallationPaused;
     private final Map<UUID,Long> installationActorChunks=new LinkedHashMap<>();
     private final Map<Integer,Job> jobs=new LinkedHashMap<>();
     public boolean claimed(){return claimed;}
@@ -28,6 +41,33 @@ public final class NervRouteRuntimeStateR52 extends SavedData
     public String personnelLiftManifest(){return personnelLiftManifest;}
     public String installationBundle(){return installationBundle;}
     public String installationBundleSHA(){return installationBundleSHA;}
+    public PendingInstallationR52 pendingInstallationR52(){return pendingInstallation;}
+    public String pendingInstallationHoldR52(){return pendingInstallationHold;}
+    public String pendingInstallationPreviousHoldR52(){return pendingInstallationPreviousHold;}
+    public int pendingInstallationAttemptsR52(){return pendingInstallationAttempts;}
+    public boolean pendingInstallationPausedR52(){return pendingInstallationPaused;}
+    public void queueInstallationR52(PendingInstallationR52 request)
+    {
+        Objects.requireNonNull(request);
+        if(!fault.isEmpty())throw new IllegalStateException("Existing runtime fault must be resolved before installation: "+fault);
+        if(pendingInstallation!=null&&!pendingInstallation.equals(request))throw new IllegalStateException("Pending bundle authority changed; preserve the original request and repair its exact sources");
+        if(request.restoring())
+        {
+            if(!claimed||epoch!=request.epoch()||!fingerprint.equals(request.directory())||!installationBundle.equals(request.bundle())||!installationBundleSHA.equals(request.sha()))throw new IllegalStateException("Restoration must retain the accepted bundle, epoch and directory");
+        }
+        else if(!installationBundle.isEmpty()||!jobs.isEmpty())throw new IllegalStateException("Accepted installation or original jobs require restoration, not new commissioning");
+        if(pendingInstallation!=null&&!pendingInstallationHold.isEmpty())pendingInstallationPreviousHold=pendingInstallationHold;
+        claim(request.epoch(),request.directory());pendingInstallation=request;pendingInstallationPaused=false;pendingInstallationHold="";pendingInstallationAttempts=Math.addExact(pendingInstallationAttempts,1);setDirty();
+    }
+    public void installationHoldR52(String reason)
+    {if(pendingInstallation!=null&&!Objects.equals(pendingInstallationHold,reason)){pendingInstallationHold=Objects.requireNonNull(reason);setDirty();}}
+    public void pauseInstallationR52(String reason)
+    {if(pendingInstallation==null)throw new IllegalStateException("No pending installation");if(reason==null||reason.isBlank())throw new IllegalArgumentException("Explicit cancellation reason required");pendingInstallationPaused=true;pendingInstallationHold=reason;setDirty();}
+    public void finishInstallationR52(PendingInstallationR52 request)
+    {
+        if(!Objects.equals(pendingInstallation,request)||pendingInstallationPaused||epoch!=request.epoch()||!fingerprint.equals(request.directory()))throw new IllegalStateException("Only the current verified request may complete installation");
+        rememberInstallationR52(request.bundle(),request.sha());pendingInstallation=null;pendingInstallationPaused=false;pendingInstallationHold="";pendingInstallationPreviousHold="";pendingInstallationAttempts=0;setDirty();
+    }
     public String uprightGuideSourceR52(){return uprightGuideSourceSHA;}
     void declareUprightGuideSourceR52(String sha){if(!claimed||sha==null||!sha.matches("[0-9a-f]{64}")||sha.equals("0".repeat(64)))throw new IllegalArgumentException("Actual claimed upright source SHA required");if(!sha.equals(uprightGuideSourceSHA)){uprightGuideSourceSHA=sha;setDirty();}}
     public Map<UUID,Long> installationActorChunks(){return Map.copyOf(installationActorChunks);}
@@ -40,7 +80,7 @@ public final class NervRouteRuntimeStateR52 extends SavedData
         var path=java.nio.file.Path.of(name);if(path.isAbsolute()||path.getRoot()!=null||path.normalize().startsWith("..")||path.normalize().toString().isEmpty())throw new IllegalArgumentException("Explicit world-relative installed bundle required");return path.normalize().toString().replace('\\','/');
     }
     private static long checkedInstallationChunkR52(long chunk){int x=(int)chunk,z=(int)(chunk>>32);if(Math.abs((long)x)>1875000||Math.abs((long)z)>1875000)throw new IllegalArgumentException("Actual installed actor chunk exceeds world bounds");return chunk;}
-    public void installationActorChunkR52(UUID actor,long chunk){if(installationBundle.isEmpty()||actor==null)throw new IllegalStateException("Installed bundle and original actor required");checkedInstallationChunkR52(chunk);if(!Objects.equals(installationActorChunks.put(actor,chunk),chunk))setDirty();}
+    public void installationActorChunkR52(UUID actor,long chunk){if(installationBundle.isEmpty()&&pendingInstallation==null||actor==null)throw new IllegalStateException("Accepted or pending bundle and original actor required");checkedInstallationChunkR52(chunk);if(!Objects.equals(installationActorChunks.put(actor,chunk),chunk))setDirty();}
     public void retainInstallationActorsR52(Set<UUID> actual){if(installationActorChunks.keySet().removeIf(id->!actual.contains(id)))setDirty();}
     public void personnelLiftManifest(String relativeRootFile)
     {
@@ -86,8 +126,18 @@ public final class NervRouteRuntimeStateR52 extends SavedData
         if(tag.contains("UprightGuideSourceSHA"))try{state.declareUprightGuideSourceR52(tag.getString("UprightGuideSourceSHA"));}catch(RuntimeException invalid){state.fault="Invalid persisted upright guide source: "+invalid.getMessage();}
         if(tag.contains("InstallationBundle")||tag.contains("InstallationBundleSHA"))try{
             state.rememberInstallationR52(tag.getString("InstallationBundle"),tag.getString("InstallationBundleSHA"));
-            for(var raw:tag.getList("InstallationActorChunks",Tag.TAG_COMPOUND)){var row=(CompoundTag)raw;if(!row.hasUUID("Actor")||!row.contains("Chunk",Tag.TAG_LONG)||state.installationActorChunks.putIfAbsent(row.getUUID("Actor"),checkedInstallationChunkR52(row.getLong("Chunk")))!=null)throw new IllegalArgumentException("Distinct actual installed actor chunks required");}
         }catch(RuntimeException invalid){state.fault="Invalid persisted Root installation: "+invalid.getMessage();}
+        if(tag.contains("PendingInstallation",Tag.TAG_COMPOUND))try
+        {
+            var p=tag.getCompound("PendingInstallation");if(p.getInt("Version")!=1||!p.contains("Restoring",Tag.TAG_BYTE))throw new IllegalArgumentException("Explicit pending installation version and mode required");
+            var request=new PendingInstallationR52(p.getString("Bundle"),p.getString("SHA"),p.getLong("Epoch"),p.getString("Directory"),p.getBoolean("Restoring"));
+            if(!state.claimed||state.epoch!=request.epoch()||!state.fingerprint.equals(request.directory()))throw new IllegalArgumentException("Pending request differs from claimed epoch/directory");
+            state.queueInstallationR52(request);state.pendingInstallationPaused=p.getBoolean("Paused");state.pendingInstallationHold=p.getString("Hold");state.pendingInstallationPreviousHold=p.getString("PreviousHold");state.pendingInstallationAttempts=p.contains("Attempts")?p.getInt("Attempts"):1;if(state.pendingInstallationAttempts<1)throw new IllegalArgumentException("Positive pending attempt count required");
+        }catch(RuntimeException invalid){state.fault="Invalid pending Root installation: "+invalid.getMessage();}
+        try
+        {
+            for(var raw:tag.getList("InstallationActorChunks",Tag.TAG_COMPOUND)){var row=(CompoundTag)raw;if(!row.hasUUID("Actor")||!row.contains("Chunk",Tag.TAG_LONG)||state.installationBundle.isEmpty()&&state.pendingInstallation==null||state.installationActorChunks.putIfAbsent(row.getUUID("Actor"),checkedInstallationChunkR52(row.getLong("Chunk")))!=null)throw new IllegalArgumentException("Distinct actual actor chunks require an accepted or pending bundle");}
+        }catch(RuntimeException invalid){state.fault="Invalid persisted Root actor chunks: "+invalid.getMessage();}
         for(var element:tag.getList("Jobs",Tag.TAG_COMPOUND))
         {
             try
@@ -99,13 +149,16 @@ public final class NervRouteRuntimeStateR52 extends SavedData
             }
             catch(RuntimeException invalid){state.fault="Invalid persisted R52 job: "+invalid.getMessage();}
         }
+        if(state.pendingInstallation!=null&&!state.pendingInstallation.restoring()&&!state.jobs.isEmpty())state.fault="Initial commissioning cannot replace original saved jobs";
         return state;
     }
     @Override public CompoundTag save(CompoundTag tag)
     {
         tag.putInt("Version",1);tag.putBoolean("Claimed",claimed);tag.putLong("Epoch",epoch);tag.putString("DirectoryFingerprint",fingerprint);tag.putString("PersonnelLiftManifest",personnelLiftManifest);tag.putString("Fault",fault);
         if(!uprightGuideSourceSHA.isEmpty())tag.putString("UprightGuideSourceSHA",uprightGuideSourceSHA);
-        if(!installationBundle.isEmpty()){tag.putString("InstallationBundle",installationBundle);tag.putString("InstallationBundleSHA",installationBundleSHA);var chunks=new ListTag();for(var e:installationActorChunks.entrySet()){var row=new CompoundTag();row.putUUID("Actor",e.getKey());row.putLong("Chunk",e.getValue());chunks.add(row);}tag.put("InstallationActorChunks",chunks);}
+        if(!installationBundle.isEmpty()){tag.putString("InstallationBundle",installationBundle);tag.putString("InstallationBundleSHA",installationBundleSHA);}
+        if(pendingInstallation!=null){var p=new CompoundTag();p.putInt("Version",1);p.putString("Bundle",pendingInstallation.bundle());p.putString("SHA",pendingInstallation.sha());p.putLong("Epoch",pendingInstallation.epoch());p.putString("Directory",pendingInstallation.directory());p.putBoolean("Restoring",pendingInstallation.restoring());p.putBoolean("Paused",pendingInstallationPaused);p.putString("Hold",pendingInstallationHold);p.putString("PreviousHold",pendingInstallationPreviousHold);p.putInt("Attempts",pendingInstallationAttempts);tag.put("PendingInstallation",p);}
+        if(!installationActorChunks.isEmpty()){var chunks=new ListTag();for(var e:installationActorChunks.entrySet()){var row=new CompoundTag();row.putUUID("Actor",e.getKey());row.putLong("Chunk",e.getValue());chunks.add(row);}tag.put("InstallationActorChunks",chunks);}
         var rows=new ListTag();for(var job:jobs.values()){var row=new CompoundTag();row.put("Snapshot",encode(job.snapshot()));row.putString("Phase",job.phase().name());row.put("OwnerData",job.ownerData().copy());row.putString("Waiting",job.waiting());rows.add(row);}tag.put("Jobs",rows);return tag;
     }
     public static CompoundTag encode(Snapshot snapshot)

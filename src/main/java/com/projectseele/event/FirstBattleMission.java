@@ -43,6 +43,7 @@ public final class FirstBattleMission
     private static Vec3 point(com.google.gson.JsonArray a){return new Vec3(a.get(0).getAsDouble(),a.get(1).getAsDouble(),a.get(2).getAsDouble());}
     private static Site site(ServerLevel level)
     {
+        if(com.projectseele.world.SurfaceAngelPlanR52.declared(level))return null;
         return SITES.computeIfAbsent(level,l->{
             Path path=l.getServer().getWorldPath(LevelResource.ROOT).resolve("first_battle_site_r10.json");if(!Files.isRegularFile(path))return Optional.empty();
             try{var d=JsonParser.parseString(Files.readString(path)).getAsJsonObject();String dim=d.get("dimension").getAsString();if(!l.dimension().location().toString().equals(dim))return Optional.empty();return Optional.of(new Site(dim,point(d.getAsJsonArray("hero")),point(d.getAsJsonArray("angel")),BlockPos.containing(point(d.getAsJsonArray("console"))),d.get("yaw").getAsFloat()));}
@@ -51,14 +52,15 @@ public final class FirstBattleMission
     }
     private static ServerLevel missionLevel(ServerPlayer player)
     {
+        for(ServerLevel level:player.server.getAllLevels())if(com.projectseele.world.SurfaceAngelPlanR52.declared(level))return level;
         for(ServerLevel level:player.server.getAllLevels())if(site(level)!=null)return level;return null;
     }
     public static boolean begin(ServerPlayer player)
     {
         ServerLevel level=missionLevel(player);if(level==null){player.displayClientMessage(Component.literal("当前世界尚未设置迎击区域。"),false);return false;}
         var campaign=com.projectseele.world.TvCampaignSavedData.get(level);
-        if(com.projectseele.world.SurfaceAngelPlanR52.handles(campaign.active))
-        {player.displayClientMessage(Component.literal("本次地表作战已接受，原使徒按登记远端路线接近；无需重复生成迎击目标。"),false);return false;}
+        if(com.projectseele.world.SurfaceAngelPlanR52.handles(level,"sachiel"))
+        {String blocker=com.projectseele.world.SurfaceAngelPlanR52.startBlocker(level,"sachiel");player.displayClientMessage(Component.literal(blocker.isEmpty()?"本地图使用已登记的地表作战路线，请从作战指挥下达行动，不重复生成旧迎击目标。":blocker),false);return false;}
         var data=FirstBattleSavedData.get(level);if(data.active!=null||data.missionOwner!=null){player.displayClientMessage(Component.literal("迎击任务已下达，请先完成当前行动。"),false);return false;}
         Site existingSite=site(level);
         if(!level.getEntitiesOfClass(SachielEntity.class,new net.minecraft.world.phys.AABB(existingSite.angel,existingSite.angel).inflate(220),
@@ -107,7 +109,7 @@ public final class FirstBattleMission
             Site s=site(level);if(s==null)continue;var data=FirstBattleSavedData.get(level);var bar=BARS.computeIfAbsent(level,l->new ServerBossEvent(Component.literal("NERV 迎撃指令"),BossEvent.BossBarColor.YELLOW,BossEvent.BossBarOverlay.PROGRESS));bar.removeAllPlayers();
             // The TV surface director already owns spawn, approach, live bar and original UUID retention.
             // Independent development replays keep their separate lifecycle.
-            if(com.projectseele.world.SurfaceAngelPlanR52.handles(com.projectseele.world.TvCampaignSavedData.get(level).active))
+            if(com.projectseele.world.SurfaceAngelPlanR52.handles(level,com.projectseele.world.TvCampaignSavedData.get(level).active))
             {bar.setVisible(false);continue;}
             if(data.missionOwner==null)continue;
             if(data.missionAngel!=null)

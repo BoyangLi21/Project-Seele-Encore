@@ -19,6 +19,17 @@ AIR='minecraft:air';DECK='minecraft:light_gray_concrete';STEEL='projectseele:ner
 def load(p):return json.loads(p.read_text(encoding='utf-8'))
 def arrays(p):
     with np.load(p) as a:return {k:a[k] for k in a.files}
+
+def measured_restore_height(terrain,x,z):
+    """Inactive R02 cells contain placeholder64, not surveyed natural terrain.
+
+    R52 traced the deep west-ridge trench to using that placeholder while
+    retiring old rails. Unknown terrain must remain unchanged by this tool.
+    """
+    ox,oz=map(int,terrain['origin']);iz,ix=z-oz,x-ox
+    nz,nx=terrain['height'].shape
+    if not (0<=ix<nx and 0<=iz<nz and bool(terrain['active'][iz,ix])):return None
+    return int(terrain['height'][iz,ix])
 def ff(p,box,state,owner):p.fill(*map(int,box),state,owner,'owned')
 def grouped(columns):
     rows=defaultdict(list)
@@ -168,8 +179,8 @@ def main():
         for state in ('minecraft:gray_concrete','minecraft:polished_deepslate','minecraft:polished_blackstone','minecraft:deepslate_tiles','minecraft:smooth_stone','minecraft:quartz_block','minecraft:iron_block'):
             p.match((x,y-4,z,X,y+7,z),state,AIR,'r20/retire_ground_rail_formation')
     for (x,z),y in old_columns.items():
-        if 0<=x-ox<nx and 0<=z-oz<nz:
-            h=int(terrain['height'][z-oz,x-ox]);natural_restore[x//16,z//16][x%16,z%16]=h
+        h=measured_restore_height(terrain,x,z)
+        if h is not None:natural_restore[x//16,z//16][x%16,z%16]=h
     for (cx,cz),columns in natural_restore.items():
         heights=np.zeros((16,16),int);active=np.zeros((16,16),bool)
         for (x,z),y in columns.items():heights[z,x]=y;active[z,x]=True

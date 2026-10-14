@@ -42,6 +42,8 @@ public final class NervRouteNativeR52 implements NativeAccess
         default boolean atOriginalPilotStandby(ServerLevel level,int variant){return false;}
         Preparation prepareOriginal(ServerLevel level,Original original,CompoundTag ownerData);
         boolean prepareLeg(ServerLevel level,Original original,Route route,Leg leg,CompoundTag ownerData);
+        default boolean prepareBankHeadsR53(ServerLevel level,Original original,Route route,UUID task,CompoundTag ownerData){return false;}
+        default boolean prepareBankForRetargetR53(ServerLevel level,Original original,Route route,UUID task,CompoundTag ownerData){return false;}
         default boolean prepareContinuousRouteR52(ServerLevel level,Original original,Route route,CompoundTag ownerData){return false;}
         default List<DirectoryTrajectoryR52> continuousRoutePathsR52(ServerLevel level,Original original,Route route,CompoundTag ownerData){return List.of();}
         default boolean rebindStoppedContinuousR52(ServerLevel level,Original original,CompoundTag ownerData){return false;}
@@ -114,6 +116,8 @@ public final class NervRouteNativeR52 implements NativeAccess
         if(!AutoSortieR32.missionToken(level).equals(original.mission()))return false;
         var tag=eva.getPersistentData();if(tag.hasUUID("R32SortieCommander")&&!tag.getUUID("R32SortieCommander").equals(original.owner()))return false;
         if(AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),original.mission()))return false;
+        if(r instanceof TrainingPilotEntity pilot&&original.mission().isEmpty())
+            return NervRouteRuntimeR52.manualOriginalNpcR60(level,directory,owner,original,eva,pilot);
         if(r instanceof TrainingPilotEntity)return AutoSortieR32.assignedPilotR45(level,original.variant(),r)
                 &&TvCampaignSavedData.get(level).sorties.get(original.variant()).commander.equals(original.owner());
         return r instanceof ServerPlayer player&&!player.isSpectator()&&player.getUUID().equals(original.owner())&&NervStaffDialogue.authorized(player);

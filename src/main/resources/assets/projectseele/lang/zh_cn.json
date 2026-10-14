@@ -324,5 +324,7 @@
   "block.projectseele.entry_plug_bridge_deck": "插入栓检修桥面",
   "block.projectseele.entry_plug_bridge_guard": "插入栓检修桥护栏",
   "key.projectseele.eva_dash": "疾跑（TV）",
-  "entity.projectseele.gaghiel": "鱼天使"
+  "entity.projectseele.gaghiel": "鱼天使",
+  "subtitles.projectseele.launch_electric_burst_r53": "发射轨道：电流爆发",
+  "subtitles.projectseele.launch_rail_friction_r53": "发射轨道：高速摩擦"
 }

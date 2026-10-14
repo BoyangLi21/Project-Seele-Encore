@@ -12,17 +12,21 @@ public final class SiloHatchMechanism
     public static final double PANEL_TOP = .98D;
 
     public record Panel(double x, double y) {}
-    public record Spec(float openingX,float openingZ,int openTicks,int closeTicks,int separationSign,double beamBottom,boolean serviceColumnPorts,boolean uprightGuidePorts)
+    public record Spec(float openingX,float openingZ,int openTicks,int closeTicks,int separationSign,double beamBottom,boolean serviceColumnPorts,boolean uprightGuidePorts,int serviceGantryYawDegrees,int uprightGuideEarlyVariant)
     {
-        public Spec{if(!Float.isFinite(openingX+openingZ)||openingX<=0||openingZ<=0||openTicks<=0||closeTicks<=0||Math.abs(separationSign)!=1||!Double.isFinite(beamBottom)||beamBottom>=-.35||serviceColumnPorts&&(openingX!=33||openingZ!=33||separationSign!=-1)||uprightGuidePorts&&(openingX!=31||openingZ!=31||separationSign!=1||serviceColumnPorts))throw new IllegalArgumentException("Actual positive hatch aperture/clocks and explicit tier/bearing direction required");if(openingX==31&&openingZ==31&&separationSign<0)throw new IllegalArgumentException("Declared R52 net31 uses upward tiers; original collar does not support downward travel");}
+        public Spec{if(uprightGuideEarlyVariant < -1||uprightGuideEarlyVariant > 2||uprightGuideEarlyVariant>=0&&!uprightGuidePorts)throw new IllegalArgumentException("Early guide fitting belongs only to the three explicitly declared bank3 upper hatches");if(serviceGantryYawDegrees!=0&&serviceGantryYawDegrees!=180||!serviceColumnPorts&&serviceGantryYawDegrees!=0)throw new IllegalArgumentException("Explicit service gantry relative yaw0/180 belongs only to service column ports");if(!Float.isFinite(openingX+openingZ)||openingX<=0||openingZ<=0||openTicks<=0||closeTicks<=0||Math.abs(separationSign)!=1||!Double.isFinite(beamBottom)||beamBottom>=-.35||serviceColumnPorts&&(openingX!=33||openingZ!=33||separationSign!=-1)||uprightGuidePorts&&(openingX!=31||openingZ!=31||separationSign!=1||serviceColumnPorts))throw new IllegalArgumentException("Actual positive hatch aperture/clocks and explicit tier/bearing direction required");if(openingX==31&&openingZ==31&&separationSign<0)throw new IllegalArgumentException("Declared R52 net31 uses upward tiers; original collar does not support downward travel");}
+        public Spec(float x,float z,int open,int close,int sign,double bottom,boolean servicePorts,boolean uprightPorts,int gantryYaw){this(x,z,open,close,sign,bottom,servicePorts,uprightPorts,gantryYaw,-1);}
+        public Spec(float x,float z,int open,int close,int sign,double bottom,boolean servicePorts,boolean uprightPorts){this(x,z,open,close,sign,bottom,servicePorts,uprightPorts,0);}
         public Spec(float x,float z,int open,int close,int sign,double bottom,boolean servicePorts){this(x,z,open,close,sign,bottom,servicePorts,false);}
         public Spec(float x,float z,int open,int close){this(x,z,open,close,1,-2.01,false);}
         public Spec(float x,float z,int open,int close,int sign,double bottom){this(x,z,open,close,sign,bottom,false);}
+        public Spec withUprightGuideEarlyVariant(int variant){return new Spec(openingX,openingZ,openTicks,closeTicks,separationSign,beamBottom,serviceColumnPorts,uprightGuidePorts,serviceGantryYawDegrees,variant);}
         public double firstTier(){return serviceColumnPorts?1.62:1.1;}
         public double maximumTier(){return firstTier()+3*1.1;}
         // The preserved original gantry datum is 2.04m above the service
         // beam's unchanged bearing plane. It is never relocated by a hatch.
         public double serviceColumnDatumOffsetY(){return beamBottom+2.04;}
+        public com.projectseele.world.RigidTransform serviceGantryRelativeFrame(){return new com.projectseele.world.RigidTransform(new net.minecraft.world.phys.Vec3(0,serviceColumnDatumOffsetY(),0),0,serviceGantryYawDegrees==180?1:0,0,serviceGantryYawDegrees==0?1:0);}
         public boolean compact(){return openingX>31&&openingX<64;}
         public double panelWidth(){return compact()?openingX/(2D*PANELS):(openingX+1D)/(2*PANELS);}
         public double pocketX(){return openingX/2D+(compact()?.15*openingX/33D:.9D);}

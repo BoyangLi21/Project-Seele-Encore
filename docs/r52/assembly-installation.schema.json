@@ -1,0 +1,151 @@
+{
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "projectseele.r52.assembly-installation.v1"
+    },
+    "map_author": {
+      "const": "root"
+    },
+    "status": {
+      "enum": [
+        "design",
+        "installed"
+      ]
+    },
+    "dimension": {
+      "type": "string",
+      "pattern": "^[A-Za-z0-9_./:-]{1,160}$"
+    },
+    "epoch": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "directory_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "directory": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^(?!.*(?:\\.\\.|:|^[\\\\/])).+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "file",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "mechanical_owner": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^(?!.*(?:\\.\\.|:|^[\\\\/])).+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "file",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "air_transport": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^(?!.*(?:\\.\\.|:|^[\\\\/])).+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "file",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "personnel_lifts": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^(?!.*(?:\\.\\.|:|^[\\\\/])).+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "file",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "fixed_cannon": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^(?!.*(?:\\.\\.|:|^[\\\\/])).+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "file",
+        "sha256"
+      ],
+      "additionalProperties": false
+    },
+    "upright_guideway": {
+      "type": "object",
+      "properties": {
+        "file": {
+          "type": "string",
+          "pattern": "^(?!.*(?:\\.\\.|:|^[\\\\/])).+$"
+        },
+        "sha256": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      },
+      "required": [
+        "file",
+        "sha256"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "schema",
+    "map_author",
+    "status",
+    "dimension",
+    "epoch",
+    "directory_fingerprint",
+    "directory",
+    "mechanical_owner",
+    "upright_guideway"
+  ],
+  "additionalProperties": false,
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "projectseele:r52:assembly-installation"
+}

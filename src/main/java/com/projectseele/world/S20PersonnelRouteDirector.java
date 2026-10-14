@@ -58,6 +58,7 @@ public final class S20PersonnelRouteDirector
 
     public static void tick(MinecraftServer server)
     {
+        if(NervLegacyGenerationGuardR52.retired(server))return;
         if (!authorised(server))
         {
             return;
@@ -114,6 +115,7 @@ public final class S20PersonnelRouteDirector
     /** Rebuilds only the corrected B-40 stair and its upper handoff. */
     public static void repairB40RiseAndHandoff(ServerLevel level)
     {
+        if(NervLegacyGenerationGuardR52.retired(level))return;
         buildB40Rise(level);
         for (int x = 57; x <= 77; x++)
         {

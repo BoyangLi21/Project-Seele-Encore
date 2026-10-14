@@ -27,6 +27,7 @@
     "MtrRouteEndpointMixin",
     "UNFlightSpeedR22Mixin",
     "SbwDefenseOwnerMixin",
+    "SbwDefenseLoadedLosR56Mixin",
     "SbwGaghielContactMixinR50",
     "EvaSmallObstacleMixin",
     "CityExactUnionCreateMixinR45",

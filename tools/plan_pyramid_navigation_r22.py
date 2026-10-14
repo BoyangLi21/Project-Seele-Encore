@@ -13,6 +13,12 @@ LO=(-76,-474,235);HI=(157,-356,474)
 GOALS=[('command','指挥室入口',(28,-406,269)),('hangars','机库',(118,-442,240)),('station','总部火车站',(30,-466,451))]
 LIFT_GROUPS=[dict(id='command',points=[(12,y,258) for y in (-448,-423,-419,-409)])]
 PUBLIC_DOMAINS=None;PUBLIC_PATHS=None;RAIL_CURVES=None
+COMMAND_DOOR_FILE='.projectseele_command_sliding_doors_r01.json'
+FREE_LATCH_DOORS=((24,-423,254),(28,-448,282),(48,-448,282))
+EXTRA_OPERABLE_DOORS=()
+MEASURE_ACCESS_READERS=False
+GRAPH_ONLY=False
+COLLISION_SHAPES_FILE=None
 DEBUG_PATHS=None
 # Explicit R46 user retirement of the whole low maintenance layer and blind
 # north branch. Foundation/hoist structures remain physical, never public routes.
@@ -26,7 +32,7 @@ def main(apply=False,output=None,export_routes=None):
  # Registered moving doors are real controlled connections. A static snapshot
  # of their closed barrier must not make the entire command suite disappear
  # from the navigation graph. No arbitrary glass or barrier is opened here.
- marker=WORLD/'.projectseele_command_sliding_doors_r01.json';air=pal.index('minecraft:air')
+ marker=WORLD/COMMAND_DOOR_FILE;air=pal.index('minecraft:air')
  if marker.exists():
   for door in json.loads(marker.read_text()).get('doors',[]):
    included=[]
@@ -35,13 +41,56 @@ def main(apply=False,output=None,export_routes=None):
      current=pal[a[y-LO[1],z-LO[2],x-LO[0]]]
      if current in ('minecraft:barrier','minecraft:air'):a[y-LO[1],z-LO[2],x-LO[0]]=air;included.append((x,y,z))
    if included:door_ports.append(dict(id=door['id'],aperture=included,buttons=door.get('buttons',[])))
- shapes={v.canonical_state(k):s for k,s in json.loads((WORLD/'native_collision_shapes.json').read_text()).items()}
+ shapes={v.canonical_state(k):s for k,s in json.loads((Path(COLLISION_SHAPES_FILE) if COLLISION_SHAPES_FILE else WORLD/'native_collision_shapes.json').read_text()).items()}
+ if MEASURE_ACCESS_READERS:
+  from query_blocks import iter_block_entities,dimension_dir
+  def signed(value,bits):return value-(1<<bits)if value&(1<<(bits-1))else value
+  chamber_path=dimension_dir(WORLD,v.DIM)/'data/projectseele_dead_sea_chamber_r45.dat'
+  chamber=nbtlib.load(chamber_path).get('data',{}) if chamber_path.is_file() else {}
+  for reader,tag in iter_block_entities(WORLD,v.DIM,LO,HI):
+   if str(tag.get('id',''))!='projectseele:nerv_access_reader'or not bool(tag.get('Linked',False)):continue
+   packed=int(tag['Gate']);gate=(signed((packed>>38)&0x3ffffff,26),signed(packed&0xfff,12),signed((packed>>12)&0x3ffffff,26))
+   width=int(tag['Width']);height=int(tag['Height']);along=bool(tag['AlongX'])
+   if not(1<=width<=7 and 2<=height<=9):raise RuntimeError(('Actual reader aperture bounds',reader))
+   cells=[(gate[0]+(span if along else 0),gate[1]+dy,gate[2]+(0 if along else span))for span in range(width)for dy in range(height)]
+   if not all(all(LO[i]<=q[i]<=HI[i]for i in range(3))for q in cells):continue
+   actual=[pal[int(measured[y-LO[1],z-LO[2],x-LO[0]])]for x,y,z in cells]
+   chamber_id=str(tag.get('ChamberId',''))
+   if chamber_id:
+    if not bool(chamber.get('Configured',False)) or str(chamber.get('ChamberId',''))!=chamber_id or int(chamber.get('Gate',0))!=packed:
+     raise RuntimeError(('Reader does not match configured chamber',reader,chamber_id))
+    images={int(image['Pos']):image for image in chamber['Images']}
+    for p,current in zip(cells,actual):
+     key=((p[0]&0x3ffffff)<<38)|((p[2]&0x3ffffff)<<12)|(p[1]&4095)
+     if key>=1<<63:key-=1<<64
+     image=images.get(key)
+     if image is None:raise RuntimeError(('Chamber gate cell has no original saved image',p))
+     state=image['State'];closed=str(state['Name'])
+     if state.get('Properties'):closed+='['+','.join(f'{k}={value}'for k,value in sorted(state['Properties'].items()))+']'
+     if current not in AIR and current!=v.canonical_state(closed):raise RuntimeError(('Actual chamber differs from its saved closed image',p,current,closed))
+   elif not all(s in AIR|{'minecraft:barrier'}for s in actual):raise RuntimeError(('Actual reader aperture has foreign structure',reader,actual))
+   for x,y,z in cells:a[y-LO[1],z-LO[2],x-LO[0]]=air
+   door_ports.append(dict(id='native/access_reader',reader=list(reader),aperture=cells,clearance=int(tag['Clearance']),label=str(tag.get('Label','')),
+    measured=actual,operated=['minecraft:air']*len(cells),
+    measured_reader_nbt=tag.snbt(),requires_actual_use=True,native_operation_verified=False))
+ for pair in EXTRA_OPERABLE_DOORS:
+  included=[]
+  for cell in pair:
+   x,y,z=cell['position']
+   if not all(LO[i]<=q<=HI[i]for i,q in enumerate((x,y,z))):continue
+   at=(y-LO[1],z-LO[2],x-LO[0]);current=pal[int(a[at])];closed=v.canonical_state(cell['closed']);opened=v.canonical_state(cell['open'])
+   if current not in (closed,opened):raise RuntimeError(('Declared personnel door differs',(x,y,z),current,closed))
+   if opened not in shapes:raise RuntimeError(('Native opened personnel door shape missing',opened))
+   if opened not in pal:pal.append(opened)
+   a[at]=pal.index(opened);included.append((x,y,z))
+  if included:door_ports.append(dict(id='root/original_personnel',aperture=included,requires_actual_use=True,native_operation_verified=False))
  # Three imported free-latch command doors are real operated edges. Their
  # full native OPEN shapes remain in the collision image; do not turn any
  # arbitrary iron door, secure reader, window or wall into air.
  if (WORLD/'.projectseele_tv_lifts_r45.json').is_file():
-  for lower in ((24,-423,254),(28,-448,282),(48,-448,282)):
+  for lower in FREE_LATCH_DOORS:
    halves=[lower,(lower[0],lower[1]+1,lower[2])]
+   if not all(all(LO[i]<=q[i]<=HI[i]for i in range(3))for q in halves):continue
    actual=[pal[int(a[Y-LO[1],Z-LO[2],X-LO[0]])]for X,Y,Z in halves]
    if not all(s.startswith('projectseele:city_personnel_door[')for s in actual):continue
    from measure_world_r40 import properties
@@ -165,6 +214,10 @@ def main(apply=False,output=None,export_routes=None):
   for (y,i),(Y,j) in pairs:
    rows.extend([i,j]);cols.extend([j,i]);weights.extend([LIFT_BOARD_COST+abs(Y-y)*LIFT_VERTICAL_COST]*2);lift_edges.append(dict(id=lift['id'],a=i,b=j))
  graph=sparse.coo_matrix((weights,(rows,cols)),shape=(n,n)).tocsr()
+ if GRAPH_ONLY:
+  np.savez_compressed(OUT/'walkable_graph.npz',coords=coords[:,[2,0,1]]+LO,indptr=graph.indptr,indices=graph.indices,weights=graph.data)
+  (OUT/'geometry_graph_only.json').write_text(json.dumps(dict(world=str(WORLD),bounds=[LO,HI],nodes=n,edges=graph.nnz,operable_doors=door_ports,world_written=False,native_verified=False),ensure_ascii=False,indent=2),'utf8')
+  print('Measured graph only',n,'nodes',graph.nnz,'edges',flush=True);return
  # Door 18 is the documented public entrance to the command hall. The old
  # target was inside the glazed operator island beside Misato, not its entry.
  goals=[(name,point) for key,name,point in GOALS];gids=[nearest(g,8) for _,g in goals]

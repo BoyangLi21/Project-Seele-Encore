@@ -972,5 +972,31 @@
         "stream": false
       }
     ]
+  },
+  "launch_electric_burst_r53": {
+    "subtitle": "subtitles.projectseele.launch_electric_burst_r53",
+    "sounds": [
+      {
+        "name": "projectseele:launch_electric_burst_r53",
+        "stream": false
+      }
+    ]
+  },
+  "launch_rail_friction_r53": {
+    "subtitle": "subtitles.projectseele.launch_rail_friction_r53",
+    "sounds": [
+      {
+        "name": "projectseele:launch_rail_friction_r53_0",
+        "stream": false
+      },
+      {
+        "name": "projectseele:launch_rail_friction_r53_1",
+        "stream": false
+      },
+      {
+        "name": "projectseele:launch_rail_friction_r53_2",
+        "stream": false
+      }
+    ]
   }
 }

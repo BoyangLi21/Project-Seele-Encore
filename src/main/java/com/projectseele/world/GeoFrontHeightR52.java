@@ -13,10 +13,10 @@ import net.minecraft.world.level.chunk.PalettedContainer;
  * Build height is a dimension property; old noise context stays -672..320. */
 public final class GeoFrontHeightR52
 {
-    public static final int MIN_Y=-960,LEGACY_MIN_Y=-672,MAX_Y_EXCLUSIVE=320;
+    public static final int MIN_Y=-1344,LEGACY_MIN_Y=-672,MAX_Y_EXCLUSIVE=320;
     public static final int HEIGHT=MAX_Y_EXCLUSIVE-MIN_Y;
-    private static BlockState foundation(int y)
-    {return (y==MIN_Y?Blocks.BEDROCK:Blocks.DEEPSLATE).defaultBlockState();}
+    private static BlockState foundation(int y,int worldMin)
+    {return (y==worldMin?Blocks.BEDROCK:Blocks.DEEPSLATE).defaultBlockState();}
     static void fillFoundation(ChunkAccess chunk)
     {
         int from=Math.max(MIN_Y,chunk.getMinBuildHeight());int to=Math.min(LEGACY_MIN_Y,chunk.getMaxBuildHeight());
@@ -27,14 +27,14 @@ public final class GeoFrontHeightR52
         {
             int index=chunk.getSectionIndex(y);var previous=sections[index];
             var states=new PalettedContainer<>(Block.BLOCK_STATE_REGISTRY,Blocks.DEEPSLATE.defaultBlockState(),PalettedContainer.Strategy.SECTION_STATES);
-            if(y==MIN_Y)for(int z=0;z<16;z++)for(int x=0;x<16;x++)states.set(x,0,z,Blocks.BEDROCK.defaultBlockState());
+            if(y==chunk.getMinBuildHeight())for(int z=0;z<16;z++)for(int x=0;x<16;x++)states.set(x,0,z,Blocks.BEDROCK.defaultBlockState());
             // The native constructor recounts nonempty/ticking/fluid totals.
             // Biomes were already sampled by the original generator stage.
             sections[index]=new LevelChunkSection(states,previous.getBiomes());
         }
         // No old solid column can lose height. Update the new top once for
-        // initially empty columns, without 73,728 block/heightmap callbacks.
-        for(var entry:chunk.getHeightmaps())for(int z=0;z<16;z++)for(int x=0;x<16;x++)entry.getValue().update(x,to-1,z,foundation(to-1));
+        // initially empty columns, without per-block heightmap callbacks.
+        for(var entry:chunk.getHeightmaps())for(int z=0;z<16;z++)for(int x=0;x<16;x++)entry.getValue().update(x,to-1,z,foundation(to-1,chunk.getMinBuildHeight()));
         chunk.setUnsaved(true);
     }
     static NoiseColumn extendColumn(NoiseColumn original,LevelHeightAccessor bounds)
@@ -42,7 +42,7 @@ public final class GeoFrontHeightR52
         int from=Math.max(MIN_Y,bounds.getMinBuildHeight()),to=bounds.getMaxBuildHeight();
         if(from>=LEGACY_MIN_Y||to<=from)return original;
         var states=new BlockState[to-from];
-        for(int y=from;y<to;y++)states[y-from]=y<LEGACY_MIN_Y?foundation(y):original.getBlock(y);
+        for(int y=from;y<to;y++)states[y-from]=y<LEGACY_MIN_Y?foundation(y,bounds.getMinBuildHeight()):original.getBlock(y);
         return new NoiseColumn(from,states);
     }
     private GeoFrontHeightR52(){}

@@ -280,15 +280,102 @@ public final class NervFlightProofR52
     {return stopped!=null&&stopped.current(l)&&stopped.to().rig().jaws()==1&&deliverySupportReady(l,stopped.preview(),stopped.to().cargo(),receiver);}
     public static boolean deliverySupportReady(ServerLevel l,FlightPickupPreview preview,RigidTransform stopped,Receiver receiver)
     {
-        if(preview==null||preview.kind()!=Kind.OCCUPIED||receiver==null||!receiver.delivery()||!NervAirTransportManifestR52.same(stopped,receiver.stopped())||!(l.getEntity(preview.original().eva()) instanceof EvaUnit01Entity eva)||!NervAirTransportManifestR52.same(NervOwnerPlacementR52.actualRoot(eva),receiver.stopped()))return false;
+        if(preview==null||preview.kind()!=Kind.OCCUPIED||receiver==null||!receiver.delivery()||!NervAirTransportManifestR52.same(stopped,receiver.stopped())||!(l.getEntity(preview.original().eva()) instanceof EvaUnit01Entity eva)||!NervAirTransportManifestR52.same(NervOwnerPlacementR52.actualRoot(eva),receiver.stopped())||!preview.current(l))return false;
         for(var c:receiver.supports())if(!l.hasChunkAt(c.position())||!net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(l.getBlockState(c.position())).equals(c.state()))return false;
-        var sample=preview.sample(stopped);for(var foot:List.of(sample.leftContact(),sample.rightContact()))
+        var nativeSupports=new ArrayList<AABB>();
+        for(var c:receiver.supports())
+            for(var box:l.getBlockState(c.position()).getCollisionShape(l,c.position(),net.minecraft.world.phys.shapes.CollisionContext.of(eva)).toAabbs())
+                nativeSupports.add(box.move(c.position()));
+        return finiteDeliverySolesR53(preview.geometry(),stopped,nativeSupports)
+                &&EvaMechanicalReleaseR52.actualGroundBearingR52(l,eva,preview.geometry(),stopped);
+    }
+    /** Exact projected coverage of the actual lowest sole facets. Declared
+     * native faces must cover their interiors as well as their vertices. */
+    static boolean finiteDeliverySolesR53(EvaOriginalMeshGeometryR52.Geometry geometry,RigidTransform root,List<AABB> supports)
+    {
+        if(geometry==null||root==null||supports==null||supports.isEmpty()
+                ||root.transformVector(new Vec3(0,1,0)).distanceTo(new Vec3(0,1,0))>1e-6)return false;
+        for(String foot:List.of("foot_l","foot_r"))
         {
-            boolean support=false;for(var c:receiver.supports())for(var b:l.getBlockState(c.position()).getCollisionShape(l,c.position(),net.minecraft.world.phys.shapes.CollisionContext.of(eva)).toAabbs())
-            {var world=b.move(c.position());if(foot.x>world.minX&&foot.x<world.maxX&&foot.z>world.minZ&&foot.z<world.maxZ&&Math.abs(foot.y-world.maxY)<=.002)support=true;}
-            if(!support)return false;
+            var triangles=new ArrayList<List<Vec3>>();double lowest=Double.POSITIVE_INFINITY;
+            for(var part:geometry.parts())if(part.bone().equals(foot))
+            {
+                var xyz=part.triangles();
+                for(int i=0;i<xyz.length;i+=9)
+                {
+                    var triangle=new ArrayList<Vec3>(3);
+                    for(int j=0;j<9;j+=3)
+                    {
+                        var p=root.transformPoint(new Vec3(xyz[i+j],xyz[i+j+1],xyz[i+j+2]));
+                        if(!Double.isFinite(p.x)||!Double.isFinite(p.y)||!Double.isFinite(p.z))return false;
+                        lowest=Math.min(lowest,p.y);triangle.add(p);
+                    }
+                    triangles.add(triangle);
+                }
+            }
+            if(!Double.isFinite(lowest))return false;
+            double finiteArea=0;
+            for(var triangle:triangles)
+            {
+                final double bottom=lowest;
+                if(triangle.stream().anyMatch(p->p.y>bottom+.002))continue;
+                double area=soleAreaR53(triangle);if(area<=1e-10)continue;
+                var eligible=supports.stream().filter(b->b.maxX>b.minX&&b.maxZ>b.minZ
+                        &&triangle.stream().allMatch(p->Math.abs(p.y-b.maxY)<=.0021)).toList();
+                if(!soleTriangleCoveredR53(triangle,area,eligible))return false;
+                finiteArea+=area;
+            }
+            if(finiteArea<.0025)return false;
         }
         return true;
+    }
+    private static double soleAreaR53(List<Vec3> polygon)
+    {
+        if(polygon.size()<3)return 0;
+        var origin=polygon.get(0);double twice=0;
+        for(int i=1;i+1<polygon.size();i++)
+        {
+            var a=polygon.get(i).subtract(origin);var b=polygon.get(i+1).subtract(origin);
+            twice+=a.x*b.z-a.z*b.x;
+        }
+        return Math.abs(twice)*.5;
+    }
+    private static List<Vec3> clipSoleR53(List<Vec3> polygon,int axis,double plane,boolean above)
+    {
+        if(polygon.isEmpty())return List.of();
+        var out=new ArrayList<Vec3>();var previous=polygon.get(polygon.size()-1);
+        double prior=(axis==0?previous.x:previous.z)-plane;boolean was=above?prior>=0:prior<=0;
+        for(var current:polygon)
+        {
+            double next=(axis==0?current.x:current.z)-plane;boolean inside=above?next>=0:next<=0;
+            if(inside!=was)out.add(previous.lerp(current,prior/(prior-next)));
+            if(inside)out.add(current);previous=current;prior=next;was=inside;
+        }
+        return out;
+    }
+    private static boolean soleTriangleCoveredR53(List<Vec3> triangle,double area,List<AABB> supports)
+    {
+        double x0=triangle.stream().mapToDouble(p->p.x).min().orElseThrow(),x1=triangle.stream().mapToDouble(p->p.x).max().orElseThrow();
+        double z0=triangle.stream().mapToDouble(p->p.z).min().orElseThrow(),z1=triangle.stream().mapToDouble(p->p.z).max().orElseThrow();
+        var overlapping=supports.stream().filter(b->b.maxX>x0&&b.minX<x1&&b.maxZ>z0&&b.minZ<z1).toList();
+        if(overlapping.isEmpty())return false;
+        var xs=new TreeSet<Double>();var zs=new TreeSet<Double>();xs.add(x0);xs.add(x1);zs.add(z0);zs.add(z1);
+        for(var b:overlapping)
+        {
+            xs.add(Math.max(x0,b.minX));xs.add(Math.min(x1,b.maxX));
+            zs.add(Math.max(z0,b.minZ));zs.add(Math.min(z1,b.maxZ));
+        }
+        var x=new ArrayList<>(xs);var z=new ArrayList<>(zs);double covered=0;
+        for(int i=1;i<x.size();i++)for(int j=1;j<z.size();j++)
+        {
+            double cx=(x.get(i-1)+x.get(i))*.5,cz=(z.get(j-1)+z.get(j))*.5;
+            if(overlapping.stream().noneMatch(b->cx>=b.minX&&cx<=b.maxX&&cz>=b.minZ&&cz<=b.maxZ))continue;
+            List<Vec3> polygon=triangle;
+            polygon=clipSoleR53(polygon,0,x.get(i-1),true);polygon=clipSoleR53(polygon,0,x.get(i),false);
+            polygon=clipSoleR53(polygon,2,z.get(j-1),true);polygon=clipSoleR53(polygon,2,z.get(j),false);
+            covered+=soleAreaR53(polygon);
+        }
+        return covered>=area-Math.max(1e-9,area*1e-9);
     }
     public static CheckedAirDelivery delivery(ServerLevel l,CheckedFlightStep stopped,Receiver destination)
     {return supportedDelivery(l,stopped,destination)?new CheckedAirDelivery(stopped,destination):null;}

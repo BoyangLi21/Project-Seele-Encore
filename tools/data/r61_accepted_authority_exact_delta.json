@@ -1,0 +1,118 @@
+{
+  "schema": "projectseele.r61.exact-reviewed-motor-fit-accepted-authority-delta.v1",
+  "current_build_receipt": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate61\\BUILD_RECEIPT.json",
+    "sha256": "09176ba0786c95e504a53e696e5a629823cfb236811f5f77b74245da6e01ee79"
+  },
+  "previous_build_receipt": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate60\\BUILD_RECEIPT.json",
+    "sha256": "4c7c649050dfdd28dc407cd42cb31d0b9fd4e02951a231160fe4c9b62b7347b2"
+  },
+  "current61_jar_sha256": "a10e6686c4f553c142ee4946c3410e257e1e9358aa53af3bb31c39a8d201d59f",
+  "previous60_jar_sha256": "6f8db5d002c84d759ccc5be236b922eeb58ae40da235c59872da1d0bf90f71f7",
+  "previous_pipeline": {
+    "path": "D:\\eva\\artifacts\\map_complete_20261013\\current_runtime_bundle_release60_accepted_authority_final\\CURRENT_BUNDLE_PIPELINE_RECEIPT.json",
+    "sha256": "58eabbe06ed7eb8e61c73a40a659d8d6bbfab6646981fce594afa91a7d2ade74"
+  },
+  "previous_compatibility": {
+    "path": "D:\\eva\\artifacts\\map_complete_20261013\\current_runtime_bundle_release60_accepted_authority_final\\CURRENT_R60_ACCEPTED_AUTHORITY_COMPATIBILITY.json",
+    "sha256": "bf24033550c9927b1d9fc9d481b003ed4e5e1cf422a7e02dd5e2064d31c31f0e"
+  },
+  "previous_source_equivalence": {
+    "path": "D:\\eva\\artifacts\\map_complete_20261013\\current_runtime_bundle_release60_accepted_authority_final\\CURRENT60_SOURCE_EQUIVALENCE.json",
+    "sha256": "2536dc91ebece7123cb5bff8d673e305490cd8528983ab2a8454df45538004aa"
+  },
+  "root_install_receipt": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\route_audit\\current60_prepare_hold_readonly\\ROOT_INSTALLED_MOTOR_FIT_R61.json",
+    "sha256": "c556b477b24f466b944c1d178f0e0e8a4fe70c425553e93935501c60c48cdafd"
+  },
+  "source_before": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate60\\SOURCE_BEFORE.json",
+    "sha256": "a9c625e2de7f6ac95cc6c63ef25fec286b1793fe0cb4e62367d445509f1c73f4"
+  },
+  "source_after": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate61\\SOURCE_BEFORE.json",
+    "sha256": "9229005e1734d822f32e7da92b905a673d4bd0c3928a4a76014b35b04ab31a5f"
+  },
+  "named_before": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate60\\NAMED_PRODUCTION_CLASSES.json",
+    "sha256": "4f95bf57d7acb21f721385f3800757ce981a4e63cc7bb30ff6ca5ab66e11a7e0"
+  },
+  "named_after": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate61\\NAMED_PRODUCTION_CLASSES.json",
+    "sha256": "177425da989082190a0af651d59c06856b0c6798c5f52287eb38e52988270eb7"
+  },
+  "source_delta": {
+    "src/main/resources/assets/projectseele/eva/actual_crane_procedural_triangles_r52.json.gz": {
+      "before_sha256": "366cbc5d927d4b6655d32deb40169313390725a44d61700321096d4d559f6ca2",
+      "after_sha256": "a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b"
+    },
+    "src/main/java/com/projectseele/world/NervCraneGeometryR52.java": {
+      "before_sha256": "ae61bbad4b3df4d396a03a5547031ce8ec7b97557750ac60897b8626aa99b4e0",
+      "after_sha256": "fd912b3557e36829337d686f2a31f7c3e70877199191f8240fd1bc9aaa29d288"
+    },
+    "src/main/java/com/projectseele/client/render/PlugGantryRenderer.java": {
+      "before_sha256": "92257237d8fdc9e07ee87fb0e9e2b5d51a220e7d2f94ecc469da7d94cb6f3406",
+      "after_sha256": "ad6ba9ccc632584bec8e02b4c8dcb8bc430da53021708d89f81ccafcb97b7d04"
+    }
+  },
+  "named_delta": {
+    "com/projectseele/world/NervCraneGeometryR52.class": {
+      "before_sha256": "8c0a40a1ceeb6b7583fe8ec2d2b6b5ca01325e0183ac1eb160cefc431b807e57",
+      "after_sha256": "b7d7e08125f776e70a090c255911e92cab35c0d4cd8cc61407b458c55b238645"
+    },
+    "com/projectseele/client/render/PlugGantryRenderer.class": {
+      "before_sha256": "7d449968f276d17f4a46a98f2e09da11a114d7a43c1fcf7bc93fea59f1ab28d6",
+      "after_sha256": "7b72e056f506a1546a400f4840d1b7b2b970cc641186aeea41c613eeb91a4d64"
+    }
+  },
+  "jar_delta": {
+    "META-INF/MANIFEST.MF": {
+      "before_sha256": "9a5ec6f46966b3e6a8c29e8192c01070fd33d1debe926af366ce5b367e17913c",
+      "after_sha256": "6b993e06a8dd3fd3294ed17f020174e70a01b925bc417b34fcbc3d7fa9361825"
+    },
+    "assets/projectseele/eva/actual_crane_procedural_triangles_r52.json.gz": {
+      "before_sha256": "366cbc5d927d4b6655d32deb40169313390725a44d61700321096d4d559f6ca2",
+      "after_sha256": "a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b"
+    },
+    "com/projectseele/client/render/PlugGantryRenderer.class": {
+      "before_sha256": "d0881641ba966f8b07ded40c011b174e14608b2002e48379ccb5de155243ad49",
+      "after_sha256": "6e597fec2a1c18becd08215c7cf7a3b511ea395cc1201380dbb875ee3071c993"
+    },
+    "com/projectseele/world/NervCraneGeometryR52.class": {
+      "before_sha256": "fcc3b02728a859981be22995d53e7a997a8173e24afbbd4e734a666bee979c22",
+      "after_sha256": "1d49d356ea5fee1c32c019de4faab1bb02427e77c962a471f95bb73dfeffdea2"
+    }
+  },
+  "source_mechanical_crane_r61": {
+    "source": {
+      "member": "assets/projectseele/eva/actual_crane_procedural_triangles_r52.json.gz",
+      "source_path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\src\\main\\resources\\assets\\projectseele\\eva\\actual_crane_procedural_triangles_r52.json.gz",
+      "source_gzip_sha256": "a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b",
+      "source_json_sha256": "6e2f2aba5d3f70ebd418ad0606394a86c9b21bf049eb65bd9425d124de25f8aa",
+      "source_geometry_delta": true,
+      "model_scope": "Only reviewed top motors and first hose; all other parts/anchors unchanged"
+    },
+    "actual_jar_readbacks": {
+      "gzip_sha256": "a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b",
+      "json_sha256": "6e2f2aba5d3f70ebd418ad0606394a86c9b21bf049eb65bd9425d124de25f8aa"
+    },
+    "exact_source_readbacks": true
+  },
+  "accepted_authority": {
+    "epoch": 53,
+    "directory_fingerprint": "f70fceb95ee4ec70d075208ad6538383c3e599fef409f42aefb5b8f0c3c54f23",
+    "bundle_relative": "ROOT_ASSEMBLY_BUNDLE.json",
+    "bundle_sha256": "098081c5afbd481732937e0079da4457f1dfabb822f52d509cbfdb36012ece85",
+    "guide_sha256": "28201ce1bbdca6b742b925cb6a2675b8a895b47bec6b122bfcb86e48e2d3eee8"
+  },
+  "normal_saved_frontier": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\route_audit\\current60_prepare_hold_readonly\\CURRENT60_NORMAL_SAVE_FRONTIER_FOR61.json",
+    "sha256": "39a07a96bdd685097bfeb5f7e4807b244e39079cffde1b39dfba272eec0cdf2d"
+  },
+  "saved_data_sha256": "25040e9559a0371a7a2db3c4f68a293ec02c3a774a9683c5c2d6a70d12fa6b2c",
+  "jobs_snbt_sha256": "d76b451da7fc9cea1a06c76754ed52ef58de3914dbba0ebee1135e340020efe8",
+  "native61_functional_pass": false,
+  "all_geometry_equal": false,
+  "source_geometry_delta": true
+}

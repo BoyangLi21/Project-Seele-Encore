@@ -417,10 +417,12 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         RigidTransform current = this.getCanonicalTransform();
         boolean unchanged = this.hasCanonicalPose()
                 && current.translation().distanceToSqr(transform.translation())
-                        <= 1.0D / (4096.0D * 4096.0D)
-                && current.rotationErrorDegrees(transform) <= 0.01D;
+                        < 1.0E-8D
+                && current.rotationErrorDegrees(transform) < 0.01D;
         if (unchanged&&!force)
         {
+            // The no-op predicate must be no wider than the mapped producer
+            // postcondition, or a real micro-step can never be acknowledged.
             // Do not publish a fresh pose sequence for the same dock frame.
             // The stage edge used to send an otherwise-identical quaternion
             // and restart client interpolation, which read as a one-frame

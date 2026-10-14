@@ -48,23 +48,25 @@ public final class GeoFrontHeightR52Test
         for(var block:BuiltInRegistries.BLOCK)for(var state:block.getStateDefinition().getPossibleStates())state.initCache();
         check(Blocks.DEEPSLATE.defaultBlockState().blocksMotion(),"Detached native solid-state cache was not initialized");
         var definition=resource("/data/projectseele/dimension_type/geofront.json");
-        if(!NervRouteRuntimeR52.mapRebuildEnabledR52())
+        if(definition.get("min_y").getAsInt()==GeoFrontHeightR52.LEGACY_MIN_Y)
         {
             check(definition.get("min_y").getAsInt()==-672,"Rollback moved the original minimum");
             check(definition.get("height").getAsInt()==992,"Rollback changed original section count");
             check(definition.get("logical_height").getAsInt()==992,"Rollback changed logical height");
             var legacyNoise=resource("/data/projectseele/worldgen/noise_settings/geofront_surface.json").getAsJsonObject("noise");
             check(legacyNoise.get("min_y").getAsInt()==-672&&legacyNoise.get("height").getAsInt()==992,"Rollback changed original noise interval");
-            System.out.println("R52 rollback height contract PASS: original -672..320; migrated-map checks remain deferred");
-            return;
+            System.out.println("Selected legacy dimension remains -672..320; both accessor contracts are tested below");
         }
-        check(definition.get("min_y").getAsInt()==GeoFrontHeightR52.MIN_Y,"Build minimum differs");
-        check(definition.get("height").getAsInt()==GeoFrontHeightR52.HEIGHT,"Build height differs");
-        check(definition.get("logical_height").getAsInt()==GeoFrontHeightR52.HEIGHT,"Logical height differs");
+        else
+        {
+            check(definition.get("min_y").getAsInt()==GeoFrontHeightR52.MIN_Y,"Build minimum differs");
+            check(definition.get("height").getAsInt()==GeoFrontHeightR52.HEIGHT,"Build height differs");
+            check(definition.get("logical_height").getAsInt()==GeoFrontHeightR52.HEIGHT,"Logical height differs");
+        }
         check(GeoFrontHeightR52.MIN_Y+GeoFrontHeightR52.HEIGHT==320,"Existing upper limit moved");
-        var oldHeight=LevelHeightAccessor.create(-672,992);var extended=LevelHeightAccessor.create(-960,1280);
-        check(oldHeight.getSectionsCount()==62&&extended.getSectionsCount()==80,"Wrong section expansion");
-        check(extended.getMinSection()==-60&&extended.getMaxSection()==20,"Section absolute coordinates shifted");
+        var oldHeight=LevelHeightAccessor.create(-672,992);var extended=LevelHeightAccessor.create(-1344,1664);
+        check(oldHeight.getSectionsCount()==62&&extended.getSectionsCount()==104,"Wrong section expansion");
+        check(extended.getMinSection()==-84&&extended.getMaxSection()==20,"Section absolute coordinates shifted");
         var lookup=VanillaRegistries.createLookup();var noise=resource("/data/projectseele/worldgen/noise_settings/geofront_surface.json");
         var settings=NoiseGeneratorSettings.DIRECT_CODEC.parse(RegistryOps.create(JsonOps.INSTANCE,lookup),noise).getOrThrow(false,message->{throw new AssertionError(message);});
         check(settings.noiseSettings().minY()==-672&&settings.noiseSettings().height()==992,"Legacy noise interval changed");
@@ -77,13 +79,13 @@ public final class GeoFrontHeightR52Test
         {
             var state=RandomState.create(settings,lookup.lookupOrThrow(Registries.NOISE),seed);
             check(generator.getBaseHeight(0,0,Heightmap.Types.OCEAN_FLOOR_WG,LevelHeightAccessor.create(-960,288),state)==-672,"Deep-only height query omitted solid foundation");
-            check(generator.getBaseHeight(0,0,Heightmap.Types.OCEAN_FLOOR_WG,LevelHeightAccessor.create(-1024,64),state)==-1024,"Outside build bounds became a solid column");
+            check(generator.getBaseHeight(0,0,Heightmap.Types.OCEAN_FLOOR_WG,LevelHeightAccessor.create(-1408,64),state)==-1408,"Outside build bounds became a solid column");
             for(var at:new int[][]{{0,0},{15,-17},{-33,48}})
             {
                 var before=original.getBaseColumn(at[0],at[1],oldHeight,state);var after=generator.getBaseColumn(at[0],at[1],extended,state);
                 for(int y=-672;y<320;y++)check(before.getBlock(y)==after.getBlock(y),"Original noise column changed at Y="+y);
-                for(int y=-960;y<-672;y++)check(after.getBlock(y).is(y==-960?Blocks.BEDROCK:Blocks.DEEPSLATE),"New deep column is missing solid geology");
-                check(after.getBlock(-961).isAir()&&after.getBlock(320).isAir(),"Column exceeded declared build bounds");
+                for(int y=-1344;y<-672;y++)check(after.getBlock(y).is(y==-1344?Blocks.BEDROCK:Blocks.DEEPSLATE),"New deep column is missing solid geology");
+                check(after.getBlock(-1345).isAir()&&after.getBlock(320).isAir(),"Column exceeded declared build bounds");
                 check(original.getBaseHeight(at[0],at[1],Heightmap.Types.OCEAN_FLOOR_WG,oldHeight,state)==generator.getBaseHeight(at[0],at[1],Heightmap.Types.OCEAN_FLOOR_WG,extended,state),"Original top/base height moved");
             }
         }
@@ -101,23 +103,31 @@ public final class GeoFrontHeightR52Test
         for(var entry:chunk.getHeightmaps())originalMaps.put(entry.getKey(),entry.getValue().getRawData().clone());
         GeoFrontHeightR52.fillFoundation(chunk);
         check(oldBlocks(chunk)==before,"Foundation rewrote an original section/city block");
-        for(int i=18;i<originalSections.length;i++)check(chunk.getSection(i)==originalSections[i],"Original upper section replaced");
+        for(int i=42;i<originalSections.length;i++)check(chunk.getSection(i)==originalSections[i],"Original upper section replaced");
         for(var entry:chunk.getHeightmaps())check(Arrays.equals(originalMaps.get(entry.getKey()),entry.getValue().getRawData()),"An existing high heightmap column changed");
-        for(int i=0;i<18;i++)
+        for(int i=0;i<42;i++)
         {
             var section=chunk.getSection(i);check(section.getBiomes()==originalSections[i].getBiomes(),"Original sampled biome palette replaced");
             check(!section.hasOnlyAir()&&!section.isRandomlyTicking()&&!section.isRandomlyTickingFluids(),"Native section counts were not reconstructed");
             int[] counted={0,0};section.getStates().count((state,count)->{if(state.is(Blocks.BEDROCK))counted[0]+=count;else if(state.is(Blocks.DEEPSLATE))counted[1]+=count;else throw new AssertionError("Unexpected deep palette state");});
             check(counted[0]==(i==0?256:0)&&counted[1]==(i==0?3840:4096),"Native palette block counts differ");
         }
-        for(int y=-960;y<-672;y++)for(int z=z0;z<z0+16;z++)for(int x=x0;x<x0+16;x++)check(chunk.getBlockState(pos.set(x,y,z)).is(y==-960?Blocks.BEDROCK:Blocks.DEEPSLATE),"Detached deep section contains void");
+        for(int y=-1344;y<-672;y++)for(int z=z0;z<z0+16;z++)for(int x=x0;x<x0+16;x++)check(chunk.getBlockState(pos.set(x,y,z)).is(y==-1344?Blocks.BEDROCK:Blocks.DEEPSLATE),"Detached deep section contains void");
         Heightmap.primeHeightmaps(chunk,EnumSet.of(Heightmap.Types.WORLD_SURFACE_WG,Heightmap.Types.OCEAN_FLOOR_WG));
         check(chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG,0,0)==surface,"Deep foundation moved the existing surface");
         check(chunk.getOrCreateHeightmapUnprimed(Heightmap.Types.WORLD_SURFACE_WG).getRawData().length==52,"Extended heightmap was not 11-bit/native packed");
         var empty=new ProtoChunk(new ChunkPos(0,0),UpgradeData.EMPTY,extended,registry,null);
         Heightmap.primeHeightmaps(empty,EnumSet.of(Heightmap.Types.WORLD_SURFACE_WG,Heightmap.Types.OCEAN_FLOOR_WG));GeoFrontHeightR52.fillFoundation(empty);
         check(empty.getHeight(Heightmap.Types.WORLD_SURFACE_WG,0,0)==-673&&empty.getHeight(Heightmap.Types.OCEAN_FLOOR_WG,0,0)==-673,"Previously empty column omitted new solid top in heightmap: "+empty.getHeight(Heightmap.Types.WORLD_SURFACE_WG,0,0)+"/"+empty.getHeight(Heightmap.Types.OCEAN_FLOOR_WG,0,0));
+        // An existing -960 dimension keeps its own bedrock, even with a newer global minimum.
+        var previousHeight=LevelHeightAccessor.create(-960,1280);
+        var previous=new ProtoChunk(new ChunkPos(1,1),UpgradeData.EMPTY,previousHeight,registry,null);
+        GeoFrontHeightR52.fillFoundation(previous);
+        for(int y=-960;y<-672;y++)for(int z=16;z<32;z++)for(int x=16;x<32;x++)
+            check(previous.getBlockState(pos.set(x,y,z)).is(y==-960?Blocks.BEDROCK:Blocks.DEEPSLATE),"Existing -960 dimension lost its native bottom");
+        var priorColumn=GeoFrontHeightR52.extendColumn(new NoiseColumn(-672,new net.minecraft.world.level.block.state.BlockState[]{Blocks.GOLD_BLOCK.defaultBlockState()}),previousHeight);
+        check(priorColumn.getBlock(-960).is(Blocks.BEDROCK)&&priorColumn.getBlock(-959).is(Blocks.DEEPSLATE)&&priorColumn.getBlock(-672).is(Blocks.GOLD_BLOCK),"Old accessor column bottom/old absolute data changed");
         var legacy=new ProtoChunk(new ChunkPos(0,0),UpgradeData.EMPTY,oldHeight,registry,null);legacy.setBlockState(new BlockPos(1,-672,1),Blocks.GOLD_BLOCK.defaultBlockState(),false);long legacyBefore=oldBlocks(legacy);GeoFrontHeightR52.fillFoundation(legacy);check(oldBlocks(legacy)==legacyBefore,"Legacy dimension was altered");
-        System.out.println("GeoFront height PASS checks="+checks+": build -960..320, 18 added solid sections, exact unchanged old noise columns/context/top, detached old blocks unchanged, new native 11-bit heightmaps; no world save/game");
+        System.out.println("GeoFront height PASS checks="+checks+": build -1344..320, 42 added solid sections, prior -960 bedrock preserved, exact unchanged old noise columns/context/top, detached old blocks unchanged, new native 11-bit heightmaps; no world save/game");
     }
 }

@@ -1,0 +1,16 @@
+{
+  "schema": "projectseele.r53.original-assembly-rigid-deep-frame.v1",
+  "translation": [
+    0,
+    -384,
+    0
+  ],
+  "source_frames": [
+    "original_incline",
+    "world"
+  ],
+  "original_running_source_sha256": "63fa3c8c4140a34557ee7a07f47a7bc82485900b68d669b11457ba6b1aee3f97",
+  "floor_overlay_sha256": "4e6c0fa70ab57ae52978c5c7dec0195d4cd534d78b4ea1b2ff15f3cef3607e7a",
+  "service_overlay_sha256": "c4fe6c5bc5f2f41db8dce7abb3090de67bc4b2d806b85f90fade1e38660bce08",
+  "level_overlay_sha256": "c47c055eaa90f97eca46a40b36439804ceaf0f50f1cb88a5fb426fbf0353d001"
+}

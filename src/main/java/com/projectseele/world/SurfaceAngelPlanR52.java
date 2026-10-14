@@ -17,12 +17,33 @@ public final class SurfaceAngelPlanR52
     public record Site(String chapter,Vec3 spawn,List<Vec3> route,Vec3 intercept,float yaw,
             double speed,double arrivalRadius,double engagementRange,int attackPeriod,float armorDamage) {}
     public record Plan(String id,String armorColumn,String fingerprint,Map<String,Site> sites) {}
-    private static final Map<ServerLevel,Optional<Plan>> CACHE=new WeakHashMap<>();
-    public static boolean handles(String chapter)
+    public enum RoutingR52 { LEGACY,HOLD,SURFACE }
+    private record DeclarationR52(String dimension,Optional<Plan> plan){}
+    private static final Map<ServerLevel,DeclarationR52> CACHE=new WeakHashMap<>();
+    static RoutingR52 routingR52(String chapter,boolean declared,boolean claimed,boolean ready)
     {
-        return NervRouteRuntimeR52.mapRebuildEnabledR52()
-                && (chapter.equals("sachiel") || chapter.equals("shamshel"));
+        if(!"sachiel".equals(chapter)&&!"shamshel".equals(chapter)||!declared&&!claimed)return RoutingR52.LEGACY;
+        return claimed&&ready?RoutingR52.SURFACE:RoutingR52.HOLD;
     }
+    static boolean declarationMatchesR52(String declaredDimension,String actualDimension,boolean geofrontGenerator)
+    {return declaredDimension.equals(actualDimension)||declaredDimension.isEmpty()&&geofrontGenerator;}
+    private static boolean claimedForRoutingR52(ServerLevel level)
+    {
+        if(NervRouteRuntimeR52.claimed(level))return true;
+        // Read an existing claim even while the global installation switch
+        // is disabled; that switch cannot send a migrated save to old spawns.
+        var saved=level.getDataStorage().get(NervRouteRuntimeStateR52::load,NervRouteRuntimeStateR52.NAME);
+        return saved!=null&&saved.claimed();
+    }
+    public static boolean declared(ServerLevel level)
+    {
+        if(claimedForRoutingR52(level))return true;
+        var declaration=declarationR52(level);
+        return declaration!=null&&declarationMatchesR52(declaration.dimension(),level.dimension().location().toString(),level.getChunkSource().getGenerator() instanceof GeoFrontBoundedChunkGenerator);
+    }
+    public static RoutingR52 routingR52(ServerLevel level,String chapter)
+    {boolean claimed=claimedForRoutingR52(level);return routingR52(chapter,claimed||declared(level),claimed,NervRouteRuntimeR52.ready(level));}
+    public static boolean handles(ServerLevel level,String chapter){return routingR52(level,chapter)!=RoutingR52.LEGACY;}
     private static Vec3 vec(com.google.gson.JsonArray a)
     {
         if(a==null||a.size()!=3)throw new IllegalArgumentException("Explicit three-coordinate point required");
@@ -63,18 +84,25 @@ public final class SurfaceAngelPlanR52
         }
         catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
     }
-    public static Optional<Plan> plan(ServerLevel level)
+    private static DeclarationR52 declarationR52(ServerLevel level)
     {
-        return CACHE.computeIfAbsent(level,l->{
-            var file=l.getServer().getWorldPath(LevelResource.ROOT).resolve(FILE);if(!Files.isRegularFile(file))return Optional.empty();
-            try{return Optional.of(parse(JsonParser.parseString(Files.readString(file)).getAsJsonObject(),l.dimension().location().toString()));}
-            catch(Exception failure){ProjectSeele.LOGGER.error("Installed R52 surface assault rejected",failure);return Optional.empty();}
-        });
+        var cached=CACHE.get(level);if(cached!=null)return cached;
+        var file=level.getServer().getWorldPath(LevelResource.ROOT).resolve(FILE);if(!Files.isRegularFile(file))return null;
+        String dimension="";Optional<Plan> plan=Optional.empty();
+        try
+        {
+            var root=JsonParser.parseString(Files.readString(file)).getAsJsonObject();dimension=root.get("dimension").getAsString();
+            if(dimension.equals(level.dimension().location().toString()))plan=Optional.of(parse(root,dimension));
+        }
+        catch(Exception failure){ProjectSeele.LOGGER.error("Declared R52 surface assault is held; no legacy-site fallback",failure);}
+        var declaration=new DeclarationR52(dimension,plan);CACHE.put(level,declaration);return declaration;
     }
+    public static Optional<Plan> plan(ServerLevel level){var declaration=declarationR52(level);return declaration==null?Optional.empty():declaration.plan();}
     public static Optional<Site> site(ServerLevel level,String chapter){return plan(level).map(p->p.sites().get(chapter));}
     public static String startBlocker(ServerLevel level,String chapter)
     {
-        if(!handles(chapter))return "";
+        var routing=routingR52(level,chapter);if(routing==RoutingR52.LEGACY)return "";
+        if(routing==RoutingR52.HOLD)return "新地图已声明，机库、发射通道与原编队的运行安装尚未就绪；作战保持等待。";
         var plan=plan(level).orElse(null);var armor=NervArmorColumnR50.plan(level).orElse(null);
         if(plan==null)return "远端使徒与地表进攻路线尚未完成实际施工和安装。";
         if(armor==null||!armor.installed()||!armor.id().equals(plan.armorColumn()))return "本场原地表装甲井尚未安装或身份不符。";

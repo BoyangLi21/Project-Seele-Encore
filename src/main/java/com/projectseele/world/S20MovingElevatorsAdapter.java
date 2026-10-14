@@ -87,7 +87,7 @@ public final class S20MovingElevatorsAdapter
     public static boolean reconcile(
             ServerLevel level, S20PhysicalElevatorDirector.LiftSpec spec)
     {
-        if(NervRouteRuntimeR52.claimed(level))
+        if(NervTravelDirectoryR52.applies(level))
         {
             if(S20LiftDirectoryR52.current(level,spec))
             {
@@ -670,7 +670,7 @@ public final class S20MovingElevatorsAdapter
             {
                 continue;
             }
-            if(NervRouteRuntimeR52.claimed(level)&&!S20LiftDirectoryR52.current(level,spec))
+            if(NervTravelDirectoryR52.applies(level)&&!S20LiftDirectoryR52.current(level,spec))
             {
                 player.displayClientMessage(Component.literal("电梯原生绑定尚未确认，请等待设施检查。"),true);
                 return true;
@@ -1820,7 +1820,7 @@ public final class S20MovingElevatorsAdapter
         {
             return true;
         }
-        if(NervRouteRuntimeR52.claimed(level)&&!S20LiftDirectoryR52.displayAllowed(level,group))return false;
+        if(NervTravelDirectoryR52.applies(level)&&!S20LiftDirectoryR52.displayAllowed(level,group))return false;
         int targetY = floorLevel;
         if (floorOffset != 0)
         {

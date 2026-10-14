@@ -46,13 +46,16 @@ class Op:
 
 
 class Painter:
-    def __init__(self):
+    def __init__(self,vertical_bounds=(-672,320)):
+        self.minimum_y,self.maximum_y=map(int,vertical_bounds)
+        if self.minimum_y%16 or self.maximum_y%16 or self.minimum_y>=self.maximum_y:
+            raise ValueError('Aligned explicit dimension bounds required')
         self.ops=[];self.by_chunk=defaultdict(list);self.block_entities={};self.keep_boxes=[];self.entity_updates={}
         self.meta={'rooms':[],'landmarks':[],'doors':[],'walk_nodes':[]}
     def fill(self,x0,y0,z0,x1,y1,z1,state,owner,mode='new'):
         state=canonical_state(state)
         x0,x1=sorted((int(x0),int(x1)));y0,y1=sorted((int(y0),int(y1)));z0,z1=sorted((int(z0),int(z1)))
-        if y0<-672 or y1>=320:raise ValueError((owner,y0,y1))
+        if y0<self.minimum_y or y1>=self.maximum_y:raise ValueError((owner,y0,y1))
         op=Op((x0,y0,z0,x1,y1,z1),state,owner,mode);i=len(self.ops);self.ops.append(op)
         for cx in range(x0//16,x1//16+1):
             for cz in range(z0//16,z1//16+1):self.by_chunk[cx,cz].append(i)
@@ -62,6 +65,10 @@ class Painter:
     def match(self,box,before,after,owner):
         self.fill(*box,after,owner,'match')
         self.ops[-1]=Op(self.ops[-1].box,canonical_state(after),owner,'match',(canonical_state(before),))
+    def exact(self,box,before,after,owner):
+        """A measured run must match completely, not silently filter changed cells."""
+        self.fill(*box,after,owner,'exact')
+        self.ops[-1]=Op(self.ops[-1].box,canonical_state(after),owner,'exact',(canonical_state(before),))
     def update_block_entity(self,pos,state,before,after,owner):
         """Explicit NBT-only edit with measured state/tag preconditions and inverse."""
         pos=tuple(map(int,pos));self.match((*pos,*pos),state,state,owner)
@@ -205,7 +212,7 @@ class Painter:
                             continue
                         if op.mode in ('owned','retire'):mask=np.ones(src.shape,dtype=bool)
                         elif op.mode=='ground_clear':mask=np.asarray([s.split('[')[0].removeprefix('minecraft:') in NATURAL-{'water'} for s in palettes],dtype=bool)[src]
-                        elif op.mode=='match':
+                        elif op.mode in ('match','exact'):
                             mask=np.asarray([s==op.extra[0] for s in palettes],dtype=bool)[src]
                             # A measured single-cell delta is an assertion,
                             # not a bulk palette filter. Previously a stale
@@ -214,7 +221,7 @@ class Painter:
                             # Legacy multi-cell palette selections keep their
                             # filtering semantics; exact candidates fail and
                             # roll back instead of quietly losing a member.
-                            if op.box[:3]==op.box[3:] and not bool(mask.all()):
+                            if (op.mode=='exact' or op.box[:3]==op.box[3:]) and not bool(mask.all()):
                                 actual=palettes[int(src.reshape(-1)[0])]
                                 raise RuntimeError(f'Exact cell precondition changed: {op.box[:3]} expected {op.extra[0]}, actual {actual}, owner {op.owner}')
                         else:
@@ -295,7 +302,7 @@ class Painter:
                                 raise RuntimeError(f'Full created/retired/updated NBT readback mismatch: {p}')
                         counts['block_entity_records_verified']+=len(expected_entities)
                 print(f'{name}: regions {number+1}/{len(groups)}, cells {counts["cells"]}, {time.monotonic()-start:.1f}s',flush=True)
-        except Exception:
+        except BaseException:
             for path,backup in touched:atomic_replace(path,backup.read_bytes())
             raise
         finally:

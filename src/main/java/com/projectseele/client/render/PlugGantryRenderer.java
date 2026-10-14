@@ -148,7 +148,7 @@ public final class PlugGantryRenderer
     private void gpuRope(Vec3 a,Vec3 b,double radius)
     {
         if(ROPE==null)ROPE=bake(r->r.cylinder(v(0,0,0),v(0,1,0),1,0,STEEL,12));Vec3 delta=b.subtract(a);double length=delta.length();if(length<1e-6)return;
-        poses.pushPose();poses.translate(a.x,a.y,a.z);poses.mulPose(declaredRigR52?com.projectseele.world.NervCranePoseR52.ropeFrame(a,b).rotation():new Quaternionf().rotationTo(new Vector3f(0,1,0),new Vector3f((float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length))));poses.scale((float)radius,(float)length,(float)radius);gpu(ROPE,poses,light);poses.popPose();
+        poses.pushPose();poses.translate(a.x,a.y,a.z);poses.mulPose(declaredRigR52?com.projectseele.world.NervCranePoseR52.originalHoistRopeRotationR63(a,b):new Quaternionf().rotationTo(new Vector3f(0,1,0),new Vector3f((float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length))));poses.scale((float)radius,(float)length,(float)radius);gpu(ROPE,poses,light);poses.popPose();
     }
     private void gpu(RigidMachineryPartR44 mesh,PoseStack poses,int light)
     {

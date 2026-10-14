@@ -21,7 +21,7 @@ public final class SurfaceAngelAssaultR52
     {var chunk=new ChunkPos(BlockPos.containing(point));level.getChunkSource().addRegionTicket(TICKET,chunk,3,chunk);}
     public static boolean begun(ServerLevel level,TvCampaignSavedData data)
     {
-        if(!SurfaceAngelPlanR52.handles(data.active)||data.owner==null)return false;
+        if(!SurfaceAngelPlanR52.handles(level,data.active)||data.owner==null)return false;
         var plan=SurfaceAngelPlanR52.plan(level).orElse(null);var site=SurfaceAngelPlanR52.site(level,data.active).orElse(null);
         if(plan==null||site==null||!SurfaceAngelPlanR52.startBlocker(level,data.active).isEmpty())return false;
         data.encounterSiteR45=plan.id();data.encounterLayoutR45=plan.fingerprint();data.setDirty();
@@ -56,11 +56,13 @@ public final class SurfaceAngelAssaultR52
     {boss.setNoAi(true);boss.setTarget(null);boss.getNavigation().stop();boss.setDeltaMovement(0,boss instanceof ShamshelEntity?0:boss.getDeltaMovement().y,0);if(boss instanceof SachielEntity s)SachielTacticsR34.recordMotion(s,Vec3.ZERO);}
     public static Mob tick(ServerLevel level,TvCampaignSavedData data)
     {
+        if(!SurfaceAngelPlanR52.handles(level,data.active))return null;
         var plan=SurfaceAngelPlanR52.plan(level).orElse(null);var site=SurfaceAngelPlanR52.site(level,data.active).orElse(null);
         Mob boss=data.angel!=null&&level.getEntity(data.angel) instanceof Mob m?m:null;
+        String blocker=SurfaceAngelPlanR52.startBlocker(level,data.active);
         if(site==null||plan==null||!data.encounterSiteR45.equals(plan.id())||!data.encounterLayoutR45.equals(plan.fingerprint())
-                ||!SurfaceAngelPlanR52.startBlocker(level,data.active).isEmpty())
-        {if(boss!=null&&TvEncounterDirectorR45.owned(boss,data))hold(boss);data.notice="原远端路线或地表装甲井安装状态改变，行动暂停。";return boss;}
+                ||!blocker.isEmpty())
+        {if(boss!=null&&TvEncounterDirectorR45.owned(boss,data))hold(boss);String notice=blocker.isEmpty()?"原远端路线或地表装甲井安装状态改变，行动暂停。":blocker;if(!data.notice.equals(notice)){data.notice=notice;data.setDirty();}return boss;}
         if(data.angel!=null)
         {
             if(data.lastPosition!=null)retain(level,Vec3.atCenterOf(data.lastPosition));

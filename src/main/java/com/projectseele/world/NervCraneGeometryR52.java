@@ -85,9 +85,9 @@ public final class NervCraneGeometryR52
         return Map.copyOf(out);
     }
     private static void ropeTransform(Map<String,Transform> out,String name,Vec3 first,Vec3 last,double radius,RigidTransform root)
-    {var d=last.subtract(first);double length=d.length();if(length<1e-6)throw new IllegalArgumentException("Actual full rope cannot vanish");out.put(name,new Transform(root.compose(NervCranePoseR52.ropeFrame(first,last)),new Vec3((float)radius,(float)length,(float)radius)));}
+    {var d=last.subtract(first);double length=d.length();if(length<1e-6)throw new IllegalArgumentException("Actual full rope cannot vanish");out.put(name,new Transform(root.compose(NervCranePoseR52.originalHoistRopeFrameR63(first,last)),new Vec3((float)radius,(float)length,(float)radius)));}
     private void rope(List<Part> out,String name,Vec3 first,Vec3 last,double radius,RigidTransform root)
-    {var delta=last.subtract(first);double length=delta.length();if(length<1e-6)return;double[] source=procedural.get("rope"),xyz=source.clone();for(int i=0;i<xyz.length;i+=3){xyz[i]*=(float)radius;xyz[i+1]*=(float)length;xyz[i+2]*=(float)radius;}out.add(new Part(name,xyz,root.compose(NervCranePoseR52.ropeFrame(first,last))));}
+    {var delta=last.subtract(first);double length=delta.length();if(length<1e-6)return;double[] source=procedural.get("rope"),xyz=source.clone();for(int i=0;i<xyz.length;i+=3){xyz[i]*=(float)radius;xyz[i+1]*=(float)length;xyz[i+2]*=(float)radius;}out.add(new Part(name,xyz,root.compose(NervCranePoseR52.originalHoistRopeFrameR63(first,last))));}
     private static double[] positions(JsonReader json)throws IOException
     {var chunks=new ArrayList<float[]>();int count=0;json.beginArray();while(json.hasNext()){float f=Float.parseFloat(json.nextString());require(Float.isFinite(f),"Nonfinite actual clamp vertex");if(count%8192==0)chunks.add(new float[8192]);chunks.get(count/8192)[count%8192]=f;count++;}json.endArray();require(count>0&&count%24==0,"Actual clamp stride8 triangles required");var xyz=new double[count/8*3];for(int v=0;v<count/8;v++)for(int a=0;a<3;a++){int at=v*8+a;xyz[v*3+a]=chunks.get(at/8192)[at%8192];}return xyz;}
     private static String sha(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception impossible){throw new IllegalStateException(impossible);}}

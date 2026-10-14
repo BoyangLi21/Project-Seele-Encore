@@ -22,7 +22,8 @@ def retained_faces(painter, world, dimension):
     for q,tag in iter_block_entities(world,dimension,lo,hi,selected_chunks=chunks):
         if str(tag.get('id',''))!='projectseele:station_departure_board' or q in painter.block_entities:
             continue
-        retired=any(op.mode=='match' and op.box==(*q,*q)
+        retired=any((op.mode=='match' and op.box==(*q,*q)
+                     or op.mode=='exact' and all(op.box[i]<=q[i]<=op.box[i+3] for i in range(3)))
                     and op.extra[0].startswith('projectseele:station_departure_board[')
                     and not op.state.startswith('projectseele:station_departure_board[')
                     for op in (painter.ops[i] for i in painter.by_chunk.get((q[0]//16,q[2]//16),[])))

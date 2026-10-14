@@ -12,6 +12,7 @@ import com.projectseele.world.EvaLogisticsDirector.Status;
 import com.projectseele.world.FacilityV2EvaRuntime;
 import com.projectseele.world.FacilityWorldPolicy;
 import com.projectseele.world.IntegratedNervMapBuilder;
+import com.projectseele.world.NervRouteRuntimeR52;
 import com.projectseele.world.S20SurfaceTransitDirector;
 import com.projectseele.world.Tokyo3RecoveryConsole;
 import com.projectseele.world.TrainingPilotDirector;
@@ -48,6 +49,16 @@ public final class EvaLogisticsCommands
                         .then(Commands.literal("prepare")
                                 .then(Commands.argument("variant", StringArgumentType.word())
                                         .executes(context -> prepare(context.getSource(),
+                                                StringArgumentType.getString(context, "variant")))
+                                        .then(Commands.argument("destination", StringArgumentType.word())
+                                                .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                                                        java.util.List.of("geofront", "surface", "hakone"), builder))
+                                                .executes(context -> prepare(context.getSource(),
+                                                        StringArgumentType.getString(context, "variant"),
+                                                        StringArgumentType.getString(context, "destination"))))))
+                        .then(Commands.literal("cancel")
+                                .then(Commands.argument("variant", StringArgumentType.word())
+                                        .executes(context -> cancel(context.getSource(),
                                                 StringArgumentType.getString(context, "variant")))))
                         .then(Commands.literal("launch")
                                 .then(Commands.argument("variant", StringArgumentType.word())
@@ -107,6 +118,17 @@ public final class EvaLogisticsCommands
     private static int prepare(CommandSourceStack source, String raw)
             throws CommandSyntaxException
     {
+        return prepare(source, raw, null);
+    }
+
+    private static int prepare(CommandSourceStack source, String raw, String destination)
+            throws CommandSyntaxException
+    {
+        if (destination != null && !java.util.Set.of("geofront", "surface", "hakone").contains(destination))
+        {
+            source.sendFailure(Component.literal("请选择 geofront（一号）、surface（二号）或 hakone（三号）。"));
+            return 0;
+        }
         ServerLevel level = geoFront(source);
         int requested = parseVariant(raw);
         int accepted = 0;
@@ -116,8 +138,9 @@ public final class EvaLogisticsCommands
             {
                 continue;
             }
-            ActionResult result =
-                    EvaLogisticsDirector.requestPrepare(level, variant);
+            ActionResult result = destination == null
+                    ? EvaLogisticsDirector.requestPrepare(level, variant)
+                    : NervRouteRuntimeR52.prepare(level, variant, destination);
             int current = variant;
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
                     "EVA-%02d: %s", current, result.message())), false);
@@ -125,6 +148,24 @@ public final class EvaLogisticsCommands
             {
                 accepted++;
             }
+        }
+        return accepted;
+    }
+
+    private static int cancel(CommandSourceStack source, String raw)
+            throws CommandSyntaxException
+    {
+        ServerLevel level = geoFront(source);
+        int requested = parseVariant(raw);
+        int accepted = 0;
+        for (int variant = 0; variant < 3; variant++)
+        {
+            if (requested >= 0 && requested != variant) continue;
+            ActionResult result = EvaLogisticsDirector.requestCancel(level, variant);
+            int current = variant;
+            source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+                    "EVA-%02d: %s", current, result.message())), false);
+            if (result.accepted()) accepted++;
         }
         return accepted;
     }
@@ -277,6 +318,8 @@ public final class EvaLogisticsCommands
     {
         ServerPlayer player = source.getPlayerOrException();
         ServerLevel level = geoFront(source);
+        if(com.projectseele.world.NervTravelDirectoryR52.applies(level))
+            return SeeleTravelCommandsR43.teleport(source,"hangar");
         EvaLogisticsDirector.ensureFleet(level);
         BlockPos target;
         if (FacilityWorldPolicy.isS20Rebuild(level.getServer()))

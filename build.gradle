@@ -695,6 +695,8 @@ tasks.named('processResources').configure {
                 // Registration metadata must remain the processed current
                 // source, never a template or an older private snapshot.
                 include 'assets/**', 'META-INF/licenses/**'
+                exclude 'assets/projectseele/sounds.json'
+                exclude 'assets/projectseele/lang/en_us.json', 'assets/projectseele/lang/zh_cn.json'
             }
         }
     }

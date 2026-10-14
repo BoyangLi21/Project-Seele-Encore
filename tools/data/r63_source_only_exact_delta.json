@@ -1,0 +1,162 @@
+{
+  "schema": "projectseele.r63.exact-root-source-only-delta.v1",
+  "current_build_receipt": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate63\\BUILD_RECEIPT.json",
+    "sha256": "3bb36539775b98d84bd73b088b6804f112426a0137057d5e02f74d33d5560ada"
+  },
+  "current63_jar_sha256": "53b0664f737898f24b1501fdd3d43531f4aae6ab7d7150e236ad6906b8a481d1",
+  "previous_build_receipt": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate62\\BUILD_RECEIPT.json",
+    "sha256": "3320aef7b9c63c948a04cea6ce56db8659089b986bb6e4b82beb2603577fb9b7"
+  },
+  "previous_pipeline": {
+    "path": "D:\\eva\\artifacts\\map_complete_20261013\\current_runtime_bundle_release62_accepted_authority_final\\CURRENT_BUNDLE_PIPELINE_RECEIPT.json",
+    "sha256": "df0edfc9eb162cf6b4b3ddc929ae197b03aae8dcbde80a3a99254ab94967c33c"
+  },
+  "root_source_review": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\root_final63\\ROOT_INSTALLED_SOURCE_FIX_R63.json",
+    "sha256": "05530089e0a89ee0c8fdf346723c9b4952d45420c0e7008cccc4b634e3ca453d"
+  },
+  "source_before": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate62\\SOURCE_BEFORE.json",
+    "sha256": "20151b91be3289b4c96e9d3c2ee6197c90de4995e2eb2b3e61cc8ffe3e4f57c2"
+  },
+  "source_after": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate63\\SOURCE_BEFORE.json",
+    "sha256": "a36cad43196e143ba3770c1958aeea2bc88018da8b029578a0ee412fb2822fd8"
+  },
+  "named_before": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate62\\NAMED_PRODUCTION_CLASSES.json",
+    "sha256": "577c05fdbe766b1dc2e4416b952b4a257aa61bdfe83ca36622bef4cc61791c20"
+  },
+  "named_after": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\artifacts\\r52_unified_candidate63\\NAMED_PRODUCTION_CLASSES.json",
+    "sha256": "04fc64a1319b20611f7733cd944fcd5e1f22f896a9b28440e4a706180a94f8d7"
+  },
+  "source_delta": {
+    "src/main/java/com/projectseele/world/NervAssemblyOwnerR52.java": {
+      "before_sha256": "fddfac3bd019a86db8ef3e86dc6dcf7556bacb55f60dcccfa90c4492f837c9fc",
+      "after_sha256": "0f04b2a83474e5f63c1e235c2f94fef90738c27130b6277e76e18d39aeda69bb"
+    },
+    "src/main/java/com/projectseele/world/NervCranePoseR52.java": {
+      "before_sha256": "38a2e5e8f5e56db295d572bf25077fc5e29d353a61c82890a20e78b9ee803088",
+      "after_sha256": "182f56b1fa6283bdf25858616db2a2a447d4289e1830141bedcbce8fe98ce08d"
+    },
+    "src/main/java/com/projectseele/client/render/PlugGantryRenderer.java": {
+      "before_sha256": "ad6ba9ccc632584bec8e02b4c8dcb8bc430da53021708d89f81ccafcb97b7d04",
+      "after_sha256": "faba3ca3d8ce70e299d6d119413870ccd35c854a3a6ba727b0d3478987601ea0"
+    },
+    "src/main/java/com/projectseele/world/NervCraneGeometryR52.java": {
+      "before_sha256": "fd912b3557e36829337d686f2a31f7c3e70877199191f8240fd1bc9aaa29d288",
+      "after_sha256": "54f27145996c1e72017227a7c462d7364f9c800876bb2bfcbcfdaf9cd24ded1e"
+    },
+    "src/main/resources/assets/projectseele/eva/actual_crane_procedural_triangles_r52.json.gz": {
+      "before_sha256": "a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b",
+      "after_sha256": "366cbc5d927d4b6655d32deb40169313390725a44d61700321096d4d559f6ca2"
+    }
+  },
+  "named_delta": {
+    "com/projectseele/world/NervAssemblyOwnerR52$1.class": {
+      "before_sha256": "92698659713e891a794c3b19d55fa501de935a672650d96feba6859e2581f6e2",
+      "after_sha256": "b7f8952190fe36e89b503c2875284be2346f217f54b529a5b5c97b7809e19f01"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52$CageDomainKeyR57.class": {
+      "before_sha256": "602c39a0801b48150f778899acca32b56dadec04e4a2f3a1381e5cfdb3270287",
+      "after_sha256": "9c80266a8b1d9c9d18b5af625e6934f7ebd4132fda1b0efc26901ac7a9e06da9"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52$ContinuousGeometryR52.class": {
+      "before_sha256": "c6aa5c45c57cd0cc6790b2aa6ced68ff4ef0ff5ec9362219b07ca6de92fbea9e",
+      "after_sha256": "90cf153049012f36ea07f3ee86988e7532b0ea23c6af2208e5cc9588cadd1c40"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52.class": {
+      "before_sha256": "c9b190bbee1bc055dea09a29a327694f3758e296217d9a02983390fa2efa124d",
+      "after_sha256": "83703e65edc205e97ec70c4a1f9bc7b534ca8cda81b2ef175fb1640be8e65b58"
+    },
+    "com/projectseele/world/NervCraneGeometryR52.class": {
+      "before_sha256": "b7d7e08125f776e70a090c255911e92cab35c0d4cd8cc61407b458c55b238645",
+      "after_sha256": "bb99bf6b87bea6bcc36233f61298f6a85b6f5c18168870622ee5fdb5e7143b6c"
+    },
+    "com/projectseele/world/NervCranePoseR52$Pose.class": {
+      "before_sha256": "02daae98b51a111aa688b6d79632d84e998073b1bd57047257c56fc2df51af1e",
+      "after_sha256": "96cfa88b4470dfcc2f65e4addebb0ccef91c4a209c8ae3a38fe772c7f59cb77c"
+    },
+    "com/projectseele/world/NervCranePoseR52.class": {
+      "before_sha256": "db573738f79433f1ccd1adbb8e3fbfc2c854626cd32674dd4c94d7d345bd141c",
+      "after_sha256": "130b84148c37f4d0320b0ac97de2c1bc6b4b745c1d7d71bf7f540406e7cdab3b"
+    },
+    "com/projectseele/client/render/PlugGantryRenderer.class": {
+      "before_sha256": "7b72e056f506a1546a400f4840d1b7b2b970cc641186aeea41c613eeb91a4d64",
+      "after_sha256": "48883dbd80e681c278850ffd91311f1173bd3f07bf251e942dbcc5a85cbd0c01"
+    }
+  },
+  "jar_delta": {
+    "META-INF/MANIFEST.MF": {
+      "before_sha256": "54f0bb2329c632d0535d4f07f9daf138755fba5dd990fef3d8dbb04aa91a9950",
+      "after_sha256": "166fafc80bf2c98db4f3cd1adbdb26d2870dd9002627a12fe148f83f06e0944e"
+    },
+    "assets/projectseele/eva/actual_crane_procedural_triangles_r52.json.gz": {
+      "before_sha256": "a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b",
+      "after_sha256": "366cbc5d927d4b6655d32deb40169313390725a44d61700321096d4d559f6ca2"
+    },
+    "com/projectseele/client/render/PlugGantryRenderer.class": {
+      "before_sha256": "6e597fec2a1c18becd08215c7cf7a3b511ea395cc1201380dbb875ee3071c993",
+      "after_sha256": "5e0c1e65acd55a227941a44789c3441c90fbfeb5a5c833e029cbf7bd8eeb0c68"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52$1.class": {
+      "before_sha256": "fc723c9062d0e3b72c36e293d6b40a80ef4fc107794bea81b3dc1e0d1d26111c",
+      "after_sha256": "c296df18b1bdfa26789d107719cf25b18b656de79e7a51ce803b9e2195ebbbc0"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52$CageDomainKeyR57.class": {
+      "before_sha256": "5eb88fd685fd0862f40c24db4950fbb29f9b2b559ad417f343ef90c65cdfed50",
+      "after_sha256": "f07caccba4e3c704875d8ce9a66e4559bec94c0149488a08ca2ffac38eaf6003"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52$ContinuousGeometryR52.class": {
+      "before_sha256": "a099ac1be653147bb820de4963eebc5c02a77d7de54f80150153547ea4844401",
+      "after_sha256": "8eeeede09ea2ed2eb00bbf0bc0082086b100eab4e89857b1aa6cd155ce979d7c"
+    },
+    "com/projectseele/world/NervAssemblyOwnerR52.class": {
+      "before_sha256": "86bb985036c8b4a4098b66825021b5212aba781735127ac673084d45e9ca9bf0",
+      "after_sha256": "9e574e40359aa956ad3a96dacc41f445719f8ecb71ce002d1a8e69bab04f0f9c"
+    },
+    "com/projectseele/world/NervCraneGeometryR52.class": {
+      "before_sha256": "1d49d356ea5fee1c32c019de4faab1bb02427e77c962a471f95bb73dfeffdea2",
+      "after_sha256": "85facb0be872638e032d8a87b77c18308c55ae16bce5bd3b5da86948945bb0b3"
+    },
+    "com/projectseele/world/NervCranePoseR52$Pose.class": {
+      "before_sha256": "7b25ac4b6bd3b9dcda8622d5b1e775a296f892929ca5b22ff9dd08591d1a3165",
+      "after_sha256": "a49d4e48fb7f9953d4eb7a3ae250d21dbeda4d867efaff32401bc4952a7a7625"
+    },
+    "com/projectseele/world/NervCranePoseR52.class": {
+      "before_sha256": "cc2cb790e5f868a692da479c0b02e0c969d7ca3aba80cc4622d39343312854aa",
+      "after_sha256": "8e35d1a8a83072f8f1fa0ffd1ac93b73b31e07f807eb76f9075116dfbc5a5e3a"
+    }
+  },
+  "accepted_authority": {
+    "epoch": 53,
+    "directory_fingerprint": "f70fceb95ee4ec70d075208ad6538383c3e599fef409f42aefb5b8f0c3c54f23",
+    "bundle_relative": "ROOT_ASSEMBLY_BUNDLE.json",
+    "bundle_sha256": "098081c5afbd481732937e0079da4457f1dfabb822f52d509cbfdb36012ece85",
+    "guide_sha256": "28201ce1bbdca6b742b925cb6a2675b8a895b47bec6b122bfcb86e48e2d3eee8"
+  },
+  "current_cold_frontier": {
+    "path": "C:\\Users\\liboy\\.codex\\worktrees\\r51-nonmap\\eva\\.Codex\\map_complete_20261013\\root_final63\\ACTUAL_WORLD_FRONTIER_AFTER_REPLAY.json",
+    "sha256": "0467b7021fe292f710c53074fb2b1f49357e21f37ef72f5338f67cb260214028"
+  },
+  "initial_saved_runtime": {
+    "path": "D:\\eva\\artifacts\\map_complete_20261013\\WORLD\\dimensions\\projectseele\\geofront\\data\\projectseele_nerv_routes_r52.dat",
+    "sha256": "a3fecaa1d7c66c23cb27b4e4297b0179c7a6693c8d1747adcb760755c0d3c90f",
+    "claimed": true,
+    "epoch": 53,
+    "directory_fingerprint": "f70fceb95ee4ec70d075208ad6538383c3e599fef409f42aefb5b8f0c3c54f23",
+    "bundle_relative": "ROOT_ASSEMBLY_BUNDLE.json",
+    "bundle_sha256": "098081c5afbd481732937e0079da4457f1dfabb822f52d509cbfdb36012ece85",
+    "guide_sha256": "28201ce1bbdca6b742b925cb6a2675b8a895b47bec6b122bfcb86e48e2d3eee8",
+    "fault": "",
+    "jobs": 2,
+    "pending_installation": true
+  },
+  "current_jobs_projection_sha256": "ca05d91cef74aeee23519f3a8e9ac062b0be4aa90ee1ecec37e554ae89be45b0",
+  "original_restore": true,
+  "all_geometry_equal": false,
+  "native63_functional_pass": false
+}

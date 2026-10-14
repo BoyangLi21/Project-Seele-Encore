@@ -34,12 +34,14 @@ public final class S20LiftManifestR52
     public record RoomControls(List<Door> gate,List<Reader> gateReaders,List<Door> pilot) {}
     public record Office(String liftId,int middleY,Set<BlockPos> readers,BlockPos middleReader,
                          List<AABB> meeting,List<AABB> liftRoom,AABB landingLease,RoomControls controls) {}
-    public record Document(long epoch,String directoryFingerprint,boolean ready,List<Binding> lifts,Office office) {}
+    public record MainLift(String liftId,List<Integer> headquartersFloors,int hangarFloor,Integer terminalFloor) {}
+    public record MainLifts(MainLift commandRear,MainLift eastGallery) {}
+    public record Document(long epoch,String directoryFingerprint,boolean ready,List<Binding> lifts,Office office,MainLifts mainLifts) {}
     private S20LiftManifestR52() {}
     public static Document parse(JsonObject root)
     {
         require(SCHEMA.equals(root.get("schema").getAsString())&&root.get("complete_replacement").getAsBoolean(),"Complete Root lift replacement required");
-        long epoch=root.get("epoch").getAsLong();String fingerprint=root.get("directory_fingerprint").getAsString();
+        long epoch=root.get("epoch").getAsBigDecimal().longValueExact();String fingerprint=root.get("directory_fingerprint").getAsString();
         require(epoch>0&&fingerprint.matches("[0-9a-f]{64}"),"Root claim epoch/fingerprint required");
         require("s20_personnel_only".equals(root.get("scope").getAsString()),"S20-only scope required; independent gateway excluded");
         List<Binding> lifts=new ArrayList<>();Set<String> ids=new HashSet<>();Set<BlockPos> allControllers=new HashSet<>();
@@ -48,6 +50,10 @@ public final class S20LiftManifestR52
         {
             var lift=value.getAsJsonObject();String id=lift.get("id").getAsString();require(!id.isBlank()&&ids.add(id),"Duplicate lift identity");
             require(!id.equals(NervLiftPassengerSync.GATEWAY),"Independent regional gateway must not be duplicated in S20 manifest");
+            require(Set.of(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,
+                    S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID,
+                    FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION).contains(id),
+                    "Only original lift identities may be migrated; no third headquarters-to-hangar lift");
             Direction side=direction(lift,"controller_side"),facing=direction(lift,"controller_facing");require(side.getOpposite()==facing,"Controller must face its declared cabin");
             var insideButton=point(lift.getAsJsonArray("inside_button_offset"));var insideDisplay=point(lift.getAsJsonArray("inside_display_offset"));
             List<Floor> floors=new ArrayList<>();
@@ -72,7 +78,7 @@ public final class S20LiftManifestR52
                 }
                 require(!calls.isEmpty(),"At least one measured call required per floor");
                 UUID visual=f.has("visual_door_uuid")?UUID.fromString(f.get("visual_door_uuid").getAsString()):null;
-                floors.add(new Floor(f.get("label").getAsString(),cabin,direction(f,"exit"),f.get("approach_y").getAsInt(),controller,
+                floors.add(new Floor(f.get("label").getAsString(),cabin,direction(f,"exit"),f.get("approach_y").getAsBigDecimal().intValueExact(),controller,
                         List.copyOf(calls),
                         f.get("restricted").getAsBoolean(),doors,cabinDoors,visual));
             }
@@ -88,22 +94,76 @@ public final class S20LiftManifestR52
             var raw=root.getAsJsonObject("office_access");Set<BlockPos> readers=new HashSet<>();for(var p:raw.getAsJsonArray("readers"))require(readers.add(point(p.getAsJsonArray())),"Duplicate office reader");
             office=new Office(raw.get("lift_id").getAsString(),raw.get("middle_y").getAsInt(),Set.copyOf(readers),point(raw.getAsJsonArray("middle_reader")),
                     boxes(raw.getAsJsonArray("meeting_boxes")),boxes(raw.getAsJsonArray("lift_room_boxes")),box(raw.getAsJsonArray("landing_lease_box")),room(raw.getAsJsonObject("room_controls")));
-            require(ids.contains(office.liftId())&&office.readers().contains(office.middleReader()),"Office reader/lift binding missing");
+            require(office.liftId().equals(S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID)
+                    &&ids.contains(office.liftId())&&office.readers().contains(office.middleReader()),"Original office reader/lift identity binding missing");
             Office check=office;Binding owner=lifts.stream().filter(b->b.id().equals(check.liftId())).findFirst().orElseThrow();
             require(owner.floors().stream().anyMatch(f->f.cabin().getY()==check.middleY()&&f.restricted()),"SEELE middle must retain highest-card admission");
             require(owner.floors().get(owner.floors().size()-1).restricted(),"Original commander-office top must remain restricted");
         }
         boolean ready=root.get("ready").getAsBoolean();
+        MainLifts mainLifts=null;
+        if(root.has("main_lifts"))
+        {
+            var roles=root.getAsJsonObject("main_lifts");
+            require(roles.keySet().equals(Set.of("command_rear","east_gallery")),"Declare only the two original headquarters main-lift roles");
+            MainLift rear=mainLift(roles.getAsJsonObject("command_rear"),S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,lifts,12,253,9,253,true);
+            MainLift east=mainLift(roles.getAsJsonObject("east_gallery"),FacilityLiftsR25.EAST,lifts,66,302,63,302,false);
+            var rearHangar=lift(lifts,rear.liftId()).floor(rear.hangarFloor());
+            var eastHangar=lift(lifts,east.liftId()).floor(east.hangarFloor());
+            require(rearHangar.approachY()==eastHangar.approachY(),"Both original main lifts must meet the same actual hangar personnel floor");
+            mainLifts=new MainLifts(rear,east);
+        }
         if(ready)
         {
-            require(ids.equals(Set.of(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,
-                    S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID,
-                    FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION,"r52-hq-hangar-terminal-shared")),"Ready requires the complete six original S20 lifts plus shared lift");
-            require(office!=null,"Ready original office requires explicit highest-card controls");
+            require(mainLifts!=null,"Ready requires explicit original main/east lift roles, both hangar landings and main-lift Terminal access");
+            require(ids.contains(S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID)&&office!=null,
+                    "Ready must retain the original office lift and its highest-card controls");
         }
         for(var binding:lifts)for(var floor:binding.floors())for(var call:floor.calls())if(call.kind()==CallKind.SEELE_READER)
             require(office!=null&&office.liftId().equals(binding.id())&&office.readers().contains(call.position()),"Highest-card reader must belong to this actual office lift");
-        return new Document(epoch,fingerprint,ready,List.copyOf(lifts),office);
+        return new Document(epoch,fingerprint,ready,List.copyOf(lifts),office,mainLifts);
+    }
+    private static Binding lift(List<Binding> lifts,String id)
+    {return lifts.stream().filter(lift->lift.id().equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("Declared main lift identity is missing: "+id));}
+    private static MainLift mainLift(JsonObject role,String id,List<Binding> lifts,int cabinX,int cabinZ,int controllerX,int controllerZ,boolean terminalRequired)
+    {
+        require(role!=null&&id.equals(role.get("lift_id").getAsString()),"Main-lift role must retain its original identity");
+        Binding binding=lift(lifts,id);
+        var source=role.getAsJsonObject("source_axis");
+        require(source!=null&&horizontal(source.getAsJsonArray("cabin")).equals(new BlockPos(cabinX,0,cabinZ))
+                &&horizontal(source.getAsJsonArray("controller")).equals(new BlockPos(controllerX,0,controllerZ)),
+                "Main-lift source axis must match its measured original identity");
+        var translation=horizontal(role.getAsJsonArray("shaft_translation"));
+        require(Math.abs((long)translation.getX())<=4096&&Math.abs((long)translation.getZ())<=4096,"Bounded explicit whole-shaft translation required");
+        for(var floor:binding.floors())require(floor.cabin().getX()==cabinX+translation.getX()&&floor.cabin().getZ()==cabinZ+translation.getZ()
+                &&floor.controller().getX()==controllerX+translation.getX()&&floor.controller().getZ()==controllerZ+translation.getZ(),
+                "Every original main-lift floor must use the same declared rigid shaft translation");
+        int hangar=role.get("hangar_floor").getAsBigDecimal().intValueExact();
+        Integer terminal=role.has("terminal_floor")?role.get("terminal_floor").getAsBigDecimal().intValueExact():null;
+        Set<Integer> assigned=new HashSet<>();assigned.add(hangar);
+        List<Integer> headquarters=new ArrayList<>();
+        for(var floor:role.getAsJsonArray("headquarters_floors"))
+        {
+            int y=floor.getAsBigDecimal().intValueExact();
+            require(y>hangar&&assigned.add(y),"Headquarters floors must be distinct and above the hangar");
+            headquarters.add(y);
+        }
+        require(!headquarters.isEmpty(),"Each original main lift must retain its headquarters landings");
+        require(!terminalRequired||terminal!=null,"Original command lift must continue to Terminal Dogma");
+        if(terminal!=null)
+        {
+            require(terminal<hangar&&assigned.add(terminal),"Terminal Dogma must be a separate lower floor");
+            require(binding.floor(terminal).restricted(),"Terminal Dogma landing must retain access control");
+        }
+        require(!binding.floor(hangar).restricted(),"Shared hangar landing cannot inherit Terminal-only admission");
+        require(assigned.equals(binding.floors().stream().map(f->f.cabin().getY()).collect(java.util.stream.Collectors.toSet())),
+                "Every actual main-lift floor must have an explicit headquarters, hangar or Terminal role");
+        return new MainLift(id,List.copyOf(headquarters),hangar,terminal);
+    }
+    private static BlockPos horizontal(JsonArray values)
+    {
+        require(values!=null&&values.size()==2,"Explicit X/Z pair required");
+        return new BlockPos(values.get(0).getAsBigDecimal().intValueExact(),0,values.get(1).getAsBigDecimal().intValueExact());
     }
     private static Map<BlockPos,String> cells(JsonArray rows)
     {

@@ -1,5 +1,5 @@
 """Build one frozen source candidate and verify the actual archived resources."""
-import argparse,hashlib,json,os,shutil,subprocess,time,zipfile
+import argparse,gzip,hashlib,json,os,shutil,subprocess,time,zipfile
 from pathlib import Path
 from release_r45_contract import class_protocol
 
@@ -53,10 +53,34 @@ DELIVERY_CLASSES=('com/projectseele/world/StationDepartureBoardBlockEntity.class
                   'com/projectseele/world/DeadSeaChamberSavedDataR45.class',
                   'com/projectseele/GameEvents.class',
                   'com/projectseele/world/S20LiftDirectoryR52.class',
-                  'com/projectseele/world/S20LiftDirectoryR52$State.class')
+                  'com/projectseele/world/S20LiftDirectoryR52$State.class',
+                  'com/projectseele/world/NervRouteRuntimeR52.class',
+                  'com/projectseele/world/NervRouteDirectoryR52.class',
+                  'com/projectseele/world/NervRouteRuntimeStateR52.class',
+                  'com/projectseele/world/NervLaunchPhasesR53.class',
+                  'com/projectseele/world/NervBankHeadTransferR53.class',
+                  'com/projectseele/world/NervOriginalCarrierR52.class',
+                  'com/projectseele/world/NervLegacyServiceBypassR52.class',
+                  'com/projectseele/world/NervLegacyCompactLevelR52.class',
+                  'com/projectseele/world/NervLegacyDeepFrameR53.class',
+                  'com/projectseele/world/NervLaunchFeedbackR53.class',
+                  'com/projectseele/world/NervSiloHatchGeometryR52.class',
+                  'com/projectseele/world/NervConvexReliefR53.class',
+                  'com/projectseele/entity/SiloHatchMechanism.class',
+                  'com/projectseele/entity/SiloHatchMechanism$Spec.class',
+                  'com/projectseele/world/GeoFrontHeightR52.class',
+                  'com/projectseele/world/GeoFrontBoundedChunkGenerator.class',
+                  'com/projectseele/world/SurfaceAngelPlanR52.class',
+                  'com/projectseele/world/NervBallisticHandoffR52.class',
+                  'com/projectseele/world/NervBallisticHandoffR52$Profile.class')
 SOURCE_ASSETS=('assets/projectseele/mesh/upright_outer_captured_r52.json',
                'assets/projectseele/facility/r52_upright_guideway_paths.json',
-               'assets/projectseele/mesh/legacy_floor_recesses_r52.json')
+               'assets/projectseele/mesh/legacy_floor_recesses_r52.json',
+               'assets/projectseele/mesh/legacy_service_bypass_r52.json',
+               'assets/projectseele/mesh/legacy_compact_level_r52.json',
+               'assets/projectseele/mesh/legacy_deep_frame_r53.json',
+               'assets/projectseele/mesh/outer_head_transfer_r53.json',
+               'assets/projectseele/mesh/cage_lower_telescopes_r52.json')
 
 def delivery_class_pins(archive):
     actual={n:archive.read(n) for n in DELIVERY_CLASSES}
@@ -91,6 +115,83 @@ def source_asset_pins():
               'assets/projectseele/eva/prone_leg_support_hulls_r52.json') if NONMAP_RELEASE else SOURCE_ASSETS
     return {n:sha(ROOT/'src/main/resources'/n) for n in selected}
 
+
+SOUND_CATALOG='assets/projectseele/sounds.json'
+REVIEWED_SOUND_CATALOG_SHA='8872f82650ad766cf5bb51f94c5dc5b99d70aee5655372f65845d2c14c2f4016'
+REVIEWED_LAUNCH_SOUND_DEFINITIONS={
+    'launch_electric_burst_r53':{'subtitle':'subtitles.projectseele.launch_electric_burst_r53',
+        'sounds':[{'name':'projectseele:launch_electric_burst_r53','stream':False}]},
+    'launch_rail_friction_r53':{'subtitle':'subtitles.projectseele.launch_rail_friction_r53',
+        'sounds':[{'name':'projectseele:launch_rail_friction_r53_'+str(i),'stream':False} for i in range(3)]}}
+
+
+def source_sounds_catalog_pin(frozen_source_sha256):
+    """Only the reviewed catalog adds the two original launch sound definitions."""
+    source=ROOT/'src/main/resources'/SOUND_CATALOG;baseline=BASE/SOUND_CATALOG
+    frozen=json.loads((BASE/'ASSET_FROZEN.json').read_text('utf8'))['files']
+    assert frozen_source_sha256==REVIEWED_SOUND_CATALOG_SHA and sha(source)==frozen_source_sha256, 'Frozen reviewed Source sound catalog changed'
+    assert sha(baseline)==frozen[SOUND_CATALOG], 'Original frozen sound catalog changed'
+    original=json.loads(baseline.read_text('utf-8-sig'));current=json.loads(source.read_text('utf-8-sig'))
+    assert len(original)==88 and len(current)==90 and set(current)==set(original)|set(REVIEWED_LAUNCH_SOUND_DEFINITIONS), 'Only the exact two new launch events may extend the original88 sound catalog'
+    assert all(current[name]==definition for name,definition in original.items()), 'An original sound definition changed'
+    assert {name:current[name] for name in REVIEWED_LAUNCH_SOUND_DEFINITIONS}==REVIEWED_LAUNCH_SOUND_DEFINITIONS, 'Reviewed original launch sound definitions changed'
+    return dict(path=str(source.resolve()),source_sha256=frozen_source_sha256,baseline_sha256=frozen[SOUND_CATALOG],
+                original_definitions_unchanged=88,source_definitions=90,exact_added_definitions=REVIEWED_LAUNCH_SOUND_DEFINITIONS)
+
+
+REVIEWED_LAUNCH_SUBTITLES={
+    'assets/projectseele/lang/en_us.json':dict(
+        sha256='91855638c578e79569b31816a1174113c9f84be0efe264274fe76effb50723a4',original_count=324,
+        added={'subtitles.projectseele.launch_electric_burst_r53':'Launch rails discharge',
+               'subtitles.projectseele.launch_rail_friction_r53':'Launch rails spark and scrape'}),
+    'assets/projectseele/lang/zh_cn.json':dict(
+        sha256='0cd4e92c8d3169523546ab474c8dcc81111fe7d5cf9e2047e650788842dd891f',original_count=326,
+        added={'subtitles.projectseele.launch_electric_burst_r53':'\u53d1\u5c04\u8f68\u9053\uff1a\u7535\u6d41\u7206\u53d1',
+               'subtitles.projectseele.launch_rail_friction_r53':'\u53d1\u5c04\u8f68\u9053\uff1a\u9ad8\u901f\u6469\u64e6'})}
+
+
+def source_launch_subtitle_pins(frozen_source_sha256):
+    """Hard-pin only the reviewed two locale additions; keep every old value."""
+    assert set(frozen_source_sha256)==set(REVIEWED_LAUNCH_SUBTITLES), 'Exact two frozen locale files required'
+    frozen=json.loads((BASE/'ASSET_FROZEN.json').read_text('utf8'))['files'];files={}
+    for name,reviewed in REVIEWED_LAUNCH_SUBTITLES.items():
+        source=ROOT/'src/main/resources'/name;baseline=BASE/name
+        assert frozen_source_sha256[name]==reviewed['sha256'] and sha(source)==reviewed['sha256'], 'Frozen reviewed Source locale changed: '+name
+        assert sha(baseline)==frozen[name], 'Original frozen locale changed: '+name
+        original=json.loads(baseline.read_text('utf-8-sig'));current=json.loads(source.read_text('utf-8-sig'))
+        assert len(original)==reviewed['original_count'] and len(current)==len(original)+2, 'Reviewed locale key counts changed: '+name
+        assert set(current)==set(original)|set(reviewed['added']), 'Only exact two launch subtitle keys may be added: '+name
+        assert all(current[key]==value for key,value in original.items()), 'An original locale value changed: '+name
+        assert {key:current[key] for key in reviewed['added']}==reviewed['added'], 'Reviewed launch subtitle value changed: '+name
+        files[name]=dict(path=str(source.resolve()),source_sha256=reviewed['sha256'],baseline_sha256=frozen[name],
+                        original_definitions_unchanged=len(original),source_definitions=len(current),exact_added_definitions=reviewed['added'])
+    return files
+
+
+MECHANICAL_CRANE_PROC_R61='assets/projectseele/eva/actual_crane_procedural_triangles_r52.json.gz'
+MECHANICAL_CRANE_GZIP_R61='a12a1f1b47ddf852a8a6e5165def8739c6a1698a4c672ad55fa7d7b30985258b'
+MECHANICAL_CRANE_JSON_R61='6e2f2aba5d3f70ebd418ad0606394a86c9b21bf049eb65bd9425d124de25f8aa'
+MECHANICAL_CRANE_ORIGINAL_GZIP_R63='366cbc5d927d4b6655d32deb40169313390725a44d61700321096d4d559f6ca2'
+MECHANICAL_CRANE_ORIGINAL_JSON_R63='3411018955aec9b8827dcfcc217275fffd3edbe8880d448500f06beefd216064'
+
+
+def source_mechanical_crane_pin_r61(frozen_source_sha256):
+    # Only exact reviewed61 or Root-reviewed original63 restoration; no hash wildcard.
+    source=ROOT/'src/main/resources'/MECHANICAL_CRANE_PROC_R61
+    versions={MECHANICAL_CRANE_GZIP_R61:MECHANICAL_CRANE_JSON_R61,
+              MECHANICAL_CRANE_ORIGINAL_GZIP_R63:MECHANICAL_CRANE_ORIGINAL_JSON_R63}
+    assert frozen_source_sha256 in versions and sha(source)==frozen_source_sha256, 'Exact reviewed crane Source gzip changed'
+    raw=gzip.decompress(source.read_bytes());raw_sha=hashlib.sha256(raw).hexdigest()
+    assert raw_sha==versions[frozen_source_sha256], 'Exact reviewed crane uncompressed Source changed'
+    doc=json.loads(raw);assert doc['schema']=='projectseele.r52.actual-crane-procedural-triangles.v1'
+    assert set(doc['parts'])=={'top','yoke','sheave','wheel','links','rope'} and sum(len(a)//9 for a in doc['parts'].values())==28044, 'Complete actual six-part procedural Source required'
+    row=dict(member=MECHANICAL_CRANE_PROC_R61,source_path=str(source.resolve()),source_gzip_sha256=frozen_source_sha256,
+             source_json_sha256=raw_sha,source_geometry_delta=True,model_scope='Only reviewed top motors and first hose; all other parts/anchors unchanged')
+    if frozen_source_sha256==MECHANICAL_CRANE_ORIGINAL_GZIP_R63:
+        row.update(original_restore=True,all_geometry_equal=False,
+                   model_scope='Root-reviewed original_restore: undo motor +.57m/first-hose geometry; restore exact original procedural source, not all-geometry equivalence')
+    return row
+
 def frozen_build_class_pins(receipt_path,jar):
     receipt_path=Path(receipt_path).resolve();jar=Path(jar).resolve();report=json.loads(receipt_path.read_text('utf-8-sig'))
     source=json.loads((receipt_path.parent/'SOURCE_BEFORE.json').read_text('utf-8-sig'))
@@ -100,6 +201,12 @@ def frozen_build_class_pins(receipt_path,jar):
         pins=delivery_class_pins(archive);assets=source_asset_pins()
         assert report['protocol']=='70' and pins==report['required_delivery_classes'] and assets==report['required_source_assets'],'Final compiled delivery class/source pins differ'
         for n,h in assets.items():assert hashlib.sha256(archive.read(n)).hexdigest()==h,'Actual guideway asset differs: '+n
+        if 'source_mechanical_crane_r61' in report:
+            crane=source_mechanical_crane_pin_r61(source['src/main/resources/'+MECHANICAL_CRANE_PROC_R61])
+            actual=archive.read(MECHANICAL_CRANE_PROC_R61)
+            readbacks=dict(gzip_sha256=hashlib.sha256(actual).hexdigest(),json_sha256=hashlib.sha256(gzip.decompress(actual)).hexdigest())
+            assert report['source_mechanical_crane_r61']==dict(source=crane,actual_jar_readbacks=readbacks,exact_source_readbacks=True), 'Frozen mechanical61 readback row changed'
+            assert readbacks==dict(gzip_sha256=crane['source_gzip_sha256'],json_sha256=crane['source_json_sha256']), 'Frozen mechanical61 actual Jar bytes differ'
     return pins
 
 
@@ -194,17 +301,36 @@ def main():
     assert r.returncode==0,(out/'build.log').read_text('utf8',errors='replace')[-5000:]
     assert not changed,changed
     expected={n:sha(BASE/n)for n in json.loads((BASE/'ASSET_FROZEN.json').read_text('utf8'))['files']if n.startswith(('assets/','META-INF/licenses/'))}
+    assert len(expected)==803 and SOUND_CATALOG in expected, 'Exact original803 asset inventory required'
+    sounds=source_sounds_catalog_pin(before['src/main/resources/'+SOUND_CATALOG])
+    subtitles=source_launch_subtitle_pins({n:before['src/main/resources/'+n] for n in REVIEWED_LAUNCH_SUBTITLES})
+    crane_r61=source_mechanical_crane_pin_r61(before['src/main/resources/'+MECHANICAL_CRANE_PROC_R61])
     for row in json.loads((REVIEW.parent/'FINAL_OVERLAY_RECEIPT.json').read_text('utf8'))['files']:
         assert sha(REVIEW/row['path'])==row['sha256'];expected[row['path']]=row['sha256']
     model='assets/projectseele/models/block/entry_plug_bridge_fascia.json';expected[model]=sha(ROOT/'src/main/resources'/model)
+    expected[SOUND_CATALOG]=sounds['source_sha256'];assert len(expected)==803, 'Sound catalog must replace exactly one existing asset entry'
+    for name,row in subtitles.items():
+        assert name in expected, 'Original locale inventory missing: '+name
+        expected[name]=row['source_sha256']
+    assert len(expected)==803, 'Sound and two locales must replace exactly three existing asset entries'
     jar=out/'projectseele-0.1.0-all.jar';shutil.copyfile(ROOT/'build/libs'/jar.name,jar)
     with zipfile.ZipFile(jar)as z:
         assert len(z.namelist())==len(set(z.namelist()))
         for n,d in expected.items():assert hashlib.sha256(z.read(n)).hexdigest()==d,n
+        subtitle_readbacks={n:hashlib.sha256(z.read(n)).hexdigest() for n in subtitles}
+        assert subtitle_readbacks=={n:row['source_sha256'] for n,row in subtitles.items()}, 'Actual Jar locale readbacks differ from frozen Source'
         protocol=class_protocol(z.read('com/projectseele/network/SeeleNetwork.class'));class_pins=delivery_class_pins(z);source_pins=source_asset_pins()
         for n,h in source_pins.items():assert hashlib.sha256(z.read(n)).hexdigest()==h,n
+        crane_gzip=z.read(MECHANICAL_CRANE_PROC_R61);crane_readbacks=dict(gzip_sha256=hashlib.sha256(crane_gzip).hexdigest(),json_sha256=hashlib.sha256(gzip.decompress(crane_gzip)).hexdigest())
+        assert crane_readbacks==dict(gzip_sha256=crane_r61['source_gzip_sha256'],json_sha256=crane_r61['source_json_sha256']), 'Actual61 Jar mechanical Source readback differs'
         for n in('BoundedNativeCollisionGroupsR52','NervStaticSpatialIndexR52'):assert f'com/projectseele/world/{n}.class'in z.namelist()
-    report.update(jar=str(jar),sha256=sha(jar),bytes=jar.stat().st_size,protocol=protocol,asset_readbacks=len(expected),required_delivery_classes=class_pins,required_source_assets=source_pins,source_asset_readbacks=len(source_pins))
+    named=ROOT/'build/classes/java/main'
+    named_pins={p.relative_to(named).as_posix():sha(p) for p in named.rglob('*.class')}
+    assert named_pins and all(n in named_pins for n in DELIVERY_CLASSES),'Same build named production classes required for offline source reports'
+    named_file=out/'NAMED_PRODUCTION_CLASSES.json';named_file.write_text(json.dumps(named_pins,indent=2)+'\n','utf8')
+    report.update(jar=str(jar),sha256=sha(jar),bytes=jar.stat().st_size,protocol=protocol,asset_readbacks=len(expected),required_delivery_classes=class_pins,required_source_assets=source_pins,source_asset_readbacks=len(source_pins),source_sounds_catalog=sounds,named_class_directory=str(named.resolve()),named_class_manifest=str(named_file.resolve()),named_class_manifest_sha256=sha(named_file))
+    report['source_launch_subtitles']=dict(files=subtitles,actual_jar_readbacks=subtitle_readbacks,exact_source_readbacks=True)
+    report['source_mechanical_crane_r61']=dict(source=crane_r61,actual_jar_readbacks=crane_readbacks,exact_source_readbacks=True)
     (out/'BUILD_RECEIPT.json').write_text(json.dumps(report,indent=2),'utf8');print(json.dumps(report),flush=True)
 
 

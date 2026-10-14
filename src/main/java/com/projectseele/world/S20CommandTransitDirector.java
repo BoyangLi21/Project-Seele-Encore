@@ -96,6 +96,7 @@ public final class S20CommandTransitDirector
      */
     public static void tick(MinecraftServer server)
     {
+        if(NervLegacyGenerationGuardR52.retired(server))return;
         if (!isAuthorisedS20MarkerWorld(server))
         {
             return;

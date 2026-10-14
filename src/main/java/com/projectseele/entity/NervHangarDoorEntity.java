@@ -198,17 +198,17 @@ public final class NervHangarDoorEntity extends Entity
     {
         data.putFloat("Width",spec.width());data.putFloat("Height",spec.height());data.putInt("OpenTicks",spec.openTicks());data.putInt("CloseTicks",spec.closeTicks());data.putInt("DepthDirection",spec.depthDirection());
         if(spec.bottomSeal()==null){data.remove("FloorSeal");return;}
-        var seal=new CompoundTag();seal.putInt("Version",1);seal.putDouble("DropM",spec.bottomSeal().dropM());seal.putDouble("RetreatLocalZ",spec.bottomSeal().retreatLocalZ());var rows=new ListTag();
+        var seal=new CompoundTag();seal.putInt("Version",spec.bottomSeal().version());if(spec.bottomSeal().version()==2)seal.putInt("RetainedBoxCount",spec.bottomSeal().retainedBoxCount());seal.putDouble("DropM",spec.bottomSeal().dropM());seal.putDouble("RetreatLocalZ",spec.bottomSeal().retreatLocalZ());var rows=new ListTag();
         for(var b:spec.bottomSeal().closedBoxes()){var row=new ListTag();for(double v:new double[]{b.minX(),b.minY(),b.minZ(),b.maxX(),b.maxY(),b.maxZ()})row.add(DoubleTag.valueOf(v));rows.add(row);}seal.put("ClosedBoxes",rows);data.put("FloorSeal",seal);
     }
     private static NervHangarGateGeometryR52.BottomSeal readFloorSealR52(CompoundTag data)
     {
         if(!data.contains("FloorSeal"))return null;
         if(!data.contains("FloorSeal",Tag.TAG_COMPOUND))throw new IllegalStateException("Unknown actual floor-seal tag");var t=data.getCompound("FloorSeal");
-        if(t.getInt("Version")!=1||!t.contains("DropM",Tag.TAG_ANY_NUMERIC)||!t.contains("RetreatLocalZ",Tag.TAG_ANY_NUMERIC)||!t.contains("ClosedBoxes",Tag.TAG_LIST))throw new IllegalStateException("Unknown actual floor-seal version/fields");
-        var rows=t.getList("ClosedBoxes",Tag.TAG_LIST);if(rows.isEmpty()||rows.size()>256)throw new IllegalStateException("Missing or unbounded actual floor-seal boxes");var boxes=new ArrayList<NervHangarGateGeometryR52.SealBox>();
+        if((t.getInt("Version")!=1&&t.getInt("Version")!=2)||t.getInt("Version")==2&&!t.contains("RetainedBoxCount",Tag.TAG_INT)||!t.contains("DropM",Tag.TAG_ANY_NUMERIC)||!t.contains("RetreatLocalZ",Tag.TAG_ANY_NUMERIC)||!t.contains("ClosedBoxes",Tag.TAG_LIST))throw new IllegalStateException("Unknown actual floor-seal version/fields");
+        var rows=t.getList("ClosedBoxes",Tag.TAG_LIST);if(rows.isEmpty()||rows.size()>512)throw new IllegalStateException("Missing or unbounded actual floor-seal boxes");var boxes=new ArrayList<NervHangarGateGeometryR52.SealBox>();
         for(var value:rows){var r=(ListTag)value;if(r.size()!=6||r.getElementType()!=Tag.TAG_DOUBLE)throw new IllegalStateException("Unknown actual floor-seal bounds");boxes.add(new NervHangarGateGeometryR52.SealBox(r.getDouble(0),r.getDouble(1),r.getDouble(2),r.getDouble(3),r.getDouble(4),r.getDouble(5)));}
-        return new NervHangarGateGeometryR52.BottomSeal(boxes,t.getDouble("DropM"),t.getDouble("RetreatLocalZ"));
+        return new NervHangarGateGeometryR52.BottomSeal(boxes,t.getDouble("DropM"),t.getDouble("RetreatLocalZ"),t.getInt("Version"),t.getInt("Version")==2?t.getInt("RetainedBoxCount"):0);
     }
     private static NervHangarGateGeometryR52.Spec readSpec(CompoundTag t){return t.isEmpty()||t.getBoolean("GeometryMissing")?null:new NervHangarGateGeometryR52.Spec(t.getFloat("Width"),t.getFloat("Height"),t.getInt("OpenTicks"),t.getInt("CloseTicks"),t.contains("DepthDirection")?t.getInt("DepthDirection"):1,readFloorSealR52(t));}
     public boolean declaredGeometryMissingR52(){return entityData.get(DATA_STACK_R52).getBoolean("GeometryMissing");}

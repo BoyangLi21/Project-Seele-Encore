@@ -1,0 +1,71 @@
+{
+  "original_full_source_sha256": "0fa6f8fe5e0d4195ae52702ecb0bcc366057ca76490b490ecae39892f91e7561",
+  "original_running_source_sha256": "63fa3c8c4140a34557ee7a07f47a7bc82485900b68d669b11457ba6b1aee3f97",
+  "actual_deck_connections": [
+    {
+      "variant": 0,
+      "radius": 15.0,
+      "side": -1,
+      "actual_deck_face": [
+        [
+          -12.73180103302002,
+          -2.200000047683716,
+          13.942028999328613
+        ],
+        [
+          -12.818376541137695,
+          -2.200000047683716,
+          14.003299713134766
+        ],
+        [
+          -12.829010963439941,
+          -2.200000047683716,
+          13.041468620300293
+        ]
+      ],
+      "actual_source_deck_facet_index": 22791,
+      "actual_area_m2": 0.04196129711544927,
+      "actual_weld_centroid_root_local": [
+        -12.793062845865885,
+        -2.200000047683716,
+        13.66226577758789
+      ],
+      "actual_direct_length_m": 2.75831493450268,
+      "plane": "original lower deck finite steel face"
+    },
+    {
+      "variant": 0,
+      "radius": 15.0,
+      "side": 1,
+      "actual_deck_face": [
+        [
+          13.02403736114502,
+          -2.200000047683716,
+          -13.219282150268555
+        ],
+        [
+          12.899910926818848,
+          -2.200000047683716,
+          -13.962616920471191
+        ],
+        [
+          13.059147834777832,
+          -2.200000047683716,
+          -14.051589965820312
+        ]
+      ],
+      "actual_source_deck_facet_index": 1338,
+      "actual_area_m2": 0.06470511862789863,
+      "actual_weld_centroid_root_local": [
+        12.994365374247232,
+        -2.200000047683716,
+        -13.74449634552002
+      ],
+      "actual_direct_length_m": 2.5657821330174495,
+      "plane": "original lower deck finite steel face"
+    }
+  ],
+  "actual_export_sha256": "357bbf1288c12540659373dabef30d40ccd8612a204f4887955669f24b95615c",
+  "layout": "reverse diagonal Root authorized; original deck faces untouched",
+  "world_written": false
+}

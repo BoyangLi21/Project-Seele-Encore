@@ -13,17 +13,19 @@ NORMAL={'north':(0,-1),'south':(0,1),'west':(-1,0),'east':(1,0)}
 def main(apply=False,world=WORLD,out=OUT):
     world=Path(world);out=Path(out);v.WORLD=world;v.OUT=out;out.mkdir(parents=True,exist_ok=True);p=v.Painter()
     with gzip.open(world/'nerv_routes_r24.json.gz','rt',encoding='utf8') as f:graph=json.load(f)
+    if graph.get('r52_navigation'):p=v.Painter(vertical_bounds=(-960,320))
     nodes=np.asarray(graph['nodes']);coords=nodes[:,:3];tree=cKDTree(coords)
     ids=[q['id'] for q in graph['goals']]
     station_cols=[ids.index(k) for k in ('station','pyramid_station','launch_station') if k in ids]
     costs={col:{int(graph['goals'][col]['node']):0.} for col in station_cols}
     lift_edges={tuple(sorted((int(e['a']),int(e['b'])))) for e in graph.get('lift_edges',[])}
+    transit={(int(e['from']),int(e['to'])):e for e in graph.get('transport_edges',[])}
     def route_cost(start,col):
         memo=costs[col];path=[];seen=set();cursor=int(start)
         while cursor not in memo:
             if cursor in seen:raise RuntimeError('Cyclic route predecessor')
             seen.add(cursor);nxt=int(nodes[cursor,3+col]);dy=abs(int(coords[nxt,1])-int(coords[cursor,1]))
-            weight=4+dy*.12 if tuple(sorted((cursor,nxt))) in lift_edges else 4 if dy else 1
+            weight=transit[cursor,nxt].get('weight',180)if(cursor,nxt)in transit else 4+dy*.12 if tuple(sorted((cursor,nxt))) in lift_edges else 4 if dy else 1
             path.append((cursor,weight));cursor=nxt
         total=memo[cursor]
         for previous,weight in reversed(path):total+=weight;memo[previous]=total
@@ -46,6 +48,14 @@ def main(apply=False,world=WORLD,out=OUT):
         return None
     def zone(point):
         x,y,z=point
+        if graph.get('r52_navigation'):
+            if y>0:return '地表联络入口'
+            if z<100 and -480<=y<=-420:return '原试验区'
+            if y<-790:return '终极教条区'
+            if y<-577:return '机库观景层'if y>-617 else '机库登机层'if y>-665 else '机库维修层'
+            if y<=-550:return '总部入口与车站层'
+            floors={-541:'总部主环廊',-535:'地表直梯接驳层',-527:'作业联络层',-516:'指挥后部通道',-513:'技术联络层',-512:'指挥后部通道',-502:'指挥后部通道',-499:'指挥室层',-485:'综合服务层',-481:'指挥专用电梯层',-471:'上层接待区',-457:'SEELE 会议层',-433:'总司令办公室层'}
+            level=min(floors,key=lambda q:abs(q-y));return floors[level]if abs(level-y)<=3 else '总部通行指引'
         if z<0:return '机库观景层' if y>=-380 else '机库登机层' if y>=-405 else '发射区交通层'
         return '终极教条区' if y<-520 else '总部车站层' if y<=-465 else '交通接驳层' if y<=-455 else '总部主环廊' if y<=-440 else '作业联络层' if y<=-426 else '技术联络层' if y<=-412 else '指挥联络层' if y<=-399 else '综合服务层' if y<=-384 else '上层接待区' if y<-355 else '总指挥层'
     for q,before in tags.items():
@@ -58,28 +68,31 @@ def main(apply=False,world=WORLD,out=OUT):
         labels=['指挥室','机库登机层',graph['goals'][station_col]['name']]
         nx,nz=NORMAL[face];texts=[];proof=[]
         for col,label in zip(cols,labels):
-            path=[int(i)];cursor=int(i);lift=False
+            path=[int(i)];cursor=int(i);lift=False;train=None
             for k in range(7):
                 nxt=int(nodes[cursor,3+col])
                 if nxt==cursor:break
+                if(cursor,nxt)in transit:train=transit[cursor,nxt];break
                 if abs(coords[nxt,1]-coords[cursor,1])>1:lift=True;path.append(nxt);break
                 path.append(nxt);cursor=nxt
             delta=coords[path[-1]]-coords[i];right=delta[0]*nz-delta[2]*nx;forward=-delta[0]*nx-delta[2]*nz
             arrow='●' if len(path)==1 else '↑' if lift and delta[1]>0 else '↓' if lift else '→' if right>abs(forward)*.65 else '←' if -right>abs(forward)*.65 else '↑' if forward>0 else '↓'
             suffix=' · 直梯' if lift else ''
+            if train:suffix=' · 乘 '+train['line']+' 至 '+train['destination'];arrow='↔'
             texts.append(arrow+' '+label+suffix);proof.append(dict(goal=ids[col],reader=coords[i].tolist(),next=coords[path[-1]].tolist(),arrow=arrow))
         after=copy.deepcopy(before);after['Route']=nbtlib.String('通行指引');after['Station']=nbtlib.String(zone(coords[i]))
         for k,text in enumerate(texts):after['Row'+str(k)]=nbtlib.String(text)
         # Upgrade key boards only when the actual 3x2 housing and its backing
         # fit entirely above the walking clearance. Compact plates stay short.
         dest=q;newstate=state
-        if state.startswith('projectseele:nerv_direction_panel'):
+        if state.startswith('projectseele:nerv_direction_panel')and not graph.get('r52_navigation'):
             candidate=(q[0],q[1]+(1 if q[1]-coords[i,1]<2 else 0),q[2])
             front=[(candidate[0]+(d if nz else 0),candidate[1]+h,candidate[2]+(d if nx else 0)) for d in (-1,0,1) for h in (0,1)]
             back=[(x-nx,y,z-nz) for x,y,z in front]
             backing={'projectseele:nerv_wall_panel','projectseele:nerv_structural_panel','projectseele:nerv_wall_datum','minecraft:gray_concrete','minecraft:light_gray_concrete','minecraft:white_concrete','minecraft:black_concrete'}
             if all(c==q or clear(c) for c in front) and all((w.block(c) or '').partition('[')[0] in backing for c in back):
                 dest=candidate;newstate=f'projectseele:station_departure_board[facing={face},wayfinding=true]';upgraded.append(dict(before=q,after=dest))
+        if dest==q and newstate==state and after==before:continue
         if dest!=q or newstate!=state:
             if dest!=q:p.match((*q,*q),state,'minecraft:air','r40/retire_low_or_tiny_direction_plate')
             p.match((*dest,*dest),w.block(dest),newstate,'r40/readable_direction_board')
