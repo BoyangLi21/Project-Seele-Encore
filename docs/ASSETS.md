@@ -442,3 +442,7 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 - 建筑、倒金字塔湖盆、水下灯带、岸边设备、屋顶警示灯及树木均从当前单人存档导出；树木和本次湖盆整理由项目自行生成，没有导入参考图像素或官方资产。
 - 离线环境照明沿用 Poly Haven 的 [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky)，Greg Zaal 与 Jarod Guest，CC0。Blender Cycles 的水体材质、细草、摄影布光、轻微辉光和金字塔上部青色轮廓线属于宣传处理；青色轮廓线没有宣称已安装到游戏。
+
+- 最新共尖湖面修订保留实测建筑中心、顶点和水下角，摄影网格将原方块台阶重建为连续斜面；水上、水下为同一网格。连续饰面与阴影透射近似属于离线渲染，并非游戏内新光影。远景森林按已安装的 12 种原生树木模板及其实际坐标实例化，没有使用参考图植被或外部树木素材。
+
+- 10 月 18 日参考灯光实装：青蓝冠带、棱角灯点、铺装草坪边灯现已写入当前存档，使用原生海晶灯；水下暖灯使用原生赭黄蛙明灯。离线图沿已安装灯位细化发光外观与倒角，不再把冠带列为仅宣传处理。原 NERV 标志只补齐现有 N 字的七格细笔，未引入新的图像资源。
