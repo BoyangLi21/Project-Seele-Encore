@@ -31,16 +31,16 @@ final class EvaPowerAttachmentR25
             var direction=fitted.cableDirection();
             FRAMES.put(eva,new Frame(new Vec3(m.transformPosition(fitted.mountPixels().scale(1D/16).toVector3f())),
                     new Vec3(m.transformPosition(fitted.cableTailPixels().scale(1D/16).toVector3f())),
-                    axis(m,1,0,0),axis(m,0,1,0),axis(m,0,0,1),axis(m,(float)direction.x,(float)direction.y,(float)direction.z),eva.level().getGameTime()));
+                    axis(m,1,0,0),axis(m,0,1,0),axis(m,0,0,1),axis(m,(float)direction.x,(float)direction.y,(float)direction.z),com.projectseele.entity.FirstBattleSignals.clientFrameTime()));
             return;
         }
         FRAMES.put(eva,new Frame(point(m,EvaScale.UMBILICAL_MOUNT_HEIGHT,eva.powerMountRearOffset()),
                 point(m,EvaScale.UMBILICAL_SOCKET_HEIGHT,eva.powerSocketRearOffset()),
-                axis(m,1,0,0),axis(m,0,1,0),axis(m,0,0,1),axis(m,0,0,1),eva.level().getGameTime()));
+                axis(m,1,0,0),axis(m,0,1,0),axis(m,0,0,1),axis(m,0,0,1),com.projectseele.entity.FirstBattleSignals.clientFrameTime()));
     }
     static Frame frame(EvaUnit01Entity eva,float partial)
     {
-        var value=FRAMES.get(eva);if(value!=null&&eva.level().getGameTime()-value.tick()<=1)return value;
+        var value=FRAMES.get(eva);if(value!=null&&value.tick()==com.projectseele.entity.FirstBattleSignals.clientFrameTime())return value;
         var fitted=com.projectseele.entity.EvaPowerPortsR48.of(eva);
         if(fitted!=null)
         {

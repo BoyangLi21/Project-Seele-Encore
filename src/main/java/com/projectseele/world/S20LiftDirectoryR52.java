@@ -34,6 +34,7 @@ public final class S20LiftDirectoryR52
         final Set<String> nativeReady=new HashSet<>();boolean officeReady;
         final Map<String,BlockState> closed=new HashMap<>();
         final Map<String,Set<ChunkPos>> footprints=new HashMap<>();
+        final Map<String,UUID> cabinVisuals=new HashMap<>();
     }
     private S20LiftDirectoryR52() {}
     private static State state(ServerLevel level)
@@ -106,17 +107,21 @@ public final class S20LiftDirectoryR52
                 var block=level.getBlockState(floor.controller());
                 if(!block.is(MovingElevators.elevator_block)||!block.hasProperty(ControllerBlock.FACING)||block.getValue(ControllerBlock.FACING)!=binding.controllerFacing()
                         ||!(level.getBlockEntity(floor.controller()) instanceof ControllerBlockEntity controller)||!controller.hasGroup())return false;
-                var group=controller.getGroup();if(group.x!=floor.controller().getX()||group.z!=floor.controller().getZ()||group.facing!=binding.controllerFacing()||group.getFloorCount()!=binding.floors().size())return false;
+                var group=controller.getGroup();var canonical=NervPersonnelTransferR53.canonicalController(level,floor.controller());
+                if(group.x!=canonical.getX()||group.z!=canonical.getZ()||group.facing!=binding.controllerFacing()||group.getFloorCount()!=binding.floors().size())return false;
                 moving|=group.isMoving();boolean present=S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,floor.cabin());if(present)cars++;
                 for(var call:floor.calls())if(!callValid(level,state,binding,call))return false;
                 if(present&&!group.isMoving()&&(!controlLink(level,state,binding,floor.cabin().offset(binding.insideButtonOffset()))||!controlLink(level,state,binding,floor.cabin().offset(binding.insideDisplayOffset()))))return false;
                 for(int i=0;i<binding.floors().size();i++)if(group.getFloorYLevel(i)!=binding.floors().get(i).cabin().getY())return false;
                 var anchor=group.getCageAnchorBlockPos(floor.cabin().getY());
                 if(anchor.getX()+group.getCageSizeX()/2!=floor.cabin().getX()||anchor.getY()!=floor.cabin().getY()-1||anchor.getZ()+group.getCageSizeZ()/2!=floor.cabin().getZ())return false;
-                for(var cells:group.isMoving()?List.of(floor.landingDoors()):List.of(floor.landingDoors(),floor.cabinDoors()))for(var cell:cells.entrySet())
+                // Cabin doors travel with the single car. At a nearby empty
+                // stop their hypothetical cells may contain that car's roof.
+                // Landing doors remain fixed and are checked at every stop.
+                for(var cells:group.isMoving()||!present?List.of(floor.landingDoors()):List.of(floor.landingDoors(),floor.cabinDoors()))for(var cell:cells.entrySet())
                 {
                     var current=level.getBlockState(cell.getKey());var closed=closed(state,cell.getValue());
-                    if(level.getBlockEntity(cell.getKey())!=null||!current.isAir()&&!current.equals(closed))return false;
+                    if(level.getBlockEntity(cell.getKey())!=null||!current.isAir()&&!current.equals(closed)&&!current.is(com.projectseele.registry.ModBlocks.LIFT_DOOR_INTERLOCK_R53.get()))return false;
                 }
             }
             if(!moving&&cars!=1)return false;
@@ -244,17 +249,38 @@ public final class S20LiftDirectoryR52
         {
             boolean open=car==floor;
             var office=state.document.office();if(open&&office!=null&&office.liftId().equals(spec.id())&&floor.cabin().getY()==office.middleY())open=SeeleConferenceAccessR47.canOpenLanding(level);
-            writeDoors(level,state,floor.landingDoors(),open);
-            if(floor.visualDoor()!=null&&level.getEntity(floor.visualDoor()) instanceof NervLiftDoorEntity visual)visual.setOpen(open);
+            var old=floor.visualDoor()==null?null:level.getEntity(floor.visualDoor());
+            int id=old instanceof NervLiftDoorEntity d?d.getDoorId():Objects.hash(spec.id(),floor.cabin(),"landing");
+            int minX=Integer.MAX_VALUE,minY=minX,minZ=minX,maxX=Integer.MIN_VALUE,maxY=maxX,maxZ=maxX;
+            for(var p:floor.landingDoors().keySet()){minX=Math.min(minX,p.getX());minY=Math.min(minY,p.getY());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxY=Math.max(maxY,p.getY());maxZ=Math.max(maxZ,p.getZ());}
+            if(floor.landingDoors().isEmpty())continue;
+            var visual=NervLiftDoorEntity.reconcile(level,id,maxX-minX>=maxZ-minZ,Math.max(maxX-minX,maxZ-minZ)+1,maxY-minY+1,NervLiftDoorEntity.STYLE_GLASS,new net.minecraft.world.phys.Vec3((minX+maxX+1)*.5,minY,(minZ+maxZ+1)*.5));
+            if(visual!=null)visual.setOpen(open);
+            writeDoors(level,state,floor.landingDoors(),open&&visual!=null&&visual.getOpenProgress(1)>=.95F);
             if(S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,floor.cabin()))writeDoors(level,state,floor.cabinDoors(),open);
+        }
+        var reference=spec.r52().floors().get(0);
+        if(!reference.cabinDoors().isEmpty()&&level.getBlockEntity(reference.controller()) instanceof ControllerBlockEntity controller&&controller.hasGroup())
+        {
+            var group=controller.getGroup();
+            int minX=Integer.MAX_VALUE,minY=minX,minZ=minX,maxX=Integer.MIN_VALUE,maxY=maxX,maxZ=maxX;
+            for(var p:reference.cabinDoors().keySet()){minX=Math.min(minX,p.getX());minY=Math.min(minY,p.getY());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxY=Math.max(maxY,p.getY());maxZ=Math.max(maxZ,p.getZ());}
+            var initial=group.getCageAnchorBlockPos(reference.controller().getY());
+            var centre=group.getCageAnchorPos(group.getCurrentY()).add((minX+maxX+1)*.5-initial.getX(),minY-initial.getY(),(minZ+maxZ+1)*.5-initial.getZ());
+            var id=state.cabinVisuals.get(spec.id());
+            var visual=id==null?null:level.getEntity(id);
+            NervLiftDoorEntity door;
+            if(visual instanceof NervLiftDoorEntity existing){door=existing;door.setPos(centre.x,centre.y,centre.z);}
+            else{door=NervLiftDoorEntity.reconcile(level,Objects.hash(spec.id(),"moving_cabin"),maxX-minX>=maxZ-minZ,Math.max(maxX-minX,maxZ-minZ)+1,maxY-minY+1,NervLiftDoorEntity.STYLE_GLASS,centre);if(door!=null)state.cabinVisuals.put(spec.id(),door.getUUID());}
+            if(door!=null){boolean open=car!=null&&!moving;var office=state.document.office();if(open&&office!=null&&office.liftId().equals(spec.id())&&car.cabin().getY()==office.middleY())open=SeeleConferenceAccessR47.canOpenLanding(level);door.setOpen(open);}
         }
     }
     private static void writeDoors(ServerLevel level,State state,Map<BlockPos,String> cells,boolean open)
     {
         for(var cell:cells.entrySet())try
         {
-            var before=level.getBlockState(cell.getKey());var closed=closed(state,cell.getValue());if(level.getBlockEntity(cell.getKey())!=null||!before.isAir()&&!before.equals(closed))continue;
-            var target=open?Blocks.AIR.defaultBlockState():closed;if(!before.equals(target))level.setBlock(cell.getKey(),target,Block.UPDATE_CLIENTS|Block.UPDATE_KNOWN_SHAPE);
+            var before=level.getBlockState(cell.getKey());var closed=closed(state,cell.getValue());var interlock=com.projectseele.registry.ModBlocks.LIFT_DOOR_INTERLOCK_R53.get().defaultBlockState();if(level.getBlockEntity(cell.getKey())!=null||!before.isAir()&&!before.equals(closed)&&!before.equals(interlock))continue;
+            var target=open?Blocks.AIR.defaultBlockState():interlock;if(!before.equals(target))level.setBlock(cell.getKey(),target,Block.UPDATE_CLIENTS|Block.UPDATE_KNOWN_SHAPE);
         }
         catch(Exception failure){state.ready=false;ProjectSeele.LOGGER.error("Root native lift door state rejected",failure);return;}
     }

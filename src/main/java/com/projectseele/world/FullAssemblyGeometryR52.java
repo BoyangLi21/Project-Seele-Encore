@@ -50,15 +50,15 @@ public final class FullAssemblyGeometryR52
     {
         var receipt=new TreeMap<String,String>();var carrier=read(bytes,"mesh/tripo_carrier_r48.json",expected,receipt);var plugs=new HashMap<Integer,Map<String,double[]>>();
         String geoPath="geo/entry_plug_carrier.geo.json";byte[] geoBytes;try(var input=bytes.open(geoPath)){geoBytes=input.readAllBytes();}require(expected.containsKey(geoPath)&&expected.get(geoPath).equals(sha(geoBytes)),"Actual capsule GEO selection changed");receipt.put(geoPath,expected.get(geoPath));
-        var geo=JsonParser.parseString(new String(geoBytes,StandardCharsets.UTF_8)).getAsJsonObject();var bones=geo.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject().getAsJsonArray("bones");var named=new HashSet<String>();
-        for(var value:bones){var b=value.getAsJsonObject();String name=b.get("name").getAsString();require(named.add(name),"Duplicate capsule bone");if(b.has("rotation"))for(var component:b.getAsJsonArray("rotation"))require(component.getAsDouble()==0,"Actual closed capsule has unsupported bind transform");if(!name.equals("entry_plug"))require(b.get("parent").getAsString().equals("entry_plug"),"Actual closed capsule parent changed");}
+        var geo=JsonParser.parseString(new String(geoBytes,StandardCharsets.UTF_8)).getAsJsonObject();var bones=geo.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject().getAsJsonArray("bones");var named=new HashSet<String>();var plugPivots=new HashMap<String,Vec3>();
+        for(var value:bones){var b=value.getAsJsonObject();String name=b.get("name").getAsString();require(named.add(name),"Duplicate capsule bone");if(b.has("rotation"))for(var component:b.getAsJsonArray("rotation"))require(component.getAsDouble()==0,"Actual closed capsule has unsupported bind transform");if(!name.equals("entry_plug"))require(b.get("parent").getAsString().equals("entry_plug"),"Actual closed capsule parent changed");var pivot=b.getAsJsonArray("pivot");require(pivot!=null&&pivot.size()==3,"Actual capsule hinge pivot required");var p=new Vec3(-pivot.get(0).getAsDouble(),pivot.get(1).getAsDouble(),pivot.get(2).getAsDouble()).scale(EntryPlugKinematics.MODEL_TO_BLOCK);finite(p);plugPivots.put(name,p);}
         require(named.equals(Set.of("entry_plug","plug_hatch_l","plug_hatch_r","plug_crane_collar")),"Actual capsule skeleton incomplete");
         for(int v=0;v<3;v++)plugs.put(v,read(bytes,"mesh/entry_plug_unit0"+v+".mesh.json",expected,receipt).parts);
         require(carrier.parts.keySet().equals(Set.of("body","deck","contact_pads","service_platform"))&&carrier.anchors.containsKey("service_platform"),"Actual four-part Tripo carrier and hinge required");
         for(var entry:plugs.values())require(entry.keySet().equals(Set.of("entry_plug","plug_hatch_l","plug_hatch_r","plug_crane_collar")),"Actual complete original capsule required");
         var bearings=read(bytes,"mesh/carrier_sole_bearings_r52.json",expected,receipt).parts;require(bearings.keySet().equals(Set.of("sole_bearing_0_l","sole_bearing_0_r","sole_bearing_1_l","sole_bearing_1_r","sole_bearing_2_l","sole_bearing_2_r")),"Explicit six engineered sole-bearing parts required");
         var trim=read(bytes,"mesh/carrier_body_trimmed_r52.json",expected,receipt).parts;require(trim.keySet().equals(Set.of("body_trimmed_r52","upper_frame_cap_r52","interior_cut_caps_r52")),"Actual authorised cropped upper body and engineering steel cap required");
-        var stow=read(bytes,"mesh/carrier_service_stow_r52.json",expected,receipt).parts;require(stow.containsKey("service_platform_stowed_r52")&&stow.keySet().stream().filter(n->n.startsWith("contact_pad_stowed_")).count()==6,"All original physical folded pads/platform required");var runningDeck=expected.containsKey(NervLegacyCarrierRideR52.DECK_SOURCE)?read(bytes,NervLegacyCarrierRideR52.DECK_SOURCE,expected,receipt).parts:Map.<String,double[]>of();if(!runningDeck.isEmpty())require(runningDeck.keySet().equals(Set.of("deck")),"Actual four-housing textured deck source required");if(expected.containsKey(NervLegacyCarrierRideR52.SOURCE)){String hash=digestResourceR52(bytes,NervLegacyCarrierRideR52.SOURCE);require(hash.equals(expected.get(NervLegacyCarrierRideR52.SOURCE)),"Selected four-slide/fixed-head source changed");receipt.put(NervLegacyCarrierRideR52.SOURCE,hash);}return new Provider(carrier.parts,carrier.anchors,Map.copyOf(plugs),bearings,trim,stow,runningDeck,sha(receipt.toString().getBytes(StandardCharsets.UTF_8)));
+        var stow=read(bytes,"mesh/carrier_service_stow_r52.json",expected,receipt).parts;require(stow.containsKey("service_platform_stowed_r52")&&stow.keySet().stream().filter(n->n.startsWith("contact_pad_stowed_")).count()==6,"All original physical folded pads/platform required");var runningDeck=expected.containsKey(NervLegacyCarrierRideR52.DECK_SOURCE)?read(bytes,NervLegacyCarrierRideR52.DECK_SOURCE,expected,receipt).parts:Map.<String,double[]>of();if(!runningDeck.isEmpty())require(runningDeck.keySet().equals(Set.of("deck")),"Actual four-housing textured deck source required");if(expected.containsKey(NervLegacyCarrierRideR52.SOURCE)){String hash=digestResourceR52(bytes,NervLegacyCarrierRideR52.SOURCE);require(hash.equals(expected.get(NervLegacyCarrierRideR52.SOURCE)),"Selected four-slide/fixed-head source changed");receipt.put(NervLegacyCarrierRideR52.SOURCE,hash);}return new Provider(carrier.parts,carrier.anchors,Map.copyOf(plugs),bearings,trim,stow,runningDeck,plugPivots,sha(receipt.toString().getBytes(StandardCharsets.UTF_8)));
     }
     private record Imported(Map<String,double[]> parts,Map<String,Vec3> anchors){}
     private static Imported read(StreamSource source,String path,Map<String,String> expected,Map<String,String> receipt)throws IOException
@@ -106,8 +106,8 @@ public final class FullAssemblyGeometryR52
     }
     public static final class Provider
     {
-        private final Map<String,double[]> carrier,bearings,trim,stow,runningDeck;private final Map<String,Vec3> anchors;private final Map<Integer,Map<String,double[]>> plugs;private final String source;
-        private Provider(Map<String,double[]> carrier,Map<String,Vec3> anchors,Map<Integer,Map<String,double[]>> plugs,Map<String,double[]> bearings,Map<String,double[]> trim,Map<String,double[]> stow,Map<String,double[]> runningDeck,String source){this.runningDeck=runningDeck;this.carrier=carrier;this.anchors=anchors;this.plugs=plugs;this.bearings=bearings;this.trim=trim;this.stow=stow;this.source=source;}
+        private final Map<String,double[]> carrier,bearings,trim,stow,runningDeck;private final Map<String,Vec3> anchors,plugPivots;private final Map<Integer,Map<String,double[]>> plugs;private final String source;
+        private Provider(Map<String,double[]> carrier,Map<String,Vec3> anchors,Map<Integer,Map<String,double[]>> plugs,Map<String,double[]> bearings,Map<String,double[]> trim,Map<String,double[]> stow,Map<String,double[]> runningDeck,Map<String,Vec3> plugPivots,String source){this.runningDeck=runningDeck;this.carrier=carrier;this.anchors=anchors;this.plugs=plugs;this.bearings=bearings;this.trim=trim;this.stow=stow;this.plugPivots=Map.copyOf(plugPivots);this.source=source;}
         public String sourceFingerprint(){return source;}
         public boolean selectedRunningDeckR52(){return runningDeck.keySet().equals(Set.of("deck"));}
         /** Pure source transform evaluator for actual renderer comparison.
@@ -136,10 +136,20 @@ public final class FullAssemblyGeometryR52
          * part and use the same 64m actuator and the exact rendered triangles. */
         public Map<String,double[]> carrierParts(int variant,float rise,boolean recoveryRack,float release,double deckTravel)
         {
+            if(NervR50CarrierModeR53.enabled())return carrierParts(rise,recoveryRack,release,0);
             var result=new LinkedHashMap<>(carrierParts(rise,recoveryRack,release,deckTravel));if(deckTravel==64){require(variant>=0&&variant<3,"Actual sole-bearing variant required");var frame=new RigidTransform(new Vec3(0,-64*(1-rise),0),0,0,0,1);if(selectedRunningDeckR52())result.put("deck",transform(runningDeck.get("deck"),frame));result.remove("body");result.remove("contact_pads");result.remove("service_platform");stow.forEach((name,xyz)->result.put(name,transform(xyz,frame)));trim.forEach((name,xyz)->result.put(name,transform(xyz,frame)));for(String side:List.of("l","r")){String name="sole_bearing_"+variant+"_"+side;result.put(name,transform(bearings.get(name),frame));}}return Collections.unmodifiableMap(result);
         }
         public Map<String,double[]> closedPlugParts(int variant)
         {var source=plugs.get(variant);require(source!=null,"Original capsule variant absent");var result=new LinkedHashMap<String,double[]>();source.forEach((n,p)->{if(!n.equals("plug_crane_collar"))result.put(n,p.clone());});return Collections.unmodifiableMap(result);}
+        /** Same two hinge pivots and opposed Z rotations as EntryPlugCarrierRenderer. */
+        public RigidTransform plugPartFrameR53(String part,float hatch)
+        {
+            require(Float.isFinite(hatch)&&hatch>=0&&hatch<=1&&plugPivots.containsKey(part),"Actual capsule part and hatch clock required");
+            if(hatch==0||!part.startsWith("plug_hatch_"))return RigidTransform.identity();
+            float angle=(float)Math.toRadians(EntryPlugKinematics.HATCH_OPEN_ANGLE_DEGREES*hatch*(part.equals("plug_hatch_l")?1:-1));
+            var pivot=plugPivots.get(part);var rotation=RigidTransform.of(Vec3.ZERO,new Quaternionf().rotationZ(angle));
+            return new RigidTransform(pivot.subtract(rotation.transformVector(pivot)),rotation.qx(),rotation.qy(),rotation.qz(),rotation.qw());
+        }
     }
     public static Captured capture(ServerLevel level,Original original,EvaOriginalMeshGeometryR52.Geometry actualEva,FootSupportFrameR52.Binding binding,FootSupportFrameR52.Sample actualFrame)
     {
@@ -185,15 +195,27 @@ public final class FullAssemblyGeometryR52
     public static final class CheckedAssemblySweep
     {
         private final Captured assembly;private final List<DirectoryTrajectoryR52> trajectories;private final DirectoryTrajectoryR52 trajectory;private final double maximumError;private final List<AABB> envelopes;
+        private final Map<DirectoryTrajectoryR52,List<TriangleSweepMeshR52.PreparedSweep>> prepared=new IdentityHashMap<>();
+        private record PilotSegment(double from,double to,AABB box){}
+        private record SweptPiece(AABB bounds,TriangleSweepMeshR52.PreparedSweep mesh,List<PilotSegment> pilot,String component,DirectoryTrajectoryR52 path){}
+        private final NervStaticSpatialIndexR52<SweptPiece> pieceIndex;
+        private String clearanceHoldR53="assembly_state";private SweptPiece intersectedPieceR53;
+        public String clearanceHoldR53(){return clearanceHoldR53;}
+        private boolean collisionHeldR53(String obstacle){clearanceHoldR53=obstacle+(intersectedPieceR53==null?"":" component="+intersectedPieceR53.component()+" leg="+intersectedPieceR53.path().leg().id()+" interval="+intersectedPieceR53.path().fromFraction()+".."+intersectedPieceR53.path().toFraction());return false;}
         private CheckedAssemblySweep(Captured assembly,List<DirectoryTrajectoryR52> paths,double maximumError)
         {
             require(paths!=null&&!paths.isEmpty()&&paths.size()<=2048,"Bounded declared composite trajectory required");
-            this.assembly=assembly;this.trajectories=List.copyOf(paths);this.trajectory=paths.get(0);this.maximumError=maximumError;var boxes=new ArrayList<AABB>();
+            this.assembly=assembly;this.trajectories=List.copyOf(paths);this.trajectory=paths.get(0);this.maximumError=maximumError;var boxes=new ArrayList<AABB>();var pieces=new ArrayList<SweptPiece>();
             FootSupportFrameR52.Sample previous=null;
             for(var path:trajectories){require(path.directory().fingerprint().equals(trajectory.directory().fingerprint())&&path.binding().equals(assembly.binding),"Composite source/binding changed");if(previous!=null)require(sampleMatches(previous,path.sample(0)),"Disconnected composite trajectory");previous=path.sample(1);
-                for(var surface:assembly.surfaces){boxes.add(surface.mesh.envelope(path));path.divisions(surface.mesh.bounds().getCenter().distanceTo(path.footCentreLocal())+Math.sqrt(Math.pow(surface.mesh.bounds().getXsize(),2)+Math.pow(surface.mesh.bounds().getYsize(),2)+Math.pow(surface.mesh.bounds().getZsize(),2))/2,maximumError);}
-                if(assembly.pilot!=null)boxes.add(pilotEnvelope(assembly.pilot,path));}
-            envelopes=List.copyOf(boxes);
+                var meshes=new ArrayList<TriangleSweepMeshR52.PreparedSweep>();
+                for(var surface:assembly.surfaces){var bounds=surface.mesh.envelope(path);boxes.add(bounds);path.divisions(surface.mesh.bounds().getCenter().distanceTo(path.footCentreLocal())+Math.sqrt(Math.pow(surface.mesh.bounds().getXsize(),2)+Math.pow(surface.mesh.bounds().getYsize(),2)+Math.pow(surface.mesh.bounds().getZsize(),2))/2,maximumError);var mesh=surface.mesh.prepare(path,maximumError);meshes.add(mesh);pieces.add(new SweptPiece(bounds,mesh,List.of(),surface.component(),path));}
+                prepared.put(path,List.copyOf(meshes));
+                if(assembly.pilot!=null){var p=assembly.pilot;var bounds=pilotEnvelope(p,path);boxes.add(bounds);double radius=p.seatInEva.distanceTo(path.footCentreLocal());int divisions=path.divisions(radius,maximumError);double error=path.error(radius,divisions);var segments=new ArrayList<PilotSegment>();
+                    for(int i=0;i<divisions;i++){double from=(double)i/divisions,to=(double)(i+1)/divisions;var a=path.sample(from).evaRoot().transformPoint(p.seatInEva);var b=path.sample(to).evaRoot().transformPoint(p.seatInEva);segments.add(new PilotSegment(from,to,pilotBox(p,a).minmax(pilotBox(p,b)).inflate(error)));}
+                    // Index the same conservative pilot chords used by narrow phase.
+                    for(var segment:segments)bounds=bounds.minmax(segment.box());pieces.add(new SweptPiece(bounds,null,List.copyOf(segments),"pilot",path));}}
+            envelopes=List.copyOf(boxes);pieceIndex=new NervStaticSpatialIndexR52<>(pieces,SweptPiece::bounds);
         }
         public List<DirectoryTrajectoryR52> trajectories(){return trajectories;}
         public String sourceFingerprint(){return assembly.source;}
@@ -227,7 +249,7 @@ public final class FullAssemblyGeometryR52
             var blocks=BoundedNativeCollisionGroupsR52.clear(envelopes,
                     box->EntryPlugEjectionR48.loaded(level,box),
                     box->{var shapes=new ArrayList<AABB>();for(var shape:level.getBlockCollisions(eva,box))shapes.addAll(shape.toAabbs());return shapes;},
-                    (piece,obstacle)->testedBlocks.add(obstacle)&&intersects(obstacle));
+                    (piece,obstacle)->{if(!testedBlocks.add(obstacle)||!intersects(obstacle))return false;collisionHeldR53("native_block="+obstacle);return true;});
             if(!blocks.clear())return false;
             for(var box:envelopes)
             {
@@ -242,29 +264,29 @@ public final class FullAssemblyGeometryR52
             for(var actor:actors.values())
             {
                 var meshes=NervFlightProofR52.actualObstacleMeshes(actor);
-                if(meshes==null)return false;
-                if(meshes.isEmpty()){if(intersects(actor.getBoundingBox()))return false;}
-                else for(var mesh:meshes)if(intersects(mesh))return false;
+                if(meshes==null)return collisionHeldR53("actor_source_missing="+actor.getUUID());
+                if(meshes.isEmpty()){if(intersects(actor.getBoundingBox()))return collisionHeldR53("actor_body="+actor.getUUID());}
+                else for(var mesh:meshes)if(intersects(mesh))return collisionHeldR53("actor_mesh="+actor.getUUID()+" bounds="+mesh.mesh().envelope(mesh.frame(),mesh.endFrame()));
             }
             var detached=NervFlightProofR52.detachedCarrierObstacles(level);if(detached==null)return false;
-            for(var mesh:detached)if(intersects(mesh))return false;
+            for(var mesh:detached)if(intersects(mesh))return collisionHeldR53("detached_mesh="+mesh.frame());
+            clearanceHoldR53="";
             return true;
         }
         private boolean intersects(NervFlightProofR52.ObstacleMesh obstacle)
         {
             AABB bounds=obstacle.mesh().envelope(obstacle.frame(),obstacle.endFrame());
-            if(envelopes.stream().noneMatch(box->box.intersects(bounds)))return false;
             if((trajectories.size()>1||trajectory.pureTranslation())&&!same(obstacle.frame(),obstacle.endFrame()))return intersects(bounds);
-            for(var path:trajectories){for(var surface:assembly.surfaces)if(surface.mesh.intersects(path,obstacle.mesh(),obstacle.frame(),obstacle.endFrame(),maximumError))return true;
-                var p=assembly.pilot;if(p==null)continue;double radius=p.seatInEva.distanceTo(path.footCentreLocal());int divisions=path.divisions(radius,maximumError);double error=path.error(radius,divisions);
-                for(int i=0;i<divisions;i++){double from=(double)i/divisions,to=(double)(i+1)/divisions;var a=path.sample(from).evaRoot().transformPoint(p.seatInEva);var b=path.sample(to).evaRoot().transformPoint(p.seatInEva);var body=pilotBox(p,a).minmax(pilotBox(p,b)).inflate(error);if(obstacle.mesh().intersects(obstacle.frame().interpolate(obstacle.endFrame(),from),obstacle.frame().interpolate(obstacle.endFrame(),to),body,maximumError))return true;}}
+            for(var piece:pieceIndex.query(bounds)){
+                if(piece.mesh()!=null){if(piece.mesh().intersects(obstacle.mesh(),obstacle.frame(),obstacle.endFrame())){intersectedPieceR53=piece;return true;}}
+                else for(var segment:piece.pilot())if(segment.box().intersects(bounds)&&obstacle.mesh().intersects(obstacle.frame().interpolate(obstacle.endFrame(),segment.from()),obstacle.frame().interpolate(obstacle.endFrame(),segment.to()),segment.box(),maximumError)){intersectedPieceR53=piece;return true;}}
             return false;
         }
         private boolean intersects(AABB obstacle)
         {
-            for(var path:trajectories){for(var surface:assembly.surfaces)if(surface.mesh.intersects(path,obstacle,maximumError))return true;
-                var p=assembly.pilot;if(p==null)continue;double radius=p.seatInEva.distanceTo(path.footCentreLocal());int divisions=path.divisions(radius,maximumError);double error=path.error(radius,divisions);
-                for(int i=0;i<divisions;i++){var a=path.sample((double)i/divisions).evaRoot().transformPoint(p.seatInEva);var b=path.sample((double)(i+1)/divisions).evaRoot().transformPoint(p.seatInEva);if(pilotBox(p,a).minmax(pilotBox(p,b)).inflate(error).intersects(obstacle))return true;}}
+            for(var piece:pieceIndex.query(obstacle)){
+                if(piece.mesh()!=null){if(piece.mesh().intersects(obstacle)){intersectedPieceR53=piece;return true;}}
+                else for(var segment:piece.pilot())if(segment.box().intersects(obstacle)){intersectedPieceR53=piece;return true;}}
             return false;
         }
     }

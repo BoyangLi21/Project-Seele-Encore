@@ -36,7 +36,14 @@ public final class PoseSnapshotCodecR45Test
             }
         }
         if(oldMaximum<.1)throw new AssertionError("Legacy negative control did not reproduce pose corruption");
-        if(newMaximum>2e-4)throw new AssertionError("Snapshot axes changed: "+newMaximum);
+        if(newMaximum>1e-6)throw new AssertionError("Snapshot axes changed: "+newMaximum);
+        var legacyPose=new EvaBodyPose.Sample(rig);legacyPose.rotations.put("root",new Quaternionf().rotationZYX(.3F,.4F,.5F));
+        var legacyTag=EvaPoseSnapshotR50.encode(legacyPose);legacyTag.remove("__exact_quaternions_r53");
+        var legacyRead=new EvaBodyPose.Sample(rig);EvaPoseSnapshotR50.decode(legacyTag,legacyRead);
+        if(Math.abs(legacyRead.rotations.get("root").dot(legacyPose.rotations.get("root")))<.999999F)
+            throw new AssertionError("Existing nine-channel saved poses no longer load");
+        if(!EvaPoseSnapshotR50.bones(EvaPoseSnapshotR50.encode(legacyPose)).equals(rig.keySet()))
+            throw new AssertionError("Pose precision metadata was treated as a bone");
         System.out.println("Pose snapshot common codec: legacy maximum axis error="+oldMaximum+"; shared codec="+newMaximum+"; 2400 orientations PASS");
     }
 }

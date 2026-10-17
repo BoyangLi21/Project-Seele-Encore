@@ -171,7 +171,7 @@ public abstract class CameraMixin
             return;
         }
         boolean lockedCapsule=!(subject.getVehicle() instanceof EntryPlugCarrierEntity capsule)||capsule.isLockedToEva();
-        if (detached && controlled != null && (controlled.hasActiveCarrierMotion()||controlled.isNervLogisticsLocked()&&lockedCapsule))
+        if (detached && controlled != null && lockedCapsule)
         {
             // Both collision rays and orbit originate at the analytic optical
             // frame. Translating an already-clipped rider camera still shook

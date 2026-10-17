@@ -79,21 +79,78 @@ public final class NervLegacyCarrierRideR52 {
         public boolean current(ServerLevel l){return l.getGameTime()==at&&l.getEntity(gantry) instanceof NervCarrierPlatformEntity g&&g.serviceLeadStateR52().equals(before)&&leadFeetBear(l,to);}
     }
     private static LeadSampleR52 leadAt(LeadSampleR52 a,LeadSampleR52 b,double t){return new LeadSampleR52(a.spec(),(float)(a.serviceBridge()+(b.serviceBridge()-a.serviceBridge())*t),(float)(a.rise()+(b.rise()-a.rise())*t),b.at());}
-    public static int leadSweepDivisionsR52(LeadSampleR52 from,LeadSampleR52 to){return from.serviceBridge()==0&&to.serviceBridge()==0||Math.max(from.rise(),to.rise())<=.90?1:Math.max(16,(int)Math.ceil(Math.abs(to.rise()-from.rise())*Math.sqrt(700000/(8*.001))));}
-    public static double leadSweepErrorR52(LeadSampleR52 from,LeadSampleR52 to,int divisions){if(divisions<1)throw new IllegalArgumentException("Actual finite sweep subdivisions required");return from.serviceBridge()==0&&to.serviceBridge()==0||Math.max(from.rise(),to.rise())<=.90?.00002:700000*Math.pow((to.rise()-from.rise())/divisions,2)/8+.00002;}
+    private static double easeFirst(double t){return t<=0||t>=1?0:30*t*t*(1-t)*(1-t);}
+    private static double easeSecond(double t){return t<=0||t>=1?0:60*t*(1-t)*(1-2*t);}
+    private static double easeDerivativeBound(double lo,double hi,boolean second){
+        double maximum=0;double[] candidates=second?new double[]{lo,hi,(3-Math.sqrt(3))/6,(3+Math.sqrt(3))/6}:new double[]{lo,hi,.5};
+        for(double t:candidates)if(t>=lo&&t<=hi)maximum=Math.max(maximum,Math.abs(second?easeSecond(t):easeFirst(t)));
+        return maximum;
+    }
+    private record LeadDerivativesR53(double first,double second){}
+    private static LeadDerivativesR53 leadDerivativesR53(LeadSampleR52 from,LeadSampleR52 to){
+        if(from.serviceBridge()!=to.serviceBridge())return new LeadDerivativesR53(4096,700000);
+        double bridge=from.serviceBridge(),lo=Math.min(from.rise(),to.rise()),hi=Math.max(from.rise(),to.rise());
+        double q0=bridge*ease((lo-.90)/.10),q1=bridge*ease((hi-.90)/.10);
+        double qFirst=bridge*easeDerivativeBound((lo-.90)/.10,(hi-.90)/.10,false)/.10;
+        double qSecond=bridge*easeDerivativeBound((lo-.90)/.10,(hi-.90)/.10,true)/.01;
+        double h1=easeDerivativeBound(q0/.8,q1/.8,false)/.8;
+        double h2=easeDerivativeBound(q0/.8,q1/.8,true)/(.8*.8);
+        double lift1=easeDerivativeBound((q0-.8)/.2,(q1-.8)/.2,false)/.2;
+        double lift2=easeDerivativeBound((q0-.8)/.2,(q1-.8)/.2,true)/(.2*.2);
+        double horizontalFirst=h1*qFirst,horizontalSecond=h2*qFirst*qFirst+h1*qSecond;
+        double liftSecond=lift2*qFirst*qFirst+lift1*qSecond;
+        // Chain rule for leadShift: X=11.05*(1-h),
+        // Y=-8*(1-lift)-64*(1-rise)*h. All telescopic members
+        // have fixed rotations and affine fractions of these translations.
+        return new LeadDerivativesR53(Math.hypot(11.05*horizontalFirst,8*lift1*qFirst+64*ease(q1/.8)+64*(1-lo)*horizontalFirst),Math.hypot(11.05*horizontalSecond,8*liftSecond+128*horizontalFirst+64*(1-lo)*horizontalSecond));
+    }
+    static double leadCurvatureBoundR53(LeadSampleR52 from,LeadSampleR52 to){return leadDerivativesR53(from,to).second();}
+    public static int leadSweepDivisionsR52(LeadSampleR52 from,LeadSampleR52 to){return Math.max(1,(int)Math.ceil(Math.abs(to.rise()-from.rise())*Math.sqrt(leadCurvatureBoundR53(from,to)/(8*.001))));}
+    public static double leadSweepErrorR52(LeadSampleR52 from,LeadSampleR52 to,int divisions){if(divisions<1)throw new IllegalArgumentException("Actual finite sweep subdivisions required");var bound=leadDerivativesR53(from,to);return bound.second()*Math.pow((to.rise()-from.rise())/divisions,2)/8+2*Math.ulp(Math.max(from.rise(),to.rise()))*bound.first()+.00002;}
     public static LeadSampleR52 interpolateLeadR52(LeadSampleR52 from,LeadSampleR52 to,double t){if(!from.spec().equals(to.spec())||!Double.isFinite(t)||t<0||t>1)throw new IllegalArgumentException("One declared lead clock required");return leadAt(from,to,t);}
+    private record CarrierPairR53(NervOriginalCarrierR52.Part from,NervOriginalCarrierR52.Part to){}
+    private record ActorMeshesR53(boolean known,boolean ordinary,NervStaticSpatialIndexR52<NervFlightProofR52.ObstacleMesh> index){}
+    private static final Map<UUID,String> LEAD_REJECTIONS_R53=new LinkedHashMap<>();
+    public static String lastLeadRejectionR53(NervCarrierPlatformEntity gantry){return LEAD_REJECTIONS_R53.getOrDefault(gantry.getUUID(),"");}
+    private static AcceptedLeadStep rejectLeadR53(NervCarrierPlatformEntity gantry,String detail){if(LEAD_REJECTIONS_R53.size()>=32)LEAD_REJECTIONS_R53.remove(LEAD_REJECTIONS_R53.keySet().iterator().next());LEAD_REJECTIONS_R53.put(gantry.getUUID(),detail);return null;}
+    private static NervStaticSpatialIndexR52<NervFlightProofR52.ObstacleMesh> obstacleIndexR53(List<NervFlightProofR52.ObstacleMesh> meshes){return new NervStaticSpatialIndexR52<>(meshes,m->m.mesh().envelope(m.frame(),m.endFrame()));}
     /** The same actual original carrier and gantry clocks form one proposed
      * motion. The carrier remains an explicit whole-source obstacle. */
     public static AcceptedLeadStep proposeLeadR52(ServerLevel l,NervCarrierPlatformEntity gantry,NervCarrierPlatformEntity carrier,NervOriginalCarrierR52.CheckedStep carrierStep,LeadSampleR52 from,LeadSampleR52 to,Set<UUID> own)throws IOException{
-        if(carrierStep==null||!carrierStep.current(l)||carrierStep.checkedAt()!=l.getGameTime()||!from.spec().equals(to.spec())||!Objects.equals(NervOriginalCarrierR52.actualLeadSampleR52(gantry,1),from)||from.serviceBridge()!=to.serviceBridge()||from.serviceBridge()!=1||from.rise()!=carrierStep.fromRise()||to.rise()!=carrierStep.toRise()||!NervAirTransportManifestR52.same(from.spec().bay(),carrierStep.fromRoot())||!NervAirTransportManifestR52.same(to.spec().bay(),carrierStep.toRoot())||!own.contains(gantry.getUUID())||!own.contains(carrier.getUUID())||!leadFeetBear(l,from))return null;
+        LEAD_REJECTIONS_R53.remove(gantry.getUUID());
+        if(carrierStep==null||!carrierStep.current(l)||carrierStep.checkedAt()!=l.getGameTime()||!from.spec().equals(to.spec())||!Objects.equals(NervOriginalCarrierR52.actualLeadSampleR52(gantry,1),from)||from.serviceBridge()!=to.serviceBridge()||from.serviceBridge()!=1||from.rise()!=carrierStep.fromRise()||to.rise()!=carrierStep.toRise()||!NervAirTransportManifestR52.same(from.spec().bay(),carrierStep.fromRoot())||!NervAirTransportManifestR52.same(to.spec().bay(),carrierStep.toRoot())||!own.contains(gantry.getUUID())||!own.contains(carrier.getUUID())||!leadFeetBear(l,from))return rejectLeadR53(gantry,"lead source, clock, membership or foundation changed");
         var ride=NervOriginalCarrierR52.actualRidePoseR52(carrier);var up=NervOriginalCarrierR52.guideUp(carrier);var source=carrier.originalCarrierStateR52();if(!source.hasUUID("OriginalEva"))return null;var actor=l.getEntity(source.getUUID("OriginalEva"));if(!(actor instanceof EvaUnit01Entity eva))return null;var body=NervFlightProofR52.actualObstacleMeshes(eva);if(body==null)return null;var boxes=new ArrayList<AABB>();int divisions=leadSweepDivisionsR52(from,to);if(divisions>4096)return null;
+        // The proposed clocks are immutable throughout this synchronous read.
+        // Neighboring actors are sampled once; paired motion is indexed per slice.
+        var structural=obstacleIndexR53(NervPlantMotionR52.actualStructuralMeshesR52(gantry));
+        var guides=new NervStaticSpatialIndexR52<>(NervServiceFootDriveR52.pieces(from.spec(),from.serviceBridge()),p->p.mesh().envelope(p.frame(),p.frame()));
+        var actors=new IdentityHashMap<Entity,ActorMeshesR53>();
+        AABB actorScope=null;var leadStart=actualLeadPartsR52(from);var leadEnd=actualLeadPartsR52(to);
+        double wholeError=leadSweepErrorR52(from,to,1)+leadSweepErrorR52(from,to,divisions);
+        for(int i=0;i<leadStart.size();i++){var p=leadStart.get(i);var q=leadEnd.get(i);var bounds=p.mesh().envelope(p.frame(),q.frame()).inflate(wholeError);actorScope=actorScope==null?bounds:actorScope.minmax(bounds);}
+        var nearby=l.getEntities((Entity)null,actorScope.inflate(100),e->!e.getUUID().equals(gantry.getUUID())&&!e.getUUID().equals(carrier.getUUID())&&!e.getUUID().equals(eva.getUUID())&&e.isAlive()&&(e instanceof LivingEntity||e.canBeCollidedWith()||e instanceof NervCarrierPlatformEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof UNTransportEntity));
+        var nearbyIndex=new NervStaticSpatialIndexR52<>(nearby,e->e.getBoundingBox().inflate(100));
         for(int k=0;k<divisions;k++){double ta=k/(double)divisions,tb=(k+1D)/divisions;var a=leadAt(from,to,ta);var b=leadAt(from,to,tb);var A=actualLeadPartsR52(a);var B=actualLeadPartsR52(b);var CA=NervOriginalCarrierR52.partsAtR52(carrier.getUnitVariant(),from.spec().bay(),a.rise(),up,ride);var CB=NervOriginalCarrierR52.partsAtR52(carrier.getUnitVariant(),to.spec().bay(),b.rise(),up,ride);double error=leadSweepErrorR52(from,to,divisions);var allowance=new Vec3(error,error,error);
-            for(int n=0;n<A.size();n++){var p=A.get(n);var q=B.get(n);if(!p.name().equals(q.name())||p.mesh()!=q.mesh())return null;var bound=p.mesh().envelope(p.frame(),q.frame()).inflate(error);boxes.add(bound);if(!EntryPlugEjectionR48.loaded(l,bound))return null;
-                for(var shape:l.getBlockCollisions(gantry,bound))for(var block:shape.toAabbs()){if(p.role().equals("lead_fixed_support")&&Math.abs(block.maxY-from.spec().foundationTop())<=FIT&&p.mesh().envelope(p.frame(),p.frame()).minY>=block.maxY-FIT)continue;if(p.mesh().intersects(p.frame(),q.frame(),block.inflate(error),.003))return null;}
-                for(int c=0;c<CA.size();c++){var x=CA.get(c);var y=CB.get(c);if(!bound.intersects(x.mesh().envelope(x.frame(),y.frame())))continue;if(namedLeadPadContactR52(x,y,p,q))continue;if(p.mesh().intersects(p.frame(),q.frame(),x.mesh(),x.frame(),y.frame(),.003,allowance))return null;}
-                var bodyA=new RigidTransform(new Vec3(0,-64*(a.rise()-from.rise()),0),0,0,0,1);var bodyB=new RigidTransform(new Vec3(0,-64*(b.rise()-from.rise()),0),0,0,0,1);for(var m:body)if(p.mesh().intersects(p.frame(),q.frame(),m.mesh(),bodyA.compose(m.frame()),bodyB.compose(m.endFrame()),.003,allowance))return null;
-                for(var steel:NervPlantMotionR52.actualStructuralMeshesR52(gantry))if(p.mesh().intersects(p.frame(),q.frame(),steel.mesh(),steel.frame(),steel.endFrame(),.003,allowance))return null;for(var steel:NervServiceFootDriveR52.pieces(from.spec(),from.serviceBridge()))if(p.mesh().intersects(p.frame(),q.frame(),steel.mesh(),steel.frame(),steel.frame(),.003,allowance))return null;
-                for(var other:l.getEntities((Entity)null,bound.inflate(100),e->!e.getUUID().equals(gantry.getUUID())&&!e.getUUID().equals(carrier.getUUID())&&!e.getUUID().equals(eva.getUUID())&&e.isAlive()&&(e instanceof LivingEntity||e.canBeCollidedWith()||e instanceof NervCarrierPlatformEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof UNTransportEntity))){var meshes=NervFlightProofR52.actualObstacleMeshes(other);if(meshes==null)return null;if(meshes.isEmpty()){if(p.mesh().intersects(p.frame(),q.frame(),other.getBoundingBox().inflate(error),.003))return null;}else for(var m:meshes)if(p.mesh().intersects(p.frame(),q.frame(),m.mesh(),m.frame(),m.endFrame(),.003,allowance))return null;}
+            var nativeBounds=new ArrayList<AABB>();for(int n=0;n<A.size();n++){var p=A.get(n);var q=B.get(n);nativeBounds.add(p.mesh().envelope(p.frame(),q.frame()).inflate(error));}
+            String[] blockRejection={null};
+            var blockCheck=BoundedNativeCollisionGroupsR52.clear(nativeBounds,box->EntryPlugEjectionR48.loaded(l,box),box->{var shapes=new ArrayList<AABB>();for(var shape:l.getBlockCollisions(gantry,box))shapes.addAll(shape.toAabbs());return shapes;},(n,block)->{
+                var p=A.get(n);var q=B.get(n);if(p.role().equals("lead_fixed_support")&&Math.abs(block.maxY-from.spec().foundationTop())<=FIT&&p.mesh().envelope(p.frame(),p.frame()).minY>=block.maxY-FIT)return false;
+                if(!p.mesh().intersects(p.frame(),q.frame(),block.inflate(error),.003))return false;blockRejection[0]=p.name()+" / native block "+block;return true;
+            });
+            if(!blockCheck.clear())return rejectLeadR53(gantry,blockRejection[0]==null?"unloaded native lead sweep":blockRejection[0]);
+            var carrierPairs=new ArrayList<CarrierPairR53>();for(int c=0;c<CA.size();c++)carrierPairs.add(new CarrierPairR53(CA.get(c),CB.get(c)));
+            var carrierIndex=new NervStaticSpatialIndexR52<>(carrierPairs,p->p.from().mesh().envelope(p.from().frame(),p.to().frame()));
+            var bodyA=new RigidTransform(new Vec3(0,-64*(a.rise()-from.rise()),0),0,0,0,1);var bodyB=new RigidTransform(new Vec3(0,-64*(b.rise()-from.rise()),0),0,0,0,1);
+            var bodyIndex=obstacleIndexR53(body.stream().map(m->new NervFlightProofR52.ObstacleMesh(m.mesh(),bodyA.compose(m.frame()),bodyB.compose(m.endFrame()))).toList());
+            for(int n=0;n<A.size();n++){var p=A.get(n);var q=B.get(n);if(!p.name().equals(q.name())||p.mesh()!=q.mesh())return rejectLeadR53(gantry,p.name()+" / endpoint topology changed");var bound=p.mesh().envelope(p.frame(),q.frame()).inflate(error);boxes.add(bound);if(!EntryPlugEjectionR48.loaded(l,bound))return rejectLeadR53(gantry,p.name()+" / unloaded "+bound);
+                for(var pair:carrierIndex.query(bound)){var x=pair.from();var y=pair.to();if(namedLeadPadContactR52(x,y,p,q))continue;if(p.mesh().intersects(p.frame(),q.frame(),x.mesh(),x.frame(),y.frame(),.003,allowance))return rejectLeadR53(gantry,p.name()+" / carrier "+x.name());}
+                for(var m:bodyIndex.query(bound))if(p.mesh().intersects(p.frame(),q.frame(),m.mesh(),m.frame(),m.endFrame(),.003,allowance))return rejectLeadR53(gantry,p.name()+" / EVA body "+m.mesh().bounds());
+                for(var steel:structural.query(bound))if(p.mesh().intersects(p.frame(),q.frame(),steel.mesh(),steel.frame(),steel.endFrame(),.003,allowance))return rejectLeadR53(gantry,p.name()+" / gantry structure "+steel.mesh().bounds());
+                for(var steel:guides.query(bound))if(p.mesh().intersects(p.frame(),q.frame(),steel.mesh(),steel.frame(),steel.frame(),.003,allowance))return rejectLeadR53(gantry,p.name()+" / service guide "+steel.name());
+                for(var other:nearbyIndex.query(bound)){
+                    if(!actors.containsKey(other)){var meshes=NervFlightProofR52.actualObstacleMeshes(other);actors.put(other,new ActorMeshesR53(meshes!=null,meshes!=null&&meshes.isEmpty(),meshes==null?null:obstacleIndexR53(meshes)));}
+                    var meshes=actors.get(other);if(!meshes.known())return rejectLeadR53(gantry,"unknown collision actor "+other);if(meshes.ordinary()){if(p.mesh().intersects(p.frame(),q.frame(),other.getBoundingBox().inflate(error),.003))return rejectLeadR53(gantry,p.name()+" / actor "+other);}else for(var m:meshes.index().query(bound))if(p.mesh().intersects(p.frame(),q.frame(),m.mesh(),m.frame(),m.endFrame(),.003,allowance))return rejectLeadR53(gantry,p.name()+" / actor "+other);
+                }
             }
         }return new AcceptedLeadStep(l,gantry,carrier,from,to,boxes);
     }

@@ -40,6 +40,12 @@ public final class EvaLogisticsCommands
         CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
         dispatcher.register(Commands.literal("seele")
                 .requires(source -> source.hasPermission(2))
+                .then(Commands.literal("reset")
+                        .then(Commands.argument("variant", StringArgumentType.word())
+                                .executes(context -> reset(context.getSource(),
+                                        StringArgumentType.getString(context, "variant"))))));
+        dispatcher.register(Commands.literal("seele")
+                .requires(source -> source.hasPermission(2))
                 .then(Commands.literal("eva")
                         .then(Commands.literal("status")
                                 .executes(context -> status(context.getSource(), "all"))
@@ -138,6 +144,13 @@ public final class EvaLogisticsCommands
             {
                 continue;
             }
+            if(source.getEntity() instanceof ServerPlayer caller&&NervRouteRuntimeR52.claimed(level)
+                    &&!NervRouteRuntimeR52.pending(level,variant))
+            {
+                var eva=EvaLogisticsDirector.canonicalUnit(level,variant);
+                if(eva!=null&&EvaLogisticsDirector.inAssignedHangarR33(level,eva))
+                    eva.getPersistentData().putUUID("R32SortieCommander",caller.getUUID());
+            }
             ActionResult result = destination == null
                     ? EvaLogisticsDirector.requestPrepare(level, variant)
                     : NervRouteRuntimeR52.prepare(level, variant, destination);
@@ -180,6 +193,7 @@ public final class EvaLogisticsCommands
                     level, IntegratedNervMapBuilder.GEOFRONT_ORIGIN);
         }
         int requested = parseVariant(raw);
+        if(NervRouteRuntimeR52.claimed(level))return com.projectseele.world.EvaMaintenanceResetR53.request(source,level,requested);
         int reset = 0;
         for (int variant = 0; variant < 3; variant++)
         {
@@ -192,8 +206,8 @@ public final class EvaLogisticsCommands
             catch(IllegalStateException held){source.sendFailure(Component.literal(held.getMessage()));continue;}
             int current = variant;
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d canonical airframe reset to wet cage: %s",
-                    current, unit.getStringUUID())), false);
+                    "EVA-%02d 已复位到当前机库，插入栓、驾驶员和登机桥同步恢复。",
+                    current)), false);
             reset++;
         }
         return reset;

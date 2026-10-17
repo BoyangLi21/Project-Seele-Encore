@@ -196,16 +196,29 @@ public final class NervRouteReservationsR52
         var next=new Snapshot(task,state.original(),state.directoryFingerprint(),state.route(),index,fraction,stage,"",state.kind());tasks.put(task,next);return new Result(true,next,"");
     }
     public synchronized boolean releaseCompletion(UUID task,UUID owner)
-    {var s=tasks.get(task);if(s==null||s.stage()!=Stage.COMPLETE||!s.original().owner().equals(owner))return false;release(s);return true;}
+    {var s=tasks.get(task);if(s==null)s=quarantinedGround.get(task);if(s==null||s.stage()!=Stage.COMPLETE||!s.original().owner().equals(owner))return false;release(s);quarantinedGround.remove(task);return true;}
     public synchronized Result restoreCompletion(Snapshot saved,NativeAccess actual)
     {
         var route=directory.route(saved.route());
-        if(saved.stage()!=Stage.COMPLETE||route==null||saved.leg()!=route.legs().size()-1||saved.fraction()!=1)return new Result(false,null,"Actual final endpoint completion receipt required");
+        if(route==null||saved.leg()!=route.legs().size()-1||!Double.isFinite(saved.fraction())||Math.abs(1-saved.fraction())>1e-12
+                ||saved.stage()!=Stage.COMPLETE&&saved.stage()!=Stage.MOVING)return new Result(false,null,"Actual final endpoint completion receipt required");
         var active=new Snapshot(saved.task(),saved.original(),saved.directoryFingerprint(),saved.route(),saved.leg(),saved.fraction(),Stage.HOLD,saved.waiting(),saved.kind());
-        var result=restore(active,actual);if(result.accepted())tasks.put(saved.task(),saved);return new Result(result.accepted(),result.accepted()?saved:null,result.reason());
+        var result=restore(active,actual);
+        var complete=new Snapshot(saved.task(),saved.original(),saved.directoryFingerprint(),saved.route(),saved.leg(),1,Stage.COMPLETE,"",saved.kind());
+        if(result.accepted())tasks.put(saved.task(),complete);return new Result(result.accepted(),result.accepted()?complete:null,result.reason());
     }
     /** Cancellation releases bookkeeping; the real controller stops/brakes in
      * place. It never relocates an original actor or removes physical collision. */
+    public synchronized void clearOriginalMaintenanceR53(UUID eva)
+    {
+        var originals=new ArrayList<>(tasks.values());originals.addAll(quarantinedGround.values());
+        for(var snapshot:originals)if(snapshot.original().eva().equals(eva))
+        {
+            release(snapshot);tasks.remove(snapshot.task());quarantinedGround.remove(snapshot.task());
+        }
+        for(var flight:new ArrayList<>(flights.values()))if(flight.original().eva().equals(eva))
+        {release(flight.task());flights.remove(flight.task());quarantinedFlights.remove(flight.task());}
+    }
     public synchronized Result cancel(UUID task,UUID owner)
     {
         if(quarantinedGround.containsKey(task)||quarantinedFlights.contains(task))return new Result(false,null,"Saved physical placement is still unknown; provisional space/members remain held");

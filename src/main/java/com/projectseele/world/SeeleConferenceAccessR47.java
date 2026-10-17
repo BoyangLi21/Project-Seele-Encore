@@ -249,7 +249,7 @@ public final class SeeleConferenceAccessR47
                 player.displayClientMessage(Component.literal(permit ? "SEELE 会议室许可已确认：30秒内进梯选择该层。" : "刷卡未完成，请保持最高卡与读卡距离。"), true);
                 level.playSound(null, swipe.reader(), permit ? SoundEvents.NOTE_BLOCK_PLING.value() : SoundEvents.NOTE_BLOCK_BASS.value(), SoundSource.BLOCKS, .35F, permit ? 1.3F : .75F);
                 entry.setValue(new Swipe(swipe.reader(), swipe.hand(), swipe.started(), true));
-                if (permit && swipe.reader().equals(middleReader(level))) S20MovingElevatorsAdapter.handleExternalCall(player, middleReader(level));
+                if (permit) S20MovingElevatorsAdapter.handleExternalCall(player, swipe.reader());
             }
             if (age >= 32) { visual(level, swipe.reader(), -1, 0, 0); iterator.remove(); }
         }

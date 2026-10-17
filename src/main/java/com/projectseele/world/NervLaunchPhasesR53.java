@@ -28,7 +28,9 @@ public final class NervLaunchPhasesR53
         if(tag.getInt("Version")!=1||!tag.hasUUID("Task")||!tag.getUUID("Task").equals(task)||!tag.getString("Directory").equals(directory.fingerprint())||!tag.getString("Route").equals(route.id()))throw new IllegalStateException("Original task/phase/directory authority changed");
         Stage stage=Stage.valueOf(tag.getString("Stage"));boolean bank=stage==Stage.PRELAUNCH||stage==Stage.DESCENT;
         if(route.recovery()!=(stage==Stage.DESCENT||stage==Stage.RETURN_TRANSFER)||at<0||at>total||bank&&at>ready+1e-6||!bank&&at<ready-1e-6)throw new IllegalStateException("Actual distance is outside its persisted motion phase");
-        var speed=stage==Stage.PRELAUNCH||stage==Stage.RETURN_TRANSFER?route.motionProfile().prelaunch():route.motionProfile().launch();
+        boolean transfer=stage==Stage.PRELAUNCH||stage==Stage.RETURN_TRANSFER;
+        var speed=transfer?route.motionProfile().prelaunch():route.motionProfile().launch();
+        if(transfer)speed=new NervRouteDirectoryR52.SpeedProfile(speed.cruiseMps()*4,speed.accelerationMps2()*16,speed.decelerationMps2()*16);
         return new Run(stage,bank?ready:total,speed);
     }
     /** A complete native distance clock is necessary; a request flag cannot skip the stop. */
@@ -56,7 +58,7 @@ public final class NervLaunchPhasesR53
     }
     public static boolean firstLaunchCommit(CompoundTag data,Run run,double before,double after,double ready)
     {
-        if(!run.launch()||after<=before)return false;var tag=data.getCompound(KEY);boolean first=!tag.getBoolean("LaunchCommitted")&&before==ready;
+        if(!run.launch()||after<=before)return false;var tag=data.getCompound(KEY);boolean first=!tag.getBoolean("LaunchCommitted")&&before<=ready+.01&&after>=ready;
         tag.putBoolean("LaunchCommitted",true);return first;
     }
     private NervLaunchPhasesR53(){}

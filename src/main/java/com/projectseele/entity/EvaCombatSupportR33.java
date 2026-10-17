@@ -122,15 +122,22 @@ public final class EvaCombatSupportR33
                 // through them; switching to the latest packet clock skips
                 // the first stopping poses on slower clients.
                 double elapsed=clientTime-clock.clientTime;
-                clock.serverTime=timedStop&&elapsed>=0&&elapsed<4
-                        ?clock.serverTime+elapsed:spatialTime;
+                if(elapsed>=0&&elapsed<4&&Math.abs(spatialTime-clock.serverTime)<4)
+                {
+                    clock.serverTime+=elapsed;
+                    if(!timedStop)clock.serverTime+=Mth.clamp(spatialTime-clock.serverTime,-elapsed*.15,elapsed*.15);
+                }
+                else clock.serverTime=spatialTime;
                 clock.clientTime=clientTime;clock.frame=frame;clock.timedStop=timedStop;clock.latestMove=newestMove;
             }
             // All three channels must consume the SAME frame decision, and
             // renewed movement must leave stop mode even if its rising packet
             // was skipped and the next history already contains two full rows.
             timedStop=clock.timedStop;timedStopReview=timedStop;
-            if(timedStop)
+            // Sample one continuous render timeline while moving too. Choosing
+            // a new nearest spatial segment each frame freezes at its endpoint
+            // and jumps when the next position packet replaces the history.
+            if(clock!=null)
             {
                 first=last=samples.getCompound(0);amount=0;
                 for(int i=1;i<samples.size();i++)

@@ -150,7 +150,7 @@ final class RigidMachineryPartR44
     void draw(PoseStack poses, MultiBufferSource buffers, int light)
     {
         if(RigidMachineryGpuR44.enabled()&&!(buffers instanceof OutlineBufferSource)
-                &&!ShaderShadowPassR44.active()&&!ShaderShadowPassR44.enabled()&&!Boolean.getBoolean("projectseele.r44NativeCraneMeshWitness")
+                &&!ShaderShadowPassR44.active()&&!Boolean.getBoolean("projectseele.r44NativeCraneMeshWitness")
                 &&outsideClipR60(bounds,RenderSystem.getProjectionMatrix(),RenderSystem.getModelViewMatrix(),poses.last().pose()))return;
         drawWithProofR52(poses,buffers,light);
     }

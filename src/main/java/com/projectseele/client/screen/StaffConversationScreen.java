@@ -14,7 +14,7 @@ public final class StaffConversationScreen extends Screen
 {
     private ClientboundStaffConversationPacket view;
     private EditBox input;
-    private EditBox transportX,transportZ;
+    private EditBox transportX,transportY,transportZ;
     private String mission="sachiel";
     private boolean npcSortie;
     private String sortieEquipment="rifle";
@@ -124,7 +124,7 @@ public final class StaffConversationScreen extends Screen
                         x + 12 + i * (column + 4), controlsY, column, () -> { unit = selection; rebuildWidgets(); }, true);
             }
             String[] commands = {"整备", "发射", "回收"};
-            String[] labels = {"准备", "地表发射", "回收"};
+            String[] labels = {"仅整备", "确认发射", "回收"};
             for (int i = 0; i < commands.length; i++)
             {
                 String action = commands[i];
@@ -132,11 +132,11 @@ public final class StaffConversationScreen extends Screen
                         () -> send(action + " 0" + unit), permitted(new String[]{"prepare","launch","recover"}[i]));
             }
             int half = (panelWidth - 28) / 2;
-            addButton("准备＋地表发射", x + 12, controlsY + 44, half, () -> send("整备后发射 0" + unit), permitted("deploy"));
-            addButton("准备＋地下紧急部署", x + 16 + half, controlsY + 44, half,
-                    () -> send(com.projectseele.world.StaffUndergroundChoiceR52.request(unit,true)), permitted("deploy"));
-            addButton("地下紧急部署", x + 12, controlsY + 66, half,
-                    () -> send(com.projectseele.world.StaffUndergroundChoiceR52.request(unit,false)), permitted("deploy"));
+            addButton("整备＋地表出口", x + 12, controlsY + 44, half, () -> send("OUTLET:"+unit+":surface"), permitted("deploy"));
+            addButton("整备＋地下出口", x + 16 + half, controlsY + 44, half,
+                    () -> send("OUTLET:"+unit+":geofront"), permitted("deploy"));
+            addButton("整备＋箱根出口", x + 12, controlsY + 66, half,
+                    () -> send("OUTLET:"+unit+":hakone"), permitted("deploy"));
             addButton("取消后续操作", x + 16 + half, controlsY + 66, half, () -> send("停止操作"), true);
         }
         else if(tab==9)
@@ -221,10 +221,12 @@ public final class StaffConversationScreen extends Screen
                 int selection=i;addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),x+12+i*(column+4),controlsY,column,()->{unit=selection;rebuildWidgets();},true);
             }
             int half=(panelWidth-28)/2;
-            transportX=new EditBox(font,x+12,controlsY+24,half,20,Component.literal("目的地 X"));transportZ=new EditBox(font,x+16+half,controlsY+24,half,20,Component.literal("目的地 Z"));
+            transportX=new EditBox(font,x+12,controlsY+24,column,20,Component.literal("目的地 X"));transportY=new EditBox(font,x+16+column,controlsY+24,column,20,Component.literal("目的地 Y"));transportZ=new EditBox(font,x+20+column*2,controlsY+24,column,20,Component.literal("目的地 Z"));
+            transportY.setMaxLength(10);transportY.setFilter(s->s.matches("-?\\d*"));transportY.setValue(Integer.toString(minecraft.player.getBlockY()));addRenderableWidget(transportY);
+            transportX.setHint(Component.literal("X"));transportY.setHint(Component.literal("Y · 脚下高度"));transportZ.setHint(Component.literal("Z"));
             transportX.setMaxLength(10);transportZ.setMaxLength(10);transportX.setFilter(s->s.matches("-?\\d*"));transportZ.setFilter(s->s.matches("-?\\d*"));
             transportX.setValue(Integer.toString(minecraft.player.getBlockX()));transportZ.setValue(Integer.toString(minecraft.player.getBlockZ()));addRenderableWidget(transportX);addRenderableWidget(transportZ);
-            addButton("投放至 X / Z",x+12,controlsY+48,column,()->send("TRANSPORT:deliver:"+unit+":"+transportX.getValue()+":"+transportZ.getValue()),true);
+            addButton("投放至 X / Y / Z",x+12,controlsY+48,column,()->send("TRANSPORT:deliver:"+unit+":"+transportX.getValue()+":"+transportY.getValue()+":"+transportZ.getValue()),true);
             addButton("空运回库 · 自动选路",x+16+column,controlsY+48,column,()->send("TRANSPORT:recover:"+unit),true);
             addButton("取消本机 / 安全返回",x+20+column*2,controlsY+48,column,()->send("TRANSPORT:cancel:"+unit),true);
             addButton("运输状态",x+12,controlsY+72,panelWidth-24,()->send("TRANSPORT:status"),true);

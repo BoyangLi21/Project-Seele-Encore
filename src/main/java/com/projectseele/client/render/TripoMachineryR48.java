@@ -121,10 +121,19 @@ final class TripoMachineryR48
     /** Cable endpoint on a real imported upright, in the carrier's shared frame. */
     static Vec3 carrierPowerAnchor(EvaUnit01Entity unit,float partial)
     {
-        if(com.projectseele.entity.EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(unit)){var actor=com.projectseele.entity.EvaMechanicalFrameR52.originalCarrierControllerR52(unit);if(actor==null||!com.projectseele.world.NervOriginalCarrierR52.attachedTo(actor,unit))return null;}
         var assembly=load("carrier");
         if(assembly==null||!assembly.anchors.containsKey("power_reel"))return null;
         var at=assembly.anchors.get("power_reel");
+        if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&com.projectseele.entity.EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(unit))
+        {
+            var actor=com.projectseele.entity.EvaMechanicalFrameR52.originalCarrierControllerR52(unit);
+            if(actor==null)return null;
+            var root=com.projectseele.world.NervOriginalCarrierR52.actualRoot(actor,partial);
+            float rise=com.projectseele.world.NervOriginalCarrierR52.progress(actor,partial);
+            boolean parked=root.translation().y< -1000&&rise==0&&!actor.originalCarrierStateR52().getBoolean("Attached");
+            double drop=com.projectseele.world.NervR50CarrierModeR53.launchDeckDropR53(root,0)!=0?com.projectseele.world.NervR50CarrierModeR53.launchDeckDropR53(root,rise):parked?0:-64D*(1-rise);
+            return root.transformPoint(at.add(0,drop,0));
+        }
         if(com.projectseele.entity.EvaMechanicalFrameR52.detachedCarrierR52(unit))return com.projectseele.entity.EvaMechanicalFrameR52.carrierFrameR52(unit,partial).transformPoint(at.add(0,-64*(1-unit.carrierRiseProgress(partial)),0));
         Vec3 rear=Vec3.directionFromRotation(0,EvaUnit01Entity.SILO_BAY_YAW).scale(-1);
         Vec3 right=new Vec3(rear.z,0,-rear.x);
@@ -156,27 +165,26 @@ final class TripoMachineryR48
         if (assembly == null) return false;
         float rise = unit.carrierRiseProgress(partial);
         poses.pushPose();
-        double deckTravel=com.projectseele.entity.EvaMechanicalFrameR52.carrierDeckTravelR52(unit);if(deckTravel>0)poses.translate(0,-deckTravel*(1-rise),0);
-        (deckTravel==64?selectedDeckR52(assembly):assembly.parts.get("deck")).draw(poses, buffers, light);if(deckTravel==64)for(var part:soleBearings(unit.getUnitVariant()).parts.values())part.draw(poses,buffers,light);poses.popPose();
+        if (unit.recoveryRackR39()) poses.translate(0, -3 * (1 - rise), 0);
+        assembly.parts.get("deck").draw(poses, buffers, light);poses.popPose();
         poses.pushPose();poses.translate(0, -64 * (1 - rise), 0);
         float release = unit.getLaunchPhase() == EvaUnit01Entity.LAUNCH_CLEAR
                 ? EvaDorsalMechanism.smooth(1 - (unit.getLaunchTicks() - partial) / 18F) : 0;
-        if(deckTravel==64)for(var part:trimmedCarrierBody().parts.values())part.draw(poses,buffers,light);else assembly.parts.get("body").draw(poses, buffers, light);
-        poses.pushPose();if(deckTravel!=64)poses.translate(0, 0, 1.5F * release);
-        if(deckTravel==64)for(var part:stowedService().parts.values())part.draw(poses,buffers,light);else assembly.parts.get("contact_pads").draw(poses,buffers,light);poses.popPose();
+        assembly.parts.get("body").draw(poses, buffers, light);
+        poses.pushPose();poses.translate(0, 0, 1.5F * release);
+        assembly.parts.get("contact_pads").draw(poses,buffers,light);poses.popPose();
         // Its full-width standing platform belongs outside the narrow shaft.
         // Fold it about the supplied hinge before any carrier travel.
-        if(deckTravel==64){poses.popPose();return true;}
         Vec3 hinge = assembly.anchors.get("service_platform");
         poses.pushPose();poses.translate(hinge.x, hinge.y, hinge.z);
         poses.mulPose(Axis.ZP.rotationDegrees(-90));
         poses.translate(-hinge.x, -hinge.y, -hinge.z);
         assembly.parts.get("service_platform").draw(poses, buffers, light);
         poses.popPose();poses.popPose();
-        NervFootGuideRigRendererR52.render(poses,light,unit,partial);
         return true;
     }
 
     private TripoMachineryR48() { }
-    static boolean originalCarrier(PoseStack poses,MultiBufferSource buffers,int light,int variant,float rise){var a=load("carrier");if(a==null)return false;poses.pushPose();poses.translate(0,-64D*(1-rise),0);selectedDeckR52(a).draw(poses,buffers,light);for(var p:soleBearings(variant).parts.values())p.draw(poses,buffers,light);for(var p:trimmedCarrierBody().parts.values())p.draw(poses,buffers,light);for(var p:stowedService().parts.values())p.draw(poses,buffers,light);poses.popPose();return true;}
+    static boolean originalCarrier(PoseStack poses,MultiBufferSource buffers,int light,int variant,float rise){var a=load("carrier");if(a==null)return false;a.parts.get("deck").draw(poses,buffers,light);poses.pushPose();poses.translate(0,-64D*(1-rise),0);a.parts.get("body").draw(poses,buffers,light);a.parts.get("contact_pads").draw(poses,buffers,light);var h=a.anchors.get("service_platform");poses.pushPose();poses.translate(h.x,h.y,h.z);poses.mulPose(Axis.ZP.rotationDegrees(-90));poses.translate(-h.x,-h.y,-h.z);a.parts.get("service_platform").draw(poses,buffers,light);poses.popPose();poses.popPose();return true;}
+
 }

@@ -129,6 +129,12 @@ public final class NervHangarControlsR53
                     EvaHangarBuilder.LCL_SHOULDER_LAYERS, state.ticks())).withStyle(ChatFormatting.AQUA), false);
             return 1;
         }
+        if(selected==Decision.PREPARE&&!NervRouteRuntimeR52.pending(level,variant))
+        {
+            var eva=EvaLogisticsDirector.canonicalUnit(level,variant);
+            if(eva!=null&&EvaLogisticsDirector.inAssignedHangarR33(level,eva))
+                eva.getPersistentData().putUUID("R32SortieCommander",player.getUUID());
+        }
         var result = selected == Decision.PREPARE ? NervRouteRuntimeR52.prepare(level, variant)
                 : NervRouteRuntimeR52.cancel(level, variant);
         player.displayClientMessage(Component.literal("[NERV 机库] " + result.message())

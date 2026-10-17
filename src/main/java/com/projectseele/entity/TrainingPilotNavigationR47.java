@@ -361,7 +361,8 @@ public final class TrainingPilotNavigationR47 extends GroundPathNavigation
     {
         if(path==null||path.isDone())return false;
         int index=path.getNextNodeIndex();
-        return nearPersonnelDoorR47(mob.blockPosition())||nearPersonnelDoorR47(path.getNextNodePos())
+        return partialSurface(level,mob.blockPosition())||partialSurface(level,path.getNextNodePos())
+                ||nearPersonnelDoorR47(mob.blockPosition())||nearPersonnelDoorR47(path.getNextNodePos())
                 ||index+1<path.getNodeCount()&&nearPersonnelDoorR47(path.getNodePos(index+1));
     }
 

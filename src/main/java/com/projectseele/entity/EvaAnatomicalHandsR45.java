@@ -270,6 +270,26 @@ public final class EvaAnatomicalHandsR45
             body.rotations.get(hand).slerp(desired,weight);body.dirty();
         }
     }
+    public static void alignPunchWristR53(EvaUnit01Entity e,EvaBodyPose.Sample body,float partial)
+    {
+        if(!enabled(e)||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isNervLogisticsLocked())return;
+        String clip=EvaGameplayMotionR32.activeGroundClip(e,partial);
+        if(!java.util.Set.of("jab","cross","hook","heavy").contains(clip))return;
+        String side=EvaGameplayMotionR32.side(e,clip),hand="hand_"+side,forearm="forearm_"+side;
+        if(!body.rig.containsKey(hand)||!body.rig.containsKey(forearm))return;
+        var matrix=body.matrix(hand);var palm=matrix.transformDirection(new Vector3f(rig(e.getUnitVariant()).carry().get(side).along())).normalize();
+        var arm=body.matrix(forearm).transformDirection(new Vector3f(body.rig.get(hand).pivot()).sub(body.rig.get(forearm).pivot())).normalize();
+        float angle=(float)Math.acos(Mth.clamp(palm.dot(arm),-1,1));
+        if(angle<=10*Mth.DEG_TO_RAD)return;
+        // Keep the authored fist roll and arm trajectory; remove only the
+        // excessive wrist bend so the knuckles remain in line with the forearm.
+        var correction=new Quaternionf().rotationTo(palm,arm);
+        correction=new Quaternionf().slerp(correction,1-10*Mth.DEG_TO_RAD/angle);
+        var desired=correction.mul(matrix.getUnnormalizedRotation(new Quaternionf()).normalize());
+        String parent=body.rig.get(hand).parent();
+        if(parent!=null)desired=body.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(desired);
+        body.rotations.put(hand,desired);body.dirty();
+    }
     public static void attachSwordR45(EvaUnit01Entity e,EvaBodyPose.Sample body)
     {
         if(e.getWeapon()!=EvaUnit01Entity.WEAPON_SWORD_R45||!swordAttachmentReadyR45(e))return;

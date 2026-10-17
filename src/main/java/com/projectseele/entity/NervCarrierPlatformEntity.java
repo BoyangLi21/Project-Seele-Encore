@@ -28,6 +28,17 @@ import com.projectseele.world.S20PhysicalElevatorDirector;
  */
 public final class NervCarrierPlatformEntity extends Entity
 {
+    @Override
+    protected boolean updateInWaterStateAndDoFluidPushing()
+    {
+        // Anchored or actuator-driven machinery never receives fluid motion.
+        // Its full mechanical bounding box can span hundreds of thousands of cells.
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
+        this.wasTouchingWater=false;
+        return false;
+    }
+
     private static final EntityDataAccessor<Float> DATA_REPAIR_R33=SynchedEntityData.defineId(NervCarrierPlatformEntity.class,EntityDataSerializers.FLOAT);
     public void setRepairProgressR33(float progress){entityData.set(DATA_REPAIR_R33,progress);}
     public float repairProgressR33(){return entityData.get(DATA_REPAIR_R33);}
@@ -100,6 +111,8 @@ public final class NervCarrierPlatformEntity extends Entity
     public CompoundTag footGuideStationStateR52(){return entityData.get(DATA_LOWER_FRAME_R52).getCompound("FootGuideStation").copy();}
     public void acceptFootGuideStationStateR52(com.projectseele.world.NervFootGuideStationR52.DeclaredState proof){if(proof==null||!proof.current(this))throw new IllegalStateException("Current checked fixed station state required");var tag=entityData.get(DATA_LOWER_FRAME_R52).copy();tag.put("FootGuideStation",proof.next());entityData.set(DATA_LOWER_FRAME_R52,tag);}
     public CompoundTag originalCarrierStateR52(){return entityData.get(DATA_LOWER_FRAME_R52).getCompound("OriginalCarrier").copy();}
+    /** Borrowed state for render queries; callers must never mutate it. */
+    public CompoundTag originalCarrierReadStateR53(){return entityData.get(DATA_LOWER_FRAME_R52).getCompound("OriginalCarrier");}
     public void acceptOriginalCarrierStateR52(com.projectseele.world.NervOriginalCarrierR52.DeclaredState proof){if(proof==null||!proof.current(this))throw new IllegalStateException("Current checked original carrier state required");var tag=entityData.get(DATA_LOWER_FRAME_R52).copy();tag.put("OriginalCarrier",proof.next());entityData.set(DATA_LOWER_FRAME_R52,tag);}
     public boolean lowerFrameDeclaredR52(){return entityData.get(DATA_LOWER_FRAME_R52).getString("Source").equals(com.projectseele.world.NervLowerFrameR52.SOURCE_SHA);}
     public float lowerFrameProgressR52(float partial){var t=entityData.get(DATA_LOWER_FRAME_R52);if(!lowerFrameDeclaredR52())return Float.NaN;float p=t.getInt("Progress")/1000F;if(!level().isClientSide)return p;return net.minecraft.util.Mth.lerp((float)net.minecraft.util.Mth.clamp(level().getGameTime()-t.getLong("At")+(double)partial,0,1),t.getInt("Previous")/1000F,p);}

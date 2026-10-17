@@ -57,12 +57,18 @@ public final class NervAircraftFrameR52
         var data=p.getEntityData().get(DATA);var current=decode(data.getCompound("Current"));if(!p.level().isClientSide)return current;
         var previous=decode(data.getCompound("Previous"));if(previous.cargo()==null&&current.cargo()!=null)previous=new Frame(previous.plane(),current.cargo(),previous.rig());else if(previous.cargo()!=null&&current.cargo()==null)current=new Frame(current.plane(),previous.cargo(),current.rig());double t=Math.max(0,Math.min(1,p.level().getGameTime()-data.getLong("At")+(double)partial));return previous.interpolate(current,t);
     }
-    public static List<NervAirframeGeometryR52.Part> renderParts(UNTransportEntity p,float partial)
+    public static NervAirframeGeometryR52 renderGeometry(UNTransportEntity p)
     {
         var data=p.getEntityData().get(DATA);String manifest=data.getString("Manifest");var geometry=CLIENT_GEOMETRY.get(manifest);
         if(geometry==null){var hashes=new HashMap<String,String>();var sources=data.getCompound("Sources");for(String k:sources.getAllKeys())hashes.put(k,sources.getString(k));try{geometry=NervAirframeGeometryR52.loadClasspath(hashes);}catch(java.io.IOException|IllegalStateException missing){throw new IllegalStateException("Actual checked aircraft draw source absent",missing);}CLIENT_GEOMETRY.put(manifest,geometry);}
-        double t=Math.max(0,Math.min(1,p.level().getGameTime()-data.getLong("At")+(double)partial));double clock=data.getDouble("RotorPrevious")+(data.getDouble("RotorCurrent")-data.getDouble("RotorPrevious"))*t;return geometry.parts(frame(p,partial),renderedRecoveryPoints(p,"Anchors","PreviousAnchorsR52",t,false),renderedRecoveryPoints(p,"JawAxes","PreviousJawAxesR52",t,true),clock);
+        return geometry;
     }
+    public static double renderRotorClock(UNTransportEntity p,float partial)
+    {var data=p.getEntityData().get(DATA);double t=Math.max(0,Math.min(1,p.level().getGameTime()-data.getLong("At")+(double)partial));return data.getDouble("RotorPrevious")+(data.getDouble("RotorCurrent")-data.getDouble("RotorPrevious"))*t;}
+    public static List<NervAirframeGeometryR52.Part> renderCradleParts(UNTransportEntity p,float partial)
+    {var data=p.getEntityData().get(DATA);double t=Math.max(0,Math.min(1,p.level().getGameTime()-data.getLong("At")+(double)partial));return renderGeometry(p).cradleParts(frame(p,partial),renderedRecoveryPoints(p,"Anchors","PreviousAnchorsR52",t,false),renderedRecoveryPoints(p,"JawAxes","PreviousJawAxesR52",t,true),false);}
+    public static List<NervAirframeGeometryR52.Part> renderParts(UNTransportEntity p,float partial)
+    {var data=p.getEntityData().get(DATA);double t=Math.max(0,Math.min(1,p.level().getGameTime()-data.getLong("At")+(double)partial));return renderGeometry(p).parts(frame(p,partial),renderedRecoveryPoints(p,"Anchors","PreviousAnchorsR52",t,false),renderedRecoveryPoints(p,"JawAxes","PreviousJawAxesR52",t,true),renderRotorClock(p,partial));}
     public static double rotorClock(UNTransportEntity p){return p.getEntityData().get(DATA).getDouble("RotorCurrent");}
     public static long sampledAt(UNTransportEntity p){return p.getEntityData().get(DATA).getLong("At");}
     public static List<Vec3> jawAxes(UNTransportEntity p){var list=new ArrayList<Vec3>();for(var a:p.getEntityData().get(DATA).getList("JawAxes",Tag.TAG_COMPOUND))list.add(readPoint((CompoundTag)a));return List.copyOf(list);}

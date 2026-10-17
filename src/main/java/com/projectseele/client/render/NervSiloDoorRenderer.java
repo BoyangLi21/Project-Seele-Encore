@@ -42,6 +42,9 @@ public final class NervSiloDoorRenderer
             int packedLight)
     {
         if(door.declaredGeometryMissingR52())return;
+        var declared=door.declaredSpecR52();
+        if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&declared!=null
+                &&declared.serviceColumnPorts()&&declared.separationSign()<0)return;
         float open = door.getOpenProgress(partialTick);
         poses.pushPose();
         var spec=door.declaredSpecR52();if(spec!=null)poses.mulPose(door.actualFrameR52().rotation());

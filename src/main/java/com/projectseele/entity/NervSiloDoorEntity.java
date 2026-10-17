@@ -36,6 +36,17 @@ import net.minecraftforge.network.NetworkHooks;
 /** Synchronized visual plus physical weather seal for one EVA surface hatch. */
 public final class NervSiloDoorEntity extends Entity
 {
+    @Override
+    protected boolean updateInWaterStateAndDoFluidPushing()
+    {
+        // Anchored or actuator-driven machinery never receives fluid motion.
+        // Its full mechanical bounding box can span hundreds of thousands of cells.
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
+        this.wasTouchingWater=false;
+        return false;
+    }
+
     private static final int PHYSICAL_RADIUS = 15;
     // setBlock already updates collision and heightmaps.  Cascading neighbour
     // shape work over 2,883 hatch cells only creates a first-load stall.
@@ -225,11 +236,36 @@ public final class NervSiloDoorEntity extends Entity
         if(to<from&&!com.projectseele.world.NervGateClosureR52.clearActualActors(level,this,movingCells))return false;
         java.util.UUID attachedGantry=null;if(declaredSpecR52().serviceColumnPorts()){for(var gantry:level.getEntitiesOfClass(NervCarrierPlatformEntity.class,getBoundingBox().inflate(2),g->g.isRestraintGantry()&&g.getUnitVariant()==getVariant())){if(!gantry.hasDeclaredMachineFrameR52()||!gantry.declaredCollisionSourceR52().equals(com.projectseele.world.NervFlightProofR52.selectedCageSourceR52()))return false;var actual=RigidTransform.of(gantry.position(),gantry.declaredMachineRotationR52());var expected=frame.compose(declaredSpecR52().serviceGantryRelativeFrame());if(!com.projectseele.world.NervAirTransportManifestR52.same(actual,expected))continue;if(attachedGantry!=null)return false;try{for(var member:com.projectseele.world.NervPlantMotionR52.actualRenderedMeshesR52(gantry))if(geometry.movingIntersects(frame,from,to,member.mesh(),member.frame()))return false;}catch(java.io.IOException missing){return false;}attachedGantry=gantry.getUUID();}if(attachedGantry==null)return false;}
         for(var local:geometry.bearingPoints()){var p=frame.transformPoint(local);boolean supported=false;for(var at:supportCells){if(Math.abs(p.x-(at.getX()+.5))>.6||Math.abs(p.z-(at.getZ()+.5))>.6)continue;if(!level.hasChunkAt(at))return false;for(var box:level.getBlockState(at).getCollisionShape(level,at,CollisionContext.of(this)).toAabbs()){var world=box.move(at);if(p.x>world.minX&&p.x<world.maxX&&p.z>world.minZ&&p.z<world.maxZ&&Math.abs(p.y-world.maxY)<=.002)supported=true;}}if(!supported)return false;}
-        var seen=new HashSet<BlockPos>();var actorsSeen=new HashSet<java.util.UUID>();var guideSteelSeen=new HashSet<String>();for(var box:geometry.envelopes(frame,from,to))
+        var sweepBounds=geometry.sweptBounds(frame,from,to);
+        var guideSteelSeen=new HashSet<String>();
+        for(var rail:com.projectseele.world.NervUprightGuidewayR52.actualPieces(level,sweepBounds))if(guideSteelSeen.add(rail.name())&&geometry.movingIntersects(frame,from,to,rail.steel().mesh(),rail.steel().frame()))return false;
+        var seen=new HashSet<BlockPos>();
+        for(var box:geometry.envelopes(frame,from,to))
         {
-            for(var rail:com.projectseele.world.NervUprightGuidewayR52.actualPieces(level,box))if(guideSteelSeen.add(rail.name())&&geometry.movingIntersects(frame,from,to,rail.steel().mesh(),rail.steel().frame()))return false;
-            if(!com.projectseele.world.EntryPlugEjectionR48.loaded(level,box))return false;for(var at:BlockPos.betweenClosed(BlockPos.containing(box.minX,box.minY,box.minZ),BlockPos.containing(box.maxX,box.maxY,box.maxZ))){var key=at.immutable();if(!seen.add(key)||movingCells.contains(key)||peerProxyCells.contains(key))continue;var state=level.getBlockState(key);if(state.isAir())continue;for(var shape:state.getCollisionShape(level,key,CollisionContext.of(this)).toAabbs())if(geometry.intersects(frame,from,to,shape.move(key)))return false;}
-            for(var actor:level.getEntities(this,box.inflate(200),e->e.isAlive()&&!e.isSpectator()&&(e instanceof net.minecraft.world.entity.LivingEntity||e.canBeCollidedWith()||e instanceof UNTransportEntity||e instanceof EntryPlugCarrierEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof NervCarrierPlatformEntity))){if(!actorsSeen.add(actor.getUUID()))continue;if(actor.getUUID().equals(attachedGantry))continue;var meshes=com.projectseele.world.NervFlightProofR52.actualObstacleMeshes(actor);if(meshes==null){var bounds=actor instanceof UNTransportEntity aircraft?aircraft.getBoundingBoxForCulling():actor.getBoundingBox();if(geometry.intersects(frame,from,to,bounds))return false;}else if(meshes.isEmpty()){if(geometry.intersects(frame,from,to,actor.getBoundingBox()))return false;}else for(var mesh:meshes)if(actualGateMeshIntersectsR52(geometry,frame,from,to,mesh))return false;}
+            if(!com.projectseele.world.EntryPlugEjectionR48.loaded(level,box))return false;
+            for(var at:BlockPos.betweenClosed(BlockPos.containing(box.minX,box.minY,box.minZ),BlockPos.containing(box.maxX,box.maxY,box.maxZ)))
+            {
+                var key=at.immutable();if(!seen.add(key)||movingCells.contains(key)||peerProxyCells.contains(key))continue;
+                var state=level.getBlockState(key);if(state.isAir())continue;
+                for(var shape:state.getCollisionShape(level,key,CollisionContext.of(this)).toAabbs())if(geometry.intersects(frame,from,to,shape.move(key)))return false;
+            }
+        }
+        // Query the union once. All live geometry and the exact gantry-contact
+        // exception retain the same full-motion narrow-phase checks.
+        for(var actor:level.getEntities(this,sweepBounds.inflate(200),e->e.isAlive()&&!e.isSpectator()&&(e instanceof net.minecraft.world.entity.LivingEntity||e.canBeCollidedWith()||e instanceof UNTransportEntity||e instanceof EntryPlugCarrierEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof NervCarrierPlatformEntity)))
+        {
+            if(actor.getUUID().equals(attachedGantry))continue;
+            var meshes=com.projectseele.world.NervFlightProofR52.actualObstacleMeshes(actor);
+            if(meshes==null)
+            {
+                var bounds=actor instanceof UNTransportEntity aircraft?aircraft.getBoundingBoxForCulling():actor.getBoundingBox();
+                if(geometry.intersects(frame,from,to,bounds))return false;
+            }
+            else if(meshes.isEmpty())
+            {
+                if(geometry.intersects(frame,from,to,actor.getBoundingBox()))return false;
+            }
+            else for(var mesh:meshes)if(actualGateMeshIntersectsR52(geometry,frame,from,to,mesh))return false;
         }
         return true;
     }

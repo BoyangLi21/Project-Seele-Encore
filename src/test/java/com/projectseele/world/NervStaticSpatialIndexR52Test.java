@@ -29,6 +29,10 @@ public final class NervStaticSpatialIndexR52Test
             same(boxes,index,new AABB(x-1,-1,-1,end,1,1));
         same(boxes,index,new AABB(-9000,-9000,-9000,9000,9000,9000));same(boxes,index,new AABB(32,0,0,32,1,1));
         if(!new NervStaticSpatialIndexR52<AABB>(List.of(),b->b).query(new AABB(0,0,0,1,1,1)).isEmpty())throw new AssertionError("Empty index");
+        var lattice=new ArrayList<AABB>();
+        for(int i=-1024;i<1024;i++)lattice.add(new AABB(0,-32D*i,992D*i,1,-32D*i+1,992D*i+1));
+        var regular=new NervStaticSpatialIndexR52<>(lattice,b->b);
+        for(int i=-1024;i<1024;i+=7){same(lattice,regular,new AABB(-1,-32D*i-.5,992D*i-.5,2,-32D*i+1.5,992D*i+1.5));same(lattice,regular,new AABB(2,-32D*i,992D*i,3,-32D*i+1,992D*i+1));}
         System.out.println("NervStaticSpatialIndexR52Test PASS "+checks+" exact brute-force/source-order comparisons");
     }
 }

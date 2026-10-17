@@ -14,6 +14,7 @@ public final class DirectoryTrajectoryR52
     private final NervRouteDirectoryR52.Leg leg;
     private final FootSupportFrameR52.Binding binding;
     private final double from,to,angularTravel,translationCurvature,samplingError;
+    private final Map<Double,FootSupportFrameR52.Sample> samples=new HashMap<>();
     public DirectoryTrajectoryR52(NervRouteDirectoryR52 directory,NervRouteDirectoryR52.Leg leg,FootSupportFrameR52.Binding binding,double from,double to)
     {
         this.directory=Objects.requireNonNull(directory);this.leg=Objects.requireNonNull(leg);this.binding=Objects.requireNonNull(binding);
@@ -78,8 +79,14 @@ public final class DirectoryTrajectoryR52
     public static RigidTransform samplePortableR52(CompoundTag tag,double localMetres){return decodePortableR52(tag).sample(localMetres);}
     private static double angle(Quaternionf a,Quaternionf b)
     {if(a.x==b.x&&a.y==b.y&&a.z==b.z&&a.w==b.w||a.x==-b.x&&a.y==-b.y&&a.z==-b.z&&a.w==-b.w)return 0;double aa=(double)a.x*a.x+(double)a.y*a.y+(double)a.z*a.z+(double)a.w*a.w,bb=(double)b.x*b.x+(double)b.y*b.y+(double)b.z*b.z+(double)b.w*b.w;double dot=Math.abs((double)a.x*b.x+(double)a.y*b.y+(double)a.z*b.z+(double)a.w*b.w)/Math.sqrt(aa*bb);return 2*Math.acos(Math.min(1,dot));}
-    public FootSupportFrameR52.Sample sample(double time)
-    {if(!Double.isFinite(time)||time<0||time>1)throw new IllegalArgumentException("Curve time outside [0,1]");return directory.sample(leg,directory.intervalFraction(leg,from,to,time),binding);}
+    public synchronized FootSupportFrameR52.Sample sample(double time)
+    {
+        if(!Double.isFinite(time)||time<0||time>1)throw new IllegalArgumentException("Curve time outside [0,1]");
+        var known=samples.get(time);if(known!=null)return known;
+        var result=directory.sample(leg,directory.intervalFraction(leg,from,to,time),binding);
+        // Only immutable source samples are reused; live clearance is always read again.
+        if(samples.size()<8192)samples.put(time,result);return result;
+    }
     public NervRouteDirectoryR52 directory(){return directory;}
     public NervRouteDirectoryR52.Leg leg(){return leg;}
     public FootSupportFrameR52.Binding binding(){return binding;}

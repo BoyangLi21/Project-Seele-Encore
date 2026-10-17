@@ -14,11 +14,11 @@ public final class NervHullPreviewR52
     {original=o;capture=proof;stopped=EvaShutdownR30.pose(e).copy();this.hands=hands.copy();this.frame=frame;this.binding=binding;}
     public static NervHullPreviewR52 inspect(EvaUnit01Entity e,Original o)
     {
-        var proof=EvaMechanicalFrameR52.prepareHullCapture(e,o);if(proof==null||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||EvaShieldRigR47.equipped(e)||e.isBerserk()||EvaDorsalMechanism.open(e)>=.0001F||EvaDorsalMechanism.bow(e)>=.0001F||EvaBerserkMotionR34.mouth(e,1)!=0)return null;
+        var proof=EvaMechanicalFrameR52.prepareHullCapture(e,o);if(proof==null||!NervR50CarrierModeR53.enabled()&&(e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||EvaShieldRigR47.equipped(e)||e.isBerserk()||EvaDorsalMechanism.open(e)>=.0001F||EvaDorsalMechanism.bow(e)>=.0001F||EvaBerserkMotionR34.mouth(e,1)!=0))return null;
         var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var hands=EvaFrozenHandsR52.capture(e,1);var handPose=EvaFrozenHandsR52.decode(e.getUnitVariant(),provider.handContractFingerprint(e.getUnitVariant()),provider.handJoints(e.getUnitVariant()),hands);var body=EvaBodyPose.sample(e,1);var g=provider.evaluate(e.getUnitVariant(),body,handPose);
         float yaw=EvaAirTransportR31.frameYaw(e,1);var f=RigidTransform.of(e.position(),new Quaternionf().rotationY((float)Math.toRadians(180-yaw)));var socket=EvaMechanicalFrameR52.emptySocketReferenceR52(body,EvaRifleKinematics.frameWorldR52(e.position(),yaw),EvaDorsalProfile.of(e));var b=new FootSupportFrameR52.Binding(sole(g,"foot_l"),sole(g,"foot_r"),f.inverse().compose(socket));return new NervHullPreviewR52(o,proof,e,hands,f,b);
     }
-    public boolean matches(EvaUnit01Entity e,Original o){return original.equals(o)&&!e.isNervLogisticsLocked()&&e.position().distanceToSqr(frame.translation())<1e-12&&EvaShutdownR30.pose(e).equals(stopped)&&EvaFrozenHandsR52.capture(e,1).equals(hands)&&Math.abs(EvaAirTransportR31.frameYaw(e,1)-(180-yawDegrees(frame)))<.001;}
+    public boolean matches(EvaUnit01Entity e,Original o){return original.equals(o)&&!e.isNervLogisticsLocked()&&e.position().distanceToSqr(frame.translation())<1e-12&&EvaShutdownR30.pose(e).equals(stopped)&&EvaFrozenHandsR52.capture(e,1).equals(hands)&&Math.abs(net.minecraft.util.Mth.wrapDegrees(EvaAirTransportR31.frameYaw(e,1)-(180-yawDegrees(frame))))<.001;}
     private static double yawDegrees(RigidTransform f){var d=f.transformVector(new Vec3(0,0,1));return Math.toDegrees(Math.atan2(d.x,d.z));}
     public FootSupportFrameR52.Binding binding(){return binding;}
     public RigidTransform frame(){return frame;}

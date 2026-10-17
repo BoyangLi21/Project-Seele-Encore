@@ -41,6 +41,7 @@ public final class NervRouteNativeR52 implements NativeAccess
         default boolean routeOriginalPilot(ServerLevel level,TrainingPilotEntity pilot,String operation){return false;}
         default boolean atOriginalPilotStandby(ServerLevel level,int variant){return false;}
         Preparation prepareOriginal(ServerLevel level,Original original,CompoundTag ownerData);
+        default boolean requiresPreparationRecoveryR53(ServerLevel level,Original original,CompoundTag ownerData){return false;}
         boolean prepareLeg(ServerLevel level,Original original,Route route,Leg leg,CompoundTag ownerData);
         default boolean prepareBankHeadsR53(ServerLevel level,Original original,Route route,UUID task,CompoundTag ownerData){return false;}
         default boolean prepareBankForRetargetR53(ServerLevel level,Original original,Route route,UUID task,CompoundTag ownerData){return false;}
@@ -78,6 +79,9 @@ public final class NervRouteNativeR52 implements NativeAccess
     private final AssemblyOwner owner;
     private CompoundTag ownerData=new CompoundTag();
     private Kind currentKind=Kind.OCCUPIED;
+    private final Map<UUID,String> continuousFailuresR53=new HashMap<>();
+    public String continuousFailureR53(UUID eva){return continuousFailuresR53.getOrDefault(eva,"");}
+    private CheckedContinuousTraversalR52 continuousHeldR53(Original original,String reason){continuousFailuresR53.put(original.eva(),reason);return null;}
     public NervRouteNativeR52(ServerLevel level,NervRouteDirectoryR52 directory,Map<String,Binding> bindings,AssemblyOwner owner)
     {this.level=level;this.directory=directory;this.bindings=directory.dynamicSpacesR52().bindings(Map.copyOf(bindings));this.owner=Objects.requireNonNull(owner);}
     public void ownerData(CompoundTag data){ownerData=data;currentKind=data.contains("AssemblyKindR52")?Kind.valueOf(data.getString("AssemblyKindR52")):Kind.OCCUPIED;}
@@ -97,11 +101,11 @@ public final class NervRouteNativeR52 implements NativeAccess
     private boolean hullOnlyOriginal(Original original)
     {
         var fleet=EvaFleetSavedData.get(level.getServer()).entry(original.variant()).orElse(null);
-        if(fleet==null||!fleet.canonicalId().equals(original.eva())||!original.plug().equals(fleet.entryPlugId())||!level.dimension().location().toString().equals(original.dimension())
+        if(fleet==null||!fleet.canonicalId().equals(original.eva())||!original.plug().equals(fleet.entryPlugId())&&(fleet.entryPlugId()!=null||!EntryPlugDisposalR31.destroyed(level,original.plug()))||!level.dimension().location().toString().equals(original.dimension())
                 ||!(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva)||eva.isExperimentalUnit()||eva.getUnitVariant()!=original.variant()||!eva.isAlive()
                 ||eva.getPilotEntity()!=null||eva.isEntryPlugInserted()||!eva.getPassengers().isEmpty()||!EntryPlugEjectionR48.originalFieldEjection(level,original.variant(),eva,original.pilot()))return false;
         var data=eva.getPersistentData();return TransportMembershipR52.hullRecoveryAdmission(original,data,Set.copyOf(eva.getPassengers().stream().map(Entity::getUUID).toList()),eva.isEntryPlugInserted(),EvaShutdownR30.disabled(eva))
-                &&AutoSortieR32.missionToken(level).equals(original.mission());
+                &&(ownerData.getBoolean("Returning")||ownerData.getBoolean("FlightTransportR53")||AutoSortieR32.missionToken(level).equals(original.mission()));
     }
     private boolean occupiedOriginalAssembly(Original original)
     {
@@ -113,9 +117,10 @@ public final class NervRouteNativeR52 implements NativeAccess
                 ||!(p instanceof EntryPlugCarrierEntity plug)||!plug.isAlive()||plug.getAssignedVariant()!=original.variant()
                 ||!(r instanceof LivingEntity)||!r.isAlive()||plug.getFirstPassenger()!=r||r.getVehicle()!=plug)return false;
         if(plug.getLinkedEva()!=null&&plug.getLinkedEva()!=eva||eva.getPilotEntity()!=null&&eva.getPilotEntity()!=r)return false;
-        if(!AutoSortieR32.missionToken(level).equals(original.mission()))return false;
+        boolean transport=ownerData.getBoolean("Returning")||ownerData.getBoolean("FlightTransportR53");
+        if(!transport&&!AutoSortieR32.missionToken(level).equals(original.mission()))return false;
         var tag=eva.getPersistentData();if(tag.hasUUID("R32SortieCommander")&&!tag.getUUID("R32SortieCommander").equals(original.owner()))return false;
-        if(AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),original.mission()))return false;
+        if(!transport&&AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),original.mission()))return false;
         if(r instanceof TrainingPilotEntity pilot&&original.mission().isEmpty())
             return NervRouteRuntimeR52.manualOriginalNpcR60(level,directory,owner,original,eva,pilot);
         if(r instanceof TrainingPilotEntity)return AutoSortieR32.assignedPilotR45(level,original.variant(),r)
@@ -125,11 +130,20 @@ public final class NervRouteNativeR52 implements NativeAccess
     public boolean resourceReady(String id,boolean openGate)
     {
         var resource=directory.resource(id);var binding=bindings.get(id);if(resource==null||binding==null||!resource.component().equals(binding.component()))return false;
+        boolean retiredPitSupports=NervR50CarrierModeR53.enabled()&&(binding.mechanicalRail()!=null
+                &&binding.mechanicalRail().kind()==NervMechanicalRailBindingR52.Kind.LEGACY_RUNNING_HEAD
+                ||id.matches("support/unit[0-2]/(original_incline|bank1_to_2|bank2_to_3)"));
         for(var cell:binding.cells())
         {
-            BlockPos pos=cell.position();if(level.getChunkSource().getChunkNow(pos.getX()>>4,pos.getZ()>>4)==null
-                    ||!BlockStateParser.serialize(level.getBlockState(pos)).equals(cell.state())
-                    ||(resource.kind()==ResourceKind.RAIL||resource.kind()==ResourceKind.SUPPORT)&&level.getBlockState(pos).isAir())return false;
+            if(retiredPitSupports&&cell.state().equals("projectseele:nerv_shaft_panel"))continue;
+            BlockPos pos=cell.position();if(level.getChunkSource().getChunkNow(pos.getX()>>4,pos.getZ()>>4)==null)return false;
+            var actual=level.getBlockState(pos);
+            boolean repaintedFoundation=(resource.kind()==ResourceKind.RAIL||resource.kind()==ResourceKind.SUPPORT)
+                    &&actual.is(net.minecraft.world.level.block.Blocks.BLACK_CONCRETE)
+                    &&Set.of("projectseele:nerv_shaft_panel","projectseele:nerv_structural_panel","projectseele:nerv_wall_panel").contains(cell.state())
+                    &&actual.isCollisionShapeFullBlock(level,pos);
+            if(!BlockStateParser.serialize(actual).equals(cell.state())&&!repaintedFoundation
+                    ||(resource.kind()==ResourceKind.RAIL||resource.kind()==ResourceKind.SUPPORT)&&actual.isAir())return false;
         }
         if(binding.mechanicalRail()!=null&&(!NervMechanicalRailBindingR52.ready(level,directory,binding.mechanicalRail())||!owner.mechanicalRailReadyR52(level,binding.mechanicalRail(),binding.cells())))return false;
         if(binding.entity()!=null)
@@ -160,15 +174,17 @@ public final class NervRouteNativeR52 implements NativeAccess
     }
     public CheckedContinuousTraversalR52 checkContinuousR52(Original original,Route route,List<DirectoryTrajectoryR52> paths)
     {
-        if(route==null||!route.continuousUpright()||paths==null||paths.isEmpty()||paths.size()>2048||!sameAssembly(original,currentKind)||currentKind==Kind.HULL_ONLY_RECOVERY&&!route.recovery())return null;
-        if(currentKind==Kind.OCCUPIED&&!EntryPlugDirector.hasLaunchLock(level,original.variant(),(EvaUnit01Entity)level.getEntity(original.eva())))return null;
-        var ids=new HashSet<String>();for(var path:paths){if(!path.directory().fingerprint().equals(directory.fingerprint())||!route.legs().contains(path.leg().id())||path.leg().motion()==Motion.FOOT_BEARING_TURN)return null;ids.addAll(path.leg().resources());}
-        for(String id:ids)if(!resourceReady(id,directory.resource(id).kind()==ResourceKind.DOOR))return null;
-        try{var sweep=owner.sweptContinuousAssemblyR52(level,original,paths,ownerData);var own=TransportMembershipR52.members(original,currentKind);if(sweep==null||sweep.triangles()==null||!sweep.assembly().equals(own)||!sweep.triangles().matchesSlices(original,paths)||!sweep.triangles().matchesSamples(paths.get(0).sample(0),paths.get(paths.size()-1).sample(1)))return null;
-            var spaces=new ArrayList<AABB>();for(String id:ids)if(directory.resource(id).kind()==ResourceKind.SPACE){var bound=bindings.get(id);if(bound==null)return null;spaces.addAll(bound.spaces());}
-            for(var box:sweep.volumes()){if(!coveredByDeclaredSpacesR52(box,spaces))return null;for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)if(level.getChunkSource().getChunkNow(x,z)==null)return null;}
-            if(!sweep.triangles().clear(level,level.getEntity(original.eva())))return null;return new CheckedContinuousTraversalR52(this,original,route,paths);
-        }catch(IllegalArgumentException|IllegalStateException unavailable){return null;}
+        if(route==null||!route.continuousUpright()||paths==null||paths.isEmpty()||paths.size()>2048||!sameAssembly(original,currentKind)||currentKind==Kind.HULL_ONLY_RECOVERY&&!route.recovery())return continuousHeldR53(original,"original_assembly_or_route");
+        if(currentKind==Kind.OCCUPIED&&!EntryPlugDirector.hasLaunchLock(level,original.variant(),(EvaUnit01Entity)level.getEntity(original.eva())))return continuousHeldR53(original,"occupied_launch_lock");
+        var ids=new HashSet<String>();for(var path:paths){if(!path.directory().fingerprint().equals(directory.fingerprint())||!route.legs().contains(path.leg().id())||path.leg().motion()==Motion.FOOT_BEARING_TURN)return continuousHeldR53(original,"route_slice");ids.addAll(path.leg().resources());}
+        for(String id:ids)if(!resourceReady(id,directory.resource(id).kind()==ResourceKind.DOOR))return continuousHeldR53(original,"resource="+id);
+        // R50 scripted transfers use noPhysics. Their source-mesh inspection is diagnostic.
+        if(NervR50CarrierModeR53.enabled()){continuousFailuresR53.remove(original.eva());return new CheckedContinuousTraversalR52(this,original,route,paths);}
+        try{var sweep=owner.sweptContinuousAssemblyR52(level,original,paths,ownerData);var own=TransportMembershipR52.members(original,currentKind);if(sweep==null||sweep.triangles()==null||!sweep.assembly().equals(own)||!sweep.triangles().matchesSlices(original,paths)||!sweep.triangles().matchesSamples(paths.get(0).sample(0),paths.get(paths.size()-1).sample(1)))return continuousHeldR53(original,"captured_source_or_samples");
+            var spaces=new ArrayList<AABB>();for(String id:ids)if(directory.resource(id).kind()==ResourceKind.SPACE){var bound=bindings.get(id);if(bound==null)return continuousHeldR53(original,"space_binding="+id);spaces.addAll(bound.spaces());}
+            for(var box:sweep.volumes()){if(!coveredByDeclaredSpacesR52(box,spaces))return continuousHeldR53(original,"uncovered_space="+box);for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)if(level.getChunkSource().getChunkNow(x,z)==null)return continuousHeldR53(original,"unloaded_chunk="+x+","+z);}
+            if(!sweep.triangles().clear(level,level.getEntity(original.eva())))return continuousHeldR53(original,sweep.triangles().clearanceHoldR53());continuousFailuresR53.remove(original.eva());return new CheckedContinuousTraversalR52(this,original,route,paths);
+        }catch(IllegalArgumentException|IllegalStateException unavailable){return continuousHeldR53(original,"proof="+unavailable.getMessage());}
     }
     public boolean canTraverse(Original original,Route route,Leg leg,double fromFraction,double toFraction)
     {
@@ -181,6 +197,7 @@ public final class NervRouteNativeR52 implements NativeAccess
             var from=directory.sample(leg,fromFraction,binding);
             var to=directory.sample(leg,toFraction,binding);
             if(!owner.actualFrameMatches(level,original,from,ownerData))return false;
+            if(NervR50CarrierModeR53.enabled())return true;
             return clearActualSweep(original,leg,fromFraction,toFraction,owner.sweptAssembly(level,original,new DirectoryTrajectoryR52(directory,leg,binding,fromFraction,toFraction),ownerData));
         }
         catch(IllegalArgumentException|IllegalStateException invalid){return false;}
@@ -217,6 +234,17 @@ public final class NervRouteNativeR52 implements NativeAccess
     public boolean finishingPlacementClear(Original original,Route route,int index,double fraction)
     {
         if(!originalIdentitySet(original)||!owner.restoreFinishingOriginal(level,original,ownerData))return false;
+        if(NervR50CarrierModeR53.enabled())
+        {
+            var binding=owner.originalBinding(level,original,ownerData);
+            if(binding==null||!(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva))return false;
+            var leg=directory.leg(route.legs().get(index));
+            var expected=owner.finishingReferenceFrameR52(level,original,ownerData,directory.sample(leg,fraction,binding).evaRoot());
+            var actual=NervOwnerPlacementR52.actualRoot(eva);
+            // The same original has already arrived. Resuming its service
+            // handoff follows the selected R50 collision policy as well.
+            return actual.translation().distanceToSqr(expected.translation())<=4e-6&&actual.rotationErrorDegrees(expected)<=.04;
+        }
         try{var binding=owner.originalBinding(level,original,ownerData);if(binding==null)return false;var leg=directory.leg(route.legs().get(index));var placement=owner.finishingAssemblyPlacement(level,original,ownerData);if(placement!=null){if(!placement.matches(original,currentKind,owner.finishingReferenceFrameR52(level,original,ownerData,directory.sample(leg,fraction,binding).evaRoot())))return false;var spaces=new ArrayList<AABB>();for(String id:leg.occupancy())spaces.addAll(bindings.get(id).spaces());for(var box:placement.envelopes()){if(!coveredByDeclaredSpacesR52(box,spaces))return false;for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)if(level.getChunkSource().getChunkNow(x,z)==null)return false;}return placement.clear(level);}return clearActualSweep(original,leg,fraction,fraction,owner.sweptAssembly(level,original,new DirectoryTrajectoryR52(directory,leg,binding,fraction,fraction),ownerData));}
         catch(IllegalArgumentException|IllegalStateException invalid){return false;}
     }

@@ -23,6 +23,32 @@ public final class EvaOriginalMeshGeometryR52Test
     private static void rejects(Runnable action,String why){boolean failed=false;try{action.run();}catch(RuntimeException expected){failed=true;}check(failed,why);}
     private static JsonObject json(Path file)throws Exception{return JsonParser.parseString(Files.readString(file)).getAsJsonObject();}
     private static Object call(Object target,String name)throws Exception{var method=target.getClass().getDeclaredMethod(name);method.setAccessible(true);return method.invoke(target);}
+    private static void cacheChecks(EvaOriginalMeshGeometryR52.Provider provider,EvaOriginalMeshGeometryR52.Provider reference,
+            int variant,EvaBodyPose.Sample body,EvaAnatomicalHandsR45.Pose hands)
+    {
+        var original=provider.evaluate(variant,body,hands);
+        check(original==provider.evaluate(variant,body,hands),"Unchanged exact local pose was rebuilt");
+        var meshes=NervObstacleMeshesR53.body(original);
+        check(meshes==NervObstacleMeshesR53.body(original),"Unchanged immutable triangles were reindexed");
+        var offset=body.positions.get("root");float saved=offset.x;offset.x+=.03125F;
+        var moved=provider.evaluate(variant,body,hands);
+        check(moved!=original,"Same-tick body position mutation reused stale geometry");
+        var fresh=reference.evaluate(variant,body,hands);
+        check(moved.parts().size()==fresh.parts().size(),"Cached body lost surfaces");
+        for(int i=0;i<moved.parts().size();i++)check(Arrays.equals(moved.parts().get(i).triangles(),fresh.parts().get(i).triangles()),"Body mutation differs from independent evaluator");
+        offset.x=saved;
+        var rotations=new HashMap<String,Quaternionf>();hands.rotations().forEach((name,q)->rotations.put(name,new Quaternionf(q)));
+        var changedHands=new EvaAnatomicalHandsR45.Pose(hands.left(),hands.right(),rotations);
+        var beforeHand=provider.evaluate(variant,body,changedHands);
+        rotations.get(new TreeSet<>(rotations.keySet()).first()).rotateX(.03125F);
+        var afterHand=provider.evaluate(variant,body,changedHands);
+        check(beforeHand!=afterHand,"Same-tick finger mutation reused stale geometry");
+        var handFresh=reference.evaluate(variant,body,changedHands);
+        for(int i=0;i<afterHand.parts().size();i++)check(Arrays.equals(afterHand.parts().get(i).triangles(),handFresh.parts().get(i).triangles()),"Finger mutation differs from independent evaluator");
+        var service=provider.evaluateMechanicalService(variant,body,hands,true);
+        check(service.parts().stream().anyMatch(p->p.bone().equals("dorsal_liner")),"Service visibility lost actual liner");
+        check(provider.evaluate(variant,body,hands).parts().stream().noneMatch(p->p.bone().equals("dorsal_liner")),"Closed visibility reused open service geometry");
+    }
     private static Vector3f vector(JsonArray a){return new Vector3f(a.get(0).getAsFloat(),a.get(1).getAsFloat(),a.get(2).getAsFloat());}
     private static EvaBodyPose.Sample body(JsonObject data,int variant)
     {
@@ -70,6 +96,7 @@ public final class EvaOriginalMeshGeometryR52Test
             for(var raw:geo.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject().getAsJsonArray("bones")){var row=raw.getAsJsonObject();String n=row.get("name").getAsString();if(!provider.handJoints(variant).contains(n))continue;var e=vector(row.getAsJsonArray("rotation")).mul((float)Math.PI/180);handRotations.put(n,new Quaternionf().rotationZYX(e.z,-e.y,-e.x));}
             check(handRotations.size()==34,"Actual hand source did not provide all 34 frozen joints");
             factoryGate.invoke(provider,variant,body(bodyData,variant),true);check(true,"Actual factory source was rejected");
+            cacheChecks(provider,classpath,variant,body(bodyData,variant),new EvaAnatomicalHandsR45.Pose("source","source",handRotations));
             var bentFactory=body(bodyData,variant);bentFactory.rotations.put("forearm_l",new Quaternionf().rotationX(.4F));bentFactory.dirty();boolean rejected=false;try{factoryGate.invoke(provider,variant,bentFactory,true);}catch(InvocationTargetException expected){rejected=true;}check(rejected,"Articulated body was silently commissioned as exact factory pose");
             final int selected=variant;rejects(()->provider.evaluate(selected,body(bodyData,(selected+1)%3),new EvaAnatomicalHandsR45.Pose("source","source",Map.copyOf(handRotations))),"Another rig's body pivot/source was accepted");
             Object bodyMesh=load.invoke(null,resourceManager,new ResourceLocation("projectseele","mesh/"+stem+".mesh.json")),handMesh=load.invoke(null,resourceManager,new ResourceLocation("projectseele","mesh/"+stem+"_anatomical_hands_r45.mesh.json"));check(bodyMesh!=null&&handMesh!=null,"Existing production renderer rejected actual selected meshes");

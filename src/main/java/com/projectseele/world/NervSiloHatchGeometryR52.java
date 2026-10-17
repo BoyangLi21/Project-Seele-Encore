@@ -20,6 +20,17 @@ public final class NervSiloHatchGeometryR52
     private record Fixed(NervAirframeGeometryR52.Part part,NervRigidMeshSweepR52 mesh){}
     private static final Map<Spec,NervSiloHatchGeometryR52> CACHE=new HashMap<>();
     private final Spec spec;private final List<Fixed> fixed;private final NervAirframeGeometryR52.Part[][] panels;private final NervRigidMeshSweepR52[][] panelMeshes;
+    private record SweepKey(RigidTransform frame,float from,float to){}
+    private record Sweep(List<AABB> envelopes,AABB bounds){}
+    private final Map<SweepKey,Sweep> sweeps=new LinkedHashMap<>();
+    private synchronized Sweep sweep(RigidTransform frame,float from,float to)
+    {
+        var key=new SweepKey(frame,from,to);var known=sweeps.get(key);if(known!=null)return known;
+        var boxes=calculateEnvelopes(frame,from,to);AABB bounds=null;
+        for(var box:boxes)bounds=bounds==null?box:bounds.minmax(box);
+        if(bounds==null)throw new IllegalStateException("Complete declared hatch sweep required");
+        known=new Sweep(boxes,bounds);if(sweeps.size()>=4)sweeps.remove(sweeps.keySet().iterator().next());sweeps.put(key,known);return known;
+    }
     private NervSiloHatchGeometryR52(Spec spec,Map<String,NervAirframeGeometryR52.Part> source)
     {
         this.spec=Objects.requireNonNull(spec);var parts=new ArrayList<NervAirframeGeometryR52.Part>();
@@ -184,22 +195,24 @@ public final class NervSiloHatchGeometryR52
     private int divisions(float from,float to)
     {double d=Math.abs(to-from),coefficient=Math.max(spec.maximumTier()*6/(.3*.3*8),spec.pocketX()*6/(.7*.7*8));int n=Math.max(1,(int)Math.ceil(d*Math.sqrt(coefficient/.003)));if(n>4096)throw new IllegalStateException("Explicit hatch curve exceeds its physical subdivision budget");return n;}
     private Vec3 curveError(float from,float to,RigidTransform frame)
-    {double d=to-from,x=spec.pocketX()*6*d*d/(.7*.7*8),y=spec.maximumTier()*6*d*d/(.3*.3*8);var axis=frame.transformVector(new Vec3(1,0,0));return new Vec3(Math.abs(axis.x)*x,y,Math.abs(axis.z)*x);}
-    public List<AABB> envelopes(RigidTransform frame,float from,float to)
+    {double d=to-from,x=Math.max(from,to)<=.3?0:spec.pocketX()*6*d*d/(.7*.7*8),y=Math.min(from,to)>=.3?0:spec.maximumTier()*6*d*d/(.3*.3*8);var axis=frame.transformVector(new Vec3(1,0,0));return new Vec3(Math.abs(axis.x)*x,y,Math.abs(axis.z)*x);}
+    public List<AABB> envelopes(RigidTransform frame,float from,float to){return sweep(frame,from,to).envelopes();}
+    public AABB sweptBounds(RigidTransform frame,float from,float to){return sweep(frame,from,to).bounds();}
+    private List<AABB> calculateEnvelopes(RigidTransform frame,float from,float to)
     {
         validate(from);validate(to);var boxes=new ArrayList<AABB>();for(var p:fixed)boxes.addAll(p.mesh().leafEnvelopes(frame,frame));int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var pad=curveError(a,b,frame);for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++){var pf=panelFrame(frame,side,i,a);var pt=panelFrame(frame,side,i,b);for(var box:panelMeshes[side][i].leafEnvelopes(pf,pt))boxes.add(box.inflate(pad.x,pad.y,pad.z));}}return List.copyOf(boxes);
     }
     private RigidTransform panelFrame(RigidTransform frame,int side,int index,float open)
     {var p=SiloHatchMechanism.panel(index,open,spec);return frame.compose(new RigidTransform(new Vec3((side==0?-1:1)*p.x(),p.y(),0),0,0,0,1));}
     public boolean intersects(RigidTransform frame,float from,float to,AABB obstacle)
-    {
+    {if(!sweep(frame,from,to).bounds().intersects(obstacle))return false;
         for(var p:fixed)if(p.mesh().intersects(frame,frame,obstacle,.005))return true;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var error=curveError(a,b,frame);var expanded=obstacle.inflate(error.x,error.y,error.z);for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),expanded,.005))return true;}return false;
     }
     public boolean intersects(RigidTransform frame,float from,float to,NervRigidMeshSweepR52 other,RigidTransform otherFrom,RigidTransform otherTo)
-    {
+    {if(!sweep(frame,from,to).bounds().intersects(other.envelope(otherFrom,otherTo)))return false;
         for(var p:fixed)if(p.mesh().intersects(frame,frame,other,otherFrom,otherTo,.005,Vec3.ZERO))return true;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var of=otherFrom.interpolate(otherTo,(double)step/n);var ot=otherFrom.interpolate(otherTo,(double)(step+1)/n);for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),other,of,ot,.005,curveError(a,b,frame)))return true;}return false;
     }
     public boolean movingIntersects(RigidTransform frame,float from,float to,NervRigidMeshSweepR52 other,RigidTransform otherFrame)
-    {int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),other,otherFrame,otherFrame,.005,curveError(a,b,frame)))return true;}return false;}
+    {if(!sweep(frame,from,to).bounds().intersects(other.envelope(otherFrame,otherFrame)))return false;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),other,otherFrame,otherFrame,.005,curveError(a,b,frame)))return true;}return false;}
     private static void validate(float open){if(!Float.isFinite(open)||open<0||open>1)throw new IllegalArgumentException("Actual hatch sample required");}
 }

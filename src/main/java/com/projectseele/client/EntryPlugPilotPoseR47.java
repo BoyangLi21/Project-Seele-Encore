@@ -30,11 +30,11 @@ public final class EntryPlugPilotPoseR47
         // at the foot end of the capsule.
         var rotation=new Quaternionf(frame.qx(),frame.qy(),frame.qz(),frame.qw())
                 .rotateX(com.projectseele.world.EntryPlugKinematics.pilotReclineRadiansR48())
-                .rotateY(Mth.rotLerp(partial,rider.yBodyRotO,rider.yBodyRot)*Mth.DEG_TO_RAD);
+                .rotateY((Mth.rotLerp(partial,rider.yBodyRotO,rider.yBodyRot)-180F)*Mth.DEG_TO_RAD);
         pose.pushPose();
-        pose.translate(0,.75,0);
+        pose.translate(0,rider.getBbHeight()*.5,0);
         pose.mulPose(rotation);
-        pose.translate(0,-.75,0);
+        pose.translate(0,-rider.getBbHeight()*.5,0);
         return true;
     }
 

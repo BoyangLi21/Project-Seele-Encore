@@ -104,7 +104,7 @@ public final class EntryPlugKinematics
         // retained EMPTY/field snapshot is not the plant's current socket.
         // Sampling that snapshot here tilted the plug independently of the
         // visible EVA until pilot activation cleared the shutdown state.
-        if(EvaAirTransportR31.active(unit)
+        if(EvaAirTransportR31.active(unit)||com.projectseele.entity.EvaMechanicalFrameR52.serviceSourceHeldR52(unit)
                 ||!unit.isNervLogisticsLocked()&&EvaShutdownR30.displayed(unit))
             return posedSocketTransform(unit,unit.level().isClientSide?Mth.clamp(partial,0,1):1F);
         // The retained NERV plant is rendered in its surveyed rail heading.
@@ -307,6 +307,7 @@ public final class EntryPlugKinematics
 
     public static RigidTransform lockedTransform(EvaUnit01Entity unit,float partial)
     {
+        if(NervR50CarrierModeR53.enabled()&&com.projectseele.entity.EvaMechanicalFrameR52.active(unit))return com.projectseele.entity.EvaMechanicalFrameR52.carriedPlugTransformR53(unit,partial);
         RigidTransform socket=EvaShutdownR30.displayed(unit)&&!unit.isNervLogisticsLocked()
                 ?posedSocketTransform(unit,unit.level().isClientSide?Mth.clamp(partial,0,1):1F)
                 :socketTransform(unit,partial);

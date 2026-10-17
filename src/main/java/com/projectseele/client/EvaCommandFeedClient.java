@@ -664,6 +664,8 @@ public final class EvaCommandFeedClient
         }
         boolean r52Headquarters=FacilityFrameClientR52.claimed(level);
         if(r52Headquarters&&!FacilityFrameClientR52.headquartersBound(level))return;
+        if(r52Headquarters&&!FacilityFrameClientR52.insidePyramid(level,event.getCamera().getPosition()))
+        {PerformanceCounters.leaveClientScenario();return;}
         PerformanceCounters.recordClientFrame();
         if (activeLevel != level)
         {

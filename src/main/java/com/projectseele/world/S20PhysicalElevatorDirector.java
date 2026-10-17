@@ -2881,10 +2881,10 @@ public final class S20PhysicalElevatorDirector
                     throw new IllegalArgumentException(
                             "Physical lift stops must ascend");
                 }
-                if (below.cabinCentre().getX()
+                if (r52 == null && (below.cabinCentre().getX()
                         != above.cabinCentre().getX()
                         || below.cabinCentre().getZ()
-                        != above.cabinCentre().getZ())
+                        != above.cabinCentre().getZ()))
                 {
                     throw new IllegalArgumentException(
                             "Physical lift stops must share one vertical axis");
@@ -2910,6 +2910,11 @@ public final class S20PhysicalElevatorDirector
 
         public BlockPos centreAt(int walkY)
         {
+            if (r52 != null)
+            {
+                var actual=landingAt(walkY);
+                if(actual!=null)return actual.cabinCentre();
+            }
             return new BlockPos(lower().cabinCentre().getX(), walkY,
                     lower().cabinCentre().getZ());
         }

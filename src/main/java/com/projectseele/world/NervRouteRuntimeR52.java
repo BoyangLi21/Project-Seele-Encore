@@ -64,7 +64,7 @@ public final class NervRouteRuntimeR52
     public record FlightContext(NervRouteDirectoryR52 directory,NervRouteReservationsR52 pool,NervRouteNativeR52 nativeAccess,Map<String,NervRouteNativeR52.Binding> bindings,NervFlightProofR52.Owner owner)
     {public FlightContext{bindings=directory.dynamicSpacesR52().bindings(Map.copyOf(bindings));}}
     public static FlightContext flightContext(ServerLevel level)
-    {var c=LIVE.get(level);return c!=null&&ready(level)&&c.owner instanceof NervFlightProofR52.Owner owner?new FlightContext(c.directory,c.pool,c.nativeAccess,c.bindings,owner):null;}
+    {var c=LIVE.get(level);return c!=null&&ready(level)?c.flightContext:null;}
     public static Original originalForFlight(ServerLevel level,int variant,UUID commander)
     {var c=LIVE.get(level);if(c==null||!ready(level))return null;var job=c.saved.job(variant);if(job==null||job.phase()!=Phase.DEPLOYED)return null;var original=job.snapshot().original();return original.owner().equals(commander)&&original.epoch()==c.directory.epoch()&&job.snapshot().directoryFingerprint().equals(c.directory.fingerprint())&&original.dimension().equals(level.dimension().location().toString())?original:null;}
     /** Read before the atomic broker transfer; no leases or saved job change. */
@@ -144,14 +144,16 @@ public final class NervRouteRuntimeR52
     public static EvaLogisticsDirector.ActionResult prepare(ServerLevel level,int variant)
     {
         var c=LIVE.get(level);if(c==null||!ready(level))return unavailable();
-        var order=StaffCommandBookR24.unitOrder(level,variant);String intent=order!=null&&order.requested.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY)
-                ||TvCampaignSavedData.get(level).active.equals("ramiel")?"geofront":"surface";
+        var order=StaffCommandBookR24.unitOrder(level,variant);String intent=order!=null?NervOutletControlsR53.intent(order.requested)
+                :TvCampaignSavedData.get(level).active.equals("ramiel")?"geofront":"surface";
         var result=c.prepare(variant,intent);if(result.accepted()&&order!=null&&order.requested.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY))c.launch(variant,null);return result;
     }
     public static EvaLogisticsDirector.ActionResult prepare(ServerLevel level,int variant,String rootIntent)
     {var c=LIVE.get(level);return c==null||!ready(level)?unavailable():c.prepare(variant,rootIntent);}
     public static EvaLogisticsDirector.ActionResult launch(ServerLevel level,int variant)
     {var c=LIVE.get(level);return c==null||!ready(level)?unavailable():c.launch(variant,null);}
+    public static EvaLogisticsDirector.ActionResult launchToR53(ServerLevel level,int variant,String intent)
+    {var c=LIVE.get(level);return c==null||!ready(level)?unavailable():c.launch(variant,intent);}
     public static EvaLogisticsDirector.ActionResult underground(ServerPlayer caller,int variant,boolean open)
     {
         var c=LIVE.get(caller.serverLevel());if(c==null||!ready(caller.serverLevel()))return unavailable();
@@ -166,6 +168,7 @@ public final class NervRouteRuntimeR52
     {var c=LIVE.get(level);var s=state(level,false);var job=s==null?null:s.job(variant);return c==null||job==null?unavailable():c.cancel(variant,job.snapshot().original().owner());}
     public static void cancelOwner(ServerLevel level,UUID owner,int variant)
     {var c=LIVE.get(level);if(c==null)return;for(int v=0;v<3;v++)if(variant<0||variant==v)c.cancel(v,owner);}
+    public static EvaUnit01Entity resetOriginalMaintenanceR53(ServerLevel level,int variant){var c=LIVE.get(level);if(c==null||!(c.owner instanceof NervAssemblyOwnerR52 owner))throw new IllegalStateException("原编队正在加载，尚未执行复位");var eva=owner.resetOriginalMaintenanceR53(level,variant);c.pool.clearOriginalMaintenanceR53(eva.getUUID());c.saved.clearOriginalMaintenanceR53(variant);return eva;}
     public static EvaLogisticsDirector.Status status(ServerLevel level,int variant)
     {
         var entry=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);var s=state(level,false);var job=s==null?null:s.job(variant);
@@ -201,8 +204,9 @@ public final class NervRouteRuntimeR52
         final ServerLevel level;final NervRouteDirectoryR52 directory;final NervRouteReservationsR52 pool;final NervRouteNativeR52 nativeAccess;
         final Map<String,String> defaults;final Map<Integer,Door> doors;final NervRouteNativeR52.AssemblyOwner owner;final NervRouteRuntimeStateR52 saved;
         final Map<String,NervRouteNativeR52.Binding> bindings;
+        final FlightContext flightContext;
         Controller(ServerLevel level,NervRouteDirectoryR52 directory,Map<String,NervRouteNativeR52.Binding> bindings,Map<String,String> defaults,Map<Integer,Door> doors,NervRouteNativeR52.AssemblyOwner owner,NervRouteRuntimeStateR52 saved)
-        {this.level=level;this.directory=directory;this.pool=new NervRouteReservationsR52(directory);this.defaults=defaults;this.doors=doors;this.owner=owner;this.saved=saved;this.bindings=directory.dynamicSpacesR52().bindings(Map.copyOf(bindings));this.nativeAccess=new NervRouteNativeR52(level,directory,bindings,owner);}
+        {this.level=level;this.directory=directory;this.pool=new NervRouteReservationsR52(directory);this.defaults=defaults;this.doors=doors;this.owner=owner;this.saved=saved;this.bindings=directory.dynamicSpacesR52().bindings(Map.copyOf(bindings));this.nativeAccess=new NervRouteNativeR52(level,directory,bindings,owner);this.flightContext=owner instanceof NervFlightProofR52.Owner flightOwner?new FlightContext(directory,pool,nativeAccess,this.bindings,flightOwner):null;}
         final Set<UUID> continuousPrimedR52=new HashSet<>();
         Original original(int variant)
         {
@@ -256,7 +260,8 @@ public final class NervRouteRuntimeR52
             var job=saved.job(variant);if(job!=null&&job.phase()==Phase.CANCELLED)return recoverCancelledContinuousR52(job);if(job==null||job.phase()!=Phase.DEPLOYED)return new EvaLogisticsDirector.ActionResult(false,"没有可接应的原出动编队记录。");
             var moving=level.getEntity(job.snapshot().original().eva());if(moving instanceof EvaUnit01Entity current&&NervAirTransportRuntimeR52.pending(level,current))return new EvaLogisticsDirector.ActionResult(false,"同一原机体仍由已保存的航空任务保持，不另抢地面路线。");
             var old=job.snapshot().original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level),old.dimension());
-            Entity actor=level.getEntity(original.eva());if(!(actor instanceof EvaUnit01Entity eva)||!EvaLogisticsDirector.recoveryMotionSettled(eva))return new EvaLogisticsDirector.ActionResult(false,"原机体尚未在实际支撑上停稳。");
+            if(job.snapshot().stage()==Stage.COMPLETE)pool.releaseCompletion(job.snapshot().task(),old.owner());
+            Entity actor=level.getEntity(original.eva());if(!(actor instanceof EvaUnit01Entity eva)||!(NervR50CarrierModeR53.enabled()?eva.getDeltaMovement().horizontalDistanceSqr()<.001:EvaLogisticsDirector.recoveryMotionSettled(eva)))return new EvaLogisticsDirector.ActionResult(false,"原机体尚未在实际支撑上停稳。");
             Kind kind=EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())?Kind.HULL_ONLY_RECOVERY:Kind.OCCUPIED;
             var data=job.ownerData().copy();for(String oldPhase:List.of("Finish","FinishTicks","FinishRoot","FinishFeet","FinishPlugLocal","LastFinishTick","RouteR52","ContinuousClockR52","ContinuousDistanceR52","ContinuousRotationR52","ContinuousAutoLaunchR52","ContinuousCheckedStartR52"))data.remove(oldPhase);data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("Returning",true);data.putString("AssemblyKindR52",kind.name());nativeAccess.ownerData(data);
             var binding=owner.originalBinding(level,original,data);if(binding==null)return unavailable();
@@ -337,6 +342,7 @@ public final class NervRouteRuntimeR52
                     {saved.put(job.update(snapshot,route.recovery()?Phase.RETURNING:Phase.PREPARING,data,"等待停稳后的真实滑靴换轨与承托锁定"));return;}
                     boolean requested=route.recovery()||data.getBoolean("ContinuousAutoLaunchR52")||data.getBoolean("ReleaseWhenReady");
                     if(!requested){saved.put(job.update(snapshot,Phase.READY,data,""));return;}
+                    if(!route.recovery()&&!FacilityRouteAudioR53.countdown(level,job,data)){saved.put(job.update(snapshot,Phase.READY,data,"发射倒计时"));return;}
                     phased=NervLaunchPhasesR53.crossStoppedBank(data,snapshot.task(),directory,route,at);
                     continuousPrimedR52.remove(snapshot.task());stored=data.getCompound("ContinuousClockR52");
                     job=job.update(snapshot,route.recovery()?Phase.RETURNING:Phase.DEPARTING,data,"");saved.put(job);
@@ -379,6 +385,7 @@ public final class NervRouteRuntimeR52
                 if(phased!=null&&phased.launch())
                 {
                     boolean first=NervLaunchPhasesR53.firstLaunchCommit(data,phased,at,next.distance(),readyDistanceR52(route));
+                    if(first&&level.getEntity(snapshot.original().eva()) instanceof EvaUnit01Entity launched)FacilityPaR31.announce(level,launched.position().add(0,52,0),"pa_launch");
                     NervLaunchFeedbackR53.afterCommittedMotion(level,data,snapshot.task(),true,first,(next.distance()-at)*20,contacts);
                 }
                 if(next.complete()&&data.getString("ContinuousBrakeR52").equals("CANCEL")){finishContinuousCancelR52(job,result.state(),data);return;}
@@ -392,6 +399,7 @@ public final class NervRouteRuntimeR52
         {
             if(!saved.fault().isEmpty())return;for(var job:saved.jobs())
             {
+                FacilityRouteAudioR53.tick(level,job);
                 if(Set.of(Phase.PARKED,Phase.DEPLOYED,Phase.CANCELLED).contains(job.phase()))continue;var snapshot=job.snapshot();var route=directory.route(snapshot.route());nativeAccess.ownerData(job.ownerData());
                 if(route==null){wait(job,"Root 路线或保存版本已变化");continue;}
                 if(job.phase()==Phase.FINISHING)
@@ -399,13 +407,29 @@ public final class NervRouteRuntimeR52
                     if(pool.query(snapshot.task())==null)
                     {
                         Kind finishingKind=snapshot.kind();NativeAccess finishing=new NativeAccess(){public boolean sameOriginalAssembly(Original o){return nativeAccess.originalIdentitySet(o);}public boolean canTraverse(Original o,Route r,Leg l,double a,double b){return false;}public boolean canRestore(Original o,Route r,int i,double f){return nativeAccess.finishingPlacementClear(o,r,i,f);}public boolean sameAssembly(Original o,Kind k){return k==finishingKind&&nativeAccess.originalIdentitySet(o);}public boolean canRestoreAssembly(Original o,Kind k,Route r,int i,double f){return k==finishingKind&&nativeAccess.finishingPlacementClear(o,r,i,f);}};
-                        if(!pool.restoreCompletion(snapshot,finishing).accepted()){wait(job,"等待整组收尾状态/几何恢复验证");continue;}
+                        var restored=pool.restoreCompletion(snapshot,finishing);
+                        if(!restored.accepted()){wait(job,"等待整组收尾状态/几何恢复验证");continue;}
+                        snapshot=restored.state();job=job.update(snapshot,job.phase(),job.ownerData(),"");saved.put(job);
                     }
+                    var completion=pool.query(snapshot.task());
+                    if(completion!=null&&completion.stage()==Stage.COMPLETE){snapshot=completion;job=job.update(snapshot,job.phase(),job.ownerData(),"");saved.put(job);}
                     if(owner.finishOriginal(level,snapshot.original(),route.recovery(),job.ownerData())){pool.releaseCompletion(snapshot.task(),snapshot.original().owner());saved.put(job.update(snapshot,route.recovery()?Phase.PARKED:Phase.DEPLOYED,job.ownerData(),""));mirror(saved.job(snapshot.original().variant()));}
                     else wait(job,"等待原编队真实机械收尾");continue;
                 }
+                if(job.phase()==Phase.PREPARING&&snapshot.leg()==0&&snapshot.fraction()==0&&job.ownerData().getBoolean("Prepared")&&owner.requiresPreparationRecoveryR53(level,snapshot.original(),job.ownerData()))
+                {
+                    // Retain identity, leases and clocks; an invalid prepared
+                    // certificate must use physical preparation restoration.
+                    var data=job.ownerData().copy();data.remove("Prepared");
+                    job=job.update(snapshot,Phase.PREPARING,data,"");saved.put(job);nativeAccess.ownerData(data);
+                }
                 if(pool.query(snapshot.task())==null)
                 {
+                    if(route.recovery()&&snapshot.leg()==0&&snapshot.fraction()==0&&job.ownerData().getBoolean("ReceiverAlignmentR53"))
+                    {
+                        if(!owner.prepareContinuousRouteR52(level,snapshot.original(),route,job.ownerData()))
+                        {wait(job,"继续出口接应架姿态调整");continue;}
+                    }
                     NativeAccess restoreAccess=nativeAccess;
                     if(job.phase()==Phase.PREPARING&&!job.ownerData().getBoolean("Prepared"))
                     {

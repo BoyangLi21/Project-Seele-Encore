@@ -32,6 +32,17 @@ import net.minecraftforge.network.NetworkHooks;
 /** Transient visual leaves for one physical wet-cage pressure gate. */
 public final class NervHangarDoorEntity extends Entity
 {
+    @Override
+    protected boolean updateInWaterStateAndDoFluidPushing()
+    {
+        // Anchored or actuator-driven machinery never receives fluid motion.
+        // Its full mechanical bounding box can span hundreds of thousands of cells.
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
+        this.wasTouchingWater=false;
+        return false;
+    }
+
     private static final EntityDataAccessor<Integer> DATA_VARIANT =
             SynchedEntityData.defineId(NervHangarDoorEntity.class,
                     EntityDataSerializers.INT);
@@ -193,7 +204,20 @@ public final class NervHangarDoorEntity extends Entity
         declaredClockR52=true;entityData.set(DATA_VARIANT,variant);entityData.set(DATA_WIDTH,width);entityData.set(DATA_HEIGHT,height);entityData.set(DATA_TARGET,open?1F:0F);
     }
     public void applyDeclaredR52(int variant,NervHangarGateGeometryR52.Spec spec,boolean open)
-    {if(invalidStackR52||spec==null||declaredStackR52()!=null&&!declaredStackR52().equals(spec))throw new IllegalStateException("Actual side-stack specification required");applyDeclaredR52(variant,spec.width(),spec.height(),open);var data=entityData.get(DATA_STACK_R52).copy();writeSpecR52(data,spec);if(!data.contains("CurrentRaw")){data.putFloat("CurrentRaw",entityData.get(DATA_OPEN));data.putFloat("PreviousRaw",entityData.get(DATA_OPEN));data.putLong("At",level().getGameTime());}entityData.set(DATA_STACK_R52,data);setBoundingBox(com.projectseele.world.NervRigidMeshSweepR52.transformed(declaredGeometryR52().bounds(actualOpenProgressR52()),actualFrameR52()));}
+    {
+        var previous=declaredStackR52();
+        boolean fixedFloor=com.projectseele.world.NervR50CarrierModeR53.enabled()&&previous!=null&&spec!=null
+            &&spec.bottomSeal()==null&&previous.width()==spec.width()&&previous.height()==spec.height()
+            &&previous.openTicks()==spec.openTicks()&&previous.closeTicks()==spec.closeTicks()
+            &&previous.depthDirection()==spec.depthDirection();
+        if(invalidStackR52||spec==null||previous!=null&&!previous.equals(spec)&&!fixedFloor)
+            throw new IllegalStateException("Actual side-stack specification required");
+        applyDeclaredR52(variant,spec.width(),spec.height(),open);
+        var data=entityData.get(DATA_STACK_R52).copy();writeSpecR52(data,spec);
+        if(!data.contains("CurrentRaw")){data.putFloat("CurrentRaw",entityData.get(DATA_OPEN));data.putFloat("PreviousRaw",entityData.get(DATA_OPEN));data.putLong("At",level().getGameTime());}
+        entityData.set(DATA_STACK_R52,data);
+        setBoundingBox(com.projectseele.world.NervRigidMeshSweepR52.transformed(declaredGeometryR52().bounds(actualOpenProgressR52()),actualFrameR52()));
+    }
     private static void writeSpecR52(CompoundTag data,NervHangarGateGeometryR52.Spec spec)
     {
         data.putFloat("Width",spec.width());data.putFloat("Height",spec.height());data.putInt("OpenTicks",spec.openTicks());data.putInt("CloseTicks",spec.closeTicks());data.putInt("DepthDirection",spec.depthDirection());
@@ -216,6 +240,24 @@ public final class NervHangarDoorEntity extends Entity
     public NervHangarGateGeometryR52.Spec declaredStackR52(){return readSpec(entityData.get(DATA_STACK_R52));}
     public boolean matchesDeclaredR52(NervHangarGateGeometryR52.Spec spec){return !invalidStackR52&&spec!=null&&spec.equals(declaredStackR52())&&visualWidth()==spec.width()&&visualHeight()==spec.height();}
     public float actualOpenProgressR52(){return EvaDorsalMechanism.smooth(entityData.get(DATA_OPEN));}
+    /** Administrative reset restores the same declared gate and its clock. */
+    public void restoreDeclaredClosedR53()
+    {
+        if(!(level() instanceof ServerLevel)||declaredStackR52()==null)
+            throw new IllegalStateException("Original declared hangar gate is not loaded");
+        invalidStackR52=false;
+        clockStartR52=clockGoalR52=0;
+        clockStepR52=clockDurationR52=0;
+        declaredAcceptedAtR52=level().getGameTime();
+        entityData.set(DATA_OPEN,0F);
+        entityData.set(DATA_TARGET,0F);
+        var sample=entityData.get(DATA_STACK_R52).copy();
+        sample.putFloat("PreviousRaw",0);
+        sample.putFloat("CurrentRaw",0);
+        sample.putLong("At",level().getGameTime());
+        entityData.set(DATA_STACK_R52,sample);
+        setBoundingBox(com.projectseele.world.NervRigidMeshSweepR52.transformed(declaredGeometryR52().bounds(0),actualFrameR52()));
+    }
     public RigidTransform actualFrameR52(){return RigidTransform.of(position(),new Quaternionf().rotationY((float)Math.toRadians(-getYRot())));}
     public NervHangarGateGeometryR52 declaredGeometryR52(){try{return NervHangarGateGeometryR52.loadClasspath(declaredStackR52());}catch(java.io.IOException missing){throw new IllegalStateException("Side-stack source absent",missing);}}
     private static boolean actualWetSealFaceR52(Vec3 p,Vec3 n,List<AABB> boxes)
@@ -232,7 +274,20 @@ public final class NervHangarDoorEntity extends Entity
     {
         if(geo.bottomSealBearingPointsR52().isEmpty())return true;var boxes=new ArrayList<AABB>();
         for(var at:supports){if(!level.hasChunkAt(at))return false;for(var shape:level.getBlockState(at).getCollisionShape(level,at,CollisionContext.of(this)).toAabbs())boxes.add(shape.move(at));}
-        for(var local:geo.bottomSealBearingPointsR52())if(!actualWetSealFaceR52(frame.transformPoint(local),frame.transformVector(new Vec3(-Math.signum(local.x),0,0)),boxes))return false;
+        for(var local:geo.bottomSealBearingPointsR52())
+        {
+            var point=frame.transformPoint(local);
+            // A finite bearing patch can straddle a block edge. Its centre's
+            // declared backing alone does not contain the neighbouring face.
+            var patch=new ArrayList<AABB>(boxes);
+            for(var at:BlockPos.betweenClosed(BlockPos.containing(point.add(-.101,-.101,-.101)),BlockPos.containing(point.add(.101,.101,.101))))
+            {
+                var chunk=level.getChunkSource().getChunkNow(at.getX()>>4,at.getZ()>>4);
+                if(chunk==null)return false;
+                for(var shape:chunk.getBlockState(at).getCollisionShape(level,at,CollisionContext.of(this)).toAabbs())patch.add(shape.move(at));
+            }
+            if(!actualWetSealFaceR52(point,frame.transformVector(new Vec3(-Math.signum(local.x),0,0)),patch))return false;
+        }
         return true;
     }
     public boolean declaredSupportsBearR52(ServerLevel level,Set<BlockPos> supports)
@@ -245,7 +300,34 @@ public final class NervHangarDoorEntity extends Entity
     {
         if(invalidStackR52||declaredStackR52()==null||actualOpenProgressR52()!=from)return false;var geo=declaredGeometryR52();var frame=actualFrameR52();var detached=com.projectseele.world.NervFlightProofR52.detachedCarrierObstacles(level);if(detached==null)return false;for(var mesh:detached)if(geo.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame()))return false;if(to<from&&!com.projectseele.world.NervGateClosureR52.clearActualActors(level,this,moving))return false;
         if(!declaredSupportsBearR52(level,supports))return false;
-        var seen=new HashSet<BlockPos>();var actorsSeen=new HashSet<UUID>();for(var box:geo.envelopes(frame,from,to)){if(!com.projectseele.world.EntryPlugEjectionR48.loaded(level,box))return false;for(var at:BlockPos.betweenClosed(BlockPos.containing(box.minX,box.minY,box.minZ),BlockPos.containing(box.maxX,box.maxY,box.maxZ))){var key=at.immutable();if(!seen.add(key)||moving.contains(key))continue;var state=level.getBlockState(key);if(state.isAir())continue;for(var shape:state.getCollisionShape(level,key,CollisionContext.of(this)).toAabbs())if(geo.intersects(frame,from,to,shape.move(key)))return false;}for(var actor:level.getEntities(this,box.inflate(200),e->e.isAlive()&&!e.isSpectator()&&(e instanceof net.minecraft.world.entity.LivingEntity||e.canBeCollidedWith()||e instanceof UNTransportEntity||e instanceof EntryPlugCarrierEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof NervCarrierPlatformEntity))){if(!actorsSeen.add(actor.getUUID()))continue;var meshes=com.projectseele.world.NervFlightProofR52.actualObstacleMeshes(actor);if(meshes==null){var bounds=actor instanceof UNTransportEntity aircraft?aircraft.getBoundingBoxForCulling():actor.getBoundingBox();if(geo.intersects(frame,from,to,bounds))return false;}else if(meshes.isEmpty()){if(geo.intersects(frame,from,to,actor.getBoundingBox()))return false;}else for(var mesh:meshes)if(geo.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame()))return false;}}return true;
+        var seen=new HashSet<BlockPos>();
+        for(var box:geo.envelopes(frame,from,to))
+        {
+            if(!com.projectseele.world.EntryPlugEjectionR48.loaded(level,box))return false;
+            for(var at:BlockPos.betweenClosed(BlockPos.containing(box.minX,box.minY,box.minZ),BlockPos.containing(box.maxX,box.maxY,box.maxZ)))
+            {
+                var key=at.immutable();if(!seen.add(key)||moving.contains(key))continue;
+                var state=level.getBlockState(key);if(state.isAir())continue;
+                for(var shape:state.getCollisionShape(level,key,CollisionContext.of(this)).toAabbs())if(geo.intersects(frame,from,to,shape.move(key)))return false;
+            }
+        }
+        // The union includes every former per-leaf search area. Snapshot live
+        // actors once; exact full-motion geometry still decides obstruction.
+        for(var actor:level.getEntities(this,geo.sweptBounds(frame,from,to).inflate(200),e->e.isAlive()&&!e.isSpectator()&&(e instanceof net.minecraft.world.entity.LivingEntity||e.canBeCollidedWith()||e instanceof UNTransportEntity||e instanceof EntryPlugCarrierEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof NervCarrierPlatformEntity)))
+        {
+            var meshes=com.projectseele.world.NervFlightProofR52.actualObstacleMeshes(actor);
+            if(meshes==null)
+            {
+                var bounds=actor instanceof UNTransportEntity aircraft?aircraft.getBoundingBoxForCulling():actor.getBoundingBox();
+                if(geo.intersects(frame,from,to,bounds))return false;
+            }
+            else if(meshes.isEmpty())
+            {
+                if(geo.intersects(frame,from,to,actor.getBoundingBox()))return false;
+            }
+            else for(var mesh:meshes)if(geo.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame()))return false;
+        }
+        return true;
     }
 
     @Override public boolean isPickable() { return false; }

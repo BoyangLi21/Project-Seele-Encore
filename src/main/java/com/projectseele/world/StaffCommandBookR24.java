@@ -89,8 +89,8 @@ public final class StaffCommandBookR24
 
     public static int request(ServerPlayer player, NervStaffEntity npc, String operation, int unit)
     {
-        if (unit < 0 || unit > 2 || !Set.of("prepare", "launch", "recover", "deploy",StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY).contains(operation)) return 0;
-        String authority=operation.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY)?"deploy":operation;
+        if (unit < 0 || unit > 2 || !Set.of("prepare", "launch", "recover", "deploy","deploy_surface","deploy_geofront","deploy_hakone",StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY).contains(operation)) return 0;
+        String authority=operation.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY)||operation.startsWith("deploy_")?"deploy":operation;
         if (!NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc, authority))
         {
             NervStaffDialogue.reply(player, npc, NervStaffDialogue.commandRefusal(player,npc,authority));
@@ -209,6 +209,8 @@ public final class StaffCommandBookR24
                     failed(npc, "待执行指令已取消：通讯中断、权限改变或等待超时。已开始的运输继续按安全流程运行。"); npc.finishTask(); continue;
                 }
                 var status = EvaLogisticsDirector.status(level, job.unit);
+                if (status.phase().equals("CANCELLED"))
+                { failed(npc, "出动指令已取消，机体在原位停止。可下达回收指令。"); npc.finishTask(); continue; }
                 if (status.phase().equals("PLUG_FAULT"))
                 { failed(npc, "插入栓接入出现故障，后续发射已取消。请到机库检查。"); npc.finishTask(); continue; }
                 if (job.step == Step.PRESS)
@@ -226,6 +228,8 @@ public final class StaffCommandBookR24
                 }
                 if (job.step == Step.PREPARING)
                 {
+                    if(status.phase().equals("DEPLOYED")&&job.requested.startsWith("deploy_"))
+                    {jobs.remove(job.actor);NervStaffDialogue.reply(owner,npc,"机体已抵达所选出口，操纵权交还驾驶员。");continue;}
                     if (Set.of("PARKED", "PLUG_ABORT_RETURNING", "PLUG_ABORT_DOCKED", "DEPLOYED").contains(status.phase()))
                     { failed(npc, "整备状态已被其他操作改变，后续发射已取消。请重新核对机体状态。"); continue; }
                     if (!status.phase().equals("SILO_READY")) continue;

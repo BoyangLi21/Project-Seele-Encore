@@ -88,6 +88,7 @@ public final class NervRouteRuntimeStateR52 extends SavedData
         personnelLiftManifest=relativeRootFile;setDirty();
     }
     public Job job(int variant){return jobs.get(variant);}
+    public void clearOriginalMaintenanceR53(int variant){jobs.remove(variant);fault="";setDirty();}
     public Collection<Job> jobs(){return List.copyOf(jobs.values());}
     public void claim(long epoch,String fingerprint)
     {
@@ -115,7 +116,7 @@ public final class NervRouteRuntimeStateR52 extends SavedData
     }
     public static String legacyPhase(Job job)
     {
-        return switch(job.phase()){case PREPARING->"TO_SILO";case READY,DEPARTING->"SILO_READY";case DEPLOYED->"DEPLOYED";case RETURNING->"TO_HANGAR";case FINISHING->job.ownerData().getBoolean("Returning")?"TO_HANGAR":"SILO_READY";case PARKED->"PARKED";case CANCELLED->"PLUG_FAULT";};
+        return switch(job.phase()){case PREPARING->"TO_SILO";case READY,DEPARTING->"SILO_READY";case DEPLOYED->"DEPLOYED";case RETURNING->"TO_HANGAR";case FINISHING->job.ownerData().getBoolean("Returning")?"TO_HANGAR":"SILO_READY";case PARKED->"PARKED";case CANCELLED->"CANCELLED";};
     }
     public static NervRouteRuntimeStateR52 load(CompoundTag tag)
     {

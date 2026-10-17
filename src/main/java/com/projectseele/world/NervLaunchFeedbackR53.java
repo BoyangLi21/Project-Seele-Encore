@@ -61,44 +61,57 @@ public final class NervLaunchFeedbackR53
         soundPoint = soundPoint.scale(1D / contacts.size());
         if (burst)
         {
+            feedback.putLong("BurstAt",now);
             level.playSound(null, soundPoint.x, soundPoint.y, soundPoint.z,
-                    ModSounds.LAUNCH_ELECTRIC_BURST_R53.get(), SoundSource.BLOCKS, 1.2F, 1F);
+                    ModSounds.LAUNCH_ELECTRIC_BURST_R53.get(), SoundSource.BLOCKS, 4F, .88F);
+            level.playSound(null, soundPoint.x, soundPoint.y, soundPoint.z,
+                    ModSounds.FACILITY.get("facility_hydraulic_launch").get(), SoundSource.BLOCKS, 3.6F, 1F);
+            GiantParticles.send(level, ParticleTypes.FLASH, soundPoint.x, soundPoint.y, soundPoint.z, 1, 0, 0, 0, 0);
             for (int i = 0; i < Math.min(4, contacts.size()); i++)
             {
                 Vec3 point = contacts.get(i).point();
-                GiantParticles.send(level, ParticleTypes.FLASH, point.x, point.y, point.z, 1, 0, 0, 0, 0);
-                GiantParticles.send(level, ParticleTypes.ELECTRIC_SPARK, point.x, point.y, point.z, 12, .16, .16, .16, .2);
+                GiantParticles.send(level, ParticleTypes.ELECTRIC_SPARK, point.x, point.y, point.z, 64, 1.2, 1.2, 1.2, 1.1);
+                GiantParticles.send(level, ParticleTypes.FIREWORK, point.x, point.y, point.z, 36, .8, .8, .8, .65);
             }
         }
-        if (speedMps < 12)
+        if(burst)
+        {
+            for(int i=0;i<Math.min(4,contacts.size());i++)
+            {
+                var contact=contacts.get(i);var point=contact.point();var away=point.subtract(soundPoint).normalize();
+                var jet=contact.tangent().scale(-3.2).add(away.scale(1.2));
+                GiantParticles.send(level,ParticleTypes.CLOUD,point.x,point.y,point.z,32,1.6,.8,1.6,.4);
+                for(int n=0;n<8;n++)GiantParticles.send(level,new net.minecraft.core.particles.DustParticleOptions(new org.joml.Vector3f(.84F,.90F,.92F),4F),point.x,point.y,point.z,0,jet.x,jet.y,jet.z,1);
+            }
+        }
+        if (speedMps < 3)
         {
             return;
         }
         double strength = Math.min(1, speedMps / 100D);
+        if(now-feedback.getLong("LastFriction")>=12)
+        {
+            feedback.putLong("LastFriction",now);
+            level.playSound(null,soundPoint.x,soundPoint.y,soundPoint.z,
+                    ModSounds.LAUNCH_RAIL_FRICTION_R53.get(),SoundSource.BLOCKS,2.8F,.9F+(float)strength*.2F);
+        }
         if (now - feedback.getLong("LastParticles") >= 2)
         {
             feedback.putLong("LastParticles", now);
-            int sparks = 2 + (int)Math.round(4 * strength);
+            int sparks = 10;
             for (int i = 0; i < Math.min(4, contacts.size()); i++)
             {
                 Contact contact = contacts.get(i);
                 Vec3 p = contact.point();
-                Vec3 trailing = contact.tangent().scale(-(.10 + .28 * strength));
+                Vec3 trailing = contact.tangent().scale(-(.6 + 2.0 * strength));
                 for (int n = 0; n < sparks; n++)
                 {
                     Vec3 velocity = trailing.add((level.random.nextDouble() - .5) * .18,
                             (level.random.nextDouble() - .5) * .18, (level.random.nextDouble() - .5) * .18);
-                    GiantParticles.send(level, ParticleTypes.ELECTRIC_SPARK, p.x, p.y, p.z,
+                    GiantParticles.send(level, n%3==0?ParticleTypes.FIREWORK:n%3==1?ParticleTypes.ELECTRIC_SPARK:ParticleTypes.CRIT, p.x, p.y, p.z,
                             0, velocity.x, velocity.y, velocity.z, 1);
                 }
             }
-        }
-        if (now - feedback.getLong("LastFriction") >= 5)
-        {
-            feedback.putLong("LastFriction", now);
-            level.playSound(null, soundPoint.x, soundPoint.y, soundPoint.z,
-                    ModSounds.LAUNCH_RAIL_FRICTION_R53.get(), SoundSource.BLOCKS,
-                    (float)(.18 + .24 * strength), (float)(.85 + .30 * strength));
         }
     }
 

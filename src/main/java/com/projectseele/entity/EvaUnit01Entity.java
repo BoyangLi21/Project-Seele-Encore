@@ -1127,7 +1127,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void setRecoveryRackR39(boolean active){this.entityData.set(DATA_RECOVERY_RACK_R39,active);}
     public boolean recoveryRackR39(){return this.entityData.get(DATA_RECOVERY_RACK_R39);}
     public void setCarrierRiseProgress(float progress) { this.entityData.set(DATA_CARRIER_RISE_R26,Mth.clamp(progress,0,1)); }
-    public float carrierRiseProgress(float partial) { var actor=EvaMechanicalFrameR52.originalCarrierControllerR52(this);if(actor!=null)return com.projectseele.world.NervOriginalCarrierR52.progress(actor,partial);if(EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(this))return Float.NaN;return Mth.lerp(partial,this.oldCarrierRiseR26,this.entityData.get(DATA_CARRIER_RISE_R26)); }
+    public float carrierRiseProgress(float partial) { var actor=EvaMechanicalFrameR52.originalCarrierControllerR52(this);if(actor!=null)return com.projectseele.world.NervOriginalCarrierR52.progress(actor,partial);if(EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(this)&&!this.level().isClientSide)return Float.NaN;return Mth.lerp(partial,this.oldCarrierRiseR26,this.entityData.get(DATA_CARRIER_RISE_R26)); }
 
     public int getPowerCapacityTicks()
     {
@@ -1143,6 +1143,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     public boolean isCarrierPowerConnected()
     {
+        boolean groundCustody=EvaMechanicalFrameR52.active(this)&&!EvaMechanicalFrameR52.flightCustody(this)&&!EvaMechanicalFrameR52.ballisticCustodyR52(this);
+        if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&(!EvaAirTransportR31.active(this)||groundCustody)&&!this.isBerserk()&&!this.isExperimentalUnit()&&this.isNervLogisticsLocked())
+        {
+            var rack=EvaMechanicalFrameR52.originalCarrierControllerR52(this);
+            if(rack!=null&&com.projectseele.world.NervOriginalCarrierR52.actualRoot(rack,1).translation().distanceToSqr(this.position())<.25
+                    &&(groundCustody||this.getY()<80||this.getLaunchPhase()==LAUNCH_ASCENT))return true;
+        }
         return !EvaAirTransportR31.active(this) && !this.isBerserk() && !this.isExperimentalUnit() && this.isEntryPlugInserted()
                 && this.getPilotEntity()!=null && this.isNervLogisticsLocked()
                 && this.carrierRiseProgress(1)>=.999F
@@ -1869,6 +1876,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.entityData.set(DATA_NERV_LOGISTICS_LOCKED, locked);
             if (locked)
             {
+                this.setUmbilicalAnchor(null);
                 /*
                  * The logistics flag is also the pre-launch pose contract.
                  * A recovered pilot can leave crouch/prone/aim values in the
@@ -4589,20 +4597,17 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         // Transport owns the captured inert pose. It neither consumes the
         // onboard reserve nor reconnects a cable while the load is restrained.
-        if(EvaAirTransportR31.active(this))return;
+        if(EvaAirTransportR31.active(this)&&(!EvaMechanicalFrameR52.active(this)||EvaMechanicalFrameR52.flightCustody(this)))
+        {
+            this.setUmbilicalAnchor(null);
+            return;
+        }
         if (this.isExperimentalUnit())
         {
             this.setUmbilicalAnchor(null);
             this.entityData.set(DATA_POWER_TICKS, this.getPowerCapacityTicks());
             this.entityData.set(DATA_UMBILICAL_SEVERED, false);
             this.batterySessionArmed = this.isEntryPlugInserted() && this.getPilotEntity() != null;
-            return;
-        }
-        if(EvaAirTransportR31.active(this))
-        {
-            this.setUmbilicalAnchor(null);
-            if(this.isEntryPlugInserted()&&this.getPilotEntity()!=null&&this.getPowerTicks()>0)
-                this.entityData.set(DATA_POWER_TICKS,this.getPowerTicks()-1);
             return;
         }
         if (this.isBerserk())
@@ -7586,6 +7591,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     protected AABB makeBoundingBox()
     {
+        // Entity.move already translated the native box. Its final setPos
+        // must not rebuild that box from the preceding mechanical sample.
+        if(this.getPersistentData().getBoolean("MechanicalNativeMoveR53"))return this.getBoundingBox();
         if(this.rifleStanceInitialized&&EvaMechanicalFrameR52.serviceSourceHeldR52(this))return EvaMechanicalFrameR52.serviceBoundsR52(this);
         if(this.rifleStanceInitialized&&EvaMechanicalFrameR52.active(this))return EvaMechanicalFrameR52.bounds(this);
         AABB physical=com.projectseele.physics.CombatBodyDynamics.bounds(this);if(physical!=null)return physical;

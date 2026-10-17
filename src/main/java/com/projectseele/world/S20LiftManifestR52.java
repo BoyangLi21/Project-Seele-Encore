@@ -34,7 +34,8 @@ public final class S20LiftManifestR52
     public record RoomControls(List<Door> gate,List<Reader> gateReaders,List<Door> pilot) {}
     public record Office(String liftId,int middleY,Set<BlockPos> readers,BlockPos middleReader,
                          List<AABB> meeting,List<AABB> liftRoom,AABB landingLease,RoomControls controls) {}
-    public record MainLift(String liftId,List<Integer> headquartersFloors,int hangarFloor,Integer terminalFloor) {}
+    public record MainLift(String liftId,List<Integer> headquartersFloors,int hangarFloor,Integer terminalFloor,
+                           Integer observationFloor,Integer launchFloor) {}
     public record MainLifts(MainLift commandRear,MainLift eastGallery) {}
     public record Document(long epoch,String directoryFingerprint,boolean ready,List<Binding> lifts,Office office,MainLifts mainLifts) {}
     private S20LiftManifestR52() {}
@@ -85,7 +86,14 @@ public final class S20LiftManifestR52
             Binding binding=new Binding(id,side,facing,insideButton,insideDisplay,List.copyOf(floors));
             binding.spec();
             for(int i=1;i<floors.size();i++)require(floors.get(i-1).cabin().getY()<floors.get(i).cabin().getY(),"Native floors must be listed in ascending order");
-            require(floors.stream().allMatch(f->f.controller().getX()==floors.get(0).controller().getX()&&f.controller().getZ()==floors.get(0).controller().getZ()),"Native controller group must share one axis");
+            var transfer=NervPersonnelTransferR53.parse(id,lift);
+            if(transfer==null)require(floors.stream().allMatch(f->f.controller().getX()==floors.get(0).controller().getX()&&f.controller().getZ()==floors.get(0).controller().getZ()),"Native controller group must share one axis");
+            else
+            {
+                require(floors.stream().allMatch(f->f.controller().equals(transfer.controller(f.controller().getY()))),"Each transferred floor must use its declared original or deep shaft");
+                require(floors.stream().noneMatch(f->f.controller().getY()==transfer.transferY()),"Horizontal transfer is an internal section, not a passenger stop");
+                require(floors.stream().anyMatch(f->f.controller().getY()>transfer.transferY())&&floors.stream().anyMatch(f->f.controller().getY()<transfer.transferY()),"Horizontal transfer must join both actual shafts");
+            }
             lifts.add(binding);
         }
         require(!lifts.isEmpty(),"Root complete list cannot be empty");Office office=null;
@@ -111,6 +119,13 @@ public final class S20LiftManifestR52
             var rearHangar=lift(lifts,rear.liftId()).floor(rear.hangarFloor());
             var eastHangar=lift(lifts,east.liftId()).floor(east.hangarFloor());
             require(rearHangar.approachY()==eastHangar.approachY(),"Both original main lifts must meet the same actual hangar personnel floor");
+            require(Objects.equals(rear.launchFloor(),east.launchFloor()),"Both original main lifts must serve the same launch personnel floor");
+            if(rear.launchFloor()!=null)
+            {
+                var rearLaunch=lift(lifts,rear.liftId()).floor(rear.launchFloor());
+                var eastLaunch=lift(lifts,east.liftId()).floor(east.launchFloor());
+                require(rearLaunch.approachY()==eastLaunch.approachY(),"Both launch landings must meet the same actual personnel floor");
+            }
             mainLifts=new MainLifts(rear,east);
         }
         if(ready)
@@ -135,12 +150,37 @@ public final class S20LiftManifestR52
                 "Main-lift source axis must match its measured original identity");
         var translation=horizontal(role.getAsJsonArray("shaft_translation"));
         require(Math.abs((long)translation.getX())<=4096&&Math.abs((long)translation.getZ())<=4096,"Bounded explicit whole-shaft translation required");
-        for(var floor:binding.floors())require(floor.cabin().getX()==cabinX+translation.getX()&&floor.cabin().getZ()==cabinZ+translation.getZ()
+        if(role.has("transfer_y"))
+        {
+            int cut=role.get("transfer_y").getAsInt();
+            var upper=role.getAsJsonObject("upper_axis");var lower=role.getAsJsonObject("lower_axis");
+            for(var floor:binding.floors())
+            {
+                var axis=floor.cabin().getY()>cut?upper:lower;
+                var cabin=horizontal(axis.getAsJsonArray("cabin"));var controller=horizontal(axis.getAsJsonArray("controller"));
+                require(floor.cabin().getX()==cabin.getX()&&floor.cabin().getZ()==cabin.getZ()
+                        &&floor.controller().getX()==controller.getX()&&floor.controller().getZ()==controller.getZ(),
+                        "Each actual stop must match its declared retained or deep shaft axis");
+            }
+        }
+        else for(var floor:binding.floors())require(floor.cabin().getX()==cabinX+translation.getX()&&floor.cabin().getZ()==cabinZ+translation.getZ()
                 &&floor.controller().getX()==controllerX+translation.getX()&&floor.controller().getZ()==controllerZ+translation.getZ(),
                 "Every original main-lift floor must use the same declared rigid shaft translation");
         int hangar=role.get("hangar_floor").getAsBigDecimal().intValueExact();
         Integer terminal=role.has("terminal_floor")?role.get("terminal_floor").getAsBigDecimal().intValueExact():null;
+        Integer observation=role.has("observation_floor")?role.get("observation_floor").getAsBigDecimal().intValueExact():null;
+        Integer launch=role.has("launch_floor")?role.get("launch_floor").getAsBigDecimal().intValueExact():null;
         Set<Integer> assigned=new HashSet<>();assigned.add(hangar);
+        if(observation!=null)
+        {
+            require(observation>hangar&&assigned.add(observation),"Observation must be a separate floor above the boarding landing");
+            require(!binding.floor(observation).restricted(),"Observation cannot inherit Terminal-only admission");
+        }
+        if(launch!=null)
+        {
+            require(launch<hangar&&assigned.add(launch),"Launch personnel access must be a separate floor below boarding");
+            require(!binding.floor(launch).restricted(),"Launch personnel access cannot inherit Terminal-only admission");
+        }
         List<Integer> headquarters=new ArrayList<>();
         for(var floor:role.getAsJsonArray("headquarters_floors"))
         {
@@ -152,13 +192,13 @@ public final class S20LiftManifestR52
         require(!terminalRequired||terminal!=null,"Original command lift must continue to Terminal Dogma");
         if(terminal!=null)
         {
-            require(terminal<hangar&&assigned.add(terminal),"Terminal Dogma must be a separate lower floor");
+            require(terminal<hangar&&(launch==null||terminal<launch)&&assigned.add(terminal),"Terminal Dogma must be a separate lower floor");
             require(binding.floor(terminal).restricted(),"Terminal Dogma landing must retain access control");
         }
         require(!binding.floor(hangar).restricted(),"Shared hangar landing cannot inherit Terminal-only admission");
         require(assigned.equals(binding.floors().stream().map(f->f.cabin().getY()).collect(java.util.stream.Collectors.toSet())),
-                "Every actual main-lift floor must have an explicit headquarters, hangar or Terminal role");
-        return new MainLift(id,List.copyOf(headquarters),hangar,terminal);
+                "Every actual main-lift floor must have an explicit headquarters, boarding, observation, launch or Terminal role");
+        return new MainLift(id,List.copyOf(headquarters),hangar,terminal,observation,launch);
     }
     private static BlockPos horizontal(JsonArray values)
     {

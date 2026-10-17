@@ -744,9 +744,11 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     private static Map<String,JointSkin> jointSkins(Map<String,MeshPart> parts,int stride)
     {
         Map<String,JointSkin> result=new HashMap<>();
-            for(String joint:new String[]{"elbow","ankle","wrist"})for(String side:new String[]{"l","r"})
+            for(String joint:new String[]{"elbow","ankle","wrist","hip","waist"})for(String side:new String[]{"l","r"})
         {
-                String upper=(joint.equals("elbow")?"arm_":joint.equals("ankle")?"shin_":"forearm_")+side,lower=(joint.equals("elbow")?"forearm_":joint.equals("ankle")?"foot_":"hand_")+side;
+                if(joint.equals("waist")&&side.equals("r"))continue;
+                String upper=switch(joint){case "hip","waist"->"torso_lower";case "elbow"->"arm_"+side;case "ankle"->"shin_"+side;default->"forearm_"+side;};
+                String lower=switch(joint){case "waist"->"torso_upper";case "hip"->"leg_"+side;case "elbow"->"forearm_"+side;case "ankle"->"foot_"+side;default->"hand_"+side;};
             var a=parts.get(upper);var b=parts.get(lower);if(a==null||b==null)continue;
             // Pivot + relative coordinates can round to opposite sides of a
             // quantization cell. Match spatially and give BOTH copies the same

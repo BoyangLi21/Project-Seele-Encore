@@ -60,6 +60,7 @@ public final class FacilityPaR31
             {
                 var previous = iterator.next();
                 if (previous.position().distanceToSqr(position) >= 140 * 140) continue;
+                if(previous.clip().equals("pa_1")||previous.clip().equals("pa_2")||previous.clip().equals("pa_3"))continue;
                 for (var player : level.players())
                     if (player.position().distanceToSqr(previous.position()) < 240 * 240)
                         player.connection.send(new ClientboundStopSoundPacket(
@@ -79,13 +80,13 @@ public final class FacilityPaR31
 
     public static void warning(ServerLevel level, Vec3 position)
     {
-        if (busy(level, position)) return;
+        boolean underVoice=busy(level,position);
         long now = level.getGameTime();
         var warnings = WARNINGS.computeIfAbsent(level, key -> new ArrayList<>());
         warnings.removeIf(sound -> now < sound.started() || now >= sound.until());
         if (warnings.stream().anyMatch(sound -> sound.position().distanceToSqr(position) < 140 * 140)) return;
         level.playSound(null, position.x, position.y, position.z,
-                ModSounds.FACILITY.get("facility_siren").get(), SoundSource.BLOCKS, .48F, 1);
+                ModSounds.FACILITY.get("facility_siren").get(), SoundSource.BLOCKS, underVoice?.18F:.48F, 1);
         warnings.add(new Transmission(position, "facility_siren", "facility_siren", now, now + 60));
     }
 
@@ -113,9 +114,18 @@ public final class FacilityPaR31
     }
     private static boolean hangar(ServerLevel level,Vec3 position)
     {
-        // The finite underground cage/transfer room excludes command PA, outdoor sites and phones.
-        return level.dimension().location().toString().equals("projectseele:geofront")
-                &&position.x>=-40&&position.x<=122&&position.y>=-455&&position.y<=-350
+        if(!level.dimension().location().toString().equals("projectseele:geofront"))return false;
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            for(int variant=0;variant<3;variant++)
+            {
+                var bay=NervOriginalActorsR52.bayPose(level,variant);if(bay==null)continue;
+                var local=bay.inverse().transformPoint(position);
+                if(Math.abs(local.x)<=23&&local.y>=-5&&local.y<=105&&Math.abs(local.z)<=40)return true;
+            }
+            return false;
+        }
+        return position.x>=-40&&position.x<=122&&position.y>=-455&&position.y<=-350
                 &&position.z>=-300&&position.z<=-15;
     }
 

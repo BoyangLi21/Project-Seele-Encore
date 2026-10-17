@@ -41,30 +41,45 @@ public final class TriangleSweepMeshR52
     {AABB result=null;for(double x:new double[]{box.minX,box.maxX})for(double y:new double[]{box.minY,box.maxY})for(double z:new double[]{box.minZ,box.maxZ}){var p=frame.transformPoint(new Vec3(x,y,z));var b=new AABB(p,p);result=result==null?b:result.minmax(b);}return result;}
     public AABB envelope(DirectoryTrajectoryR52 path)
     {double r=radius(root.box,path.footCentreLocal());return transformed(root.box,path.sample(0).evaRoot()).minmax(transformed(root.box,path.sample(1).evaRoot())).inflate(path.error(r,1));}
+    public PreparedSweep prepare(DirectoryTrajectoryR52 path,double maximumError){return new PreparedSweep(path,maximumError);}
+    public final class PreparedSweep
+    {
+        private final DirectoryTrajectoryR52 path;private final double maximumError;private final AABB wholeEnvelope;
+        private final Map<Node,AABB> envelopes=new IdentityHashMap<>();
+        private final Map<Node,Double> radii=new IdentityHashMap<>();
+        private final Map<Node,List<CurveSegment>> segments=new IdentityHashMap<>();
+        private PreparedSweep(DirectoryTrajectoryR52 path,double maximumError){this.path=Objects.requireNonNull(path);if(!Double.isFinite(maximumError)||maximumError<=0)throw new IllegalArgumentException("Positive finite error required");this.maximumError=maximumError;wholeEnvelope=envelope(root);}
+        private double radius(Node node){return radii.computeIfAbsent(node,n->TriangleSweepMeshR52.radius(n.box,path.footCentreLocal()));}
+        private AABB envelope(Node node){return envelopes.computeIfAbsent(node,n->transformed(n.box,path.sample(0).evaRoot()).minmax(transformed(n.box,path.sample(1).evaRoot())).inflate(path.error(radius(n),1)));}
+        private List<CurveSegment> segments(Node node)
+        {
+            return segments.computeIfAbsent(node,n->{double r=radius(n);int count=path.divisions(r,maximumError);double error=path.error(r,count);var result=new ArrayList<CurveSegment>(count);
+                for(int i=0;i<count;i++){double a=(double)i/count,b=(double)(i+1)/count;var from=path.sample(a).evaRoot();var to=path.sample(b).evaRoot();result.add(new CurveSegment(a,b,from,to,error,count,transformed(n.box,from).minmax(transformed(n.box,to)).inflate(error)));}return List.copyOf(result);});
+        }
+        public boolean intersects(AABB obstacle){return wholeEnvelope.intersects(obstacle)&&(TriangleSweepMeshR52.this.intersects(root,this,obstacle)||closed&&inside(path.sample(0).evaRoot().inverse().transformPoint(obstacle.getCenter())));}
+        public boolean intersects(NervRigidMeshSweepR52 obstacle,RigidTransform from,RigidTransform to){return paired(root,this,obstacle,from,to,obstacle.envelope(from,to));}
+    }
+    private record CurveSegment(double start,double end,RigidTransform from,RigidTransform to,double error,int divisions,AABB bounds){}
     public boolean intersects(DirectoryTrajectoryR52 path,AABB obstacle,double maximumError)
-    {return intersects(root,path,obstacle,maximumError)||closed&&inside(path.sample(0).evaRoot().inverse().transformPoint(obstacle.getCenter()));}
+    {return prepare(path,maximumError).intersects(obstacle);}
     /** The same certified directory curve against actual moving machinery,
      * including its empty centre. Neither actor's broadphase fills that hole. */
     public boolean intersects(DirectoryTrajectoryR52 path,NervRigidMeshSweepR52 obstacle,
             RigidTransform obstacleFrom,RigidTransform obstacleTo,double maximumError)
     {
-        AABB bounds=obstacle.envelope(obstacleFrom,obstacleTo);
-        return paired(root,path,obstacle,obstacleFrom,obstacleTo,bounds,maximumError);
+        return prepare(path,maximumError).intersects(obstacle,obstacleFrom,obstacleTo);
     }
-    private boolean paired(Node node,DirectoryTrajectoryR52 path,NervRigidMeshSweepR52 obstacle,
-            RigidTransform obstacleFrom,RigidTransform obstacleTo,AABB obstacleBounds,double maximumError)
+    private boolean paired(Node node,PreparedSweep query,NervRigidMeshSweepR52 obstacle,
+            RigidTransform obstacleFrom,RigidTransform obstacleTo,AABB obstacleBounds)
     {
-        double r=radius(node.box,path.footCentreLocal());
-        AABB envelope=transformed(node.box,path.sample(0).evaRoot()).minmax(transformed(node.box,path.sample(1).evaRoot())).inflate(path.error(r,1));
-        if(!envelope.intersects(obstacleBounds))return false;
-        if(node.left!=null)return paired(node.left,path,obstacle,obstacleFrom,obstacleTo,obstacleBounds,maximumError)
-                ||paired(node.right,path,obstacle,obstacleFrom,obstacleTo,obstacleBounds,maximumError);
-        int divisions=path.divisions(r,maximumError);double e=path.error(r,divisions);var pad=new Vec3(e,e,e);
-        for(int segment=0;segment<divisions;segment++)
+        if(!query.envelope(node).intersects(obstacleBounds))return false;
+        if(node.left!=null)return paired(node.left,query,obstacle,obstacleFrom,obstacleTo,obstacleBounds)
+                ||paired(node.right,query,obstacle,obstacleFrom,obstacleTo,obstacleBounds);
+        for(var segment:query.segments(node))
         {
-            double a=(double)segment/divisions,b=(double)(segment+1)/divisions;
-            var from=path.sample(a).evaRoot();var to=path.sample(b).evaRoot();
-            var otherFrom=obstacleFrom.interpolate(obstacleTo,a);var otherTo=obstacleFrom.interpolate(obstacleTo,b);
+            if(!segment.bounds.intersects(obstacleBounds))continue;
+            var from=segment.from;var to=segment.to;var pad=new Vec3(segment.error,segment.error,segment.error);
+            var otherFrom=obstacleFrom.interpolate(obstacleTo,segment.start);var otherTo=obstacleFrom.interpolate(obstacleTo,segment.end);
             for(int i=node.start;i<node.end;i++)
             {
                 var chord=new Vec3[6];for(int c=0;c<3;c++){var point=point(order[i],c);chord[c]=from.transformPoint(point);chord[c+3]=to.transformPoint(point);}
@@ -83,18 +98,30 @@ public final class TriangleSweepMeshR52
         if(node.left!=null){ray(node.left,point,direction,hits);ray(node.right,point,direction,hits);return;}
         for(int i=node.start;i<node.end;i++){int t=order[i];var a=point(t,0);var ab=point(t,1).subtract(a);var ac=point(t,2).subtract(a);var cross=direction.cross(ac);double determinant=ab.dot(cross);if(Math.abs(determinant)<1e-14)continue;var offset=point.subtract(a);double u=offset.dot(cross)/determinant;if(u<0||u>1)continue;var q=offset.cross(ab);double v=direction.dot(q)/determinant;if(v<0||u+v>1)continue;double distance=ac.dot(q)/determinant;if(distance>0)hits.add(Math.rint(distance*1e10)/1e10);}
     }
-    private boolean intersects(Node node,DirectoryTrajectoryR52 path,AABB obstacle,double maximumError)
+    private boolean intersects(Node node,PreparedSweep query,AABB obstacle)
     {
-        double r=radius(node.box,path.footCentreLocal());AABB envelope=transformed(node.box,path.sample(0).evaRoot()).minmax(transformed(node.box,path.sample(1).evaRoot())).inflate(path.error(r,1));if(!envelope.intersects(obstacle))return false;
-        if(node.left!=null)return intersects(node.left,path,obstacle,maximumError)||intersects(node.right,path,obstacle,maximumError);
-        int divisions=path.divisions(r,maximumError);double error=path.error(r,divisions);
-        for(int segment=0;segment<divisions;segment++)
+        if(!query.envelope(node).intersects(obstacle))return false;
+        if(node.left!=null)return intersects(node.left,query,obstacle)||intersects(node.right,query,obstacle);
+        for(var segment:query.segments(node))
         {
-            var from=path.sample((double)segment/divisions).evaRoot();var to=path.sample((double)(segment+1)/divisions).evaRoot();
+            if(!segment.bounds.intersects(obstacle))continue;
             for(int i=node.start;i<node.end;i++)
-            {int triangle=order[i];var points=new Vec3[6];for(int corner=0;corner<3;corner++){var p=point(triangle,corner);points[corner]=from.transformPoint(p);points[corner+3]=to.transformPoint(p);}if(convexSweepBox(points,error,obstacle))return true;}
+                if(refinedTriangleBox(query.path,order[i],query.radius(node),segment.start,segment.end,segment.from,segment.to,segment.divisions,0,obstacle))return true;
         }
         return false;
+    }
+    private boolean refinedTriangleBox(DirectoryTrajectoryR52 path,int triangle,double radius,double a,double b,
+            RigidTransform from,RigidTransform to,int divisions,int depth,AABB obstacle)
+    {
+        double error=path.error(radius,divisions);var points=new Vec3[6];
+        for(int corner=0;corner<3;corner++){var p=point(triangle,corner);points[corner]=from.transformPoint(p);points[corner+3]=to.transformPoint(p);}
+        if(!convexSweepBox(points,error,obstacle))return false;
+        // The error is an enclosure, not solid machinery. Refine only a
+        // suspected hit; unresolved or roundoff-limited cases still block.
+        if(depth==4||divisions>2048||path.error(radius,divisions*2)>=error)return true;
+        double mid=(a+b)*.5;var middle=path.sample(mid).evaRoot();
+        return refinedTriangleBox(path,triangle,radius,a,mid,from,middle,divisions*2,depth+1,obstacle)
+                ||refinedTriangleBox(path,triangle,radius,mid,b,middle,to,divisions*2,depth+1,obstacle);
     }
     /** SAT for the six-corner chord hull Minkowski-summed with the certified
      * L-infinity error box. All hull face/edge axes are included; extra axes
@@ -124,9 +151,20 @@ public final class TriangleSweepMeshR52
     {
         if(a.length!=6||b.length!=6||!Double.isFinite(error.lengthSqr())||error.x<0||error.y<0||error.z<0)throw new IllegalArgumentException("Actual paired triangle hulls required");
         for(var axis:new Vec3[]{new Vec3(1,0,0),new Vec3(0,1,0),new Vec3(0,0,1)})if(separated(a,b,error,axis))return false;
-        for(var hull:new Vec3[][]{a,b})for(int i=0;i<6;i++)for(int j=i+1;j<6;j++)for(int k=j+1;k<6;k++)if(separated(a,b,error,hull[j].subtract(hull[i]).cross(hull[k].subtract(hull[i]))))return false;
-        for(int i=0;i<6;i++)for(int j=i+1;j<6;j++)for(int k=0;k<6;k++)for(int m=k+1;m<6;m++)if(separated(a,b,error,a[j].subtract(a[i]).cross(b[m].subtract(b[k]))))return false;
+        int an=distinctEndpointCount(a),bn=distinctEndpointCount(b);
+        for(var hull:new Vec3[][]{a,b})
+        {
+            int n=hull==a?an:bn;
+            for(int i=0;i<n;i++)for(int j=i+1;j<n;j++)for(int k=j+1;k<n;k++)if(separated(a,b,error,hull[j].subtract(hull[i]).cross(hull[k].subtract(hull[i]))))return false;
+        }
+        for(int i=0;i<an;i++)for(int j=i+1;j<an;j++)for(int k=0;k<bn;k++)for(int m=k+1;m<bn;m++)if(separated(a,b,error,a[j].subtract(a[i]).cross(b[m].subtract(b[k]))))return false;
         return true;
+    }
+    private static int distinctEndpointCount(Vec3[] points)
+    {
+        // An exactly stationary triangle repeats its three vertices. Removing
+        // only those duplicates preserves every hull face and edge axis.
+        return points[0].equals(points[3])&&points[1].equals(points[4])&&points[2].equals(points[5])?3:6;
     }
     private static boolean separated(Vec3[] a,Vec3[] b,Vec3 error,Vec3 axis)
     {

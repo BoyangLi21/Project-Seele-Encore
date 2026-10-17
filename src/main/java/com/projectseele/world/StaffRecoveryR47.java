@@ -178,8 +178,14 @@ public final class StaffRecoveryR47
                 { stage(state, job, "WAIT_SAFE_STATE"); continue; }
                 if(NervRouteRuntimeR52.claimed(level))
                 {
-                    if(!NervAirTransportRuntimeR52.pending(level,eva)){var ground=NervRouteRuntimeR52.recover(owner,job.unit);if(!ground.accepted())NervAirTransportRuntimeR52.request(owner,job.unit,true,0,0);}
-                    stage(state,job,"R52_ACTUAL_RECOVERY");continue;
+                    if(NervAirTransportRuntimeR52.pending(level,eva)){stage(state,job,"R52_ACTUAL_RECOVERY");continue;}
+                    var ground=NervRouteRuntimeR52.recover(owner,job.unit);
+                    if(ground.accepted()){stage(state,job,"R52_ACTUAL_RECOVERY");continue;}
+                    String reply=NervAirTransportRuntimeR52.request(owner,job.unit,true,0,0);
+                    boolean accepted=NervAirTransportRuntimeR52.pending(level,eva);
+                    String next=accepted?"R52_ACTUAL_RECOVERY":"R53_AIR_WAIT:"+reply;
+                    if(!next.equals(job.stage))NervStaffDialogue.say(owner,"NERV 运输联络",reply);
+                    stage(state,job,next);continue;
                 }
 
                 if(UndergroundSortieR48.recoveringR48(level,job.unit,eva))

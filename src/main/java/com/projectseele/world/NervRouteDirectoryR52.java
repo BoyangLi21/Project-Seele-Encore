@@ -103,7 +103,7 @@ public final class NervRouteDirectoryR52
     private final Map<String,Route> routes;
     private final Map<String,Port> ports;
     private final NervDynamicAirspaceR52 dynamicSpaces;
-    private final Map<Leg,RampArc> rampArcs=new HashMap<>();
+    private final Map<String,RampArc> rampArcs=new HashMap<>();
     private final Set<String> continuousLegs;
     private final int schemaVersion;
     private final Map<Integer,BankRole> bankRoles;
@@ -313,6 +313,23 @@ public final class NervRouteDirectoryR52
             bearing=new RigidTransform(new Vec3(p.x,from.translation().y+(to.translation().y-from.translation().y)*h,p.z),q.x,q.y,q.z,q.w);
         }
         if(leg.centreCurve()!=null)bearing=RigidTransform.of(leg.centreCurve().point(fraction),from.rotation());
+        if(NervR50CarrierModeR53.enabled()&&continuousLegs.contains(leg.id()))
+        {
+            // These rails were authored against the original carrier's sole
+            // reference. A recovered stance may change the measured feet, but
+            // must not move the rail origin or the carried EVA root with it.
+            for(var route:routes.values())if(route.continuousUpright()&&route.legs().contains(leg.id()))
+            {
+                try
+                {
+                    var reference=NervFootGuideRigR52.nominalBinding(route.variant());
+                    var root=FootSupportFrameR52.sample(reference,bearing,leg.evaFrom().quaternion(),leg.evaTo().quaternion(),fraction).evaRoot();
+                    return new FootSupportFrameR52.Sample(root,root.transformPoint(original.leftFoot()),
+                            root.transformPoint(original.rightFoot()),root.compose(original.plugInEva()));
+                }
+                catch(java.io.IOException missing){throw new IllegalStateException("Original carrier route reference unavailable",missing);}
+            }
+        }
         return FootSupportFrameR52.sample(original,bearing,leg.evaFrom().quaternion(),leg.evaTo().quaternion(),fraction);
     }
     private void actual(Leg leg){require(leg!=null&&leg.equals(legs.get(leg.id())),"Actual directory leg required");}
@@ -343,7 +360,7 @@ public final class NervRouteDirectoryR52
         double distance(double fraction){double t=fraction*count;int i=Math.min(count-1,(int)t);return cumulative[i]+(cumulative[i+1]-cumulative[i])*(t-i);}
         double fraction(double distance){int low=0,high=count;while(low+1<high){int mid=(low+high)>>>1;if(cumulative[mid]<=distance)low=mid;else high=mid;}return(low+(distance-cumulative[low])/(cumulative[low+1]-cumulative[low]))/count;}
     }
-    private synchronized RampArc rampArc(Leg leg){return rampArcs.computeIfAbsent(leg,l->new RampArc(node(l.from()).footFrame().translation(),node(l.to()).footFrame().translation(),l.rampProfile()));}
+    private synchronized RampArc rampArc(Leg leg){actual(leg);return rampArcs.computeIfAbsent(leg.id(),id->new RampArc(node(leg.from()).footFrame().translation(),node(leg.to()).footFrame().translation(),leg.rampProfile()));}
     public double legLength(Leg leg){actual(leg);return leg.centreCurve()!=null?leg.centreCurve().length():leg.rampProfile()!=null?rampArc(leg).cumulative[4096]:node(leg.from()).footFrame().translation().distanceTo(node(leg.to()).footFrame().translation());}
     public double legLength(String id){return legLength(leg(id));}
     public double legLengthError(Leg leg){actual(leg);return leg.centreCurve()!=null?leg.centreCurve().lengthErrorBound():leg.rampProfile()!=null?rampArc(leg).error:0;}
@@ -351,7 +368,7 @@ public final class NervRouteDirectoryR52
     public double legFractionAtDistance(Leg leg,double metres){double length=legLength(leg);require(Double.isFinite(metres)&&metres>=0&&metres<=length,"Distance outside actual leg");return metres==0?0:metres==length?1:leg.rampProfile()!=null?rampArc(leg).fraction(metres):metres/length;}
     public double routeLength(Route route){require(route!=null&&route.equals(routes.get(route.id())),"Actual route required");double length=0;for(String id:route.legs())length+=legLength(leg(id));return length;}
     public double routeDistance(Route route,int legIndex,double fraction){require(legIndex>=0&&legIndex<route.legs().size(),"Actual route leg index required");routeLength(route);double distance=0;for(int i=0;i<legIndex;i++)distance+=legLength(leg(route.legs().get(i)));return distance+legDistance(leg(route.legs().get(legIndex)),fraction);}
-    public RoutePosition locateDistance(Route route,double metres){double total=routeLength(route);require(Double.isFinite(metres)&&metres>=0&&metres<=total,"Distance outside actual route");double before=0;for(int i=0;i<route.legs().size();i++){var leg=leg(route.legs().get(i));double length=legLength(leg);if(metres<before+length||i==route.legs().size()-1)return new RoutePosition(i,legFractionAtDistance(leg,Math.max(0,Math.min(length,metres-before))));before+=length;}throw new IllegalStateException("Route length mismatch");}
+    public RoutePosition locateDistance(Route route,double metres){double total=routeLength(route);require(Double.isFinite(metres)&&metres>=0&&metres<=total,"Distance outside actual route");if(metres==total)return new RoutePosition(route.legs().size()-1,1);if(metres==0)return new RoutePosition(0,0);double before=0;for(int i=0;i<route.legs().size();i++){var leg=leg(route.legs().get(i));double length=legLength(leg);if(metres<before+length||i==route.legs().size()-1)return new RoutePosition(i,legFractionAtDistance(leg,Math.max(0,Math.min(length,metres-before))));before+=length;}throw new IllegalStateException("Route length mismatch");}
     public List<LegSpan> routeSpans(Route route,double fromMetres,double toMetres){require(route.continuousUpright(),"Arc spans require explicit continuous route authority");var from=locateDistance(route,fromMetres);var to=locateDistance(route,toMetres);require(toMetres>=fromMetres,"Monotone route distance required; use the actual reverse route for recovery");var spans=new ArrayList<LegSpan>();for(int i=from.legIndex();i<=to.legIndex();i++){String id=route.legs().get(i);double a=i==from.legIndex()?from.fraction():0,b=i==to.legIndex()?to.fraction():1;if(b>a||fromMetres==toMetres)spans.add(new LegSpan(id,a,b));}return List.copyOf(spans);}
     public List<DirectoryTrajectoryR52> routeSlices(Route route,double fromMetres,double toMetres,FootSupportFrameR52.Binding binding){return routeSpans(route,fromMetres,toMetres).stream().map(s->new DirectoryTrajectoryR52(this,leg(s.id()),binding,s.from(),s.to())).toList();}
     public boolean usesArcLengthSampling(Leg leg){actual(leg);return leg.centreCurve()!=null||continuousLegs.contains(leg.id());}

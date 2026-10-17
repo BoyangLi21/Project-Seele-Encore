@@ -98,6 +98,10 @@ public final class NervMechanicalRailBindingR52 {
     /** Readiness does not imply admission to move: all existing world/actor
      * triangle sweeps and resource leases remain mandatory. */
     public static boolean ready(ServerLevel l,NervRouteDirectoryR52 d,Spec s) {
+        if(NervR50CarrierModeR53.enabled()&&s.kind()==Kind.LEGACY_RUNNING_HEAD)
+            return NervUprightGuidewayR52.enabledForDirectoryR52(l,d)
+                    &&l.getEntity(s.controller()) instanceof NervCarrierPlatformEntity g&&g.isAlive()
+                    &&g.isRestraintGantry()&&g.hasDeclaredMachineFrameR52()&&g.getUnitVariant()==variant(d,s.leg());
         try {
             if(!s.guideSha().equals(s.kind()==Kind.UPRIGHT_CAPTURED_GUIDEWAY?NervOuterCarrierGuideR52.SOURCE_SHA:NervFootGuideRigR52.SOURCE_SHA))return false;
             return switch(s.kind()) {

@@ -19,6 +19,8 @@ public final class ModBlocks
 {
     public static final DeferredRegister<Block> BLOCKS = DeferredRegister.create(
             ForgeRegistries.BLOCKS, ProjectSeele.MODID);
+    public static final RegistryObject<Block> LIFT_DOOR_INTERLOCK_R53 = BLOCKS.register("lift_door_interlock_r53",
+            () -> new com.projectseele.world.LiftDoorInterlockR53(BlockBehaviour.Properties.copy(Blocks.GLASS).noOcclusion()));
     public static final RegistryObject<Block> DEAD_SEA_ARCHIVE=BLOCKS.register("dead_sea_archive",
             ()->new com.projectseele.world.DeadSeaArchiveBlockR45(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(3).noOcclusion()));
 

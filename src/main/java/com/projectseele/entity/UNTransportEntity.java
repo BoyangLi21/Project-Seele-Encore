@@ -14,6 +14,17 @@ import net.minecraftforge.network.NetworkHooks;
 /** One persistent service aircraft per active airlift, owned by the server job. */
 public final class UNTransportEntity extends Entity
 {
+    @Override
+    protected boolean updateInWaterStateAndDoFluidPushing()
+    {
+        // Anchored or actuator-driven machinery never receives fluid motion.
+        // Its full mechanical bounding box can span hundreds of thousands of cells.
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
+        this.wasTouchingWater=false;
+        return false;
+    }
+
     private static final boolean R52_FRAME=com.projectseele.world.NervAircraftFrameR52.bootstrap();
     private static final EntityDataAccessor<Integer> SERIAL=SynchedEntityData.defineId(UNTransportEntity.class,EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> CARGO=SynchedEntityData.defineId(UNTransportEntity.class,EntityDataSerializers.BOOLEAN);

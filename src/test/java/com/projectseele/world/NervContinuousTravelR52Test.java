@@ -17,6 +17,21 @@ public final class NervContinuousTravelR52Test {
     private static void reject(Runnable fn,String why){boolean failed=false;try{fn.run();}catch(RuntimeException expected){failed=true;}check(failed,why);}
     private static CompoundTag cold(CompoundTag data)throws Exception{var bytes=new ByteArrayOutputStream();NbtIo.writeCompressed(data,bytes);return NbtIo.readCompressed(new ByteArrayInputStream(bytes.toByteArray()));}
     public static void main(String[] args)throws Exception {
+        // Actual unit2/departure/3 save from the 2026-10-17 bank-stop crash.
+        var bank=new ContinuousClock(new ContinuousProfile(255.25777441279135,303.2577744127914,16,32,32),70);
+        check(bank.complete()&&bank.speed()==0,"Rounded bank endpoint retained a nonzero velocity");
+        check(bank.profile().speedAt(69)>0&&bank.profile().distanceAt(69)<bank.distance(),"Bank repair stopped the preceding moving tick");
+        for(String reason:List.of("BLOCKED","CANCEL")) {
+            var legacy=new CompoundTag();rememberContinuous(legacy,"unit2/departure/3","bank",2976.2118505734297,bank);
+            legacy.getCompound("ContinuousClockR52").putDouble("SpeedMps",5.684341886080802e-14);
+            var reload=cold(legacy);
+            var restored=continuousClock(reload,"unit2/departure/3","bank",bank.distance(),2976.2118505734297,bank.distance(),16,32,32);
+            check(restored.complete()&&restored.speed()==0,"Legacy bank stop could not resume at rest");
+            brakeContinuousR52(reload,"unit2/departure/3","bank",2976.2118505734297,reason);
+            check(!reload.contains("ContinuousBrakeR52")&&reload.getCompound("ContinuousClockR52").getDouble("SpeedMps")==0,"Stopped bank created a zero-length brake");
+            check(reload.getCompound("ContinuousClockR52").getDouble("DistanceMetres")==bank.distance()&&reload.getCompound("ContinuousClockR52").getLong("Ticks")==70,"Bank repair changed saved position or progress");
+        }
+        if(args.length==1&&args[0].equals("--bank-stop")){System.out.println("Actual bank-stop crash/reload regression PASS checks="+checks);return;}
         for(double metres:new double[]{.5,5,270,1200,6000}) {
             var profile=new ContinuousProfile(0,metres,180,120,120);double previous=0;
             for(long ticks=0;ticks<Math.ceil(profile.durationSeconds()*20)+2;ticks++) {

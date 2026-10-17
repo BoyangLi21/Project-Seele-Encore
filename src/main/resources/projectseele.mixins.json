@@ -20,6 +20,8 @@
     "EcologyPlacedFeatureR44Mixin",
     "PianoSyncServerR23Mixin",
     "MovingElevatorGroupAccessMixin",
+    "MovingElevatorTransferCapabilityR53Mixin",
+    "MovingElevatorTransferR53Mixin",
     "MovingElevatorMotionR22Mixin",
     "MovingElevatorPassengerR22Mixin",
     "MovingElevatorRemoteAccessor",

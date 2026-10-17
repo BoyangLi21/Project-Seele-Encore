@@ -795,7 +795,7 @@ public final class EvaLogisticsDirector
     /** Maintenance of the original empty wet-cage assembly, never replacement actors. */
     public static EvaUnit01Entity forceReset(ServerLevel level, int variant)
     {
-        if(NervRouteRuntimeR52.claimed(level))throw new IllegalStateException("R52 原编队须经真实机械回收/维护；未按旧坐标复位或替换。");
+        if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.resetOriginalMaintenanceR53(level,variant);
         requireCompactLogistics(level, "forceReset");
         FleetEntry previous=entry(level,variant);
         EvaUnit01Entity unit=canonical(level,variant);
@@ -872,9 +872,19 @@ public final class EvaLogisticsDirector
     /** Hangar preparation controls plus three supported Tokyo-3 recovery keys. */
     public static boolean handleUse(ServerPlayer player, BlockPos position)
     {
+        ServerLevel level = player.serverLevel();
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            for(int variant=0;variant<3;variant++)
+                if(Tokyo3RecoveryConsole.controlPosition(IntegratedNervMapBuilder.tokyo3Origin(level),variant).equals(position)
+                        &&level.getBlockState(position).getBlock() instanceof net.minecraft.world.level.block.ButtonBlock)
+                {
+                    var result=NervRouteRuntimeR52.recover(player,variant);
+                    player.displayClientMessage(Component.literal("[NERV 回收] "+result.message()),false);return true;
+                }
+        }
         int mappedControl = NervHangarControlsR53.handleUse(player, position);
         if (mappedControl >= 0) return mappedControl == 1;
-        ServerLevel level = player.serverLevel();
         boolean modern = FacilityWorldPolicy.isCleanRebuild(
                 level.getServer());
         boolean compact = FacilityWorldPolicy.isS20Rebuild(
@@ -1886,10 +1896,23 @@ public final class EvaLogisticsDirector
 
     public static BlockPos assignedHangarBedR33(ServerLevel level,int variant){return hangarBed(level,variant);}
     public static boolean inAssignedHangarR33(ServerLevel level,EvaUnit01Entity unit)
-    {var bed=hangarBed(level,unit.getUnitVariant());return unit.position().distanceToSqr(new net.minecraft.world.phys.Vec3(bed.getX()+.5,bed.getY()+1,bed.getZ()+.5))<16;}
+    {
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            var bay=NervOriginalActorsR52.bayPose(level,unit.getUnitVariant());
+            return bay!=null&&unit.position().distanceToSqr(bay.translation())<16;
+        }
+        var bed=hangarBed(level,unit.getUnitVariant());
+        return unit.position().distanceToSqr(new net.minecraft.world.phys.Vec3(bed.getX()+.5,bed.getY()+1,bed.getZ()+.5))<16;
+    }
 
     private static BlockPos hangarBed(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            var bay=java.util.Objects.requireNonNull(NervOriginalActorsR52.bayPose(level,variant),"迁移后的机库正在加载");
+            return BlockPos.containing(bay.translation()).below();
+        }
         if (FacilityV2EvaRuntime.ready(level, variant))
         {
             return FacilityV2EvaRuntime.hangarBed(level, variant);
@@ -2460,6 +2483,7 @@ public final class EvaLogisticsDirector
     private static void maintainRouteChunks(ServerLevel level, int variant,
                                             UUID canonicalId, boolean forced)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         Boolean previous = ROUTE_TICKET_STATE.put(canonicalId, forced);
         if (previous != null && previous == forced)
         {

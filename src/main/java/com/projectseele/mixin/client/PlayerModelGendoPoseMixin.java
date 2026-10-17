@@ -23,6 +23,24 @@ public abstract class PlayerModelGendoPoseMixin
             float limbSwing, float limbSwingAmount, float ageInTicks,
             float netHeadYaw, float headPitch, CallbackInfo callback)
     {
+        if(entity.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity plug&&plug.hasCanonicalPose()
+                &&(!plug.isLockedToEva()||plug.usesPhysicalPilotSeatR52()))
+        {
+            PlayerModel<?> model=(PlayerModel<?>)(Object)this;
+            model.body.xRot=model.body.yRot=model.body.zRot=0;
+            model.rightLeg.xRot=model.leftLeg.xRot=-.08F;
+            model.rightLeg.yRot=model.leftLeg.yRot=0;
+            model.rightLeg.zRot=.025F;model.leftLeg.zRot=-.025F;
+            model.rightArm.xRot=model.leftArm.xRot=-.18F;
+            model.rightArm.yRot=model.leftArm.yRot=0;
+            model.rightArm.zRot=.05F;model.leftArm.zRot=-.05F;
+            model.head.yRot=net.minecraft.util.Mth.clamp(model.head.yRot,-.45F,.45F);
+            model.head.xRot=net.minecraft.util.Mth.clamp(model.head.xRot,-.25F,.25F);
+            model.rightSleeve.copyFrom(model.rightArm);model.leftSleeve.copyFrom(model.leftArm);
+            model.rightPants.copyFrom(model.rightLeg);model.leftPants.copyFrom(model.leftLeg);
+            model.jacket.copyFrom(model.body);model.hat.copyFrom(model.head);
+            return;
+        }
         if (entity instanceof AbstractClientPlayer player
                 && UltramanClientState.hayataPose(player))
         {

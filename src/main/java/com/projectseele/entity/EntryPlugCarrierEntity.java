@@ -138,6 +138,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     private static final EntityDataAccessor<Boolean> DATA_CANONICAL_POSE =
             SynchedEntityData.defineId(EntryPlugCarrierEntity.class,
                     EntityDataSerializers.BOOLEAN);
+    private static final EntityDataAccessor<Boolean> DATA_MAPPED_SEAT_R53 =
+            SynchedEntityData.defineId(EntryPlugCarrierEntity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Vector3f> DATA_POSE_TRANSLATION =
             SynchedEntityData.defineId(EntryPlugCarrierEntity.class,
                     EntityDataSerializers.VECTOR3);
@@ -255,6 +257,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         this.entityData.define(DATA_CABIN_PROGRESS, 0);
         this.entityData.define(DATA_HATCH_OPEN, 100);
         this.entityData.define(DATA_CANONICAL_POSE, false);
+        this.entityData.define(DATA_MAPPED_SEAT_R53, false);
         this.entityData.define(DATA_POSE_TRANSLATION, new Vector3f());
         this.entityData.define(DATA_POSE_QX, 0.0F);
         this.entityData.define(DATA_POSE_QY, 0.0F);
@@ -282,7 +285,9 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public RigidTransform getCanonicalTransform()
     {
         Vector3f syncedTranslation = this.entityData.get(DATA_POSE_TRANSLATION);
-        Vec3 translation = this.hasCanonicalPose()
+        // Authoritative coordinates stay double precision. Network floats at
+        // distant outlets cannot be fed back into the physical socket check.
+        Vec3 translation = this.level().isClientSide && this.hasCanonicalPose()
                 ? new Vec3(syncedTranslation.x(), syncedTranslation.y(),
                         syncedTranslation.z()) : this.position();
         return new RigidTransform(translation,
@@ -417,8 +422,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         RigidTransform current = this.getCanonicalTransform();
         boolean unchanged = this.hasCanonicalPose()
                 && current.translation().distanceToSqr(transform.translation())
-                        < 1.0E-8D
-                && current.rotationErrorDegrees(transform) < 0.01D;
+                        < 1.0E-12D
+                && current.rotationErrorDegrees(transform) < 0.00001D;
         if (unchanged&&!force)
         {
             // The no-op predicate must be no wider than the mapped producer
@@ -693,6 +698,15 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     }
 
     /** Operator recovery keeps the same independent capsule and never spawns a replacement. */
+    /** Explicit administrator reset of this same canonical NERV capsule. */
+    public void resetOriginalAtDockR53(RigidTransform dock)
+    {
+        if(level().isClientSide)throw new IllegalStateException("Server reset required");
+        getPersistentData().putBoolean("AdministrativeResetR53",true);
+        try{ejectPassengers();unlockFromEva();}
+        finally{getPersistentData().remove("AdministrativeResetR53");}
+        setInsertionStage(STAGE_SUSPENDED);setInsertionProgress(0);setCabinRecoveryProgress(0);clearInsertionAbortRequest();snapCanonicalTransformR31(dock);openCabin();ejectionTicks=0;fieldEjectionStart=fieldEjectionEscape=fieldEjectionLanding=Vec3.ZERO;
+    }
     public void resetIndependentAtDock(EvaPrototypeEntity eva)
     {
         if(this.level().isClientSide||!this.isIndependentUNPlug()
@@ -719,6 +733,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         this.fieldEjectionStart = start;
         this.fieldEjectionEscape = escape;
         this.fieldEjectionLanding = landing;
+        this.getPersistentData().put("FieldEjectionStartFrameR53",com.projectseele.world.NervAircraftFrameR52.encodeRigid(this.getCanonicalTransform()));
         this.ejectionTicks = 0;
         this.setInsertionProgress(100);
         return true;
@@ -939,7 +954,11 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
             return InteractionResult.SUCCESS;
         }
         if(com.projectseele.world.NervOriginalActorsR52.managed(this)&&!com.projectseele.world.NervOriginalActorsR52.boardingAllowed((ServerLevel)this.level(),this,player))
-        {player.displayClientMessage(Component.literal("原插入栓登机接口尚未确认，请保持当前位置。"),true);return InteractionResult.CONSUME;}
+        {
+            boolean ready=com.projectseele.world.NervRouteRuntimeR52.ready((ServerLevel)this.level());
+            player.displayClientMessage(Component.literal(ready?"当前插入栓尚未恢复到登机停靠位，请使用 /seele eva reset all。":"机库系统仍在加载，完成后即可登机。"),true);
+            return InteractionResult.CONSUME;
+        }
         if ((isIndependentUNPlug() && getLinkedEva()!=null && getLinkedEva().isNervLogisticsLocked()) || !this.isHatchOpen() || this.getInsertionStage() != STAGE_SUSPENDED
                 || this.isVehicle() || player.isPassenger())
         {
@@ -1022,7 +1041,16 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         // A client passenger-list refresh must not abort insertion, open the
         // cabin or change synchronized progress. The server owns those edges.
         if(this.level().isClientSide){passengerAuthorityTraceR44(passenger,"plug_after_client_graph_only");return;}
-        if(com.projectseele.world.NervOriginalActorsR52.managed(this))return;
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this))
+        {
+            // The owner already admitted a safe original dock/field exit in
+            // EntityMountEvent. Keep the same capsule reusable afterwards.
+            if(this.getInsertionStage()==STAGE_OCCUPIED||this.getInsertionStage()==STAGE_ABORT_DOCKED)
+                this.transitionInsertionStage(this.getInsertionStage(),this.getInsertionEpoch(),STAGE_SUSPENDED);
+            this.openCabin();
+            passenger.setInvisible(false);
+            return;
+        }
         if(this.laboratorySlotR47()>=0)
         {
             com.projectseele.world.SynchLabDirectorR47.passengerRemovedR47(this,passenger);
@@ -1078,7 +1106,23 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public boolean usesPhysicalPilotSeatR52()
     {
         var eva=this.getLinkedEva();
-        return this.isLockedToEva()&&this.hasCanonicalPose()&&eva!=null&&EvaMechanicalFrameR52.active(eva);
+        return this.isLockedToEva()&&this.hasCanonicalPose()&&eva!=null
+                &&(this.entityData.get(DATA_MAPPED_SEAT_R53)||EvaMechanicalFrameR52.active(eva));
+    }
+    public void retainMappedPilotSeatR53()
+    {if(!this.level().isClientSide)this.entityData.set(DATA_MAPPED_SEAT_R53,true);}
+    private boolean canonicalTranslationSavedR53;
+    public void restoreMappedLockedTranslationR53()
+    {
+        if(canonicalTranslationSavedR53||!this.isLockedToEva()||!this.hasCanonicalPose())return;
+        var eva=this.getLinkedEva();
+        if(eva==null||this.getVehicle()!=eva||eva.getLockedEntryPlug()!=this)return;
+        var seated=EntryPlugKinematics.lockedTransform(eva);
+        if(this.getCanonicalTransform().rotationErrorDegrees(seated)>.01)return;
+        // Vanilla saves mounted entities with the vehicle's X/Z. Older plugs
+        // saved only their quaternion, so restore the original socket offset.
+        this.setCanonicalTransform(seated);
+        canonicalTranslationSavedR53=true;
     }
 
     @Override
@@ -1347,7 +1391,10 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         this.setDeltaMovement(Vec3.ZERO);
         this.fallDistance = 0.0F;
         if(com.projectseele.world.NervOriginalActorsR52.managed(this))
-        {com.projectseele.world.NervOriginalActorsR52.tickPlug((ServerLevel)this.level(),this);return;}
+        {
+            if(this.entityData.get(DATA_SHELL_VISIBLE))this.keepPlayersOutsideShell();
+            com.projectseele.world.NervOriginalActorsR52.tickPlug((ServerLevel)this.level(),this);return;
+        }
         if (!this.level().isClientSide
                 && this.entityData.get(DATA_SHELL_VISIBLE))
         {
@@ -1617,6 +1664,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
             tag.putFloat("LaboratoryQx",dock.qx());tag.putFloat("LaboratoryQy",dock.qy());tag.putFloat("LaboratoryQz",dock.qz());tag.putFloat("LaboratoryQw",dock.qw());
         }
         tag.putBoolean("IndependentUN",isIndependentUNPlug());
+        tag.putBoolean("MappedPilotSeatR53",this.entityData.get(DATA_MAPPED_SEAT_R53));
         tag.putInt("EvaVariant", this.getAssignedVariant());
         tag.putInt("InsertionStage", this.getInsertionStage());
         tag.putInt("InsertionEpoch", this.getInsertionEpoch());
@@ -1625,6 +1673,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         tag.putInt("CabinProgress", this.getCabinProgress());
         tag.putInt("HatchOpen", this.entityData.get(DATA_HATCH_OPEN));
         tag.putBoolean("CanonicalPose", this.hasCanonicalPose());
+        if(this.hasCanonicalPose())putVector(tag,"CanonicalTranslationR53",this.getCanonicalTransform().translation());
         tag.putFloat("PoseQX", this.entityData.get(DATA_POSE_QX));
         tag.putFloat("PoseQY", this.entityData.get(DATA_POSE_QY));
         tag.putFloat("PoseQZ", this.entityData.get(DATA_POSE_QZ));
@@ -1648,6 +1697,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public void readAdditionalSaveData(CompoundTag tag)
     {
         super.readAdditionalSaveData(tag);
+        this.entityData.set(DATA_MAPPED_SEAT_R53,tag.getBoolean("MappedPilotSeatR53"));
         this.entityData.set(DATA_LAB_SLOT_R47,tag.contains("LaboratorySlotR47")?tag.getInt("LaboratorySlotR47"):-1);
         if(this.laboratorySlotR47()>=0)
             this.laboratoryDockR47=new RigidTransform(new Vec3(tag.getDouble("LaboratoryX"),tag.getDouble("LaboratoryY"),tag.getDouble("LaboratoryZ")),
@@ -1694,7 +1744,9 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         }
         if (tag.getBoolean("CanonicalPose"))
         {
-            RigidTransform saved = new RigidTransform(this.position(),
+            this.canonicalTranslationSavedR53=tag.contains("CanonicalTranslationR53X")
+                    &&tag.contains("CanonicalTranslationR53Y")&&tag.contains("CanonicalTranslationR53Z");
+            RigidTransform saved = new RigidTransform(getVector(tag,"CanonicalTranslationR53",this.position()),
                     tag.getFloat("PoseQX"), tag.getFloat("PoseQY"),
                     tag.getFloat("PoseQZ"), tag.getFloat("PoseQW"));
             this.setCanonicalTransform(saved);

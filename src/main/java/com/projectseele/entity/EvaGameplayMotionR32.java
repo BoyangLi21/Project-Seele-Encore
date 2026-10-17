@@ -570,6 +570,11 @@ public final class EvaGameplayMotionR32
             // only the captured shoulder/arm chain, never a frozen lower body.
             for(String name:base.rig.keySet())if(name.startsWith("clavicle_")||name.startsWith("arm_")||name.startsWith("forearm_")||name.startsWith("wrist_")||name.startsWith("hand_"))
             {base.rotations.put(name,new Quaternionf(guard.rotations.get(name)));base.positions.put(name,new Vector3f(guard.positions.get(name)));}
+            base.rotations.get("arm_r").rotateZ(.06981317F);
+            base.rotations.get("arm_l").rotateZ(-.08726646F);
+            base.rotations.get("forearm_l").slerp(new Quaternionf(base.rig.get("forearm_l").bindRotation()),.22F);
+            float standing=1-Mth.clamp(e.rifleMoveBlend(1),0,1);
+            base.rotations.get("leg_l").rotateZ(-.0125F*standing);base.rotations.get("leg_r").rotateZ(.0125F*standing);
             base.dirty();if(movementOwner!=null)movementOwner[0]=capturedBase;return base;
         }
         reviewChoice(e,"owner_branch","ground_locomotion");reviewChoice(e,"effective_guard_clip","r32_guard");
@@ -673,6 +678,11 @@ public final class EvaGameplayMotionR32
             var guard=EvaBodyPose.gameplayClip(e,"sword_guard",inputs.swordPhase());
             for(String name:base.rig.keySet())if(name.startsWith("clavicle_")||name.startsWith("arm_")||name.startsWith("forearm_")||name.startsWith("wrist_")||name.startsWith("hand_"))
             {base.rotations.put(name,new Quaternionf(guard.rotations.get(name)));base.positions.put(name,new Vector3f(guard.positions.get(name)));}
+            base.rotations.get("arm_r").rotateZ(.06981317F);
+            base.rotations.get("arm_l").rotateZ(-.08726646F);
+            base.rotations.get("forearm_l").slerp(new Quaternionf(base.rig.get("forearm_l").bindRotation()),.22F);
+            float standing=1-Mth.clamp(e.rifleMoveBlend(1),0,1);
+            base.rotations.get("leg_l").rotateZ(-.0125F*standing);base.rotations.get("leg_r").rotateZ(.0125F*standing);
             base.dirty();return base;
         }
         float low=EvaPoseBlendR51.smooth(inputs.stance()),weight=inputs.guard()*(1-low);

@@ -147,9 +147,9 @@ public final class EvaOriginalMeshGeometryR52
     private static JsonObject json(byte[] data){return JsonParser.parseString(new String(data,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();}
     private static String sha(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception impossible){throw new IllegalStateException(impossible);}}
 
-    /** Native admission is deliberately only the actual closed factory
-     * frozen assembly. Articulated/armed/berserk variants need full visibility
-     * and equipment geometry contracts; they hold instead of losing surfaces. */
+    /** Evaluate the actual closed, unarmed frozen assembly, including the
+     * retained service pose after recovery. A bind-pose comparison must not
+     * reject original joints that have already been captured and restored. */
     public static Geometry parts(EvaUnit01Entity eva,EvaBodyPose.Sample frozenLocalPose)
     {
         var cradle=EvaAirTransportR31.cradleStateR50(eva);require(cradle.getBoolean("MechanicalFrameR52"),"Actual mechanical frozen source required");
@@ -158,7 +158,8 @@ public final class EvaOriginalMeshGeometryR52
         for(String bone:frozenLocalPose.rig.keySet())
         {
             var row=origin.getList(bone,net.minecraft.nbt.Tag.TAG_FLOAT);require(row.size()==9,"Actual captured body bone absent");
-            var q=new Quaternionf().rotationZYX(row.getFloat(2),row.getFloat(1),row.getFloat(0));var p=new Vector3f(-row.getFloat(3),row.getFloat(4),row.getFloat(5)).div(16);
+            var exact=origin.getCompound("__exact_quaternions_r53").getList(bone,net.minecraft.nbt.Tag.TAG_FLOAT);
+            var q=exact.size()==4?new Quaternionf(exact.getFloat(0),exact.getFloat(1),exact.getFloat(2),exact.getFloat(3)):new Quaternionf().rotationZYX(row.getFloat(2),row.getFloat(1),row.getFloat(0));var p=new Vector3f(-row.getFloat(3),row.getFloat(4),row.getFloat(5)).div(16);
             require(sameRotation(q,frozenLocalPose.rotations.get(bone))&&p.distanceSquared(frozenLocalPose.positions.get(bone))<1e-12F
                     &&row.getFloat(6)==1&&row.getFloat(7)==1&&row.getFloat(8)==1,"Body argument is not the actual captured unturned unit-scale pose");
         }
@@ -167,7 +168,7 @@ public final class EvaOriginalMeshGeometryR52
     /** Root calls before setting Active, then stores this same hand snapshot
      * under FRAME/AnatomicalHandsR52. Nothing in this query starts transport. */
     public static Geometry partsForCapture(EvaUnit01Entity eva,EvaBodyPose.Sample frozenLocalPose,CompoundTag handSnapshot)
-    {return partsForFrozen(eva,frozenLocalPose,handSnapshot,true);}
+    {return partsForFrozen(eva,frozenLocalPose,handSnapshot,false);}
     /** Recovery preserves the actual retained fallen joints. Only the late
      * closed dorsal/mouth visibility and complete equipment are admitted;
      * this never manufactures a factory stance or an occupied capsule. */
@@ -193,6 +194,23 @@ public final class EvaOriginalMeshGeometryR52
     public static final class Provider
     {
         private final Map<Integer,Rig> rigs;private final String fingerprint;
+        private record Rotation(float x,float y,float z,float w)
+        {static Rotation of(Quaternionf q){return new Rotation(q.x,q.y,q.z,q.w);}}
+        private record BodyChannels(String parent,float px,float py,float pz,Rotation rotation,float x,float y,float z){}
+        private record EvaluatedPose(Map<String,BodyChannels> body,Map<String,Rotation> hands,boolean liner,boolean dominantReview){}
+        private record Evaluated(EvaluatedPose pose,Geometry geometry){}
+        private final Map<Integer,Evaluated> evaluated=new HashMap<>();
+        private static EvaluatedPose evaluationPose(EvaBodyPose.Sample body,EvaAnatomicalHandsR45.Pose hands,boolean liner)
+        {
+            var bones=new HashMap<String,BodyChannels>();
+            for(var entry:body.rig.entrySet())
+            {
+                var bone=entry.getValue();var p=bone.pivot();var offset=body.positions.get(entry.getKey());
+                bones.put(entry.getKey(),new BodyChannels(bone.parent(),p.x,p.y,p.z,Rotation.of(body.rotations.get(entry.getKey())),offset.x,offset.y,offset.z));
+            }
+            var fingers=new HashMap<String,Rotation>();hands.rotations().forEach((name,q)->fingers.put(name,Rotation.of(q)));
+            return new EvaluatedPose(Map.copyOf(bones),Map.copyOf(fingers),liner,Boolean.getBoolean("projectseele.r44DominantSkinReview"));
+        }
         private Provider(Map<Integer,Rig> rigs,String fingerprint){this.rigs=rigs;this.fingerprint=fingerprint;}
         public String sourceFingerprint(){return fingerprint;}
         public String handContractFingerprint(int variant){return rig(variant).contractHash();}
@@ -236,7 +254,21 @@ public final class EvaOriginalMeshGeometryR52
             }return Map.copyOf(result);
         }
         /** Pure actual service visibility; never relaxes any native capture admission. */
-        public Geometry evaluateMechanicalService(int variant,EvaBodyPose.Sample body,EvaAnatomicalHandsR45.Pose hands,boolean linerVisible)
+        public synchronized Geometry evaluateMechanicalService(int variant,EvaBodyPose.Sample body,EvaAnatomicalHandsR45.Pose hands,boolean linerVisible)
+        {
+            // Cache exact local channels, not the game clock: a mechanism may
+            // change pose more than once in one tick. World frames stay live.
+            var pose=evaluationPose(body,hands,linerVisible);var old=evaluated.get(variant);
+            if(old!=null&&old.pose().equals(pose))return old.geometry();
+            var geometry=new Geometry(variant,fingerprint,evaluateServiceParts(variant,body,hands,linerVisible,false));
+            evaluated.put(variant,new Evaluated(pose,geometry));return geometry;
+        }
+        /** Contact-only query: these two arm surfaces are never a transport envelope. */
+        public List<Part> evaluateShoulderContactsR53(int variant,EvaBodyPose.Sample body,EvaAnatomicalHandsR45.Pose hands)
+        {
+            return evaluateServiceParts(variant,body,hands,false,true);
+        }
+        private List<Part> evaluateServiceParts(int variant,EvaBodyPose.Sample body,EvaAnatomicalHandsR45.Pose hands,boolean linerVisible,boolean shouldersOnly)
         {
             var r=rig(variant);validateBody(variant,body,false);require(hands.rotations().keySet().equals(r.handJoints()),"Full actual 34-joint hand pose required");
             var locals=new HashMap<String,Quaternionf>();var positions=new HashMap<String,Vector3f>();var pivots=new HashMap<String,Vector3f>();
@@ -250,7 +282,7 @@ public final class EvaOriginalMeshGeometryR52
             var parts=new ArrayList<Part>();
             for(var mesh:List.of(r.body(),r.hands()))for(var entry:new TreeMap<>(mesh.parts()).entrySet())
             {
-                String name=entry.getKey();if(mesh==r.body()&&(name.startsWith("hand_")||name.startsWith("finger_")||(HIDDEN_FACTORY.contains(name)&&!(linerVisible&&name.equals("dorsal_liner")))))continue;
+                String name=entry.getKey();if(shouldersOnly&&(mesh!=r.body()||!Set.of("arm_l","arm_r").contains(name)))continue;if(mesh==r.body()&&(name.startsWith("hand_")||name.startsWith("finger_")||(HIDDEN_FACTORY.contains(name)&&!(linerVisible&&name.equals("dorsal_liner")))))continue;
                 var part=entry.getValue();float[] values=skin(part,mesh.skins().get(name),name,models,locals);
                 double[] xyz=new double[values.length/8*3];AABB bounds=null;Matrix4f matrix=models.get(name);
                 for(int i=0,n=0;i<values.length;i+=8,n+=3)
@@ -260,7 +292,7 @@ public final class EvaOriginalMeshGeometryR52
                 }
                 parts.add(new Part(name,mesh.resource(),mesh.hash(),xyz,bounds));
             }
-            return new Geometry(variant,fingerprint,parts);
+            return List.copyOf(parts);
         }
     }
     private static Matrix4f model(String name,Map<String,Bone> bones,Map<String,Quaternionf> locals,Map<String,Vector3f> positions,Map<String,Vector3f> pivots,Map<String,Matrix4f> cache,Set<String> active)
@@ -344,9 +376,10 @@ public final class EvaOriginalMeshGeometryR52
         {
             require(models.containsKey(entry.getKey()),"Actual authored palette bone absent");var model=new Matrix4f(models.get(entry.getKey()));var bind=skin.inverseBind().get(entry.getKey());if(bind!=null)model.mul(bind);var global=model.getUnnormalizedRotation(new Quaternionf()).normalize();if(global.w<0)global.mul(-1);var relative=new Matrix4f(inverse).mul(model);var q=relative.getUnnormalizedRotation(new Quaternionf()).normalize();if(q.dot(new Quaternionf(inverseRotation).mul(global))<0)q.mul(-1);var d=new Quaternionf(relative.m30(),relative.m31(),relative.m32(),0).mul(q).mul(.5F);stable[slot]=names.indexOf(entry.getKey());transforms[slot]=new float[]{q.x,q.y,q.z,q.w,d.x,d.y,d.z,d.w};weights[slot++]=entry.getValue();
         }
+        boolean dominantReview=Boolean.getBoolean("projectseele.r44DominantSkinReview");
         var out=skin.rest().clone();for(int n=0;n<skin.rest().length/8;n++)
         {
-            int dominant=0;for(int j=1;j<count;j++)if(weights[j][n]>weights[dominant][n]||Boolean.getBoolean("projectseele.r44DominantSkinReview")&&weights[j][n]==weights[dominant][n]&&weights[j][n]>0&&stable[j]<stable[dominant])dominant=j;
+            int dominant=0;for(int j=1;j<count;j++)if(weights[j][n]>weights[dominant][n]||dominantReview&&weights[j][n]==weights[dominant][n]&&weights[j][n]>0&&stable[j]<stable[dominant])dominant=j;
             var reference=transforms[dominant];var blend=new float[8];for(int j=0;j<count;j++){float w=weights[j][n];if(w==0)continue;var t=transforms[j];if(t[0]*reference[0]+t[1]*reference[1]+t[2]*reference[2]+t[3]*reference[3]<0)w=-w;for(int k=0;k<8;k++)blend[k]+=t[k]*w;}deform(p,skin.rest(),out,n,blend);
         }
         if(skin.corrective()!=null)

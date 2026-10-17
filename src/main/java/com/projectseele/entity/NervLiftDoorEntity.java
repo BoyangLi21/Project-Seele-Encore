@@ -23,6 +23,17 @@ import net.minecraftforge.network.NetworkHooks;
 /** Smooth silver leaves for an S20 physical elevator landing. */
 public final class NervLiftDoorEntity extends Entity
 {
+    @Override
+    protected boolean updateInWaterStateAndDoFluidPushing()
+    {
+        // Anchored or actuator-driven machinery never receives fluid motion.
+        // Its full mechanical bounding box can span hundreds of thousands of cells.
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
+        this.wasTouchingWater=false;
+        return false;
+    }
+
     private static final EntityDataAccessor<Integer> DATA_DOOR_ID =
             SynchedEntityData.defineId(NervLiftDoorEntity.class,
                     EntityDataSerializers.INT);
@@ -46,6 +57,7 @@ public final class NervLiftDoorEntity extends Entity
                     EntityDataSerializers.INT);
     public static final int STYLE_SILVER = 0;
     public static final int STYLE_NERV_BLACK = 1;
+    public static final int STYLE_GLASS = 2;
     private float clientOpen;
     private float clientOpenO;
 

@@ -10,7 +10,10 @@ public final class NervStaticSpatialIndexR52<T>
 {
     private static final double CELL=32;
     private static final long MAX_ENUMERATED_CELLS=32768;
-    private record Cell(long x,long y,long z){}
+    private record Cell(long x,long y,long z) implements Comparable<Cell>{
+        @Override public int hashCode(){long h=x*0x9e3779b97f4a7c15L^Long.rotateLeft(y*0xc2b2ae3d27d4eb4fL,21)^Long.rotateLeft(z*0x165667b19e3779f9L,42);h^=h>>>33;h*=0xff51afd7ed558ccdL;h^=h>>>33;return Long.hashCode(h);}
+        @Override public int compareTo(Cell b){int c=Long.compare(x,b.x);if(c==0)c=Long.compare(y,b.y);return c==0?Long.compare(z,b.z):c;}
+    }
     private final List<T> values;
     private final AABB[] bounds;
     private final Map<Cell,int[]> cells;
@@ -28,14 +31,16 @@ public final class NervStaticSpatialIndexR52<T>
                 building.computeIfAbsent(new Cell(x,y,z),key->new ArrayList<>()).add(i);
         }
         var frozen=new HashMap<Cell,int[]>();building.forEach((key,v)->frozen.put(key,v.stream().mapToInt(Integer::intValue).toArray()));
-        cells=Map.copyOf(frozen);oversized=large.stream().mapToInt(Integer::intValue).toArray();
+        // Compact MapN uses linear probing; regular spatial coordinates can
+        // form long clusters. Keep the immutable view of the hashed buckets.
+        cells=Collections.unmodifiableMap(frozen);oversized=large.stream().mapToInt(Integer::intValue).toArray();
     }
 
     public List<T> query(AABB query)
     {
         requireFinite(query);long x0=cell(query.minX),x1=last(query.minX,query.maxX),y0=cell(query.minY),y1=last(query.minY,query.maxY),z0=cell(query.minZ),z1=last(query.minZ,query.maxZ);
         var candidates=new BitSet(values.size());
-        if(large(x0,x1,y0,y1,z0,z1))candidates.set(0,values.size());
+        if(large(x0,x1,y0,y1,z0,z1)||((double)x1-x0+1)*((double)y1-y0+1)*((double)z1-z0+1)>=values.size())candidates.set(0,values.size());
         else
         {
             for(int id:oversized)candidates.set(id);

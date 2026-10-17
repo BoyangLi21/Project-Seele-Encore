@@ -35,6 +35,8 @@ public final class NervAirframeGeometryR52
     }
     public static NervAirframeGeometryR52 loadClasspath(Map<String,String> expected)throws IOException{return load(EvaOriginalMeshGeometryR52::classpathBytes,expected);}
     public Part originalGroundCarrier(){return source.get("un_ground_carrier");}
+    public Part originalBody(){return source.get("un_transport_body");}
+    public Part originalRotor(int i){return source.get("un_transport_rotor_"+i);}
     public NervRigidMeshSweepR52 bodyMesh(){return rigidSources.get("un_transport_body");}
     public NervRigidMeshSweepR52 rotorMesh(int i){return rigidSources.get("un_transport_rotor_"+i);}
     public RigidTransform rotorLocalFrame(int i,double clock){return RigidTransform.of(new Vec3(ROTORS[i][0],4.8,ROTORS[i][1]),new Quaternionf().rotationY((float)Math.toRadians(clock*47*(i%2==0?1:-1))));}
@@ -51,6 +53,12 @@ public final class NervAirframeGeometryR52
         var result=new ArrayList<Part>();result.add(source.get("un_transport_body"));
         for(int i=0;i<4;i++)
         {double angle=Math.toRadians(rotorClock*47*(i%2==0?1:-1));var root=RigidTransform.of(new Vec3(ROTORS[i][0],4.8,ROTORS[i][1]),new Quaternionf().rotationY((float)angle));result.add(transform(source.get("un_transport_rotor_"+i),root));}
+        result.addAll(cradleParts(frame,cargoAnchors,jawAxes,includeStowed));
+        return List.copyOf(result);
+    }
+    public List<Part> cradleParts(Frame frame,List<Vec3> cargoAnchors,List<Vec3> jawAxes,boolean includeStowed)
+    {
+        var result=new ArrayList<Part>();
         if(frame.rig().deployment()==0&&!includeStowed)return List.copyOf(result);
         if(frame.rig().deployment()>0&&(frame.cargo()==null||cargoAnchors.size()!=6))throw new IllegalStateException("Actual six frozen body anchors required for deployed cradle");
         var cargoInPlane=frame.cargo()==null?RigidTransform.identity():frame.plane().inverse().compose(frame.cargo());var anchors=new ArrayList<Vec3>();
@@ -132,7 +140,14 @@ public final class NervAirframeGeometryR52
         private static void add(List<RigidPiece> pieces,List<AABB> boxes,NervRigidMeshSweepR52 mesh,RigidTransform a,RigidTransform b,double bend)
         {add(pieces,boxes,mesh,a,b,bend,0,1);}
         private static void add(List<RigidPiece> pieces,List<AABB> boxes,NervRigidMeshSweepR52 mesh,RigidTransform a,RigidTransform b,double bend,double start,double end)
-        {var box=mesh.envelope(a,b).inflate(bend,0,bend);pieces.add(new RigidPiece(mesh,a,b,bend,box,start,end));for(var leaf:mesh.leafEnvelopes(a,b))boxes.add(leaf.inflate(bend,0,bend));}
+        {
+            var box=mesh.envelope(a,b).inflate(bend,0,bend);pieces.add(new RigidPiece(mesh,a,b,bend,box,start,end));
+            // Scripted movement only needs each part's enclosing occupied
+            // volume; expanding every mesh leaf repeats thousands of chunk
+            // and reservation queries without doing triangle collisions.
+            if(NervR50CarrierModeR53.enabled())boxes.add(box.inflate(1e-6));
+            else for(var leaf:mesh.leafEnvelopes(a,b))boxes.add(leaf.inflate(Math.max(bend,1e-6),1e-6,Math.max(bend,1e-6)));
+        }
         private static Frame geometryFrame(Frame a,Frame b,double t)
         {var cargo=a.cargo()==null?b.cargo():b.cargo()==null?a.cargo():a.cargo().interpolate(b.cargo(),t);return new Frame(a.plane().interpolate(b.plane(),t),cargo,a.rig().interpolate(b.rig(),t));}
         public List<AABB> envelopes(){return envelopes;}

@@ -31,9 +31,37 @@ public final class NervRootAssemblyInstallationR52
     private static final Map<ServerLevel,Long> RESTORE_TRIES=new WeakHashMap<>();
     private static final Map<ServerLevel,String> RESTORE_HOLDS=new WeakHashMap<>();
     private static final Map<ServerLevel,Set<UUID>> INSTALLED_ACTORS=new WeakHashMap<>();
-    private static final Map<ServerLevel,Set<ChunkPos>> PENDING_TICKETS=new WeakHashMap<>();
+    private static final Map<ServerLevel,NervChunkAdmissionR53> PENDING_TICKETS=new WeakHashMap<>();
     private static final Map<ServerLevel,Long> TICKET_REFRESH=new WeakHashMap<>();
     public record Result(boolean accepted,String reason,String directoryFingerprint,long epoch){}
+    /** Read the actual saved installation reference for each registered
+     * dimension. No actors, tickets, map cells or task state are changed. */
+    public static void prepareBeforeServerLoadR53(net.minecraft.server.MinecraftServer server)throws IOException
+    {
+        var world=server.getWorldPath(LevelResource.ROOT).toRealPath();
+        for(var dimension:server.registryAccess().registryOrThrow(net.minecraft.core.registries.Registries.LEVEL_STEM).keySet())
+        {
+            var key=net.minecraft.resources.ResourceKey.create(net.minecraft.core.registries.Registries.DIMENSION,dimension);
+            var saved=net.minecraft.world.level.dimension.DimensionType.getStorageFolder(key,world).resolve("data").resolve(NervRouteRuntimeStateR52.NAME+".dat");
+            if(!Files.isRegularFile(saved))continue;
+            try
+            {
+                var state=net.minecraft.nbt.NbtIo.readCompressed(saved.toFile()).getCompound("data");
+                if(!state.getBoolean("Claimed")||state.getString("InstallationBundle").isBlank())continue;
+                var relative=NervRouteRuntimeStateR52.relativeBundleR52(state.getString("InstallationBundle"));
+                var file=world.resolve(relative).toRealPath();require(file.startsWith(world)&&Files.size(file)<=256000,"Bounded saved installation inside the actual world required");
+                var bytes=Files.readAllBytes(file);String selection=sha(bytes);
+                var root=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                require(root.get("schema").getAsString().equals(SCHEMA)&&root.get("map_author").getAsString().equals("root")&&root.get("status").getAsString().equals("installed")&&root.get("dimension").getAsString().equals(dimension.toString()),"Saved installation source authority or dimension differs");
+                long start=System.nanoTime();com.projectseele.ProjectSeele.LOGGER.info("Preparing saved mechanical resources before world simulation: {}",dimension);
+                NervSourcePreparationR52.beforeServerLoadR53(sourceKeyR52(file,selection,true),()->prepareBundleR52(world,file,selection,root,true));
+                com.projectseele.ProjectSeele.LOGGER.info("Saved mechanical resources prepared before world simulation: {} in {} ms",dimension,(System.nanoTime()-start)/1_000_000);
+            }
+            catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw new IOException("Mechanical startup preparation interrupted",interrupted);}
+            catch(Exception held){com.projectseele.ProjectSeele.LOGGER.warn("Saved mechanical preparation remains held for {}: {}",dimension,held.toString());}
+        }
+    }
+    private static String sourceKeyR52(Path file,String selection,boolean restoring){return "bundle/"+file+"/"+selection+"/restore="+restoring;}
     public static Result install(ServerLevel level,Path explicitBundle)throws IOException
     {try{return install(level,explicitBundle,false,true);}catch(IOException|RuntimeException held){restoreHoldR52(level,held.toString());throw held;}}
     private static Result install(ServerLevel level,Path explicitBundle,boolean restoring,boolean explicit)throws IOException
@@ -53,25 +81,29 @@ public final class NervRootAssemblyInstallationR52
         if(persisted!=null&&persisted.pendingInstallationR52()!=null)require(persisted.pendingInstallationR52().equals(request),"Pending bundle bytes, epoch, directory or restoration mode changed; original request retained");
         if(explicit||persisted==null||persisted.pendingInstallationR52()==null)persisted=NervRouteRuntimeR52.queueInstallationR52(level,request);
         if(persisted.pendingInstallationPausedR52())return heldResultR52(level,persisted.pendingInstallationHoldR52(),request);
-        for(var chunk:persisted.installationActorChunks().values())retain(level,new ChunkPos(chunk));
+        var admission=PENDING_TICKETS.computeIfAbsent(level,unused->new NervChunkAdmissionR53());
+        for(var chunk:persisted.installationActorChunks().values())admission.request(new ChunkPos(chunk),2);
         boolean restoredSource=restoring;
-        String sourceKey="bundle/"+file+"/"+bundleSHA+"/restore="+restoring;
+        String sourceKey=sourceKeyR52(file,bundleSHA,restoring);
         if(explicit&&NervSourcePreparationR52.retryFailedR52(sourceKey))restoreHoldR52(level,"Explicit immutable-source retry "+persisted.pendingInstallationAttemptsR52()+"; previous HOLD: "+persisted.pendingInstallationPreviousHoldR52());
         var ready=NervSourcePreparationR52.poll(sourceKey,()->prepareBundleR52(world,file,bundleSHA,root,restoredSource));
         if(!ready.ready())return heldResultR52(level,"Root source preparation HOLD: "+ready.hold(),request);
         var prepared=ready.value();var directoryDocument=prepared.directoryDocument();var directory=prepared.directory();
         var saved=NervRouteRuntimeR52.installationStateR52(level);if(restoring)require(saved!=null&&saved.fault().isEmpty()&&saved.claimed()&&saved.epoch()==directory.epoch()&&saved.fingerprint().equals(directory.fingerprint())&&bundleSHA.equals(saved.installationBundleSHA()),"Persisted Root bundle/source/directory authority changed; explicit installation required");
         boolean continuous=directory.routes().values().stream().allMatch(NervRouteDirectoryR52.Route::continuousUpright);
-        var owner=NervAssemblyOwnerR52.parse(prepared.ownerDocument(),directory);owner.preparedGeometryR52(prepared.geometry());
-        var runtime=directoryDocument.getAsJsonObject("runtime");require(runtime!=null,"Complete declared native runtime required");NervRouteNativeR52.parseBindings(runtime.getAsJsonArray("bindings"),directory);
+        var owner=prepared.owner();
+        var runtime=directoryDocument.getAsJsonObject("runtime");require(runtime!=null,"Complete declared native runtime required");
         JsonObject airDocument=prepared.airDocument();if(airDocument!=null){var manifest=NervAirTransportManifestR52.parse(airDocument,directory);require(manifest.installed(),"Root air manifest remains design");}
         Path personnelFile=prepared.personnelFile();if(personnelFile!=null){var personnel=S20LiftManifestR52.parse(prepared.personnelDocument());require(personnel.ready()&&personnel.epoch()==directory.epoch()&&personnel.directoryFingerprint().equals(directory.fingerprint()),"Root personnel lifts do not match the installed directory");}
         TvYashimaStationR52.Plan cannon=prepared.cannon();
         var positions=new LinkedHashMap<UUID,Vec3>(owner.installationActorPositionsR52());if(airDocument!=null){var manifest=NervAirTransportManifestR52.parse(airDocument,directory);for(var aircraft:manifest.aircraft().values())positions.put(aircraft.entity(),manifest.node(aircraft.stand()).frame().plane().translation());}if(cannon!=null){positions.put(cannon.cannon(),cannon.closed());positions.put(cannon.source(),cannon.sourcePosition());positions.put(cannon.hatch(),cannon.closed());}
-        var requiredChunks=new HashSet<ChunkPos>(owner.installationFoundationChunksR52());for(var e:positions.entrySet()){requiredChunks.add(new ChunkPos(BlockPos.containing(e.getValue())));if(saved!=null){var actual=saved.installationActorChunks().get(e.getKey());if(actual!=null)requiredChunks.add(new ChunkPos(actual));}}PENDING_TICKETS.put(level,Set.copyOf(requiredChunks));for(var chunk:requiredChunks)retain(level,chunk);TICKET_REFRESH.put(level,level.getGameTime());
+        var actorChunks=new HashSet<ChunkPos>();for(var e:positions.entrySet()){actorChunks.add(new ChunkPos(BlockPos.containing(e.getValue())));if(saved!=null){var actual=saved.installationActorChunks().get(e.getKey());if(actual!=null)actorChunks.add(new ChunkPos(actual));}}
+        var requiredChunks=restorationRadiiR53(prepared.foundationChunks(),actorChunks);admission.request(requiredChunks);advanceAdmissionR53(level,admission);
         INSTALLED_ACTORS.put(level,Set.copyOf(positions.keySet()));captureActorChunksR52(level,saved);
+        if(!admission.admittedAll())return heldResultR52(level,"Original actor and foundation chunks loading in bounded batches; claim retained",request);
+        NervRouteNativeR52.parseBindings(runtime.getAsJsonArray("bindings"),directory);
         for(var position:positions.values()){var chunk=new ChunkPos(BlockPos.containing(position));if(!level.areEntitiesLoaded(chunk.toLong()))return heldResultR52(level,"Declared original actor chunks still loading; no replacement controllers created",request);}
-        for(var actor:saved.installationActorChunks().entrySet())if(positions.containsKey(actor.getKey())&&level.getEntity(actor.getKey())==null)return heldResultR52(level,"Previously observed original actor still absent: "+actor.getKey(),request);
+        for(var actor:saved.installationActorChunks().entrySet())if(positions.containsKey(actor.getKey())&&level.getEntity(actor.getKey())==null&&!EntryPlugDisposalR31.destroyed(level,actor.getKey()))return heldResultR52(level,"Previously observed original actor still absent: "+actor.getKey(),request);
         NervRouteRuntimeR52.claimPending(level,directory.epoch(),directory.fingerprint());
         if(continuous)NervRouteRuntimeR52.installationStateR52(level).declareUprightGuideSourceR52(NervUprightGuidewayR52.sourceSha256());
         if(continuous){for(var chunk:NervUprightGuidewayR52.foundationChunks())if(level.getChunkSource().getChunkNow(chunk.x,chunk.z)==null)return heldResultR52(level,"Root upright guideway foundation tickets still loading; claim retained",request);NervUprightGuidewayR52.enable(level,directory);}
@@ -87,7 +119,7 @@ public final class NervRootAssemblyInstallationR52
         catch(IOException|RuntimeException failure){NervRouteRuntimeR52.installationHeldR52(level);throw failure;}
         return new Result(true,"Root physical owner and shared runtime installed; native cycles and visuals still require actual verification",directory.fingerprint(),directory.epoch());
     }
-    private record PreparedBundleR52(JsonObject directoryDocument,NervRouteDirectoryR52 directory,JsonObject ownerDocument,NervAssemblyOwnerR52.PreparedGeometryR52 geometry,JsonObject airDocument,Path personnelFile,JsonObject personnelDocument,TvYashimaStationR52.Plan cannon){}
+    private record PreparedBundleR52(JsonObject directoryDocument,NervRouteDirectoryR52 directory,NervAssemblyOwnerR52 owner,Set<ChunkPos> foundationChunks,JsonObject airDocument,Path personnelFile,JsonObject personnelDocument,TvYashimaStationR52.Plan cannon){}
     /** Only immutable source bytes/CPU geometry. No Level, actor or native shape. */
     private static PreparedBundleR52 prepareBundleR52(Path world,Path file,String bundleSHA,JsonObject root,boolean restoring)throws IOException {
         require(bundleSHA.equals(sha(Files.readAllBytes(file))),"Root bundle changed before source preparation");
@@ -99,29 +131,39 @@ public final class NervRootAssemblyInstallationR52
         boolean continuous=directory.routes().values().stream().allMatch(NervRouteDirectoryR52.Route::continuousUpright);
         if(continuous){require(root.has("upright_guideway"),"Continuous bundle requires its explicit actual upright guideway source reference");var guideFile=sourceBytesR52(file.getParent(),world,root.getAsJsonObject("upright_guideway"),256000000);var guide=ownerDocument.getAsJsonObject("ground_guides");String expected=root.getAsJsonObject("upright_guideway").get("sha256").getAsString();require(guide!=null&&guide.get("mode").getAsString().equals("continuous_upright")&&expected.equals(guide.get("paths_sha256").getAsString())&&guide.get("source_sha256").getAsString().equals(NervOuterCarrierGuideR52.SOURCE_SHA),"Explicit selected owner/model/guideway path source differs");NervUprightGuidewayR52.install(guideFile.bytes(),expected,directory);}
         var geometry=NervAssemblyOwnerR52.prepareGeometryR52(NervAssemblyOwnerR52.geometryRequestR52(ownerDocument));
+        var owner=NervAssemblyOwnerR52.parse(ownerDocument,directory);owner.preparedGeometryR52(geometry);
+        var foundationChunks=owner.installationFoundationChunksR52();
         JsonObject airDocument=null;if(root.has("air_transport")){var airFile=sourceBytesR52(file.getParent(),world,root.getAsJsonObject("air_transport"),32000000);airDocument=JsonParser.parseString(new String(airFile.bytes(),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();}
         Path personnelFile=null;JsonObject personnelDocument=null;if(root.has("personnel_lifts")){var personnel=sourceBytesR52(file.getParent(),world,root.getAsJsonObject("personnel_lifts"),32000000);personnelFile=personnel.file();personnelDocument=JsonParser.parseString(new String(personnel.bytes(),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();}
         TvYashimaStationR52.Plan cannon=null;if(root.has("fixed_cannon")){var cannonFile=sourceBytesR52(file.getParent(),world,root.getAsJsonObject("fixed_cannon"),32000000);require(cannonFile.file().equals(world.resolve(TvYashimaStationR52.FILE)),"Fixed cannon must be the actual runtime station file");cannon=TvYashimaStationR52.parse(JsonParser.parseString(new String(cannonFile.bytes(),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject(),root.get("dimension").getAsString());}
         if(cannon!=null)FixedCannonCradleR52.pieces(cannon.geometry(),cannon.cradle(),cannon.closed(),new org.joml.Quaternionf());
         require(bundleSHA.equals(sha(Files.readAllBytes(file))),"Root bundle changed during source preparation");
-        return new PreparedBundleR52(directoryDocument,directory,ownerDocument,geometry,airDocument,personnelFile,personnelDocument,cannon);
+        return new PreparedBundleR52(directoryDocument,directory,owner,foundationChunks,airDocument,personnelFile,personnelDocument,cannon);
     }
     private static void verifyCannonFoundationR52(ServerLevel level,TvYashimaStationR52.Plan plan)throws IOException {
         int feet=0;for(var piece:FixedCannonCradleR52.pieces(plan.geometry(),plan.cradle(),plan.closed(),new org.joml.Quaternionf()))if(piece.part().name().equals("floor_plate")){feet++;var b=piece.mesh().envelope(piece.frame(),piece.frame());for(int x=(int)Math.floor(b.minX+.0001);x<=(int)Math.floor(b.maxX-.0001);x++)for(int z=(int)Math.floor(b.minZ+.0001);z<=(int)Math.floor(b.maxZ-.0001);z++){var floor=new BlockPos(x,(int)Math.floor(plan.cradle().floorTop()-.0001),z);if(!level.hasChunkAt(floor)||!level.getBlockState(floor).isCollisionShapeFullBlock(level,floor))throw new IllegalStateException("Actual fixed cannon finite foundation missing: "+floor);}}require(feet==2,"Actual original cannon two finite floor plates required");
     }
-    private static void retain(ServerLevel level,ChunkPos at){level.getChunkSource().addRegionTicket(RESTORE_TICKET,at,2,at);}
+    static Map<ChunkPos,Integer> restorationRadiiR53(Set<ChunkPos> foundations,Set<ChunkPos> actors)
+    {
+        // FULL chunks retain native blocks and accessible entities. Foundation
+        // readback does not require entity ticking across the entire guideway.
+        // Original machines and their saved positions still receive radius 2.
+        var result=new HashMap<ChunkPos,Integer>();for(var at:foundations)result.put(at,0);for(var at:actors)result.put(at,2);return Map.copyOf(result);
+    }
+    private static void retain(ServerLevel level,ChunkPos at){retain(level,at,2);}
+    private static void retain(ServerLevel level,ChunkPos at,int radius){level.getChunkSource().addRegionTicket(RESTORE_TICKET,at,radius,at);}
+    private static void advanceAdmissionR53(ServerLevel level,NervChunkAdmissionR53 admission)
+    {admission.advance(level.getGameTime(),(chunk,radius)->level.getChunkSource().getChunkNow(chunk.x,chunk.z)!=null&&(radius==0||level.areEntitiesLoaded(chunk.toLong())),(chunk,radius)->retain(level,chunk,radius));}
     private static void captureActorChunksR52(ServerLevel level,NervRouteRuntimeStateR52 saved){for(var id:INSTALLED_ACTORS.getOrDefault(level,Set.of())){var actor=level.getEntity(id);if(actor!=null&&actor.isAlive())saved.installationActorChunkR52(id,new ChunkPos(BlockPos.containing(actor.position())).toLong());}}
     public static String restorationHoldR52(ServerLevel level){return RESTORE_HOLDS.getOrDefault(level,"");}
     private static Result heldResultR52(ServerLevel level,String reason,NervRouteRuntimeStateR52.PendingInstallationR52 request){restoreHoldR52(level,reason);return new Result(false,reason,request.directory(),request.epoch());}
     @SubscribeEvent(priority=EventPriority.LOWEST) public static void restoreTickR52(TickEvent.ServerTickEvent event){
         if(event.phase!=TickEvent.Phase.END||!NervRouteRuntimeR52.mapRebuildEnabledR52())return;for(var level:event.getServer().getAllLevels()){
-            long now=level.getGameTime();Long refreshed=TICKET_REFRESH.get(level);if(refreshed==null||now<refreshed||now-refreshed>=100){for(var chunk:PENDING_TICKETS.getOrDefault(level,Set.of()))retain(level,chunk);TICKET_REFRESH.put(level,now);}
             var saved=NervRouteRuntimeR52.installationStateR52(level);if(saved==null||!saved.claimed()||saved.installationBundle().isEmpty()&&saved.pendingInstallationR52()==null)continue;
-            // Keep saved actor chunks eligible for entity loading even while
-            // pure source preparation/native commissioning is still held.
-            for(var chunk:saved.installationActorChunks().values())retain(level,new ChunkPos(chunk));
-            if(NervRouteRuntimeR52.controllerLoadedR52(level)&&saved.pendingInstallationR52()==null){captureActorChunksR52(level,saved);continue;}
+            if(NervRouteRuntimeR52.controllerLoadedR52(level)&&saved.pendingInstallationR52()==null){for(var chunk:new HashSet<>(saved.installationActorChunks().values()))retain(level,new ChunkPos(chunk));captureActorChunksR52(level,saved);continue;}
             if(saved.pendingInstallationPausedR52()){restoreHoldR52(level,saved.pendingInstallationHoldR52());continue;}
+            var admission=PENDING_TICKETS.computeIfAbsent(level,unused->new NervChunkAdmissionR53());for(var chunk:saved.installationActorChunks().values())admission.request(new ChunkPos(chunk),2);
+            long now=level.getGameTime();Long refreshed=TICKET_REFRESH.get(level);if(refreshed==null||now<refreshed||now-refreshed>=100){admission.refresh((chunk,radius)->retain(level,chunk,radius));TICKET_REFRESH.put(level,now);}advanceAdmissionR53(level,admission);
             long tick=level.getGameTime();Long previous=RESTORE_TRIES.get(level);if(previous!=null&&tick>=previous&&tick-previous<100)continue;RESTORE_TRIES.put(level,tick);
             try{require(saved.fault().isEmpty(),saved.fault());var pending=saved.pendingInstallationR52();String relative=NervRouteRuntimeStateR52.relativeBundleR52(pending==null?saved.installationBundle():pending.bundle());var path=level.getServer().getWorldPath(LevelResource.ROOT).resolve(relative);var result=install(level,path,pending==null||pending.restoring(),false);if(!result.accepted())restoreHoldR52(level,result.reason());}
             catch(IOException|RuntimeException held){restoreHoldR52(level,held.toString());}

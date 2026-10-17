@@ -24,6 +24,17 @@ import net.minecraftforge.network.NetworkHooks;
 /** Smooth two-leaf silver door for one authored three-wide command-room port. */
 public final class NervSlidingDoorEntity extends Entity
 {
+    @Override
+    protected boolean updateInWaterStateAndDoFluidPushing()
+    {
+        // Anchored or actuator-driven machinery never receives fluid motion.
+        // Its full mechanical bounding box can span hundreds of thousands of cells.
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
+        this.wasTouchingWater=false;
+        return false;
+    }
+
     private static final EntityDataAccessor<Integer> DATA_DOOR_ID =
             SynchedEntityData.defineId(NervSlidingDoorEntity.class,
                     EntityDataSerializers.INT);

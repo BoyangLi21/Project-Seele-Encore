@@ -40,7 +40,8 @@ public final class NervLiftArrivalSyncR44
                         || !level.hasChunkAt(actual) || player.distanceToSqr(landing.cabinCentre().getCenter())>4096)continue;
                 if(!(level.getBlockEntity(actual) instanceof ControllerBlockEntity block) || !block.hasGroup())return;
                 var group=block.getGroup();
-                if(group.x!=controller.getX() || group.z!=controller.getZ() || group.facing!=facing)return;
+                var canonical=NervPersonnelTransferR53.canonicalController(level,controller);
+                if(group.x!=canonical.getX() || group.z!=canonical.getZ() || group.facing!=facing)return;
                 var prior=LAST_REQUEST.computeIfAbsent(player,key->new HashMap<>());
                 if(now-prior.getOrDefault(spec.id(),-100L)<10)return;
                 prior.put(spec.id(),now);

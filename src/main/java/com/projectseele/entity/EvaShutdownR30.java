@@ -153,10 +153,14 @@ public final class EvaShutdownR30
     public static boolean valid(CompoundTag tag)
     {
         if(tag.isEmpty()||tag.size()>128)return false;
-        for(String name:tag.getAllKeys())
+        var bones=EvaPoseSnapshotR50.bones(tag);if(bones.isEmpty())return false;
+        var exact=tag.getCompound("__exact_quaternions_r53");
+        if(!exact.isEmpty()&&!exact.getAllKeys().equals(bones))return false;
+        for(String name:bones)
         {
             if(!name.matches("[a-zA-Z0-9_]{1,64}"))return false;var a=tag.getList(name,Tag.TAG_FLOAT);if(a.size()!=9)return false;
             for(int i=0;i<9;i++){float v=a.getFloat(i);if(!Float.isFinite(v)||Math.abs(v)>(i<3?32:i<6?256:4)||i>=6&&v<0)return false;}
+            if(!exact.isEmpty()){var q=exact.getList(name,Tag.TAG_FLOAT);if(q.size()!=4)return false;for(int i=0;i<4;i++)if(!Float.isFinite(q.getFloat(i))||Math.abs(q.getFloat(i))>2)return false;}
         }
         return true;
     }

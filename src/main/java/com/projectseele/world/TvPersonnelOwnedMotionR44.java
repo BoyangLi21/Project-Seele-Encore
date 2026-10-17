@@ -28,7 +28,7 @@ public final class TvPersonnelOwnedMotionR44
     }
     public static Decision unit(EvaUnit01Entity unit)
     {
-        if(!(unit.level() instanceof ServerLevel level)||!TvPersonnelPlatformInterlockR44.enabled(level)
+        if(!(unit.level() instanceof ServerLevel level)||NervRouteRuntimeR52.claimed(level)||!TvPersonnelPlatformInterlockR44.enabled(level)
                 ||unit.isStreamingAirCarrierFrameR44()||com.projectseele.entity.EvaAirTransportR31.active(unit)
                 ||unit.isFirstBattleActive()||unit.isBerserk())return outside();
         int v=unit.getUnitVariant();if(v<0||v>2)return outside();
@@ -75,7 +75,7 @@ public final class TvPersonnelOwnedMotionR44
     }
     public static Decision wetPlug(EntryPlugCarrierEntity plug)
     {
-        if(!(plug.level() instanceof ServerLevel level)||!TvPersonnelPlatformInterlockR44.enabled(level)
+        if(!(plug.level() instanceof ServerLevel level)||NervRouteRuntimeR52.claimed(level)||!TvPersonnelPlatformInterlockR44.enabled(level)
                 ||plug.laboratorySlotR47()>=0||plug.isIndependentUNPlug()||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_EJECTING)return outside();
         int v=plug.getAssignedVariant();if(v<0||v>2)return outside();
         var fleet=EvaFleetSavedData.get(level.getServer()).entry(v);
@@ -95,7 +95,7 @@ public final class TvPersonnelOwnedMotionR44
     /** A pause must not let the existing non-saving visuals expire after40ticks. */
     public static void keepWetMachines(ServerLevel level,int variant)
     {
-        if(!TvPersonnelPlatformInterlockR44.enabled(level)||variant<0||variant>2)return;
+        if(NervRouteRuntimeR52.claimed(level)||!TvPersonnelPlatformInterlockR44.enabled(level)||variant<0||variant>2)return;
         double x=-11.5+42*variant;
         for(var machine:level.getEntitiesOfClass(NervCarrierPlatformEntity.class,new AABB(x-21,-445,-268,x+21,-354,-210),
                 e->e.isAlive()&&e.getUnitVariant()==variant&&(e.isRestraintGantry()||e.isPlugCrane())))

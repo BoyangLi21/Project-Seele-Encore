@@ -79,7 +79,8 @@ public final class NervStaffEntity extends PathfinderMob
                 &&!com.projectseele.world.NervOriginalActorsR52.mappedPersonnel(server))
         {getNavigation().stop();setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);setNoAi(true);}
         super.tick();if(level().isClientSide)return;
-        if(level() instanceof net.minecraft.server.level.ServerLevel server&&com.projectseele.world.NervRouteRuntimeR52.claimed(server))return;
+        if(level() instanceof net.minecraft.server.level.ServerLevel server&&com.projectseele.world.NervRouteRuntimeR52.claimed(server)
+                &&!com.projectseele.world.NervOriginalActorsR52.mappedPersonnel(server))return;
         if(settleTicks>0)
         {
             setNoAi(false);if(--settleTicks==0||onGround()){settleTicks=0;if(requester==null)setNoAi(true);}return;

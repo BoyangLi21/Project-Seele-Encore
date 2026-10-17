@@ -104,9 +104,46 @@ public final class S20LiftManifestR52Test
             for(String key:new String[]{"landing_doors","cabin_doors"})for(var door:f.getAsJsonArray(key))shiftX(door.getAsJsonObject().getAsJsonArray("pos"),12);
         }
         check(S20LiftManifestR52.parse(shifted).mainLifts().commandRear().liftId().equals(S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID),"Rigidly moved original main lift lost its identity");
+        var personnel=source.deepCopy();
+        for(int i=0;i<2;i++)
+        {
+            var role=personnel.getAsJsonObject("main_lifts").getAsJsonObject(i==0?"command_rear":"east_gallery");
+            role.addProperty("observation_floor",-630);role.addProperty("hangar_floor",-657);role.addProperty("launch_floor",-673);
+            var binding=personnel.getAsJsonArray("lifts").get(i).getAsJsonObject();var oldFloors=binding.getAsJsonArray("floors");
+            var expanded=new JsonArray();
+            for(var raw:oldFloors)
+            {
+                if(raw.getAsJsonObject().getAsJsonArray("cabin").get(1).getAsInt()==-630)
+                {expanded.add(floor(i==0?12:66,i==0?253:302,i==0?9:63,-673,false));expanded.add(floor(i==0?12:66,i==0?253:302,i==0?9:63,-657,false));}
+                expanded.add(raw.deepCopy());
+            }
+            binding.add("floors",expanded);
+        }
+        var access=S20LiftManifestR52.parse(personnel).mainLifts();
+        check(access.commandRear().hangarFloor()==-657&&access.commandRear().observationFloor()==-630
+                &&access.commandRear().launchFloor()==-673&&access.eastGallery().launchFloor()==-673,
+                "Boarding and launch stops collapsed back into observation");
+        invalid=personnel.deepCopy();invalid.getAsJsonObject("main_lifts").getAsJsonObject("east_gallery").remove("launch_floor");
+        rejected(invalid,"One main lift silently lost launch access");
+        invalid=personnel.deepCopy();invalid.getAsJsonObject("main_lifts").getAsJsonObject("command_rear").addProperty("observation_floor",-657);
+        rejected(invalid,"Observation label accepted as the boarding stop");
+        invalid=personnel.deepCopy();invalid.getAsJsonObject("main_lifts").getAsJsonObject("command_rear").add("headquarters_floors",array(-630,-541,-502));
+        rejected(invalid,"Observation floor received two incompatible roles");
+        invalid=personnel.deepCopy();invalid.getAsJsonArray("lifts").get(1).getAsJsonObject().getAsJsonArray("floors").get(0).getAsJsonObject().addProperty("restricted",true);
+        rejected(invalid,"Launch floor inherited restricted Terminal admission");
         check(S20LiftDirectoryR52.retiredControllerAxis(108,410)&&!S20LiftDirectoryR52.retiredControllerAxis(1000,1000),"Retired group confused with independent player group");
         check(S20LiftDirectoryR52.independentGateway(true,-368,750,Direction.EAST),"Independent gateway denied");
-        if(args.length>0)rejected(JsonParser.parseString(java.nio.file.Files.readString(java.nio.file.Path.of(args[0]))).getAsJsonObject(),
+        if(args.length==2&&args[0].equals("--candidate"))
+        {
+            var actual=JsonParser.parseString(java.nio.file.Files.readString(java.nio.file.Path.of(args[1]))).getAsJsonObject();
+            actual.addProperty("ready",true);var installed=S20LiftManifestR52.parse(actual);
+            check(installed.mainLifts().commandRear().hangarFloor()==-1014&&installed.mainLifts().eastGallery().hangarFloor()==-1014,
+                    "Actual proposal does not reach both boarding landings");
+            check(installed.mainLifts().commandRear().launchFloor()==-1030&&installed.mainLifts().eastGallery().launchFloor()==-1030,
+                    "Actual proposal does not reach both launch landings");
+            check(installed.lifts().size()==6,"Actual proposal changed the six original personnel-lift identities");
+        }
+        else if(args.length>0)rejected(JsonParser.parseString(java.nio.file.Files.readString(java.nio.file.Path.of(args[0]))).getAsJsonObject(),
                 "Actual frozen failed shared-lift manifest was accepted");
         System.out.println("PASS original two-main-lift contract checks="+checks+"; parser only, no world acceptance");
     }

@@ -53,6 +53,18 @@ public final class NervHangarDoorRenderer
     {
         int facilityLight = packedLight;
         if(door.declaredGeometryMissingR52())return;
+        if(door.declaredStackR52()!=null&&com.projectseele.world.NervR50CarrierModeR53.enabled())
+        {
+            float open=door.getOpenProgress(partialTick);
+            poses.pushPose();
+            poses.mulPose(door.actualFrameR52().rotation());
+            poses.scale(door.visualWidth()/33F,door.visualHeight()/65F,1);
+            TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.pressureDoors(poses,facilityLight,open));
+            splitLogo(poses,buffers,open*17,false,facilityLight);
+            poses.popPose();
+            super.render(door,yaw,partialTick,poses,buffers,packedLight);
+            return;
+        }
         if(door.declaredStackR52()!=null)
         {float open=door.getOpenProgress(partialTick);poses.pushPose();poses.mulPose(door.actualFrameR52().rotation());TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.hangarStackDeclared(poses,facilityLight,open,door.declaredStackR52()));stackLogo(door,poses,buffers,open,facilityLight);poses.popPose();super.render(door,yaw,partialTick,poses,buffers,packedLight);return;}
         if(door.isSectionalUNGate())
@@ -133,7 +145,24 @@ public final class NervHangarDoorRenderer
     }
     private static void stackLogo(NervHangarDoorEntity door,PoseStack poses,MultiBufferSource buffers,float open,int light)
     {
-        var texture=TreeOfLifeWallClient.nervLogoTexture(Minecraft.getInstance());if(texture==null)return;var out=buffers.getBuffer(RenderType.entityCutout(texture));var geo=door.declaredGeometryR52();double width=geo.spec().panelWidth(),middle=geo.spec().height()*.5;for(int side:new int[]{-1,1})for(int index=0;index<4;index++){double a=index*width,b=Math.min(12,a+width);if(a>=b)continue;var panel=geo.panel(index,open);double x0=side<0?-b:a,x1=side<0?-a:b,shift=side*(panel.x()-a);logoHalf(poses,out,x0+shift,x1+shift,middle-14,middle+14,panel.z()+.995,(float)(.5+x0/24),(float)(.5+x1/24),light);}
+        var texture=TreeOfLifeWallClient.nervLogoTexture(Minecraft.getInstance());
+        if(texture==null)return;
+        var out=buffers.getBuffer(RenderType.entityCutout(texture));
+        var geo=door.declaredGeometryR52();
+        double width=geo.spec().panelWidth(),middle=geo.spec().height()*.5;
+        for(int side:new int[]{-1,1})for(int index=0;index<4;index++)
+        {
+            double a=index*width,b=Math.min(12,a+width);
+            if(a>=b)continue;
+            var panel=geo.panel(index,open);
+            double x0=side<0?-b:a,x1=side<0?-a:b,shift=side*(panel.x()-a);
+            // The leaf occupies Z=0..0.98. Each face needs outward winding;
+            // its normal cannot depend on the translated pocket position.
+            logoHalf(poses,out,x0+shift,x1+shift,middle-14,middle+14,panel.z()-.015,
+                    (float)(.5-x0/24),(float)(.5-x1/24),light);
+            logoHalf(poses,out,x1+shift,x0+shift,middle-14,middle+14,panel.z()+.995,
+                    (float)(.5+x1/24),(float)(.5+x0/24),light);
+        }
     }
 
     private static void logoHalf(PoseStack poses, VertexConsumer consumer,
@@ -142,7 +171,7 @@ public final class NervHangarDoorRenderer
     {
         Matrix4f matrix = poses.last().pose();
         Matrix3f normal = poses.last().normal();
-        float normalZ=z<0?-1:1;
+        float normalZ=x1>x0?-1:1;
         vertex(consumer, matrix, normal, x0, y1, z, u0, 0.0F,light,normalZ);
         vertex(consumer, matrix, normal, x1, y1, z, u1, 0.0F,light,normalZ);
         vertex(consumer, matrix, normal, x1, y0, z, u1, 1.0F,light,normalZ);

@@ -72,7 +72,7 @@ public final class PilotRestroomServicesR47
 
     private static boolean completePhone(ServerLevel level,BlockPos root)
     {
-        if(!level.hasChunkAt(root))return false;
+        if(level.getChunkSource().getChunkNow(root.getX()>>4,root.getZ()>>4)==null)return false;
         var base=level.getBlockState(root);
         if(!(base.getBlock() instanceof PeriodFixtureBlock)
                 ||base.getValue(PeriodFixtureBlock.KIND)!=PeriodFixtureBlock.Kind.PUBLIC_PHONE
@@ -111,7 +111,13 @@ public final class PilotRestroomServicesR47
         return valid;
     }
     private static boolean beaconExists(ServerLevel level,PilotRestroomsR47.Plan room)
-    {return level.hasChunkAt(room.beacon())&&level.getBlockState(room.beacon()).is(ModBlocks.NERV_WARNING_BEACON.get());}
+    {
+        var pos=room.beacon();
+        // A pending chunk ticket does not mean the full chunk is available.
+        // Decorative alarms must never finish loading a distant room on the server thread.
+        var chunk=level.getChunkSource().getChunkNow(pos.getX()>>4,pos.getZ()>>4);
+        return chunk!=null&&chunk.getBlockState(pos).is(ModBlocks.NERV_WARNING_BEACON.get());
+    }
     private static void light(ServerLevel level,PilotRestroomsR47.Plan room,boolean lit)
     {
         if(!beaconExists(level,room))return;

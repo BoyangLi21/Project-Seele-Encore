@@ -92,7 +92,32 @@ public final class S20MovingElevatorsAdapter
             if(S20LiftDirectoryR52.current(level,spec))
             {
                 var base=controller(level,controllerPosition(spec,spec.lower()));
-                if(base!=null&&base.hasGroup())synchronizeDoorsFromPhysicalCage(level,spec,base.getGroup());
+                if(base!=null&&base.hasGroup())
+                {
+                    var group=base.getGroup();
+                    if(!group.isMoving())
+                    {
+                        for(var floor:spec.r52().floors())
+                        {
+                            if(!S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,floor.cabin()))continue;
+                            var entity=level.getBlockEntity(floor.cabin().offset(spec.r52().insideButtonOffset()));
+                            if(entity instanceof RemoteControllerBlockEntity remote&&remote.getGroup()==group)
+                            {
+                                // A restored upper-shaft car can keep its old lower-stop
+                                // reference while the native in-cabin cache is still false.
+                                // Bind the existing selector to the measured arrival; do not
+                                // recreate the car or run the retired geometry reconciler.
+                                if(!floor.controller().equals(remote.getControllerPos()))
+                                    remote.setValues(remote.getFacing(),floor.controller(),spec.r52().controllerFacing());
+                                var accessor=(MovingElevatorRemoteAccessor)remote;
+                                accessor.projectSeele$setInCabin(true);
+                                accessor.projectSeele$setCabinFloorIndex(group.getFloorNumber(floor.cabin().getY()));
+                            }
+                            break;
+                        }
+                    }
+                    synchronizeDoorsFromPhysicalCage(level,spec,group);
+                }
             }
             return true; // Pending claims never enter old repair/retirement/cabin generation.
         }
@@ -1491,10 +1516,7 @@ public final class S20MovingElevatorsAdapter
                     &&level.getBlockState(input.above()).is(MovingElevators.display_block))
             {
                 var data=linked.saveWithoutMetadata().getCompound("data");
-                var controller=controllerPosition(spec,spec.lower());
-                selector=data.contains("controllerX")&&data.contains("controllerY")&&data.contains("controllerZ")
-                        &&data.getInt("controllerX")==controller.getX()&&data.getInt("controllerZ")==controller.getZ()
-                        &&spec.stops().stream().anyMatch(s->controllerPosition(spec,s).getY()==data.getInt("controllerY"));
+                selector=seele$knownCabinController(spec,data);
             }
             boolean interior=missing.size()==1&&Math.abs(missing.get(0).getX()-landing.cabinCentre().getX())<radius
                     &&Math.abs(missing.get(0).getZ()-landing.cabinCentre().getZ())<radius;
@@ -1550,10 +1572,8 @@ public final class S20MovingElevatorsAdapter
         var button=level.getBlockEntity(selector);var display=level.getBlockEntity(selector.above());
         if(button==null||display==null||!level.getBlockState(selector).is(MovingElevators.button_block)
                 ||!level.getBlockState(selector.above()).is(MovingElevators.display_block))return;
-        var link=button.saveWithoutMetadata().getCompound("data");var controller=controllerPosition(spec,spec.lower());
-        if(!link.contains("controllerX")||!link.contains("controllerY")||!link.contains("controllerZ")
-                ||link.getInt("controllerX")!=controller.getX()||link.getInt("controllerZ")!=controller.getZ()
-                ||spec.stops().stream().noneMatch(s->controllerPosition(spec,s).getY()==link.getInt("controllerY")))return;
+        var link=button.saveWithoutMetadata().getCompound("data");
+        if(!seele$knownCabinController(spec,link))return;
         var exits=new HashSet<Direction>();spec.stops().forEach(s->exits.add(s.exit()));
         // Certify the complete original floor/roof/shell/selector, including
         // currently open and opposite closed apertures, before all11 writes.
@@ -2120,6 +2140,13 @@ public final class S20MovingElevatorsAdapter
     }
 
     private record RemoteCall(String liftId, int stopIndex) {}
+
+    private static boolean seele$knownCabinController(S20PhysicalElevatorDirector.LiftSpec spec,net.minecraft.nbt.CompoundTag data)
+    {
+        if(!data.contains("controllerX")||!data.contains("controllerY")||!data.contains("controllerZ"))return false;
+        var actual=new BlockPos(data.getInt("controllerX"),data.getInt("controllerY"),data.getInt("controllerZ"));
+        return spec.stops().stream().anyMatch(stop->controllerPosition(spec,stop).equals(actual));
+    }
 
     private static void camouflage(
             CamoBlockEntity entity, BlockState state)

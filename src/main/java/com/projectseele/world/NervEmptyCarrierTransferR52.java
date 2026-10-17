@@ -48,7 +48,7 @@ public final class NervEmptyCarrierTransferR52
     /** Actual source actor/pose is read first. A failed proof leaves its last
      * accepted frame, saved fraction and physical leases untouched. */
     public static boolean ensure(ServerLevel level,Original original,String targetPort,UUID companionFlight,CompoundTag flightData)
-    {try{return ensureSource(level,original,targetPort,companionFlight,flightData);}catch(java.io.IOException|IllegalArgumentException|IllegalStateException missing){return false;}}
+    {try{flightData.remove("EmptyCarrierWaitR53");return ensureSource(level,original,targetPort,companionFlight,flightData);}catch(java.io.IOException|IllegalArgumentException|IllegalStateException missing){flightData.putString("EmptyCarrierWaitR53",missing.getMessage()==null?missing.toString():missing.getMessage());return false;}}
     private static boolean ensureSource(ServerLevel level,Original original,String targetPort,UUID companionFlight,CompoundTag flightData)throws java.io.IOException
     {
         var context=NervRouteRuntimeR52.flightContext(level);var controller=NervOriginalCarrierR52.controller(level,original);if(context==null||controller==null)return false;
@@ -63,15 +63,27 @@ public final class NervEmptyCarrierTransferR52
         }
         if(!state.getUUID("Controller").equals(controller.getUUID())||!state.getString("Directory").equals(directory.fingerprint())||!state.getString("Port").equals(targetPort))return false;
         var legs=readList(state,"Legs");int index=state.getInt("Index"),age=state.getInt("Age");if(index<0||index>legs.size())return false;
-        var own=Set.of(controller.getUUID());Leg leg=index<legs.size()?directory.leg(legs.get(index)):directory.leg(reverse.legs().get(0));if(leg==null)return false;
+        var own=new HashSet<UUID>();own.add(controller.getUUID());
+        var flight=context.pool().queryFlight(companionFlight);
+        // At the receiving endpoint the rising rack docks around this flight's
+        // original EVA. It is the handoff payload, not an unrelated obstacle.
+        if(index==legs.size()&&NervAirTransportManifestR52.same(current,endpoint)
+                &&flight!=null&&!flight.payloadTransferred()&&flight.original().equals(original))
+        {
+            own.addAll(TransportMembershipR52.members(original,flight.kind()));
+            own.add(flight.aircraft());
+        }
+        Leg leg=index<legs.size()?directory.leg(legs.get(index)):directory.leg(reverse.legs().get(0));if(leg==null)return false;
+        boolean legacy=NervR50CarrierModeR53.enabled();boolean mechanicalTurn=leg.motion()==Motion.FOOT_BEARING_TURN&&!legacy;
         Leg next=index+1<legs.size()?directory.leg(legs.get(index+1)):null;var held=new HashSet<>(leg.resources());if(next!=null&&next.motion()==Motion.FOOT_BEARING_TURN)held.addAll(next.resources());
         // A traversed station remains actual steel above its foundation until
         // its independently checked storage movement finishes. Its resources
         // remain owned across the next leg and the stopped receiver frame.
         held.addAll(context.owner().pendingEmptyStationResourcesR52(level,original,flightData));
-        var stationary=NervOriginalCarrierR52.proposeActuator(level,controller,rise,rise,own);if(!geometryLease(level,original,controller,companionFlight,state,held,stationary)){flightData.put(KEY,state);return false;}
-        if(!context.owner().prepareEmptyCarrierGatesR52(level,original,controller.getUUID(),Set.copyOf(leg.doors()),flightData)){flightData.put(KEY,state);return false;}
-        for(String id:leg.resources())if(!context.nativeAccess().resourceReady(id,directory.resource(id).kind()==ResourceKind.DOOR)){flightData.put(KEY,state);return false;}
+        for(String id:held)if(!context.nativeAccess().resourceReady(id,false)){flightData.putString("EmptyCarrierWaitR53","resource:"+id);flightData.put(KEY,state);return false;}
+        var stationary=NervOriginalCarrierR52.proposeActuator(level,controller,rise,rise,own);if(!geometryLease(level,original,controller,companionFlight,state,held,stationary)){flightData.putString("EmptyCarrierWaitR53","stationary/lease");flightData.put(KEY,state);return false;}
+        if(!context.owner().prepareEmptyCarrierGatesR52(level,original,controller.getUUID(),Set.copyOf(leg.doors()),flightData)){flightData.putString("EmptyCarrierWaitR53","opening:"+leg.doors());flightData.put(KEY,state);return false;}
+        for(String id:leg.resources())if(!context.nativeAccess().resourceReady(id,directory.resource(id).kind()==ResourceKind.DOOR)){flightData.putString("EmptyCarrierWaitR53","operating:"+id);flightData.put(KEY,state);return false;}
         if(index==legs.size()&&NervAirTransportManifestR52.same(current,endpoint)&&rise==1){
             if(!context.owner().finishEmptyStationIdleR52(level,original,controller.getUUID(),flightData)){flightData.put(KEY,state);return false;}
             if(!context.owner().pendingEmptyStationResourcesR52(level,original,flightData).isEmpty()){flightData.put(KEY,state);return false;}
@@ -79,19 +91,20 @@ public final class NervEmptyCarrierTransferR52
         }
         if(rise<1)
         {
-            float nextRise=Math.min(1,rise+1F/320);var accepted=NervOriginalCarrierR52.proposeActuator(level,controller,rise,nextRise,own);if(accepted==null||!geometryLease(level,original,controller,companionFlight,state,held,accepted)||!accepted.commit(level)){flightData.put(KEY,state);return false;}
+            float nextRise=Math.min(1,rise+1F/80);var accepted=NervOriginalCarrierR52.proposeActuator(level,controller,rise,nextRise,own);if(accepted==null||!geometryLease(level,original,controller,companionFlight,state,held,accepted)||!accepted.commit(level)){flightData.put(KEY,state);return false;}
             if(nextRise==1)state.putString("Stage","MOVE");flightData.put(KEY,state);return false;
         }
         if(index>=legs.size()){flightData.put(KEY,state);return false;}
-        if(next!=null&&next.motion()==Motion.FOOT_BEARING_TURN&&!context.owner().prepareEmptyCarrierTurnR52(level,original,controller.getUUID(),next,flightData)){flightData.put(KEY,state);return false;}
-        if(leg.motion()==Motion.FOOT_BEARING_TURN&&!context.owner().prepareEmptyCarrierTurnR52(level,original,controller.getUUID(),leg,flightData)){flightData.put(KEY,state);return false;}
-        if(age==leg.ticks()){if(leg.motion()!=Motion.FOOT_BEARING_TURN||!context.owner().finishEmptyCarrierTurnR52(level,original,controller.getUUID(),leg,flightData)){flightData.put(KEY,state);return false;}state.putInt("Index",index+1);state.putInt("Age",0);flightData.put(KEY,state);return false;}
+        if(!legacy&&next!=null&&next.motion()==Motion.FOOT_BEARING_TURN&&!context.owner().prepareEmptyCarrierTurnR52(level,original,controller.getUUID(),next,flightData)){flightData.put(KEY,state);return false;}
+        if(mechanicalTurn&&!context.owner().prepareEmptyCarrierTurnR52(level,original,controller.getUUID(),leg,flightData)){flightData.put(KEY,state);return false;}
+        if(age==leg.ticks()){if(mechanicalTurn&&!context.owner().finishEmptyCarrierTurnR52(level,original,controller.getUUID(),leg,flightData)){flightData.put(KEY,state);return false;}state.putInt("Index",index+1);state.putInt("Age",0);flightData.put(KEY,state);return false;}
         if(age<0||age>leg.ticks()||!NervAirTransportManifestR52.same(current,directory.sample(leg,NervMechanicalTravelR52.fraction(age,leg.ticks()),binding).evaRoot()))return false;
-        var curve=new DirectoryTrajectoryR52(directory,leg,binding,NervMechanicalTravelR52.fraction(age,leg.ticks()),NervMechanicalTravelR52.fraction(Math.min(leg.ticks(),age+1),leg.ticks()));
-        if(leg.motion()==Motion.FOOT_BEARING_TURN){if(!context.owner().applyEmptyCarrierTurnR52(level,original,controller.getUUID(),curve,flightData)){flightData.put(KEY,state);return false;}}
-        else {var moved=NervOriginalCarrierR52.propose(level,controller,curve,1,1,own);if(moved==null||!geometryLease(level,original,controller,companionFlight,state,held,moved)||!moved.commit(level)){flightData.put(KEY,state);return false;}}
+        int nextAge=Math.min(leg.ticks(),age+(mechanicalTurn?2:4));
+        var curve=new DirectoryTrajectoryR52(directory,leg,binding,NervMechanicalTravelR52.fraction(age,leg.ticks()),NervMechanicalTravelR52.fraction(nextAge,leg.ticks()));
+        if(mechanicalTurn){if(!context.owner().applyEmptyCarrierTurnR52(level,original,controller.getUUID(),curve,flightData)){flightData.put(KEY,state);return false;}}
+        else {var moved=NervOriginalCarrierR52.propose(level,controller,curve,1,1,own);if(moved==null||!geometryLease(level,original,controller,companionFlight,state,held,moved)||!moved.commit(level)){flightData.putString("EmptyCarrierWaitR53","movement/lease:"+NervOriginalCarrierR52.lastRejectionR53(controller));flightData.put(KEY,state);return false;}}
         state.put("LastFrom",NervAircraftFrameR52.encodeRigid(curve.sample(0).evaRoot()));state.put("LastTo",NervAircraftFrameR52.encodeRigid(curve.sample(1).evaRoot()));state.putLong("LastAt",level.getGameTime());
-        if(age+1>=leg.ticks()&&leg.motion()!=Motion.FOOT_BEARING_TURN){state.putInt("Index",index+1);state.putInt("Age",0);}else state.putInt("Age",age+1);state.putString("Stage","MOVE");flightData.put(KEY,state);return false;
+        if(nextAge>=leg.ticks()&&!mechanicalTurn){state.putInt("Index",index+1);state.putInt("Age",0);}else state.putInt("Age",nextAge);state.putString("Stage","MOVE");flightData.put(KEY,state);return false;
     }
     private NervEmptyCarrierTransferR52(){}
 }

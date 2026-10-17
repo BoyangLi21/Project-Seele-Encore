@@ -28,6 +28,7 @@ public final class NervOriginalActorsR52
         default boolean originalEntryPlugBindingsReady(ServerLevel level){return false;}
         default Vec3 originalBoardingAnchor(ServerLevel level,EntryPlugCarrierEntity plug){return null;}
         default RigidTransform originalDockPose(ServerLevel level,int variant){return null;}
+        default RigidTransform originalBayPose(ServerLevel level,int variant){return null;}
         default Vec3 originalDismountAnchor(ServerLevel level,EntryPlugCarrierEntity plug,LivingEntity passenger){return null;}
         default boolean originalBoardingAllowed(ServerLevel level,EntryPlugCarrierEntity plug,Entity passenger){return false;}
         default boolean originalLaunchLock(ServerLevel level,int variant,EvaUnit01Entity eva,EntryPlugCarrierEntity plug){return false;}
@@ -72,6 +73,8 @@ public final class NervOriginalActorsR52
     public static RigidTransform dockPose(ServerLevel level,int variant)
     {var owner=plugAccess(level);var pose=owner==null?null:owner.originalDockPose(level,variant);return pose!=null&&finite(pose.translation())!=null
             &&Float.isFinite(pose.qx())&&Float.isFinite(pose.qy())&&Float.isFinite(pose.qz())&&Float.isFinite(pose.qw())?pose:null;}
+    public static RigidTransform bayPose(ServerLevel level,int variant)
+    {var owner=NervRouteRuntimeR52.originalActorAccess(level);return owner==null?null:owner.originalBayPose(level,variant);}
     public static boolean boardingAllowed(ServerLevel level,EntryPlugCarrierEntity plug,Entity passenger)
     {var owner=plugAccess(level);return owner!=null&&original(level,plug)&&passenger.level()==level&&owner.originalBoardingAllowed(level,plug,passenger)&&boardingAnchor(level,plug)!=null;}
     public static boolean riderUpdatesAllowed(ServerLevel level,EntryPlugCarrierEntity plug)
@@ -102,6 +105,7 @@ public final class NervOriginalActorsR52
         if(!(event.getEntityBeingMounted() instanceof EntryPlugCarrierEntity plug)||!managed(plug)
                 ||!(plug.level() instanceof ServerLevel level))return;
         Entity passenger=event.getEntityMounting();if(!passenger.isAlive()||passenger.isRemoved())return;
+        if(plug.getPersistentData().getBoolean("AdministrativeResetR53"))return;
         // Vanilla restores saved passenger graphs with forced startRiding at load,
         // before Root installs its owner. New boarding is gated in the capsule API.
         boolean safe=event.isMounting()||passenger instanceof LivingEntity living&&dismountAnchor(level,plug,living)!=null;

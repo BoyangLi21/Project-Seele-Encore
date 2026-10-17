@@ -50,6 +50,24 @@ public final class NervLiftDoorRenderer
         float progress = door.getOpenProgress(partialTick);
         double half = door.getDoorWidth() * 0.5D;
         float closedWidth = (float)half - 0.02F;
+        if (door.getDoorStyle() == NervLiftDoorEntity.STYLE_GLASS)
+        {
+            poses.pushPose();
+            if (!door.isAxisX()) poses.mulPose(Axis.YP.rotationDegrees(90));
+            double slide=half*progress;
+            for(double x:new double[]{-half-slide,.02+slide})
+            {
+                // Constant-sized leaves retract into the two side pockets.
+                poses.pushPose();poses.translate(x,0,-.04);
+                poses.scale(closedWidth,door.getDoorHeight(),.08F);
+                Minecraft.getInstance().getBlockRenderer().renderSingleBlock(Blocks.GLASS.defaultBlockState(),poses,buffers,packedLight,OverlayTexture.NO_OVERLAY);
+                poses.popPose();
+            }
+            NervDoorFinish.frame(poses,buffers,packedLight,half,door.getDoorHeight(),progress>=.95F);
+            poses.popPose();
+            super.render(door,yaw,partialTick,poses,buffers,packedLight);
+            return;
+        }
         float pocketWidth = Math.min(0.96F, closedWidth);
         float leafWidth = Mth.lerp(progress, closedWidth, pocketWidth);
         double leftX = Mth.lerp(progress, -half,

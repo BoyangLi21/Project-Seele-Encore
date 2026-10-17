@@ -55,6 +55,7 @@ public final class EvaBodyPose
             return JsonParser.parseReader(new InputStreamReader(stream,StandardCharsets.UTF_8)).getAsJsonObject();
         }
     }
+    public static void prepareBeforeServerLoadR53(){if(data==null)reload();}
     public static synchronized void reload()
     {
         try
@@ -523,7 +524,7 @@ public final class EvaBodyPose
         {var lying=new Sample(body.rig);for(var entry:d.prone().entrySet()){if(!lying.rig.containsKey(entry.getKey()))continue;var channels=entry.getValue().getAsJsonObject();if(channels.has("rotation")){var v=first(channels.get("rotation")).mul(Mth.DEG_TO_RAD);lying.rotations.put(entry.getKey(),new Quaternionf().rotationZYX(v.z,-v.y,-v.x));}if(channels.has("position"))lying.positions.put(entry.getKey(),first(channels.get("position")).mul(-1,1,1).div(16));}body=mix(body,lying,prone);}
         float floor=Float.POSITIVE_INFINITY;for(var entry:d.rigSupport().getOrDefault(variant,d.support()).entrySet()){if(!body.rig.containsKey(entry.getKey()))continue;var matrix=body.matrix(entry.getKey());for(var v:entry.getValue())floor=Math.min(floor,matrix.m01()*v.x+matrix.m11()*v.y+matrix.m21()*v.z+matrix.m31());}if(Float.isFinite(floor)&&!supported){body.positions.get("root").y-=floor;body.dirty();}
         for(var bone:body.rig.values())if(bone.name().contains("_axis_"))body.rotations.put(bone.name(),new Quaternionf(bone.bindRotation()));
-        EvaAnatomicalHandsR45.naturalCarryTargetR52(variant,body,input.stance);body=EvaGameplayMotionR32.ordinaryIdleTargetR52(e,body,input.idle);preserveJointCentres(body);body.rotations.get("root").rotateX(input.terrain.x).rotateZ(input.terrain.y);body.positions.get("root").y+=input.terrain.z/5;body.dirty();EvaProneLegSupportR52.apply(variant,body,input.stance,input.terrain);return body;
+        EvaAnatomicalHandsR45.naturalCarryTargetR52(variant,body,input.stance);body=EvaGameplayMotionR32.ordinaryIdleTargetR52(e,body,input.idle);preserveJointCentres(body);body.rotations.get("root").rotateX(input.terrain.x).rotateZ(input.terrain.y);body.positions.get("root").y+=input.terrain.z/5;body.dirty();return body;
     }
     public static Sample ordinaryReleaseTargetR52(EvaUnit01Entity e,float partial){return ordinaryReleaseTargetR52(e,ordinaryReleaseInputsR52(e,partial),e.level().getGameTime()+partial);}
     public static Sample sample(EvaUnit01Entity entity,float partial)
@@ -557,7 +558,7 @@ public final class EvaBodyPose
             var locked=new Sample(d.rigs().get(variant));
             for(var bone:locked.rig.values())locked.rotations.put(bone.name(),new Quaternionf(bone.bindRotation()));
             var head=locked.rotations.get("head");
-            if(head!=null)head.rotationX(.72F*EvaDorsalMechanism.bow(entity));
+            if(head!=null)head.rotationX(-.72F*EvaDorsalMechanism.bow(entity));
             locked.dirty();return locked;
         }
         float time=((entity.level().getGameTime()%24000)+partial)/20;
@@ -715,8 +716,8 @@ public final class EvaBodyPose
         EvaShieldRigR47.applyCarryR48(entity,body);
         EvaShieldRigR47.attach(entity,body);
         EvaTripoHandsR48.apply(entity,body,partial);
+        EvaAnatomicalHandsR45.alignPunchWristR53(entity,body,partial);
         EvaOrdinaryStandingSupportR52.apply(entity,body,partial);
-        EvaProneLegSupportR52.apply(entity,body,partial);
         FixedCannonPoseR52.apply(entity,body,partial);
         EvaCombatSupportR33.rememberFinalFeetR44(entity,body,partial);
         com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
@@ -724,6 +725,7 @@ public final class EvaBodyPose
     }
     private static void supportProneFirearmChestR45(EvaUnit01Entity entity,Sample body,float partial)
     {
+        if(entity.getWeapon()!=EvaUnit01Entity.WEAPON_RIFLE&&entity.getWeapon()!=EvaUnit01Entity.WEAPON_CANNON)return;
         if(entity.isExperimentalUnit()||entity.isNervLogisticsLocked()||entity.isFirstBattleActive()
                 ||EvaShutdownR30.disabled(entity)||entity.isVisuallyAirborneForRender())return;
         float support=Mth.clamp((entity.rifleStanceLevel(partial)-2.4F)/.6F,0,1);

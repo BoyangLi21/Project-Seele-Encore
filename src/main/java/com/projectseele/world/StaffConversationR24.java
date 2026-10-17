@@ -171,6 +171,13 @@ public final class StaffConversationR24
             if(action.equals("start"))session.coordinationInstance=CityCoordinationR44.instance(player);
             send(player,npc,session,false);return;
         }
+        if(request.startsWith("OUTLET:"))
+        {
+            String[] choice=request.split(":");
+            try{if(choice.length==3&&NervOutletControlsR53.TARGETS.contains(choice[2]))StaffCommandBookR24.request(player,npc,"deploy_"+choice[2],Integer.parseInt(choice[1]));}
+            catch(NumberFormatException invalid){session.reply="机体编号无效。";}
+            return;
+        }
         if(request.startsWith(StaffUndergroundChoiceR52.PREFIX))
         {
             try
@@ -254,11 +261,11 @@ public final class StaffConversationR24
                         yield NervAirLiftR30.cancel(player,Integer.parseInt(parts[2]));
                     }
                     case "recover" -> NervAirLiftR30.request(player,Integer.parseInt(parts[2]),true,0,0);
-                    case "deliver" -> NervAirLiftR30.request(player,Integer.parseInt(parts[2]),false,Integer.parseInt(parts[3]),Integer.parseInt(parts[4]));
+                    case "deliver" -> parts.length==6?NervAirTransportRuntimeR52.requestXYZ(player,Integer.parseInt(parts[2]),Integer.parseInt(parts[3]),Integer.parseInt(parts[4]),Integer.parseInt(parts[5])):NervAirLiftR30.request(player,Integer.parseInt(parts[2]),false,Integer.parseInt(parts[3]),Integer.parseInt(parts[4]));
                     default -> "请选择运输操作。";
                 };
             }
-            catch(IllegalArgumentException|IndexOutOfBoundsException error){session.reply="请填写有效的机体编号与整数 X、Z 坐标。";}
+            catch(IllegalArgumentException|IndexOutOfBoundsException error){session.reply="请填写有效的机体编号与整数 X、Y、Z 坐标。";}
             send(player,npc,session,false);return;
         }
         if(request.startsWith("PILOTCHAT:"))

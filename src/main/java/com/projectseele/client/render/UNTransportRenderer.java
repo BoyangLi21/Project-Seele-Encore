@@ -22,6 +22,12 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
     private static final ResourceLocation PAINT=new ResourceLocation("minecraft","textures/block/white_concrete.png");
     private static final Map<String,float[]> PARTS=new HashMap<>();
     private static final int[] TRIANGLE_AS_QUAD={0,1,2,2};
+    private static final Map<com.projectseele.world.NervAirframeGeometryR52.Part,RigidMachineryPartR44> RIGID_PARTS=new IdentityHashMap<>();
+    private static void drawRigid(com.projectseele.world.NervAirframeGeometryR52.Part source,PoseStack poses,MultiBufferSource buffers,int light)
+    {
+        var mesh=RIGID_PARTS.computeIfAbsent(source,part->{var values=part.vertices();for(int i=0;i<values.length;i+=6)for(int j=3;j<6;j++)values[i+j]/=255.;return RigidMachineryPartR44.trianglesNormalizedR52(values).withTexture(PAINT);});
+        mesh.draw(poses,buffers,light);
+    }
     private static int draw(String name,PoseStack poses,MultiBufferSource buffers,int light)
     {return draw(name,poses,buffers,light,0);}
     private static float hoistY(float y,float extension){return y-extension*net.minecraft.util.Mth.clamp((-11-y)/21,0,1);}
@@ -196,8 +202,17 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
         {
             var frame=com.projectseele.world.NervAircraftFrameR52.frame(entity,partial);var wanted=frame.plane().translation();
             poses.translate(wanted.x-dispatcher.x,wanted.y-dispatcher.y,wanted.z-dispatcher.z);poses.mulPose(frame.plane().rotation());
+            var geometry=com.projectseele.world.NervAircraftFrameR52.renderGeometry(entity);
+            drawRigid(geometry.originalBody(),poses,buffers,light);
+            double rotorClock=com.projectseele.world.NervAircraftFrameR52.renderRotorClock(entity,partial);
+            for(int rotor=0;rotor<4;rotor++)
+            {
+                var local=geometry.rotorLocalFrame(rotor,rotorClock);var offset=local.translation();
+                poses.pushPose();poses.translate(offset.x,offset.y,offset.z);poses.mulPose(local.rotation());
+                drawRigid(geometry.originalRotor(rotor),poses,buffers,light);poses.popPose();
+            }
             var out=buffers.getBuffer(RenderType.entityCutoutNoCull(PAINT));var m=poses.last().pose();var normal=poses.last().normal();
-            for(var part:com.projectseele.world.NervAircraftFrameR52.renderParts(entity,partial))
+            for(var part:com.projectseele.world.NervAircraftFrameR52.renderCradleParts(entity,partial))
             {
                 var v=part.vertices();for(int i=0;i<v.length;i+=18)
                 {

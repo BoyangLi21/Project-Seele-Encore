@@ -48,6 +48,29 @@ public final class PilotRestroomsR47
     }
     public static List<Plan> plans(ServerLevel level)
     {
+        var source=sourcePlans(level);
+        if(!NervRouteRuntimeR52.claimed(level))return source;
+        var result=new ArrayList<Plan>();
+        for(var p:source)
+        {
+            var bay=NervOriginalActorsR52.bayPose(level,p.variant);
+            if(bay==null)return List.of();
+            var oldBay=new RigidTransform(new Vec3(-11.5+42*p.variant,-442,-239.5),0,0,0,1);
+            var move=bay.compose(oldBay.inverse());
+            java.util.function.Function<BlockPos,BlockPos> cell=q->BlockPos.containing(move.transformPoint(Vec3.atCenterOf(q)));
+            var direction=move.transformVector(new Vec3(0,0,1));
+            int turns=Math.floorMod((int)Math.round(Math.atan2(direction.x,direction.z)/(Math.PI/2)),4);
+            var rotation=switch(turns){case 1->net.minecraft.world.level.block.Rotation.COUNTERCLOCKWISE_90;case 2->net.minecraft.world.level.block.Rotation.CLOCKWISE_180;case 3->net.minecraft.world.level.block.Rotation.CLOCKWISE_90;default->net.minecraft.world.level.block.Rotation.NONE;};
+            java.util.function.Function<String,String> state=s->{try{return TvPersonnelPlatformRecipeR44.stateKey(net.minecraft.commands.arguments.blocks.BlockStateParser.parseForBlock(net.minecraft.core.registries.BuiltInRegistries.BLOCK.asLookup(),s,true).blockState().rotate(rotation));}catch(com.mojang.brigadier.exceptions.CommandSyntaxException invalid){throw new IllegalArgumentException("Invalid declared original room state",invalid);}};
+            result.add(new Plan(p.variant,p.id,p.pilot,cell.apply(p.chair),state.apply(p.chairState),p.seatYOffset,
+                    move.transformPoint(p.stand),move.transformPoint(p.exitMidpoint),move.transformPoint(p.insideDoor),move.transformPoint(p.outsideDoor),
+                    cell.apply(p.doorLower),state.apply(p.doorState),cell.apply(p.goal),p.route.stream().map(move::transformPoint).toList(),
+                    cell.apply(p.phone),cell.apply(p.button),cell.apply(p.beacon),p.guardId));
+        }
+        return List.copyOf(result);
+    }
+    private static List<Plan> sourcePlans(ServerLevel level)
+    {
         if(!level.dimension().equals(FacilitySchemaV2.DIMENSION)||!configured(level))return List.of();
         return CACHE.computeIfAbsent(level,key->
         {
@@ -105,12 +128,20 @@ public final class PilotRestroomsR47
         if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return false;
         for(Plan p:plans(level))
         {
-            int x=p.doorLower.getX();
-            if(position.getX()>=x&&position.getX()<=x+2
-                    &&position.getY()>=-395&&position.getY()<=-390
-                    &&position.getZ()>=-223&&position.getZ()<=-217)return true;
-            if(position.getX()==x-1&&position.getY()==-392
-                    &&(position.getZ()==-219||position.getZ()==-222))return true;
+            var source=sourcePlans(level).stream().filter(q->q.variant==p.variant).findFirst().orElseThrow();
+            BlockPos actual=position;
+            if(NervRouteRuntimeR52.claimed(level))
+            {
+                var oldBay=new RigidTransform(new Vec3(-11.5+42*p.variant,-442,-239.5),0,0,0,1);
+                var move=NervOriginalActorsR52.bayPose(level,p.variant).compose(oldBay.inverse());
+                actual=BlockPos.containing(move.inverse().transformPoint(Vec3.atCenterOf(position)));
+            }
+            int x=source.doorLower.getX();
+            if(actual.getX()>=x&&actual.getX()<=x+2
+                    &&actual.getY()>=-395&&actual.getY()<=-390
+                    &&actual.getZ()>=-223&&actual.getZ()<=-217)return true;
+            if(actual.getX()==x-1&&actual.getY()==-392
+                    &&(actual.getZ()==-219||actual.getZ()==-222))return true;
         }
         return false;
     }
@@ -126,6 +157,7 @@ public final class PilotRestroomsR47
             &&TvPersonnelPlatformRecipeR44.stateKey(level.getBlockState(p.chair)).equals(p.chairState);}
     public static boolean ownsSeat(ServerLevel level,NervCommandSeatEntity seat,TrainingPilotEntity pilot)
     {
+        if(NervRouteRuntimeR52.claimed(level))return NervOriginalActorsR52.originalSeatAllowed(level,seat,pilot);
         var p=plan(level,pilot.getAssignedVariant());var data=seat.getPersistentData();
         return seat.getType()==ModEntities.PILOT_REST_SEAT_R47.get()&&p.isPresent()&&original(p.get(),pilot)
                 &&data.hasUUID("RestroomPilotR47")&&data.getUUID("RestroomPilotR47").equals(pilot.getUUID())
@@ -223,6 +255,7 @@ public final class PilotRestroomsR47
     /** First reassignment is an actual navigation order, never an install teleport. */
     public static void holdOrArrangePost(ServerLevel level,TrainingPilotEntity pilot)
     {
+        if(NervRouteRuntimeR52.claimed(level))return;
         var optional=plan(level,pilot.getAssignedVariant());if(optional.isEmpty()||!original(optional.get(),pilot))return;
         var p=optional.get();if(isSeated(level,pilot)){closeDoorWhenClear(level,pilot);return;}
         if(pilot.getVehicle()!=null||pilot.getTrainingStage()!=TrainingPilotEntity.STAGE_STANDBY)return;
@@ -252,6 +285,7 @@ public final class PilotRestroomsR47
     }
     public static boolean sitAtPost(ServerLevel level,TrainingPilotEntity pilot)
     {
+        if(NervRouteRuntimeR52.claimed(level))return isSeated(level,pilot);
         var optional=plan(level,pilot.getAssignedVariant());if(optional.isEmpty())return false;var p=optional.get();
         if(isSeated(level,pilot))return true;
         if(pilot.getVehicle()!=null||!atStand(level,p,pilot)||!chairValid(level,p)||!clearStand(level,p,pilot))return false;

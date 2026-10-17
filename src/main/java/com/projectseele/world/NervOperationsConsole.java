@@ -468,6 +468,17 @@ public final class NervOperationsConsole
     /** Returns true only for one of the seven exact NERV command buttons. */
     public static BlockPos staffControl(ServerLevel level,String operation,int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            var frame=NervHeadquartersFrameR52.frame(level);if(frame==null)return null;
+            if(operation.equals("prepare")||operation.equals("launch"))
+            {
+                var order=StaffCommandBookR24.unitOrder(level,variant);
+                return NervOutletControlsR53.position(level,variant,order==null?"surface":NervOutletControlsR53.intent(order.requested));
+            }
+            int action=switch(operation){case "city_rise"->0;case "city_lower"->1;case "prepare"->variant>=0&&variant<3?8-variant:-1;case "launch"->variant>=0&&variant<3?11-variant:-1;case "recover"->variant>=0&&variant<3?14-variant:-1;default->-1;};
+            return action<0?null:frame.apply(authoredS20Control(action));
+        }
         if(FacilityWorldPolicy.isS20Rebuild(level.getServer()) && (operation.equals("city_rise") || operation.equals("city_lower")))
             return S24CoordinateTransform.apply(level.getServer(),S20_AUTHORED_CONTROLS[operation.equals("city_rise")?0:1]);
         if(variant<0||variant>2||!FacilityWorldPolicy.isS20Rebuild(level.getServer()))return null;
@@ -497,6 +508,14 @@ public final class NervOperationsConsole
         ServerLevel level = player.serverLevel();
         if(NervRouteRuntimeR52.claimed(level))
         {
+            var outlet=NervOutletControlsR53.at(level,position);
+            if(outlet!=null)
+            {
+                var result=NervOutletControlsR53.request(player,outlet);
+                LAST_OUTCOMES.put(level,new ControlOutcome(level.getGameTime(),player.getUUID(),position,result.accepted(),result.message()));
+                player.displayClientMessage(Component.literal("[NERV] "+result.message()),false);
+                return true;
+            }
             var frame=NervHeadquartersFrameR52.frame(level);if(frame==null)return false;
             int action=authoredS20ActionAt(frame.inverse(position));
             var actual=level.getBlockState(position);

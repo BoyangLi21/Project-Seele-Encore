@@ -978,7 +978,8 @@
     "sounds": [
       {
         "name": "projectseele:launch_electric_burst_r53",
-        "stream": false
+        "stream": false,
+        "attenuation_distance": 192
       }
     ]
   },
@@ -987,15 +988,18 @@
     "sounds": [
       {
         "name": "projectseele:launch_rail_friction_r53_0",
-        "stream": false
+        "stream": false,
+        "attenuation_distance": 128
       },
       {
         "name": "projectseele:launch_rail_friction_r53_1",
-        "stream": false
+        "stream": false,
+        "attenuation_distance": 128
       },
       {
         "name": "projectseele:launch_rail_friction_r53_2",
-        "stream": false
+        "stream": false,
+        "attenuation_distance": 128
       }
     ]
   }

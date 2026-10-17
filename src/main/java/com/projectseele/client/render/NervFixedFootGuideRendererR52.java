@@ -48,6 +48,7 @@ final class NervFixedFootGuideRendererR52 {
 
  static void draw(RenderLevelStageEvent event,ClientLevel level)
  {
+  if(com.projectseele.world.NervR50CarrierModeR53.enabled())return;
   if(!com.projectseele.client.FacilityFrameClientR52.claimed(level))return;
   try
   {

@@ -57,8 +57,22 @@ final class NervWetFloorSealR52 {
  List<Vec3> bearingPoints(){return List.copyOf(seats);}
  AABB bounds(float p){var known=boundsCache.get(p);if(known!=null)return known;AABB b=null;for(var e:elements){var q=e.mesh().envelope(frame(e,RigidTransform.identity(),p),frame(e,RigidTransform.identity(),p));b=b==null?q:b.minmax(q);}if(boundsCache.size()<512)boundsCache.put(p,b);return b;}
  private int divisions(float from,float to){return Math.max(1,(int)Math.ceil(Math.abs(to-from)*Math.sqrt(Math.max(spec.dropM()*6/(.25*.25),spec.retreatLocalZ()*6/(.75*.75))/(8*.003))));}
- private Vec3 error(RigidTransform base,float a,float b){double h=b-a,dy=spec.dropM()*6*h*h/(.25*.25*8),dz=spec.retreatLocalZ()*6*h*h/(.75*.75*8);var y=base.transformVector(new Vec3(0,1,0));var z=base.transformVector(new Vec3(0,0,1));return new Vec3(Math.abs(y.x)*dy+Math.abs(z.x)*dz,Math.abs(y.y)*dy+Math.abs(z.y)*dz,Math.abs(y.z)*dy+Math.abs(z.z)*dz);}
- List<AABB> envelopes(RigidTransform base,float from,float to){var result=new ArrayList<AABB>();int n=divisions(from,to);for(int k=0;k<n;k++){float a=from+(to-from)*k/n,b=from+(to-from)*(k+1)/n;var pad=error(base,a,b);for(var e:elements)for(var q:e.mesh().leafEnvelopes(frame(e,base,a),frame(e,base,b)))result.add(e.moving()?q.inflate(pad.x,pad.y,pad.z):q);}return List.copyOf(result);}
- boolean intersects(RigidTransform base,float from,float to,AABB obstacle){if(!NervRigidMeshSweepR52.transformed(bounds(from).minmax(bounds(to)),base).intersects(obstacle))return false;int n=divisions(from,to);for(int k=0;k<n;k++){float a=from+(to-from)*k/n,b=from+(to-from)*(k+1)/n;var pad=error(base,a,b);for(var e:elements)if(e.mesh().intersects(frame(e,base,a),frame(e,base,b),e.moving()?obstacle.inflate(pad.x,pad.y,pad.z):obstacle,.003))return true;}return false;}
- boolean intersects(RigidTransform base,float from,float to,NervRigidMeshSweepR52 obstacle,RigidTransform obstacleFrom,RigidTransform obstacleTo){if(!NervRigidMeshSweepR52.transformed(bounds(from).minmax(bounds(to)),base).intersects(obstacle.envelope(obstacleFrom,obstacleTo)))return false;int n=divisions(from,to);for(int k=0;k<n;k++){float a=from+(to-from)*k/n,b=from+(to-from)*(k+1)/n;var pad=error(base,a,b);var oa=obstacleFrom.interpolate(obstacleTo,k/(double)n);var ob=obstacleFrom.interpolate(obstacleTo,(k+1D)/n);for(var e:elements)if(e.mesh().intersects(frame(e,base,a),frame(e,base,b),obstacle,oa,ob,.003,e.moving()?pad:Vec3.ZERO))return true;}return false;}
+ // A clamped axis has no curvature error. Inflating it creates false
+ // penetration into adjacent stationary floor cells at the first drop step.
+ private Vec3 error(RigidTransform base,float a,float b,Element e){double h=b-a,dy=Math.min(a,b)>=.25?0:Math.abs(e.liftFactor())*spec.dropM()*6*h*h/(.25*.25*8),dz=Math.max(a,b)<=.25?0:Math.abs(e.zFactor())*spec.retreatLocalZ()*6*h*h/(.75*.75*8);var y=base.transformVector(new Vec3(0,1,0));var z=base.transformVector(new Vec3(0,0,1));return new Vec3(Math.abs(y.x)*dy+Math.abs(z.x)*dz,Math.abs(y.y)*dy+Math.abs(z.y)*dz,Math.abs(y.z)*dy+Math.abs(z.z)*dz);}
+ List<AABB> envelopes(RigidTransform base,float from,float to){var result=new ArrayList<AABB>();int n=divisions(from,to);for(int k=0;k<n;k++){float a=from+(to-from)*k/n,b=from+(to-from)*(k+1)/n;for(var e:elements){var pad=error(base,a,b,e);for(var q:e.mesh().leafEnvelopes(frame(e,base,a),frame(e,base,b)))result.add(e.moving()?q.inflate(pad.x,pad.y,pad.z):q);}}return List.copyOf(result);}
+ boolean intersects(RigidTransform base,float from,float to,AABB obstacle){
+  if(!NervRigidMeshSweepR52.transformed(bounds(from).minmax(bounds(to)),base).intersects(obstacle))return false;
+  // Against a stationary block, monotone easing traverses exactly the same
+  // straight sweep. Split at the real drop/retreat corner; padding the curve
+  // beyond its endpoint falsely penetrates the untouched pocket end wall.
+  if(Math.min(from,to)<.25F&&Math.max(from,to)>.25F)
+   return straightBlockSweep(base,from,.25F,obstacle)||straightBlockSweep(base,.25F,to,obstacle);
+  return straightBlockSweep(base,from,to,obstacle);
+ }
+ private boolean straightBlockSweep(RigidTransform base,float from,float to,AABB obstacle){
+  for(var e:elements)if(e.mesh().intersects(frame(e,base,from),frame(e,base,to),obstacle,.003))return true;
+  return false;
+ }
+ boolean intersects(RigidTransform base,float from,float to,NervRigidMeshSweepR52 obstacle,RigidTransform obstacleFrom,RigidTransform obstacleTo){if(!NervRigidMeshSweepR52.transformed(bounds(from).minmax(bounds(to)),base).intersects(obstacle.envelope(obstacleFrom,obstacleTo)))return false;int n=divisions(from,to);for(int k=0;k<n;k++){float a=from+(to-from)*k/n,b=from+(to-from)*(k+1)/n;var oa=obstacleFrom.interpolate(obstacleTo,k/(double)n);var ob=obstacleFrom.interpolate(obstacleTo,(k+1D)/n);for(var e:elements){var pad=error(base,a,b,e);if(e.mesh().intersects(frame(e,base,a),frame(e,base,b),obstacle,oa,ob,.003,e.moving()?pad:Vec3.ZERO))return true;}}return false;}
 }

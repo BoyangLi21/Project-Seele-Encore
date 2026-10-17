@@ -43,7 +43,7 @@ public final class EntryPlugDirector
     /** Ticks the crane takes to draw a seated capsule back out to its cage. */
     public static final int EJECTION_TICKS = 197;
     /** Pyrotechnic extraction, ballistic clearance and landing. */
-    public static final int FIELD_EJECTION_TICKS = 70;
+    public static final int FIELD_EJECTION_TICKS = 24;
     private static final Map<ResourceKey<Level>, Map<Integer, UUID>>
             CACHED_PLUGS = new HashMap<>();
     /** Last crane frame drawn per cage, so identical ticks cost nothing. */
@@ -1383,17 +1383,21 @@ public final class EntryPlugDirector
                 ||unit.getPilotEntity()!=pilot||unit.isNervLogisticsLocked()||unit.isLaunchSequenceActive()||unit.hasActiveCarrierMotion()||com.projectseele.entity.EvaAirTransportR31.active(unit)||!plug.isHatchFullySealed())return false;
         var seated=plug.getCanonicalTransform();var socket=unit.getEntryPlugSocketPosition();var outward=unit.getForward().multiply(-1,0,-1).normalize();if(outward.lengthSqr()<1e-4)return false;
         Vec3 escape=socket.add(outward.scale(EvaScale.ENTRY_PLUG_LENGTH*.54)).add(0,EvaScale.ENTRY_PLUG_LENGTH*.12,0).add(outward.scale(12)).add(0,9,0);
-        var landing=findClearFieldEjectionLandingR50(level,unit,plug,seated,escape,unit.position().add(outward.scale(EvaScale.ENTRY_PLUG_LENGTH+12)));if(landing==null||!NervMappedPlugMechanicsR52.clearFieldArc(level,unit,plug,seated,escape,landing))return false;
+        var landing=findClearFieldEjectionLandingR50(level,unit,plug,seated,escape,unit.position().add(outward.scale(EvaScale.ENTRY_PLUG_LENGTH+12)));
+        // The R50 landing selector already checks every native capsule frame.
+        // Repeating the whole arc with every imported mesh triangle stalled V
+        // on the server thread before the first ejection frame was published.
+        if(landing==null||!NervR50CarrierModeR53.enabled()&&!NervMappedPlugMechanicsR52.clearFieldArc(level,unit,plug,seated,escape,landing))return false;
         var before=EntryPlugEjectionR48.snapshot(plug);if(!plug.beginFieldEjection(seated.translation(),escape,landing)||!EntryPlugEjectionR48.detach(unit,plug,before))return false;
         plug.setCanonicalTransform(seated);plug.getPersistentData().putInt("MappedFieldEjectionAgeR52",0);return true;
     }
     public static RigidTransform mappedFieldPoseR52(RigidTransform start,Vec3 escape,Vec3 landing,int ticks)
-    {double t=Mth.clamp(ticks/(double)FIELD_EJECTION_TICKS,0,1);var point=t<=.38?start.translation().lerp(escape,smoothstep(t/.38)):escape.lerp(landing,smoothstep((t-.38)/.62)).add(0,Math.sin(Math.PI*smoothstep((t-.38)/.62))*8,0);return new RigidTransform(point,start.qx(),start.qy(),start.qz(),start.qw());}
+    {double t=Mth.clamp(ticks/(double)FIELD_EJECTION_TICKS,0,1);var point=t<=.38?start.translation().lerp(escape,smoothstep(t/.38)):escape.lerp(landing,smoothstep((t-.38)/.62)).add(0,Math.sin(Math.PI*smoothstep((t-.38)/.62))*8,0);var axis=start.transformVector(new Vec3(0,0,1));var flat=new org.joml.Quaternionf().rotationY((float)Math.atan2(axis.x,axis.z));var rotation=start.rotation().slerp(flat,(float)smoothstep(Mth.clamp((t-.38)/.62,0,1)));return RigidTransform.of(point,rotation);}
     public static boolean tickMappedFieldEjectionR52(EntryPlugCarrierEntity plug)
     {
         if(!NervOriginalActorsR52.managed(plug)||!(plug.level() instanceof ServerLevel level)||plug.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_FIELD_EJECTING)return false;
         var fleet=EvaFleetSavedData.get(level.getServer()).entry(plug.getAssignedVariant()).orElse(null);if(fleet==null||!(level.getEntity(fleet.canonicalId()) instanceof EvaUnit01Entity unit))return false;
-        int age=plug.getPersistentData().getInt("MappedFieldEjectionAgeR52")+1;var current=plug.getCanonicalTransform();var start=new RigidTransform(plug.getFieldEjectionStart(),current.qx(),current.qy(),current.qz(),current.qw());var target=mappedFieldPoseR52(start,plug.getFieldEjectionEscape(),plug.getFieldEjectionLanding(),age);
+        int age=plug.getPersistentData().getInt("MappedFieldEjectionAgeR52")+1;var current=plug.getCanonicalTransform();var start=plug.getPersistentData().contains("FieldEjectionStartFrameR53")?NervAircraftFrameR52.decodeRigid(plug.getPersistentData().getCompound("FieldEjectionStartFrameR53")):new RigidTransform(plug.getFieldEjectionStart(),current.qx(),current.qy(),current.qz(),current.qw());var target=mappedFieldPoseR52(start,plug.getFieldEjectionEscape(),plug.getFieldEjectionLanding(),age);
         if(!NervMappedPlugMechanicsR52.clearCapsule(level,unit,plug,current,target,null))return false;tickFieldEjectionCommon(plug,age);plug.getPersistentData().putInt("MappedFieldEjectionAgeR52",age);plug.syncPilotPositionNow();return true;
     }
     public static void tickFieldEjection(EntryPlugCarrierEntity plug, int ticks)
@@ -1426,8 +1430,16 @@ public final class EntryPlugDirector
                     .add(0.0D, Math.sin(Math.PI * phase) * 8.0D, 0.0D);
         }
         RigidTransform current = plug.getCanonicalTransform();
-        plug.setCanonicalTransform(new RigidTransform(position,
-                current.qx(), current.qy(), current.qz(), current.qw()));
+        var initial=plug.getPersistentData().contains("FieldEjectionStartFrameR53")?NervAircraftFrameR52.decodeRigid(plug.getPersistentData().getCompound("FieldEjectionStartFrameR53")):new RigidTransform(start,current.qx(),current.qy(),current.qz(),current.qw());
+        plug.setCanonicalTransform(mappedFieldPoseR52(initial,escape,landing,ticks));
+        if(ticks==1)
+        {
+            level.playSound(null,start.x,start.y,start.z,com.projectseele.registry.ModSounds.LAUNCH_ELECTRIC_BURST_R53.get(),SoundSource.BLOCKS,4F,1.2F);
+            level.playSound(null,start.x,start.y,start.z,com.projectseele.registry.ModSounds.FACILITY.get("facility_hydraulic_launch").get(),SoundSource.BLOCKS,4F,1.3F);
+            GiantParticles.send(level,ParticleTypes.FLASH,start.x,start.y,start.z,1,0,0,0,0);
+            GiantParticles.send(level,ParticleTypes.CLOUD,start.x,start.y,start.z,90,1.5,1.5,1.5,.8);
+            GiantParticles.send(level,ParticleTypes.FIREWORK,start.x,start.y,start.z,70,.6,.6,.6,1.2);
+        }
         plug.setInsertionProgress(
                 (int) Math.round((1.0D - linear) * 100.0D));
         if (ticks % 3 == 0)
@@ -1657,8 +1669,10 @@ public final class EntryPlugDirector
             {
                 continue;
             }
+            var direction=seated.transformVector(new Vec3(0,0,1));
+            seated=RigidTransform.of(seated.translation(),new org.joml.Quaternionf().rotationY((float)Math.atan2(direction.x,direction.z)));
             Vec3 position = new Vec3(x + 0.5D, y + 2.4D, z + 0.5D);
-            RigidTransform pose = new RigidTransform(position, seated.qx(), seated.qy(), seated.qz(), seated.qw());
+            RigidTransform pose = new RigidTransform(position,seated.qx(),seated.qy(),seated.qz(),seated.qw());
             AABB bounds = EntryPlugKinematics.worldBounds(pose,
                     EntryPlugKinematics.BODY_OBB_CENTRE_P, EntryPlugKinematics.BODY_OBB_HALF_EXTENTS);
             position = position.add(0, y + 1.04D - bounds.minY, 0);
@@ -1691,7 +1705,7 @@ public final class EntryPlugDirector
             Vec3 position = linear <= .38 ? seated.translation().lerp(escape, smoothstep(linear / .38))
                     : escape.lerp(landing, smoothstep((linear - .38) / .62))
                         .add(0, Math.sin(Math.PI * smoothstep((linear - .38) / .62)) * 8, 0);
-            RigidTransform pose = new RigidTransform(position, seated.qx(), seated.qy(), seated.qz(), seated.qw());
+            RigidTransform pose = mappedFieldPoseR52(seated,escape,landing,sample);
             AABB current = EntryPlugKinematics.worldBounds(pose,
                     EntryPlugKinematics.BODY_OBB_CENTRE_P, EntryPlugKinematics.BODY_OBB_HALF_EXTENTS).deflate(.04);
             if (!EntryPlugEjectionR48.loaded(level, previous.minmax(current).inflate(.1))) return false;
@@ -1986,6 +2000,11 @@ public final class EntryPlugDirector
 
     private static BlockPos hangarBed(ServerLevel level, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            var bay=java.util.Objects.requireNonNull(NervOriginalActorsR52.bayPose(level,variant),"迁移后的机库正在加载");
+            return BlockPos.containing(bay.translation()).below();
+        }
         if (FacilityV2EvaRuntime.supportsPlugCrane(level, variant))
         {
             return FacilityV2EvaRuntime.hangarBed(level, variant);
@@ -2008,6 +2027,11 @@ public final class EntryPlugDirector
     private static boolean isInsideAssignedCage(
             ServerLevel level, EvaUnit01Entity unit, int variant)
     {
+        if(NervRouteRuntimeR52.claimed(level))
+        {
+            var bay=NervOriginalActorsR52.bayPose(level,variant);
+            return bay!=null&&unit.getUnitVariant()==variant&&unit.position().distanceToSqr(bay.translation())<16;
+        }
         if (FacilityV2EvaRuntime.ready(level, variant))
         {
             return unit.getUnitVariant() == variant

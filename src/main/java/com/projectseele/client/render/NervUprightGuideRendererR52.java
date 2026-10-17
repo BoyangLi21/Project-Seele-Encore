@@ -69,6 +69,7 @@ public final class NervUprightGuideRendererR52 {
         for(var shape:level.getBlockState(a.at()).getCollisionShape(level,a.at()).toAabbs()){var b=shape.move(a.at());boolean good=true;for(double x:new double[]{-.05,0,.05})for(double z:new double[]{-.05,0,.05}){var p=a.bearing().add(u.scale(x)).add(v.scale(z));double plane=n.x>0?b.maxX:n.x<0?b.minX:n.y>0?b.maxY:n.y<0?b.minY:n.z>0?b.maxZ:b.minZ;double coordinate=n.x!=0?p.x:n.y!=0?p.y:p.z;if(Math.abs(coordinate-plane)>.0002||p.x<b.minX-.0002||p.x>b.maxX+.0002||p.y<b.minY-.0002||p.y>b.maxY+.0002||p.z<b.minZ-.0002||p.z>b.maxZ+.0002)good=false;}if(good)return true;}return false;
     }
     static void draw(RenderLevelStageEvent event,ClientLevel level){
+        if(com.projectseele.world.NervR50CarrierModeR53.enabled())return;
         String selected=FacilityFrameClientR52.uprightGuideSourceR52(level);if(selected.isEmpty()){if(!expected.isEmpty())clear();return;}
         if(!selected.equals(expected)){clear();expected=selected;status="LOADING";long token=generation;loading=CompletableFuture.supplyAsync(()->{try{return read(selected,token);}catch(IOException e){throw new CompletionException(e);}},READER);}
         if(loaded==null&&loading!=null&&loading.isDone()){try{loaded=loading.join();parsedParts=loaded.pieceCount();status="LOADED";}catch(RuntimeException failure){status="FAILED";ProjectSeele.LOGGER.error("Actual declared upright visual source rejected sha={}",expected,failure);}loading=null;}

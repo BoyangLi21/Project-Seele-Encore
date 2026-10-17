@@ -21,11 +21,11 @@ public final class StaffUndergroundChoiceR52
         return new Choice(unit,fields[2].equals("prepare"));
     }
     public static String initialOperation(String requested)
-    {return requested.equals("deploy")||requested.equals(PREPARE_AND_DEPLOY)?"prepare":requested;}
+    {return requested.equals("deploy")||requested.startsWith("deploy_")||requested.equals(PREPARE_AND_DEPLOY)?"prepare":requested;}
     public static String readyContinuation(String requested,String phase)
     {
         if(!deploymentReady(phase))return "";
-        return requested.equals(PREPARE_AND_DEPLOY)?"underground":requested.equals("deploy")?"launch":"";
+        return requested.equals(PREPARE_AND_DEPLOY)?"underground":requested.equals("deploy")||requested.startsWith("deploy_")?"launch":"";
     }
     public static boolean deploymentReady(String phase){return "SILO_READY".equals(phase);}
     public static boolean deployedDoorReady(String phase){return "DEPLOYED".equals(phase);}

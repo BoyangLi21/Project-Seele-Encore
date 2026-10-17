@@ -3,7 +3,7 @@ package com.projectseele.world;
 import java.util.*;
 import java.util.concurrent.*;
 
-/** One bounded CPU/byte-source worker. Callers poll; the server never waits.
+/** One bounded CPU/byte-source worker. Live callers poll without waiting.
  * Tasks must capture only immutable source data, never a Level or Entity. */
 public final class NervSourcePreparationR52 {
     public record Poll<T>(T value,String hold) { public boolean ready(){return value!=null;} }
@@ -31,6 +31,25 @@ public final class NervSourcePreparationR52 {
         if(!existing.isDone())return new Poll<>(null,"immutable sources still preparing");
         try{return new Poll<>(existing.getNow(null),"");}
         catch(CompletionException failure){var cause=failure.getCause();return new Poll<>(null,"immutable source preparation failed: "+cause.getClass().getSimpleName()+": "+cause.getMessage());}
+    }
+    /** Only the ServerAboutToStart lifecycle may await this result, before
+     * world simulation or entity deserialization. Live polling reuses it. */
+    public static <T> T beforeServerLoadR53(String key,Callable<T> loader)throws Exception
+    {
+        CompletableFuture<T> future;
+        synchronized(NervSourcePreparationR52.class)
+        {
+            Poll<T> ready=poll(key,loader);if(ready.ready())return ready.value();
+            @SuppressWarnings("unchecked") var pending=(CompletableFuture<T>)JOBS.get(key);
+            if(pending==null)throw new IllegalStateException(ready.hold());future=pending;
+        }
+        try{return future.get();}
+        catch(ExecutionException failure)
+        {
+            var cause=failure.getCause();if(cause instanceof Exception exception)throw exception;
+            if(cause instanceof Error error)throw error;throw new IllegalStateException(cause);
+        }
+        catch(InterruptedException interrupted){Thread.currentThread().interrupt();throw interrupted;}
     }
     private NervSourcePreparationR52(){}
 }

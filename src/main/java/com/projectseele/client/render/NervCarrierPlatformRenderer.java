@@ -85,8 +85,8 @@ public final class NervCarrierPlatformRenderer
             float service=entity.repairProgressR33();
             TvFacilityMeshes.withBuffers(buffers,()->
             {
-                TvFacilityMeshes.cage(poses,packedLight,entity.getRestraintProgress(partialTick),entity.getUnitVariant(),entity.lowerFrameProgressR52(partialTick));
-                NervServiceFootDriveRendererR52.render(poses,packedLight,entity,partialTick);
+                TvFacilityMeshes.cage(poses,packedLight,entity.getRestraintProgress(partialTick),entity.getUnitVariant(),Float.NaN);
+
                 EvaBayMachineryR33.render(poses,service<0?-1:Math.min(1,service+partialTick/2400F),entity.tickCount+partialTick,15.2F,false,entity.getUnitVariant());
             });
             super.render(entity, yaw, partialTick, poses, buffers,

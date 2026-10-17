@@ -71,6 +71,7 @@ public final class TvEncounterSitesR45
                 {
                     if(!entry.getKey().equals("ramiel")&&!entry.getKey().equals("gaghiel"))continue;
                     var r=entry.getValue().getAsJsonObject();
+                    if(r.has("retired_r53")&&r.get("retired_r53").getAsBoolean())continue;
                     var site=new Site(r.get("id").getAsString(),vec(r.getAsJsonArray("hero")),vec(r.getAsJsonArray("angel")),
                             vec(r.getAsJsonArray("cover")),r.get("yaw").getAsFloat(),r.get("requires_retracted_city").getAsBoolean(),
                             r.get("geometry_validated").getAsBoolean(),r.get("model_ready").getAsBoolean(),r.get("visibility").getAsString(),

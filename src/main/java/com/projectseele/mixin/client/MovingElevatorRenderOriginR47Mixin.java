@@ -9,11 +9,21 @@ import net.minecraft.util.Mth;
 import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.injection.At;
 import org.spongepowered.asm.mixin.injection.ModifyVariable;
+import org.spongepowered.asm.mixin.injection.Inject;
+import org.spongepowered.asm.mixin.injection.callback.CallbackInfo;
 
 /** The renderer's virtual block/BE coordinates use the same floor rule as world blocks. */
 @Mixin(value=ElevatorGroupRenderer.class,remap=false)
 public abstract class MovingElevatorRenderOriginR47Mixin
 {
+    @Inject(method={"renderGroupBlocks","renderGroupBlockEntities"},at=@At("HEAD"),remap=false)
+    private static void seele$beginHorizontalRender(PoseStack poses,ElevatorGroup group,MultiBufferSource buffers,float partialTick,CallbackInfo ci)
+    {com.projectseele.client.LiftTransferRenderClockR53.begin(partialTick);}
+
+    @Inject(method={"renderGroupBlocks","renderGroupBlockEntities"},at=@At("RETURN"),remap=false)
+    private static void seele$endHorizontalRender(PoseStack poses,ElevatorGroup group,MultiBufferSource buffers,float partialTick,CallbackInfo ci)
+    {com.projectseele.client.LiftTransferRenderClockR53.end();}
+
     @ModifyVariable(method={"renderGroupBlocks","renderGroupBlockEntities"},
             at=@At("STORE"),ordinal=0,remap=false)
     private static BlockPos projectSeele$floorUndergroundRenderAnchor(BlockPos original,

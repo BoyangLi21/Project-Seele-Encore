@@ -34,6 +34,12 @@ public final class DirectoryTriangleSweepR52Test
         Vec3[] chord={new Vec3(-2,0,-2),new Vec3(-2,2,-2),new Vec3(-2,0,2),new Vec3(2,0,-2),new Vec3(2,2,-2),new Vec3(2,0,2)};check(TriangleSweepMeshR52.convexSweepBox(chord,0,new AABB(-.1,.5,-.1,.1,.7,.1)),"Translation swept triangle prism missed an interior obstacle");check(!TriangleSweepMeshR52.convexSweepBox(chord,0,new AABB(5,5,5,6,6,6)),"Separated obstacle filled synthetic empty space");
         var straight=new DirectoryTrajectoryR52(directory,directory.leg("original1"),binding,0,1);check(straight.angularTravel()==0&&straight.roundoffBound(60)==0,"Fixed upright transfer invented angular clearance padding");
         check(mesh.intersects(curve,new NervRigidMeshSweepR52(box(obstacle)),RigidTransform.identity(),RigidTransform.identity(),.005),"Actual moving source pair missed the certified foot-coupled midpoint");
+        // This triangle's whole arc is inside radius 10.1 around the bearing.
+        // A coarse chord's padding reaches the nearby box; the source does not.
+        var nearArc=new AABB(10.000009,11.082570271119964,10.609882237993512,10.000011,11.082572271119963,10.60988423799351);
+        check(Math.hypot(nearArc.minY-1,nearArc.minZ-10)>10.1,"Near-arc negative fixture entered the true source radius");
+        check(!mesh.intersects(curve,nearArc,.005),"Curve enclosure padding was treated as solid machinery");
+        check(mesh.intersects(curve,nearArc.inflate(.01),.005),"Refining a near miss waived a real curved-path intrusion");
         var stopped=new DirectoryTrajectoryR52(directory,directory.leg("original1"),binding,0,0);var stoppedFrame=stopped.sample(0).evaRoot();
         var smallBody=new TriangleSweepMeshR52(box(new AABB(-.2,-.2,-.2,.2,.2,.2)));
         var frameBoxes=List.of(new AABB(-2,-2,-.5,-1,2,.5),new AABB(1,-2,-.5,2,2,.5),new AABB(-1,-2,-.5,1,-1,.5),new AABB(-1,1,-.5,1,2,.5));
@@ -41,6 +47,19 @@ public final class DirectoryTriangleSweepR52Test
         check(smallBody.intersects(stopped,hollow.envelope(stoppedFrame,stoppedFrame),.005),"Hollow fixture failed to expose whole-bounding-box false positive");
         check(!smallBody.intersects(stopped,hollow,stoppedFrame,stoppedFrame,.005),"Actual open machinery cavity was filled by its actor box");
         check(smallBody.intersects(stopped,new NervRigidMeshSweepR52(box(new AABB(-.4,-.4,-.05,.4,.4,.05))),stoppedFrame,stoppedFrame,.005),"Real closed leaf crossing the same cavity was missed");
+        var reused=smallBody.prepare(stopped,.005);
+        for(int i=0;i<120;i++)
+        {
+            var centre=stoppedFrame.transformPoint(new Vec3(i%2==0?0:4,0,0));
+            var movingObstacle=new AABB(centre.add(-.03,-.03,-.03),centre.add(.03,.03,.03));
+            check(reused.intersects(movingObstacle)==(i%2==0),"Prepared source reused a previous live obstacle result");
+            check(!reused.intersects(hollow,stoppedFrame,stoppedFrame),"Prepared bounds filled a hollow obstacle");
+        }
+        for(var path:List.of(curve,combined,straight,stopped))for(int i=0;i<=1000;i++)
+        {
+            double time=i/1000D;var direct=path.directory().sample(path.leg(),path.directory().intervalFraction(path.leg(),path.fromFraction(),path.toFraction(),time),path.binding());
+            check(path.sample(time).equals(direct),"Reused source sample changed the actual directory transform");
+        }
         System.out.println("R52 actual directory curve/triangle chord proof PASS checks="+checks+"; no native world acceptance");
     }
     private DirectoryTriangleSweepR52Test(){}

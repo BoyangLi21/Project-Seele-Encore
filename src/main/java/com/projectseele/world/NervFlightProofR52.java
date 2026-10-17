@@ -24,6 +24,7 @@ public final class NervFlightProofR52
         default NervFlightGatePlanR52 previewFlightGates(ServerLevel level,Original original,Kind kind,Set<String> gates){return gates.isEmpty()?NervFlightGatePlanR52.inspect(level,Map.of(),gates,TransportMembershipR52.members(original,kind)):null;}
         default Set<String> flightReceiverGates(ServerLevel level,String port){return Set.of();}
         default boolean flightGateSampleCurrent(ServerLevel level,String id){return false;}
+        default boolean closeIdleAirshaftGateR53(ServerLevel level,String id){return false;}
         default RigidTransform resolveFlightReceiverCargoRootR52(ServerLevel level,Original original,Kind kind,String port,CompoundTag data){return null;}
         default boolean prepareFlightGates(ServerLevel level,Original original,Kind kind,Set<String> gates,CompoundTag data){return gates.isEmpty();}
         default boolean holdFlightPickup(ServerLevel level,CheckedPickupHold proof,CompoundTag data){return false;}
@@ -45,7 +46,7 @@ public final class NervFlightProofR52
     private static FullAssemblyGeometryR52.Provider capsules;
     public static synchronized void installCapsules()throws IOException
     {
-        var receipt=JsonParser.parseString(new String(EvaOriginalMeshGeometryR52.classpathBytes("eva/full_assembly_geometry_r52_sources.json"),StandardCharsets.UTF_8)).getAsJsonObject();var hashes=new HashMap<String,String>();receipt.getAsJsonObject("resources").entrySet().forEach(e->hashes.put(e.getKey(),e.getValue().getAsString()));capsules=FullAssemblyGeometryR52.load(EvaOriginalMeshGeometryR52::classpathBytes,hashes);
+        var receipt=JsonParser.parseString(new String(EvaOriginalMeshGeometryR52.classpathBytes("eva/full_assembly_geometry_r52_sources.json"),StandardCharsets.UTF_8)).getAsJsonObject();var hashes=new HashMap<String,String>();receipt.getAsJsonObject("resources").entrySet().forEach(e->hashes.put(e.getKey(),e.getValue().getAsString()));capsules=FullAssemblyGeometryR52.selectedClasspathProviderR52(hashes);
     }
     public static final class FlightPickupPreview
     {
@@ -92,7 +93,7 @@ public final class NervFlightProofR52
     public static FlightPickupPreview inspect(ServerLevel l,Original o,Kind kind)
     {
         if(!(l.getEntity(o.eva()) instanceof EvaUnit01Entity e)||!e.isAlive()||e.isExperimentalUnit()||e.getUnitVariant()!=o.variant()||!l.dimension().location().toString().equals(o.dimension()))return null;
-        var fleet=EvaFleetSavedData.get(l.getServer()).entry(o.variant()).orElse(null);var deployed=NervRouteRuntimeR52.originalForFlight(l,o.variant(),o.owner());if(fleet==null||!fleet.canonicalId().equals(o.eva())||!fleet.entryPlugId().equals(o.plug())||!AutoSortieR32.missionToken(l).equals(o.mission())&&(deployed==null||!deployed.equals(o)))return null;
+        var fleet=EvaFleetSavedData.get(l.getServer()).entry(o.variant()).orElse(null);var deployed=NervRouteRuntimeR52.originalForFlight(l,o.variant(),o.owner());if(fleet==null||!fleet.canonicalId().equals(o.eva())||!o.plug().equals(fleet.entryPlugId())&&(kind!=Kind.HULL_ONLY_RECOVERY||fleet.entryPlugId()!=null||!EntryPlugDisposalR31.destroyed(l,o.plug()))||!AutoSortieR32.missionToken(l).equals(o.mission())&&(deployed==null||!deployed.equals(o)))return null;
         NervHullPreviewR52 hp=null;EvaMechanicalFrameR52.OccupiedCapture occupied=null;EvaMechanicalFrameR52.HullCapture hull=null;FootSupportFrameR52.Binding binding;RigidTransform frame;
         if(EvaMechanicalFrameR52.active(e)){if(EvaMechanicalFrameR52.kind(e)!=kind)return null;binding=EvaMechanicalFrameR52.measuredBinding(e,o);frame=EvaMechanicalFrameR52.frame(e,1);}
         else if(kind==Kind.HULL_ONLY_RECOVERY){hp=NervHullPreviewR52.inspect(e,o);if(hp==null)return null;hull=hp.capture();binding=hp.binding();frame=hp.frame();}
@@ -140,6 +141,7 @@ public final class NervFlightProofR52
         if(!(l.getEntity(aircraft) instanceof UNTransportEntity p)||!NervAircraftFrameR52.contextMatches(p,manifest)||!NervAirTransportManifestR52.same(NervAircraftFrameR52.actual(p),from.plane())||movingCargo&&(preview==null||!preview.shapeCurrent(l)))return null;
         var sweep=prepared.sweep;if(preview==null)return null;
         var proof=new CheckedFlightStep(l,aircraft,preview,from,to,sweep,manifest.fingerprint(),movingCargo,preview.original(),preview.kind(),spaces,rotorFrom,rotorTo,geometry,prepared.envelopes());var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null||manifest.directory().resource(id)==null||manifest.directory().resource(id).kind()!=ResourceKind.SPACE)return null;declared.addAll(b.spaces());}
+        if(NervR50CarrierModeR53.enabled())return authorizedDynamicSpacesR52(manifest,proof.envelopes(),spaces,bindings)&&(!movingCargo&&NervAirTransportManifestR52.same(from.plane(),to.plane())&&from.rig().equals(to.rig())||scriptedFlightAvailableR53(l,proof.envelopes(),null))?proof:null;
         if(!authorizedDynamicSpacesR52(manifest,proof.envelopes(),spaces,bindings)||movingCargo&&sweep.airframeIntersectsCargo(preview.surfaces,root(preview,from),root(preview,to))||!clear(l,p,preview,from,to,sweep,proof.envelopes(),declared,proof.own,movingCargo))return null;
         return proof;
     }
@@ -151,7 +153,7 @@ public final class NervFlightProofR52
         if(prepared==null||!prepared.matchesR52(l,geometry,null,from,to,rotorFrom,rotorTo,false))return null;
         if(!(l.getEntity(aircraft) instanceof UNTransportEntity p)||!NervAircraftFrameR52.contextMatches(p,manifest)||p.carrying()||from.rig().deployment()!=0||to.rig().deployment()!=0||!NervAirTransportManifestR52.same(NervAircraftFrameR52.actual(p),from.plane())||!NervAircraftFrameR52.frame(p,1).rig().equals(from.rig()))return null;
         var sweep=prepared.sweep;var proof=new CheckedFlightStep(l,aircraft,null,from,to,sweep,manifest.fingerprint(),false,original,kind,spaces,rotorFrom,rotorTo,geometry,prepared.envelopes());var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return null;declared.addAll(b.spaces());}
-        return authorizedDynamicSpacesR52(manifest,proof.envelopes(),spaces,bindings)&&clear(l,p,null,from,to,sweep,proof.envelopes(),declared,Set.of(aircraft),false)?proof:null;
+        return authorizedDynamicSpacesR52(manifest,proof.envelopes(),spaces,bindings)&&(NervR50CarrierModeR53.enabled()?scriptedFlightAvailableR53(l,proof.envelopes(),null):clear(l,p,null,from,to,sweep,proof.envelopes(),declared,Set.of(aircraft),false))?proof:null;
     }
     public static boolean pathClear(ServerLevel l,NervAirTransportManifestR52 manifest,NervAirframeGeometryR52 geometry,UUID aircraft,FlightPickupPreview preview,Frame from,Frame to,Set<String> spaces,Map<String,NervRouteNativeR52.Binding> bindings,boolean movingCargo,int ticks)
     {return pathClear(l,manifest,geometry,aircraft,preview,from,to,spaces,bindings,movingCargo,ticks,null);}
@@ -164,11 +166,24 @@ public final class NervFlightProofR52
         try
         {
             var sweep=prepared.sweep;var boxes=prepared.envelopes();var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return false;declared.addAll(b.spaces());}
-            if(!authorizedDynamicSpacesR52(manifest,boxes,spaces,bindings))return false;var own=new HashSet<UUID>();own.add(aircraft);if(movingCargo){own.addAll(preview.members());if(sweep.airframeIntersectsCargo(preview.surfaces,from.cargo(),to.cargo()))return false;}return clear(l,p,preview,from,to,sweep,boxes,declared,own,movingCargo,plan);
+            if(!authorizedDynamicSpacesR52(manifest,boxes,spaces,bindings))return false;
+            if(NervR50CarrierModeR53.enabled())return scriptedFlightAvailableR53(l,boxes,plan);
+            var own=new HashSet<UUID>();own.add(aircraft);if(movingCargo){own.addAll(preview.members());if(sweep.airframeIntersectsCargo(preview.surfaces,from.cargo(),to.cargo()))return false;}return clear(l,p,preview,from,to,sweep,boxes,declared,own,movingCargo,plan);
         }
         catch(IllegalArgumentException|IllegalStateException blocked){return false;}
     }
     private static boolean authorizedDynamicSpacesR52(NervAirTransportManifestR52 manifest,List<AABB> envelopes,Set<String> spaces,Map<String,NervRouteNativeR52.Binding> bindings){if(manifest.directory().dynamicSpacesR52().domains().isEmpty())return true;try{return spaces.containsAll(manifest.directory().dynamicSpacesR52().required(manifest.dimension(),envelopes,bindings));}catch(IllegalArgumentException denied){return false;}}
+    /** User-selected scripted preview. The exact collision diagnostic below
+     * remains available; original actors, poses and leases stay with callers. */
+    private static boolean scriptedFlightAvailableR53(ServerLevel level,List<AABB> boxes,NervFlightGatePlanR52 plan)
+    {
+        if(boxes.isEmpty()||plan!=null&&!plan.current(level))return false;
+        var seen=new HashSet<Long>();
+        for(var box:boxes)for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(Math.nextDown(box.maxX))>>4);x++)
+            for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(Math.nextDown(box.maxZ))>>4);z++)
+                if(seen.add(net.minecraft.world.level.ChunkPos.asLong(x,z))&&level.getChunkSource().getChunkNow(x,z)==null)return false;
+        return true;
+    }
     private static boolean clear(ServerLevel l,Entity p,FlightPickupPreview preview,Frame from,Frame to,NervAirframeGeometryR52.Sweep sweep,List<AABB> envelopes,List<AABB> declared,Set<UUID> own,boolean movingCargo)
     {return clear(l,p,preview,from,to,sweep,envelopes,declared,own,movingCargo,null);}
     private static boolean clear(ServerLevel l,Entity p,FlightPickupPreview preview,Frame from,Frame to,NervAirframeGeometryR52.Sweep sweep,List<AABB> envelopes,List<AABB> declared,Set<UUID> own,boolean movingCargo,NervFlightGatePlanR52 plan)
@@ -218,10 +233,28 @@ public final class NervFlightProofR52
     private static List<ObstacleMesh> obstacleMeshes(Entity actor,NervAirframeGeometryR52 source)
     {
         if(actor instanceof NervCarrierPlatformEntity gantry){try{if(NervFootGuideStationR52.declared(gantry))return NervFootGuideStationR52.actualMeshesR52(gantry);if(NervOriginalCarrierR52.declared(gantry))return NervOriginalCarrierR52.actualMeshesR52(gantry);if(gantry.isPlugCrane())return NervCraneGeometryR52.actualObstacleMeshesR52(gantry);if(!gantry.isRestraintGantry()||!gantry.hasDeclaredMachineFrameR52()||!gantry.declaredCollisionSourceR52().equals(selectedCageSourceR52()))return null;return NervPlantMotionR52.actualRenderedMeshesR52(gantry);}catch(IOException|IllegalStateException missing){return null;}}
-        if(actor instanceof EvaUnit01Entity eva){var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var body=EvaMechanicalFrameR52.active(eva)?EvaMechanicalFrameR52.frozenLocalPose(eva):EvaBodyPose.sample(eva,1);var hands=EvaFrozenHandsR52.capture(eva,1);var geometry=provider.evaluate(eva.getUnitVariant(),body,EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),hands));var root=EvaMechanicalFrameR52.active(eva)?EvaMechanicalFrameR52.frame(eva,1):NervOwnerPlacementR52.actualRoot(eva);var out=new ArrayList<ObstacleMesh>();for(var part:geometry.parts())out.add(new ObstacleMesh(new NervRigidMeshSweepR52(part.triangles()),root));if(!EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(eva)&&NervMappedPlugMechanicsR52.actualCarrierVisibleR52(eva)){if(capsules==null)try{installCapsules();}catch(IOException missing){return null;}float release=eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR?EvaDorsalMechanism.smooth(1-(eva.getLaunchTicks()-1)/18F):0;try{for(var mesh:carrierMeshes(eva))out.add(new ObstacleMesh(mesh,EvaMechanicalFrameR52.carrierFrameR52(eva,1)));}catch(IOException missing){return null;}}return List.copyOf(out);}
-        if(actor instanceof EntryPlugCarrierEntity plug){if(!plug.isHatchFullySealed())return null;if(capsules==null)try{installCapsules();}catch(IOException missing){return null;}var out=new ArrayList<ObstacleMesh>();for(var part:capsules.closedPlugParts(plug.getAssignedVariant()).values())out.add(new ObstacleMesh(new NervRigidMeshSweepR52(part),plug.getCanonicalTransform()));return List.copyOf(out);}
-        if(actor instanceof NervSiloDoorEntity hatch){if(hatch.declaredSpecR52()==null)return null;var out=new ArrayList<ObstacleMesh>();for(var piece:hatch.declaredGeometryR52().pieces(hatch.actualOpenProgressR52()))out.add(new ObstacleMesh(new NervRigidMeshSweepR52(piece.part().xyz()),hatch.actualFrameR52().compose(piece.local())));return List.copyOf(out);}
-        if(actor instanceof NervHangarDoorEntity gate){if(gate.declaredStackR52()==null)return null;var out=new ArrayList<ObstacleMesh>();for(var piece:gate.declaredGeometryR52().pieces(gate.actualOpenProgressR52()))out.add(new ObstacleMesh(new NervRigidMeshSweepR52(piece.part().xyz()),gate.actualFrameR52().compose(piece.local())));return List.copyOf(out);}
+        if(actor instanceof EvaUnit01Entity eva)
+        {
+            EvaOriginalMeshGeometryR52.Geometry geometry;
+            if(EvaMechanicalFrameR52.active(eva))geometry=EvaMechanicalFrameR52.capturedGeometry(eva);
+            else if(EvaMechanicalFrameR52.serviceSourceHeldR52(eva))geometry=EvaMechanicalFrameR52.serviceGeometryR52(eva);
+            else
+            {
+                var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var body=EvaBodyPose.sample(eva,1);var hands=EvaFrozenHandsR52.capture(eva,1);
+                geometry=provider.evaluate(eva.getUnitVariant(),body,EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),hands));
+            }
+            var root=NervOwnerPlacementR52.actualRoot(eva);var out=new ArrayList<ObstacleMesh>();
+            for(var mesh:NervObstacleMeshesR53.body(geometry))out.add(new ObstacleMesh(mesh,root));
+            if(!EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(eva)&&NervMappedPlugMechanicsR52.actualCarrierVisibleR52(eva))
+            {
+                try{for(var mesh:carrierMeshes(eva))out.add(new ObstacleMesh(mesh,EvaMechanicalFrameR52.carrierFrameR52(eva,1)));}
+                catch(IOException missing){return null;}
+            }
+            return List.copyOf(out);
+        }
+        if(actor instanceof EntryPlugCarrierEntity plug){if(capsules==null)try{installCapsules();}catch(IOException missing){return null;}var out=new ArrayList<ObstacleMesh>();for(var part:NervObstacleMeshesR53.plugParts(capsules,plug.getAssignedVariant()).entrySet())out.add(new ObstacleMesh(part.getValue(),plug.getCanonicalTransform().compose(capsules.plugPartFrameR53(part.getKey(),plug.getHatchOpenAmount()))));return List.copyOf(out);}
+        if(actor instanceof NervSiloDoorEntity hatch){if(hatch.declaredSpecR52()==null)return null;var out=new ArrayList<ObstacleMesh>();for(var piece:hatch.declaredGeometryR52().pieces(hatch.actualOpenProgressR52()))out.add(new ObstacleMesh(NervObstacleMeshesR53.part(piece.part()),hatch.actualFrameR52().compose(piece.local())));return List.copyOf(out);}
+        if(actor instanceof NervHangarDoorEntity gate){if(gate.declaredStackR52()==null)return null;var out=new ArrayList<ObstacleMesh>();for(var piece:gate.declaredGeometryR52().pieces(gate.actualOpenProgressR52()))out.add(new ObstacleMesh(NervObstacleMeshesR53.part(piece.part()),gate.actualFrameR52().compose(piece.local())));return List.copyOf(out);}
         if(!(actor instanceof UNTransportEntity plane))return List.of();if(!NervAircraftFrameR52.active(plane)&&(plane.carrying()||plane.rig(1)!=0))return null;
         var frame=NervAircraftFrameR52.active(plane)?NervAircraftFrameR52.frame(plane,1):new Frame(NervAircraftFrameR52.actual(plane),null,new Rig(plane.hoistDistance(),0,1));var out=new ArrayList<ObstacleMesh>();NervAircraftFrameR52.actual(plane);
         if(plane.groundCart()){var part=source.originalGroundCarrier();if(part==null)return null;return List.of(new ObstacleMesh(new NervRigidMeshSweepR52(part.xyz()),frame.plane()));}
@@ -245,12 +278,25 @@ public final class NervFlightProofR52
     {
         var context=NervRouteRuntimeR52.flightContext(level);var lease=pool.queryFlight(task);if(context==null||context.pool()!=pool||lease==null||preview==null||aircraft==null||!aircraft.current(level)||!preview.current(level)||!lease.original().equals(preview.original())||lease.kind()!=preview.kind()||!lease.aircraft().equals(aircraft.aircraft())||aircraft.from().cargo()!=null||aircraft.to().cargo()!=null||aircraft.from().rig().deployment()!=0||!lease.spaces().containsAll(cargoSpaces)||!positiveBearing(level,preview))return null;
         var boxes=preview.cargoEnvelopes(preview.root(),preview.root());var declared=new ArrayList<AABB>();for(String id:cargoSpaces){var b=bindings.get(id);if(b==null)return null;declared.addAll(b.spaces());}var own=new HashSet<>(preview.members());own.add(aircraft.aircraft());var eva=level.getEntity(preview.original().eva());
+        if(NervR50CarrierModeR53.enabled())
+        {
+            for(var box:boxes)if(!NervAirspaceCoverageR52.covered(box,declared)||!EntryPlugEjectionR48.loaded(level,box))return null;
+            return new CheckedPickupHold(aircraft,preview,task);
+        }
         for(var box:boxes){if(!NervAirspaceCoverageR52.covered(box,declared)||!EntryPlugEjectionR48.loaded(level,box))return null;for(var shape:level.getBlockCollisions(eva,box))for(var obstacle:shape.toAabbs())if(preview.cargoIntersects(preview.root(),preview.root(),obstacle))return null;for(var e:level.getEntities((Entity)null,box,e->!own.contains(e.getUUID())&&e.isAlive()&&!e.isSpectator()&&(e instanceof LivingEntity||e.canBeCollidedWith())))if(preview.cargoIntersects(preview.root(),preview.root(),e.getBoundingBox()))return null;}
         return new CheckedPickupHold(aircraft,preview,task);
     }
     private static boolean positiveBearing(ServerLevel level,FlightPickupPreview preview)
     {
-        if(!(level.getEntity(preview.original().eva()) instanceof EvaUnit01Entity eva)||!eva.onGround()&&!EvaMechanicalFrameR52.active(eva))return false;
+        if(!(level.getEntity(preview.original().eva()) instanceof EvaUnit01Entity eva))return false;
+        if(NervR50CarrierModeR53.enabled())
+        {
+            // Recovery clamps accept ledges, slopes and water. Foot contact
+            // is a locomotion condition, not permission to dispatch rescue.
+            return Double.isFinite(eva.position().lengthSqr())
+                    && eva.getY()>level.getMinBuildHeight() && eva.getY()<level.getMaxBuildHeight();
+        }
+        if(!eva.onGround()&&!EvaMechanicalFrameR52.active(eva))return false;
         if(preview.kind()==Kind.OCCUPIED){var sample=preview.sample(preview.root());return contact(level,eva,sample.leftContact())&&contact(level,eva,sample.rightContact());}
         double low=Double.POSITIVE_INFINITY;var points=new ArrayList<Vec3>();for(var part:preview.geometry().parts())for(var p:part.vertices()){var at=preview.root().transformPoint(p);low=Math.min(low,at.y);points.add(at);}for(var p:points)if(p.y<=low+.002&&contact(level,eva,p))return true;return false;
     }

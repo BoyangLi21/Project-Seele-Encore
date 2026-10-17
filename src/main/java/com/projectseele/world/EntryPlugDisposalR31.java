@@ -39,6 +39,11 @@ public final class EntryPlugDisposalR31
     public static boolean destroyed(ServerLevel level,UUID id)
     {return id!=null&&ledger(level).destroyed.containsKey(id);}
 
+    public static void restoreForMaintenanceR53(ServerLevel level,UUID id)
+    {
+        if(ledger(level).destroyed.remove(id)!=null)ledger(level).setDirty();
+    }
+
     public static boolean replacementAuthorized(EvaPrototypeEntity eva)
     {
         var data=eva.getPersistentData();

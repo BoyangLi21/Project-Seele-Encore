@@ -57,6 +57,7 @@ public final class NervAirTransportManifestR52
         String status=str(root,"status");require(Set.of("design","installed").contains(status),"Root air installation status required");installed=status.equals("installed");
         require(root.get("epoch").getAsLong()==directory.epoch()&&str(root,"directory_fingerprint").equals(directory.fingerprint()),"Air and ground must share the same exact epoch/directory");
         dimension=str(root,"dimension");require(directory.knowsDimension(dimension),"Actual aircraft dimension is absent from ground directory");fingerprint=sha(root.toString().getBytes(StandardCharsets.UTF_8));
+        root=NervAirPickupColumnR53.expand(root);
         double clearance=0;if(root.has("pickup_vertical_clearance")){var value=root.get("pickup_vertical_clearance");require(value.isJsonPrimitive()&&value.getAsJsonPrimitive().isNumber(),"Explicit numeric Root pickup vertical clearance required");clearance=value.getAsDouble();require(Double.isFinite(clearance)&&clearance>0&&clearance<=256,"Finite positive Root pickup vertical clearance of at most256m required");}pickupVerticalClearance=clearance;
         var hashes=new TreeMap<String,String>();root.getAsJsonObject("mesh_sources").entrySet().forEach(e->{require(e.getValue().getAsString().matches("[0-9a-f]{64}"),"Actual source SHA required");hashes.put(e.getKey(),e.getValue().getAsString());});
         require(hashes.keySet().equals(Set.of("mesh/tv_facilities_r16.json","mesh/air_cradle_r31.json")),"Actual R16 aircraft and original cradle source required");sources=Map.copyOf(hashes);
@@ -84,7 +85,7 @@ public final class NervAirTransportManifestR52
         for(var r:receivers.values())
         {
             require(node(r.node())!=null&&node(r.node()).region()==r.region()&&same(r.stopped(),node(r.node()).frame().cargo()),"Actual same-region receiver cargo frame required");
-            if(r.delivery()){require(r.reverseRoutes().isEmpty()&&!r.supports().isEmpty()&&Math.abs(r.stopped().qx())<1e-6&&Math.abs(r.stopped().qz())<1e-6,"Delivery requires explicit actual sole support and an upright frame");for(String gate:r.gates())require(directory.resource(gate)!=null&&directory.resource(gate).kind()==ResourceKind.DOOR,"Delivery gate must be the same existing physical DOOR");}
+            if(r.delivery()){require(r.reverseRoutes().isEmpty()&&(!r.supports().isEmpty()||r.port().startsWith("r53/coordinate/"))&&Math.abs(r.stopped().qx())<1e-6&&Math.abs(r.stopped().qz())<1e-6,"Delivery requires explicit actual sole support and an upright frame");for(String gate:r.gates())require(directory.resource(gate)!=null&&directory.resource(gate).kind()==ResourceKind.DOOR,"Delivery gate must be the same existing physical DOOR");}
             else{var port=directory.ports().get(r.port());require(port!=null&&port.region()==r.region()&&r.reverseRoutes().equals(port.reverseRoutes()),"Air receiver must be the same typed ground port/reverse routes");}
         }
         for(var m:missions.values())

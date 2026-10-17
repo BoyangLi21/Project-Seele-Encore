@@ -100,7 +100,8 @@ public final class EntryPlugEjectionR48
         return unit.getPilotEntity() == null && pilot != null && fleet != null
                 && unit.getUUID().equals(fleet.canonicalId()) && receipt.hasUUID("R49EjectedPilot")
                 && pilot.equals(receipt.getUUID("R49EjectedPilot")) && receipt.hasUUID("R49EjectedPlug")
-                && receipt.getUUID("R49EjectedPlug").equals(fleet.entryPlugId())
+                && (receipt.getUUID("R49EjectedPlug").equals(fleet.entryPlugId())
+                    ||fleet.entryPlugId()==null&&EntryPlugDisposalR31.destroyed(level,receipt.getUUID("R49EjectedPlug")))
                 && (com.projectseele.entity.EvaShutdownR30.disabled(unit));
     }
 

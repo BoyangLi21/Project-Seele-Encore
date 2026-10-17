@@ -21,13 +21,20 @@ public final class NervMappedPlugMechanicsR52
         if(sources!=null)return;var receipt=JsonParser.parseString(new String(EvaOriginalMeshGeometryR52.classpathBytes("eva/full_assembly_geometry_r52_sources.json"),StandardCharsets.UTF_8)).getAsJsonObject();
         var hashes=new HashMap<String,String>();receipt.getAsJsonObject("resources").entrySet().forEach(e->hashes.put(e.getKey(),e.getValue().getAsString()));sources=FullAssemblyGeometryR52.selectedClasspathProviderR52(hashes);
         for(int v=0;v<3;v++)CAPSULES.put(v,sources.closedPlugParts(v).values().stream().map(NervRigidMeshSweepR52::new).toList());
-        for(int v=0;v<3;v++)for(boolean rack:new boolean[]{false,true})for(boolean plant:new boolean[]{false,true}){var parts=new HashMap<String,NervRigidMeshSweepR52>();sources.carrierParts(v,1,rack,0,plant?64:rack?3:0).forEach((name,triangles)->parts.put(name,new NervRigidMeshSweepR52(triangles)));CARRIERS.put(v*4+(rack?2:0)+(plant?1:0),Map.copyOf(parts));}
+        for(int v=0;v<3;v++)for(boolean rack:new boolean[]{false,true})for(boolean plant:new boolean[]{false,true})
+        {
+            int key=v*4+(rack?2:0)+(plant?1:0);
+            if(NervR50CarrierModeR53.enabled()&&plant){CARRIERS.put(key,CARRIERS.get(key-1));continue;}
+            var parts=new HashMap<String,NervRigidMeshSweepR52>();sources.carrierParts(v,1,rack,0,plant?64:rack?3:0).forEach((name,triangles)->parts.put(name,new NervRigidMeshSweepR52(triangles)));CARRIERS.put(key,Map.copyOf(parts));
+        }
     }
     public static boolean clearCapsule(ServerLevel l,EvaUnit01Entity eva,EntryPlugCarrierEntity plug,RigidTransform from,RigidTransform to,UUID crane)
     {
         if(sources==null||!NervOriginalActorsR52.managed(plug)||!plug.isHatchFullySealed()||plug.getHatchOpenAmount()!=0||plug.getAssignedVariant()!=eva.getUnitVariant()
                 ||!same(plug.getCanonicalTransform(),from)||!plug.isVehicle()||!(plug.getFirstPassenger() instanceof LivingEntity pilot)||pilot.getVehicle()!=plug)return false;
         var fleet=EvaFleetSavedData.get(l.getServer()).entry(eva.getUnitVariant()).orElse(null);if(fleet==null||!eva.getUUID().equals(fleet.canonicalId())||!plug.getUUID().equals(fleet.entryPlugId()))return false;
+        // R50 scripted service follows the original sealed capsule; full mesh sweeps remain diagnostic.
+        if(NervR50CarrierModeR53.enabled())return loaded(l,plug.getBoundingBox().move(to.translation().subtract(from.translation())));
         Set<UUID> own=new HashSet<>(Set.of(eva.getUUID(),plug.getUUID(),pilot.getUUID()));if(crane!=null)own.add(crane);var meshes=CAPSULES.get(eva.getUnitVariant());
         for(var mesh:meshes){var bound=mesh.envelope(from,to);if(!loaded(l,bound))return false;for(var shape:l.getBlockCollisions(plug,bound))for(var obstacle:shape.toAabbs())if(mesh.intersects(from,to,obstacle,.003))return false;for(var entity:l.getEntities((Entity)null,bound,e->!own.contains(e.getUUID())&&e.isAlive()&&(e instanceof LivingEntity||e.canBeCollidedWith())))if(mesh.intersects(from,to,entity.getBoundingBox(),.003))return false;}
         // Existing native passenger dimensions stay world aligned. The
@@ -74,7 +81,7 @@ public final class NervMappedPlugMechanicsR52
      * finite, non-collinear real low-sole contacts on the selected deck. */
     public static boolean actualCarrierFootBearing(ServerLevel l,EvaUnit01Entity eva)
     {
-        if(sources==null||eva.level()!=l||eva.carrierRiseProgress(1)!=1||EvaMechanicalFrameR52.carrierDeckTravelR52(eva)!=64)return false;
+        if(sources==null||eva.level()!=l||eva.carrierRiseProgress(1)!=1||!NervR50CarrierModeR53.enabled()&&EvaMechanicalFrameR52.carrierDeckTravelR52(eva)!=64)return false;
         var hardware=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);if(hardware!=null)try{var actual=EvaMechanicalFrameR52.active(eva)?EvaMechanicalFrameR52.capturedGeometry(eva):EvaOriginalMeshGeometryR52.partsForCapture(eva,EvaBodyPose.sample(eva,1),EvaFrozenHandsR52.capture(eva,1));return NervOriginalCarrierR52.carrierFootBearingR52(l,hardware,eva,actual,NervOwnerPlacementR52.actualRoot(eva));}catch(IOException missing){return false;}
         if(EvaMechanicalFrameR52.carrierFrameR52(eva,1).translation().distanceToSqr(NervOwnerPlacementR52.actualRoot(eva).translation())>4e-6||EvaMechanicalFrameR52.carrierFrameR52(eva,1).rotationErrorDegrees(NervOwnerPlacementR52.actualRoot(eva))>.04)return false;
         var geometry=EvaMechanicalFrameR52.active(eva)?EvaMechanicalFrameR52.capturedGeometry(eva):EvaOriginalMeshGeometryR52.partsForCapture(eva,EvaBodyPose.sample(eva,1),EvaFrozenHandsR52.capture(eva,1));

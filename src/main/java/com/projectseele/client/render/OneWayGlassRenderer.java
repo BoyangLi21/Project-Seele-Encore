@@ -27,8 +27,7 @@ public final class OneWayGlassRenderer implements BlockEntityRenderer<OneWayGlas
         boolean inside;
         if(state.getValue(OneWayGlassBlock.PYRAMID))
         {
-            double radius=120*(1-(camera.y+466)/172);
-            inside=camera.y>=-466&&camera.y<=-294&&Math.abs(camera.x-30)<=radius+1&&Math.abs(camera.z-327)<=radius+1;
+            inside=com.projectseele.client.FacilityFrameClientR52.insidePyramid(Minecraft.getInstance().level,camera);
         }
         else
         {

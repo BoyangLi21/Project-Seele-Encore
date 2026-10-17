@@ -36,7 +36,9 @@ public final class LiftPassengerPacketsR22
             LiftPassengerPhaseR22.afterClientCarry=(p,dy)->
             {
                 if(p!=Minecraft.getInstance().player)return;
-                carriedLevel=p.level();if(Math.abs(dy)>1e-7)carriedAt=p.level().getGameTime();flush(p);
+                // A horizontal transfer has dy=0 but still needs its walking
+                // packet published after the cage carries the passenger.
+                carriedLevel=p.level();carriedAt=p.level().getGameTime();flush(p);
             };
         }
         else if(deferred&&mc.player!=null)flush(mc.player);

@@ -41,9 +41,9 @@ public final class EvaUmbilicalCableRenderer
             return;
         }
 
-        AABB visible = minecraft.player.getBoundingBox().inflate(RENDER_RANGE);
-        var units = level.getEntitiesOfClass(EvaUnit01Entity.class, visible,
-                EvaUnit01Entity::isUmbilicalConnected);
+        var units = new java.util.ArrayList<EvaUnit01Entity>();
+        for(var entity:level.entitiesForRendering())
+            if(entity instanceof EvaUnit01Entity eva&&eva.isUmbilicalConnected())units.add(eva);
         if (units.isEmpty())
         {
             return;

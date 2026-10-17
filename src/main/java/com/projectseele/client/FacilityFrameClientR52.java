@@ -30,6 +30,12 @@ public final class FacilityFrameClientR52
     {return headquartersBound(level)?original.offset(frame.headquartersTranslation()):original;}
     public static Vec3 headquarters(ClientLevel level,Vec3 original)
     {var p=headquartersBound(level)?frame.headquartersTranslation():BlockPos.ZERO;return original.add(p.getX(),p.getY(),p.getZ());}
+    public static boolean insidePyramid(ClientLevel level,Vec3 camera)
+    {
+        var offset=headquarters(level,BlockPos.ZERO);var local=camera.subtract(offset.getX(),offset.getY(),offset.getZ());
+        double y=Math.floor(local.y),radius=Math.floor(120*(1-(y+466)/172)+.5);
+        return y>=-466&&y<=-294&&Math.abs(Math.floor(local.x)-30)<=radius&&Math.abs(Math.floor(local.z)-327)<=radius;
+    }
     @SubscribeEvent public static void logout(ClientPlayerNetworkEvent.LoggingOut event){connection=null;frame=null;}
     private FacilityFrameClientR52(){}
 }

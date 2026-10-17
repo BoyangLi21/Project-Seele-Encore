@@ -20,6 +20,31 @@ public final class FullAssemblyGeometryR52Test
     private static int checks,vertices;
     private static void check(boolean ok,String why){checks++;if(!ok)throw new AssertionError(why);}
     private static Object call(Object target,String name)throws Exception{var m=target.getClass().getDeclaredMethod(name);m.setAccessible(true);return m.invoke(target);}
+    private static void openHatchChecks(FullAssemblyGeometryR52.Provider provider,int variant,Map<?,?> raw)throws Exception
+    {
+        var geo=JsonParser.parseString(new String(EvaOriginalMeshGeometryR52.classpathBytes("geo/entry_plug_carrier.geo.json"),StandardCharsets.UTF_8)).getAsJsonObject();
+        var model=Class.forName("com.projectseele.client.render.EvaRigTransforms").getDeclaredMethod("model",software.bernie.geckolib.cache.object.GeoBone.class);model.setAccessible(true);
+        var geometry=provider.closedPlugParts(variant);
+        for(var value:geo.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject().getAsJsonArray("bones"))
+        {
+            var spec=value.getAsJsonObject();String name=spec.get("name").getAsString();if(!geometry.containsKey(name))continue;
+            var bone=new software.bernie.geckolib.cache.object.GeoBone(null,name,false,0D,false,false);var pivot=spec.getAsJsonArray("pivot");
+            bone.setPivotX(-pivot.get(0).getAsFloat());bone.setPivotY(pivot.get(1).getAsFloat());bone.setPivotZ(pivot.get(2).getAsFloat());
+            Object part=raw.get(name);float[] source=(float[])call(part,"vertices");float x=(float)call(part,"pivotX"),y=(float)call(part,"pivotY"),z=(float)call(part,"pivotZ");
+            for(float opening:new float[]{0,.37F,1})
+            {
+                float sign=name.equals("plug_hatch_l")?1:name.equals("plug_hatch_r")?-1:0;
+                bone.setRotZ((float)Math.toRadians(com.projectseele.world.EntryPlugKinematics.HATCH_OPEN_ANGLE_DEGREES*opening*sign));
+                var matrix=(org.joml.Matrix4f)model.invoke(null,bone);var frame=provider.plugPartFrameR53(name,opening);var points=geometry.get(name);
+                for(int at=0,n=0;at<source.length;at+=8,n+=3)
+                {
+                    var expected=matrix.transformPosition(new Vector3f(-(source[at]+x)/16,(source[at+1]+y)/16,(source[at+2]+z)/16)).mul(3.2F);
+                    var actual=frame.transformPoint(new net.minecraft.world.phys.Vec3(points[n],points[n+1],points[n+2]));
+                    check(actual.distanceTo(new net.minecraft.world.phys.Vec3(expected.x,expected.y,expected.z))<.0001,"Actual open capsule renderer mismatch: "+variant+" "+name+" "+opening);vertices++;
+                }
+            }
+        }
+    }
     public static void main(String[] args)throws Exception
     {
         var receipt=JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonObject();var hashes=new HashMap<String,String>();receipt.getAsJsonArray("files").forEach(v->hashes.put(v.getAsJsonObject().get("resource").getAsString(),v.getAsJsonObject().get("sha256").getAsString()));var provider=FullAssemblyGeometryR52.load(EvaOriginalMeshGeometryR52::classpathBytes,hashes);
@@ -49,6 +74,7 @@ public final class FullAssemblyGeometryR52Test
             for(var part:actual.entrySet())
             {Object data=raw.get(part.getKey());float[] source=(float[])call(data,"vertices");float x=(float)call(data,"pivotX"),y=(float)call(data,"pivotY"),z=(float)call(data,"pivotZ");double[] points=part.getValue();triangles+=points.length/9;for(int at=0,n=0;at<source.length;at+=8,n+=3){var expected=new Vector3f(-(source[at]+x)/16,(source[at+1]+y)/16,(source[at+2]+z)/16).mul(3.2F);double error=Math.sqrt(Math.pow(points[n]-expected.x,2)+Math.pow(points[n+1]-expected.y,2)+Math.pow(points[n+2]-expected.z,2));maximum=Math.max(maximum,error);vertices++;check(error<.0001,"Actual closed original capsule mismatch rig="+variant+" part="+part.getKey());}}
             var row=new JsonObject();row.addProperty("capsule_variant",variant);row.addProperty("triangles",triangles);row.addProperty("maximum_error_metres",maximum);results.add(row);System.out.println(row);
+            openHatchChecks(provider,variant,raw);
         }
         var report=new JsonObject();report.addProperty("actual_vertices_compared",vertices);report.addProperty("checks",checks);report.addProperty("native_acceptance",false);report.add("cases",results);Files.writeString(Path.of(args[2]),new GsonBuilder().setPrettyPrinting().create().toJson(report)+"\n");System.out.println("R52 actual original capsule/Tripo source+render-matrix PASS checks="+checks+" vertices="+vertices+"; no native world acceptance");
     }

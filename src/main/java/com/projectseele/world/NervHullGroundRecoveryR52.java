@@ -71,7 +71,9 @@ public final class NervHullGroundRecoveryR52
         // an independently swept, gradual change from the original captured pose.
         var geometry=evaluate(e,target,hands);var feet=binding(e,target,geometry);var context=NervRouteRuntimeR52.flightContext(level);if(context==null)return null;var directory=context.directory();var route=directory.route(receiver.reverseRoutes().get(e.getUnitVariant()));if(route==null||route.legs().isEmpty())return null;
         RigidTransform stopped;try{stopped=directory.sample(directory.leg(route.legs().get(0)),0,feet).evaRoot();}catch(IllegalArgumentException invalid){return null;}
-        double minimum=Double.POSITIVE_INFINITY;for(int i=0;i<=32;i++){var body=mix(initial,target,ease(i/32D));var g=evaluate(e,body,hands);minimum=Math.min(minimum,NervRigidMeshSweepR52.transformed(g.bounds(),RigidTransform.of(Vec3.ZERO,stopped.rotation())).minY);}
+        double minimum=Double.POSITIVE_INFINITY;
+        if(sameBody(initial,target))minimum=NervRigidMeshSweepR52.transformed(geometry.bounds(),RigidTransform.of(Vec3.ZERO,stopped.rotation())).minY;
+        else for(int i=0;i<=32;i++){var body=mix(initial,target,ease(i/32D));var g=evaluate(e,body,hands);minimum=Math.min(minimum,NervRigidMeshSweepR52.transformed(g.bounds(),RigidTransform.of(Vec3.ZERO,stopped.rotation())).minY);}
         // The complete original Tripo frame is taller than its shoe plane.
         // Keep the lowest source hull surface above that real upper frame.
         double top=NervOriginalCarrierR52.raisedBoundsAtR52(e.getUnitVariant(),stopped).maxY;var wait=RigidTransform.of(new Vec3(stopped.translation().x,Math.max(stopped.translation().y,top+2-minimum),stopped.translation().z),stopped.rotation());
@@ -133,7 +135,7 @@ public final class NervHullGroundRecoveryR52
         var bodyFrom=EvaMechanicalFrameR52.frozenLocalPose(e);var geometryFrom=evaluate(e,bodyFrom,plan.hands);var contactsFrom=NervAirCradleContactsR52.evaluate(geometryFrom,desiredAnchors(bodyFrom));var after=EvaShutdownR30.encode(plan.body(e,age+1));
         var next=new Frame(current.plane(),plan.root(age+1),current.rig());var bodyTo=decode(e,after);var geometryTo=evaluate(e,bodyTo,plan.hands);var contactsTo=NervAirCradleContactsR52.evaluate(geometryTo,desiredAnchors(bodyTo));
         if(!NervAircraftFrameR52.anchors(p).equals(contactsFrom.stream().map(NervAirCradleContactsR52.Contact::centre).toList())||!NervAircraftFrameR52.jawAxes(p).equals(contactsFrom.stream().map(NervAirCradleContactsR52.Contact::axis).toList()))return null;
-        for(int sample=0;sample<4;sample++)
+        if(!NervR50CarrierModeR53.enabled())for(int sample=0;sample<4;sample++)
         {
             var pa=mix(bodyFrom,bodyTo,sample/4F);var pb=mix(bodyFrom,bodyTo,(sample+1)/4F);var ga=evaluate(e,pa,plan.hands);var gb=evaluate(e,pb,plan.hands);var ra=current.cargo().interpolate(next.cargo(),sample/4D);var rb=current.cargo().interpolate(next.cargo(),(sample+1)/4D);double error=curveError(pa,pb,ga,ra,rb);
             var bodyChords=chords(ga,gb,ra,rb,error);if(!clearWorld(level,e,bodyChords,declared,own))return null;
@@ -152,7 +154,7 @@ public final class NervHullGroundRecoveryR52
             // Jaws are the named actual contacts. Other struts/crossbars may not cut through the original body.
             for(int i=5;i<partsA.size();i++)if(!partsA.get(i).name().startsWith("jaw/")){var rigid=new NervRigidMeshSweepR52(partsA.get(i).xyz());for(var chord:bodyChords)if(rigid.intersectsChord(chord.vertices(),new Vec3(error,error,error),current.plane()))return null;}
         }
-        if(age+1==TICKS)
+        if(!NervR50CarrierModeR53.enabled()&&age+1==TICKS)
         {var carrier=NervOriginalCarrierR52.controller(level,plan.original);try{if(carrier==null||!NervOriginalCarrierR52.carrierFootBearingR52(level,carrier,e,geometryTo,next.cargo()))return null;}catch(java.io.IOException absent){return null;}}
         return new AcceptedRecoveryStep(level,plan.original,aircraft,EvaAirTransportR31.cradleStateR50(e).getCompound("Origin"),after,plan.hands,current,next,geometryTo,binding(e,bodyTo,geometryTo),contactsTo,rotor);
     }
