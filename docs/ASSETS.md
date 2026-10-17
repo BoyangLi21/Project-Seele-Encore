@@ -437,3 +437,8 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 - `launch_electric_burst_r53.ogg` 与三段 `launch_rail_friction_r53_*.ogg` 为本项目原创数学合成，没有采样录音、官方音轨或角色配音。生成器为 `tools/build_launch_feedback_r53.py`，使用固定随机种子、带限噪声、低频衰减及有限隧道反射；48 kHz 单声道用于游戏内定位。
 - 文件哈希、时长和解码测量见 `assets/projectseele/audio/launch_feedback_r53.json`。启动电流声只绑定正式发射的首次实际运动提交；摩擦声与火花绑定真实轨道接触点和实际速度。离线解码通过不代表实际场景听感已验收。
+
+## R53 GeoFront 湖畔宣传图
+
+- 建筑、倒金字塔湖盆、水下灯带、岸边设备、屋顶警示灯及树木均从当前单人存档导出；树木和本次湖盆整理由项目自行生成，没有导入参考图像素或官方资产。
+- 离线环境照明沿用 Poly Haven 的 [Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky)，Greg Zaal 与 Jarod Guest，CC0。Blender Cycles 的水体材质、细草、摄影布光、轻微辉光和金字塔上部青色轮廓线属于宣传处理；青色轮廓线没有宣称已安装到游戏。
