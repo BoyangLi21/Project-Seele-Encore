@@ -10,6 +10,19 @@ import net.minecraft.resources.ResourceLocation;
 
 final class SynchCradleRendererR47
 {
+    static boolean visible(EntryPlugCarrierEntity plug, net.minecraft.client.renderer.culling.Frustum frustum)
+    {
+        int slot = plug.laboratorySlotR47();
+        if (slot < 0) return false;
+        var bounds = LocalTriangleMeshLayer.standaloneBounds(
+                new ResourceLocation(ProjectSeele.MODID, "mesh/synch_cradle_r47.mesh.json"));
+        if (bounds == null) return false;
+        double scale = EvaScale.ENTRY_PLUG_RENDER_SCALE, x = slot == 0 ? 30.5 : 55.5;
+        return frustum.isVisible(new net.minecraft.world.phys.AABB(
+                x + bounds.minX * scale, -466.5 + bounds.minY * scale, -123 + bounds.minZ * scale,
+                x + bounds.maxX * scale, -466.5 + bounds.maxY * scale, -123 + bounds.maxZ * scale));
+    }
+
     static void render(PoseStack pose,MultiBufferSource buffers,EntryPlugCarrierEntity plug,float partial,int light)
     {
         int slot=plug.laboratorySlotR47();if(slot<0)return;

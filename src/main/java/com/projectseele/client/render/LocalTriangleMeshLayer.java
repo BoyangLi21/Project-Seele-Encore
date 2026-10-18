@@ -47,6 +47,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     private static final Set<ResourceLocation> LOAD_ATTEMPTED = new HashSet<>();
     private static final Set<Class<?>> GPU_DIAGNOSTICS = new HashSet<>();
     private static final Map<JointSkin, PosedMeshCacheR52> SKIN_POSES = new java.util.IdentityHashMap<>();
+    private static final Map<MeshPart, Object> STANDALONE_GPU_KEYS = new java.util.IdentityHashMap<>();
     private final Function<T, ResourceLocation> meshSelector;
     private final Function<T, ResourceLocation> textureSelector;
     private final BiPredicate<T, GeoBone> partVisibility;
@@ -272,6 +273,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     {
         EvaEyeMaterialsR42.reload();
         RigidCapsuleGpu.clear();
+        STANDALONE_GPU_KEYS.clear();
         ModelRenderTypesR49.clear();
         CACHE.clear();
         SKIN_POSES.clear();
@@ -367,6 +369,15 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         for (MeshPart part : mesh.parts().values())
         {
             float[] values = part.vertices();
+            // Standalone meshes use a different origin from bone attachments.
+            // Keep a separate buffer identity so neither origin replaces the other.
+            if (triangles && (target instanceof com.mojang.blaze3d.vertex.BufferBuilder
+                    || target.getClass().getName().equals("me.jellysquid.mods.sodium.client.render.vertex.buffer.SodiumBufferBuilder"))
+                    && RigidCapsuleGpu.draw(STANDALONE_GPU_KEYS.computeIfAbsent(part, key -> new Object()),
+                        values, mesh.stride(), part.pivotX() - mesh.centreX(),
+                        part.pivotY() - mesh.minimumY(), part.pivotZ() - mesh.centreZ(),
+                        textureResource, poseStack, packedLight, packedOverlay))
+                continue;
             for (int index = 0; index + mesh.stride() * 3 <= values.length;
                  index += mesh.stride() * 3)
             {
@@ -385,6 +396,12 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             }
         }
         return true;
+    }
+
+    static net.minecraft.world.phys.AABB standaloneBounds(ResourceLocation resource)
+    {
+        MeshData mesh = getMesh(resource);
+        return mesh == null ? null : mesh.standaloneBounds();
     }
 
     private static void emitStandaloneVertex(VertexConsumer buffer,
@@ -484,6 +501,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             float minimumY = Float.POSITIVE_INFINITY;
             float minimumZ = Float.POSITIVE_INFINITY;
             float maximumX = Float.NEGATIVE_INFINITY;
+            float maximumY = Float.NEGATIVE_INFINITY;
             float maximumZ = Float.NEGATIVE_INFINITY;
             for (MeshPart part : parts.values())
             {
@@ -497,13 +515,17 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                     minimumY = Math.min(minimumY, y);
                     minimumZ = Math.min(minimumZ, z);
                     maximumX = Math.max(maximumX, x);
+                    maximumY = Math.max(maximumY, y);
                     maximumZ = Math.max(maximumZ, z);
                 }
             }
             MeshData mesh = new MeshData(stride, Map.copyOf(parts),
                     triangleCount, captureTag,
                     (minimumX + maximumX) * 0.5F, minimumY,
-                    (minimumZ + maximumZ) * 0.5F, resolvedJointSkins(root,parts,stride));
+                    (minimumZ + maximumZ) * 0.5F, resolvedJointSkins(root,parts,stride),
+                    new net.minecraft.world.phys.AABB((minimumX - maximumX) / 32F, 0,
+                        (minimumZ - maximumZ) / 32F, (maximumX - minimumX) / 32F,
+                        (maximumY - minimumY) / 16F, (maximumZ - minimumZ) / 32F));
             CACHE.put(meshLocation, mesh);
             ProjectSeele.LOGGER.info("Loaded local triangle mesh {}: {}",
                     meshLocation, captureTag);
@@ -553,7 +575,8 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     private record MeshData(int stride, Map<String, MeshPart> parts,
                             int triangleCount, String captureTag,
                             float centreX, float minimumY,
-                            float centreZ,Map<String,JointSkin> joints) {}
+                            float centreZ,Map<String,JointSkin> joints,
+                            net.minecraft.world.phys.AABB standaloneBounds) {}
 
     private record ContactCorrective(Map<String,org.joml.Quaternionf> targets,float activationRadians,float[] sparse) {}
     private record JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences,Map<String,Matrix4f> inverseBind,ContactCorrective corrective)

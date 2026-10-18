@@ -67,15 +67,15 @@ public final class EntryPlugCarrierRenderer
                                 double cameraX, double cameraY,
                                 double cameraZ)
     {
-        /*
-         * The visible shell is ten blocks long while the PathfinderMob AABB
-         * is intentionally tiny.  Frustum testing that tiny origin box made
-         * the capsule disappear when a player stood beside its flank, tail or
-         * hatch.  There are at most three carriers, so rendering every visible
-         * shell is both deterministic and negligible.
-         */
-        return entity.isShellVisible() || super.shouldRender(entity, frustum,
-                cameraX, cameraY, cameraZ);
+        if (!entity.isShellVisible()) return false;
+        if (!entity.hasCanonicalPose())
+            return super.shouldRender(entity, frustum, cameraX, cameraY, cameraZ);
+        // Use the complete moving shell, including the open hatch, rather
+        // than the deliberately small interaction box at its origin.
+        var bounds = EntryPlugKinematics.sweptBodyBounds(
+                entity.getInterpolatedCanonicalTransform(0),
+                entity.getInterpolatedCanonicalTransform(1)).inflate(2);
+        return frustum.isVisible(bounds) || SynchCradleRendererR47.visible(entity, frustum);
     }
 
     @Override
