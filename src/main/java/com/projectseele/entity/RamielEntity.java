@@ -152,6 +152,47 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         this.xpReward = 500;
     }
 
+    @Override
+    protected boolean updateInWaterStateAndDoFluidPushing()
+    {
+        if (fluidSectionsEmpty())
+        {
+            this.fluidHeight.clear();
+            this.forgeFluidTypeHeight.clear();
+            this.wasTouchingWater = false;
+            return false;
+        }
+        return super.updateInWaterStateAndDoFluidPushing();
+    }
+
+    private boolean fluidSectionsEmpty()
+    {
+        // A scaled airframe spans millions of voxels. Palette rejection is
+        // conservative: any fluid (including waterlogged blocks) keeps the
+        // original fluid calculation, and missing chunks are never generated.
+        AABB bounds = this.getBoundingBox();
+        int firstSection = Math.max(0, this.level().getSectionIndex(Mth.floor(bounds.minY)));
+        int lastSection = Math.min(this.level().getSectionsCount() - 1,
+                this.level().getSectionIndex(Mth.ceil(bounds.maxY) - 1));
+        for (int x = Mth.floor(bounds.minX) >> 4; x <= (Mth.ceil(bounds.maxX) - 1) >> 4; x++)
+        {
+            for (int z = Mth.floor(bounds.minZ) >> 4; z <= (Mth.ceil(bounds.maxZ) - 1) >> 4; z++)
+            {
+                var chunk = this.level().getChunkSource().getChunk(x, z,
+                        net.minecraft.world.level.chunk.ChunkStatus.FULL, false);
+                if (chunk == null) return false;
+                var sections = chunk.getSections();
+                for (int index = firstSection; index <= lastSection; index++)
+                {
+                    if (!sections[index].hasOnlyAir()
+                            && sections[index].maybeHas(state -> !state.getFluidState().isEmpty()))
+                        return false;
+                }
+            }
+        }
+        return true;
+    }
+
     public static AttributeSupplier.Builder createAttributes()
     {
         return Mob.createMobAttributes()

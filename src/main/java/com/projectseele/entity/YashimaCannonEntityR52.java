@@ -18,6 +18,16 @@ import org.joml.Quaternionf;
 /** The original preloaded cannon's fixed world body. No duplicate equipment or portable muzzle. */
 public final class YashimaCannonEntityR52 extends Entity
 {
+    @Override
+    protected boolean updateInWaterStateAndDoFluidPushing()
+    {
+        // The fixed cradle and its actuators own movement, never water currents.
+        this.fluidHeight.clear();
+        this.forgeFluidTypeHeight.clear();
+        this.wasTouchingWater = false;
+        return false;
+    }
+
     private static final EntityDataAccessor<CompoundTag> GEOMETRY=SynchedEntityData.defineId(YashimaCannonEntityR52.class,EntityDataSerializers.COMPOUND_TAG);
     private static final EntityDataAccessor<CompoundTag> CRADLE=SynchedEntityData.defineId(YashimaCannonEntityR52.class,EntityDataSerializers.COMPOUND_TAG);
     private static final EntityDataAccessor<Quaternionf> AIM=SynchedEntityData.defineId(YashimaCannonEntityR52.class,EntityDataSerializers.QUATERNION);
