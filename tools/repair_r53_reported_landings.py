@@ -56,7 +56,7 @@ def plan(world, output):
     updated[old]=None;updated[new]=artwork
     put(old,'minecraft:air','raise_original_command_logo')
     put(new,'projectseele:wall_artwork','raise_original_command_logo')
-    for x in range(26,32):
+    for x in range(26,31):
         for y in range(-497,-491):put((x,y,272),'minecraft:black_concrete','raised_logo_backing_above_door')
     # Keep the existing three-wide doorway and its two original control sides.
     for x in range(27,30):

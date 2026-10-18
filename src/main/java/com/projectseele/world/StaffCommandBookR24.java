@@ -19,6 +19,7 @@ public final class StaffCommandBookR24
     public static final class Order
     {
         public final UUID actor, owner;
+        public UUID contact;
         public final int unit;
         public final String requested;
         public final String mission;
@@ -31,7 +32,7 @@ public final class StaffCommandBookR24
         private int missingTicks;
         private Order(NervStaffEntity npc, ServerPlayer player, String operation, int unit)
         {
-            actor = npc.getUUID(); owner = player.getUUID(); requested = operation;
+            actor = npc.getUUID(); contact = actor; owner = player.getUUID(); requested = operation;
             actorName = npc.getName().getString(); lastPosition = npc.blockPosition();
             this.operation = StaffUndergroundChoiceR52.initialOperation(operation);
             this.unit = unit; deadline = player.level().getGameTime() + 12000;
@@ -54,7 +55,10 @@ public final class StaffCommandBookR24
 
     public static Order order(NervStaffEntity npc)
     {
-        return npc.level() instanceof ServerLevel level ? ORDERS.getOrDefault(level, Map.of()).get(npc.getUUID()) : null;
+        if (!(npc.level() instanceof ServerLevel level)) return null;
+        var jobs = ORDERS.getOrDefault(level, Map.of());
+        var direct = jobs.get(npc.getUUID());
+        return direct != null ? direct : jobs.values().stream().filter(job -> job.contact.equals(npc.getUUID())).findFirst().orElse(null);
     }
     public static Order unitOrder(ServerLevel level,int unit)
     {return ORDERS.getOrDefault(level,Map.of()).values().stream().filter(order->order.unit==unit).findFirst().orElse(null);}
@@ -98,10 +102,31 @@ public final class StaffCommandBookR24
         }
         ServerLevel level = player.serverLevel();
         var orders = ORDERS.computeIfAbsent(level, key -> new LinkedHashMap<>());
-        if (npc.busy() || orders.containsKey(npc.getUUID()) || orders.values().stream().anyMatch(job -> job.unit == unit))
+        if (npc.busy() || order(npc) != null || orders.values().stream().anyMatch(job -> job.unit == unit))
         {
             NervStaffDialogue.reply(player, npc, "司令，我这边或机体还有一道操作没结束。可以等它完成，也可以取消后续安排。");
             return 0;
+        }
+        if (npc.skin().equals("fuyutsuki"))
+        {
+            // The deputy's raised city console has no path to the EVA desks.
+            // Keep the caller/contact while the responsible officer presses the real key.
+            String skin = operation.equals("prepare") || operation.equals("recover") ? "ritsuko" : "misato";
+            var post = NervStaffDirector.roster(level).stream().filter(p -> p.skin().equals(skin)).findFirst().orElse(null);
+            if (post != null) retainOperator(level, post.feet());
+            var identity = post == null ? null : NervStaffSavedData.get(level).identity(post.id());
+            if (identity == null || !(level.getEntity(identity) instanceof NervStaffEntity operator))
+            {
+                NervStaffDialogue.reply(player, npc, "机体操作岗位暂时没有接通信号，这项指令尚未执行。");
+                return 0;
+            }
+            int accepted = request(player, operator, operation, unit);
+            if (accepted > 0)
+            {
+                order(operator).contact = npc.getUUID();
+                NervStaffDialogue.reply(player, npc, "已交给" + operator.getName().getString() + "在机体控制台执行，进度会保持联络。");
+            }
+            return accepted;
         }
         var order = new Order(npc, player, operation, unit); orders.put(npc.getUUID(), order);
         StaffOperationsTraceR45.event(level,"staff_order_accepted",player.getUUID(),npc.getUUID(),unit,operation,order.step.name());
@@ -131,7 +156,11 @@ public final class StaffCommandBookR24
         {
             NervStaffDialogue.reply(player,npc,"请由下达这项指令的人取消，或联系值班指挥。");return 0;
         }
-        if (job != null) ORDERS.get(player.serverLevel()).remove(npc.getUUID());
+        if (job != null)
+        {
+            ORDERS.get(player.serverLevel()).remove(job.actor);
+            if (player.serverLevel().getEntity(job.actor) instanceof NervStaffEntity operator) operator.finishTask();
+        }
         if(NervStaffDialogue.authorized(player)&&StaffAuthorityR25.commandContact(npc))
             AutoSortieR32.cancel(player,job==null?unit:job.unit);
         npc.finishTask();
@@ -143,7 +172,7 @@ public final class StaffCommandBookR24
     public static void failed(NervStaffEntity npc, String message)
     {
         var job = order(npc); if (job == null) return;
-        var level = (ServerLevel) npc.level(); ORDERS.get(level).remove(npc.getUUID());
+        var level = (ServerLevel) npc.level(); ORDERS.get(level).remove(job.actor);
         StaffOperationsTraceR45.event(level,"staff_order_failed",job.owner,job.actor,job.unit,job.operation,message);
         var owner = level.getServer().getPlayerList().getPlayer(job.owner);
         if (owner != null) NervStaffDialogue.reply(owner, npc, message);
