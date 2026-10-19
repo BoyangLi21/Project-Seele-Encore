@@ -51,3 +51,13 @@ build777 完整构建成功。三角形树构造仅为每个三角形计算一�
 实际 options.txt 主音量原为 0，已改为 35% 并保存。sounds785 记录回库广播、轨道机械、警报、关门、注液及待命广播均创建播放通道；此前 sounds781 的空结果由静音解释，不能当成发射效果缺失证据。发射瞬间电弧、喷气和音效仍需下一次正常出击实景确认。
 
 departure781.jfr 的 55 秒正常出击窗口仍有 15 次约 0.33–0.45 秒 GC 停顿。alloc783 将主要分配定位到原版天空光/方块光存储表复制：采样估算 long[] 约 12.46 GB、Object[] 约 4.19 GB；这些是分配量估计，不是同时堆占用。为处理这个特定热点，下载官方 Forge 1.20.1 Starlight 1.1.2（Modrinth version cNa0vkNj），SHA512 与官方元数据一致，暂装实际客户端开展同流程比较。没有升级 Minecraft/Forge；未验证前不纳入最终发布包。该组件 LGPL-3.0-only，分发时须单独保留许可和来源。
+
+## 13:02 光照修正原生比较与本机启动入口
+
+安装官方未修改 Starlight 后，原初号机再次经同一实际舱口与美里指令出击，watch790 为 DEPLOYED，无等待。两份 JFR 按各自 `jdk.ActiveRecording.recordingStart` 和 55 秒窗口重新筛选，避免上一轮录制元数据的旧时间污染：781→791 的最长 GC 停顿 453.7855→28.2166 ms，100 ms 以上停顿 15→0，GCPhasePause 总时长 6699.71→569.24 ms。光照表 clone 的采样分配估计 16.646 GB→0；总分配估计仍约 41.1→40.5 GB，不能说所有分配热点都已消除。新记录仍包含区块保存、DH 光源枚举和模型首次读取。窗口报告为 departure781-window.json / departure791-window.json。
+
+启动后第一次检查赶在原设备分批加载完成前执行，board790 未进入任何机体、没有创建出击；这次及 departure790 明确排除出出击验证。加载完成后 board791 成功。
+
+sounds790 在驾驶监听点记录插栓、排液、开门、转移广播、警报、倒数及发射；`launch_electric_burst_r53` 一次，`facility_hydraulic_launch` 一次，`launch_rail_friction_r53` 13 次，均建立播放通道。starlight792 原生地表图已查看，原光影、24 格视距及动态天气保持。该图不代表全部室内光照验收。motion793 为另一侧的 26 秒实际走跑、爬行、拳刀记录，209 帧零丢弃；保留录制开销标记，未把它当日常 FPS。
+
+固定组件已写入 ready-client，当前实际安装 JAR 的 SHA512 与官方相同。打包器和本机安装器同步纳入独立 JAR、完整许可、通知及对应源码 ZIP；没有复制第三方代码进 SEELE。当前本机 start_R53_local.ps1 改用已跑通流程的 Microsoft OpenJDK 17.0.20.1 和完整 JIT 参数，不再自动用回旧 Temurin 的两个方法排除。仅此客户端入口变更，系统 Java 和构建 JDK 未变；尚不能将未复现原生崩溃当作硬件或 JVM 根因结论。

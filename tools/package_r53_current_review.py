@@ -1,7 +1,7 @@
 """Build the established R53 server/PCL formats from the current singleplayer save."""
 from pathlib import Path
 from collections.abc import Mapping
-import argparse,json,shutil,zipfile,msvcrt
+import argparse,json,shutil,zipfile,msvcrt,hashlib
 from patch_zip_entries import replace_entries
 
 class Payloads(Mapping):
@@ -42,9 +42,20 @@ def main():
             with zipfile.ZipFile(source) as z:
                 old=set(z.namelist());prefix='' if side=='Server' else 'overrides/'
                 entries={prefix+'mods/projectseele-0.1.0-all.jar':jar,prefix+'R53_DELIVERY_AND_ACCEPTANCE.zh.txt':review,prefix+'R53_BATCH.json':batch}
+                starlight=base/'ready-client/starlight-1.1.2+forge.1cda73c.jar'
+                if starlight.is_file():
+                    expected='cc89c6b2dd0db709586028c7732a57a3e6184f19cc2b98b25964c720c3ab434031e62de23e0dab022575d637b5e4a34b5813164d32ec356d56588da400e7d026'
+                    if hashlib.sha512(starlight.read_bytes()).hexdigest()!=expected:raise ValueError('Pinned Starlight artifact differs')
+                    entries[prefix+'mods/'+starlight.name]=starlight
+                    entries[prefix+'licenses/Starlight-LGPL-3.0.txt']=review.parent/'licenses/Starlight-LGPL-3.0.txt'
+                    entries[prefix+'licenses/Starlight-NOTICE.txt']=review.parent/'licenses/Starlight-NOTICE.txt'
+                    entries[prefix+'licenses/Starlight-1cda73c-source.zip']=base/'ready-client/Starlight-1cda73c-source.zip'
+                    remove_starlight={n for n in old if n.startswith(prefix+'mods/starlight-') and n!=prefix+'mods/'+starlight.name}
+                else:remove_starlight=set()
                 entries[prefix+'HAKONE_LONG_RANGE_PLAN_R53.zh.md']=review.parent/'HAKONE_LONG_RANGE_PLAN_R53.zh.md'
                 entries.update({prefix+'projectseele-local-maps/'+n:p for n,p in runtime.items()})
                 remove={n for n in old if n.startswith(prefix+'projectseele-local-maps/') and n not in entries}
+                remove.update(remove_starlight)
                 remove.update(n for n in old if n.endswith(('R52_ROLLBACK_BATCH.json','MAP_TODO.zh.md')))
                 if side=='Server':
                     remove.update(n for n in old if n.startswith(('SEELE_R52_WORLD/','SEELE_R53_WORLD/')))
@@ -55,8 +66,15 @@ def main():
                 else:
                     remove.update(n for n in old if n.startswith('overrides/saves/'))
                     manifest=json.loads(z.read('manifest.json'));manifest['name']='EVANGELION:Encore R53';manifest['version']='R53-'+a.date+'-PCL';entries['manifest.json']=(json.dumps(manifest,ensure_ascii=False,indent=2)+'\n').encode('utf8')
-                    shader=base/'ready-client/SEELE_Local_Cavern_R53_Private_v1.zip'
+                    shader=base/'client/shaderpacks/SEELE_Local_Cavern_R53_Private_v1.zip'
                     if shader.is_file():entries[prefix+'shaderpacks/'+shader.name]=shader
+                    shader_settings=shader.with_suffix(shader.suffix+'.txt')
+                    if shader_settings.is_file():entries[prefix+'shaderpacks/'+shader_settings.name]=shader_settings
+                    dh=base/'client/mods/DistantHorizons-2.3.4-b-1.20.1-fabric-forge.jar'
+                    if dh.is_file():
+                        entries[prefix+'mods/'+dh.name]=dh
+                        entries[prefix+'config/DistantHorizons.toml']=base/'client/config/DistantHorizons.toml'
+                        remove.update(n for n in old if n.startswith(prefix+'mods/DistantHorizons-') and n!=prefix+'mods/'+dh.name)
                     settings=base/'client/config/oculus.properties'
                     if settings.is_file():entries[prefix+'config/oculus.properties']=settings
                 remove.difference_update(entries)

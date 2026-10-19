@@ -1,0 +1,12 @@
+Starlight (Forge) 1.1.2+forge.1cda73c
+Author: Spottedleaf / PaperMC contributors
+License: GNU LGPL version 3; the complete LGPL and incorporated GPL text are provided alongside this notice.
+This is an unmodified third-party mod, separate from Project SEELE's MIT code.
+
+Official artifact: https://modrinth.com/mod/starlight-forge/version/cNa0vkNj
+Official source revision: https://github.com/PaperMC/Starlight/tree/1cda73c
+Corresponding source archive: Starlight-1cda73c-source.zip (included alongside this notice).
+SHA512 of the distributed mod:
+cc89c6b2dd0db709586028c7732a57a3e6184f19cc2b98b25964c720c3ab434031e62de23e0dab022575d637b5e4a34b5813164d32ec356d56588da400e7d026
+
+The mod is loaded independently from the mods directory. It can be removed or replaced with a compatible build without rebuilding Project SEELE. No Starlight source has been copied into the Project SEELE jar.
