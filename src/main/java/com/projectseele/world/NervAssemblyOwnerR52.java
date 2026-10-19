@@ -781,7 +781,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var b=originalBinding(l,o,data);if(b==null)return hold(o,"actual_stopped_geometry_preview_missing");var start=directory.sample(leg,0,b);var observed=kind(data)==Kind.HULL_ONLY_RECOVERY?preview(l,o).frame():EvaMechanicalFrameR52.occupiedPreviewFrame(occupiedPreviews.get(o.eva()));
         if(observed==null||!pose(observed,start.evaRoot())||!pose(observed,start.evaRoot()))return hold(o,"original_hull_not_on_declared_receiver_frame");
         Set<UUID> own=TransportMembershipR52.members(o,kind(data));float next=Math.min(1,e.carrierRiseProgress(1)+1F/receiver.carrierTicks());if(!acceptCarrierActuatorR52(l,e,observed,e.carrierRiseProgress(1),next,own,o,data))return hold(o,"actual_receiver_carrier_sweep_blocked");if(next!=1)return false;
-        boolean accepted;if(kind(data)==Kind.HULL_ONLY_RECOVERY){var proof=preview(l,o);if(proof==null)return false;e.setNervLogisticsLocked(true);accepted=EvaMechanicalFrameR52.captureHull(e,o,proof.capture());}else accepted=EvaMechanicalFrameR52.captureOccupiedRecovery(e,o,occupiedPreviews.get(o.eva()));if(!accepted)return hold(o,"actual_hull_receiver_capture_rejected");captureAssembly(l,o,data);return true;
+        boolean accepted;if(kind(data)==Kind.HULL_ONLY_RECOVERY){var proof=preview(l,o);if(proof==null)return false;accepted=EvaMechanicalFrameR52.captureHull(e,o,proof.capture());}else accepted=EvaMechanicalFrameR52.captureOccupiedRecovery(e,o,occupiedPreviews.get(o.eva()));if(!accepted)return hold(o,"actual_hull_receiver_capture_rejected");captureAssembly(l,o,data);return true;
     }
     private boolean captureR50ReceiverR53(ServerLevel level,Original original,Route route,Leg leg,CompoundTag data)
     {
@@ -792,7 +792,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             var binding=originalBinding(level,original,data);if(binding==null)return hold(original,"stopped_original_recovery_pose_unavailable");
             var feet=actualFootBearingCentre(level,original,data);if(!receiver.domain().contains(feet))return hold(original,"outside_receiver_platform");
             boolean captured;
-            if(kind(data)==Kind.HULL_ONLY_RECOVERY){var proof=preview(level,original);eva.setNervLogisticsLocked(true);captured=proof!=null&&EvaMechanicalFrameR52.captureHull(eva,original,proof.capture());}
+            if(kind(data)==Kind.HULL_ONLY_RECOVERY){var proof=preview(level,original);captured=proof!=null&&EvaMechanicalFrameR52.captureHull(eva,original,proof.capture());}
             else captured=EvaMechanicalFrameR52.captureOccupiedRecovery(eva,original,occupiedPreviews.get(original.eva()));
             if(!captured)return hold(original,"same_original_recovery_capture_failed");
             data.putBoolean("ReceiverAlignmentR53",true);
@@ -869,7 +869,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {
         var e=hull(l,o);if(plant(o)==null||e==null||!originalGraph(l,o,requested==Kind.OCCUPIED)||!observed.current(l)||!observed.sourceFingerprint().equals(EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52().sourceFingerprint()))return hold(o,"actual_checked_flight_pickup_changed");
         boolean accepted;if(EvaMechanicalFrameR52.active(e))accepted=EvaMechanicalFrameR52.kind(e)==requested&&EvaMechanicalFrameR52.epoch(e)==epoch&&pose(EvaMechanicalFrameR52.frame(e,1),observed.root());
-        else if(requested==Kind.HULL_ONLY_RECOVERY){if(observed.hullCapture()==null)return false;e.setNervLogisticsLocked(true);accepted=EvaMechanicalFrameR52.captureHull(e,o,observed.hullCapture());if(!accepted)e.setNervLogisticsLocked(false);}
+        else if(requested==Kind.HULL_ONLY_RECOVERY){if(observed.hullCapture()==null)return false;accepted=EvaMechanicalFrameR52.captureHull(e,o,observed.hullCapture());}
         else accepted=EvaMechanicalFrameR52.captureOccupiedRecovery(e,o,observed.occupiedCapture());
         if(!accepted||!pose(EvaMechanicalFrameR52.frame(e,1),observed.root()))return hold(o,"real_flight_custody_capture_rejected");EvaMechanicalFrameR52.setFlightCustody(e,true,observed.carrierVisible());
         data.putString("AssemblyKindR52",requested.name());data.putUUID("FlightAircraftR52",aircraft);data.putLong("FlightEpochR52",epoch);data.putString("FlightDirectoryR52",directory.fingerprint());data.putString("FlightSourceR52",observed.sourceFingerprint());captured.remove(o.eva());return true;

@@ -169,13 +169,14 @@ public final class EvaOriginalMeshGeometryR52
      * under FRAME/AnatomicalHandsR52. Nothing in this query starts transport. */
     public static Geometry partsForCapture(EvaUnit01Entity eva,EvaBodyPose.Sample frozenLocalPose,CompoundTag handSnapshot)
     {return partsForFrozen(eva,frozenLocalPose,handSnapshot,false);}
-    /** Recovery preserves the actual retained fallen joints. Only the late
-     * closed dorsal/mouth visibility and complete equipment are admitted;
-     * this never manufactures a factory stance or an occupied capsule. */
+    /** Recovery evaluates the retained field pose just as the pickup preview
+     * does; a weapon or open dorsal cover is not a factory-pose prerequisite. */
     public static Geometry partsForFrozenRecovery(EvaUnit01Entity eva,EvaBodyPose.Sample frozenLocalPose,CompoundTag handSnapshot)
     {
         require(EvaShutdownR30.disabled(eva)&&eva.getPilotEntity()==null,"Actual stopped unpiloted hull required");
-        return partsForFrozen(eva,frozenLocalPose,handSnapshot,false);
+        var provider=readOnlySelectedProviderR52();
+        var hands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),handSnapshot);
+        return provider.evaluate(eva.getUnitVariant(),frozenLocalPose,hands);
     }
     private static Geometry partsForFrozen(EvaUnit01Entity eva,EvaBodyPose.Sample frozenLocalPose,CompoundTag handSnapshot,boolean factory)
     {

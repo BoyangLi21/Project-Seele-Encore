@@ -29,3 +29,13 @@ build749、build752 完整构建成功，包含字段顺序、特殊浮点舍入
 本次空运回库请求已被正常入口接受，但预备阶段仍报告停稳等待，尚未通过完整回库。PID32108 随后再次在 `jvm.dll+0x2b0581` 的 C2 编译线程崩溃，这次编译目标为 `NervAirTransportRuntimeR52$Controller::pulseStoppedRotors`。逐个排除方法没有解决根因；PID28124 临时用 `-XX:TieredStopAtLevel=1` 继续诊断，不把此参数当成已验证的最终性能方案，未修改 BIOS 或作出硬件故障判断。
 
 连续动作记录仍受到修正前浓雾遮挡；手指、腰颈缝、刀腿及处决冲击感不能据本次远景宣布通过。音源监听746启动晚于发射，空结果不能作为声音缺失证据。原生 C2 崩溃及全局性能仍未全部关闭，屋岛保持最后。
+
+## 12:20 原初号机空机回收修正
+
+原始异常在 `partsForFrozenRecovery`：接载预览接受停稳、带刀的原机体，但实际夹持又进入要求徒手及背盖关闭的工厂姿态分支。异常发生前已写入 logistics lock，因此留下“锁定但没有机械帧”的原机体。现统一使用同一实际身体与手部快照求值；成功校验机械帧后才写锁。针对已保存的旧失败任务，仅在 PREFLIGHT、无夹持/无载荷转交、原弹射身份与位置仍相符时解除这个半完成锁，再走正常接载流程。
+
+build764 完整构建成功，实际客户端 2,123 个代码/Mixin 条目安装回读一致。原任务 `d427a79a-8d3d-4bfb-add4-58418a5bf431` 未重建 EVA、未复原存档，继续经过 FERRY、LOADED、UNCLAMP、扶正与下降、地表接驳及地下回库。`air768/769/770.json`、`screenshots/air-recovery769.png` 记录原机空运与机械交接；`status771.json` 记录初号机 PARKED/COMPLETE、Finish DONE、44 层 LCL 已注入、原转移架降至 0，所有等待与故障为空。原弹射栓仍是地面的 FIELD_LANDED；这是空机回收，不能把它描述成插入栓也已运回。后续整备前仍须处理原栓维护。
+
+为区分旧 Java C2 编译崩溃与项目逻辑，下载并核对 Microsoft 官方 OpenJDK 17.0.20.1 Windows x64 SHA256 `3d9006956fc8af5601cd24ffc4f468bef48279c7ebd8171b9bdf90d0aabfbf1f`。只用于当前后台诊断客户端，恢复 C2，构建仍用锁定 JDK17；没有修改系统 Java、BIOS 或永久启动配置。运行通过上述完整回库，但短时没有再崩溃不能证明根因已关闭。来源：https://learn.microsoft.com/en-us/java/openjdk/download 。
+
+`air-recovery769.jfr` 的 35 秒实际回收窗口记录五次 0.31–0.44 秒 GC 停顿。主要分配热点包含反复建立三角形碰撞树；下一步优化其临时边界对象，保留原三角形与碰撞语义。此阶段还不能宣布全局帧率达标。

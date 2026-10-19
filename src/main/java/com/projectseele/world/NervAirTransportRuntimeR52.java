@@ -343,7 +343,7 @@ public final class NervAirTransportRuntimeR52
             var m=manifest.missions().get(job.itinerary());if(m==null||!job.manifestFingerprint().equals(manifest.fingerprint())){hold(job,"保存目录/任务版本已改变");return;}
             var hint=job.ownerData();var savedFrame=NervAircraftFrameR52.decode(hint.getCompound("Frame"));ticketAt(savedFrame.plane().translation());if(savedFrame.cargo()!=null)ticketAt(savedFrame.cargo().translation());if(hint.contains("PickupRoot"))ticketAt(NervAircraftFrameR52.decodeRigid(hint.getCompound("PickupRoot")).translation());
             if(!(level.getEntity(job.aircraft()) instanceof UNTransportEntity plane)||!NervAircraftFrameR52.active(plane)){hold(job,"等待同 UUID 原飞机加载；不重造、不复制备份");return;}
-            var data=job.ownerData();var p=previews.get(job.task());if(p==null&&!job.payloadTransferred()){p=ground().owner().previewFlight(level,job.original(),job.kind(),data);if(p==null){hold(job,"重载等待原载荷实际姿势/乘员图恢复");return;}previews.put(job.task(),p);}
+            var data=job.ownerData();releaseIncompleteHullCapture(job,data);var p=previews.get(job.task());if(p==null&&!job.payloadTransferred()){p=ground().owner().previewFlight(level,job.original(),job.kind(),data);if(p==null){hold(job,"重载等待原载荷实际姿势/乘员图恢复");return;}previews.put(job.task(),p);}
             if(!job.payloadTransferred()&&(p==null||!p.shapeCurrent(level))&&Set.of("UNCLAMP","TRANSFER").contains(data.getString("FlightStage"))){var actual=ground().owner().previewFlight(level,job.original(),job.kind(),data);if(actual!=null){p=actual;previews.put(job.task(),p);}}
             var current=NervAircraftFrameR52.decode(data.getCompound("Frame"));if(!NervAirTransportManifestR52.same(current.plane(),NervAircraftFrameR52.actual(plane))||!current.rig().equals(NervAircraftFrameR52.frame(plane,1).rig())){hold(job,"原飞机保存 fraction 与实际同步帧不同");return;}
             var stationary=proof(job.aircraft(),p,current,current,job.spaces(),job.carrying()||!job.payloadTransferred()&&(data.getString("FlightStage").equals("TRANSFER")||data.getBoolean("FlightWaitingR52")));if(stationary==null){hold(job,"当前原机体、旋翼或夹具空间受阻/未加载");return;}
@@ -398,6 +398,21 @@ public final class NervAirTransportRuntimeR52
             if(stage.equals("OUTBOUND")){data.putString("FlightStage","CLAMP");save(job.update(0,0,Phase.CLAMP,false,false,occupied,c.gates(),data,""));}
             else if(stage.equals("LOADED")){data.putString("FlightStage","UNCLAMP");save(job.update(0,0,Phase.RELEASE,true,false,c.spaces(),c.gates(),data,""));}
             else{var stand=manifest.aircraft().get(m.aircraft());if(!aircraftSupported(stand)||!NervAirTransportManifestR52.same(next.plane(),manifest.node(stand.stand()).frame().plane())){hold(job,"原飞机未在实际原泊位支撑上到位");return;}if(data.getBoolean("FlightWaitingR52")){var stationaryHold=proof(job.aircraft(),p,next,next,occupied,false);var wait=NervFlightProofR52.holdPickup(level,ground().pool(),job.task(),stationaryHold,p,Set.copyOf(readList(data,"PickupHeldSpaces")),ground().bindings());if(wait==null||!ground().owner().releaseWaitingPickup(level,wait,data)){NervAircraftFrameR52.putFrame(data,"Frame",next);save(job.update(job.leg(),c.ticks(),Phase.HOLD,false,false,occupied,c.gates(),data,"原机已返场；等待原载荷原位解锁"));return;}}if(!clearStandReference(job,next,data,occupied)){save(job.update(job.leg(),c.ticks(),Phase.HOLD,false,job.payloadTransferred(),occupied,c.gates(),data,"原泊位等待实际空机样本收尾"));return;}ground().pool().cancel(job.task(),job.original().owner());save(job.update(job.leg(),c.ticks(),job.cancelRequested()?Phase.CANCELLED:Phase.COMPLETE,false,job.payloadTransferred(),occupied,c.gates(),data,""));}
+        }
+        private void releaseIncompleteHullCapture(Job job,CompoundTag data)
+        {
+            // Older field capture could throw after setting the logistics lock,
+            // before acquiring a mechanical frame. Release only that stranded
+            // preflight lock; normal pickup still validates the actual source.
+            if(job.kind()!=Kind.HULL_ONLY_RECOVERY||job.carrying()||job.payloadTransferred()
+                    ||!data.getString("FlightStage").equals("PREFLIGHT")||data.getBoolean("FlightWaitingR52")
+                    ||!(level.getEntity(job.original().eva()) instanceof EvaUnit01Entity eva)
+                    ||!eva.isNervLogisticsLocked()||EvaMechanicalFrameR52.active(eva)
+                    ||eva.hasActiveCarrierMotion()||eva.isLaunchSequenceActive()||EvaAirTransportR31.active(eva)
+                    ||!TransportMembershipR52.hullRecoveryAdmission(job.original(),eva.getPersistentData(),
+                            Set.copyOf(eva.getPassengers().stream().map(Entity::getUUID).toList()),eva.isEntryPlugInserted(),EvaShutdownR30.disabled(eva))
+                    ||!data.contains("PickupRoot")||eva.position().distanceToSqr(NervAircraftFrameR52.decodeRigid(data.getCompound("PickupRoot")).translation())>1e-10)return;
+            eva.setNervLogisticsLocked(false);
         }
         void preflight(Job j,Mission m,NervFlightProofR52.FlightPickupPreview p,Frame current,CompoundTag data)
         {

@@ -448,7 +448,7 @@ public final class EvaMechanicalFrameR52
         boolean hull=wantedKind==Kind.HULL_ONLY_RECOVERY;var plug=hull?null:originalPlug(eva,original);
         if(hull?!originalHull(eva,original):plug==null)return false;
         if(active(eva))return kind(eva)==wantedKind&&epoch(eva)==original.epoch();
-        if(!geometryInstalled||occupiedCapture==null&&!eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)||eva.hasActiveCarrierMotion())return false;
+        if(!geometryInstalled||occupiedCapture==null&&hullCapture==null&&!eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)||eva.hasActiveCarrierMotion())return false;
         EvaBodyPose.Sample pose;CompoundTag hands;
         if(hull)
         {
@@ -476,7 +476,7 @@ public final class EvaMechanicalFrameR52
         origin.put(EvaFrozenHandsR52.KEY,hands);origin.putString("GeometrySourceR52",geometry.sourceFingerprint());
         origin.put("Origin",EvaShutdownR30.encode(pose));origin.putFloat("FromRestraint",1);origin.putFloat("ToRestraint",1);
         origin.putInt("Duration",1);origin.putLong("Since",eva.level().getGameTime());
-        if(occupiedCapture!=null){eva.setNervLogisticsLocked(true);eva.adoptOccupiedMechanicalYawR52(capturedYaw);}else if(hull)eva.adoptStoppedHullYawR52(capturedYaw);
+        if(occupiedCapture!=null){eva.setNervLogisticsLocked(true);eva.adoptOccupiedMechanicalYawR52(capturedYaw);}else if(hull){eva.setNervLogisticsLocked(true);eva.adoptStoppedHullYawR52(capturedYaw);}
         com.projectseele.physics.CombatBodyDynamics.cancel(eva);
         synchronized(GEOMETRY){GEOMETRY.put(eva,new CapturedGeometry(eva.level().getGameTime(),geometry));}
         EvaAirTransportR31.cradleStateR50(eva,origin);eva.getEntityData().set(SAMPLE,t);eva.setBoundingBox(bounds(eva));
