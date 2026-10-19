@@ -420,9 +420,12 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     private void setCanonicalTransform(RigidTransform transform,boolean force)
     {
         RigidTransform current = this.getCanonicalTransform();
+        Vector3f published = this.entityData.get(DATA_POSE_TRANSLATION);
+        Vec3 target = transform.translation();
         boolean unchanged = this.hasCanonicalPose()
                 && current.translation().distanceToSqr(transform.translation())
                         < 1.0E-12D
+                && published.equals((float) target.x, (float) target.y, (float) target.z)
                 && current.rotationErrorDegrees(transform) < 0.00001D;
         if (unchanged&&!force)
         {

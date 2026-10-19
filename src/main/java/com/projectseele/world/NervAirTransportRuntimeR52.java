@@ -46,6 +46,13 @@ public final class NervAirTransportRuntimeR52
         LIVE.put(l,new Controller(l,manifest,geometry,saved));return true;
     }
     public static boolean ready(ServerLevel l){return LIVE.containsKey(l)&&NervRouteRuntimeR52.flightContext(l)!=null;}
+    public static boolean sameOperatingRegion(ServerLevel level,Vec3 body,Vec3 socket)
+    {
+        var controller=LIVE.get(level);
+        if(controller==null)return body.y>=64&&socket.y>=32;
+        var region=controller.manifest.region(body);
+        return region!=null&&region==controller.manifest.region(socket);
+    }
     public static boolean pending(ServerLevel l,EvaUnit01Entity eva){return eva!=null&&state(l).payload(eva.getUUID())!=null;}
     public static boolean ownsMotion(EvaUnit01Entity e){if(!(e.level() instanceof ServerLevel l))return false;var job=state(l).payload(e.getUUID());return job!=null&&job.carrying();}
     public static boolean busy(ServerLevel l){var c=LIVE.get(l);return c==null||c.manifest.aircraft().values().stream().allMatch(a->state(l).aircraft(a.entity())!=null);}
@@ -347,7 +354,10 @@ public final class NervAirTransportRuntimeR52
             var hint=job.ownerData();var savedFrame=NervAircraftFrameR52.decode(hint.getCompound("Frame"));ticketAt(savedFrame.plane().translation());if(savedFrame.cargo()!=null)ticketAt(savedFrame.cargo().translation());if(hint.contains("PickupRoot"))ticketAt(NervAircraftFrameR52.decodeRigid(hint.getCompound("PickupRoot")).translation());
             if(!(level.getEntity(job.aircraft()) instanceof UNTransportEntity plane)||!NervAircraftFrameR52.active(plane)){hold(job,"等待同 UUID 原飞机加载；不重造、不复制备份");return;}
             var data=job.ownerData();releaseIncompleteHullCapture(job,data);var p=previews.get(job.task());if(p==null&&!job.payloadTransferred()){p=ground().owner().previewFlight(level,job.original(),job.kind(),data);if(p==null){hold(job,"重载等待原载荷实际姿势/乘员图恢复");return;}previews.put(job.task(),p);}
-            if(!job.payloadTransferred()&&(p==null||!p.shapeCurrent(level))&&Set.of("UNCLAMP","TRANSFER").contains(data.getString("FlightStage"))){var actual=ground().owner().previewFlight(level,job.original(),job.kind(),data);if(actual!=null){p=actual;previews.put(job.task(),p);}}
+            // Shape identity can remain unchanged after a flight, while the
+            // captured root still names the pickup point. Delivery admission
+            // requires evidence at the actual stopped destination.
+            if(!job.payloadTransferred()&&(p==null||!p.current(level))&&Set.of("UNCLAMP","TRANSFER").contains(data.getString("FlightStage"))){var actual=ground().owner().previewFlight(level,job.original(),job.kind(),data);if(actual!=null){p=actual;previews.put(job.task(),p);}}
             var current=NervAircraftFrameR52.decode(data.getCompound("Frame"));if(!NervAirTransportManifestR52.same(current.plane(),NervAircraftFrameR52.actual(plane))||!current.rig().equals(NervAircraftFrameR52.frame(plane,1).rig())){hold(job,"原飞机保存 fraction 与实际同步帧不同");return;}
             var stationary=proof(job.aircraft(),p,current,current,job.spaces(),job.carrying()||!job.payloadTransferred()&&(data.getString("FlightStage").equals("TRANSFER")||data.getBoolean("FlightWaitingR52")));if(stationary==null){hold(job,"当前原机体、旋翼或夹具空间受阻/未加载");return;}
             // Preserve uncertain saved claims until the same original actor
@@ -543,9 +553,18 @@ public final class NervAirTransportRuntimeR52
                 tickets(directory.leg(route.legs().get(0)).resources());
             }
             int index=data.getInt("TransferLeg"),age=data.getInt("TransferAge");if(index>=m.retreat().size()){hold(j,"原飞机未能离开接应资源域");return;}var c=manifest.corridor(m.retreat().get(index));
+            var declaredTo=endFrame(m,c,p,data,false);
+            if(data.contains("DeliveryTargetR53")&&!data.getBoolean("CoordinateTransferR53"))
+            {
+                // Old saves may already be partway toward the unshifted
+                // template. Resume from the real aircraft, never reposition it.
+                age=0;data.putInt("TransferAge",0);data.remove("TransferStart");
+                data.putBoolean("CoordinateTransferR53",true);
+                data.getCompound("AirCorridorTicksR53").putInt(c.id(),NervAirTravelR53.ticks(c,current,declaredTo));
+            }
             int plannedTicks=data.getCompound("AirCorridorTicksR53").getInt(c.id());if(plannedTicks>0)c=new Corridor(c.id(),c.from(),c.to(),plannedTicks,c.reverseOf(),c.spaces(),c.gates());
             tickets(c);var doorPreparation=prepareDoors(j,p,current,data,c.gates());j=doorPreparation.job();if(!doorPreparation.ready())return;if(!gates(c,m,data)){hold(j,"等待实际接应退出门/空域");return;}
-            var declaredTo=manifest.node(c.to()).frame();var start=age==0?current:NervAircraftFrameR52.decode(data.getCompound("TransferStart"));if(age==0)data.put("TransferStart",NervAircraftFrameR52.encode(current));var to=new Frame(declaredTo.plane(),current.cargo(),new Rig(declaredTo.rig().hoist(),0,1));var next=start.interpolate(to,ease((double)Math.min(c.ticks(),age+1)/c.ticks()));var held=new HashSet<>(c.spaces());held.addAll(readList(data,"ReceiverHeldSpaces"));var checked=proof(j.aircraft(),p,current,next,held,true);
+            var start=age==0?current:NervAircraftFrameR52.decode(data.getCompound("TransferStart"));if(age==0)data.put("TransferStart",NervAircraftFrameR52.encode(current));var to=new Frame(declaredTo.plane(),current.cargo(),new Rig(declaredTo.rig().hoist(),0,1));var next=start.interpolate(to,ease((double)Math.min(c.ticks(),age+1)/c.ticks()));var held=new HashSet<>(c.spaces());held.addAll(readList(data,"ReceiverHeldSpaces"));var checked=proof(j.aircraft(),p,current,next,held,true);
             if(checked==null||!ground().pool().retargetFlightSpaces(j.task(),held,c.gates(),access(j.original(),j.kind(),j.aircraft(),checked,false))||!NervAircraftFrameR52.apply((UNTransportEntity)level.getEntity(j.aircraft()),checked)){hold(j,"原飞机连续退出 sweep/共享占域受阻");return;}NervAircraftFrameR52.putFrame(data,"Frame",next);data.putInt("TransferAge",Math.min(c.ticks(),age+1));var spaces=c.spaces();
             if(age+1>=c.ticks())
             {
@@ -562,7 +581,7 @@ public final class NervAirTransportRuntimeR52
                 }
                 if(stationary!=null&&manifest.receiver(m.receiver()).delivery())
                 {
-                    var receipt=NervFlightProofR52.delivery(level,stationary,manifest.receiver(m.receiver()));
+                    var receipt=NervFlightProofR52.delivery(level,stationary,resolvedReceiver(m,p,data));
                     if(receipt!=null&&ground().pool().handoffFlightToDelivery(j.task(),spaces,Set.of(),access(j.original(),j.kind(),j.aircraft(),stationary,true,receipt,data)))
                     {
                         data.putString("FlightStage","RETREAT");var plane=(UNTransportEntity)level.getEntity(j.aircraft());plane.cargo(-1,false,0);

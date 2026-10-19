@@ -4660,14 +4660,20 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.entityData.set(DATA_UMBILICAL_SEVERED,false);
             this.powerCheckCooldown=0;return;
         }
-        boolean surfacePower = (this.getY() >= 64 || com.projectseele.world.TvMarineDirectorR50.marinePowerAllowed(this)) && this.getLaunchPhase() != LAUNCH_ASCENT
-                && (!this.isNervLogisticsLocked() || this.getY() >= 80);
+        boolean marinePower = com.projectseele.world.TvMarineDirectorR50.marinePowerAllowed(this);
+        java.util.function.Predicate<BlockPos> allowedSocket = socket ->
+                com.projectseele.world.NervAirTransportRuntimeR52.sameOperatingRegion(
+                        server,this.position(),Vec3.atCenterOf(socket))
+                || marinePower && socket.getY() >= 32;
+        boolean surfacePower = (com.projectseele.world.NervAirTransportRuntimeR52.sameOperatingRegion(server,this.position(),this.position())
+                || marinePower)
+                && this.getLaunchPhase() != LAUNCH_ASCENT && !this.isNervLogisticsLocked();
         int range = SeeleConfig.COMMON_SPEC.isLoaded()
                 ? SeeleConfig.UMBILICAL_RANGE.get() : 768;
         BlockPos anchor = this.getUmbilicalAnchor();
         anchor = com.projectseele.world.TvYashimaDirectorR50.missionPowerAnchor(this,anchor,range);
         anchor = com.projectseele.world.TvMarineDirectorR50.missionPowerAnchor(this,anchor,range);
-        if (!surfacePower || anchor != null && anchor.getY()<32) anchor=null;
+        if (!surfacePower || anchor != null && !allowedSocket.test(anchor)) anchor=null;
         if (anchor != null && this.position().distanceToSqr(Vec3.atCenterOf(anchor)) <= (double) range * range)
             com.projectseele.world.EvaPowerLinkR25.retain(server, anchor);
         boolean anchorValid = anchor != null
@@ -4680,14 +4686,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             anchor = null;
         }
-        // The surface reel takes over after ascent. Keeping the wet-cage
-        // anchor would draw a lead through the GeoFront roof and consume most
-        // of its usable range before the airframe even walks off the launch pad.
-        if(anchor!=null && anchor.getY()<32 && this.getY()>=64 && this.tickCount%10==0)
-        {
-            BlockPos surface=UmbilicalPylonBlockEntity.findNearest(server,this.position(),Math.min(range,128),32);
-            if(surface!=null)anchor=surface;
-        }
         if (surfacePower && wasConnected && anchor == null
                 && !this.isNervLogisticsLocked())
         {
@@ -4698,7 +4696,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if (surfacePower && anchor == null && !this.isUmbilicalSevered() && --this.powerCheckCooldown <= 0)
         {
             anchor = UmbilicalPylonBlockEntity.findNearest(
-                    server, this.position(), range,32);
+                    server, this.position(), range,Integer.MIN_VALUE,allowedSocket);
             this.powerCheckCooldown = 20;
         }
 
@@ -7623,6 +7621,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // each tick even though its current impulse was immediately erased.
             this.forgeFluidTypeHeight.clear();this.fluidHeight.clear();return;
         }
+        // Keep the original water/flow calculation whenever any section can
+        // contain fluid, including waterlogged blocks. Dry giants need not
+        // inspect every voxel of their full-height collision box each tick.
+        if(com.projectseele.physics.FluidSectionPresenceR53.empty(this.level(),this.getBoundingBox()))return;
         super.updateFluidHeightAndDoFluidPushing(predicate);
     }
 
@@ -7776,7 +7778,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if (passenger instanceof EntryPlugCarrierEntity plug
                 && plug.isLockedToEva())
         {
-            Vec3 seated = EntryPlugKinematics.lockedTransform(this).translation();
+            var frame = EntryPlugKinematics.lockedTransform(this);
+            // Free driving has no logistics producer to publish the capsule
+            // stream. A vanilla rider move alone leaves its client seat at
+            // the launch outlet while the server pilot follows the body.
+            if (!this.level().isClientSide && !this.isNervLogisticsLocked()
+                    && !EvaMechanicalFrameR52.active(this))
+                plug.setCanonicalTransform(frame);
+            Vec3 seated = frame.translation();
             move.accept(passenger, seated.x, seated.y, seated.z);
             return;
         }

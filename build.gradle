@@ -525,6 +525,13 @@ tasks.register('verifyLocalMeshJsonR53', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyLocalMeshJsonR53' }
 
+tasks.register('verifyFullCubeBoxesR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.physics.FullCubeBoxesR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyFullCubeBoxesR53' }
+
 tasks.register('verifyBiomeCornerMainThreadR51', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath

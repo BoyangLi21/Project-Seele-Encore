@@ -13,6 +13,7 @@
     "TvCageCollisionR44Mixin",
     "PublicStationGateR44Mixin",
     "SbwRestCollisionR24Mixin",
+    "SbwTerrainBoxesR53Mixin",
     "SbwParkingTicketsR44Mixin",
     "SbwBootstrapTicketsR44Mixin",
     "GiantExplosionQueryMixinR44",

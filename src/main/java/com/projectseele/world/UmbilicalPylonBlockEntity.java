@@ -66,6 +66,13 @@ public final class UmbilicalPylonBlockEntity extends BlockEntity
     @Nullable
     public static BlockPos findNearest(ServerLevel level, Vec3 centre, int range, int minimumY)
     {
+        return findNearest(level,centre,range,minimumY,position->true);
+    }
+
+    @Nullable
+    public static BlockPos findNearest(ServerLevel level, Vec3 centre, int range, int minimumY,
+            java.util.function.Predicate<BlockPos> allowed)
+    {
         Set<BlockPos> positions = LOADED.get(level.dimension());
         if (positions == null || positions.isEmpty())
         {
@@ -77,7 +84,7 @@ public final class UmbilicalPylonBlockEntity extends BlockEntity
         BlockPos nearest = null;
         for (BlockPos position : Set.copyOf(positions))
         {
-            if(position.getY()<minimumY)continue;
+            if(position.getY()<minimumY||!allowed.test(position))continue;
             if (!level.hasChunkAt(position)
                     || !(level.getBlockEntity(position) instanceof UmbilicalPylonBlockEntity))
             {
