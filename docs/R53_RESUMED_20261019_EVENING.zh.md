@@ -72,3 +72,5 @@
 本次交付边界：当前实际试玩世界与客户端已安装这些修补；旧 build334/LOD v2 全量压缩包不是本次更新版。美术与动作手感待用户人工复核；性能/崩溃专项、屋岛仍待该复核后开展。原生崩溃原因尚未定论，没有据此判定硬件损坏。
 
 归档：提交沿用仓库上一提交的 BoyangLi21 作者身份及用户要求的 Ayanami_Rei trailer，不修改全局 Git 身份。一次非交互远程推送返回 `Host key verification failed`，未修改 SSH 信任或凭据；本次变更保留为本地提交，不能报告已推送。
+
+后续 SSH 排查已完成：仅为 `F:/eva` 添加 `safe.directory` 例外；GitHub 的 Ed25519 主机指纹与官方文档一致后，补入当前用户的 known_hosts。GitHub 已确认 BoyangLi21 认证成功，原私钥未修改。功能提交 `84f8df75b11b30f1667a2711e56247c367768071` 已推送到 `origin/codex/map-complete-20261013`，远端读取与本地提交一致，前段“尚未推送”记录至此解除。用户启动入口 `start_R53_local.bat` 对应的脚本也已使用本次验证的 Temurin 17.0.19。
