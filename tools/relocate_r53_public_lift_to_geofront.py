@@ -63,7 +63,10 @@ def run(world, out, install=False):
     # shaft (all neighbours outside it are air), not part of the pyramid.
     for p in box((126, -459, 269), (134, 80, 277)):
         y = p[1]
-        state = AIR if y < -36 else 'projectseele:geofront_skyweave' if y < -34 else 'minecraft:stone'
+        # Current TV central roof is Y=24 (first cover cell 25), not the
+        # retired R640 skyweave datum. An old datum leaves a hanging stone plug.
+        armor = 'minecraft:black_concrete' if (p[0]-30)%64 == 0 or (p[2]-296)%64 == 0 else 'projectseele:nerv_structural_panel'
+        state = AIR if y < 25 else armor if y < 28 else 'minecraft:stone'
         if y == 80:
             state = 'minecraft:smooth_stone'
         put(p, state, 'retire_tall_shaft_and_seal_sky_ceiling')

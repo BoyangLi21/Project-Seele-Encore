@@ -10,10 +10,14 @@ DIM='projectseele:geofront';FLOOR='projectseele:nerv_floor_panel';WALL='projects
 
 def plan(world,out):
     cells={};tags={};wanted={};newtags={};reasons={}
+    owner=json.loads((world/'ROOT_MECHANICAL_OWNER.json').read_text('utf8'))
+    native_cells={tuple(cell['position']) for group in owner['resources'].values() for cell in group}
     def read(a,b):cells.update(read_box(world,DIM,a,b));tags.update(iter_block_entities(world,DIM,a,b))
     def put(p,s,why):
         assert p in cells,p
         assert p not in tags,('Retained device',p)
+        if p in native_cells:
+            return
         wanted[p]=s;reasons[p]=why
     def box(a,b,s,why):
         for x in range(a[0],b[0]+1):

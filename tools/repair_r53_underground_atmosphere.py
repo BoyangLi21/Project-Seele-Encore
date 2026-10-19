@@ -11,8 +11,18 @@ def repair(pack):
         source = z.read(path).decode('utf8')
     old = 'void DoAtmosphericFog(inout vec3 color, vec3 playerPos, float lViewPos, float VdotS) {'
     marker = '// SEELE: exterior atmosphere must not tint the underground cavern.'
+    # Preserve distant lake/armor contrast inside the finite 1.8 km cavern.
+    # This branch is already masked by dimension and underground altitude.
+    previous = 'float cavernFog = 1.0 - exp(-2.0 * pow(max(lPos / renderDistance, 0.0), 2.2));'
+    revised = 'float cavernFog = 1.0 - exp(-0.65 * pow(max(lPos / renderDistance, 0.0), 2.2));'
+    fog_changed = previous in source
+    source = source.replace(previous, revised)
     if marker in source:
-        return False
+        if fog_changed:
+            replace_entries(pack, {path: source.encode('utf8')})
+            with zipfile.ZipFile(pack) as z:
+                assert z.read(path) == source.encode('utf8')
+        return fog_changed
     assert source.count(old) == 1 and 'SeeleCavernWeight' in source
     new = old + '\n        ' + marker + '\n        if (SeeleCavernWeight() >= 1.0) return;'
     source = source.replace(old, new)
