@@ -19,7 +19,7 @@ import java.lang.reflect.Proxy;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID,value=Dist.CLIENT)
 public final class GeoFrontVerticalVisibilityR44
 {
-    private static final boolean ENABLED=Boolean.getBoolean("projectseele.r44VerticalCavern");
+    private static final boolean ENABLED=Boolean.parseBoolean(System.getProperty("projectseele.r44VerticalCavern","true"));
     private static final float UPWARD_LIMIT=640;
     private static volatile boolean active,installed;
     private static String installation="not requested";

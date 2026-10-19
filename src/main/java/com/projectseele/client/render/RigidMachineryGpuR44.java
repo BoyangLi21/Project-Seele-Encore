@@ -61,6 +61,14 @@ public final class RigidMachineryGpuR44
 
     static boolean draw(Object identity, float[] vertices, ResourceLocation texture,
                         PoseStack poses, MultiBufferSource buffers, int light,boolean triangles)
+    {return draw(identity,vertices,texture,poses,buffers,light,triangles,false);}
+
+    static boolean drawCutout(Object identity,float[] vertices,ResourceLocation texture,
+                              PoseStack poses,MultiBufferSource buffers,int light)
+    {return draw(identity,vertices,texture,poses,buffers,light,true,true);}
+
+    private static boolean draw(Object identity,float[] vertices,ResourceLocation texture,
+                                PoseStack poses,MultiBufferSource buffers,int light,boolean triangles,boolean cutout)
     {
         if (!enabled() || buffers instanceof OutlineBufferSource)
             return false;
@@ -68,7 +76,7 @@ public final class RigidMachineryGpuR44
         ShaderInstance custom = RigidCapsuleGpu.machineryShader();
         if (!external && custom == null || external && !resolveIrisState()) return false;
         BufferUploader.reset();
-        var type = triangles?ModelRenderTypesR49.solidTriangles(texture):ModelRenderTypesR49.solid(texture);
+        var type = cutout?ModelRenderTypesR49.entityTriangles(texture):triangles?ModelRenderTypesR49.solidTriangles(texture):ModelRenderTypesR49.solid(texture);
         type.setupRenderState();
         try
         {

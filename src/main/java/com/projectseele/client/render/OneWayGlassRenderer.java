@@ -41,5 +41,5 @@ public final class OneWayGlassRenderer implements BlockEntityRenderer<OneWayGlas
         blocks.renderBatched(material,pane.getBlockPos(),level,pose,buffers.getBuffer(RenderType.solid()),true,random,ModelData.EMPTY,RenderType.solid());
     }
     @Override public int getViewDistance(){return 4096;}
-    @Override public boolean shouldRenderOffScreen(OneWayGlassBlockEntity pane){return true;}
+    @Override public boolean shouldRenderOffScreen(OneWayGlassBlockEntity pane){return false;}
 }

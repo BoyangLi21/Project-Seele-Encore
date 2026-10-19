@@ -220,12 +220,15 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         RigidCapsuleGpu.captureWitnessSubmission=runtimeWitness;
         try
         {
-            gpu=triangles&&!optics
+            gpu=triangles
                 &&(targetBuffer instanceof com.mojang.blaze3d.vertex.BufferBuilder
                     ||targetBuffer.getClass().getName().equals("me.jellysquid.mods.sodium.client.render.vertex.buffer.SodiumBufferBuilder"))
-                &&RigidCapsuleGpu.drawPosed(values==part.vertices()?part:skin,
+                &&(optics?RigidCapsuleGpu.drawOptics(values==part.vertices()?part:skin,
                 values==part.vertices()?0:skinPose.revision(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
-                selectedTexture,poseStack,vertexLight,packedOverlay,part.red(),part.green(),part.blue());
+                selectedTexture,poseStack,vertexLight,packedOverlay,part.red(),part.green(),part.blue(),this.fullBright)
+                :RigidCapsuleGpu.drawPosed(values==part.vertices()?part:skin,
+                values==part.vertices()?0:skinPose.revision(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
+                selectedTexture,poseStack,vertexLight,packedOverlay,part.red(),part.green(),part.blue()));
         }
         finally { RigidCapsuleGpu.captureWitnessSubmission=false; }
         if(runtimeWitness&&animatable instanceof net.minecraft.world.entity.Entity actor)

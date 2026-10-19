@@ -597,6 +597,7 @@ public final class EvaCommandFeedClient
                 texture.setPixels(image);
             }
             texture.upload();
+            texture.setFilter(true, false);
             LAST_FRAME_NANOS[variant] = System.nanoTime();
             if(Boolean.getBoolean("projectseele.feedReviewR06"))REVIEW_UPLOADED.incrementAndGet();
         }
@@ -1024,6 +1025,7 @@ public final class EvaCommandFeedClient
         }
         fillRect(image, 14, 356, 164, 2, red);
         tacticalTexture = new DynamicTexture(image);
+        tacticalTexture.setFilter(true, false);
         minecraft.getTextureManager().register(
                 TACTICAL_TEXTURE_ID, tacticalTexture);
     }
@@ -1140,6 +1142,7 @@ public final class EvaCommandFeedClient
             }
             cityTexture.upload();
         }
+        cityTexture.setFilter(true, false);
         cityTextureDirty = false;
     }
 
@@ -1213,6 +1216,7 @@ public final class EvaCommandFeedClient
                     ServerboundEvaVideoFramePacket.FRAME_HEIGHT, false);
             paintStandby(image, variant);
             DynamicTexture texture = new DynamicTexture(image);
+            texture.setFilter(true, false);
             STANDBY_TEXTURES[variant] = texture;
             minecraft.getTextureManager().register(
                     STANDBY_TEXTURE_IDS[variant], texture);
@@ -1331,7 +1335,7 @@ public final class EvaCommandFeedClient
         poseStack.scale(1.0F, Math.max(0.015F, eased), 1.0F);
         MultiBufferSource.BufferSource buffers =
                 minecraft.renderBuffers().bufferSource();
-        RenderType renderType = RenderType.entityTranslucent(texture);
+        RenderType renderType = com.projectseele.client.render.ModelRenderTypesR49.commandScreen(texture);
         VertexConsumer consumer = buffers.getBuffer(renderType);
         Matrix4f pose = poseStack.last().pose();
         Matrix3f normal = poseStack.last().normal();
@@ -1345,18 +1349,7 @@ public final class EvaCommandFeedClient
                 halfWidth, halfHeight, 0.0F, 1.0F, 0.0F, eased);
         vertex(consumer, pose, normal,
                 -halfWidth, halfHeight, 0.0F, 0.0F, 0.0F, eased);
-        // The measured S20 masks are viewed both directly and through the
-        // command glazing.  Emit the reverse winding as well: relying on one
-        // guessed normal made every raster disappear when the camera crossed
-        // the authored plane, even though the physical display was present.
-        vertex(consumer, pose, normal,
-                -halfWidth, halfHeight, -0.002F, 0.0F, 0.0F, eased, -1.0F);
-        vertex(consumer, pose, normal,
-                halfWidth, halfHeight, -0.002F, 1.0F, 0.0F, eased, -1.0F);
-        vertex(consumer, pose, normal,
-                halfWidth, -halfHeight, -0.002F, 1.0F, 1.0F, eased, -1.0F);
-        vertex(consumer, pose, normal,
-                -halfWidth, -halfHeight, -0.002F, 0.0F, 1.0F, eased, -1.0F);
+        // entityTranslucent already draws both sides; keep a single raster.
         buffers.endBatch(renderType);
         poseStack.popPose();
     }

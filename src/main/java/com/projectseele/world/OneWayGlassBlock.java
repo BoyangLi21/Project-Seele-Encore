@@ -54,7 +54,7 @@ public final class OneWayGlassBlock extends HorizontalDirectionalBlock implement
     // Keep that state on its original baked-model path instead of hiding it.
     @Override public RenderShape getRenderShape(BlockState state)
     {
-        return state.getValue(PYRAMID)?RenderShape.ENTITYBLOCK_ANIMATED:RenderShape.MODEL;
+        return RenderShape.MODEL;
     }
     @Override public BlockEntity newBlockEntity(BlockPos pos,BlockState state)
     {

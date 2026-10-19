@@ -17,9 +17,10 @@ public final class DeadSeaArchiveRendererR45 implements BlockEntityRenderer<Dead
 {
     private static final ResourceLocation TEXTURE=new ResourceLocation("projectseele","textures/block/dead_sea_archive_r45.png");
     private static float[] geometry;
+    private static float[] gpuGeometry;
     private static final int[] TRIANGLE_CORNERS={0,8,16,16};
     public DeadSeaArchiveRendererR45(BlockEntityRendererProvider.Context context){}
-    public static void clearCache(){geometry=null;}
+    public static void clearCache(){geometry=null;gpuGeometry=null;}
     private static float[] geometry()
     {
         if(geometry!=null)return geometry;
@@ -36,7 +37,21 @@ public final class DeadSeaArchiveRendererR45 implements BlockEntityRenderer<Dead
     @Override public void render(DeadSeaArchiveEntityR45 entity,float partial,PoseStack pose,MultiBufferSource buffers,int light,int overlay)
     {
         pose.pushPose();pose.translate(.5,0,.5);pose.mulPose(Axis.YP.rotationDegrees(180-entity.getBlockState().getValue(HorizontalDirectionalBlock.FACING).toYRot()));pose.translate(-.5,0,-.5);
-        var consumer=buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));var matrix=pose.last().pose();var normal=pose.last().normal();var vertices=geometry();
+        var vertices=geometry();
+        if(gpuGeometry==null)
+        {
+            gpuGeometry=new float[vertices.length/24*44];int out=0;
+            for(int triangle=0;triangle<vertices.length;triangle+=24)for(int offset:TRIANGLE_CORNERS)
+            {
+                int i=triangle+offset;
+                gpuGeometry[out++]=vertices[i];gpuGeometry[out++]=vertices[i+1];gpuGeometry[out++]=vertices[i+2];
+                gpuGeometry[out++]=1;gpuGeometry[out++]=1;gpuGeometry[out++]=1;
+                gpuGeometry[out++]=vertices[i+5];gpuGeometry[out++]=vertices[i+6];gpuGeometry[out++]=vertices[i+7];
+                gpuGeometry[out++]=vertices[i+3];gpuGeometry[out++]=vertices[i+4];
+            }
+        }
+        if(RigidMachineryGpuR44.drawCutout(geometry,gpuGeometry,TEXTURE,pose,buffers,light)){pose.popPose();return;}
+        var consumer=buffers.getBuffer(RenderType.entityCutoutNoCull(TEXTURE));var matrix=pose.last().pose();var normal=pose.last().normal();
         // Minecraft's entity material is QUADS. Repeat the last vertex of
         // each authored triangle instead of grouping unrelated triangles.
         for(int triangle=0;triangle<vertices.length;triangle+=24)for(int offset:TRIANGLE_CORNERS)

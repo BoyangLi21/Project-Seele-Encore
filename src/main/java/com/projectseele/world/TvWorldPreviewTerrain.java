@@ -7,6 +7,7 @@ import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
+import com.projectseele.registry.ModBlocks;
 
 /** Fresh preview chunks only. Authored facilities are transplanted afterwards. */
 public final class TvWorldPreviewTerrain
@@ -37,6 +38,15 @@ public final class TvWorldPreviewTerrain
         double t = Math.min(1, (radius - FLAT_RADIUS) / (RADIUS - FLAT_RADIUS));
         return FLOOR_Y + (int) Math.floor((ROOF_Y - FLOOR_Y)
                 * Math.sqrt(Math.max(0, 1 - t * t)));
+    }
+
+    public static BlockState roofArmor(int x, int z)
+    {
+        // Flush panel joints preserve the authored ceiling and all apertures.
+        return Math.floorMod(x - CENTRE_X, 64) == 0
+                || Math.floorMod(z - CENTRE_Z, 64) == 0
+                ? Blocks.BLACK_CONCRETE.defaultBlockState()
+                : ModBlocks.NERV_STRUCTURAL_PANEL.get().defaultBlockState();
     }
 
     public static double lakeDistance(int x, int z)
@@ -101,7 +111,8 @@ public final class TvWorldPreviewTerrain
                 boolean lake = lakeDistance(x, z) < 1.1 && floor < LAKE_Y;
                 // Retain solid cover even where the natural ocean is deep.
                 for (int y = ceiling + 1; y <= ceiling + 16; y++)
-                    chunk.setBlockState(p.set(x, y, z), Blocks.STONE.defaultBlockState(), false);
+                    chunk.setBlockState(p.set(x, y, z), y <= ceiling + 3
+                            ? roofArmor(x, z) : Blocks.STONE.defaultBlockState(), false);
                 for (int y = floor + 1; y <= ceiling; y++)
                     chunk.setBlockState(p.set(x, y, z), lake && y <= LAKE_Y
                             ? Blocks.WATER.defaultBlockState() : Blocks.AIR.defaultBlockState(), false);

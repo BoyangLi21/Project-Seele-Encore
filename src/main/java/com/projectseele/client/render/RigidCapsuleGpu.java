@@ -27,7 +27,7 @@ public final class RigidCapsuleGpu
     private record Mesh(VertexBuffer buffer,long revision,float red,float green,float blue) {}
     private static final Map<Object,Mesh> PARTS=new IdentityHashMap<>();
     private record MaterialIds(int entity,int blockEntity,int item) {}
-    private record ExternalKey(ResourceLocation texture,boolean shadow,int light,int overlay,
+    private record ExternalKey(ResourceLocation texture,RenderType type,boolean shadow,int light,int overlay,
                                int red,int green,int blue,MaterialIds material) {}
     private record ExternalMesh(VertexBuffer buffer,long revision,int light,int overlay,float red,float green,float blue,MaterialIds material,boolean shadow){}
     private static final class ExternalStates
@@ -109,12 +109,27 @@ public final class RigidCapsuleGpu
     }
     private static boolean drawExternal(Object key,long revision,float[] vertices,int stride,float px,float py,float pz,ResourceLocation texture,PoseStack poses,int light,int overlay,float r,float g,float b)
     {
+        return drawExternal(key,revision,vertices,stride,px,py,pz,texture,poses,light,overlay,r,g,b,
+                ModelRenderTypesR49.entityTriangles(texture));
+    }
+    static boolean drawOptics(Object key,long revision,float[] vertices,int stride,float px,float py,float pz,
+                              ResourceLocation texture,PoseStack poses,int light,int overlay,float r,float g,float b,boolean emissive)
+    {
+        if(shader==null||Boolean.getBoolean("projectseele.disableRigidCapsuleGpu")
+                ||!externalShaderActive())return false;
+        // Keep the original eye shader, depth bias and blend state. Reusing
+        // the body pass here would darken the eyes or overwrite the decal.
+        return drawExternal(key,revision,vertices,stride,px,py,pz,texture,poses,light,overlay,r,g,b,
+                ModelRenderTypesR49.opticsTriangles(texture,emissive));
+    }
+    private static boolean drawExternal(Object key,long revision,float[] vertices,int stride,float px,float py,float pz,ResourceLocation texture,PoseStack poses,int light,int overlay,float r,float g,float b,RenderType type)
+    {
         var material=materialIds();if(material==null)return false;
-        var type=ModelRenderTypesR49.entityTriangles(texture);type.setupRenderState();var active=RenderSystem.getShader();
+        type.setupRenderState();var active=RenderSystem.getShader();
         if(active==null||!active.getClass().getName().contains("ExtendedShader")){type.clearRenderState();return false;}
         var states=EXTERNAL_PARTS.computeIfAbsent(key,k->new ExternalStates(4));
         boolean shadow=ShaderShadowPassR44.active();
-        var state=new ExternalKey(texture,shadow,light,overlay,
+        var state=new ExternalKey(texture,type,shadow,light,overlay,
                 Float.floatToRawIntBits(r),Float.floatToRawIntBits(g),Float.floatToRawIntBits(b),material);
         var cached=selectPosedState(states,state,revision);
         boolean uploaded=false;

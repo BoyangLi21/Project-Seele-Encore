@@ -8,12 +8,13 @@ import java.util.HashMap;
 import java.util.Map;
 
 /** Smooth sampling for imported model atlases; block textures stay unchanged. */
-final class ModelRenderTypesR49 extends RenderType
+public final class ModelRenderTypesR49 extends RenderType
 {
     private static final Map<ResourceLocation, RenderType> TYPES = new HashMap<>();
     private static final Map<ResourceLocation, RenderType> SOLID = new HashMap<>();
     private static final Map<ResourceLocation, RenderType> OPTICS = new HashMap<>();
     private static final Map<ResourceLocation, RenderType> LIT_OPTICS = new HashMap<>();
+    private static final Map<ResourceLocation, RenderType> COMMAND_SCREENS = new HashMap<>();
     private record TriangleTexture(ResourceLocation texture, boolean smooth) { }
     private static final Map<TriangleTexture, RenderType> TRIANGLES = new HashMap<>();
     private static final Map<ResourceLocation, RenderType> TRIANGLE_OPTICS = new HashMap<>();
@@ -50,6 +51,18 @@ final class ModelRenderTypesR49 extends RenderType
                         .setShaderState(RENDERTYPE_ENTITY_SOLID_SHADER)
                         .setTextureState(new TextureStateShard(key,true,false))
                         .setLightmapState(LIGHTMAP).setOverlayState(OVERLAY).createCompositeState(true)));
+    }
+
+    public static RenderType commandScreen(ResourceLocation texture)
+    {
+        // RenderType binds the texture again, overriding filters set during upload.
+        return COMMAND_SCREENS.computeIfAbsent(texture, key -> create("entity_translucent",
+                DefaultVertexFormat.NEW_ENTITY, VertexFormat.Mode.QUADS, 256, true, true,
+                CompositeState.builder().setShaderState(RENDERTYPE_ENTITY_TRANSLUCENT_SHADER)
+                        .setTextureState(new TextureStateShard(key, true, false))
+                        .setTransparencyState(TRANSLUCENT_TRANSPARENCY).setCullState(NO_CULL)
+                        .setLightmapState(LIGHTMAP).setOverlayState(OVERLAY)
+                        .createCompositeState(true)));
     }
 
     static RenderType entityTriangles(ResourceLocation texture)
@@ -126,6 +139,7 @@ final class ModelRenderTypesR49 extends RenderType
     static void clear()
     {
         TYPES.clear();SOLID.clear();OPTICS.clear();LIT_OPTICS.clear();
+        COMMAND_SCREENS.clear();
         TRIANGLES.clear();TRIANGLE_OPTICS.clear();TRIANGLE_LIT_OPTICS.clear();
         TRIANGLE_SOLID.clear();
     }
