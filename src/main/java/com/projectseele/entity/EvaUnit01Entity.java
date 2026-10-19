@@ -1147,7 +1147,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&(!EvaAirTransportR31.active(this)||groundCustody)&&!this.isBerserk()&&!this.isExperimentalUnit()&&this.isNervLogisticsLocked())
         {
             var rack=EvaMechanicalFrameR52.originalCarrierControllerR52(this);
-            if(rack!=null&&com.projectseele.world.NervOriginalCarrierR52.actualRoot(rack,1).translation().distanceToSqr(this.position())<.25
+            if(rack!=null&&this.carrierRiseProgress(1)>=.999F
+                    &&com.projectseele.world.NervOriginalCarrierR52.actualRoot(rack,1).translation().distanceToSqr(this.position())<.25
                     &&(groundCustody||this.getY()<80||this.getLaunchPhase()==LAUNCH_ASCENT))return true;
         }
         return !EvaAirTransportR31.active(this) && !this.isBerserk() && !this.isExperimentalUnit() && this.isEntryPlugInserted()
@@ -1172,7 +1173,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // Observers must not infer the control circuit from a temporarily
         // missing nested pilot, especially outside that passenger's tracking range.
         if(this.level().isClientSide)return this.entityData.get(DATA_POWERED_VISUAL_R46);
-        if(EvaAirTransportR31.active(this))return false;
+        // Ground transfer and catapult motion reuse the cradle frame. Only
+        // actual airlift custody suspends the powered control circuit.
+        if(EvaAirTransportR31.active(this)
+                &&(!EvaMechanicalFrameR52.active(this)||EvaMechanicalFrameR52.flightCustody(this)))return false;
         if(EvaBerserkMotionR34.silent(this))return false;
         if(EvaShutdownR30.wreck(this)||EvaBayRepairR33.active(this))return false;
         if(this.isBerserk())return true;
@@ -1569,9 +1573,17 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void acceptIssuedTvMissionEquipmentR45()
     {
         this.refreshTvMissionEquipmentR45();
+        boolean shield=com.projectseele.world.TvMissionEquipmentR45.shieldAuthorized(this);
+        if(shield)this.entityData.set(DATA_ARMAMENT_MASK,this.getArmamentMask()|ARMAMENT_MASK_SHIELD_R45);
+        if(this.isNervLogisticsLocked()){this.stowBayEquipmentR53();return;}
         if(com.projectseele.world.TvMissionEquipmentR45.cannonAuthorized(this))this.selectWeapon(WEAPON_CANNON);
-        else if(com.projectseele.world.TvMissionEquipmentR45.shieldAuthorized(this))
-        {this.entityData.set(DATA_ARMAMENT_MASK,this.getArmamentMask()|ARMAMENT_MASK_SHIELD_R45);this.selectWeapon(WEAPON_SHIELD_R45);}
+        else if(shield)this.selectWeapon(WEAPON_SHIELD_R45);
+    }
+    /** Stored cargo remains in custody; the launch cradle carries an unarmed stance. */
+    public void stowBayEquipmentR53()
+    {
+        if(!this.level().isClientSide&&this.isNervLogisticsLocked()&&this.getWeapon()!=WEAPON_FISTS)
+            this.selectWeapon(WEAPON_FISTS);
     }
     public boolean hasEquippedYashimaShieldR45(){return this.entityData.get(DATA_MISSION_SHIELD_R45);}
     /** Only the verified physical ground-crew transfer removes a returned mission plate. */

@@ -18,7 +18,7 @@ import org.joml.Vector3f;
  * and pilot are provenance only, never motion members. */
 public final class NervHullGroundRecoveryR52
 {
-    public static final int POSE_TICKS=960,LOWER_TICKS=480,TICKS=POSE_TICKS+LOWER_TICKS;
+    public static final int POSE_TICKS=120,LOWER_TICKS=80,TICKS=POSE_TICKS+LOWER_TICKS;
     private static final String KEY="HullGroundRecoveryR52";
     private static EvaBodyPose.Sample decode(EvaUnit01Entity e,CompoundTag tag)
     {var body=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(tag,body);return body;}
@@ -40,7 +40,7 @@ public final class NervHullGroundRecoveryR52
         var target=EvaBodyPose.neutralForTransportR32(e);
         if(!target.rig.keySet().equals(initial.rig.keySet()))throw new IllegalStateException("Original captured skeleton cannot be substituted");
         // The original clamp/shoe source was engineered for these original
-        // standing joint goals. They are reached through 960 checked physical
+        // standing joint goals. They are reached through checked physical
         // samples; no caller can apply this target as a capture or snap.
         return target;
     }

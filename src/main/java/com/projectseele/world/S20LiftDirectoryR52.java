@@ -250,7 +250,7 @@ public final class S20LiftDirectoryR52
             boolean open=car==floor;
             var office=state.document.office();if(open&&office!=null&&office.liftId().equals(spec.id())&&floor.cabin().getY()==office.middleY())open=SeeleConferenceAccessR47.canOpenLanding(level);
             var old=floor.visualDoor()==null?null:level.getEntity(floor.visualDoor());
-            int id=old instanceof NervLiftDoorEntity d?d.getDoorId():Objects.hash(spec.id(),floor.cabin(),"landing");
+            int id=old instanceof NervLiftDoorEntity d&&d.getDoorId()!=0?d.getDoorId():Objects.hash(spec.id(),floor.cabin(),"landing");
             int minX=Integer.MAX_VALUE,minY=minX,minZ=minX,maxX=Integer.MIN_VALUE,maxY=maxX,maxZ=maxX;
             for(var p:floor.landingDoors().keySet()){minX=Math.min(minX,p.getX());minY=Math.min(minY,p.getY());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxY=Math.max(maxY,p.getY());maxZ=Math.max(maxZ,p.getZ());}
             if(floor.landingDoors().isEmpty())continue;
@@ -266,7 +266,21 @@ public final class S20LiftDirectoryR52
             int minX=Integer.MAX_VALUE,minY=minX,minZ=minX,maxX=Integer.MIN_VALUE,maxY=maxX,maxZ=maxX;
             for(var p:reference.cabinDoors().keySet()){minX=Math.min(minX,p.getX());minY=Math.min(minY,p.getY());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxY=Math.max(maxY,p.getY());maxZ=Math.max(maxZ,p.getZ());}
             var initial=group.getCageAnchorBlockPos(reference.controller().getY());
-            var centre=group.getCageAnchorPos(group.getCurrentY()).add((minX+maxX+1)*.5-initial.getX(),minY-initial.getY(),(minZ+maxZ+1)*.5-initial.getZ());
+            net.minecraft.world.phys.Vec3 centre;
+            if(group.isMoving())
+                centre=group.getCageAnchorPos(group.getCurrentY()).add((minX+maxX+1)*.5-initial.getX(),minY-initial.getY(),(minZ+maxZ+1)*.5-initial.getZ());
+            else
+            {
+                // Native currentY is not an absolute world position while idle.
+                // The landed cage, including its horizontal offset, owns this door.
+                S20LiftManifestR52.Floor stopped=car;
+                if(stopped==null)for(var floor:spec.r52().floors())
+                    if(S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,floor.cabin())){stopped=floor;break;}
+                if(stopped==null||stopped.cabinDoors().isEmpty())return;
+                minX=Integer.MAX_VALUE;minY=minX;minZ=minX;maxX=Integer.MIN_VALUE;maxY=maxX;maxZ=maxX;
+                for(var p:stopped.cabinDoors().keySet()){minX=Math.min(minX,p.getX());minY=Math.min(minY,p.getY());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxY=Math.max(maxY,p.getY());maxZ=Math.max(maxZ,p.getZ());}
+                centre=new net.minecraft.world.phys.Vec3((minX+maxX+1)*.5,minY,(minZ+maxZ+1)*.5);
+            }
             var id=state.cabinVisuals.get(spec.id());
             var visual=id==null?null:level.getEntity(id);
             NervLiftDoorEntity door;

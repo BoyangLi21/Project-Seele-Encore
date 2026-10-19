@@ -19,7 +19,8 @@ public final class NervAirRescueApproachR53
 {
     private static final TicketType<ChunkPos> TICKET=TicketType.create("nerv_rescue_approach_r53",Comparator.comparingLong(ChunkPos::toLong),100);
     public static String prepare(ServerLevel level, NervAirTransportManifestR52 manifest,
-            Mission mission, NervFlightProofR52.FlightPickupPreview preview, CompoundTag data)
+            Mission mission, NervFlightProofR52.FlightPickupPreview preview, CompoundTag data,
+            NervAirframeGeometryR52 geometry)
     {
         if(data.getBoolean("RescuePlannedR53"))return "";
         var eva=(EvaUnit01Entity)level.getEntity(preview.original().eva());
@@ -32,7 +33,7 @@ public final class NervAirRescueApproachR53
         int cursor=data.getInt("RescueSearchR53");
         // Spread an obstructed search over ticks; never scan the whole world
         // or synchronously load distant chunks from a rescue request.
-        for(int budget=0;budget<4&&cursor<65;budget++,cursor++)
+        for(int budget=0;budget<1&&cursor<65;budget++,cursor++)
         {
             int radius=cursor==0?0:((cursor-1)/8+1)*12;
             double angle=cursor==0?0:(cursor-1)%8*Math.PI/4;
@@ -41,17 +42,30 @@ public final class NervAirRescueApproachR53
             // Each original piston has a 144 m stroke. Its attachments,
             // rather than EVA foot support, determine rescue reach.
             boolean reachable=true;
-            for(var anchor:preview.anchors())
-                if(preview.root().transformPoint(anchor).distanceTo(plane.add(0,-11,0))>140){reachable=false;break;}
+            var planeRoot=RigidTransform.of(plane,pickup.plane().rotation());
+            for(int i=0;i<preview.anchors().size();i++)
+            {
+                var top=planeRoot.transformPoint(new Vec3(i%2==0?14:-14,-11,(i/2-1)*11));
+                if(preview.root().transformPoint(preview.anchors().get(i)).distanceTo(top)>144){reachable=false;break;}
+            }
             if(!reachable)continue;
-            var aircraft=NervRigidMeshSweepR52.transformed(new AABB(-59,-12,-28,59,10,28),RigidTransform.of(plane,pickup.plane().rotation()));
+            var emptyFrame=new Frame(planeRoot,null,new Rig(pickup.rig().hoist(),0,1));
+            var aircraftSweep=geometry.sweep(emptyFrame,emptyFrame,List.of(),0,360D/47,.2);
+            AABB aircraft=null;
+            for(var envelope:aircraftSweep.envelopes())aircraft=aircraft==null?envelope:aircraft.minmax(envelope);
             var moved=box.move(delta);
             var upright=radius==0
                     ?new AABB(box.minX+.08,box.maxY+.08,box.minZ+.08,box.maxX-.08,Math.max(box.maxY+16,plane.y-12),box.maxZ-.08)
                     :new AABB(moved.minX+.08,moved.minY+.08,moved.minZ+.08,moved.maxX-.08,Math.max(moved.maxY+16,plane.y-12),moved.maxZ-.08);
             if(!loaded(level,aircraft)||!loaded(level,upright))
             {data.putInt("RescueSearchR53",cursor);return "正在载入附近起吊区域";}
-            if(level.getBlockCollisions(eva,aircraft).iterator().hasNext())continue;
+            boolean aircraftClear=true;
+            for(var shape:level.getBlockCollisions(eva,aircraft))
+            {
+                for(var obstacle:shape.toAabbs())if(aircraftSweep.intersects(obstacle)){aircraftClear=false;break;}
+                if(!aircraftClear)break;
+            }
+            if(!aircraftClear)continue;
             if(level.getBlockCollisions(eva,upright).iterator().hasNext())continue;
             // Existing shallow contact at the source is allowed. Along the
             // pull, require the body corridor itself to remain unobstructed.

@@ -83,8 +83,31 @@ public final class NervLiftDoorEntity extends Entity
         this.entityData.define(DATA_STYLE, STYLE_SILVER);
     }
 
-    @Override protected void readAdditionalSaveData(CompoundTag tag) {}
-    @Override protected void addAdditionalSaveData(CompoundTag tag) {}
+    @Override
+    protected void readAdditionalSaveData(CompoundTag tag)
+    {
+        if (!tag.contains("DoorId")) return;
+        this.entityData.set(DATA_DOOR_ID, tag.getInt("DoorId"));
+        this.entityData.set(DATA_AXIS_X, tag.getBoolean("AxisX"));
+        this.entityData.set(DATA_WIDTH, tag.getInt("Width"));
+        this.entityData.set(DATA_HEIGHT, tag.getInt("Height"));
+        this.entityData.set(DATA_STYLE, tag.getInt("Style"));
+        this.entityData.set(DATA_OPEN, tag.getFloat("Open"));
+        this.entityData.set(DATA_TARGET, tag.getFloat("Target"));
+        this.clientOpen = this.clientOpenO = tag.getFloat("Open");
+    }
+
+    @Override
+    protected void addAdditionalSaveData(CompoundTag tag)
+    {
+        tag.putInt("DoorId", this.getDoorId());
+        tag.putBoolean("AxisX", this.isAxisX());
+        tag.putInt("Width", this.getDoorWidth());
+        tag.putInt("Height", this.getDoorHeight());
+        tag.putInt("Style", this.getDoorStyle());
+        tag.putFloat("Open", this.entityData.get(DATA_OPEN));
+        tag.putFloat("Target", this.entityData.get(DATA_TARGET));
+    }
 
     @Override
     public Packet<ClientGamePacketListener> getAddEntityPacket()
@@ -142,7 +165,9 @@ public final class NervLiftDoorEntity extends Entity
         AABB search = new AABB(centre, centre).inflate(4.0D);
         List<NervLiftDoorEntity> matches = level.getEntitiesOfClass(
                 NervLiftDoorEntity.class, search,
-                door -> door.getDoorId() == doorId);
+                door -> door.getDoorId() == doorId
+                        || door.getDoorId() == 0
+                        && door.position().distanceToSqr(centre) < 1.0E-8D);
         matches.sort(Comparator.comparingInt(Entity::getId));
         NervLiftDoorEntity door;
         if (matches.isEmpty())
@@ -166,6 +191,8 @@ public final class NervLiftDoorEntity extends Entity
         else
         {
             door = matches.get(0);
+            // Adopt pre-migration doors whose old save omitted their controller id.
+            door.entityData.set(DATA_DOOR_ID, doorId);
             door.entityData.set(DATA_AXIS_X, axisX);
             door.entityData.set(DATA_WIDTH, width);
             door.entityData.set(DATA_HEIGHT, height);

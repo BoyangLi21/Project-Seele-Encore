@@ -213,7 +213,7 @@ public final class NervRouteRuntimeR52
             nativeAccess.ownerData(new CompoundTag());
             var unit=directory.unit(variant);if(unit==null)return null;Entity p=level.getEntity(unit.plug());if(!(p instanceof EntryPlugCarrierEntity plug)||plug.getFirstPassenger()==null)return null;
             Entity pilot=plug.getFirstPassenger();UUID commander=pilot instanceof ServerPlayer?pilot.getUUID():null;
-            String mission=AutoSortieR32.missionToken(level);
+            String mission=AutoSortieR32.missionToken(level,variant);
             if(commander==null&&mission.isEmpty())
             {var eva=level.getEntity(unit.eva());if(!(eva instanceof EvaUnit01Entity original)||!original.getPersistentData().hasUUID("R32SortieCommander"))return null;commander=original.getPersistentData().getUUID("R32SortieCommander");}
             else
@@ -259,7 +259,7 @@ public final class NervRouteRuntimeR52
         {
             var job=saved.job(variant);if(job!=null&&job.phase()==Phase.CANCELLED)return recoverCancelledContinuousR52(job);if(job==null||job.phase()!=Phase.DEPLOYED)return new EvaLogisticsDirector.ActionResult(false,"没有可接应的原出动编队记录。");
             var moving=level.getEntity(job.snapshot().original().eva());if(moving instanceof EvaUnit01Entity current&&NervAirTransportRuntimeR52.pending(level,current))return new EvaLogisticsDirector.ActionResult(false,"同一原机体仍由已保存的航空任务保持，不另抢地面路线。");
-            var old=job.snapshot().original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level),old.dimension());
+            var old=job.snapshot().original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level,old.variant()),old.dimension());
             if(job.snapshot().stage()==Stage.COMPLETE)pool.releaseCompletion(job.snapshot().task(),old.owner());
             Entity actor=level.getEntity(original.eva());if(!(actor instanceof EvaUnit01Entity eva)||!(NervR50CarrierModeR53.enabled()?eva.getDeltaMovement().horizontalDistanceSqr()<.001:EvaLogisticsDirector.recoveryMotionSettled(eva)))return new EvaLogisticsDirector.ActionResult(false,"原机体尚未在实际支撑上停稳。");
             Kind kind=EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())?Kind.HULL_ONLY_RECOVERY:Kind.OCCUPIED;
@@ -277,7 +277,7 @@ public final class NervRouteRuntimeR52
             NervMechanicalTravelR52.ContinuousClock originalStop;
             try{var resumeSpeed=route.phased()?NervLaunchPhasesR53.current(job.ownerData().copy(),snapshot.task(),directory,route,directory.routeDistance(route,snapshot.leg(),snapshot.fraction())).speed():route.motionProfile().launch();originalStop=NervMechanicalTravelR52.continuousClock(job.ownerData(),route.id(),directory.fingerprint(),directory.routeDistance(route,snapshot.leg(),snapshot.fraction()),directory.routeLength(route),stored.getDouble("ToMetres"),resumeSpeed.cruiseMps(),resumeSpeed.accelerationMps2(),resumeSpeed.decelerationMps2());if(originalStop.speed()!=0)return new EvaLogisticsDirector.ActionResult(false,"原取消任务尚未真正停稳。");}
             catch(IllegalArgumentException|IllegalStateException mismatch){return new EvaLogisticsDirector.ActionResult(false,"原取消任务的实际位置与保存时钟不符，保持原UUID等待修复。");}
-            var old=snapshot.original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level),old.dimension());var data=job.ownerData().copy();data.putString("AssemblyKindR52",snapshot.kind().name());nativeAccess.ownerData(data);
+            var old=snapshot.original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level,old.variant()),old.dimension());var data=job.ownerData().copy();data.putString("AssemblyKindR52",snapshot.kind().name());nativeAccess.ownerData(data);
             if(!owner.rebindStoppedContinuousR52(level,original,data))return new EvaLogisticsDirector.ActionResult(false,"原UUID编队的实际恒定姿态与停止承托尚未通过。");
             var result=pool.reclaimCancelledContinuousR52(snapshot,UUID.randomUUID(),original,nativeAccess);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
             for(String field:List.of("Finish","FinishTicks","FinishRoot","FinishFeet","FinishPlugLocal","LastFinishTick","ContinuousClockR52","ContinuousBrakeR52","ContinuousResumeStopR52","ContinuousAutoLaunchR52","ReleaseWhenReady","RetargetPreparedRouteR53"))data.remove(field);data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("Returning",true);data.putBoolean("ContinuousCheckedStartR52",true);data.putString("RouteR52",result.state().route());data.putDouble("ContinuousDistanceR52",directory.routeDistance(directory.route(result.state().route()),result.state().leg(),result.state().fraction()));
@@ -413,7 +413,20 @@ public final class NervRouteRuntimeR52
                     }
                     var completion=pool.query(snapshot.task());
                     if(completion!=null&&completion.stage()==Stage.COMPLETE){snapshot=completion;job=job.update(snapshot,job.phase(),job.ownerData(),"");saved.put(job);}
-                    if(owner.finishOriginal(level,snapshot.original(),route.recovery(),job.ownerData())){pool.releaseCompletion(snapshot.task(),snapshot.original().owner());saved.put(job.update(snapshot,route.recovery()?Phase.PARKED:Phase.DEPLOYED,job.ownerData(),""));mirror(saved.job(snapshot.original().variant()));}
+                    if(owner.finishOriginal(level,snapshot.original(),route.recovery(),job.ownerData()))
+                    {
+                        pool.releaseCompletion(snapshot.task(),snapshot.original().owner());
+                        saved.put(job.update(snapshot,route.recovery()?Phase.PARKED:Phase.DEPLOYED,job.ownerData(),""));
+                        mirror(saved.job(snapshot.original().variant()));
+                        // A direct radio sortie has no campaign return order.
+                        // Hand its original NPC back to the existing walking
+                        // route only after the capsule and bridge are restored.
+                        if(route.recovery() && level.getEntity(snapshot.original().plug())
+                                instanceof com.projectseele.entity.EntryPlugCarrierEntity capsule
+                                && capsule.getFirstPassenger() instanceof com.projectseele.entity.TrainingPilotEntity pilot
+                                && pilot.getUUID().equals(snapshot.original().pilot()))
+                            TrainingPilotDirector.stop(level,snapshot.original().variant());
+                    }
                     else wait(job,"等待原编队真实机械收尾");continue;
                 }
                 if(job.phase()==Phase.PREPARING&&snapshot.leg()==0&&snapshot.fraction()==0&&job.ownerData().getBoolean("Prepared")&&owner.requiresPreparationRecoveryR53(level,snapshot.original(),job.ownerData()))

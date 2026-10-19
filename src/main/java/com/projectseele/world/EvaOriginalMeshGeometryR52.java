@@ -153,7 +153,17 @@ public final class EvaOriginalMeshGeometryR52
     public static Geometry parts(EvaUnit01Entity eva,EvaBodyPose.Sample frozenLocalPose)
     {
         var cradle=EvaAirTransportR31.cradleStateR50(eva);require(cradle.getBoolean("MechanicalFrameR52"),"Actual mechanical frozen source required");
-        var geometry=cradle.getBoolean("FrozenOccupiedRecoveryR52")?partsForFrozen(eva,frozenLocalPose,cradle.getCompound(EvaFrozenHandsR52.KEY),false):cradle.getBoolean("FrozenRecoveryR52")?partsForFrozenRecovery(eva,frozenLocalPose,cradle.getCompound(EvaFrozenHandsR52.KEY)):partsForCapture(eva,frozenLocalPose,cradle.getCompound(EvaFrozenHandsR52.KEY));
+        Geometry geometry;
+        if(cradle.getBoolean("FrozenOccupiedRecoveryR52"))
+        {
+            // Rehydrate with the same evaluator used by occupied capture.
+            // A field recovery can retain a bent or damaged dorsal joint;
+            // reloading it must not require a factory rest pose.
+            var provider=readOnlySelectedProviderR52();
+            var hands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),cradle.getCompound(EvaFrozenHandsR52.KEY));
+            geometry=provider.evaluate(eva.getUnitVariant(),frozenLocalPose,hands);
+        }
+        else geometry=cradle.getBoolean("FrozenRecoveryR52")?partsForFrozenRecovery(eva,frozenLocalPose,cradle.getCompound(EvaFrozenHandsR52.KEY)):partsForCapture(eva,frozenLocalPose,cradle.getCompound(EvaFrozenHandsR52.KEY));
         var origin=cradle.getCompound("Origin");
         for(String bone:frozenLocalPose.rig.keySet())
         {

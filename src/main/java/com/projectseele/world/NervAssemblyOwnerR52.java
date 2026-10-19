@@ -407,6 +407,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {
         var p=plant(o);var e=hull(l,o);var capsule=plug(l,o);if(p==null||e==null||capsule==null||!originalGraph(l,o,true)){hold(o,"original_custody_or_manifest_missing");return Preparation.WAITING;}
         if(data.contains("LastPrepareTick")&&data.getLong("LastPrepareTick")==l.getGameTime())return Preparation.WAITING;data.putLong("LastPrepareTick",l.getGameTime());
+        e.stowBayEquipmentR53();
         if(!data.contains("Prepare")){if(!pose(capsule.getCanonicalTransform(),p.dock())||e.position().distanceToSqr(p.bay().translation())>1e-6||!bridgeMatches(l,p,9)||!personnelDoors(l,p,false)){hold(o,"original_dock_bay_bridge_or_personnel_door_not_actual");return Preparation.WAITING;}rememberBridge(data,9);data.putInt("BridgeStartAmount",9);capsule.beginCabinPreparation();e.setNervLogisticsLocked(true);data.putString("Prepare",Prepare.HATCH.name());data.putInt("PrepareTicks",0);}
         if(!savedBridgeMatches(l,p,data)){hold(o,"actual_bridge_or_saved_owner_epoch_changed");return Preparation.WAITING;}
         Prepare phase=Prepare.valueOf(data.getString("Prepare"));int ticks=data.getInt("PrepareTicks");Set<UUID> own=TransportMembershipR52.members(o,Kind.OCCUPIED);
@@ -846,6 +847,15 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         for(String id:gateIds)if(directory.resource(id)==null||directory.resource(id).kind()!=ResourceKind.DOOR||!gates.containsKey(id))return false;
         Set<UUID> own=TransportMembershipR52.members(o,requested);boolean ready=true;for(String id:gateIds)if(!gate(l,gates.get(id),true,own))ready=false;return ready;
     }
+    public Set<net.minecraft.world.level.ChunkPos> flightGateSupportChunksR53(String id)
+    {
+        var gate=gates.get(id);if(gate==null)return Set.of();
+        var chunks=new HashSet<net.minecraft.world.level.ChunkPos>();
+        for(var cell:gate.supports())chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));
+        for(var step:gate.collisionSteps())for(var cell:step)chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));
+        chunks.add(new net.minecraft.world.level.ChunkPos(BlockPos.containing(gate.frame().translation())));
+        return Set.copyOf(chunks);
+    }
     @Override public boolean closeIdleAirshaftGateR53(ServerLevel l,String id)
     {
         if(!commissioned||!(id.startsWith("bank_")||Set.of("remote_airshaft_surface","remote_airshaft_south").contains(id)))return false;
@@ -878,10 +888,8 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {
         if(proof==null||!proof.current(l)||!data.getBoolean("FlightWaitingR52")||!data.hasUUID("FlightTaskR52")||!proof.task().equals(data.getUUID("FlightTaskR52"))||!flightCustody(proof.original(),proof.kind(),data)||!proof.aircraft().equals(data.getUUID("FlightAircraftR52")))return false;var e=hull(l,proof.original());
         if(e==null||!EvaMechanicalFrameR52.flightCustody(e)||!pose(EvaMechanicalFrameR52.frame(e,1),getFrame(data,"FlightWaitingRootR52"))||!proof.preview().sourceFingerprint().equals(data.getString("FlightSourceR52")))return false;
-        // Occupied release requires the same full-body/hand stance admission
-        // as a landed delivery. A timer or clearing the hold cannot grant it.
-        if(proof.kind()==Kind.OCCUPIED)return hold(proof.original(),"waiting_occupied_source_to_real_stance_release_proof_required");
-        if(!EvaMechanicalFrameR52.releaseUpright(e,proof.original()))return false;for(String key:List.of("FlightWaitingR52","FlightTaskR52","FlightWaitingRootR52","FlightAircraftR52","FlightEpochR52","FlightDirectoryR52","FlightSourceR52"))data.remove(key);return true;
+        if(!EvaMechanicalFrameR52.releaseWaitingPickupR53(e,proof.original(),getFrame(data,"FlightWaitingRootR52")))return false;
+        for(String key:List.of("FlightWaitingR52","FlightTaskR52","FlightWaitingRootR52","FlightAircraftR52","FlightEpochR52","FlightDirectoryR52","FlightSourceR52"))data.remove(key);return true;
     }
     private boolean flightCustody(Original o,Kind requested,CompoundTag data)
     {return data.hasUUID("FlightAircraftR52")&&data.getLong("FlightEpochR52")==epoch&&data.getString("FlightDirectoryR52").equals(directory.fingerprint())&&kind(data)==requested&&plant(o)!=null;}
@@ -1042,7 +1050,20 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {var p=units.get(pilot.getAssignedVariant());return p!=null&&originalSeatAllowed(l,seat,pilot)&&TrainingPilotDirector.safeActualFeetR47(l,p.standby())&&l.noCollision(pilot,pilot.getDimensions(net.minecraft.world.entity.Pose.STANDING).makeBoundingBox(p.standby()))?p.standby():null;}
     @Override public boolean originalPersonnelBindingsReady(ServerLevel l){return commissioned&&units.values().stream().allMatch(u->l.getEntity(u.npc()) instanceof TrainingPilotEntity&&l.getEntity(u.seat())!=null);}
     @Override public TrainingPilotEntity originalPilot(ServerLevel l,int v){var p=units.get(v);return p!=null&&l.getEntity(p.npc()) instanceof TrainingPilotEntity n&&n.getAssignedVariant()==v?n:null;}
-    @Override public TrainingPilotDirector.ActionResult requestOriginalPilot(ServerLevel l,int v,String operation){var n=originalPilot(l,v);if(n==null||!Set.of("board","return","standby").contains(operation))return new TrainingPilotDirector.ActionResult(false,"原驾驶员或声明的操作尚未就绪。");pilotOperations.put(n.getUUID(),operation);pilotNodes.put(n.getUUID(),0);n.getPersistentData().putString("R52OriginalPilotOperation",operation);n.getPersistentData().putString("R52OriginalPilotDirectory",directory.fingerprint());n.getPersistentData().putInt("R52OriginalPilotNode",0);return new TrainingPilotDirector.ActionResult(true,"原驾驶员已沿声明的真实步行路线前往岗位。");}
+    @Override public TrainingPilotDirector.ActionResult requestOriginalPilot(ServerLevel l,int v,String operation)
+    {
+        var n=originalPilot(l,v);
+        if(n==null||!Set.of("board","return","standby").contains(operation))return new TrainingPilotDirector.ActionResult(false,"原驾驶员或声明的操作尚未就绪。");
+        var tag=n.getPersistentData();
+        // Recovery polls this request once a second. Preserve an accepted
+        // route's cursor instead of repeatedly sending its pilot to node zero.
+        if(operation.equals(tag.getString("R52OriginalPilotOperation"))
+                &&directory.fingerprint().equals(tag.getString("R52OriginalPilotDirectory")))
+            return new TrainingPilotDirector.ActionResult(true,"原驾驶员正在执行当前步行指令。");
+        pilotOperations.put(n.getUUID(),operation);pilotNodes.put(n.getUUID(),0);
+        tag.putString("R52OriginalPilotOperation",operation);tag.putString("R52OriginalPilotDirectory",directory.fingerprint());tag.putInt("R52OriginalPilotNode",0);
+        return new TrainingPilotDirector.ActionResult(true,"原驾驶员已沿声明的真实步行路线前往岗位。");
+    }
     @Override public boolean routeOriginalPilot(ServerLevel l,TrainingPilotEntity n,String operation)
     {
         var p=units.get(n.getAssignedVariant());if(p==null||!p.npc().equals(n.getUUID()))return false;var saved=n.getPersistentData();if(!saved.getString("R52OriginalPilotDirectory").equals(directory.fingerprint()))return atOriginalPilotStandby(l,p.variant());String requested=saved.getString("R52OriginalPilotOperation");if(!Set.of("board","return","standby").contains(requested))return false;

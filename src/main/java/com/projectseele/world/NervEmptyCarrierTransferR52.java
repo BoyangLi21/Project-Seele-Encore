@@ -13,6 +13,30 @@ public final class NervEmptyCarrierTransferR52
 {
     private static final String KEY="EmptyCarrierTransferR52";
     private record Edge(String leg,String from,String to){}
+
+    static long arrivalTicks(ServerLevel level, Original original, String targetPort)
+    {
+        var context=NervRouteRuntimeR52.flightContext(level);
+        var controller=NervOriginalCarrierR52.controller(level,original);
+        if(context==null||controller==null)return Long.MAX_VALUE/8;
+        var directory=context.directory();var port=directory.ports().get(targetPort);
+        if(port==null)return Long.MAX_VALUE/8;
+        FootSupportFrameR52.Binding binding;
+        try{binding=NervOriginalCarrierR52.nominalBinding(original.variant());}
+        catch(java.io.IOException unavailable){return Long.MAX_VALUE/8;}
+        var node=actualNode(directory,original.variant(),NervOriginalCarrierR52.actualRoot(controller,1),binding);
+        if(node==null)return Long.MAX_VALUE/8;
+        var path=existingPath(directory,original.variant(),node,port.node());
+        if(path==null)return Long.MAX_VALUE/8;
+        long ticks=(long)Math.ceil((1-NervOriginalCarrierR52.progress(controller,1))*80);
+        for(String id:path)
+        {
+            var leg=directory.leg(id);
+            int step=leg.motion()==Motion.FOOT_BEARING_TURN&&!NervR50CarrierModeR53.enabled()?2:4;
+            ticks+=(leg.ticks()+step-1)/step;
+        }
+        return ticks;
+    }
     /** Every edge already belongs to a Root forward or reverse route for this
      * variant. BFS cuts their shared prefix at the existing common bank node. */
     public static List<String> existingPath(NervRouteDirectoryR52 directory,int variant,String from,String to)

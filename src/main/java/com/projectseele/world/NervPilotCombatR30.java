@@ -6,7 +6,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.server.level.*;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.ChunkStatus;
 import net.minecraft.world.phys.*;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -35,7 +34,11 @@ public final class NervPilotCombatR30
                 &&sortie.pilotR45!=null&&sortie.pilotR45.equals(pilot.getUUID())&&pilot.getAssignedVariant()==sortie.unit;
     }
     private static void retain(ServerLevel l,BlockPos p)
-    {var c=new ChunkPos(p);l.getChunkSource().addRegionTicket(TICKET,c,3,c);l.getChunkSource().getChunkFuture(c.x,c.z,ChunkStatus.FULL,true);}
+    {
+        var c=new ChunkPos(p);
+        // The ticket loads asynchronously; callers already wait for the original actor.
+        l.getChunkSource().addRegionTicket(TICKET,c,3,c);
+    }
     private static NervStaffEntity officer(ServerLevel l,String skin)
     {
         var post=NervStaffDirector.roster(l).stream().filter(p->p.skin().equals(skin)).findFirst().orElse(null);if(post==null)return null;

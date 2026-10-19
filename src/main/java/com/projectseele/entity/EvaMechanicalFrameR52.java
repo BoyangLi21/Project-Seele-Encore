@@ -528,6 +528,15 @@ public final class EvaMechanicalFrameR52
         result.dirty();return result;
     }
     public static CompoundTag originalStanceR52(EvaUnit01Entity eva){return eva.getEntityData().get(SAMPLE).getCompound("OriginStance").copy();}
+    /** Cancellation before pickup returns control at the unchanged capture frame. */
+    public static boolean releaseWaitingPickupR53(EvaUnit01Entity eva,Original original,RigidTransform waiting)
+    {
+        if(!flightCustody(eva)||!same(frame(eva,1),waiting)||eva.position().distanceToSqr(waiting.translation())>4e-6
+                ||epoch(eva)!=original.epoch()||kind(eva)==Kind.OCCUPIED&&originalPlug(eva,original)==null)return false;
+        if(kind(eva)==Kind.OCCUPIED)eva.restoreMechanicalStanceR52(originalStanceR52(eva));
+        if(!releaseUpright(eva,original))return false;
+        eva.setNervLogisticsLocked(false);eva.setNoGravity(false);return true;
+    }
     public static boolean releaseUpright(EvaUnit01Entity eva,Original original)
     {
         if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&ballisticCustodyR52(eva))eva.restoreMechanicalStanceR52(originalStanceR52(eva));

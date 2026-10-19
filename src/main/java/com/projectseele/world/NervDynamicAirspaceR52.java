@@ -6,6 +6,7 @@ import net.minecraft.world.phys.AABB;
 /** Root's bounded permission to instantiate existing32m grid identities.
  * No region is enumerated. Only actual source envelopes produce cell claims. */
 public final class NervDynamicAirspaceR52 {
+ private static final java.util.regex.Pattern CELL_ID=java.util.regex.Pattern.compile("space/c-?[0-9]{1,8}_-?[0-9]{1,8}_-?[0-9]{1,8}");
  public record Domain(String id,String dimension,AABB bounds,int maximumStepCells) {}
  private final List<Domain> domains;
  private NervDynamicAirspaceR52(List<Domain> domains){this.domains=List.copyOf(domains);}
@@ -35,7 +36,7 @@ public final class NervDynamicAirspaceR52 {
  public List<Domain> domains(){return domains;}
  public int maximumStepCells(){return domains.stream().mapToInt(Domain::maximumStepCells).max().orElse(0);}
  public static String key(int x,int y,int z){return "space/c"+x+"_"+y+"_"+z;}
- public static AABB canonicalBox(String id){if(id==null||!id.matches("space/c-?[0-9]{1,8}_-?[0-9]{1,8}_-?[0-9]{1,8}"))return null;try{var pieces=id.substring(7).split("_");int x=Integer.parseInt(pieces[0]),y=Integer.parseInt(pieces[1]),z=Integer.parseInt(pieces[2]);if(!key(x,y,z).equals(id)||Math.max(Math.max(Math.abs((long)x),Math.abs((long)y)),Math.abs((long)z))>937500)return null;return new AABB(x*32D,y*32D,z*32D,(x+1D)*32,(y+1D)*32,(z+1D)*32);}catch(NumberFormatException invalid){return null;}}
+ public static AABB canonicalBox(String id){if(id==null||!CELL_ID.matcher(id).matches())return null;try{var pieces=id.substring(7).split("_");int x=Integer.parseInt(pieces[0]),y=Integer.parseInt(pieces[1]),z=Integer.parseInt(pieces[2]);if(!key(x,y,z).equals(id)||Math.max(Math.max(Math.abs((long)x),Math.abs((long)y)),Math.abs((long)z))>937500)return null;return new AABB(x*32D,y*32D,z*32D,(x+1D)*32,(y+1D)*32,(z+1D)*32);}catch(NumberFormatException invalid){return null;}}
  public NervRouteDirectoryR52.Resource resource(String id){var b=canonicalBox(id);return b!=null&&domains.stream().anyMatch(d->d.bounds().intersects(b))?new NervRouteDirectoryR52.Resource(id,NervRouteDirectoryR52.ResourceKind.SPACE,id):null;}
  public NervRouteNativeR52.Binding binding(String id){var r=resource(id);return r==null?null:new NervRouteNativeR52.Binding(id,id,null,"",List.of(),List.of(canonicalBox(id)),0);}
  /** Static authority may cover shafts between the Root domains. New cells
@@ -47,7 +48,17 @@ public final class NervDynamicAirspaceR52 {
   return Set.copyOf(ids);
  }
  private static boolean contains(AABB a,AABB b){return b.minX>=a.minX&&b.minY>=a.minY&&b.minZ>=a.minZ&&b.maxX<=a.maxX&&b.maxY<=a.maxY&&b.maxZ<=a.maxZ;}
- private static final class ResolvedBindings extends AbstractMap<String,NervRouteNativeR52.Binding>{private final NervDynamicAirspaceR52 authority;private final Map<String,NervRouteNativeR52.Binding> statics;private ResolvedBindings(NervDynamicAirspaceR52 a,Map<String,NervRouteNativeR52.Binding> s){authority=a;statics=Map.copyOf(s);}@Override public NervRouteNativeR52.Binding get(Object key){var b=statics.get(key);return b!=null?b:key instanceof String s?authority.binding(s):null;}@Override public boolean containsKey(Object key){return get(key)!=null;}@Override public Set<Entry<String,NervRouteNativeR52.Binding>> entrySet(){return statics.entrySet();}}
+ private static final class ResolvedBindings extends AbstractMap<String,NervRouteNativeR52.Binding>{
+  private final NervDynamicAirspaceR52 authority;private final Map<String,NervRouteNativeR52.Binding> statics;
+  private final Map<String,NervRouteNativeR52.Binding> dynamic=new LinkedHashMap<>(256,.75F,true);
+  private ResolvedBindings(NervDynamicAirspaceR52 a,Map<String,NervRouteNativeR52.Binding> s){authority=a;statics=Map.copyOf(s);}
+  @Override public synchronized NervRouteNativeR52.Binding get(Object key){
+   var b=statics.get(key);if(b!=null)return b;if(!(key instanceof String s))return null;
+   b=dynamic.get(s);if(b!=null)return b;b=authority.binding(s);if(b==null)return null;
+   if(dynamic.size()>=4096){var it=dynamic.keySet().iterator();it.next();it.remove();}dynamic.put(s,b);return b;
+  }
+  @Override public boolean containsKey(Object key){return get(key)!=null;}@Override public Set<Entry<String,NervRouteNativeR52.Binding>> entrySet(){return statics.entrySet();}
+ }
  public Map<String,NervRouteNativeR52.Binding> bindings(Map<String,NervRouteNativeR52.Binding> statics){return new ResolvedBindings(this,statics);}
  public static Map<String,NervRouteNativeR52.Binding> immutableBindings(Map<String,NervRouteNativeR52.Binding> bindings){return bindings instanceof ResolvedBindings?bindings:Map.copyOf(bindings);}
 }

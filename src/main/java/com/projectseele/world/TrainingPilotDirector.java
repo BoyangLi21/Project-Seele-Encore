@@ -267,7 +267,6 @@ public final class TrainingPilotDirector
         for(var chunk:chunks)
         {
             level.getChunkSource().addRegionTicket(ORIGINAL_PILOT_TICKET_R47,chunk,2,chunk);
-            level.getChunkSource().getChunkFuture(chunk.x,chunk.z,net.minecraft.world.level.chunk.ChunkStatus.FULL,true);
         }
     }
 

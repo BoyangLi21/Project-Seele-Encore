@@ -23,6 +23,10 @@ public final class AutoSortieR32
     }
     public static boolean cancellationCurrentR45(boolean canceled,String acceptedMission,String mission)
     {return canceled&&!mission.isEmpty()&&mission.equals(acceptedMission);}
+    public static String missionToken(ServerLevel level,int unit)
+    {
+        return TvCampaignSavedData.get(level).sorties.containsKey(unit)?missionToken(level):"";
+    }
     static boolean assignedPilotR45(ServerLevel level,int unit,net.minecraft.world.entity.Entity pilot)
     {
         var assignment=TvCampaignSavedData.get(level).sorties.get(unit);if(assignment==null||pilot==null||!pilot.isAlive())return false;

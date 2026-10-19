@@ -29,7 +29,13 @@ public final class EvaDorsalMechanism
         eva.getEntityData().set(OPEN, Math.max(0, Math.min(1, open)));
         eva.getEntityData().set(BOW, Math.max(0, Math.min(1, bow)));
     }
-    public static float smooth(float x) { x = Math.max(0, Math.min(1, x)); return x*x*x*(x*(x*6-15)+10); }
+    public static float smooth(float x)
+    {
+        // Float cancellation near the fully open end can exceed 1 and invalidate
+        // an otherwise legal hatch sample. Evaluate the same curve in double.
+        double t = Math.max(0D, Math.min(1D, x));
+        return (float)Math.max(0D, Math.min(1D, t*t*t*(t*(t*6D-15D)+10D)));
+    }
     public static void prepare(EvaUnit01Entity eva, int ticks)
     { set(eva, smooth((ticks-12)/22F), smooth(ticks/22F)); }
     public static void seal(EvaUnit01Entity eva, int ticks)

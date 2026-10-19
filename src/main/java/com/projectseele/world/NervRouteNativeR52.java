@@ -109,7 +109,7 @@ public final class NervRouteNativeR52 implements NativeAccess
                 ||!(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva)||eva.isExperimentalUnit()||eva.getUnitVariant()!=original.variant()||!eva.isAlive()
                 ||eva.getPilotEntity()!=null||eva.isEntryPlugInserted()||!eva.getPassengers().isEmpty()||!EntryPlugEjectionR48.originalFieldEjection(level,original.variant(),eva,original.pilot()))return false;
         var data=eva.getPersistentData();return TransportMembershipR52.hullRecoveryAdmission(original,data,Set.copyOf(eva.getPassengers().stream().map(Entity::getUUID).toList()),eva.isEntryPlugInserted(),EvaShutdownR30.disabled(eva))
-                &&(ownerData.getBoolean("Returning")||ownerData.getBoolean("FlightTransportR53")||AutoSortieR32.missionToken(level).equals(original.mission()));
+                &&(ownerData.getBoolean("Returning")||ownerData.getBoolean("FlightTransportR53")||AutoSortieR32.missionToken(level,original.variant()).equals(original.mission()));
     }
     private boolean occupiedOriginalAssembly(Original original)
     {
@@ -122,7 +122,7 @@ public final class NervRouteNativeR52 implements NativeAccess
                 ||!(r instanceof LivingEntity)||!r.isAlive()||plug.getFirstPassenger()!=r||r.getVehicle()!=plug)return false;
         if(plug.getLinkedEva()!=null&&plug.getLinkedEva()!=eva||eva.getPilotEntity()!=null&&eva.getPilotEntity()!=r)return false;
         boolean transport=ownerData.getBoolean("Returning")||ownerData.getBoolean("FlightTransportR53");
-        if(!transport&&!AutoSortieR32.missionToken(level).equals(original.mission()))return false;
+        if(!transport&&!AutoSortieR32.missionToken(level,original.variant()).equals(original.mission()))return false;
         var tag=eva.getPersistentData();if(tag.hasUUID("R32SortieCommander")&&!tag.getUUID("R32SortieCommander").equals(original.owner()))return false;
         if(!transport&&AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),original.mission()))return false;
         if(r instanceof TrainingPilotEntity pilot&&original.mission().isEmpty())

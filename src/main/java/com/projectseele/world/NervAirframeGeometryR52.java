@@ -18,6 +18,7 @@ public final class NervAirframeGeometryR52
     private final Map<String,Part> source;
     private final Map<String,NervRigidMeshSweepR52> rigidSources;
     private final String fingerprint;
+    private volatile List<AABB> cachedBearingPatches;
     private NervAirframeGeometryR52(Map<String,Part> parts,String sha){source=Map.copyOf(parts);var meshes=new HashMap<String,NervRigidMeshSweepR52>();for(String name:List.of("un_transport_body","un_transport_rotor_0","un_transport_rotor_1","un_transport_rotor_2","un_transport_rotor_3"))meshes.put(name,new NervRigidMeshSweepR52(parts.get(name).xyz()));rigidSources=Map.copyOf(meshes);fingerprint=sha;}
     public String fingerprint(){return fingerprint;}
     public static NervAirframeGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource bytes,Map<String,String> expected)throws IOException
@@ -42,7 +43,8 @@ public final class NervAirframeGeometryR52
     public RigidTransform rotorLocalFrame(int i,double clock){return RigidTransform.of(new Vec3(ROTORS[i][0],4.8,ROTORS[i][1]),new Quaternionf().rotationY((float)Math.toRadians(clock*47*(i%2==0?1:-1))));}
     public List<AABB> bearingPatches()
     {
-        var patches=new LinkedHashSet<AABB>();var xyz=source.get("un_transport_body").xyz();double bottom=rigidSources.get("un_transport_body").bounds().minY;for(int i=0;i<xyz.length;i+=9){var a=new Vec3(xyz[i],xyz[i+1],xyz[i+2]);var b=new Vec3(xyz[i+3],xyz[i+4],xyz[i+5]);var c=new Vec3(xyz[i+6],xyz[i+7],xyz[i+8]);if(a.y==bottom&&b.y==bottom&&c.y==bottom&&b.subtract(a).cross(c.subtract(a)).lengthSqr()>1e-12)patches.add(new AABB(a,a).minmax(new AABB(b,b)).minmax(new AABB(c,c)));}if(patches.isEmpty())throw new IllegalStateException("Actual original gear bearing surface absent");return List.copyOf(patches);
+        var cached=cachedBearingPatches;if(cached!=null)return cached;
+        var patches=new LinkedHashSet<AABB>();var xyz=source.get("un_transport_body").xyz();double bottom=rigidSources.get("un_transport_body").bounds().minY;for(int i=0;i<xyz.length;i+=9){var a=new Vec3(xyz[i],xyz[i+1],xyz[i+2]);var b=new Vec3(xyz[i+3],xyz[i+4],xyz[i+5]);var c=new Vec3(xyz[i+6],xyz[i+7],xyz[i+8]);if(a.y==bottom&&b.y==bottom&&c.y==bottom&&b.subtract(a).cross(c.subtract(a)).lengthSqr()>1e-12)patches.add(new AABB(a,a).minmax(new AABB(b,b)).minmax(new AABB(c,c)));}if(patches.isEmpty())throw new IllegalStateException("Actual original gear bearing surface absent");return cachedBearingPatches=List.copyOf(patches);
     }
     /** Original rotor clock, with its continuous 47 degree/tick phase. */
     public List<Part> parts(Frame frame,List<Vec3> cargoAnchors,double rotorClock)
