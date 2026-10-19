@@ -17,23 +17,35 @@ public final class TriangleSweepMeshR52
     {
         if(triangles.length==0||triangles.length%9!=0||Arrays.stream(triangles).anyMatch(v->!Double.isFinite(v)))throw new IllegalArgumentException("Complete finite original triangles required");
         xyz=triangles.clone();order=new int[xyz.length/9];var vertices=new HashMap<Vertex,Integer>();var edges=new HashMap<Long,Integer>();
-        for(int i=0;i<order.length;i++){order[i]=i;int[] ids=new int[3];for(int c=0;c<3;c++){var p=point(i,c);ids[c]=vertices.computeIfAbsent(new Vertex(p.x,p.y,p.z),key->vertices.size());}for(int c=0;c<3;c++){int a=ids[c],b=ids[(c+1)%3];if(a!=b)edges.merge(((long)Math.min(a,b)<<32)|(Math.max(a,b)&0xffffffffL),1,Integer::sum);}}
-        closed=!edges.isEmpty()&&edges.values().stream().allMatch(n->n==2);root=build(0,order.length);
+        var bounds=new AABB[order.length];var ids=new int[3];
+        for(int i=0;i<order.length;i++){order[i]=i;bounds[i]=triangleBox(i);for(int c=0;c<3;c++){int n=i*9+c*3;ids[c]=vertices.computeIfAbsent(new Vertex(xyz[n],xyz[n+1],xyz[n+2]),key->vertices.size());}for(int c=0;c<3;c++){int a=ids[c],b=ids[(c+1)%3];if(a!=b)edges.merge(((long)Math.min(a,b)<<32)|(Math.max(a,b)&0xffffffffL),1,Integer::sum);}}
+        closed=!edges.isEmpty()&&edges.values().stream().allMatch(n->n==2);root=build(0,order.length,bounds);
     }
     public int triangles(){return order.length;}
     public double[] vertices(){return xyz.clone();}
     public AABB bounds(){return root.box;}
     public boolean closed(){return closed;}
     private Vec3 point(int triangle,int corner){int n=triangle*9+corner*3;return new Vec3(xyz[n],xyz[n+1],xyz[n+2]);}
-    private AABB triangleBox(int t){var a=point(t,0);var b=point(t,1);var c=point(t,2);return new AABB(a,a).minmax(new AABB(b,b)).minmax(new AABB(c,c));}
+    private AABB triangleBox(int t)
+    {
+        int n=t*9;
+        return new AABB(Math.min(Math.min(xyz[n],xyz[n+3]),xyz[n+6]),Math.min(Math.min(xyz[n+1],xyz[n+4]),xyz[n+7]),Math.min(Math.min(xyz[n+2],xyz[n+5]),xyz[n+8]),
+                Math.max(Math.max(xyz[n],xyz[n+3]),xyz[n+6]),Math.max(Math.max(xyz[n+1],xyz[n+4]),xyz[n+7]),Math.max(Math.max(xyz[n+2],xyz[n+5]),xyz[n+8]));
+    }
     private double centre(int t,int axis){int n=t*9+axis;return (xyz[n]+xyz[n+3]+xyz[n+6])/3;}
     private void select(int start,int end,int target,int axis)
     {
         int low=start,high=end-1;while(low<high){double pivot=centre(order[(low+high)>>>1],axis);int i=low,j=high;while(i<=j){while(centre(order[i],axis)<pivot)i++;while(centre(order[j],axis)>pivot)j--;if(i<=j){int old=order[i];order[i++]=order[j];order[j--]=old;}}if(target<=j)high=j;else if(target>=i)low=i;else break;}
     }
-    private Node build(int start,int end)
+    private Node build(int start,int end,AABB[] bounds)
     {
-        var node=new Node();node.start=start;node.end=end;for(int i=start;i<end;i++){var b=triangleBox(order[i]);node.box=node.box==null?b:node.box.minmax(b);}if(end-start>12){int axis=node.box.getXsize()>node.box.getYsize()?0:1;if(node.box.getZsize()>(axis==0?node.box.getXsize():node.box.getYsize()))axis=2;int mid=(start+end)>>>1;select(start,end,mid,axis);node.left=build(start,mid);node.right=build(mid,end);}return node;
+        var node=new Node();node.start=start;node.end=end;
+        // A triangle's immutable bounds are shared through the build, instead
+        // of allocating them again at every ancestor of its BVH leaf.
+        var first=bounds[order[start]];double x=first.minX,y=first.minY,z=first.minZ,X=first.maxX,Y=first.maxY,Z=first.maxZ;
+        for(int i=start+1;i<end;i++){var b=bounds[order[i]];x=Math.min(x,b.minX);y=Math.min(y,b.minY);z=Math.min(z,b.minZ);X=Math.max(X,b.maxX);Y=Math.max(Y,b.maxY);Z=Math.max(Z,b.maxZ);}
+        node.box=new AABB(x,y,z,X,Y,Z);
+        if(end-start>12){int axis=node.box.getXsize()>node.box.getYsize()?0:1;if(node.box.getZsize()>(axis==0?node.box.getXsize():node.box.getYsize()))axis=2;int mid=(start+end)>>>1;select(start,end,mid,axis);node.left=build(start,mid,bounds);node.right=build(mid,end,bounds);}return node;
     }
     private static double radius(AABB box,Vec3 bearing)
     {double squared=0;for(double x:new double[]{box.minX,box.maxX})for(double y:new double[]{box.minY,box.maxY})for(double z:new double[]{box.minZ,box.maxZ})squared=Math.max(squared,new Vec3(x,y,z).distanceToSqr(bearing));return Math.sqrt(squared);}

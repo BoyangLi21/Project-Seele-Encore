@@ -77,6 +77,10 @@ public final class NervRouteNativeR52 implements NativeAccess
     private final NervRouteDirectoryR52 directory;
     private final Map<String,Binding> bindings;
     private final AssemblyOwner owner;
+    private static final Set<String> RETIRED_PIT_SUPPORTS_R53=Set.of(
+            "support/unit0/original_incline","support/unit1/original_incline","support/unit2/original_incline",
+            "support/unit0/bank1_to_2","support/unit1/bank1_to_2","support/unit2/bank1_to_2",
+            "support/unit0/bank2_to_3","support/unit1/bank2_to_3","support/unit2/bank2_to_3");
     private CompoundTag ownerData=new CompoundTag();
     private Kind currentKind=Kind.OCCUPIED;
     private final Map<UUID,String> continuousFailuresR53=new HashMap<>();
@@ -132,7 +136,7 @@ public final class NervRouteNativeR52 implements NativeAccess
         var resource=directory.resource(id);var binding=bindings.get(id);if(resource==null||binding==null||!resource.component().equals(binding.component()))return false;
         boolean retiredPitSupports=NervR50CarrierModeR53.enabled()&&(binding.mechanicalRail()!=null
                 &&binding.mechanicalRail().kind()==NervMechanicalRailBindingR52.Kind.LEGACY_RUNNING_HEAD
-                ||id.matches("support/unit[0-2]/(original_incline|bank1_to_2|bank2_to_3)"));
+                ||RETIRED_PIT_SUPPORTS_R53.contains(id));
         for(var cell:binding.cells())
         {
             if(retiredPitSupports&&cell.state().equals("projectseele:nerv_shaft_panel"))continue;

@@ -26,6 +26,7 @@ public final class NervUprightGuidewayR52 {
  private static List<RailPiece> fixed;
  private static List<Anchor> anchors;
  private static List<PathBinding> paths;
+ private static volatile NervRouteDirectoryR52 matchedDirectory;
  private static String installedSha="";
  private static boolean supportsComplete;
  private static NervStaticSpatialIndexR52<RailPiece> index;
@@ -63,7 +64,15 @@ public final class NervUprightGuidewayR52 {
  }
  private static Vec3 readPoint(JsonArray a){return new Vec3(a.get(0).getAsDouble(),a.get(1).getAsDouble(),a.get(2).getAsDouble());}
  private static RigidTransform readFrame(JsonObject a){var q=a.getAsJsonArray("quaternion_xyzw");return RigidTransform.of(readPoint(a.getAsJsonArray("translation")),new Quaternionf(q.get(0).getAsFloat(),q.get(1).getAsFloat(),q.get(2).getAsFloat(),q.get(3).getAsFloat()));}
- public static boolean matchesDirectory(NervRouteDirectoryR52 d){if(paths==null)return false;for(var p:paths){var l=d.leg(p.leg());var r=d.leg(p.reverse());if(l==null||r==null||l.centreCurve()==null||l.motion()==NervRouteDirectoryR52.Motion.FOOT_BEARING_TURN||!l.centreCurve().toJson().equals(p.curve())||!d.node(l.from()).footFrame().equals(p.from())||!d.node(l.to()).footFrame().equals(p.to())||!r.from().equals(l.to())||!r.to().equals(l.from())||NervMechanicalRailBindingR52.variant(d,l.id())!=p.variant())return false;}return true;}
+ public static boolean matchesDirectory(NervRouteDirectoryR52 d)
+ {
+  if(paths==null)return false;
+  // Both sources are immutable. Keep native foundation/occupancy checks live,
+  // but do not serialize every curve to JSON again for each moving frame.
+  if(matchedDirectory==d)return true;
+  for(var p:paths){var l=d.leg(p.leg());var r=d.leg(p.reverse());if(l==null||r==null||l.centreCurve()==null||l.motion()==NervRouteDirectoryR52.Motion.FOOT_BEARING_TURN||!l.centreCurve().toJson().equals(p.curve())||!d.node(l.from()).footFrame().equals(p.from())||!d.node(l.to()).footFrame().equals(p.to())||!r.from().equals(l.to())||!r.to().equals(l.from())||NervMechanicalRailBindingR52.variant(d,l.id())!=p.variant())return false;}
+  matchedDirectory=d;return true;
+ }
  public static List<RailPiece> pieces(){if(fixed==null)throw new IllegalStateException("Explicit selected upright paths not installed");return fixed;}
  public static List<Anchor> anchors(){if(anchors==null)throw new IllegalStateException("Explicit selected upright anchors not installed");return anchors;}
  public static Set<ChunkPos> foundationChunks(){var out=new HashSet<ChunkPos>();for(var a:anchors())out.add(new ChunkPos(a.at()));return Set.copyOf(out);}
