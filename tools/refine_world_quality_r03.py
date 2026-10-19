@@ -279,7 +279,7 @@ def airports(p):
                 p.fill(x,84,hz+5,x+5,84,hz+11,'minecraft:iron_trapdoor[facing=north,half=bottom,open=false,powered=false,waterlogged=false]',o)
             p.fill(hx-17,99,hz+20,hx+17,106,hz+20,GRAY,o+'/hangar_number_panel')
             letters(p,'0'+str(number+1),hx-3,100,hz+21,o)
-            sign(p,hx,98,hz+21,['航空整備庫','MAINTENANCE','AUTHORIZED PERSONNEL',''],o,'south')
+            sign(p,hx-18,82,hz+21,['航空整備庫','MAINTENANCE','AUTHORIZED','PERSONNEL'],o,'south')
         p.meta['landmarks'].append(dict(id=o,programme='six check-in counters, lounges, departures board, service wall, hangar details'))
 
 def surface(p):

@@ -42,11 +42,11 @@ def main(apply=False):
  for x,z in [(545,47),(645,47)]:
   room(x-38,z-20,x+38,z+35,72,23);b((x-31,73,z-20,x+31,92,z-20),AIR)
   for xx in (x-35,x+35):b((xx,73,z-21,xx,91,z-21),'projectseele:nerv_machine_hazard')
-  p.sign(x-34,80,z-21,['NERV','航空整备库','机务检修',''],o)
  # Connected, sheltered passenger gallery ends before the retracting stair.
  room(434,17,670,29,72,7)
  b((437,73,27,445,78,38),AIR);b((437,72,27,445,72,38),FLOOR);b((436,73,28,436,79,38),WALL);b((446,73,28,446,79,38),WALL);b((436,79,28,446,79,38),STRUCT)
  b((663,73,17,668,77,17),AIR)
+ for x in (511,611):p.sign(x,75,28,['NERV','← 航空整备库','机务检修',''],o)
  # The existing A320 native doorway measured in R20 is translated/rotated
  # without changing cabin scale, seat layout or flight physics.
  old=json.loads((WORLD/'regional_boarding_gates.json').read_text(encoding='utf8'));base=next(g for g in old['gates'] if g['id']=='bay');gates=[]

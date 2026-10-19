@@ -186,14 +186,15 @@ def plan(world=WORLD, out=OUT):
     # Three new, complete boarded decision points have a 3x2 solid housing
     # behind the visible sign and an unobstructed two-metre reader approach.
     boards = [((-316, -461, 726), "west", "U1 · 地下都市站", ["↑ U1 · 总部／研究模拟区", "↓ 大直梯 · 地面出口", "服务台在大厅西侧"]),
-              ((-336, -461, 740), "north", "U1 · 自动步道接驳", ["↑ 站台 · 双向自动步道", "→ 大直梯 · 地面出口", "乘车前请确认方向和站序"]),
+              ((-342, -465, 740), "north", "U1 · 自动步道接驳", ["↑ 站台 · 双向自动步道", "→ 大直梯 · 地面出口", "乘车前请确认方向和站序"]),
               ((-402, -463, 728), "east", "到达服务 · 通行咨询", ["职员服务 · 通行协助", "换乘／出口见南侧导向牌", "请保留通行证"])]
     new_tags = {}
     for q, face, title, rows in boards:
         dx, dz = {"north": (0, -1), "east": (1, 0), "west": (-1, 0)}[face]
         for lateral in (-1, 0, 1):
             for h in (0, 1):
-                put((q[0] - dx + lateral * dz, q[1] + h, q[2] - dz + lateral * dx), WALL, "complete_wayfinding_board_backing")
+                if q!=(-342,-465,740):
+                    put((q[0] - dx + lateral * dz, q[1] + h, q[2] - dz + lateral * dx), WALL, "complete_wayfinding_board_backing")
         put(q, f"projectseele:station_departure_board[facing={face},wayfinding=true]", "decision_board", fixture=True)
         new_tags[q] = nbtlib.Compound({"id": nbtlib.String("projectseele:station_departure_board"),
             "x": nbtlib.Int(q[0]), "y": nbtlib.Int(q[1]), "z": nbtlib.Int(q[2]),

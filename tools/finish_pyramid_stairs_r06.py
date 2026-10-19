@@ -22,10 +22,13 @@ def main(apply=False):
                     for yy in range(start+1,y+1):
                         if old((x,yy,z))=='minecraft:air':changes[x,yy,z]='minecraft:gray_concrete'
                     pos=(x,y+1,z)
-                    if old(pos)=='minecraft:air':changes[pos]='minecraft:iron_bars[east=false,north=true,south=true,waterlogged=false,west=false]'
+                    if old(pos)=='minecraft:air':
+                        facing='north' if step<0 else 'south'
+                        side=('right' if x<centre else 'left') if step<0 else ('left' if x<centre else 'right')
+                        changes[pos]=f'mtr:escalator_side[facing={facing},orientation=slope,side={side}]'
     vox.OUT=OUT;p=vox.Painter()
     for pos,state in changes.items():p.match((*pos,*pos),old(pos),state,'r06/pyramid/supported_stair_guards')
-    p.meta.update(flights=12,clear_width=3,style='Smooth concrete stringers, metal guards and stone treads',
+    p.meta.update(flights=12,clear_width=3,style='Smooth concrete stringers, continuous sloped guards and stone treads',
                   source='R04 flight_a/flight_b exact centres and floor datums')
     p.apply('finish') if apply else p.save_plan('finish')
     print('Stair finish',len(changes),flush=True)
