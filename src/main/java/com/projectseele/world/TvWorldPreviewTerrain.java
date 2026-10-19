@@ -105,14 +105,28 @@ public final class TvWorldPreviewTerrain
                     for (int d = 0; d < 4; d++)
                         chunk.setBlockState(p.set(x, surfaceTop - d, z),
                                 (d == 0 ? Blocks.GRASS_BLOCK : Blocks.DIRT).defaultBlockState(), false);
-                if (Math.hypot(x - CENTRE_X, z - CENTRE_Z) >= RADIUS) continue;
+                double domeRadius = Math.hypot(x - CENTRE_X, z - CENTRE_Z);
+                int adjacentRoof = Math.max(Math.max(roof(x-1,z),roof(x+1,z)),
+                        Math.max(roof(x,z-1),roof(x,z+1)));
+                if (domeRadius >= RADIUS)
+                {
+                    // At the steep rim, neighbouring carved columns expose
+                    // the side of this column as well as the ceiling below it.
+                    if(domeRadius <= RADIUS+1)
+                        for(int y=FLOOR_Y+1;y<=adjacentRoof;y++)
+                            if(chunk.getBlockState(p.set(x,y,z)).is(Blocks.STONE))
+                                chunk.setBlockState(p,rimArmor(x,y,z),false);
+                    continue;
+                }
                 int floor = ground(x, z), ceiling = roof(x, z);
                 if (ceiling <= floor + 4) continue;
                 boolean lake = lakeDistance(x, z) < 1.1 && floor < LAKE_Y;
                 // Retain solid cover even where the natural ocean is deep.
-                for (int y = ceiling + 1; y <= ceiling + 16; y++)
-                    chunk.setBlockState(p.set(x, y, z), y <= ceiling + 3
-                            ? roofArmor(x, z) : Blocks.STONE.defaultBlockState(), false);
+                int armorTop = Math.max(ceiling+3,adjacentRoof);
+                for (int y = ceiling + 1; y <= Math.max(ceiling+16,armorTop); y++)
+                    chunk.setBlockState(p.set(x, y, z), y <= armorTop
+                            ? (domeRadius>=1750?rimArmor(x,y,z):roofArmor(x,z))
+                            : Blocks.STONE.defaultBlockState(), false);
                 for (int y = floor + 1; y <= ceiling; y++)
                     chunk.setBlockState(p.set(x, y, z), lake && y <= LAKE_Y
                             ? Blocks.WATER.defaultBlockState() : Blocks.AIR.defaultBlockState(), false);
@@ -128,6 +142,11 @@ public final class TvWorldPreviewTerrain
         // Native placed features run in the decoration stage, after adjacent
         // carved chunks are available. Shape only establishes soil and geology.
         chunk.setUnsaved(true);
+    }
+
+    private static BlockState rimArmor(int x,int y,int z)
+    {
+        return Math.floorMod(y-FLOOR_Y,32)==0?Blocks.BLACK_CONCRETE.defaultBlockState():roofArmor(x,z);
     }
 
     private static void plantForest(ChunkAccess chunk)

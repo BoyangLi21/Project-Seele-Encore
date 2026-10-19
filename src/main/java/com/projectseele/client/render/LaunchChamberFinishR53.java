@@ -30,30 +30,33 @@ final class LaunchChamberFinishR53
         SERVICES.clear();leaf = null;header = null;
     }
 
-    static void moving(PoseStack poses, MultiBufferSource buffers, int light, float open)
+    static void moving(NervHangarDoorEntity door, PoseStack poses, MultiBufferSource buffers, int light, float open)
     {
         if(leaf == null)
         {
             var builder = new RigidMachineryPartR44.Builder();
-            for(int x = 0; x < 2; x++)for(int y = 0; y < 4; y++)
+            for(int y = 0; y < 5; y++)
             {
-                double left = x * 8.25, bottom = y * 16.25;
-                for(double z : new double[]{-.925, .425})
+                double width=door.declaredStackR52().panelWidth(),bottom=y*15D;
+                for(double z : new double[]{-.012,.98})
                 {
-                    box(builder,left+.045,bottom+.055,z,8.16,16.14,.012,0x9ba493);
-                    box(builder,left+.09,bottom+.10,z-.002,.045,16.04,.016,0xc2c6b5);
-                    for(double bx:new double[]{left+.38,left+7.87})
-                        for(double by:new double[]{bottom+.40,bottom+15.85})
+                    box(builder,.045,bottom+.055,z,width-.09,14.89,.012,0x9ba493);
+                    box(builder,.09,bottom+.10,z-.002,.045,14.80,.016,0xc2c6b5);
+                    for(double bx:new double[]{.28,width-.40})
+                        for(double by:new double[]{bottom+.40,bottom+14.48})
                             box(builder,bx,by,z-.006,.12,.12,.024,0x475345);
-                    box(builder,left+.65,bottom+1.35,z-.004,1.7,2.1,.022,0x788773);
-                    box(builder,left+.72,bottom+1.42,z-.009,1.56,1.96,.030,0x9aa28f);
+                    box(builder,.65,bottom+1.35,z-.004,1.7,2.1,.022,0x788773);
+                    box(builder,.72,bottom+1.42,z-.009,1.56,1.96,.030,0x9aa28f);
                 }
             }
             leaf = builder.finish();
         }
-        for(int side:new int[]{-1,1})
+        for(var piece:door.declaredGeometryR52().pieces(open))
         {
-            poses.pushPose();poses.scale(side,1,1);poses.translate(open*17,0,0);
+            if(!piece.moving()||!piece.part().name().startsWith("panel/"))continue;
+            poses.pushPose();
+            var point=piece.local().translation();poses.translate(point.x,point.y,point.z);
+            poses.scale(piece.part().name().endsWith("/0")?-1:1,1,1);
             leaf.draw(poses,buffers,light);poses.popPose();
         }
     }
@@ -64,13 +67,13 @@ final class LaunchChamberFinishR53
         {
             var builder = new RigidMachineryPartR44.Builder();
             // The declared rear gates face +Z into their chamber. Keep the
-            // service beam above the 65-unit leaf and below the upper hatch.
-            box(builder,-16.5,65.08,1.52,33,1.82,.22,0x566350);
-            tube(builder,new Vec3(-16.3,66,2.02),new Vec3(16.3,66,2.02),.32,0x963d30);
+            // service beam above the 75-metre leaf and below the upper hatch.
+            box(builder,-16.5,75.09,1.52,33,2.10,.22,0x566350);
+            tube(builder,new Vec3(-16.3,76.15,2.02),new Vec3(16.3,76.15,2.02),.32,0x963d30);
             for(int side:new int[]{-1,1})for(double x:new double[]{4,12})
             {
-                tube(builder,new Vec3(side*x,65.25,2.22),new Vec3(side*x,66.65,1.7),.16,0x9aa58c);
-                box(builder,side*x-.32,65.08,1.52,.64,.25,.82,0x394336);
+                tube(builder,new Vec3(side*x,75.29,2.22),new Vec3(side*x,76.90,1.7),.16,0x9aa58c);
+                box(builder,side*x-.32,75.09,1.52,.64,.29,.82,0x394336);
             }
             header = builder.finish();
         }

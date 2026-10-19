@@ -53,19 +53,16 @@ public final class NervHangarDoorRenderer
     {
         int facilityLight = packedLight;
         if(door.declaredGeometryMissingR52())return;
-        if(door.declaredStackR52()!=null&&com.projectseele.world.NervR50CarrierModeR53.enabled())
+        if(door.declaredStackR52()!=null&&LaunchChamberFinishR53.applies(door))
         {
             float open=door.getOpenProgress(partialTick);
             poses.pushPose();
             poses.mulPose(door.actualFrameR52().rotation());
-            poses.scale(door.visualWidth()/33F,door.visualHeight()/65F,1);
-            TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.pressureDoors(poses,facilityLight,open));
-            if(LaunchChamberFinishR53.applies(door))
-            {
-                LaunchChamberFinishR53.moving(poses,buffers,facilityLight,open);
-                LaunchChamberFinishR53.fixed(door,poses,buffers,facilityLight);
-            }
-            else splitLogo(poses,buffers,open*17,false,facilityLight);
+            // The visible leaves must share the actual eight-panel depth
+            // separation and side pockets used by the collision controller.
+            TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.hangarStackDeclared(poses,facilityLight,open,door.declaredStackR52()));
+            LaunchChamberFinishR53.moving(door,poses,buffers,facilityLight,open);
+            LaunchChamberFinishR53.fixed(door,poses,buffers,facilityLight);
             poses.popPose();
             super.render(door,yaw,partialTick,poses,buffers,packedLight);
             return;
