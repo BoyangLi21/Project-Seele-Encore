@@ -31,6 +31,46 @@ from inspect_map_assets import (  # noqa: E402
 
 AIR = {"minecraft:air", "minecraft:cave_air", "minecraft:void_air"}
 
+
+def iter_lod_source_chunks(world: Path, dimension: str, selected):
+    """Exact FULL chunk sections, saved light and biome samples for offline LODs.
+
+    No heightmap-based clipping: edited underground roofs can outlive a stale
+    heightmap. Callers must preserve the returned states, including air spans.
+    """
+    import numpy as np
+    wanted=set(map(tuple,selected))
+    bounds=(min(x for x,z in wanted),max(x for x,z in wanted),
+            min(z for x,z in wanted),max(z for x,z in wanted))
+    for cx,cz,chunk in iter_chunks(dimension_dir(world,dimension),bounds,wanted):
+        if str(chunk.get('Status','')).removeprefix('minecraft:')!='full':
+            raise ValueError(f'LOD source chunk {(cx,cz)} is not FULL')
+        sections=[]
+        for section in chunk.get('sections',[]):
+            palette,ids=decode_modern_section(section)
+            if not palette:continue
+            light=np.zeros(4096,dtype=np.uint8)
+            packed=np.asarray(section.get('BlockLight',[]),dtype=np.int8).view(np.uint8)
+            if len(packed):
+                if len(packed)!=2048:raise ValueError('Invalid saved block light length')
+                light[::2]=packed&15;light[1::2]=packed>>4
+            biome=section.get('biomes',{});bp=tuple(map(str,biome.get('palette',[])))
+            if not bp:raise ValueError(f'Missing biome palette {(cx,cz,section.get("Y"))}')
+            bi=np.zeros(64,dtype=np.int32)
+            if len(bp)>1:
+                bits=max(1,(len(bp)-1).bit_length());per=64//bits
+                data=[int(v)&((1<<64)-1)for v in biome.get('data',[])]
+                if len(data)*per<64:raise ValueError('Truncated biome indices')
+                bi=np.asarray([(data[i//per]>>((i%per)*bits))&((1<<bits)-1)for i in range(64)],dtype=np.int32)
+            sections.append((int(section['Y']),tuple(palette_state(v)for v in palette),
+                             np.asarray(ids,dtype=np.int32),light,bp,bi))
+        # Starlight SaveUtil writes Byte(0) and tests tag presence plus its
+        # format version. The boolean value alone is only a vanilla marker.
+        light_valid = (('isLightOn' in chunk and int(chunk['starlight.light_version']) == 9)
+                       if 'starlight.light_version' in chunk
+                       else bool(chunk.get('isLightOn',False)))
+        yield cx,cz,sections,light_valid
+
 def chunk_statuses(world: Path, dimension: str, selected):
     """Metadata preflight without decoding voxel palettes or altering chunks."""
     wanted=set(map(tuple,selected))

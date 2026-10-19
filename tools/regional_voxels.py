@@ -280,8 +280,13 @@ class Painter:
                     for p in changed_positions:
                         expected_entities[p]=self.block_entities.get(p)
                     if diff.any():
-                        flush_decoded(root,decoded);root['isLightOn']=nbtlib.Byte(0);root.pop('Heightmaps',None)
-                        for section in root.get('sections',[]):section.pop('BlockLight',None);section.pop('SkyLight',None)
+                        flush_decoded(root,decoded);root.pop('isLightOn',None);root.pop('Heightmaps',None)
+                        # Starlight uses tag presence plus its version, not the
+                        # boolean value of isLightOn. Invalidate both formats.
+                        root.pop('starlight.light_version',None)
+                        for section in root.get('sections',[]):
+                            for key in ('BlockLight','SkyLight','starlight.blocklight_state','starlight.skylight_state'):
+                                section.pop(key,None)
                     blobs[slot]=chunk_blob(root);dirty=True;counts['cells']+=len(offsets);counts['chunks']+=1;counts['block_entities']+=len(nbt_changes)
                 if dirty:
                     atomic_replace(path,build_region(stamps,blobs));touched.append((path,backup))

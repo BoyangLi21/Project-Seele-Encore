@@ -7,6 +7,7 @@ import zipfile
 from pathlib import Path
 
 from audit_r53_lod_hierarchy import audit
+from audit_r53_lod_voxel_coverage import audit as audit_geometry
 
 
 def package(world, coverage, destination):
@@ -26,6 +27,9 @@ def package(world, coverage, destination):
             hierarchy = audit(sql, center=(30, 296), radius=1800)
             if not hierarchy['verified']:
                 raise ValueError('Child data is missing from the LOD parent hierarchy')
+        geometry = audit_geometry(world)
+        if not geometry['verified']:
+            raise ValueError('LOD geometry is missing or contradicts the actual cavern roof')
         # A live WAL would make copying just the main file an incomplete export.
         wal = Path(str(database)+'-wal')
         if wal.exists() and wal.stat().st_size:
@@ -38,6 +42,7 @@ def package(world, coverage, destination):
             'source_modified_ns': database.stat().st_mtime_ns,
             'terrain_completion': proof,
             'lod_hierarchy': hierarchy,
+            'lod_geometry': geometry,
             'lod_rows_by_detail': [dict(zip(('detail','rows','min_x','max_x','min_z','max_z'), row)) for row in levels],
             'scope': 'Current generated GeoFront cache; distant surface battle coverage remains a separate task',
             'changes_block_destruction': False,
