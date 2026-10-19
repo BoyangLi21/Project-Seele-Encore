@@ -1,0 +1,20 @@
+{
+  "source_file": "SEELE_GeoFront_ClearWater.png",
+  "source_sha256": "0eec533a6b51f3001a2262e49d226697851390a1876681e5d249f57637ce4177",
+  "source_dimensions": [
+    2400,
+    1242
+  ],
+  "preview_file": "geofront-r53.jpg",
+  "preview_sha256": "8fe7043d67809054e495a2350350db6ab1ea6ddc29b915e6bd3ca1b904a5c2e9",
+  "preview_dimensions": [
+    1600,
+    828
+  ],
+  "preview_bytes": 311658,
+  "processing": "Proportional resize to 1600 pixels wide; JPEG quality 89, 4:4:4, progressive. No scene/content edits.",
+  "render_date": "2026-10-18",
+  "renderer": "Blender Cycles",
+  "kind": "offline promotional render from local development world; not a real-time screenshot",
+  "credits": "See README.md in this directory and ../ASSETS.md."
+}
