@@ -5,6 +5,7 @@ celestial effects; it does not fabricate a roof or replace real chunk geometry.
 """
 from pathlib import Path
 import hashlib, json, shutil, zipfile
+from repair_r53_geofront_dry_weather import patch as repair_dry_weather
 
 ROOT=Path(__file__).resolve().parents[1]
 SOURCE=ROOT/'artifacts/rebuild_r44/lcl/ComplementaryUnbound_r5.3_SEELE_R44.zip'
@@ -73,6 +74,7 @@ def build():
             assert s.index(marker)>s.index('void DoBorderFog') and s.index(marker)<s.index('void DoCaveFog')
             return s.replace(marker,'        #ifdef SEELE_GEOFRONT\n            float cavernFog = 1.0 - exp(-2.0 * pow(max(lPos / renderDistance, 0.0), 2.2));\n            fog = mix(fog, cavernFog, SeeleCavernWeight());\n        #endif\n\n'+marker,1)
         edit('shaders/lib/atmospherics/fog/mainFog.glsl',fog)
+        edit('shaders/lib/uniforms.glsl',repair_dry_weather)
         result['shaders/lib/seele/cavern.glsl']=HELPER.encode()
         mapping=original['shaders/dimension.properties'].decode().replace('\r','')
         assert 'dimension.world0=*' in mapping and 'projectseele:geofront' not in mapping

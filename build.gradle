@@ -518,6 +518,13 @@ tasks.register('verifyBiomeCornerCache', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyBiomeCornerCache' }
 
+tasks.register('verifyLocalMeshJsonR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.client.render.LocalMeshJsonR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyLocalMeshJsonR53' }
+
 tasks.register('verifyBiomeCornerMainThreadR51', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath

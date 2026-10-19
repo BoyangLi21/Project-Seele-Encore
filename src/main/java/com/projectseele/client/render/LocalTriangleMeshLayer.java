@@ -1,7 +1,6 @@
 package com.projectseele.client.render;
 
 import java.io.IOException;
-import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Map;
@@ -10,12 +9,10 @@ import java.util.Optional;
 import java.util.Set;
 import java.util.function.Function;
 import java.util.function.BiPredicate;
-import java.util.zip.CRC32;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonElement;
 import com.google.gson.JsonObject;
-import com.google.gson.JsonParser;
 import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.projectseele.ProjectSeele;
@@ -448,9 +445,8 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         }
         try (var stream = resource.get().open())
         {
-            byte[] bytes = stream.readAllBytes();
-            JsonObject root = JsonParser.parseString(
-                    new String(bytes, StandardCharsets.UTF_8)).getAsJsonObject();
+            var document = LocalMeshJsonR53.read(stream);
+            JsonObject root = document.metadata();
             int stride = root.get("stride").getAsInt();
             if (stride != 8)
             {
@@ -461,19 +457,10 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             {
                 JsonObject object = entry.getValue().getAsJsonObject();
                 JsonArray pivot = object.getAsJsonArray("pivot");
-                JsonArray source = object.getAsJsonArray("vertices");
-                if (pivot.size() != 3 || source.size() == 0)
+                float[] vertices = document.vertices().get(entry.getKey());
+                if (pivot.size() != 3 || vertices.length == 0)
                 {
                     throw new IOException("Invalid local mesh part " + entry.getKey());
-                }
-                float[] vertices = new float[source.size()];
-                for (int index = 0; index < source.size(); index++)
-                {
-                    vertices[index] = source.get(index).getAsFloat();
-                    if (!Float.isFinite(vertices[index]))
-                    {
-                        throw new IOException("Non-finite vertex in " + entry.getKey());
-                    }
                 }
                 if (vertices.length % (stride * 3) != 0)
                 {
@@ -493,10 +480,8 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             }
             int triangleCount = parts.values().stream()
                     .mapToInt(part -> part.vertices().length / (stride * 3)).sum();
-            CRC32 crc = new CRC32();
-            crc.update(bytes);
             String captureTag = String.format("triangle-mesh-%d-p%d-%08x",
-                    triangleCount, parts.size(), crc.getValue());
+                    triangleCount, parts.size(), document.crc());
             float minimumX = Float.POSITIVE_INFINITY;
             float minimumY = Float.POSITIVE_INFINITY;
             float minimumZ = Float.POSITIVE_INFINITY;

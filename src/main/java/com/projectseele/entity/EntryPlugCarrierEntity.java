@@ -887,14 +887,18 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         // callbacks may query the capsule immediately; leaving it SUSPENDED
         // during startRiding made both real and dummy pilots intermittently
         // reject an otherwise valid docked plug.
-        if (!this.transitionInsertionStage(stage, epoch, STAGE_OCCUPIED))
+        // A landed emergency capsule must keep its field-local dismount
+        // authority while occupied; OCCUPIED alone denotes the hangar dock.
+        int boardedStage = stage == STAGE_FIELD_LANDED ? stage : STAGE_OCCUPIED;
+        if (stage != boardedStage && !this.transitionInsertionStage(stage, epoch, boardedStage))
         {
             return false;
         }
         if (!passenger.startRiding(this, true))
         {
-            this.transitionInsertionStage(STAGE_OCCUPIED,
-                    this.getInsertionEpoch(), stage);
+            if (stage != boardedStage)
+                this.transitionInsertionStage(boardedStage,
+                        this.getInsertionEpoch(), stage);
             if (this.tickCount >= this.nextBoardingDiagnosticTick)
             {
                 this.nextBoardingDiagnosticTick = this.tickCount + 20;
@@ -959,7 +963,9 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
             player.displayClientMessage(Component.literal(ready?"当前插入栓尚未恢复到登机停靠位，请使用 /seele eva reset all。":"机库系统仍在加载，完成后即可登机。"),true);
             return InteractionResult.CONSUME;
         }
-        if ((isIndependentUNPlug() && getLinkedEva()!=null && getLinkedEva().isNervLogisticsLocked()) || !this.isHatchOpen() || this.getInsertionStage() != STAGE_SUSPENDED
+        int stage = this.getInsertionStage();
+        if ((isIndependentUNPlug() && getLinkedEva()!=null && getLinkedEva().isNervLogisticsLocked()) || !this.isHatchOpen()
+                || (stage != STAGE_SUSPENDED && stage != STAGE_FIELD_LANDED)
                 || this.isVehicle() || player.isPassenger())
         {
             player.displayClientMessage(Component.literal(
