@@ -40,7 +40,7 @@ public final class TvFacilityMeshes
     }
     public static void clearCache()
     {
-        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();DECLARED_HATCH_PARTS.clear();DECLARED_STACK_PARTS.clear();attempted=false;R52FixedGuideRenderer.clearCache();EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TripoMachineryR48.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();};
+        Runnable release=()->{RigidMachineryGpuR44.clear();PARTS.clear();CARRIER_MOUNTS.clear();DECLARED_HATCH_PARTS.clear();DECLARED_STACK_PARTS.clear();attempted=false;R52FixedGuideRenderer.clearCache();EvaBayMachineryR33.clearCache();PlugGantryRenderer.clearCache();TripoMachineryR48.clearCache();TvShoulderRestraintsR44.clearCache();TvCageEnclosureR44.clearCache();LaunchChamberFinishR53.clear();};
         if(RenderSystem.isOnRenderThread())release.run();else RenderSystem.recordRenderCall(release::run);
     }
     private static void load()

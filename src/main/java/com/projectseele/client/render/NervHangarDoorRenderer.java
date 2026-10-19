@@ -60,7 +60,12 @@ public final class NervHangarDoorRenderer
             poses.mulPose(door.actualFrameR52().rotation());
             poses.scale(door.visualWidth()/33F,door.visualHeight()/65F,1);
             TvFacilityMeshes.withBuffers(buffers,()->TvFacilityMeshes.pressureDoors(poses,facilityLight,open));
-            splitLogo(poses,buffers,open*17,false,facilityLight);
+            if(LaunchChamberFinishR53.applies(door))
+            {
+                LaunchChamberFinishR53.moving(poses,buffers,facilityLight,open);
+                LaunchChamberFinishR53.fixed(door,poses,buffers,facilityLight);
+            }
+            else splitLogo(poses,buffers,open*17,false,facilityLight);
             poses.popPose();
             super.render(door,yaw,partialTick,poses,buffers,packedLight);
             return;

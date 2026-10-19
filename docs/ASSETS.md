@@ -421,6 +421,11 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 - 18份机库 PA 混响：从已有本项目广播音源派生，只添加有限室内反射及响度整平。来源与台词许可沿用原音源，处理元数据见 `assets/projectseele/audio/hangar_pa_reverb_r46.json`。角色对白不新增语音。
 
+## R53 发射仓连续装甲饰面
+
+- `tools/gen_launch_armor_r53.py` 程序原创大板拼缝、检修盖、铆钉与粗糙度；门扇、顶部管梁及三色管线由 `LaunchChamberFinishR53` 原创几何生成。参考负责人提供的动画场景与模型照片的色彩和构件关系，不复制原画、摄影图片或其纹理进入资源。
+- 实际地图只替换已测量的实墙饰面，保留原机械声明接触、门洞和三条运行通道。私人地图来源许可与原始模型许可不因本批饰面而改变。
+
 ## R47 广播、运输机与设施音效
 
 - 机库18段PA沿用已登记的本项目日语设施广播，仅加强早反射和2.6秒室内尾响。清晰直达声保留；角色交谈仍仅文字。
