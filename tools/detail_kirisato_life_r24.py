@@ -46,12 +46,12 @@ def main(apply=False):
             setcell((xx,72,z-3),'projectseele:period_fixture_part[offset=1]',AIR)
             p.block_entities[q]=nbtlib.Compound({'id':nbtlib.String('projectseele:period_fixture'),'x':nbtlib.Int(xx),'y':nbtlib.Int(71),'z':nbtlib.Int(z-3),'Title':nbtlib.String('霧里团地 · 居民自行车')})
             bikes.append(q)
-        # Move the existing building identity above the canopy, on the same
-        # measured wall. Its three-wide mesh has solid backing at all points.
-        q=(x+7,74,z-1)
+        # The deep canopy hides labels above it from ground level. Keep the
+        # identity on the same solid wall, below the canopy and above bicycles.
+        q=(x+7,72,z-1)
         for dx in (-1,0,1):
-            assert b[(q[0]+dx,74,z)]=='minecraft:light_gray_concrete'
-            assert b[(q[0]+dx,74,z-1)] in AIR
+            assert b[(q[0]+dx,72,z)]=='minecraft:light_gray_concrete'
+            assert b[(q[0]+dx,72,z-1)] in AIR
         setcell(q,'projectseele:period_fixture[facing=north,kind=shop_sign]',AIR)
         p.block_entities[q]=nbtlib.Compound({'id':nbtlib.String('projectseele:period_fixture'),'x':nbtlib.Int(q[0]),'y':nbtlib.Int(q[1]),'z':nbtlib.Int(q[2]),'Title':nbtlib.String(label+'栋 · 霧里团地'),'Lines':nbtlib.List[nbtlib.String]([nbtlib.String('KIRISATO  /  自転車置場')])})
         shelters.append(dict(building=label,bounds=[x+2,70,z-4,x+9,74,z-1],bicycles=bikes,sign=q,entry_preserved=[x+10,70,z-5,x+14,75,z],source_sign=tags[oldsign].snbt()))

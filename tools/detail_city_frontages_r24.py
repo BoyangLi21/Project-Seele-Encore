@@ -45,8 +45,10 @@ def main(apply=False):
         old=(cx+3,f+3,z1+1)
         if old in tags and '_wall_sign[' in b[old]:
             assert id.split('/')[-1] in tags[old].snbt();put(old,'minecraft:air',{b[old]})
-        sign=(cx,f+5,z1+1)
-        for dx in (-1,0,1):assert b[(cx+dx,f+5,z1)]=='minecraft:smooth_stone' and b[(cx+dx,f+5,z1+1)] in AIR
+        # Leave a full wall course above the projecting canopy so that the
+        # lower text line remains visible from the existing pavement.
+        sign=(cx,f+6,z1+1)
+        for dx in (-1,0,1):assert b[(cx+dx,f+6,z1)] in {'minecraft:smooth_sandstone','minecraft:gray_concrete'} and b[(cx+dx,f+6,z1+1)] in AIR
         put(sign,'projectseele:period_fixture[facing=south,kind=shop_sign]',AIR)
         p.block_entities[sign]=nbtlib.Compound({'id':nbtlib.String('projectseele:period_fixture'),'x':nbtlib.Int(sign[0]),'y':nbtlib.Int(sign[1]),'z':nbtlib.Int(sign[2]),'Title':nbtlib.String(title),'Lines':nbtlib.List[nbtlib.String]([nbtlib.String(subtitle)])})
         def fixture(kind,x,z,face='south'):
