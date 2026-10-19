@@ -313,10 +313,10 @@ public final class NervAirTransportRuntimeR52
             long now=System.currentTimeMillis();
             for(var j:saved.jobs())
             {
-                var data=j.ownerData();if(!j.active()&&!data.contains("ReportAtR53"))continue;
+                if(!j.active()&&!j.hasStatusReport())continue;
                 String note=phaseLabelR52(j.phase())+" · "+humanWaitingR52(j.waiting());
-                long last=data.getLong("ReportAtR53");
-                boolean changed=!note.equals(data.getString("ReportNoteR53"));
+                long last=j.lastStatusReportTime();
+                boolean changed=!note.equals(j.lastStatusReportNote());
                 if(!changed&&(!j.active()||now-last<10000&&now>=last)||changed&&j.active()&&now-last<1500&&now>=last)continue;
                 var owner=level.getServer().getPlayerList().getPlayer(j.original().owner());
                 var plane=level.getEntity(j.aircraft());
@@ -324,7 +324,7 @@ public final class NervAirTransportRuntimeR52
                     owner.sendSystemMessage(net.minecraft.network.chat.Component.literal("[NERV 运输管制] 运输机"
                             +aircraft.serial()+" · "+plane.blockPosition().toShortString()+" · "
                             +NervStaffDialogue.unitName(j.original().variant())+" · "+note));
-                data.putLong("ReportAtR53",now);data.putString("ReportNoteR53",note);
+                var data=j.ownerData();data.putLong("ReportAtR53",now);data.putString("ReportNoteR53",note);
                 save(j.update(j.leg(),j.age(),j.phase(),j.carrying(),j.payloadTransferred(),j.spaces(),j.mechanisms(),data,j.waiting()));
             }
         }
