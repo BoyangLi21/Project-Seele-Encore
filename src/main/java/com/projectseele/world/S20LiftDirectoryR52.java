@@ -266,6 +266,9 @@ public final class S20LiftDirectoryR52
             int minX=Integer.MAX_VALUE,minY=minX,minZ=minX,maxX=Integer.MIN_VALUE,maxY=maxX,maxZ=maxX;
             for(var p:reference.cabinDoors().keySet()){minX=Math.min(minX,p.getX());minY=Math.min(minY,p.getY());minZ=Math.min(minZ,p.getZ());maxX=Math.max(maxX,p.getX());maxY=Math.max(maxY,p.getY());maxZ=Math.max(maxZ,p.getZ());}
             var initial=group.getCageAnchorBlockPos(reference.controller().getY());
+            var localCentre=new net.minecraft.world.phys.Vec3(
+                    (minX+maxX+1)*.5-initial.getX(),minY-initial.getY(),
+                    (minZ+maxZ+1)*.5-initial.getZ());
             net.minecraft.world.phys.Vec3 centre;
             if(group.isMoving())
                 centre=group.getCageAnchorPos(group.getCurrentY()).add((minX+maxX+1)*.5-initial.getX(),minY-initial.getY(),(minZ+maxZ+1)*.5-initial.getZ());
@@ -286,7 +289,13 @@ public final class S20LiftDirectoryR52
             NervLiftDoorEntity door;
             if(visual instanceof NervLiftDoorEntity existing){door=existing;door.setPos(centre.x,centre.y,centre.z);}
             else{door=NervLiftDoorEntity.reconcile(level,Objects.hash(spec.id(),"moving_cabin"),maxX-minX>=maxZ-minZ,Math.max(maxX-minX,maxZ-minZ)+1,maxY-minY+1,NervLiftDoorEntity.STYLE_GLASS,centre);if(door!=null)state.cabinVisuals.put(spec.id(),door.getUUID());}
-            if(door!=null){boolean open=car!=null&&!moving;var office=state.document.office();if(open&&office!=null&&office.liftId().equals(spec.id())&&car.cabin().getY()==office.middleY())open=SeeleConferenceAccessR47.canOpenLanding(level);door.setOpen(open);}
+            if(door!=null)
+            {
+                door.bindCage(group.x,group.z,group.facing,localCentre);
+                boolean open=car!=null&&!moving;var office=state.document.office();
+                if(open&&office!=null&&office.liftId().equals(spec.id())&&car.cabin().getY()==office.middleY())open=SeeleConferenceAccessR47.canOpenLanding(level);
+                door.setOpen(open);
+            }
         }
     }
     private static void writeDoors(ServerLevel level,State state,Map<BlockPos,String> cells,boolean open)

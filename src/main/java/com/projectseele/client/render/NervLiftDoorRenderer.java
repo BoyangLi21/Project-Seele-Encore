@@ -4,6 +4,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import com.projectseele.client.TreeOfLifeWallClient;
+import com.projectseele.client.LiftDoorRenderAnchorR53;
 import com.projectseele.entity.NervLiftDoorEntity;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -39,7 +40,11 @@ public final class NervLiftDoorRenderer
     public boolean shouldRender(NervLiftDoorEntity entity, Frustum frustum,
             double cameraX, double cameraY, double cameraZ)
     {
-        return entity.distanceToSqr(cameraX,cameraY,cameraZ)<144*144&&frustum.isVisible(entity.getBoundingBox().inflate(entity.getDoorWidth()+1,entity.getDoorHeight()+1,entity.getDoorWidth()+1));
+        var centre = LiftDoorRenderAnchorR53.centre(entity, Minecraft.getInstance().getFrameTime());
+        return centre.distanceToSqr(cameraX,cameraY,cameraZ)<144*144
+                && frustum.isVisible(entity.getBoundingBox()
+                        .move(centre.subtract(entity.position()))
+                        .inflate(entity.getDoorWidth()+1,entity.getDoorHeight()+1,entity.getDoorWidth()+1));
     }
 
     @Override
@@ -47,6 +52,11 @@ public final class NervLiftDoorRenderer
             float partialTick, PoseStack poses, MultiBufferSource buffers,
             int packedLight)
     {
+        var centre = LiftDoorRenderAnchorR53.centre(door, partialTick);
+        poses.pushPose();
+        poses.translate(centre.x - Mth.lerp(partialTick, door.xOld, door.getX()),
+                centre.y - Mth.lerp(partialTick, door.yOld, door.getY()),
+                centre.z - Mth.lerp(partialTick, door.zOld, door.getZ()));
         float progress = door.getOpenProgress(partialTick);
         double half = door.getDoorWidth() * 0.5D;
         float closedWidth = (float)half - 0.02F;
@@ -57,13 +67,11 @@ public final class NervLiftDoorRenderer
             double slide=half*progress;
             for(double x:new double[]{-half-slide,.02+slide})
             {
-                // Constant-sized leaves retract into the two side pockets.
-                poses.pushPose();poses.translate(x,0,-.04);
-                poses.scale(closedWidth,door.getDoorHeight(),.08F);
-                Minecraft.getInstance().getBlockRenderer().renderSingleBlock(Blocks.GLASS.defaultBlockState(),poses,buffers,packedLight,OverlayTexture.NO_OVERLAY);
-                poses.popPose();
+                LiftGlassPocketR53.render(poses,buffers,packedLight,
+                        x,closedWidth,door.getDoorHeight(),half);
             }
             NervDoorFinish.frame(poses,buffers,packedLight,half,door.getDoorHeight(),progress>=.95F);
+            poses.popPose();
             poses.popPose();
             super.render(door,yaw,partialTick,poses,buffers,packedLight);
             return;
@@ -92,6 +100,7 @@ public final class NervLiftDoorRenderer
             renderSplitLogo(poses, buffers, leftX, rightX, leafWidth,
                     door.getDoorHeight());
         }
+        poses.popPose();
         poses.popPose();
         super.render(door, yaw, partialTick, poses, buffers, packedLight);
     }

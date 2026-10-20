@@ -3,6 +3,8 @@ package com.projectseele.world;
 import com.google.gson.JsonParser;
 import com.projectseele.ProjectSeele;
 import com.projectseele.registry.ModItems;
+import com.projectseele.registry.ModBlocks;
+import com.projectseele.entity.NervLiftDoorEntity;
 import com.supermartijn642.movingelevators.MovingElevators;
 import com.supermartijn642.movingelevators.blocks.ControllerBlock;
 import com.supermartijn642.movingelevators.blocks.ControllerBlockEntity;
@@ -20,6 +22,7 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.AABB;
+import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -45,6 +48,9 @@ public final class RegionalGatewayDirector
     {
         boolean ready, checked, active;
         long gateUntil, doorsClosedUntil;
+        int pendingTarget = Integer.MIN_VALUE;
+        long launchAfter;
+        java.util.UUID pendingPlayer, cabinDoor;
         final long[] carSensorTimes={Long.MIN_VALUE,Long.MIN_VALUE};
         final boolean[] carSensorResults=new boolean[2];
     }
@@ -181,7 +187,7 @@ public final class RegionalGatewayDirector
         }
         Runtime state = RUNTIMES.get(level);
         if(!state.ready&&!commission(level))return rejected(target,"native controller configuration incomplete");
-        if (carAt(level, target)){state.doorsClosedUntil=0;return true;}
+        if (carAt(level, target)){state.doorsClosedUntil=0;state.pendingTarget=Integer.MIN_VALUE;return true;}
         int source=target==LOWER?UPPER:LOWER;
         for(int cz=46;cz<=47;cz++)
         {ChunkPos at=new ChunkPos(-23,cz);level.getChunkSource().addRegionTicket(ATTACH,at,2,at);level.getChunk(-23,cz);}
@@ -192,6 +198,15 @@ public final class RegionalGatewayDirector
             door(level, y, 741, false);
             if (carAt(level, y)) door(level, y, 743, false);
         }
+        var leaf = state.cabinDoor == null ? null : level.getEntity(state.cabinDoor);
+        if (leaf instanceof NervLiftDoorEntity cabin && cabin.getOpenProgress(1) > 0.001F)
+        {
+            state.pendingTarget = target;
+            state.pendingPlayer = player == null ? null : player.getUUID();
+            state.launchAfter = level.getGameTime() + 15;
+            return true;
+        }
+        state.pendingTarget = Integer.MIN_VALUE;
         if(Boolean.getBoolean("projectseele.r40LiftDebug"))
             for(int y:new int[]{LOWER,UPPER})
             {
@@ -258,8 +273,53 @@ public final class RegionalGatewayDirector
 
     private static void door(ServerLevel level, int y, int z, boolean open)
     {
+        NervLiftDoorEntity visual;
+        if (z == 743)
+        {
+            var nativeGroup = group(level);
+            if (nativeGroup == null) return;
+            visual = cabinDoor(level,nativeGroup,new Vec3(X+.5,y,z+.5));
+        }
+        else
+            visual = NervLiftDoorEntity.reconcile(level,
+                    java.util.Objects.hash("regional_gateway_landing",y),
+                    true,7,5,NervLiftDoorEntity.STYLE_GLASS,new Vec3(X+.5,y,z+.5));
+        if (visual != null) visual.setOpen(open);
+        boolean clear = open && visual != null && visual.getOpenProgress(1) >= .95F;
         for (int x = X - 3; x <= X + 3; x++) for (int dy = 0; dy < 5; dy++)
-            set(level, new BlockPos(x, y + dy, z), open ? AIR : CLOSED);
+        {
+            var pos = new BlockPos(x,y+dy,z);
+            var before = level.getBlockState(pos);
+            if (level.getBlockEntity(pos) == null && (before.isAir() || before.equals(CLOSED)
+                    || before.is(ModBlocks.LIFT_DOOR_INTERLOCK_R53.get())))
+                set(level,pos,clear ? AIR : ModBlocks.LIFT_DOOR_INTERLOCK_R53.get().defaultBlockState());
+        }
+    }
+
+    private static NervLiftDoorEntity cabinDoor(ServerLevel level,ElevatorGroup group,Vec3 centre)
+    {
+        var state = RUNTIMES.get(level);
+        var existing = state.cabinDoor == null ? null : level.getEntity(state.cabinDoor);
+        NervLiftDoorEntity door;
+        if (existing instanceof NervLiftDoorEntity found)
+        {
+            door = found;
+            door.setPos(centre);
+        }
+        else
+        {
+            door = NervLiftDoorEntity.reconcile(level,
+                    java.util.Objects.hash("regional_gateway_cabin"),true,7,5,
+                    NervLiftDoorEntity.STYLE_GLASS,centre);
+            if (door != null) state.cabinDoor = door.getUUID();
+        }
+        if (door != null)
+        {
+            var anchor = group.getCageAnchorBlockPos(LOWER);
+            door.bindCage(group.x,group.z,group.facing,
+                    new Vec3(X+.5-anchor.getX(),LOWER-anchor.getY(),743.5-anchor.getZ()));
+        }
+        return door;
     }
 
     public static java.util.Set<BlockPos> arrivalDoorCells(int y)
@@ -296,6 +356,21 @@ public final class RegionalGatewayDirector
             boolean open = present && state.doorsClosedUntil <= time;
             door(level,y,741,open);
             if (present) door(level,y,743,open);
+        }
+        if (group.isMoving())
+        {
+            var initial = group.getCageAnchorBlockPos(LOWER);
+            var centre = group.getCageAnchorPos(group.getCurrentY())
+                    .add(X+.5-initial.getX(),LOWER-initial.getY(),743.5-initial.getZ());
+            var visual = cabinDoor(level,group,centre);
+            if (visual != null) visual.setOpen(false);
+        }
+        if (!group.isMoving() && state.pendingTarget != Integer.MIN_VALUE && time >= state.launchAfter)
+        {
+            int target = state.pendingTarget;
+            var player = state.pendingPlayer == null ? null : level.getServer().getPlayerList().getPlayer(state.pendingPlayer);
+            state.pendingTarget = Integer.MIN_VALUE;
+            request(level,target,player);
         }
     }
 }

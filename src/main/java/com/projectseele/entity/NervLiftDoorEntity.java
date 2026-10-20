@@ -55,6 +55,9 @@ public final class NervLiftDoorEntity extends Entity
     private static final EntityDataAccessor<Integer> DATA_STYLE =
             SynchedEntityData.defineId(NervLiftDoorEntity.class,
                     EntityDataSerializers.INT);
+    private static final EntityDataAccessor<CompoundTag> DATA_CAGE =
+            SynchedEntityData.defineId(NervLiftDoorEntity.class,
+                    EntityDataSerializers.COMPOUND_TAG);
     public static final int STYLE_SILVER = 0;
     public static final int STYLE_NERV_BLACK = 1;
     public static final int STYLE_GLASS = 2;
@@ -81,6 +84,7 @@ public final class NervLiftDoorEntity extends Entity
         this.entityData.define(DATA_OPEN, 0.0F);
         this.entityData.define(DATA_TARGET, 0.0F);
         this.entityData.define(DATA_STYLE, STYLE_SILVER);
+        this.entityData.define(DATA_CAGE, new CompoundTag());
     }
 
     @Override
@@ -140,6 +144,23 @@ public final class NervLiftDoorEntity extends Entity
     public int getDoorWidth() { return this.entityData.get(DATA_WIDTH); }
     public int getDoorHeight() { return this.entityData.get(DATA_HEIGHT); }
     public int getDoorStyle() { return this.entityData.get(DATA_STYLE); }
+
+    public CompoundTag cageBinding() { return this.entityData.get(DATA_CAGE); }
+
+    /** A cabin leaf belongs to the native cage, never an independent render clock. */
+    public void bindCage(int controllerX, int controllerZ,
+            net.minecraft.core.Direction facing, Vec3 localCentre)
+    {
+        CompoundTag binding = new CompoundTag();
+        binding.putInt("X", controllerX);
+        binding.putInt("Z", controllerZ);
+        binding.putInt("Facing", facing.get3DDataValue());
+        binding.putDouble("LocalX", localCentre.x);
+        binding.putDouble("LocalY", localCentre.y);
+        binding.putDouble("LocalZ", localCentre.z);
+        if (!binding.equals(this.entityData.get(DATA_CAGE)))
+            this.entityData.set(DATA_CAGE, binding);
+    }
 
     public float getOpenProgress(float partialTick)
     {
