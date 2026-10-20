@@ -275,7 +275,14 @@ public final class EvaAnatomicalHandsR45
         if(!enabled(e)||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isNervLogisticsLocked())return;
         String clip=EvaGameplayMotionR32.activeGroundClip(e,partial);
         if(!java.util.Set.of("jab","cross","hook","heavy").contains(clip))return;
-        String side=EvaGameplayMotionR32.side(e,clip),hand="hand_"+side,forearm="forearm_"+side;
+        // Both fists carry weight in the guard: correcting only the striking
+        // side leaves the withdrawn hand folded against its forearm.
+        alignPunchWristR53(e,body,"l");
+        alignPunchWristR53(e,body,"r");
+    }
+    private static void alignPunchWristR53(EvaUnit01Entity e,EvaBodyPose.Sample body,String side)
+    {
+        String hand="hand_"+side,forearm="forearm_"+side;
         if(!body.rig.containsKey(hand)||!body.rig.containsKey(forearm))return;
         var matrix=body.matrix(hand);var palm=matrix.transformDirection(new Vector3f(rig(e.getUnitVariant()).carry().get(side).along())).normalize();
         var arm=body.matrix(forearm).transformDirection(new Vector3f(body.rig.get(hand).pivot()).sub(body.rig.get(forearm).pivot())).normalize();
