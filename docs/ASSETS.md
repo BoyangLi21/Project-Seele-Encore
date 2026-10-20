@@ -441,6 +441,7 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 ## R53 发射轨道电流与摩擦
 
 - `launch_electric_burst_r53.ogg` 与三段 `launch_rail_friction_r53_*.ogg` 为本项目原创数学合成，没有采样录音、官方音轨或角色配音。生成器为 `tools/build_launch_feedback_r53.py`，使用固定随机种子、带限噪声、低频衰减及有限隧道反射；48 kHz 单声道用于游戏内定位。
+- 2026-10-20 音色候选：起射拆为短接触冲击、低频电磁脉冲及逐渐变暗的反射，减少尖锐长嘶声；轨道接触由0.31秒改为0.74秒，适配现有12tick播报间隔，峰值由0.82降至0.34，避免和起射抢占同一响度。仍为上述原创合成，未使用官方声音。生成器现在保留192/128格衰减配置，支持独立候选资源目录。音色是否满意仍需用户试听，不能用解码或播放事件检查代替。
 - 文件哈希、时长和解码测量见 `assets/projectseele/audio/launch_feedback_r53.json`。启动电流声只绑定正式发射的首次实际运动提交；摩擦声与火花绑定真实轨道接触点和实际速度。离线解码通过不代表实际场景听感已验收。
 
 ## R53 GeoFront 湖畔宣传图

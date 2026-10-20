@@ -21,12 +21,13 @@ def main() -> None:
     source_path = ROOT / "src/main/resources/assets/projectseele/sounds.json"
     source_bytes = source_path.read_bytes(); source = json.loads(source_bytes)
     with zipfile.ZipFile(args.before_jar) as z: before = json.loads(z.read("assets/projectseele/sounds.json"))
-    assert len(before) == 88 and len(source) == 90 and set(source) - set(before) == EVENTS and not set(before) - set(source)
-    assert all(source[k] == before[k] for k in before), "Original88 sound definitions changed"
+    original = set(before) - EVENTS
+    assert EVENTS <= set(source) and set(source) - EVENTS == original
+    assert all(source[k] == before[k] for k in original), "Unrelated sound definitions changed"
     rows = []
     with zipfile.ZipFile(args.jar) as z:
         delivered_bytes = z.read("assets/projectseele/sounds.json"); delivered = json.loads(delivered_bytes)
-        assert delivered == source, "Selected JAR lacks exact current90 sound definitions"
+        assert delivered == source, "Selected JAR lacks exact current sound definitions"
         assert delivered_bytes == source_bytes, "Catalog bytes differ from frozen current Source"
         registry = z.read("com/projectseele/registry/ModSounds.class")
         assert all(name.encode("ascii") in registry for name in EVENTS), "Registered launch events absent from actual class"
@@ -40,11 +41,12 @@ def main() -> None:
             table = json.loads(z.read("assets/projectseele/lang/" + lang + ".json"))
             captions[lang] = {"subtitles.projectseele." + event: table.get("subtitles.projectseele." + event) for event in sorted(EVENTS)}
     report = dict(passed=True, jar=str(args.jar.resolve()), jar_sha256=sha(args.jar.read_bytes()), source_catalog_sha256=sha(source_bytes),
-                  original_definitions_unchanged=88, exact_current_definitions=90, exact_added_events=sorted(EVENTS), oggs=rows,
+                  original_definitions_unchanged=len(original), exact_current_definitions=len(source),
+                  exact_added_events=sorted(EVENTS-set(before)), verified_launch_events=sorted(EVENTS), oggs=rows,
                   subtitle_translations_observed=captions, world_written=False, source_modified=False,
                   native_sound_resource_reload_or_actual_playback_pass=False,
                   scope="Exact actual JAR packaging readback only. Real client resource reload and committed launch audio playback remain native checks.")
     out.parent.mkdir(parents=True, exist_ok=True); out.write_text(json.dumps(report, indent=2), encoding="utf-8")
-    print(json.dumps({"passed": True, "events": 90, "original_unchanged": 88, "ogg_files": len(rows), "receipt": str(out)}))
+    print(json.dumps({"passed": True, "events": len(source), "original_unchanged": len(original), "ogg_files": len(rows), "receipt": str(out)}))
 
 if __name__ == "__main__": main()
