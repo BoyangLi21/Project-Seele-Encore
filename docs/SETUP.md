@@ -30,11 +30,13 @@ ssh -T git@github.com   # 出现 "Hi BoyangLi21!" 即成功
 ```powershell
 git clone git@github.com:BoyangLi21/Project-Seele-Encore.git
 cd Project-Seele-Encore
-.\gradlew build      # 首次要下载依赖并反编译 MC：强 CPU 机器约 5-15 分钟
-.\gradlew runClient  # 冒烟测试：进主菜单 → Mods 列表应有 Project SEELE
+python tools/bootstrap_dev_dependencies_r24.py
+.\gradlew.bat build
+.\gradlew.bat runClient
 ```
 
 说明：
+- 依赖下载助手需要 Python 3.11+，获取并校验固定版本的 Moving Elevators、两项公共库和 MTR，写入忽略目录 `.Codex/local-mods/`；新克隆不能跳过这一步。完整说明见 [参与指南](../CONTRIBUTING.md)。
 - Gradle wrapper 已指向**腾讯镜像**（`gradle/wrapper/gradle-wrapper.properties`），国内直接快
 - `gradle.properties` 已启用 daemon 与 4G 堆内存，无需调整
 - IDEA 打开项目根目录会自动识别 Gradle；Gradle JVM 选 17（通常自动跟 JAVA_HOME）

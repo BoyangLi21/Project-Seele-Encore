@@ -38,6 +38,16 @@ mcmodsrepo
 /*.jar.log
 /external-assets/
 __pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+
+# Local crash dumps and operating-system metadata.
+/hs_err_pid*.log
+/replay_pid*.log
+/crash-reports/
+.DS_Store
+Thumbs.db
 
 # Files from Forge MDK
 forge*changelog.txt
