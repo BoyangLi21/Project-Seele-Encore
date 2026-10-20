@@ -132,7 +132,12 @@ def selected(actor, label, record, reference, names):
             ]:
                 upper=family+side;lower+=side;end+=side
                 oldU=oldJoint-oldP[upper];oldV=oldP[end]-oldJoint
-                oldAxis=np.cross(oldU,oldV);oldAxis/=max(np.linalg.norm(oldAxis),1e-9)
+                # The source knee is an authored X hinge. Its rest hip,
+                # knee and foot markers are not sagittal: their cross product
+                # is 78.7 degrees from X and introduces that twist into both
+                # thighs even when source and target are the same rig.
+                oldAxis=axis.copy() if family=='leg_' else np.cross(oldU,oldV)
+                oldAxis/=max(np.linalg.norm(oldAxis),1e-9)
                 if oldAxis[0]*axis[0]<0:oldAxis=-oldAxis
                 newU=joint-actor.P[upper]
                 calibration=R.from_matrix(axes(oldU,oldAxis)@axes(newU,axis).T)
