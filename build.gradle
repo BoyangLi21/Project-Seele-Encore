@@ -609,6 +609,12 @@ tasks.register('verifyEvaPoseClock', JavaExec) {
     mainClass = 'com.projectseele.entity.EvaPoseSignalClockTest'
 }
 tasks.named('check').configure { dependsOn 'verifyEvaPoseClock' }
+tasks.register('verifyEvaGaitPacketTailR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.entity.EvaGaitPacketTailR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyEvaGaitPacketTailR53' }
 tasks.register('verifyPoseSnapshotCodecR45', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath

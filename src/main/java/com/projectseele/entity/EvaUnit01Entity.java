@@ -7273,7 +7273,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float remaining = Math.max(0.0F, Math.abs(delta) - deadZone);
         float turn = Math.copySign(Math.min(remaining, maxTurn), delta);
         float bodyYaw = previousBodyYaw + turn;
-        if(longHull)
+        if(longHull && turn != 0F)
         {
             // A long capsule can translate through a passage yet cannot rotate
             // through its side wall. Keep mouse look free and limit only the hull.

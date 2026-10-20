@@ -17,6 +17,12 @@ public abstract class EvaSmallObstacleMixin
     @Redirect(method="computeNext",at=@At(value="INVOKE",target="Lnet/minecraft/world/level/block/state/BlockState;getCollisionShape(Lnet/minecraft/world/level/BlockGetter;Lnet/minecraft/core/BlockPos;Lnet/minecraft/world/phys/shapes/CollisionContext;)Lnet/minecraft/world/phys/shapes/VoxelShape;"))
     private VoxelShape seele$largeAirframeClearance(BlockState state,BlockGetter level,BlockPos pos,CollisionContext context)
     {
+        // The three vanilla air blocks have no collision in any context.
+        // Giant hull sweeps visit thousands of them; avoid the vehicle cache
+        // and obstacle filters for these empty cells.
+        if(state.is(net.minecraft.world.level.block.Blocks.AIR)
+                ||state.is(net.minecraft.world.level.block.Blocks.CAVE_AIR)
+                ||state.is(net.minecraft.world.level.block.Blocks.VOID_AIR))return Shapes.empty();
         VoxelShape shape=com.projectseele.entity.SbwStaticShapesR24.shape(state,context);
         if(shape==null){com.projectseele.entity.SbwRestCollisionR24.shapeFallback();shape=state.getCollisionShape(level,pos,context);}
         return context instanceof EntityCollisionContext entityContext&&entityContext.getEntity() instanceof EvaUnit01Entity eva

@@ -24,6 +24,7 @@ public final class EvaCombatSupportR33
     private static final class RenderClockR45
     {
         long frame; double serverTime,clientTime; float latestMove; boolean timedStop;
+        final EvaGaitPacketTailR53.Cursor gait=new EvaGaitPacketTailR53.Cursor();
     }
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,RenderClockR45> RENDER_CLOCKS_R45=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,com.google.gson.JsonObject> SIGNAL_REVIEW_R45=new com.projectseele.util.WeakIdentityMap<>();
@@ -88,7 +89,9 @@ public final class EvaCombatSupportR33
         // Every pair contains a phase, blend and the server origin from the
         // same tick. Sample that pair at the actual renderer origin instead
         // of advancing phase ahead of vanilla's three-tick position lerp.
-        if(best>64&&Double.isFinite(best))return witnessSignalR45(e,partial,channel,fallback,fallback,"far_from_history",first,last,amount,false);
+        if(best>64&&Double.isFinite(best))
+            return witnessSignalR45(e,partial,channel,fallback,channel==4?stableGaitR53(e,samples,fallback):fallback,
+                    "far_from_history",first,last,amount,false);
         boolean stationaryReview=false,timedStopReview=false;
         if(!(e instanceof EvaPrototypeEntity))
         {
@@ -154,9 +157,31 @@ public final class EvaCombatSupportR33
         }
         String key=channel==4?"gait":channel==5?"move":"run";float a=first.getFloat(key),b=last.getFloat(key);
         float value;
-        if(channel==4){float difference=b-a;difference-=Math.round(difference);value=a+difference*amount;}
+        if(channel==4)
+        {
+            float difference=b-a;difference-=Math.round(difference);value=a+difference*amount;
+            var clock=RENDER_CLOCKS_R45.get(e);
+            if(clock!=null&&!timedStopReview&&samples.size()>1
+                    &&first==last&&last==samples.getCompound(samples.size()-1))
+            {
+                var previous=samples.getCompound(samples.size()-2);
+                value=EvaGaitPacketTailR53.sample(previous.getFloat(key),b,
+                        previous.getFloat("move"),last.getFloat("move"),
+                        last.getLong("tick")-previous.getLong("tick"),
+                        clock.serverTime-last.getLong("tick"));
+            }
+            value=stableGaitR53(e,samples,value);
+        }
         else value=Mth.lerp(amount,a,b);
         return witnessSignalR45(e,partial,channel,fallback,value,timedStopReview?"stop_timeline":"position_history",first,last,amount,stationaryReview);
+    }
+    private static float stableGaitR53(EvaUnit01Entity e,ListTag samples,float value)
+    {
+        var clock=RENDER_CLOCKS_R45.get(e);
+        if(clock==null||samples.size()<2)return value;
+        var newest=samples.getCompound(samples.size()-1);var previous=samples.getCompound(samples.size()-2);
+        return clock.gait.accept(value,previous.getFloat("gait"),newest.getFloat("gait"),
+                newest.getFloat("move"),newest.getLong("tick"));
     }
     private static void rememberClockR44(EvaUnit01Entity e)
     {
