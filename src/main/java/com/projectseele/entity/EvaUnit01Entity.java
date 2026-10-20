@@ -110,7 +110,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         FIRST_BATTLE.begin(this,spec,partner,oldWeapon);
         // The scene may start after this tick's aiStep. Send its real power
         // state with the first scene packet instead of one frame later.
-        if(!this.level().isClientSide)this.entityData.set(DATA_POWERED_VISUAL_R46,this.isPoweredOn());
+        this.syncPowerVisualsR53();
     }
     public void endFirstBattle()
     {
@@ -803,6 +803,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.entityData.define(DATA_CARRIER_TO_Z, 0.0F);
         this.entityData.define(DATA_POWER_TICKS, 0);
         this.entityData.define(DATA_POWERED_VISUAL_R46, false);
+        this.entityData.define(DATA_CARRIER_POWER_CONNECTED_R53, false);
         this.entityData.define(DATA_POWER_CONNECTED, false);
         this.entityData.define(DATA_UMBILICAL_SEVERED, false);
         this.entityData.define(DATA_POWER_ANCHOR_X, 0);
@@ -1123,6 +1124,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
 
     private static final EntityDataAccessor<Float> DATA_CARRIER_RISE_R26 = SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Boolean> DATA_CARRIER_POWER_CONNECTED_R53 =
+            SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.BOOLEAN);
     private float oldCarrierRiseR26;
     public void setRecoveryRackR39(boolean active){this.entityData.set(DATA_RECOVERY_RACK_R39,active);}
     public boolean recoveryRackR39(){return this.entityData.get(DATA_RECOVERY_RACK_R39);}
@@ -1143,6 +1146,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     public boolean isCarrierPowerConnected()
     {
+        // The EVA, rack and passenger packets arrive independently. Comparing
+        // their client positions disconnects a powered gun during fast transfer.
+        if (this.level().isClientSide)
+        {
+            return this.entityData.get(DATA_CARRIER_POWER_CONNECTED_R53);
+        }
         boolean groundCustody=EvaMechanicalFrameR52.active(this)&&!EvaMechanicalFrameR52.flightCustody(this)&&!EvaMechanicalFrameR52.ballisticCustodyR52(this);
         if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&(!EvaAirTransportR31.active(this)||groundCustody)&&!this.isBerserk()&&!this.isExperimentalUnit()&&this.isNervLogisticsLocked())
         {
@@ -1155,6 +1164,15 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 && this.getPilotEntity()!=null && this.isNervLogisticsLocked()
                 && this.carrierRiseProgress(1)>=.999F
                 && !(this.getY()>=80 && this.getLaunchPhase()!=LAUNCH_ASCENT);
+    }
+
+    private void syncPowerVisualsR53()
+    {
+        if (!this.level().isClientSide)
+        {
+            this.entityData.set(DATA_CARRIER_POWER_CONNECTED_R53, this.isCarrierPowerConnected());
+            this.entityData.set(DATA_POWERED_VISUAL_R46, this.isPoweredOn());
+        }
     }
 
     public boolean isUmbilicalSevered()
@@ -5259,7 +5277,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             EvaCombatSupportR33.release(this);
             // Directed motion skips the ordinary power tick, but observers
             // still need the real circuit state after a same-tick restart.
-            if(!this.level().isClientSide)this.entityData.set(DATA_POWERED_VISUAL_R46,this.isPoweredOn());
+            this.syncPowerVisualsR53();
             FirstBattleClip.applyKinematics(this);this.syncPassengerAssembly();return;
         }
         if(!EvaShutdownR30.retainsPoseR45(this))this.updateRiflePoseSignals();
@@ -5563,7 +5581,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.tickBerserkState();
         this.tickSortieParkingLock();
         this.tickLaunchSequence();
-        this.entityData.set(DATA_POWERED_VISUAL_R46, this.isPoweredOn());
+        this.syncPowerVisualsR53();
         if (!this.onGround())
         {
             this.serverAirborneTicks++;
