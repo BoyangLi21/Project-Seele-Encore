@@ -8,12 +8,16 @@ from pathlib import Path
 from audit_r53_pyramid_stair_treads import Frozen
 from prepare_school_hakone_native_r45 import ActualGeometry
 from r52_spatial_plan import PYRAMID
-p=argparse.ArgumentParser(description=__doc__);p.add_argument('--world',type=Path,required=True);p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True);args=p.parse_args()
+p=argparse.ArgumentParser(description=__doc__);p.add_argument('--world',type=Path,required=True);p.add_argument('--source',type=Path,required=True);p.add_argument('--output',type=Path,required=True);p.add_argument('--scope',choices=('pyramid','hq-station','experiment-station'),default='pyramid');args=p.parse_args()
 w=args.world;m=Frozen(args.source,w);g=ActualGeometry(m);g.boxes=functools.lru_cache(None)(g.boxes)
-rooms=json.loads((w/'spatial_contract_r23.json').read_text(encoding='utf8'))['room_entries'];ys={r['floor']+PYRAMID.dy+1 for r in rooms}
+rooms=json.loads((w/'spatial_contract_r23.json').read_text(encoding='utf8'))['room_entries'] if args.scope=='pyramid' else [];ys={r['floor']+PYRAMID.dy+1 for r in rooms}
 graph=json.loads(gzip.decompress((w/'r53_personnel_walking_graph.json.gz').read_bytes()));nav=json.loads(gzip.decompress((w/'nerv_routes_r24.json.gz').read_bytes()));nodes=[tuple(n) for n in graph['nodes']];ix={q:i for i,q in enumerate(nodes)};edges={(a,c) for a,c,*_ in graph['walking_edges']};active={q for q,v in zip(nodes,nav['node_active']) if v}
 assert nodes == [tuple(r[:3]) for r in nav['nodes']] and len(nodes) == len(nav['node_active'])
-selected={q for q in active if q[1] in ys and -90<=q[0]<=150 and 207<=q[2]<=447};counts=collections.Counter();bad=[];drops=[];separators=[];sweeps=0
+def inside(q):
+ if args.scope=='pyramid':return q[1] in ys and -90<=q[0]<=150 and 207<=q[2]<=447
+ if args.scope=='hq-station':return -30<=q[0]<=93 and -573<=q[1]<=-532 and 466<=q[2]<=557
+ return 81<=q[0]<=199 and -477<=q[1]<=-428 and -89<=q[2]<=29
+selected={q for q in active if inside(q)};counts=collections.Counter();bad=[];drops=[];separators=[];sweeps=0
 @functools.lru_cache(None)
 def point(q):
  boxes=g.boxes((q[0],q[1]-1,q[2]))
@@ -36,7 +40,8 @@ for q in sorted(selected):
  if s!='STATIC_STANDING':
   states=[m.block((q[0],q[1]+d,q[2]))for d in(-1,0,1)]
   kind=('SHAPED_STAIR_INTERFACE' if (states[0]or'').partition('[')[0].endswith('_stairs') else
-        'NATIVE_CLOSED_LIFT_DOOR' if states[1]=='projectseele:lift_door_interlock_r53' else 'UNRESOLVED')
+        'NATIVE_CLOSED_LIFT_DOOR' if states[1]=='projectseele:lift_door_interlock_r53' else
+        'NATIVE_CLOSED_FARE_GATE' if (states[1]or'').startswith('mtr:ticket_barrier_') else 'UNRESOLVED')
   bad.append(dict(cell=q,status=s,classification=kind,states=states));continue
  p=point(q)
  for dx,dz in((1,0),(-1,0),(0,1),(0,-1)):
@@ -48,6 +53,6 @@ for q in sorted(selected):
   lows=[d for d in(.5,1,1.5,2,2.5,3)if status((a[0],a[1]-d,a[2]))=='STATIC_STANDING']
   if lows and min(lows)<=.5:continue
   drops.append(dict(cell=q,to=a,lower=lows,states=[m.block((a[0],a[1]+d,a[2]))for d in(-4,-3,-2,-1,0,1)]))
-report=dict(scope='Active commissioned room levels and current navigation connector cells in pyramid envelope; measured shaped bearing datum; no construction grant',source=str(args.source),rooms=room_results,nodes=len(selected),statuses=dict(counts),blocked_nodes=bad,body_sweeps=sweeps,separators=separators,drop_candidates=drops,unknown_shapes=sorted(g.unknown),world_written=False)
+report=dict(scope=args.scope,scope_note='Active navigation cells in measured facility bounds; floor use requires separate owner evidence; no construction grant',source=str(args.source),rooms=room_results,nodes=len(selected),statuses=dict(counts),blocked_nodes=bad,body_sweeps=sweeps,separators=separators,drop_candidates=drops,unknown_shapes=sorted(g.unknown),world_written=False)
 args.output.parent.mkdir(parents=True,exist_ok=True);args.output.write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf8')
 print('nodes',len(selected),'statuses',dict(counts),'sweeps',sweeps,'separators',len(separators),'drops',len(drops),'unknown',len(g.unknown));print('blocked',bad[:12]);print('drops sample',drops[:10])

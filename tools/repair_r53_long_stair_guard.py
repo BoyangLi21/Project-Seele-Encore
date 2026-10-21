@@ -67,8 +67,12 @@ def install(world, output):
     import msvcrt
     with (world/'session.lock').open('r+b') as lock:
         msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
-        region=dimension_dir(world,DIM)/'region/r.0.0.mca'
-        shutil.copy2(region,output/'region-before.mca')
+        rows=json.loads(gzip.decompress((output/'EXACT_DELTA.json.gz').read_bytes()))
+        regions={(r['pos'][0]//512,r['pos'][2]//512) for r in rows}
+        for rx,rz in regions:
+            region=dimension_dir(world,DIM)/f'region/r.{rx}.{rz}.mca'
+            backup='region-before.mca' if len(regions)==1 else f'region-before-r.{rx}.{rz}.mca'
+            shutil.copy2(region,output/backup)
         protected={p for p in world.iterdir() if p.is_file() and p.name!='session.lock'}
         for folder in ('playerdata','entities','data','dimensions/projectseele/geofront/entities'):
             protected.update(p for p in (world/folder).rglob('*') if p.is_file() and 'DistantHorizons' not in p.name)
@@ -78,7 +82,6 @@ def install(world, output):
         headers=list(data.glob('projectseele_city_rigid_topology_r45_*.dat'))
         assert len(headers)==1
         cache=data/str(nbtlib.load(headers[0])['data']['GenerationFolder'])/'chunks'
-        rows=json.loads(gzip.decompress((output/'EXACT_DELTA.json.gz').read_bytes()))
         wanted={tuple(r['pos']) for r in rows}
         for cx,cz in {(p[0]//16,p[2]//16) for p in wanted}:
             path=cache/f'{cx}_{cz}.dat'
