@@ -17,7 +17,7 @@ import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 import org.joml.Matrix4f;
 
-/** World-space distant original octahedron, with actual decode/resource/frame acknowledgement. Never a HUD surrogate. */
+/** World-space selected Ramiel, with actual decode/resource/frame acknowledgement. Never a HUD surrogate. */
 @Mod.EventBusSubscriber(modid="projectseele",value=Dist.CLIENT)
 public final class RamielDistantViewR52
 {
@@ -28,15 +28,17 @@ public final class RamielDistantViewR52
         {event.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)manager->{resources=null;hash="";reported=null;});}
         private ReloadRegistration(){}
     }
-    private static final ResourceLocation TEXTURE=new ResourceLocation("projectseele","textures/entity/ramiel.png");
     private static final MultiBufferSource.BufferSource BUFFERS=MultiBufferSource.immediate(new BufferBuilder(8192));
     private static boolean installed;private static Object resources;private static String hash="";private static UUID reported;
     private static String resourceHash()
     {
         var manager=Minecraft.getInstance().getResourceManager();if(resources==manager&&!hash.isEmpty())return hash;
         resources=manager;hash="";
-        try{var found=manager.getResource(TEXTURE);if(found.isPresent())try(var input=found.get().open()){hash=RamielRemoteResourcesR52.hash(input.readAllBytes());}}
-        catch(java.io.IOException unavailable){}
+        hash=RamielRemoteResourcesR52.resourceHash(path->{
+            var found=manager.getResource(new ResourceLocation("projectseele",path.substring("assets/projectseele/".length())));
+            if(found.isEmpty())return null;
+            try(var input=found.get().open()){return input.readAllBytes();}
+        }).orElse("");
         return hash;
     }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent event)
@@ -66,7 +68,7 @@ public final class RamielDistantViewR52
         if(event.getStage()!=RenderLevelStageEvent.Stage.AFTER_ENTITIES)return;
         var view=EncounterObserverCacheR45.renderCandidate().orElse(null);if(view==null)return;
         var packet=view.current();var state=packet.snapshot();if((state.flags()&ClientboundEncounterObserverPacket.ALIVE)==0)return;
-        var camera=event.getCamera().getPosition();float scale=state.height()/15F,radius=12*scale;
+        var camera=event.getCamera().getPosition();float scale=state.height()/15F,radius=16*scale;
         var box=new AABB(state.position().add(-radius,state.height()*.5-radius,-radius),state.position().add(radius,state.height()*.5+radius,radius));
         if(!event.getFrustum().isVisible(box))return;
         var poses=event.getPoseStack();float fogStart=RenderSystem.getShaderFogStart(),fogEnd=RenderSystem.getShaderFogEnd();

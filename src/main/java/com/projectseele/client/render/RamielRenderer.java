@@ -8,21 +8,21 @@ import com.projectseele.entity.RamielEntity;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
+import net.minecraft.client.renderer.culling.Frustum;
 import net.minecraft.client.renderer.entity.EntityRenderer;
 import net.minecraft.client.renderer.entity.EntityRendererProvider;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
 import net.minecraft.world.phys.Vec3;
+import net.minecraft.world.phys.AABB;
 import org.joml.Matrix3f;
 import org.joml.Matrix4f;
 import org.joml.Vector3f;
 
 /**
- * Renders Ramiel as a mathematically exact octahedron: a translucent blue
- * crystal shell with glowing edges around a pulsing red core. The charge-up
- * light convergence and the positron beam itself are drawn here too, from
- * entity-synced state — no particles, no model files.
+ * Renders the selected source model, with the built-in octahedron as fallback.
+ * Charge light, core exposure and the beam use the existing entity-synced state.
  */
 public class RamielRenderer extends EntityRenderer<RamielEntity>
 {
@@ -38,6 +38,18 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
     {
         super(context);
         this.shadowRadius = 0.0F;
+    }
+
+    @Override
+    public boolean shouldRender(RamielEntity entity, Frustum frustum,
+                                double cameraX, double cameraY, double cameraZ)
+    {
+        if (!entity.shouldRender(cameraX, cameraY, cameraZ)) return false;
+        // The supplied expanded form reaches 15.462 model units from its core.
+        double radius = 16 * entity.modelScaleR52();
+        double y = entity.getY() + entity.getBbHeight() * .5;
+        return frustum.isVisible(new AABB(entity.getX() - radius, y - radius, entity.getZ() - radius,
+                entity.getX() + radius, y + radius, entity.getZ() + radius));
     }
 
     @Override
@@ -66,7 +78,6 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         poseStack.scale(entity.modelScaleR52(),entity.modelScaleR52(),entity.modelScaleR52());
         poseStack.mulPose(Axis.YP.rotationDegrees(entity.getSpin(partialTick)));
 
-        VertexConsumer body = buffer.getBuffer(RenderType.entityTranslucent(TEXTURE));
         int fullBright = LightTexture.FULL_BRIGHT;
         float time = entity.tickCount + partialTick;
 
@@ -74,43 +85,56 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         float expose = entity.getExposeProgress(partialTick);
         float halfGap = 3.75F * expose;
 
-        float corePulse = entity.isCharging()
-                ? 1.1F + 0.3F * Mth.sin(time * 0.5F)
-                : 0.95F;
-        corePulse *= 1.0F + 0.16F * expose * Mth.sin(time * 0.9F);
-        float coreSize = (2.6F + 1.4F * expose) * corePulse;
-        drawOctahedron(poseStack, body, coreSize,
-                1.0F, 0.12F + 0.45F * expose, 0.18F + 0.28F * expose, 1.0F, fullBright);
-
-        // Shell flashes toward white while the beam is live.
-        float shellR = Mth.lerp(beamGlow, 0.45F, 1.0F);
-        float shellG = Mth.lerp(beamGlow, 0.72F, 0.95F);
-        float shellB = 1.0F;
-        VertexConsumer glow = buffer.getBuffer(RenderType.lightning());
-
-        poseStack.pushPose();
-        poseStack.translate(0.0D, halfGap, 0.0D);
-        drawOctahedronFaces(poseStack, body, 8.25F, 0, 4, shellR, shellG, shellB, 0.7F, fullBright);
-        drawOctahedronEdgeSet(poseStack, glow, 8.25F, 0.11F, TOP_EDGES,
-                0.75F, 0.92F, 1.0F, 0.55F + 0.4F * beamGlow);
-        poseStack.popPose();
-
-        poseStack.pushPose();
-        poseStack.translate(0.0D, -halfGap, 0.0D);
-        drawOctahedronFaces(poseStack, body, 8.25F, 4, 8, shellR, shellG, shellB, 0.7F, fullBright);
-        drawOctahedronEdgeSet(poseStack, glow, 8.25F, 0.11F, BOTTOM_EDGES,
-                0.75F, 0.92F, 1.0F, 0.55F + 0.4F * beamGlow);
-        poseStack.popPose();
-
-        // Luminous seam around the opened equator.
-        if (expose > 0.05F)
+        if (!RamielSourceModelR53.draw(poseStack, buffer, expose, time, entity.isCharging(), packedLight))
         {
-            Vector3f[] basis = {new Vector3f(1.0F, 0.0F, 0.0F), new Vector3f(0.0F, 0.0F, 1.0F)};
-            RibbonRenderer.drawPolyRing(poseStack.last().pose(), glow, basis[0], basis[1], 4,
-                    8.4F, 0.25F + 0.12F * Mth.sin(time * 0.8F),
-                    1.0F, 0.55F, 0.75F, 0.5F * expose);
-        }
+            VertexConsumer body = buffer.getBuffer(RenderType.entityTranslucent(TEXTURE));
+            float corePulse = entity.isCharging()
+                    ? 1.1F + 0.3F * Mth.sin(time * 0.5F)
+                    : 0.95F;
+            corePulse *= 1.0F + 0.16F * expose * Mth.sin(time * 0.9F);
+            float coreSize = (2.6F + 1.4F * expose) * corePulse;
+            drawOctahedron(poseStack, body, coreSize,
+                    1.0F, 0.12F + 0.45F * expose, 0.18F + 0.28F * expose, 1.0F, fullBright);
 
+            // Shell flashes toward white while the beam is live.
+            float shellR = Mth.lerp(beamGlow, 0.45F, 1.0F);
+            float shellG = Mth.lerp(beamGlow, 0.72F, 0.95F);
+            float shellB = 1.0F;
+
+            poseStack.pushPose();
+            poseStack.translate(0.0D, halfGap, 0.0D);
+            drawOctahedronFaces(poseStack, body, 8.25F, 0, 4, shellR, shellG, shellB, 0.7F, fullBright);
+            poseStack.popPose();
+
+            poseStack.pushPose();
+            poseStack.translate(0.0D, -halfGap, 0.0D);
+            drawOctahedronFaces(poseStack, body, 8.25F, 4, 8, shellR, shellG, shellB, 0.7F, fullBright);
+            poseStack.popPose();
+
+            // A new render type may reuse the same BufferBuilder. Finish all
+            // body vertices before acquiring its effect consumer.
+            VertexConsumer glow = buffer.getBuffer(RenderType.lightning());
+            poseStack.pushPose();
+            poseStack.translate(0.0D, halfGap, 0.0D);
+            drawOctahedronEdgeSet(poseStack, glow, 8.25F, 0.11F, TOP_EDGES,
+                    0.75F, 0.92F, 1.0F, 0.55F + 0.4F * beamGlow);
+            poseStack.popPose();
+            poseStack.pushPose();
+            poseStack.translate(0.0D, -halfGap, 0.0D);
+            drawOctahedronEdgeSet(poseStack, glow, 8.25F, 0.11F, BOTTOM_EDGES,
+                    0.75F, 0.92F, 1.0F, 0.55F + 0.4F * beamGlow);
+            poseStack.popPose();
+
+            // Luminous seam around the opened equator.
+            if (expose > 0.05F)
+            {
+                Vector3f[] basis = {new Vector3f(1.0F, 0.0F, 0.0F), new Vector3f(0.0F, 0.0F, 1.0F)};
+                RibbonRenderer.drawPolyRing(poseStack.last().pose(), glow, basis[0], basis[1], 4,
+                        8.4F, 0.25F + 0.12F * Mth.sin(time * 0.8F),
+                        1.0F, 0.55F, 0.75F, 0.5F * expose);
+            }
+
+        }
         poseStack.popPose();
 
         // ----- charge-up light convergence (world-aligned, does not spin) -----
@@ -126,22 +150,28 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         com.projectseele.client.EncounterObserverCacheR45.markNormalDrawn(entity);
     }
 
-    /** The same original primitives, drawn from the sole real server UUID snapshot. No client entity is spawned. */
+    /** The same selected model, drawn from the real server UUID snapshot. No client entity is spawned. */
     public static void renderObservedR52(com.projectseele.network.ClientboundEncounterObserverPacket.Snapshot state,
             float partial,PoseStack poses,MultiBufferSource buffers)
     {
         float scale=state.height()/15F,center=state.height()*.5F;
         boolean exposed=(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.EXPOSED)!=0;
         boolean charging=(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.CHARGING)!=0;
-        var body=buffers.getBuffer(RenderType.entityTranslucent(TEXTURE));var glow=buffers.getBuffer(RenderType.lightning());
         float time=state.poseTick()+partial,gap=exposed?3.75F:0;
         poses.pushPose();poses.translate(0,center,0);poses.scale(scale,scale,scale);poses.mulPose(Axis.YP.rotationDegrees(time*.75F));
-        float core=(exposed?4F:2.6F)*(charging?1.1F+.3F*Mth.sin(time*.5F):.95F);
-        drawOctahedron(poses,body,core,1,.3F,.28F,1,LightTexture.FULL_BRIGHT);
-        poses.pushPose();poses.translate(0,gap,0);drawOctahedronFaces(poses,body,8.25F,0,4,.45F,.72F,1,.7F,LightTexture.FULL_BRIGHT);
-        drawOctahedronEdgeSet(poses,glow,8.25F,.11F,TOP_EDGES,.75F,.92F,1,.8F);poses.popPose();
-        poses.pushPose();poses.translate(0,-gap,0);drawOctahedronFaces(poses,body,8.25F,4,8,.45F,.72F,1,.7F,LightTexture.FULL_BRIGHT);
-        drawOctahedronEdgeSet(poses,glow,8.25F,.11F,BOTTOM_EDGES,.75F,.92F,1,.8F);poses.popPose();poses.popPose();
+        if (!RamielSourceModelR53.draw(poses,buffers,exposed?1:0,time,charging,LightTexture.pack(0,15)))
+        {
+            var body=buffers.getBuffer(RenderType.entityTranslucent(TEXTURE));
+            float core=(exposed?4F:2.6F)*(charging?1.1F+.3F*Mth.sin(time*.5F):.95F);
+            drawOctahedron(poses,body,core,1,.3F,.28F,1,LightTexture.FULL_BRIGHT);
+            poses.pushPose();poses.translate(0,gap,0);drawOctahedronFaces(poses,body,8.25F,0,4,.45F,.72F,1,.7F,LightTexture.FULL_BRIGHT);poses.popPose();
+            poses.pushPose();poses.translate(0,-gap,0);drawOctahedronFaces(poses,body,8.25F,4,8,.45F,.72F,1,.7F,LightTexture.FULL_BRIGHT);poses.popPose();
+            var glow=buffers.getBuffer(RenderType.lightning());
+            poses.pushPose();poses.translate(0,gap,0);drawOctahedronEdgeSet(poses,glow,8.25F,.11F,TOP_EDGES,.75F,.92F,1,.8F);poses.popPose();
+            poses.pushPose();poses.translate(0,-gap,0);drawOctahedronEdgeSet(poses,glow,8.25F,.11F,BOTTOM_EDGES,.75F,.92F,1,.8F);poses.popPose();
+        }
+        poses.popPose();
+        var glow=buffers.getBuffer(RenderType.lightning());
         if(state.beamTicks()>0)
         {
             Vec3 delta=state.beamEnd().subtract(state.position());var start=new Vector3f(0,center,0);var end=delta.toVector3f();

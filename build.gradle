@@ -629,6 +629,13 @@ tasks.register('verifyPoseSnapshotCodecR45', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyPoseSnapshotCodecR45' }
 
+tasks.register('verifyRamielResourcesR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.RamielRemoteResourcesR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyRamielResourcesR53' }
+
 // Compile/prepare with ForgeGradle, then release the build JVM before playing.
 // Export only explicitly changed environment values, not the user's full env.
 ['Client', 'Server'].each { side ->
