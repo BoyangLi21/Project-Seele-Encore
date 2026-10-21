@@ -851,6 +851,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             tag.putUUID("SeeleLockedEntryPlug", this.lockedEntryPlugUuid);
         }
         tag.putBoolean("SeeleNervLogisticsLocked", this.isNervLogisticsLocked());
+        var stance = new CompoundTag();
+        stance.putBoolean("Crouching", this.isPilotCrouching());
+        stance.putBoolean("Prone", this.isPilotProne());
+        stance.putFloat("CrouchBlend", this.entityData.get(DATA_RIFLE_CROUCH));
+        stance.putFloat("ProneBlend", this.entityData.get(DATA_RIFLE_PRONE));
+        stance.putFloat("Level", this.entityData.get(DATA_RIFLE_STANCE));
+        stance.putFloat("Velocity", this.rifleStanceVelocity);
+        tag.put("SeeleOrdinaryStanceR53", stance);
         tag.putFloat("SeeleNervLogisticsYaw", this.entityData.get(DATA_NERV_LOGISTICS_YAW));
         tag.putInt("SeelePowerTicks", this.getPowerTicks());
         tag.putBoolean("SeeleBatterySession",this.batterySessionArmed);
@@ -1006,6 +1014,29 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {
                 this.setNoGravity(true);
             }
+        }
+        // Ordinary low postures used to reload as standing. This changed both
+        // the visible body and its collision hull underneath low structures.
+        // Mechanical custody keeps its separate captured-pose authority.
+        if(tag.contains("SeeleOrdinaryStanceR53", net.minecraft.nbt.Tag.TAG_COMPOUND))
+        {
+            var stance = tag.getCompound("SeeleOrdinaryStanceR53");
+            boolean prone = stance.getBoolean("Prone");
+            boolean crouch = !prone && stance.getBoolean("Crouching");
+            float target = prone ? 3F : crouch ? 1F : 0F;
+            float level = stance.getFloat("Level");
+            float cb = stance.getFloat("CrouchBlend"), pb = stance.getFloat("ProneBlend");
+            float velocity = stance.getFloat("Velocity");
+            this.entityData.set(DATA_PRONE, prone);
+            this.entityData.set(DATA_CROUCHING, crouch);
+            this.entityData.set(DATA_RIFLE_STANCE, Float.isFinite(level) ? Mth.clamp(level,0,3) : target);
+            this.entityData.set(DATA_RIFLE_CROUCH, Float.isFinite(cb) ? Mth.clamp(cb,0,1) : crouch ? 1F : 0F);
+            this.entityData.set(DATA_RIFLE_PRONE, Float.isFinite(pb) ? Mth.clamp(pb,0,1) : prone ? 1F : 0F);
+            this.rifleCrouchPrevious = this.entityData.get(DATA_RIFLE_CROUCH);
+            this.riflePronePrevious = this.entityData.get(DATA_RIFLE_PRONE);
+            this.rifleStanceVelocity = Float.isFinite(velocity) ? Mth.clamp(velocity,-.08F,.08F) : 0;
+            this.rifleStanceInitialized = true;
+            this.updatePoseDimensions();
         }
         FIRST_BATTLE.restore(this,tag);
         EvaShutdownR30.load(this,tag);

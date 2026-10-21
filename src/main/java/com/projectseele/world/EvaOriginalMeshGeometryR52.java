@@ -38,6 +38,69 @@ public final class EvaOriginalMeshGeometryR52
     private record Skin(String other,float[] weights,float[] rest,Map<String,float[]> influences,Map<String,Matrix4f> inverseBind,Corrective corrective){}
     private record Mesh(String resource,String hash,Map<String,RawPart> parts,Map<String,Skin> skins){}
     private record Rig(Mesh body,Mesh hands,Map<String,Bone> geo,Set<String> handJoints,String contractHash){}
+
+    /** Only the four original arm surfaces, using the same seam/DQS evaluator
+     * as the complete collision mesh. Coincident vertices with identical skin
+     * weights are evaluated once; triangles and the rendered model are intact. */
+    public static final class ProneArmSurfacesR53
+    {
+        private final Mesh mesh;
+        private ProneArmSurfacesR53(Mesh mesh){this.mesh=mesh;}
+
+        public Map<String,Vector3f[]> localSurfaces(EvaBodyPose.Sample body)
+        {
+            var models=new HashMap<String,Matrix4f>();
+            for(String name:body.rig.keySet())models.put(name,body.matrix(name));
+            var result=new HashMap<String,Vector3f[]>();
+            for(var entry:mesh.parts().entrySet())
+            {
+                var part=entry.getValue();
+                var values=skin(part,mesh.skins().get(entry.getKey()),entry.getKey(),models,body.rotations);
+                var vertices=new Vector3f[values.length/8];
+                for(int i=0;i<vertices.length;i++)vertices[i]=new Vector3f(
+                        -(values[i*8]+part.pivot().x)/16,(values[i*8+1]+part.pivot().y)/16,
+                        (values[i*8+2]+part.pivot().z)/16);
+                result.put(entry.getKey(),vertices);
+            }
+            return result;
+        }
+    }
+
+    public static ProneArmSurfacesR53 loadProneArmSurfacesR53(int variant)throws IOException
+    {
+        require(variant>=0&&variant<=2,"Original arm variant required");
+        String resource="mesh/eva_unit0"+variant+".mesh.json";
+        byte[] bytes=classpathBytes(resource);var original=mesh(resource,sha(bytes),json(bytes));
+        var parts=new HashMap<String,RawPart>();var skins=new HashMap<String,Skin>();
+        for(String name:List.of("arm_l","arm_r","forearm_l","forearm_r"))
+        {
+            var part=original.parts().get(name);var source=original.skins().get(name);
+            require(part!=null&&source!=null&&source.corrective()==null,"Original arm seam required");
+            var indices=new ArrayList<Integer>();var unique=new HashSet<List<Float>>();
+            var palette=new TreeMap<>(source.influences());
+            for(int i=0;i<part.values().length/8;i++)
+            {
+                var key=new ArrayList<Float>();
+                for(int k=0;k<3;k++){key.add(part.values()[i*8+k]);key.add(source.rest()[i*8+k]);}
+                if(palette.isEmpty())key.add(source.weights()[i]);
+                else for(var weights:palette.values())key.add(weights[i]);
+                if(unique.add(key))indices.add(i);
+            }
+            var values=new float[indices.size()*8];var rest=new float[values.length];
+            var weights=new float[palette.isEmpty()?indices.size():0];var influences=new TreeMap<String,float[]>();
+            palette.keySet().forEach(bone->influences.put(bone,new float[indices.size()]));
+            for(int i=0;i<indices.size();i++)
+            {
+                int at=indices.get(i);System.arraycopy(part.values(),at*8,values,i*8,8);
+                System.arraycopy(source.rest(),at*8,rest,i*8,8);
+                if(palette.isEmpty())weights[i]=source.weights()[at];
+                else for(var entry:palette.entrySet())influences.get(entry.getKey())[i]=entry.getValue()[at];
+            }
+            parts.put(name,new RawPart(new Vector3f(part.pivot()),values));
+            skins.put(name,new Skin(source.other(),weights,rest,Map.copyOf(influences),source.inverseBind(),null));
+        }
+        return new ProneArmSurfacesR53(new Mesh(resource,original.hash(),Map.copyOf(parts),Map.copyOf(skins)));
+    }
     private static final Set<String> HIDDEN_FACTORY=Set.of("dorsal_liner","r37_red_upper","r37_red_lower","r37_lining");
     public static final String CLASSPATH_SELECTION="/assets/projectseele/eva/eva_original_mesh_geometry_r52_sources.json";
     private static volatile Provider installed;

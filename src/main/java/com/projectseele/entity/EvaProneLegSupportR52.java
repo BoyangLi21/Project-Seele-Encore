@@ -17,11 +17,16 @@ public final class EvaProneLegSupportR52
 
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample pose,float partial)
     {
-        if(e.isExperimentalUnit()||!e.isPoweredOn()||e.isBerserk()||e.isCrucified()||e.isFirstBattleActive()
-                ||e.isNervLogisticsLocked()||EvaMechanicalFrameR52.serviceSourceHeldR52(e)||EvaAirTransportR31.active(e)
-                ||e.isVisuallyAirborneForRender()||e.hasLiveActionForRender(partial)
-                ||CombatReactionsR36.active(e)||com.projectseele.physics.CombatBodyDynamics.active(e))return;
+        if(!eligible(e,partial))return;
         apply(e.getUnitVariant(),pose,e.rifleStanceLevel(partial),EvaTerrainSupport.sample(e));
+    }
+
+    static boolean eligible(EvaUnit01Entity e,float partial)
+    {
+        return !(e.isExperimentalUnit()||!e.isPoweredOn()||e.isBerserk()||e.isCrucified()||e.isFirstBattleActive()
+                ||e.isNervLogisticsLocked()||EvaMechanicalFrameR52.serviceSourceHeldR52(e)||EvaAirTransportR31.active(e)
+                ||e.isVisuallyAirborneForRender()
+                ||CombatReactionsR36.active(e)||com.projectseele.physics.CombatBodyDynamics.active(e));
     }
 
     /** Explicit original stance/plane also supplies a pure ordinary release
@@ -42,60 +47,67 @@ public final class EvaProneLegSupportR52
         var normal=new Quaternionf().rotationX(terrain.x).rotateZ(terrain.y).transform(new Vector3f(0,1,0));
         float plane=normal.y*terrain.z/EvaScale.RENDER_SCALE;
         for(String side:List.of("l","r"))
+            supportChain(pose,source,"leg_"+side,"shin_"+side,"foot_"+side,
+                    side.equals("l")?-1:1,anticipation,normal,plane);
+    }
+
+    /** Rotate an intact chain around fixed endpoints; retain its end surface. */
+    static boolean supportChain(EvaBodyPose.Sample pose,Map<String,Vector3f[]> source,
+                             String upper,String lower,String foot,float sign,float anticipation,
+                             Vector3f normal,float plane)
+    {
+        if(!pose.rig.containsKey(upper)||!pose.rig.containsKey(lower)||!pose.rig.containsKey(foot))return false;
+        var upperMatrix=pose.matrix(upper);var footMatrix=pose.matrix(foot);
+        var origin=upperMatrix.transformPosition(new Vector3f(pose.rig.get(upper).pivot()));
+        var end=footMatrix.transformPosition(new Vector3f(pose.rig.get(foot).pivot()));
+        var axis=new Vector3f(end).sub(origin);if(axis.lengthSquared()<1e-8F)return false;axis.normalize();
+        // Rodrigues' formula gives each full source vertex's signed height
+        // as constant + cosine*cos(swivel) + sine*sin(swivel).
+        var heights=new float[(source.get(upper).length+source.get(lower).length)*3];int at=0;float lowest=Float.POSITIVE_INFINITY;
+        float normalAxis=normal.dot(axis);
+        var cosineDirection=new Vector3f(normal).fma(-normalAxis,axis);
+        var sineDirection=new Vector3f(normal).cross(axis);
+        for(String name:List.of(upper,lower))
         {
-            String upper="leg_"+side,lower="shin_"+side,foot="foot_"+side;
-            if(!pose.rig.containsKey(upper)||!pose.rig.containsKey(lower)||!pose.rig.containsKey(foot))continue;
-            var upperMatrix=pose.matrix(upper);var footMatrix=pose.matrix(foot);
-            var origin=upperMatrix.transformPosition(new Vector3f(pose.rig.get(upper).pivot()));
-            var end=footMatrix.transformPosition(new Vector3f(pose.rig.get(foot).pivot()));
-            var axis=new Vector3f(end).sub(origin);if(axis.lengthSquared()<1e-8F)continue;axis.normalize();
-            // Rodrigues' formula gives each full source vertex's signed height
-            // as constant + cosine*cos(swivel) + sine*sin(swivel).
-            var heights=new float[(source.get(upper).length+source.get(lower).length)*3];int at=0;float lowest=Float.POSITIVE_INFINITY;
-            float normalAxis=normal.dot(axis);
-            var cosineDirection=new Vector3f(normal).fma(-normalAxis,axis);
-            var sineDirection=new Vector3f(normal).cross(axis);
-            for(String name:List.of(upper,lower))
+            var matrix=pose.matrix(name);
+            float tx=matrix.m30()-origin.x,ty=matrix.m31()-origin.y,tz=matrix.m32()-origin.z;
+            float constantBase=normal.dot(origin)-plane+normalAxis*(axis.x*tx+axis.y*ty+axis.z*tz);
+            float cosineBase=cosineDirection.x*tx+cosineDirection.y*ty+cosineDirection.z*tz;
+            float sineBase=sineDirection.x*tx+sineDirection.y*ty+sineDirection.z*tz;
+            float ax=normalAxis*(axis.x*matrix.m00()+axis.y*matrix.m01()+axis.z*matrix.m02());
+            float ay=normalAxis*(axis.x*matrix.m10()+axis.y*matrix.m11()+axis.z*matrix.m12());
+            float az=normalAxis*(axis.x*matrix.m20()+axis.y*matrix.m21()+axis.z*matrix.m22());
+            float bx=cosineDirection.x*matrix.m00()+cosineDirection.y*matrix.m01()+cosineDirection.z*matrix.m02();
+            float by=cosineDirection.x*matrix.m10()+cosineDirection.y*matrix.m11()+cosineDirection.z*matrix.m12();
+            float bz=cosineDirection.x*matrix.m20()+cosineDirection.y*matrix.m21()+cosineDirection.z*matrix.m22();
+            float cx=sineDirection.x*matrix.m00()+sineDirection.y*matrix.m01()+sineDirection.z*matrix.m02();
+            float cy=sineDirection.x*matrix.m10()+sineDirection.y*matrix.m11()+sineDirection.z*matrix.m12();
+            float cz=sineDirection.x*matrix.m20()+sineDirection.y*matrix.m21()+sineDirection.z*matrix.m22();
+            for(var vertex:source.get(name))
             {
-                var matrix=pose.matrix(name);
-                float tx=matrix.m30()-origin.x,ty=matrix.m31()-origin.y,tz=matrix.m32()-origin.z;
-                float constantBase=normal.dot(origin)-plane+normalAxis*(axis.x*tx+axis.y*ty+axis.z*tz);
-                float cosineBase=cosineDirection.x*tx+cosineDirection.y*ty+cosineDirection.z*tz;
-                float sineBase=sineDirection.x*tx+sineDirection.y*ty+sineDirection.z*tz;
-                float ax=normalAxis*(axis.x*matrix.m00()+axis.y*matrix.m01()+axis.z*matrix.m02());
-                float ay=normalAxis*(axis.x*matrix.m10()+axis.y*matrix.m11()+axis.z*matrix.m12());
-                float az=normalAxis*(axis.x*matrix.m20()+axis.y*matrix.m21()+axis.z*matrix.m22());
-                float bx=cosineDirection.x*matrix.m00()+cosineDirection.y*matrix.m01()+cosineDirection.z*matrix.m02();
-                float by=cosineDirection.x*matrix.m10()+cosineDirection.y*matrix.m11()+cosineDirection.z*matrix.m12();
-                float bz=cosineDirection.x*matrix.m20()+cosineDirection.y*matrix.m21()+cosineDirection.z*matrix.m22();
-                float cx=sineDirection.x*matrix.m00()+sineDirection.y*matrix.m01()+sineDirection.z*matrix.m02();
-                float cy=sineDirection.x*matrix.m10()+sineDirection.y*matrix.m11()+sineDirection.z*matrix.m12();
-                float cz=sineDirection.x*matrix.m20()+sineDirection.y*matrix.m21()+sineDirection.z*matrix.m22();
-                for(var vertex:source.get(name))
-                {
-                    float constant=constantBase+ax*vertex.x+ay*vertex.y+az*vertex.z;
-                    float cosine=cosineBase+bx*vertex.x+by*vertex.y+bz*vertex.z;
-                    float sine=sineBase+cx*vertex.x+cy*vertex.y+cz*vertex.z;
-                    heights[at++]=constant;heights[at++]=cosine;heights[at++]=sine;lowest=Math.min(lowest,constant+cosine);
-                }
+                float constant=constantBase+ax*vertex.x+ay*vertex.y+az*vertex.z;
+                float cosine=cosineBase+bx*vertex.x+by*vertex.y+bz*vertex.z;
+                float sine=sineBase+cx*vertex.x+cy*vertex.y+cz*vertex.z;
+                heights[at++]=constant;heights[at++]=cosine;heights[at++]=sine;lowest=Math.min(lowest,constant+cosine);
             }
-            if(lowest>=CLEARANCE&&anticipation<=0)continue;
-            float sign=side.equals("l")?-1:1,angle=sign*supportAngle(heights,sign,anticipation);
-            // The smallest outward rotation retains the authored knee hinge,
-            // link lengths and hip position. No root/leg translation is added.
-            if(!Float.isFinite(angle))continue;
-            var swivel=new Quaternionf().rotationAxis(angle,axis);
-            var world=swivel.mul(upperMatrix.getUnnormalizedRotation(new Quaternionf()).normalize());
-            String parent=pose.rig.get(upper).parent();
-            if(parent!=null)world=pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(world);
-            pose.rotations.put(upper,world.normalize());pose.dirty();
-            // The ankle centre lies on the swivel axis. Counter-rotate only the
-            // shoe, keeping its complete original world matrix and sole anchor.
-            parent=pose.rig.get(foot).parent();
-            var orientation=footMatrix.getUnnormalizedRotation(new Quaternionf()).normalize();
-            if(parent!=null)orientation=pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(orientation);
-            pose.rotations.put(foot,orientation.normalize());pose.dirty();
         }
+        if(lowest>=CLEARANCE&&anticipation<=0)return false;
+        float angle=sign*supportAngle(heights,sign,anticipation);
+        // The smallest outward rotation retains the authored limb hinge,
+        // link lengths and proximal joint. No root/limb translation is added.
+        if(!Float.isFinite(angle))return false;
+        var swivel=new Quaternionf().rotationAxis(angle,axis);
+        var world=swivel.mul(upperMatrix.getUnnormalizedRotation(new Quaternionf()).normalize());
+        String parent=pose.rig.get(upper).parent();
+        if(parent!=null)world=pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(world);
+        pose.rotations.put(upper,world.normalize());pose.dirty();
+        // The end joint lies on the swivel axis. Counter-rotate its surface,
+        // retaining the original shoe/hand world matrix and contact anchor.
+        parent=pose.rig.get(foot).parent();
+        var orientation=footMatrix.getUnnormalizedRotation(new Quaternionf()).normalize();
+        if(parent!=null)orientation=pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(orientation);
+        pose.rotations.put(foot,orientation.normalize());pose.dirty();
+        return true;
     }
 
     /** Project directly to the first allowed angular interval of a violated

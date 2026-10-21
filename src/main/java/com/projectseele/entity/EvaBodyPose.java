@@ -524,7 +524,9 @@ public final class EvaBodyPose
         {var lying=new Sample(body.rig);for(var entry:d.prone().entrySet()){if(!lying.rig.containsKey(entry.getKey()))continue;var channels=entry.getValue().getAsJsonObject();if(channels.has("rotation")){var v=first(channels.get("rotation")).mul(Mth.DEG_TO_RAD);lying.rotations.put(entry.getKey(),new Quaternionf().rotationZYX(v.z,-v.y,-v.x));}if(channels.has("position"))lying.positions.put(entry.getKey(),first(channels.get("position")).mul(-1,1,1).div(16));}body=mix(body,lying,prone);}
         float floor=Float.POSITIVE_INFINITY;for(var entry:d.rigSupport().getOrDefault(variant,d.support()).entrySet()){if(!body.rig.containsKey(entry.getKey()))continue;var matrix=body.matrix(entry.getKey());for(var v:entry.getValue())floor=Math.min(floor,matrix.m01()*v.x+matrix.m11()*v.y+matrix.m21()*v.z+matrix.m31());}if(Float.isFinite(floor)&&!supported){body.positions.get("root").y-=floor;body.dirty();}
         for(var bone:body.rig.values())if(bone.name().contains("_axis_"))body.rotations.put(bone.name(),new Quaternionf(bone.bindRotation()));
-        EvaAnatomicalHandsR45.naturalCarryTargetR52(variant,body,input.stance);body=EvaGameplayMotionR32.ordinaryIdleTargetR52(e,body,input.idle);preserveJointCentres(body);body.rotations.get("root").rotateX(input.terrain.x).rotateZ(input.terrain.y);body.positions.get("root").y+=input.terrain.z/5;body.dirty();return body;
+        EvaAnatomicalHandsR45.naturalCarryTargetR52(variant,body,input.stance);body=EvaGameplayMotionR32.ordinaryIdleTargetR52(e,body,input.idle);preserveJointCentres(body);body.rotations.get("root").rotateX(input.terrain.x).rotateZ(input.terrain.y);body.positions.get("root").y+=input.terrain.z/5;body.dirty();
+        EvaProneLegSupportR52.apply(variant,body,input.stance,input.terrain);
+        EvaProneArmSupportR53.apply(variant,body,input.stance,input.terrain);return body;
     }
     public static Sample ordinaryReleaseTargetR52(EvaUnit01Entity e,float partial){return ordinaryReleaseTargetR52(e,ordinaryReleaseInputsR52(e,partial),e.level().getGameTime()+partial);}
     public static Sample sample(EvaUnit01Entity entity,float partial)
@@ -719,6 +721,8 @@ public final class EvaBodyPose
         EvaAnatomicalHandsR45.alignPunchWristR53(entity,body,partial);
         EvaOrdinaryStandingSupportR52.apply(entity,body,partial);
         FixedCannonPoseR52.apply(entity,body,partial);
+        EvaProneLegSupportR52.apply(entity,body,partial);
+        EvaProneArmSupportR53.apply(entity,body,partial);
         EvaCombatSupportR33.rememberFinalFeetR44(entity,body,partial);
         com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;
