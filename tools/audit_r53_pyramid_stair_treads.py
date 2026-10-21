@@ -54,13 +54,25 @@ def run(source,world,out):
                             if boxes is None or any(all(at[k]+b[k]<hi[k] and at[k]+b[k+3]>lo[k] for k in range(3)) for b in boxes):hits.append(dict(pos=at,state=m.block(at)))
                 failures.append(dict(tread=[x,y,z],point=p,status=status,hits=hits))
         landings=[]
+        buried=[]
         lanes={}
         for q in part:lanes.setdefault(dz*q[0]-dx*q[2],[]).append(q)
         for lane in lanes.values():
             lane.sort(key=lambda q:q[1]);a,b=lane[0],lane[-1]
             for kind,p in (('lower',(a[0]+.5-1.1*dx,a[1],a[2]+.5-1.1*dz)),('upper',(b[0]+.5+1.1*dx,b[1]+1,b[2]+.5+1.1*dz))):
                 landings.append(dict(kind=kind,point=p,status=geometry.standing(p)))
-        flights.append(dict(state=state,materials=dict(Counter(cells[q] for q in part)),cells=len(part),bounds=[[min(q[k] for q in part) for k in range(3)],[max(q[k] for q in part) for k in range(3)]],rises=len({q[1] for q in part}),failures=failures,landings=landings))
+            approach=(a[0]+.5-1.1*dx,a[1],a[2]+.5-1.1*dz)
+            surfaces=[]
+            for rise in (-.5,0,.5,1,1.5):
+                p=(approach[0],a[1]+rise,approach[2])
+                if geometry.standing(p)=='STATIC_STANDING':surfaces.append(p)
+            if len(surfaces)==1 and surfaces[0][1]>a[1]+.01:
+                p=surfaces[0]
+                buried.append(dict(first_tread=list(a),stair_state=cells[a],
+                    approach=p,floor_state=m.block((math.floor(p[0]),math.floor(p[1]-.04),math.floor(p[2]))),
+                    covered_height=p[1]-a[1],first_half_riser_exposed=a[1]+.5-p[1],
+                    classification='BURIED_FIRST_TREAD',construction_authorized=False))
+        flights.append(dict(state=state,materials=dict(Counter(cells[q] for q in part)),cells=len(part),bounds=[[min(q[k] for q in part) for k in range(3)],[max(q[k] for q in part) for k in range(3)]],rises=len({q[1] for q in part}),failures=failures,landings=landings,buried_first_treads=buried))
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(dict(source=str(source),flights=flights,unclassified=unclassified,unknown_shapes=sorted(geometry.unknown),world_written=False),ensure_ascii=False,indent=2),'utf8')
     print('Flights',len(flights),'treads',sum(r['cells'] for r in flights),'blocked flights',sum(bool(r['failures']) for r in flights),'unclassified',len(unclassified))
