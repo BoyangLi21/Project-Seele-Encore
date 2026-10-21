@@ -232,7 +232,37 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     private static boolean matches(ServerLevel l,List<Cell> cells,boolean open){for(var c:cells)if(!loaded(l,c.at())||!NervMechanicalMaterialR53.samePhase(l.getBlockState(c.at()),open?c.open():c.closed()))return false;return true;}
     private static boolean canChange(ServerLevel l,List<Cell> cells,boolean open,Set<UUID> own)
     {
-        for(var c:cells){if(!loaded(l,c.at()))return false;var current=l.getBlockState(c.at());boolean originalLiquid=c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())&&current.is(c.closed().getBlock());if(!originalLiquid&&!NervMechanicalMaterialR53.samePhase(current,c.closed())&&!NervMechanicalMaterialR53.samePhase(current,c.open()))return false;var next=open?c.open():c.closed();if(!NervMechanicalMaterialR53.samePhase(current,next)&&!next.getCollisionShape(l,c.at()).isEmpty())for(var box:next.getCollisionShape(l,c.at()).toAabbs())if(!l.getEntities((Entity)null,box.move(c.at()),e->!own.contains(e.getUUID())&&e.isAlive()).isEmpty())return false;}return true;
+        for(var c:cells)
+        {
+            if(!loaded(l,c.at()))return false;
+            var current=l.getBlockState(c.at());
+            boolean originalLiquid=c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())&&current.is(c.closed().getBlock());
+            if(!originalLiquid&&!NervMechanicalMaterialR53.samePhase(current,c.closed())&&!NervMechanicalMaterialR53.samePhase(current,c.open()))return false;
+            var next=open?c.open():c.closed();
+            if(!NervMechanicalMaterialR53.samePhase(current,next))for(var box:next.getCollisionShape(l,c.at()).toAabbs())
+            {
+                var worldBox=box.move(c.at());
+                for(var entity:l.getEntities((Entity)null,worldBox,e->!own.contains(e.getUUID())&&e.isAlive()))
+                    if(occupiesProxyR53(entity,worldBox))return false;
+            }
+        }
+        return true;
+    }
+    private static boolean occupiesProxyR53(Entity entity,AABB worldBox)
+    {
+        // The hoist's render box spans empty space beyond its nineteen parts.
+        // Keep its real trolley, ropes and gripper in the closing-door check.
+        if(entity instanceof NervCarrierPlatformEntity crane&&crane.isPlugCrane()&&crane.noPhysics&&crane.hasDeclaredMachineFrameR52())
+        {
+            try
+            {
+                for(var part:NervCraneGeometryR52.actualObstacleMeshesR52(crane))
+                    if(part.mesh().intersects(part.frame(),part.endFrame(),worldBox,.001))return true;
+                return false;
+            }
+            catch(java.io.IOException|IllegalArgumentException|IllegalStateException unavailable){return true;}
+        }
+        return true;
     }
     private static boolean change(ServerLevel l,List<Cell> cells,boolean open,Set<UUID> own)
     {if(!canChange(l,cells,open,own))return false;for(var c:cells){var next=open?c.open():c.closed();if(!NervMechanicalMaterialR53.samePhase(l.getBlockState(c.at()),next))l.setBlock(c.at(),next,c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())?2:3);}return matches(l,cells,open);}
