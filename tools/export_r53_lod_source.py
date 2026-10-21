@@ -91,7 +91,13 @@ def verify_import(world,directory):
                     count=struct.unpack('>H',stream.read(2))[0];source=struct.unpack('>'+str(count)+'Q',stream.read(count*8))
                     count=struct.unpack_from('>H',native,offset)[0];offset+=2
                     actual=struct.unpack_from('>'+str(count)+'Q',native,offset);offset+=count*8
-                    if geometry(source,source_map)!=geometry(actual,native_map):raise ValueError(f'Geometry differs {(tx,tz,column)}')
+                    expected_spans=geometry(source,source_map);actual_spans=geometry(actual,native_map)
+                    if expected_spans!=actual_spans:
+                        mismatch=next((i for i,(a,b) in enumerate(zip(expected_spans,actual_spans)) if a!=b),
+                                      min(len(expected_spans),len(actual_spans)))
+                        raise ValueError(f'Geometry differs {(tx,tz,column)} at span {mismatch}: '
+                                         f'expected {expected_spans[mismatch:mismatch+2]}, '
+                                         f'actual {actual_spans[mismatch:mismatch+2]}')
                     checked+=1
             tiles+=1
     return dict(verified=True,tiles=tiles,exact_columns_checked=checked,compared='full-height block and biome spans; lighting kept separate',world_written=False)

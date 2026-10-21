@@ -16,6 +16,9 @@ public final class SavedColumnLodImporterR53 {
    Object gson=t("com.google.gson.Gson").getConstructor().newInstance();Object world=c(t(ROOT+"api.internal.SharedApi"),"getDhClientServerWorld"),provider=null,wrapper=null;
    for(Object l:(Set<?>)f(world,"dhLevels"))if(String.valueOf(c(l,"getLevelWrapper")).contains("projectseele:geofront")){wrapper=c(l,"getLevelWrapper");provider=c(l,"getFullDataProvider");}
    if(provider==null)throw new IllegalStateException("GeoFront provider not ready");
+   Object compressionSetting=t(ROOT+"config.Config$Common$LodBuilding").getField("worldCompression").get(null);
+   if(!String.valueOf(c(compressionSetting,"get")).equals("MERGE_SAME_BLOCKS"))
+    throw new IllegalStateException("Exact import requires MERGE_SAME_BLOCKS for subsequent loaded-chunk updates");
    var blockCache=new HashMap<String,Object>();var biomeCache=new HashMap<String,Object>();Class<?> lists=t("it.unimi.dsi.fastutil.longs.LongArrayList");
    byte generation=((Number)f(t("com.seibel.distanthorizons.api.enums.worldGeneration.EDhApiWorldGenerationStep").getField("LIGHT").get(null),"value")).byteValue();
    byte compression=((Number)f(t("com.seibel.distanthorizons.api.enums.config.EDhApiWorldCompressionMode").getField("MERGE_SAME_BLOCKS").get(null),"value")).byteValue();

@@ -69,7 +69,8 @@
     "client.PianoInventoryOverlayR22Mixin",
     "client.AircraftCorrectionBudgetMixin",
     "client.CommandShaderLightR39Mixin",
-    "client.OculusDhReloadR53Mixin"
+    "client.OculusDhReloadR53Mixin",
+    "client.DhWaterTransparencyR53Mixin"
   ],
   "injectors": {
     "defaultRequire": 1

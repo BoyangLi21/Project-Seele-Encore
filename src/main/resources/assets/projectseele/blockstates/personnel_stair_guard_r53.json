@@ -1,0 +1,36 @@
+{
+  "variants": {
+    "facing=south,left=false": {
+      "model": "projectseele:block/personnel_stair_guard_r53_right",
+      "y": 0
+    },
+    "facing=west,left=false": {
+      "model": "projectseele:block/personnel_stair_guard_r53_right",
+      "y": 90
+    },
+    "facing=north,left=false": {
+      "model": "projectseele:block/personnel_stair_guard_r53_right",
+      "y": 180
+    },
+    "facing=east,left=false": {
+      "model": "projectseele:block/personnel_stair_guard_r53_right",
+      "y": 270
+    },
+    "facing=south,left=true": {
+      "model": "projectseele:block/personnel_stair_guard_r53_left",
+      "y": 0
+    },
+    "facing=west,left=true": {
+      "model": "projectseele:block/personnel_stair_guard_r53_left",
+      "y": 90
+    },
+    "facing=north,left=true": {
+      "model": "projectseele:block/personnel_stair_guard_r53_left",
+      "y": 180
+    },
+    "facing=east,left=true": {
+      "model": "projectseele:block/personnel_stair_guard_r53_left",
+      "y": 270
+    }
+  }
+}

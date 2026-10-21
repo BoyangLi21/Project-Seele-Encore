@@ -64,6 +64,8 @@ public final class ModBlocks
     public static final RegistryObject<Block> ENTRY_PLUG_BRIDGE_GUARD_R48=BLOCKS.register("entry_plug_bridge_guard",()->new com.projectseele.world.FacilityEdgeRailR41(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion(),true));
     public static final RegistryObject<Block> NERV_TV_PERSONNEL_DECK_R44=BLOCKS.register("tv_personnel_deck_r44",()->new com.projectseele.world.TvPersonnelDeckR44(BlockBehaviour.Properties.copy(Blocks.IRON_BLOCK).strength(3F).noOcclusion()));
     public static final RegistryObject<Block> NERV_TV_PERSONNEL_GUARD_R44=BLOCKS.register("tv_personnel_guard_r44",()->new com.projectseele.world.TvPersonnelGuardR44(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion()));
+    public static final RegistryObject<Block> PERSONNEL_STAIR_GUARD_R53=BLOCKS.register("personnel_stair_guard_r53",
+            ()->new com.projectseele.world.PersonnelStairGuardR53(BlockBehaviour.Properties.copy(Blocks.IRON_BARS).strength(3F).noOcclusion()));
     public static final RegistryObject<Block> NERV_MACHINE_HAZARD=structuralFinish("nerv_machine_hazard");
 
     private static RegistryObject<Block> structuralFinish(String name)
