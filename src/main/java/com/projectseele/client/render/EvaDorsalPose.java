@@ -10,13 +10,20 @@ import java.util.Set;
 /** Mechanical travel owns the upper body only while the socket is in use. */
 public final class EvaDorsalPose
 {
+    /** Visibility must also run for captured/service poses that already own the hinge rotation. */
+    public static void applyVisibility(EvaUnit01Entity eva, BakedGeoModel model)
+    {
+        boolean closed = EvaDorsalMechanism.open(eva) < .002F;
+        model.getBone("dorsal_liner").ifPresent(bone -> bone.setHidden(closed));
+    }
+
     public static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva, BakedGeoModel model)
     {
         float open=EvaDorsalMechanism.open(eva), bow=EvaDorsalMechanism.bow(eva);
         var profile=EvaDorsalProfile.of(eva);var axis=profile.hingeAxisModel();
         var rotation=new Quaternionf().rotationAxis((float)Math.toRadians(profile.openAngle()*open),(float)axis.x,(float)-axis.y,(float)-axis.z);
         model.getBone("dorsal_cover").ifPresent(b -> EvaRigTransforms.rotate(b,rotation));
-        model.getBone("dorsal_liner").ifPresent(b -> b.setHidden(open<.002F));
+        applyVisibility(eva, model);
         model.getBone("dorsal_leaf_l").ifPresent(b -> b.setRotY((float)Math.toRadians(-106*open)));
         model.getBone("dorsal_leaf_r").ifPresent(b -> b.setRotY((float)Math.toRadians(106*open)));
         if (bow < .0001F && open < .0001F) return new EvaMotionEngineV2.BoneWrites(Set.of("dorsal_cover"),Set.of(),"MOTION_ENGINE_LIVE_ACTION");

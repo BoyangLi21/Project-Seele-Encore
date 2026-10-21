@@ -313,6 +313,7 @@ public final class EvaPoseGraph
     private static Snapshot finish(EvaUnit01Entity entity,BakedGeoModel model,float partialTick,org.joml.Matrix4f modelToWorld,
                                    EvaMotionEngineV2.BoneWrites motionWrites,EvaMotionEngineV2.BoneWrites transitions,EvaMotionEngineV2.BoneWrites firearm)
     {
+        EvaDorsalPose.applyVisibility(entity, model);
         EvaCannonContactRigR45.apply(entity,model,partialTick,modelToWorld);
         if(!entity.isFirstBattleActive()||!com.projectseele.entity.FirstBattleClip.ownsAnatomicalHandsR52(entity.getUnitVariant()))
             EvaAnatomicalHandPoseR45.apply(entity,model,partialTick);

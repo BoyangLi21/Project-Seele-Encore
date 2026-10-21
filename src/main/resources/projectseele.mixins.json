@@ -6,6 +6,7 @@
   "refmap": "projectseele.refmap.json",
   "minVersion": "0.8",
   "mixins": [
+    "DhColumnExtentR53Mixin",
     "PhysicalBodyVehiclePackets",
     "ServiceAircraftWorldR32Accessor",
     "ServiceAircraftSectionsR32Accessor",
