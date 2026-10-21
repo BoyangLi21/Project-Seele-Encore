@@ -32,7 +32,11 @@ def run(source,world,out):
             q=queue.popleft()
             for d in ((dz,0,-dx),(-dz,0,dx),(dx,1,dz),(-dx,-1,-dz)):
                 p=tuple(q[k]+d[k] for k in range(3))
-                if p in remaining and cells[p]==state:remaining.remove(p);part.add(p);queue.append(p)
+                # A change of stair material does not end a continuous flight.
+                # Every admitted cell already has the same bottom/straight
+                # shape; facing and one-block rise define this connection.
+                if p in remaining and properties(cells[p])['facing']==properties(state)['facing']:
+                    remaining.remove(p);part.add(p);queue.append(p)
         if len({q[1] for q in part})<3:
             unclassified.append(dict(cells=sorted(part),state=state));continue
         failures=[]
@@ -56,7 +60,7 @@ def run(source,world,out):
             lane.sort(key=lambda q:q[1]);a,b=lane[0],lane[-1]
             for kind,p in (('lower',(a[0]+.5-1.1*dx,a[1],a[2]+.5-1.1*dz)),('upper',(b[0]+.5+1.1*dx,b[1]+1,b[2]+.5+1.1*dz))):
                 landings.append(dict(kind=kind,point=p,status=geometry.standing(p)))
-        flights.append(dict(state=state,cells=len(part),bounds=[[min(q[k] for q in part) for k in range(3)],[max(q[k] for q in part) for k in range(3)]],rises=len({q[1] for q in part}),failures=failures,landings=landings))
+        flights.append(dict(state=state,materials=dict(Counter(cells[q] for q in part)),cells=len(part),bounds=[[min(q[k] for q in part) for k in range(3)],[max(q[k] for q in part) for k in range(3)]],rises=len({q[1] for q in part}),failures=failures,landings=landings))
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(dict(source=str(source),flights=flights,unclassified=unclassified,unknown_shapes=sorted(geometry.unknown),world_written=False),ensure_ascii=False,indent=2),'utf8')
     print('Flights',len(flights),'treads',sum(r['cells'] for r in flights),'blocked flights',sum(bool(r['failures']) for r in flights),'unclassified',len(unclassified))

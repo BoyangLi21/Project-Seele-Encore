@@ -24,7 +24,8 @@ def rail_gaps(rows):
             if state.startswith('projectseele:personnel_stair_guard_r53['):
                 return pos[1]+.375, pos[1]+1.375
             raise ValueError('Unclassified guard geometry: '+state)
-        if b[0][2] != a[0][2]+1 or b[0][0] != a[0][0]:
+        if (abs(b[0][2]-a[0][2])+abs(b[0][0]-a[0][0]) != 1
+                or b[0][1] != a[0][1]+1):
             raise ValueError('Nonadjacent guard run')
         gap = abs(ends(a)[1]-ends(b)[0])
         if gap > .05: gaps.append({'a': a[0], 'b': b[0], 'gap': gap})
