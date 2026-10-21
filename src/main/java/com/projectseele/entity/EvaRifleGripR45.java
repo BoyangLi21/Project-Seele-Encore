@@ -26,17 +26,33 @@ public final class EvaRifleGripR45
         // Contacts measured on the imported grip and lower fore-end. These
         // are the SAME contact frames the final rendered arms must consume.
         var dominant = contact(frames.get("r"), body.rig.get("hand_r").pivot(),
-                frame(along, across), grip.toVector3f().fma(.573097F, r).fma(-.324F, u).fma(-1.584F, f));
+                frame(along, across), pad(grip,r,f,u,EvaRifleClearance.dominantPad()),
+                EvaRifleClearance.usesLegacyGripFit());
         var supporting = contact(frames.get("l"), body.rig.get("hand_l").pivot(),
-                frame(r, f), grip.toVector3f().fma(4.536F, f).fma(.170421F, u));
+                frame(r, f), pad(grip,r,f,u,EvaRifleClearance.supportingPad()),
+                EvaRifleClearance.usesLegacyGripFit());
         return new Pair(supporting, dominant);
+    }
+
+    private static Vector3f pad(Vec3 grip,Vector3f right,Vector3f forward,Vector3f up,Vec3 point)
+    {
+        return grip.toVector3f().fma((float)point.x,right).fma((float)point.y,forward).fma((float)point.z,up);
     }
 
     private static Contact contact(EvaAnatomicalHandsR45.Grip grip, Vector3f wrist,
                                     Matrix3f desiredFrame, Vector3f pad)
     {
+        return contact(grip,wrist,desiredFrame,pad,true);
+    }
+
+    private static Contact contact(EvaAnatomicalHandsR45.Grip grip, Vector3f wrist,
+                                    Matrix3f desiredFrame, Vector3f pad,boolean legacyTranslation)
+    {
         var rotation = new Quaternionf().setFromNormalized(desiredFrame.mul(frame(grip.along(), grip.across()).transpose()));
-        pad.add(new Quaternionf(rotation).transform(new Vector3f(grip.poseTranslation())).mul(EvaScale.RENDER_SCALE));
+        // New mesh pads are actual palm targets. The old weapon's fitting
+        // translation would displace them a second time and leave a visible gap.
+        if(legacyTranslation)
+            pad.add(new Quaternionf(rotation).transform(new Vector3f(grip.poseTranslation())).mul(EvaScale.RENDER_SCALE));
         rotation.mul(grip.poseRotation());
         var target = pad.sub(new Quaternionf(rotation).transform(new Vector3f(grip.palm()).sub(wrist).mul(EvaScale.RENDER_SCALE)));
         return new Contact(target, rotation);

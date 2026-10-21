@@ -597,6 +597,13 @@ tasks.register('verifyKneeSupportR40', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyKneeSupportR40' }
 
+tasks.register('verifyRifleGeometryR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.entity.EvaRifleGeometryR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyRifleGeometryR53' }
+
 tasks.register('verifyVerticalCarrierSweepR40', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath

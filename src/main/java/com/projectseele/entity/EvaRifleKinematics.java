@@ -14,10 +14,10 @@ import org.joml.Vector3f;
 public final class EvaRifleKinematics
 {
     public static final float WEAPON_SCALE=.72F;
-    public static final double CAP_FORWARD=20.3010625D*WEAPON_SCALE;
-    public static final double CAP_DOWN=.1561192D*WEAPON_SCALE;
-    private static final double STOCK_BACK=49.700046D/16*EvaScale.RENDER_SCALE*WEAPON_SCALE;
-    private static final double STOCK_UP=7.656318D/16*EvaScale.RENDER_SCALE*WEAPON_SCALE;
+    public static final double CAP_FORWARD=EvaRifleClearance.muzzle().y;
+    public static final double CAP_DOWN=-EvaRifleClearance.muzzle().z;
+    private static final double STOCK_BACK=-EvaRifleClearance.stock().y;
+    private static final double STOCK_UP=EvaRifleClearance.stock().z;
     public record Frame(Vec3 grip,Vec3 muzzle,Vec3 stock,Vec3 forward,Vec3 up,Vec3 right,
                         float ready,float recoil,Vec3 eye,Quaternionf headRotation) {}
 
@@ -133,7 +133,7 @@ public final class EvaRifleKinematics
                 // its floor/reach lift, even with zero recoil and full aim.
                 if(measuredGrip)carryLift+=clearance;
             }
-            Vec3 muzzle=grip.add(aim.scale(CAP_FORWARD)).subtract(up.scale(CAP_DOWN)).add(right.scale(-.0014665D*WEAPON_SCALE));
+            Vec3 muzzle=grip.add(aim.scale(CAP_FORWARD)).subtract(up.scale(CAP_DOWN)).add(right.scale(EvaRifleClearance.muzzle().x));
             if(supported)
             {
                 // The raised rear receiver reaches 4.35 blocks above the bore.
