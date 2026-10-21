@@ -148,7 +148,7 @@ def stage(args):
                     points=points.tolist(), muzzle=muzzle.tolist(),
                     stock=weapon_frame([11.1, .8, 0]),
                     dominant_pad=weapon_frame([2, -1.7, -.5]),
-                    supporting_pad=weapon_frame([-3.4, -.1, 0]),
+                    supporting_pad=weapon_frame([-1.55, -.8, 0]),
                     source_origin=origin.tolist(), uniform_scale=args.scale)
     motion = assets / 'motion/rifle_clearance_r10.json'
     motion.parent.mkdir(parents=True)

@@ -83,6 +83,15 @@ public final class EvaRifleKinematics
         float sight=entity.rifleSightBlendR45(partial);sight=sight*sight*(3-2*sight);
         double stockLift=measuredGrip?5*sight:5;
         double pocketY=supported?-3.1:Mth.lerp(entity.rifleProneBlend(partial),-1.5D,.2D);
+        if(!EvaRifleClearance.usesLegacyGripFit())
+        {
+            // The imported receiver extends above and behind its grip. Carry
+            // its complete frame clear of the chest; both arm targets and the
+            // server muzzle must follow, rather than moving only the mesh.
+            lateralOffset-=3.7;
+            forwardOffset+=3.8;
+            pocketY+=1.8;
+        }
         Vec3 pocket=shoulder.add(bodyRight.scale(lateralOffset)).add(bodyForward.scale(forwardOffset)).add(0,pocketY,0);
         Vector3f headPoint=new Matrix4f(world).mul(body.matrix("head")).transformPosition(new Vector3f(body.rig.get("head").pivot()));
         Vec3 joint=new Vec3(headPoint.x,headPoint.y,headPoint.z);
