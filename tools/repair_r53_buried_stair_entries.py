@@ -1,4 +1,4 @@
-"""Restore level landings over five observed buried first stair rows.
+"""Restore level landings over the observed buried first stair rows.
 
 The authored flight and its upper landing stay fixed. An existing stair whose
 entire top is at the approach floor becomes that same floor, removing its
@@ -17,11 +17,13 @@ from measure_world_r40 import properties
 from station_sign_readers_r44 import NORMAL
 
 
-def plan(frozen, report, output):
+def plan(frozen, report, output, short_only=False):
     observed = {(3,-528,z) for z in range(266,269)} | {(56,-528,z) for z in range(266,269)}
     observed |= {(x,-486,z) for x in (5,55) for z in range(268,271)}
     observed |= {(x,-458,301) for x in range(5,8)}
-    findings = [row for flight in json.loads(report.read_text('utf8'))['flights']
+    if short_only:
+        observed = {(x,-514,z) for x in (7,52) for z in range(263,266)}
+    findings = [row for flight in json.loads(report.read_text('utf8'))['unclassified' if short_only else 'flights']
                 for row in flight['buried_first_treads']]
     assert {tuple(r['first_tread']) for r in findings} == observed
     cells, tags, rows = {}, {}, []
@@ -77,13 +79,15 @@ def plan(frozen, report, output):
     (output/'EXACT_DELTA.json.gz').write_bytes(gzip.compress(json.dumps(rows).encode(),mtime=0))
     (output/'ENTRY_PROFILES.json').write_text(json.dumps(profiles,indent=2),'utf8')
     (output/'PLAN.json').write_text(json.dumps(dict(frozen=str(frozen),source_report=str(report),
-        observed_flights=5,changed_cells=len(rows),full_body_samples=sum(r['clear_full_body_samples'] for r in profiles),
-        complete_flight_width=3,removed_approach_dips=15,world_written=False),indent=2),'utf8')
+        observed_flights=2 if short_only else 5,changed_cells=len(rows),full_body_samples=sum(r['clear_full_body_samples'] for r in profiles),
+        complete_flight_width=3,removed_approach_dips=len(rows),world_written=False),indent=2),'utf8')
 
 
 if __name__=='__main__':
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--frozen',type=Path);parser.add_argument('--report',type=Path)
     parser.add_argument('--world',type=Path);parser.add_argument('--output',type=Path,required=True)
-    parser.add_argument('--apply',action='store_true');args=parser.parse_args()
-    install(args.world,args.output) if args.apply else plan(args.frozen,args.report,args.output)
+    parser.add_argument('--apply',action='store_true')
+    parser.add_argument('--short-only',action='store_true',help='Only the two visually verified short white stair entries')
+    args=parser.parse_args()
+    install(args.world,args.output) if args.apply else plan(args.frozen,args.report,args.output,args.short_only)

@@ -19,6 +19,26 @@ class Frozen:
         return self.palette[int(self.a[i])] if all(0<=q<s for q,s in zip(i,self.a.shape)) else None
     def block(self,q):return self.get(*q)
 
+def buried_entries(part,cells,m,geometry):
+    lanes={};findings=[]
+    for q in part:
+        dx,dz=NORMAL[properties(cells[q])['facing']]
+        lanes.setdefault(dz*q[0]-dx*q[2],[]).append(q)
+    for lane in lanes.values():
+        a=min(lane,key=lambda q:q[1]);dx,dz=NORMAL[properties(cells[a])['facing']]
+        approach=(a[0]+.5-1.1*dx,a[1],a[2]+.5-1.1*dz)
+        surfaces=[]
+        for rise in (-.5,0,.5,1,1.5):
+            p=(approach[0],a[1]+rise,approach[2])
+            if geometry.standing(p)=='STATIC_STANDING':surfaces.append(p)
+        if len(surfaces)==1 and surfaces[0][1]>a[1]+.01:
+            p=surfaces[0]
+            findings.append(dict(first_tread=list(a),stair_state=cells[a],
+                approach=p,floor_state=m.block((math.floor(p[0]),math.floor(p[1]-.04),math.floor(p[2]))),
+                covered_height=p[1]-a[1],first_half_riser_exposed=a[1]+.5-p[1],
+                classification='BURIED_FIRST_TREAD',construction_authorized=False))
+    return findings
+
 def run(source,world,out):
     m=Frozen(source,world);geometry=ActualGeometry(m)
     ids=[i for i,s in enumerate(m.palette) if s.partition('[')[0].endswith('_stairs') and properties(s).get('half')=='bottom' and properties(s).get('shape')=='straight']
@@ -38,7 +58,8 @@ def run(source,world,out):
                 if p in remaining and properties(cells[p])['facing']==properties(state)['facing']:
                     remaining.remove(p);part.add(p);queue.append(p)
         if len({q[1] for q in part})<3:
-            unclassified.append(dict(cells=sorted(part),state=state));continue
+            unclassified.append(dict(cells=sorted(part),state=state,
+                buried_first_treads=buried_entries(part,cells,m,geometry)));continue
         failures=[]
         for x,y,z in sorted(part):
             # A player's footprint rests on the upper half before the next
@@ -54,24 +75,13 @@ def run(source,world,out):
                             if boxes is None or any(all(at[k]+b[k]<hi[k] and at[k]+b[k+3]>lo[k] for k in range(3)) for b in boxes):hits.append(dict(pos=at,state=m.block(at)))
                 failures.append(dict(tread=[x,y,z],point=p,status=status,hits=hits))
         landings=[]
-        buried=[]
+        buried=buried_entries(part,cells,m,geometry)
         lanes={}
         for q in part:lanes.setdefault(dz*q[0]-dx*q[2],[]).append(q)
         for lane in lanes.values():
             lane.sort(key=lambda q:q[1]);a,b=lane[0],lane[-1]
             for kind,p in (('lower',(a[0]+.5-1.1*dx,a[1],a[2]+.5-1.1*dz)),('upper',(b[0]+.5+1.1*dx,b[1]+1,b[2]+.5+1.1*dz))):
                 landings.append(dict(kind=kind,point=p,status=geometry.standing(p)))
-            approach=(a[0]+.5-1.1*dx,a[1],a[2]+.5-1.1*dz)
-            surfaces=[]
-            for rise in (-.5,0,.5,1,1.5):
-                p=(approach[0],a[1]+rise,approach[2])
-                if geometry.standing(p)=='STATIC_STANDING':surfaces.append(p)
-            if len(surfaces)==1 and surfaces[0][1]>a[1]+.01:
-                p=surfaces[0]
-                buried.append(dict(first_tread=list(a),stair_state=cells[a],
-                    approach=p,floor_state=m.block((math.floor(p[0]),math.floor(p[1]-.04),math.floor(p[2]))),
-                    covered_height=p[1]-a[1],first_half_riser_exposed=a[1]+.5-p[1],
-                    classification='BURIED_FIRST_TREAD',construction_authorized=False))
         flights.append(dict(state=state,materials=dict(Counter(cells[q] for q in part)),cells=len(part),bounds=[[min(q[k] for q in part) for k in range(3)],[max(q[k] for q in part) for k in range(3)]],rises=len({q[1] for q in part}),failures=failures,landings=landings,buried_first_treads=buried))
     out.parent.mkdir(parents=True,exist_ok=True)
     out.write_text(json.dumps(dict(source=str(source),flights=flights,unclassified=unclassified,unknown_shapes=sorted(geometry.unknown),world_written=False),ensure_ascii=False,indent=2),'utf8')
