@@ -108,7 +108,7 @@ public final class FullAssemblyGeometryR52
     {
         private final Map<String,double[]> carrier,bearings,trim,stow,runningDeck;private final Map<String,Vec3> anchors,plugPivots;private final Map<Integer,Map<String,double[]>> plugs;private final String source;
         private Provider(Map<String,double[]> carrier,Map<String,Vec3> anchors,Map<Integer,Map<String,double[]>> plugs,Map<String,double[]> bearings,Map<String,double[]> trim,Map<String,double[]> stow,Map<String,double[]> runningDeck,Map<String,Vec3> plugPivots,String source){this.runningDeck=runningDeck;this.carrier=carrier;this.anchors=anchors;this.plugs=plugs;this.bearings=bearings;this.trim=trim;this.stow=stow;this.plugPivots=Map.copyOf(plugPivots);this.source=source;}
-        public String sourceFingerprint(){return source;}
+        public String sourceFingerprint(){var selected=CarrierAssemblyR53.selected();return selected==null?source:sha((source+selected.fingerprint()).getBytes(StandardCharsets.UTF_8));}
         public boolean selectedRunningDeckR52(){return runningDeck.keySet().equals(Set.of("deck"));}
         /** Pure source transform evaluator for actual renderer comparison.
          * Native capture admits only fully raised/release-free machinery. */
@@ -116,6 +116,8 @@ public final class FullAssemblyGeometryR52
         {return carrierParts(rise,recoveryRack,release,recoveryRack?3:0);}
         public Map<String,double[]> carrierParts(float rise,boolean recoveryRack,float release,double deckTravel)
         {
+            var selected=CarrierAssemblyR53.selected();
+            if(selected!=null)return selected.posed(rise,release,deckTravel);
             require(deckTravel==0||deckTravel==3||deckTravel==64,"Actual declared deck travel required");
             require(Float.isFinite(rise)&&rise>=0&&rise<=1&&Float.isFinite(release)&&release>=0&&release<=1,"Actual carrier render channels required");var result=new LinkedHashMap<String,double[]>();
             for(var entry:carrier.entrySet())
@@ -163,9 +165,9 @@ public final class FullAssemblyGeometryR52
         var current=pilot.getBoundingBox();var seatInEva=binding.plugInEva().transformPoint(EntryPlugKinematics.PILOT_SEAT_P);var expected=actualFrame.evaRoot().transformPoint(seatInEva);
         require(current.getCenter().distanceToSqr(expected)<=1e-10,"Actual native pilot body is not at the physical capsule seat");
         var surfaces=new ArrayList<Surface>();for(var part:actualEva.parts())surfaces.add(new Surface("eva/"+part.bone(),actualEva.sourceFingerprint(),new TriangleSweepMeshR52(part.triangles())));
-        provider.carrierParts(eva.getUnitVariant(),1,eva.recoveryRackR39(),0,EvaMechanicalFrameR52.carrierDeckTravelR52(eva)).forEach((n,p)->surfaces.add(new Surface("carrier/"+n,provider.source,new TriangleSweepMeshR52(p))));
-        provider.closedPlugParts(original.variant()).forEach((n,p)->surfaces.add(new Surface("capsule/"+n,provider.source,new TriangleSweepMeshR52(transform(p,binding.plugInEva())))));
-        return new Captured(original,binding,List.copyOf(surfaces),new NativePilot(original.pilot(),new Vec3(current.getXsize()/2,current.getYsize()/2,current.getZsize()/2),seatInEva),actualEva.sourceFingerprint()+":"+provider.source,Kind.OCCUPIED);
+        provider.carrierParts(eva.getUnitVariant(),1,eva.recoveryRackR39(),0,EvaMechanicalFrameR52.carrierDeckTravelR52(eva)).forEach((n,p)->surfaces.add(new Surface("carrier/"+n,provider.sourceFingerprint(),new TriangleSweepMeshR52(p))));
+        provider.closedPlugParts(original.variant()).forEach((n,p)->surfaces.add(new Surface("capsule/"+n,provider.sourceFingerprint(),new TriangleSweepMeshR52(transform(p,binding.plugInEva())))));
+        return new Captured(original,binding,List.copyOf(surfaces),new NativePilot(original.pilot(),new Vec3(current.getXsize()/2,current.getYsize()/2,current.getZsize()/2),seatInEva),actualEva.sourceFingerprint()+":"+provider.sourceFingerprint(),Kind.OCCUPIED);
     }
     /** Only the original stopped empty hull and its actual carrier are carried.
      * Original capsule/pilot UUIDs remain provenance; neither is queried as a
@@ -178,8 +180,8 @@ public final class FullAssemblyGeometryR52
                 &&!eva.isEntryPlugInserted()&&eva.carrierRiseProgress(1)==1&&eva.getLaunchPhase()!=EvaUnit01Entity.LAUNCH_CLEAR
                 &&EntryPlugEjectionR48.originalFieldEjection(level,original.variant(),eva,original.pilot())&&TransportMembershipR52.originalEjectionReceipts(original,eva.getPersistentData()),"Actual stopped original ejected hull/raised carrier required");
         var surfaces=new ArrayList<Surface>();for(var part:actualFrozenHull.parts())surfaces.add(new Surface("eva/"+part.bone(),actualFrozenHull.sourceFingerprint(),new TriangleSweepMeshR52(part.triangles())));
-        provider.carrierParts(eva.getUnitVariant(),1,eva.recoveryRackR39(),0,EvaMechanicalFrameR52.carrierDeckTravelR52(eva)).forEach((n,p)->surfaces.add(new Surface("carrier/"+n,provider.source,new TriangleSweepMeshR52(p))));
-        return new Captured(original,binding,List.copyOf(surfaces),null,actualFrozenHull.sourceFingerprint()+":"+provider.source,Kind.HULL_ONLY_RECOVERY);
+        provider.carrierParts(eva.getUnitVariant(),1,eva.recoveryRackR39(),0,EvaMechanicalFrameR52.carrierDeckTravelR52(eva)).forEach((n,p)->surfaces.add(new Surface("carrier/"+n,provider.sourceFingerprint(),new TriangleSweepMeshR52(p))));
+        return new Captured(original,binding,List.copyOf(surfaces),null,actualFrozenHull.sourceFingerprint()+":"+provider.sourceFingerprint(),Kind.HULL_ONLY_RECOVERY);
     }
     public static final class Captured
     {

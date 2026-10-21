@@ -13,6 +13,16 @@ final class NervOriginalCarrierRendererR52 {
   var root=NervOriginalCarrierR52.actualRoot(e,partial);float rise=NervOriginalCarrierR52.progress(e,partial);
   boolean parked=NervR50CarrierModeR53.enabled()&&root.translation().y< -1000&&rise==0&&!e.originalCarrierStateR52().getBoolean("Attached");
   var relative=root.translation().subtract(e.getPosition(partial));poses.pushPose();poses.translate(relative.x,relative.y,relative.z);poses.mulPose(root.rotation());
+  if(CarrierAssemblyR53.selected()!=null)
+  {
+   if(!parked)
+   {
+    boolean outlet=NervR50CarrierModeR53.launchDeckDropR53(root,0)!=0;
+    poses.translate(0,NervR50CarrierModeR53.launchDeckDropR53(root,rise),0);
+    CarrierAssemblyRendererR53.draw(poses,buffers,light,outlet?1:rise,outlet?1-rise:0,0);
+   }
+   poses.popPose();return;
+  }
   if(parked)
   {
    // Keep the original reel module at the imported rack's measured cable datum.

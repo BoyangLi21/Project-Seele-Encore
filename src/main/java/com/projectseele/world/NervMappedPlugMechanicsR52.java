@@ -58,12 +58,16 @@ public final class NervMappedPlugMechanicsR52
     public static boolean clearCarrierRise(ServerLevel l,EvaUnit01Entity eva,RigidTransform root,float from,float to,Set<UUID> own)
     {
         if(sources==null||from<0||from>1||to<0||to>1)return false;
+        var selected=CarrierAssemblyR53.selected();
+        if(selected!=null&&Math.min(from,to)<CarrierAssemblyR53.RISE_END&&Math.max(from,to)>CarrierAssemblyR53.RISE_END)
+            return clearCarrierRise(l,eva,root,from,CarrierAssemblyR53.RISE_END,own)&&clearCarrierRise(l,eva,root,CarrierAssemblyR53.RISE_END,to,own);
         for(var row:CARRIERS.get(eva.getUnitVariant()*4+(eva.recoveryRackR39()?2:0)+(EvaMechanicalFrameR52.carrierDeckTravelR52(eva)==64?1:0)).entrySet())
         {
             if(row.getKey().startsWith("sole_bearing_")&&EvaMechanicalFrameR52.carrierDeckTravelR52(eva)!=64)continue;
             var mesh=row.getValue();double speed=row.getKey().equals("deck")?EvaMechanicalFrameR52.carrierDeckTravelR52(eva):64;
-            var first=root.compose(new RigidTransform(new Vec3(0,-speed*(1-from),0),0,0,0,1));
-            var end=root.compose(new RigidTransform(new Vec3(0,-speed*(1-to),0),0,0,0,1));var bound=mesh.envelope(first,end);
+            double deckTravel=NervR50CarrierModeR53.enabled()?0:EvaMechanicalFrameR52.carrierDeckTravelR52(eva);
+            var first=root.compose(selected==null?new RigidTransform(new Vec3(0,-speed*(1-from),0),0,0,0,1):selected.frame(row.getKey(),from,0,deckTravel));
+            var end=root.compose(selected==null?new RigidTransform(new Vec3(0,-speed*(1-to),0),0,0,0,1):selected.frame(row.getKey(),to,0,deckTravel));var bound=mesh.envelope(first,end);
             if(!loaded(l,bound))return false;
             for(var shape:l.getBlockCollisions(eva,bound))for(var b:shape.toAabbs())if(mesh.intersects(first,end,b,.003))return false;
             for(var actor:l.getEntities((Entity)null,bound,e->!own.contains(e.getUUID())&&e.isAlive()&&(e instanceof LivingEntity||e.canBeCollidedWith())))if(mesh.intersects(first,end,actor.getBoundingBox(),.003))return false;
@@ -111,7 +115,7 @@ public final class NervMappedPlugMechanicsR52
         if(sources==null)return false;if(cells.stream().allMatch(c->level.hasChunkAt(c.at())&&level.getBlockState(c.at()).equals(c.closed())))return true;
         boolean visible=actualCarrierVisibleR52(eva);
         if(!visible)return true;var root=EvaMechanicalFrameR52.carrierFrameR52(eva,1);float rise=eva.carrierRiseProgress(1),release=eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR?EvaDorsalMechanism.smooth(1-(eva.getLaunchTicks()-1)/18F):0;
-        var meshes=new LinkedHashMap<NervRigidMeshSweepR52,RigidTransform>();for(var row:CARRIERS.get(eva.getUnitVariant()*4+(eva.recoveryRackR39()?2:0)+(EvaMechanicalFrameR52.carrierDeckTravelR52(eva)==64?1:0)).entrySet()){String name=row.getKey();if(name.startsWith("sole_bearing_")&&EvaMechanicalFrameR52.carrierDeckTravelR52(eva)!=64)continue;double speed=name.equals("deck")?EvaMechanicalFrameR52.carrierDeckTravelR52(eva):64;var local=new RigidTransform(new Vec3(0,-speed*(1-rise),name.equals("contact_pads")?1.5F*release:0),0,0,0,1);meshes.put(row.getValue(),root.compose(local));}
+        var meshes=new LinkedHashMap<NervRigidMeshSweepR52,RigidTransform>();for(var row:CARRIERS.get(eva.getUnitVariant()*4+(eva.recoveryRackR39()?2:0)+(EvaMechanicalFrameR52.carrierDeckTravelR52(eva)==64?1:0)).entrySet()){String name=row.getKey();if(name.startsWith("sole_bearing_")&&EvaMechanicalFrameR52.carrierDeckTravelR52(eva)!=64)continue;double speed=name.equals("deck")?EvaMechanicalFrameR52.carrierDeckTravelR52(eva):64;var local=new RigidTransform(new Vec3(0,-speed*(1-rise),name.equals("contact_pads")?1.5F*release:0),0,0,0,1);var selected=CarrierAssemblyR53.selected();if(selected!=null)local=selected.frame(name,rise,release,NervR50CarrierModeR53.enabled()?0:EvaMechanicalFrameR52.carrierDeckTravelR52(eva));meshes.put(row.getValue(),root.compose(local));}
         for(var cell:cells){if(!level.hasChunkAt(cell.at()))return false;if(level.getBlockState(cell.at()).equals(cell.closed()))continue;for(var local:cell.closed().getCollisionShape(level,cell.at()).toAabbs()){var obstacle=local.move(cell.at());for(var entry:meshes.entrySet()){var mesh=entry.getKey();var frame=entry.getValue();if(mesh.envelope(frame,frame).intersects(obstacle)&&mesh.intersects(frame,frame,obstacle,.003))return false;}}}return true;
     }
     private static boolean loaded(ServerLevel l,AABB b){for(int x=(int)Math.floor(b.minX)>>4;x<=((int)Math.floor(b.maxX)>>4);x++)for(int z=(int)Math.floor(b.minZ)>>4;z<=((int)Math.floor(b.maxZ)>>4);z++)if(l.getChunkSource().getChunkNow(x,z)==null)return false;return true;}

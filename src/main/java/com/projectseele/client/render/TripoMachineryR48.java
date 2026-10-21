@@ -23,7 +23,7 @@ final class TripoMachineryR48
     private record Assembly(Map<String, RigidMachineryPartR44> parts, Map<String, Vec3> anchors) { }
     private static final Map<String, Assembly> CACHE = new HashMap<>();
 
-    static void clearCache() { CACHE.clear(); NervFootGuideRigRendererR52.clear(); NervLegacyCarrierRideRendererR52.clear(); }
+    static void clearCache() { CACHE.clear(); CarrierAssemblyRendererR53.clear(); NervFootGuideRigRendererR52.clear(); NervLegacyCarrierRideRendererR52.clear(); }
     static boolean selectedRunningDeckR52(){String key="selected_running_deck";var cached=CACHE.get(key);if(cached!=null)return cached.parts().containsKey("deck");try(var input=Minecraft.getInstance().getResourceManager().open(new ResourceLocation(ProjectSeele.MODID,"eva/full_assembly_geometry_r52_sources.json"));var reader=new InputStreamReader(input,StandardCharsets.UTF_8)){var j=JsonParser.parseReader(reader).getAsJsonObject();boolean selected=j.getAsJsonObject("resources").has(com.projectseele.world.NervLegacyCarrierRideR52.DECK_SOURCE);if(!selected){CACHE.put(key,new Assembly(Map.of(),Map.of()));return false;}try(var deckInput=Minecraft.getInstance().getResourceManager().open(new ResourceLocation(ProjectSeele.MODID,com.projectseele.world.NervLegacyCarrierRideR52.DECK_SOURCE));var deckReader=new InputStreamReader(deckInput,StandardCharsets.UTF_8)){var d=JsonParser.parseReader(deckReader).getAsJsonObject();if(!d.get("schema").getAsString().equals("projectseele.r52.actual-running-deck-housings.v1")||d.get("stride").getAsInt()!=8)throw new IllegalStateException("Selected original housing deck source required");var original=load("carrier");if(original==null)throw new IllegalStateException("Original Tripo material source required");var material=new ResourceLocation("projectseele:textures/entity/tripo_carrier_r48.png");var part=RigidMachineryPartR44.textured(d.getAsJsonObject("parts").getAsJsonArray("deck"),material);CACHE.put(key,new Assembly(Map.of("deck",part),Map.of()));return true;}}catch(Exception unavailable){throw new IllegalStateException("Declared carrier running deck selection unavailable",unavailable);}}
     private static RigidMachineryPartR44 selectedDeckR52(Assembly original){return selectedRunningDeckR52()?CACHE.get("selected_running_deck").parts().get("deck"):original.parts().get("deck");}
     private static Assembly soleBearings(int variant)
@@ -123,7 +123,8 @@ final class TripoMachineryR48
     {
         var assembly=load("carrier");
         if(assembly==null||!assembly.anchors.containsKey("power_reel"))return null;
-        var at=assembly.anchors.get("power_reel");
+        var selected=com.projectseele.world.CarrierAssemblyR53.selected();
+        var at=selected==null?assembly.anchors.get("power_reel"):selected.powerReel();
         if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&com.projectseele.entity.EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(unit))
         {
             var actor=com.projectseele.entity.EvaMechanicalFrameR52.originalCarrierControllerR52(unit);
@@ -131,13 +132,21 @@ final class TripoMachineryR48
             var root=com.projectseele.world.NervOriginalCarrierR52.actualRoot(actor,partial);
             float rise=com.projectseele.world.NervOriginalCarrierR52.progress(actor,partial);
             boolean parked=root.translation().y< -1000&&rise==0&&!actor.originalCarrierStateR52().getBoolean("Attached");
+            if(selected!=null)
+            {
+                if(parked)return null;
+                boolean outlet=com.projectseele.world.NervR50CarrierModeR53.launchDeckDropR53(root,0)!=0;
+                var local=selected.frame("body",outlet?1:rise,0,0).transformPoint(at);
+                return root.transformPoint(local.add(0,com.projectseele.world.NervR50CarrierModeR53.launchDeckDropR53(root,rise),0));
+            }
             double drop=com.projectseele.world.NervR50CarrierModeR53.launchDeckDropR53(root,0)!=0?com.projectseele.world.NervR50CarrierModeR53.launchDeckDropR53(root,rise):parked?0:-64D*(1-rise);
             return root.transformPoint(at.add(0,drop,0));
         }
-        if(com.projectseele.entity.EvaMechanicalFrameR52.detachedCarrierR52(unit))return com.projectseele.entity.EvaMechanicalFrameR52.carrierFrameR52(unit,partial).transformPoint(at.add(0,-64*(1-unit.carrierRiseProgress(partial)),0));
+        if(com.projectseele.entity.EvaMechanicalFrameR52.detachedCarrierR52(unit))return com.projectseele.entity.EvaMechanicalFrameR52.carrierFrameR52(unit,partial).transformPoint(selected==null?at.add(0,-64*(1-unit.carrierRiseProgress(partial)),0):selected.frame("body",unit.carrierRiseProgress(partial),0,0).transformPoint(at));
         Vec3 rear=Vec3.directionFromRotation(0,EvaUnit01Entity.SILO_BAY_YAW).scale(-1);
         Vec3 right=new Vec3(rear.z,0,-rear.x);
         float rise=unit.carrierRiseProgress(partial);
+        if(selected!=null){at=selected.frame("body",rise,0,0).transformPoint(at);return unit.carrierRenderPosition(partial).add(right.scale(at.x)).add(rear.scale(at.z)).add(0,at.y,0);}
         return unit.carrierRenderPosition(partial).add(right.scale(at.x)).add(rear.scale(at.z))
                 .add(0,at.y-64*(1-rise),0);
     }
@@ -161,6 +170,10 @@ final class TripoMachineryR48
 
     static boolean carrier(PoseStack poses, MultiBufferSource buffers, int light, EvaUnit01Entity unit, float partial)
     {
+        float selectedRelease = unit.getLaunchPhase() == EvaUnit01Entity.LAUNCH_CLEAR
+                ? EvaDorsalMechanism.smooth(1 - (unit.getLaunchTicks() - partial) / 18F) : 0;
+        if (CarrierAssemblyRendererR53.draw(poses,buffers,light,unit.carrierRiseProgress(partial),
+                selectedRelease,unit.recoveryRackR39()?3:0)) return true;
         var assembly = load("carrier");
         if (assembly == null) return false;
         float rise = unit.carrierRiseProgress(partial);
@@ -185,6 +198,6 @@ final class TripoMachineryR48
     }
 
     private TripoMachineryR48() { }
-    static boolean originalCarrier(PoseStack poses,MultiBufferSource buffers,int light,int variant,float rise){var a=load("carrier");if(a==null)return false;a.parts.get("deck").draw(poses,buffers,light);poses.pushPose();poses.translate(0,-64D*(1-rise),0);a.parts.get("body").draw(poses,buffers,light);a.parts.get("contact_pads").draw(poses,buffers,light);var h=a.anchors.get("service_platform");poses.pushPose();poses.translate(h.x,h.y,h.z);poses.mulPose(Axis.ZP.rotationDegrees(-90));poses.translate(-h.x,-h.y,-h.z);a.parts.get("service_platform").draw(poses,buffers,light);poses.popPose();poses.popPose();return true;}
+    static boolean originalCarrier(PoseStack poses,MultiBufferSource buffers,int light,int variant,float rise){if(CarrierAssemblyRendererR53.draw(poses,buffers,light,rise,0,0))return true;var a=load("carrier");if(a==null)return false;a.parts.get("deck").draw(poses,buffers,light);poses.pushPose();poses.translate(0,-64D*(1-rise),0);a.parts.get("body").draw(poses,buffers,light);a.parts.get("contact_pads").draw(poses,buffers,light);var h=a.anchors.get("service_platform");poses.pushPose();poses.translate(h.x,h.y,h.z);poses.mulPose(Axis.ZP.rotationDegrees(-90));poses.translate(-h.x,-h.y,-h.z);a.parts.get("service_platform").draw(poses,buffers,light);poses.popPose();poses.popPose();return true;}
 
 }
