@@ -69,14 +69,52 @@ def plan(world, frozen, output):
     print(json.dumps(report))
 
 
+def plan_bridge(world, frozen, output):
+    # The actual upper crossing is five blocks wide (X174..178). Both glazed
+    # guards sit one block outside it, leaving an unsupported strip below them.
+    lo, hi = (172, -438, -52), (180, -434, -28)
+    cells = read_box(frozen, DIM, lo, hi)
+    current = read_box(world, DIM, lo, hi)
+    tags = dict(iter_block_entities(world, DIM, lo, hi))
+    rows = []
+    for x, inner in ((173, 174), (179, 178)):
+        for z in range(-49, -30):
+            q = (x, -437, z)
+            assert cells[inner, -437, z] == current[inner, -437, z] == "minecraft:smooth_stone"
+            assert all(cells[x, y, z] == current[x, y, z] == "minecraft:light_gray_stained_glass"
+                       for y in (-436, -435))
+            assert cells[q] == current[q] == "minecraft:air" and q not in tags
+            rows.append(dict(pos=q, before="minecraft:air", after="minecraft:smooth_stone",
+                             before_nbt=None, after_nbt=None,
+                             reason="connect_existing_upper_crossing_glazed_guards_to_deck"))
+    changed = {tuple(r["pos"]) for r in rows}
+    graph = json.loads(gzip.decompress((world / "nerv_routes_r24.json.gz").read_bytes()))
+    assert not any((n[0], n[1] + dy, n[2]) in changed for n in graph["nodes"] for dy in (-1, 0, 1))
+    # All additions are directly below solid two-high guards: they create no
+    # new standing surface or route, and neither stair opening is filled.
+    output.mkdir(parents=True, exist_ok=True)
+    for name, data in (("EXACT_DELTA.json.gz", rows),
+                       ("INVERSE_DELTA.json.gz", [dict(r, before=r["after"], after=r["before"]) for r in rows])):
+        (output / name).write_bytes(gzip.compress(json.dumps(data).encode(), mtime=0))
+    report = dict(world=str(world), frozen_original=str(frozen), changed_cells=len(rows),
+                  graph_sha256=digest(world / "nerv_routes_r24.json.gz"),
+                  retained_bridge_floor=[174, -437, -49, 178, -437, -31],
+                  retained_stair_apertures=[[-52, -50], [-30, -28]],
+                  declared_navigation_nodes_affected=0, block_entities_affected=0,
+                  native_visual="pending", installed=False)
+    (output / "PLAN.json").write_text(json.dumps(report, indent=2), "utf8")
+    print(json.dumps(report))
+
+
 if __name__ == "__main__":
     p = argparse.ArgumentParser(description=__doc__)
     p.add_argument("--world", required=True, type=Path)
     p.add_argument("--frozen", required=True, type=Path)
     p.add_argument("--output", required=True, type=Path)
     p.add_argument("--apply", action="store_true")
+    p.add_argument("--bridge", action="store_true")
     a = p.parse_args()
     if a.apply:
         install(a.world, a.output)
     else:
-        plan(a.world, a.frozen, a.output)
+        (plan_bridge if a.bridge else plan)(a.world, a.frozen, a.output)
