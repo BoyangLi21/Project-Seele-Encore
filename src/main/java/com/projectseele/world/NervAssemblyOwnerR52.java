@@ -265,6 +265,64 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {var g=gantry(l,p);if(g==null||!g.hasDeclaredMachineFrameR52()||!pose(RigidTransform.of(g.position(),g.declaredMachineRotationR52()),p.gantry().frame())||g.getRestraintProgress()!=1)return false;if(NervR50CarrierModeR53.enabled())return true;try{return fixed(l,p.gantry().supports())&&NervLowerFrameR52.actualPermanentFeetBearR52(l,g,p.gantry().supports())&&actualShoulderBearingR52(l,p,g);}catch(java.io.IOException failure){return false;}}
     private boolean actualShoulderBearingR52(ServerLevel l,UnitPlant p,NervCarrierPlatformEntity g)throws java.io.IOException
     {if(!(l.getEntity(p.eva()) instanceof EvaUnit01Entity e))return false;var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var body=EvaMechanicalFrameR52.active(e)?EvaMechanicalFrameR52.capturedGeometry(e).parts():EvaMechanicalFrameR52.serviceSourceHeldR52(e)?EvaMechanicalFrameR52.serviceGeometryR52(e).parts():provider.evaluateShoulderContactsR53(e.getUnitVariant(),NervServiceBodyPoseR52.sample(e),EvaAnatomicalHandsR45.sample(e,1));return NervShoulderBearingR52.bears(body,NervOwnerPlacementR52.actualRoot(e),p.gantry().frame(),e.getUnitVariant());}
+    /** A persisted DONE is not evidence that chunk blocks survived the same save. */
+    public String parkedServiceHoldR53(ServerLevel level,Original original)
+    {
+        var plant=plant(original);var eva=hull(level,original);
+        if(plant==null||eva==null)return "回库现场原机体未加载";
+        if(!pose(NervOwnerPlacementR52.actualRoot(eva),plant.bay()))return "回库记录与原机实际位置不一致";
+        if(eva.carrierRiseProgress(1)!=0||!originalClampsBear(level,plant)
+                ||!gateAtRest(level,servicePit(plant),false)||!gateAtRest(level,gates.get("bay_"+plant.variant()+"_front"),false))
+            return "回库完成记录与实际承托或封口状态不一致";
+        for(var layer:plant.lcl())for(var cell:layer)
+            if(!level.hasChunkAt(cell.at()))return "回库液体区块尚未加载";
+        if(!plant.lcl().stream().allMatch(layer->matches(level,layer,false)))return "回库完成记录与实际 LCL 不一致，等待现场整备修复";
+        if(!bridgeMatches(level,plant,9))return "回库完成记录与实际登机桥不一致，等待现场整备修复";
+        return "";
+    }
+
+    /** Explicit maintenance admission: observe known states, never replace world cells here. */
+    CompoundTag parkedServiceReadbackR53(ServerLevel level,Original original,CompoundTag saved)
+    {
+        var plant=plant(original);var eva=hull(level,original);var capsule=plug(level,original);
+        if(plant==null||eva==null||capsule==null||!"DONE".equals(saved.getString("Finish"))
+                ||!saved.getBoolean("Returning")||!savedBridgeProvenance(saved,epoch,directory.fingerprint())
+                ||!originalGraph(level,original,kind(saved)==Kind.OCCUPIED)
+                ||!pose(NervOwnerPlacementR52.actualRoot(eva),plant.bay())
+                ||!saved.contains("FinishRoot")||!pose(getFrame(saved,"FinishRoot"),plant.bay())
+                ||eva.isEntryPlugInserted()||eva.carrierRiseProgress(1)!=0
+                ||!pose(capsule.getCanonicalTransform(),plant.dock())
+                ||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_OCCUPIED
+                ||!originalClampsBear(level,plant))return null;
+        var gantry=gantry(level,plant);var front=gates.get("bay_"+plant.variant()+"_front");
+        if(gantry==null||gantry.lowerFrameProgressR52(1)!=0||!gateAtRest(level,servicePit(plant),false)
+                ||front==null||!declaredDoor(level,front)||!fixed(level,front.supports()))return null;
+        for(var step:front.collisionSteps())for(var cell:step)
+        {
+            if(!loaded(level,cell.at()))return null;var actual=level.getBlockState(cell.at());
+            if(!NervMechanicalMaterialR53.samePhase(actual,cell.closed())&&!NervMechanicalMaterialR53.samePhase(actual,cell.open()))return null;
+        }
+        int bridge=-1;
+        for(int i=0;i<=9;i++)if(bridgeMatches(level,plant,i)){if(bridge>=0)return null;bridge=i;}
+        if(bridge<0)return null;
+        int filled=0;boolean dry=false;
+        for(var layer:plant.lcl())
+        {
+            if(matches(level,layer,false)){if(dry)return null;filled++;}
+            else if(matches(level,layer,true))dry=true;
+            else return null;
+        }
+        if(filled<plant.lcl().size()&&bridge!=0||filled==plant.lcl().size()&&bridge==9)return null;
+        // A fully dry bay may first close its interrupted front proxies through
+        // the existing REFILL interlock. Never admit an unsealed partly wet bay.
+        if(filled>0&&(!gateAtRest(level,front,false)||hasWetFloorSealR52(front)&&!wetFloorSealClosedR52(level,front)))return null;
+        var data=saved.copy();rememberBridge(data,bridge);data.putInt("FilledLayers",filled);
+        data.putString("Finish",filled<plant.lcl().size()?Finish.REFILL.name():Finish.BRIDGE.name());
+        data.putInt("FinishTicks",filled<plant.lcl().size()?filled*4:bridge==0?0:(int)Math.ceil(bridge*40D/9));
+        data.remove("LastFinishTick");
+        return data;
+    }
+
     private final Map<Integer,NervDryBayReadbackR53> dryBayReadbacks=new HashMap<>();
     private boolean dryBay(ServerLevel l,UnitPlant p)
     {return dryBayReadbacks.computeIfAbsent(p.variant(),ignored->new NervDryBayReadbackR53(p.lcl())).matches(l);}
@@ -402,6 +460,16 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var e=hull(l,o);var p=plant(o);if(e==null||p==null||!e.isAlive())return false;var fleet=EvaFleetSavedData.get(l.getServer()).entry(o.variant()).orElse(null);if(fleet==null||!fleet.canonicalId().equals(o.eva())||!o.plug().equals(fleet.entryPlugId())&&(occupied||fleet.entryPlugId()!=null||!EntryPlugDisposalR31.destroyed(l,o.plug())))return false;
         if(!occupied)return TransportMembershipR52.hullRecoveryAdmission(o,e.getPersistentData(),Set.copyOf(e.getPassengers().stream().map(Entity::getUUID).toList()),e.isEntryPlugInserted(),EvaShutdownR30.disabled(e));
         var capsule=plug(l,o);return capsule!=null&&capsule.isAlive()&&capsule.getFirstPassenger()!=null&&capsule.getFirstPassenger().getUUID().equals(o.pilot())&&capsule.getFirstPassenger().getVehicle()==capsule;
+    }
+    boolean canResumeDockPreparationR53(ServerLevel level,Original original,CompoundTag data)
+    {
+        var p=plant(original);var e=hull(level,original);var capsule=plug(level,original);
+        return p!=null&&e!=null&&capsule!=null&&originalGraph(level,original,true)
+                &&Set.of(Prepare.HATCH.name(),Prepare.BRIDGE.name()).contains(data.getString("Prepare"))
+                &&pose(capsule.getCanonicalTransform(),p.dock())
+                &&e.position().distanceToSqr(p.bay().translation())<=1e-6
+                &&capsule.getInsertionStage()==EntryPlugCarrierEntity.STAGE_OCCUPIED
+                &&savedBridgeMatches(level,p,data)&&personnelDoors(level,p,false);
     }
     @Override public Preparation prepareOriginal(ServerLevel l,Original o,CompoundTag data)
     {
@@ -934,6 +1002,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(!returning)return finishDeployment(l,o,e,data,phase,age,own);
         if(!pose(getFrame(data,"FinishRoot"),p.bay())||!NervR50CarrierModeR53.enabled()&&!fixed(l,p.carrierSupport()))return hold(o,"original_bay_receiver_not_actual");
         var capsule=plug(l,o);var gantry=gantry(l,p);if(gantry==null)return false;
+        if(phase==Finish.REFILL&&data.hasUUID("ServiceReadbackTaskR53"))gantry.setLclVisualLevel(data.getInt("FilledLayers"));
         switch(phase)
         {
             case RECEIVE -> {if(!dryBay(l,p)||!gateAtRest(l,servicePit(p),true)||!carrierSupportReadyR53(l,e))return hold(o,"original_receiver_dry_pit_or_foot_bearing_changed");float closure=Math.min(1,age/40F);if(!NervPlantMotionR52.clearRestraints(l,p.variant(),p.gantry().frame(),gantry.getRestraintProgress(),closure,own))return hold(o,"real_receiver_clamp_motion_blocked");gantry.setRestraintProgress(closure);if(age>=40&&originalClampsBear(l,p)){var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);try{if(carrier!=null&&!NervOriginalCarrierR52.setAttachedR52(l,carrier,e,false))return hold(o,"real_shoulder_support_to_empty_carrier_custody_rejected");}catch(java.io.IOException missing){return false;}data.putString("Finish",Finish.LOWER.name());data.putInt("FinishTicks",0);}}
@@ -945,7 +1014,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             case EXTRACT -> {if(capsule==null||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_EJECTING||!capsule.isVehicle())return false;double progress=NervAssemblyClocksR52.extractionProgress(age);if(age<=36)EvaDorsalMechanism.prepare(e,age);else if(age>=137)EvaDorsalMechanism.seal(e,age-137);var target=age<=36?capsule.getCanonicalTransform():EntryPlugKinematics.insertionTransform(e,p.dock(),progress);if(!NervMappedPlugMechanicsR52.clearCapsule(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id()))return hold(o,"recovery_capsule_payload_unavailable");if(!(age<=36?approachCrane(l,p,capsule,age,data):crane(l,p,capsule,target,false)))return hold(o,"recovery_original_crane_approach_held");if(!NervMappedPlugMechanicsR52.applyInsertion(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id()))return hold(o,"recovery_capsule_motion_unavailable");if(l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=36)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinRecoveryProgress((int)Math.round(EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT*progress));if(age>=197){if(!pose(capsule.getCanonicalTransform(),p.dock())||!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_EJECTING,capsule.getInsertionEpoch(),EntryPlugCarrierEntity.STAGE_OCCUPIED))return false;data.putString("Finish",Finish.REFILL.name());data.putInt("FinishTicks",0);}}
             case REFILL -> {if(kind(data)==Kind.HULL_ONLY_RECOVERY&&EntryPlugDisposalR31.destroyed(l,p.plug())&&maintenanceCapsuleR53(l,p)==null)return hold(o,"destroyed_capsule_maintenance_replacement_failed");if(!gateAtRest(l,servicePit(p),false)||e.carrierRiseProgress(1)!=0||!originalClampsBear(l,p)||gantry.lowerFrameProgressR52(1)!=0)return hold(o,"watertight_actual_floor_and_clamps_required_before_refill");var front=gates.get("bay_"+p.variant()+"_front");if(!gateAtRest(l,front,false)){gate(l,front,false,own);return hold(o,"original_front_door_must_close_before_refill");}if(hasWetFloorSealR52(front)&&!wetSealRefillReadyR52(wetFloorSealClosedR52(l,front),wetSealBayDryR52(l,front),data.getInt("FilledLayers"),data,()->gate(l,front,false,own)))return hold(o,"actual_dry_front_and_complete_floor_seal_required_before_refill");if(kind(data)==Kind.OCCUPIED&&(capsule==null||!pose(capsule.getCanonicalTransform(),p.dock())||!crane(l,p,capsule,p.dock(),false)))return false;int count=Math.min(p.lcl().size(),age/4);int accepted=data.getInt("FilledLayers");while(accepted<count){if(!change(l,p.lcl().get(accepted),false,own))return hold(o,"real_lcl_refill_layer_changed_"+accepted);data.putInt("FilledLayers",++accepted);}gantry.setLclVisualLevel(Math.min(p.lcl().size(),age/4F));if(count==p.lcl().size()&&p.lcl().stream().allMatch(layer->matches(l,layer,false))){data.putString("Finish",Finish.BRIDGE.name());data.putInt("FinishTicks",0);}}
             case BRIDGE -> {int count=Math.min(9,(int)Math.floor(age*9D/40));if(age%5==0||age>=40)if(!applyBridgeState(l,p,count,data,own))return hold(o,"complete_original_bridge_extension_blocked_"+count);if(age>=40&&bridgeMatches(l,p,9)){if(kind(data)==Kind.OCCUPIED)capsule.setCabinRecoveryProgress(0);data.putString("Finish",Finish.DONE.name());captured.remove(o.eva());holds.remove(o.eva());return true;}}
-            case DONE -> {holds.remove(o.eva());return true;}
+            case DONE -> {String mismatch=parkedServiceHoldR53(l,o);if(!mismatch.isEmpty())return hold(o,mismatch);holds.remove(o.eva());return true;}
             default -> {return hold(o,"outbound_phase_in_original_bay_return");}
         }
         if(phase.name().equals(data.getString("Finish")))data.putInt("FinishTicks",age);return false;

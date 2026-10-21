@@ -131,7 +131,8 @@ public final class EvaFleetSavedData extends SavedData
         DEPLOYED,
         DESCENDING,
         TO_HANGAR,
-        FILLING;
+        FILLING,
+        CANCELLED;
 
         private static Phase parse(String value)
         {

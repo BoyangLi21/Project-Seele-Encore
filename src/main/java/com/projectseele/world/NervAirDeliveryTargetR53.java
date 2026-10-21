@@ -62,7 +62,30 @@ final class NervAirDeliveryTargetR53
     {
         var target=data.getCompound("DeliveryTargetR53");if(target.isEmpty())return template;
         var cells=new ArrayList<Cell>();for(var value:target.getList("Cells",Tag.TAG_COMPOUND)){var cell=(CompoundTag)value;cells.add(new Cell(BlockPos.of(cell.getLong("Pos")),cell.getString("State")));}
-        return new Receiver(template.port(),template.region(),template.node(),NervAircraftFrameR52.decodeRigid(target.getCompound("Root")),Map.of(),true,cells,Set.of());
+        return new Receiver(template.port(),template.region(),template.node(),NervAircraftFrameR52.decodeRigid(target.getCompound("Root")),Map.of(),true,cells,target.getBoolean("PreserveTemplateGates")?template.gates():Set.of());
+    }
+
+    /** Revalidate changed paving at the already reached authorized landing frame.
+     * No height search, alternate landing point or cargo movement is permitted. */
+    static boolean refreshStoppedSupports(ServerLevel level,NervFlightProofR52.FlightPickupPreview preview,Receiver receiver,CompoundTag data)
+    {
+        if(preview==null||receiver==null||!receiver.delivery()||!preview.current(level)
+                ||!NervAirTransportManifestR52.same(preview.root(),receiver.stopped())
+                ||!(level.getEntity(preview.original().eva()) instanceof com.projectseele.entity.EvaUnit01Entity eva))return false;
+        var supports=new ArrayList<AABB>();var cells=new ListTag();boolean changed=false;
+        for(var original:receiver.supports())
+        {
+            var pos=original.position();if(!level.hasChunkAt(pos))return false;
+            var state=level.getBlockState(pos);String serialized=net.minecraft.commands.arguments.blocks.BlockStateParser.serialize(state);
+            changed|=!serialized.equals(original.state());
+            for(var box:state.getCollisionShape(level,pos,net.minecraft.world.phys.shapes.CollisionContext.of(eva)).toAabbs())supports.add(box.move(pos));
+            var cell=new CompoundTag();cell.putLong("Pos",pos.asLong());cell.putString("State",serialized);cells.add(cell);
+        }
+        if(!changed||!NervFlightProofR52.finiteDeliverySolesR53(preview.geometry(),receiver.stopped(),supports)
+                ||!com.projectseele.entity.EvaMechanicalReleaseR52.actualGroundBearingR52(level,eva,preview.geometry(),receiver.stopped()))return false;
+        var target=new CompoundTag();target.put("Root",NervAircraftFrameR52.encodeRigid(receiver.stopped()));target.put("Cells",cells);target.putBoolean("PreserveTemplateGates",!receiver.gates().isEmpty());
+        data.put("DeliveryTargetR53",target);data.putLong("DeliverySupportReadbackTickR53",level.getGameTime());
+        return true;
     }
 
     static Frame frame(Mission mission,String node,Receiver template,Frame current,CompoundTag data)

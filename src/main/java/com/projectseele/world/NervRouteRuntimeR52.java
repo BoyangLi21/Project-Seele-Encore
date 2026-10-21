@@ -133,6 +133,17 @@ public final class NervRouteRuntimeR52
         catch(java.io.IOException|RuntimeException failure){LIVE.remove(level);throw new IllegalStateException("Claimed Root installation held: actual declared air transport did not commission",failure);}
         finally{INSTALLING.remove(level);}return true;
     }
+    public static EvaLogisticsDirector.ActionResult resumeParkedServiceR53(ServerLevel level,int variant)
+    {
+        var controller=LIVE.get(level);var job=controller==null?null:controller.saved.job(variant);
+        if(!ready(level)||job==null||job.phase()!=Phase.PARKED||job.snapshot().stage()!=Stage.COMPLETE
+                ||!(controller.owner instanceof NervAssemblyOwnerR52 plant))return unavailable();
+        var observed=plant.parkedServiceReadbackR53(level,job.snapshot().original(),job.ownerData());
+        if(observed==null)return new EvaLogisticsDirector.ActionResult(false,"现场原机、原栓、封口或已知液体/桥状态不满足整备续接，未修改现场。");
+        observed.putUUID("ServiceReadbackTaskR53",job.snapshot().task());observed.putLong("ServiceReadbackTickR53",level.getGameTime());
+        controller.saved.resumeParkedServiceR53(job,observed);controller.mirror(controller.saved.job(variant));
+        return new EvaLogisticsDirector.ActionResult(true,"原任务已按实际液体和桥状态续接注液/桥复位；机体、驾驶员及任务身份保留。");
+    }
     public static boolean pending(ServerLevel level,int variant)
     {var saved=state(level,false);var job=saved==null?null:saved.job(variant);return job!=null&&!Set.of(Phase.PARKED,Phase.DEPLOYED,Phase.CANCELLED).contains(job.phase());}
     public static List<EvaUnit01Entity> loadedOriginals(ServerLevel level)
@@ -172,7 +183,7 @@ public final class NervRouteRuntimeR52
     public static EvaLogisticsDirector.Status status(ServerLevel level,int variant)
     {
         var entry=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);var s=state(level,false);var job=s==null?null:s.job(variant);
-        return new EvaLogisticsDirector.Status(variant,job==null?(entry==null?"UNREGISTERED":entry.phase().name()):NervRouteRuntimeStateR52.legacyPhase(job),entry!=null&&level.getEntity(entry.canonicalId()) instanceof EvaUnit01Entity,
+        return new EvaLogisticsDirector.Status(variant,job==null?(entry==null?"UNREGISTERED":entry.phase().name()):job.phase()==Phase.PARKED&&!job.waiting().isEmpty()?"SERVICE_HOLD":NervRouteRuntimeStateR52.legacyPhase(job),entry!=null&&level.getEntity(entry.canonicalId()) instanceof EvaUnit01Entity,
                 entry==null?null:entry.canonicalId(),entry==null?0:entry.lclLayers(),job==null?0:job.snapshot().leg());
     }
     public static void tick(ServerLevel level){var c=LIVE.get(level);if(c!=null&&ready(level))c.tick();}
@@ -205,6 +216,7 @@ public final class NervRouteRuntimeR52
         final Map<String,String> defaults;final Map<Integer,Door> doors;final NervRouteNativeR52.AssemblyOwner owner;final NervRouteRuntimeStateR52 saved;
         final Map<String,NervRouteNativeR52.Binding> bindings;
         final FlightContext flightContext;
+        final Set<UUID> parkedReadbacksR53=new HashSet<>();
         Controller(ServerLevel level,NervRouteDirectoryR52 directory,Map<String,NervRouteNativeR52.Binding> bindings,Map<String,String> defaults,Map<Integer,Door> doors,NervRouteNativeR52.AssemblyOwner owner,NervRouteRuntimeStateR52 saved)
         {this.level=level;this.directory=directory;this.pool=new NervRouteReservationsR52(directory);this.defaults=defaults;this.doors=doors;this.owner=owner;this.saved=saved;this.bindings=directory.dynamicSpacesR52().bindings(Map.copyOf(bindings));this.nativeAccess=new NervRouteNativeR52(level,directory,bindings,owner);this.flightContext=owner instanceof NervFlightProofR52.Owner flightOwner?new FlightContext(directory,pool,nativeAccess,this.bindings,flightOwner):null;}
         final Set<UUID> continuousPrimedR52=new HashSet<>();
@@ -226,9 +238,27 @@ public final class NervRouteRuntimeR52
         EvaLogisticsDirector.ActionResult prepare(int variant,String intent)
         {
             var existing=saved.job(variant);if(existing!=null&&!Set.of(Phase.PARKED,Phase.CANCELLED).contains(existing.phase()))return new EvaLogisticsDirector.ActionResult(false,"原机体已有运行安排，请先确认当前状态。");
+            if(existing!=null&&existing.phase()==Phase.PARKED&&owner instanceof NervAssemblyOwnerR52 plant)
+            {
+                String hold=plant.parkedServiceHoldR53(level,existing.snapshot().original());
+                if(!hold.isEmpty()){saved.put(existing.update(existing.snapshot(),existing.phase(),existing.ownerData(),hold));return new EvaLogisticsDirector.ActionResult(false,hold);}
+            }
             Original original=original(variant);String route=defaults.get(variant+"/"+intent);if(original==null||route==null)return new EvaLogisticsDirector.ActionResult(false,"等待原驾驶员、原插入栓与 Root 路线许可。");
+            var preparation=new CompoundTag();
+            if(existing!=null&&existing.phase()==Phase.CANCELLED&&existing.ownerData().contains("Prepare"))
+            {
+                var stopped=existing.snapshot();
+                if(stopped.stage()!=Stage.CANCELLED||stopped.leg()!=0||stopped.fraction()!=0
+                        ||!stopped.original().equals(original)||!stopped.route().equals(route)
+                        ||!(owner instanceof NervAssemblyOwnerR52 plant)
+                        ||!plant.canResumeDockPreparationR53(level,original,existing.ownerData()))
+                    return new EvaLogisticsDirector.ActionResult(false,"取消后的原编队不在可续接的登乘位；请按实际停止位置回收，未重置整备。");
+                preparation=existing.ownerData().copy();
+                preparation.remove("ReleaseWhenReady");preparation.remove("ContinuousAutoLaunchR52");
+                preparation.putUUID("ResumedPreparationTaskR53",stopped.task());
+            }
             var result=pool.reserve(UUID.randomUUID(),original,route,nativeAccess);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
-            saved.put(new Job(result.state(),Phase.PREPARING,new CompoundTag(),""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"原编队已登记；按真实机械反馈整备并转移到预备位。");
+            saved.put(new Job(result.state(),Phase.PREPARING,preparation,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"原编队已登记；按真实机械反馈整备并转移到预备位。");
         }
         EvaLogisticsDirector.ActionResult launch(int variant,String intent)
         {
@@ -257,7 +287,9 @@ public final class NervRouteRuntimeR52
         }
         EvaLogisticsDirector.ActionResult recover(int variant)
         {
-            var job=saved.job(variant);if(job!=null&&job.phase()==Phase.CANCELLED)return recoverCancelledContinuousR52(job);if(job==null||job.phase()!=Phase.DEPLOYED)return new EvaLogisticsDirector.ActionResult(false,"没有可接应的原出动编队记录。");
+            var job=saved.job(variant);
+            if(job!=null&&job.phase()==Phase.PARKED&&!job.waiting().isEmpty())return resumeParkedServiceR53(level,variant);
+            if(job!=null&&job.phase()==Phase.CANCELLED)return recoverCancelledContinuousR52(job);if(job==null||job.phase()!=Phase.DEPLOYED)return new EvaLogisticsDirector.ActionResult(false,"没有可接应的原出动编队记录。");
             var moving=level.getEntity(job.snapshot().original().eva());if(moving instanceof EvaUnit01Entity current&&NervAirTransportRuntimeR52.pending(level,current))return new EvaLogisticsDirector.ActionResult(false,"同一原机体仍由已保存的航空任务保持，不另抢地面路线。");
             var old=job.snapshot().original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level,old.variant()),old.dimension());
             if(job.snapshot().stage()==Stage.COMPLETE)pool.releaseCompletion(job.snapshot().task(),old.owner());
@@ -400,7 +432,17 @@ public final class NervRouteRuntimeR52
             if(!saved.fault().isEmpty())return;for(var job:saved.jobs())
             {
                 FacilityRouteAudioR53.tick(level,job);
-                if(Set.of(Phase.PARKED,Phase.DEPLOYED,Phase.CANCELLED).contains(job.phase()))continue;var snapshot=job.snapshot();var route=directory.route(snapshot.route());nativeAccess.ownerData(job.ownerData());
+                if(job.phase()==Phase.PARKED)
+                {
+                    if(parkedReadbacksR53.add(job.snapshot().task())&&owner instanceof NervAssemblyOwnerR52 plant)
+                    {
+                        String hold=plant.parkedServiceHoldR53(level,job.snapshot().original());
+                        if(!hold.equals(job.waiting()))saved.put(job.update(job.snapshot(),job.phase(),job.ownerData(),hold));
+                    }
+                    continue;
+                }
+                parkedReadbacksR53.remove(job.snapshot().task());
+                if(Set.of(Phase.DEPLOYED,Phase.CANCELLED).contains(job.phase()))continue;var snapshot=job.snapshot();var route=directory.route(snapshot.route());nativeAccess.ownerData(job.ownerData());
                 if(route==null){wait(job,"Root 路线或保存版本已变化");continue;}
                 if(job.phase()==Phase.FINISHING)
                 {

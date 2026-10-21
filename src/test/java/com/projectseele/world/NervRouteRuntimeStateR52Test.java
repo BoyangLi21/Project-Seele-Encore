@@ -21,6 +21,18 @@ public final class NervRouteRuntimeStateR52Test
         owner.putString("OriginalPoseHash","mutated_external_tag");check(state.job(0).ownerData().getString("OriginalPoseHash").equals("measured_pose_receipt"),"Owner payload aliased external mutation");
         var tag=state.save(new CompoundTag());var loaded=NervRouteRuntimeStateR52.load(tag);check(loaded.claimed()&&loaded.epoch()==7&&loaded.personnelLiftManifest().equals("root_personnel_lifts_r52.json"),"Shared pending claim/lift reference did not survive real NBT roundtrip");
         check(loaded.job(0).snapshot().equals(initial),"Original UUID triple/owner/mission/progress not exactly preserved");
+        for(var phase:Phase.values())
+        {
+            var mirrored=new Job(initial,phase,new CompoundTag(),"");
+            check(EvaFleetSavedData.Phase.valueOf(NervRouteRuntimeStateR52.legacyPhase(mirrored))!=null,
+                    "Route phase cannot be mirrored into persisted fleet state: "+phase);
+        }
+        var cancelled=NervRouteRuntimeStateR52.load(tag);
+        cancelled.put(new Job(snapshot(task,Stage.CANCELLED,0,0,"original_mission"),Phase.CANCELLED,owner,"stopped in place"));
+        var stopped=NervRouteRuntimeStateR52.load(cancelled.save(new CompoundTag())).job(0);
+        check(stopped.phase()==Phase.CANCELLED&&stopped.snapshot().original().equals(initial.original())
+                &&EvaFleetSavedData.Phase.valueOf(NervRouteRuntimeStateR52.legacyPhase(stopped))==EvaFleetSavedData.Phase.CANCELLED,
+                "Cancellation lost the original assembly or threw while mirroring after reload");
         rejects(()->loaded.put(new Job(initial,Phase.DEPLOYED,new CompoundTag(),"")),"Preparation skipped actual READY/release/departure lifecycle");
         loaded.put(new Job(snapshot(task,Stage.MOVING,1,0,"original_mission"),Phase.READY,new CompoundTag(),""));check(NervRouteRuntimeStateR52.legacyPhase(loaded.job(0)).equals("SILO_READY"),"Existing UI/commands lost SILO_READY semantics");
         loaded.put(new Job(snapshot(task,Stage.MOVING,1,0,"original_mission"),Phase.DEPARTING,new CompoundTag(),""));loaded.put(new Job(snapshot(task,Stage.HOLD,1,.25,"original_mission"),Phase.DEPARTING,new CompoundTag(),"actual_door_blocked"));
@@ -32,6 +44,17 @@ public final class NervRouteRuntimeStateR52Test
         restart.put(new Job(snapshot(task,Stage.COMPLETE,3,1,"original_mission"),Phase.DEPLOYED,new CompoundTag(),""));
         UUID returning=new UUID(0,101);restart.put(new Job(snapshot(returning,Stage.RESERVED,0,0,""),Phase.RETURNING,new CompoundTag(),""));restart.put(new Job(snapshot(returning,Stage.COMPLETE,3,1,""),Phase.FINISHING,new CompoundTag(),""));restart.put(new Job(snapshot(returning,Stage.COMPLETE,3,1,""),Phase.PARKED,new CompoundTag(),""));
         check(NervRouteRuntimeStateR52.legacyPhase(restart.job(0)).equals("PARKED"),"Actual return/refill completion did not reach parked phase");
+        var completed=restart.job(0);var completedData=completed.ownerData().copy();completedData.putString("Finish","DONE");completedData.putBoolean("Returning",true);
+        restart.put(completed.update(completed.snapshot(),Phase.PARKED,completedData,""));var expected=restart.job(0);
+        var observed=completedData.copy();observed.putString("Finish","REFILL");observed.putInt("FilledLayers",0);observed.putInt("BridgeAmount",0);
+        rejects(()->restart.resumeParkedServiceR53(expected,observed),"Missing task-bound physical readback admitted");
+        observed.putUUID("ServiceReadbackTaskR53",returning);restart.resumeParkedServiceR53(expected,observed);
+        check(restart.job(0).snapshot().equals(expected.snapshot())&&restart.job(0).phase()==Phase.FINISHING,"Bay service changed original identities or route progress");
+        check(expected.ownerData().getString("Finish").equals("DONE"),"Physical service repair changed original completion evidence");
+        rejects(()->restart.resumeParkedServiceR53(expected,observed),"Stale completion overwrote an active service task");
+        var resumed=NervRouteRuntimeStateR52.load(restart.save(new CompoundTag()));
+        check(resumed.job(0).phase()==Phase.FINISHING&&resumed.job(0).ownerData().getInt("FilledLayers")==0&&resumed.job(0).snapshot().equals(expected.snapshot()),"Restart lost physical service readback or original identities");
+        check(!NervRouteRuntimeStateR52.allowed(Phase.PARKED,Phase.FINISHING),"Ordinary transition bypassed explicit physical readback");
         var bad=tag.copy();bad.putInt("Version",99);var unsupported=NervRouteRuntimeStateR52.load(bad);check(unsupported.claimed()&&!unsupported.fault().isEmpty(),"Unsupported claimed state silently fell back to old coordinates");
         bad=tag.copy();bad.getList("Jobs",net.minecraft.nbt.Tag.TAG_COMPOUND).getCompound(0).getCompound("Snapshot").remove("Plug");var missing=NervRouteRuntimeStateR52.load(bad);check(missing.claimed()&&!missing.fault().isEmpty(),"Missing original plug receipt became an unclaimed legacy world");
         rejects(()->restart.personnelLiftManifest("../another_world.json"),"Lift reference escaped Root world");

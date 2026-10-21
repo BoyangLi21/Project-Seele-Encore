@@ -109,6 +109,16 @@ public final class NervRouteRuntimeStateR52 extends SavedData
         }
         jobs.put(snapshot.original().variant(),job);setDirty();
     }
+    void resumeParkedServiceR53(Job expected,CompoundTag observed)
+    {
+        int variant=expected.snapshot().original().variant();
+        if(jobs.get(variant)!=expected||expected.phase()!=Phase.PARKED||expected.snapshot().stage()!=Stage.COMPLETE
+                ||!"DONE".equals(expected.ownerData().getString("Finish"))
+                ||!observed.getBoolean("Returning")||!Set.of("REFILL","BRIDGE").contains(observed.getString("Finish"))
+                ||!observed.hasUUID("ServiceReadbackTaskR53")||!observed.getUUID("ServiceReadbackTaskR53").equals(expected.snapshot().task()))
+            throw new IllegalArgumentException("Only the unchanged completed task may resume observed bay service");
+        jobs.put(variant,expected.update(expected.snapshot(),Phase.FINISHING,observed,"现场回读不一致，补完原机库整备"));setDirty();
+    }
     public static boolean allowed(Phase from,Phase to)
     {
         if(from==to||to==Phase.CANCELLED)return true;

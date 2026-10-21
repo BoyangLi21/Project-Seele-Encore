@@ -41,6 +41,7 @@ public final class NervStaffDialogue
     {return Component.literal("["+text+"] ").withStyle(s->s.withColor(ChatFormatting.GOLD).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,command)));}
     public static String stage(String value)
     {
+        if("SERVICE_HOLD".equals(value))return "机库现场整备待修复";
         EvaFleetSavedData.Phase phase;
         try{phase=EvaFleetSavedData.Phase.valueOf(value);}catch(RuntimeException exception){return "等待状态确认";}
         return switch(phase)
@@ -49,7 +50,7 @@ public final class NervStaffDialogue
             case PLUG_ABORT_RETURNING,PLUG_ABORT_DOCKED->"中止接入并返回";case PLUG_FAULT->"插入栓故障，等待检修";
             case PLUG_LOCKING->"锁定插入栓";case DRAINING->"排出 LCL";case TO_SILO->"运往发射井";
             case SILO_READY->"发射待命";case DEPLOYED->"已出动";case DESCENDING->"回收下降";
-            case TO_HANGAR->"返回机库";case FILLING->"恢复 LCL";
+            case TO_HANGAR->"返回机库";case FILLING->"恢复 LCL";case CANCELLED->"任务已取消，原位停止";
         };
     }
     public static void open(ServerPlayer player,NervStaffEntity npc)
@@ -213,6 +214,7 @@ public final class NervStaffDialogue
         if(!status.loaded())return "还没收到机库的信号，请稍等。";
         return switch(status.phase())
         {
+            case "SERVICE_HOLD" -> "回库记录与现场不一致。留在原插入栓内，下达回收指令以补完机库整备。";
             case "PARKED" -> boarded(level,variant)?"驾驶员已登机，可以开始整备。":"驾驶员还没登机。先进入机库里悬挂的插入栓，再开始整备。";
             case "SILO_READY" -> "机体已到发射台，等待发射命令。";
             case "DEPLOYED" -> "机体已经出动。回收时，请回到本机的地表平台停稳。";
