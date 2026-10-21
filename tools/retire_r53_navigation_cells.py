@@ -8,7 +8,7 @@ from apply_s20_approved_semantic_repairs import atomic_replace
 
 FILES=('nerv_routes_r24.json.gz','nearest_lift_paths_r44.json.gz','r53_personnel_walking_graph.json.gz')
 
-def plan(world,delta,out,connections=None):
+def plan(world,delta,out,connections=None,blocked_connections=None):
     original={name:(world/name).read_bytes() for name in FILES}
     graph,nearest,npc=[json.loads(gzip.decompress(original[n])) for n in FILES]
     assert nearest['graph_sha256']==hashlib.sha256(original[FILES[0]]).hexdigest()
@@ -26,6 +26,25 @@ def plan(world,delta,out,connections=None):
     assert all(active[r['node']] for r in landings)
     retired_ids={r['node'] for r in retired}
     edges=[r for r in npc['walking_edges'] if r[0] not in retired_ids and r[1] not in retired_ids]
+    removed_connections=[]
+    if blocked_connections:
+        lookup={p:i for i,p in enumerate(points)}
+        records=json.loads(blocked_connections.read_text('utf8'))['connections']
+        for row in records:
+            for key in ('a','b'):world_read.around(row[key],2)
+        world_read.load()
+        rejected=set()
+        for row in records:
+            a,b=tuple(row['a']),tuple(row['b']);i,j=lookup[a],lookup[b]
+            assert a[1]==b[1] and math.dist(a,b)==1 and active[i] and active[j]
+            states=[world_read.block(tuple(r['pos'])) for r in row['witnesses']]
+            assert states==[r['state'] for r in row['witnesses']],('Changed guard evidence',a,b)
+            assert any(s.startswith('projectseele:personnel_stair_guard_r53[') for s in states)
+            assert all(geometry.standing(p)['status']=='STATIC_STANDING' for p in (a,b))
+            assert not geometry.edge_clear(a,b),('Existing guard no longer separates nodes',a,b)
+            assert any(u==i and v==j for u,v,_ in edges),('Missing source edge',a,b)
+            rejected.add((i,j));removed_connections.append(row)
+        edges=[r for r in edges if tuple(r[:2]) not in rejected]
     added=[]
     if connections:
         lookup={p:i for i,p in enumerate(points)};existing={(a,b) for a,b,_ in edges}
@@ -69,10 +88,13 @@ def plan(world,delta,out,connections=None):
     nearest.update(graph_sha256=hashlib.sha256(raw).hexdigest(),nodes=table,unresolved_coordinates=unresolved,native_verified=False)
     npc.update(walking_edges=edges,native_verified=False)
     out.mkdir(parents=True,exist_ok=True)
+    (out/'before').mkdir(exist_ok=True)
+    for name,data in original.items():(out/'before'/name).write_bytes(data)
     for name,data in zip(FILES,(raw,encode(nearest),encode(npc))):(out/name).write_bytes(data)
     report=dict(world=str(world),delta_sha256=hashlib.sha256(delta.read_bytes()).hexdigest(),affected=len(affected),retired=retired,
         preserved_all_landing_and_goal_connections=True,removed_edges=len(json.loads(gzip.decompress(original[FILES[2]]))['walking_edges'])-len(edges),
-        added_connections=added,previous_sha256={n:hashlib.sha256(b).hexdigest() for n,b in original.items()},
+        added_connections=added,removed_connections=removed_connections,
+        previous_sha256={n:hashlib.sha256(b).hexdigest() for n,b in original.items()},
         installed_sha256={n:hashlib.sha256((out/n).read_bytes()).hexdigest() for n in FILES},world_written=False)
     (out/'PLAN.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
     print('Affected',len(affected),'retired',len(retired),'net removed edges',report['removed_edges'],'added',len(added))
@@ -82,6 +104,14 @@ def install(world,out):
     with (world/'session.lock').open('r+b') as lock:
         msvcrt.locking(lock.fileno(),msvcrt.LK_NBLCK,1)
         for n in FILES:assert hashlib.sha256((world/n).read_bytes()).hexdigest()==report['previous_sha256'][n]
+        if report.get('removed_connections'):
+            measured=MeasuredWorld(world)
+            for row in report['removed_connections']:
+                for witness in row['witnesses']:measured.around(witness['pos'],1)
+            measured.load()
+            for row in report['removed_connections']:
+                for witness in row['witnesses']:
+                    assert measured.block(tuple(witness['pos']))==witness['state'],'Guard changed since plan'
         for n in FILES:
             atomic_replace(world/n,(out/n).read_bytes())
             assert hashlib.sha256((world/n).read_bytes()).hexdigest()==report['installed_sha256'][n]
@@ -90,6 +120,6 @@ def install(world,out):
     print('Installed navigation; runtime progress untouched')
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--world',type=Path,required=True);p.add_argument('--delta',type=Path);p.add_argument('--connections',type=Path);p.add_argument('--output',type=Path,required=True);p.add_argument('--apply',action='store_true');a=p.parse_args()
+    p=argparse.ArgumentParser(description=__doc__);p.add_argument('--world',type=Path,required=True);p.add_argument('--delta',type=Path);p.add_argument('--connections',type=Path);p.add_argument('--blocked-connections',type=Path);p.add_argument('--output',type=Path,required=True);p.add_argument('--apply',action='store_true');a=p.parse_args()
     if a.apply:install(a.world,a.output)
-    else:plan(a.world,a.delta,a.output,a.connections)
+    else:plan(a.world,a.delta,a.output,a.connections,a.blocked_connections)
