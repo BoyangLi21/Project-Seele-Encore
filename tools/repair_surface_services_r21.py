@@ -49,9 +49,9 @@ def main():
  b((21,68,288,38,79,305),'minecraft:stone','r21/retired_weapon_well');b((21,80,288,38,80,305),'minecraft:black_concrete','r21/retired_weapon_well')
  # A new reinforced armament vault is beside the actual surface launch group.
  b((109,35,-47,131,79,-25),STRUCT,'r21/weapon_vault')
- b((116,37,-40,124,79,-32),EMPTY,'r21/weapon_vault')
+ b((116,37,-44,124,79,-28),EMPTY,'r21/weapon_vault')
  b((109,80,-47,131,80,-25),FLOOR,'r21/weapon_vault')
- b((115,80,-41,125,80,-31),'minecraft:barrier','r21/weapon_vault')
+ b((115,80,-45,125,80,-27),'minecraft:barrier','r21/weapon_vault')
  for x in (109,131):b((x,80,-47,x,80,-25),'projectseele:nerv_machine_hazard','r21/weapon_vault')
  for x in (-12,30,72):
   b((x-5,77,-82,x+5,80,-68),FLOOR,'r21/launch_power_pads');p.put(x,81,-75,'projectseele:umbilical_pylon','r21/launch_power_pads','owned')

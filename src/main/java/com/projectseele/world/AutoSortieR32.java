@@ -15,8 +15,9 @@ public final class AutoSortieR32
     private static final TicketType<ChunkPos> TICKET=TicketType.create("auto_sortie_r32",Comparator.comparingLong(ChunkPos::toLong),100);
     private static final Map<ServerLevel,Map<Integer,String>> BLOCKED=new WeakHashMap<>();
     public static String missionToken(ServerLevel level)
+    {return missionToken(TvCampaignSavedData.get(level));}
+    private static String missionToken(TvCampaignSavedData mission)
     {
-        var mission=TvCampaignSavedData.get(level);
         return mission.active.isEmpty()||Set.of("cancel","failure","combat_victory","episode_archived").contains(mission.phase)
                 ||mission.targetDeathConfirmedR45||mission.owner==null?""
                 :mission.active+":"+mission.generationR43+":"+mission.owner;
@@ -24,8 +25,10 @@ public final class AutoSortieR32
     public static boolean cancellationCurrentR45(boolean canceled,String acceptedMission,String mission)
     {return canceled&&!mission.isEmpty()&&mission.equals(acceptedMission);}
     public static String missionToken(ServerLevel level,int unit)
+    {return missionToken(TvCampaignSavedData.get(level),unit);}
+    static String missionToken(TvCampaignSavedData mission,int unit)
     {
-        return TvCampaignSavedData.get(level).sorties.containsKey(unit)?missionToken(level):"";
+        return mission.sorties.containsKey(unit)?missionToken(mission):"";
     }
     static boolean assignedPilotR45(ServerLevel level,int unit,net.minecraft.world.entity.Entity pilot)
     {

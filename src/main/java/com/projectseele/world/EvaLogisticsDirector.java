@@ -606,6 +606,11 @@ public final class EvaLogisticsDirector
     {
         Vec3 motion=unit.getDeltaMovement();
         if(motion.horizontalDistanceSqr()>RECOVERY_MAX_SPEED_SQR)return false;
+        // Migrated wet bays support the original EVA through their mechanical
+        // tray or restraints, which are not vanilla floor collision blocks.
+        if(motion.lengthSqr()<=RECOVERY_MAX_SPEED_SQR&&unit.level() instanceof ServerLevel level
+                &&NervRouteRuntimeR52.originalActorAccess(level) instanceof NervAssemblyOwnerR52 owner
+                &&owner.parkedBearingR53(level,unit))return true;
         if(NervAirLiftR30.waitingAtHead(unit)&&!NervAirLiftR30.ownsMotion(unit)&&motion.lengthSqr()<.001)return true;
         // An unpiloted, grounded EVA retains the next gravity impulse in
         // deltaMovement. Its magnitude follows the airframe's gravity attribute.

@@ -12,6 +12,9 @@ public final class NervR50CarrierModeR53 {
    for(var value:data.getAsJsonArray("outlets")){var p=value.getAsJsonObject().getAsJsonArray("position");result.add(new net.minecraft.world.phys.Vec3(p.get(0).getAsDouble(),p.get(1).getAsDouble(),p.get(2).getAsDouble()));}return java.util.List.copyOf(result);
   }catch(java.io.IOException ex){throw new java.io.UncheckedIOException(ex);}
  }
- public static double launchDeckDropR53(RigidTransform root,float rise){return enabled()&&OUTLETS.stream().anyMatch(p->p.distanceToSqr(root.translation())<.0004)?-64D*(1-rise):0;}
+ // The original clock first releases both jaw axes, then lowers the entire rack.
+ // Reversing the same clock raises the rack before either jaw axis closes.
+ public static double launchDeckDropR53(RigidTransform root,float rise){return enabled()&&OUTLETS.stream().anyMatch(p->p.distanceToSqr(root.translation())<.0004)?-64D*Math.max(0,1-2D*rise):0;}
+ public static float launchJawReleaseR53(float rise){return Math.min(1,2*(1-rise));}
  private NervR50CarrierModeR53(){}
 }

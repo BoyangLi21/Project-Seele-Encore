@@ -409,8 +409,6 @@ public final class UNAirLiftR29
         {j.cancel=false;j.homebound=true;j.destination=reception(l,j.serial);begin(l,j,Phase.ROLL_IN,eva.position(),UNRecoveryR22.home(j.serial).add(0,DECK,0),120,eva);}
         if(cruisePhase(j.phase))AirRouteR39.prefetch(l,j.from,j.to,j.age,j.duration);
         j.age++;double t=smooth(Mth.clamp((double)j.age/Math.max(1,j.duration),0,1));Vec3 point=j.from.lerp(j.to,t);
-        if(j.phase==Phase.CRUISE||j.phase==Phase.FERRY||j.phase==Phase.RETURN_FLIGHT)
-            readyAt(l,j.from.lerp(j.to,smooth(Mth.clamp((j.age+8D)/Math.max(1,j.duration),0,1))));
         if(!readyAt(l,point))
         {j.age--;if(movesEva(j.phase)){eva.endNervCarrierMotion();}note(l,j,"前方区块正在加载，保持位置");s.setDirty();return;}
         if(movesEva(j.phase))

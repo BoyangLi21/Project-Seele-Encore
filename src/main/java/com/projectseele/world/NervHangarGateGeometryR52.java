@@ -17,11 +17,12 @@ public final class NervHangarGateGeometryR52
         public BottomSeal(List<SealBox> boxes,double drop,double retreat){this(boxes,drop,retreat,1,0);}
         public BottomSeal{closedBoxes=List.copyOf(closedBoxes);if(closedBoxes.isEmpty()||closedBoxes.size()>(version==1?64:512)||!Double.isFinite(dropM+retreatLocalZ)||dropM<=0||dropM>6||retreatLocalZ<=0||retreatLocalZ>32||version!=1&&version!=2||version==1&&retainedBoxCount!=0||version==2&&(retainedBoxCount<=0||retainedBoxCount>=closedBoxes.size()||retainedBoxCount>64))throw new IllegalArgumentException("Finite actual bay floor seal, explicit version and retained original mechanism required");}
     }
-    public record Spec(float width,float height,int openTicks,int closeTicks,int depthDirection,BottomSeal bottomSeal)
+    public record Spec(float width,float height,int openTicks,int closeTicks,int depthDirection,BottomSeal bottomSeal,double leafLowerExtensionM)
     {
         public Spec(float width,float height,int openTicks,int closeTicks){this(width,height,openTicks,closeTicks,1);}
         public Spec(float width,float height,int openTicks,int closeTicks,int depthDirection){this(width,height,openTicks,closeTicks,depthDirection,null);}
-        public Spec{if(!Float.isFinite(width+height)||width<=0||height<=0||openTicks<=0||closeTicks<=0||(depthDirection!=1&&depthDirection!=-1))throw new IllegalArgumentException("Explicit positive side-stack aperture/clocks and signed depth required");}
+        public Spec(float width,float height,int openTicks,int closeTicks,int depthDirection,BottomSeal bottomSeal){this(width,height,openTicks,closeTicks,depthDirection,bottomSeal,0);}
+        public Spec{if(!Float.isFinite(width+height)||width<=0||height<=0||openTicks<=0||closeTicks<=0||(depthDirection!=1&&depthDirection!=-1)||!Double.isFinite(leafLowerExtensionM)||leafLowerExtensionM<0||leafLowerExtensionM>5)throw new IllegalArgumentException("Explicit positive side-stack aperture/clocks, signed depth and finite lower steel required");}
         public double panelWidth(){return width/8D;}
         public double gap(){return Math.min(.9,.15*width/33D);}
         public double wall(){return Math.min(.3,.1*width/33D);}
@@ -61,7 +62,10 @@ public final class NervHangarGateGeometryR52
             for(int tier=0;tier<4;tier++)statics.add(box("tier/"+side+"/"+tier,side>0?outer-wall:-outer,spec.height()-.5,1.04+tier*1.1,side>0?outer:-outer+wall,spec.height()-.3,1.1+tier*1.1,160));
         }
         statics.add(box("lintel",-h-.22,spec.height(),-.35,h+.22,spec.height()+.35,1.03,74));var f=new ArrayList<Fixed>();for(var p:statics){if(spec.depthDirection()<0)p=reflectClosedDepth(p);f.add(new Fixed(p,new NervRigidMeshSweepR52(p.xyz())));}fixed=List.copyOf(f);
-        panels=new NervAirframeGeometryR52.Part[2];meshes=new NervRigidMeshSweepR52[2];for(int side=0;side<2;side++){var a=source.vertices();for(int i=0;i<a.length;i+=6){double y=a[i+1],z=a[i+2];a[i]*=spec.panelWidth()/4D*(side==0?-1:1);a[i+1]=(z+16.5)*spec.height()/33D;a[i+2]=y;}if(side==1)for(int i=0;i<a.length;i+=18)for(int n=0;n<6;n++){double old=a[i+6+n];a[i+6+n]=a[i+12+n];a[i+12+n]=old;}var panel=new NervAirframeGeometryR52.Part("panel/"+side,a);panels[side]=spec.depthDirection()<0?reflectClosedDepth(panel):panel;meshes[side]=new NervRigidMeshSweepR52(panels[side].xyz());}
+        panels=new NervAirframeGeometryR52.Part[2];meshes=new NervRigidMeshSweepR52[2];for(int side=0;side<2;side++){var a=source.vertices();for(int i=0;i<a.length;i+=6){double y=a[i+1],z=a[i+2];a[i]*=spec.panelWidth()/4D*(side==0?-1:1);a[i+1]=(z+16.5)*spec.height()/33D;a[i+2]=y;}if(side==1)for(int i=0;i<a.length;i+=18)for(int n=0;n<6;n++){double old=a[i+6+n];a[i+6+n]=a[i+12+n];a[i+12+n]=old;}
+            // Preserve all original upper steel and its hanging guides; add a joined lower plate.
+            if(spec.leafLowerExtensionM()>0){var lower=box("lower",side==0?-spec.panelWidth():0,-spec.leafLowerExtensionM(),0,side==0?0:spec.panelWidth(),0,.98,74).vertices();var joined=Arrays.copyOf(a,a.length+lower.length);System.arraycopy(lower,0,joined,a.length,lower.length);a=joined;}
+            var panel=new NervAirframeGeometryR52.Part("panel/"+side,a);panels[side]=spec.depthDirection()<0?reflectClosedDepth(panel):panel;meshes[side]=new NervRigidMeshSweepR52(panels[side].xyz());}
     }
     /** Reflection about the actual closed R16 leaf midplane (Z=.49).
      * The closed slab still occupies Z=0..0.98; only its separation and

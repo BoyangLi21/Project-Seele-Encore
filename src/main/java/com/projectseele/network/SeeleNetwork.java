@@ -14,7 +14,7 @@ public final class SeeleNetwork
 {
     // R52 includes the independent original carrier, cannon cradle and armor-beam
     // state. Older clients must reject the changed synchronized accessor layout.
-    private static final String PROTOCOL_VERSION = "73";
+    private static final String PROTOCOL_VERSION = "75";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),
@@ -219,6 +219,9 @@ public final class SeeleNetwork
         CHANNEL.messageBuilder(ClientboundFacilityFrameR52.class,id++,NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(ClientboundFacilityFrameR52::encode).decoder(ClientboundFacilityFrameR52::new)
                 .consumerMainThread(ClientboundFacilityFrameR52::handle).add();
+        CHANNEL.messageBuilder(ClientboundLaunchFeedbackR54.class,id++,NetworkDirection.PLAY_TO_CLIENT)
+                .encoder(ClientboundLaunchFeedbackR54::encode).decoder(ClientboundLaunchFeedbackR54::new)
+                .consumerMainThread(ClientboundLaunchFeedbackR54::handle).add();
         com.projectseele.world.DeadSeaReadingR45.installBridge((player,challenge)->CHANNEL.send(
                 net.minecraftforge.network.PacketDistributor.PLAYER.with(()->player),new ClientboundDeadSeaReadChallengeR45(
                         challenge.nonce(),challenge.revision(),challenge.pages())));

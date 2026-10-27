@@ -137,6 +137,62 @@ public final class NervCentrelineCurveR52
     }
     public double secondDerivativeBound(double from,double to)
     {double upper=length+lengthError,span=to-from;return curvatureBound(from,to)*upper*upper*span*span;}
+
+    /** Arc-metre bounds for the projected transverse/normal/tangent basis.
+     * These cover independent guide rotation, which a Root translation
+     * certificate alone cannot enclose. */
+    public Vec3 transportedFrameSecondDerivativeBound(double from,double to,Vec3 transverse)
+    {
+        curvatureBound(from,to);
+        require(Math.abs(transverse.lengthSqr()-1)<1e-8,"Unit fixed transverse axis required");
+        for(int i=1;i<segments.size();i++)
+            require(endpointTangentDerivative(segments.get(i-1),true).distanceTo(
+                endpointTangentDerivative(segments.get(i),false))<1e-7,"Guide frame derivative jumps at curve join");
+        double low=from*length-pointError,high=to*length+pointError,X=0,Y=0,Z=0;
+        int first=Arrays.binarySearch(prefix,Math.max(0,low));if(first<0)first=Math.max(0,-first-2);
+        for(int i=first;i<leaves.size()&&prefix[i]<=high;i++)
+        {
+            var leaf=leaves.get(i);var c=segments.get(leaf.segment()).controls().toArray(Vec3[]::new);int degree=c.length-1;
+            if(degree==1)continue;
+            var velocity=derivativeControls(c);var acceleration=derivativeControls(velocity);var jerk=derivativeControls(acceleration);
+            velocity=restrictedControls(velocity,leaf.from(),leaf.to());
+            acceleration=restrictedControls(acceleration,leaf.from(),leaf.to());
+            jerk=restrictedControls(jerk,leaf.from(),leaf.to());
+            var axis=velocity[0].normalize();
+            double minSpeed=Double.POSITIVE_INFINITY,along=0,second=0,third=0,scale=1;
+            for(var p:c)scale=Math.max(scale,Math.max(Math.abs(p.x),Math.max(Math.abs(p.y),Math.abs(p.z))));
+            double epsilon=Math.ulp(scale)*8192;
+            for(var v:velocity)
+            {
+                minSpeed=Math.min(minSpeed,v.dot(axis));along=Math.max(along,Math.abs(v.dot(transverse)));
+            }
+            for(var v:acceleration)second=Math.max(second,v.length());
+            for(var v:jerk)third=Math.max(third,v.length());
+            minSpeed-=epsilon;along+=epsilon;second+=epsilon;third+=epsilon;
+            require(minSpeed>0,"Guide tangent has no positive derivative bound");
+            double ratio=along/minSpeed,q=Math.sqrt(Math.max(0,1-ratio*ratio));
+            require(q>.1,"Projected guide frame has no finite separation from its singularity");
+            double d1=second/(minSpeed*minSpeed);
+            double d2=third/(minSpeed*minSpeed*minSpeed)+6*d1*d1;
+            double x1=2*d1/q,x2=(2*d2+2*d1*d1)/q+12*d1*d1/(q*q);
+              X=Math.max(X,x2);Y=Math.max(Y,d2+2*d1*x1+x2);Z=Math.max(Z,d2);
+        }
+        return new Vec3(X,Y,Z);
+    }
+
+    private static Vec3[] derivativeControls(Vec3[] source)
+    {var result=new Vec3[source.length-1];for(int i=0;i<result.length;i++)result[i]=source[i+1].subtract(source[i]).scale(result.length);return result;}
+
+    private static Vec3[] restrictedControls(Vec3[] source,double from,double to)
+    {var left=to==1?source:split(source,to)[0];return from==0?left:split(left,from/to)[1];}
+
+    private static Vec3 endpointTangentDerivative(Segment segment,boolean end)
+    {
+        var c=segment.controls();int n=c.size()-1;if(n==1)return Vec3.ZERO;
+        int a=end?n-2:0;var v=(end?c.get(n).subtract(c.get(n-1)):c.get(1).subtract(c.get(0))).scale(n);
+        var acceleration=c.get(a+2).subtract(c.get(a+1).scale(2)).add(c.get(a)).scale(n*(n-1));
+        var tangent=v.normalize();return acceleration.subtract(tangent.scale(tangent.dot(acceleration))).scale(1/v.lengthSqr());
+    }
     public double secondDerivativeBound(double fractionSpan)
     {require(Double.isFinite(fractionSpan)&&fractionSpan>=0&&fractionSpan<=1,"Actual bounded arc span required");double upper=length+lengthError;return curvatureBound*upper*upper*fractionSpan*fractionSpan;}
     public List<Segment> segments(){return segments;}

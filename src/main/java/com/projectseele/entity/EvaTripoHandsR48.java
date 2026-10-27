@@ -9,6 +9,7 @@ import java.util.Map;
 import java.util.HashMap;
 import net.minecraft.util.Mth;
 import org.joml.Quaternionf;
+import org.joml.Matrix3f;
 import org.joml.Vector3f;
 
 /** The supplied UN hands retain their curved neutral surface and measured phalange pivots. */
@@ -26,10 +27,20 @@ public final class EvaTripoHandsR48
         boolean attack=eva.hasLiveActionForRender(partial)||action!=0;
         boolean gun=weapon==EvaUnit01Entity.WEAPON_RIFLE||weapon==EvaUnit01Entity.WEAPON_CANNON;
         boolean armed=weapon!=EvaUnit01Entity.WEAPON_FISTS;
-        float right=armed||attack?1:0,left=gun||attack?1:0;
+        float guard=weapon==EvaUnit01Entity.WEAPON_FISTS?EvaGameplayMotionR32.guardWeight(eva):0;
+        float right=armed||attack?1:guard,left=gun||attack?1:guard;
         var state=STATES.computeIfAbsent(eva,e->new State());double now=eva.level().getGameTime()+(double)partial;
         float blend=Double.isFinite(state.time)&&now>=state.time?(float)(1-Math.exp(-Math.min(2,now-state.time)/2.4)):1;
         state.left=Mth.lerp(blend,state.left,left);state.right=Mth.lerp(blend,state.right,right);state.time=now;
+        String strike=EvaGameplayMotionR32.activeGroundClip(eva,partial);
+        boolean punch=java.util.Set.of("jab","cross","hook","heavy").contains(strike);
+        float punchWeight=punch?EvaDorsalMechanism.smooth(EvaGameplayMotionR32.activeGroundPhase(eva,partial)/.15F):0;
+        if(punch)
+        {
+            // The first visible frame may arrive after the wind-up. Finger
+            // closure follows the action clock rather than restarting there.
+            state.left=Math.max(state.left,punchWeight);state.right=Math.max(state.right,punchWeight);
+        }
         float supported=!armed?Mth.clamp((eva.rifleStanceLevel(partial)-1)/2,0,1):0;
         for(String side:new String[]{"l","r"})
         {
@@ -58,13 +69,57 @@ public final class EvaTripoHandsR48
                         .rotateZ((joint==0?-20:joint==1?40:20)*mirror*weight*Mth.DEG_TO_RAD));
                 pose.positions.put(name,new Vector3f());
             }
-            if(!armed&&!attack&&eva.rifleStanceLevel(partial)<.3F)
+            if(!armed&&!attack&&guard<.01F&&eva.rifleStanceLevel(partial)<.3F)
             {
                 for(String name:new String[]{"wrist_"+side,"hand_"+side})if(pose.rig.containsKey(name))
                 {pose.rotations.put(name,new Quaternionf());pose.positions.put(name,new Vector3f());}
             }
         }
         pose.dirty();
+        if(punch&&weapon==EvaUnit01Entity.WEAPON_FISTS)
+        {
+            float phase=EvaGameplayMotionR32.activeGroundPhase(eva,partial);
+            float weight=punchWeight*(1-EvaDorsalMechanism.smooth((phase-.85F)/.15F));
+            String lead=strike.equals("jab")||strike.equals("cross")?EvaGameplayMotionR32.side(eva,strike):"";
+            alignWrist(pose,"l",weight,lead.equals("l"));
+            alignWrist(pose,"r",weight,lead.equals("r"));
+        }
+    }
+    private static void alignWrist(EvaBodyPose.Sample pose,String side,float weight,boolean straight)
+    {
+        if(weight<=0)return;
+        String hand="hand_"+side,forearm="forearm_"+side;
+        var wrist=pose.rig.get(hand).pivot();var elbow=pose.rig.get(forearm).pivot();
+        var knuckles=new Vector3f();
+        for(String digit:new String[]{"index","middle"})knuckles.add(pose.rig.get("finger_"+digit+"_"+side).pivot());
+        var along=knuckles.mul(.5F).sub(wrist).normalize();
+        var across=new Vector3f(pose.rig.get("finger_little_"+side).pivot()).sub(pose.rig.get("finger_index_"+side).pivot());
+        var normal=new Vector3f(along).cross(across).normalize().mul(side.equals("l")?-1:1);
+        var arm=pose.matrix(forearm).transformDirection(new Vector3f(wrist).sub(elbow)).normalize();
+        var targetNormal=pose.matrix(forearm).transformDirection(new Vector3f(normal));
+        targetNormal.fma(-targetNormal.dot(arm),arm).normalize();
+        if(straight)
+        {
+            var down=new Vector3f(0,-1,0);down.fma(-down.dot(arm),arm);
+            if(down.lengthSquared()>.01F)
+            {
+                down.normalize();
+                float angle=(float)Math.atan2(arm.dot(new Vector3f(targetNormal).cross(down)),targetNormal.dot(down));
+                var world=pose.matrix(forearm).getUnnormalizedRotation(new Quaternionf()).normalize();
+                world.premul(new Quaternionf().rotationAxis(angle*weight,arm));
+                var parent=pose.rig.get(forearm).parent();
+                if(parent!=null)world=pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(world);
+                pose.rotations.put(forearm,world);pose.dirty();
+                targetNormal=pose.matrix(forearm).transformDirection(new Vector3f(normal));
+                targetNormal.fma(-targetNormal.dot(arm),arm).normalize();
+            }
+        }
+        var source=new Matrix3f().setColumn(0,new Vector3f(along).cross(normal)).setColumn(1,along).setColumn(2,normal);
+        var target=new Matrix3f().setColumn(0,new Vector3f(arm).cross(targetNormal)).setColumn(1,arm).setColumn(2,targetNormal);
+        var desired=new Quaternionf().setFromNormalized(target.mul(source.transpose())).normalize();
+        var parent=pose.rig.get(hand).parent();
+        if(parent!=null)desired=pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(desired);
+        pose.rotations.get(hand).slerp(desired,weight);pose.dirty();
     }
     private static Map<String,float[]> loadFists()
     {

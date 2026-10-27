@@ -87,7 +87,7 @@ public final class SurfaceAngelAssaultR52
         {
             if(boss.getPersistentData().getBoolean("SurfaceArmorAttackR52"))cancelPlateAttack(boss);
             boss.setNoAi(false);boss.setTarget(defender);
-            if(!data.phase.equals("alert")&&!data.phase.equals("combat")&&boss.distanceToSqr(defender)<=48*48)
+            if(beginsCombatR53(data.phase,boss.distanceToSqr(defender),site.engagementRange()))
             {data.phase="combat";data.setDirty();}
             return boss;
         }
@@ -130,6 +130,9 @@ public final class SurfaceAngelAssaultR52
         if(started){tag.putBoolean("SurfaceArmorAttackR52",true);tag.putBoolean("SurfaceArmorHitR52",false);tag.putBoolean("SurfaceArmorBeamFiredR52",false);tag.putLong("SurfaceArmorNextAttackR52",level.getGameTime()+site.attackPeriod());}
         return boss;
     }
+    /** Called only after the original ready defender and line of sight were accepted. */
+    static boolean beginsCombatR53(String phase,double distanceSquared,double engagementRange)
+    {return phase.equals("approach")&&distanceSquared<=engagementRange*engagementRange;}
     private static boolean arrived(Mob boss,Vec3 point,double radius)
     {return boss.position().subtract(point).horizontalDistance()<=radius&&Math.abs(boss.getY()-point.y)<=1.6;}
     private static void cancelPlateAttack(Mob boss)

@@ -68,6 +68,21 @@ public final class TvYashimaDirectorR50
     }
     private static void retain(ServerLevel level,BlockPos position)
     {var chunk=new ChunkPos(position);level.getChunkSource().addRegionTicket(TICKET,chunk,2,chunk);}
+    private static void retainBody(ServerLevel level,RamielEntity boss,boolean loadNow)
+    {
+        // The authored scene scale and the model multiplier produce a body
+        // much wider than the centre's ticking ticket. Keep its actual block
+        // footprint loaded for native collision/fluid queries, without ticking
+        // all entities under the enlarged body.
+        var bounds=boss.getBoundingBox().inflate(1);
+        int minX=net.minecraft.util.Mth.floor(bounds.minX)>>4,maxX=(net.minecraft.util.Mth.ceil(bounds.maxX)-1)>>4;
+        int minZ=net.minecraft.util.Mth.floor(bounds.minZ)>>4,maxZ=(net.minecraft.util.Mth.ceil(bounds.maxZ)-1)>>4;
+        for(int x=minX;x<=maxX;x++)for(int z=minZ;z<=maxZ;z++)
+        {
+            var chunk=new ChunkPos(x,z);level.getChunkSource().addRegionTicket(TICKET,chunk,0,chunk);
+            if(loadNow)level.getChunk(x,z);
+        }
+    }
     public static String startBlocker(ServerLevel level)
     {
         var plan=controls(level);
@@ -102,18 +117,17 @@ public final class TvYashimaDirectorR50
         var targetPosition=data.lastPosition==null?BlockPos.containing(site.angel()):data.lastPosition;
         retain(level,targetPosition);
         var origin=new ChunkPos(targetPosition);
-        // Spawn admission needs the full real body footprint immediately, rather
-        // than waiting for a distant EVA to load the target's chunk by arrival.
-        for(int x=origin.x-1;x<=origin.x+1;x++)for(int z=origin.z-1;z<=origin.z+1;z++)level.getChunk(x,z);
+        level.getChunk(origin.x,origin.z);
         if(data.angel!=null)
         {
             if(level.getEntity(data.angel) instanceof RamielEntity original&&original.isAlive()&&TvEncounterDirectorR45.owned(original,data))
-            {TvYashimaSavedDataR50.get(level).bind(data);return true;}
+            {retainBody(level,original,true);TvYashimaSavedDataR50.get(level).bind(data);return true;}
             return false;
         }
         var boss=ModEntities.RAMIEL.get().create(level);if(boss==null)return false;
         boss.configureScaleR52(site.modelScale());
         boss.moveTo(site.angel().x,site.angel().y,site.angel().z,site.yaw()+180,0);
+        retainBody(level,boss,true);
         boss.finalizeSpawn(level,level.getCurrentDifficultyAt(boss.blockPosition()),MobSpawnType.EVENT,null,null);
         if(!level.noCollision(boss,boss.getBoundingBox())){data.notice="拉米尔原目标区被占用，作战暂停；未生成替代目标。";data.setDirty();return false;}
         if(!level.getEntitiesOfClass(RamielEntity.class,boss.getBoundingBox().inflate(128),r->r.isAlive()&&r.getTags().contains(TvEncounterDirectorR45.tag("ramiel"))).isEmpty())
@@ -138,11 +152,32 @@ public final class TvYashimaDirectorR50
     private static void services(ServerLevel level,TvCampaignSavedData data,Controls plan)
     {
         var state=TvYashimaSavedDataR50.get(level);if(!state.matches(data))return;
+        boolean changed=false;
         boolean coolant=pressed(level,plan.coolant(),false),reload=pressed(level,plan.reload(),false);
-        if(coolant&&!state.coolantPressed)state.coolantReady=true;
-        if(reload&&!state.reloadPressed)state.reloadReady=true;
+        if(coolant&&!state.coolantPressed){state.coolantReady=true;changed=true;}
+        if(reload&&!state.reloadPressed){state.reloadReady=true;changed=true;}
         if(coolant!=state.coolantPressed||reload!=state.reloadPressed)
-        {state.coolantPressed=coolant;state.reloadPressed=reload;state.setDirty();}
+        {state.coolantPressed=coolant;state.reloadPressed=reload;changed=true;}
+        long now=level.getGameTime();
+        int elapsed=state.serviceLastTickR53<0?0:(int)Math.max(0,Math.min(10,now-state.serviceLastTickR53));
+        state.serviceLastTickR53=now;
+        if(state.shots>0&&(!state.coolantReady||!state.reloadReady))
+        {
+            var shooter=TvSortiesR32.assignedUnit(level,data,1);var gun=TvYashimaStationR52.gun(level);
+            boolean powered=plan.grid().stream().allMatch(p->pressed(level,p,true))
+                    &&plan.pylons().stream().allMatch(p->level.hasChunkAt(p)&&level.getBlockEntity(p) instanceof UmbilicalPylonBlockEntity);
+            // Service the same installed cannon and its recorded cargo; never create ammunition or refill a rack.
+            if(powered&&gun!=null&&gun.loadedR52()&&gun.readyR52()&&shooter!=null
+                    &&TvMissionEquipmentR45.fixedCannonAuthorizedR52(shooter,gun)
+                    &&shooter.isUmbilicalConnected()&&plan.pylons().contains(shooter.getUmbilicalAnchor()))
+            {
+                state.serviceTicksR53=Math.min(120,state.serviceTicksR53+elapsed);
+                if(state.serviceTicksR53>=100)state.reloadReady=true;
+                if(state.serviceTicksR53>=120)state.coolantReady=true;
+                changed|=elapsed>0;
+            }
+        }
+        if(changed)state.setDirty();
     }
     public static String cannonBlocker(EvaUnit01Entity eva)
     {
@@ -155,14 +190,15 @@ public final class TvYashimaDirectorR50
                 ||!TvMissionEquipmentR45.operational(eva))return "原炮击任务尚未允许开火。";
         var plan=controls(level);var state=TvYashimaSavedDataR50.get(level);
         if(plan==null||!state.matches(data))return "炮务设备与原作战绑定正在恢复。";
+        if(!TvYashimaFirelineR53.ready(level,data))return "炮击线路正在加载实际地形，请稍候。";
         if(plan.grid().stream().anyMatch(p->!pressed(level,p,true)))return "全国电网三路汇流尚未全部接通，请开启阵地实际供电开关。";
         if(plan.pylons().stream().anyMatch(p->!level.hasChunkAt(p)||!(level.getBlockEntity(p) instanceof UmbilicalPylonBlockEntity)))
             return "阵地实际供电插座离线，请检修线路。";
         if(!eva.isUmbilicalConnected()||eva.getUmbilicalAnchor()==null||!plan.pylons().contains(eva.getUmbilicalAnchor()))
             return "初号机尚未连接阵地实际外部电源，内置电池不能给屋岛炮充能。";
         services(level,data,plan);
-        if(!state.coolantReady)return "炮管仍需冷却，请操作阵地冷却按钮。";
-        if(!state.reloadReady)return "熔断器尚未更换，请操作阵地装填按钮。";
+        if(!state.coolantReady)return "炮管自动冷却中，也可操作阵地冷却按钮。";
+        if(!state.reloadReady)return "原炮装填机构运行中，也可操作阵地装填按钮。";
         return "";
     }
     /** The regular reel connects to an actual installed local socket on arrival. */
@@ -184,6 +220,7 @@ public final class TvYashimaDirectorR50
         var data=TvCampaignSavedData.get(level);var state=TvYashimaSavedDataR50.get(level);var plan=controls(level);
         if(!data.active.equals("ramiel")||!state.matches(data)||plan==null)return;
         state.shots++;state.coolantReady=state.reloadReady=false;
+        state.serviceTicksR53=0;state.serviceLastTickR53=level.getGameTime();
         state.coolantPressed=pressed(level,plan.coolant(),false);state.reloadPressed=pressed(level,plan.reload(),false);state.setDirty();
     }
     /** The actual fixed emplacement requires both original units and their real equipment. */
@@ -210,12 +247,21 @@ public final class TvYashimaDirectorR50
         if(!(boss.level() instanceof ServerLevel level))return true;
         var data=TvCampaignSavedData.get(level);
         return !data.active.equals("ramiel")||!boss.getUUID().equals(data.angel)||!TvEncounterDirectorR45.owned(boss,data)
-                ||TvEncounterRulesR45.missionBeamAllowed(boss);
+                ||TvYashimaFirelineR53.ready(level,data)&&TvEncounterRulesR45.missionBeamAllowed(boss);
+    }
+    /** The server already owns the target and physical rays; turning a commander's camera must not freeze combat. */
+    public static boolean targetAvailableR53(ServerLevel level,TvCampaignSavedData data)
+    {
+        var site=TvEncounterSitesR45.site(level,"ramiel").orElse(null);
+        return data.active.equals("ramiel")&&data.angel!=null&&site!=null&&site.geometryValidated()&&site.modelReady()
+                &&site.id().equals(data.encounterSiteR45)&&site.fingerprint().equals(data.encounterLayoutR45)
+                &&level.getEntity(data.angel) instanceof RamielEntity boss&&TvEncounterDirectorR45.owned(boss,data);
     }
     public static void fail(ServerLevel level,TvCampaignSavedData data,String reason)
     {
         if(data.phase.equals("failure")||data.targetDeathConfirmedR45)return;
         data.phase="failure";data.notice=reason+" 本行动未计通关；原机体、驾驶员与装备按正常流程回收。";data.setDirty();
+        TvYashimaFirelineR53.clear(level);
         TvMissionEquipmentR45.revokeMission(level);TvEncounterRulesR45.stopEquipment(level,data);
         NervArmorColumnR50.pause(level);
         for(var sortie:data.sorties.values())if(sortie.unit<3)AutoSortieR32.clearAutomatic(level,sortie.unit);
@@ -235,7 +281,7 @@ public final class TvYashimaDirectorR50
             data.notice="原屋岛阵地或炮务配置暂不可用，原目标与钻进暂停。";bar.setName(Component.literal(data.notice));return;
         }
         if(data.phase.equals("failure")||data.targetDeathConfirmedR45)
-        {bar.setName(Component.literal(data.notice));TvEncounterRulesR45.stopEquipment(level,data);return;}
+        {TvYashimaFirelineR53.clear(level);bar.setName(Component.literal(data.notice));TvEncounterRulesR45.stopEquipment(level,data);return;}
         if(data.angel==null)begin(level,data);
         if(data.angel==null){bar.setName(Component.literal(data.notice));return;}
         retain(level,data.lastPosition==null?BlockPos.containing(site.angel()):data.lastPosition);
@@ -243,6 +289,7 @@ public final class TvYashimaDirectorR50
         {if(level.isPositionEntityTicking(data.lastPosition==null?BlockPos.containing(site.angel()):data.lastPosition)
                 &&++data.missingTicksR45>=40)fail(level,data,"原拉米尔信号中断，请确认原目标状态。");return;}
         data.missingTicksR45=0;
+        retainBody(level,boss,false);
         boolean valid=site.geometryValidated()&&site.modelReady()&&site.id().equals(data.encounterSiteR45)&&site.fingerprint().equals(data.encounterLayoutR45);
         if(owner==null||owner.level()!=level||!valid)
         {
@@ -259,8 +306,7 @@ public final class TvYashimaDirectorR50
         // Retry the same one-time receipt after loading; the cargo ledger refuses
         // a second commission even after the original stock has been issued.
         if(TvYashimaSavedDataR50.get(level).onlineTicks%20==0)supply(level,plan);
-        int segments=Math.max(1,(int)Math.ceil(site.separation()/16));
-        for(int n=0;n<=segments;n++)retain(level,BlockPos.containing(site.hero().lerp(site.angel(),n/(double)segments)));
+        TvYashimaFirelineR53.retain(level,data,site);
         services(level,data,plan);
         var service=TvYashimaSavedDataR50.get(level);service.onlineTicks+=10;service.setDirty();
         NervArmorColumnR50.tickRamiel(level,data,boss,plan.drillStepTicks());
@@ -280,7 +326,7 @@ public final class TvYashimaDirectorR50
         if(data.phase.equals("alert")&&TvMissionAlertR30.tick(level,data,owner)){data.phase="approach";data.setDirty();}
         if(data.phase.equals("approach")&&boss.getTarget()==shooter&&shooter!=null
                 &&TvMissionEquipmentR45.cannonAuthorized(shooter)&&TvEncounterEquipmentControlR45.serverCargoAndCannonR45().cannonReady(shooter)
-                &&TvYashimaStationR52.atPlatformR52(shooter)&&TvEncounterRulesR45.targetFrameReady(level,data,owner))
+                &&TvYashimaStationR52.atPlatformR52(shooter)&&TvEncounterRulesR45.fireControlReadyR53(level,data,owner))
         {data.phase="combat";data.setDirty();}
         String blocked=data.phase.equals("alert")?"识别与编成确认中；原拉米尔正在钻进。":TvEncounterRulesR45.equipmentBlocker(level,data);
         if(!service.fireControlLocked&&!setup.isEmpty())blocked=setup;
@@ -289,6 +335,6 @@ public final class TvYashimaDirectorR50
         data.notice="屋岛作战 · "+breach+"装甲贯穿 "+NervArmorColumnR50.penetratedLayers(level)+" 层 · "+(blocked.isEmpty()?"炮位就绪，确认核心后炮击。":blocked);
         bar.setName(Component.literal(data.notice));bar.setProgress(Math.max(0,Math.min(1,boss.getHealth()/boss.getMaxHealth())));
     }
-    public static void clearSession(ServerLevel level){CONTROLS.remove(level);TvYashimaArrivalR50.clear(level);}
+    public static void clearSession(ServerLevel level){TvYashimaFirelineR53.clear(level);CONTROLS.remove(level);TvYashimaArrivalR50.clear(level);}
     private TvYashimaDirectorR50(){}
 }

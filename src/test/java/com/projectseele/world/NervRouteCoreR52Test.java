@@ -81,14 +81,15 @@ public final class NervRouteCoreR52Test
     {return new Original(7,variant,uuid(10+variant),uuid(20+variant),uuid(30+variant),uuid(100),"synthetic_mission","test:synthetic_route_graph");}
     private static final class Access implements NativeAccess
     {
-        boolean identity=true,clear=true,restore=true;int swept,restored;
+        boolean identity=true,clear=true,restore=true;int swept,restored,lastLeg;double lastFraction;String lastRoute;
         public boolean sameOriginalAssembly(Original original){return identity;}
         public boolean canTraverse(Original original,Route route,Leg leg,double from,double to){swept++;return clear;}
-        public boolean canRestore(Original original,Route route,int leg,double fraction){restored++;return restore;}
+        public boolean canRestore(Original original,Route route,int leg,double fraction){restored++;lastRoute=route.id();lastLeg=leg;lastFraction=fraction;return restore;}
     }
     public static void main(String[] args)
     {
         verifyRotatingFootPlatform();
+        verifyCancelledContinuousCompletion();
         var json=fixture(true,false);var directory=NervRouteDirectoryR52.parse(json);check(directory.installed(),"Root installed receipt was lost");
         var draft=NervRouteDirectoryR52.parse(fixture(false,false));var access=new Access();check(!new NervRouteReservationsR52(draft).reserve(uuid(501),original(0),"depart_b1l1",access).accepted(),"Draft activated runtime");
         var plan=new JsonObject();plan.addProperty("schema","projectseele.r52.root-spatial-plan.v1");plan.addProperty("status","component design; NOT installed");rejects(()->NervRouteDirectoryR52.parse(plan),"Spatial design masqueraded as runtime");
@@ -181,6 +182,71 @@ public final class NervRouteCoreR52Test
         var wrong=document.deepCopy();var roll=new org.joml.Quaternionf().rotationZ(.2F);
         find(wrong.getAsJsonArray("legs"),"bearing_turn").add("eva_to_xyzw",numbers(roll.x,roll.y,roll.z,roll.w));
         var rejected=NervRouteDirectoryR52.parse(wrong);rejects(()->rejected.sample(rejected.leg("bearing_turn"),.5,b),"Two-foot-axis restriction was relaxed");
+    }
+    private static void verifyCancelledContinuousCompletion()
+    {
+        var document=fixture(true,false);
+        var ramp=new JsonObject();ramp.addProperty("flat_before",1);ramp.addProperty("slope_run",8);ramp.addProperty("blend",1);
+        find(document.getAsJsonArray("legs"),"original1").add("ramp_profile",ramp.deepCopy());
+        find(document.getAsJsonArray("legs"),"reverse_original1").add("ramp_profile",ramp.deepCopy());
+        var curve=new NervCentrelineCurveR52(List.of(new NervCentrelineCurveR52.Segment(NervCentrelineCurveR52.Type.QUINTIC_BEZIER,
+                List.of(new Vec3(10,1,10),new Vec3(10,1,12),new Vec3(10,1,14),new Vec3(10,-3,20),new Vec3(10,-1,20),new Vec3(10,1,20)))));
+        find(document.getAsJsonArray("legs"),"bridge12_1").add("centre_curve",curve.toJson());
+        find(document.getAsJsonArray("legs"),"reverse_bridge12_1").add("centre_curve",curve.reversed().toJson());
+        var profile=new JsonObject();profile.addProperty("type","continuous_upright");profile.addProperty("cruise_mps",30);profile.addProperty("acceleration_mps2",8);profile.addProperty("deceleration_mps2",10);profile.addProperty("ready_node","dock1_1");
+        find(document.getAsJsonArray("routes"),"depart_b2l1").add("motion_profile",profile.deepCopy());
+        find(document.getAsJsonArray("routes"),"return_b2l1").add("motion_profile",profile.deepCopy());
+        var directory=NervRouteDirectoryR52.parse(document);var reverse=directory.route("return_b2l1");int last=reverse.legs().size()-1;
+        var pool=new NervRouteReservationsR52(directory);var access=new Access();var original=original(0);
+        check(pool.reserve(uuid(1000),original,"depart_b2l1",access).accepted(),"Cancelled departure setup failed");
+        var stopped=pool.cancel(uuid(1000),original.owner()).state();
+        access.restore=false;
+        check(!pool.reclaimCheckedCancelledContinuousR52(stopped,uuid(1001),original,access).accepted(),"Zero-distance recovery bypassed native endpoint restoration");
+        check(pool.available(reverse)&&pool.leasedMembers(uuid(1001)).isEmpty(),"Rejected endpoint recovery acquired leases");
+        access.restore=true;access.identity=false;int prior=access.restored;
+        check(!pool.reclaimCheckedCancelledContinuousR52(stopped,uuid(1001),original,access).accepted()&&access.restored==prior,"Changed original identity reached endpoint admission");
+        access.identity=true;
+        var endpoint=pool.reclaimCheckedCancelledContinuousR52(stopped,uuid(1001),original,access);
+        check(endpoint.accepted()&&endpoint.state().stage()==Stage.COMPLETE&&endpoint.state().leg()==last&&endpoint.state().fraction()==1,"Actual cancelled departure origin did not become a completed reverse endpoint");
+        check(access.lastRoute.equals(reverse.id())&&access.lastLeg==last&&access.lastFraction==1,"Completion was not checked at the exact reverse endpoint");
+        check(pool.leasedMembers(uuid(1001)).equals(Set.of(original.eva(),original.plug(),original.pilot()))&&!pool.available(reverse),"Zero-distance completion released assembly or route before mechanical finish");
+        check(!pool.reserve(uuid(1002),original,"depart_b2l1",access).accepted(),"Unfinished endpoint accepted another departure");
+        check(!pool.reclaimCheckedCancelledContinuousR52(stopped,uuid(1001),original,access).accepted()&&!pool.reclaimCheckedCancelledContinuousR52(stopped,uuid(1003),original,access).accepted(),"Duplicate endpoint reclaim replaced the retained task");
+        check(!pool.releaseCompletion(uuid(1001),uuid(101))&&!pool.available(reverse),"Wrong owner released endpoint service leases");
+        var cold=new NervRouteReservationsR52(directory);
+        check(cold.quarantineGround(endpoint.state()),"Cold endpoint could not retain provisional space");access.restore=false;
+        check(!cold.restoreCompletion(endpoint.state(),access).accepted()&&cold.groundQuarantined(uuid(1001))&&!cold.available(reverse),"Failed cold endpoint restore released provisional space");
+        access.restore=true;
+        check(cold.restoreCompletion(endpoint.state(),access).accepted()&&cold.query(uuid(1001)).stage()==Stage.COMPLETE,"Cold endpoint restore lost completion receipt");
+        check(cold.releaseCompletion(uuid(1001),original.owner())&&cold.leasedMembers(uuid(1001)).isEmpty()&&cold.available(reverse),"Cold completed endpoint leaked leases");
+        check(pool.releaseCompletion(uuid(1001),original.owner())&&pool.reserve(uuid(1002),original,"depart_b2l1",access).accepted(),"Completed cancelled departure prevented the next real task");
+        check(pool.releaseCompletion(uuid(1001),original.owner())&&pool.leasedMembers(uuid(1002)).size()==3&&!pool.available(reverse),"Repeated old completion released a newer task's leases");
+        for(double invalid:new double[]{Double.NaN,Double.NEGATIVE_INFINITY,Double.POSITIVE_INFINITY,-.01,1.01,Double.MIN_VALUE})
+        {
+            var rejected=new NervRouteReservationsR52(directory);var malformed=new Snapshot(stopped.task(),original,directory.fingerprint(),stopped.route(),0,invalid,Stage.CANCELLED,"");prior=access.restored;
+            check(!rejected.reclaimCheckedCancelledContinuousR52(malformed,uuid(1010),original,access).accepted()&&access.restored==prior&&rejected.available(reverse),"Invalid or rounded-away cancelled fraction reached geometry admission: "+invalid);
+        }
+        for(int invalid:new int[]{-1,reverse.legs().size()})
+        {
+            var rejected=new NervRouteReservationsR52(directory);var malformed=new Snapshot(stopped.task(),original,directory.fingerprint(),stopped.route(),invalid,0,Stage.CANCELLED,"");prior=access.restored;
+            check(!rejected.reclaimCheckedCancelledContinuousR52(malformed,uuid(1010),original,access).accepted()&&access.restored==prior,"Invalid source leg reached recovery admission");
+        }
+        for(double fraction:new double[]{.35,Math.ulp(1D)})
+        {
+            var midpoint=new NervRouteReservationsR52(directory);var cancelled=new Snapshot(stopped.task(),original,directory.fingerprint(),stopped.route(),0,fraction,Stage.CANCELLED,"");
+            var result=midpoint.reclaimCheckedCancelledContinuousR52(cancelled,uuid(1020),original,access);
+            check(result.accepted()&&result.state().stage()==Stage.HOLD&&result.state().leg()==last&&result.state().fraction()==1-fraction,"Interior cancellation was moved or marked complete");
+            check(!midpoint.releaseCompletion(uuid(1020),original.owner())&&!midpoint.available(reverse),"Unfinished reverse point released its leases");
+            access.clear=false;check(!midpoint.advanceRetainingCompletion(uuid(1020),1,access).accepted()&&midpoint.query(uuid(1020)).fraction()==1-fraction,"Blocked final sweep advanced recovered task");
+            access.clear=true;check(midpoint.advanceRetainingCompletion(uuid(1020),1,access).accepted()&&midpoint.query(uuid(1020)).stage()==Stage.COMPLETE,"Accepted remaining reverse travel failed to complete");
+            check(midpoint.releaseCompletion(uuid(1020),original.owner())&&midpoint.available(reverse),"Finished midpoint recovery leaked its leases");
+        }
+        var join=new NervRouteReservationsR52(directory);var cancelledJoin=new Snapshot(stopped.task(),original,directory.fingerprint(),stopped.route(),1,0,Stage.CANCELLED,"");
+        var joined=join.reclaimCheckedCancelledContinuousR52(cancelledJoin,uuid(1030),original,access);
+        check(joined.accepted()&&joined.state().stage()==Stage.HOLD&&joined.state().leg()==last&&joined.state().fraction()==0,"Intermediate reverse join masqueraded as final endpoint");
+        var returning=new NervRouteReservationsR52(directory);var cancelledReturn=new Snapshot(stopped.task(),original,directory.fingerprint(),reverse.id(),last,1,Stage.CANCELLED,"");
+        var alreadyHome=returning.reclaimCheckedCancelledContinuousR52(cancelledReturn,uuid(1040),original,access);
+        check(alreadyHome.accepted()&&alreadyHome.state().stage()==Stage.COMPLETE&&alreadyHome.state().leg()==last&&alreadyHome.state().fraction()==1,"Cancelled actual return endpoint started a fabricated extra trip");
     }
     private NervRouteCoreR52Test(){}
 }

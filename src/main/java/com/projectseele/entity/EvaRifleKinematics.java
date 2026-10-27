@@ -65,9 +65,8 @@ public final class EvaRifleKinematics
         boolean supported=EvaBodyPose.hasSupportedStances();
         double lateralOffset=supported?-2.3:switch(entity.getUnitVariant()){case 0->2.8;case 2->1.9;default->1.4;};
         double forwardOffset=EvaBodyPose.hasOwnUnRig(entity)?3.8:supported?5:2;
-        boolean measuredGrip=EvaTripoHandsR48.enabled(entity,body)||EvaAnatomicalHandsR45.enabled(entity)
-                &&!EvaBodyPose.hasOwnUnRig(entity)
-                &&!EvaAnatomicalHandsR45.rig(entity.getUnitVariant()).grips().isEmpty();
+        var handRig=EvaAnatomicalHandsR45.forEntityR53(entity);
+        boolean measuredGrip=EvaTripoHandsR48.enabled(entity,body)||handRig!=null&&!handRig.grips().isEmpty();
         if(measuredGrip)
         {
             forwardOffset=1.2;

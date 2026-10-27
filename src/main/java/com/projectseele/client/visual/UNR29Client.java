@@ -54,7 +54,7 @@ public final class UNR29Client
         {
             if(!UNR29Review.photos.contains("un_phone")){UNR29Review.photo="un_phone";return;}
             int serial=command.endsWith("1")?1:0;
-            for(var child:List.copyOf(screen.children()))if(child instanceof Button b&&b.getMessage().getString().equals("EVA-UN-0"+serial)){screen.mouseClicked(b.getX()+3,b.getY()+3,0);screen.mouseReleased(b.getX()+3,b.getY()+3,0);}
+            for(var child:List.copyOf(screen.children()))if(child instanceof Button b&&b.getMessage().getString().equals(com.projectseele.entity.Unit03SourceRigR53.displayName(serial))){screen.mouseClicked(b.getX()+3,b.getY()+3,0);screen.mouseReleased(b.getX()+3,b.getY()+3,0);}
             var boxes=screen.children().stream().filter(x->x instanceof EditBox).map(x->(EditBox)x).toList();if(boxes.size()!=2)return;
             boxes.get(0).setValue(serial==0?"6400":"6260");boxes.get(1).setValue("-5820");
             for(var child:List.copyOf(screen.children()))if(child instanceof Button b&&b.getMessage().getString().equals("投放到指定 X / Z"))

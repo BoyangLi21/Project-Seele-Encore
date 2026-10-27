@@ -44,6 +44,11 @@ public final class TvEncounterSitesR45
         }
     }
     private static final Map<ServerLevel,Map<String,Site>> CACHE=new WeakHashMap<>();
+    private static final Map<ServerLevel,String> DEPARTURES_R53=new WeakHashMap<>();
+    public static String departureIntentR53(ServerLevel level)
+    {
+        site(level,"ramiel");return DEPARTURES_R53.getOrDefault(level,"geofront");
+    }
     private static Vec3 vec(com.google.gson.JsonArray row)
     {return new Vec3(row.get(0).getAsDouble(),row.get(1).getAsDouble(),row.get(2).getAsDouble());}
     public static Map<Integer,Landing> readLandingsR52(com.google.gson.JsonObject row)
@@ -72,6 +77,13 @@ public final class TvEncounterSitesR45
                     if(!entry.getKey().equals("ramiel")&&!entry.getKey().equals("gaghiel"))continue;
                     var r=entry.getValue().getAsJsonObject();
                     if(r.has("retired_r53")&&r.get("retired_r53").getAsBoolean())continue;
+                    if(entry.getKey().equals("ramiel"))
+                    {
+                        String departure=r.has("departure")?r.get("departure").getAsString():"geofront";
+                        if(!java.util.Set.of("geofront","surface","hakone").contains(departure))
+                            throw new IllegalArgumentException("Unknown installed Yashima departure");
+                        DEPARTURES_R53.put(l,departure);
+                    }
                     var site=new Site(r.get("id").getAsString(),vec(r.getAsJsonArray("hero")),vec(r.getAsJsonArray("angel")),
                             vec(r.getAsJsonArray("cover")),r.get("yaw").getAsFloat(),r.get("requires_retracted_city").getAsBoolean(),
                             r.get("geometry_validated").getAsBoolean(),r.get("model_ready").getAsBoolean(),r.get("visibility").getAsString(),

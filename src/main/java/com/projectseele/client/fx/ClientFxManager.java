@@ -168,7 +168,9 @@ public final class ClientFxManager
     public static void addRifleTracer(ClientboundRifleTracerPacket packet)
     {
         if(com.projectseele.visual.FactoryR20Review.R28_VISUAL)com.projectseele.visual.FieldR28Review.receivedRifleTracers++;
+        ensureActiveLevel();
         Vec3 fallback = new Vec3(packet.x1, packet.y1, packet.z1);
+        com.projectseele.client.RifleShotAudioR53.confirmedShot(packet.entityId, fallback);
         ACTIVE.add(new RifleTracer(packet.entityId, fallback,
                 new Vec3(packet.x2, packet.y2, packet.z2)));
     }
@@ -257,7 +259,7 @@ public final class ClientFxManager
             poseStack.translate(fx.pos.x - cam.x, fx.pos.y - cam.y, fx.pos.z - cam.z);
             VertexConsumer target = fx instanceof KabbalahTree
                     ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof AtFieldRipple
-                    ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.AT_FIELD) : fx instanceof CrossExplosion || fx instanceof NukeExplosion
+                    ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.AT_FIELD) : fx instanceof CrossExplosion || fx instanceof NukeExplosion || fx instanceof RifleTracer
                     // Vanilla lightning writes depth even for translucent
                     // rings, cutting a hard empty band through the smoke.
                     ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.CROSS) : buffer.getBuffer(RenderType.lightning());
@@ -577,7 +579,7 @@ public final class ClientFxManager
         @Override
         int lifetime()
         {
-            return LIFETIME;
+            return firstRenderTime < 0 ? 20 : (int)Math.ceil(firstRenderTime) + LIFETIME;
         }
 
         @Override
@@ -601,12 +603,19 @@ public final class ClientFxManager
             if (t * 220 < distance + 18)
                 RibbonRenderer.drawStarRibbon(poseStack.last().pose(), consumer,
                         start, end, .09F, .035F, 1, .78F, .35F, alpha);
-            if (t < .7F)
+            if (t < 1.5F)
             {
+                float glow = 1 - t / 1.5F;
                 Vector3f flash = visibleOrigin.subtract(pos).toVector3f();
                 RibbonRenderer.drawStarRibbon(poseStack.last().pose(), consumer,
                         flash, new Vector3f(flash).add(direction.scale(1.6).toVector3f()),
-                        .42F * (1 - t), .06F, 1, .92F, .65F, 1 - t);
+                        .42F * glow, .06F, 1, .92F, .65F, glow);
+                // Axial ribbons are edge-on through the sight. Keep the hot
+                // muzzle core visible from that same actual barrel origin.
+                var basis = RibbonRenderer.planeBasis(direction.toVector3f());
+                var corePose = new Matrix4f(poseStack.last().pose()).translate(flash);
+                RibbonRenderer.drawPolyRing(corePose, consumer, basis[0], basis[1],
+                        8, .20F * glow, .20F * glow, 1, .98F, .85F, glow);
             }
         }
     }

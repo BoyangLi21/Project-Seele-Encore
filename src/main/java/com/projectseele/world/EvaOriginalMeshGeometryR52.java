@@ -34,7 +34,7 @@ public final class EvaOriginalMeshGeometryR52
     }
     private record Bone(String name,String parent,Vector3f pivot,Quaternionf bind){}
     private record RawPart(Vector3f pivot,float[] values){}
-    private record Corrective(Map<String,Quaternionf> targets,float activation,float[] sparse){}
+    private record Corrective(Map<String,Quaternionf> targets,float activation,float positionLimit,float[] sparse){}
     private record Skin(String other,float[] weights,float[] rest,Map<String,float[]> influences,Map<String,Matrix4f> inverseBind,Corrective corrective){}
     private record Mesh(String resource,String hash,Map<String,RawPart> parts,Map<String,Skin> skins){}
     private record Rig(Mesh body,Mesh hands,Map<String,Bone> geo,Set<String> handJoints,String contractHash){}
@@ -120,6 +120,21 @@ public final class EvaOriginalMeshGeometryR52
     {
         var manifest=json(classpathBytes("eva/eva_original_mesh_geometry_r52_sources.json"));require("projectseele.r52.actual-rendered-mesh-selection.v1".equals(manifest.get("schema").getAsString()),"Actual classpath source receipt required");
         var hashes=new HashMap<String,String>();for(var entry:manifest.getAsJsonObject("resources").entrySet())hashes.put(entry.getKey(),entry.getValue().getAsString());installClasspath(hashes);
+        var predecessors=new HashSet<String>();
+        if(manifest.has("held_hand_surface_predecessors"))for(var value:manifest.getAsJsonArray("held_hand_surface_predecessors"))
+        {
+            var previous=new TreeMap<String,String>();
+            for(var entry:value.getAsJsonObject().entrySet())previous.put(entry.getKey(),entry.getValue().getAsString());
+            require(previous.keySet().equals(hashes.keySet()),"Hand update must retain the complete original source membership");
+            for(var entry:previous.entrySet())
+            {
+                require(entry.getValue().matches("[0-9a-f]{64}"),"Hand predecessor binding is invalid");
+                if(!entry.getKey().matches("mesh/eva_unit0[012]_anatomical_hands_r45\\.mesh\\.json"))
+                    require(entry.getValue().equals(hashes.get(entry.getKey())),"Held hand update cannot replace body, rig or hand contract");
+            }
+            predecessors.add(sha(previous.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        }
+        installed.heldHandPredecessors=Set.copyOf(predecessors);
     }
     public static byte[] classpathBytes(String relativeResource)throws IOException
     {
@@ -194,8 +209,9 @@ public final class EvaOriginalMeshGeometryR52
             for(String side:List.of("l","r"))
             {
                 require(b.parts().keySet().containsAll(Set.of("arm_"+side,"forearm_"+side,"foot_"+side,"leg_"+side,"shin_"+side)),"Actual complete limb mesh missing");
-                var skin=h.skins().get("hand_"+side);require(skin!=null&&skin.influences().size()==18&&skin.inverseBind().size()==18&&skin.corrective()!=null,"Actual 18-influence hand skin/corrective required");
+                var skin=h.skins().get("hand_"+side);require(skin!=null&&(skin.influences().size()==18||skin.influences().size()==19)&&skin.inverseBind().size()==skin.influences().size()&&skin.corrective()!=null,"Actual articulated hand skin/corrective required");
                 var expected=new HashSet<String>();expected.add("hand_"+side);for(String joint:joints)if(joint.startsWith("r45_hand_"+side+"_"))expected.add(joint);
+                if(skin.influences().containsKey("forearm_"+side))expected.add("forearm_"+side);
                 require(skin.influences().keySet().equals(expected),"Hand source joint palette identity differs");
             }
             rigs.put(variant,new Rig(b,h,skeleton,Set.copyOf(joints),selection.get(contract)));
@@ -268,6 +284,7 @@ public final class EvaOriginalMeshGeometryR52
     public static final class Provider
     {
         private final Map<Integer,Rig> rigs;private final String fingerprint;
+        private Set<String> heldHandPredecessors=Set.of();
         private record Rotation(float x,float y,float z,float w)
         {static Rotation of(Quaternionf q){return new Rotation(q.x,q.y,q.z,q.w);}}
         private record BodyChannels(String parent,float px,float py,float pz,Rotation rotation,float x,float y,float z){}
@@ -287,6 +304,7 @@ public final class EvaOriginalMeshGeometryR52
         }
         private Provider(Map<Integer,Rig> rigs,String fingerprint){this.rigs=rigs;this.fingerprint=fingerprint;}
         public String sourceFingerprint(){return fingerprint;}
+        public boolean replacesHeldHandSurface(String previous){return heldHandPredecessors.contains(previous);}
         public String handContractFingerprint(int variant){return rig(variant).contractHash();}
         public Set<String> handJoints(int variant){return rig(variant).handJoints();}
         private Rig rig(int variant){var r=rigs.get(variant);require(r!=null,"Original rig selection absent");return r;}
@@ -320,11 +338,17 @@ public final class EvaOriginalMeshGeometryR52
             var models=new HashMap<String,Matrix4f>();for(String name:r.geo().keySet())model(name,r.geo(),locals,offsets,pivots,models,new HashSet<>());
             var result=new HashMap<String,Double>();for(var part:actual.parts()){var mesh=r.body().parts().containsKey(part.bone())?r.body():r.hands();var raw=mesh.parts().get(part.bone());var skin=mesh.skins().get(part.bone());var influences=new HashSet<String>();influences.add(part.bone());if(skin!=null){if(skin.influences().isEmpty())influences.add(skin.other());else influences.addAll(skin.influences().keySet());}
                 var drivers=new HashSet<String>();for(String influence:influences)for(String n=influence;n!=null;n=r.geo().get(n).parent())if(angles.get(n)>0||displacements.get(n)>0)drivers.add(n);if(skin!=null&&skin.corrective()!=null)for(String n:skin.corrective().targets().keySet())if(angles.get(n)>0)drivers.add(n);
-                double angle=drivers.stream().mapToDouble(angles::get).sum(),translation=drivers.stream().mapToDouble(displacements::get).sum();if(angle==0&&translation==0){result.put(part.bone(),0D);continue;}
+                double angle=drivers.stream().mapToDouble(angles::get).sum(),translation=drivers.stream().mapToDouble(displacements::get).sum();if(angle==0&&translation==0){result.put(part.bone(),0D);result.put("RigidCurveR53/"+part.bone(),0D);continue;}
                 var rotations=new ArrayList<Quaternionf>();for(String n:influences){var rotationMatrix=new Matrix4f(models.get(n));if(skin!=null&&skin.inverseBind().containsKey(n))rotationMatrix.mul(skin.inverseBind().get(n));rotations.add(rotationMatrix.getUnnormalizedRotation(new Quaternionf()).normalize());}boolean crossed=false;for(int a=0;a<rotations.size();a++)for(int b=a+1;b<rotations.size();b++)if(Math.abs(rotations.get(a).dot(rotations.get(b)))<=Math.sin(Math.min(Math.PI/2,angle))+1e-5)crossed=true;if(crossed){result.put(part.bone(),Double.POSITIVE_INFINITY);continue;}
                 AABB rest=null;var values=skin==null?raw.values():skin.rest();for(int i=0;i<values.length;i+=8){var p=new Vec3(-(values[i]+raw.pivot().x)/16,(values[i+1]+raw.pivot().y)/16,(values[i+2]+raw.pivot().z)/16);rest=rest==null?new AABB(p,p):rest.minmax(new AABB(p,p));}
                 double radius=0;for(String d:drivers){var pivot=models.get(d).transformPosition(new Vector3f(pivots.get(d))).mul(EvaScale.RENDER_SCALE);for(String n:influences){var m=new Matrix4f(models.get(n));if(skin!=null&&skin.inverseBind().containsKey(n))m.mul(skin.inverseBind().get(n));for(double x:new double[]{rest.minX,rest.maxX})for(double y:new double[]{rest.minY,rest.maxY})for(double z:new double[]{rest.minZ,rest.maxZ})radius=Math.max(radius,m.transformPosition(new Vector3f((float)x,(float)y,(float)z)).mul(EvaScale.RENDER_SCALE).distance(pivot));}for(var p:part.vertices())radius=Math.max(radius,new Vec3(pivot.x,pivot.y,pivot.z).distanceTo(p));}
-                double bound=(radius+translation)*Math.expm1(angle)+translation;if(skin!=null)bound*=16D*influences.size()*influences.size();if(skin!=null&&skin.corrective()!=null)bound+=Math.sqrt(3)*2/16*EvaScale.RENDER_SCALE*1.5*angle/skin.corrective().activation();result.put(part.bone(),bound+.00005);
+                var common=new HashSet<String>();boolean firstInfluence=true;
+                for(String influence:influences){var chain=new HashSet<String>();for(String n=influence;n!=null;n=r.geo().get(n).parent())chain.add(n);if(firstInfluence){common.addAll(chain);firstInfluence=false;}else common.retainAll(chain);}
+                // Only motion shared by every palette influence is rigid.
+                // Relative skin/corrective deformation retains its prior bound.
+                if(common.containsAll(drivers))result.put("RigidCurveR53/"+part.bone(),
+                        (radius+translation)*Math.exp(angle)*angle*angle/8+translation*angle/4+.00005);
+                double bound=(radius+translation)*Math.expm1(angle)+translation;if(skin!=null)bound*=16D*influences.size()*influences.size();if(skin!=null&&skin.corrective()!=null)bound+=Math.sqrt(3)*skin.corrective().positionLimit()/16*EvaScale.RENDER_SCALE*1.5*angle/skin.corrective().activation();result.put(part.bone(),bound+.00005);
             }return Map.copyOf(result);
         }
         /** Pure actual service visibility; never relaxes any native capture admission. */
@@ -413,9 +437,10 @@ public final class EvaOriginalMeshGeometryR52
     private static Corrective corrective(JsonObject definition,int count)
     {
         if(!definition.has("contactCorrectiveR45"))return null;var c=definition.getAsJsonObject("contactCorrectiveR45");float degrees=c.get("activation_degrees").getAsFloat();require(Float.isFinite(degrees)&&degrees>0&&degrees<=60,"Actual corrective activation differs");
+        float positionLimit=c.has("position_limit_model")?c.get("position_limit_model").getAsFloat():2;require(Float.isFinite(positionLimit)&&positionLimit>0&&positionLimit<=8,"Actual corrective position limit");
         var targets=new HashMap<String,Quaternionf>();for(var row:c.getAsJsonObject("local_quaternion_xyzw").entrySet()){require(row.getKey().startsWith("r45_hand_")&&definition.getAsJsonObject("influences").has(row.getKey()),"Actual corrective driver absent");var q=floats(row.getValue().getAsJsonArray());require(q.length==4,"Corrective quaternion width");var value=new Quaternionf(q[0],q[1],q[2],q[3]);require(Math.abs(value.lengthSquared()-1)<=.001F,"Invalid corrective quaternion");targets.put(row.getKey(),value.normalize());}require(!targets.isEmpty(),"Actual corrective drivers required");
-        var rows=c.getAsJsonArray("vertex_index_position_normal_delta");float[] sparse=new float[rows.size()*7];var seen=new HashSet<Integer>();for(int i=0;i<rows.size();i++){var row=floats(rows.get(i).getAsJsonArray());require(row.length==7&&row[0]==(int)row[0]&&row[0]>=0&&row[0]<count&&seen.add((int)row[0]),"Corrective source vertex identity differs");for(int k=1;k<7;k++)require(Math.abs(row[k])<=2,"Unbounded actual corrective");System.arraycopy(row,0,sparse,i*7,7);}
-        return new Corrective(Map.copyOf(targets),(float)Math.toRadians(degrees),sparse);
+        var rows=c.getAsJsonArray("vertex_index_position_normal_delta");float[] sparse=new float[rows.size()*7];var seen=new HashSet<Integer>();for(int i=0;i<rows.size();i++){var row=floats(rows.get(i).getAsJsonArray());require(row.length==7&&row[0]==(int)row[0]&&row[0]>=0&&row[0]<count&&seen.add((int)row[0]),"Corrective source vertex identity differs");for(int k=1;k<7;k++)require(Math.abs(row[k])<=(k<=3?positionLimit:2),"Unbounded actual corrective");System.arraycopy(row,0,sparse,i*7,7);}
+        return new Corrective(Map.copyOf(targets),(float)Math.toRadians(degrees),positionLimit,sparse);
     }
     private static Vector3f restPoint(RawPart p,int n){return new Vector3f(p.values()[n]+p.pivot().x,p.values()[n+1]+p.pivot().y,p.values()[n+2]+p.pivot().z);}
     /** Exact renderer seam construction is kept, including its rounded shared

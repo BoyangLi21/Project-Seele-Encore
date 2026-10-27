@@ -10,18 +10,19 @@ final class NervOriginalCarrierRendererR52 {
  private static final Map<String,RigidMachineryPartR44> GUIDES=new HashMap<>();
  static void render(NervCarrierPlatformEntity e,float partial,PoseStack poses,MultiBufferSource buffers,int light)
  {
-  var root=NervOriginalCarrierR52.actualRoot(e,partial);float rise=NervOriginalCarrierR52.progress(e,partial);
-  boolean parked=NervR50CarrierModeR53.enabled()&&root.translation().y< -1000&&rise==0&&!e.originalCarrierStateR52().getBoolean("Attached");
-  var relative=root.translation().subtract(e.getPosition(partial));poses.pushPose();poses.translate(relative.x,relative.y,relative.z);poses.mulPose(root.rotation());
+  var root=NervOriginalCarrierR52.actualRoot(e,partial);float rise=NervOriginalCarrierR52.progress(e,partial);var mounting=CarrierMountProfileR53.read(e,partial);
+  boolean parked=!mounting.aboveFloor()&&NervR50CarrierModeR53.enabled()&&root.translation().y< -1000&&rise==0&&!e.originalCarrierStateR52().getBoolean("Attached");
+  var dispatcher=new net.minecraft.world.phys.Vec3(net.minecraft.util.Mth.lerp((double)partial,e.xOld,e.getX()),net.minecraft.util.Mth.lerp((double)partial,e.yOld,e.getY()),net.minecraft.util.Mth.lerp((double)partial,e.zOld,e.getZ()));
+  var relative=root.translation().subtract(dispatcher);poses.pushPose();poses.translate(relative.x,relative.y,relative.z);poses.mulPose(root.rotation());
   if(CarrierAssemblyR53.selected()!=null)
   {
    if(!parked)
    {
     boolean outlet=NervR50CarrierModeR53.launchDeckDropR53(root,0)!=0;
     poses.translate(0,NervR50CarrierModeR53.launchDeckDropR53(root,rise),0);
-    CarrierAssemblyRendererR53.draw(poses,buffers,light,outlet?1:rise,outlet?1-rise:0,0);
+    CarrierAssemblyRendererR53.draw(poses,buffers,light,outlet?1:rise,outlet?NervR50CarrierModeR53.launchJawReleaseR53(rise):0,0,e.getUnitVariant(),mounting);
    }
-   poses.popPose();return;
+   poses.popPose();if(!parked&&!mounting.supportOnly())CarrierRearGuideRendererR53.drawMoving(e,partial,poses,buffers,light,root,rise);return;
   }
   if(parked)
   {

@@ -200,6 +200,11 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     private float atField = AT_FIELD_MAX;
     private int spearCooldown = 45;
     private int selfDestructTicks = -1;
+    private DamageSource selfDestructSource;
+    private java.util.UUID selfDestructAttacker;
+    private boolean resolvingSelfDestruct;
+    private boolean applyingOrdinaryDamage;
+    private DamageSource deferredOrdinaryDeath;
     private BlockPos siegeBeacon;
 
     public SachielEntity(EntityType<? extends SachielEntity> type, Level level)
@@ -305,6 +310,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         }
         if (this.getHealth() <= this.getMaxHealth() * 0.14F)
         {
+            rememberSelfDestructSource(getLastDamageSource());
             this.selfDestructTicks = 60;
         }
     }
@@ -331,31 +337,96 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
             }
             return false;
         }
-        if (amount >= this.getHealth())
+        // Let vanilla/Forge accept the hit, apply armor, resistance and
+        // absorption, and test a totem before deciding whether it was lethal.
+        // A scoped die interception defers only that accepted lethal result;
+        // LivingDeathEvent and loot still belong to the actual finale.
+        boolean previousApplying=applyingOrdinaryDamage;
+        DamageSource previousDeath=deferredOrdinaryDeath,lethal;
+        boolean accepted;
+        applyingOrdinaryDamage=true;deferredOrdinaryDeath=null;
+        try
         {
-            this.setHealth(1.0F);
-            if(source.getEntity() instanceof EvaUnit01Entity eva&&com.projectseele.event.FirstBattleDirector.tryStart(this,eva,false))return true;
+            accepted=super.hurt(source,amount);
+            lethal=deferredOrdinaryDeath;
+        }
+        finally
+        {
+            applyingOrdinaryDamage=previousApplying;
+            deferredOrdinaryDeath=previousDeath;
+        }
+        if(accepted&&lethal!=null)
+        {
+            if(lethal.getEntity() instanceof EvaUnit01Entity eva&&com.projectseele.event.FirstBattleDirector.tryStart(this,eva,false))return true;
+            rememberSelfDestructSource(lethal);
             this.selfDestructTicks = 45;
             return true;
         }
-        boolean accepted=super.hurt(source,amount);
         if(accepted&&source.getEntity() instanceof EvaUnit01Entity eva)com.projectseele.event.FirstBattleDirector.tryStart(this,eva,false);
         return accepted;
     }
 
+    @Override
+    public void die(DamageSource source)
+    {
+        if(applyingOrdinaryDamage&&!resolvingSelfDestruct&&!isFirstBattleActive()&&!dead&&getHealth()<=0)
+        {
+            deferredOrdinaryDeath=source;
+            setHealth(1.0F);
+            return;
+        }
+        super.die(source);
+    }
+
+    private void rememberSelfDestructSource(DamageSource source)
+    {
+        selfDestructSource = source;
+        selfDestructAttacker = source != null && source.getEntity() != null ? source.getEntity().getUUID() : null;
+    }
+
     private void selfDestruct()
     {
-        if (!(this.level() instanceof ServerLevel server))
+        if (!(this.level() instanceof ServerLevel server) || dead || isRemoved() || resolvingSelfDestruct)
         {
             return;
         }
-        Vec3 center = this.position().add(0.0D, 8.0D, 0.0D);
+        DamageSource source = selfDestructSource;
+        if (source == null)
+        {
+            var attacker = selfDestructAttacker == null ? null : server.getEntity(selfDestructAttacker);
+            source = attacker instanceof Player player ? damageSources().playerAttack(player)
+                    : attacker instanceof LivingEntity living ? damageSources().mobAttack(living) : damageSources().generic();
+        }
+        if (source.getEntity() instanceof LivingEntity attacker) setLastHurtByMob(attacker);
+        if (source.getEntity() instanceof Player player) setLastHurtByPlayer(player);
+        else if (source.getEntity() instanceof EvaUnit01Entity eva && eva.getPilotEntity() instanceof Player player)
+            setLastHurtByPlayer(player);
+        selfDestructTicks = -1;
+        resolvingSelfDestruct = true;
+        try { die(source); }
+        finally { resolvingSelfDestruct = false; }
+        // A canceled Forge death neither explodes nor completes the mission.
+        if (!dead) return;
+        setHealth(0);
         com.projectseele.event.FirstBattleMission.naturalResolution(this);
+        discard();
+    }
+
+    @Override
+    protected void dropAllDeathLoot(DamageSource source)
+    {
+        // Resolve the blast before vanilla loot so this blast cannot consume its own reward.
+        if (resolvingSelfDestruct && level() instanceof ServerLevel server) selfDestructBlast(server);
+        super.dropAllDeathLoot(source);
+    }
+
+    private void selfDestructBlast(ServerLevel server)
+    {
+        Vec3 center = this.position().add(0.0D, 8.0D, 0.0D);
         CrossExplosionFX.spawn(server, center, 2.2F);
         SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
                 new ClientboundNukeFxPacket(center.x, center.y, center.z, 3.2F, false));
         server.explode(this, this.getX(), this.getY() + 4.0D, this.getZ(), 16.0F, ExplosionInteraction.MOB);
-        this.discard();
     }
 
     @Override
@@ -369,6 +440,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     {
         super.addAdditionalSaveData(tag);
         FIRST_BATTLE.save(this,tag);tag.putFloat("SachielAtField",atField);tag.putInt("SachielSelfDestruct",selfDestructTicks);tag.putBoolean("FirstBattleUsed",firstBattleUsed);tag.putBoolean("FirstBattleDeathResolved",firstBattleDeathResolved);tag.putFloat("FirstBattlePreviousField",firstBattlePreviousField);
+        if (selfDestructAttacker != null) tag.putUUID("SachielSelfDestructAttackerR53", selfDestructAttacker);
         tag.putInt("StrikeChoiceR31",strikeChoice);tag.putInt("MeleeRecoveryR31",meleeRecovery);
         if (this.siegeBeacon != null)
         {
@@ -384,6 +456,8 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         strikeChoice=Math.max(0,tag.getInt("StrikeChoiceR31"));meleeRecovery=Math.max(0,Math.min(30,tag.getInt("MeleeRecoveryR31")));
         atField=tag.contains("SachielAtField")?tag.getFloat("SachielAtField"):900;this.entityData.set(FIELD,atField);
         selfDestructTicks=tag.contains("SachielSelfDestruct")?tag.getInt("SachielSelfDestruct"):-1;firstBattleUsed=tag.getBoolean("FirstBattleUsed");firstBattleDeathResolved=tag.getBoolean("FirstBattleDeathResolved");firstBattlePreviousField=tag.getFloat("FirstBattlePreviousField");FIRST_BATTLE.restore(this,tag);
+        selfDestructSource = null;
+        selfDestructAttacker = tag.hasUUID("SachielSelfDestructAttackerR53") ? tag.getUUID("SachielSelfDestructAttackerR53") : null;
         this.siegeBeacon = tag.contains("SiegeBeacon")
                 ? BlockPos.of(tag.getLong("SiegeBeacon")) : null;
     }

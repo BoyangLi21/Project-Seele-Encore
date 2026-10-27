@@ -281,7 +281,11 @@ public final class TvCampaignDirector
             }
             if(recordVictory&&data.originalRecoveryRecorded(sortie.unit)&&!sortie.npc)continue;
             if(sortie.pilotR45==null)return "驾驶员联络中断了，暂时无法完成交接。请联系整备部。";
+            // Victory skips ordinary sortie continuity. Retain the original rest room too,
+            // otherwise a saved, seated pilot outside the player's chunks can never be archived.
+            if(sortie.npc&&sortie.unit<3)TrainingPilotDirector.retainOriginalPilotR47(level,sortie.unit);
             var pilot=sortie.npc?level.getEntity(sortie.pilotR45):level.getServer().getPlayerList().getPlayer(sortie.pilotR45);
+            if(sortie.npc&&pilot==null)return TvSortiesR32.name(sortie.unit)+"的驾驶员待命区正在加载，稍后自动完成交接。";
             if(pilot==null||!pilot.isAlive()||pilot.level()!=level||sortie.npc&&!(pilot instanceof TrainingPilotEntity npc&&npc.getAssignedVariant()==sortie.unit)||pilot.getVehicle()==eva
                     ||pilot instanceof net.minecraft.world.entity.LivingEntity living&&living.getVehicle() instanceof EntryPlugCarrierEntity plug&&plug.getLinkedEva()==eva)
                 return TvSortiesR32.name(sortie.unit)+"的驾驶员还没完成安全交接，请先确认人已离开插入栓。";

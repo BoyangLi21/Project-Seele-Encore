@@ -9,8 +9,10 @@ import net.minecraft.world.phys.*;
 public final class NervCraneSweepR52
 {
     private final NervCraneGeometryR52 geometry;
+    private final boolean bearing;
     private final Map<String,Mesh> meshes=new HashMap<>();
-    public NervCraneSweepR52(NervCraneGeometryR52 geometry){this.geometry=Objects.requireNonNull(geometry);}
+    public NervCraneSweepR52(NervCraneGeometryR52 geometry){this(geometry,geometry.bearing());}
+    public NervCraneSweepR52(NervCraneGeometryR52 geometry,boolean bearing){this.geometry=Objects.requireNonNull(geometry);this.bearing=bearing;}
     private static final class Node{AABB box;Node left,right;int start,end;}
     private static final class Mesh
     {
@@ -35,23 +37,23 @@ public final class NervCraneSweepR52
             if(from.referenceRotation()!=null&&!from.referenceRotation().equals(to.referenceRotation()))throw new IllegalArgumentException("Actual held hoist reference changed");
             double machine=from.machine().translation().distanceTo(to.machine().translation()),grip,omega,jaw,mount;
             if(from.coupled())
-            {omega=NervRigidMeshSweepR52.angular(from.plug(),to.plug());grip=from.plug().translation().distanceTo(to.plug().translation())+EntryPlugKinematics.CRANE_ATTACHMENT_P.length()*omega;jaw=0;mount=grip+geometry.mount().length()*omega;}
+            {omega=NervRigidMeshSweepR52.angular(from.plug(),to.plug());grip=from.plug().translation().distanceTo(to.plug().translation())+EntryPlugKinematics.CRANE_ATTACHMENT_P.length()*omega;if(bearing)omega*=2.1;jaw=0;mount=grip+geometry.mount().length()*omega;}
             else
             {
-                if(machine>1e-8||from.plug()!=null||from.referenceWorld()==null)throw new IllegalArgumentException("Uncoupled hoist holds its actual trolley and reference");
-                double anchor=from.machine().inverse().transformPoint(from.referenceWorld()).y,travel=Math.max(1,-2-anchor),rise=1.875*Math.abs(to.bottom()-from.bottom());
-                grip=6*rise;omega=Math.PI*1.875*rise/Math.max(1,travel-2);jaw=Math.toRadians(32)*rise/.65;mount=grip+geometry.mount().length()*omega;
+                if(from.plug()!=null||from.referenceWorld()==null)throw new IllegalArgumentException("Uncoupled hoist requires its actual held reference");
+                double anchor=from.machine().inverse().transformPoint(from.referenceWorld()).y,travel=Math.max(1,NervCranePoseR52.STOW_BOTTOM_R53-anchor),rise=1.875*Math.abs(to.bottom()-from.bottom());
+                grip=machine+6*rise;omega=Math.PI*1.875*rise/Math.max(.1,travel-Math.min(2,travel*.5));jaw=Math.toRadians(32)*rise/.65;mount=grip+geometry.mount().length()*omega;
             }
             numericError=8e-6*(1+geometry.mount().length()+Math.max(Math.abs(from.bottom()),Math.abs(to.bottom()))+EntryPlugKinematics.CRANE_ATTACHMENT_P.length());
             if(numericError>=.003)throw new IllegalArgumentException("Real hoist numeric error exceeds native budget");
-            var first=sample(0);var last=sample(1);if(!first.keySet().equals(last.keySet())||first.size()!=19)throw new IllegalArgumentException("Complete real hoist inventory changed");
+            var first=sample(0);var last=sample(1);if(!first.keySet().equals(last.keySet())||first.size()!=(bearing?22:19))throw new IllegalArgumentException("Complete real hoist inventory changed");
             for(String name:first.keySet())
             {
                 var mesh=meshes.computeIfAbsent(name,k->new Mesh(geometry.sourceFor(k)));double r=NervRigidMeshSweepR52.radius(mesh.root.box),v;
                 if(name.equals("top"))v=machine;
                 else if(name.startsWith("wheel/"))v=machine+2*r*Math.abs(to.machine().translation().z-from.machine().translation().z)/.38;
                 else if(name.equals("yoke")||name.startsWith("sheave/"))v=mount;
-                else if(name.startsWith("gripper/"))v=grip+omega*r+(name.equals("gripper/body")?0:jaw*(r+2*geometry.jawPivot(name.substring(8)).length()));
+                else if(name.startsWith("gripper/")||name.startsWith("bearing/"))v=grip+omega*r+(name.endsWith("/body")?0:jaw*(r+2*geometry.jawPivot(name.substring(8)).length()));
                 else if(name.startsWith("mount/"))v=mount;
                 else
                 {
@@ -65,7 +67,7 @@ public final class NervCraneSweepR52
                 if(!Double.isFinite(v)||v<0)throw new IllegalArgumentException("Actual vertex speed certificate required");speeds.put(name,v);
             }
         }
-        Map<String,NervCraneGeometryR52.Transform> sample(double t){return samples.computeIfAbsent(t,k->geometry.transforms(from.interpolate(to,k).pose(geometry.mount())));}
+        Map<String,NervCraneGeometryR52.Transform> sample(double t){return samples.computeIfAbsent(t,k->{var state=from.interpolate(to,k);return geometry.transforms(bearing?NervCraneBearingR53.pose(state,geometry.mount()):state.pose(geometry.mount()),bearing);});}
         private Vec3 error(String name,double duration){double pad=speeds.get(name)*duration/2+numericError;return new Vec3(pad,name.equals("top")?0:pad,pad);}
         public Set<String> names(){return segments==null?Set.copyOf(speeds.keySet()):segments.get(0).names();}
         public AABB envelope(String name){if(segments!=null){AABB out=null;for(var segment:segments)out=out==null?segment.envelope(name):out.minmax(segment.envelope(name));return out;}var m=meshes.get(name);return transformed(m.root.box,sample(0).get(name)).minmax(transformed(m.root.box,sample(1).get(name))).inflate(error(name,1).x,error(name,1).y,error(name,1).z);}

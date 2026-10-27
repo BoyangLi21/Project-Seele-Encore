@@ -76,7 +76,7 @@ public final class EvaCombatHudR31
         if(eva==null||mc.level==null)return;
         int panelWidth=Math.min(166,Math.max(120,width/3)),x=8,y=Math.max(8,height-79);
         Font font=gui.getFont();panel(g,x,y,panelWidth,70,ORANGE);
-        String identity=eva instanceof EvaPrototypeEntity un?String.format(Locale.ROOT,"UN / EVA-%02d",un.getUNSerial())
+        String identity=eva instanceof EvaPrototypeEntity un?"UN / "+com.projectseele.entity.Unit03SourceRigR53.displayName(un.getUNSerial())
                 :String.format(Locale.ROOT,"NERV / EVA-%02d",eva.getUnitVariant());
         text(g,font,identity,x+7,y+5,panelWidth-14,ORANGE);
         String hp=String.format(Locale.ROOT,"%.0f / %.0f",Math.max(0,eva.getHealth()),eva.getMaxHealth());

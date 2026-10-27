@@ -260,7 +260,11 @@ public final class StaffConversationR24
                         if(parts.length!=3)throw new IllegalArgumentException("Ambiguous transport cancellation");
                         yield NervAirLiftR30.cancel(player,Integer.parseInt(parts[2]));
                     }
-                    case "recover" -> NervAirLiftR30.request(player,Integer.parseInt(parts[2]),true,0,0);
+                    case "recover" -> {
+                        if(parts.length==3)yield NervAirLiftR30.request(player,Integer.parseInt(parts[2]),true,0,0);
+                        if(parts.length!=4)throw new IllegalArgumentException("Ambiguous recovery receiver");
+                        yield NervAirTransportRuntimeR52.requestRecoveryReceiver(player,Integer.parseInt(parts[2]),parts[3]);
+                    }
                     case "deliver" -> parts.length==6?NervAirTransportRuntimeR52.requestXYZ(player,Integer.parseInt(parts[2]),Integer.parseInt(parts[3]),Integer.parseInt(parts[4]),Integer.parseInt(parts[5])):NervAirLiftR30.request(player,Integer.parseInt(parts[2]),false,Integer.parseInt(parts[3]),Integer.parseInt(parts[4]));
                     default -> "请选择运输操作。";
                 };

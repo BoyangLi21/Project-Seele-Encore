@@ -66,7 +66,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
 {
     private static final EntityDataAccessor<Float> DATA_MODEL_SCALE_R52=SynchedEntityData.defineId(RamielEntity.class,EntityDataSerializers.FLOAT);
     private float modelScaleR52=1;
-    public float modelScaleR52(){return modelScaleR52>0?modelScaleR52:1;}
+    public static final float MODEL_SIZE_MULTIPLIER_R53=4;
+    public float modelScaleR52(){return (modelScaleR52>0?modelScaleR52:1)*MODEL_SIZE_MULTIPLIER_R53;}
     public void configureScaleR52(float scale)
     {if(this.level().isClientSide||!Float.isFinite(scale)||scale<1||scale>16)throw new IllegalArgumentException("Measured Ramiel scale required");this.entityData.set(DATA_MODEL_SCALE_R52,scale);}
     @Override public net.minecraft.world.entity.EntityDimensions getDimensions(net.minecraft.world.entity.Pose pose)
@@ -165,6 +166,79 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         return super.updateInWaterStateAndDoFluidPushing();
     }
 
+    @Override
+    public boolean isInWall()
+    {
+        if (this.noPhysics || this.isSleeping()) return false;
+        // Match Entity.isInWall's float width and exact thin eye volume.
+        // Only the three vanilla air blocks can bypass its position-sensitive
+        // suffocation/shape predicate. Client missing chunks read VOID_AIR;
+        // unavailable server chunks retain super's path.
+        float width = this.getBbWidth() * .8F;
+        AABB eye = AABB.ofSize(this.getEyePosition(), width, 1e-6D, width);
+        if (com.projectseele.physics.GiantMoveBlockQueryR53.noPaletteMatch(this.level(), eye,
+                state -> !state.is(net.minecraft.world.level.block.Blocks.AIR)
+                        && !state.is(net.minecraft.world.level.block.Blocks.CAVE_AIR)
+                        && !state.is(net.minecraft.world.level.block.Blocks.VOID_AIR))) return false;
+        return super.isInWall();
+    }
+
+    @Override
+    protected void checkInsideBlocks()
+    {
+        AABB bounds = this.getBoundingBox();
+        BlockPos first = BlockPos.containing(bounds.minX + 1e-7, bounds.minY + 1e-7, bounds.minZ + 1e-7);
+        BlockPos last = BlockPos.containing(bounds.maxX - 1e-7, bounds.maxY - 1e-7, bounds.maxZ - 1e-7);
+        if (!this.level().hasChunksAt(first, last)) return;
+        int firstChunkX = first.getX() >> 4, firstChunkZ = first.getZ() >> 4;
+        int columns = (last.getX() >> 4) - firstChunkX + 1, rows = (last.getZ() >> 4) - firstChunkZ + 1;
+        var chunks = new net.minecraft.world.level.chunk.ChunkAccess[columns][rows];
+        for (int x = 0; x < columns; x++) for (int z = 0; z < rows; z++)
+        {
+            chunks[x][z] = this.level().getChunkSource().getChunk(firstChunkX + x, firstChunkZ + z,
+                    net.minecraft.world.level.chunk.ChunkStatus.FULL, false);
+            if (chunks[x][z] == null) return;
+        }
+        var at = new BlockPos.MutableBlockPos();
+        int minY = Math.max(first.getY(), this.level().getMinBuildHeight());
+        int maxY = Math.min(last.getY(), this.level().getMaxBuildHeight() - 1);
+        java.util.function.Predicate<BlockState> customAir = state -> state.isAir()
+                && !state.is(net.minecraft.world.level.block.Blocks.AIR)
+                && !state.is(net.minecraft.world.level.block.Blocks.CAVE_AIR)
+                && !state.is(net.minecraft.world.level.block.Blocks.VOID_AIR);
+        // Preserve vanilla's x/y/z callback order. Skip only current empty
+        // sections and vanilla air; modded air blocks retain their callbacks.
+        for (int x = first.getX(); x <= last.getX(); x++)
+            for (int y = minY; y <= maxY; y++)
+                for (int z = first.getZ(); z <= last.getZ();)
+                {
+                    int endZ = Math.min(last.getZ(), (z & ~15) + 15);
+                    var section = chunks[(x >> 4) - firstChunkX][(z >> 4) - firstChunkZ]
+                            .getSections()[this.level().getSectionIndex(y)];
+                    if (section.hasOnlyAir() && !section.maybeHas(customAir)) { z = endZ + 1;continue; }
+                    for (; z <= endZ; z++)
+                    {
+                        var state = section.getBlockState(x & 15, y & 15, z & 15);
+                        if (state.is(net.minecraft.world.level.block.Blocks.AIR)
+                                || state.is(net.minecraft.world.level.block.Blocks.CAVE_AIR)
+                                || state.is(net.minecraft.world.level.block.Blocks.VOID_AIR)) continue;
+                        at.set(x, y, z);
+                        try
+                        {
+                            state.entityInside(this.level(), at, this);
+                            this.onInsideBlock(state);
+                        }
+                        catch (Throwable failure)
+                        {
+                            var report = net.minecraft.CrashReport.forThrowable(failure, "Colliding entity with block");
+                            var category = report.addCategory("Block being collided with");
+                            net.minecraft.CrashReportCategory.populateBlockDetails(category, this.level(), at, state);
+                            throw new net.minecraft.ReportedException(report);
+                        }
+                    }
+                }
+    }
+
     private boolean fluidSectionsEmpty()
     {
         // A scaled airframe spans millions of voxels. Palette rejection is
@@ -180,7 +254,13 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             {
                 var chunk = this.level().getChunkSource().getChunk(x, z,
                         net.minecraft.world.level.chunk.ChunkStatus.FULL, false);
-                if (chunk == null) return false;
+                if (chunk == null)
+                {
+                    // Client missing chunks have Fluids.EMPTY, as returned by
+                    // vanilla EmptyLevelChunk; never generate a server chunk.
+                    if (this.level().isClientSide) continue;
+                    return false;
+                }
                 var sections = chunk.getSections();
                 for (int index = firstSection; index <= lastSection; index++)
                 {
@@ -224,7 +304,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     public void addAdditionalSaveData(CompoundTag tag)
     {
         super.addAdditionalSaveData(tag);
-        tag.putFloat("AtFieldEnergy", this.getAtFieldEnergy());tag.putFloat("ModelScaleR52",this.modelScaleR52());
+        // Save the authored base scale; loading must not multiply it again.
+        tag.putFloat("AtFieldEnergy", this.getAtFieldEnergy());tag.putFloat("ModelScaleR52",this.entityData.get(DATA_MODEL_SCALE_R52));
     }
 
     @Override

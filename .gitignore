@@ -66,3 +66,5 @@ forge*changelog.txt
 # World-specific generated rail triangles are bundled and SHA-checked by the
 # release tools; retain their generators/design sources, not a >100MB Git blob.
 /src/main/resources/assets/projectseele/facility/r52_upright_guideway_paths.json
+# Derived from a private supplied carrier mesh; local runtime overlay only.
+/src/main/resources/assets/projectseele/mesh/carrier_mast_slot_r54.json

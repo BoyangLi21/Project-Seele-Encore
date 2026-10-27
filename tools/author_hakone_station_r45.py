@@ -112,7 +112,7 @@ def service_room(c,label,rect,facing='south',kind='ticket_information'):
         for xx in range(x+2,X-1,3):
             c.fixture((xx,g+1,z+2),'cafe_table','駅係員机')
             c.put((xx,g+1,z+3),'projectseele:residential_chair[facing=north]','Complete station staff office seating')
-    for xx in [x+2,X-2]:c.put((xx,g+4,z+2),'minecraft:sea_lantern','Visible room luminaire attached to the entire roof')
+    for xx in [x+2,X-2]:c.put((xx,g+4,z+2),'minecraft:lantern[hanging=true,waterlogged=false]','Warm 15-level room luminaire supported by the complete timber roof')
     c.sign((dx+2,g+3,front+(1 if facing=='south' else -1)),[label,'駅内サービス'],facing)
     c.rooms.append(dict(id='r45/hakone/'+label,kind=kind,bounds=[x+1,g+1,z+1,X-1,g+4,Z-1],level='lower_station_hall',canon_exact_layout=False))
     c.components.append(dict(id='r45/hakone/'+label,kind=kind,bounds=[x,g,z,X,g+5,Z],metre_layout='original engineering bay inside the existing station plinth'))
@@ -147,7 +147,7 @@ def canopy(c,s):
             old=c.measured.get(xx,111,zz)
             if old in AIR:c.put((xx,111,zz),'minecraft:oak_planks','Whole fitted lower station hall ceiling; all native stair and moving-walk envelopes protected')
     for xx in range(x-h+12,x+h-9,12):
-        for zz in [z-6,z+6]:c.put((xx,110,zz),'minecraft:sea_lantern','Visible human-scale station hall luminaire below the complete fitted ceiling')
+        for zz in [z-6,z+6]:c.put((xx,110,zz),'minecraft:lantern[hanging=true,waterlogged=false]','Single original 15-level warm hall-lamp rhythm below the complete timber ceiling')
     # Entire extant vertical columns receive an even, finite cladding update.
     for zz in [z-15,z+15]:
         for xx in range(x-h,x+h+1):

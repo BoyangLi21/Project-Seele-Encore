@@ -12,7 +12,8 @@ final class EvaUNHandPoseR30
     static void resetEntityR31(EvaUnit01Entity eva){STATES.remove(eva);}
     static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva,BakedGeoModel model,float partial)
     {
-        if(model.getBone("tripo_hand_adapter_r48").isPresent())
+        if(model.getBone("tripo_hand_adapter_r48").isPresent()
+                || model.getBone("unit03_shared_unit01_r53").isPresent())
         {STATES.remove(eva);return EvaMotionEngineV2.BoneWrites.empty();}
         if(EvaGameplayMotionR32.sharedHands(eva,partial))
         {

@@ -6,7 +6,6 @@ authoring evidence, not a substitute for in-game listening.
 """
 from pathlib import Path
 import argparse
-import hashlib
 import json
 import subprocess
 import wave
@@ -37,13 +36,13 @@ def burst():
     t = np.arange(round(SR * 2.1)) / SR
     # A short contactor strike, a broad electrical body, then the heavy rail
     # impulse. Avoid the old long high-band hiss and exposed sine chirp.
-    a = filtered_noise(rng, len(t), 450, 5800) * np.exp(-t/.013) * .30
-    a += filtered_noise(rng, len(t), 160, 1900) * np.exp(-t/.105) * .27
+    a = filtered_noise(rng, len(t), 350, 3500) * np.exp(-t/.018) * .18
+    a += filtered_noise(rng, len(t), 140, 1500) * np.exp(-t/.14) * .31
     a += np.sin(2*np.pi*(46*t+1.5*(1-np.exp(-t/.055)))) * np.exp(-t/.31) * .68
     a += filtered_noise(rng, len(t), 55, 260) * np.exp(-t/.34) * .24
     for delay, weight in ((.021, .10), (.052, .07), (.088, .04)):
         dt = np.maximum(0, t-delay)
-        a += filtered_noise(rng, len(t), 1100, 5700) * np.exp(-dt/.004) * (t >= delay) * weight
+        a += filtered_noise(rng, len(t), 650, 2800) * np.exp(-dt/.007) * (t >= delay) * weight*.45
     coil = np.sin(2*np.pi*102*t) + .28*np.sin(2*np.pi*204*t)
     a += coil * (1-np.exp(-t/.008)) * np.exp(-t/.14) * .055
     # Reflections lose brightness as they recede, instead of duplicating the
@@ -58,24 +57,24 @@ def burst():
 
 def friction(seed):
     rng=np.random.default_rng(seed)
-    duration=.74
+    duration=.88
     t=np.arange(round(SR*duration))/SR
-    attack=np.sin(.5*np.pi*np.clip(t/.055,0,1))**2
-    release=np.sin(.5*np.pi*np.clip((duration-t)/.15,0,1))**2
+    attack=np.sin(.5*np.pi*np.clip(t/.09,0,1))**2
+    release=np.sin(.5*np.pi*np.clip((duration-t)/.22,0,1))**2
     envelope=attack*release
-    # Twelve-tick emission cadence is 0.6 s. These longer, tapered contacts
-    # overlap gently even at the highest ordinary playback pitch (1.1).
-    a=filtered_noise(rng,len(t),100,650)*.15
-    a+=filtered_noise(rng,len(t),450,3100)*.12
+    # Fourteen-tick cadence is 0.7 s. Long overlapping tapers retain a steady
+    # rolling body without repeated sharp scrape attacks.
+    a=filtered_noise(rng,len(t),90,580)*.18
+    a+=filtered_noise(rng,len(t),350,1700)*.075
     roughness=.78+.14*np.sin(2*np.pi*17.3*t+rng.uniform(0,6.28))
     roughness+=.08*np.sin(2*np.pi*41.7*t+rng.uniform(0,6.28))
     a*=roughness
-    for frequency, weight in ((482,.026),(817,.020),(1391,.011)):
+    for frequency, weight in ((241,.018),(482,.012),(817,.006)):
         phase=2*np.pi*frequency*t+rng.uniform(0,2*np.pi)
         a += np.sin(phase+.21*np.sin(2*np.pi*6.1*t))*weight
     for delay in rng.uniform(.05,.65,9):
         dt=np.maximum(0,t-delay)
-        a+=filtered_noise(rng,len(t),1500,6200)*np.exp(-dt/.0025)*(t>=delay)*.028
+        a+=filtered_noise(rng,len(t),900,3400)*np.exp(-dt/.006)*(t>=delay)*.010
     # Do not peak-normalize rail friction to the launch impact's level.
     return finish(a*envelope,peak=.34)
 
@@ -101,7 +100,7 @@ def main():
         samples=np.frombuffer(decoded.stdout,dtype='<f4')
         assert np.isfinite(samples).all() and .1 < max(abs(samples)) < .99
         assert abs(len(samples)-len(signal)) < 1024
-        records.append(dict(asset='assets/projectseele/sounds/'+dest.name,sha256=hashlib.sha256(dest.read_bytes()).hexdigest(),
+        records.append(dict(asset='assets/projectseele/sounds/'+dest.name,
             seconds=len(signal)/SR,decoded_peak=float(max(abs(samples))),decoded_rms=float(np.sqrt(np.mean(samples**2))),
             source='Original deterministic mathematical synthesis; no sampled recording',channels=1,sample_rate=SR))
     p=assets/'sounds.json';catalog=json.loads(p.read_text('utf8')) if p.exists() else {}
@@ -119,7 +118,7 @@ def main():
         data=json.loads(p.read_text('utf8')) if p.exists() else {}
         for key,label in zip(('launch_electric_burst_r53','launch_rail_friction_r53'),labels):data['subtitles.projectseele.'+key]=label
         p.write_text(json.dumps(data,ensure_ascii=False,indent=2)+'\n','utf8')
-    receipt=dict(generator=str(Path(__file__).resolve().relative_to(ROOT)),revision='2026-10-20',
+    receipt=dict(generator=str(Path(__file__).resolve().relative_to(ROOT)),revision='2026-10-23',
                  assets=records,listening='Pending in-game positional mix and user listening')
     (args.out/'AUDIO_SYNTHESIS.json').write_text(json.dumps(receipt,ensure_ascii=False,indent=2),'utf8')
     provenance=assets/'audio/launch_feedback_r53.json';provenance.parent.mkdir(exist_ok=True)

@@ -107,13 +107,19 @@ public final class EvaCapturedLocomotionR44
     {data.define(CLIP,"");data.define(DESTINATION,"");data.define(SINCE,0L);data.define(ORIGIN,new CompoundTag());data.define(DISPLACEMENT,new Vector3f());}
 
     public static synchronized void reload()
+    {reload(false);}
+    public static synchronized void reload(boolean sourceUnit03)
     {
         Map<Integer,Profile> profiles=new HashMap<>();STATES.clear();String directory=com.projectseele.config.PortableRuntimeOwnersR45.capturedDirectory();
         if(directory.isEmpty()){PROFILES=Map.of();loaded=true;return;}
+        boolean excludedSourceProfile=false;
         for(int variant=0;variant<5;variant++)
         {
             Path path=Path.of(directory,"eva_locomotion_capture_r44_"+variant+".json");
             if(!Files.isRegularFile(path))continue;
+            // Source UN01 owns its complete retargeted base library. The old
+            // proportions' captured channels must not enter this profile map.
+            if(variant==4&&sourceUnit03){excludedSourceProfile=true;continue;}
             try
             {
                 byte[] bytes=CombatMotionResourcesR44.read(path,"captured-locomotion-"+variant);
@@ -171,7 +177,7 @@ public final class EvaCapturedLocomotionR44
             }
             catch(Exception failure){throw new IllegalStateException("Cannot load explicit captured locomotion "+path,failure);}
         }
-        if(profiles.isEmpty())throw new IllegalStateException("Explicit captured locomotion directory contains no profiles: "+directory);
+        if(profiles.isEmpty()&&!excludedSourceProfile)throw new IllegalStateException("Explicit captured locomotion directory contains no profiles: "+directory);
         PROFILES=Map.copyOf(profiles);loaded=true;
     }
 
@@ -239,6 +245,7 @@ public final class EvaCapturedLocomotionR44
 
     public static EvaBodyPose.Sample sample(EvaUnit01Entity e,int variant,Map<String,EvaBodyPose.Bone> rig,float partial)
     {
+        if(variant==4&&rig.containsKey(Unit03SourceRigR53.MARKER))return null;
         Profile profile=PROFILES.get(variant);
         String clipName=e.getEntityData().get(CLIP);
         if(profile==null||!eligible(e)||clipName.isEmpty())return null;

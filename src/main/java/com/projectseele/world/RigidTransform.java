@@ -22,8 +22,9 @@ public record RigidTransform(Vec3 translation,
         {
             throw new IllegalArgumentException("translation is required");
         }
-        float length = Mth.sqrt(qx * qx + qy * qy + qz * qz + qw * qw);
-        if (!Float.isFinite(length) || length < EPSILON)
+        double length = Math.sqrt((double)qx * qx + (double)qy * qy
+                + (double)qz * qz + (double)qw * qw);
+        if (!Double.isFinite(length) || length < EPSILON)
         {
             qx = 0.0F;
             qy = 0.0F;
@@ -32,11 +33,16 @@ public record RigidTransform(Vec3 translation,
         }
         else
         {
-            float inverse = 1.0F / length;
-            qx *= inverse;
-            qy *= inverse;
-            qz *= inverse;
-            qw *= inverse;
+            // Re-normalizing an already unit float quaternion can alternate
+            // between adjacent values on every copy/interpolation.
+            if (Math.abs(length - 1.0D) > Math.ulp(1.0F))
+            {
+                float inverse = (float)(1.0D / length);
+                qx *= inverse;
+                qy *= inverse;
+                qz *= inverse;
+                qw *= inverse;
+            }
             if (qw < 0.0F)
             {
                 qx = -qx;
@@ -170,6 +176,10 @@ public record RigidTransform(Vec3 translation,
     public RigidTransform interpolate(RigidTransform target, double amount)
     {
         float alpha = (float) Mth.clamp(amount, 0.0D, 1.0D);
+        if (qx == target.qx && qy == target.qy && qz == target.qz && qw == target.qw)
+        {
+            return new RigidTransform(this.translation.lerp(target.translation, alpha), qx, qy, qz, qw);
+        }
         Quaternionf rotation = this.rotation()
                 .slerp(target.rotation(), alpha)
                 .normalize();

@@ -105,6 +105,7 @@ public final class LocalVisualAssetFingerprint
                 || R21_CONTRACTS.containsKey(assetName) && R21_CONTRACTS.get(assetName).matches(meshTag,mesh)
                 || R22_CONTRACTS.containsKey(assetName) && R22_CONTRACTS.get(assetName).matches(meshTag,mesh)
                 || R23_CONTRACTS.containsKey(assetName) && R23_CONTRACTS.get(assetName).matches(meshTag,mesh)
+                || matchesSourceSurfaceR53(assetName,sourcePack,resources,meshTag)
                 || matchesR48(assetName,sourcePack,meshTag)
                 || matchesR30(assetName,sourcePack,resources,meshTag)
                 || matchesR37(assetName,sourcePack,resources,meshTag)
@@ -122,6 +123,36 @@ public final class LocalVisualAssetFingerprint
         return fingerprint;
     }
     private record SelectedR50Contract(MeshContract mesh, Map<String, String> sha256) {}
+
+    private static boolean matchesSourceSurfaceR53(String name,String pack,Map<String,ResourceDigest> resources,String tag)
+    {
+        if(!name.equals("eva_prototype")&&!name.equals("eva_un01"))return false;
+        var manifest=Minecraft.getInstance().getResourceManager()
+                .getResource(resource("eva/source_surface_r53.json"));
+        if(manifest.isEmpty()||!manifest.get().sourcePackId().equals(pack))return false;
+        try(var reader=manifest.get().openAsReader())
+        {
+            var root=com.google.gson.JsonParser.parseReader(reader).getAsJsonObject();
+            if(!root.get("schema").getAsString().equals("projectseele.source-surface-r53.v1"))return false;
+            var model=root.getAsJsonObject("models").getAsJsonObject(name);
+            if(model==null)return false;
+            int source=model.get("source_triangles").getAsInt(),added=model.get("added_triangles").getAsInt();
+            int count=model.get("triangles").getAsInt(),parts=model.get("parts").getAsInt();
+            if(source<=0||added<0||count!=source+added||count>5_000_000||parts<=0
+                    ||!tag.startsWith("triangle-mesh-"+count+"-p"+parts+"-"))return false;
+            var hashes=model.getAsJsonObject("resources");
+            if(!hashes.keySet().equals(resources.keySet()))return false;
+            for(var entry:resources.entrySet())
+                if(!entry.getValue().present()||!entry.getValue().sourcePack().equals(pack)
+                        ||!entry.getValue().sha256().equals(hashes.get(entry.getKey()).getAsString()))return false;
+            return true;
+        }
+        catch(Exception invalid)
+        {
+            ProjectSeele.LOGGER.warn("Source surface manifest rejected",invalid);
+            return false;
+        }
+    }
 
     private static boolean matchesR52Reviewed(String name,String pack,Map<String,ResourceDigest> resources,String tag,ResourceLocation mesh)
     {
@@ -246,8 +277,10 @@ public final class LocalVisualAssetFingerprint
         try (var stream = resource.get().open())
         {
             MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] buffer=new byte[65536];
+            for(int count;(count=stream.read(buffer))!=-1;)digest.update(buffer,0,count);
             return new ResourceDigest(true, resource.get().sourcePackId(),
-                    HexFormat.of().formatHex(digest.digest(stream.readAllBytes())));
+                    HexFormat.of().formatHex(digest.digest()));
         }
         catch (Exception exception)
         {

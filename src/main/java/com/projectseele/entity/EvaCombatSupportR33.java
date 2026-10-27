@@ -72,7 +72,7 @@ public final class EvaCombatSupportR33
         // Releasing a planted foot must not also discard the gait clock.
         // Attacks and turning previously cleared CONTACTS, switching the
         // same moving legs between two differently delayed sample streams.
-        var tag=e instanceof EvaPrototypeEntity?e.getEntityData().get(CONTACTS):e.getEntityData().get(PHASE_HISTORY_R45);
+        var tag=!Unit03SourceRigR53.sharesGroundActions(e)?e.getEntityData().get(CONTACTS):e.getEntityData().get(PHASE_HISTORY_R45);
         if(!tag.contains("position_phase_r44",Tag.TAG_LIST))return witnessSignalR45(e,partial,channel,fallback,fallback,"no_history",null,null,0,false);
         var samples=tag.getList("position_phase_r44",Tag.TAG_COMPOUND);if(samples.isEmpty())return witnessSignalR45(e,partial,channel,fallback,fallback,"empty_history",null,null,0,false);
         var origin=e.getPosition(partial);CompoundTag first=samples.getCompound(samples.size()-1),last=first;float amount=1;double best=Double.POSITIVE_INFINITY;
@@ -93,7 +93,7 @@ public final class EvaCombatSupportR33
             return witnessSignalR45(e,partial,channel,fallback,channel==4?stableGaitR53(e,samples,fallback):fallback,
                     "far_from_history",first,last,amount,false);
         boolean stationaryReview=false,timedStopReview=false;
-        if(!(e instanceof EvaPrototypeEntity))
+        if(Unit03SourceRigR53.sharesGroundActions(e))
         {
             var newest=samples.getCompound(samples.size()-1);
             var prior=samples.getCompound(Math.max(0,samples.size()-2));
@@ -190,7 +190,7 @@ public final class EvaCombatSupportR33
         row.putFloat("gait",e.rifleGaitPhase(0));row.putFloat("run",e.rifleRunBlend(0));row.putFloat("move",e.rifleMoveBlend(0));
         if(!samples.isEmpty()&&samples.getCompound(samples.size()-1).getLong("tick")==e.level().getGameTime())samples.remove(samples.size()-1);
         samples.add(row);while(samples.size()>8)samples.remove(0);CLOCKS.put(e,samples);
-        if(!(e instanceof EvaPrototypeEntity))
+        if(Unit03SourceRigR53.sharesGroundActions(e))
         {
             var history=new CompoundTag();
             if(e.getPilotEntity()!=null&&!e.isNervLogisticsLocked())history.put("position_phase_r44",samples.copy());
@@ -236,7 +236,7 @@ public final class EvaCombatSupportR33
         FLOOR_WITNESS.remove(e);
         // Terrain non-penetration is independent of the optional locomotion
         // foot-lock asset. Legacy clips and attacks use the same final soles.
-        if(e.isExperimentalUnit()||!supported(e)||!EvaGameplayMotionR32.sharedWeapon(e)||e.rifleStanceLevel(partial)>.01F
+        if(!Unit03SourceRigR53.sharesGroundActions(e)||!supported(e)||!EvaGameplayMotionR32.sharedWeapon(e)||e.rifleStanceLevel(partial)>.01F
                 ||e.isFirstBattleActive()||e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e)||CombatReactionsR36.active(e))return;
         var origin=e.level().isClientSide?e.getPosition(partial):e.position();var diagnostics=new CompoundTag();
         var profile=com.projectseele.physics.CombatBodyProfiles.get(e);
@@ -266,7 +266,7 @@ public final class EvaCombatSupportR33
         if(!ready(e))return 0;
         // R47 field travel keeps the base walk/run in the actual leg owner.
         // Its clock cannot still use combat-advance stride/contact timing.
-        if(!(e instanceof EvaPrototypeEntity)&&!e.isBerserk()
+        if(Unit03SourceRigR53.sharesGroundActions(e)&&!e.isBerserk()
                 &&(!EvaGameplayMotionR32.sharedWeapon(e)
                    ||(e.pilotLocomotionRequestedR45()||e.rifleMoveBlend(partial)>.05F)
                      &&e.rifleStanceLevel(partial)<.01F))return 0;
@@ -316,7 +316,7 @@ public final class EvaCombatSupportR33
     public static void capture(EvaUnit01Entity e,EvaBodyPose.Sample pose)
     {
         if(e.level().isClientSide||!ready(e)||!supported(e)||e.isPilotCrouching()||e.isPilotProne())return;
-        if(!(e instanceof EvaPrototypeEntity)&&(e.pilotLocomotionRequestedR45()||e.rifleMoveBlend(0)>.08F))
+        if(Unit03SourceRigR53.sharesGroundActions(e)&&(e.pilotLocomotionRequestedR45()||e.rifleMoveBlend(0)>.08F))
         {release(e);return;}
         CompoundTag t=new CompoundTag();t.putFloat("yaw",e.getYRot());t.putLong("plant",e.level().getGameTime());t.putInt("weapon",e.getWeapon());
         for(String s:new String[]{"l","r"})
@@ -354,7 +354,7 @@ public final class EvaCombatSupportR33
         // Gating the history on a new foot-lock asset contract left those
         // clips on bursty packet clocks, skipping several gait poses at once.
         // This records timing only; it does not enable planted-foot IK.
-        if(!(e instanceof EvaPrototypeEntity)||EvaBodyPose.runtimeLocomotionR44(e))rememberClockR44(e);
+        if(Unit03SourceRigR53.sharesGroundActions(e)||EvaBodyPose.runtimeLocomotionR44(e))rememberClockR44(e);
         boolean locomotion=EvaBodyPose.runtimeLocomotionR44(e)&&EvaGameplayMotionR32.sharedWeapon(e)
                 &&e.getPilotEntity()!=null&&supported(e)&&!strike(e)&&e.rifleMoveBlend(0)>.05F&&e.rifleStanceLevel(0)<.01F
                 &&!e.isNervLogisticsLocked()&&!e.isFirstBattleActive()&&!EvaShutdownR30.disabled(e)&&!CombatReactionsR36.active(e);
@@ -363,7 +363,7 @@ public final class EvaCombatSupportR33
         var beat=CombatFeelR31.beat(e);boolean fallen=beat!=null&&(beat.kind()==CombatFeelR31.DOWN||beat.kind()==CombatFeelR31.THROWN);
         boolean release=!supported(e)||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)
                 ||!EvaGameplayMotionR32.sharedWeapon(e)||e.isPilotCrouching()||e.isPilotProne()||fallen||!strike(e)&&e.rifleMoveBlend(1)>.18F;
-        if(!(e instanceof EvaPrototypeEntity))
+        if(Unit03SourceRigR53.sharesGroundActions(e))
         {
             var anchors=e.getEntityData().get(CONTACTS);
             release|=e.rifleMoveBlend(1)>.08F||!anchors.isEmpty()
@@ -447,7 +447,7 @@ public final class EvaCombatSupportR33
     }
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample p,float partial)
     {
-        if(!(e instanceof EvaPrototypeEntity)&&e.rifleMoveBlend(partial)>.08F)
+        if(Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleMoveBlend(partial)>.08F)
         {TARGETS.remove(e);CLIENT_RELEASES.remove(e);return;}
         TARGETS.remove(e);
         if(CombatReactionsR36.active(e))return;

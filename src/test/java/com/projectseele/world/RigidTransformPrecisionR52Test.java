@@ -20,6 +20,16 @@ public final class RigidTransformPrecisionR52Test
             if(a.rotationErrorDegrees(opposite)>1e-5)throw new AssertionError("q/-q discontinuity");
             checks+=3;
         }
+        var lift=new RigidTransform(new Vec3(72.50857491591684,81.025,297.5828188997969),0,.7149445F,0,.69918126F);
+        var liftEnd=new RigidTransform(lift.translation().add(0,48,0),lift.qx(),lift.qy(),lift.qz(),lift.qw());
+        for(int i=0;i<=64;i++)
+        {
+            var sample=lift.interpolate(liftEnd,i/64D);
+            for(int copy=0;copy<4;copy++)sample=new RigidTransform(sample.translation(),sample.qx(),sample.qy(),sample.qz(),sample.qw());
+            if(sample.qx()!=lift.qx()||sample.qy()!=lift.qy()||sample.qz()!=lift.qz()||sample.qw()!=lift.qw())
+                throw new AssertionError("Fixed lift rotation drifted during interpolation/reload");
+            checks++;
+        }
         for(double degrees:new double[]{.001,.01,.04,1,45,90,179.9,180})
         {
             double half=Math.toRadians(degrees)*.5;

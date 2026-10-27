@@ -178,17 +178,20 @@ public abstract class CameraMixin
             // when the rider and EVA crossed a packet boundary separately.
             long now=System.nanoTime();
             double dt=Math.min(.1,Math.max(0,(now-projectseele$carrierFrame)/1e9));
-            Vec3 base=controlled.hasActiveCarrierMotion()?controlled.carrierRenderPosition(partialTick):controlled.getPosition(partialTick);
+            boolean mechanical=com.projectseele.entity.EvaMechanicalFrameR52.active(controlled);
+            Vec3 base=mechanical?com.projectseele.entity.EvaMechanicalFrameR52.frame(controlled,partialTick).translation()
+                    :controlled.hasActiveCarrierMotion()?controlled.carrierRenderPosition(partialTick):controlled.getPosition(partialTick);
             // A 60-metre EVA needs a chest-height orbit even when the silo
             // wall contracts its zoom. Never inherit the low rider seat or
             // ease back toward the old 30-metre waist pivot.
             projectseele$carrierPivotHeight=48;
-            Vec3 pivot=com.projectseele.entity.EvaAirTransportR31.active(controlled)
+            Vec3 pivot=mechanical?com.projectseele.entity.EvaMechanicalFrameR52.frame(controlled,partialTick).transformPoint(new Vec3(0,40,0))
+                    :com.projectseele.entity.EvaAirTransportR31.active(controlled)
                     ?com.projectseele.entity.EvaAirTransportR31.point(controlled,new Vec3(0,40,0),partialTick):base.add(0,projectseele$carrierPivotHeight,0);
             this.setPosition(pivot.x,pivot.y,pivot.z);
             double available=Math.max(.25,this.getMaxZoom(4)-2.0);
             double anticipated=available;
-            if(controlled.hasActiveCarrierMotion()&&!com.projectseele.entity.EvaAirTransportR31.active(controlled))
+            if(!mechanical&&controlled.hasActiveCarrierMotion()&&!com.projectseele.entity.EvaAirTransportR31.active(controlled))
             {
                 // Read the already synchronized mechanical path ahead. A
                 // descending camera contracts before reaching the surface

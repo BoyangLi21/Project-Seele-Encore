@@ -19,8 +19,62 @@ public final class NervLowerFrameR52 {
     public record Piece(String name,double[] rgb,RigidTransform local,String kind,JsonObject declaration){public double[] xyz(){var result=new double[rgb.length/2];for(int i=0,n=0;i<rgb.length;i+=6){result[n++]=rgb[i];result[n++]=rgb[i+1];result[n++]=rgb[i+2];}return result;}public NervRigidMeshSweepR52 mesh(){return kind.equals("rope")?new NervRigidMeshSweepR52(xyz()):MESHES.computeIfAbsent(name,key->new NervRigidMeshSweepR52(xyz()));}}
     private static final Map<String,NervRigidMeshSweepR52> MESHES=new HashMap<>();
     private static JsonObject source;private static Map<String,double[]> parts;private static List<JsonObject> members;
+    private static boolean fixedCarrierBay;
+    private static JsonObject fixedCarrierRefit;
+    /** A separately installed equipment declaration retires the redundant pit
+     * crossbars as physical members on both clients and servers. The original
+     * column seats and their four permanent floor bearings are unchanged. */
+    private static List<JsonObject> installedMembers(List<JsonObject> previous)throws IOException
+    {
+        try(var input=NervLowerFrameR52.class.getResourceAsStream("/assets/projectseele/mesh/cage_lower_fixed_carrier_r53.json"))
+        {
+            if(input==null)return List.copyOf(previous);
+            var refit=JsonParser.parseString(new String(input.readAllBytes(),StandardCharsets.UTF_8)).getAsJsonObject();
+            if(!refit.get("schema").getAsString().equals("projectseele.r53.fixed-carrier-bay-gantry.v1")
+                    ||!refit.get("predecessor_resource").getAsString().equals(SOURCE)
+                    ||refit.get("retained_column_triangles").getAsInt()!=4912
+                    ||refit.get("permanent_floor_bearings").getAsInt()!=4)
+                throw new IllegalStateException("Explicit original bay equipment replacement required");
+            var retained=new HashSet<String>();var removed=new HashSet<String>();
+            for(var name:refit.getAsJsonArray("retained_members"))if(!retained.add(name.getAsString()))throw new IllegalStateException("Repeated retained member");
+            for(var name:refit.getAsJsonArray("removed_members"))if(!removed.add(name.getAsString()))throw new IllegalStateException("Repeated retired member");
+            var result=new ArrayList<JsonObject>();
+            for(var member:previous)
+            {
+                String name=member.get("part").getAsString();
+                boolean keep=name.equals("original_fixed_columns_r52")||name.startsWith("permanent_column_foot_seat_");
+                if(keep!=retained.remove(name)||keep==removed.remove(name))throw new IllegalStateException("Complete physical lower equipment replacement required");
+                if(keep){if(!member.get("kind").getAsString().equals("fixed"))throw new IllegalStateException("Permanent column supports required");result.add(member);}
+            }
+            if(result.size()!=5||!retained.isEmpty()||!removed.isEmpty())throw new IllegalStateException("Exact five original column support members required");
+            fixedCarrierRefit=refit.deepCopy();fixedCarrierBay=true;return List.copyOf(result);
+        }
+    }
+    public static boolean fixedCarrierBayR53()throws IOException{install();return fixedCarrierBay;}
+    /** Only these three declared, stationary service-pit actors lost their
+     * moving leaves during the shallow-tray installation. No clock is edited. */
+    public static boolean retiredServiceLeavesR53(UUID id,int variant,SiloHatchMechanism.Spec spec,RigidTransform frame)throws IOException
+    {
+        install();if(!fixedCarrierBay||!fixedCarrierRefit.has("retired_service_pit_leaves"))return false;
+        var rows=fixedCarrierRefit.getAsJsonArray("retired_service_pit_leaves");
+        if(rows.size()!=3)throw new IllegalStateException("Exact three original service-pit replacements required");
+        var variants=new HashSet<Integer>();var ids=new HashSet<UUID>();boolean selected=false;
+        for(var raw:rows)
+        {
+            var row=raw.getAsJsonObject();int unit=row.get("variant").getAsInt();UUID actor=UUID.fromString(row.get("visual").getAsString());
+            if(unit<0||unit>2||!variants.add(unit)||!ids.add(actor)||!row.get("resource").getAsString().equals("bay_"+unit+"_service_pit")||row.get("retired_moving_panels").getAsInt()!=8||row.get("retained_fixed_members").getAsInt()!=7)
+                throw new IllegalStateException("Distinct original eight-leaf service-pit replacements required");
+            if(!actor.equals(id))continue;
+            var at=row.getAsJsonArray("position");var expected=new Vec3(at.get(0).getAsDouble(),at.get(1).getAsDouble(),at.get(2).getAsDouble());
+            if(unit!=variant||spec==null||!spec.serviceColumnPorts()||spec.uprightGuidePorts()||spec.separationSign()!=-1||spec.openingX()!=33||spec.openingZ()!=33||spec.serviceGantryYawDegrees()!=180
+                    ||frame.translation().distanceToSqr(expected)>1e-8||frame.rotationErrorDegrees(RigidTransform.identity())>1e-6)
+                throw new IllegalStateException("Retired original service-pit identity/frame/spec changed");
+            selected=true;
+        }
+        return selected;
+    }
     public static synchronized void install()throws IOException {
-        if(source!=null)return;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);try{if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(SOURCE_SHA))throw new IllegalStateException("Actual lower frame source changed");}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}var root=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(!root.get("schema").getAsString().equals("projectseele.r52.engineered-lower-frame-telescopes.v1")||root.get("stride").getAsInt()!=6)throw new IllegalStateException("Actual lower frame declaration absent");var all=new HashMap<String,double[]>();for(var row:root.getAsJsonObject("parts").entrySet()){var a=row.getValue().getAsJsonArray();if(a.size()%18!=0)throw new IllegalStateException("Incomplete lower steel triangles");var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();all.put(row.getKey(),v);}var rows=new ArrayList<JsonObject>();for(var r:root.getAsJsonArray("members"))rows.add(r.getAsJsonObject());parts=Map.copyOf(all);members=List.copyOf(rows);source=root;
+        if(source!=null)return;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);try{if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(SOURCE_SHA))throw new IllegalStateException("Actual lower frame source changed");}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}var root=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(!root.get("schema").getAsString().equals("projectseele.r52.engineered-lower-frame-telescopes.v1")||root.get("stride").getAsInt()!=6)throw new IllegalStateException("Actual lower frame declaration absent");var all=new HashMap<String,double[]>();for(var row:root.getAsJsonObject("parts").entrySet()){var a=row.getValue().getAsJsonArray();if(a.size()%18!=0)throw new IllegalStateException("Incomplete lower steel triangles");var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();all.put(row.getKey(),v);}var rows=new ArrayList<JsonObject>();for(var r:root.getAsJsonArray("members"))rows.add(r.getAsJsonObject());parts=Map.copyOf(all);members=installedMembers(rows);source=root;
     }
     private static double smooth(double value){double p=Math.max(0,Math.min(1,value));return p*p*p*(10+p*(-15+6*p));}
     public static RigidTransform at(JsonObject member,double progress) {

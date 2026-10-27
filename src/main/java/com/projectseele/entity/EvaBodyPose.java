@@ -62,7 +62,6 @@ public final class EvaBodyPose
         {
             EvaGameplayMotionR32.reload();
             CombatMotionResourcesR44.resetFingerprints();
-            EvaCapturedLocomotionR44.reload();
             String explicit=System.getProperty("projectseele.bodyPoseReview","");
             Path path=explicit.isEmpty()?CombatMotionResourcesR44.resolve("projectseele.bodyPoseReviewDirectory",
                     "eva_body_r44.json","eva_body_r43.json","eva_body_r42.json","eva_body_r41.json","eva_body_r25.json"):Path.of(explicit);
@@ -81,6 +80,10 @@ public final class EvaBodyPose
                 all=new JsonObject();all.add("motion",resource("motion/eva_connected_locomotion_v1.json"));
                 all.add("rig",resource("eva/eva_rig_schema.json").get("bones"));
             }
+            boolean sourceUnit03=false;
+            if(all.has("rigs")&&all.getAsJsonObject("rigs").has("4"))for(var bone:all.getAsJsonObject("rigs").getAsJsonArray("4"))
+                if(bone.getAsJsonObject().get("name").getAsString().equals(Unit03SourceRigR53.MARKER))sourceUnit03=true;
+            EvaCapturedLocomotionR44.reload(sourceUnit03);
             var motion=all.getAsJsonObject("motion");var boneNames=motion.getAsJsonArray("bones");String[] names=new String[boneNames.size()];Map<String,Integer> index=new HashMap<>();
             for(int i=0;i<names.length;i++){names[i]=boneNames.get(i).getAsString();index.put(names[i],i);}
             Map<String,Clip> clips=new HashMap<>();
@@ -437,6 +440,15 @@ public final class EvaBodyPose
     public static int rigKey(EvaUnit01Entity eva)
     {if(data==null)reload();int candidate=eva instanceof EvaPrototypeEntity un?3+un.getUNSerial():eva.getUnitVariant();return data.rigs().containsKey(candidate)?candidate:eva.getUnitVariant();}
     public static boolean hasOwnUnRig(EvaUnit01Entity eva){return eva.isExperimentalUnit()&&rigKey(eva)>=3;}
+    public static boolean hasRigBoneR53(int key,String name)
+    {if(data==null)reload();var rig=data.rigs().get(key);return rig!=null&&rig.containsKey(name);}
+    public static boolean usesUnit01SkeletonR53(EvaUnit01Entity eva)
+    {
+        if (!(eva instanceof EvaPrototypeEntity un) || un.getUNSerial() != 1) return false;
+        if (data == null) reload();
+        var rig = data.rigs().get(4);
+        return rig != null && rig.containsKey("unit03_shared_unit01_r53");
+    }
     public static Vector3f eyePoint(EvaUnit01Entity eva){return eva instanceof EvaPrototypeEntity un?EvaUNOptics.lens(un):eyePoint(eva.getUnitVariant());}
     public static net.minecraft.world.phys.Vec3 opticalEye(EvaUnit01Entity eva,float partial)
     {

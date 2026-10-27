@@ -61,7 +61,18 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     private final boolean installed;
     private final long epoch;
     private boolean commissioned;
-    private final Map<UUID,FullAssemblyGeometryR52.Captured> captured=new HashMap<>();
+    private static final class CapturedSourcesR53 extends HashMap<UUID,FullAssemblyGeometryR52.Captured>
+    {
+        @Override public FullAssemblyGeometryR52.Captured put(UUID id,FullAssemblyGeometryR52.Captured value)
+        {var previous=super.put(id,value);if(previous!=null&&previous!=value)previous.invalidateSourceWorkR53();return previous;}
+        @Override public FullAssemblyGeometryR52.Captured remove(Object id)
+        {var previous=super.remove(id);if(previous!=null)previous.invalidateSourceWorkR53();return previous;}
+        @Override public void clear()
+        {values().forEach(FullAssemblyGeometryR52.Captured::invalidateSourceWorkR53);super.clear();}
+        @Override public void putAll(Map<? extends UUID,? extends FullAssemblyGeometryR52.Captured> values)
+        {values.forEach(this::put);}
+    }
+    private final Map<UUID,FullAssemblyGeometryR52.Captured> captured=new CapturedSourcesR53();
     private final Map<UUID,NervBallisticHandoffR52.Proof> ballistic=new HashMap<>();
     private final Map<UUID,NervHullPreviewR52> previews=new HashMap<>();
     private final Map<UUID,EvaMechanicalFrameR52.OccupiedCapture> occupiedPreviews=new HashMap<>();
@@ -90,7 +101,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         EvaMechanicalFrameR52.installGeometry();FullAssemblyGeometryR52.installClasspath();NervMappedPlugMechanicsR52.install();NervPlantMotionR52.install(request.cage());
         NervLowerFrameR52.install();NervPlantMotionR52.originalFixedColumnsR52();
         for(var spec:request.silos())NervSiloHatchGeometryR52.loadClasspath(spec);for(var spec:request.hangars())NervHangarGateGeometryR52.loadClasspath(spec);
-        if(request.ground()){NervLegacyCarrierRideR52.fixedPartsR52();for(var unit:request.units()){NervOriginalCarrierR52.partsAtR52(unit.variant(),unit.bay(),0,new Vec3(0,1,0));NervOriginalCarrierR52.partsAtR52(unit.variant(),unit.bay(),1,new Vec3(0,1,0));}}
+        if(request.ground()){CarrierRearGuideR53.fixed();NervLegacyCarrierRideR52.fixedPartsR52();for(var unit:request.units()){NervOriginalCarrierR52.partsAtR52(unit.variant(),unit.bay(),0,new Vec3(0,1,0));NervOriginalCarrierR52.partsAtR52(unit.variant(),unit.bay(),1,new Vec3(0,1,0));}}
         var crane=NervCraneGeometryR52.loadClasspath();return new PreparedGeometryR52(crane,new NervCraneSweepR52(crane));
     }
     void preparedGeometryR52(PreparedGeometryR52 ready){preparedGeometryR52=Objects.requireNonNull(ready);}
@@ -128,7 +139,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         for(var p:units.values()){
             if(!fixed(level,p.gantry().supports()))return commissioningHoldR52("unit_"+p.variant()+"/gantry_support",firstFixedMismatchR52(level,p.gantry().supports()));
             if(!fixed(level,p.crane().frameCells()))return commissioningHoldR52("unit_"+p.variant()+"/crane_frame",firstFixedMismatchR52(level,p.crane().frameCells()));
-            if(!NervR50CarrierModeR53.enabled()&&!fixed(level,p.carrierSupport()))return commissioningHoldR52("unit_"+p.variant()+"/carrier_support",firstFixedMismatchR52(level,p.carrierSupport()));
+
             if(!(level.getEntity(p.eva()) instanceof EvaUnit01Entity))return commissioningHoldR52("unit_"+p.variant()+"/original_eva","uuid="+p.eva()+" expected_pos="+p.bay().translation()+" current="+level.getEntity(p.eva()));
             if(!(level.getEntity(p.plug()) instanceof EntryPlugCarrierEntity)&&!EntryPlugDisposalR31.destroyed(level,p.plug()))return commissioningHoldR52("unit_"+p.variant()+"/original_capsule","uuid="+p.plug()+" expected_frame="+p.dock()+" current="+level.getEntity(p.plug()));
         }
@@ -148,6 +159,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     public boolean resumeExistingR52(ServerLevel level)throws java.io.IOException {
         var machines=new HashSet<UUID>();for(var p:units.values()){machines.add(p.gantry().id());machines.add(p.crane().visual().id());var carrier=carrierControllers.get(p.variant());if(carrier==null)return commissioningHoldR52("resume/carrier_identity","variant="+p.variant());machines.add(carrier);}for(var g:gates.values())machines.add(g.visual());for(String id:canonicalTurnsR52())machines.add(NervFootGuideStationR52.proposedIdentityR52(epoch,id));
         for(var id:machines){var actor=level.getEntity(id);if(actor==null||!actor.isAlive())return commissioningHoldR52("resume/original_controller_not_loaded","uuid="+id);}
+        CarrierEquipmentUpdateR53.verifyPendingBank(level,NervRouteRuntimeR52.installationStateR52(level),directory);
         return commission(level);
     }
     public Map<UUID,Vec3> installationActorPositionsR52(){
@@ -169,6 +181,8 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var passengers=List.copyOf(capsule.getPassengers());capsule.resetOriginalAtDockR53(p.dock());eva.clearEntryPlugLink(capsule);for(var passenger:passengers)passenger.teleportTo(p.standby().x,p.standby().y,p.standby().z);eva.ejectPassengers();pilot.stopRiding();pilot.getNavigation().stop();pilot.setInvisible(false);pilot.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);pilot.moveTo(p.standby().x,p.standby().y,p.standby().z,0,0);
         for(String key:List.of("R52OriginalPilotOperation","R52OriginalPilotDirectory","R52OriginalPilotNode"))pilot.getPersistentData().remove(key);
         pilot.getPersistentData().putString("SeelePilotRouteR30","standby");pilotOperations.remove(pilot.getUUID());pilotNodes.remove(pilot.getUUID());
+                var tag=pilot.getPersistentData();tag.putString("R52OriginalPilotOperation","standby");
+                tag.putString("R52OriginalPilotDirectory",directory.fingerprint());tag.putInt("R52OriginalPilotNode",p.returnPath().size());
         if(l.getEntity(p.seat()) instanceof NervCommandSeatEntity seat)pilot.startRiding(seat,true);
         if(l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist)
         {
@@ -184,12 +198,13 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(front==null||!(l.getEntity(front.visual()) instanceof NervHangarDoorEntity frontDoor))throw new IllegalStateException("原机库门尚未加载，不能完成复位");
         frontDoor.restoreDeclaredClosedR53();
         for(var step:front.collisionSteps())for(var cell:step)if(!l.getBlockState(cell.at()).equals(cell.closed()))l.setBlock(cell.at(),cell.closed(),18);
-        for(var layer:p.lcl())for(var cell:layer)if(!l.getBlockState(cell.at()).equals(cell.closed()))l.setBlock(cell.at(),cell.closed(),18);
-        var g=gantry(l,p);if(g!=null){g.setRestraintProgress(1);g.setLclVisualLevel(p.lcl().size());g.setLowerFrameProgressR52(0);g.setServiceGuideBridgeR52(0);}
+        CarrierBayTrayR53.restoreResetGuardsR53(l,hardware,p.lcl());
+        for(var layer:p.lcl())for(var cell:layer)if(!CarrierBayTrayR53.retainsLiquidCell(l,cell)&&!l.getBlockState(cell.at()).equals(cell.closed()))l.setBlock(cell.at(),cell.closed(),18);
+        var g=gantry(l,p);if(g!=null){g.setRestraintProgress(fixedCarrierBayR53(l,p)?0:1);g.setLclVisualLevel(p.lcl().size());g.setLowerFrameProgressR52(0);g.setServiceGuideBridgeR52(0);}
         var fleet=EvaFleetSavedData.get(l.getServer());var row=fleet.entry(variant).orElseThrow();fleet.put(variant,row.withPhase(EvaFleetSavedData.Phase.PARKED,0,0,p.lcl().size()));captured.remove(eva.getUUID());continuousGeometryR52.remove(eva.getUUID());ballistic.remove(eva.getUUID());previews.remove(eva.getUUID());occupiedPreviews.remove(eva.getUUID());holds.remove(eva.getUUID());receiverTicks.remove(eva.getUUID());return eva;
     }
-    private boolean carrierSupportReadyR53(ServerLevel l,EvaUnit01Entity eva){if(!NervR50CarrierModeR53.enabled())return NervMappedPlugMechanicsR52.actualCarrierFootBearing(l,eva);var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);return carrier!=null&&NervOriginalCarrierR52.declared(carrier)&&eva.carrierRiseProgress(1)==1&&pose(NervOriginalCarrierR52.actualRoot(carrier,1),NervOwnerPlacementR52.actualRoot(eva));}
-    private boolean acceptCarrierActuatorR52(ServerLevel l,EvaUnit01Entity e,RigidTransform root,float from,float to,Set<UUID> own,Original o,CompoundTag data){if(NervR50CarrierModeR53.enabled()){e.setCarrierRiseProgress(to);var n=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(n!=null)NervOriginalCarrierR52.restoreR50RiseR53(n,to);return true;}if(!EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(e)){if(!NervMappedPlugMechanicsR52.clearCarrierRise(l,e,root,from,to,own))return false;e.setCarrierRiseProgress(to);return true;}var n=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(n==null||!pose(NervOriginalCarrierR52.actualRoot(n,1),root))return false;var members=new HashSet<>(own);members.add(n.getUUID());var admission=carrierActuatorAdmissionR52(l,o,data);if(admission==null)return hold(o,"actual_carrier_actuator_same_ground_or_flight_lease_missing");try{var plant=plant(o);var g=plant==null?null:gantry(l,plant);boolean inBay=groundGuidesDeclared&&plant!=null&&pose(root,plant.bay());NervOriginalCarrierR52.CheckedStep step;NervLegacyCarrierRideR52.AcceptedLeadStep lead=null;if(inBay){var before=g==null?null:NervOriginalCarrierR52.actualLeadSampleR52(g,1);if(before==null||before.rise()!=from)return hold(o,"actual_bay_lead_and_original_carrier_clock_differ");var after=new NervLegacyCarrierRideR52.LeadSampleR52(before.spec(),before.serviceBridge(),to,l.getGameTime());step=NervOriginalCarrierR52.proposeActuator(l,n,from,to,Set.copyOf(members),g,before,after);if(step==null)return false;var leadOwn=new HashSet<>(members);leadOwn.add(g.getUUID());lead=NervLegacyCarrierRideR52.proposeLeadR52(l,g,n,step,before,after,Set.copyOf(leadOwn));if(lead==null||!lead.current(l)||!NervTurnStationRuntimeR52.covered(admission,lead.envelopes()))return hold(o,"actual_bay_lead_full_source_or_space_admission_rejected");}else step=NervOriginalCarrierR52.proposeActuator(l,n,from,to,Set.copyOf(members));if(step==null||!step.current(l)||!NervTurnStationRuntimeR52.covered(admission,step.envelopes())||!(lead==null?step.commit(l):step.commit(l,lead)))return false;}catch(java.io.IOException missing){return false;}e.setCarrierRiseProgress(to);return true;}
+    private boolean carrierSupportReadyR53(ServerLevel l,EvaUnit01Entity eva){var installed=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);if(installed!=null&&CarrierMountProfileR53.read(installed,1).supportOnly())return false;if(installed!=null&&CarrierMountProfileR53.read(installed,1).shallowBay())return NervMappedPlugMechanicsR52.actualCarrierFootBearing(l,eva);var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);return carrier!=null&&NervOriginalCarrierR52.declared(carrier)&&eva.carrierRiseProgress(1)==1&&pose(NervOriginalCarrierR52.actualRoot(carrier,1),NervOwnerPlacementR52.actualRoot(eva));}
+    private boolean acceptCarrierActuatorR52(ServerLevel l,EvaUnit01Entity e,RigidTransform root,float from,float to,Set<UUID> own,Original o,CompoundTag data){var n=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(n!=null&&CarrierMountProfileR53.read(n,1).shallowBay()){var admission=carrierActuatorAdmissionR52(l,o,data);if(admission==null)return hold(o,"shallow_bay_original_space_lease_missing");var members=new HashSet<>(own);members.add(n.getUUID());try{var step=Finish.EJECT_LOWER.name().equals(data.getString("Finish"))?NervOriginalCarrierR52.proposeOutletReturnR53(l,n,e,data.getString("RouteR52"),from,to,Set.copyOf(members)):NervR50CarrierModeR53.launchDeckDropR53(NervOriginalCarrierR52.actualRoot(n,1),0)==-64?NervOriginalCarrierR52.proposeReceiverActuatorR53(l,n,from,to,Set.copyOf(members)):NervOriginalCarrierR52.proposeShallowBayActuatorR53(l,n,from,to,Set.copyOf(members));if(step==null||!step.current(l)||!admission.pool().resourcesHeldR52(admission.task(),admission.resources())||NervTraversalPolicyR53.strict(l)&&!NervTurnStationRuntimeR52.covered(admission,step.envelopes())||!step.commit(l))return hold(o,"shallow_bay_complete_source_stroke_held");}catch(java.io.IOException missing){return false;}}else if(n!=null)NervOriginalCarrierR52.restoreR50RiseR53(n,to);e.setCarrierRiseProgress(to);return true;}
 
     public String holdReason(UUID original){return holds.getOrDefault(original,"");}
     private boolean hold(Original original,String reason){holds.put(original.eva(),reason);return false;}
@@ -205,7 +220,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var leg=directory.leg(rail.leg());if(leg==null)return false;
         try {
             if(rail.kind()==NervMechanicalRailBindingR52.Kind.UPRIGHT_CAPTURED_GUIDEWAY)return continuousGuidesR52&&continuousGuidePathsShaR52.equals(rail.sourceSha())&&NervMechanicalRailBindingR52.ready(l,directory,rail);
-            if(NervR50CarrierModeR53.enabled()&&rail.kind()==NervMechanicalRailBindingR52.Kind.LEGACY_RUNNING_HEAD)
+            if((rail.kind()==NervMechanicalRailBindingR52.Kind.LEGACY_RUNNING_HEAD))
             {
                 for(var cell:foundations)
                 {
@@ -226,14 +241,36 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             return actual.equals(expected)&&fixed(l,p.gantry().supports())&&fixed(l,p.carrierSupport())&&NervLowerFrameR52.actualPermanentFeetBearR52(l,g,p.gantry().supports())&&drive!=null&&drive.equals(g.declaredServiceFootDriveR52())&&NervServiceFootDriveR52.foundationsBear(l,drive)&&lead!=null&&actualLeadFoundationsBearR52(l,lead);
         }catch(java.io.IOException|IllegalArgumentException|IllegalStateException missing){return false;}
     }
+    @Override public boolean mechanicalRailReadyR53(ServerLevel l,NervMechanicalRailBindingR52.Spec rail,List<NervRouteNativeR52.Cell> foundations,boolean scoped)
+    {
+        if((!scoped))return mechanicalRailReadyR52(l,rail,foundations);
+        if(!commissioned||directory.leg(rail.leg())==null)return false;
+        try
+        {
+            // Current native feet are checked by the existing rear nearby-support query.
+            // Retain source/installation identity without querying anchors on the rest of the leg.
+            if(rail.kind()==NervMechanicalRailBindingR52.Kind.UPRIGHT_CAPTURED_GUIDEWAY)
+                return continuousGuidesR52&&continuousGuidePathsShaR52.equals(rail.sourceSha())
+                    &&rail.guideSha().equals(NervOuterCarrierGuideR52.SOURCE_SHA)
+                    &&rail.sourceSha().equals(NervUprightGuidewayR52.sourceSha256())
+                    &&NervUprightGuidewayR52.enabledForDirectoryR52(l,directory)&&NervUprightGuidewayR52.matchesDirectory(directory);
+            if(rail.kind()==NervMechanicalRailBindingR52.Kind.FIXED_FOOT_GUIDE)
+                return groundGuidesDeclared&&rail.guideSha().equals(NervFootGuideRigR52.SOURCE_SHA)
+                    &&rail.sourceSha().equals(NervFixedFootGuidesR52.SOURCE_SHA)
+                    &&NervFixedFootGuidesR52.enabledForDirectoryR52(l,directory)&&NervFixedFootGuidesR52.matchesDirectory(directory);
+            return NervMechanicalRailBindingR52.ready(l,directory,rail)&&mechanicalRailReadyR52(l,rail,foundations);
+        }
+        catch(java.io.IOException|IllegalArgumentException|IllegalStateException invalid){return false;}
+    }
     private static boolean actualLeadFoundationsBearR52(ServerLevel l,NervLegacyCarrierRideR52.LeadSampleR52 lead){for(var p:NervLegacyCarrierRideR52.leadFoundationPointsR52(lead)){var face=new AABB(p.x-.12,p.y-.001,p.z-.12,p.x+.12,p.y,p.z+.12);var tops=new ArrayList<AABB>();int y=(int)Math.floor(p.y-.001);for(int x=(int)Math.floor(face.minX);x<=Math.floor(face.maxX);x++)for(int z=(int)Math.floor(face.minZ);z<=Math.floor(face.maxZ);z++){var at=new BlockPos(x,y,z);if(!loaded(l,at))return false;for(var local:l.getBlockState(at).getCollisionShape(l,at).toAabbs()){var w=local.move(at);if(Math.abs(w.maxY-p.y)<.000003)tops.add(new AABB(w.minX,p.y-.001,w.minZ,w.maxX,p.y,w.maxZ));}}if(!NervAirspaceCoverageR52.covered(face,tops))return false;}return true;}
     private static boolean loaded(ServerLevel l,BlockPos p){return l.getChunkSource().getChunkNow(p.getX()>>4,p.getZ()>>4)!=null;}
     private static boolean fixed(ServerLevel l,List<FixedCell> cells){for(var c:cells)if(!loaded(l,c.at())||!l.getBlockState(c.at()).equals(c.expected()))return false;return true;}
-    private static boolean matches(ServerLevel l,List<Cell> cells,boolean open){for(var c:cells)if(!loaded(l,c.at())||!NervMechanicalMaterialR53.samePhase(l.getBlockState(c.at()),open?c.open():c.closed()))return false;return true;}
+    private static boolean matches(ServerLevel l,List<Cell> cells,boolean open){for(var c:cells)if(!CarrierBayTrayR53.retainsLiquidCell(l,c)&&(!loaded(l,c.at())||!NervMechanicalMaterialR53.samePhase(l.getBlockState(c.at()),open?c.open():c.closed())))return false;return true;}
     private static boolean canChange(ServerLevel l,List<Cell> cells,boolean open,Set<UUID> own)
     {
         for(var c:cells)
         {
+            if(CarrierBayTrayR53.retainsLiquidCell(l,c))continue;
             if(!loaded(l,c.at()))return false;
             var current=l.getBlockState(c.at());
             boolean originalLiquid=c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())&&current.is(c.closed().getBlock());
@@ -265,7 +302,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         return true;
     }
     private static boolean change(ServerLevel l,List<Cell> cells,boolean open,Set<UUID> own)
-    {if(!canChange(l,cells,open,own))return false;for(var c:cells){var next=open?c.open():c.closed();if(!NervMechanicalMaterialR53.samePhase(l.getBlockState(c.at()),next))l.setBlock(c.at(),next,c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())?2:3);}return matches(l,cells,open);}
+    {if(!canChange(l,cells,open,own))return false;for(var c:cells){if(CarrierBayTrayR53.retainsLiquidCell(l,c))continue;var next=open?c.open():c.closed();if(!NervMechanicalMaterialR53.samePhase(l.getBlockState(c.at()),next))l.setBlock(c.at(),next,c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())?2:3);}return matches(l,cells,open);}
     private static void validateOriginalLcl(List<List<Cell>> layers)
     {
         require(layers.size()==44&&layers.stream().mapToInt(List::size).sum()==90947,"Complete original 44-layer/90947-cell wet bay required");int previousY=Integer.MIN_VALUE;var unique=new HashSet<BlockPos>();
@@ -290,16 +327,45 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     private NervCarrierPlatformEntity gantry(ServerLevel l,UnitPlant p){var e=l.getEntity(p.gantry().id());return e instanceof NervCarrierPlatformEntity n&&n.isRestraintGantry()?n:null;}
     private Gate servicePit(UnitPlant p){return gates.get(servicePits.get(p.variant()));}
     private NervServiceFootDriveR52.Spec serviceDriveSpecR52(ServerLevel l,UnitPlant p){if(!groundGuidesDeclared)return null;var gate=servicePit(p);if(gate==null||p.carrierSupport().isEmpty())return null;double top=Double.NaN;for(var c:p.carrierSupport()){if(!l.hasChunkAt(c.at())||!l.getBlockState(c.at()).equals(c.expected()))return null;double actual=c.expected().getCollisionShape(l,c.at()).toAabbs().stream().mapToDouble(b->b.maxY+c.at().getY()).max().orElse(Double.NaN);if(!Double.isFinite(actual)||Double.isFinite(top)&&Math.abs(top-actual)>.000001)return null;top=actual;}return new NervServiceFootDriveR52.Spec(p.variant(),p.bay(),gate.frame(),gate.siloHatch().firstTier(),top);}
-    private boolean serviceBridgeReadyR52(ServerLevel l,UnitPlant p,boolean open){if(NervR50CarrierModeR53.enabled())return true;var g=gantry(l,p);try{return !groundGuidesDeclared||g!=null&&g.declaredServiceFootDriveR52()!=null&&g.serviceGuideBridgeR52(1)==(open?1:0)&&NervServiceFootDriveR52.foundationsBear(l,g.declaredServiceFootDriveR52());}catch(java.io.IOException missing){return false;}}
+
+    private boolean fixedCarrierBayR53(ServerLevel l,UnitPlant p)
+    {if(!(l.getEntity(p.eva()) instanceof EvaUnit01Entity e))return false;var c=EvaMechanicalFrameR52.originalCarrierControllerR52(e);return c!=null&&CarrierMountProfileR53.read(c,1).shallowBay();}
+    private boolean traySupportBearsR53(ServerLevel l,UnitPlant p)
+    {
+        if(!(l.getEntity(p.eva()) instanceof EvaUnit01Entity e))return false;
+        var c=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(c==null||!NervOriginalCarrierR52.declared(c))return false;
+        var mounting=CarrierMountProfileR53.read(c,1);if(!mounting.shallowBay()&&!mounting.supportOnly())return false;
+        var bay=CarrierBayTrayR53.bay(c);var root=NervOriginalCarrierR52.actualRoot(c,1);
+        if(!pose(root,p.bay())||!pose(NervOwnerPlacementR52.actualRoot(e),p.bay())||!CarrierBayTrayR53.ready(l,bay)||!CarrierBayTrayR53.bears(bay,root))return false;
+        var body=EvaMechanicalFrameR52.active(e)?EvaMechanicalFrameR52.capturedGeometry(e):EvaMechanicalFrameR52.serviceSourceHeldR52(e)?EvaMechanicalFrameR52.serviceGeometryR52(e):null;
+        return body!=null&&CarrierFootBearingR53.bears(CarrierFootBearingR53.selected(),body,NervOwnerPlacementR52.actualRoot(e),root,mounting,CarrierAssemblyR53.selected());
+    }
+    public boolean withdrawCommissionShouldersR53(ServerLevel l,NervCarrierPlatformEntity carrier,Set<UUID> own)
+    {
+        var p=units.get(carrier.getUnitVariant());if(p==null||!CarrierMountProfileR53.read(carrier,1).supportOnly()||!CarrierBayTrayR53.parkedInstallationCurrent(carrier)||!traySupportBearsR53(l,p))return false;
+        var g=gantry(l,p);if(g==null||!g.hasDeclaredMachineFrameR52()||!pose(RigidTransform.of(g.position(),g.declaredMachineRotationR52()),p.gantry().frame()))return false;
+        var clock=g.getPersistentData();if(clock.contains("CarrierCommissionShoulderTickR53")&&clock.getLong("CarrierCommissionShoulderTickR53")==l.getGameTime())return g.getRestraintProgress()==0;
+        clock.putLong("CarrierCommissionShoulderTickR53",l.getGameTime());
+        float next=Math.max(0,g.getRestraintProgress()-1F/40);
+        if(!NervPlantMotionR52.clearRestraints(l,p.variant(),p.gantry().frame(),g.getRestraintProgress(),next,own))return false;
+        g.setRestraintProgress(next);return next==0;
+    }
     private boolean originalClampsBear(ServerLevel l,UnitPlant p)
-    {var g=gantry(l,p);if(g==null||!g.hasDeclaredMachineFrameR52()||!pose(RigidTransform.of(g.position(),g.declaredMachineRotationR52()),p.gantry().frame())||g.getRestraintProgress()!=1)return false;if(NervR50CarrierModeR53.enabled())return true;try{return fixed(l,p.gantry().supports())&&NervLowerFrameR52.actualPermanentFeetBearR52(l,g,p.gantry().supports())&&actualShoulderBearingR52(l,p,g);}catch(java.io.IOException failure){return false;}}
-    private boolean actualShoulderBearingR52(ServerLevel l,UnitPlant p,NervCarrierPlatformEntity g)throws java.io.IOException
-    {if(!(l.getEntity(p.eva()) instanceof EvaUnit01Entity e))return false;var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var body=EvaMechanicalFrameR52.active(e)?EvaMechanicalFrameR52.capturedGeometry(e).parts():EvaMechanicalFrameR52.serviceSourceHeldR52(e)?EvaMechanicalFrameR52.serviceGeometryR52(e).parts():provider.evaluateShoulderContactsR53(e.getUnitVariant(),NervServiceBodyPoseR52.sample(e),EvaAnatomicalHandsR45.sample(e,1));return NervShoulderBearingR52.bears(body,NervOwnerPlacementR52.actualRoot(e),p.gantry().frame(),e.getUnitVariant());}
+    {var g=gantry(l,p);if(traySupportBearsR53(l,p))return g!=null&&(fixedCarrierBayR53(l,p)?g.getRestraintProgress()==0:true);if(g==null||!g.hasDeclaredMachineFrameR52()||!pose(RigidTransform.of(g.position(),g.declaredMachineRotationR52()),p.gantry().frame())||g.getRestraintProgress()!=1)return false;{return true;}}
+
+    public boolean parkedBearingR53(ServerLevel level,EvaUnit01Entity eva)
+    {
+        var plant=units.get(eva.getUnitVariant());
+        return plant!=null&&plant.eva().equals(eva.getUUID())&&eva.isNervLogisticsLocked()
+                &&eva.carrierRiseProgress(1)==0&&!EvaMechanicalFrameR52.flightCustody(eva)
+                &&pose(NervOwnerPlacementR52.actualRoot(eva),plant.bay())&&originalClampsBear(level,plant);
+    }
     /** A persisted DONE is not evidence that chunk blocks survived the same save. */
     public String parkedServiceHoldR53(ServerLevel level,Original original)
     {
         var plant=plant(original);var eva=hull(level,original);
         if(plant==null||eva==null)return "回库现场原机体未加载";
+        if(!parkedBayBlocksLoadedR54(level,original))return "回库承托区块尚未加载";
         if(!pose(NervOwnerPlacementR52.actualRoot(eva),plant.bay()))return "回库记录与原机实际位置不一致";
         if(eva.carrierRiseProgress(1)!=0||!originalClampsBear(level,plant)
                 ||!gateAtRest(level,servicePit(plant),false)||!gateAtRest(level,gates.get("bay_"+plant.variant()+"_front"),false))
@@ -309,6 +375,14 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(!plant.lcl().stream().allMatch(layer->matches(level,layer,false)))return "回库完成记录与实际 LCL 不一致，等待现场整备修复";
         if(!bridgeMatches(level,plant,9))return "回库完成记录与实际登机桥不一致，等待现场整备修复";
         return "";
+    }
+
+    boolean parkedBayBlocksLoadedR54(ServerLevel level,Original original)
+    {
+        var bay=CarrierBayTrayR53.selected().stream().filter(b->b.variant()==original.variant()
+                &&b.eva().equals(original.eva())).findFirst().orElse(null);
+        return bay!=null&&CarrierBayTrayR53.requiredChunks(bay).stream()
+                .allMatch(c->level.getChunkSource().getChunkNow(c.x,c.z)!=null);
     }
 
     /** Explicit maintenance admission: observe known states, never replace world cells here. */
@@ -348,7 +422,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(filled>0&&(!gateAtRest(level,front,false)||hasWetFloorSealR52(front)&&!wetFloorSealClosedR52(level,front)))return null;
         var data=saved.copy();rememberBridge(data,bridge);data.putInt("FilledLayers",filled);
         data.putString("Finish",filled<plant.lcl().size()?Finish.REFILL.name():Finish.BRIDGE.name());
-        data.putInt("FinishTicks",filled<plant.lcl().size()?filled*4:bridge==0?0:(int)Math.ceil(bridge*40D/9));
+        data.putInt("FinishTicks",filled<plant.lcl().size()?filled*NervAssemblyClocksR52.LCL_TICKS_PER_LAYER:bridge==0?0:(int)Math.ceil(bridge*40D/9));
         data.remove("LastFinishTick");
         return data;
     }
@@ -371,7 +445,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     /** Both sources are physical: exact original44-layer air readback and the retained gantry's liquid sample. */
     private static boolean wetSealDryInputsR52(boolean actualOriginalLayersDry,float actualVisualLevel)
     {return actualOriginalLayersDry&&Float.isFinite(actualVisualLevel)&&actualVisualLevel==0;}
-    /** Closing time never advances the original four-tick-per-layer refill clock. */
+    /** Closing time never advances the shared refill clock. */
     static boolean wetSealRefillReadyR52(boolean actualSealClosed,boolean actualBayDry,int filledLayers,CompoundTag data,java.util.function.BooleanSupplier actualClose)
     {if(actualSealClosed)return true;if(filledLayers!=0||!actualBayDry)return false;if(actualClose.getAsBoolean())data.putInt("FinishTicks",0);return false;}
     private boolean wetSealBayDryR52(ServerLevel l,Gate g)
@@ -439,11 +513,18 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         catch(IllegalArgumentException invalid){return false;}
     }
     private boolean crane(ServerLevel l,UnitPlant p,EntryPlugCarrierEntity plug,RigidTransform target,boolean stow)
+    {return crane(l,p,plug,target,stow,1);}
+    private boolean crane(ServerLevel l,UnitPlant p,EntryPlugCarrierEntity plug,RigidTransform target,boolean stow,double speedScale)
     {
         if(!fixed(l,p.crane().frameCells()))return false;var entity=l.getEntity(p.crane().visual().id());if(!(entity instanceof NervCarrierPlatformEntity n)||!n.isPlugCrane())return false;
-        var eye=target.transformPoint(EntryPlugKinematics.CRANE_ATTACHMENT_P);var base=p.crane().visual().frame();var localEye=base.inverse().transformPoint(eye);double along=localEye.dot(p.crane().railAxis());if(along<p.crane().railMin()||along>p.crane().railMax()||localEye.y>=0)return false;
+        var eye=target.transformPoint(EntryPlugKinematics.CRANE_ATTACHMENT_P);var base=p.crane().visual().frame();var localEye=base.inverse().transformPoint(eye);double along=localEye.dot(p.crane().railAxis())-NervCranePoseR52.TROLLEY_TRAILING_R53;if(along<p.crane().railMin()||along>p.crane().railMax()||localEye.y>=0)return false;
         Vec3 wanted=base.transformPoint(p.crane().railAxis().scale(along));double offset=localEye.y;
-        if(stow){wanted=p.crane().stow().translation();double step=p.crane().hoistStep();offset=Math.min(p.crane().stowBottom(),n.actualCraneBottomOffsetR52()+step);}
+        // Retract above the handoff station before the internal socket drive
+        // continues. The suspended chuck must not chase the buried capsule.
+        double stowBottom=Math.min(p.crane().stowBottom(),NervCranePoseR52.STOW_BOTTOM_R53);
+        if(stow){wanted=n.position();double step=(p.crane().hoistStep()*speedScale);offset=Math.min(stowBottom,n.actualCraneBottomOffsetR52()+step);}
+        boolean trolleyReady=wanted.distanceTo(n.position())<=(p.crane().hoistStep()*speedScale);
+        if(!trolleyReady)wanted=n.position().add(wanted.subtract(n.position()).normalize().scale((p.crane().hoistStep()*speedScale)));
         var from=craneState(n);var reference=from.referenceWorld();var referenceRotation=from.referenceRotation();
         if(stow)
         {
@@ -451,26 +532,54 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             if(from.coupled()){reference=from.plug().transformPoint(EntryPlugKinematics.CRANE_ATTACHMENT_P);referenceRotation=from.plug().rotation();var release=new NervCranePoseR52.State(from.machine(),from.bottom(),null,false,reference,referenceRotation);if(!sameCranePose(from.pose(craneGeometry.mount()),release.pose(craneGeometry.mount())))return false;from=release;}
         }
         else if(!from.coupled()){var attach=new NervCranePoseR52.State(from.machine(),from.bottom(),plug.getCanonicalTransform(),true,reference,referenceRotation);if(!sameCranePose(from.pose(craneGeometry.mount()),attach.pose(craneGeometry.mount())))return false;from=attach;}
-        offset=Math.round(Math.min(-.001,offset)*1000)/1000F;var to=new NervCranePoseR52.State(RigidTransform.of(wanted,base.rotation()),offset,stow?null:target,!stow,reference,referenceRotation);if(!clearCrane(l,p,plug,from,to))return false;
+        offset=Math.round(Math.min(-.001,offset)*1000)/1000F;var to=new NervCranePoseR52.State(RigidTransform.of(wanted,base.rotation()),offset,stow?null:trolleyReady?target:plug.getCanonicalTransform(),!stow,reference,referenceRotation);if(!clearCrane(l,p,plug,from,to))return false;
         if(stow&&n.getCranePlug()!=null)n.setCraneReferenceR52(plug.getCanonicalTransform());n.configurePlugCrane(p.variant(),offset);n.moveControlled(wanted.x,wanted.y,wanted.z);n.setYRot(yaw(p.crane().visual().frame()));n.linkCranePlug(stow?null:plug);
-        return n.position().distanceToSqr(wanted)<1e-8&&(!stow||Math.abs(n.actualCraneBottomOffsetR52()-p.crane().stowBottom())<=.0011);
+        return trolleyReady&&n.position().distanceToSqr(wanted)<1e-8&&(!stow||Math.abs(n.actualCraneBottomOffsetR52()-stowBottom)<=.0011);
     }
     private boolean approachCrane(ServerLevel l,UnitPlant p,EntryPlugCarrierEntity capsule,int age,CompoundTag data)
     {
         if(!(l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity n)||!n.isPlugCrane()||age<1||age>36)return false;var from=craneState(n);if(from.coupled())return false;
         var actual=capsule.getCanonicalTransform();var eye=actual.transformPoint(EntryPlugKinematics.CRANE_ATTACHMENT_P);var local=from.machine().inverse().transformPoint(eye);
-        if(!data.contains("ExtractStartBottomR52")){if(age!=1)return false;data.putDouble("ExtractStartBottomR52",from.bottom());putFrame(data,"ExtractCraneReferenceR52",actual);putFrame(data,"CraneApproachStartR53",from.machine());}
+        if(age==1&&!alignRetractedCraneReferenceR53(l,p,capsule,n,from,eye,actual.rotation()))return false;
+        if(age==1){data.putDouble("ExtractStartBottomR52",from.bottom());putFrame(data,"ExtractCraneReferenceR52",actual);putFrame(data,"CraneApproachStartR53",from.machine());}
+        if(!data.contains("ExtractStartBottomR52"))return false;
         if(!pose(getFrame(data,"ExtractCraneReferenceR52"),actual))return false;double start=data.getDouble("ExtractStartBottomR52"),previous=start+(local.y-start)*NervCranePoseR52.smooth((age-1)/36F),next=start+(local.y-start)*NervCranePoseR52.smooth(age/36F);previous=Math.round(previous*1000)/1000F;next=Math.round(next*1000)/1000F;
-        if(Math.abs(from.bottom()-previous)>.0011)return false;var observed=new NervCranePoseR52.State(from.machine(),from.bottom(),null,false,eye,actual.rotation());if(!NervR50CarrierModeR53.enabled()&&!sameCranePose(from.pose(craneGeometry.mount()),observed.pose(craneGeometry.mount())))return false;
+        if(Math.abs(from.bottom()-previous)>.0011)return false;var observed=new NervCranePoseR52.State(from.machine(),from.bottom(),null,false,eye,actual.rotation());
         var machine=from.machine();
         if(data.contains("CraneApproachStartR53"))
         {
-            var base=p.crane().visual().frame();var at=base.inverse().transformPoint(eye);double along=at.dot(p.crane().railAxis());
+            var base=p.crane().visual().frame();var at=base.inverse().transformPoint(eye);double along=at.dot(p.crane().railAxis())-NervCranePoseR52.TROLLEY_TRAILING_R53;
             if(along<p.crane().railMin()||along>p.crane().railMax())return false;
             var end=RigidTransform.of(base.transformPoint(p.crane().railAxis().scale(along)),base.rotation());
             machine=getFrame(data,"CraneApproachStartR53").interpolate(end,NervCranePoseR52.smooth(age/36F));
         }
-        var to=new NervCranePoseR52.State(machine,next,null,false,eye,actual.rotation());if(!clearCrane(l,p,capsule,observed,to))return false;n.setCraneReferenceR52(actual);n.configurePlugCrane(p.variant(),next);n.moveControlled(machine.translation().x,machine.translation().y,machine.translation().z);n.linkCranePlug(age==36?capsule:null);return true;
+        var to=new NervCranePoseR52.State(machine,next,null,false,eye,actual.rotation());if(!clearCrane(l,p,capsule,observed,to))return false;n.configurePlugCrane(p.variant(),next);n.moveControlled(machine.translation().x,machine.translation().y,machine.translation().z);n.setCraneReferenceR52(actual);n.linkCranePlug(age==36?capsule:null);return true;
+    }
+    private boolean alignRetractedCraneReferenceR53(ServerLevel l,UnitPlant p,EntryPlugCarrierEntity capsule,
+            NervCarrierPlatformEntity n,NervCranePoseR52.State from,Vec3 eye,org.joml.Quaternionf rotation)
+    {
+        // Old saves parked the chuck using the fully buried capsule reference.
+        // Carry that local reference on the runway until the two physical poses
+        // coincide; only then may approachCrane switch to the handoff reference.
+        var wanted=new NervCranePoseR52.State(from.machine(),from.bottom(),null,false,eye,rotation);
+        var a=craneGeometry.pose(from);var b=craneGeometry.pose(wanted);
+        if(sameCranePose(a,b))return true;
+        if(from.referenceWorld()==null||a.released()!=1||b.released()!=1
+                ||a.grip().rotationErrorDegrees(b.grip())>.001)return false;
+        var delta=from.machine().transformVector(b.grip().translation().subtract(a.grip().translation()));
+        var rail=from.machine().transformVector(p.crane().railAxis());
+        if(delta.subtract(rail.scale(delta.dot(rail))).lengthSqr()>1e-8)return false;
+        // Saved local anchors are floats. Their micrometre cross-rail error
+        // must not command lateral trolley drift off its actual wheel bearings.
+        delta=rail.scale(delta.dot(rail));
+        var step=delta.length()>p.crane().hoistStep()?delta.normalize().scale(p.crane().hoistStep()):delta;
+        var target=RigidTransform.of(n.position().add(step),from.machine().rotation());
+        double along=p.crane().visual().frame().inverse().transformPoint(target.translation()).dot(p.crane().railAxis());
+        if(along<p.crane().railMin()||along>p.crane().railMax())return false;
+        var to=new NervCranePoseR52.State(target,from.bottom(),null,false,from.referenceWorld().add(step),from.referenceRotation());
+        if(!clearCrane(l,p,capsule,from,to))return false;
+        n.moveControlled(target.translation().x,target.translation().y,target.translation().z);
+        return false;
     }
     private EntryPlugCarrierEntity maintenanceCapsuleR53(ServerLevel level,UnitPlant plant)
     {
@@ -505,10 +614,16 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {
         var p=plant(o);var e=hull(l,o);var capsule=plug(l,o);if(p==null||e==null||capsule==null||!originalGraph(l,o,true)){hold(o,"original_custody_or_manifest_missing");return Preparation.WAITING;}
         if(data.contains("LastPrepareTick")&&data.getLong("LastPrepareTick")==l.getGameTime())return Preparation.WAITING;data.putLong("LastPrepareTick",l.getGameTime());
+        holds.remove(o.eva());
+        var assembling=EvaMechanicalFrameR52.originalCarrierControllerR52(e);
+        if(assembling!=null&&CarrierMountProfileR53.read(assembling,1).supportOnly()){hold(o,"actual_carrier_equipment_installation_in_progress");return Preparation.WAITING;}
         e.stowBayEquipmentR53();
-        if(!data.contains("Prepare")){if(!pose(capsule.getCanonicalTransform(),p.dock())||e.position().distanceToSqr(p.bay().translation())>1e-6||!bridgeMatches(l,p,9)||!personnelDoors(l,p,false)){hold(o,"original_dock_bay_bridge_or_personnel_door_not_actual");return Preparation.WAITING;}rememberBridge(data,9);data.putInt("BridgeStartAmount",9);capsule.beginCabinPreparation();e.setNervLogisticsLocked(true);data.putString("Prepare",Prepare.HATCH.name());data.putInt("PrepareTicks",0);}
+        if(!data.contains("Prepare")){if(!pose(capsule.getCanonicalTransform(),p.dock())||e.position().distanceToSqr(p.bay().translation())>1e-6||!bridgeMatches(l,p,9)||!personnelDoors(l,p,false)){hold(o,"original_dock_bay_bridge_or_personnel_door_not_actual");return Preparation.WAITING;}rememberBridge(data,9);data.putBoolean("QuickPreparationR54",true);data.putInt("BridgeStartAmount",9);capsule.beginCabinPreparation();e.setNervLogisticsLocked(true);data.putString("Prepare",Prepare.HATCH.name());data.putInt("PrepareTicks",0);}
         if(!savedBridgeMatches(l,p,data)){hold(o,"actual_bridge_or_saved_owner_epoch_changed");return Preparation.WAITING;}
         Prepare phase=Prepare.valueOf(data.getString("Prepare"));int ticks=data.getInt("PrepareTicks");Set<UUID> own=TransportMembershipR52.members(o,Kind.OCCUPIED);
+        boolean quick=data.getBoolean("QuickPreparationR54");
+        int bridgeTicks=quick?NervAssemblyClocksR52.QUICK_BRIDGE_TICKS_R54:40;
+        if(quick)preopenDepartureGatesR54(l,o,p,own);
         var front=gates.get("bay_"+p.variant()+"_front");
         var recovery=frontSealRecoveryR53(phase,hasWetFloorSealR52(front),gateAtRest(l,front,true));
         if(recovery!=phase){
@@ -521,50 +636,61 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             case HATCH -> {if(!capsule.isHatchFullySealed()){hold(o,"actual_pressure_leaves_closing_or_obstructed");return Preparation.WAITING;}advance(data,Prepare.BRIDGE);}
             case BRIDGE ->
             {
-                int wanted=NervAssemblyClocksR52.bridgeRemaining(ticks+1);if((ticks+1)%5==0||ticks>=39)if(!applyBridgeState(l,p,wanted,data,own)){hold(o,"complete_original_bridge_state_blocked_"+wanted);return Preparation.WAITING;}
-                capsule.setCabinSequenceProgress(Math.min(30,Math.max(1,(int)Math.round(30D*(ticks+1)/40))));
-                if(ticks>=39){if(!bridgeMatches(l,p,0)||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_OCCUPIED||!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_OCCUPIED,EntryPlugCarrierEntity.STAGE_INSERTING)){hold(o,"original_insertion_epoch_or_bridge_changed");return Preparation.WAITING;}advance(data,Prepare.INSERT);}
+                int wanted=NervAssemblyClocksR52.bridgeRemaining((ticks+1)*(quick?2:1));if((ticks+1)%(quick?2:5)==0||ticks>=bridgeTicks-1)if(!applyBridgeState(l,p,wanted,data,own)){hold(o,"complete_original_bridge_state_blocked_"+wanted);return Preparation.WAITING;}
+                capsule.setCabinSequenceProgress(Math.min(30,Math.max(1,(int)Math.round(30D*(ticks+1)/bridgeTicks))));
+                if(ticks>=bridgeTicks-1){if(!bridgeMatches(l,p,0)||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_OCCUPIED||!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_OCCUPIED,EntryPlugCarrierEntity.STAGE_INSERTING)){hold(o,"original_insertion_epoch_or_bridge_changed");return Preparation.WAITING;}advance(data,Prepare.INSERT);}
             }
             case INSERT ->
             {
                 if(capsule.isInsertionAbortRequested()||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_INSERTING){hold(o,"original_insertion_aborted_or_stage_changed");return Preparation.WAITING;}
-                int age=ticks+1;EvaDorsalMechanism.prepare(e,age);double progress=NervAssemblyClocksR52.insertionProgress(age);var target=EntryPlugKinematics.insertionTransform(e,p.dock(),progress);
+                int age=ticks+1;EvaDorsalMechanism.prepare(e,age);double progress=NervAssemblyClocksR52.insertionProgress(age,quick);var target=EntryPlugKinematics.insertionTransform(e,p.dock(),progress);
                 if(!NervMappedPlugMechanicsR52.clearCapsule(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id())){hold(o,"actual_capsule_sweep_blocked");return Preparation.WAITING;}
                 boolean approaching=age<=36&&l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&hoist.getCranePlug()==null;
-                if(!(approaching?approachCrane(l,p,capsule,age,data):crane(l,p,capsule,target,false))){hold(o,"actual_crane_coupling_or_rail_not_ready");return Preparation.WAITING;}
+                boolean internalDrive=age>(quick?NervAssemblyClocksR52.QUICK_HANDOFF_TICK_R54:NervAssemblyClocksR52.INSERT_HANDOFF_TICK);
+                if(!(internalDrive?crane(l,p,capsule,target,true,quick?3:1):approaching?approachCrane(l,p,capsule,age,data):crane(l,p,capsule,target,false,quick?3:1))){hold(o,internalDrive?"socket_handoff_waiting_for_chuck_retraction":"actual_crane_coupling_or_rail_not_ready");return Preparation.WAITING;}
                 // Mapped producer performs actual full geometry sweep; absent
                 // permission/geometry is a concrete HOLD, never a teleport.
                 if(!NervMappedPlugMechanicsR52.applyInsertion(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id())){hold(o,"actual_capsule_sweep_blocked");return Preparation.WAITING;}
-                if(l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=36)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinSequenceProgress(30+(int)Math.round(progress*40));
-                if(age>=190){if(!capsule.lockToEva(e)||!e.bindEntryPlug(capsule,capsule.getCabinProgress())){hold(o,"original_lock_graph_rejected");return Preparation.WAITING;}advance(data,Prepare.SEAL);}
+                if(!internalDrive&&l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=36)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinSequenceProgress(30+(int)Math.round(progress*40));
+                if(age>=(quick?NervAssemblyClocksR52.QUICK_INSERTION_TICKS_R54:EntryPlugDirector.INSERTION_TICKS)){if(!capsule.lockToEva(e)||!e.bindEntryPlug(capsule,capsule.getCabinProgress())){hold(o,"original_lock_graph_rejected");return Preparation.WAITING;}advance(data,Prepare.SEAL);}
             }
-            case SEAL -> {if(!originalLaunchLock(l,p.variant(),e,capsule)){hold(o,"real_launch_lock_changed");return Preparation.WAITING;}EvaDorsalMechanism.seal(e,ticks+1);if(!crane(l,p,capsule,p.dock(),true))return Preparation.WAITING;if(ticks>=59)advance(data,Prepare.DRAIN);}
+            case SEAL -> {if(!originalLaunchLock(l,p.variant(),e,capsule)){hold(o,"real_launch_lock_changed");return Preparation.WAITING;}EvaDorsalMechanism.seal(e,(ticks+1)*(quick?2:1));if(!crane(l,p,capsule,p.dock(),true,quick?3:1))return Preparation.WAITING;if(ticks>=(quick?29:59))advance(data,Prepare.DRAIN);}
             case DRAIN ->
             {
-                if(!originalLaunchLock(l,p.variant(),e,capsule)||!crane(l,p,capsule,p.dock(),true)||!NervR50CarrierModeR53.enabled()&&!originalClampsBear(l,p)||!gateAtRest(l,servicePit(p),false)){hold(o,"wet_bay_requires_actual_closed_shutter_and_original_clamps");return Preparation.WAITING;}
-                int removed=NervAssemblyClocksR52.drainedLayers(p.lcl().size(),ticks+1);int accepted=data.getInt("DrainedLayers");while(accepted<removed){if(!change(l,p.lcl().get(p.lcl().size()-1-accepted),true,own)){hold(o,"actual_lcl_layer_not_owned_"+accepted);return Preparation.WAITING;}data.putInt("DrainedLayers",++accepted);}
-                var gantry=gantry(l,p);if(gantry==null)return Preparation.WAITING;gantry.setLclVisualLevel(Math.max(0,p.lcl().size()-(ticks+1)/4F));
-                if(NervR50CarrierModeR53.enabled())
+                var installed=EvaMechanicalFrameR52.originalCarrierControllerR52(e);
+                if(installed!=null&&!data.getBoolean("LclGuardsRestoredR53"))
+                {CarrierBayTrayR53.restoreResetGuardsR53(l,installed,p.lcl());data.putBoolean("LclGuardsRestoredR53",true);}
+                var legacyClamp=gantry(l,p);
+                if(fixedCarrierBayR53(l,p)&&legacyClamp!=null&&legacyClamp.getRestraintProgress()>0)
                 {
-                    float progress=Math.min(1,(ticks+1)/(float)Math.max(p.raiseTicks(),p.lcl().size()*4));
+                    float next=Math.max(0,legacyClamp.getRestraintProgress()-1F/40);
+                    if(!NervPlantMotionR52.clearRestraints(l,p.variant(),p.gantry().frame(),legacyClamp.getRestraintProgress(),next,own))
+                    {hold(o,"legacy_reset_clamps_retracting");return Preparation.WAITING;}
+                    legacyClamp.setRestraintProgress(next);return Preparation.WAITING;
+                }
+                if((!originalLaunchLock(l,p.variant(),e,capsule)||!crane(l,p,capsule,p.dock(),true,quick?3:1))||!gateAtRest(l,servicePit(p),false)){hold(o,"wet_bay_requires_actual_closed_shutter_and_original_clamps");return Preparation.WAITING;}
+                int removed=NervAssemblyClocksR52.drainingLayers(p.lcl().size(),(ticks+1)*(quick?2:1));int accepted=data.getInt("DrainedLayers");while(accepted<removed){if(!change(l,p.lcl().get(p.lcl().size()-1-accepted),true,own)){hold(o,"actual_lcl_layer_not_owned_"+accepted);return Preparation.WAITING;}data.putInt("DrainedLayers",++accepted);}
+                var gantry=gantry(l,p);if(gantry==null)return Preparation.WAITING;gantry.setLclVisualLevel(p.lcl().size()-NervAssemblyClocksR52.liquidLayers(p.lcl().size(),(ticks+1)*(quick?2:1)));
+                {
+                    float progress=Math.min(1,(ticks+1)/(float)Math.max(quick?NervAssemblyClocksR52.QUICK_RAISE_TICKS_R54:p.raiseTicks(),p.lcl().size()*(quick?1:NervAssemblyClocksR52.LCL_TICKS_PER_LAYER)));
                     float rise=EvaDorsalMechanism.smooth(progress);
                     if(!acceptCarrierActuatorR52(l,e,p.bay(),e.carrierRiseProgress(1),rise,own,o,data))return Preparation.WAITING;
-                    gantry.setRestraintProgress(1-rise);
+                    if(!fixedCarrierBayR53(l,p))gantry.setRestraintProgress(1-rise);
+                    else if(gantry.getRestraintProgress()!=0)return Preparation.WAITING;
                     data.remove("DryVerified");
-                    if(accepted==p.lcl().size()&&dryBay(l,p)&&rise==1)advance(data,Prepare.FRONT_SEAL_OPEN);
+                    if(accepted==p.lcl().size()&&dryBay(l,p)){if(quick)gate(l,front,true,own);if(rise==1)advance(data,Prepare.FRONT_SEAL_OPEN);}
                 }
-                else {data.remove("DryVerified");if(accepted==p.lcl().size()&&dryBay(l,p))advance(data,Prepare.LOWER_FRAME_OPEN);}
             }
-            case LOWER_FRAME_OPEN -> {if(NervR50CarrierModeR53.enabled()){var oldGantry=gantry(l,p);if(oldGantry!=null)oldGantry.setLowerFrameProgressR52(1);advance(data,Prepare.PIT_OPEN);break;}var g=gantry(l,p);if(!dryBay(l,p)||!originalClampsBear(l,p)||!gateAtRest(l,servicePit(p),false)||g==null||!g.lowerFrameDeclaredR52())return Preparation.WAITING;float next=Math.min(1,(ticks+1)/(float)NervLowerFrameR52.OPEN_TICKS);try{if(!NervLowerFrameR52.clearAdvance(l,g,g.lowerFrameProgressR52(1),next,own)){hold(o,"actual_lower_crossbar_or_winch_motion_blocked");return Preparation.WAITING;}}catch(java.io.IOException failure){return Preparation.WAITING;}g.setLowerFrameProgressR52(next);if(next==1)advance(data,Prepare.PIT_OPEN);}
+            case LOWER_FRAME_OPEN -> {var oldGantry=gantry(l,p);if(oldGantry!=null)oldGantry.setLowerFrameProgressR52(1);advance(data,Prepare.PIT_OPEN);break;}
             case PIT_OPEN -> {if(!dryBay(l,p)||!originalClampsBear(l,p)){hold(o,"dry_readback_or_original_clamp_support_changed");return Preparation.WAITING;}if(gate(l,servicePit(p),true,own))advance(data,Prepare.FRONT_SEAL_OPEN);}
             case FRONT_RECOVER_CLAMPS ->
             {
                 var g=gantry(l,p);var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);
                 if(g==null||carrier==null||!dryBay(l,p)||!gateAtRest(l,servicePit(p),true)||e.carrierRiseProgress(1)!=1||!carrierSupportReadyR53(l,e))return Preparation.WAITING;
-                float closure=Math.min(1,g.getRestraintProgress()+1F/40);
+                float closure=fixedCarrierBayR53(l,p)?0:Math.min(1,g.getRestraintProgress()+1F/40);
                 if(!NervPlantMotionR52.clearRestraints(l,p.variant(),p.gantry().frame(),g.getRestraintProgress(),closure,own))return Preparation.WAITING;
                 g.setRestraintProgress(closure);
-                if(closure==1&&originalClampsBear(l,p))try{if(NervOriginalCarrierR52.setAttachedR52(l,carrier,e,false))advance(data,Prepare.FRONT_RECOVER_LOWER);}catch(java.io.IOException missing){return Preparation.WAITING;}
+                if((closure==1||fixedCarrierBayR53(l,p)&&closure==0)&&originalClampsBear(l,p))try{if(NervOriginalCarrierR52.setAttachedR52(l,carrier,e,false))advance(data,Prepare.FRONT_RECOVER_LOWER);}catch(java.io.IOException missing){return Preparation.WAITING;}
             }
             case FRONT_RECOVER_LOWER ->
             {
@@ -586,21 +712,36 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             }
             case FRONT_SEAL_OPEN ->
             {
-                if(NervR50CarrierModeR53.enabled()&&e.carrierRiseProgress(1)==1&&gantry(l,p)!=null&&gantry(l,p).getRestraintProgress()==0)
+                if((e.carrierRiseProgress(1)==1)&&gantry(l,p)!=null&&gantry(l,p).getRestraintProgress()==0)
                 {
                     if(dryBay(l,p)&&gate(l,front,true,own))advance(data,Prepare.RELEASE_CLAMPS);
                     break;
                 }
-                if(!wetFrontReturnClosePermitR52(dryBay(l,p),e.carrierRiseProgress(1),originalClampsBear(l,p),serviceBridgeReadyR52(l,p,false),gateAtRest(l,servicePit(p),true)))return Preparation.WAITING;
+                if(!wetFrontReturnClosePermitR52(dryBay(l,p),e.carrierRiseProgress(1),originalClampsBear(l,p),true,gateAtRest(l,servicePit(p),true)))return Preparation.WAITING;
                 if(!gate(l,front,true,own))return Preparation.WAITING;
                 advance(data,Prepare.SERVICE_BRIDGE_OPEN);
             }
-            case SERVICE_BRIDGE_OPEN -> {if(NervR50CarrierModeR53.enabled()){advance(data,Prepare.RAISE);break;}if(!dryBay(l,p)||!originalClampsBear(l,p)||!gateAtRest(l,servicePit(p),true))return Preparation.WAITING;if(!groundGuidesDeclared){advance(data,Prepare.RAISE);break;}var g=gantry(l,p);float next=Math.min(1,(ticks+1)/(float)NervServiceFootDriveR52.BRIDGE_OPEN_TICKS);try{if(g==null||!NervServiceFootDriveR52.clearBridge(l,g,g.serviceGuideBridgeR52(1),next,own)){hold(o,"actual_service_guide_bridge_open_blocked");return Preparation.WAITING;}}catch(java.io.IOException missing){return Preparation.WAITING;}g.setServiceGuideBridgeR52(next);if(next==1)advance(data,Prepare.RAISE);}
-            case RAISE -> {if(!dryBay(l,p)||!originalClampsBear(l,p)||!gateAtRest(l,servicePit(p),true))return Preparation.WAITING;if(!NervR50CarrierModeR53.enabled()&&!fixed(l,p.carrierSupport())||!serviceBridgeReadyR52(l,p,true)){hold(o,"physical_carrier_support_or_guide_bridge_missing");return Preparation.WAITING;}float rise=Math.min(1,(ticks+1)/(float)p.raiseTicks());if(!acceptCarrierActuatorR52(l,e,p.bay(),e.carrierRiseProgress(1),rise,own,o,data)){hold(o,"actual_carrier_rise_sweep_blocked");return Preparation.WAITING;}if(ticks+1>=p.raiseTicks()&&e.carrierRiseProgress(1)==1&&EvaDorsalMechanism.open(e)<.0001F&&EvaDorsalMechanism.bow(e)<.0001F){if(!carrierSupportReadyR53(l,e)){hold(o,"actual_sole_to_full_carrier_bearing_absent");return Preparation.WAITING;}advance(data,Prepare.RELEASE_CLAMPS);}}
-            case RELEASE_CLAMPS -> {if(!dryBay(l,p)||!gateAtRest(l,servicePit(p),true)||e.carrierRiseProgress(1)!=1||!carrierSupportReadyR53(l,e))return Preparation.WAITING;var gantry=gantry(l,p);if(gantry==null)return Preparation.WAITING;float closure=Math.min(gantry.getRestraintProgress(),1-Math.min(1,(ticks+1)/40F));if(!NervPlantMotionR52.clearRestraints(l,p.variant(),p.gantry().frame(),gantry.getRestraintProgress(),closure,own))return Preparation.WAITING;gantry.setRestraintProgress(closure);if((ticks>=39||NervR50CarrierModeR53.enabled()&&gantry.getRestraintProgress()==0)&&closure==0){if(!EvaMechanicalFrameR52.capture(e,o)){hold(o,"actual_complete_rigid_capture_rejected");return Preparation.WAITING;}captureAssembly(l,o,data);advance(data,Prepare.READY);}}
+            case SERVICE_BRIDGE_OPEN -> {advance(data,Prepare.RAISE);break;}
+            case RAISE -> {if(!dryBay(l,p)||!originalClampsBear(l,p)||!gateAtRest(l,servicePit(p),true))return Preparation.WAITING;float rise=Math.min(1,(ticks+1)/(float)p.raiseTicks());if(!acceptCarrierActuatorR52(l,e,p.bay(),e.carrierRiseProgress(1),rise,own,o,data)){hold(o,"actual_carrier_rise_sweep_blocked");return Preparation.WAITING;}if(ticks+1>=p.raiseTicks()&&e.carrierRiseProgress(1)==1&&EvaDorsalMechanism.open(e)<.0001F&&EvaDorsalMechanism.bow(e)<.0001F){if(!carrierSupportReadyR53(l,e)){hold(o,"actual_sole_to_full_carrier_bearing_absent");return Preparation.WAITING;}advance(data,Prepare.RELEASE_CLAMPS);}}
+            case RELEASE_CLAMPS -> {if(!dryBay(l,p)||!gateAtRest(l,servicePit(p),true)||e.carrierRiseProgress(1)!=1||!carrierSupportReadyR53(l,e))return Preparation.WAITING;var gantry=gantry(l,p);if(gantry==null)return Preparation.WAITING;float closure=Math.min(gantry.getRestraintProgress(),1-Math.min(1,(ticks+1)/40F));if(!NervPlantMotionR52.clearRestraints(l,p.variant(),p.gantry().frame(),gantry.getRestraintProgress(),closure,own))return Preparation.WAITING;gantry.setRestraintProgress(closure);if((ticks>=39||(gantry.getRestraintProgress()==0))&&closure==0){if(!EvaMechanicalFrameR52.capture(e,o)){hold(o,"actual_complete_rigid_capture_rejected");return Preparation.WAITING;}if(!captureAssembly(l,o,data))return Preparation.WAITING;advance(data,Prepare.READY);}}
             case READY -> {return originalLaunchLock(l,p.variant(),e,capsule)&&EvaMechanicalFrameR52.active(e)?Preparation.READY:Preparation.WAITING;}
         }
         if(phase.name().equals(data.getString("Prepare")))data.putInt("PrepareTicks",ticks+1);return Preparation.WAITING;
+    }
+    private void preopenDepartureGatesR54(ServerLevel level,Original original,UnitPlant plant,Set<UUID> own)
+    {
+        var context=NervRouteRuntimeR52.flightContext(level);if(context==null)return;
+        var lease=context.pool().groundTaskR52(original);if(lease==null)return;
+        var route=directory.route(lease.route());if(route==null||route.recovery()||!context.pool().resourcesHeldR52(lease.task(),directory.resources(route)))return;
+        for(String legId:route.legs())
+        {
+            var leg=directory.leg(legId);if(leg.from().equals(route.readyNode()))break;
+            for(String id:leg.doors())
+            {
+                if(id.equals("bay_"+plant.variant()+"_front")||id.equals(servicePits.get(plant.variant())))continue;
+                var gate=gates.get(id);if(gate!=null)gate(level,gate,true,own);
+            }
+        }
     }
     @Override public boolean requiresPreparationRecoveryR53(ServerLevel l,Original o,CompoundTag data)
     {
@@ -650,34 +791,105 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     private static double smoother(double t){return t*t*t*(t*(t*6-15)+10);}
     @Override public boolean restoreOriginalPreparation(ServerLevel l,Original o,CompoundTag data)
     {
-        if(!originalGraph(l,o,true))return hold(o,"restore_original_graph_missing");var p=plant(o);var e=hull(l,o);var capsule=plug(l,o);if(e.position().distanceToSqr(p.bay().translation())>1e-6||!(NervR50CarrierModeR53.enabled()?EvaMechanicalFrameR52.originalCarrierControllerR52(e)!=null&&pose(NervOriginalCarrierR52.actualRoot(EvaMechanicalFrameR52.originalCarrierControllerR52(e),1),p.bay()):fixed(l,p.carrierSupport())))return false;
+        if(!originalGraph(l,o,true))return hold(o,"restore_original_graph_missing");var p=plant(o);var e=hull(l,o);var capsule=plug(l,o);if(e.position().distanceToSqr(p.bay().translation())>1e-6||!((EvaMechanicalFrameR52.originalCarrierControllerR52(e)!=null&&pose(NervOriginalCarrierR52.actualRoot(EvaMechanicalFrameR52.originalCarrierControllerR52(e),1),p.bay()))))return false;
         if(!data.contains("Prepare"))return pose(capsule.getCanonicalTransform(),p.dock())&&bridgeMatches(l,p,9);Prepare phase=Prepare.valueOf(data.getString("Prepare"));int age=data.getInt("PrepareTicks");if(age<0)return false;
         if(!savedBridgeMatches(l,p,data))return false;
         if(phase==Prepare.DRAIN){int removed=data.getInt("DrainedLayers");if(removed<0||removed>p.lcl().size())return false;for(int i=0;i<p.lcl().size();i++)if(!matches(l,p.lcl().get(i),i>=p.lcl().size()-removed))return false;}
         if(phase.ordinal()>=Prepare.LOWER_FRAME_OPEN.ordinal()&&!dryBay(l,p))return false;
         if(phase.ordinal()<=Prepare.DRAIN.ordinal()&&!gateAtRest(l,servicePit(p),false))return false;
-        if(!NervR50CarrierModeR53.enabled()&&phase.ordinal()>=Prepare.PIT_OPEN.ordinal()&&(!gantry(l,p).lowerFrameDeclaredR52()||gantry(l,p).lowerFrameProgressR52(1)!=1))return false;
+
         if(phase.ordinal()>=Prepare.RAISE.ordinal()&&!gateAtRest(l,servicePit(p),true))return false;
-        if(!NervR50CarrierModeR53.enabled()&&(phase==Prepare.DRAIN||phase==Prepare.LOWER_FRAME_OPEN||phase==Prepare.PIT_OPEN||phase==Prepare.FRONT_SEAL_OPEN||phase==Prepare.SERVICE_BRIDGE_OPEN||phase==Prepare.RAISE||phase==Prepare.FRONT_RECOVER_LOWER||phase==Prepare.FRONT_RECOVER_BRIDGE)&&!originalClampsBear(l,p))return false;
+
         if((phase==Prepare.RELEASE_CLAMPS||phase==Prepare.READY)&&!carrierSupportReadyR53(l,e))return false;
         if(phase.ordinal()<Prepare.INSERT.ordinal())return pose(capsule.getCanonicalTransform(),p.dock())&&capsule.getInsertionStage()==EntryPlugCarrierEntity.STAGE_OCCUPIED;
-        if(phase==Prepare.INSERT){double progress=NervAssemblyClocksR52.insertionProgress(age);return capsule.getInsertionStage()==EntryPlugCarrierEntity.STAGE_INSERTING&&pose(capsule.getCanonicalTransform(),EntryPlugKinematics.insertionTransform(e,p.dock(),progress))&&capsule.isHatchFullySealed()&&bridgeMatches(l,p,0);}
+        if(phase==Prepare.INSERT){double progress=NervAssemblyClocksR52.insertionProgress(age,data.getBoolean("QuickPreparationR54"));return capsule.getInsertionStage()==EntryPlugCarrierEntity.STAGE_INSERTING&&pose(capsule.getCanonicalTransform(),EntryPlugKinematics.insertionTransform(e,p.dock(),progress))&&capsule.isHatchFullySealed()&&bridgeMatches(l,p,0);}
         return originalLaunchLock(l,o.variant(),e,capsule)&&pose(capsule.getCanonicalTransform(),EntryPlugKinematics.lockedTransform(e))&&(phase!=Prepare.READY||EvaMechanicalFrameR52.active(e));
     }
     private static final TicketType<net.minecraft.world.level.ChunkPos> CONTINUOUS_ROUTE_TICKET_R52=TicketType.create("r52_continuous_route",Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong),100);
-    private record ContinuousGeometryR52(String route,FootSupportFrameR52.Binding binding,FullAssemblyGeometryR52.Captured source,double from,List<DirectoryTrajectoryR52> paths,Set<net.minecraft.world.level.ChunkPos> chunks){}
+    void retainOriginalBayBlocksR54(ServerLevel level,Original original)
+    {
+        var plant=plant(original);if(plant==null)return;
+        var eva=hull(level,original);
+        // Only an active local handoff owns these blocks. The same route ticket
+        // expires normally once the machine departs or its return job finishes.
+        if(eva==null||eva.position().distanceToSqr(plant.bay().translation())>128D*128D)return;
+        var bay=CarrierBayTrayR53.selected().stream().filter(b->b.variant()==original.variant()&&b.eva().equals(original.eva())).findFirst().orElse(null);
+        for(var chunk:CarrierBayTrayR53.requiredChunks(bay))
+            level.getChunkSource().addRegionTicket(CONTINUOUS_ROUTE_TICKET_R52,chunk,0,chunk);
+    }
+    private boolean servicingRouteChunkTasksR53;
+    private record ContinuousGeometryR52(String route,FootSupportFrameR52.Binding binding,FullAssemblyGeometryR52.Captured source,MountedPayloadTrajectoryR53.Mount mount,double rearLift,double from,double to,boolean strict,List<DirectoryTrajectoryR52> paths,List<AABB> resourceScope,Set<String> resources,Set<net.minecraft.world.level.ChunkPos> chunks){}
     private final Map<UUID,ContinuousGeometryR52> continuousGeometryR52=new HashMap<>();
     private List<DirectoryTrajectoryR52> continuousPathsR52(Route route,double from,double to,FootSupportFrameR52.Binding binding)
-    {var paths=new ArrayList<DirectoryTrajectoryR52>();for(double a=from;a<to;){double b=Math.min(to,a+16);paths.addAll(directory.routeSlices(route,a,b,binding));if(paths.size()>2048)throw new IllegalArgumentException("Bounded full continuous route required");a=b;}return List.copyOf(paths);}
+    {var paths=new ArrayList<DirectoryTrajectoryR52>();for(double a=from;a<to;){double b=Math.min(to,a+16);paths.addAll(directory.routeSlices(route,a,b,binding));if(paths.size()>2048)throw new IllegalArgumentException("Bounded continuous route required");a=b;}return List.copyOf(paths);}
+    private static double continuousLookaheadR53(Route route,CompoundTag data)
+    {
+        var clock=data.getCompound("ContinuousClockR52");var profile=route.motionProfile().launch();
+        String stage=data.getCompound(NervLaunchPhasesR53.KEY).getString("Stage");
+        if(route.phased()&&(stage.equals("PRELAUNCH")||stage.equals("RETURN_TRANSFER")))
+        {var transfer=route.motionProfile().prelaunch();profile=new SpeedProfile(transfer.cruiseMps()*4,transfer.accelerationMps2()*16,transfer.decelerationMps2()*16);}
+        double speed=clock.getDouble("SpeedMps"),acceleration=profile.accelerationMps2(),deceleration=profile.decelerationMps2();
+        if(!clock.isEmpty())
+        {acceleration=Math.max(acceleration,clock.getDouble("AccelerationMps2"));deceleration=Math.min(deceleration,clock.getDouble("DecelerationMps2"));}
+        if(!Double.isFinite(speed)||speed<0||!Double.isFinite(acceleration)||!Double.isFinite(deceleration)||deceleration<=0)throw new IllegalStateException("Invalid continuous preparation clock");
+        double nextSpeed=speed+acceleration*.05;
+        return Math.max(64,nextSpeed*.05+NervMechanicalTravelR52.brakingDistanceR52(nextSpeed,deceleration)+32);
+    }
+    private static void addContinuousChunksR53(Set<net.minecraft.world.level.ChunkPos> chunks,AABB box)
+    {for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)chunks.add(new net.minecraft.world.level.ChunkPos(x,z));}
     private ContinuousGeometryR52 continuousGeometryR52(ServerLevel level,Original o,Route route,FootSupportFrameR52.Binding binding,CompoundTag data,boolean atCurrent)
     {
-        var source=captured.get(o.eva());if(source==null)return null;double from=data.getDouble("ContinuousDistanceR52"),total=directory.routeLength(route);if(!Double.isFinite(from)||from<0||from>total)return null;
-        var known=continuousGeometryR52.get(o.eva());if(known!=null&&known.route().equals(route.id())&&known.binding().equals(binding)&&known.source()==source&&(!atCurrent||known.from()==from))return known;
-        var paths=continuousPathsR52(route,from,total,binding);var chunks=new HashSet<net.minecraft.world.level.ChunkPos>();if(!paths.isEmpty())for(var box:source.sweep(paths,.005).envelopes())for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)chunks.add(new net.minecraft.world.level.ChunkPos(x,z));
-        // Fixed rail feet and complete gate machinery may extend beyond the original body envelope.
-        for(String id:directory.resources(route)){for(var cell:resources.getOrDefault(id,List.of()))chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));var gate=gates.get(id);if(gate!=null){chunks.add(new net.minecraft.world.level.ChunkPos(BlockPos.containing(gate.frame().translation())));for(var cell:gate.supports())chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));for(var step:gate.collisionSteps())for(var cell:step)chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));}}
-        var context=NervRouteRuntimeR52.flightContext(level);if(context!=null)for(String id:directory.resources(route)){var bound=context.bindings().get(id);if(bound!=null)for(var cell:bound.cells())chunks.add(new net.minecraft.world.level.ChunkPos(cell.position()));}
-        if(chunks.size()>8192)throw new IllegalArgumentException("Continuous route actual chunk scope exceeds bound");var result=new ContinuousGeometryR52(route.id(),binding,source,from,paths,Set.copyOf(chunks));continuousGeometryR52.put(o.eva(),result);return result;
+        if(!transportSourceReadyR54(level,o,data))return null;var source=captured.get(o.eva());double at=data.getDouble("ContinuousDistanceR52"),total=directory.routeLength(route);if(!Double.isFinite(at)||at<0||at>total)return null;
+        boolean strict=NervTraversalPolicyR53.strict(level);
+        double required=strict?total:Math.min(total,at+continuousLookaheadR53(route,data));
+        double from=strict||atCurrent?at:Math.floor(at/32)*32;
+        var carrier=NervOriginalCarrierR52.controller(level,o);var mount=MountedPayloadTrajectoryR53.Mount.capture(carrier);
+        double rearLift=carrier==null?CarrierRearGuideR53.STOW_LIFT:CarrierRearGuideR53.actualLift(carrier,1);
+        var known=continuousGeometryR52.get(o.eva());
+        if(known!=null&&known.route().equals(route.id())&&known.binding().equals(binding)&&known.source()==source&&known.mount().equals(mount)&&known.rearLift()==rearLift&&known.strict()==strict
+            &&(strict?(!atCurrent||known.from()==at):known.from()==from&&known.to()>=required))return known;
+        // Reuse one bounded window while advancing through its 32 m starting bin.
+        double to=strict?total:Math.min(total,Math.ceil(required/32)*32+32);
+        var paths=continuousPathsR52(route,from,to,binding);var chunks=new HashSet<net.minecraft.world.level.ChunkPos>();var scope=new ArrayList<AABB>();
+        if(!paths.isEmpty())for(var box:source.sweep(paths,.005).envelopes())
+        {var nearby=strict?box:box.inflate(32);scope.add(nearby);addContinuousChunksR53(chunks,nearby);}
+        {try{chunks.addAll(CarrierRearGuideMotionR53.continuousSupportChunks(paths,rearLift,mount.state()));}
+        catch(java.io.IOException invalid){hold(o,"continuous_rear_support_scope="+invalid.getMessage());return null;}}
+        var ids=new HashSet<String>();if(strict)ids.addAll(directory.resources(route));else for(var path:paths)ids.addAll(path.leg().resources());
+        var context=NervRouteRuntimeR52.flightContext(level);
+        // Complete machinery is loaded only when its authored cells enter this window.
+        for(String id:ids)
+        {
+            var gate=gates.get(id);boolean nearby=strict||context!=null&&context.nativeAccess().resourceNearbyR53(id,scope);
+            if(gate!=null&&nearby&&context!=null)
+            {var bound=context.bindings().get(id);if(bound!=null)for(var cell:bound.cells())chunks.add(new net.minecraft.world.level.ChunkPos(cell.position()));}
+            if(gate!=null&&nearby)
+            {chunks.add(new net.minecraft.world.level.ChunkPos(BlockPos.containing(gate.frame().translation())));for(var cell:gate.supports())chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));for(var step:gate.collisionSteps())for(var cell:step)chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));{chunks.addAll(CarrierTransferRailsR53.gateSupportChunks(gate.frame()));}}
+            if(strict)
+            {for(var cell:resources.getOrDefault(id,List.of()))chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));if(context!=null){var bound=context.bindings().get(id);if(bound!=null)for(var cell:bound.cells())chunks.add(new net.minecraft.world.level.ChunkPos(cell.position()));}}
+        }
+        if(chunks.size()>8192)throw new IllegalArgumentException("Continuous route actual chunk scope exceeds bound");
+        var result=new ContinuousGeometryR52(route.id(),binding,source,mount,rearLift,from,to,strict,paths,List.copyOf(scope),Set.copyOf(ids),Set.copyOf(chunks));continuousGeometryR52.put(o.eva(),result);return result;
+    }
+    private void advancePreparingChunkTasksR53(ServerLevel level,Original original,Route route)
+    {
+        if(servicingRouteChunkTasksR53)return;
+        var context=NervRouteRuntimeR52.flightContext(level);var lease=context==null?null:context.pool().groundTaskR52(original);
+        var status=NervRouteRuntimeR52.status(level,original.variant());
+        // The public legacy status maps only PREPARING to TO_SILO.
+        if(lease==null||!lease.route().equals(route.id())||!"TO_SILO".equals(status.phase())
+            ||!original.eva().equals(status.canonicalId()))return;
+        // FULL promotion runs on the chunk executor; busy server ticks can starve
+        // its normal idle-time polling. Never drain the server/owner tick queue.
+        servicingRouteChunkTasksR53=true;
+        try
+        {
+            long started=System.nanoTime();
+            // A single native task cannot be preempted; the budget bounds starts.
+            for(int count=0;count<2&&System.nanoTime()-started<1_000_000L;count++)
+                if(!level.getChunkSource().pollTask())break;
+        }
+        finally{servicingRouteChunkTasksR53=false;}
     }
     @Override public boolean prepareContinuousRouteR52(ServerLevel l,Original o,Route route,CompoundTag data)
     {
@@ -685,13 +897,77 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var e=hull(l,o);if((!EvaMechanicalFrameR52.active(e)||data.getBoolean("ReceiverAlignmentR53"))&&!captureReceiver(l,o,route,directory.leg(route.legs().get(0)),data))return false;
         var binding=originalBinding(l,o,data);if(binding==null)return false;var current=EvaMechanicalFrameR52.frame(e,1);if(!data.contains("ContinuousRotationR52"))data.put("ContinuousRotationR52",NervAircraftFrameR52.encodeRigid(new RigidTransform(Vec3.ZERO,current.qx(),current.qy(),current.qz(),current.qw())));
         if(current.rotationErrorDegrees(NervAircraftFrameR52.decodeRigid(data.getCompound("ContinuousRotationR52")))>.0001)return hold(o,"continuous_captured_rotation_changed");
-        // The route needs readable native geometry. Original moving actors and
-        // gate controllers retain their separate entity-ticking restore tickets.
-        var geometry=continuousGeometryR52(l,o,route,binding,data,false);if(geometry==null)return false;boolean ready=true;String pending="";for(var chunk:geometry.chunks()){l.getChunkSource().addRegionTicket(CONTINUOUS_ROUTE_TICKET_R52,chunk,0,chunk);if(l.getChunkSource().getChunkNow(chunk.x,chunk.z)==null){ready=false;pending="route_chunk/"+chunk.x+"/"+chunk.z;}}
+        // This bounded window preloads the approach. NORMAL checks readiness
+        // only in the actual next-step native proof, not across the lookahead.
+        // Moving actors and gates retain their separate entity-ticking tickets.
+        var geometry=continuousGeometryR52(l,o,route,binding,data,false);if(geometry==null)return false;
+        var chunks=l.getChunkSource();var missing=new ArrayList<net.minecraft.world.level.ChunkPos>();
+        for(var chunk:geometry.chunks()){chunks.addRegionTicket(CONTINUOUS_ROUTE_TICKET_R52,chunk,0,chunk);if(chunks.getChunkNow(chunk.x,chunk.z)==null)missing.add(chunk);}
+        if(!missing.isEmpty())advancePreparingChunkTasksR53(l,o,route);
+        boolean ready=true;String pending="";if(geometry.strict())for(var chunk:missing)if(chunks.getChunkNow(chunk.x,chunk.z)==null){ready=false;pending="route_chunk/"+chunk.x+"/"+chunk.z;}
         var context=NervRouteRuntimeR52.flightContext(l);if(context==null)return false;var lease=context.pool().groundTaskR52(o);if(lease==null||!lease.route().equals(route.id())||!context.pool().resourcesHeldR52(lease.task(),directory.resources(route)))return hold(o,"continuous_full_route_lease_missing");
-        for(String id:directory.resources(route)){var r=directory.resource(id);if(r.kind()==ResourceKind.DOOR){var g=gates.get(id);if(g==null||!gate(l,g,true,TransportMembershipR52.members(o,kind(data)))){ready=false;pending="route_gate/"+id;}}else if(!context.nativeAccess().resourceReady(id,false)){ready=false;pending="route_resource/"+id;}}
+        for(String id:geometry.resources())
+        {
+            var r=directory.resource(id);var scope=geometry.strict()?null:geometry.resourceScope();
+            if(r.kind()==ResourceKind.DOOR)
+            {
+                if(scope!=null&&!context.nativeAccess().resourceNearbyR53(id,scope))continue;
+                var g=gates.get(id);boolean open=g!=null&&gate(l,g,true,TransportMembershipR52.members(o,kind(data)));
+                if(geometry.strict()&&!open){ready=false;pending="route_gate/"+id;}
+            }
+            else if(geometry.strict()&&!context.nativeAccess().resourceReadyR53(id,false,scope)){ready=false;pending="route_resource/"+id;}
+        }
+        if(ready&&CarrierRearLateralR53.supported())
+        {
+            var carrier=NervOriginalCarrierR52.controller(l,o);
+            if(carrier==null)return hold(o,"rear_lateral_original_controller_missing");
+            if(CarrierRearGuideR53.actualLift(carrier,1)==CarrierRearGuideR53.STOW_LIFT)
+            {
+                double at=data.getDouble("ContinuousDistanceR52");
+                boolean bank=route.phased()&&!route.recovery()&&at==directory.readyDistanceR53(route)
+                    &&!data.contains("ContinuousBrakeR52")&&!data.contains("RetargetPreparedRouteR53");
+                if(!prepareRearLateralR53(l,o,route,data,bank?0:1))return false;
+            }
+        }
         if(ready)holds.remove(o.eva());else hold(o,pending);
         return ready;
+    }
+    private boolean prepareRearLateralR53(ServerLevel l,Original o,Route route,CompoundTag data,double target)
+    {
+        if(!CarrierRearLateralR53.supported())return true;
+        var carrier=NervOriginalCarrierR52.controller(l,o);if(carrier==null)return false;
+        var state=CarrierMountProfileR53.read(carrier,1);
+        if(state.aboveFloor()||state.elevation()!=0)return hold(o,"rear_lateral_requires_original_load_datum");
+        var mount=carrier.carrierMountProfileR53();
+        if(!mount.isEmpty()&&(!mount.getString("Source").equals(CarrierRearGuideR53.selected().fingerprint())
+            ||mount.getLong("Epoch")!=carrier.originalCarrierStateR52().getLong("Epoch")))
+            return hold(o,"rear_lateral_installed_source_or_epoch_changed");
+        var tray=CarrierBayTrayR53.bay(carrier);boolean trayPending=!state.shallowBay()&&tray!=null&&CarrierBayTrayR53.bears(tray,NervOriginalCarrierR52.actualRoot(carrier,1));
+        if(!trayPending&&!mount.isEmpty()&&state.transverse()==target)return true;
+        var context=NervRouteRuntimeR52.flightContext(l);if(context==null)return false;
+        var lease=context.pool().groundTaskR52(o);if(lease==null||!lease.route().equals(route.id()))return false;
+        var own=new HashSet<>(TransportMembershipR52.members(o,kind(data)));own.add(carrier.getUUID());
+        var spaces=new ArrayList<AABB>();for(String id:directory.resources(route))if(directory.resource(id).kind()==ResourceKind.SPACE)
+        {var resource=context.bindings().get(id);if(resource==null)return false;spaces.addAll(resource.spaces());}
+        try
+        {
+            java.util.function.BooleanSupplier custody=()->
+            {
+                var actual=context.pool().groundTaskR52(o);
+                return actual!=null&&actual.task().equals(lease.task())&&actual.route().equals(route.id())
+                    &&context.pool().resourcesHeldR52(actual.task(),directory.resources(route))&&originalGraph(l,o,kind(data)==Kind.OCCUPIED);
+            };
+            var proof=trayPending?CarrierBayTrayR53.prepare(l,carrier,Set.copyOf(own),custody):CarrierRearLateralR53.prepare(l,carrier,target,Set.copyOf(own),custody);
+            if(proof==null)return hold(o,trayPending?"shallow_tray_complete_source_commissioning_held":"rear_lateral/"+CarrierRearLateralR53.lastRejection(carrier));
+            if(NervTraversalPolicyR53.strict(l)&&!proof.envelopes().stream().allMatch(box->NervAirspaceCoverageR52.covered(box,spaces)))
+                return hold(o,"rear_lateral_actual_sweep_outside_original_lease");
+            if(!proof.token().current(carrier))return hold(o,"rear_lateral_scene_changed_before_commit");
+            carrier.acceptCarrierMountProfileR53(proof.token());
+            carrier.setBoundingBox(NervOriginalCarrierR52.boundsR52(carrier));continuousGeometryR52.remove(o.eva());
+            if(CarrierMountProfileR53.read(carrier,1).transverse()!=target)return hold(o,"rear_lateral_original_actuator_in_progress");
+            return true;
+        }
+        catch(java.io.IOException missing){return hold(o,"rear_lateral_selected_mesh_unavailable");}
     }
     @Override public List<DirectoryTrajectoryR52> continuousRoutePathsR52(ServerLevel l,Original o,Route route,CompoundTag data)
     {var binding=originalBinding(l,o,data);if(binding==null)return List.of();var geometry=continuousGeometryR52(l,o,route,binding,data,true);return geometry==null?List.of():geometry.paths();}
@@ -701,7 +977,8 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {return !route.recovery()&&prepareBankHeadsR53(l,o,route,task,data,true);}
     private boolean prepareBankHeadsR53(ServerLevel l,Original o,Route route,UUID task,CompoundTag data,boolean toTransfer)
     {
-        if(NervR50CarrierModeR53.enabled())return true;
+        boolean rear=(CarrierRearGuideR53.selected()!=null);
+        if((!rear))return true;
         if(!route.phased()||!originalGraph(l,o,kind(data)==Kind.OCCUPIED))return hold(o,"bank_head_original_custody_missing");
         var run=NervLaunchPhasesR53.current(data,task,directory,route,data.getDouble("ContinuousDistanceR52"));if(!run.bankStop()||data.getDouble("ContinuousDistanceR52")!=run.stop()||data.contains("ContinuousBrakeR52"))return hold(o,"bank_head_requires_exact_unbraked_bank_stop");
         NervLaunchPhasesR53.verifyStoppedBank(data,task,directory,route,run.stop());
@@ -709,11 +986,14 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var outbound=route.recovery()?directory.route(route.reverseOf()):route;int index=-1;for(int i=0;i<outbound.legs().size();i++)if(directory.leg(outbound.legs().get(i)).from().equals(route.readyNode())){index=i;break;}if(index<=0)return false;
         var incoming=directory.leg(outbound.legs().get(index-1));var launch=directory.leg(outbound.legs().get(index));var levelAxis=directory.tangent(incoming,1);var launchAxis=directory.tangent(launch,0);var from=toTransfer?launchAxis:levelAxis;var to=toTransfer?levelAxis:launchAxis;var root=directory.sample(launch,0,binding).evaRoot();if(!pose(NervOriginalCarrierR52.actualRoot(carrier,1),root)||!pose(EvaMechanicalFrameR52.frame(e,1),root))return hold(o,"bank_head_actual_original_root_changed");
         var context=NervRouteRuntimeR52.flightContext(l);var lease=context==null?null:context.pool().groundTaskR52(o);if(lease==null||!lease.task().equals(task)||!context.pool().resourcesHeldR52(task,directory.resources(route)))return hold(o,"bank_head_real_space_and_rail_lease_missing");
+        // Native/source bindings remain required even when envelope diagnostics are off.
+        for(String id:directory.resources(route))if(directory.resource(id).kind()==ResourceKind.SPACE&&context.bindings().get(id)==null)
+            return hold(o,"bank_head_actual_space_binding_missing="+id);
         try
         {
             var head=carrier.originalCarrierStateR52().getCompound(NervBankHeadTransferR53.KEY);boolean same=head.hasUUID("Task")&&head.getUUID("Task").equals(task)&&head.getString("Directory").equals(directory.fingerprint())&&head.getString("Route").equals(route.id())&&NervBankHeadTransferR53.pose(head,0).direction().equals(from)&&NervBankHeadTransferR53.pose(head,NervBankHeadTransferR53.TICKS).direction().equals(to);
             if(route.recovery()&&data.hasUUID("HeadReturnFromTaskR53")&&!NervBankHeadTransferR53.unfinished(head)&&NervOriginalCarrierR52.headSlideR53(carrier,1)==0&&NervOriginalCarrierR52.uprightDirectionR52(carrier,1).distanceTo(to)<1e-7)
-            {var pads=NervLegacyCarrierRideR52.finitePadBearingsR52(root,NervOriginalCarrierR52.actualRidePoseR52(carrier));if(pads.size()==4&&pads.stream().allMatch(NervLegacyCarrierRideR52.PadBearing::bears))return true;}
+            {if(bankCarrierSupportR53(l,e,carrier,root,rear))return true;}
             boolean cancelledReturn=route.recovery()&&data.hasUUID("HeadReturnFromTaskR53")&&head.hasUUID("Task")&&data.getUUID("HeadReturnFromTaskR53").equals(head.getUUID("Task"))&&data.getString("HeadReturnFromRouteR53").equals(head.getString("Route"))&&head.getString("Directory").equals(directory.fingerprint());
             if(cancelledReturn&&(NervBankHeadTransferR53.unfinished(head)||head.getBoolean("AbortedToStart")))
             {
@@ -721,40 +1001,102 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                 if(resumeStep<0?head.getInt("Clock")>0:head.getInt("Clock")<NervBankHeadTransferR53.TICKS)
                 {
                     var own=new HashSet<>(TransportMembershipR52.members(o,kind(data)));own.add(carrier.getUUID());var proof=NervOriginalCarrierR52.proposeBankHeadStepR53(l,carrier,head,Set.copyOf(own),resumeStep);
-                    if(proof==null||!proof.current(l)||!bankHeadSpaceCoveredR53(context,route,proof)||!proof.commit(l))return hold(o,"bank_head_cancelled_reverse_sweep_held");
+                    if(proof==null||!proof.current(l)||NervTraversalPolicyR53.strict(l)&&!bankHeadSpaceCoveredR53(context,route,proof)||!proof.commit(l))return hold(o,"bank_head_cancelled_reverse_sweep_held");
                     return hold(o,"bank_head_cancelled_preparation_reversing_original_clock");
                 }
-                var pads=NervLegacyCarrierRideR52.finitePadBearingsR52(root,NervOriginalCarrierR52.actualRidePoseR52(carrier));return NervOriginalCarrierR52.headSlideR53(carrier,1)==0&&NervOriginalCarrierR52.uprightDirectionR52(carrier,1).distanceTo(to)<1e-7&&pads.size()==4&&pads.stream().allMatch(NervLegacyCarrierRideR52.PadBearing::bears);
+                return NervOriginalCarrierR52.headSlideR53(carrier,1)==0&&NervOriginalCarrierR52.uprightDirectionR52(carrier,1).distanceTo(to)<1e-7&&bankCarrierSupportR53(l,e,carrier,root,rear);
             }
             if(!same){if(NervBankHeadTransferR53.unfinished(head))return hold(o,"bank_head_prior_original_task_not_finished");if(NervOriginalCarrierR52.uprightDirectionR52(carrier,1).distanceTo(from)>1e-7||NervOriginalCarrierR52.headSlideR53(carrier,1)!=0)return hold(o,"bank_head_actual_incoming_axis_changed");head=NervBankHeadTransferR53.begin(task,directory.fingerprint(),route.id(),from,to);}
+            if(rear){if(head.contains("RearLegR53")&&(!head.getString("RearLegR53").equals(launch.id())||head.getBoolean("RearToTransferR53")!=toTransfer))return hold(o,"rear_head_saved_source_leg_changed");head.putString("RearLegR53",launch.id());head.putBoolean("RearToTransferR53",toTransfer);if(!bankCarrierSupportR53(l,e,carrier,root,true))return hold(o,"rear_head_original_carrier_root_or_rise_changed");}
             if(!NervBankHeadTransferR53.pose(head,0).direction().equals(from)||!NervBankHeadTransferR53.pose(head,NervBankHeadTransferR53.TICKS).direction().equals(to))return hold(o,"bank_head_saved_route_axes_changed");
             if(head.getInt("Clock")<NervBankHeadTransferR53.TICKS)
             {
+                for(int substep=0;substep<NervAssemblyClocksR52.HEAD_SUBSTEPS_R54&&head.getInt("Clock")<NervBankHeadTransferR53.TICKS;substep++)
+                {
                 var own=new HashSet<>(TransportMembershipR52.members(o,kind(data)));own.add(carrier.getUUID());var proof=NervOriginalCarrierR52.proposeBankHeadStepR53(l,carrier,head,Set.copyOf(own));if(proof==null||!proof.current(l))return hold(o,"bank_head_full_mesh_sweep_or_original_four_pad_support_held");
-                if(!bankHeadSpaceCoveredR53(context,route,proof))return hold(o,"bank_head_actual_sweep_exceeds_original_lease");
-                if(!proof.commit(l))return hold(o,"bank_head_same_tick_actual_commit_failed");head=carrier.originalCarrierStateR52().getCompound(NervBankHeadTransferR53.KEY);if(head.getInt("Clock")<NervBankHeadTransferR53.TICKS)return hold(o,"bank_head_local_retract_turn_extend_in_progress");
+                if(NervTraversalPolicyR53.strict(l)&&!bankHeadSpaceCoveredR53(context,route,proof))return hold(o,"bank_head_actual_sweep_exceeds_original_lease");
+                if(!proof.commit(l))return hold(o,"bank_head_same_tick_actual_commit_failed");head=carrier.originalCarrierStateR52().getCompound(NervBankHeadTransferR53.KEY);
+                }
+                if(head.getInt("Clock")<NervBankHeadTransferR53.TICKS)return hold(o,"bank_head_local_retract_turn_extend_in_progress");
             }
-            if(!NervBankHeadTransferR53.pose(head,NervBankHeadTransferR53.TICKS).direction().equals(to)||NervOriginalCarrierR52.uprightDirectionR52(carrier,1).distanceTo(to)>1e-7||NervOriginalCarrierR52.headSlideR53(carrier,1)!=0||!NervBankHeadTransferR53.internalBearings())return hold(o,"bank_head_real_lock_readback_failed");
-            var pads=NervLegacyCarrierRideR52.finitePadBearingsR52(root,NervOriginalCarrierR52.actualRidePoseR52(carrier));if(pads.size()!=4||pads.stream().anyMatch(p->!p.bears()))return hold(o,"bank_head_original_four_pads_lost_support");
-            if(!toTransfer&&!NervUprightGuidewayR52.finiteCaptureAtR52(new DirectoryTrajectoryR52(directory,launch,binding,0,1),0))return hold(o,"bank_head_ten_actual_capture_faces_not_locked");
+            if(!NervBankHeadTransferR53.pose(head,NervBankHeadTransferR53.TICKS).direction().equals(to)||NervOriginalCarrierR52.uprightDirectionR52(carrier,1).distanceTo(to)>1e-7||NervOriginalCarrierR52.headSlideR53(carrier,1)!=0||NervTraversalPolicyR53.strict(l)&&!NervBankHeadTransferR53.internalBearings())return hold(o,"bank_head_real_lock_readback_failed");
+            if(!bankCarrierSupportR53(l,e,carrier,root,rear))return hold(o,"bank_head_original_carrier_support_changed");
+            if(NervTraversalPolicyR53.strict(l)&&!toTransfer&&!(rear?CarrierRearGuideR53.finiteBankCapture(root,to,launch.id()):NervUprightGuidewayR52.finiteCaptureAtR52(new DirectoryTrajectoryR52(directory,launch,binding,0,1),0)))return hold(o,"bank_head_ten_actual_capture_faces_not_locked");
+            if(toTransfer&&rear&&!prepareRearLateralR53(l,o,route,data,1))return false;
             return true;
         }
         catch(java.io.IOException missing){return hold(o,"bank_head_selected_original_mesh_unavailable");}
     }
+    private boolean bankCarrierSupportR53(ServerLevel l,EvaUnit01Entity eva,NervCarrierPlatformEntity carrier,RigidTransform root,boolean rear)throws java.io.IOException
+    {if(rear)return carrierSupportReadyR53(l,eva);var pads=NervLegacyCarrierRideR52.finitePadBearingsR52(root,NervOriginalCarrierR52.actualRidePoseR52(carrier));return pads.size()==4&&pads.stream().allMatch(NervLegacyCarrierRideR52.PadBearing::bears);}
     private boolean bankHeadSpaceCoveredR53(NervRouteRuntimeR52.FlightContext context,Route route,NervOriginalCarrierR52.CheckedStep proof)
     {var spaces=new ArrayList<AABB>();for(String id:directory.resources(route))if(directory.resource(id).kind()==ResourceKind.SPACE){var bound=context.bindings().get(id);if(bound==null)return false;spaces.addAll(bound.spaces());}return proof.envelopes().stream().allMatch(box->NervAirspaceCoverageR52.covered(box,spaces));}
     @Override public boolean rebindStoppedContinuousR52(ServerLevel l,Original o,CompoundTag data)
-    {var e=hull(l,o);if(!commissioned||e==null||!originalGraph(l,o,kind(data)==Kind.OCCUPIED)||!EvaMechanicalFrameR52.active(e)||data.getCompound("ContinuousClockR52").getDouble("SpeedMps")!=0||e.getDeltaMovement().lengthSqr()>1e-12)return false;captureAssembly(l,o,data);continuousGeometryR52.remove(o.eva());return captured.get(o.eva())!=null;}
+    {var e=hull(l,o);if(!commissioned||e==null||!originalGraph(l,o,kind(data)==Kind.OCCUPIED)||!EvaMechanicalFrameR52.active(e)||data.getCompound("ContinuousClockR52").getDouble("SpeedMps")!=0||e.getDeltaMovement().lengthSqr()>1e-12)return false;if(!captureAssembly(l,o,data))return false;continuousGeometryR52.remove(o.eva());return true;}
     private boolean continuousCarrierCoveredR52(ServerLevel l,Route route,NervOriginalCarrierR52.CheckedContinuousStepR52 checked)
-    {var context=NervRouteRuntimeR52.flightContext(l);if(context==null)return false;var spaces=new ArrayList<AABB>();for(String id:directory.resources(route))if(directory.resource(id).kind()==ResourceKind.SPACE){var b=context.bindings().get(id);if(b==null)return false;spaces.addAll(b.spaces());}return checked.envelopes().stream().allMatch(box->NervAirspaceCoverageR52.covered(box,spaces));}
-    @Override public boolean preflightContinuousCarrierR52(ServerLevel l,Original o,Route route,List<DirectoryTrajectoryR52> paths,CompoundTag data)
-    {if(NervR50CarrierModeR53.enabled())return !paths.isEmpty();var e=hull(l,o);var carrier=e==null?null:EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier==null||paths.isEmpty())return false;var members=new HashSet<>(TransportMembershipR52.members(o,kind(data)));members.add(carrier.getUUID());try{var checked=NervOriginalCarrierR52.proposeContinuousR52(l,carrier,paths,new Vec3(0,1,0),Set.copyOf(members));return checked!=null&&checked.current(l)&&continuousCarrierCoveredR52(l,route,checked);}catch(java.io.IOException unavailable){return false;}}
+    {return continuousCarrierCoverageHoldR53(l,route,checked)==null;}
+    private String continuousCarrierCoverageHoldR53(ServerLevel l,Route route,NervOriginalCarrierR52.CheckedContinuousStepR52 checked)
+    {
+        var context=NervRouteRuntimeR52.flightContext(l);if(context==null)return "continuous_carrier_flight_context_missing";
+        var spaces=new ArrayList<AABB>();
+        for(String id:directory.resources(route))if(directory.resource(id).kind()==ResourceKind.SPACE)
+        {var binding=context.bindings().get(id);if(binding==null)return "continuous_carrier_space_binding="+id;spaces.addAll(binding.spaces());}
+        if(NervTraversalPolicyR53.strict(l))for(var box:checked.envelopes())if(!NervAirspaceCoverageR52.covered(box,spaces))return "continuous_carrier_uncovered_space="+box;
+        return null;
+    }
+
+    @Override public boolean preflightCheckedContinuousCarrierR53(ServerLevel l,NervRouteNativeR52.CheckedContinuousTraversalR52 proof,CompoundTag data)
+    {
+        if(proof==null)return false;
+        if(!proof.current(l))return hold(proof.original(),"continuous_carrier_native_proof_stale");
+        var o=proof.original();var route=proof.route();var paths=proof.paths();
+        var e=hull(l,o);var carrier=e==null?null:EvaMechanicalFrameR52.originalCarrierControllerR52(e);
+        if(carrier==null)return hold(o,"continuous_actual_original_carrier_missing");
+        if(paths==null||paths.isEmpty())return hold(o,"continuous_carrier_route_slices_missing");
+        var members=new HashSet<>(TransportMembershipR52.members(o,kind(data)));members.add(carrier.getUUID());
+        // Rear additions are outside the captured body sweep. They must be
+        // checked during route/braking lookahead, before the final commit.
+        try
+        {
+            var checked=NervOriginalCarrierR52.proposeContinuousR52(l,carrier,paths,new Vec3(0,1,0),Set.copyOf(members),proof);
+            if(checked==null)return hold(o,"continuous_carrier_proposal="+NervOriginalCarrierR52.lastRejectionR53(carrier));
+            if(!checked.current(l))return hold(o,"continuous_carrier_proposal_stale");
+            var coverageHold=continuousCarrierCoverageHoldR53(l,route,checked);
+            return coverageHold==null||hold(o,coverageHold);
+        }
+        catch(java.io.IOException unavailable){return hold(o,"continuous_carrier_source="+unavailable.getMessage());}
+    }
     @Override public Sweep sweptContinuousAssemblyR52(ServerLevel l,Original o,List<DirectoryTrajectoryR52> paths,CompoundTag data)
-    {if(originalBinding(l,o,data)==null||paths.isEmpty()||captured.get(o.eva())==null)return null;var rotation=NervAircraftFrameR52.decodeRigid(data.getCompound("ContinuousRotationR52"));for(var path:paths)if(!path.pureTranslation()||path.leg().motion()==Motion.FOOT_BEARING_TURN||path.sample(0).evaRoot().rotationErrorDegrees(rotation)>.0001||path.sample(1).evaRoot().rotationErrorDegrees(rotation)>.0001)return null;return new Sweep(captured.get(o.eva()).sweep(paths,.005));}
+    {if(paths.isEmpty()||!transportSourceReadyR54(l,o,data))return null;var rotation=NervAircraftFrameR52.decodeRigid(data.getCompound("ContinuousRotationR52"));for(var path:paths)if(!path.pureTranslation()||path.leg().motion()==Motion.FOOT_BEARING_TURN||path.sample(0).evaRoot().rotationErrorDegrees(rotation)>.0001||path.sample(1).evaRoot().rotationErrorDegrees(rotation)>.0001)return null;return new Sweep(captured.get(o.eva()).sweep(paths,.005));}
+    private static final TicketType<net.minecraft.world.level.ChunkPos> CONTINUOUS_ACTOR_TICKET_R63=TicketType.create("r63_continuous_actor",Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong),100);
+    private boolean continuousActorChunksReadyR63(ServerLevel level,Original original,Kind kind,
+            FootSupportFrameR52.Sample from,FootSupportFrameR52.Sample to,NervCarrierPlatformEntity carrier)
+    {
+        if(from.evaRoot().rotationErrorDegrees(to.evaRoot())>.0001)return hold(original,"continuous_actor_requires_translation_only");
+        var delta=to.evaRoot().translation().subtract(from.evaRoot().translation());
+        var members=new HashSet<>(TransportMembershipR52.members(original,kind));members.add(carrier.getUUID());
+        var points=new ArrayList<BlockPos>();
+        for(var id:members)
+        {
+            var actor=level.getEntity(id);if(actor==null||!actor.isAlive())return hold(original,"continuous_original_actor_missing="+id);
+            points.add(BlockPos.containing(actor.position()));points.add(BlockPos.containing(actor.position().add(delta)));
+        }
+        // FULL prefetch does not make the destination entity-ticking. Preserve
+        // each original member in native lookup across its own setPos boundary.
+        for(var point:points){var chunk=new net.minecraft.world.level.ChunkPos(point);level.getChunkSource().addRegionTicket(CONTINUOUS_ACTOR_TICKET_R63,chunk,2,chunk);}
+        for(var point:points)
+        {
+            var chunk=new net.minecraft.world.level.ChunkPos(point);
+            if(!level.areEntitiesLoaded(chunk.toLong())||!level.isPositionEntityTicking(point))
+                return hold(original,"continuous_actor_chunk_pending="+chunk.x+"/"+chunk.z);
+        }
+        return true;
+    }
     @Override public boolean applyCheckedContinuousR52(ServerLevel l,CheckedContinuousTraversalR52 proof,CompoundTag data)
     {
         if(proof==null||!proof.current(l)||!proof.route().continuousUpright()||!originalGraph(l,proof.original(),proof.kind()==Kind.OCCUPIED))return false;var o=proof.original();var e=hull(l,o);var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier==null)return hold(o,"continuous_actual_original_carrier_missing");
-        var members=new HashSet<>(TransportMembershipR52.members(o,proof.kind()));members.add(carrier.getUUID());try{var checked=NervOriginalCarrierR52.proposeContinuousR52(l,carrier,proof.paths(),new Vec3(0,1,0),Set.copyOf(members));if(checked==null||!checked.current(l)||!continuousCarrierCoveredR52(l,proof.route(),checked))return hold(o,"continuous_full_carrier_curve_bearing_or_lease_rejected");
+        if(!continuousActorChunksReadyR63(l,o,proof.kind(),proof.from(),proof.to(),carrier))return false;
+        var members=new HashSet<>(TransportMembershipR52.members(o,proof.kind()));members.add(carrier.getUUID());try{var checked=NervOriginalCarrierR52.proposeContinuousR52(l,carrier,proof.paths(),new Vec3(0,1,0),Set.copyOf(members),proof);if(checked==null||!checked.current(l)||!checked.committable()||!continuousCarrierCoveredR52(l,proof.route(),checked))return hold(o,"continuous_full_carrier_curve_bearing_or_lease_rejected");
             if(!EvaMechanicalFrameR52.applyVerifiedContinuousR52(e,o,proof.from(),proof.to(),proof.paths(),data.getCompound("ContinuousClockR52")))return false;if(!checked.commit(l))throw new IllegalStateException("Prevalidated continuous carrier final commit rejected after sole assembly commit");if(!proof.recordCommittedR52(l,data))throw new IllegalStateException("Committed continuous assembly final readback failed");return true;
         }catch(java.io.IOException missing){return hold(o,"continuous_selected_carrier_source_missing");}
     }
@@ -767,7 +1109,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     private boolean commissionDoor(ServerLevel l,Gate g)
     {
         if(NervR50CarrierModeR53.retiredPit(g.resource()))return true;
-        if(NervR50CarrierModeR53.enabled()&&l.getEntity(g.visual()) instanceof NervHangarDoorEntity existing&&!existing.matchesDeclaredR52(g.hangarStack()))existing.applyDeclaredR52(g.variant(),g.hangarStack(),existing.actualOpenProgressR52()>=.5F);if(l.getEntity(g.visual())!=null)return declaredDoor(l,g);if(!fixed(l,g.supports())||!loaded(l,BlockPos.containing(g.frame().translation()))||g.collisionSteps().stream().anyMatch(c->!matches(l,c,false)))return false;
+        if((l.getEntity(g.visual()) instanceof NervHangarDoorEntity existing)&&!existing.matchesDeclaredR52(g.hangarStack()))existing.applyDeclaredR52(g.variant(),g.hangarStack(),existing.actualOpenProgressR52()>=.5F);if(l.getEntity(g.visual())!=null)return declaredDoor(l,g);if(!fixed(l,g.supports())||!loaded(l,BlockPos.containing(g.frame().translation()))||g.collisionSteps().stream().anyMatch(c->!matches(l,c,false)))return false;
         Entity e=g.kind()==GateKind.HANGAR?ModEntities.NERV_HANGAR_DOOR.get().create(l):ModEntities.NERV_SILO_DOOR.get().create(l);if(e==null)return false;e.setUUID(g.visual());e.setPos(g.frame().translation());
         e.setYRot(yaw(g.frame()));if(e instanceof NervHangarDoorEntity door)door.applyDeclaredR52(g.variant(),g.hangarStack(),false);else ((NervSiloDoorEntity)e).configureDeclaredR52(g.variant(),g.stage(),g.frame(),false,g.siloHatch());return l.addFreshEntity(e);
     }
@@ -811,8 +1153,8 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(l.getEntity(g.visual()) instanceof NervHangarDoorEntity door){door.applyDeclaredR52(g.variant(),g.hangarStack(),open);proposed=door.proposedDeclaredProgressR52(open);}
         else {var door=(NervSiloDoorEntity)l.getEntity(g.visual());door.configureDeclaredR52(g.variant(),g.stage(),g.frame(),open,g.siloHatch());proposed=door.proposedDeclaredProgressR52(open);}
         int completed=proposed==1?g.collisionSteps().size():0;
-        var closing=new ArrayList<Cell>();for(int i=completed;i<g.collisionSteps().size();i++)closing.addAll(g.collisionSteps().get(i));
-        if(!NervR50CarrierModeR53.enabled()&&!closing.isEmpty())for(var plant:units.values())if(l.getEntity(plant.eva()) instanceof EvaUnit01Entity eva&&!NervMappedPlugMechanicsR52.clearCarrierClosure(l,eva,closing))return false;
+
+
         var moving=new HashSet<BlockPos>();for(var step:g.collisionSteps())for(var cell:step)moving.add(cell.at());var supports=new HashSet<BlockPos>();for(var cell:g.supports())supports.add(cell.at());
         float actual=l.getEntity(g.visual()) instanceof NervHangarDoorEntity d?d.actualOpenProgressR52():((NervSiloDoorEntity)l.getEntity(g.visual())).actualOpenProgressR52();
         // Chunk blocks and the actuator entity can persist at different steps
@@ -820,15 +1162,13 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         // states, with the same live occupancy and complete mesh checks below.
         // The door's own broad box is not an occupant of its collision proxy.
         var proxyOwner=new HashSet<UUID>();proxyOwner.add(g.visual());
-        if(NervR50CarrierModeR53.enabled())
         {
             proxyOwner.addAll(own);
             for(var p:units.values())if(own.contains(p.eva())&&l.getEntity(p.eva()) instanceof EvaUnit01Entity e)
             {var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier!=null)proxyOwner.add(carrier.getUUID());}
         }
         for(int i=0;i<g.collisionSteps().size();i++)if(!canChange(l,g.collisionSteps().get(i),i<completed,proxyOwner))return false;
-        if(!NervR50CarrierModeR53.enabled())
-        {if(l.getEntity(g.visual()) instanceof NervHangarDoorEntity d){if(!d.clearDeclaredSweepR52(l,actual,proposed,own,moving,supports))return false;}else if(!((NervSiloDoorEntity)l.getEntity(g.visual())).clearDeclaredSweepR52(l,actual,proposed,own,moving,supports,peerProxyCells))return false;}
+
         for(int i=0;i<g.collisionSteps().size();i++)if(!canChange(l,g.collisionSteps().get(i),i<completed,proxyOwner))return false;
         for(int i=0;i<g.collisionSteps().size();i++)if(!change(l,g.collisionSteps().get(i),i<completed,proxyOwner))return false;
         if(l.getEntity(g.visual()) instanceof NervHangarDoorEntity door)door.advanceDeclaredR52(open);else ((NervSiloDoorEntity)l.getEntity(g.visual())).advanceDeclaredR52(open);
@@ -841,7 +1181,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     @Override public boolean flightGateSampleCurrent(ServerLevel l,String id)
     {return commissioned&&NervFlightGatePlanR52.sampleCurrent(l,directory,gates.get(id));}
     private boolean prepareRunningShoesR52(ServerLevel l,Original o,Leg leg,CompoundTag data,NervCarrierPlatformEntity carrier,Set<UUID> own)throws java.io.IOException {return prepareRunningShoesR52(l,o,leg,data,carrier,own,leg.motion()==Motion.FOOT_BEARING_TURN);}
-    private boolean prepareRunningShoesR52(ServerLevel l,Original o,Leg leg,CompoundTag data,NervCarrierPlatformEntity carrier,Set<UUID> own,boolean forceStow)throws java.io.IOException {if(NervOriginalCarrierR52.progress(carrier,1)!=1)return false;var current=NervOriginalCarrierR52.actualRidePoseR52(carrier);var target=NervLegacyCarrierRideR52.targetFromActualHeadsR52(NervOriginalCarrierR52.actualRoot(carrier,1));boolean onHeads=target!=null&&!forceStow;if(target==null||forceStow)target=NervLegacyCarrierRideR52.rest();if(current.equals(target))return !onHeads||NervLegacyCarrierRideR52.finitePadBearingsR52(NervOriginalCarrierR52.actualRoot(carrier,1),current).stream().allMatch(p->p.bears());if(carrier.originalCarrierStateR52().getLong("At")==l.getGameTime())return false;var joints=new ArrayList<NervLegacyCarrierRideR52.Joint>();for(int i=0;i<4;i++){var a=current.joints().get(i);var b=target.joints().get(i);double drop=a.drop()+Math.max(-.01,Math.min(.01,b.drop()-a.drop())),pitch=a.pitch()+Math.max(-.005,Math.min(.005,b.pitch()-a.pitch()));if(Math.abs(drop-b.drop())<1e-10)drop=b.drop();if(Math.abs(pitch-b.pitch())<1e-10)pitch=b.pitch();joints.add(new NervLegacyCarrierRideR52.Joint(drop,pitch));}var proposal=NervLegacyCarrierRideR52.proposeActuatorR52(l,carrier,current,new NervLegacyCarrierRideR52.RidePose(joints),own);var admission=turnAdmissionR52(l,o,data,leg,carrier.getUUID());if(proposal!=null&&proposal.current(l)&&NervTurnStationRuntimeR52.covered(admission,proposal.envelopes()))NervOriginalCarrierR52.acceptRideStepR52(l,proposal);return false;}
+    private boolean prepareRunningShoesR52(ServerLevel l,Original o,Leg leg,CompoundTag data,NervCarrierPlatformEntity carrier,Set<UUID> own,boolean forceStow)throws java.io.IOException {if(NervOriginalCarrierR52.progress(carrier,1)!=1)return false;var current=NervOriginalCarrierR52.actualRidePoseR52(carrier);var target=NervLegacyCarrierRideR52.targetFromActualHeadsR52(NervOriginalCarrierR52.actualRoot(carrier,1));boolean onHeads=target!=null&&!forceStow;if(target==null||forceStow)target=NervLegacyCarrierRideR52.rest();if(current.equals(target))return !onHeads||NervLegacyCarrierRideR52.finitePadBearingsR52(NervOriginalCarrierR52.actualRoot(carrier,1),current).stream().allMatch(p->p.bears());if(carrier.originalCarrierStateR52().getLong("At")==l.getGameTime())return false;var joints=new ArrayList<NervLegacyCarrierRideR52.Joint>();for(int i=0;i<4;i++){var a=current.joints().get(i);var b=target.joints().get(i);double drop=a.drop()+Math.max(-.01,Math.min(.01,b.drop()-a.drop())),pitch=a.pitch()+Math.max(-.005,Math.min(.005,b.pitch()-a.pitch()));if(Math.abs(drop-b.drop())<1e-10)drop=b.drop();if(Math.abs(pitch-b.pitch())<1e-10)pitch=b.pitch();joints.add(new NervLegacyCarrierRideR52.Joint(drop,pitch));}var proposal=NervLegacyCarrierRideR52.proposeActuatorR52(l,carrier,current,new NervLegacyCarrierRideR52.RidePose(joints),own);var admission=turnAdmissionR52(l,o,data,leg,carrier.getUUID());if(proposal!=null&&proposal.current(l)&&admission!=null&&admission.pool().resourcesHeldR52(admission.task(),admission.resources())&&(!NervTraversalPolicyR53.strict(l)||NervTurnStationRuntimeR52.covered(admission,proposal.envelopes())))NervOriginalCarrierR52.acceptRideStepR52(l,proposal);return false;}
     private NervTurnStationRuntimeR52.Admission turnAdmissionR52(ServerLevel l,Original o,CompoundTag data,Leg leg,UUID controller){var c=NervRouteRuntimeR52.flightContext(l);if(c==null)return null;UUID task;Set<String> ids;var hardware=data.getCompound("EmptyCarrierTransferR52");if(hardware.hasUUID("Task")&&!hardware.getString("Stage").equals("READY")){task=hardware.getUUID("Task");var lease=c.pool().queryHardware(task);if(lease==null||!lease.controller().equals(controller)||lease.variant()!=o.variant()||lease.epoch()!=epoch||!lease.directoryFingerprint().equals(directory.fingerprint()))return null;ids=lease.resources();}else{var lease=c.pool().groundTaskR52(o);if(lease==null||!lease.directoryFingerprint().equals(directory.fingerprint()))return null;task=lease.task();var route=directory.route(lease.route());if(route==null)return null;ids=directory.resources(route);}if(!ids.containsAll(leg.resources())||!c.pool().resourcesHeldR52(task,ids))return null;return new NervTurnStationRuntimeR52.Admission(task,ids,c.bindings(),c.pool());}
     private Set<UUID> turnOwnR52(Original o,Kind k,UUID controller,NervFootGuideDockR52.Spec spec){var ids=new HashSet<>(TransportMembershipR52.members(o,k));ids.add(controller);ids.add(NervFootGuideStationR52.proposedIdentityR52(epoch,spec.leg().id()));return Set.copyOf(ids);}
     private boolean prepareTurnR52(ServerLevel l,Original o,Route route,Leg leg,CompoundTag data)throws java.io.IOException {var e=hull(l,o);var carrier=e==null?null:EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier==null)return false;var binding=EvaMechanicalFrameR52.measuredBinding(e,o);var rideOwn=new HashSet<>(TransportMembershipR52.members(o,kind(data)));rideOwn.add(carrier.getUUID());if(!prepareRunningShoesR52(l,o,leg,data,carrier,Set.copyOf(rideOwn)))return hold(o,"actual_running_shoe_extension_or_supported_stow_in_progress");int index=route.legs().indexOf(leg.id());if(index>0){var previous=directory.leg(route.legs().get(index-1));if(previous.motion()==Motion.FOOT_BEARING_TURN){var spec=turnSpecR52(previous,binding);var admission=turnAdmissionR52(l,o,data,previous,carrier.getUUID());if(spec==null||!NervTurnStationRuntimeR52.afterTurn(l,carrier,spec,admission,turnOwnR52(o,kind(data),carrier.getUUID(),spec),data))return hold(o,"actual_outgoing_station_bridge_or_axle_release_in_progress");if(carrier.originalCarrierStateR52().getLong("At")==l.getGameTime())return hold(o,"actual_station_release_clock_before_departure");}}
@@ -853,91 +1193,117 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     @Override public boolean applyEmptyCarrierTurnR52(ServerLevel l,Original o,UUID id,DirectoryTrajectoryR52 curve,CompoundTag data){try{var carrier=NervOriginalCarrierR52.controller(l,o);if(carrier==null||!carrier.getUUID().equals(id))return false;var spec=turnSpecR52(curve.leg(),curve.binding());var a=turnAdmissionR52(l,o,data,curve.leg(),id);if(spec==null||a==null)return false;var proof=NervTurnStationRuntimeR52.checkTurn(l,carrier,spec,a,Set.of(id,NervFootGuideStationR52.proposedIdentityR52(epoch,curve.leg().id())),data,curve.fromFraction(),curve.toFraction());return NervTurnStationRuntimeR52.commitTurn(l,proof,data);}catch(java.io.IOException unavailable){return false;}}
     @Override public boolean finishEmptyCarrierTurnR52(ServerLevel l,Original o,UUID id,Leg leg,CompoundTag data){try{var carrier=NervOriginalCarrierR52.controller(l,o);if(carrier==null||!carrier.getUUID().equals(id))return false;var spec=turnSpecR52(leg,NervOriginalCarrierR52.nominalBinding(o.variant()));var a=turnAdmissionR52(l,o,data,leg,id);return spec!=null&&a!=null&&NervTurnStationRuntimeR52.afterTurn(l,carrier,spec,a,Set.of(id,NervFootGuideStationR52.proposedIdentityR52(epoch,leg.id())),data);}catch(java.io.IOException unavailable){return false;}}
     private boolean carrierSpaceCoveredR52(ServerLevel l,Leg leg,NervOriginalCarrierR52.CheckedStep proof){var context=NervRouteRuntimeR52.flightContext(l);if(context==null)return false;var spaces=new ArrayList<AABB>();for(String id:leg.resources())if(directory.resource(id).kind()==ResourceKind.SPACE){var binding=context.bindings().get(id);if(binding==null)return false;spaces.addAll(binding.spaces());}return proof.envelopes().stream().allMatch(box->NervAirspaceCoverageR52.covered(box,spaces));}
-    private List<Leg> traversedEmptyTurnsR52(CompoundTag data){var transfer=data.getCompound("EmptyCarrierTransferR52");var ids=transfer.getList("Legs",net.minecraft.nbt.Tag.TAG_STRING);int index=transfer.getInt("Index");if(index<0||index>ids.size())throw new IllegalStateException("Actual empty route index required");var result=new ArrayList<Leg>();for(int i=0;i<index;i++){var leg=directory.leg(ids.getString(i));if(leg==null)throw new IllegalStateException("Actual Root empty route leg required");if(leg.motion()==Motion.FOOT_BEARING_TURN)result.add(leg);}return List.copyOf(result);}
-    @Override public Set<String> pendingEmptyStationResourcesR52(ServerLevel l,Original o,CompoundTag data){if(NervR50CarrierModeR53.enabled())return Set.of();var pending=new HashSet<String>();for(var leg:traversedEmptyTurnsR52(data)){try{var spec=turnSpecR52(leg,NervOriginalCarrierR52.nominalBinding(o.variant()));if(spec==null||!NervTurnStationRuntimeR52.idleComplete(l,spec))pending.addAll(leg.resources());}catch(java.io.IOException unavailable){pending.addAll(leg.resources());}}return Set.copyOf(pending);}
-    private boolean advanceEmptyStationIdleR52(ServerLevel l,Original o,UUID controller,CompoundTag data){if(!commissioned||plant(o)==null||NervOriginalCarrierR52.controller(l,o)==null||!NervOriginalCarrierR52.controller(l,o).getUUID().equals(controller))return false;if(NervR50CarrierModeR53.enabled())return true;try{for(var leg:traversedEmptyTurnsR52(data)){var spec=turnSpecR52(leg,NervOriginalCarrierR52.nominalBinding(o.variant()));if(spec==null)return false;if(NervTurnStationRuntimeR52.idleComplete(l,spec))continue;var admission=turnAdmissionR52(l,o,data,leg,controller);if(admission==null)return false;NervTurnStationRuntimeR52.idle(l,spec,admission);}return true;}catch(java.io.IOException unavailable){return false;}}
-    @Override public boolean finishEmptyStationIdleR52(ServerLevel l,Original o,UUID controller,CompoundTag data){return advanceEmptyStationIdleR52(l,o,controller,data)&&pendingEmptyStationResourcesR52(l,o,data).isEmpty();}
-    @Override public boolean prepareEmptyCarrierGatesR52(ServerLevel l,Original o,UUID controller,Set<String> ids,CompoundTag data){if(!commissioned||plant(o)==null||NervOriginalCarrierR52.controller(l,o)==null||!NervOriginalCarrierR52.controller(l,o).getUUID().equals(controller))return false;var context=NervRouteRuntimeR52.flightContext(l);var transfer=data.getCompound("EmptyCarrierTransferR52");if(context==null||!transfer.hasUUID("Task"))return false;var lease=context.pool().queryHardware(transfer.getUUID("Task"));if(lease==null||!lease.controller().equals(controller)||lease.epoch()!=epoch||!lease.directoryFingerprint().equals(directory.fingerprint())||!lease.resources().containsAll(ids))return false;for(String id:ids)if(!gate(l,gates.get(id),true,Set.of(controller)))return false;if(NervR50CarrierModeR53.enabled())return true;var routeLegs=transfer.getList("Legs",net.minecraft.nbt.Tag.TAG_STRING);int routeIndex=transfer.getInt("Index");if(NervOriginalCarrierR52.progress(NervOriginalCarrierR52.controller(l,o),1)==1&&routeIndex<routeLegs.size())try{var leg=directory.leg(routeLegs.getString(routeIndex));if(leg==null||!prepareRunningShoesR52(l,o,leg,data,NervOriginalCarrierR52.controller(l,o),Set.of(controller)))return false;}catch(java.io.IOException unavailable){return false;}return advanceEmptyStationIdleR52(l,o,controller,data);}
+
+    @Override public boolean finishEmptyStationIdleR52(ServerLevel level,Original original,UUID controller,CompoundTag data)
+    {
+        var carrier=NervOriginalCarrierR52.controller(level,original);
+        return commissioned&&plant(original)!=null&&carrier!=null&&carrier.getUUID().equals(controller);
+    }
+    @Override public boolean prepareEmptyCarrierGatesR52(ServerLevel l,Original o,UUID controller,Set<String> ids,CompoundTag data){if(!commissioned||plant(o)==null||NervOriginalCarrierR52.controller(l,o)==null||!NervOriginalCarrierR52.controller(l,o).getUUID().equals(controller))return false;var context=NervRouteRuntimeR52.flightContext(l);var transfer=data.getCompound("EmptyCarrierTransferR52");if(context==null||!transfer.hasUUID("Task"))return false;var lease=context.pool().queryHardware(transfer.getUUID("Task"));if(lease==null||!lease.controller().equals(controller)||lease.epoch()!=epoch||!lease.directoryFingerprint().equals(directory.fingerprint())||!lease.resources().containsAll(ids))return false;for(String id:ids)if(!gate(l,gates.get(id),true,Set.of(controller)))return false;{return true;}}
     private boolean finishRouteStationsR52(ServerLevel l,Original o,CompoundTag data)throws java.io.IOException {var route=directory.route(data.getString("RouteR52"));var e=hull(l,o);var carrier=e==null?null:EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(route==null||carrier==null)return false;boolean complete=true;var binding=finishingBinding(data);for(String id:route.legs()){var leg=directory.leg(id);if(leg.motion()!=Motion.FOOT_BEARING_TURN)continue;var spec=turnSpecR52(leg,binding);if(spec==null)return false;if(NervTurnStationRuntimeR52.idleComplete(l,spec))continue;var admission=turnAdmissionR52(l,o,data,leg,carrier.getUUID());if(admission==null)return false;if(!NervTurnStationRuntimeR52.idle(l,spec,admission))complete=false;}return complete;}
     @Override public Set<String> flightReceiverGates(ServerLevel l,String port)
     {var receiver=receivers.get(port);return commissioned&&receiver!=null?Set.copyOf(receiver.gates()):Set.of();}
     public RigidTransform resolveFlightReceiverCargoRootR52(ServerLevel l,Original o,Kind k,String port,CompoundTag data)
     {if(!commissioned||!originalGraph(l,o,k==Kind.OCCUPIED)||!receivers.containsKey(port))return null;var p=directory.ports().get(port);if(p==null||!p.reverseRoutes().containsKey(o.variant()))return null;var route=directory.route(p.reverseRoutes().get(o.variant()));var observed=data.copy();observed.putString("AssemblyKindR52",k.name());var binding=originalBinding(l,o,observed);return route!=null&&route.recovery()&&route.variant()==o.variant()&&binding!=null?directory.sample(directory.leg(route.legs().get(0)),0,binding).evaRoot():null;}
-    private void captureAssembly(ServerLevel l,Original o,CompoundTag data)
-    {var e=hull(l,o);var binding=EvaMechanicalFrameR52.measuredBinding(e,o);var geometry=EvaMechanicalFrameR52.capturedGeometry(e);var current=EvaMechanicalFrameR52.frame(e,1);var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier!=null)try{if(!NervOriginalCarrierR52.setAttachedR52(l,carrier,e,true))throw new IllegalStateException("Actual original carrier/sole bearing required");}catch(java.io.IOException missing){throw new IllegalStateException("Actual original carrier source unavailable",missing);}var sample=new FootSupportFrameR52.Sample(current,current.transformPoint(binding.leftFoot()),current.transformPoint(binding.rightFoot()),current.compose(binding.plugInEva()));captured.put(o.eva(),kind(data)==Kind.HULL_ONLY_RECOVERY?FullAssemblyGeometryR52.captureHullRecovery(l,o,geometry,binding):FullAssemblyGeometryR52.capture(l,o,geometry,binding,sample));}
+    private boolean captureAssembly(ServerLevel level,Original original,CompoundTag data)
+    {
+        var eva=hull(level,original);
+        if(eva==null||!EvaMechanicalFrameR52.active(eva))return hold(original,"original_transport_body_not_captured");
+        try
+        {
+            var binding=EvaMechanicalFrameR52.measuredBinding(eva,original);
+            var geometry=EvaMechanicalFrameR52.capturedGeometry(eva);
+            var root=EvaMechanicalFrameR52.frame(eva,1);
+            var sample=new FootSupportFrameR52.Sample(root,root.transformPoint(binding.leftFoot()),
+                    root.transformPoint(binding.rightFoot()),root.compose(binding.plugInEva()));
+            var source=kind(data)==Kind.HULL_ONLY_RECOVERY
+                    ?FullAssemblyGeometryR52.captureHullRecovery(level,original,geometry,binding)
+                    :FullAssemblyGeometryR52.capture(level,original,geometry,binding,sample);
+            var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);
+            if(carrier!=null&&!NervOriginalCarrierR52.setAttachedR52(level,carrier,eva,true))
+                return hold(original,"actual_original_carrier_sole_bearing_pending");
+            captured.put(original.eva(),source);
+            return true;
+        }
+        catch(java.io.IOException|IllegalArgumentException|IllegalStateException unavailable)
+        {return hold(original,"original_transport_capture="+unavailable.getMessage());}
+    }
+    private boolean transportSourceReadyR54(ServerLevel level,Original original,CompoundTag data)
+    {
+        var eva=hull(level,original);
+        if(eva==null||!EvaMechanicalFrameR52.active(eva)||data.getBoolean("ReceiverAlignmentR53")
+                ||EvaMechanicalFrameR52.ballisticCustodyR52(eva)||EvaMechanicalFrameR52.flightCustody(eva)
+                ||data.contains("Finish")&&!data.getString("Finish").equals(Finish.DONE.name()))return false;
+        return captured.containsKey(original.eva())||captureAssembly(level,original,data);
+    }
     private NervHullPreviewR52 preview(ServerLevel l,Original o)
     {var e=hull(l,o);if(e==null)return null;var prior=previews.get(o.eva());if(prior!=null&&prior.matches(e,o))return prior;var next=NervHullPreviewR52.inspect(e,o);if(next!=null)previews.put(o.eva(),next);return next;}
+    // A finishing body remains mechanically active while its detached carrier
+    // lowers. Reuse its saved local binding without reacquiring transport custody.
     @Override public FootSupportFrameR52.Binding originalBinding(ServerLevel l,Original o,CompoundTag data)
-    {var e=hull(l,o);if(e==null)return null;if(data.contains("FinishFeet")&&data.contains("Finish")&&!data.getString("Finish").equals(Finish.DONE.name())&&!EvaMechanicalFrameR52.active(e))return finishingBinding(data);if(!EvaMechanicalFrameR52.active(e)){if(kind(data)!=Kind.HULL_ONLY_RECOVERY){var proof=occupiedPreviews.get(o.eva());if(!EvaMechanicalFrameR52.occupiedPreviewCurrent(e,o,proof))proof=EvaMechanicalFrameR52.prepareOccupiedRecovery(e,o);if(proof==null)return null;occupiedPreviews.put(o.eva(),proof);return EvaMechanicalFrameR52.occupiedPreviewBinding(proof);}var observed=preview(l,o);return observed==null?null:observed.binding();}if(!data.getBoolean("ReceiverAlignmentR53")&&!captured.containsKey(o.eva())&&!EvaMechanicalFrameR52.ballisticCustodyR52(e)&&!EvaMechanicalFrameR52.flightCustody(e)&&!data.getString("Finish").equals(Finish.RELEASE.name()))captureAssembly(l,o,data);return EvaMechanicalFrameR52.measuredBinding(e,o);}
+    {var e=hull(l,o);if(e==null)return null;if(data.contains("FinishFeet")&&data.contains("Finish")&&!data.getString("Finish").equals(Finish.DONE.name()))return finishingBinding(data);if(!EvaMechanicalFrameR52.active(e)){if(kind(data)!=Kind.HULL_ONLY_RECOVERY){var proof=occupiedPreviews.get(o.eva());if(!EvaMechanicalFrameR52.occupiedPreviewCurrent(e,o,proof))proof=EvaMechanicalFrameR52.prepareOccupiedRecovery(e,o);if(proof==null)return null;occupiedPreviews.put(o.eva(),proof);return EvaMechanicalFrameR52.occupiedPreviewBinding(proof);}var observed=preview(l,o);return observed==null?null:observed.binding();}return EvaMechanicalFrameR52.measuredBinding(e,o);}
     @Override public Vec3 actualFootBearingCentre(ServerLevel l,Original o,CompoundTag data)
     {var b=originalBinding(l,o,data);var e=hull(l,o);if(b==null)return null;var frame=EvaMechanicalFrameR52.active(e)?EvaMechanicalFrameR52.frame(e,1):kind(data)==Kind.HULL_ONLY_RECOVERY?preview(l,o).frame():EvaMechanicalFrameR52.occupiedPreviewFrame(occupiedPreviews.get(o.eva()));return frame.transformPoint(b.contactCentre());}
     @Override public Region actualRecoveryRegion(ServerLevel l,Original o,CompoundTag data)
     {var feet=actualFootBearingCentre(l,o,data);if(feet==null)return null;Region found=null;for(var r:receivers.values())if(r.domain().contains(feet)){if(found!=null&&found!=r.region())return null;found=r.region();}return found;}
-    private boolean captureReceiver(ServerLevel l,Original o,Route route,Leg leg,CompoundTag data)
+    /** Routing check only: an absent raised support requires the existing air
+     * pickup lifecycle before any ground capture or receiver hatch movement. */
+    public boolean groundReceiverBearingReadyR53(ServerLevel l,Original o,String port,Kind requested,CompoundTag data)
     {
-        if(NervR50CarrierModeR53.enabled())return captureR50ReceiverR53(l,o,route,leg,data);
-        var receiver=receivers.get(route.port());var e=hull(l,o);if(!route.recovery()||receiver==null||!fixed(l,receiver.supports()))return hold(o,"actual_receiver_support_not_ready");
-        var b=originalBinding(l,o,data);if(b==null)return hold(o,"actual_stopped_geometry_preview_missing");var start=directory.sample(leg,0,b);var observed=kind(data)==Kind.HULL_ONLY_RECOVERY?preview(l,o).frame():EvaMechanicalFrameR52.occupiedPreviewFrame(occupiedPreviews.get(o.eva()));
-        if(observed==null||!pose(observed,start.evaRoot())||!pose(observed,start.evaRoot()))return hold(o,"original_hull_not_on_declared_receiver_frame");
-        Set<UUID> own=TransportMembershipR52.members(o,kind(data));float next=Math.min(1,e.carrierRiseProgress(1)+1F/receiver.carrierTicks());if(!acceptCarrierActuatorR52(l,e,observed,e.carrierRiseProgress(1),next,own,o,data))return hold(o,"actual_receiver_carrier_sweep_blocked");if(next!=1)return false;
-        boolean accepted;if(kind(data)==Kind.HULL_ONLY_RECOVERY){var proof=preview(l,o);if(proof==null)return false;accepted=EvaMechanicalFrameR52.captureHull(e,o,proof.capture());}else accepted=EvaMechanicalFrameR52.captureOccupiedRecovery(e,o,occupiedPreviews.get(o.eva()));if(!accepted)return hold(o,"actual_hull_receiver_capture_rejected");captureAssembly(l,o,data);return true;
+        var receiver=receivers.get(port);var eva=hull(l,o);var rack=eva==null?null:EvaMechanicalFrameR52.originalCarrierControllerR52(eva);
+        if(receiver==null||eva==null||rack==null||!fixed(l,receiver.supports())
+                ||NervOriginalCarrierR52.progress(rack,1)!=1
+                ||!pose(NervOriginalCarrierR52.actualRoot(rack,1),receiver.stoppedFrame())
+                ||receiver.gates().stream().anyMatch(id->!gateAtRest(l,gates.get(id),true)))return false;
+        var observed=previewFlight(l,o,requested,data.copy());if(observed==null||!observed.current(l)
+                ||!pose(CarrierMountProfileR53.read(rack,1).payloadFrame(NervOriginalCarrierR52.actualRoot(rack,1)),observed.root()))return false;
+        var declared=directory.ports().get(port);if(declared==null)return false;
+        String reverseId=declared.reverseRoutes().get(o.variant());if(reverseId==null)return false;
+        var reverse=directory.route(reverseId);
+        if(reverse==null||reverse.legs().isEmpty()
+                ||!pose(observed.root(),directory.sample(directory.leg(reverse.legs().get(0)),0,observed.binding()).evaRoot()))return false;
+        try{return NervOriginalCarrierR52.carrierFootBearingR52(l,rack,eva,observed.geometry(),observed.root());}
+        catch(java.io.IOException unavailable){return false;}
     }
+    private boolean captureReceiver(ServerLevel l,Original o,Route route,Leg leg,CompoundTag data)
+    {return captureR50ReceiverR53(l,o,route,leg,data);}
     private boolean captureR50ReceiverR53(ServerLevel level,Original original,Route route,Leg leg,CompoundTag data)
     {
         var receiver=receivers.get(route.port());var eva=hull(level,original);
-        if(!route.recovery()||receiver==null||eva==null||!fixed(level,receiver.supports()))return hold(original,"receiver_foundation_unavailable");
+        // A walking return that is not already physically received is routed
+        // through the original aircraft before reserving this ground job.
+        if(!route.recovery()||receiver==null||eva==null
+                ||!groundReceiverBearingReadyR53(level,original,route.port(),kind(data),data))
+            return hold(original,"original_receiver_requires_supported_air_handoff_before_capture");
+        if(carrierActuatorAdmissionR52(level,original,data)==null)return hold(original,"original_receiver_space_lease_missing");
         if(!EvaMechanicalFrameR52.active(eva))
         {
-            var binding=originalBinding(level,original,data);if(binding==null)return hold(original,"stopped_original_recovery_pose_unavailable");
-            var feet=actualFootBearingCentre(level,original,data);if(!receiver.domain().contains(feet))return hold(original,"outside_receiver_platform");
-            boolean captured;
-            if(kind(data)==Kind.HULL_ONLY_RECOVERY){var proof=preview(level,original);captured=proof!=null&&EvaMechanicalFrameR52.captureHull(eva,original,proof.capture());}
-            else captured=EvaMechanicalFrameR52.captureOccupiedRecovery(eva,original,occupiedPreviews.get(original.eva()));
-            if(!captured)return hold(original,"same_original_recovery_capture_failed");
-            data.putBoolean("ReceiverAlignmentR53",true);
-            data.remove("ReceiverBodyR53");data.remove("ReceiverHandsR53");data.putInt("ReceiverPoseTicksR53",0);
+            boolean accepted;
+            if(kind(data)==Kind.HULL_ONLY_RECOVERY)
+            {var observed=preview(level,original);accepted=observed!=null&&EvaMechanicalFrameR52.captureHull(eva,original,observed.capture());}
+            else accepted=EvaMechanicalFrameR52.captureOccupiedRecovery(eva,original,occupiedPreviews.get(original.eva()));
+            if(!accepted)return hold(original,"same_original_recovery_capture_failed");
         }
-        var binding=EvaMechanicalFrameR52.measuredBinding(eva,original);var current=EvaMechanicalFrameR52.frame(eva,1);
-        var target=directory.sample(leg,0,binding).evaRoot();double distance=current.translation().distanceTo(target.translation()),angle=current.rotationErrorDegrees(target);
-        double step=Math.min(1,Math.min(distance>.25?.25/distance:1,angle>3?3/angle:1));
-        var next=current.interpolate(target,step);
-        var from=new FootSupportFrameR52.Sample(current,current.transformPoint(binding.leftFoot()),current.transformPoint(binding.rightFoot()),current.compose(binding.plugInEva()));
-        var to=new FootSupportFrameR52.Sample(next,next.transformPoint(binding.leftFoot()),next.transformPoint(binding.rightFoot()),next.compose(binding.plugInEva()));
-        if(!EvaMechanicalFrameR52.applyVerified(eva,original,from,to))return hold(original,"receiver_alignment_original_chain_changed");
-        var rack=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);if(rack==null)return hold(original,"original_receiver_rack_unavailable");
-        boolean rackReady=NervOriginalCarrierR52.alignR50ReceiverR53(rack,target);
-        float rise=Math.min(1,eva.carrierRiseProgress(1)+1F/receiver.carrierTicks());eva.setCarrierRiseProgress(rise);NervOriginalCarrierR52.restoreR50RiseR53(rack,rise);
-        if(!pose(next,target)||!rackReady||rise!=1)return hold(original,"receiver_alignment_in_progress");
-        if(kind(data)==Kind.OCCUPIED&&data.getInt("ReceiverPoseTicksR53")<40)
+        var rack=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);
+        try
         {
-            if(!data.contains("ReceiverBodyR53"))
-            {
-                data.put("ReceiverBodyR53",EvaShutdownR30.encode(EvaMechanicalFrameR52.frozenLocalPose(eva)));
-                data.put("ReceiverHandsR53",EvaFrozenHandsR52.capture(eva,1));
-            }
-            int age=data.getInt("ReceiverPoseTicksR53")+1;float t=age/40F;t=t*t*(3-2*t);
-            var start=EvaBodyPose.neutralForTransportR32(eva);EvaShutdownR30.decode(data.getCompound("ReceiverBodyR53"),start);
-            var body=EvaBodyPose.blend(start,EvaBodyPose.neutralForTransportR32(eva),t);
-            var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
-            var fromHands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),data.getCompound("ReceiverHandsR53"));
-            var goalHands=EvaAnatomicalHandsR45.ordinaryReleaseTargetR52(eva.getUnitVariant(),false);
-            var joints=new java.util.LinkedHashMap<String,org.joml.Quaternionf>();
-            for(String name:fromHands.rotations().keySet())joints.put(name,new org.joml.Quaternionf(fromHands.rotations().get(name)).slerp(goalHands.rotations().get(name),t));
-            var hands=new EvaAnatomicalHandsR45.Pose(goalHands.left(),goalHands.right(),java.util.Map.copyOf(joints));
-            if(!EvaMechanicalFrameR52.applyGroundedPoseR52(eva,original,body,hands,provider.evaluate(eva.getUnitVariant(),body,hands)))return hold(original,"receiver_posture_adjustment_waiting");
-            data.putInt("ReceiverPoseTicksR53",age);if(age<40)return hold(original,"receiver_posture_adjustment_in_progress");
-            eva.stowHandsForShutdownR30();
+            if(rack==null||NervOriginalCarrierR52.progress(rack,1)!=1
+                    ||!NervOriginalCarrierR52.carrierFootBearingR52(level,rack,eva,EvaMechanicalFrameR52.capturedGeometry(eva),EvaMechanicalFrameR52.frame(eva,1)))
+                return hold(original,"original_receiver_actual_sole_contact_changed");
         }
-        data.remove("ReceiverAlignmentR53");captureAssembly(level,original,data);return true;
+        catch(java.io.IOException missing){return hold(original,"original_receiver_source_unavailable");}
+        // Mirror the already raised real actuator, without moving it or the load.
+        eva.setCarrierRiseProgress(1);
+        if(!captureAssembly(level,original,data))return false;data.remove("ReceiverAlignmentR53");return true;
     }
-    @Override public Sweep sweptAssembly(ServerLevel l,Original o,FootSupportFrameR52.Sample from,FootSupportFrameR52.Sample to,CompoundTag data){return null;}
-    @Override public Sweep sweptAssembly(ServerLevel l,Original o,DirectoryTrajectoryR52 t,CompoundTag data){if(originalBinding(l,o,data)==null)return null;return new Sweep(captured.get(o.eva()).sweep(t.directory(),t.leg(),t.fromFraction(),t.toFraction(),.005));}
+
+
     @Override public boolean actualFrameMatches(ServerLevel l,Original o,FootSupportFrameR52.Sample sample,CompoundTag data){var e=hull(l,o);return e!=null&&EvaMechanicalFrameR52.active(e)&&pose(EvaMechanicalFrameR52.frame(e,1),sample.evaRoot())&&(kind(data)==Kind.HULL_ONLY_RECOVERY||plug(l,o)!=null&&pose(plug(l,o).getCanonicalTransform(),sample.plugWorld()));}
     @Override public boolean applyVerifiedWholeAssembly(ServerLevel l,Original o,FootSupportFrameR52.Sample from,FootSupportFrameR52.Sample to,CompoundTag data){if(!actualFrameMatches(l,o,from,data))return false;var e=hull(l,o);var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier==null)return !EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(e)&&EvaMechanicalFrameR52.applyVerified(e,o,from,to);var route=directory.route(data.getString("RouteR52"));var binding=EvaMechanicalFrameR52.measuredBinding(e,o);DirectoryTrajectoryR52 curve=null;if(route!=null)for(int i=0;i<route.legs().size();i++){var leg=directory.leg(route.legs().get(i));int clock=data.getString("LegClockRouteR52").equals(route.id())&&data.getInt("LegClockIndexR52")==i?data.getInt("LegClockR52"):0;if(clock<0||clock>=leg.ticks())continue;double a=NervMechanicalTravelR52.fraction(clock,leg.ticks()),b=NervMechanicalTravelR52.fraction(clock+1,leg.ticks());if(pose(directory.sample(leg,a,binding).evaRoot(),from.evaRoot())&&pose(directory.sample(leg,b,binding).evaRoot(),to.evaRoot())){curve=new DirectoryTrajectoryR52(directory,leg,binding,a,b);break;}}if(curve==null)return hold(o,"actual_original_carrier_requires_same_declared_whole_assembly_curve");if(curve.leg().motion()==Motion.FOOT_BEARING_TURN)try{var spec=turnSpecR52(curve.leg(),binding);var a=turnAdmissionR52(l,o,data,curve.leg(),carrier.getUUID());if(spec==null||a==null)return false;var proof=NervTurnStationRuntimeR52.checkTurn(l,carrier,spec,a,turnOwnR52(o,kind(data),carrier.getUUID(),spec),data,curve.fromFraction(),curve.toFraction());if(proof==null||!proof.current(l)||!EvaMechanicalFrameR52.applyVerified(e,o,from,to))return false;return NervTurnStationRuntimeR52.commitTurn(l,proof,data);}catch(java.io.IOException unavailable){return false;}var members=new HashSet<>(TransportMembershipR52.members(o,kind(data)));members.add(carrier.getUUID());try{var proof=NervOriginalCarrierR52.propose(l,carrier,curve,1,1,Set.copyOf(members));if(proof==null)return hold(o,"actual_original_carrier_same_curve_sweep_or_guide_admission_held");if(!carrierSpaceCoveredR52(l,curve.leg(),proof))return hold(o,"actual_original_carrier_guide_envelope_outside_same_ground_space_lease");if(!EvaMechanicalFrameR52.applyVerified(e,o,from,to))return false;return proof.commit(l);}catch(java.io.IOException missing){return false;}}
     @Override public NervFlightProofR52.FlightPickupPreview previewFlight(ServerLevel l,Original o,Kind requested,CompoundTag data)
     {
         if(!commissioned||plant(o)==null||!originalGraph(l,o,requested==Kind.OCCUPIED))return null;
-        return NervFlightProofR52.inspect(l,o,requested);
+        return NervFlightProofR52.inspect(l,o,requested,data);
     }
     @Override public boolean prepareFlightGates(ServerLevel l,Original o,Kind requested,Set<String> gateIds,CompoundTag data)
     {
@@ -952,6 +1318,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         for(var cell:gate.supports())chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));
         for(var step:gate.collisionSteps())for(var cell:step)chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));
         chunks.add(new net.minecraft.world.level.ChunkPos(BlockPos.containing(gate.frame().translation())));
+        {chunks.addAll(CarrierTransferRailsR53.gateSupportChunks(gate.frame()));}
         return Set.copyOf(chunks);
     }
     @Override public boolean closeIdleAirshaftGateR53(ServerLevel l,String id)
@@ -1009,7 +1376,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {
         if(proof==null||!proof.current(l)||!flightCustody(proof.original(),proof.kind(),data)||!proof.step().aircraft().equals(data.getUUID("FlightAircraftR52")))return false;var o=proof.original();var e=hull(l,o);var receiver=receivers.get(proof.port());
         if(e==null||receiver==null||!EvaMechanicalFrameR52.active(e)||EvaMechanicalFrameR52.epoch(e)!=epoch||EvaMechanicalFrameR52.kind(e)!=proof.kind()||!EvaMechanicalFrameR52.capturedGeometry(e).sourceFingerprint().equals(proof.step().preview().sourceFingerprint())||!proof.step().preview().sourceFingerprint().equals(data.getString("FlightSourceR52"))||e.carrierRiseProgress(1)!=1||!pose(EvaMechanicalFrameR52.frame(e,1),proof.stoppedFrame())||!pose(resolveFlightReceiverCargoRootR52(l,o,proof.kind(),proof.port(),data),proof.stoppedFrame())||!fixed(l,receiver.supports())||receiver.gates().stream().anyMatch(id->!gateAtRest(l,gates.get(id),true))||!actualFrameMatches(l,o,proof.step().toSample(),data))return hold(o,"real_air_receiver_support_or_final_custody_changed");
-        if(!EvaMechanicalFrameR52.reattachCarrierR52(e))return hold(o,"actual_frozen_body_to_receiver_dolly_bearing_absent");captureAssembly(l,o,data);data.putString("AirReceiverPortR52",proof.port());data.putString("AirReceiverDirectoryR52",directory.fingerprint());return true;
+        if(!EvaMechanicalFrameR52.reattachCarrierR52(e))return hold(o,"actual_frozen_body_to_receiver_dolly_bearing_absent");if(!captureAssembly(l,o,data))return false;data.putString("AirReceiverPortR52",proof.port());data.putString("AirReceiverDirectoryR52",directory.fingerprint());return true;
     }
     @Override public boolean acceptAirDelivery(ServerLevel l,NervFlightProofR52.CheckedAirDelivery proof,CompoundTag data)
     {
@@ -1017,7 +1384,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(e==null||!EvaMechanicalFrameR52.flightCustody(e)||!originalGraph(l,o,true)||!EvaMechanicalFrameR52.capturedGeometry(e).sourceFingerprint().equals(proof.step().preview().sourceFingerprint())||!proof.step().preview().sourceFingerprint().equals(data.getString("FlightSourceR52"))||!actualFrameMatches(l,o,proof.step().toSample(),data)||!EvaMechanicalFrameR52.releaseFlightUpright(e,o,proof.stoppedFrame()))return hold(o,"actual_air_delivery_support_or_custody_release_rejected");
         e.setNervLogisticsLocked(false);e.setNoGravity(false);e.clearSortieDestination();captured.remove(o.eva());data.putString("AirDeliveryDestinationR52",proof.destination());data.putString("AirDeliveryDirectoryR52",directory.fingerprint());for(String field:List.of("FlightAircraftR52","FlightEpochR52","FlightDirectoryR52","FlightSourceR52"))data.remove(field);return true;
     }
-    @Override public boolean approachReachable(ServerLevel l,Original o,Port port,Route reverse,CompoundTag data){var receiver=receivers.get(port.id());var b=originalBinding(l,o,data);if(receiver==null||receiver.region()!=port.region()||b==null||!fixed(l,receiver.supports()))return hold(o,"explicit_actual_receiver_not_ready");var leg=directory.leg(reverse.legs().get(0));RigidTransform actual=EvaMechanicalFrameR52.active(hull(l,o))?EvaMechanicalFrameR52.frame(hull(l,o),1):kind(data)==Kind.HULL_ONLY_RECOVERY?preview(l,o).frame():EvaMechanicalFrameR52.occupiedPreviewFrame(occupiedPreviews.get(o.eva()));if(!(NervR50CarrierModeR53.enabled()?receiver.domain().contains(actual.transformPoint(b.contactCentre())):pose(actual,directory.sample(leg,0,b).evaRoot())))return hold(o,"receiver_requires_real_approach_before_rail_admission");for(String id:receiver.gates())if(gates.get(id)==null||!declaredDoor(l,gates.get(id)))return false;return true;}
+    @Override public boolean approachReachable(ServerLevel l,Original o,Port port,Route reverse,CompoundTag data){var receiver=receivers.get(port.id());var b=originalBinding(l,o,data);if(receiver==null||receiver.region()!=port.region()||b==null||!fixed(l,receiver.supports()))return hold(o,"explicit_actual_receiver_not_ready");var leg=directory.leg(reverse.legs().get(0));RigidTransform actual=EvaMechanicalFrameR52.active(hull(l,o))?EvaMechanicalFrameR52.frame(hull(l,o),1):kind(data)==Kind.HULL_ONLY_RECOVERY?preview(l,o).frame():EvaMechanicalFrameR52.occupiedPreviewFrame(occupiedPreviews.get(o.eva()));if(!((receiver.domain().contains(actual.transformPoint(b.contactCentre())))))return hold(o,"receiver_requires_real_approach_before_rail_admission");for(String id:receiver.gates())if(gates.get(id)==null||!declaredDoor(l,gates.get(id)))return false;return true;}
     @Override public NervOwnerPlacementR52.Proof finishingAssemblyPlacement(ServerLevel l,Original o,CompoundTag data)
     {return NervOwnerPlacementR52.capture(l,o,kind(data),NervMappedPlugMechanicsR52.selectedMachinery());}
     @Override public boolean finishOriginal(ServerLevel l,Original o,boolean returning,CompoundTag data)
@@ -1030,19 +1397,19 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var phase=Finish.valueOf(data.getString("Finish"));int age=data.getInt("FinishTicks")+1;
         if((returning||phase==Finish.RECEIVE)&&!pose(NervOwnerPlacementR52.actualRoot(e),getFrame(data,"FinishRoot")))return hold(o,"actual_received_root_changed");
         if(!returning)return finishDeployment(l,o,e,data,phase,age,own);
-        if(!pose(getFrame(data,"FinishRoot"),p.bay())||!NervR50CarrierModeR53.enabled()&&!fixed(l,p.carrierSupport()))return hold(o,"original_bay_receiver_not_actual");
+        if((!pose(getFrame(data,"FinishRoot"),p.bay())))return hold(o,"original_bay_receiver_not_actual");
         var capsule=plug(l,o);var gantry=gantry(l,p);if(gantry==null)return false;
         if(phase==Finish.REFILL&&data.hasUUID("ServiceReadbackTaskR53"))gantry.setLclVisualLevel(data.getInt("FilledLayers"));
         switch(phase)
         {
-            case RECEIVE -> {if(!dryBay(l,p)||!gateAtRest(l,servicePit(p),true)||!carrierSupportReadyR53(l,e))return hold(o,"original_receiver_dry_pit_or_foot_bearing_changed");float closure=Math.min(1,age/40F);if(!NervPlantMotionR52.clearRestraints(l,p.variant(),p.gantry().frame(),gantry.getRestraintProgress(),closure,own))return hold(o,"real_receiver_clamp_motion_blocked");gantry.setRestraintProgress(closure);if(age>=40&&originalClampsBear(l,p)){var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);try{if(carrier!=null&&!NervOriginalCarrierR52.setAttachedR52(l,carrier,e,false))return hold(o,"real_shoulder_support_to_empty_carrier_custody_rejected");}catch(java.io.IOException missing){return false;}data.putString("Finish",Finish.LOWER.name());data.putInt("FinishTicks",0);}}
+            case RECEIVE -> {if(!dryBay(l,p)||!gateAtRest(l,servicePit(p),true)||!carrierSupportReadyR53(l,e))return hold(o,"original_receiver_dry_pit_or_foot_bearing_changed");float closure=fixedCarrierBayR53(l,p)?0:Math.min(1,age/40F);if(!NervPlantMotionR52.clearRestraints(l,p.variant(),p.gantry().frame(),gantry.getRestraintProgress(),closure,own))return hold(o,"real_receiver_clamp_motion_blocked");gantry.setRestraintProgress(closure);if(age>=40&&originalClampsBear(l,p)){var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);try{if(carrier!=null&&!NervOriginalCarrierR52.setAttachedR52(l,carrier,e,false))return hold(o,"real_shoulder_support_to_empty_carrier_custody_rejected");}catch(java.io.IOException missing){return false;}data.putString("Finish",Finish.LOWER.name());data.putInt("FinishTicks",0);}}
             case LOWER -> {if(!dryBay(l,p)||!gateAtRest(l,servicePit(p),true)||!originalClampsBear(l,p))return hold(o,"original_clamps_and_open_dry_pit_required_for_lowering");var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier==null)return false;if(!NervOriginalCarrierR52.actualRidePoseR52(carrier).equals(NervLegacyCarrierRideR52.rest())){var route=directory.route(data.getString("RouteR52"));if(route==null||route.legs().isEmpty())return false;var leg=directory.leg(route.legs().get(route.legs().size()-1));var rideOwn=new HashSet<>(own);rideOwn.add(carrier.getUUID());try{if(!prepareRunningShoesR52(l,o,leg,data,carrier,Set.copyOf(rideOwn),true))return hold(o,"actual_clamp_supported_running_shoe_stow_before_full_lower");}catch(java.io.IOException unavailable){return false;}}float next=Math.max(0,e.carrierRiseProgress(1)-1F/p.raiseTicks());if(!acceptCarrierActuatorR52(l,e,getFrame(data,"FinishRoot"),e.carrierRiseProgress(1),next,own,o,data))return hold(o,"real_receiver_carrier_lower_blocked");if(next==0){data.putString("Finish",Finish.SERVICE_BRIDGE_CLOSE.name());data.putInt("FinishTicks",0);}}
             case SERVICE_BRIDGE_CLOSE -> {if(!dryBay(l,p)||!originalClampsBear(l,p)||e.carrierRiseProgress(1)!=0||!gateAtRest(l,servicePit(p),true))return hold(o,"actual_lowered_carrier_open_pit_required_for_guide_retraction");if(groundGuidesDeclared){float next=Math.max(0,1-age/(float)NervServiceFootDriveR52.BRIDGE_CLOSE_TICKS);try{if(!NervServiceFootDriveR52.clearBridge(l,gantry,gantry.serviceGuideBridgeR52(1),next,own))return hold(o,"actual_service_guide_bridge_close_blocked");}catch(java.io.IOException missing){return false;}gantry.setServiceGuideBridgeR52(next);if(next!=0)break;}data.putString("Finish",nextAfterServiceBridgeCloseR52(hasWetFloorSealR52(gates.get("bay_"+p.variant()+"_front"))));data.putInt("FinishTicks",0);}
-            case FRONT_SEAL_CLOSE -> {if(!wetFrontReturnClosePermitR52(dryBay(l,p),e.carrierRiseProgress(1),originalClampsBear(l,p),serviceBridgeReadyR52(l,p,false),gateAtRest(l,servicePit(p),true)))return hold(o,"actual_dry_lowered_clamp_supported_carrier_open_pit_required_before_front_seal_close");var front=gates.get("bay_"+p.variant()+"_front");if(!gate(l,front,false,own)||!gateAtRest(l,front,false)||hasWetFloorSealR52(front)&&!wetFloorSealClosedR52(l,front))return hold(o,"actual_front_door_and_declared_floor_seals_closing");data.putString("Finish",Finish.PIT_CLOSE.name());data.putInt("FinishTicks",0);}
-            case PIT_CLOSE -> {if(!dryBay(l,p)||!originalClampsBear(l,p)||e.carrierRiseProgress(1)!=0||!serviceBridgeReadyR52(l,p,false))return hold(o,"lowered_full_carrier_and_actual_clamps_required_before_floor_close");var front=gates.get("bay_"+p.variant()+"_front");if(!wetPitClosePermitR52(hasWetFloorSealR52(front),wetFloorSealClosedR52(l,front)))return hold(o,"actual_paired_front_and_complete_floor_seal_must_close_before_pit");if(!gate(l,servicePit(p),false,own))return false;data.putString("Finish",Finish.LOWER_FRAME_CLOSE.name());data.putInt("FinishTicks",0);}
-            case LOWER_FRAME_CLOSE -> {if(!dryBay(l,p)||!gateAtRest(l,servicePit(p),false)||!originalClampsBear(l,p)||e.carrierRiseProgress(1)!=0)return false;if(NervR50CarrierModeR53.enabled())gantry.setLowerFrameProgressR52(0);else{if(!gantry.lowerFrameDeclaredR52())return false;float next=Math.max(0,1-age/(float)NervLowerFrameR52.CLOSE_TICKS);try{if(!NervLowerFrameR52.clearAdvance(l,gantry,gantry.lowerFrameProgressR52(1),next,own))return hold(o,"actual_lower_frame_return_blocked");}catch(java.io.IOException failure){return false;}gantry.setLowerFrameProgressR52(next);if(next!=0)break;}if(kind(data)==Kind.HULL_ONLY_RECOVERY){if(!EvaMechanicalFrameR52.releaseHullToServiceR52(e,o))return hold(o,"actual_recovered_body_and_34hands_service_handoff_rejected");data.putString("Finish",Finish.REFILL.name());data.putInt("FinishTicks",0);break;}if(capsule==null||!originalLaunchLock(l,o.variant(),e,capsule))return false;if(!EvaMechanicalFrameR52.releaseToServiceR52(e,o))return hold(o,"actual_service_body_handoff_rejected");var before=EntryPlugEjectionR48.snapshot(capsule);if(!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_LOCKED,capsule.getInsertionEpoch(),EntryPlugCarrierEntity.STAGE_EJECTING)||!EntryPlugEjectionR48.detach(e,capsule,before))return hold(o,"original_capsule_receiver_detach_rejected");data.putString("Finish",Finish.EXTRACT.name());data.putInt("FinishTicks",0);}
-            case EXTRACT -> {if(capsule==null||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_EJECTING||!capsule.isVehicle())return false;double progress=NervAssemblyClocksR52.extractionProgress(age);if(age<=36)EvaDorsalMechanism.prepare(e,age);else if(age>=137)EvaDorsalMechanism.seal(e,age-137);var target=age<=36?capsule.getCanonicalTransform():EntryPlugKinematics.insertionTransform(e,p.dock(),progress);if(!NervMappedPlugMechanicsR52.clearCapsule(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id()))return hold(o,"recovery_capsule_payload_unavailable");if(!(age<=36?approachCrane(l,p,capsule,age,data):crane(l,p,capsule,target,false)))return hold(o,"recovery_original_crane_approach_held");if(!NervMappedPlugMechanicsR52.applyInsertion(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id()))return hold(o,"recovery_capsule_motion_unavailable");if(l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=36)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinRecoveryProgress((int)Math.round(EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT*progress));if(age>=197){if(!pose(capsule.getCanonicalTransform(),p.dock())||!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_EJECTING,capsule.getInsertionEpoch(),EntryPlugCarrierEntity.STAGE_OCCUPIED))return false;data.putString("Finish",Finish.REFILL.name());data.putInt("FinishTicks",0);}}
-            case REFILL -> {if(kind(data)==Kind.HULL_ONLY_RECOVERY&&EntryPlugDisposalR31.destroyed(l,p.plug())&&maintenanceCapsuleR53(l,p)==null)return hold(o,"destroyed_capsule_maintenance_replacement_failed");if(!gateAtRest(l,servicePit(p),false)||e.carrierRiseProgress(1)!=0||!originalClampsBear(l,p)||gantry.lowerFrameProgressR52(1)!=0)return hold(o,"watertight_actual_floor_and_clamps_required_before_refill");var front=gates.get("bay_"+p.variant()+"_front");if(!gateAtRest(l,front,false)){gate(l,front,false,own);return hold(o,"original_front_door_must_close_before_refill");}if(hasWetFloorSealR52(front)&&!wetSealRefillReadyR52(wetFloorSealClosedR52(l,front),wetSealBayDryR52(l,front),data.getInt("FilledLayers"),data,()->gate(l,front,false,own)))return hold(o,"actual_dry_front_and_complete_floor_seal_required_before_refill");if(kind(data)==Kind.OCCUPIED&&(capsule==null||!pose(capsule.getCanonicalTransform(),p.dock())||!crane(l,p,capsule,p.dock(),false)))return false;int count=Math.min(p.lcl().size(),age/4);int accepted=data.getInt("FilledLayers");while(accepted<count){if(!change(l,p.lcl().get(accepted),false,own))return hold(o,"real_lcl_refill_layer_changed_"+accepted);data.putInt("FilledLayers",++accepted);}gantry.setLclVisualLevel(Math.min(p.lcl().size(),age/4F));if(count==p.lcl().size()&&p.lcl().stream().allMatch(layer->matches(l,layer,false))){data.putString("Finish",Finish.BRIDGE.name());data.putInt("FinishTicks",0);}}
+            case FRONT_SEAL_CLOSE -> {if(!wetFrontReturnClosePermitR52(dryBay(l,p),e.carrierRiseProgress(1),originalClampsBear(l,p),true,gateAtRest(l,servicePit(p),true)))return hold(o,"actual_dry_lowered_clamp_supported_carrier_open_pit_required_before_front_seal_close");var front=gates.get("bay_"+p.variant()+"_front");if(!gate(l,front,false,own)||!gateAtRest(l,front,false)||hasWetFloorSealR52(front)&&!wetFloorSealClosedR52(l,front))return hold(o,"actual_front_door_and_declared_floor_seals_closing");data.putString("Finish",Finish.PIT_CLOSE.name());data.putInt("FinishTicks",0);}
+            case PIT_CLOSE -> {if((!dryBay(l,p)||!originalClampsBear(l,p)||e.carrierRiseProgress(1)!=0))return hold(o,"lowered_full_carrier_and_actual_clamps_required_before_floor_close");var front=gates.get("bay_"+p.variant()+"_front");if(!wetPitClosePermitR52(hasWetFloorSealR52(front),wetFloorSealClosedR52(l,front)))return hold(o,"actual_paired_front_and_complete_floor_seal_must_close_before_pit");if(!gate(l,servicePit(p),false,own))return false;data.putString("Finish",Finish.LOWER_FRAME_CLOSE.name());data.putInt("FinishTicks",0);}
+            case LOWER_FRAME_CLOSE -> {if(!dryBay(l,p)||!gateAtRest(l,servicePit(p),false)||!originalClampsBear(l,p)||e.carrierRiseProgress(1)!=0)return false;{gantry.setLowerFrameProgressR52(0);}if(kind(data)==Kind.HULL_ONLY_RECOVERY){if(!EvaMechanicalFrameR52.releaseHullToServiceR52(e,o))return hold(o,"actual_recovered_body_and_34hands_service_handoff_rejected");data.putString("Finish",Finish.REFILL.name());data.putInt("FinishTicks",0);break;}if(capsule==null||!originalLaunchLock(l,o.variant(),e,capsule))return false;if(!EvaMechanicalFrameR52.releaseToServiceR52(e,o))return hold(o,"actual_service_body_handoff_rejected");var before=EntryPlugEjectionR48.snapshot(capsule);if(!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_LOCKED,capsule.getInsertionEpoch(),EntryPlugCarrierEntity.STAGE_EJECTING)||!EntryPlugEjectionR48.detach(e,capsule,before))return hold(o,"original_capsule_receiver_detach_rejected");data.putString("Finish",Finish.EXTRACT.name());data.putInt("FinishTicks",0);}
+            case EXTRACT -> {if(capsule==null||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_EJECTING||!capsule.isVehicle())return false;double progress=NervAssemblyClocksR52.extractionProgress(age);if(age<=36)EvaDorsalMechanism.prepare(e,age);else if(age>=137)EvaDorsalMechanism.seal(e,age-137);var target=age<=36?capsule.getCanonicalTransform():EntryPlugKinematics.insertionTransform(e,p.dock(),progress);if(!NervMappedPlugMechanicsR52.clearCapsule(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id()))return hold(o,"recovery_capsule_payload_unavailable");if(age>NervAssemblyClocksR52.EXTRACT_HANDOFF_TICK&&!(age<=NervAssemblyClocksR52.EXTRACT_GRIP_TICK?approachCrane(l,p,capsule,age-NervAssemblyClocksR52.EXTRACT_HANDOFF_TICK,data):crane(l,p,capsule,target,false)))return hold(o,"recovery_original_crane_approach_held");if(!NervMappedPlugMechanicsR52.applyInsertion(l,e,capsule,capsule.getCanonicalTransform(),target,p.crane().visual().id()))return hold(o,"recovery_capsule_motion_unavailable");if(l.getEntity(p.crane().visual().id()) instanceof NervCarrierPlatformEntity hoist&&age>=NervAssemblyClocksR52.EXTRACT_GRIP_TICK)hoist.linkCranePlug(capsule);capsule.setInsertionProgress((int)Math.round(progress*100));capsule.setCabinRecoveryProgress((int)Math.round(EntryPlugCarrierEntity.CABIN_TRANSFER_PERCENT*progress));if(age>=197){if(!pose(capsule.getCanonicalTransform(),p.dock())||!capsule.transitionInsertionStage(EntryPlugCarrierEntity.STAGE_EJECTING,capsule.getInsertionEpoch(),EntryPlugCarrierEntity.STAGE_OCCUPIED))return false;data.putString("Finish",Finish.REFILL.name());data.putInt("FinishTicks",0);}}
+            case REFILL -> {if(kind(data)==Kind.HULL_ONLY_RECOVERY&&EntryPlugDisposalR31.destroyed(l,p.plug())&&maintenanceCapsuleR53(l,p)==null)return hold(o,"destroyed_capsule_maintenance_replacement_failed");if(!gateAtRest(l,servicePit(p),false)||e.carrierRiseProgress(1)!=0||!originalClampsBear(l,p)||gantry.lowerFrameProgressR52(1)!=0)return hold(o,"watertight_actual_floor_and_clamps_required_before_refill");var front=gates.get("bay_"+p.variant()+"_front");if(!gateAtRest(l,front,false)){gate(l,front,false,own);return hold(o,"original_front_door_must_close_before_refill");}if(hasWetFloorSealR52(front)&&!wetSealRefillReadyR52(wetFloorSealClosedR52(l,front),wetSealBayDryR52(l,front),data.getInt("FilledLayers"),data,()->gate(l,front,false,own)))return hold(o,"actual_dry_front_and_complete_floor_seal_required_before_refill");if(kind(data)==Kind.OCCUPIED&&(capsule==null||!pose(capsule.getCanonicalTransform(),p.dock())||!crane(l,p,capsule,p.dock(),false)))return false;int count=NervAssemblyClocksR52.drainedLayers(p.lcl().size(),age);int accepted=data.getInt("FilledLayers");while(accepted<count){if(!change(l,p.lcl().get(accepted),false,own))return hold(o,"real_lcl_refill_layer_changed_"+accepted);data.putInt("FilledLayers",++accepted);}gantry.setLclVisualLevel(NervAssemblyClocksR52.liquidLayers(p.lcl().size(),age));if(count==p.lcl().size()&&p.lcl().stream().allMatch(layer->matches(l,layer,false))){data.putString("Finish",Finish.BRIDGE.name());data.putInt("FinishTicks",0);}}
             case BRIDGE -> {int count=Math.min(9,(int)Math.floor(age*9D/40));if(age%5==0||age>=40)if(!applyBridgeState(l,p,count,data,own))return hold(o,"complete_original_bridge_extension_blocked_"+count);if(age>=40&&bridgeMatches(l,p,9)){if(kind(data)==Kind.OCCUPIED)capsule.setCabinRecoveryProgress(0);data.putString("Finish",Finish.DONE.name());captured.remove(o.eva());holds.remove(o.eva());return true;}}
             case DONE -> {String mismatch=parkedServiceHoldR53(l,o);if(!mismatch.isEmpty())return hold(o,mismatch);holds.remove(o.eva());return true;}
             default -> {return hold(o,"outbound_phase_in_original_bay_return");}
@@ -1075,6 +1442,69 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(data.contains("BallisticProfileR53")){if(!data.getCompound("BallisticProfileR53").equals(expected))return null;}else{if(directory.schemaVersionR52()>=2&&!data.getString("Finish").equals(Finish.RECEIVE.name()))return null;data.put("BallisticProfileR53",expected);}
         var proof=ballistic.get(o.eva());if(proof!=null&&!proof.profile().equals(profile))return null;if(proof==null){proof=NervBallisticHandoffR52.capture(l,o,e,start,profile);if(proof!=null)ballistic.put(o.eva(),proof);}return proof;
     }
+    private NervOriginalCarrierR52.CheckedStep outletPairHeldR53(Original original, String reason)
+    { hold(original, reason);return null; }
+
+    private String outletSpaceFailureR53(NervTurnStationRuntimeR52.Admission admission, List<AABB> envelopes, String kind)
+    {
+        if (!admission.pool().resourcesHeldR52(admission.task(), admission.resources())) return "outlet_" + kind + "_lease_no_longer_held";
+        var spaces = new ArrayList<AABB>();
+        for (String id : admission.resources())
+        { var binding = admission.bindings().get(id);if (binding != null) spaces.addAll(binding.spaces()); }
+        for (var box : envelopes) if (!NervAirspaceCoverageR52.covered(box, spaces)) return "outlet_" + kind + "_space_uncovered / " + box;
+        return null;
+    }
+
+    private NervOriginalCarrierR52.CheckedStep outletPairR53(ServerLevel level, Original original, EvaUnit01Entity eva,
+            CompoundTag data, Set<UUID> own, NervBallisticHandoffR52.StepR53 payload, float next)
+    {
+        var carrier = NervOriginalCarrierR52.controller(level, original);
+        var admission = carrierActuatorAdmissionR52(level, original, data);
+        if (carrier == null) return outletPairHeldR53(original, "outlet_original_carrier_missing");
+        if (admission == null) return outletPairHeldR53(original, "outlet_original_space_admission_missing");
+        if (payload == null || !payload.current(level, eva)) return outletPairHeldR53(original, "outlet_body_step_not_current");
+        var proof = ballistic.get(original.eva());
+        var context = NervRouteRuntimeR52.flightContext(level);
+        if (proof == null || context == null) return outletPairHeldR53(original, "outlet_actual_ballistic_source_or_context_missing");
+        var claim = context.pool().reserveGroundOutletSpacesR53(admission.task(), level, eva, proof, context.bindings());
+        if (!claim.accepted()) return outletPairHeldR53(original, claim.reason());
+        admission = new NervTurnStationRuntimeR52.Admission(admission.task(), claim.resources(), context.bindings(), context.pool());
+        var members = new HashSet<>(own);members.add(carrier.getUUID());
+        try
+        {
+            var rack = NervOriginalCarrierR52.proposeOutletReturnR53(level, carrier, eva, data.getString("RouteR52"),
+                    NervOriginalCarrierR52.progress(carrier, 1), next, Set.copyOf(members), payload);
+            if (rack == null) return outletPairHeldR53(original, "outlet_rack_sweep / " + NervOriginalCarrierR52.lastRejectionR53(carrier));
+            if (!rack.current(level)) return outletPairHeldR53(original, "outlet_rack_step_not_current");
+            String failure = outletSpaceFailureR53(admission, rack.envelopes(), "rack");
+            if (failure == null) failure = outletSpaceFailureR53(admission, payload.envelopes(), "payload");
+            return failure == null ? rack : outletPairHeldR53(original, failure);
+        }
+        catch (java.io.IOException missing) { return outletPairHeldR53(original, "outlet_original_source_unavailable / " + missing.getMessage()); }
+    }
+
+    private boolean advanceOutletPairR53(ServerLevel level, Original original, EvaUnit01Entity eva,
+            CompoundTag data, Set<UUID> own, NervBallisticHandoffR52.Proof proof, float next)
+    {
+        var carrier = NervOriginalCarrierR52.controller(level, original);
+        var admission = carrierActuatorAdmissionR52(level, original, data);
+        if (carrier == null || admission == null) return hold(original, "outlet_original_carrier_or_space_lease_missing");
+        float from = NervOriginalCarrierR52.progress(carrier, 1);
+        if (from > .5F)
+        {
+            if (next < .5F || !NervOriginalCarrierR52.outletFootBearingR53(level, carrier, eva))
+                return hold(original, "outlet_actual_foot_bearing_before_jaw_release_missing");
+            return acceptCarrierActuatorR52(level, eva, NervOriginalCarrierR52.actualRoot(carrier, 1), from, next, own, original, data);
+        }
+        var payload = proof.proposeStepR53(level, eva);
+        if (payload == null) return hold(original, proof.rejectionR53());
+        var rack = outletPairR53(level, original, eva, data, own, payload, next);
+        if (rack == null) return false;
+        if (!rack.commit(level) || !EvaMechanicalFrameR52.acceptBallisticStepR53(eva, payload))
+            throw new IllegalStateException("Current paired outlet proof changed during same-tick commit");
+        eva.setCarrierRiseProgress(next);return true;
+    }
+
     private boolean finishDeployment(ServerLevel l,Original o,EvaUnit01Entity e,CompoundTag data,Finish phase,int age,Set<UUID> own)
     {
         var route=directory.route(data.getString("RouteR52"));var receiver=route==null?null:receivers.get(route.port());if(kind(data)!=Kind.OCCUPIED||receiver==null||!fixed(l,receiver.supports()))return hold(o,"actual_deployment_support_missing");
@@ -1082,18 +1512,53 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var proof=ballisticProof(l,o,e,data,hatch);if(proof==null)return hold(o,"actual_ballistic_payload_or_saved_landing_profile_changed");
         switch(phase)
         {
-            case RECEIVE -> {for(String id:receiver.gates())if(!gateAtRest(l,gates.get(id),true))return hold(o,"deployment_hatch_must_be_physically_open");if(!carrierSupportReadyR53(l,e)||!NervR50CarrierModeR53.enabled()&&!proof.clearLaunch(l,e,hatch)||!EvaMechanicalFrameR52.beginBallisticR52(e,o,proof.launchVelocity()))return hold(o,"actual_full_payload_carrier_and_hatch_ballistic_sweep_blocked");data.putString("Finish",Finish.EJECT_LOWER.name());data.putInt("FinishTicks",0);}
-            case EJECT_LOWER -> {if(!proof.placement(l,e)||!gateAtRest(l,hatch,true))return hold(o,"actual_ballistic_custody_or_open_hatch_changed");float next=Math.max(0,1-age/(float)NervBallisticHandoffR52.CARRIER_TICKS);if(!acceptCarrierActuatorR52(l,e,EvaMechanicalFrameR52.carrierFrameR52(e,1),e.carrierRiseProgress(1),next,own,o,data))return hold(o,"actual_independent_dolly_return_blocked");if(next==0){data.putString("Finish",Finish.EJECT_CLOSE.name());data.putInt("FinishTicks",0);}}
-            case EJECT_CLOSE -> {if(!proof.placement(l,e)||e.carrierRiseProgress(1)!=0)return hold(o,"actual_ballistic_source_or_full_dolly_clearance_changed");if(!gate(l,hatch,false,own))return false;data.putString("Finish",Finish.LAND.name());data.putInt("FinishTicks",0);}
-            case LAND -> {if(!proof.placement(l,e)||!gateAtRest(l,hatch,false))return hold(o,"real_closed_hatch_before_landing_required");
-                if(NervR50CarrierModeR53.enabled())
+            case RECEIVE -> {for(String id:receiver.gates())if(!gateAtRest(l,gates.get(id),true))return hold(o,"deployment_hatch_must_be_physically_open");if(!carrierSupportReadyR53(l,e)||((!EvaMechanicalFrameR52.beginControlledBallisticR53(e,o,proof))))return hold(o,"actual_full_payload_carrier_and_hatch_ballistic_sweep_blocked");data.putString("Finish",Finish.EJECT_LOWER.name());data.putInt("FinishTicks",0);}
+            case EJECT_LOWER -> {
+                if(!proof.placement(l,e)||!gateAtRest(l,hatch,true))return hold(o,"actual_ballistic_custody_or_open_hatch_changed");
+                float next=Math.max(0,1-age/(float)NervBallisticHandoffR52.CARRIER_TICKS);
                 {
+                    if(!EvaMechanicalFrameR52.controlledBallisticR53(e))
+                    {
+                        boolean admitted=EvaMechanicalFrameR52.ballisticTicksR52(e)>=NervBallisticHandoffR52.FLIGHT_TICKS
+                                ?EvaMechanicalFrameR52.beginControlledBallisticR53(e,o,proof)
+                                :EvaMechanicalFrameR52.adoptControlledBallisticR53(e,proof);
+                        if(!admitted)return hold(o,"outlet_original_supported_launch_or_preserved_flight_required");
+                    }
+                    if(!advanceOutletPairR53(l,o,e,data,own,proof,next))return false;
+                }
+                if(next==0){data.putString("Finish",Finish.EJECT_CLOSE.name());data.putInt("FinishTicks",0);}
+            }
+            case EJECT_CLOSE -> {
+                if(!proof.placement(l,e)||e.carrierRiseProgress(1)!=0)return hold(o,"actual_ballistic_source_or_full_dolly_clearance_changed");
+                {
+                    var step=proof.proposeStepR53(l,e);
+                    if(step==null)return hold(o,proof.rejectionR53());
+                    var rack=outletPairR53(l,o,e,data,own,step,0);
+                    if(rack==null)return false;
+                    if(!proof.clearHatchStepR53(l,e,hatch,step))return hold(o,proof.rejectionR53());
+                    var door=(NervSiloDoorEntity)l.getEntity(hatch.visual());float proposed=door.proposedDeclaredProgressR52(false);
+                    boolean closed=gate(l,hatch,false,own);
+                    if(door.actualOpenProgressR52()!=proposed)return hold(o,"outlet_hatch_step_not_accepted");
+                    if(!rack.commit(l)||!EvaMechanicalFrameR52.acceptBallisticStepR53(e,step))throw new IllegalStateException("Current hatch/body proof changed during commit");
+                    if(!closed){data.putInt("FinishTicks",age);return false;}
+                }
+                data.putString("Finish",Finish.LAND.name());data.putInt("FinishTicks",0);
+            }
+            case LAND -> {if(!proof.placement(l,e)||!gateAtRest(l,hatch,false))return hold(o,"real_closed_hatch_before_landing_required");
+                {
+                    if(EvaMechanicalFrameR52.ballisticTicksR52(e)<NervBallisticHandoffR52.FLIGHT_TICKS)
+                    {
+                        var step=proof.proposeStepR53(l,e);if(step==null)return hold(o,proof.rejectionR53());
+                        var rack=outletPairR53(l,o,e,data,own,step,0);if(rack==null)return false;
+                        if(!rack.commit(l)||!EvaMechanicalFrameR52.acceptBallisticStepR53(e,step))throw new IllegalStateException("Current landing/body proof changed during commit");
+                    }
                     if(EvaMechanicalFrameR52.ballisticTicksR52(e)<NervBallisticHandoffR52.FLIGHT_TICKS||e.position().distanceToSqr(landing.translation())>.0004)return false;
+                    if(!EvaMechanicalReleaseR52.actualGroundBearingR52(l,e,EvaMechanicalFrameR52.capturedGeometry(e),EvaMechanicalFrameR52.frame(e,1)))
+                        return hold(o,"outlet_closed_hatch_actual_full_sole_bearing_missing");
                     if(!EvaMechanicalFrameR52.releaseUpright(e,o))return false;
                     e.setNervLogisticsLocked(false);e.setNoGravity(false);e.setOnGround(true);e.setDeltaMovement(Vec3.ZERO);e.resetFallDistance();e.clearSortieDestination();
                     data.putString("Finish",Finish.DONE.name());data.putInt("FinishTicks",0);captured.remove(o.eva());ballistic.remove(o.eva());holds.remove(o.eva());return true;
-                }
-                if(!e.onGround())return false;if(e.getDeltaMovement().lengthSqr()>1e-8||e.position().distanceToSqr(landing.translation())>.0004)return hold(o,"actual_native_declared_floor_contact_required");if(!EvaMechanicalReleaseR52.beginGroundedR52(l,e,o))return hold(o,"actual_grounded_ordinary_transition_not_admitted");data.putString("Finish",Finish.RELEASE.name());data.putInt("FinishTicks",0);}
+                }}
             case RELEASE -> {if(!gateAtRest(l,hatch,false)||e.carrierRiseProgress(1)!=0)return hold(o,"actual_hatch_and_stowed_dolly_changed_during_release");if(!EvaMechanicalReleaseR52.advanceGroundedR52(l,e,o))return false;data.putString("Finish",Finish.DONE.name());data.putInt("FinishTicks",0);captured.remove(o.eva());ballistic.remove(o.eva());return true;}
             case DONE -> {return true;}
             default -> {return hold(o,"return_phase_in_ballistic_deployment");}
@@ -1165,7 +1630,17 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     }
     @Override public boolean routeOriginalPilot(ServerLevel l,TrainingPilotEntity n,String operation)
     {
-        var p=units.get(n.getAssignedVariant());if(p==null||!p.npc().equals(n.getUUID()))return false;var saved=n.getPersistentData();if(!saved.getString("R52OriginalPilotDirectory").equals(directory.fingerprint()))return atOriginalPilotStandby(l,p.variant());String requested=saved.getString("R52OriginalPilotOperation");if(!Set.of("board","return","standby").contains(requested))return false;
+        var p=units.get(n.getAssignedVariant());if(p==null||!p.npc().equals(n.getUUID()))return false;var saved=n.getPersistentData();
+        if(!saved.getString("R52OriginalPilotDirectory").equals(directory.fingerprint()))
+        {
+            if(n.getVehicle()==null&&n.getTrainingStage()==TrainingPilotEntity.STAGE_STANDBY
+                    &&n.position().distanceToSqr(p.standby())<=1)
+            {
+                requestOriginalPilot(l,p.variant(),"standby");
+                saved.putInt("R52OriginalPilotNode",p.returnPath().size());
+            }
+            else return atOriginalPilotStandby(l,p.variant());
+        }String requested=saved.getString("R52OriginalPilotOperation");if(!Set.of("board","return","standby").contains(requested))return false;
         if(n.getVehicle()!=null)
         {
             if(n.getVehicle() instanceof EntryPlugCarrierEntity capsule)
@@ -1232,21 +1707,22 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             require(sources.has(NervLegacyServiceBypassR52.SOURCE)&&sources.get(NervLegacyServiceBypassR52.SOURCE).getAsString().equals(NervLegacyServiceBypassR52.SOURCE_SHA)&&sources.has(NervLegacyCompactLevelR52.SOURCE)&&sources.get(NervLegacyCompactLevelR52.SOURCE).getAsString().equals(NervLegacyCompactLevelR52.SOURCE_SHA),"Owner must retain the exact independent service-pipe and finite level-rail sources");
             require(sources.has(NervLegacyDeepFrameR53.SOURCE)&&sources.get(NervLegacyDeepFrameR53.SOURCE).getAsString().equals(NervLegacyDeepFrameR53.SOURCE_SHA),"Owner must retain the exact approved rigid deep frame");
             require(sources.has(NervBankHeadTransferR53.SOURCE)&&sources.get(NervBankHeadTransferR53.SOURCE).getAsString().equals(NervBankHeadTransferR53.SOURCE_SHA),"Owner must retain the exact actual bank-head slide and socket source");
+            require(sources.has(NervLegacyBankClearanceR53.SOURCE)&&sources.get(NervLegacyBankClearanceR53.SOURCE).getAsString().equals(NervLegacyBankClearanceR53.SOURCE_SHA),"Owner must declare the exact independent bank curb refit source");
         }
         var units=new HashMap<Integer,UnitPlant>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();int v=u.get("variant").getAsInt();var cr=u.getAsJsonObject("crane");var c=new Crane(visual(cr.getAsJsonObject("visual")),frame(cr.getAsJsonObject("stow_frame")),number(cr,"initial_bottom"),number(cr,"stow_bottom"),vector(cr.getAsJsonArray("rail_axis_local")),number(cr,"rail_min"),number(cr,"rail_max"),number(cr,"hoist_step"),fixedCells(cr.getAsJsonArray("frame_cells")));
         var p=new UnitPlant(v,uuid(u,"eva"),uuid(u,"plug"),uuid(u,"original_npc"),uuid(u,"original_seat"),frame(u.getAsJsonObject("bay_frame")),frame(u.getAsJsonObject("dock_frame")),vector(u.getAsJsonArray("boarding")),points(u.getAsJsonArray("dismount")),bridgeStates(u.getAsJsonArray("bridge_states")),steps(u.getAsJsonArray("lcl")),visual(u.getAsJsonObject("gantry")),c,fixedCells(u.getAsJsonArray("carrier_support")),u.get("carrier_raise_ticks").getAsInt(),frame(u.getAsJsonObject("seat_frame")),fixedCells(u.getAsJsonArray("chair")),vector(u.getAsJsonArray("phone")),vector(u.getAsJsonArray("standby")),points(u.getAsJsonArray("board_path")),points(u.getAsJsonArray("return_path")),number(u,"boarding_radius"),u.has("hull_handoff")?new HullHandoff(fixedCells(u.getAsJsonObject("hull_handoff").getAsJsonArray("supports")),u.getAsJsonObject("hull_handoff").get("lower_ticks").getAsInt()):null,steps(u.getAsJsonArray("personnel_doors")));require(units.putIfAbsent(v,p)==null,"Duplicate original plant");}
-        var gates=new HashMap<String,Gate>();for(var raw:root.getAsJsonArray("gates")){var g=raw.getAsJsonObject();String id=g.get("resource").getAsString();var item=new Gate(id,uuid(g,"visual"),GateKind.valueOf(g.get("kind").getAsString()),g.get("variant").getAsInt(),g.get("stage").getAsInt(),frame(g.getAsJsonObject("frame")),g.get("width").getAsFloat(),g.get("height").getAsFloat(),steps(g.getAsJsonArray("collision_steps")),fixedCells(g.getAsJsonArray("supports")),g.has("silo_hatch")?siloSpec(g.getAsJsonObject("silo_hatch")):null,g.has("hangar_stack")?hangarSpec(g):null);if(NervR50CarrierModeR53.enabled()&&g.has("floor_seal_original_cells")){var retired=new HashSet<BlockPos>();for(var position:g.getAsJsonArray("floor_seal_original_cells"))retired.add(position(position.getAsJsonArray()));var spec=item.hangarStack();item=new Gate(item.resource(),item.visual(),item.kind(),item.variant(),item.stage(),item.frame(),item.width(),item.height(),item.collisionSteps().stream().map(row->row.stream().filter(cell->!retired.contains(cell.at())).toList()).toList(),item.supports(),item.siloHatch(),new NervHangarGateGeometryR52.Spec(spec.width(),spec.height(),spec.openTicks(),spec.closeTicks(),spec.depthDirection()));}require(directory.resource(id)!=null&&directory.resource(id).kind()==ResourceKind.DOOR&&gates.putIfAbsent(id,item)==null,"Unbound/duplicate declared gate");if(hasWetFloorSealR52(item)){if(item.hangarStack().bottomSeal().version()==2)require(directory.schemaVersionR52()==2&&g.has("floor_seal_original_cells"),"Expanded actual floor seal requires the new directory and complete exact source-cell trace");if(g.has("floor_seal_original_cells")){var trace=new HashSet<BlockPos>();for(var cell:g.getAsJsonArray("floor_seal_original_cells"))require(trace.add(position(cell.getAsJsonArray())),"Duplicate actual floor-seal original cell");require(trace.equals(wetFloorSealCellsR52(item).stream().map(Cell::at).collect(java.util.stream.Collectors.toSet())),"Actual floor boxes and original floor-cell trace differ");}}if(directory.schemaVersionR52()==2&&item.siloHatch()!=null&&item.siloHatch().serviceColumnPorts())require(g.getAsJsonObject("silo_hatch").has("service_gantry_yaw_degrees"),"Current service pit requires an explicit actual gantry-relative yaw");}
+        var gates=new HashMap<String,Gate>();for(var raw:root.getAsJsonArray("gates")){var g=raw.getAsJsonObject();String id=g.get("resource").getAsString();var item=new Gate(id,uuid(g,"visual"),GateKind.valueOf(g.get("kind").getAsString()),g.get("variant").getAsInt(),g.get("stage").getAsInt(),frame(g.getAsJsonObject("frame")),g.get("width").getAsFloat(),g.get("height").getAsFloat(),steps(g.getAsJsonArray("collision_steps")),fixedCells(g.getAsJsonArray("supports")),g.has("silo_hatch")?siloSpec(g.getAsJsonObject("silo_hatch")):null,g.has("hangar_stack")?hangarSpec(g):null);if((g.has("floor_seal_original_cells"))){var retired=new HashSet<BlockPos>();for(var position:g.getAsJsonArray("floor_seal_original_cells"))retired.add(position(position.getAsJsonArray()));var spec=item.hangarStack();item=new Gate(item.resource(),item.visual(),item.kind(),item.variant(),item.stage(),item.frame(),item.width(),item.height(),item.collisionSteps().stream().map(row->row.stream().filter(cell->!retired.contains(cell.at())).toList()).toList(),item.supports(),item.siloHatch(),new NervHangarGateGeometryR52.Spec(spec.width(),spec.height(),spec.openTicks(),spec.closeTicks(),spec.depthDirection(),null,spec.leafLowerExtensionM()));}require(directory.resource(id)!=null&&directory.resource(id).kind()==ResourceKind.DOOR&&gates.putIfAbsent(id,item)==null,"Unbound/duplicate declared gate");if(hasWetFloorSealR52(item)){if(item.hangarStack().bottomSeal().version()==2)require(directory.schemaVersionR52()==2&&g.has("floor_seal_original_cells"),"Expanded actual floor seal requires the new directory and complete exact source-cell trace");if(g.has("floor_seal_original_cells")){var trace=new HashSet<BlockPos>();for(var cell:g.getAsJsonArray("floor_seal_original_cells"))require(trace.add(position(cell.getAsJsonArray())),"Duplicate actual floor-seal original cell");require(trace.equals(wetFloorSealCellsR52(item).stream().map(Cell::at).collect(java.util.stream.Collectors.toSet())),"Actual floor boxes and original floor-cell trace differ");}}if(directory.schemaVersionR52()==2&&item.siloHatch()!=null&&item.siloHatch().serviceColumnPorts())require(g.getAsJsonObject("silo_hatch").has("service_gantry_yaw_degrees"),"Current service pit requires an explicit actual gantry-relative yaw");}
         var resources=new HashMap<String,List<FixedCell>>();for(var row:root.getAsJsonObject("resources").entrySet())require(resources.putIfAbsent(row.getKey(),fixedCells(row.getValue().getAsJsonArray()))==null,"Duplicate physical resource");
         var receivers=new HashMap<String,Receiver>();for(var raw:root.getAsJsonArray("receivers")){var r=raw.getAsJsonObject();String id=r.get("port").getAsString();var b=r.getAsJsonArray("domain");require(b.size()==6,"Explicit recovery domain required");var low=new Vec3(b.get(0).getAsDouble(),b.get(1).getAsDouble(),b.get(2).getAsDouble());var high=new Vec3(b.get(3).getAsDouble(),b.get(4).getAsDouble(),b.get(5).getAsDouble());require(Double.isFinite(low.lengthSqr()+high.lengthSqr())&&low.x<high.x&&low.y<high.y&&low.z<high.z,"Actual positive recovery domain required");var ids=new ArrayList<String>();for(var g:r.getAsJsonArray("gates")){String gate=g.getAsString();require(gates.containsKey(gate),"Unknown receiver gate");ids.add(gate);}var item=new Receiver(id,Region.valueOf(r.get("region").getAsString()),new AABB(low,high),frame(r.getAsJsonObject("stopped_frame")),fixedCells(r.getAsJsonArray("supports")),ids,r.get("carrier_ticks").getAsInt());require(directory.ports().containsKey(id)&&directory.ports().get(id).region()==item.region()&&item.carrierTicks()>0&&!item.supports().isEmpty()&&receivers.putIfAbsent(id,item)==null,"Unbound/duplicate physical receiver");}
         for(var gate:gates.values())validateEarlyGuideRoleR53(gate.resource(),gate.variant(),gate.siloHatch());
         require(receivers.keySet().equals(directory.ports().keySet()),"Every real port needs its exact receiving mechanism");var owner=new NervAssemblyOwnerR52(directory,directory.epoch(),status.equals("installed"),units,gates,resources,receivers,root.getAsJsonObject("mechanism_sources").get("mesh/tv_shoulder_shells_r44.json").getAsString());
-        var pits=new HashMap<Integer,String>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("service_pit")){require(!status.equals("installed"),"Installed original bay requires its actual dry service pit gate");continue;}int v=u.get("variant").getAsInt();String id=u.get("service_pit").getAsString();var gate=gates.get(id);require(gate!=null&&gate.kind()==GateKind.SILO&&gate.variant()==v&&gate.siloHatch().separationSign()==-1&&gate.siloHatch().serviceColumnPorts()&&pits.putIfAbsent(v,id)==null,"Actual original-bay downward pit gate required");}owner.servicePits=Map.copyOf(pits);for(var pit:pits.entrySet()){var unit=units.get(pit.getKey());var gate=gates.get(pit.getValue());require(pose(unit.gantry().frame(),gate.frame().compose(gate.siloHatch().serviceGantryRelativeFrame())),"Actual gantry and service pit frame differ from the explicit port-relative transform");}var lower=new HashSet<Integer>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("lower_frame")){require(!status.equals("installed"),"Installed original bay requires actual lower crossbar mechanism");continue;}var spec=u.getAsJsonObject("lower_frame");require(spec.get("source_sha256").getAsString().equals(NervLowerFrameR52.SOURCE_SHA)&&spec.get("open_ticks").getAsInt()==NervLowerFrameR52.OPEN_TICKS&&spec.get("close_ticks").getAsInt()==NervLowerFrameR52.CLOSE_TICKS,"Actual selected lower-frame source and physical clocks required");lower.add(u.get("variant").getAsInt());}owner.lowerFrames=Set.copyOf(lower);if(root.has("ground_guides")){var guide=root.getAsJsonObject("ground_guides");boolean continuous=directory.routes().values().stream().allMatch(Route::continuousUpright);if(continuous){require(guide.has("mode")&&guide.get("mode").getAsString().equals("continuous_upright")&&guide.get("source_sha256").getAsString().equals(NervOuterCarrierGuideR52.SOURCE_SHA)&&guide.get("paths_sha256").getAsString().matches("[0-9a-f]{64}")&&!guide.get("paths_sha256").getAsString().equals("0".repeat(64))&&!guide.has("dock_foundations")&&!guide.has("dock_source_sha256"),"Actual explicit continuous captured model/paths source required; old Dock cannot be reused");owner.continuousGuidesR52=true;owner.continuousGuidePathsShaR52=guide.get("paths_sha256").getAsString();}else require(guide.get("source_sha256").getAsString().equals(NervFootGuideRigR52.SOURCE_SHA)&&guide.get("paths_sha256").getAsString().equals(NervFixedFootGuidesR52.SOURCE_SHA),"Actual selected engineered foot-guide source required");owner.groundGuidesDeclared=!NervR50CarrierModeR53.enabled();if(!continuous&&guide.has("dock_foundations")){require(guide.has("dock_source_sha256")&&guide.get("dock_source_sha256").getAsString().equals(NervFootGuideDockR52.SOURCE_SHA),"Actual fixed turn station source required");var foundation=new HashMap<String,Double>();for(var rawTop:guide.getAsJsonArray("dock_foundations")){var row=rawTop.getAsJsonObject();String id=row.get("leg").getAsString();double top=row.get("foundation_top_m").getAsDouble();require(Double.isFinite(top)&&directory.leg(id)!=null&&directory.leg(id).motion()==Motion.FOOT_BEARING_TURN&&id.equals(NervFootGuideStationR52.canonicalLeg(id))&&foundation.putIfAbsent(id,top)==null,"Explicit Root canonical station foundation required");}owner.dockFoundationsR52=Map.copyOf(foundation);}else require(continuous||!status.equals("installed"),"Installed legacy turn stations need explicit Root dock_foundations");var controllers=new HashMap<Integer,UUID>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("carrier_controller")){require(!status.equals("installed"),"Installed original full carrier requires its independent actual controller");continue;}var c=u.getAsJsonObject("carrier_controller");int v=u.get("variant").getAsInt();var id=uuid(c,"id");require(c.get("source_sha256").getAsString().equals(NervOriginalCarrierR52.SOURCE_SHA)&&id.equals(NervOriginalCarrierR52.proposedIdentityR52(owner.epoch,uuid(u,"eva")))&&controllers.putIfAbsent(v,id)==null,"Actual original single-carrier source/identity required");}owner.carrierControllers=Map.copyOf(controllers);}else require(!status.equals("installed"),"Installed foot-driven plant requires explicit ground_guides source");
+        var pits=new HashMap<Integer,String>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("service_pit")){require(!status.equals("installed"),"Installed original bay requires its actual dry service pit gate");continue;}int v=u.get("variant").getAsInt();String id=u.get("service_pit").getAsString();var gate=gates.get(id);require(gate!=null&&gate.kind()==GateKind.SILO&&gate.variant()==v&&gate.siloHatch().separationSign()==-1&&gate.siloHatch().serviceColumnPorts()&&pits.putIfAbsent(v,id)==null,"Actual original-bay downward pit gate required");}owner.servicePits=Map.copyOf(pits);for(var pit:pits.entrySet()){var unit=units.get(pit.getKey());var gate=gates.get(pit.getValue());require(pose(unit.gantry().frame(),gate.frame().compose(gate.siloHatch().serviceGantryRelativeFrame())),"Actual gantry and service pit frame differ from the explicit port-relative transform");}var lower=new HashSet<Integer>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("lower_frame")){require(!status.equals("installed"),"Installed original bay requires actual lower crossbar mechanism");continue;}var spec=u.getAsJsonObject("lower_frame");require(spec.get("source_sha256").getAsString().equals(NervLowerFrameR52.SOURCE_SHA)&&spec.get("open_ticks").getAsInt()==NervLowerFrameR52.OPEN_TICKS&&spec.get("close_ticks").getAsInt()==NervLowerFrameR52.CLOSE_TICKS,"Actual selected lower-frame source and physical clocks required");lower.add(u.get("variant").getAsInt());}owner.lowerFrames=Set.copyOf(lower);if(root.has("ground_guides")){var guide=root.getAsJsonObject("ground_guides");boolean continuous=directory.routes().values().stream().allMatch(Route::continuousUpright);if(continuous){require(guide.has("mode")&&guide.get("mode").getAsString().equals("continuous_upright")&&guide.get("source_sha256").getAsString().equals(NervOuterCarrierGuideR52.SOURCE_SHA)&&guide.get("paths_sha256").getAsString().matches("[0-9a-f]{64}")&&!guide.get("paths_sha256").getAsString().equals("0".repeat(64))&&!guide.has("dock_foundations")&&!guide.has("dock_source_sha256"),"Actual explicit continuous captured model/paths source required; old Dock cannot be reused");owner.continuousGuidesR52=true;owner.continuousGuidePathsShaR52=guide.get("paths_sha256").getAsString();}else require(guide.get("source_sha256").getAsString().equals(NervFootGuideRigR52.SOURCE_SHA)&&guide.get("paths_sha256").getAsString().equals(NervFixedFootGuidesR52.SOURCE_SHA),"Actual selected engineered foot-guide source required");owner.groundGuidesDeclared=false;if(!continuous&&guide.has("dock_foundations")){require(guide.has("dock_source_sha256")&&guide.get("dock_source_sha256").getAsString().equals(NervFootGuideDockR52.SOURCE_SHA),"Actual fixed turn station source required");var foundation=new HashMap<String,Double>();for(var rawTop:guide.getAsJsonArray("dock_foundations")){var row=rawTop.getAsJsonObject();String id=row.get("leg").getAsString();double top=row.get("foundation_top_m").getAsDouble();require(Double.isFinite(top)&&directory.leg(id)!=null&&directory.leg(id).motion()==Motion.FOOT_BEARING_TURN&&id.equals(NervFootGuideStationR52.canonicalLeg(id))&&foundation.putIfAbsent(id,top)==null,"Explicit Root canonical station foundation required");}owner.dockFoundationsR52=Map.copyOf(foundation);}else require(continuous||!status.equals("installed"),"Installed legacy turn stations need explicit Root dock_foundations");var controllers=new HashMap<Integer,UUID>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("carrier_controller")){require(!status.equals("installed"),"Installed original full carrier requires its independent actual controller");continue;}var c=u.getAsJsonObject("carrier_controller");int v=u.get("variant").getAsInt();var id=uuid(c,"id");require(c.get("source_sha256").getAsString().equals(NervOriginalCarrierR52.SOURCE_SHA)&&id.equals(NervOriginalCarrierR52.proposedIdentityR52(owner.epoch,uuid(u,"eva")))&&controllers.putIfAbsent(v,id)==null,"Actual original single-carrier source/identity required");}owner.carrierControllers=Map.copyOf(controllers);}else require(!status.equals("installed"),"Installed foot-driven plant requires explicit ground_guides source");
         var staff=new ArrayList<StaffBinding>();var identities=new HashSet<UUID>();var posts=new HashSet<String>();if(root.has("staff"))for(var raw:root.getAsJsonArray("staff")){var row=raw.getAsJsonObject();var id=uuid(row,"original_uuid");String post=row.get("id").getAsString();require(identities.add(id)&&posts.add(post),"Duplicate original staff identity/post");var station=new NervStaffDirector.Station(post,row.get("name").getAsString(),row.get("role").getAsString(),row.get("skin").getAsString(),position(row.getAsJsonArray("feet")),row.get("yaw").getAsFloat());staff.add(new StaffBinding(id,station,fixedCells(row.getAsJsonArray("support"))));}owner.staff=List.copyOf(staff);return owner;
     }
     private static SiloHatchMechanism.Spec siloSpec(JsonObject o){return new SiloHatchMechanism.Spec(o.get("opening_x").getAsFloat(),o.get("opening_z").getAsFloat(),o.get("open_ticks").getAsInt(),o.get("close_ticks").getAsInt(),o.has("separation_sign")?o.get("separation_sign").getAsInt():1,o.has("beam_bottom")?number(o,"beam_bottom"):-2.01,o.has("service_column_ports")&&o.get("service_column_ports").getAsBoolean(),o.has("upright_guide_ports")&&o.get("upright_guide_ports").getAsBoolean(),o.has("service_gantry_yaw_degrees")?o.get("service_gantry_yaw_degrees").getAsInt():0,o.has("upright_guide_early_variant")?o.get("upright_guide_early_variant").getAsInt():-1);}
     private static void validateEarlyGuideRoleR53(String resource,int variant,SiloHatchMechanism.Spec spec)
     {if(spec!=null&&spec.uprightGuideEarlyVariant()>=0)require(spec.uprightGuideEarlyVariant()==variant&&resource.equals("bank_3_upper_lane_"+(2-variant)),"Early guide fitting requires the explicit same-unit bank3 upper role");}
-    private static NervHangarGateGeometryR52.Spec hangarSpec(JsonObject g){var s=g.getAsJsonObject("hangar_stack");NervHangarGateGeometryR52.BottomSeal seal=null;if(s.has("floor_seal")){var f=s.getAsJsonObject("floor_seal");var rows=f.getAsJsonArray("closed_boxes");require(rows!=null&&!rows.isEmpty()&&rows.size()<=512,"Finite actual wet-floor seal boxes required");var boxes=new ArrayList<NervHangarGateGeometryR52.SealBox>();for(var raw:rows){var r=raw.getAsJsonArray();require(r.size()==6,"Explicit actual floor-seal box required");boxes.add(new NervHangarGateGeometryR52.SealBox(r.get(0).getAsDouble(),r.get(1).getAsDouble(),r.get(2).getAsDouble(),r.get(3).getAsDouble(),r.get(4).getAsDouble(),r.get(5).getAsDouble()));}seal=new NervHangarGateGeometryR52.BottomSeal(boxes,f.get("drop_m").getAsDouble(),f.get("retreat_local_z_m").getAsDouble(),f.has("version")?f.get("version").getAsInt():1,f.has("retained_box_count")?f.get("retained_box_count").getAsInt():0);}return new NervHangarGateGeometryR52.Spec(g.get("width").getAsFloat(),g.get("height").getAsFloat(),s.get("open_ticks").getAsInt(),s.get("close_ticks").getAsInt(),s.has("depth_direction")?s.get("depth_direction").getAsInt():1,seal);}
+    private static NervHangarGateGeometryR52.Spec hangarSpec(JsonObject g){var s=g.getAsJsonObject("hangar_stack");NervHangarGateGeometryR52.BottomSeal seal=null;if(s.has("floor_seal")){var f=s.getAsJsonObject("floor_seal");var rows=f.getAsJsonArray("closed_boxes");require(rows!=null&&!rows.isEmpty()&&rows.size()<=512,"Finite actual wet-floor seal boxes required");var boxes=new ArrayList<NervHangarGateGeometryR52.SealBox>();for(var raw:rows){var r=raw.getAsJsonArray();require(r.size()==6,"Explicit actual floor-seal box required");boxes.add(new NervHangarGateGeometryR52.SealBox(r.get(0).getAsDouble(),r.get(1).getAsDouble(),r.get(2).getAsDouble(),r.get(3).getAsDouble(),r.get(4).getAsDouble(),r.get(5).getAsDouble()));}seal=new NervHangarGateGeometryR52.BottomSeal(boxes,f.get("drop_m").getAsDouble(),f.get("retreat_local_z_m").getAsDouble(),f.has("version")?f.get("version").getAsInt():1,f.has("retained_box_count")?f.get("retained_box_count").getAsInt():0);}return new NervHangarGateGeometryR52.Spec(g.get("width").getAsFloat(),g.get("height").getAsFloat(),s.get("open_ticks").getAsInt(),s.get("close_ticks").getAsInt(),s.has("depth_direction")?s.get("depth_direction").getAsInt():1,seal,s.has("leaf_lower_extension_m")?s.get("leaf_lower_extension_m").getAsDouble():0);}
     private static Visual visual(JsonObject o){return new Visual(uuid(o,"id"),frame(o.getAsJsonObject("frame")),fixedCells(o.getAsJsonArray("supports")));}
     private static List<FixedCell> fixedCells(JsonArray a){var out=new ArrayList<FixedCell>();var own=new HashSet<BlockPos>();for(var raw:a){var r=raw.getAsJsonObject();var p=position(r.getAsJsonArray("position"));require(own.add(p),"Duplicate physical cell");out.add(new FixedCell(p,state(r.get("state").getAsString())));}return List.copyOf(out);}
     private static List<List<FixedCell>> bridgeStates(JsonArray a){var result=new ArrayList<List<FixedCell>>();for(var state:a)result.add(fixedCells(state.getAsJsonArray()));validateBridgeStates(result);return List.copyOf(result);}
@@ -1276,8 +1752,64 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var key=new CageDomainKeyR57(frame,drive);var domain=cageDomainsR57.get(key);if(domain==null){domain=sourceCageDomainR57(frame,drive);cageDomainsR57.put(key,domain);}return domain;
     }
     public List<net.minecraft.world.phys.shapes.VoxelShape> actualCageCollisions(ServerLevel l,Entity actor,AABB query)
-    {if(!commissioned||actor instanceof EvaUnit01Entity||actor instanceof NervCarrierPlatformEntity)return List.of();var result=new ArrayList<net.minecraft.world.phys.shapes.VoxelShape>();for(var p:units.values()){var actual=gantry(l,p);if(actual==null||!actual.hasDeclaredMachineFrameR52()||actual.position().distanceToSqr(p.gantry().frame().translation())>1e-8)continue;try{if(!cageDomainR57(p.gantry().frame(),actual.declaredServiceFootDriveR52()).intersects(query))continue;}catch(java.io.IOException missing){throw new IllegalStateException("Declared cage domain source unavailable",missing);}result.addAll(NervPlantMotionR52.actualCollisionMembers(p.variant(),p.gantry().frame(),actual.getRestraintProgress(),actual.lowerFrameProgressR52(1),query));try{result.addAll(NervServiceFootDriveR52.collisions(actual,1,query));}catch(java.io.IOException missing){throw new IllegalStateException("Declared service drive source unavailable",missing);}}return List.copyOf(result);}
+    {
+        if(!commissioned||actor instanceof EvaUnit01Entity||actor instanceof NervCarrierPlatformEntity)return List.of();
+        var result=new ArrayList<net.minecraft.world.phys.shapes.VoxelShape>();
+        for(var p:units.values())
+        {
+            var actual=gantry(l,p);
+            if(actual==null||!actual.hasDeclaredMachineFrameR52()||actual.position().distanceToSqr(p.gantry().frame().translation())>1e-8)continue;
+            var mounting=CarrierMountProfileR53.read(actual,1);
+            try
+            {
+                var domain=cageDomainR57(p.gantry().frame(),actual.declaredServiceFootDriveR52());
+                // A cached legacy domain must not cull newly elevated pads or
+                // rods. Include the actual current source meshes before the
+                // broadphase; collision still uses their declared shapes.
+                if(mounting.aboveFloor())for(var piece:NervPlantMotionR52.actualStructuralMeshesR52(actual))
+                    domain=domain.minmax(piece.mesh().envelope(piece.frame(),piece.endFrame()));
+                if(!domain.intersects(query))continue;
+            }
+            catch(java.io.IOException missing){throw new IllegalStateException("Declared cage domain source unavailable",missing);}
+            result.addAll(NervPlantMotionR52.actualCollisionMembers(p.variant(),p.gantry().frame(),actual.getRestraintProgress(),actual.lowerFrameProgressR52(1),query,mounting));
+            try{result.addAll(NervServiceFootDriveR52.collisions(actual,1,query));}
+            catch(java.io.IOException missing){throw new IllegalStateException("Declared service drive source unavailable",missing);}
+        }
+        return List.copyOf(result);
+    }
     @Override public List<NervStaffDirector.Station> originalStaffRoster(ServerLevel l){return staff.stream().map(StaffBinding::station).toList();}
+    public List<NervNpcResetR53.Target> npcResetTargetsR53(ServerLevel l)
+    {
+        var result=new ArrayList<NervNpcResetR53.Target>();
+        for(var binding:staff)
+        {
+            var s=binding.station();var home=new Vec3(s.feet().getX()+.5,s.feet().getY(),s.feet().getZ()+.5);
+            result.add(new NervNpcResetR53.Target(binding.original(),s.id(),ModEntities.NERV_STAFF.get(),home,s.yaw(),()->"",mob->{
+                var actor=(NervStaffEntity)mob;actor.finishTask();actor.assign(s.id(),s.name(),s.role(),s.skin(),s.feet());actor.stationYaw(s.yaw());
+                NervStaffSavedData.get(l).record(s.id(),actor.getUUID());
+            }));
+        }
+        for(var p:units.values())
+        {
+            String id=switch(p.variant()){case 0->"rei";case 2->"asuka";default->"shinji";};
+            result.add(new NervNpcResetR53.Target(p.npc(),id,ModEntities.TRAINING_PILOT.get(),p.standby(),0,()->{
+                var fleet=EvaFleetSavedData.get(l.getServer()).entry(p.variant()).orElse(null);
+                var actor=l.getEntity(p.npc());
+                var state=NervRouteRuntimeR52.installationStateR52(l);var job=state==null?null:state.job(p.variant());
+                boolean assigned=job!=null&&job.snapshot().original().pilot().equals(p.npc());
+                return fleet==null||fleet.phase()!=EvaFleetSavedData.Phase.PARKED&&assigned
+                        ||actor!=null&&actor.getVehicle() instanceof EntryPlugCarrierEntity
+                        ?"正在驾驶或机体未返库，保持当前驾驶链；返库后可再次重置。":"";
+            },mob->{
+                var pilot=(TrainingPilotEntity)mob;pilot.assignVariant(p.variant());pilot.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);
+                for(String key:List.of("R52OriginalPilotOperation","R52OriginalPilotDirectory","R52OriginalPilotNode"))pilot.getPersistentData().remove(key);
+                pilot.getPersistentData().putString("SeelePilotRouteR30","standby");pilotOperations.remove(pilot.getUUID());pilotNodes.remove(pilot.getUUID());
+                var tag=pilot.getPersistentData();tag.putString("R52OriginalPilotOperation","standby");
+                tag.putString("R52OriginalPilotDirectory",directory.fingerprint());tag.putInt("R52OriginalPilotNode",p.returnPath().size());
+            }));
+        }
+        return List.copyOf(result);
+    }
     @Override public void maintainOriginalStaff(ServerLevel l)
     {for(var p:staff)if(l.getEntity(p.original()) instanceof NervStaffEntity actor&&actor.memberId().equals(p.station().id())&&fixed(l,p.support())){ /* Original actor AI/home/identity remain authoritative. */ }}
     private static final TicketType<net.minecraft.world.level.ChunkPos> ORIGINAL_PERSONNEL_TICKET_R52=TicketType.create("r52_original_personnel",Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong),100);

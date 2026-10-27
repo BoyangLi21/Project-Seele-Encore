@@ -29,13 +29,15 @@ public final class EvaPowerPortsR48
             var data=JsonParser.parseReader(new InputStreamReader(stream,StandardCharsets.UTF_8)).getAsJsonObject();
             if(data.get("schema").getAsInt()!=48)throw new IllegalArgumentException("Power-port profile version");
             var result=new HashMap<Integer,Profile>();
-            for(int variant=0;variant<3;variant++)
+            for(int variant:new int[]{0,1,2,4})
             {
                 var p=data.getAsJsonObject("profiles").getAsJsonObject(Integer.toString(variant));
+                if(variant==4&&p==null)continue;
                 Vec3 mount=vector(p.getAsJsonArray("origin_native_model_pixels"));
                 Vec3 tail=vector(p.getAsJsonArray("cable_tail_native_model_pixels"));
                 Vec3 direction=vector(p.getAsJsonArray("cable_tangent_native"));
-                if(Math.abs(direction.length()-1)>.001||p.getAsJsonArray("ports_native_model_pixels").size()!=3)
+                boolean complete=variant==4?p.has("source_armour_point_r53")&&p.get("source_armour_point_r53").getAsBoolean():p.getAsJsonArray("ports_native_model_pixels").size()==3;
+                if(Math.abs(direction.length()-1)>.001||!complete)
                     throw new IllegalArgumentException("Incomplete three-contact connector");
                 result.put(variant,new Profile(mount,tail,direction));
             }
@@ -45,6 +47,8 @@ public final class EvaPowerPortsR48
         {ProjectSeele.LOGGER.error("R48 measured charging connector profile rejected",failure);return Map.of();}
     }
     public static Profile of(EvaUnit01Entity eva)
-    {return eva.isExperimentalUnit()?null:PROFILES.get(eva.getUnitVariant());}
+    {return Unit03SourceRigR53.uses(eva)?PROFILES.get(4):eva.isExperimentalUnit()?null:PROFILES.get(eva.getUnitVariant());}
+    public static boolean usesSuppliedMesh(EvaUnit01Entity eva)
+    {return !Unit03SourceRigR53.uses(eva)&&of(eva)!=null;}
     private EvaPowerPortsR48() { }
 }

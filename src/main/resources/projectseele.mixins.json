@@ -7,6 +7,8 @@
   "minVersion": "0.8",
   "mixins": [
     "DhColumnExtentR53Mixin",
+    "DhServerLogoutR53Mixin",
+    "FacilityTrackingRangeR54Mixin",
     "PhysicalBodyVehiclePackets",
     "ServiceAircraftWorldR32Accessor",
     "ServiceAircraftSectionsR32Accessor",
@@ -39,6 +41,8 @@
     "CitySavedOwnerUnionMixinR45"
   ],
   "client": [
+    "client.GeoFrontMissionDayTimeR54Mixin",
+    "client.GeoFrontMissionSunR54Mixin",
     "client.RamielDistantProjectionR52Mixin",
     "client.SbwPhantomLoadR24Mixin",
     "client.ChunkSkySourceR24Mixin",
@@ -71,6 +75,7 @@
     "client.AircraftCorrectionBudgetMixin",
     "client.CommandShaderLightR39Mixin",
     "client.OculusDhReloadR53Mixin",
+    "client.OculusDhRenderPassR54Mixin",
     "client.DhWaterTransparencyR53Mixin"
   ],
   "injectors": {

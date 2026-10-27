@@ -28,6 +28,12 @@ public final class NervShoulderBearingR52 {
  public static List<Pad> pads()throws IOException {install();return pads;}
  public static Vec3 movement(Pad p,float opening){if(!Float.isFinite(opening)||opening<0||opening>1)throw new IllegalArgumentException("Actual shoulder opening clock required");float lift=EvaDorsalMechanism.smooth(opening/.25F),out=EvaDorsalMechanism.smooth((opening-.23F)/.65F);return p.normal().scale(2.1*lift-p.finalStroke()*(1-lift)).add(p.side()*5.35*out,0,0);}
  public static Vec3 movement(int variant,int side,float opening){try{install();return movement(pads.stream().filter(p->p.variant()==variant&&p.side()==side).findFirst().orElseThrow(),opening);}catch(IOException unavailable){throw new IllegalStateException("Actual shoulder source unavailable",unavailable);}}
+ public static boolean bears(EvaOriginalMeshGeometryR52.Geometry body,RigidTransform bodyRoot,RigidTransform gantry,int variant,CarrierMountProfileR53.State mounting)throws IOException {
+  return bears(body,bodyRoot,mounting.payloadFrame(gantry),variant);
+ }
+ public static boolean permitsPadContactR52(EvaOriginalMeshGeometryR52.Geometry body,RigidTransform bodyRoot,RigidTransform gantry,int variant,String bone,NervFlightProofR52.ObstacleMesh obstacle,CarrierMountProfileR53.State mounting)throws IOException {
+  return permitsPadContactR52(body,bodyRoot,mounting.payloadFrame(gantry),variant,bone,obstacle);
+ }
  public static boolean bears(EvaOriginalMeshGeometryR52.Geometry body,RigidTransform bodyRoot,RigidTransform gantry,int variant)throws IOException {
   return bears(body.parts(),bodyRoot,gantry,variant);
  }
@@ -52,8 +58,13 @@ public final class NervShoulderBearingR52 {
   if(mesh==null){var xyz=triangles.get(name).clone();if(stretch!=1)for(int i=2;i<xyz.length;i+=3)xyz[i]*=stretch;mesh=new NervRigidMeshSweepR52(xyz);if(meshes.size()>=64)meshes.remove(meshes.keySet().iterator().next());meshes.put(key,mesh);}
   return new NervFlightProofR52.ObstacleMesh(mesh,f);
  }
- public static List<NervFlightProofR52.ObstacleMesh> actualMeshes(int variant,RigidTransform gantry,float closed)throws IOException {
-  install();var out=new ArrayList<NervFlightProofR52.ObstacleMesh>();for(var p:pads)if(p.variant()==variant){var move=movement(p,1-closed);out.add(mesh(p.part(),gantry.compose(new RigidTransform(move,0,0,0,1)),1));for(int i=0;i<2;i++){var anchor=p.anchors().get(i);var end=p.links().get(i).add(move);var delta=end.subtract(anchor);double length=delta.length();if(length<=2.22)throw new IllegalStateException("Actual shoulder actuator exhausted");var turn=new Quaternionf().rotationTo(0,0,1,(float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length));var frame=gantry.compose(RigidTransform.of(anchor,turn));out.add(mesh("shoulder_joint",frame,1));out.add(mesh("shoulder_barrel",frame,1));out.add(mesh("shoulder_piston_unit",frame.compose(new RigidTransform(new Vec3(0,0,2.18),0,0,0,1)),length-2.18));out.add(mesh("shoulder_joint",frame.compose(new RigidTransform(new Vec3(0,0,length),0,0,0,1)),1));}}return List.copyOf(out);
+ public record PlacedSource(String part,RigidTransform frame,double stretch){}
+ public static List<PlacedSource> transforms(int variant,RigidTransform gantry,float closed,CarrierMountProfileR53.State mounting)throws IOException {
+  install();var out=new ArrayList<PlacedSource>();for(var p:pads)if(p.variant()==variant){var move=mounting.shoulderMovement(movement(p,1-closed));out.add(new PlacedSource(p.part(),gantry.compose(new RigidTransform(move,0,0,0,1)),1));for(int i=0;i<2;i++){var anchor=p.anchors().get(i);var end=p.links().get(i).add(move);var delta=end.subtract(anchor);double length=delta.length();if(length<=2.22)throw new IllegalStateException("Actual shoulder actuator exhausted");var turn=new Quaternionf().rotationTo(0,0,1,(float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length));var frame=gantry.compose(RigidTransform.of(anchor,turn));out.add(new PlacedSource("shoulder_joint",frame,1));out.add(new PlacedSource("shoulder_barrel",frame,1));out.add(new PlacedSource("shoulder_piston_unit",frame.compose(new RigidTransform(new Vec3(0,0,2.18),0,0,0,1)),length-2.18));var endFrame=mounting.aboveFloor()?gantry.compose(RigidTransform.of(end,mounting.shoulderEndRotation(p.normal(),turn))):frame.compose(new RigidTransform(new Vec3(0,0,length),0,0,0,1));out.add(new PlacedSource("shoulder_joint",endFrame,1));}}return List.copyOf(out);
+ }
+ public static List<NervFlightProofR52.ObstacleMesh> actualMeshes(int variant,RigidTransform gantry,float closed)throws IOException {return actualMeshes(variant,gantry,closed,CarrierMountProfileR53.LEGACY);}
+ public static List<NervFlightProofR52.ObstacleMesh> actualMeshes(int variant,RigidTransform gantry,float closed,CarrierMountProfileR53.State mounting)throws IOException {
+  var out=new ArrayList<NervFlightProofR52.ObstacleMesh>();for(var p:transforms(variant,gantry,closed,mounting))out.add(mesh(p.part(),p.frame(),p.stretch()));return List.copyOf(out);
  }
  private NervShoulderBearingR52(){}
 }

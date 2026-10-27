@@ -197,12 +197,18 @@ public final class TvYashimaStationR52
         var tag=gun.getPersistentData();String phase=tag.getString("LiftPhaseR52");if(phase.isEmpty()){phase="idle";tag.putString("LiftPhaseR52",phase);}
         if(returning&&!Set.of("idle","lowering","closing").contains(phase))
         {var eva=boundEva(level,gun);if(eva!=null)release(eva,gun);gun.readyR52(false);tag.putString("LiftPhaseR52",phase="lowering");}
+        // The crane extracts the wreck first. Rotating/stowing the supporting
+        // cannon concurrently changes that contact and repeatedly stalls both.
+        if(returning&&tag.hasUUID("AssignedEvaR52"))
+            for(var rescue:NervAirTransportRuntimeR52.state(level).jobs())
+                if(rescue.active()&&!rescue.payloadTransferred()&&rescue.leg()==0
+                        &&rescue.original().eva().equals(tag.getUUID("AssignedEvaR52")))return;
         switch(phase)
         {
-            case "opening"->{hatch.setTargetOpen(1);if(hatch.actualOpenProgressR52()>=.995)tag.putString("LiftPhaseR52","raising");}
-            case "raising"->{hatch.setTargetOpen(1);if(hatch.actualOpenProgressR52()<.995)return;if(gun.liftStepR52(p.raised(),p.closed().distanceTo(p.raised())/p.riseTicks())){tag.putString("LiftPhaseR52","ready");gun.readyR52(true);}}
-            case "lowering"->{hatch.setTargetOpen(1);if(hatch.actualOpenProgressR52()<.995)return;if(!gun.resetAimR52())return;if(gun.liftStepR52(p.closed(),p.closed().distanceTo(p.raised())/p.returnTicks()))tag.putString("LiftPhaseR52","closing");}
-            case "closing"->{hatch.setTargetOpen(0);if(hatch.actualOpenProgressR52()<=.005)tag.putString("LiftPhaseR52","idle");}
+            case "opening"->{if(YashimaCannonHatchR54.advance(level,p,gun,hatch,true))tag.putString("LiftPhaseR52","raising");}
+            case "raising"->{if(!YashimaCannonHatchR54.advance(level,p,gun,hatch,true))return;if(gun.liftStepR52(p.raised(),p.closed().distanceTo(p.raised())/p.riseTicks())){tag.putString("LiftPhaseR52","ready");gun.readyR52(true);}}
+            case "lowering"->{if(!YashimaCannonHatchR54.advance(level,p,gun,hatch,true))return;if(!gun.resetAimR52())return;if(gun.liftStepR52(p.closed(),p.closed().distanceTo(p.raised())/p.returnTicks()))tag.putString("LiftPhaseR52","closing");}
+            case "closing"->{if(YashimaCannonHatchR54.advance(level,p,gun,hatch,false))tag.putString("LiftPhaseR52","idle");}
             default->{}
         }
     }

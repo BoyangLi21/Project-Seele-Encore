@@ -92,17 +92,25 @@ public final class NervHullGroundRecoveryR52
         public boolean cargoCommitted(ServerLevel level)
         {return aircraftCurrent(level)&&level.getEntity(original.eva()) instanceof EvaUnit01Entity e&&originalHull(e,original)&&NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),toRoot())&&EvaAirTransportR31.cradleStateR50(e).getCompound("Origin").equals(after)&&EvaFrozenHandsR52.capture(e,1).equals(hands);}
     }
-    private record Chord(String bone,Vec3[] vertices,double error,AABB box){}
-    private static List<Chord> chords(EvaOriginalMeshGeometryR52.Geometry from,EvaOriginalMeshGeometryR52.Geometry to,RigidTransform a,RigidTransform b,double error)
+    record Chord(String bone,Vec3[] vertices,double error,AABB box){}
+    static List<Chord> chords(EvaOriginalMeshGeometryR52.Geometry from,EvaOriginalMeshGeometryR52.Geometry to,RigidTransform a,RigidTransform b,double error)
     {
         if(from.parts().size()!=to.parts().size())throw new IllegalStateException("Original topology changed during recovery");var out=new ArrayList<Chord>();
         for(int part=0;part<from.parts().size();part++){var x=from.parts().get(part);var y=to.parts().get(part);if(!x.bone().equals(y.bone())||!x.sourceSHA256().equals(y.sourceSHA256()))throw new IllegalStateException("Original source part changed");double[] first=x.triangles(),last=y.triangles();if(first.length!=last.length)throw new IllegalStateException("Original triangle topology changed");for(int i=0;i<first.length;i+=9){var corners=new Vec3[6];AABB box=null;for(int k=0;k<3;k++){int n=i+k*3;corners[k]=a.transformPoint(new Vec3(first[n],first[n+1],first[n+2]));corners[k+3]=b.transformPoint(new Vec3(last[n],last[n+1],last[n+2]));for(int j:new int[]{k,k+3})box=box==null?new AABB(corners[j],corners[j]):box.minmax(new AABB(corners[j],corners[j]));}out.add(new Chord(x.bone(),corners,error,box.inflate(error)));}}return out;
     }
-    private static double curveError(EvaBodyPose.Sample a,EvaBodyPose.Sample b,EvaOriginalMeshGeometryR52.Geometry g,RigidTransform from,RigidTransform to)
-    {double angle=NervRigidMeshSweepR52.angular(from,to);for(String n:a.rig.keySet()){var x=a.rotations.get(n);var y=b.rotations.get(n);if(x.equals(y))continue;double dot=Math.abs((double)x.x*y.x+(double)x.y*y.y+(double)x.z*y.z+(double)x.w*y.w),xx=(double)x.x*x.x+(double)x.y*x.y+(double)x.z*x.z+(double)x.w*x.w,yy=(double)y.x*y.x+(double)y.y*y.y+(double)y.z*y.z+(double)y.w*y.w;angle+=2*Math.acos(Math.min(1,dot/Math.sqrt(xx*yy)));}return .004+NervRigidMeshSweepR52.radius(g.bounds())*angle*angle/8;}
-    private static boolean intersects(Chord chord,ObstacleMesh mesh)
-    {return chord.box().intersects(mesh.mesh().envelope(mesh.frame(),mesh.endFrame()))&&mesh.mesh().intersectsChord(chord.vertices(),new Vec3(chord.error(),chord.error(),chord.error()),mesh.frame(),mesh.endFrame());}
-    private record SourceObstacle(ObstacleMesh mesh,boolean solePlane){}
+    static double curveError(EvaBodyPose.Sample a,EvaBodyPose.Sample b,EvaOriginalMeshGeometryR52.Geometry g,RigidTransform from,RigidTransform to)
+    {double angle=NervRigidMeshSweepR52.angular(from,to);for(String n:a.rig.keySet()){var x=a.rotations.get(n);var y=b.rotations.get(n);if(x.equals(y))continue;double dot=Math.abs((double)x.x*y.x+(double)x.y*y.y+(double)x.z*y.z+(double)x.w*y.w),xx=(double)x.x*x.x+(double)x.y*x.y+(double)x.z*x.z+(double)x.w*x.w,yy=(double)y.x*y.x+(double)y.y*y.y+(double)y.z*y.z+(double)y.w*y.w;angle+=2*Math.acos(Math.min(1,dot/Math.sqrt(xx*yy)));}double error=.004+NervRigidMeshSweepR52.radius(g.bounds())*angle*angle/8;
+        if(g.parts().size()==1&&NervRigidMeshSweepR52.angular(from,to)==0)
+        {
+            var fixedHands=new EvaAnatomicalHandsR45.Pose("fixed","fixed",Map.of());
+            var bounds=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52().releaseMotionBoundsR52(g.variant(),a,fixedHands,b,fixedHands,g);
+            var rigid=bounds.get("RigidCurveR53/"+g.parts().get(0).bone());if(rigid!=null)error=.004+rigid;
+        }
+        return error;}
+    private static boolean intersects(Chord chord,SourceObstacle source)
+    {var mesh=source.mesh();return chord.box().intersects(source.envelope())&&mesh.mesh().intersectsChord(chord.vertices(),new Vec3(chord.error(),chord.error(),chord.error()),mesh.frame(),mesh.endFrame());}
+    private record SourceObstacle(ObstacleMesh mesh,boolean solePlane,AABB envelope)
+    {SourceObstacle(ObstacleMesh mesh,boolean solePlane){this(mesh,solePlane,mesh.mesh().envelope(mesh.frame(),mesh.endFrame()));}}
     private static boolean bearingTangent(Chord chord,SourceObstacle obstacle)
     {
         if(!obstacle.solePlane()||!Set.of("foot_l","foot_r").contains(chord.bone())||!NervAirTransportManifestR52.same(obstacle.mesh().frame(),obstacle.mesh().endFrame()))return false;
@@ -110,10 +118,17 @@ public final class NervHullGroundRecoveryR52
         double top=NervRigidMeshSweepR52.transformed(obstacle.mesh().mesh().bounds(),obstacle.mesh().frame()).maxY;
         for(Vec3 point:chord.vertices())if(point.y<top-2e-6)return false;return true;
     }
-    private static boolean clearWorld(ServerLevel level,Entity hull,List<Chord> chords,List<AABB> declared,Set<UUID> own)
+    static boolean clearWorld(ServerLevel level,Entity hull,List<Chord> chords,List<AABB> declared,Set<UUID> own)
     {
-        AABB whole=null;for(var c:chords)whole=whole==null?c.box():whole.minmax(c.box());if(whole==null||!NervAirspaceCoverageR52.covered(whole,declared)||!EntryPlugEjectionR48.loaded(level,whole))return false;
-        var fixed=NervFlightProofR52.detachedCarrierObstacles(level);if(fixed==null)return false;for(var chord:chords)for(var mesh:fixed)if(intersects(chord,mesh))return false;
+        var byPart=new LinkedHashMap<String,AABB>();AABB whole=null;
+        for(var c:chords){byPart.merge(c.bone(),c.box(),AABB::minmax);whole=whole==null?c.box():whole.minmax(c.box());}
+        if(whole==null)return false;
+        // Match the pose caller's per-part SPACE request. Empty gaps between
+        // separate source parts are only broad-phase query space, not cargo.
+        for(var box:byPart.values())if(!NervAirspaceCoverageR52.covered(box,declared)||!EntryPlugEjectionR48.loaded(level,box))return false;
+        var fixed=NervFlightProofR52.detachedCarrierObstacles(level);if(fixed==null)return false;
+        var fixedNearby=new ArrayList<SourceObstacle>();for(var mesh:fixed){var source=new SourceObstacle(mesh,false);if(whole.intersects(source.envelope()))fixedNearby.add(source);}
+        for(var chord:chords)for(var source:fixedNearby)if(intersects(chord,source))return false;
         var obstacles=new ArrayList<SourceObstacle>();var boxes=new ArrayList<AABB>();
         for(var shape:level.getBlockCollisions(hull,whole))boxes.addAll(shape.toAabbs());
         for(var e:level.getEntities((Entity)null,whole.inflate(200),e->!own.contains(e.getUUID())&&e.isAlive()&&!e.isSpectator()&&(e instanceof LivingEntity||e.canBeCollidedWith()||e instanceof UNTransportEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof NervCarrierPlatformEntity)))
@@ -122,7 +137,8 @@ public final class NervHullGroundRecoveryR52
             {try{for(var part:NervOriginalCarrierR52.actualPartsR52(carrier))obstacles.add(new SourceObstacle(new ObstacleMesh(part.mesh(),part.frame()),part.role()==NervOriginalCarrierR52.Role.SOLE_BEARING||part.name().equals("deck")));}catch(java.io.IOException absent){return false;}continue;}
             var meshes=NervFlightProofR52.actualObstacleMeshes(e);if(meshes==null){if(whole.intersects(e.getBoundingBox()))return false;}else if(meshes.isEmpty())boxes.add(e.getBoundingBox());else for(var mesh:meshes)obstacles.add(new SourceObstacle(mesh,false));
         }
-        for(var chord:chords){for(var box:boxes)if(chord.box().intersects(box)&&TriangleSweepMeshR52.convexSweepBox(chord.vertices(),chord.error(),box))return false;for(var source:obstacles)if(!bearingTangent(chord,source)&&intersects(chord,source.mesh()))return false;}return true;
+        var nearby=new ArrayList<SourceObstacle>();for(var source:obstacles)if(whole.intersects(source.envelope()))nearby.add(source);
+        for(var chord:chords){for(var box:boxes)if(chord.box().intersects(box)&&TriangleSweepMeshR52.convexSweepBox(chord.vertices(),chord.error(),box))return false;for(var source:nearby)if(!bearingTangent(chord,source)&&intersects(chord,source))return false;}return true;
     }
     /** Only this full source/world check can create a committable small pose step. */
     public static AcceptedRecoveryStep check(ServerLevel level,UUID task,UUID aircraft,NervAirframeGeometryR52 source,Plan plan,int age,Frame current,Set<String> spaces,Map<String,NervRouteNativeR52.Binding> bindings)
@@ -132,29 +148,38 @@ public final class NervHullGroundRecoveryR52
         if(!NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),plan.root(age))||!NervAirTransportManifestR52.same(current.cargo(),plan.root(age))||!sameBody(EvaMechanicalFrameR52.frozenLocalPose(e),plan.body(e,age))||!EvaFrozenHandsR52.capture(e,1).equals(plan.hands))return null;
         var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return null;declared.addAll(b.spaces());}
         var own=new HashSet<>(TransportMembershipR52.members(plan.original,Kind.HULL_ONLY_RECOVERY));own.add(aircraft);double rotor=NervAircraftFrameR52.rotorClock(p);
-        var bodyFrom=EvaMechanicalFrameR52.frozenLocalPose(e);var geometryFrom=evaluate(e,bodyFrom,plan.hands);var contactsFrom=NervAirCradleContactsR52.evaluate(geometryFrom,desiredAnchors(bodyFrom));var after=EvaShutdownR30.encode(plan.body(e,age+1));
-        var next=new Frame(current.plane(),plan.root(age+1),current.rig());var bodyTo=decode(e,after);var geometryTo=evaluate(e,bodyTo,plan.hands);var contactsTo=NervAirCradleContactsR52.evaluate(geometryTo,desiredAnchors(bodyTo));
+        var bodyFrom=EvaMechanicalFrameR52.frozenLocalPose(e);var geometryFrom=EvaMechanicalFrameR52.capturedGeometry(e);var contactsFrom=NervAirCradleContactsR52.evaluate(geometryFrom,desiredAnchors(bodyFrom));var after=EvaShutdownR30.encode(plan.body(e,age+1));
+        var next=new Frame(current.plane(),plan.root(age+1),current.rig());var bodyTo=decode(e,after);boolean unchanged=sameBody(bodyFrom,bodyTo);var geometryTo=unchanged?geometryFrom:evaluate(e,bodyTo,plan.hands);var contactsTo=unchanged?contactsFrom:NervAirCradleContactsR52.evaluate(geometryTo,desiredAnchors(bodyTo));
         if(!NervAircraftFrameR52.anchors(p).equals(contactsFrom.stream().map(NervAirCradleContactsR52.Contact::centre).toList())||!NervAircraftFrameR52.jawAxes(p).equals(contactsFrom.stream().map(NervAirCradleContactsR52.Contact::axis).toList()))return null;
-        if(!NervR50CarrierModeR53.enabled())for(int sample=0;sample<4;sample++)
+        int subdivisions=unchanged?1:4;
+        for(int sample=0;sample<subdivisions;sample++)
         {
-            var pa=mix(bodyFrom,bodyTo,sample/4F);var pb=mix(bodyFrom,bodyTo,(sample+1)/4F);var ga=evaluate(e,pa,plan.hands);var gb=evaluate(e,pb,plan.hands);var ra=current.cargo().interpolate(next.cargo(),sample/4D);var rb=current.cargo().interpolate(next.cargo(),(sample+1)/4D);double error=curveError(pa,pb,ga,ra,rb);
-            var bodyChords=chords(ga,gb,ra,rb,error);if(!clearWorld(level,e,bodyChords,declared,own))return null;
+            float start=(float)sample/subdivisions,end=(float)(sample+1)/subdivisions;
+            var pa=unchanged?bodyFrom:mix(bodyFrom,bodyTo,start);var pb=unchanged?bodyTo:mix(bodyFrom,bodyTo,end);var ga=unchanged?geometryFrom:evaluate(e,pa,plan.hands);var gb=unchanged?geometryTo:evaluate(e,pb,plan.hands);var ra=current.cargo().interpolate(next.cargo(),start);var rb=current.cargo().interpolate(next.cargo(),end);double error=curveError(pa,pb,ga,ra,rb);
+            var bodyChords=new ArrayList<Chord>();
+            for(int part=0;part<ga.parts().size();part++)
+            {
+                var aPart=new EvaOriginalMeshGeometryR52.Geometry(ga.variant(),ga.sourceFingerprint(),List.of(ga.parts().get(part)));
+                var bPart=new EvaOriginalMeshGeometryR52.Geometry(gb.variant(),gb.sourceFingerprint(),List.of(gb.parts().get(part)));
+                bodyChords.addAll(chords(aPart,bPart,ra,rb,curveError(pa,pb,aPart,ra,rb)));
+            }
+            if(!clearWorld(level,e,bodyChords,declared,own))return null;
             for(var chord:bodyChords)
             {
-                if(source.bodyMesh().intersectsChord(chord.vertices(),new Vec3(error,error,error),current.plane()))return null;
-                for(int r=0;r<4;r++)if(source.rotorMesh(r).intersectsChord(chord.vertices(),new Vec3(error,error,error),current.plane().compose(source.rotorLocalFrame(r,rotor+sample/4D)),current.plane().compose(source.rotorLocalFrame(r,rotor+(sample+1)/4D))))return null;
+                if(source.bodyMesh().intersectsChord(chord.vertices(),new Vec3(chord.error(),chord.error(),chord.error()),current.plane()))return null;
+                for(int r=0;r<4;r++)if(source.rotorMesh(r).intersectsChord(chord.vertices(),new Vec3(chord.error(),chord.error(),chord.error()),current.plane().compose(source.rotorLocalFrame(r,rotor+start)),current.plane().compose(source.rotorLocalFrame(r,rotor+end))))return null;
             }
             var ca=NervAirCradleContactsR52.evaluate(ga,desiredAnchors(pa));var cb=NervAirCradleContactsR52.evaluate(gb,desiredAnchors(pb));
             var fa=new Frame(current.plane(),ra,current.rig());var fb=new Frame(current.plane(),rb,current.rig());
-            var partsA=source.parts(fa,ca.stream().map(NervAirCradleContactsR52.Contact::centre).toList(),ca.stream().map(NervAirCradleContactsR52.Contact::axis).toList(),rotor+sample/4D);
-            var partsB=source.parts(fb,cb.stream().map(NervAirCradleContactsR52.Contact::centre).toList(),cb.stream().map(NervAirCradleContactsR52.Contact::axis).toList(),rotor+(sample+1)/4D);
+            var partsA=source.parts(fa,ca.stream().map(NervAirCradleContactsR52.Contact::centre).toList(),ca.stream().map(NervAirCradleContactsR52.Contact::axis).toList(),rotor+start);
+            var partsB=source.parts(fb,cb.stream().map(NervAirCradleContactsR52.Contact::centre).toList(),cb.stream().map(NervAirCradleContactsR52.Contact::axis).toList(),rotor+end);
             var cradleA=new ArrayList<EvaOriginalMeshGeometryR52.Part>();var cradleB=new ArrayList<EvaOriginalMeshGeometryR52.Part>();
             for(int i=5;i<partsA.size();i++){var x=partsA.get(i);var y=partsB.get(i);var mx=new NervRigidMeshSweepR52(x.xyz());var my=new NervRigidMeshSweepR52(y.xyz());cradleA.add(new EvaOriginalMeshGeometryR52.Part(x.name(),"original-air-cradle",source.fingerprint(),x.xyz(),mx.bounds()));cradleB.add(new EvaOriginalMeshGeometryR52.Part(y.name(),"original-air-cradle",source.fingerprint(),y.xyz(),my.bounds()));}
             if(!clearWorld(level,e,chords(new EvaOriginalMeshGeometryR52.Geometry(e.getUnitVariant(),source.fingerprint(),cradleA),new EvaOriginalMeshGeometryR52.Geometry(e.getUnitVariant(),source.fingerprint(),cradleB),current.plane(),current.plane(),error),declared,own))return null;
             // Jaws are the named actual contacts. Other struts/crossbars may not cut through the original body.
-            for(int i=5;i<partsA.size();i++)if(!partsA.get(i).name().startsWith("jaw/")){var rigid=new NervRigidMeshSweepR52(partsA.get(i).xyz());for(var chord:bodyChords)if(rigid.intersectsChord(chord.vertices(),new Vec3(error,error,error),current.plane()))return null;}
+            for(int i=5;i<partsA.size();i++)if(!partsA.get(i).name().startsWith("jaw/")){var rigid=new NervRigidMeshSweepR52(partsA.get(i).xyz());for(var chord:bodyChords)if(rigid.intersectsChord(chord.vertices(),new Vec3(chord.error(),chord.error(),chord.error()),current.plane()))return null;}
         }
-        if(!NervR50CarrierModeR53.enabled()&&age+1==TICKS)
+        if(age+1==TICKS)
         {var carrier=NervOriginalCarrierR52.controller(level,plan.original);try{if(carrier==null||!NervOriginalCarrierR52.carrierFootBearingR52(level,carrier,e,geometryTo,next.cargo()))return null;}catch(java.io.IOException absent){return null;}}
         return new AcceptedRecoveryStep(level,plan.original,aircraft,EvaAirTransportR31.cradleStateR50(e).getCompound("Origin"),after,plan.hands,current,next,geometryTo,binding(e,bodyTo,geometryTo),contactsTo,rotor);
     }

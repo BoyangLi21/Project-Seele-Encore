@@ -20,6 +20,8 @@ public final class NervRouteRuntimeR52
     private record Door(UUID entity,float width,float height){}
     private static final Map<ServerLevel,Optional<NervRouteRuntimeStateR52>> SAVES=new WeakHashMap<>();
     private static final Map<ServerLevel,Controller> LIVE=new WeakHashMap<>();
+    private static final Map<ServerLevel,String> CONTINUOUS_RECOVERY_DIAGNOSTICS_R53=new WeakHashMap<>();
+    public static String continuousRecoveryDiagnosticR53(ServerLevel level){return CONTINUOUS_RECOVERY_DIAGNOSTICS_R53.getOrDefault(level,"");}
     private static final Set<ServerLevel> INSTALLING=Collections.newSetFromMap(new WeakHashMap<>());
     /** The migrated map requires an explicit installed Root assembly declaration. */
     public static boolean mapRebuildEnabledR52(){return true;}
@@ -54,7 +56,8 @@ public final class NervRouteRuntimeR52
         return manualNpcReceiptR60(original,directory.unit(original.variant()),directory.epoch(),level.dimension().location().toString(),directory.fingerprint(),
                 receipt.getString("R52OriginalPilotDirectory"),receipt.getString("R52OriginalPilotOperation"),
                 access.originalPilot(level,original.variant())==pilot?pilot.getUUID():null,stamped,
-                c.directory==directory&&c.owner==owner&&ready(level)&&pilot.getAssignedVariant()==original.variant());
+                c.directory==directory&&c.owner==owner&&c.saved.claimed()&&c.saved.epoch()==directory.epoch()
+                        &&c.saved.fingerprint().equals(directory.fingerprint())&&pilot.getAssignedVariant()==original.variant());
     }
     static boolean controllerLoadedR52(ServerLevel level){return LIVE.containsKey(level);}
     static NervRouteRuntimeStateR52 installationStateR52(ServerLevel level){return state(level,false);}
@@ -124,12 +127,16 @@ public final class NervRouteRuntimeR52
             if(variant<0||variant>2||!Float.isFinite(width)||!Float.isFinite(height)||width<=0||height<=0||doors.putIfAbsent(variant,new Door(UUID.fromString(row.get("entity_uuid").getAsString()),width,height))!=null)throw new IllegalArgumentException("Explicit original hangar door geometry required");
         }
         if(doors.size()!=3||doors.values().stream().map(Door::entity).distinct().count()!=3)throw new IllegalArgumentException("Root must bind three distinct original wet-cage gates");
-        var saved=state(level,true);if(!saved.fault().isEmpty())throw new IllegalStateException(saved.fault());saved.claim(directory.epoch(),directory.fingerprint());
+        var saved=state(level,true);if(!saved.fault().isEmpty()&&saved.interruptedContinuousCommitR53()==null)throw new IllegalStateException(saved.fault());saved.claim(directory.epoch(),directory.fingerprint());
         var controller=new Controller(level,directory,bindings,Map.copyOf(defaults),Map.copyOf(doors),owner,saved);
         if(!NervAirTransportRuntimeR52.quarantineSavedLeases(level,directory,controller.pool))throw new IllegalStateException("Original saved flight space/actor quarantine conflicts with this Root directory");
         for(var job:saved.jobs())if(!Set.of(Phase.PARKED,Phase.DEPLOYED,Phase.CANCELLED).contains(job.phase())&&!controller.pool.quarantineGround(job.snapshot()))throw new IllegalStateException("Original saved ground space/actor quarantine conflicts with this Root directory");
         LIVE.put(level,controller);INSTALLING.add(level);
-        try{if(airDocument!=null&&!NervAirTransportRuntimeR52.install(level,airDocument))throw new IllegalStateException("Explicit Root air transport/receiver installation is incomplete");}
+        try
+        {
+            if(!saved.fault().isEmpty()&&!controller.recoverContinuousCommitR53()){LIVE.remove(level);return false;}
+            if(airDocument!=null&&!NervAirTransportRuntimeR52.install(level,airDocument))throw new IllegalStateException("Explicit Root air transport/receiver installation is incomplete");
+        }
         catch(java.io.IOException|RuntimeException failure){LIVE.remove(level);throw new IllegalStateException("Claimed Root installation held: actual declared air transport did not commission",failure);}
         finally{INSTALLING.remove(level);}return true;
     }
@@ -156,7 +163,9 @@ public final class NervRouteRuntimeR52
     {
         var c=LIVE.get(level);if(c==null||!ready(level))return unavailable();
         var order=StaffCommandBookR24.unitOrder(level,variant);String intent=order!=null?NervOutletControlsR53.intent(order.requested)
-                :TvCampaignSavedData.get(level).active.equals("ramiel")?"geofront":"surface";
+                :TvCampaignSavedData.get(level).active.equals("ramiel")?TvEncounterSitesR45.departureIntentR53(level):"surface";
+        if(TvCampaignSavedData.get(level).active.equals("ramiel")&&order!=null
+                &&Set.of("prepare","launch","deploy").contains(order.requested))intent=TvEncounterSitesR45.departureIntentR53(level);
         var result=c.prepare(variant,intent);if(result.accepted()&&order!=null&&order.requested.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY))c.launch(variant,null);return result;
     }
     public static EvaLogisticsDirector.ActionResult prepare(ServerLevel level,int variant,String rootIntent)
@@ -186,7 +195,40 @@ public final class NervRouteRuntimeR52
         return new EvaLogisticsDirector.Status(variant,job==null?(entry==null?"UNREGISTERED":entry.phase().name()):job.phase()==Phase.PARKED&&!job.waiting().isEmpty()?"SERVICE_HOLD":NervRouteRuntimeStateR52.legacyPhase(job),entry!=null&&level.getEntity(entry.canonicalId()) instanceof EvaUnit01Entity,
                 entry==null?null:entry.canonicalId(),entry==null?0:entry.lclLayers(),job==null?0:job.snapshot().leg());
     }
-    public static void tick(ServerLevel level){var c=LIVE.get(level);if(c!=null&&ready(level))c.tick();}
+    public static List<String> sortieStatusR53(ServerLevel level)
+    {
+        var result=new ArrayList<String>();var controller=LIVE.get(level);var saved=state(level,false);
+        result.add(level.dimension().location()+" tick="+level.getGameTime()+" installed="+(controller!=null)
+                +" fault="+(saved==null?"no_saved_routes":saved.fault()));
+        if(saved==null)return result;
+        for(var job:saved.jobs())
+        {
+            var original=job.snapshot().original();var data=job.ownerData();
+            var carrier=controller==null?null:NervOriginalCarrierR52.controller(level,original);
+            String hold=controller!=null&&controller.owner instanceof NervAssemblyOwnerR52 owner?owner.holdReason(original.eva()):"";
+            result.add("EVA-0"+original.variant()+" "+job.phase()+" prepare="+data.getString("Prepare")+":"+data.getInt("PrepareTicks")
+                    +" drained="+data.getInt("DrainedLayers")+" leg="+job.snapshot().leg()+" progress="+job.snapshot().fraction()
+                    +" wait="+job.waiting()+" hold="+hold+" carrier="+(carrier==null?"unloaded":NervOriginalCarrierR52.lastRejectionR53(carrier)));
+        }
+        return List.copyOf(result);
+    }
+    public static void tick(ServerLevel level)
+    {
+        var c=LIVE.get(level);if(c==null)return;
+        if(c.saved.interruptedContinuousCommitR53()!=null)c.recoverContinuousCommitR53();
+        if(ready(level))c.tick();
+    }
+    /** Constructed only after current physical endpoint and old-clock checks. */
+    static final class RecoveredContinuousStepR53
+    {
+        final Snapshot from,to;
+        final List<DirectoryTrajectoryR52> paths;
+        private final ServerLevel level;
+        private final long tick;
+        private RecoveredContinuousStepR53(ServerLevel level,Snapshot from,Snapshot to,List<DirectoryTrajectoryR52> paths)
+        {this.level=level;this.tick=level.getGameTime();this.from=from;this.to=to;this.paths=List.copyOf(paths);}
+        boolean current(){return level.getGameTime()==tick;}
+    }
     public static List<net.minecraft.world.phys.shapes.VoxelShape> cageCollisions(ServerLevel level,Entity actor,net.minecraft.world.phys.AABB query,List<net.minecraft.world.phys.shapes.VoxelShape> original)
     {var c=LIVE.get(level);if(c==null||!ready(level)||!(c.owner instanceof NervAssemblyOwnerR52 owner))return original;var extra=owner.actualCageCollisions(level,actor,query);if(extra.isEmpty())return original;var result=new ArrayList<>(original);result.addAll(extra);return result;}
     public static boolean personnelBindingsReady(ServerLevel level){var c=LIVE.get(level);return c!=null&&c.owner.originalPersonnelBindingsReady(level);}
@@ -199,8 +241,9 @@ public final class NervRouteRuntimeR52
     {var c=LIVE.get(level);if(c!=null)for(var job:c.saved.jobs())if(!job.snapshot().original().mission().isEmpty()&&!Set.of(Phase.PARKED,Phase.DEPLOYED,Phase.CANCELLED,Phase.RETURNING,Phase.FINISHING).contains(job.phase()))c.cancel(job.snapshot().original().variant(),job.snapshot().original().owner());}
     public static void automatic(ServerLevel level,int variant)
     {
-        if(!ready(level))return;var c=LIVE.get(level);var mission=AutoSortieR32.missionToken(level);if(mission.isEmpty())return;
-        var job=c.saved.job(variant);if(job==null||job.phase()==Phase.PARKED){var result=c.prepare(variant,TvCampaignSavedData.get(level).active.equals("ramiel")?"geofront":"surface");var created=c.saved.job(variant);if(created!=null&&c.directory.route(created.snapshot().route()).continuousUpright())c.launch(variant,null);}
+        if(!ready(level))return;var c=LIVE.get(level);var mission=AutoSortieR32.missionToken(level,variant);if(mission.isEmpty())return;
+        var order=StaffCommandBookR24.unitOrder(level,variant);if(order!=null&&!order.automatic)return;
+        var job=c.saved.job(variant);if(job==null||job.phase()==Phase.PARKED){var result=c.prepare(variant,TvCampaignSavedData.get(level).active.equals("ramiel")?TvEncounterSitesR45.departureIntentR53(level):"surface");var created=c.saved.job(variant);if(created!=null&&c.directory.route(created.snapshot().route()).continuousUpright())c.launch(variant,null);}
         else if(job.phase()==Phase.READY)c.launch(variant,null);
     }
     /** A moved original's declared dimensions replace the old absolute -370
@@ -217,9 +260,28 @@ public final class NervRouteRuntimeR52
         final Map<String,NervRouteNativeR52.Binding> bindings;
         final FlightContext flightContext;
         final Set<UUID> parkedReadbacksR53=new HashSet<>();
+        final Map<UUID,Long> parkedReadbackStartedR54=new HashMap<>();
         Controller(ServerLevel level,NervRouteDirectoryR52 directory,Map<String,NervRouteNativeR52.Binding> bindings,Map<String,String> defaults,Map<Integer,Door> doors,NervRouteNativeR52.AssemblyOwner owner,NervRouteRuntimeStateR52 saved)
         {this.level=level;this.directory=directory;this.pool=new NervRouteReservationsR52(directory);this.defaults=defaults;this.doors=doors;this.owner=owner;this.saved=saved;this.bindings=directory.dynamicSpacesR52().bindings(Map.copyOf(bindings));this.nativeAccess=new NervRouteNativeR52(level,directory,bindings,owner);this.flightContext=owner instanceof NervFlightProofR52.Owner flightOwner?new FlightContext(directory,pool,nativeAccess,this.bindings,flightOwner):null;}
         final Set<UUID> continuousPrimedR52=new HashSet<>();
+        NervTraversalPolicyR53.Mode traversalModeR53=NervTraversalPolicyR53.Mode.NORMAL;
+        private record StoppedPreflightRetryR53(UUID task,String route,double from,double to,long after){}
+        private final Map<Integer,StoppedPreflightRetryR53> stoppedPreflightRetriesR53=new HashMap<>();
+        private boolean deferStoppedPreflightR53(Job job,Route route,double from,double to)
+        {
+            int variant=job.snapshot().original().variant();var retry=stoppedPreflightRetriesR53.get(variant);
+            if(retry==null)return false;
+            if(!retry.task().equals(job.snapshot().task())||!retry.route().equals(route.id())||retry.from()!=from||retry.to()!=to)
+            {stoppedPreflightRetriesR53.remove(variant);return false;}
+            return level.getGameTime()<retry.after();
+        }
+        private void retryStoppedPreflightR53(Job job,Route route,double from,double to)
+        {
+            // A blocked, stationary machine must not rescan its entire route
+            // every tick and stall unrelated traffic. No successful proof is cached.
+            stoppedPreflightRetriesR53.put(job.snapshot().original().variant(),
+                    new StoppedPreflightRetryR53(job.snapshot().task(),route.id(),from,to,level.getGameTime()+10));
+        }
         Original original(int variant)
         {
             nativeAccess.ownerData(new CompoundTag());
@@ -240,6 +302,7 @@ public final class NervRouteRuntimeR52
             var existing=saved.job(variant);if(existing!=null&&!Set.of(Phase.PARKED,Phase.CANCELLED).contains(existing.phase()))return new EvaLogisticsDirector.ActionResult(false,"原机体已有运行安排，请先确认当前状态。");
             if(existing!=null&&existing.phase()==Phase.PARKED&&owner instanceof NervAssemblyOwnerR52 plant)
             {
+                plant.retainOriginalBayBlocksR54(level,existing.snapshot().original());
                 String hold=plant.parkedServiceHoldR53(level,existing.snapshot().original());
                 if(!hold.isEmpty()){saved.put(existing.update(existing.snapshot(),existing.phase(),existing.ownerData(),hold));return new EvaLogisticsDirector.ActionResult(false,hold);}
             }
@@ -293,21 +356,34 @@ public final class NervRouteRuntimeR52
             var moving=level.getEntity(job.snapshot().original().eva());if(moving instanceof EvaUnit01Entity current&&NervAirTransportRuntimeR52.pending(level,current))return new EvaLogisticsDirector.ActionResult(false,"同一原机体仍由已保存的航空任务保持，不另抢地面路线。");
             var old=job.snapshot().original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level,old.variant()),old.dimension());
             if(job.snapshot().stage()==Stage.COMPLETE)pool.releaseCompletion(job.snapshot().task(),old.owner());
-            Entity actor=level.getEntity(original.eva());if(!(actor instanceof EvaUnit01Entity eva)||!(NervR50CarrierModeR53.enabled()?eva.getDeltaMovement().horizontalDistanceSqr()<.001:EvaLogisticsDirector.recoveryMotionSettled(eva)))return new EvaLogisticsDirector.ActionResult(false,"原机体尚未在实际支撑上停稳。");
+            Entity actor=level.getEntity(original.eva());if(!(actor instanceof EvaUnit01Entity eva)||!((eva.getDeltaMovement().horizontalDistanceSqr()<.001)))return new EvaLogisticsDirector.ActionResult(false,"原机体尚未在实际支撑上停稳。");
             Kind kind=EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())?Kind.HULL_ONLY_RECOVERY:Kind.OCCUPIED;
             var data=job.ownerData().copy();for(String oldPhase:List.of("Finish","FinishTicks","FinishRoot","FinishFeet","FinishPlugLocal","LastFinishTick","RouteR52","ContinuousClockR52","ContinuousDistanceR52","ContinuousRotationR52","ContinuousAutoLaunchR52","ContinuousCheckedStartR52"))data.remove(oldPhase);data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("Returning",true);data.putString("AssemblyKindR52",kind.name());nativeAccess.ownerData(data);
             var binding=owner.originalBinding(level,original,data);if(binding==null)return unavailable();
             var region=owner.actualRecoveryRegion(level,original,data);var feet=owner.actualFootBearingCentre(level,original,data);if(region==null||feet==null)return unavailable();
             var route=pool.nearestRecovery(original,region,feet,(port,reverse)->owner.approachReachable(level,original,port,reverse,data),kind);
             if(route.isEmpty())return new EvaLogisticsDirector.ActionResult(false,"同一原机没有可达且空闲的对应回收口。");
+            // The outlet lid is not a central receiving platform. Do not take
+            // ground custody or open it beneath a body waiting for its rack.
+            if(((!(owner instanceof NervAssemblyOwnerR52 actualOwner)
+                    ||!actualOwner.groundReceiverBearingReadyR53(level,original,route.get().port(),kind,data))))
+                return NervAirTransportRuntimeR52.requestRecoveryReceiver(level,variant,original.owner(),route.get().port());
             var result=pool.reserve(UUID.randomUUID(),original,route.get().id(),nativeAccess,kind);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
             saved.put(new Job(result.state(),Phase.RETURNING,data,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,kind==Kind.HULL_ONLY_RECOVERY?"原无人机体沿真实逆向线路回库；已分离的原栓与驾驶员保持原位。":"原机体沿该入口绑定的真实逆向线路回库。");
         }
         private EvaLogisticsDirector.ActionResult recoverCancelledContinuousR52(Job job)
         {
-            var snapshot=job.snapshot();var route=directory.route(snapshot.route());var stored=job.ownerData().getCompound("ContinuousClockR52");if(route==null||!route.continuousUpright()||stored.isEmpty()||stored.getDouble("SpeedMps")!=0)return new EvaLogisticsDirector.ActionResult(false,"等待已取消的原编队沿实轨减速停稳。");
-            NervMechanicalTravelR52.ContinuousClock originalStop;
-            try{var resumeSpeed=route.phased()?NervLaunchPhasesR53.current(job.ownerData().copy(),snapshot.task(),directory,route,directory.routeDistance(route,snapshot.leg(),snapshot.fraction())).speed():route.motionProfile().launch();originalStop=NervMechanicalTravelR52.continuousClock(job.ownerData(),route.id(),directory.fingerprint(),directory.routeDistance(route,snapshot.leg(),snapshot.fraction()),directory.routeLength(route),stored.getDouble("ToMetres"),resumeSpeed.cruiseMps(),resumeSpeed.accelerationMps2(),resumeSpeed.decelerationMps2());if(originalStop.speed()!=0)return new EvaLogisticsDirector.ActionResult(false,"原取消任务尚未真正停稳。");}
+            var snapshot=job.snapshot();var route=directory.route(snapshot.route());var stored=job.ownerData().getCompound("ContinuousClockR52");if(route==null||!route.continuousUpright()||stored.getDouble("SpeedMps")!=0)return new EvaLogisticsDirector.ActionResult(false,"等待已取消的原编队沿实轨减速停稳。");
+            // Route-wide gate admission happens before the first distance
+            // clock exists. Cancelling there must still run normal bay
+            // service; a missing clock at a moved point remains invalid.
+            boolean unstarted=stored.isEmpty()&&!route.recovery()&&snapshot.leg()==0&&snapshot.fraction()==0
+                    &&job.ownerData().getString("Prepare").equals("READY")
+                    &&job.ownerData().getDouble("ContinuousDistanceR52")==0;
+            if(stored.isEmpty()&&(!unstarted||!owner.restoreOriginalPreparation(level,snapshot.original(),job.ownerData())))
+                return new EvaLogisticsDirector.ActionResult(false,"原取消任务缺少行驶时钟，且未通过原登乘位整备实况检查。");
+            NervMechanicalTravelR52.ContinuousClock originalStop=null;
+            try{if(!unstarted){var resumeSpeed=route.phased()?NervLaunchPhasesR53.current(job.ownerData().copy(),snapshot.task(),directory,route,directory.routeDistance(route,snapshot.leg(),snapshot.fraction())).speed():route.motionProfile().launch();originalStop=NervMechanicalTravelR52.continuousClock(job.ownerData(),route.id(),directory.fingerprint(),directory.routeDistance(route,snapshot.leg(),snapshot.fraction()),directory.routeLength(route),stored.getDouble("ToMetres"),resumeSpeed.cruiseMps(),resumeSpeed.accelerationMps2(),resumeSpeed.decelerationMps2());if(originalStop.speed()!=0)return new EvaLogisticsDirector.ActionResult(false,"原取消任务尚未真正停稳。");}}
             catch(IllegalArgumentException|IllegalStateException mismatch){return new EvaLogisticsDirector.ActionResult(false,"原取消任务的实际位置与保存时钟不符，保持原UUID等待修复。");}
             var old=snapshot.original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level,old.variant()),old.dimension());var data=job.ownerData().copy();data.putString("AssemblyKindR52",snapshot.kind().name());nativeAccess.ownerData(data);
             if(!owner.rebindStoppedContinuousR52(level,original,data))return new EvaLogisticsDirector.ActionResult(false,"原UUID编队的实际恒定姿态与停止承托尚未通过。");
@@ -315,10 +391,12 @@ public final class NervRouteRuntimeR52
             for(String field:List.of("Finish","FinishTicks","FinishRoot","FinishFeet","FinishPlugLocal","LastFinishTick","ContinuousClockR52","ContinuousBrakeR52","ContinuousResumeStopR52","ContinuousAutoLaunchR52","ReleaseWhenReady","RetargetPreparedRouteR53"))data.remove(field);data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("Returning",true);data.putBoolean("ContinuousCheckedStartR52",true);data.putString("RouteR52",result.state().route());data.putDouble("ContinuousDistanceR52",directory.routeDistance(directory.route(result.state().route()),result.state().leg(),result.state().fraction()));
             data.putUUID("HeadReturnFromTaskR53",snapshot.task());data.putString("HeadReturnFromRouteR53",snapshot.route());
             data.remove("PreviousBankStopR53");var returnRoute=directory.route(result.state().route());double returnAt=data.getDouble("ContinuousDistanceR52");
-            if(returnRoute.phased()&&Math.abs(returnAt-directory.readyDistanceR53(returnRoute))<=1e-6&&Math.abs(originalStop.distance()-directory.readyDistanceR53(route))<=1e-6)
+            if(originalStop!=null&&returnRoute.phased()&&Math.abs(returnAt-directory.readyDistanceR53(returnRoute))<=1e-6&&Math.abs(originalStop.distance()-directory.readyDistanceR53(route))<=1e-6)
             {var receipt=new CompoundTag();receipt.putUUID("SourceTask",snapshot.task());receipt.putUUID("TargetTask",result.state().task());receipt.putString("SourceRoute",route.id());receipt.putString("TargetRoute",returnRoute.id());receipt.putString("Directory",directory.fingerprint());receipt.putDouble("TargetDistance",directory.readyDistanceR53(returnRoute));receipt.put("Clock",stored.copy());receipt.put("SourcePhase",job.ownerData().getCompound(NervLaunchPhasesR53.KEY).copy());data.put("PreviousBankStopR53",receipt);data.putDouble("ContinuousDistanceR52",directory.readyDistanceR53(returnRoute));}
 
-            saved.put(job.update(result.state(),Phase.RETURNING,data,""));mirror(saved.job(original.variant()));return new EvaLogisticsDirector.ActionResult(true,"同一原编队已重占原路；从实际停止点沿对应反向轨道回库。");
+            var returning=job.update(result.state(),Phase.RETURNING,data,"");saved.put(returning);
+            if(result.state().stage()==Stage.COMPLETE)saved.put(returning.update(result.state(),Phase.FINISHING,data,""));
+            mirror(saved.job(original.variant()));return new EvaLogisticsDirector.ActionResult(true,"同一原编队已重占原路；从实际停止点沿对应反向轨道回库。");
         }
         EvaLogisticsDirector.ActionResult cancel(int variant,UUID commander)
         {
@@ -340,8 +418,20 @@ public final class NervRouteRuntimeR52
         {double metres=0;for(String id:route.legs()){var leg=directory.leg(id);if(leg.from().equals(route.readyNode()))return metres;metres+=directory.legLength(leg);if(leg.to().equals(route.readyNode()))return metres;}throw new IllegalStateException("Declared ready node is not on actual route");}
         private List<DirectoryTrajectoryR52> boundedContinuousSpanR52(Route route,double from,double to,FootSupportFrameR52.Binding binding)
         {var paths=new ArrayList<DirectoryTrajectoryR52>();for(double at=from;at<to;){double end=Math.min(to,at+16);paths.addAll(directory.routeSlices(route,at,end,binding));if(paths.size()>2048)throw new IllegalArgumentException("Bounded actual braking/lookahead span required");at=end;}return List.copyOf(paths);}
-        private boolean clearContinuousSpanR52(Original o,Route route,double from,double to,FootSupportFrameR52.Binding binding,CompoundTag data)
-        {var paths=boundedContinuousSpanR52(route,from,to,binding);return !paths.isEmpty()&&nativeAccess.checkContinuousR52(o,route,paths)!=null&&owner.preflightContinuousCarrierR52(level,o,route,paths,data);}
+        private NervRouteNativeR52.CheckedContinuousTraversalR52 clearContinuousSpanR52(Original o,Route route,double from,double to,FootSupportFrameR52.Binding binding,CompoundTag data)
+        {var paths=boundedContinuousSpanR52(route,from,to,binding);return checkedContinuousCarrierProofR53(o,route,paths,data);}
+        private boolean checkedContinuousCarrierR53(Original original,Route route,List<DirectoryTrajectoryR52> paths,CompoundTag data)
+        {
+            if(paths.isEmpty())return false;
+            var proof=nativeAccess.checkContinuousR52(original,route,paths,true);
+            return proof!=null&&owner.preflightCheckedContinuousCarrierR53(level,proof,data);
+        }
+        private NervRouteNativeR52.CheckedContinuousTraversalR52 checkedContinuousCarrierProofR53(Original original,Route route,List<DirectoryTrajectoryR52> paths,CompoundTag data)
+        {
+            if(paths.isEmpty())return null;
+            var proof=nativeAccess.checkContinuousR52(original,route,paths);
+            return proof!=null&&owner.preflightCheckedContinuousCarrierR53(level,proof,data)?proof:null;
+        }
         private void finishContinuousCancelR52(Job job,Snapshot snapshot,CompoundTag data)
         {
             owner.brakeOriginalInPlace(level,snapshot.original(),data);if(snapshot.stage()==Stage.COMPLETE)pool.releaseCompletion(snapshot.task(),snapshot.original().owner());else pool.cancel(snapshot.task(),snapshot.original().owner());continuousPrimedR52.remove(snapshot.task());var cancelled=new Snapshot(snapshot.task(),snapshot.original(),snapshot.directoryFingerprint(),snapshot.route(),snapshot.leg(),snapshot.fraction(),Stage.CANCELLED,"",snapshot.kind());saved.put(job.update(cancelled,Phase.CANCELLED,data,"实际原路减速停止；可从该点反向回库"));mirror(saved.job(snapshot.original().variant()));
@@ -352,8 +442,29 @@ public final class NervRouteRuntimeR52
             else {continuousPrimedR52.remove(job.snapshot().task());owner.brakeOriginalInPlace(level,job.snapshot().original(),data);}
             saved.put(job.update(job.snapshot(),job.phase(),data,reason));
         }
+        private void holdContinuousStepR53(Job job,Route route,CompoundTag data,double at,double intended,
+                                           double cruise,double acceleration,double deceleration,String reason)
+        {
+            // The rejected step has not moved anything. Retain the accepted frame,
+            // then restart its analytic clock instead of inventing a future stop.
+            owner.brakeOriginalInPlace(level,job.snapshot().original(),data);
+            if(at<intended)NervMechanicalTravelR52.rememberContinuous(data,route.id(),directory.fingerprint(),directory.routeLength(route),
+                    new NervMechanicalTravelR52.ContinuousClock(new NervMechanicalTravelR52.ContinuousProfile(at,intended,cruise,acceleration,deceleration),0));
+            data.putDouble("ContinuousDistanceR52",at);
+            if(data.getString("ContinuousBrakeR52").equals("CANCEL"))
+            {finishContinuousCancelR52(job,job.snapshot(),data);return;}
+            data.remove("ContinuousBrakeR52");data.remove("ContinuousResumeStopR52");
+            continuousPrimedR52.remove(job.snapshot().task());
+            saved.put(job.update(job.snapshot(),job.phase(),data,reason));
+        }
         private void tickContinuousR52(Job job,Route route)
         {
+            var selectedMode=NervTraversalPolicyR53.mode(level);
+            if(selectedMode!=traversalModeR53)
+            {
+                continuousPrimedR52.clear();stoppedPreflightRetriesR53.clear();
+                traversalModeR53=selectedMode;
+            }
             var snapshot=job.snapshot();var data=job.ownerData().copy();double total=directory.routeLength(route),at=directory.routeDistance(route,snapshot.leg(),snapshot.fraction());var stored=data.getCompound("ContinuousClockR52");if(!stored.isEmpty()&&stored.getString("Route").equals(route.id())&&stored.getString("Directory").equals(directory.fingerprint())&&Math.abs(at-stored.getDouble("DistanceMetres"))<=1e-6)at=stored.getDouble("DistanceMetres");data.putDouble("ContinuousDistanceR52",at);nativeAccess.ownerData(data);
             boolean finalCommitStarted=false;
             try
@@ -384,26 +495,48 @@ public final class NervRouteRuntimeR52
                 var speed=phased!=null?phased.speed():route.motionProfile().launch();
                 if(job.phase()==Phase.READY&&!launch&&phased==null)return;
                 boolean ready=owner.prepareContinuousRouteR52(level,snapshot.original(),route,data);
-                if(!ready&&stored.getDouble("SpeedMps")<=0){continuousWaitR52(job,data,"等待全路真实门、地基、导轨与加载就绪");return;}
+                if(!ready&&!NervTraversalPolicyR53.strict(level)&&!stored.isEmpty())
+                {holdContinuousStepR53(job,route,data,at,intended,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2(),"等待前方区段的舱门、支承与加载就绪");return;}
+                if(!ready&&stored.getDouble("SpeedMps")<=0){continuousWaitR52(job,data,NervTraversalPolicyR53.strict(level)?"等待全路真实门、地基、导轨与加载就绪":"等待前方区段的舱门、支承与加载就绪");return;}
                 if(!ready&&!data.contains("ContinuousBrakeR52")){NervMechanicalTravelR52.brakeContinuousR52(data,route.id(),directory.fingerprint(),total,"BLOCKED");stored=data.getCompound("ContinuousClockR52");stop=stored.getDouble("ToMetres");}
                 if(at==stop)
                 {
                     if(data.getString("ContinuousBrakeR52").equals("CANCEL")){finishContinuousCancelR52(job,snapshot,data);return;}
                     if(data.getString("ContinuousBrakeR52").equals("BLOCKED")&&at<intended)
-                    {var binding=owner.originalBinding(level,snapshot.original(),data);var whole=ready?(phased!=null?boundedContinuousSpanR52(route,at,intended,binding):owner.continuousRoutePathsR52(level,snapshot.original(),route,data)):List.<DirectoryTrajectoryR52>of();if(!ready||binding==null||whole.isEmpty()||nativeAccess.checkContinuousR52(snapshot.original(),route,whole)==null||!owner.preflightContinuousCarrierR52(level,snapshot.original(),route,whole,data)){continuousWaitR52(job,data,"已沿实轨制动停稳，等待全路重新验线");return;}data.remove("ContinuousBrakeR52");data.remove("ContinuousResumeStopR52");NervMechanicalTravelR52.rememberContinuous(data,route.id(),directory.fingerprint(),total,new NervMechanicalTravelR52.ContinuousClock(new NervMechanicalTravelR52.ContinuousProfile(at,intended,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2()),0));stored=data.getCompound("ContinuousClockR52");stop=intended;continuousPrimedR52.add(snapshot.task());}
+                    {var binding=owner.originalBinding(level,snapshot.original(),data);var whole=ready&&NervTraversalPolicyR53.strict(level)?(phased!=null?boundedContinuousSpanR52(route,at,intended,binding):owner.continuousRoutePathsR52(level,snapshot.original(),route,data)):List.<DirectoryTrajectoryR52>of();if(!ready||binding==null||(NervTraversalPolicyR53.strict(level)&&!checkedContinuousCarrierR53(snapshot.original(),route,whole,data))){continuousWaitR52(job,data,NervTraversalPolicyR53.strict(level)?"已沿实轨制动停稳，等待全路重新验线":"已沿实轨制动停稳，等待前方区段恢复");return;}data.remove("ContinuousBrakeR52");data.remove("ContinuousResumeStopR52");NervMechanicalTravelR52.rememberContinuous(data,route.id(),directory.fingerprint(),total,new NervMechanicalTravelR52.ContinuousClock(new NervMechanicalTravelR52.ContinuousProfile(at,intended,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2()),0));stored=data.getCompound("ContinuousClockR52");stop=intended;continuousPrimedR52.add(snapshot.task());}
                     else {data.remove("ContinuousBrakeR52");data.remove("ContinuousResumeStopR52");var phase=at==total?Phase.FINISHING:route.recovery()?Phase.RETURNING:Phase.READY;saved.put(job.update(snapshot,phase,data,""));mirror(saved.job(snapshot.original().variant()));return;}
                 }
                 if(at>stop)throw new IllegalStateException("Saved original passed its explicit prepared/braking stop");
                 var binding=owner.originalBinding(level,snapshot.original(),data);if(binding==null){continuousWaitR52(job,data,"实际恒定双脚与栓绑定缺失");return;}
-                if(!continuousPrimedR52.contains(snapshot.task()))
-                {var whole=data.contains("ContinuousBrakeR52")?boundedContinuousSpanR52(route,at,stop,binding):(phased!=null?boundedContinuousSpanR52(route,at,intended,binding):owner.continuousRoutePathsR52(level,snapshot.original(),route,data));if(whole.isEmpty()||nativeAccess.checkContinuousR52(snapshot.original(),route,whole)==null||!owner.preflightContinuousCarrierR52(level,snapshot.original(),route,whole,data)){if(!data.contains("ContinuousBrakeR52")){continuousWaitR52(job,data,"发车/重载前全路或实际制动范围检查未通过");return;}}else continuousPrimedR52.add(snapshot.task());}
+                if(NervTraversalPolicyR53.strict(level)&&!continuousPrimedR52.contains(snapshot.task()))
+                {
+                    boolean stopped=stored.getDouble("SpeedMps")<=0&&!data.contains("ContinuousBrakeR52");
+                    if(stopped&&deferStoppedPreflightR53(job,route,at,intended))return;
+                    var whole=data.contains("ContinuousBrakeR52")?boundedContinuousSpanR52(route,at,stop,binding):(phased!=null?boundedContinuousSpanR52(route,at,intended,binding):owner.continuousRoutePathsR52(level,snapshot.original(),route,data));
+                    if(!checkedContinuousCarrierR53(snapshot.original(),route,whole,data))
+                    {
+                        if(!data.contains("ContinuousBrakeR52"))
+                        {
+                            if(stopped)retryStoppedPreflightR53(job,route,at,intended);
+                            continuousWaitR52(job,data,"发车/重载前全路或实际制动范围检查未通过");return;
+                        }
+                    }
+                    else
+                    {
+                        stoppedPreflightRetriesR53.remove(snapshot.original().variant());
+                        continuousPrimedR52.add(snapshot.task());
+                    }
+                }
                 if(phased==null&&launch&&!data.contains("ContinuousBrakeR52"))NervMechanicalTravelR52.extendContinuousR52(data,route.id(),directory.fingerprint(),total);
                 var clock=NervMechanicalTravelR52.continuousClock(data,route.id(),directory.fingerprint(),at,total,stop,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2());var next=clock.next();NervMechanicalTravelR52.rememberContinuous(data,route.id(),directory.fingerprint(),total,clock);
-                if(!data.contains("ContinuousBrakeR52"))
-                {double horizon=Math.min(intended,next.distance()+NervMechanicalTravelR52.brakingDistanceR52(next.speed(),speed.decelerationMps2()));if(!clearContinuousSpanR52(snapshot.original(),route,at,horizon,binding,data)){if(clock.speed()<=0){continuousWaitR52(job,data,"起步前实际制动安全范围被占用");return;}NervMechanicalTravelR52.brakeContinuousR52(data,route.id(),directory.fingerprint(),total,"BLOCKED");stop=data.getCompound("ContinuousClockR52").getDouble("ToMetres");clock=NervMechanicalTravelR52.continuousClock(data,route.id(),directory.fingerprint(),at,total,stop,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2());next=clock.next();}}
-                var paths=directory.routeSlices(route,at,next.distance(),binding);var proof=nativeAccess.checkContinuousR52(snapshot.original(),route,paths);
+                NervRouteNativeR52.CheckedContinuousTraversalR52 horizonProof=null;
+                if(NervTraversalPolicyR53.strict(level)&&!data.contains("ContinuousBrakeR52"))
+                {double horizon=Math.min(intended,next.distance()+NervMechanicalTravelR52.brakingDistanceR52(next.speed(),speed.decelerationMps2()));horizonProof=clearContinuousSpanR52(snapshot.original(),route,at,horizon,binding,data);if(horizonProof==null){if(clock.speed()<=0){continuousWaitR52(job,data,"起步前实际制动安全范围被占用");return;}NervMechanicalTravelR52.brakeContinuousR52(data,route.id(),directory.fingerprint(),total,"BLOCKED");stop=data.getCompound("ContinuousClockR52").getDouble("ToMetres");clock=NervMechanicalTravelR52.continuousClock(data,route.id(),directory.fingerprint(),at,total,stop,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2());next=clock.next();}}
+                var paths=directory.routeSlices(route,at,next.distance(),binding);
+                var proof=horizonProof==null?null:horizonProof.checkedPrefixR53(paths);
+                if(proof==null)proof=nativeAccess.checkContinuousR52(snapshot.original(),route,paths);
                 if(proof==null||!pool.canCommitContinuousR52(snapshot.task(),proof))
-                {if(clock.speed()>0){owner.brakeOriginalInPlace(level,snapshot.original(),data);saved.put(job.update(snapshot,job.phase(),data,"实际障碍已侵入本步可验证制动范围，物理碰撞保持"));saved.faultR52("Unexpected obstacle invalidated the actual braking step at task "+snapshot.task()+"; no unsafe movement or synthetic zero-speed receipt");}else continuousWaitR52(job,data,"连续子曲线真实碰撞、支撑或全路预留检查未通过");return;}
+                {if(!NervTraversalPolicyR53.strict(level)){holdContinuousStepR53(job,route,data,at,intended,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2(),"本步真实碰撞、支撑或预留受阻，原位等待后继续");}else if(clock.speed()>0){owner.brakeOriginalInPlace(level,snapshot.original(),data);saved.put(job.update(snapshot,job.phase(),data,"实际障碍已侵入本步可验证制动范围，物理碰撞保持"));saved.faultR52("Unexpected obstacle invalidated the actual braking step at task "+snapshot.task()+"; no unsafe movement or synthetic zero-speed receipt");}else continuousWaitR52(job,data,"连续子曲线真实碰撞、支撑或全路预留检查未通过");return;}
                 var contacts=List.<NervLaunchFeedbackR53.Contact>of();
                 if(phased!=null&&phased.launch())
                 {
@@ -411,7 +544,8 @@ public final class NervRouteRuntimeR52
                     try{contacts=NervOuterCarrierGuideR52.actualContactPointsR53(last.sample(1).evaRoot(),tangent).stream().map(point->new NervLaunchFeedbackR53.Contact(point,tangent)).toList();}
                     catch(java.io.IOException missing){continuousWaitR52(job,data,"实际导轨接触源未加载");return;}
                 }
-                finalCommitStarted=true;if(!owner.applyCheckedContinuousR52(level,proof,data)){continuousWaitR52(job,data,"同 tick 整组唯一最终提交未通过");return;}
+                finalCommitStarted=true;if(!owner.applyCheckedContinuousR52(level,proof,data))
+                {finalCommitStarted=false;if(!NervTraversalPolicyR53.strict(level))holdContinuousStepR53(job,route,data,at,intended,speed.cruiseMps(),speed.accelerationMps2(),speed.decelerationMps2(),"本步机架、背轨或承托受阻，原位等待后继续");else continuousWaitR52(job,data,"同 tick 整组唯一最终提交未通过");return;}
                 var result=pool.advanceCommittedContinuousR52(snapshot.task(),proof);if(!result.accepted())throw new IllegalStateException("Moved checked assembly failed its retained metadata commit: "+result.reason());
                 NervMechanicalTravelR52.rememberContinuous(data,route.id(),directory.fingerprint(),total,next);data.putDouble("ContinuousDistanceR52",next.distance());data.remove("ContinuousCheckedStartR52");
                 if(phased!=null&&phased.launch())
@@ -427,6 +561,103 @@ public final class NervRouteRuntimeR52
             }
             catch(IllegalArgumentException|IllegalStateException invalid){if(finalCommitStarted){owner.brakeOriginalInPlace(level,snapshot.original(),data);saved.faultR52("Continuous final commit/readback fault at task "+snapshot.task()+": "+invalid.getMessage());}else continuousWaitR52(job,data,"连续路线保存/真实提交不一致："+invalid.getMessage());}
         }
+        private boolean recoveryHeldR53(String reason)
+        {
+            if(!reason.equals(CONTINUOUS_RECOVERY_DIAGNOSTICS_R53.put(level,reason)))
+                com.projectseele.ProjectSeele.LOGGER.warn("R53 continuous commit recovery held: {}",reason);
+            return false;
+        }
+        private boolean recoverContinuousCommitR53()
+        {
+            var job=saved.interruptedContinuousCommitR53();if(job==null)return false;
+            String fault=saved.fault();var snapshot=job.snapshot();var original=snapshot.original();
+            String prefix="task="+snapshot.task()+" ";
+            try
+            {
+                if(LIVE.get(level)!=this||saved.epoch()!=directory.epoch()||!saved.fingerprint().equals(directory.fingerprint())
+                        ||original.epoch()!=directory.epoch()||!snapshot.directoryFingerprint().equals(directory.fingerprint())
+                        ||!owner.fullRigidFramesReady(level,directory))return recoveryHeldR53(prefix+"owner/epoch/directory not restored");
+                var route=directory.route(snapshot.route());
+                if(route==null||!route.continuousUpright()||Set.of(Stage.COMPLETE,Stage.CANCELLED).contains(snapshot.stage()))
+                    return recoveryHeldR53(prefix+"saved task is not an interrupted continuous step");
+                var data=job.ownerData().copy();nativeAccess.ownerData(data);
+                if(!(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva)||!EvaMechanicalFrameR52.active(eva)
+                        ||EvaMechanicalFrameR52.epoch(eva)!=original.epoch()||EvaMechanicalFrameR52.kind(eva)!=snapshot.kind())
+                    return recoveryHeldR53(prefix+"original mechanical EVA/epoch/kind unavailable");
+                if(!nativeAccess.sameAssembly(original,snapshot.kind()))return recoveryHeldR53(prefix+"original membership/boarding receipt not restored");
+                var encoded=new CompoundTag();EvaMechanicalFrameR52.save(eva,encoded);
+                var sample=encoded.getCompound("R52MechanicalSample");var window=sample.getCompound("ContinuousWindowR52");
+                var stored=data.getCompound("ContinuousClockR52");
+                if(window.isEmpty()||stored.isEmpty()||!window.getCompound("Clock").equals(stored)
+                        ||window.getLong("Sequence")<=0||window.getLong("Sequence")!=sample.getLong("ContinuousSequenceR52"))
+                    return recoveryHeldR53(prefix+"physical window sequence/old clock differs from saved job");
+                if(!stored.getString("Route").equals(route.id())||!stored.getString("Directory").equals(directory.fingerprint())
+                        ||stored.getDouble("TotalMetres")!=directory.routeLength(route))
+                    return recoveryHeldR53(prefix+"old clock route/profile provenance differs");
+                var clock=new NervMechanicalTravelR52.ContinuousClock(new NervMechanicalTravelR52.ContinuousProfile(
+                        stored.getDouble("FromMetres"),stored.getDouble("ToMetres"),stored.getDouble("CruiseMps"),
+                        stored.getDouble("AccelerationMps2"),stored.getDouble("DecelerationMps2"),stored.getDouble("InitialMps")),stored.getLong("Ticks"));
+                double at=clock.distance(),total=directory.routeLength(route);var next=clock.next();
+                if(clock.complete()||next.distance()<=at||Math.abs(at-directory.routeDistance(route,snapshot.leg(),snapshot.fraction()))>1e-6
+                        ||Math.abs(at-stored.getDouble("DistanceMetres"))>1e-6||Math.abs(clock.speed()-stored.getDouble("SpeedMps"))>1e-9
+                        ||!data.contains("ContinuousDistanceR52")||Math.abs(at-data.getDouble("ContinuousDistanceR52"))>1e-6)
+                    return recoveryHeldR53(prefix+"old snapshot/distance/speed is not the window's unique prior tick");
+                var binding=EvaMechanicalFrameR52.measuredBinding(eva,original);
+                if(binding==null)return recoveryHeldR53(prefix+"original frozen bearing binding unavailable");
+                var paths=directory.routeSlices(route,at,next.distance(),binding);
+                if(paths.isEmpty()||!DirectoryTrajectoryR52.encodePortableR52(paths).equals(window.getCompound("Path")))
+                    return recoveryHeldR53(prefix+"portable window differs from the unique next route slice");
+                var portable=DirectoryTrajectoryR52.decodePortableR52(window.getCompound("Path"));
+                var from=paths.get(0).sample(0);var last=paths.get(paths.size()-1);var to=last.sample(1);
+                if(Math.abs(portable.lengthMetres()-(next.distance()-at))>1e-6
+                        ||!NervAirTransportManifestR52.same(portable.sample(0),from.evaRoot())
+                        ||!NervAirTransportManifestR52.same(portable.sample(portable.lengthMetres()),to.evaRoot())
+                        ||!NervAirTransportManifestR52.same(NervAircraftFrameR52.decodeRigid(sample.getCompound("Current")),to.evaRoot())
+                        ||!sample.getBoolean("ContinuousHeldR52")&&!NervAirTransportManifestR52.same(NervAircraftFrameR52.decodeRigid(sample.getCompound("Previous")),from.evaRoot())
+                        ||!owner.actualFrameMatches(level,original,to,data)||eva.position().distanceToSqr(to.evaRoot().translation())>1e-10)
+                    return recoveryHeldR53(prefix+"actual EVA/plug endpoint or portable from/to does not match");
+                var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);
+                if(carrier==null||carrier!=NervOriginalCarrierR52.controller(level,original)||!NervOriginalCarrierR52.attachedTo(carrier,eva)||carrier.getUnitVariant()!=original.variant())
+                    return recoveryHeldR53(prefix+"original attached carrier unavailable");
+                var steel=carrier.originalCarrierStateR52();var steelRoot=NervAircraftFrameR52.decodeRigid(steel.getCompound("Current"));
+                if(steel.getLong("Epoch")!=original.epoch()||!steel.getString("Directory").equals(directory.fingerprint())
+                        ||NervOriginalCarrierR52.progress(carrier,1)!=1||carrier.position().distanceToSqr(steelRoot.translation())>1e-10
+                        ||!NervAirTransportManifestR52.same(CarrierMountProfileR53.read(carrier,1).payloadFrame(steelRoot),to.evaRoot()))
+                    return recoveryHeldR53(prefix+"original carrier has not committed the same endpoint");
+                if(snapshot.kind()==Kind.OCCUPIED)
+                {
+                    if(!(level.getEntity(original.plug()) instanceof EntryPlugCarrierEntity plug)
+                            ||plug.getVehicle()!=eva||eva.getLockedEntryPlug()!=plug||!plug.isLockedToEva())
+                        return recoveryHeldR53(prefix+"original locked capsule relation unavailable");
+                    var pilot=level.getEntity(original.pilot());
+                    if(pilot==null||pilot.getVehicle()!=plug||plug.getFirstPassenger()!=pilot)
+                        return recoveryHeldR53(prefix+"original rider relation unavailable");
+                    var seat=plug.transformPlugMarker(EntryPlugKinematics.PILOT_SEAT_P).add(0,-pilot.getBbHeight()*.5,0);
+                    if(pilot.position().distanceToSqr(seat)>1e-10)return recoveryHeldR53(prefix+"original rider has not reached the committed capsule seat");
+                }
+                int index=route.legs().indexOf(last.leg().id());double fraction=last.toFraction();Stage stage=Stage.MOVING;
+                if(fraction==1){if(index+1==route.legs().size())stage=Stage.COMPLETE;else{index++;fraction=0;}}
+                var target=new Snapshot(snapshot.task(),original,snapshot.directoryFingerprint(),snapshot.route(),index,fraction,stage,"",snapshot.kind());
+                var phased=route.phased()?NervLaunchPhasesR53.current(data,snapshot.task(),directory,route,at):null;
+                boolean launch=phased!=null?phased.launch():route.recovery()||job.phase()==Phase.DEPARTING||data.getBoolean("ContinuousAutoLaunchR52")||data.getBoolean("ReleaseWhenReady");
+                NervMechanicalTravelR52.rememberContinuous(data,route.id(),directory.fingerprint(),total,next);
+                data.putDouble("ContinuousDistanceR52",next.distance());data.remove("ContinuousCheckedStartR52");
+                if(phased!=null&&phased.launch())NervLaunchPhasesR53.firstLaunchCommit(data,phased,at,next.distance(),readyDistanceR52(route));
+                var phase=launch&&!route.recovery()?Phase.DEPARTING:job.phase();
+                if(!(next.complete()&&Set.of("CANCEL","BLOCKED").contains(data.getString("ContinuousBrakeR52"))))
+                {if(stage==Stage.COMPLETE)phase=Phase.FINISHING;else if(next.complete())phase=route.recovery()?Phase.RETURNING:phased!=null?Phase.PREPARING:Phase.READY;}
+                var proof=new RecoveredContinuousStepR53(level,snapshot,target,paths);
+                var result=new Result[1];var recovered=job.update(target,phase,data,"");
+                boolean accepted=saved.recoverContinuousCommitR53(fault,job,recovered,()->
+                {result[0]=pool.recoverCommittedContinuousR53(proof);return result[0].accepted();});
+                if(!accepted)return recoveryHeldR53(prefix+(result[0]==null?"saved fault/job changed before commit":result[0].reason()));
+                continuousPrimedR52.remove(snapshot.task());
+                CONTINUOUS_RECOVERY_DIAGNOSTICS_R53.put(level,prefix+"completed metadata for observed tick "+clock.ticks()+" -> "+next.ticks());
+                com.projectseele.ProjectSeele.LOGGER.info("R53 continuous commit recovery: {}",continuousRecoveryDiagnosticR53(level));
+                return true;
+            }
+            catch(RuntimeException invalid){return recoveryHeldR53(prefix+invalid.getClass().getSimpleName()+": "+invalid.getMessage());}
+        }
         void tick()
         {
             if(!saved.fault().isEmpty())return;for(var job:saved.jobs())
@@ -434,15 +665,24 @@ public final class NervRouteRuntimeR52
                 FacilityRouteAudioR53.tick(level,job);
                 if(job.phase()==Phase.PARKED)
                 {
-                    if(parkedReadbacksR53.add(job.snapshot().task())&&owner instanceof NervAssemblyOwnerR52 plant)
+                    if(!parkedReadbacksR53.contains(job.snapshot().task())&&owner instanceof NervAssemblyOwnerR52 plant)
                     {
+                        UUID task=job.snapshot().task();long now=level.getGameTime();
+                        Long began=parkedReadbackStartedR54.putIfAbsent(task,now);
+                        // One short cold-read ticket, never permanent residency for parked machines.
+                        if(began==null)plant.retainOriginalBayBlocksR54(level,job.snapshot().original());
                         String hold=plant.parkedServiceHoldR53(level,job.snapshot().original());
                         if(!hold.equals(job.waiting()))saved.put(job.update(job.snapshot(),job.phase(),job.ownerData(),hold));
+                        if(plant.parkedBayBlocksLoadedR54(level,job.snapshot().original())
+                                ||began!=null&&now-began>=100)
+                        {parkedReadbacksR53.add(task);parkedReadbackStartedR54.remove(task);}
                     }
                     continue;
                 }
                 parkedReadbacksR53.remove(job.snapshot().task());
+                parkedReadbackStartedR54.remove(job.snapshot().task());
                 if(Set.of(Phase.DEPLOYED,Phase.CANCELLED).contains(job.phase()))continue;var snapshot=job.snapshot();var route=directory.route(snapshot.route());nativeAccess.ownerData(job.ownerData());
+                if(owner instanceof NervAssemblyOwnerR52 plant)plant.retainOriginalBayBlocksR54(level,snapshot.original());
                 if(route==null){wait(job,"Root 路线或保存版本已变化");continue;}
                 if(job.phase()==Phase.FINISHING)
                 {
@@ -454,10 +694,11 @@ public final class NervRouteRuntimeR52
                         snapshot=restored.state();job=job.update(snapshot,job.phase(),job.ownerData(),"");saved.put(job);
                     }
                     var completion=pool.query(snapshot.task());
-                    if(completion!=null&&completion.stage()==Stage.COMPLETE){snapshot=completion;job=job.update(snapshot,job.phase(),job.ownerData(),"");saved.put(job);}
+                    if(completion==null||completion.stage()!=Stage.COMPLETE){wait(job,"等待已验证的路线终点完成凭据，保留原路线占用");continue;}
+                    snapshot=completion;job=job.update(snapshot,job.phase(),job.ownerData(),"");saved.put(job);
                     if(owner.finishOriginal(level,snapshot.original(),route.recovery(),job.ownerData()))
                     {
-                        pool.releaseCompletion(snapshot.task(),snapshot.original().owner());
+                        if(!pool.releaseCompletion(snapshot.task(),snapshot.original().owner())){wait(job,"真实机械收尾完成，但原路线占用释放尚未确认");continue;}
                         saved.put(job.update(snapshot,route.recovery()?Phase.PARKED:Phase.DEPLOYED,job.ownerData(),""));
                         mirror(saved.job(snapshot.original().variant()));
                         // A direct radio sortie has no campaign return order.

@@ -32,6 +32,7 @@ public final class NervRouteNativeR52 implements NativeAccess
     {
         boolean fullRigidFramesReady(ServerLevel level,NervRouteDirectoryR52 directory);
         default boolean mechanicalRailReadyR52(ServerLevel level,NervMechanicalRailBindingR52.Spec rail,List<Cell> foundations){return false;}
+        default boolean mechanicalRailReadyR53(ServerLevel level,NervMechanicalRailBindingR52.Spec rail,List<Cell> foundations,boolean scoped){return mechanicalRailReadyR52(level,rail,foundations);}
         boolean restoreOriginalPreparation(ServerLevel level,Original original,CompoundTag ownerData);
         default NervOwnerPlacementR52.Proof finishingAssemblyPlacement(ServerLevel level,Original original,CompoundTag ownerData){return null;}
         default RigidTransform finishingReferenceFrameR52(ServerLevel level,Original original,CompoundTag ownerData,RigidTransform directoryEndpoint){return directoryEndpoint;}
@@ -48,7 +49,8 @@ public final class NervRouteNativeR52 implements NativeAccess
         default boolean prepareContinuousRouteR52(ServerLevel level,Original original,Route route,CompoundTag ownerData){return false;}
         default List<DirectoryTrajectoryR52> continuousRoutePathsR52(ServerLevel level,Original original,Route route,CompoundTag ownerData){return List.of();}
         default boolean rebindStoppedContinuousR52(ServerLevel level,Original original,CompoundTag ownerData){return false;}
-        default boolean preflightContinuousCarrierR52(ServerLevel level,Original original,Route route,List<DirectoryTrajectoryR52> paths,CompoundTag ownerData){return false;}
+
+        default boolean preflightCheckedContinuousCarrierR53(ServerLevel level,CheckedContinuousTraversalR52 proof,CompoundTag ownerData){return false;}
         default Sweep sweptContinuousAssemblyR52(ServerLevel level,Original original,List<DirectoryTrajectoryR52> paths,CompoundTag ownerData){return null;}
         default boolean applyCheckedContinuousR52(ServerLevel level,CheckedContinuousTraversalR52 proof,CompoundTag ownerData){return false;}
         FootSupportFrameR52.Binding originalBinding(ServerLevel level,Original original,CompoundTag ownerData);
@@ -56,14 +58,6 @@ public final class NervRouteNativeR52 implements NativeAccess
         /** Classify through Root's actual bound receiver domains, never a
          * historical outgoing route or an invented universal Y threshold. */
         default Region actualRecoveryRegion(ServerLevel level,Original original,CompoundTag ownerData){return null;}
-        /** Use EvaMechanicalFrameR52.frozenLocalPose, then actual model-metre
-         * body/capsule/passenger geometry under proposed evaRoot once. An
-         * already carrier-turned EvaBodyPose.sample would rotate it twice. */
-        Sweep sweptAssembly(ServerLevel level,Original original,FootSupportFrameR52.Sample from,FootSupportFrameR52.Sample to,CompoundTag ownerData);
-        /** The concrete full-surface owner receives the real directory curve.
-         * Existing conservative owners retain their two-frame contract. */
-        default Sweep sweptAssembly(ServerLevel level,Original original,DirectoryTrajectoryR52 trajectory,CompoundTag ownerData)
-        {return sweptAssembly(level,original,trajectory.sample(0),trajectory.sample(1),ownerData);}
         boolean actualFrameMatches(ServerLevel level,Original original,FootSupportFrameR52.Sample frame,CompoundTag ownerData);
         boolean applyVerifiedWholeAssembly(ServerLevel level,Original original,FootSupportFrameR52.Sample from,FootSupportFrameR52.Sample to,CompoundTag ownerData);
         boolean approachReachable(ServerLevel level,Original original,Port port,Route reverse,CompoundTag ownerData);
@@ -131,13 +125,26 @@ public final class NervRouteNativeR52 implements NativeAccess
                 &&TvCampaignSavedData.get(level).sorties.get(original.variant()).commander.equals(original.owner());
         return r instanceof ServerPlayer player&&!player.isSpectator()&&player.getUUID().equals(original.owner())&&NervStaffDialogue.authorized(player);
     }
+    private static boolean cellNearbyR53(BlockPos at,List<AABB> scope)
+    {return scope==null||scope.stream().anyMatch(box->box.intersects(new AABB(at)));}
+    public boolean resourceNearbyR53(String id,List<AABB> scope)
+    {
+        var bound=bindings.get(id);
+        // Missing/empty bindings cannot make a real gate disappear from readiness checks.
+        return scope==null||bound==null||bound.cells().isEmpty()||bound.cells().stream().anyMatch(cell->cellNearbyR53(cell.position(),scope));
+    }
     public boolean resourceReady(String id,boolean openGate)
+    {return resourceReadyR53(id,openGate,null);}
+    public boolean resourceReadyR53(String id,boolean openGate,List<AABB> scope)
     {
         var resource=directory.resource(id);var binding=bindings.get(id);if(resource==null||binding==null||!resource.component().equals(binding.component()))return false;
-        boolean retiredPitSupports=NervR50CarrierModeR53.enabled()&&(binding.mechanicalRail()!=null
+        if(scope!=null&&resource.kind()==ResourceKind.DOOR&&!resourceNearbyR53(id,scope))return true;
+        boolean scoped=scope!=null&&(resource.kind()==ResourceKind.RAIL||resource.kind()==ResourceKind.SUPPORT);
+        var cells=scoped?binding.cells().stream().filter(cell->cellNearbyR53(cell.position(),scope)).toList():binding.cells();
+        boolean retiredPitSupports=((binding.mechanicalRail()!=null
                 &&binding.mechanicalRail().kind()==NervMechanicalRailBindingR52.Kind.LEGACY_RUNNING_HEAD
-                ||RETIRED_PIT_SUPPORTS_R53.contains(id));
-        for(var cell:binding.cells())
+                ||RETIRED_PIT_SUPPORTS_R53.contains(id)));
+        for(var cell:cells)
         {
             if(retiredPitSupports&&cell.state().equals("projectseele:nerv_shaft_panel"))continue;
             BlockPos pos=cell.position();if(level.getChunkSource().getChunkNow(pos.getX()>>4,pos.getZ()>>4)==null)return false;
@@ -149,7 +156,13 @@ public final class NervRouteNativeR52 implements NativeAccess
             if(!BlockStateParser.serialize(actual).equals(cell.state())&&!repaintedFoundation
                     ||(resource.kind()==ResourceKind.RAIL||resource.kind()==ResourceKind.SUPPORT)&&actual.isAir())return false;
         }
-        if(binding.mechanicalRail()!=null&&(!NervMechanicalRailBindingR52.ready(level,directory,binding.mechanicalRail())||!owner.mechanicalRailReadyR52(level,binding.mechanicalRail(),binding.cells())))return false;
+        if(binding.mechanicalRail()!=null)
+        {
+            var rail=binding.mechanicalRail();
+            boolean localGuide=scoped&&(rail.kind()==NervMechanicalRailBindingR52.Kind.UPRIGHT_CAPTURED_GUIDEWAY||rail.kind()==NervMechanicalRailBindingR52.Kind.FIXED_FOOT_GUIDE);
+            if(!localGuide&&!NervMechanicalRailBindingR52.ready(level,directory,rail)
+                ||!owner.mechanicalRailReadyR53(level,rail,cells,scoped))return false;
+        }
         if(binding.entity()!=null)
         {
             Entity entity=level.getEntity(binding.entity());if(entity==null||!entity.isAlive()
@@ -169,25 +182,73 @@ public final class NervRouteNativeR52 implements NativeAccess
     public static final class CheckedContinuousTraversalR52
     {
         private final NervRouteNativeR52 access;private final Original original;private final Route route;private final Kind kind;private final List<DirectoryTrajectoryR52> paths;private final long at;private boolean committed;
-        private CheckedContinuousTraversalR52(NervRouteNativeR52 access,Original original,Route route,List<DirectoryTrajectoryR52> paths){this.access=access;this.original=original;this.route=route;this.kind=access.currentKind;this.paths=List.copyOf(paths);at=access.level.getGameTime();}
+        private final FullAssemblyGeometryR52.CheckedAssemblySweep assemblySweep;
+        private final List<DirectoryTrajectoryR52> coveragePaths;
+        private final boolean allowsPendingSource;
+        public boolean allowsPendingSourceR53(){return allowsPendingSource;}
+        private CheckedContinuousTraversalR52(NervRouteNativeR52 access,Original original,Route route,List<DirectoryTrajectoryR52> paths,FullAssemblyGeometryR52.CheckedAssemblySweep assemblySweep)
+        {this(access,original,route,paths,paths,assemblySweep);}
+        private CheckedContinuousTraversalR52(NervRouteNativeR52 access,Original original,Route route,List<DirectoryTrajectoryR52> paths,List<DirectoryTrajectoryR52> coveragePaths,FullAssemblyGeometryR52.CheckedAssemblySweep assemblySweep)
+        {this(access,original,route,paths,coveragePaths,assemblySweep,false);}
+        private CheckedContinuousTraversalR52(NervRouteNativeR52 access,Original original,Route route,List<DirectoryTrajectoryR52> paths,List<DirectoryTrajectoryR52> coveragePaths,FullAssemblyGeometryR52.CheckedAssemblySweep assemblySweep,boolean allowsPendingSource)
+        {this.access=access;this.original=original;this.route=route;this.kind=access.currentKind;this.paths=List.copyOf(paths);this.coveragePaths=List.copyOf(coveragePaths);this.assemblySweep=assemblySweep;this.allowsPendingSource=allowsPendingSource;at=access.level.getGameTime();}
         public Original original(){return original;}public Route route(){return route;}public Kind kind(){return kind;}public List<DirectoryTrajectoryR52> paths(){return paths;}public long checkedAt(){return at;}
         public FootSupportFrameR52.Sample from(){return paths.get(0).sample(0);}public FootSupportFrameR52.Sample to(){return paths.get(paths.size()-1).sample(1);}
         public boolean current(ServerLevel level){return !committed&&level==access.level&&level.getGameTime()==at&&access.currentKind==kind&&access.sameAssembly(original,kind);}
+        public boolean coversFixedCarrierRailsR53(ServerLevel level,NervCarrierPlatformEntity carrier,List<DirectoryTrajectoryR52> paths,Set<UUID> own)
+        {return current(level)&&samePathsR53(this.paths,paths)&&assemblySweep.matchesSlices(original,coveragePaths)&&assemblySweep.fixedRailsCurrentR53(level,carrier,coveragePaths,own);}
+        /** Only the beginning of this tick's already cleared horizon may be
+         * committed. The complete horizon remains the source of rail coverage;
+         * no result is reused after motion, a tick change or source/state change. */
+        CheckedContinuousTraversalR52 checkedPrefixR53(List<DirectoryTrajectoryR52> prefix)
+        {
+            if(!current(access.level)||!prefixR53(paths,prefix))return null;
+            return new CheckedContinuousTraversalR52(access,original,route,prefix,coveragePaths,assemblySweep);
+        }
+        private static boolean sameCurveR53(DirectoryTrajectoryR52 a,DirectoryTrajectoryR52 b)
+        {return a.directory()==b.directory()&&a.leg().equals(b.leg())&&a.binding().equals(b.binding());}
+        private static boolean samePathsR53(List<DirectoryTrajectoryR52> a,List<DirectoryTrajectoryR52> b)
+        {if(a.size()!=b.size())return false;for(int i=0;i<a.size();i++)if(!sameCurveR53(a.get(i),b.get(i))||a.get(i).fromFraction()!=b.get(i).fromFraction()||a.get(i).toFraction()!=b.get(i).toFraction())return false;return true;}
+        private static boolean prefixR53(List<DirectoryTrajectoryR52> covered,List<DirectoryTrajectoryR52> prefix)
+        {
+            if(prefix==null||prefix.isEmpty()||prefix.size()>2048||covered.isEmpty())return false;
+            int index=0;double cursor=covered.get(0).fromFraction();
+            for(var part:prefix)
+            {
+                if(index>=covered.size()||!sameCurveR53(part,covered.get(index))
+                        ||part.fromFraction()!=cursor||part.toFraction()<=cursor)return false;
+                while(part.toFraction()>covered.get(index).toFraction())
+                {
+                    double end=covered.get(index).toFraction();
+                    if(++index>=covered.size()||!sameCurveR53(part,covered.get(index))||covered.get(index).fromFraction()!=end)return false;
+                }
+                cursor=part.toFraction();
+                if(cursor==covered.get(index).toFraction()&&++index<covered.size())cursor=covered.get(index).fromFraction();
+            }
+            return true;
+        }
         public boolean recordCommittedR52(ServerLevel level,CompoundTag data){if(!current(level)||!access.owner.actualFrameMatches(level,original,to(),data))return false;committed=true;return true;}
         public boolean committed(){return committed;}
     }
     public CheckedContinuousTraversalR52 checkContinuousR52(Original original,Route route,List<DirectoryTrajectoryR52> paths)
+    {return checkContinuousR52(original,route,paths,false);}
+    CheckedContinuousTraversalR52 checkContinuousR52(Original original,Route route,List<DirectoryTrajectoryR52> paths,boolean allowPendingSource)
     {
         if(route==null||!route.continuousUpright()||paths==null||paths.isEmpty()||paths.size()>2048||!sameAssembly(original,currentKind)||currentKind==Kind.HULL_ONLY_RECOVERY&&!route.recovery())return continuousHeldR53(original,"original_assembly_or_route");
         if(currentKind==Kind.OCCUPIED&&!EntryPlugDirector.hasLaunchLock(level,original.variant(),(EvaUnit01Entity)level.getEntity(original.eva())))return continuousHeldR53(original,"occupied_launch_lock");
         var ids=new HashSet<String>();for(var path:paths){if(!path.directory().fingerprint().equals(directory.fingerprint())||!route.legs().contains(path.leg().id())||path.leg().motion()==Motion.FOOT_BEARING_TURN)return continuousHeldR53(original,"route_slice");ids.addAll(path.leg().resources());}
-        for(String id:ids)if(!resourceReady(id,directory.resource(id).kind()==ResourceKind.DOOR))return continuousHeldR53(original,"resource="+id);
-        // R50 scripted transfers use noPhysics. Their source-mesh inspection is diagnostic.
-        if(NervR50CarrierModeR53.enabled()){continuousFailuresR53.remove(original.eva());return new CheckedContinuousTraversalR52(this,original,route,paths);}
+        // Whole-source fixed-rail diagnostics are explicit; normal travel checks the current motion.
         try{var sweep=owner.sweptContinuousAssemblyR52(level,original,paths,ownerData);var own=TransportMembershipR52.members(original,currentKind);if(sweep==null||sweep.triangles()==null||!sweep.assembly().equals(own)||!sweep.triangles().matchesSlices(original,paths)||!sweep.triangles().matchesSamples(paths.get(0).sample(0),paths.get(paths.size()-1).sample(1)))return continuousHeldR53(original,"captured_source_or_samples");
+            // One block admits adjacent physical bearing cells; prefetch margin
+            // belongs to the owner and must not hold an already loaded step.
+            List<AABB> scope=NervTraversalPolicyR53.strict(level)?null:sweep.volumes().stream().map(box->box.inflate(1)).toList();
+            for(String id:ids)if(!resourceReadyR53(id,directory.resource(id).kind()==ResourceKind.DOOR,scope))return continuousHeldR53(original,"resource="+id);
             var spaces=new ArrayList<AABB>();for(String id:ids)if(directory.resource(id).kind()==ResourceKind.SPACE){var bound=bindings.get(id);if(bound==null)return continuousHeldR53(original,"space_binding="+id);spaces.addAll(bound.spaces());}
-            for(var box:sweep.volumes()){if(!coveredByDeclaredSpacesR52(box,spaces))return continuousHeldR53(original,"uncovered_space="+box);for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)if(level.getChunkSource().getChunkNow(x,z)==null)return continuousHeldR53(original,"unloaded_chunk="+x+","+z);}
-            if(!sweep.triangles().clear(level,level.getEntity(original.eva())))return continuousHeldR53(original,sweep.triangles().clearanceHoldR53());continuousFailuresR53.remove(original.eva());return new CheckedContinuousTraversalR52(this,original,route,paths);
+            for(var box:sweep.volumes()){if(NervTraversalPolicyR53.strict(level)&&!coveredByDeclaredSpacesR52(box,spaces))return continuousHeldR53(original,"uncovered_space="+box);for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)if(level.getChunkSource().getChunkNow(x,z)==null)return continuousHeldR53(original,"unloaded_chunk="+x+","+z);}
+            if(!sweep.triangles().clear(level,level.getEntity(original.eva()))
+                    ||(NervTraversalPolicyR53.strict(level)&&!sweep.triangles().clearFixedCarrierRailsR53(level,(EvaUnit01Entity)level.getEntity(original.eva()),allowPendingSource)))
+                return continuousHeldR53(original,sweep.triangles().clearanceHoldR53());
+            continuousFailuresR53.remove(original.eva());return new CheckedContinuousTraversalR52(this,original,route,paths,paths,sweep.triangles(),allowPendingSource);
         }catch(IllegalArgumentException|IllegalStateException unavailable){return continuousHeldR53(original,"proof="+unavailable.getMessage());}
     }
     public boolean canTraverse(Original original,Route route,Leg leg,double fromFraction,double toFraction)
@@ -201,34 +262,11 @@ public final class NervRouteNativeR52 implements NativeAccess
             var from=directory.sample(leg,fromFraction,binding);
             var to=directory.sample(leg,toFraction,binding);
             if(!owner.actualFrameMatches(level,original,from,ownerData))return false;
-            if(NervR50CarrierModeR53.enabled())return true;
-            return clearActualSweep(original,leg,fromFraction,toFraction,owner.sweptAssembly(level,original,new DirectoryTrajectoryR52(directory,leg,binding,fromFraction,toFraction),ownerData));
+            return true;
         }
         catch(IllegalArgumentException|IllegalStateException invalid){return false;}
     }
-    private boolean clearActualSweep(Original original,Leg leg,double fromFraction,double toFraction,Sweep sweep)
-    {
-        Set<UUID> actual=TransportMembershipR52.members(original,currentKind);if(sweep==null||!sweep.assembly().equals(actual)||sweep.volumes().isEmpty())return false;
-        if(sweep.triangles()!=null)
-        {
-            var binding=owner.originalBinding(level,original,ownerData);if(binding==null||!sweep.triangles().matches(original,directory,leg,fromFraction,toFraction)
-                    ||!sweep.triangles().matchesSamples(directory.sample(leg,fromFraction,binding),directory.sample(leg,toFraction,binding)))return false;
-        }
-        var spaces=new ArrayList<AABB>();for(String id:leg.occupancy())spaces.addAll(bindings.get(id).spaces());
-        Entity eva=level.getEntity(original.eva());
-        for(AABB box:sweep.volumes())
-        {
-            if(!coveredByDeclaredSpacesR52(box,spaces))return false;
-            for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)
-                if(level.getChunkSource().getChunkNow(x,z)==null)return false;
-            if(sweep.triangles()==null)
-            {
-                if(level.getBlockCollisions(eva,box).iterator().hasNext())return false;
-                if(!level.getEntities((Entity)null,box,e->!actual.contains(e.getUUID())&&e.isAlive()&&(e instanceof LivingEntity||e.canBeCollidedWith())).isEmpty())return false;
-            }
-        }
-        return sweep.triangles()==null||sweep.triangles().clear(level,eva);
-    }
+
     public boolean canRestore(Original original,Route route,int index,double fraction)
     {return canTraverse(original,route,directory.leg(route.legs().get(index)),fraction,fraction);}
     @Override public boolean canTraverseAssembly(Original original,Kind kind,Route route,Leg leg,double from,double to)
@@ -237,19 +275,18 @@ public final class NervRouteNativeR52 implements NativeAccess
     {return kind==currentKind&&canRestore(original,route,leg,fraction);}
     public boolean finishingPlacementClear(Original original,Route route,int index,double fraction)
     {
-        if(!originalIdentitySet(original)||!owner.restoreFinishingOriginal(level,original,ownerData))return false;
-        if(NervR50CarrierModeR53.enabled())
+        try
         {
+            if(!originalIdentitySet(original)||!owner.restoreFinishingOriginal(level,original,ownerData))return false;
             var binding=owner.originalBinding(level,original,ownerData);
             if(binding==null||!(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva))return false;
             var leg=directory.leg(route.legs().get(index));
             var expected=owner.finishingReferenceFrameR52(level,original,ownerData,directory.sample(leg,fraction,binding).evaRoot());
             var actual=NervOwnerPlacementR52.actualRoot(eva);
-            // The same original has already arrived. Resuming its service
-            // handoff follows the selected R50 collision policy as well.
+            // Restore the accepted endpoint. The finishing owner checks the
+            // actual support, gates and each subsequent mechanical step.
             return actual.translation().distanceToSqr(expected.translation())<=4e-6&&actual.rotationErrorDegrees(expected)<=.04;
         }
-        try{var binding=owner.originalBinding(level,original,ownerData);if(binding==null)return false;var leg=directory.leg(route.legs().get(index));var placement=owner.finishingAssemblyPlacement(level,original,ownerData);if(placement!=null){if(!placement.matches(original,currentKind,owner.finishingReferenceFrameR52(level,original,ownerData,directory.sample(leg,fraction,binding).evaRoot())))return false;var spaces=new ArrayList<AABB>();for(String id:leg.occupancy())spaces.addAll(bindings.get(id).spaces());for(var box:placement.envelopes()){if(!coveredByDeclaredSpacesR52(box,spaces))return false;for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)if(level.getChunkSource().getChunkNow(x,z)==null)return false;}return placement.clear(level);}return clearActualSweep(original,leg,fraction,fraction,owner.sweptAssembly(level,original,new DirectoryTrajectoryR52(directory,leg,binding,fraction,fraction),ownerData));}
         catch(IllegalArgumentException|IllegalStateException invalid){return false;}
     }
     static boolean coveredByDeclaredSpacesR52(AABB box,List<AABB> spaces)

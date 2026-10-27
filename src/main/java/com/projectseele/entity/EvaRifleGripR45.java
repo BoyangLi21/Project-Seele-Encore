@@ -17,8 +17,9 @@ public final class EvaRifleGripR45
     {
         var tripoLeft=EvaTripoHandsR48.grip(eva,body,"l");
         var tripoRight=EvaTripoHandsR48.grip(eva,body,"r");
-        if(tripoLeft==null&&(!EvaAnatomicalHandsR45.enabled(eva)||EvaBodyPose.hasOwnUnRig(eva)))return null;
-        var frames=tripoLeft==null?EvaAnatomicalHandsR45.rig(eva.getUnitVariant()).grips():java.util.Map.of("l",tripoLeft,"r",tripoRight);
+        var handRig=EvaAnatomicalHandsR45.forEntityR53(eva);
+        if(tripoLeft==null&&handRig==null)return null;
+        var frames=tripoLeft==null?handRig.grips():java.util.Map.of("l",tripoLeft,"r",tripoRight);
         if (!frames.containsKey("l") || !frames.containsKey("r")) return null;
         Vector3f r = right.toVector3f(), f = forward.toVector3f(), u = up.toVector3f();
         var along = new Vector3f(f).fma(-.56F, u).normalize();

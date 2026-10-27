@@ -100,11 +100,46 @@ public final class SeeleCompatibilityPlugin implements IMixinConfigPlugin
         }
         return required.isEmpty();
     }
+    private static void guardDhUnloadedLevelLogoutR53(ClassNode node)
+    {
+        String world="com/seibel/distanthorizons/core/world/AbstractDhServerWorld";
+        String level="com/seibel/distanthorizons/core/level/AbstractDhServerLevel";
+        String wrapper="Lcom/seibel/distanthorizons/core/wrapperInterfaces/misc/IServerPlayerWrapper;";
+        String removeDesc="("+wrapper+")V";
+        var remove=method(node,"removePlayer",removeDesc);
+        var code=new ArrayList<AbstractInsnNode>();
+        if(remove!=null)for(var instruction:remove.instructions)if(instruction.getOpcode()>=0)code.add(instruction);
+        // Match the installed DH 2.3.4-b producer, retaining the original
+        // invocation and the following player-state cleanup without reflection.
+        if(!node.name.equals(world)||code.size()!=11
+            ||!(code.get(3) instanceof MethodInsnNode lookup)||lookup.getOpcode()!=Opcodes.INVOKEVIRTUAL
+            ||!lookup.owner.equals(world)||!lookup.name.equals("getLevel")
+            ||!lookup.desc.equals("(Lcom/seibel/distanthorizons/core/wrapperInterfaces/world/ILevelWrapper;)L"+level+";")
+            ||!(code.get(4) instanceof VarInsnNode player)||player.getOpcode()!=Opcodes.ALOAD||player.var!=1
+            ||!(code.get(5) instanceof MethodInsnNode call)||call.getOpcode()!=Opcodes.INVOKEVIRTUAL
+            ||!call.owner.equals(level)||!call.name.equals("removePlayer")||!call.desc.equals(removeDesc)
+            ||!(code.get(6) instanceof VarInsnNode self)||self.getOpcode()!=Opcodes.ALOAD||self.var!=0
+            ||!(code.get(9) instanceof MethodInsnNode unregister)||unregister.getOpcode()!=Opcodes.INVOKEVIRTUAL
+            ||!unregister.owner.equals("com/seibel/distanthorizons/core/multiplayer/server/ServerPlayerStateManager")
+            ||!unregister.name.equals("unregisterLeftPlayer")||!unregister.desc.equals(removeDesc)
+            ||code.get(10).getOpcode()!=Opcodes.RETURN)
+            throw new IllegalStateException("DH optional logout compatibility: installed removePlayer contract changed");
+        var present=new LabelNode();var cleanup=new LabelNode();var guard=new InsnList();
+        guard.add(new InsnNode(Opcodes.DUP));guard.add(new JumpInsnNode(Opcodes.IFNONNULL,present));
+        guard.add(new InsnNode(Opcodes.POP));guard.add(new JumpInsnNode(Opcodes.GOTO,cleanup));
+        guard.add(present);guard.add(new FrameNode(Opcodes.F_SAME1,0,null,1,new Object[]{level}));
+        remove.instructions.insert(code.get(3),guard);
+        var continuation=new InsnList();continuation.add(cleanup);continuation.add(new FrameNode(Opcodes.F_SAME,0,null,0,null));
+        remove.instructions.insertBefore(code.get(6),continuation);
+        remove.maxStack=Math.max(remove.maxStack,2);
+    }
     @Override public void acceptTargets(Set<String> own,Set<String> others) {}
     @Override public List<String> getMixins(){return null;}
     @Override public void preApply(String name,ClassNode node,String mixin,IMixinInfo info) {}
     @Override public void postApply(String name,ClassNode node,String mixin,IMixinInfo info)
     {
+        if(mixin.endsWith("DhServerLogoutR53Mixin"))
+        {guardDhUnloadedLevelLogoutR53(node);return;}
         if(mixin.endsWith("client.MtrRailMathCacheR51Mixin"))
         {com.projectseele.compat.MtrRailMathCompatibilityR51.apply(node);return;}
         CityUnionActivationR45.applied(mixin);

@@ -27,6 +27,7 @@ def main(apply=False):
     roster=json.loads((WORLD/'nerv_staff_r15.json').read_text(encoding='utf8'))['stations'];staff=np.array([r['feet'] for r in roster],float)
     geometry={g['name']:g for g in json.loads((ROOT/'artifacts/facility_r24/props/geometry.json').read_text())}
     for room in rooms:
+        if room['id']=='r04/pyramid/435/06':continue  # R54 keeps original equipment and owns the private wards.
         x0,x1,z0,z1=room['bounds'];f=room['floor'];entry=room['entry'];purpose=room['purpose'];name=NAMES[room['label']]
         b=read_box(WORLD,v.DIM,(x0-2,f,z0-2),(x1+2,f+7,z1+2));room_items=[]
         def protected(q):return 6<=q[0]<=52 and -445<=q[1]<=-388 and 262<=q[2]<=365

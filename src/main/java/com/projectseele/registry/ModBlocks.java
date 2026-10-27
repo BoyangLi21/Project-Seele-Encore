@@ -54,6 +54,8 @@ public final class ModBlocks
             ()->new net.minecraft.world.level.block.SlabBlock(BlockBehaviour.Properties.copy(Blocks.WHITE_CONCRETE)));
     public static final RegistryObject<Block> NERV_MACHINE_PANEL=structuralFinish("nerv_machine_panel");
     public static final RegistryObject<Block> NERV_SHAFT_PANEL=structuralFinish("nerv_shaft_panel");
+    public static final RegistryObject<Block> NERV_EXIT_APRON_SKIRT_R53=BLOCKS.register("nerv_exit_apron_skirt_r53",
+            ()->new com.projectseele.world.NervExitApronSkirtR53(BlockBehaviour.Properties.copy(Blocks.REINFORCED_DEEPSLATE).noOcclusion()));
     public static final RegistryObject<Block> NERV_LAUNCH_ARMOR=BLOCKS.register("nerv_launch_armor",
             ()->new com.projectseele.world.LaunchArmorBlockR53(BlockBehaviour.Properties.copy(Blocks.REINFORCED_DEEPSLATE)));
     public static final RegistryObject<Block> NERV_MACHINE_EDGE=structuralFinish("nerv_machine_edge");

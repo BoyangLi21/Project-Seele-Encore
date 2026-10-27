@@ -1,0 +1,246 @@
+{
+  "schema": "projectseele.carrier-bay-retained-supports.r54",
+  "revision": "six-original-rear-anchors-and-five-shelf-links",
+  "cells": [
+    {
+      "variant": 2,
+      "at": [
+        -26,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "role": "original_rear_rail_anchor"
+    },
+    {
+      "variant": 2,
+      "at": [
+        2,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "role": "original_rear_rail_anchor"
+    },
+    {
+      "variant": 2,
+      "at": [
+        3,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_bearing_shelf_connection"
+    },
+    {
+      "variant": 1,
+      "at": [
+        15,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_bearing_shelf_connection"
+    },
+    {
+      "variant": 1,
+      "at": [
+        16,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "role": "original_rear_rail_anchor"
+    },
+    {
+      "variant": 1,
+      "at": [
+        44,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "role": "original_rear_rail_anchor"
+    },
+    {
+      "variant": 1,
+      "at": [
+        45,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_bearing_shelf_connection"
+    },
+    {
+      "variant": 0,
+      "at": [
+        57,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_bearing_shelf_connection"
+    },
+    {
+      "variant": 0,
+      "at": [
+        58,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "role": "original_rear_rail_anchor"
+    },
+    {
+      "variant": 0,
+      "at": [
+        86,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "role": "original_rear_rail_anchor"
+    },
+    {
+      "variant": 0,
+      "at": [
+        87,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_bearing_shelf_connection"
+    }
+  ],
+  "anchors": [
+    {
+      "variant": 2,
+      "at": [
+        2,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "leg": "unit2/original_incline",
+      "mount": "rear_l",
+      "bearing": "(2.45, -1062.0, 314.5)",
+      "normal": "(0.0, 1.0, 0.0)"
+    },
+    {
+      "variant": 2,
+      "at": [
+        -26,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "leg": "unit2/original_incline",
+      "mount": "rear_r",
+      "bearing": "(-25.450000000000003, -1062.0, 314.5)",
+      "normal": "(0.0, 1.0, 0.0)"
+    },
+    {
+      "variant": 0,
+      "at": [
+        86,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "leg": "unit0/original_incline",
+      "mount": "rear_l",
+      "bearing": "(86.44999999999999, -1062.0, 314.5)",
+      "normal": "(0.0, 1.0, 0.0)"
+    },
+    {
+      "variant": 0,
+      "at": [
+        58,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "leg": "unit0/original_incline",
+      "mount": "rear_r",
+      "bearing": "(58.55, -1062.0, 314.5)",
+      "normal": "(0.0, 1.0, 0.0)"
+    },
+    {
+      "variant": 1,
+      "at": [
+        44,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "leg": "unit1/original_incline",
+      "mount": "rear_l",
+      "bearing": "(44.45, -1062.0, 314.5)",
+      "normal": "(0.0, 1.0, 0.0)"
+    },
+    {
+      "variant": 1,
+      "at": [
+        16,
+        -1063,
+        314
+      ],
+      "state": "minecraft:iron_block",
+      "leg": "unit1/original_incline",
+      "mount": "rear_r",
+      "bearing": "(16.549999999999997, -1062.0, 314.5)",
+      "normal": "(0.0, 1.0, 0.0)"
+    }
+  ],
+  "outer_endpoints": [
+    {
+      "at": [
+        4,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel"
+    },
+    {
+      "at": [
+        -27,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel"
+    },
+    {
+      "at": [
+        88,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel"
+    },
+    {
+      "at": [
+        56,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel"
+    },
+    {
+      "at": [
+        46,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel"
+    },
+    {
+      "at": [
+        14,
+        -1063,
+        314
+      ],
+      "state": "projectseele:nerv_floor_panel"
+    }
+  ]
+}

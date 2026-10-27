@@ -1,4 +1,4 @@
 {
-  "textures": {"particle": "minecraft:block/orange_concrete"},
+  "textures": {"particle": "projectseele:block/lcl_still"},
   "elements": []
 }

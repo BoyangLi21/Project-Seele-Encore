@@ -94,6 +94,8 @@ public final class EvaMechanicalFrameR52
     public static boolean reattachCarrierR52(EvaUnit01Entity eva)
     {if(!(eva.level() instanceof ServerLevel level)||!same(carrierFrameR52(eva,1),com.projectseele.world.NervOwnerPlacementR52.actualRoot(eva))||!com.projectseele.world.NervMappedPlugMechanicsR52.actualCarrierFootBearing(level,eva))return false;var controller=originalCarrierControllerR52(eva);if(controller!=null)try{if(!com.projectseele.world.NervOriginalCarrierR52.setAttachedR52(level,controller,eva,true))return false;}catch(java.io.IOException missing){return false;}var tag=eva.getEntityData().get(SAMPLE).copy();tag.remove("CarrierDetachedR52");tag.remove("CarrierRootR52");eva.getEntityData().set(SAMPLE,tag);return true;}
     public static int ballisticTicksR52(EvaUnit01Entity eva){return eva.getEntityData().get(SAMPLE).getInt("BallisticTicksR52");}
+    public static boolean controlledBallisticR53(EvaUnit01Entity eva)
+    {return ballisticCustodyR52(eva)&&eva.getEntityData().get(SAMPLE).getBoolean("BallisticControlledR53");}
     public static CompoundTag groundReleaseStateR52(EvaUnit01Entity eva){return eva.getEntityData().get(SAMPLE).getCompound("GroundReleaseR52").copy();}
     public static void groundReleaseStateR52(EvaUnit01Entity eva,CompoundTag state)
     {if(eva.level().isClientSide||!active(eva))throw new IllegalStateException("Actual server mechanical source required");var next=eva.getEntityData().get(SAMPLE).copy();next.put("GroundReleaseR52",state.copy());eva.getEntityData().set(SAMPLE,next);}
@@ -101,7 +103,10 @@ public final class EvaMechanicalFrameR52
     {
         if(!active(eva)||epoch(eva)!=original.epoch()||originalPlug(eva,original)==null||!geometry.sourceFingerprint().equals(capturedGeometry(eva).sourceFingerprint()))return false;
         var root=frame(eva,1);var forward=root.transformVector(new Vec3(0,0,1));float yaw=180-(float)(Math.atan2(forward.x,forward.z)*Mth.RAD_TO_DEG);var plug=emptySocketReferenceR52(body,EvaRifleKinematics.frameWorldR52(eva.position(),yaw),EvaDorsalProfile.of(eva));var priorBody=EvaShutdownR30.encode(frozenLocalPose(eva));var cradle=EvaAirTransportR31.cradleStateR50(eva).copy();cradle.put("Origin",EvaShutdownR30.encode(body));cradle.put(EvaFrozenHandsR52.KEY,EvaFrozenHandsR52.encode(eva.getUnitVariant(),EvaAnatomicalHandsR45.contractFingerprintR45(eva.getUnitVariant()),hands));
-        EvaAirTransportR31.cradleStateR50(eva,cradle);var tag=eva.getEntityData().get(SAMPLE).copy();tag.put("RecoveryPreviousBodyR52",priorBody);tag.putLong("RecoveryAtR52",eva.level().getGameTime());tag.put("PlugLocal",encode(root.inverse().compose(plug)));tag.putLong("CapturedAt",eva.level().getGameTime());eva.getEntityData().set(SAMPLE,tag);synchronized(GEOMETRY){GEOMETRY.put(eva,new CapturedGeometry(eva.level().getGameTime(),geometry));}eva.setBoundingBox(bounds(eva));originalPlug(eva,original).setCanonicalTransform(plug);originalPlug(eva,original).syncPilotPositionNow();return true;
+        var feet=sourceSoleBindingR52(geometry,root.inverse().compose(plug));
+        EvaAirTransportR31.cradleStateR50(eva,cradle);var tag=eva.getEntityData().get(SAMPLE).copy();tag.put("RecoveryPreviousBodyR52",priorBody);tag.putLong("RecoveryAtR52",eva.level().getGameTime());tag.put("PlugLocal",encode(root.inverse().compose(plug)));
+        tag.put("Left",point(feet.leftFoot()));tag.put("Right",point(feet.rightFoot()));
+        tag.putLong("CapturedAt",eva.level().getGameTime());eva.getEntityData().set(SAMPLE,tag);synchronized(GEOMETRY){GEOMETRY.put(eva,new CapturedGeometry(eva.level().getGameTime(),geometry));}eva.setBoundingBox(bounds(eva));originalPlug(eva,original).setCanonicalTransform(plug);originalPlug(eva,original).syncPilotPositionNow();return true;
     }
     /** A private-constructor full-source proof owns each small airborne
      * recovery change. The separated original capsule/pilot are untouched. */
@@ -113,35 +118,79 @@ public final class EvaMechanicalFrameR52
         var carrier=originalCarrierControllerR52(eva);if(carrier!=null)try{if(!com.projectseele.world.NervOriginalCarrierR52.setAttachedR52((ServerLevel)eva.level(),carrier,eva,false))return false;}catch(java.io.IOException missing){return false;}var t=eva.getEntityData().get(SAMPLE).copy();t.putBoolean("CarrierDetachedR52",true);t.put("CarrierRootR52",encode(basis));t.putBoolean("BallisticR52",true);t.putInt("BallisticTicksR52",0);t.putDouble("BallisticInitialVelocityR53",velocity);t.putLong("BallisticLastTickR52",Long.MIN_VALUE);eva.getEntityData().set(SAMPLE,t);
         eva.clearSortieDestination();eva.getNavigation().stop();eva.setTarget(null);eva.setNoGravity(false);eva.setOnGround(false);eva.setDeltaMovement(0,velocity,0);eva.hasImpulse=true;eva.resetFallDistance();return true;
     }
-    /** R50 scripted departure retains the original impulse and actor roots.
-     * Ordinary movement outside this handoff keeps native collision response. */
+    /** Starts a real new impulse at the unchanged, physically supported root.
+     * A legacy completed impulse is retained as the preceding attempt; an
+     * airborne saved step is adopted separately, never rewound to the pad. */
+    public static boolean beginControlledBallisticR53(EvaUnit01Entity eva,Original original,
+            com.projectseele.world.NervBallisticHandoffR52.Proof proof)
+    {
+        if(!(eva.level() instanceof ServerLevel level)||!com.projectseele.world.NervR50CarrierModeR53.enabled()
+                ||eva.noPhysics||!active(eva)||kind(eva)!=Kind.OCCUPIED||epoch(eva)!=original.epoch()
+                ||proof==null||!proof.original().equals(original)||!proof.current(eva)
+                ||originalPlug(eva,original)==null||!same(frame(eva,1),proof.root(0)))return false;
+        var old=eva.getEntityData().get(SAMPLE);
+        if(controlledBallisticR53(eva)||ballisticCustodyR52(eva)
+                &&ballisticTicksR52(eva)!=com.projectseele.world.NervBallisticHandoffR52.FLIGHT_TICKS)return false;
+        var carrier=originalCarrierControllerR52(eva);
+        if(carrier==null||!com.projectseele.world.NervOriginalCarrierR52.outletFootBearingR53(level,carrier,eva))return false;
+        try{if(!com.projectseele.world.NervOriginalCarrierR52.setAttachedR52(level,carrier,eva,false))return false;}
+        catch(java.io.IOException missing){return false;}
+        var next=old.copy();next.putBoolean("CarrierDetachedR52",true);next.put("CarrierRootR52",encode(frame(eva,1)));
+        next.putInt("BallisticPriorFlightTicksR53",old.getInt("BallisticTicksR52"));
+        next.putInt("BallisticAttemptR53",Math.max(1,old.getInt("BallisticAttemptR53"))+(ballisticCustodyR52(eva)?1:0));
+        next.putBoolean("BallisticR52",true);next.putBoolean("BallisticControlledR53",true);
+        next.putInt("BallisticTicksR52",0);next.putDouble("BallisticInitialVelocityR53",proof.launchVelocity());
+        next.putLong("BallisticLastTickR52",Long.MIN_VALUE);eva.getEntityData().set(SAMPLE,next);
+        eva.clearSortieDestination();eva.getNavigation().stop();eva.setTarget(null);eva.setNoGravity(false);
+        eva.setOnGround(false);eva.setDeltaMovement(Vec3.ZERO);eva.resetFallDistance();return true;
+    }
+    public static boolean adoptControlledBallisticR53(EvaUnit01Entity eva,
+            com.projectseele.world.NervBallisticHandoffR52.Proof proof)
+    {
+        if(!(eva.level() instanceof ServerLevel level)||!com.projectseele.world.NervR50CarrierModeR53.enabled()
+                ||!ballisticCustodyR52(eva)||proof==null||!proof.current(eva)||!proof.placement(level,eva)
+                ||ballisticTicksR52(eva)>=com.projectseele.world.NervBallisticHandoffR52.FLIGHT_TICKS)return false;
+        if(controlledBallisticR53(eva))return true;
+        var next=eva.getEntityData().get(SAMPLE).copy();next.putBoolean("BallisticControlledR53",true);
+        next.putInt("BallisticAttemptR53",Math.max(1,next.getInt("BallisticAttemptR53")));
+        eva.getEntityData().set(SAMPLE,next);eva.setDeltaMovement(Vec3.ZERO);return true;
+    }
+    /** The owner commits the paired rack step first in the same server call.
+     * No entity travel callback may consume another tick independently. */
+    public static boolean acceptBallisticStepR53(EvaUnit01Entity eva,
+            com.projectseele.world.NervBallisticHandoffR52.StepR53 step)
+    {
+        if(!(eva.level() instanceof ServerLevel level)||step==null||!step.current(level,eva)
+                ||originalPlug(eva,step.original())==null)return false;
+        var old=eva.getEntityData().get(SAMPLE);
+        if(old.getLong("BallisticLastTickR52")==level.getGameTime())return false;
+        var next=old.copy();next.put("Previous",encode(step.fromRoot()));next.put("Current",encode(step.toRoot()));
+        next.putLong("AcceptedAt",level.getGameTime());next.putLong("BallisticLastTickR52",level.getGameTime());
+        next.putInt("BallisticTicksR52",step.toTick());eva.getEntityData().set(SAMPLE,next);
+        var root=step.toRoot().translation();eva.setPos(root.x,root.y,root.z);eva.setBoundingBox(bounds(eva));
+        eva.setDeltaMovement(step.toRoot().translation().subtract(step.fromRoot().translation()));
+        eva.setOnGround(false);eva.resetFallDistance();eva.hasImpulse=true;
+        var plug=originalPlug(eva,step.original());plug.setCanonicalTransform(step.toRoot().compose(decode(next.getCompound("PlugLocal"))));
+        plug.syncPilotPositionNow();return true;
+    }
+    /** Legacy native departure uses gravity; the R50 owner advances its
+     * coupled body/rack step explicitly after both sweeps are accepted. */
     public static void travelBallisticR52(EvaUnit01Entity eva)
     {
         if(!ballisticCustodyR52(eva)||!(eva.level() instanceof ServerLevel level))return;var old=eva.getEntityData().get(SAMPLE);if(old.getLong("BallisticLastTickR52")==level.getGameTime())return;
         boolean scripted=com.projectseele.world.NervR50CarrierModeR53.enabled();
-        if(scripted&&old.getInt("BallisticTicksR52")>=com.projectseele.world.NervBallisticHandoffR52.FLIGHT_TICKS)
-        {
-            eva.setDeltaMovement(Vec3.ZERO);
-            return;
-        }
+        if(scripted)return;
         // Native landing has already stopped the body. Retain that accepted
         // tick while ordinary release waits; a removed real bearing resumes
         // the native gravity path below, even after a release was captured.
         if(eva.onGround()&&eva.getDeltaMovement().lengthSqr()<1e-10&&EvaMechanicalReleaseR52.actualGroundBearingR52(level,eva,capturedGeometry(eva),frame(eva,1)))return;
         var before=eva.getBoundingBox();var previous=frame(eva,1);var velocity=eva.getDeltaMovement();
-        if(scripted&&old.contains("BallisticInitialVelocityR53"))
-        {
-            double gravity=eva.getAttributeValue(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get()),v=old.getDouble("BallisticInitialVelocityR53");
-            for(int tick=0;tick<old.getInt("BallisticTicksR52");tick++)v=(v-gravity)*.98;
-            velocity=new Vec3(0,v,0);
-        }
-        boolean priorPhysics=eva.noPhysics;if(scripted)eva.noPhysics=true;
         eva.getPersistentData().putBoolean("MechanicalNativeMoveR53",true);
-        try{if(scripted)eva.setBoundingBox(before.move(velocity));else eva.move(net.minecraft.world.entity.MoverType.SELF,velocity);}
-        finally{eva.noPhysics=priorPhysics;eva.getPersistentData().remove("MechanicalNativeMoveR53");}
+        try{eva.move(net.minecraft.world.entity.MoverType.SELF,velocity);}
+        finally{eva.getPersistentData().remove("MechanicalNativeMoveR53");}
         var root=rootAfterNativeMove(previous.translation(),before,eva.getBoundingBox());var current=new RigidTransform(root,previous.qx(),previous.qy(),previous.qz(),previous.qw());
         var next=old.copy();next.put("Previous",encode(previous));next.put("Current",encode(current));next.putLong("AcceptedAt",level.getGameTime());next.putLong("BallisticLastTickR52",level.getGameTime());next.putInt("BallisticTicksR52",old.getInt("BallisticTicksR52")+1);eva.getEntityData().set(SAMPLE,next);eva.setPos(root.x,root.y,root.z);eva.setBoundingBox(bounds(eva));
-        double gravity=eva.getAttributeValue(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get());eva.setDeltaMovement(!scripted&&eva.onGround()?Vec3.ZERO:new Vec3(velocity.x*.91,(scripted?velocity.y-gravity:eva.verticalCollision?0:velocity.y-gravity)*.98,velocity.z*.91));eva.resetFallDistance();eva.hasImpulse=true;
+        double gravity=eva.getAttributeValue(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get());eva.setDeltaMovement(eva.onGround()?Vec3.ZERO:new Vec3(velocity.x*.91,(eva.verticalCollision?0:velocity.y-gravity)*.98,velocity.z*.91));eva.resetFallDistance();eva.hasImpulse=true;
         if(level.getEntity(next.getUUID("Plug")) instanceof EntryPlugCarrierEntity plug&&plug.getVehicle()==eva){plug.setCanonicalTransform(current.compose(decode(next.getCompound("PlugLocal"))));plug.syncPilotPositionNow();}
     }
     private static void retainCarrier(CompoundTag old,CompoundTag next)
@@ -203,7 +252,37 @@ public final class EvaMechanicalFrameR52
     public static void setFlightCustody(EvaUnit01Entity eva,boolean flight,boolean actualCarrierVisible)
     {if(!active(eva))throw new IllegalStateException("Actual rigid custody required");var data=eva.getEntityData().get(SAMPLE).copy();data.putBoolean("FlightCustody",flight);data.putBoolean("ActualCarrierVisible",actualCarrierVisible);eva.getEntityData().set(SAMPLE,data);}
     public static void save(EvaUnit01Entity eva,CompoundTag tag){tag.put("R52MechanicalSample",eva.getEntityData().get(SAMPLE).copy());}
-    public static void load(EvaUnit01Entity eva,CompoundTag tag){eva.getEntityData().set(SAMPLE,tag.getCompound("R52MechanicalSample").copy());}
+    public static void load(EvaUnit01Entity eva,CompoundTag tag)
+    {
+        var sample=tag.getCompound("R52MechanicalSample").copy();
+        if(sample.getBoolean("Active")&&!eva.level().isClientSide)
+        {
+            // RootVehicle reload reaches makeBoundingBox before owner restore.
+            // Use the same explicitly declared hand-only predecessor admission
+            // as a held service pose, without changing the captured ride/pose.
+            var cradle=EvaAirTransportR31.cradleStateR50(eva);
+            var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
+            if(cradle.getBoolean("MechanicalFrameR52")&&provider.replacesHeldHandSurface(cradle.getString("GeometrySourceR52")))
+            {
+                EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),cradle.getCompound(EvaFrozenHandsR52.KEY));
+                cradle.putString("GeometrySourceR52",provider.sourceFingerprint());
+                EvaAirTransportR31.cradleStateR50(eva,cradle);
+            }
+        }
+        if(sample.getBoolean("ServiceSourceHeldR52")&&!sample.getBoolean("Active"))
+        {
+            var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
+            if(provider.replacesHeldHandSurface(sample.getString("HeldGeometrySource")))
+            {
+                // A surface-only revision retains the exact saved skeleton,
+                // hand channels and custody. Bounds use the new actual mesh;
+                // normal owner clearance still gates any subsequent motion.
+                EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),sample.getCompound("HeldHands"));
+                sample.putString("HeldGeometrySource",provider.sourceFingerprint());
+            }
+        }
+        eva.getEntityData().set(SAMPLE,sample);
+    }
     public static float baseYaw(EvaUnit01Entity eva){return eva.getEntityData().get(SAMPLE).getFloat("BaseYaw");}
     public static long epoch(EvaUnit01Entity eva){return eva.getEntityData().get(SAMPLE).getLong("Epoch");}
     public static Kind kind(EvaUnit01Entity eva)
@@ -271,15 +350,63 @@ public final class EvaMechanicalFrameR52
             throw new IllegalStateException("Invalid saved mechanical rigid frame");
         return new RigidTransform(point,x,y,z,w);
     }
-    private record ClientContinuousWindowR52(long sequence,int receivedEntityTick,CompoundTag encoded,com.projectseele.world.DirectoryTrajectoryR52.PortableWindowR52 path,com.projectseele.world.NervMechanicalTravelR52.ContinuousProfile profile,long ticks){}
+    private record ClientContinuousWindowR52(long sequence,CompoundTag encoded,com.projectseele.world.DirectoryTrajectoryR52.PortableWindowR52 path,com.projectseele.world.NervMechanicalTravelR52.ContinuousProfile profile,long ticks){}
     private static final Map<EvaUnit01Entity,ClientContinuousWindowR52> CLIENT_CONTINUOUS_R52=new WeakHashMap<>();
-    private record ClientContinuousReceiptR52(long sequence,int entityTick){}
+    private record ClientContinuousReceiptR52(long sequence,long receivedNanos,boolean initialSnapshot){}
     private static final Map<EvaUnit01Entity,ClientContinuousReceiptR52> CLIENT_CONTINUOUS_RECEIPTS_R52=new WeakHashMap<>();
+    private static final Map<EvaUnit01Entity,ClientFrameR54> CLIENT_FRAMES_R54=new WeakHashMap<>();
+    private static final class ClientFrameR54
+    {
+        private final MechanicalVisualClockR54 clock=new MechanicalVisualClockR54();
+        private RigidTransform from,to,displayed;
+        private long revision;
+        private boolean external;
+
+        void receive(RigidTransform target,long now)
+        {
+            if(target.equals(to))return;
+            // A curve/carrier-to-ballistic handoff starts at the frame that
+            // body and capsule last shared, not the new packet's old endpoint.
+            from=to==null?target:external&&displayed!=null?displayed:sample(now);
+            to=target;clock.receive(++revision,now);external=false;
+        }
+
+        RigidTransform sample(long now){return from.interpolate(to,clock.fraction(now));}
+        void takeControl(long now)
+        {
+            if(!external||displayed==null)return;
+            from=displayed;clock.receive(++revision,now);external=false;
+        }
+        RigidTransform remember(RigidTransform frame,boolean external)
+        {displayed=frame;this.external=external;return frame;}
+    }
     /** Latch receipt on the actual synchronized accessor callback, before any component renders. */
     public static void onSyncedDataUpdatedR52(EvaUnit01Entity eva,EntityDataAccessor<?> key)
-    {if(!eva.level().isClientSide||key!=SAMPLE)return;var tag=eva.getEntityData().get(SAMPLE);synchronized(CLIENT_CONTINUOUS_R52){if(!tag.contains("ContinuousWindowR52",net.minecraft.nbt.Tag.TAG_COMPOUND)){CLIENT_CONTINUOUS_R52.remove(eva);CLIENT_CONTINUOUS_RECEIPTS_R52.remove(eva);return;}long sequence=tag.getCompound("ContinuousWindowR52").getLong("Sequence");var previous=CLIENT_CONTINUOUS_RECEIPTS_R52.get(eva);if(previous==null||previous.sequence()!=sequence)CLIENT_CONTINUOUS_RECEIPTS_R52.put(eva,new ClientContinuousReceiptR52(sequence,eva.tickCount));}}
-    private static int receivedContinuousTickR52(EvaUnit01Entity eva,long sequence)
-    {var receipt=CLIENT_CONTINUOUS_RECEIPTS_R52.get(eva);return receipt!=null&&receipt.sequence()==sequence?receipt.entityTick():eva.tickCount;}
+    {
+        if(!eva.level().isClientSide||key!=SAMPLE)return;
+        var tag=eva.getEntityData().get(SAMPLE);
+        synchronized(CLIENT_CONTINUOUS_R52)
+        {
+            long now=System.nanoTime();
+            boolean initialSnapshot=!CLIENT_FRAMES_R54.containsKey(eva);
+            if(tag.getBoolean("Active")&&tag.contains("Current",net.minecraft.nbt.Tag.TAG_COMPOUND))
+                CLIENT_FRAMES_R54.computeIfAbsent(eva,ignored->new ClientFrameR54()).receive(decode(tag.getCompound("Current")),now);
+            else CLIENT_FRAMES_R54.remove(eva);
+            if(!tag.contains("ContinuousWindowR52",net.minecraft.nbt.Tag.TAG_COMPOUND))
+            {CLIENT_CONTINUOUS_R52.remove(eva);CLIENT_CONTINUOUS_RECEIPTS_R52.remove(eva);return;}
+            long sequence=tag.getCompound("ContinuousWindowR52").getLong("Sequence");
+            var previous=CLIENT_CONTINUOUS_RECEIPTS_R52.get(eva);
+            if(previous==null||previous.sequence()!=sequence)CLIENT_CONTINUOUS_RECEIPTS_R52.put(eva,new ClientContinuousReceiptR52(sequence,now,initialSnapshot));
+        }
+    }
+    private static double continuousAlphaR54(EvaUnit01Entity eva,long sequence,float partial)
+    {
+        var receipt=CLIENT_CONTINUOUS_RECEIPTS_R52.get(eva);
+        // First tracking snapshots already describe the current position.
+        if(receipt==null||receipt.sequence()!=sequence||receipt.initialSnapshot())return 1;
+        return MechanicalVisualClockR54.receivedTickFraction(receipt.receivedNanos(),
+                MechanicalVisualClockR54.presentationTime(eva.level().getGameTime(),partial));
+    }
 
     /** EVA, original capsule and original carrier consume this same received curve window. */
     public static boolean continuousWindowR52(EvaUnit01Entity eva)
@@ -294,9 +421,9 @@ public final class EvaMechanicalFrameR52
             try
             {
                 var cached=CLIENT_CONTINUOUS_R52.get(eva);if(cached==null||cached.sequence()!=sequence||!cached.encoded().equals(encoded))
-                {var clock=encoded.getCompound("Clock");long ticks=clock.getLong("Ticks");if(ticks<0)throw new IllegalArgumentException("Invalid received monotone distance clock");cached=new ClientContinuousWindowR52(sequence,receivedContinuousTickR52(eva,sequence),encoded.copy(),com.projectseele.world.DirectoryTrajectoryR52.decodePortableR52(encoded.getCompound("Path")),continuousProfileR52(clock),ticks);CLIENT_CONTINUOUS_R52.put(eva,cached);}
-                // Arrival/entity ticks advance independently of any world-time correction.
-                double alpha=Mth.clamp((long)eva.tickCount-cached.receivedEntityTick()+(double)partial,0,1),start=cached.profile().distanceAt(cached.ticks());double local=cached.profile().distanceAt(cached.ticks()+alpha)-start;
+                {var clock=encoded.getCompound("Clock");long ticks=clock.getLong("Ticks");if(ticks<0)throw new IllegalArgumentException("Invalid received monotone distance clock");cached=new ClientContinuousWindowR52(sequence,encoded.copy(),com.projectseele.world.DirectoryTrajectoryR52.decodePortableR52(encoded.getCompound("Path")),continuousProfileR52(clock),ticks);CLIENT_CONTINUOUS_R52.put(eva,cached);}
+                // Curves, bearings and guide direction share actual packet-arrival time.
+                double alpha=continuousAlphaR54(eva,cached.sequence(),partial),start=cached.profile().distanceAt(cached.ticks());double local=cached.profile().distanceAt(cached.ticks()+alpha)-start;
                 return cached.path().sample(Mth.clamp(local,0,cached.path().lengthMetres()));
             }
             catch(IllegalArgumentException|IllegalStateException invalid){return current;}
@@ -306,7 +433,7 @@ public final class EvaMechanicalFrameR52
     public static double continuousWindowFractionR52(EvaUnit01Entity eva,float partial)
     {
         var tag=eva.getEntityData().get(SAMPLE);if(!eva.level().isClientSide||!continuousWindowR52(eva)||tag.getBoolean("ContinuousHeldR52"))return 1;
-        continuousFrameR52(eva,tag,decode(tag.getCompound("Current")),partial);synchronized(CLIENT_CONTINUOUS_R52){var cached=CLIENT_CONTINUOUS_R52.get(eva);if(cached==null||cached.path().lengthMetres()<=0)return 1;double alpha=Mth.clamp((long)eva.tickCount-cached.receivedEntityTick()+(double)partial,0,1);return Mth.clamp((cached.profile().distanceAt(cached.ticks()+alpha)-cached.profile().distanceAt(cached.ticks()))/cached.path().lengthMetres(),0,1);}
+        continuousFrameR52(eva,tag,decode(tag.getCompound("Current")),partial);synchronized(CLIENT_CONTINUOUS_R52){var cached=CLIENT_CONTINUOUS_R52.get(eva);if(cached==null||cached.path().lengthMetres()<=0)return 1;double alpha=continuousAlphaR54(eva,cached.sequence(),partial);return Mth.clamp((cached.profile().distanceAt(cached.ticks()+alpha)-cached.profile().distanceAt(cached.ticks()))/cached.path().lengthMetres(),0,1);}
     }
     /** Canonical forward guide direction from the same exact arc-distance window, including recovery. */
     public static Vec3 continuousWindowTangentR52(EvaUnit01Entity eva,float partial)
@@ -315,8 +442,8 @@ public final class EvaMechanicalFrameR52
         synchronized(CLIENT_CONTINUOUS_R52)
         {
             var cached=CLIENT_CONTINUOUS_R52.get(eva);if(cached==null||cached.sequence()!=encoded.getLong("Sequence")||!cached.encoded().equals(encoded))
-            {var clock=encoded.getCompound("Clock");long ticks=clock.getLong("Ticks");if(ticks<0)throw new IllegalStateException("Invalid shared guide distance clock");cached=new ClientContinuousWindowR52(encoded.getLong("Sequence"),receivedContinuousTickR52(eva,encoded.getLong("Sequence")),encoded.copy(),com.projectseele.world.DirectoryTrajectoryR52.decodePortableR52(encoded.getCompound("Path")),continuousProfileR52(clock),ticks);CLIENT_CONTINUOUS_R52.put(eva,cached);}
-            double alpha=!eva.level().isClientSide||sample.getBoolean("ContinuousHeldR52")?1:Mth.clamp((long)eva.tickCount-cached.receivedEntityTick()+(double)partial,0,1);double local=cached.profile().distanceAt(cached.ticks()+alpha)-cached.profile().distanceAt(cached.ticks());return cached.path().tangent(Mth.clamp(local,0,cached.path().lengthMetres()));
+            {var clock=encoded.getCompound("Clock");long ticks=clock.getLong("Ticks");if(ticks<0)throw new IllegalStateException("Invalid shared guide distance clock");cached=new ClientContinuousWindowR52(encoded.getLong("Sequence"),encoded.copy(),com.projectseele.world.DirectoryTrajectoryR52.decodePortableR52(encoded.getCompound("Path")),continuousProfileR52(clock),ticks);CLIENT_CONTINUOUS_R52.put(eva,cached);}
+            double alpha=!eva.level().isClientSide||sample.getBoolean("ContinuousHeldR52")?1:continuousAlphaR54(eva,cached.sequence(),partial);double local=cached.profile().distanceAt(cached.ticks()+alpha)-cached.profile().distanceAt(cached.ticks());return cached.path().tangent(Mth.clamp(local,0,cached.path().lengthMetres()));
         }
     }
     public static void holdContinuousR52(EvaUnit01Entity eva)
@@ -325,10 +452,20 @@ public final class EvaMechanicalFrameR52
     {
         var t=eva.getEntityData().get(SAMPLE);var current=decode(t.getCompound("Current"));
         if(!eva.level().isClientSide)return current;
-        if(continuousWindowR52(eva))return continuousFrameR52(eva,t,current,partial);
-        var originalCarrier=originalCarrierControllerR52(eva);if(originalCarrier!=null&&com.projectseele.world.NervOriginalCarrierR52.attachedTo(originalCarrier,eva)&&originalCarrier.originalCarrierStateR52().getLong("At")==t.getLong("AcceptedAt")&&same(com.projectseele.world.NervAircraftFrameR52.decodeRigid(originalCarrier.originalCarrierStateR52().getCompound("Current")),current))return com.projectseele.world.NervOriginalCarrierR52.actualRoot(originalCarrier,partial);
-        double elapsed=eva.level().getGameTime()-t.getLong("AcceptedAt");
-        return decode(t.getCompound("Previous")).interpolate(current,Mth.clamp(elapsed+partial,0,1));
+        synchronized(CLIENT_CONTINUOUS_R52)
+        {
+            var visual=CLIENT_FRAMES_R54.computeIfAbsent(eva,ignored->new ClientFrameR54());
+            visual.receive(current,System.nanoTime());
+            long now=MechanicalVisualClockR54.presentationTime(eva.level().getGameTime(),partial);
+            if(continuousWindowR52(eva))return visual.remember(continuousFrameR52(eva,t,current,partial),true);
+            var originalCarrier=originalCarrierControllerR52(eva);
+            if(originalCarrier!=null&&com.projectseele.world.NervOriginalCarrierR52.attachedTo(originalCarrier,eva)
+                    &&originalCarrier.originalCarrierStateR52().getLong("At")==t.getLong("AcceptedAt")
+                    &&same(com.projectseele.world.NervAircraftFrameR52.decodeRigid(originalCarrier.originalCarrierStateR52().getCompound("Current")),current))
+                return visual.remember(com.projectseele.world.NervOriginalCarrierR52.actualRoot(originalCarrier,partial),true);
+            visual.takeControl(now);
+            return visual.remember(visual.sample(now),false);
+        }
     }
     private static EntryPlugCarrierEntity originalPlug(EvaUnit01Entity eva,Original original)
     {
@@ -490,7 +627,7 @@ public final class EvaMechanicalFrameR52
         var profile=continuousProfileR52(clock);long ticks=clock.getLong("Ticks");if(ticks<0||ticks==Long.MAX_VALUE||Math.abs(profile.distanceAt(ticks)-clock.getDouble("DistanceMetres"))>1e-6)return false;
         var encoded=com.projectseele.world.DirectoryTrajectoryR52.encodePortableR52(paths);var portable=com.projectseele.world.DirectoryTrajectoryR52.decodePortableR52(encoded);double travel=profile.distanceAt(ticks+1)-profile.distanceAt(ticks);
         if(travel<0||Math.abs(portable.lengthMetres()-travel)>1e-6||!same(portable.sample(0),from.evaRoot())||!same(portable.sample(portable.lengthMetres()),to.evaRoot())||from.evaRoot().rotationErrorDegrees(to.evaRoot())>.0001)return false;
-        var window=new CompoundTag();long prior=eva.getEntityData().get(SAMPLE).getLong("ContinuousSequenceR52");if(prior==Long.MAX_VALUE)throw new IllegalStateException("Monotone mechanical sample sequence exhausted");window.putLong("Sequence",prior+1);window.put("Path",encoded);window.put("Clock",clock.copy());boolean accepted=applyVerifiedR52(eva,original,from,to,window);if(!accepted&&(eva.position().distanceToSqr(from.evaRoot().translation())>4e-6||!same(frame(eva,1),from.evaRoot())))throw new IllegalStateException("Continuous physical assembly commit failed after changing actual frame");return accepted;
+        var window=new CompoundTag();long prior=eva.getEntityData().get(SAMPLE).getLong("ContinuousSequenceR52");if(prior==Long.MAX_VALUE)throw new IllegalStateException("Monotone mechanical sample sequence exhausted");window.putLong("Sequence",prior+1);window.put("Path",encoded);window.put("Clock",clock.copy());boolean accepted=applyVerifiedR52(eva,original,from,to,window);if(!accepted&&(eva.getEntityData().get(SAMPLE).getLong("ContinuousSequenceR52")!=prior||eva.position().distanceToSqr(from.evaRoot().translation())>4e-6||!same(frame(eva,1),from.evaRoot())))throw new IllegalStateException("Continuous physical assembly commit failed after changing sample sequence or actual frame");return accepted;
     }
     public static boolean applyVerified(EvaUnit01Entity eva,Original original,FootSupportFrameR52.Sample from,FootSupportFrameR52.Sample to)
     {return applyVerifiedR52(eva,original,from,to,null);}

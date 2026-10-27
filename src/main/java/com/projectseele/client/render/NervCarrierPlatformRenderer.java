@@ -85,7 +85,8 @@ public final class NervCarrierPlatformRenderer
             float service=entity.repairProgressR33();
             TvFacilityMeshes.withBuffers(buffers,()->
             {
-                TvFacilityMeshes.cage(poses,packedLight,entity.getRestraintProgress(partialTick),entity.getUnitVariant(),Float.NaN);
+                var mounting=com.projectseele.world.CarrierMountProfileR53.read(entity,partialTick);
+                TvFacilityMeshes.cage(poses,packedLight,entity.getRestraintProgress(partialTick),entity.getUnitVariant(),entity.lowerFrameDeclaredR52()?entity.lowerFrameProgressR52(partialTick):Float.NaN,mounting);
 
                 EvaBayMachineryR33.render(poses,service<0?-1:Math.min(1,service+partialTick/2400F),entity.tickCount+partialTick,15.2F,false,entity.getUnitVariant());
             });
@@ -156,12 +157,12 @@ public final class NervCarrierPlatformRenderer
                                   int packedLight)
     {
         float level = entity.getLclVisualLevel(partialTick);
-        if (level <= 0.01F || Math.abs(level-Math.round(level))<.002F)
+        if (level <= 0.01F)
         {
             return;
         }
-        // Fractional drainage uses the same dense orange-red material as the
-        // complete fluid layers; there must be no clear/purple flash at a step.
+        // Keep the surface through integer crossings too: the next physical
+        // layer can already be removed while this visual sample is in flight.
         var out=buffers.getBuffer(EnergyGlowR24.SMOKE);
         float y=level+.93F;
         int tint=com.projectseele.fluid.LclFluidType.TINT;

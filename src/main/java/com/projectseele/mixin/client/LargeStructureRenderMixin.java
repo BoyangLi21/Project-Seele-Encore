@@ -50,10 +50,10 @@ public abstract class LargeStructureRenderMixin
                 ||entity instanceof com.projectseele.entity.EntryPlugCarrierEntity)
                 &&entity.blockPosition().equals(position))
         {
-            var level=Minecraft.getInstance().level;
-            // Frustum and distance checks already passed. This only removes the
-            // unrelated requirement that the origin's terrain mesh was compiled.
-            return level!=null&&level.getChunkSource().hasChunk(position.getX()>>4,position.getZ()>>4);
+            // Tracking and the entity renderer's distance/frustum checks already
+            // passed. These meshes have their own geometry; requiring a terrain
+            // chunk here drops distant doors and their logos before render runs.
+            return true;
         }
         return renderer.isChunkCompiled(position);
     }

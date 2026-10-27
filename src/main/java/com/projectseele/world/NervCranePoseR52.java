@@ -10,12 +10,27 @@ import java.util.Objects;
  * no plant/world positions are chosen here. */
 public final class NervCranePoseR52
 {
+    // The complete imported chuck extends 4.95008 m along its tail axis.
+    // Keep that solid body below the original winch plate at Y=-.65.
+    public static final double STOW_BOTTOM_R53 = -6.1;
+    public static final double TROLLEY_TRAILING_R53 = 8;
     public record State(RigidTransform machine,double bottom,RigidTransform plug,boolean coupled,Vec3 referenceWorld,Quaternionf referenceRotation)
     {
         public State{if(!Double.isFinite(bottom)||bottom>=0||coupled&&plug==null||(referenceWorld==null)!=(referenceRotation==null))throw new IllegalArgumentException("Complete actual crane state required");referenceRotation=referenceRotation==null?null:new Quaternionf(referenceRotation);}
         public State interpolate(State to,double t)
-        {if(coupled!=to.coupled||machine.rotationErrorDegrees(to.machine)>.001||(plug==null)!=(to.plug==null)||!Objects.equals(referenceWorld,to.referenceWorld))throw new IllegalArgumentException("A mechanism change requires a coincident checked crane pose");return new State(machine.interpolate(to.machine,t),bottom+(to.bottom-bottom)*t,plug==null?null:plug.interpolate(to.plug,t),coupled,referenceWorld,referenceRotation);}
+        {
+            boolean translatedReference=!coupled&&referenceWorld!=null&&to.referenceWorld!=null
+                    &&to.referenceWorld.subtract(referenceWorld).distanceToSqr(to.machine.translation().subtract(machine.translation()))<1e-8;
+            if(coupled!=to.coupled||machine.rotationErrorDegrees(to.machine)>.001||(plug==null)!=(to.plug==null)
+                    ||!Objects.equals(referenceWorld,to.referenceWorld)&&!translatedReference)
+                throw new IllegalArgumentException("A mechanism change requires a coincident checked crane pose");
+            return new State(machine.interpolate(to.machine,t),bottom+(to.bottom-bottom)*t,
+                    plug==null?null:plug.interpolate(to.plug,t),coupled,
+                    translatedReference?referenceWorld.lerp(to.referenceWorld,t):referenceWorld,referenceRotation);
+        }
         public Pose pose(Vec3 mount){return evaluate(machine,bottom,plug,coupled,referenceWorld,referenceRotation,mount);}
+        public Pose pose(Vec3 mount, boolean splitBearing)
+        {return splitBearing ? NervCraneBearingR53.pose(this, mount) : pose(mount);}
     }
     /** Stable original cylinder roll through the downward vertical. The same
      * frame is used for draw and sweep, avoiding rotationTo's antipodal branch. */
@@ -37,9 +52,10 @@ public final class NervCranePoseR52
         float released=1;if(coupled){if(actualPlug==null)throw new IllegalArgumentException("Actual coupled capsule pose required");lower=anchor;released=0;}
         else if(actualPlug!=null||hasReference)
         {
-            double travel=Math.max(1,-2-anchor.y),linear=Math.max(0,Math.min(1,(lower.y-anchor.y)/travel)),rise=travel*smooth((float)linear);
+            double travel=Math.max(1,STOW_BOTTOM_R53-anchor.y),linear=Math.max(0,Math.min(1,(lower.y-anchor.y)/travel)),rise=travel*smooth((float)linear);
             var forward=rotation.transform(new Vector3f(0,0,1));var axis=new Vec3(forward.x,forward.y,forward.z);double axial=Math.min(rise,2*Math.max(.25,axis.y));lower=anchor.add(axis.scale(axial/Math.max(.25,axis.y))).add(0,rise-axial,0);
-            released=(float)Math.max(0,Math.min(1,rise/.65));rotation.slerp(stowed,smooth((float)((rise-2)/Math.max(1,travel-2))));
+            double turnStart=Math.min(2,travel*.5);
+            released=(float)Math.max(0,Math.min(1,rise/.65));rotation.slerp(stowed,smooth((float)((rise-turnStart)/Math.max(.1,travel-turnStart))));
         }
         Vec3 mount=lower;if(suppliedMount!=null){var p=rotation.transform(new Vector3f((float)suppliedMount.x,(float)suppliedMount.y,(float)suppliedMount.z));mount=lower.add(p.x,p.y,p.z);}
         Vec3 yoke=suppliedMount==null?lower.add(0,1.6,0):mount.add(0,.45,0);return new Pose(machine,RigidTransform.of(lower,rotation),mount,yoke,released);

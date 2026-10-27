@@ -113,6 +113,18 @@ public final class EncounterObserverR45
         if (event.phase != TickEvent.Phase.END || !(event.level instanceof ServerLevel level)
                 || level.getGameTime() % 2 != 0) return;
         var data = TvCampaignSavedData.get(level);
+        if (level.dimension().equals(FacilitySchemaV2.DIMENSION) && level.getGameTime() % 20 == 0
+                && !level.players().isEmpty())
+        {
+            // The saved campaign owns this visual state, including reload and
+            // victory recovery. No shared Overworld clock or gamerule changes.
+            boolean night = "ramiel".equals(data.active) && data.owner != null && data.generationR43 > 0
+                    && java.util.Set.of("alert", "approach", "combat", "combat_victory").contains(data.phase);
+            var sky = new ClientboundEncounterObserverPacket(night ? ClientboundEncounterObserverPacket.Kind.NIGHT
+                    : ClientboundEncounterObserverPacket.Kind.DAY, new UUID(0, 0), Math.max(1, data.generationR43),
+                    level.dimension().location(), ClientboundEncounterObserverPacket.RAMIEL, 0, level.getGameTime(), null);
+            SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension), sky);
+        }
         var site = live(data) ? TvEncounterSitesR45.site(level, data.active).orElse(null) : null;
         if (site == null || !site.geometryValidated() || !site.modelReady()
                 || !site.visibility().equals("remote_actual_entity_v1"))

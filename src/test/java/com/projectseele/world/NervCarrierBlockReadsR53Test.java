@@ -34,8 +34,28 @@ public final class NervCarrierBlockReadsR53Test
         var split=List.of(part("left",mesh,left),part("right",mesh,right));reads[0]=0;
         check(NervOriginalCarrierR52.nativeBlockRejectionR53(split,split,0,box->!(box.minX<0&&box.maxX>0),reader)==null&&reads[0]==2,"An unreadable merged gap falls back to each readable original volume");
     }
+    private static void wholeAssemblySemantics()
+    {
+        var volume=new AABB(0,0,0,10,10,10);
+        var obstacle=new AABB(5,2,2,6,3,3);
+        var pieces=Collections.nCopies(100,volume);
+        int[] reads={0},checksOfSource={0};
+        var live=new ArrayList<AABB>();live.add(obstacle);live.add(obstacle);
+        java.util.function.Function<AABB,List<AABB>> reader=b->{reads[0]++;return List.copyOf(live);};
+        var clear=BoundedNativeCollisionGroupsR52.clearWholeSource(pieces,b->true,reader,b->{checksOfSource[0]++;return false;});
+        check(clear.clear()&&reads[0]==1&&checksOfSource[0]==1,"Complete-source queries visit a repeated live obstacle once, regardless of source part count");
+        check(!BoundedNativeCollisionGroupsR52.clearWholeSource(pieces,b->true,reader,b->b.intersects(obstacle)).clear(),"Complete-source collision still rejects motion");
+        live.clear();
+        check(BoundedNativeCollisionGroupsR52.clearWholeSource(pieces,b->true,reader,b->true).clear(),"A removed obstacle is not cached into the next tick");
+        var left=new AABB(-2,0,0,-1,1,1);var right=new AABB(1,0,0,2,1,1);reads[0]=0;
+        check(BoundedNativeCollisionGroupsR52.clearWholeSource(List.of(left,right),b->!(b.minX<0&&b.maxX>0),reader,b->true).clear()&&reads[0]==2,"An unreadable merged gap reads only the original two volumes");
+        reads[0]=0;
+        check(!BoundedNativeCollisionGroupsR52.clearWholeSource(pieces,b->false,reader,b->false).clear()&&reads[0]==0,"Unreadable original geometry cannot authorize movement or force native reads");
+    }
     public static void main(String[] args)throws Exception
     {
+        wholeAssemblySemantics();
+        if(args.length>0&&args[0].equals("--whole-source")){System.out.println("Whole assembly native block sweep: "+checks+" checks passed");return;}
         liveBlockSemantics();
         for(int unit=0;unit<3;unit++)
         {

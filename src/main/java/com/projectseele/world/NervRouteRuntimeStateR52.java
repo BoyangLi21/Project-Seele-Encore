@@ -31,12 +31,34 @@ public final class NervRouteRuntimeStateR52 extends SavedData
     private String pendingInstallationPreviousHold="";
     private int pendingInstallationAttempts;
     private boolean pendingInstallationPaused;
+    private boolean pendingCarrierEquipmentUpdate;
+    private CompoundTag pendingBankCurbRefit=new CompoundTag();
     private final Map<UUID,Long> installationActorChunks=new LinkedHashMap<>();
     private final Map<Integer,Job> jobs=new LinkedHashMap<>();
     public boolean claimed(){return claimed;}
     public long epoch(){return epoch;}
     public String fingerprint(){return fingerprint;}
     public String fault(){return fault;}
+    /** Only this post-move readback failure has a recoverable physical window. */
+    Job interruptedContinuousCommitR53()
+    {
+        for(var job:jobs.values())
+            if(fault.equals("Continuous final commit/readback fault at task "+job.snapshot().task()+": Committed continuous assembly final readback failed"))return job;
+        return null;
+    }
+    synchronized boolean recoverContinuousCommitR53(String expectedFault,Job expected,Job recovered,
+                                                     java.util.function.BooleanSupplier commitPool)
+    {
+        if(!fault.equals(expectedFault)||jobs.get(expected.snapshot().original().variant())!=expected
+                ||interruptedContinuousCommitR53()!=expected)return false;
+        var from=expected.snapshot();var to=recovered.snapshot();
+        if(!from.task().equals(to.task())||!from.original().equals(to.original())||from.kind()!=to.kind()
+                ||!from.route().equals(to.route())||!from.directoryFingerprint().equals(to.directoryFingerprint())
+                ||epoch!=to.original().epoch()||!fingerprint.equals(to.directoryFingerprint())
+                ||!allowed(expected.phase(),recovered.phase()))return false;
+        if(!commitPool.getAsBoolean())return false;
+        jobs.put(to.original().variant(),recovered);fault="";setDirty();return true;
+    }
     void faultR52(String reason){if(reason==null||reason.isBlank())throw new IllegalArgumentException("Actual runtime fault required");fault=reason;setDirty();}
     public String personnelLiftManifest(){return personnelLiftManifest;}
     public String installationBundle(){return installationBundle;}
@@ -46,14 +68,54 @@ public final class NervRouteRuntimeStateR52 extends SavedData
     public String pendingInstallationPreviousHoldR52(){return pendingInstallationPreviousHold;}
     public int pendingInstallationAttemptsR52(){return pendingInstallationAttempts;}
     public boolean pendingInstallationPausedR52(){return pendingInstallationPaused;}
+    boolean pendingCarrierEquipmentUpdateR53(){return pendingCarrierEquipmentUpdate;}
+    void queueCarrierEquipmentUpdateR53(PendingInstallationR52 request)
+    {
+        if(pendingInstallation!=null||jobs.size()!=3||jobs.values().stream().anyMatch(j->j.phase()!=Phase.PARKED||!j.waiting().isEmpty()))
+            throw new IllegalStateException("Equipment update requires the three retained parked jobs and no pending installation");
+        pendingCarrierEquipmentUpdate=true;
+        try{queueInstallationR52(request);}catch(RuntimeException failure){pendingCarrierEquipmentUpdate=false;throw failure;}
+    }
+    void queueCarrierEquipmentUpdateR53(PendingInstallationR52 request,CarrierEquipmentUpdateR53.StoppedBankRefit proof)
+    {
+        if(pendingInstallation!=null||proof==null||!proof.current(this))throw new IllegalStateException("Exact same-tick stopped bank equipment admission required");
+        pendingBankCurbRefit=proof.persistence();
+        pendingCarrierEquipmentUpdate=true;
+        try{queueInstallationR52(request);}catch(RuntimeException failure){pendingCarrierEquipmentUpdate=false;pendingBankCurbRefit=new CompoundTag();throw failure;}
+    }
+    CompoundTag pendingBankCurbRefitR53(){return pendingBankCurbRefit.copy();}
+    boolean pendingBankCurbCurrentR53()
+    {
+        var tag=pendingBankCurbRefit;
+        if(!pendingCarrierEquipmentUpdate||tag.getInt("Version")!=2||!tag.getString("Source").equals(NervLegacyBankClearanceR53.SOURCE_SHA)||!tag.hasUUID("Carrier")||jobs.size()!=3)return false;
+        int variant=tag.getInt("Variant");if(!tag.contains("Variant")||variant<0||variant>2)return false;
+        var rows=tag.getList("Snapshots",Tag.TAG_COMPOUND);if(rows.size()!=3)return false;var variants=new HashSet<Integer>();
+        for(var raw:rows){var snapshot=decode((CompoundTag)raw);var job=jobs.get(snapshot.original().variant());if(job==null||!variants.add(snapshot.original().variant())||!job.snapshot().equals(snapshot)||snapshot.original().variant()!=variant&&!((Set.of(Phase.PARKED,Phase.DEPLOYED).contains(job.phase())&&job.waiting().isEmpty())||CarrierEquipmentUpdateR53.unmovedBayPreparationR53(job)))return false;}
+        var preserved=tag.getList("Jobs",Tag.TAG_COMPOUND);if(preserved.size()!=3)return false;var matched=new HashSet<Integer>();
+        for(var raw:preserved){var row=(CompoundTag)raw;int unit=row.getInt("Variant");var kept=jobs.get(unit);if(kept==null||!matched.add(unit)||!row.getString("Phase").equals(kept.phase().name())||!row.getString("Waiting").equals(kept.waiting())||!row.getCompound("Owner").equals(kept.ownerData()))return false;}
+        if(!variants.equals(Set.of(0,1,2))||!matched.equals(variants))return false;var job=jobs.get(variant);var snapshot=job.snapshot();var data=job.ownerData();var clock=data.getCompound("ContinuousClockR52");var phase=data.getCompound(NervLaunchPhasesR53.KEY);var head=tag.getCompound("Head");
+        boolean preparing=job.phase()==Phase.PREPARING&&phase.getString("Stage").equals("PRELAUNCH")
+                &&clock.getDouble("ToMetres")==tag.getDouble("Distance")&&head.getInt("Clock")>=0&&head.getInt("Clock")<NervBankHeadTransferR53.TICKS;
+        boolean awaitingLaunch=job.phase()==Phase.DEPARTING&&phase.getString("Stage").equals("ASCENT")&&!phase.getBoolean("LaunchCommitted")
+                &&clock.getDouble("ToMetres")>tag.getDouble("Distance")&&head.getInt("Clock")==NervBankHeadTransferR53.TICKS;
+        return (preparing||awaitingLaunch)&&snapshot.kind()==TransportMembershipR52.Kind.OCCUPIED&&snapshot.fraction()==0
+                &&!data.contains("ContinuousBrakeR52")&&!clock.isEmpty()&&clock.equals(tag.getCompound("Clock"))&&phase.equals(tag.getCompound("Phase"))
+                &&clock.getDouble("SpeedMps")==0&&Double.isFinite(tag.getDouble("Distance"))&&tag.getDouble("Distance")==data.getDouble("ContinuousDistanceR52")
+                &&clock.getDouble("DistanceMetres")==tag.getDouble("Distance")
+                &&clock.getString("Route").equals(snapshot.route())&&clock.getString("Directory").equals(fingerprint)
+                &&phase.hasUUID("Task")&&phase.getUUID("Task").equals(snapshot.task())
+                &&phase.getString("Directory").equals(fingerprint)&&phase.getString("Route").equals(snapshot.route())
+                &&head.hasUUID("Task")&&head.getUUID("Task").equals(snapshot.task())&&head.getString("Directory").equals(fingerprint)&&head.getString("Route").equals(snapshot.route())
+                &&head.getString("Source").equals(NervBankHeadTransferR53.SOURCE_SHA)&&!head.getBoolean("AbortedToStart");
+    }
     public void queueInstallationR52(PendingInstallationR52 request)
     {
         Objects.requireNonNull(request);
-        if(!fault.isEmpty())throw new IllegalStateException("Existing runtime fault must be resolved before installation: "+fault);
+        if(!fault.isEmpty()&&(!request.restoring()||interruptedContinuousCommitR53()==null))throw new IllegalStateException("Existing runtime fault must be resolved before installation: "+fault);
         if(pendingInstallation!=null&&!pendingInstallation.equals(request))throw new IllegalStateException("Pending bundle authority changed; preserve the original request and repair its exact sources");
         if(request.restoring())
         {
-            if(!claimed||epoch!=request.epoch()||!fingerprint.equals(request.directory())||!installationBundle.equals(request.bundle())||!installationBundleSHA.equals(request.sha()))throw new IllegalStateException("Restoration must retain the accepted bundle, epoch and directory");
+            if(!claimed||epoch!=request.epoch()||!fingerprint.equals(request.directory())||!installationBundle.equals(request.bundle())||!installationBundleSHA.equals(request.sha())&&!pendingCarrierEquipmentUpdate)throw new IllegalStateException("Restoration must retain the accepted bundle, epoch and directory");
         }
         else if(!installationBundle.isEmpty()||!jobs.isEmpty())throw new IllegalStateException("Accepted installation or original jobs require restoration, not new commissioning");
         if(pendingInstallation!=null&&!pendingInstallationHold.isEmpty())pendingInstallationPreviousHold=pendingInstallationHold;
@@ -66,7 +128,7 @@ public final class NervRouteRuntimeStateR52 extends SavedData
     public void finishInstallationR52(PendingInstallationR52 request)
     {
         if(!Objects.equals(pendingInstallation,request)||pendingInstallationPaused||epoch!=request.epoch()||!fingerprint.equals(request.directory()))throw new IllegalStateException("Only the current verified request may complete installation");
-        rememberInstallationR52(request.bundle(),request.sha());pendingInstallation=null;pendingInstallationPaused=false;pendingInstallationHold="";pendingInstallationPreviousHold="";pendingInstallationAttempts=0;setDirty();
+        rememberInstallationR52(request.bundle(),request.sha());pendingInstallation=null;pendingInstallationPaused=false;pendingCarrierEquipmentUpdate=false;pendingBankCurbRefit=new CompoundTag();pendingInstallationHold="";pendingInstallationPreviousHold="";pendingInstallationAttempts=0;setDirty();
     }
     public String uprightGuideSourceR52(){return uprightGuideSourceSHA;}
     void declareUprightGuideSourceR52(String sha){if(!claimed||sha==null||!sha.matches("[0-9a-f]{64}")||sha.equals("0".repeat(64)))throw new IllegalArgumentException("Actual claimed upright source SHA required");if(!sha.equals(uprightGuideSourceSHA)){uprightGuideSourceSHA=sha;setDirty();}}
@@ -143,6 +205,9 @@ public final class NervRouteRuntimeStateR52 extends SavedData
             var p=tag.getCompound("PendingInstallation");if(p.getInt("Version")!=1||!p.contains("Restoring",Tag.TAG_BYTE))throw new IllegalArgumentException("Explicit pending installation version and mode required");
             var request=new PendingInstallationR52(p.getString("Bundle"),p.getString("SHA"),p.getLong("Epoch"),p.getString("Directory"),p.getBoolean("Restoring"));
             if(!state.claimed||state.epoch!=request.epoch()||!state.fingerprint.equals(request.directory()))throw new IllegalArgumentException("Pending request differs from claimed epoch/directory");
+            state.pendingCarrierEquipmentUpdate=p.getBoolean("CarrierEquipmentUpdate");
+            if(p.contains("BankCurbRefit")){state.pendingBankCurbRefit=p.getCompound("BankCurbRefit").copy();if(!state.pendingCarrierEquipmentUpdate||state.pendingBankCurbRefit.isEmpty())throw new IllegalArgumentException("Explicit equipment-only bank refit receipt required");}
+            if(state.pendingCarrierEquipmentUpdate&&!request.restoring())throw new IllegalArgumentException("Equipment update must restore original machinery");
             state.queueInstallationR52(request);state.pendingInstallationPaused=p.getBoolean("Paused");state.pendingInstallationHold=p.getString("Hold");state.pendingInstallationPreviousHold=p.getString("PreviousHold");state.pendingInstallationAttempts=p.contains("Attempts")?p.getInt("Attempts"):1;if(state.pendingInstallationAttempts<1)throw new IllegalArgumentException("Positive pending attempt count required");
         }catch(RuntimeException invalid){state.fault="Invalid pending Root installation: "+invalid.getMessage();}
         try
@@ -161,6 +226,11 @@ public final class NervRouteRuntimeStateR52 extends SavedData
             catch(RuntimeException invalid){state.fault="Invalid persisted R52 job: "+invalid.getMessage();}
         }
         if(state.pendingInstallation!=null&&!state.pendingInstallation.restoring()&&!state.jobs.isEmpty())state.fault="Initial commissioning cannot replace original saved jobs";
+        if(state.pendingCarrierEquipmentUpdate)try
+        {
+            if(!state.pendingBankCurbRefit.isEmpty()){if(!state.pendingBankCurbCurrentR53())state.fault="Equipment update must retain the admitted original stopped bank task and clock";}
+            else if(state.jobs.size()!=3||state.jobs.values().stream().anyMatch(j->j.phase()!=Phase.PARKED||!j.waiting().isEmpty()))state.fault="Equipment update must retain three parked original jobs";
+        }catch(RuntimeException invalid){state.fault="Invalid pending bank equipment receipt: "+invalid.getMessage();}
         return state;
     }
     @Override public CompoundTag save(CompoundTag tag)
@@ -168,7 +238,8 @@ public final class NervRouteRuntimeStateR52 extends SavedData
         tag.putInt("Version",1);tag.putBoolean("Claimed",claimed);tag.putLong("Epoch",epoch);tag.putString("DirectoryFingerprint",fingerprint);tag.putString("PersonnelLiftManifest",personnelLiftManifest);tag.putString("Fault",fault);
         if(!uprightGuideSourceSHA.isEmpty())tag.putString("UprightGuideSourceSHA",uprightGuideSourceSHA);
         if(!installationBundle.isEmpty()){tag.putString("InstallationBundle",installationBundle);tag.putString("InstallationBundleSHA",installationBundleSHA);}
-        if(pendingInstallation!=null){var p=new CompoundTag();p.putInt("Version",1);p.putString("Bundle",pendingInstallation.bundle());p.putString("SHA",pendingInstallation.sha());p.putLong("Epoch",pendingInstallation.epoch());p.putString("Directory",pendingInstallation.directory());p.putBoolean("Restoring",pendingInstallation.restoring());p.putBoolean("Paused",pendingInstallationPaused);p.putString("Hold",pendingInstallationHold);p.putString("PreviousHold",pendingInstallationPreviousHold);p.putInt("Attempts",pendingInstallationAttempts);tag.put("PendingInstallation",p);}
+        if(pendingInstallation!=null){var p=new CompoundTag();p.putInt("Version",1);p.putString("Bundle",pendingInstallation.bundle());p.putString("SHA",pendingInstallation.sha());p.putLong("Epoch",pendingInstallation.epoch());p.putString("Directory",pendingInstallation.directory());p.putBoolean("Restoring",pendingInstallation.restoring());p.putBoolean("CarrierEquipmentUpdate",pendingCarrierEquipmentUpdate);p.putBoolean("Paused",pendingInstallationPaused);p.putString("Hold",pendingInstallationHold);p.putString("PreviousHold",pendingInstallationPreviousHold);p.putInt("Attempts",pendingInstallationAttempts);tag.put("PendingInstallation",p);}
+        if(pendingInstallation!=null&&!pendingBankCurbRefit.isEmpty())tag.getCompound("PendingInstallation").put("BankCurbRefit",pendingBankCurbRefit.copy());
         if(!installationActorChunks.isEmpty()){var chunks=new ListTag();for(var e:installationActorChunks.entrySet()){var row=new CompoundTag();row.putUUID("Actor",e.getKey());row.putLong("Chunk",e.getValue());chunks.add(row);}tag.put("InstallationActorChunks",chunks);}
         var rows=new ListTag();for(var job:jobs.values()){var row=new CompoundTag();row.put("Snapshot",encode(job.snapshot()));row.putString("Phase",job.phase().name());row.put("OwnerData",job.ownerData().copy());row.putString("Waiting",job.waiting());rows.add(row);}tag.put("Jobs",rows);return tag;
     }

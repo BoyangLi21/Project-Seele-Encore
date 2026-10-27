@@ -403,6 +403,8 @@ The isolated hand candidate uses the CC0 MakeHuman base mesh, default skeleton a
 
 Root-authored processing fits a coherent hand surface to EVA proportions, rebuilds a neutral finger rig and rebinds the skin. TV hand/foot design drawings were viewed as shape references; no reference image is copied into this candidate. Existing private EVA texture licensing remains unchanged. This is a development candidate, not a statement that the hand appearance, weapon contact or release asset admission has passed.
 
+2026-10-23：原零／初／二号机及三号机已安装本项目重新制作的自然拳目标、连续腕口和实体背甲片。自然手面沿用上述 MakeHuman CC0 来源；闭拳造型、甲片和连续UV图表由 `tools/author_natural_fist_r53.py` 制作，三号机适配由 `tools/transfer_unit03_natural_fist_r53.py` 完成。原机身体与私有纹理许可不变；三号机其余3387个源面保留。直拳的拳背朝上约束属于动作层的前臂旋前，并非新下载动作。原生临时姿态画面已查看，正常操纵和武器转换仍单列待完成，不能将该资源接入当作最终动作美术认可。
+
 The [official MakeHuman system poses pack](https://static.makehumancommunity.org/assets/assetpacks/makehuman_system_poses.html) was downloaded for isolated rig diagnostics. Its fight-pose metadata names MakeHuman and CC0. Download URL and ZIP hash are in `artifacts/rebuild_r45/models/hands/makehuman_pose_reference/source.json`; these pose experiments were not promoted. MCO crouch data retains the pre-existing private evaluation restriction. New ordinary-strike candidates use the already credited ACCAD Male2 E1 JabLeft and E6 HookRight captures, with their exact source hashes and selected frames in the candidate authoring receipts; this is not an official EVA animation asset.
 
 R45 pressure-door leaves and hazard stripes are original vector/material work. The TV11 R07 still informed the broad blue-grey leaf, dark centre seal, restrained bevel and red-black fixed frame; no official image pixels are shipped. Door numbering uses the actual game DoorID. Cabinet and mechanical details not visible in the reference are game adaptations. TV22's passenger-cabin wall band and TV12's utility-cabin roof are separate references, not evidence that all NERV doors have the same mechanism.
@@ -442,7 +444,8 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 - `launch_electric_burst_r53.ogg` 与三段 `launch_rail_friction_r53_*.ogg` 为本项目原创数学合成，没有采样录音、官方音轨或角色配音。生成器为 `tools/build_launch_feedback_r53.py`，使用固定随机种子、带限噪声、低频衰减及有限隧道反射；48 kHz 单声道用于游戏内定位。
 - 2026-10-20 音色候选：起射拆为短接触冲击、低频电磁脉冲及逐渐变暗的反射，减少尖锐长嘶声；轨道接触由0.31秒改为0.74秒，适配现有12tick播报间隔，峰值由0.82降至0.34，避免和起射抢占同一响度。仍为上述原创合成，未使用官方声音。生成器现在保留192/128格衰减配置，支持独立候选资源目录。音色是否满意仍需用户试听，不能用解码或播放事件检查代替。
-- 文件哈希、时长和解码测量见 `assets/projectseele/audio/launch_feedback_r53.json`。启动电流声只绑定正式发射的首次实际运动提交；摩擦声与火花绑定真实轨道接触点和实际速度。离线解码通过不代表实际场景听感已验收。
+- 2026-10-23 音色调整：电流爆发的高频冲击与重复爆点降低，保留低频电磁冲量；摩擦主噪声上沿3100→1700Hz，时长0.74→0.88秒、间隔12→14tick，长渐入出形成连续摩擦。响度和火花密度随实际速度增加，避免起步就满强度。仅重生成原四个原创声音，未引入新来源。
+- 时长和解码测量见 `assets/projectseele/audio/launch_feedback_r53.json`；按用户要求不再生成文件指纹记录。启动电流声只绑定正式发射的首次实际运动提交；摩擦声与火花绑定真实轨道接触点和实际速度。离线解码通过不代表实际场景听感已验收。
 
 ## R53 用户提供的托盘步枪
 

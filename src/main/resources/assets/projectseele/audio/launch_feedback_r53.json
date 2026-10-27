@@ -1,43 +1,39 @@
 {
   "generator": "tools\\build_launch_feedback_r53.py",
-  "revision": "2026-10-20",
+  "revision": "2026-10-23",
   "assets": [
     {
       "asset": "assets/projectseele/sounds/launch_electric_burst_r53.ogg",
-      "sha256": "4a023d3a3af77fea772e2324c4e22b34fae1deb630c581e444853a32b72fd4da",
       "seconds": 2.1,
-      "decoded_peak": 0.8259813189506531,
-      "decoded_rms": 0.1098838672041893,
+      "decoded_peak": 0.827500581741333,
+      "decoded_rms": 0.10685420781373978,
       "source": "Original deterministic mathematical synthesis; no sampled recording",
       "channels": 1,
       "sample_rate": 48000
     },
     {
       "asset": "assets/projectseele/sounds/launch_rail_friction_r53_0.ogg",
-      "sha256": "837b7a928815bacb1aedfc9c8ea5899f8ad9c28c95efdece6142167b8ecb512a",
-      "seconds": 0.74,
-      "decoded_peak": 0.34096452593803406,
-      "decoded_rms": 0.06947412341833115,
+      "seconds": 0.88,
+      "decoded_peak": 0.3383408188819885,
+      "decoded_rms": 0.09197110682725906,
       "source": "Original deterministic mathematical synthesis; no sampled recording",
       "channels": 1,
       "sample_rate": 48000
     },
     {
       "asset": "assets/projectseele/sounds/launch_rail_friction_r53_1.ogg",
-      "sha256": "f0101439824afb30f17bea27c348fb728c38d54141cfc7d698f6e9aa76ce37ee",
-      "seconds": 0.74,
-      "decoded_peak": 0.3374084234237671,
-      "decoded_rms": 0.07630852609872818,
+      "seconds": 0.88,
+      "decoded_peak": 0.33461782336235046,
+      "decoded_rms": 0.08274439722299576,
       "source": "Original deterministic mathematical synthesis; no sampled recording",
       "channels": 1,
       "sample_rate": 48000
     },
     {
       "asset": "assets/projectseele/sounds/launch_rail_friction_r53_2.ogg",
-      "sha256": "34b9d7760c05f1893adfd5b816548b9e83f141b7c8aaf33b497715e2ea14db04",
-      "seconds": 0.74,
-      "decoded_peak": 0.3304600715637207,
-      "decoded_rms": 0.07638581842184067,
+      "seconds": 0.88,
+      "decoded_peak": 0.33570465445518494,
+      "decoded_rms": 0.07744728028774261,
       "source": "Original deterministic mathematical synthesis; no sampled recording",
       "channels": 1,
       "sample_rate": 48000

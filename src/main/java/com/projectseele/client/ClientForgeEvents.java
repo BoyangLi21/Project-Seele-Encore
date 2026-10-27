@@ -550,9 +550,7 @@ public final class ClientForgeEvents
         {
             if (player != null && event.isUseItem() && !player.isShiftKeyDown())
             {
-                com.projectseele.visual.StanceContactR41Review.shutdownEntryTraceR45(player,null,"client_use_event_before_find",true,null);
                 Entity entryTarget = findEntryPlugTarget(player);
-                com.projectseele.visual.StanceContactR41Review.shutdownEntryTraceR45(player,entryTarget,"client_use_event_target",true,null);
                 if (entryTarget != null)
                 {
                     // The external capsule has a real hatch and passenger
@@ -934,9 +932,14 @@ public final class ClientForgeEvents
             {
                 event.setNewFovModifier(Mth.lerp(eva.chargeProgress(), 1.0F, 0.16F));
             }
-            else if (isRifleSightActive(eva))
+            else if (opticsAvailable(eva) && eva.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE)
             {
-                event.setNewFovModifier(eva.isExperimentalUnit()?0.72F:Mth.lerp(eva.rifleSightBlendR45(0),1F,.72F));
+                // Follow the same continuous raise/lower signal as the arms.
+                // Releasing RMB must not snap the lens wide before the gun lowers.
+                float blend=eva.isExperimentalUnit()?(isRifleSightActive(eva)?1F:0F)
+                        :Mth.clamp(eva.rifleSightBlendR45(Minecraft.getInstance().getFrameTime()),0F,1F);
+                blend=blend*blend*(3F-2F*blend);
+                event.setNewFovModifier(Mth.lerp(blend,1F,.72F));
             }
         }
     }

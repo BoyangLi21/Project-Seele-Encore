@@ -18,7 +18,9 @@ public final class PilotOpticsContinuity
         // The optical broadcast uses a separate render pass and must never advance the pilot filter.
         if(EvaCommandFeedClient.isOpticalRenderPass())return eye;
         double now=(double)eva.level().getGameTime()+partial;
-        Vec3 origin=new Vec3(Mth.lerp(partial,eva.xo,eva.getX()),Mth.lerp(partial,eva.yo,eva.getY()),Mth.lerp(partial,eva.zo,eva.getZ()));
+        Vec3 origin=com.projectseele.entity.EvaMechanicalFrameR52.active(eva)
+                ?com.projectseele.entity.EvaMechanicalFrameR52.frame(eva,partial).translation()
+                :new Vec3(Mth.lerp(partial,eva.xo,eva.getX()),Mth.lerp(partial,eva.yo,eva.getY()),Mth.lerp(partial,eva.zo,eva.getZ()));
         Vec3 local=eye.subtract(origin);
         boolean continuousBody=!eva.isExperimentalUnit()
                 &&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(eva,partial)

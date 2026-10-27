@@ -52,9 +52,9 @@ public final class NervArmamentStationRenderer
             int packedLight)
     {
         poses.pushPose();
-        renderSurfaceFrame(poses, buffers, packedLight,station.rackHalfWidthR47());
+        renderSurfaceFrame(poses, buffers, packedLight,station.rackHalfWidthR47(),station.rackHalfDepthR54());
         renderHatch(poses, buffers, packedLight,
-                station.getHatchProgress(partialTick),station.rackHalfWidthR47(),station.payloadR47()==7);
+                station.getHatchProgress(partialTick),station.rackHalfWidthR47(),station.rackHalfDepthR54(),station.payloadR47()==7);
 
         float lift = station.getLiftProgress(partialTick);
         if (lift > 0.001F || station.getStationState()
@@ -62,36 +62,36 @@ public final class NervArmamentStationRenderer
         {
             renderMovingRack(poses, buffers, packedLight, lift,
                     station.getDoorProgress(partialTick),
-                    station.isStocked(),station.payloadR47(),station.rackHalfWidthR47(),station.podTravelR47(),station.podHeightR47());
+                    station.isStocked(),station.payloadR47(),station.rackHalfWidthR47(),station.rackHalfDepthR54(),station.podTravelR47(),station.podHeightR47());
         }
         poses.popPose();
         super.render(station, yaw, partialTick, poses, buffers, packedLight);
     }
 
     private static void renderSurfaceFrame(PoseStack poses,
-            MultiBufferSource buffers, int light,int half)
+            MultiBufferSource buffers, int light,int half,int depth)
     {
         for (int x = -half-1; x <= half+1; x++)
         {
-            for (int z = -half-1; z <= half+1; z++)
+            for (int z = -depth-1; z <= depth+1; z++)
             {
-                if (Math.abs(x) == half+1 || Math.abs(z) == half+1)
+                if (Math.abs(x) == half+1 || Math.abs(z) == depth+1)
                 {
                     renderBlock(poses, buffers, light, FRAME, x, 0.0D, z);
                 }
             }
         }
-        for(int x:new int[]{-half-1,half+1})for(int z:new int[]{-half-1,half+1})
+        for(int x:new int[]{-half-1,half+1})for(int z:new int[]{-depth-1,depth+1})
             renderBlock(poses,buffers,light,WARNING,x,1.0D,z);
     }
 
     private static void renderHatch(PoseStack poses,
-            MultiBufferSource buffers, int light, float progress,int half,boolean hinged)
+            MultiBufferSource buffers, int light, float progress,int half,int depth,boolean hinged)
     {
         double slide = progress * (half+1.25D);
         for (int x = -half; x <= half; x++)
         {
-            for (int z = -half; z <= half; z++)
+            for (int z = -depth; z <= depth; z++)
             {
                 // The wide shield well folds its cover at the outer edges;
                 // a full sideways slide would sweep into the neighbouring well.
@@ -111,13 +111,13 @@ public final class NervArmamentStationRenderer
 
     private static void renderMovingRack(PoseStack poses,
             MultiBufferSource buffers, int light, float progress,
-            float doorProgress, boolean stocked,int payload,int half,float travel,float height)
+            float doorProgress, boolean stocked,int payload,int half,int depth,float travel,float height)
     {
-        float span=half*2+1,inner=half*2-1;
+        float inner=half*2-1,depthSpan=depth*2+1,innerDepth=depth*2-1;
         double baseY = -travel + progress * travel;
         for (int x = -half; x <= half; x++)
         {
-            for (int z = -half; z <= half; z++)
+            for (int z = -depth; z <= depth; z++)
             {
                 renderBlock(poses, buffers, light, ARMOUR,
                         x, baseY, z);
@@ -128,14 +128,14 @@ public final class NervArmamentStationRenderer
         // block models rather than hundreds of individual world blocks, so
         // the motion remains cheap and visually continuous.
         renderPanel(poses, buffers, light, ARMOUR,
-                -half-.5D, baseY + 1.0D, -half-.5D, 1.0F, height, span);
+                -half-.5D, baseY + 1.0D, -depth-.5D, 1.0F, height, depthSpan);
         renderPanel(poses, buffers, light, ARMOUR,
-                half-.5D, baseY + 1.0D, -half-.5D, 1.0F, height, span);
+                half-.5D, baseY + 1.0D, -depth-.5D, 1.0F, height, depthSpan);
         renderPanel(poses, buffers, light, ARMOUR,
-                -half+.5D, baseY + 1.0D, half-.5D, inner, height, 1.0F);
+                -half+.5D, baseY + 1.0D, depth-.5D, inner, height, 1.0F);
         renderPanel(poses, buffers, light, FRAME,
-                -half+.5D, baseY + height, -half+.5D,
-                inner, 1.0F, inner);
+                -half+.5D, baseY + height, -depth+.5D,
+                inner, 1.0F, innerDepth);
 
         // Covers stay shut throughout the rise. The wide shield cover rolls
         // into its own header; the narrower original pods retain sliding leaves.
@@ -145,16 +145,16 @@ public final class NervArmamentStationRenderer
         if(doorHeight>.001F)
         {
         renderPanel(poses, buffers, light, ARMOUR,
-                -half+.5D - doorSlide, doorBase, -half-.5D,
+                -half+.5D - doorSlide, doorBase, -depth-.5D,
                 inner/2, doorHeight, 1.0F);
         if(payload==7)
         {
             poses.pushPose();poses.translate(0,doorBase-(1-doorProgress)*(baseY+1),0);
-            poses.scale(1,1-doorProgress,1);renderSplitDoorLogo(poses,buffers,baseY,0,half);poses.popPose();
+            poses.scale(1,1-doorProgress,1);renderSplitDoorLogo(poses,buffers,baseY,0,half,depth);poses.popPose();
         }
-        else renderSplitDoorLogo(poses, buffers, baseY, doorSlide,half);
+        else renderSplitDoorLogo(poses, buffers, baseY, doorSlide,half,depth);
         renderPanel(poses, buffers, light, ARMOUR,
-                doorSlide, doorBase, -half-.5D,
+                doorSlide, doorBase, -depth-.5D,
                 inner/2, doorHeight, 1.0F);
         }
 
@@ -163,9 +163,9 @@ public final class NervArmamentStationRenderer
         for (int y = 2; y <= height-2; y++)
         {
             renderBlock(poses, buffers, light, RAIL,
-                    -half+1, baseY + y, half-1);
+                    -half+1, baseY + y, depth-1);
             renderBlock(poses, buffers, light, RAIL,
-                    half-1, baseY + y, half-1);
+                    half-1, baseY + y, depth-1);
         }
         for (int y = 3; y <= height-3; y += 5)
         {
@@ -198,7 +198,7 @@ public final class NervArmamentStationRenderer
     }
 
     private static void renderSplitDoorLogo(PoseStack poses,
-            MultiBufferSource buffers, double baseY, double doorSlide,int half)
+            MultiBufferSource buffers, double baseY, double doorSlide,int half,int depth)
     {
         ResourceLocation logo = TreeOfLifeWallClient.nervLogoTexture(
                 Minecraft.getInstance());
@@ -211,11 +211,11 @@ public final class NervArmamentStationRenderer
         renderLogoHalf(poses, consumer,
                 -half+.5D - doorSlide, 0.0D - doorSlide,
                 baseY + 15.0D, baseY + 31.0D,
-                -half-.515D, 1.0F, 0.5F);
+                -depth-.515D, 1.0F, 0.5F);
         renderLogoHalf(poses, consumer,
                 0.0D + doorSlide, half-.5D + doorSlide,
                 baseY + 15.0D, baseY + 31.0D,
-                -half-.515D, 0.5F, 0.0F);
+                -depth-.515D, 0.5F, 0.0F);
     }
 
     private static void renderLogoHalf(PoseStack poses,

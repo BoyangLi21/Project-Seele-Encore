@@ -15,13 +15,22 @@ import org.joml.Vector3f;
  * the continuous curved rig trajectory or silently grant native clearance. */
 public final class NervCraneGeometryR52
 {
-    private static NervCraneGeometryR52 obstacleSourceR52;
     private static volatile NervCraneGeometryR52 classpathSourceR52;
-    private record ActualCraneMeshesR52(NervCranePoseR52.State state,List<NervFlightProofR52.ObstacleMesh> meshes){}
+    private static volatile NervCraneGeometryR52 classpathRefitR53;
+    private record ActualCraneMeshesR52(NervCranePoseR52.State state,boolean refitted,List<NervFlightProofR52.ObstacleMesh> meshes){}
     private static final Map<com.projectseele.entity.NervCarrierPlatformEntity,ActualCraneMeshesR52> ACTUAL_CRANES_R52=new WeakHashMap<>();
     /** Same complete nineteen parts, real trolley frame, hoist offset,
      * reference and original gripper pose used by PlugGantryRenderer. */
-    public static synchronized List<NervFlightProofR52.ObstacleMesh> actualObstacleMeshesR52(com.projectseele.entity.NervCarrierPlatformEntity e)throws IOException {if(!e.isPlugCrane()||!e.hasDeclaredMachineFrameR52())throw new IllegalStateException("Actual declared capsule hoist required");if(obstacleSourceR52==null)obstacleSourceR52=loadClasspath();var capsule=e.getCranePlug();var state=new NervCranePoseR52.State(RigidTransform.of(e.position(),e.declaredMachineRotationR52()),e.actualCraneBottomOffsetR52(),capsule==null?null:capsule.getCanonicalTransform(),capsule!=null,e.hasCraneReference()?e.position().add(e.getCraneReferenceAnchor()):null,e.hasCraneReference()?e.getCraneReferenceRotation():null);var old=ACTUAL_CRANES_R52.get(e);if(old!=null&&old.state().equals(state))return old.meshes();var out=new ArrayList<NervFlightProofR52.ObstacleMesh>();for(var p:obstacleSourceR52.parts(state.pose(obstacleSourceR52.mount())))out.add(new NervFlightProofR52.ObstacleMesh(new NervRigidMeshSweepR52(p.triangles()),p.frame()));if(out.size()!=19)throw new IllegalStateException("Complete actual hoist inventory required");var result=List.copyOf(out);ACTUAL_CRANES_R52.put(e,new ActualCraneMeshesR52(state,result));return result;}
+    public static synchronized List<NervFlightProofR52.ObstacleMesh> actualObstacleMeshesR52(com.projectseele.entity.NervCarrierPlatformEntity e)throws IOException
+    {
+        if(!e.isPlugCrane()||!e.hasDeclaredMachineFrameR52())throw new IllegalStateException("Actual declared capsule hoist required");
+        boolean refitted=CarrierMountProfileR53.read(e,1).aboveFloor();var source=refitted?loadRefittedClasspath():loadClasspath();var capsule=e.getCranePlug();
+        var state=new NervCranePoseR52.State(RigidTransform.of(e.position(),e.declaredMachineRotationR52()),e.actualCraneBottomOffsetR52(),capsule==null?null:capsule.getCanonicalTransform(),capsule!=null,e.hasCraneReference()?e.position().add(e.getCraneReferenceAnchor()):null,e.hasCraneReference()?e.getCraneReferenceRotation():null);
+        var old=ACTUAL_CRANES_R52.get(e);if(old!=null&&old.state().equals(state)&&old.refitted()==refitted)return old.meshes();
+        var out=new ArrayList<NervFlightProofR52.ObstacleMesh>();for(var p:source.parts(source.pose(state)))out.add(new NervFlightProofR52.ObstacleMesh(new NervRigidMeshSweepR52(p.triangles()),p.frame()));
+        if(out.size()!=(source.bearing()?22:19))throw new IllegalStateException("Complete actual hoist inventory required");
+        var result=List.copyOf(out);ACTUAL_CRANES_R52.put(e,new ActualCraneMeshesR52(state,refitted,result));return result;
+    }
     private static volatile double[] rollingWheel;
     /** Actual finite baked tread, rather than an analytic-circle contact.
      * The submillimetre bogie displacement keeps that same mesh on its rail. */
@@ -32,13 +41,22 @@ public final class NervCraneGeometryR52
     }
     public record Part(String name,double[] triangles,RigidTransform frame)
     {public Part{triangles=triangles.clone();}public double[] triangles(){return triangles.clone();}}
-    private final Map<String,double[]> procedural,gripper;private final Map<String,Vec3> anchors;private final String source;
-    private NervCraneGeometryR52(Map<String,double[]> proc,Map<String,double[]> grip,Map<String,Vec3> anchors,String source)
-    {procedural=Map.copyOf(proc);gripper=Map.copyOf(grip);this.anchors=Map.copyOf(anchors);this.source=source;}
+    private final Map<String,double[]> procedural,gripper;private final Map<String,Vec3> anchors;private final String source;private final boolean refitted,bearing;
+    private NervCraneGeometryR52(Map<String,double[]> proc,Map<String,double[]> grip,Map<String,Vec3> anchors,String source,boolean refitted,boolean bearing)
+    {procedural=Map.copyOf(proc);gripper=Map.copyOf(grip);this.anchors=Map.copyOf(anchors);this.source=source;this.refitted=refitted;this.bearing=bearing;}
+    public boolean refitted(){return refitted;}
+    public boolean bearing(){return bearing;}
+    public NervCranePoseR52.Pose pose(NervCranePoseR52.State state){return state.pose(mount(),bearing);}
     public String sourceFingerprint(){return source;}public Vec3 mount(){return anchors.get("mount");}
     public static synchronized NervCraneGeometryR52 loadClasspath()throws IOException
-    {if(classpathSourceR52!=null)return classpathSourceR52;var loaded=load(path->{if(path.equals("eva/actual_crane_procedural_triangles_r52.json"))try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes(path+".gz")))){return stream.readAllBytes();}return EvaOriginalMeshGeometryR52.classpathBytes(path);},"3411018955aec9b8827dcfcc217275fffd3edbe8880d448500f06beefd216064","af16832dc6c143d3c6a23eb38811021b75c13860436682e8071b9990fc83067f");classpathSourceR52=loaded;return loaded;}
+    {if(classpathSourceR52!=null)return classpathSourceR52;var loaded=load(path->{if(path.equals("eva/actual_crane_procedural_triangles_r52.json"))try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/stable_crane_triangles_r53.json.gz")))){return stream.readAllBytes();}return EvaOriginalMeshGeometryR52.classpathBytes(path);},"72c093f4b267dcc14780df7786b7f5219e09a0140dabda1c7e085c4b15b04c41","af16832dc6c143d3c6a23eb38811021b75c13860436682e8071b9990fc83067f");classpathSourceR52=loaded;return loaded;}
     public static boolean classpathReadyR52(){return classpathSourceR52!=null;}
+    public static synchronized NervCraneGeometryR52 loadRefittedClasspath()throws IOException
+    {
+        if(classpathRefitR53!=null)return classpathRefitR53;
+        var loaded=load(path->{if(path.equals("eva/actual_crane_procedural_triangles_r52.json"))try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/raised_winch_triangles_r53.json.gz")))){return stream.readAllBytes();}return EvaOriginalMeshGeometryR52.classpathBytes(path);},"eced42ebef5b3251fd4216ec3add708a70fb99bf48b6fef5d1b9560b1b334ace","af16832dc6c143d3c6a23eb38811021b75c13860436682e8071b9990fc83067f");
+        if(!loaded.refitted())throw new IllegalStateException("Explicit refitted hoist source required");classpathRefitR53=loaded;return loaded;
+    }
     Map<String,double[]> rawParts(){var result=new HashMap<String,double[]>(procedural);gripper.forEach((name,xyz)->result.put("gripper/"+name,xyz));return Map.copyOf(result);}
     Vec3 jawPivot(String name){return anchors.get(name);}
     public static NervCraneGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource source,String proceduralSha,String gripperSha)throws IOException
@@ -46,42 +64,48 @@ public final class NervCraneGeometryR52
         byte[] proc=source.read("eva/actual_crane_procedural_triangles_r52.json"),grip=source.read("mesh/tripo_gripper_r48.json");require(sha(proc).equals(proceduralSha)&&sha(grip).equals(gripperSha),"Actual whole crane source identity changed");
         var document=JsonParser.parseString(new String(proc,StandardCharsets.UTF_8)).getAsJsonObject();require(document.get("schema").getAsString().equals("projectseele.r52.actual-crane-procedural-triangles.v1"),"Actual crane bake schema required");var meshes=new HashMap<String,double[]>();
         for(var row:document.getAsJsonObject("parts").entrySet()){var array=row.getValue().getAsJsonArray();require(array.size()>0&&array.size()%9==0,"Complete actual procedural triangles required");double[] xyz=new double[array.size()];for(int i=0;i<xyz.length;i++){xyz[i]=array.get(i).getAsDouble();require(Double.isFinite(xyz[i]),"Nonfinite crane geometry");}meshes.put(row.getKey(),xyz);}
-        require(meshes.keySet().equals(Set.of("top","yoke","sheave","wheel","links","rope"))&&meshes.values().stream().mapToInt(x->x.length/9).sum()==28044,"Actual complete six procedural parts required");
+        boolean refitted=document.has("raised_winch_deck_r53");if(refitted)require(document.get("raised_winch_deck_r53").getAsDouble()==NervCraneBearingR53.WINCH_DECK,"Bounded refitted winch datum required");
+        require(meshes.keySet().equals(Set.of("top","yoke","sheave","wheel","links","rope"))&&meshes.values().stream().mapToInt(x->x.length/9).sum()==(refitted?28092:28044),"Actual complete six procedural parts required");
         var jaws=new HashMap<String,double[]>();var anchors=new HashMap<String,Vec3>();int stride=-1;
         try(var json=new JsonReader(new InputStreamReader(new ByteArrayInputStream(grip),StandardCharsets.UTF_8)))
         {json.beginObject();while(json.hasNext())switch(json.nextName())
         {case "stride"->stride=json.nextInt();case "anchors"->{json.beginObject();while(json.hasNext()){String name=json.nextName();json.beginArray();var point=new Vec3(json.nextDouble(),json.nextDouble(),json.nextDouble());json.endArray();require(Double.isFinite(point.lengthSqr()),"Actual clamp anchor required");require(anchors.putIfAbsent(name,point)==null,"Duplicate clamp anchor");}json.endObject();}
         case "parts"->{json.beginObject();while(json.hasNext()){String name=json.nextName();require(jaws.putIfAbsent(name,positions(json))==null,"Duplicate actual clamp part");}json.endObject();}default->json.skipValue();}json.endObject();}
         require(stride==8&&jaws.keySet().equals(Set.of("body","jaw_left","jaw_right"))&&anchors.keySet().containsAll(Set.of("mount","jaw_left","jaw_right")),"Actual imported clamp selection incomplete");
-        return new NervCraneGeometryR52(meshes,jaws,anchors,sha((proceduralSha+":"+gripperSha).getBytes(StandardCharsets.UTF_8)));
+        return new NervCraneGeometryR52(meshes,jaws,anchors,sha((proceduralSha+":"+gripperSha).getBytes(StandardCharsets.UTF_8)),refitted,refitted||document.has("tail_bearing_r53")&&document.get("tail_bearing_r53").getAsBoolean());
     }
-    public List<Part> parts(NervCranePoseR52.Pose pose)
+    public List<Part> parts(NervCranePoseR52.Pose pose){return parts(pose,bearing);}
+    public List<Part> parts(NervCranePoseR52.Pose pose,boolean bearing)
     {
         var result=new ArrayList<Part>();var root=pose.machine();result.add(new Part("top",procedural.get("top"),root));
         for(double x:new double[]{-4,4})for(double z:new double[]{-2.8,2.8})result.add(new Part("wheel/"+x+"/"+z,procedural.get("wheel"),root.compose(RigidTransform.of(new Vec3(x,wheelBearingOffset(root.translation().z/.38),z),new Quaternionf().rotationX((float)(root.translation().z/.38))))));
         result.add(new Part("yoke",procedural.get("yoke"),root.compose(new RigidTransform(pose.yoke(),0,0,0,1))));
         for(double x:new double[]{-2.4,2.4})for(double z:new double[]{-.78,.78})
-        {var end=pose.yoke().add(x,0,z);rope(result,"hoist/"+x+"/"+z,new Vec3(x,-.7,z),end,.065,root);result.add(new Part("sheave/"+x+"/"+z,procedural.get("sheave"),root.compose(new RigidTransform(end,0,0,0,1))));}
+        {var end=pose.yoke().add(x,0,z);rope(result,"hoist/"+x+"/"+z,new Vec3(x,(refitted?NervCraneBearingR53.WINCH_DECK:0)-.7,z),end,.065,root);result.add(new Part("sheave/"+x+"/"+z,procedural.get("sheave"),root.compose(new RigidTransform(end,0,0,0,1))));}
         rope(result,"mount/left",pose.yoke().add(-1.8,-.2,0),pose.mount().add(-.5,0,0),.10,root);rope(result,"mount/right",pose.yoke().add(1.8,-.2,0),pose.mount().add(.5,0,0),.10,root);
         var frame=root.compose(pose.grip());result.add(new Part("gripper/body",gripper.get("body"),frame));
         for(String side:List.of("left","right")){String key="jaw_"+side;Vec3 pivot=anchors.get(key);var rotation=new Quaternionf().rotationZ((float)Math.toRadians((side.equals("left")?-1:1)*32*pose.released()));var turn=RigidTransform.of(Vec3.ZERO,rotation);var about=new RigidTransform(pivot.subtract(turn.transformVector(pivot)),turn.qx(),turn.qy(),turn.qz(),turn.qw());result.add(new Part("gripper/"+key,gripper.get(key),frame.compose(about)));}
+        if(bearing)for(String name:NervCraneBearingR53.names())
+        {var original=result.stream().filter(p->p.name().equals("gripper/"+name)).findFirst().orElseThrow();result.add(new Part("bearing/"+name,NervCraneBearingR53.triangles(name),original.frame()));}
         return List.copyOf(result);
     }
     public record Transform(RigidTransform frame,Vec3 scale)
     {Vec3 point(Vec3 p){return frame.transformPoint(p.multiply(scale));}}
-    double[] sourceFor(String name){return name.startsWith("wheel/")?procedural.get("wheel"):name.startsWith("sheave/")?procedural.get("sheave"):name.startsWith("hoist/")||name.startsWith("mount/")?procedural.get("rope"):name.startsWith("gripper/")?gripper.get(name.substring(8)):procedural.get(name);}
+    double[] sourceFor(String name){return name.startsWith("bearing/")?NervCraneBearingR53.triangles(name.substring(8)):name.startsWith("wheel/")?procedural.get("wheel"):name.startsWith("sheave/")?procedural.get("sheave"):name.startsWith("hoist/")||name.startsWith("mount/")?procedural.get("rope"):name.startsWith("gripper/")?gripper.get(name.substring(8)):procedural.get(name);}
     /** Same finite source meshes; only the actual cylinder's axial scale changes. */
-    Map<String,Transform> transforms(NervCranePoseR52.Pose pose)
+    Map<String,Transform> transforms(NervCranePoseR52.Pose pose){return transforms(pose,bearing);}
+    Map<String,Transform> transforms(NervCranePoseR52.Pose pose,boolean bearing)
     {
         var out=new LinkedHashMap<String,Transform>();var root=pose.machine();var one=new Vec3(1,1,1);
         out.put("top",new Transform(root,one));
         for(double x:new double[]{-4,4})for(double z:new double[]{-2.8,2.8})out.put("wheel/"+x+"/"+z,new Transform(root.compose(RigidTransform.of(new Vec3(x,wheelBearingOffset(root.translation().z/.38),z),new Quaternionf().rotationX((float)(root.translation().z/.38)))),one));
         out.put("yoke",new Transform(root.compose(new RigidTransform(pose.yoke(),0,0,0,1)),one));
         for(double x:new double[]{-2.4,2.4})for(double z:new double[]{-.78,.78})
-        {var end=pose.yoke().add(x,0,z);ropeTransform(out,"hoist/"+x+"/"+z,new Vec3(x,-.7,z),end,.065,root);out.put("sheave/"+x+"/"+z,new Transform(root.compose(new RigidTransform(end,0,0,0,1)),one));}
+        {var end=pose.yoke().add(x,0,z);ropeTransform(out,"hoist/"+x+"/"+z,new Vec3(x,(refitted?NervCraneBearingR53.WINCH_DECK:0)-.7,z),end,.065,root);out.put("sheave/"+x+"/"+z,new Transform(root.compose(new RigidTransform(end,0,0,0,1)),one));}
         ropeTransform(out,"mount/left",pose.yoke().add(-1.8,-.2,0),pose.mount().add(-.5,0,0),.10,root);ropeTransform(out,"mount/right",pose.yoke().add(1.8,-.2,0),pose.mount().add(.5,0,0),.10,root);
         var frame=root.compose(pose.grip());out.put("gripper/body",new Transform(frame,one));
         for(String side:List.of("left","right")){String key="jaw_"+side;Vec3 pivot=anchors.get(key);var rotation=new Quaternionf().rotationZ((float)Math.toRadians((side.equals("left")?-1:1)*32*pose.released()));var turn=RigidTransform.of(Vec3.ZERO,rotation);var about=new RigidTransform(pivot.subtract(turn.transformVector(pivot)),turn.qx(),turn.qy(),turn.qz(),turn.qw());out.put("gripper/"+key,new Transform(frame.compose(about),one));}
+        if(bearing)for(String name:NervCraneBearingR53.names())out.put("bearing/"+name,out.get("gripper/"+name));
         return Map.copyOf(out);
     }
     private static void ropeTransform(Map<String,Transform> out,String name,Vec3 first,Vec3 last,double radius,RigidTransform root)

@@ -17,7 +17,8 @@ final class EvaCannonContactRigR45
                 ||!eva.isPoweredOn()||eva.isNervLogisticsLocked()||eva.isFirstBattleActive()
                 ||eva.isBerserk()||eva.getActivationTicks()>0||EvaShutdownR30.displayed(eva)
                 ||EvaAirTransportR31.active(eva)||com.projectseele.physics.CombatBodyDynamics.active(eva))return;
-        var grips=EvaAnatomicalHandsR45.rig(eva.getUnitVariant()).grips();
+        var handRig=EvaAnatomicalHandsR45.forEntityR53(eva);if(handRig==null)return;
+        var grips=handRig.grips();
         if(!grips.containsKey("l")||!grips.containsKey("r"))return;
         var body=EvaBodyPose.sample(eva,partial);
         var frame=EvaCannonFrameR45.sample(eva,partial,eva.getAimDirectionForPoseCapture(partial),

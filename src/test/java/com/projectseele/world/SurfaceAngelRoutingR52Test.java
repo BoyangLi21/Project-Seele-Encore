@@ -25,6 +25,23 @@ public final class SurfaceAngelRoutingR52Test
         check(!SurfaceAngelPlanR52.declarationMatchesR52("other:dimension","projectseele:geofront",true),"Explicit foreign dimension is not inferred from generator type");
         check(SurfaceAngelPlanR52.declarationMatchesR52("","projectseele:geofront",true),"Damaged declaration holds its GeoFront instead of old-site fallback");
         check(!SurfaceAngelPlanR52.declarationMatchesR52("","minecraft:overworld",false),"Damaged GeoFront declaration does not select the overworld");
-        System.out.println("Surface Angel per-world routing PASS checks="+checks+"; no World/game or campaign completion");
+        var owner=java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
+        var target=java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
+        var foreign=java.util.UUID.fromString("00000000-0000-0000-0000-000000000003");
+        for(String chapter:new String[]{"sachiel","shamshel"})for(double distance:new double[]{48,80,160})
+        {
+            var data=new TvCampaignSavedData();data.active=chapter;data.owner=owner;data.angel=target;data.phase="approach";data.generationR43=6;
+            check(!data.canFinish(chapter,owner,target),"Merely approaching does not satisfy combat completion");
+            check(SurfaceAngelAssaultR52.beginsCombatR53(data.phase,distance*distance,160),"Accepted ranged engagement uses the declared range, including its boundary");
+            data.phase="combat";
+            check(!data.canFinish(chapter,foreign,target)&&!data.canFinish(chapter,owner,foreign),"Ranged engagement cannot change accepted owner or target identity");
+            check(!data.canFinish(chapter.equals("sachiel")?"shamshel":"sachiel",owner,target),"Another chapter cannot claim this kill");
+            check(data.finish(chapter,owner,target)&&data.targetDeathConfirmedR45&&data.phase.equals("combat_victory"),"The ordinary death callback can finish the accepted ranged encounter");
+            check(!data.archiveEpisode(chapter,owner,6),"Victory still requires original recovery and equipment handover before archive");
+        }
+        check(!SurfaceAngelAssaultR52.beginsCombatR53("approach",160.001*160.001,160),"Outside the declared engagement range remains approaching");
+        for(String phase:new String[]{"alert","combat","cancel","failure","combat_victory","episode_archived","idle"})
+            check(!SurfaceAngelAssaultR52.beginsCombatR53(phase,80*80,160),"An engagement cannot bypass alert or reopen another phase: "+phase);
+        System.out.println("Surface Angel routing/ranged engagement PASS checks="+checks+"; state contract only, no native encounter completion");
     }
 }

@@ -50,7 +50,7 @@ public final class NervLiftPassengerSync
     public static void beforePassengerPhysics(TickEvent.PlayerTickEvent event)
     {
         if(event.phase!=TickEvent.Phase.START||!(event.player instanceof ServerPlayer p)
-                ||p.isSpectator()||p.isPassenger())return;
+                ||!p.isAlive()||p.isSpectator()||p.isPassenger())return;
         var groups=LEVELS.get(p.serverLevel());if(groups==null)return;
         for(var entry:groups.entrySet())
         {
@@ -78,6 +78,15 @@ public final class NervLiftPassengerSync
         if(event.phase!=TickEvent.Phase.END||!net.minecraftforge.fml.ModList.get().isLoaded("movingelevators"))return;
         ServerLevel level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);
         if(level==null||!FacilityWorldPolicy.isS20Rebuild(event.getServer()))return;
+        List<ServerPlayer> players=level.players().stream().filter(p->p.isAlive()&&!p.isSpectator()&&!p.isPassenger()).toList();
+        if(players.isEmpty())
+        {
+            // Vehicle occupants cannot ride personnel lifts. Drop their stale
+            // cabin association without reading every authored lift controller.
+            var stale=LEVELS.remove(level);if(stale!=null)stale.values().forEach(NervLiftPassengerSync::invalidate);
+            return;
+        }
+        Set<UUID> available=new HashSet<>();players.forEach(p->available.add(p.getUUID()));
         Map<String,Riders> groups=LEVELS.computeIfAbsent(level,l->new HashMap<>());
         var specs=managedLifts(level);var activeIds=new HashSet<String>();specs.forEach(spec->activeIds.add(spec.id()));
         groups.keySet().removeIf(id->!activeIds.contains(id));
@@ -108,8 +117,7 @@ public final class NervLiftPassengerSync
             }
             final double currentFloor=floor;
             final AABB car=bounds;
-            List<ServerPlayer> players=level.players().stream().filter(p->p.isAlive()&&!p.isSpectator()&&!p.isPassenger()).toList();
-            Set<UUID> available=new HashSet<>();players.forEach(p->available.add(p.getUUID()));riders.passengers.retainAll(available);
+            riders.passengers.retainAll(available);
             // Sample every tick, including the very first movement tick. A
             // caller can enter and press a floor before a five-tick scan runs.
             for(ServerPlayer player:players)

@@ -118,6 +118,9 @@ final class TvCageEnclosureR44
     static boolean render(int variant, float opening, PoseStack poses, int light)
     {return render(variant,opening,poses,light,Float.NaN);}
     static boolean render(int variant,float opening,PoseStack poses,int light,float lowerProgress)
+    {return render(variant,opening,poses,light,lowerProgress,com.projectseele.world.CarrierMountProfileR53.LEGACY);}
+
+    static boolean render(int variant,float opening,PoseStack poses,int light,float lowerProgress,com.projectseele.world.CarrierMountProfileR53.State mounting)
     {
         if (!com.projectseele.world.TvCageCollisionR44.enabled() || variant < 0 || variant > 2) return false;
         load();
@@ -138,6 +141,7 @@ final class TvCageEnclosureR44
                 case "telescoping_translation" -> component.translation.scale(ramp(opening, component.from, component.to));
                 default -> Vec3.ZERO;
             };
+            move=com.projectseele.world.NervPlantMotionR52.calibratedComponentMovementR53(component.motion,move,mounting);
             poses.pushPose();
             poses.translate(move.x, move.y, move.z);
             PARTS.get(component.part).draw(poses, TvFacilityMeshes.currentBuffers(), light);

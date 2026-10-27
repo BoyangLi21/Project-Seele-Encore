@@ -19,6 +19,8 @@ public final class NervSiloHatchGeometryR52
     public record Piece(NervAirframeGeometryR52.Part part,RigidTransform local,boolean moving){}
     private record Fixed(NervAirframeGeometryR52.Part part,NervRigidMeshSweepR52 mesh){}
     private static final Map<Spec,NervSiloHatchGeometryR52> CACHE=new HashMap<>();
+    private static final Map<Spec,NervSiloHatchGeometryR52> RETIRED_SERVICE_CACHE=new HashMap<>();
+    private final boolean retiredServiceLeaves;
     private final Spec spec;private final List<Fixed> fixed;private final NervAirframeGeometryR52.Part[][] panels;private final NervRigidMeshSweepR52[][] panelMeshes;
     private record SweepKey(RigidTransform frame,float from,float to){}
     private record Sweep(List<AABB> envelopes,AABB bounds){}
@@ -31,9 +33,9 @@ public final class NervSiloHatchGeometryR52
         if(bounds==null)throw new IllegalStateException("Complete declared hatch sweep required");
         known=new Sweep(boxes,bounds);if(sweeps.size()>=4)sweeps.remove(sweeps.keySet().iterator().next());sweeps.put(key,known);return known;
     }
-    private NervSiloHatchGeometryR52(Spec spec,Map<String,NervAirframeGeometryR52.Part> source)
+    private NervSiloHatchGeometryR52(Spec spec,Map<String,NervAirframeGeometryR52.Part> source,boolean retiredServiceLeaves)
     {
-        this.spec=Objects.requireNonNull(spec);var parts=new ArrayList<NervAirframeGeometryR52.Part>();
+        this.spec=Objects.requireNonNull(spec);this.retiredServiceLeaves=retiredServiceLeaves;var parts=new ArrayList<NervAirframeGeometryR52.Part>();
         var frame=warp(source.get("hatch_frame"),"frame",0);
         parts.add(spec.serviceColumnPorts()?serviceCarrierExit(serviceFrameReliefs(frame)):frame);
         for(int side:new int[]{-1,1}){var cassette=mirror(warp(source.get("hatch_cassette"),"cassette/"+side,1),side);parts.add(spec.serviceColumnPorts()?serviceCassetteReliefs(cassette):cassette);}
@@ -41,15 +43,25 @@ public final class NervSiloHatchGeometryR52
         // the 31m aperture. Undeclared legacy doors use their old renderer.
         for(int side:new int[]{-1,1})for(int end:new int[]{-1,1})parts.add(beam(side,end));
         var fm=new ArrayList<Fixed>();for(var p:parts)fm.add(new Fixed(p,new NervRigidMeshSweepR52(p.xyz())));fixed=List.copyOf(fm);
-        panels=new NervAirframeGeometryR52.Part[2][4];panelMeshes=new NervRigidMeshSweepR52[2][4];for(int side=0;side<2;side++)for(int i=0;i<4;i++){var base=mirror(warp(source.get("hatch_panel"),"panel/"+(side==0?-1:1),2),side==0?-1:1);panels[side][i]=spec.uprightGuidePorts()?uprightGuidePorts(base,side,i):spec.serviceColumnPorts()&&i==3?columnPorts(base,side,i):base;panelMeshes[side][i]=new NervRigidMeshSweepR52(panels[side][i].xyz());}
+        int panelCount=retiredServiceLeaves?0:SiloHatchMechanism.PANELS;if(retiredServiceLeaves&&fixed.size()!=7)throw new IllegalStateException("All seven original fixed service-hatch members required");
+        panels=new NervAirframeGeometryR52.Part[2][panelCount];panelMeshes=new NervRigidMeshSweepR52[2][panelCount];for(int side=0;side<2;side++)for(int i=0;i<panelCount;i++){var leaf=warp(source.get("hatch_panel"),"panel/"+(side==0?-1:1),2);if(spec.uprightGuidePorts())leaf=outletBearingPlateR53(leaf);var base=mirror(leaf,side==0?-1:1);panels[side][i]=spec.uprightGuidePorts()?uprightGuidePorts(base,side,i):spec.serviceColumnPorts()&&i==3?columnPorts(base,side,i):base;panelMeshes[side][i]=new NervRigidMeshSweepR52(panels[side][i].xyz());}
     }
     public static NervSiloHatchGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource bytes,Spec spec)throws IOException
+    {return load(bytes,spec,false);}
+    private static NervSiloHatchGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource bytes,Spec spec,boolean retiredServiceLeaves)throws IOException
     {
         byte[] raw=bytes.read(SOURCE);String sha;try{sha=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw));}catch(Exception e){throw new IllegalStateException(e);}if(!SOURCE_SHA.equals(sha))throw new IllegalStateException("Declared hatch draw/proof R16 source changed");
-        var data=JsonParser.parseString(new String(raw,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts");var parts=new HashMap<String,NervAirframeGeometryR52.Part>();for(String name:List.of("hatch_frame","hatch_cassette","hatch_panel")){var a=data.getAsJsonArray(name);var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();parts.put(name,new NervAirframeGeometryR52.Part(name,v));}return new NervSiloHatchGeometryR52(spec,parts);
+        var data=JsonParser.parseString(new String(raw,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts");var parts=new HashMap<String,NervAirframeGeometryR52.Part>();for(String name:List.of("hatch_frame","hatch_cassette","hatch_panel")){var a=data.getAsJsonArray(name);var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();parts.put(name,new NervAirframeGeometryR52.Part(name,v));}return new NervSiloHatchGeometryR52(spec,parts,retiredServiceLeaves);
     }
     public static synchronized NervSiloHatchGeometryR52 loadClasspath(Spec spec)throws IOException
     {var result=CACHE.get(spec);if(result==null){result=load(EvaOriginalMeshGeometryR52::classpathBytes,spec);CACHE.put(spec,result);}return result;}
+    public static synchronized NervSiloHatchGeometryR52 loadRetiredServiceClasspathR53(Spec spec)throws IOException
+    {
+        if(spec==null||!spec.serviceColumnPorts()||spec.uprightGuidePorts()||spec.separationSign()!=-1||spec.openingX()!=33||spec.openingZ()!=33)
+            throw new IllegalArgumentException("Original service-hatch source required");
+        var known=RETIRED_SERVICE_CACHE.get(spec);if(known==null){known=load(EvaOriginalMeshGeometryR52::classpathBytes,spec,true);RETIRED_SERVICE_CACHE.put(spec,known);}return known;
+    }
+    public boolean retiredServiceLeavesR53(){return retiredServiceLeaves;}
     /** The original upright carrier leaves the opened service pit through its
      * front collar. Keep the side corners, rear half and all separate cassettes.
      * This exact polygon subtraction never changes a moving shutter panel. */
@@ -115,6 +127,16 @@ public final class NervSiloHatchGeometryR52
     private NervAirframeGeometryR52.Part serviceCassetteReliefs(NervAirframeGeometryR52.Part cassette)
     {
         var vertices=cassette.vertices();if(vertices.length!=876*18)throw new IllegalStateException("Exact R16 cassette primitive layout required");var ports=new ArrayList<AABB>(columnPortsInHatchFrame().stream().map(b->new AABB(b.minX,-2,b.minZ,b.maxX,2,b.maxZ)).toList());ports.addAll(lowerFixedReliefs(true));
+        // The explicitly installed five-member fixed-column refit retires all
+        // four cassette hangers. Its cassette keeps the original solid skin
+        // and bottom here; only the unchanged column/foot-seat ports remain.
+        // Legacy telescopes still require all four exact hanger interfaces.
+        try
+        {
+            if(NervLowerFrameR52.fixedCarrierBayR53())
+                return primitiveReliefs(cassette,Map.of(0,new Relief(12,ports)));
+        }
+        catch(IOException missing){throw new IllegalStateException("Declared fixed-carrier equipment source required",missing);}
         double lower=Double.POSITIVE_INFINITY,upper=Double.NEGATIVE_INFINITY;for(int i=44*18+1;i<56*18;i+=6){lower=Math.min(lower,vertices[i]);upper=Math.max(upper,vertices[i]);}final double bottom=lower-.001,top=upper+.001;
         // The 0.19m solid floor and its lower housing edge alone receive the
         // actual 40x200mm hanger opening. The upper wall remains unchanged.
@@ -169,6 +191,17 @@ public final class NervSiloHatchGeometryR52
         for(var port:ports){var next=new ArrayList<List<double[]>>();for(var original:all){List<double[]> inner=original;var outside=clip(inner,0,port.minX,false);if(outside.size()>=3)next.add(outside);inner=clip(inner,0,port.minX,true);outside=clip(inner,0,port.maxX,true);if(outside.size()>=3)next.add(outside);inner=clip(inner,0,port.maxX,false);outside=clip(inner,2,port.minZ,false);if(outside.size()>=3)next.add(outside);inner=clip(inner,2,port.minZ,true);outside=clip(inner,2,port.maxZ,true);if(outside.size()>=3)next.add(outside);}all=next;}
         var values=new ArrayList<Double>();for(var poly:all)for(int c=1;c+1<poly.size();c++){var a=poly.get(0);var b=poly.get(c);var d=poly.get(c+1);if(new Vec3(b[0]-a[0],b[1]-a[1],b[2]-a[2]).cross(new Vec3(d[0]-a[0],d[1]-a[1],d[2]-a[2])).lengthSqr()<=1e-20)continue;for(int n:new int[]{0,c,c+1}){var p=poly.get(n);for(int k=0;k<6;k++)values.add(k==0?p[k]-offset:p[k]);}}return new NervAirframeGeometryR52.Part(prefix+"/"+side+"/"+index,values.stream().mapToDouble(Double::doubleValue).toArray());
     }
+    /** The closed outlet datum coincides with the original .98m bolt tops.
+     * Weld a finite bearing strip to each existing armour leaf at that datum;
+     * it follows the same rigid leaf and leaves the original seams/guide ports.
+     * Imported ribs alone lie .07/.19m below the native landing surface. */
+    private NervAirframeGeometryR52.Part outletBearingPlateR53(NervAirframeGeometryR52.Part leaf)
+    {
+        var plate=box("outlet_bearing_strip",.05,.79,0,spec.panelWidth()-.05,SiloHatchMechanism.PANEL_TOP,6,74,84,78);
+        var original=leaf.vertices();var added=plate.vertices();var combined=Arrays.copyOf(original,original.length+added.length);
+        System.arraycopy(added,0,combined,original.length,added.length);
+        return new NervAirframeGeometryR52.Part(leaf.name(),combined);
+    }
     private static NervAirframeGeometryR52.Part mirror(NervAirframeGeometryR52.Part part,int side)
     {var a=part.vertices();if(side<0)for(int i=0;i<a.length;i+=18){for(int j=0;j<3;j++)a[i+j*6]=-a[i+j*6];for(int j=0;j<6;j++){double old=a[i+6+j];a[i+6+j]=a[i+12+j];a[i+12+j]=old;}}return new NervAirframeGeometryR52.Part(part.name(),a);}
     private NervAirframeGeometryR52.Part beam(int side,int end)
@@ -183,7 +216,7 @@ public final class NervSiloHatchGeometryR52
     public Spec spec(){return spec;}
     public List<Piece> pieces(float open)
     {
-        validate(open);var parts=new ArrayList<Piece>();for(var p:fixed)parts.add(new Piece(p.part(),RigidTransform.identity(),false));for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++){var p=SiloHatchMechanism.panel(i,open,spec);parts.add(new Piece(panels[side][i],new RigidTransform(new Vec3((side==0?-1:1)*p.x(),p.y(),0),0,0,0,1),true));}return List.copyOf(parts);
+        validate(open);var parts=new ArrayList<Piece>();for(var p:fixed)parts.add(new Piece(p.part(),RigidTransform.identity(),false));for(int side=0;side<2;side++)for(int i=0;i<panels[side].length;i++){var p=SiloHatchMechanism.panel(i,open,spec);parts.add(new Piece(panels[side][i],new RigidTransform(new Vec3((side==0?-1:1)*p.x(),p.y(),0),0,0,0,1),true));}return List.copyOf(parts);
     }
     public List<Vec3> bearingPoints()
     {
@@ -191,7 +224,7 @@ public final class NervSiloHatchGeometryR52
         return List.copyOf(points);
     }
     public AABB bounds(float open)
-    {validate(open);AABB all=null;for(var p:fixed)all=all==null?p.mesh().bounds():all.minmax(p.mesh().bounds());for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++)all=all.minmax(NervRigidMeshSweepR52.transformed(panelMeshes[side][i].bounds(),panelFrame(RigidTransform.identity(),side,i,open)));return all;}
+    {validate(open);AABB all=null;for(var p:fixed)all=all==null?p.mesh().bounds():all.minmax(p.mesh().bounds());for(int side=0;side<2;side++)for(int i=0;i<panels[side].length;i++)all=all.minmax(NervRigidMeshSweepR52.transformed(panelMeshes[side][i].bounds(),panelFrame(RigidTransform.identity(),side,i,open)));return all;}
     private int divisions(float from,float to)
     {double d=Math.abs(to-from),coefficient=Math.max(spec.maximumTier()*6/(.3*.3*8),spec.pocketX()*6/(.7*.7*8));int n=Math.max(1,(int)Math.ceil(d*Math.sqrt(coefficient/.003)));if(n>4096)throw new IllegalStateException("Explicit hatch curve exceeds its physical subdivision budget");return n;}
     private Vec3 curveError(float from,float to,RigidTransform frame)
@@ -200,19 +233,19 @@ public final class NervSiloHatchGeometryR52
     public AABB sweptBounds(RigidTransform frame,float from,float to){return sweep(frame,from,to).bounds();}
     private List<AABB> calculateEnvelopes(RigidTransform frame,float from,float to)
     {
-        validate(from);validate(to);var boxes=new ArrayList<AABB>();for(var p:fixed)boxes.addAll(p.mesh().leafEnvelopes(frame,frame));int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var pad=curveError(a,b,frame);for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++){var pf=panelFrame(frame,side,i,a);var pt=panelFrame(frame,side,i,b);for(var box:panelMeshes[side][i].leafEnvelopes(pf,pt))boxes.add(box.inflate(pad.x,pad.y,pad.z));}}return List.copyOf(boxes);
+        validate(from);validate(to);var boxes=new ArrayList<AABB>();for(var p:fixed)boxes.addAll(p.mesh().leafEnvelopes(frame,frame));int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var pad=curveError(a,b,frame);for(int side=0;side<2;side++)for(int i=0;i<panels[side].length;i++){var pf=panelFrame(frame,side,i,a);var pt=panelFrame(frame,side,i,b);for(var box:panelMeshes[side][i].leafEnvelopes(pf,pt))boxes.add(box.inflate(pad.x,pad.y,pad.z));}}return List.copyOf(boxes);
     }
     private RigidTransform panelFrame(RigidTransform frame,int side,int index,float open)
     {var p=SiloHatchMechanism.panel(index,open,spec);return frame.compose(new RigidTransform(new Vec3((side==0?-1:1)*p.x(),p.y(),0),0,0,0,1));}
     public boolean intersects(RigidTransform frame,float from,float to,AABB obstacle)
     {if(!sweep(frame,from,to).bounds().intersects(obstacle))return false;
-        for(var p:fixed)if(p.mesh().intersects(frame,frame,obstacle,.005))return true;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var error=curveError(a,b,frame);var expanded=obstacle.inflate(error.x,error.y,error.z);for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),expanded,.005))return true;}return false;
+        for(var p:fixed)if(p.mesh().intersects(frame,frame,obstacle,.005))return true;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var error=curveError(a,b,frame);var expanded=obstacle.inflate(error.x,error.y,error.z);for(int side=0;side<2;side++)for(int i=0;i<panels[side].length;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),expanded,.005))return true;}return false;
     }
     public boolean intersects(RigidTransform frame,float from,float to,NervRigidMeshSweepR52 other,RigidTransform otherFrom,RigidTransform otherTo)
     {if(!sweep(frame,from,to).bounds().intersects(other.envelope(otherFrom,otherTo)))return false;
-        for(var p:fixed)if(p.mesh().intersects(frame,frame,other,otherFrom,otherTo,.005,Vec3.ZERO))return true;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var of=otherFrom.interpolate(otherTo,(double)step/n);var ot=otherFrom.interpolate(otherTo,(double)(step+1)/n);for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),other,of,ot,.005,curveError(a,b,frame)))return true;}return false;
+        for(var p:fixed)if(p.mesh().intersects(frame,frame,other,otherFrom,otherTo,.005,Vec3.ZERO))return true;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;var of=otherFrom.interpolate(otherTo,(double)step/n);var ot=otherFrom.interpolate(otherTo,(double)(step+1)/n);for(int side=0;side<2;side++)for(int i=0;i<panels[side].length;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),other,of,ot,.005,curveError(a,b,frame)))return true;}return false;
     }
     public boolean movingIntersects(RigidTransform frame,float from,float to,NervRigidMeshSweepR52 other,RigidTransform otherFrame)
-    {if(!sweep(frame,from,to).bounds().intersects(other.envelope(otherFrame,otherFrame)))return false;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;for(int side=0;side<2;side++)for(int i=0;i<SiloHatchMechanism.PANELS;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),other,otherFrame,otherFrame,.005,curveError(a,b,frame)))return true;}return false;}
+    {if(!sweep(frame,from,to).bounds().intersects(other.envelope(otherFrame,otherFrame)))return false;int n=divisions(from,to);for(int step=0;step<n;step++){float a=from+(to-from)*step/n,b=from+(to-from)*(step+1)/n;for(int side=0;side<2;side++)for(int i=0;i<panels[side].length;i++)if(panelMeshes[side][i].intersects(panelFrame(frame,side,i,a),panelFrame(frame,side,i,b),other,otherFrame,otherFrame,.005,curveError(a,b,frame)))return true;}return false;}
     private static void validate(float open){if(!Float.isFinite(open)||open<0||open>1)throw new IllegalArgumentException("Actual hatch sample required");}
 }

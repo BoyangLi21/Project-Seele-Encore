@@ -598,6 +598,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private final AnimatableInstanceCache geoCache = GeckoLibUtil.createInstanceCache(this);
 
     private boolean chargingHeld;
+    private boolean berserkTargetRestorePendingR53;
+    private UUID berserkRestoreTargetR53;
+    private BlockPos berserkRestoreTargetBlockR53;
+    private long berserkRestoreGenerationR53 = -1;
     private int meleeCooldown;
     private int meleeInputBufferTicks;
     private int ordinaryAttackVisualTicks;
@@ -871,6 +875,27 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaBerserkMotionR34.save(this,tag);
         tag.putInt("SeeleBerserkTicks", this.getBerserkTicks());
         tag.putInt("SeeleBerserkRecoveryTicks", this.berserkRecoveryTicks);
+        if(this.isBerserk())
+        {
+            UUID targetId=this.berserkRestoreTargetR53;
+            BlockPos targetBlock=this.berserkRestoreTargetBlockR53;
+            long generation=this.berserkRestoreGenerationR53;
+            if(this.getTarget() instanceof Angel&&this.getTarget().isAlive())
+            {
+                targetId=this.getTarget().getUUID();targetBlock=this.getTarget().blockPosition();generation=-1;
+                if(this.level() instanceof ServerLevel server)
+                {
+                    var campaign=com.projectseele.world.TvCampaignSavedData.get(server);
+                    if(this.originalBerserkEncounterR53(campaign)&&targetId.equals(campaign.angel))generation=campaign.generationR43;
+                }
+            }
+            if(targetId!=null)
+            {
+                tag.putUUID("SeeleBerserkTargetR53",targetId);
+                if(targetBlock!=null)tag.putLong("SeeleBerserkTargetBlockR53",targetBlock.asLong());
+                tag.putLong("SeeleBerserkTargetGenerationR53",generation);
+            }
+        }
         if (this.sortieDestinationDimension != null && this.sortieDestinationBed != null)
         {
             tag.putString("SeeleSortieDimension",
@@ -955,6 +980,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         boolean savedBerserk = tag.getBoolean("SeeleBerserk")
                 && this.getUnitVariant() == UNIT_01;
         this.entityData.set(DATA_BERSERK, savedBerserk);
+        this.berserkTargetRestorePendingR53=savedBerserk;
+        this.berserkRestoreTargetR53=savedBerserk&&tag.hasUUID("SeeleBerserkTargetR53")?tag.getUUID("SeeleBerserkTargetR53"):null;
+        this.berserkRestoreTargetBlockR53=savedBerserk&&tag.contains("SeeleBerserkTargetBlockR53")?BlockPos.of(tag.getLong("SeeleBerserkTargetBlockR53")):null;
+        this.berserkRestoreGenerationR53=tag.contains("SeeleBerserkTargetGenerationR53")?tag.getLong("SeeleBerserkTargetGenerationR53"):-1;
         EvaBerserkMotionR34.load(this,tag);
         this.entityData.set(DATA_BERSERK_TICKS, savedBerserk
                 ? Math.max(1, tag.getInt("SeeleBerserkTicks")) : 0);
@@ -1427,14 +1456,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             float stance=this.entityData.get(DATA_RIFLE_STANCE);
             float priorStance=stance;
             if(!rifleStanceInitialized){stance=wanted;rifleStanceInitialized=true;}
-            float remaining=wanted-stance;
-            float desired=Math.copySign(Math.min(.08F,(float)Math.sqrt(2*.012F*Math.abs(remaining))),remaining);
-            rifleStanceVelocity=Mth.approach(rifleStanceVelocity,desired,.012F);
-            if(Math.abs(remaining)<Math.abs(rifleStanceVelocity)||Math.abs(remaining)<.001F)
-            {
-                stance=wanted;rifleStanceVelocity=0;
-            }
-            else stance=Mth.clamp(stance+rifleStanceVelocity,0,3);
+            var step=EvaStanceTimingR53.advance(stance,wanted,rifleStanceVelocity);
+            stance=step.phase();rifleStanceVelocity=step.velocity();
             this.entityData.set(DATA_RIFLE_STANCE,stance);
             EvaStanceFoleyR41.tick(this,priorStance,stance);
             double dx=this.getX()-riflePreviousX,dz=this.getZ()-riflePreviousZ;
@@ -2155,7 +2178,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void contextualPilotCR45(ServerPlayer pilot,int directions)
     {
         if(this.level().isClientSide||pilot==null||this.getPilotEntity()!=pilot)return;
-        if(directions<0||this.isExperimentalUnit()||this.isNervLogisticsLocked()||this.isLaunchSequenceActive())
+        if(directions<0||!Unit03SourceRigR53.sharesGroundActions(this)||this.isNervLogisticsLocked()||this.isLaunchSequenceActive())
         {this.cancelLaunchFromPilot(pilot);return;}
         if(this.chargingHeld||this.rifleSightHeldR45)return;
         EvaFieldActionsR45.request(this,pilot,directions,this.isPilotSprinting());
@@ -2786,6 +2809,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public BlockPos findLaunchBed()
     {
         if(this.isExperimentalUnit())return null;
+        var installedTrayBed = com.projectseele.world.CarrierBayTrayR53.launchBed(this);
+        if (installedTrayBed != null) return installedTrayBed;
         BlockPos base = BlockPos.containing(this.getX(), this.getY() - 0.2D, this.getZ());
         BlockPos nearest = null;
         double nearestDistance = Double.MAX_VALUE;
@@ -4100,7 +4125,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             Vec3 impulse=from==null?away:away.scale(.65).add(fxCenter.subtract(from).multiply(1,.12,1).normalize().scale(.35)).normalize();
             // Independent ordinary punches can contact less than ten ticks apart.
             // Use a dedicated cooldown tag only after this actual body/LOS admission.
-            boolean ordinary=!this.isExperimentalUnit()&&target instanceof LivingEntity&&this.getWeapon()==WEAPON_FISTS&&this.getOrdinaryAttackStage()>=0
+            boolean ordinary=Unit03SourceRigR53.sharesGroundActions(this)&&target instanceof LivingEntity&&this.getWeapon()==WEAPON_FISTS&&this.getOrdinaryAttackStage()>=0
                     &&!this.isHeavyMotionActive()&&!this.isKickMotionActive(0)&&this.getKnifeMotionType(0)<0
                     &&!EvaCombatR31.active(this)&&pilot!=null&&this.getPilotEntity()==pilot&&!this.isPilotControlLocked();
             float targetFieldBefore=ordinary&&target instanceof EvaUnit01Entity defender?defender.getAtFieldEnergy():Float.NaN;
@@ -4585,7 +4610,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         var rifleSound=net.minecraftforge.fml.ModList.get().isLoaded("superbwarfare")
                 ? net.minecraft.sounds.SoundEvent.createFixedRangeEvent(new net.minecraft.resources.ResourceLocation("superbwarfare","ntw_20_fire_3p"),512F)
                 : net.minecraft.sounds.SoundEvent.createFixedRangeEvent(ModSounds.EVA_RIFLE_FIRE.get().getLocation(),512F);
-        level.playSound(null, muzzle.x, muzzle.y, muzzle.z, rifleSound,
+        // The pilot receives one camera-appropriate sound from the confirmed tracer packet.
+        level.playSound(pilot instanceof Player human ? human : null, muzzle.x, muzzle.y, muzzle.z, rifleSound,
                 SoundSource.PLAYERS, 12F,
                 0.93F + this.random.nextFloat() * 0.08F);
     }
@@ -4866,6 +4892,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return;
         }
 
+        if(this.berserkTargetRestorePendingR53&&this.restoreBerserkTargetR53(server))return;
+
         // The configured interval must not shut the airframe down in the
         // middle of its protected encounter. Target loss/defeat and the
         // authored finale still own the real stop transition below.
@@ -4995,6 +5023,50 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 this.getStringUUID(), this.getPilotSynchronization(), duration);
     }
 
+    private boolean originalBerserkEncounterR53(com.projectseele.world.TvCampaignSavedData campaign)
+    {
+        var sortie=campaign.sorties.get(this.getUnitVariant());
+        return sortie!=null&&this.getUUID().equals(sortie.eva)&&campaign.angel!=null
+                &&!campaign.active.isEmpty()&&!campaign.targetDeathConfirmedR45
+                &&!java.util.Set.of("idle","cancel","failure","combat_victory").contains(campaign.phase);
+    }
+
+    /** Wait for the saved opponent, not a replacement, during entity restoration. */
+    private boolean restoreBerserkTargetR53(ServerLevel server)
+    {
+        var campaign=com.projectseele.world.TvCampaignSavedData.get(server);
+        boolean encounter=this.originalBerserkEncounterR53(campaign);
+        // Older saves retained the sortie's original opponent but no mob target.
+        if(this.berserkRestoreTargetR53==null&&encounter)
+        {
+            this.berserkRestoreTargetR53=campaign.angel;
+            this.berserkRestoreTargetBlockR53=campaign.lastPosition;
+            this.berserkRestoreGenerationR53=campaign.generationR43;
+        }
+        boolean sameEncounter=encounter&&campaign.angel.equals(this.berserkRestoreTargetR53)
+                &&campaign.generationR43==this.berserkRestoreGenerationR53;
+        if(this.berserkRestoreTargetR53!=null&&(this.berserkRestoreGenerationR53<0||sameEncounter))
+        {
+            var target=server.getEntity(this.berserkRestoreTargetR53);
+            if(target instanceof LivingEntity living&&living instanceof Angel&&living.isAlive())
+            {
+                this.setTarget(living);this.berserkTargetSearchCooldown=20;
+            }
+            else if(target==null&&(sameEncounter||this.berserkRestoreTargetBlockR53!=null
+                    &&!server.isPositionEntityTicking(this.berserkRestoreTargetBlockR53)))
+            {
+                // The campaign retains its original target chunks. A missing
+                // entity while that encounter is active is not a death receipt.
+                // Death/cancellation/generation change releases this wait.
+                this.getNavigation().stop();
+                return true;
+            }
+        }
+        this.berserkTargetRestorePendingR53=false;
+        this.berserkRestoreTargetR53=null;this.berserkRestoreTargetBlockR53=null;this.berserkRestoreGenerationR53=-1;
+        return false;
+    }
+
     @Nullable
     private LivingEntity findNearestBerserkTarget(ServerLevel server)
     {
@@ -5069,6 +5141,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             return;
         }
+        this.berserkTargetRestorePendingR53=false;
+        this.berserkRestoreTargetR53=null;this.berserkRestoreTargetBlockR53=null;this.berserkRestoreGenerationR53=-1;
         var stoppedPose=EvaBodyPose.sample(this,0);
         this.entityData.set(DATA_BERSERK, false);
         this.entityData.set(DATA_BERSERK_TICKS, 0);
@@ -5238,7 +5312,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {this.chargingHeld=false;this.entityData.set(DATA_CANNON_CHARGE,0);return false;}
         if(!this.autonomousWeaponR30(pilot,WEAPON_CANNON))return false;
         if(!this.fixedCannonProneR52(pilot,true)||!com.projectseele.world.TvYashimaStationR52.aim(this,actualAim)
-                ||!com.projectseele.world.TvYashimaStationR52.fireBlocker(this).isEmpty()){this.suspendFixedCannonR52();return false;}
+                ||!com.projectseele.world.TvYashimaStationR52.fireBlocker(this).isEmpty())
+        {
+            // Let the already selected cannon posture settle. Switching to
+            // fists here restarts the weapon transition on the next NPC input
+            // and can prevent the real grip contacts from ever becoming ready.
+            this.chargingHeld=false;this.entityData.set(DATA_CANNON_CHARGE,0);return false;
+        }
         Vec3 direction=actualAim.subtract(this.cannonMuzzlePosition(this.getForward())).normalize();
         // Solve against the measured muzzle, not the old head-height approximation.
         for(int iteration=0;iteration<6;iteration++)direction=actualAim.subtract(this.cannonMuzzlePosition(direction)).normalize();
@@ -7252,6 +7332,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public boolean isControlledByLocalInstance()
     {
+        if(this.level().isClientSide&&EvaMechanicalFrameR52.active(this))return false;
         if(EvaMechanicalFrameR52.ballisticCustodyR52(this))return !this.level().isClientSide;
         if(EvaShutdownR30.disabled(this))return !this.level().isClientSide;
         if(EvaSwordActionsR45.active(this)||EvaFieldActionsR45.active(this))return !this.level().isClientSide;

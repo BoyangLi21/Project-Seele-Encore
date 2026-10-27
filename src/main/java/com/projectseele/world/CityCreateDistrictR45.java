@@ -558,7 +558,7 @@ public final class CityCreateDistrictR45
             state.phase = "PREPARE"; state.index = state.cursor = state.savedPlans = 0;
             state.planHashes.clear();
             state.progress = 0; state.rollback = false; plans.clear(); preparing = null;
-            state.motionTick = 0;
+            state.motionTick = 0; state.motionProfile = CityRegionalMotionR54.PROFILE;
             state.worldTouched = false; state.created = 0; state.allowMissingRecovery = false;
             prepCursor = prepStage = 0; actualWrites = 0; persist(); claim(true);
         }
@@ -884,7 +884,7 @@ public final class CityCreateDistrictR45
                 entity.addTag(ownerTag()); entity.getPersistentData().putUUID("R45CityJourney", state.journey);
                 if (!level.addFreshEntity(entity)) throw new IllegalStateException("Persistent cargo owner insertion rejected");
             }
-            double offset = Math.abs(plan.targetY - plan.sourceY) * fraction(state.motionTick, duration(plan));
+            double offset = Math.abs(plan.targetY - plan.sourceY) * motionFraction(plan, state.motionTick, state.motionProfile, origin);
             Vec3 checkpointPose = new Vec3(plan.spec.centre().getX() + .5,
                     plan.sourceY + Math.signum(plan.targetY - plan.sourceY) * offset, plan.spec.centre().getZ() + .5);
             if (entity.position().distanceTo(checkpointPose) > 1e-5)
@@ -934,14 +934,14 @@ public final class CityCreateDistrictR45
             occupied = occupied();
             if (occupied) { stopEntities(); return; }
             int maximum = 0;
-            for (Plan plan : plans) maximum = Math.max(maximum, duration(plan));
+            for (Plan plan : plans) maximum = Math.max(maximum, duration(plan) + motionDelay(plan, state.motionProfile, origin));
             int nextTick = Math.min(maximum, state.motionTick + 1);
             Map<Integer, Vec3> targets = new HashMap<>();
             for (var entry : entities.entrySet())
             {
                 Plan plan = plans.get(entry.getKey()); Entity entity = entry.getValue();
                 if (!entity.isAlive() || entity.getVehicle() != null) throw new IllegalStateException("Original rigid cargo owner disappeared/mounted");
-                double delta = Math.abs(plan.targetY - plan.sourceY) * fraction(nextTick, duration(plan));
+                double delta = Math.abs(plan.targetY - plan.sourceY) * motionFraction(plan, nextTick, state.motionProfile, origin);
                 double y = plan.sourceY + Math.signum(plan.targetY - plan.sourceY) * delta;
                 Vec3 target = new Vec3(plan.spec.centre().getX() + .5, y, plan.spec.centre().getZ() + .5);
                 if (entity.position().distanceTo(target) > .500001) throw new IllegalStateException("Cargo/control pose epochs disagree; explicit recovery required");
@@ -1192,6 +1192,12 @@ public final class CityCreateDistrictR45
         return ticks + (ticks & 1);
     }
 
+    private static int motionDelay(Plan plan, String profile, BlockPos origin)
+    { return CityRegionalMotionR54.PROFILE.equals(profile) ? CityRegionalMotionR54.delay(plan.spec.centre().getX()-origin.getX(), plan.spec.centre().getZ()-origin.getZ()) : 0; }
+
+    private static double motionFraction(Plan plan, int tick, String profile, BlockPos origin)
+    { return fraction(tick - motionDelay(plan, profile, origin), duration(plan)); }
+
     private static double fraction(int tick, int duration)
     {
         double t = Math.max(0, Math.min(duration, tick));
@@ -1222,6 +1228,7 @@ public final class CityCreateDistrictR45
     private static final class State
     {
         String phase = "IDLE", fault = "", faultPhase = "", queueFault = "";
+        String motionProfile = "c1_trapezoid_v1";
         int depth, target, queued = -1, index, cursor, savedPlans, created, motionTick;
         int journeySourceDepth, journeyTargetDepth;
         final List<String> planHashes = new ArrayList<>();
@@ -1241,7 +1248,7 @@ public final class CityCreateDistrictR45
             tag.putInt("JourneySourceDepth", journeySourceDepth); tag.putInt("JourneyTargetDepth", journeyTargetDepth);
             ListTag hashes = new ListTag(); for (String hash : planHashes) hashes.add(net.minecraft.nbt.StringTag.valueOf(hash));
             tag.put("JournalSHA256s", hashes);
-            tag.putInt("MotionTick", motionTick); tag.putString("MotionProfile", "c1_trapezoid_v1");
+            tag.putInt("MotionTick", motionTick); tag.putString("MotionProfile", motionProfile);
             if(!previousCommittedLedgerR48.isEmpty())tag.put("PreviousCommittedLedgerR48",previousCommittedLedgerR48.copy());
             return tag;
         }
@@ -1254,6 +1261,7 @@ public final class CityCreateDistrictR45
             s.progress = tag.getDouble("Progress"); s.journey = tag.getUUID("Journey"); s.rollback = tag.getBoolean("Rollback"); s.worldTouched = tag.getBoolean("WorldTouched");
             s.faultPhase = tag.getString("FaultPhase"); s.created = tag.getInt("Created"); s.allowMissingRecovery = tag.getBoolean("AllowMissingRecovery");
             s.motionTick = tag.getInt("MotionTick");
+            s.motionProfile = tag.contains("MotionProfile") ? tag.getString("MotionProfile") : "c1_trapezoid_v1";
             s.previousCommittedLedgerR48=tag.getCompound("PreviousCommittedLedgerR48").copy();
             s.journeySourceDepth = tag.contains("JourneySourceDepth") ? tag.getInt("JourneySourceDepth") : s.depth;
             s.journeyTargetDepth = tag.contains("JourneyTargetDepth") ? tag.getInt("JourneyTargetDepth") : s.target;
@@ -1261,7 +1269,7 @@ public final class CityCreateDistrictR45
             for (int i = 0; i < hashes.size(); i++) s.planHashes.add(hashes.getString(i));
             if (s.worldTouched && !s.phase.equals("IDLE") && !tag.contains("JournalSHA256s"))
                 throw new IllegalStateException("Previous active city WAL needs an explicit byte-hash migration; original journals remain untouched");
-            if (s.worldTouched && !s.phase.equals("IDLE") && !tag.getString("MotionProfile").equals("c1_trapezoid_v1"))
+            if (s.worldTouched && !s.phase.equals("IDLE") && !s.motionProfile.equals("c1_trapezoid_v1") && !s.motionProfile.equals(CityRegionalMotionR54.PROFILE))
                 throw new IllegalStateException("Previous rigid trajectory requires explicit saved-control migration");
             return s;
         }

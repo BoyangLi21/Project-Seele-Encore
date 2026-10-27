@@ -15,7 +15,7 @@ public record ClientboundEncounterObserverPacket(Kind kind, UUID nonce, long gen
         ResourceLocation dimension, ResourceLocation entityType, long sequence, long serverTick,
         Snapshot snapshot)
 {
-    public enum Kind { CAPABILITY, STATE, CLEAR }
+    public enum Kind { CAPABILITY, STATE, CLEAR, NIGHT, DAY }
     public static final int SCHEMA = 1;
     public static final int MAX_BYTES = 1024;
     public static final int STALE_TICKS = 60;

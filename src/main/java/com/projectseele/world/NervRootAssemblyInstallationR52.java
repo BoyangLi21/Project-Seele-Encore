@@ -89,7 +89,7 @@ public final class NervRootAssemblyInstallationR52
         var ready=NervSourcePreparationR52.poll(sourceKey,()->prepareBundleR52(world,file,bundleSHA,root,restoredSource));
         if(!ready.ready())return heldResultR52(level,"Root source preparation HOLD: "+ready.hold(),request);
         var prepared=ready.value();var directoryDocument=prepared.directoryDocument();var directory=prepared.directory();
-        var saved=NervRouteRuntimeR52.installationStateR52(level);if(restoring)require(saved!=null&&saved.fault().isEmpty()&&saved.claimed()&&saved.epoch()==directory.epoch()&&saved.fingerprint().equals(directory.fingerprint())&&bundleSHA.equals(saved.installationBundleSHA()),"Persisted Root bundle/source/directory authority changed; explicit installation required");
+        var saved=NervRouteRuntimeR52.installationStateR52(level);if(restoring)require(saved!=null&&(saved.fault().isEmpty()||saved.interruptedContinuousCommitR53()!=null)&&saved.claimed()&&saved.epoch()==directory.epoch()&&saved.fingerprint().equals(directory.fingerprint())&&(bundleSHA.equals(saved.installationBundleSHA())||saved.pendingCarrierEquipmentUpdateR53()&&request.equals(saved.pendingInstallationR52())),"Persisted Root bundle/source/directory authority changed; explicit installation required");
         boolean continuous=directory.routes().values().stream().allMatch(NervRouteDirectoryR52.Route::continuousUpright);
         var owner=prepared.owner();
         var runtime=directoryDocument.getAsJsonObject("runtime");require(runtime!=null,"Complete declared native runtime required");
@@ -165,7 +165,7 @@ public final class NervRootAssemblyInstallationR52
             var admission=PENDING_TICKETS.computeIfAbsent(level,unused->new NervChunkAdmissionR53());for(var chunk:saved.installationActorChunks().values())admission.request(new ChunkPos(chunk),2);
             long now=level.getGameTime();Long refreshed=TICKET_REFRESH.get(level);if(refreshed==null||now<refreshed||now-refreshed>=100){admission.refresh((chunk,radius)->retain(level,chunk,radius));TICKET_REFRESH.put(level,now);}advanceAdmissionR53(level,admission);
             long tick=level.getGameTime();Long previous=RESTORE_TRIES.get(level);if(previous!=null&&tick>=previous&&tick-previous<100)continue;RESTORE_TRIES.put(level,tick);
-            try{require(saved.fault().isEmpty(),saved.fault());var pending=saved.pendingInstallationR52();String relative=NervRouteRuntimeStateR52.relativeBundleR52(pending==null?saved.installationBundle():pending.bundle());var path=level.getServer().getWorldPath(LevelResource.ROOT).resolve(relative);var result=install(level,path,pending==null||pending.restoring(),false);if(!result.accepted())restoreHoldR52(level,result.reason());}
+            try{require(saved.fault().isEmpty()||saved.interruptedContinuousCommitR53()!=null,saved.fault());var pending=saved.pendingInstallationR52();String relative=NervRouteRuntimeStateR52.relativeBundleR52(pending==null?saved.installationBundle():pending.bundle());var path=level.getServer().getWorldPath(LevelResource.ROOT).resolve(relative);var result=install(level,path,pending==null||pending.restoring(),false);if(!result.accepted())restoreHoldR52(level,result.reason());}
             catch(IOException|RuntimeException held){restoreHoldR52(level,held.toString());}
         }
     }
@@ -184,6 +184,10 @@ public final class NervRootAssemblyInstallationR52
     }
     @SubscribeEvent public static void commands(RegisterCommandsEvent event)
     {
+        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("r52").requires(source->source.hasPermission(2)).then(Commands.literal("equipment_update").then(Commands.argument("previous_metadata_directory",StringArgumentType.greedyString()).executes(context->{
+            var source=context.getSource();try{var result=CarrierEquipmentUpdateR53.admit(source.getLevel(),Path.of(StringArgumentType.getString(context,"previous_metadata_directory")));source.sendSuccess(()->Component.literal(result.reason()),true);return result.accepted()?1:0;}
+            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("Original equipment update held: "+failure.getMessage()));return 0;}
+        })))));
         event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("r52").requires(source->source.hasPermission(2)).then(Commands.literal("install_cancel").executes(context->{
             var source=context.getSource();var saved=NervRouteRuntimeR52.installationStateR52(source.getLevel());if(saved==null||saved.pendingInstallationR52()==null){source.sendFailure(Component.literal("没有待推进的地图安装。"));return 0;}
             saved.pauseInstallationR52("管理员已取消自动安装推进；原实体、任务及已验证安装凭证保留。再次安装同一凭证可继续。");PENDING_TICKETS.remove(source.getLevel());TICKET_REFRESH.remove(source.getLevel());restoreHoldR52(source.getLevel(),saved.pendingInstallationHoldR52());source.sendSuccess(()->Component.literal(saved.pendingInstallationHoldR52()),true);return 1;

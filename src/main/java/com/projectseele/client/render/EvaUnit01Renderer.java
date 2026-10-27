@@ -102,7 +102,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
     private EvaUnit01Entity pendingPoseEntity;
     private float pendingPosePartialTick;
     private boolean pendingPoseCommit;
-    private boolean strictFailureReported;
 
     public static void rememberRifleMuzzle(int entityId, Vec3 position)
     {
@@ -159,7 +158,9 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 this::shouldRenderBodyMesh));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
                 EvaHandSurfaceR45::mesh,
-                entity -> textureResourceForVariant(entity.getUnitVariant()),
+                entity -> entity.isExperimentalUnit()
+                        ? new ResourceLocation(ProjectSeele.MODID, "textures/entity/" + entity.experimentalAssetName() + ".png")
+                        : textureResourceForVariant(entity.getUnitVariant()),
                 (entity,bone) -> EvaHandSurfaceR45.applies(entity)&&(bone.getName().startsWith("hand_")||bone.getName().startsWith("r45_hand_"))));
         this.addRenderLayer(new EvaChargingPlugLayerR48(this));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
@@ -232,18 +233,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                        MultiBufferSource bufferSource, int packedLight)
     {
         com.projectseele.client.visual.FactoryR20Client.bodyDraw(entity);
-        LocalVisualAssetFingerprint.Fingerprint fingerprint =
-                entity.isExperimentalUnit()?LocalVisualAssetFingerprint.inspect(entity.experimentalAssetName()):visualFingerprintForVariant(entity.getUnitVariant());
-        if (LocalVisualAssetFingerprint.isStrictMode() && !fingerprint.valid())
-        {
-            if (!this.strictFailureReported)
-            {
-                this.strictFailureReported = true;
-                ProjectSeele.LOGGER.error(
-                        "Strict high-detail EVA render refused: {}", fingerprint.description());
-            }
-            return;
-        }
         Minecraft minecraft = Minecraft.getInstance();
         // The physical feed trims enclosing armour. The sun's view must keep
         // the whole body, even though Minecraft's camera mode is first person.

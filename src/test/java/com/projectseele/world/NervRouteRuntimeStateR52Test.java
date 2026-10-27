@@ -16,6 +16,17 @@ public final class NervRouteRuntimeStateR52Test
     {return new Snapshot(task,new Original(7,0,new UUID(0,10),new UUID(0,20),new UUID(0,30),new UUID(0,40),mission,"test:native_nbt_lifecycle"),"f".repeat(64),"root_declared_route",leg,fraction,stage,"");}
     public static void main(String[] args)
     {
+        var campaign=new TvCampaignSavedData();campaign.active="sachiel";campaign.phase="boarding";
+        campaign.owner=new UUID(0,200);campaign.generationR43=6;campaign.assign(2,campaign.owner,true,false);
+        var persistedCampaign=TvCampaignSavedData.load(campaign.save(new CompoundTag()));
+        String mission="sachiel:6:"+campaign.owner;
+        check(AutoSortieR32.missionToken(persistedCampaign,0).isEmpty()
+                &&AutoSortieR32.missionToken(persistedCampaign,1).isEmpty(),"Another unit's chapter claimed an independent original's preparation");
+        check(AutoSortieR32.missionToken(persistedCampaign,2).equals(mission),"Assigned NPC lost its original chapter after save/reload");
+        persistedCampaign.phase="cancel";
+        check(AutoSortieR32.missionToken(persistedCampaign,2).isEmpty(),"Canceled chapter kept automatic launch authority");
+        persistedCampaign.phase="boarding";persistedCampaign.targetDeathConfirmedR45=true;
+        check(AutoSortieR32.missionToken(persistedCampaign,2).isEmpty(),"Completed battle reacquired automatic launch authority");
         var state=new NervRouteRuntimeStateR52();check(!state.claimed(),"Ordinary old save unexpectedly claimed R52");state.claim(7,"f".repeat(64));state.personnelLiftManifest("root_personnel_lifts_r52.json");
         UUID task=new UUID(0,100);var owner=new CompoundTag();owner.putString("OriginalPoseHash","measured_pose_receipt");var initial=snapshot(task,Stage.RESERVED,0,0,"original_mission");state.put(new Job(initial,Phase.PREPARING,owner,""));
         owner.putString("OriginalPoseHash","mutated_external_tag");check(state.job(0).ownerData().getString("OriginalPoseHash").equals("measured_pose_receipt"),"Owner payload aliased external mutation");
@@ -33,9 +44,19 @@ public final class NervRouteRuntimeStateR52Test
         check(stopped.phase()==Phase.CANCELLED&&stopped.snapshot().original().equals(initial.original())
                 &&EvaFleetSavedData.Phase.valueOf(NervRouteRuntimeStateR52.legacyPhase(stopped))==EvaFleetSavedData.Phase.CANCELLED,
                 "Cancellation lost the original assembly or threw while mirroring after reload");
+        var zeroDistance=snapshot(new UUID(0,102),Stage.COMPLETE,3,1,"original_mission");var returnData=new CompoundTag();returnData.putBoolean("Returning",true);
+        returnData.putString("Finish","LOWER");returnData.putInt("FinishTicks",36);
+        var finishFeet=new CompoundTag();finishFeet.putDouble("LX",-7.005280017852783);finishFeet.putDouble("RX",7.005280017852783);
+        returnData.put("FinishFeet",finishFeet);var finishRoot=new CompoundTag();finishRoot.putDouble("Y",-1062);returnData.put("FinishRoot",finishRoot);
+        cancelled.put(stopped.update(zeroDistance,Phase.RETURNING,returnData,""));
+        cancelled.put(cancelled.job(0).update(zeroDistance,Phase.FINISHING,returnData,""));
+        var endpointRestart=NervRouteRuntimeStateR52.load(cancelled.save(new CompoundTag())).job(0);
+        check(endpointRestart.phase()==Phase.FINISHING&&endpointRestart.snapshot().equals(zeroDistance)&&endpointRestart.ownerData().getBoolean("Returning"),"Zero-distance cancelled recovery restarted as unfinished route travel");
+        check(endpointRestart.ownerData().equals(returnData),"Cold LOWER36 changed its accepted service clock or saved local binding");
         rejects(()->loaded.put(new Job(initial,Phase.DEPLOYED,new CompoundTag(),"")),"Preparation skipped actual READY/release/departure lifecycle");
         loaded.put(new Job(snapshot(task,Stage.MOVING,1,0,"original_mission"),Phase.READY,new CompoundTag(),""));check(NervRouteRuntimeStateR52.legacyPhase(loaded.job(0)).equals("SILO_READY"),"Existing UI/commands lost SILO_READY semantics");
         loaded.put(new Job(snapshot(task,Stage.MOVING,1,0,"original_mission"),Phase.DEPARTING,new CompoundTag(),""));loaded.put(new Job(snapshot(task,Stage.HOLD,1,.25,"original_mission"),Phase.DEPARTING,new CompoundTag(),"actual_door_blocked"));
+        check(NervRouteRuntimeStateR52.load(loaded.save(new CompoundTag())).job(0).snapshot().equals(loaded.job(0).snapshot()),"Cold transport restart changed original task or last accepted route position");
         check(loaded.job(0).snapshot().fraction()==.25&&loaded.job(0).waiting().equals("actual_door_blocked"),"Blocked real phase did not persist unchanged progress");
         rejects(()->loaded.put(new Job(snapshot(task,Stage.MOVING,1,.5,"replacement_mission"),Phase.DEPARTING,new CompoundTag(),"")),"Mission changed inside an original task");
         loaded.put(new Job(snapshot(task,Stage.COMPLETE,3,1,"original_mission"),Phase.FINISHING,new CompoundTag(),"physical_finish_pending"));var restart=NervRouteRuntimeStateR52.load(loaded.save(new CompoundTag()));
@@ -46,6 +67,8 @@ public final class NervRouteRuntimeStateR52Test
         check(NervRouteRuntimeStateR52.legacyPhase(restart.job(0)).equals("PARKED"),"Actual return/refill completion did not reach parked phase");
         var completed=restart.job(0);var completedData=completed.ownerData().copy();completedData.putString("Finish","DONE");completedData.putBoolean("Returning",true);
         restart.put(completed.update(completed.snapshot(),Phase.PARKED,completedData,""));var expected=restart.job(0);
+        var parkedRestart=NervRouteRuntimeStateR52.load(restart.save(new CompoundTag())).job(0);
+        check(parkedRestart.phase()==Phase.PARKED&&parkedRestart.snapshot().equals(expected.snapshot())&&parkedRestart.ownerData().equals(completedData),"Cold PARKED readback changed completion or original custody");
         var observed=completedData.copy();observed.putString("Finish","REFILL");observed.putInt("FilledLayers",0);observed.putInt("BridgeAmount",0);
         rejects(()->restart.resumeParkedServiceR53(expected,observed),"Missing task-bound physical readback admitted");
         observed.putUUID("ServiceReadbackTaskR53",returning);restart.resumeParkedServiceR53(expected,observed);

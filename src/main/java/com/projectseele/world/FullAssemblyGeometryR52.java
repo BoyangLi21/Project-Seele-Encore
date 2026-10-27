@@ -11,6 +11,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.*;
+import net.minecraft.nbt.CompoundTag;
 import org.joml.Quaternionf;
 import com.projectseele.world.NervRouteReservationsR52.Original;
 import com.projectseele.world.TransportMembershipR52.Kind;
@@ -20,6 +21,11 @@ import com.projectseele.world.TransportMembershipR52.Kind;
 public final class FullAssemblyGeometryR52
 {
     private record Surface(String component,String source,TriangleSweepMeshR52 mesh){}
+    private record RailMeshKey(NervRigidMeshSweepR52 mesh,RigidTransform frame,AABB bounds){}
+    private record RailEvaluation(String rejection){}
+    private record RailWork(List<DirectoryTrajectoryR52> paths,Set<RailMeshKey> rails,double maximumError,
+        java.util.concurrent.CompletableFuture<RailEvaluation> result){}
+
     private record NativePilot(UUID id,Vec3 halfExtents,Vec3 seatInEva){}
     private static volatile Provider installed;
     private record CheckedClasspath(Map<String,String> expected,Provider provider){}
@@ -186,6 +192,10 @@ public final class FullAssemblyGeometryR52
     public static final class Captured
     {
         private final Original original;private final FootSupportFrameR52.Binding binding;private final List<Surface> surfaces;private final NativePilot pilot;private final String source;private final Kind kind;
+        private final List<RailWork> railWork=new ArrayList<>();
+        private volatile boolean sourceWorkValid=true;
+        public void invalidateSourceWorkR53(){sourceWorkValid=false;}
+
         private Captured(Original original,FootSupportFrameR52.Binding binding,List<Surface> surfaces,NativePilot pilot,String source,Kind kind){this.original=original;this.binding=binding;this.surfaces=surfaces;this.pilot=pilot;this.source=source;this.kind=kind;}
         public CheckedAssemblySweep sweep(NervRouteDirectoryR52 directory,NervRouteDirectoryR52.Leg leg,double from,double to,double maximumError)
         {return new CheckedAssemblySweep(this,List.of(new DirectoryTrajectoryR52(directory,leg,binding,from,to)),maximumError);}
@@ -199,7 +209,20 @@ public final class FullAssemblyGeometryR52
         private final Captured assembly;private final List<DirectoryTrajectoryR52> trajectories;private final DirectoryTrajectoryR52 trajectory;private final double maximumError;private final List<AABB> envelopes;
         private final Map<DirectoryTrajectoryR52,List<TriangleSweepMeshR52.PreparedSweep>> prepared=new IdentityHashMap<>();
         private record PilotSegment(double from,double to,AABB box){}
-        private record SweptPiece(AABB bounds,TriangleSweepMeshR52.PreparedSweep mesh,List<PilotSegment> pilot,String component,DirectoryTrajectoryR52 path){}
+        private record SweptPiece(AABB bounds,TriangleSweepMeshR52.PreparedSweep mesh,List<PilotSegment> pilot,String component,DirectoryTrajectoryR52 path,Surface surface){}
+        private record BridgeFrame(NervHangarDoorEntity door,RigidTransform frame,float open)
+        {
+            boolean current(ServerLevel level)
+            {return level.getEntity(door.getUUID())==door&&door.isAlive()&&frame.equals(door.actualFrameR52())&&open==door.actualOpenProgressR52();}
+        }
+        private record RailCoverage(ServerLevel level,long tick,EvaUnit01Entity eva,NervCarrierPlatformEntity carrier,
+                EvaOriginalMeshGeometryR52.Geometry geometry,Provider provider,CarrierAssemblyR53.Profile profile,
+                CarrierRearGuideR53.FixedGeometry rails,CarrierTransferRailsR53.Source transfer,List<BridgeFrame> bridges,
+                CompoundTag carrierState,CompoundTag mount,CompoundTag body,CompoundTag hands){}
+        private RailCoverage railCoverage;
+        private final Map<SweptPiece,TriangleSweepMeshR52.PreparedSweep> railRefinements=new IdentityHashMap<>();
+        private final Map<DirectoryTrajectoryR52,Double> railErrors=new IdentityHashMap<>();
+        private final Map<DirectoryTrajectoryR52,List<PilotSegment>> railPilotRefinements=new IdentityHashMap<>();
         private final NervStaticSpatialIndexR52<SweptPiece> pieceIndex;
         private String clearanceHoldR53="assembly_state";private SweptPiece intersectedPieceR53;
         public String clearanceHoldR53(){return clearanceHoldR53;}
@@ -211,12 +234,12 @@ public final class FullAssemblyGeometryR52
             FootSupportFrameR52.Sample previous=null;
             for(var path:trajectories){require(path.directory().fingerprint().equals(trajectory.directory().fingerprint())&&path.binding().equals(assembly.binding),"Composite source/binding changed");if(previous!=null)require(sampleMatches(previous,path.sample(0)),"Disconnected composite trajectory");previous=path.sample(1);
                 var meshes=new ArrayList<TriangleSweepMeshR52.PreparedSweep>();
-                for(var surface:assembly.surfaces){var bounds=surface.mesh.envelope(path);boxes.add(bounds);path.divisions(surface.mesh.bounds().getCenter().distanceTo(path.footCentreLocal())+Math.sqrt(Math.pow(surface.mesh.bounds().getXsize(),2)+Math.pow(surface.mesh.bounds().getYsize(),2)+Math.pow(surface.mesh.bounds().getZsize(),2))/2,maximumError);var mesh=surface.mesh.prepare(path,maximumError);meshes.add(mesh);pieces.add(new SweptPiece(bounds,mesh,List.of(),surface.component(),path));}
+                for(var surface:assembly.surfaces){var bounds=surface.mesh.envelope(path);boxes.add(bounds);path.divisions(surface.mesh.bounds().getCenter().distanceTo(path.footCentreLocal())+Math.sqrt(Math.pow(surface.mesh.bounds().getXsize(),2)+Math.pow(surface.mesh.bounds().getYsize(),2)+Math.pow(surface.mesh.bounds().getZsize(),2))/2,maximumError);var mesh=surface.mesh.prepare(path,maximumError);meshes.add(mesh);pieces.add(new SweptPiece(bounds,mesh,List.of(),surface.component(),path,surface));}
                 prepared.put(path,List.copyOf(meshes));
                 if(assembly.pilot!=null){var p=assembly.pilot;var bounds=pilotEnvelope(p,path);boxes.add(bounds);double radius=p.seatInEva.distanceTo(path.footCentreLocal());int divisions=path.divisions(radius,maximumError);double error=path.error(radius,divisions);var segments=new ArrayList<PilotSegment>();
                     for(int i=0;i<divisions;i++){double from=(double)i/divisions,to=(double)(i+1)/divisions;var a=path.sample(from).evaRoot().transformPoint(p.seatInEva);var b=path.sample(to).evaRoot().transformPoint(p.seatInEva);segments.add(new PilotSegment(from,to,pilotBox(p,a).minmax(pilotBox(p,b)).inflate(error)));}
                     // Index the same conservative pilot chords used by narrow phase.
-                    for(var segment:segments)bounds=bounds.minmax(segment.box());pieces.add(new SweptPiece(bounds,null,List.copyOf(segments),"pilot",path));}}
+                    for(var segment:segments)bounds=bounds.minmax(segment.box());pieces.add(new SweptPiece(bounds,null,List.copyOf(segments),"pilot",path,null));}}
             envelopes=List.copyOf(boxes);pieceIndex=new NervStaticSpatialIndexR52<>(pieces,SweptPiece::bounds);
         }
         public List<DirectoryTrajectoryR52> trajectories(){return trajectories;}
@@ -232,6 +255,7 @@ public final class FullAssemblyGeometryR52
         {return sampleMatches(trajectory.sample(0),from)&&sampleMatches(trajectories.get(trajectories.size()-1).sample(1),to);}
         public boolean clear(ServerLevel level,Entity eva)
         {
+            railCoverage=null;
             if(!(eva instanceof EvaUnit01Entity unit)||unit.carrierRiseProgress(1)!=1||unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR
                     ||!assembly.source.startsWith(EvaAirTransportR31.cradleStateR50(unit).getString("GeometrySourceR52")+":"))return false;
             if(!EvaMechanicalFrameR52.active(unit)||!same(EvaMechanicalFrameR52.frame(unit,1),trajectory.sample(0).evaRoot()))return false;
@@ -247,11 +271,17 @@ public final class FullAssemblyGeometryR52
                     ||actual.getCenter().distanceToSqr(trajectory.sample(0).evaRoot().transformPoint(assembly.pilot.seatInEva))>1e-10
                     )return false;
             }
-            var own=originalIds();var actors=new LinkedHashMap<UUID,Entity>();var testedBlocks=new HashSet<AABB>();
-            var blocks=BoundedNativeCollisionGroupsR52.clear(envelopes,
+            if(NervTraversalPolicyR53.bypass(level))
+            {
+                for(var box:envelopes)if(!EntryPlugEjectionR48.loaded(level,box))return false;
+                clearanceHoldR53="";
+                return true;
+            }
+            var own=originalIds();var actors=new LinkedHashMap<UUID,Entity>();
+            var blocks=BoundedNativeCollisionGroupsR52.clearWholeSource(envelopes,
                     box->EntryPlugEjectionR48.loaded(level,box),
-                    box->{var shapes=new ArrayList<AABB>();for(var shape:level.getBlockCollisions(eva,box))shapes.addAll(shape.toAabbs());return shapes;},
-                    (piece,obstacle)->{if(!testedBlocks.add(obstacle)||!intersects(obstacle))return false;collisionHeldR53("native_block="+obstacle);return true;});
+                    box->NativeCollisionShapesR53.read(level,eva,box),
+                    obstacle->{if(!intersects(obstacle))return false;collisionHeldR53("native_block="+obstacle);return true;});
             if(!blocks.clear())return false;
             for(var box:envelopes)
             {
@@ -274,6 +304,162 @@ public final class FullAssemblyGeometryR52
             for(var mesh:detached)if(intersects(mesh))return collisionHeldR53("detached_mesh="+mesh.frame());
             clearanceHoldR53="";
             return true;
+        }
+
+        /** Same complete captured source and directory paths, against the real
+         * fixed steel and this tick's bridge frames. The prepared BVH rejects
+         * distant surfaces before any fine rear-bearing subdivisions exist. */
+        boolean clearFixedCarrierRailsR53(ServerLevel level,EvaUnit01Entity eva)
+        {return clearFixedCarrierRailsR53(level,eva,false);}
+        boolean clearFixedCarrierRailsR53(ServerLevel level,EvaUnit01Entity eva,boolean allowPending)
+        {
+            railCoverage=null;
+            if(!NervR50CarrierModeR53.enabled()||CarrierRearGuideR53.selected()==null)return true;
+            if(!assembly.original.eva().equals(eva.getUUID())||trajectories.stream().anyMatch(p->!p.pureTranslation()))
+                return collisionHeldR53("carrier_rail_source_or_path");
+            var captured=EvaMechanicalFrameR52.capturedGeometry(eva);
+            if(installed==null||CarrierAssemblyR53.selected()==null
+                    ||!assembly.source.equals(captured.sourceFingerprint()+":"+installed.sourceFingerprint()))
+                return collisionHeldR53("carrier_rail_captured_source_changed");
+            var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);
+            if(carrier==null||NervOriginalCarrierR52.progress(carrier,1)!=1
+                    ||!same(NervOriginalCarrierR52.actualRoot(carrier,1),trajectory.sample(0).evaRoot()))
+                return collisionHeldR53("carrier_rail_actual_frame");
+            var rails=CarrierRearGuideR53.fixed();var transfer=CarrierTransferRailsR53.selected();
+            if(!rails.directory().equals(trajectory.directory().fingerprint())
+                    ||transfer!=null&&!transfer.directory().equals(trajectory.directory().fingerprint()))
+                return collisionHeldR53("carrier_rail_directory");
+            var bridges=new ArrayList<BridgeFrame>();var candidates=new LinkedHashMap<String,CarrierRearGuideR53.Fixed>();
+            for(var box:envelopes)for(var rail:rails.index().query(box))candidates.putIfAbsent(rail.name(),rail);
+            if(transfer!=null)for(var gate:transfer.bridges().keySet())
+            {
+                if(envelopes.stream().noneMatch(box->box.inflate(40).contains(gate.frame().translation())))continue;
+                if(!(level.getEntity(gate.visual()) instanceof NervHangarDoorEntity door))
+                    return collisionHeldR53("carrier_bridge_not_loaded="+gate.resource());
+                var snapshot=new BridgeFrame(door,door.actualFrameR52(),door.actualOpenProgressR52());bridges.add(snapshot);
+                for(var rail:CarrierTransferRailsR53.bridgeParts(door,snapshot.open()))
+                    if(envelopes.stream().anyMatch(box->box.intersects(rail.bounds())))candidates.putIfAbsent(rail.name(),rail);
+            }
+            var sourceResult=sourceRails(List.copyOf(candidates.values()),allowPending);
+            if(sourceResult==null)return collisionHeldR53("carrier_rail_source_pending");
+            if(!sourceResult.rejection().isEmpty())return collisionHeldR53(sourceResult.rejection());
+            var cradle=EvaAirTransportR31.cradleStateR50(eva);
+            railCoverage=new RailCoverage(level,level.getGameTime(),eva,carrier,captured,
+                    installed,CarrierAssemblyR53.selected(),rails,transfer,List.copyOf(bridges),carrier.originalCarrierStateR52().copy(),
+                    carrier.carrierMountProfileR53().copy(),cradle.getCompound("Origin").copy(),cradle.getCompound(EvaFrozenHandsR52.KEY).copy());
+            clearanceHoldR53="";return true;
+        }
+
+        /** Only source triangles, immutable directory paths and captured steel
+         * frames cross to the worker. Native world checks and the same-tick
+         * RailCoverage above always run on the server thread after it finishes. */
+        private RailEvaluation sourceRails(List<CarrierRearGuideR53.Fixed> rails,boolean allowPending)
+        {
+            var keys=new HashSet<RailMeshKey>();
+            for(var rail:rails)keys.add(new RailMeshKey(rail.steel().mesh(),rail.steel().frame(),rail.bounds()));
+            for(var work:assembly.railWork)
+            {
+                if(work.maximumError()!=maximumError||!work.rails().containsAll(keys)
+                    ||!NervRailSourceCoverageR53.covers(work.paths(),trajectories))continue;
+                if(!work.result().isDone()){if(allowPending)return null;continue;}
+                var result=work.result().join();
+                if(result.rejection().isEmpty())return result;
+                // A collision on a larger path is not evidence against its
+                // safe prefix. Only an identical query can reuse a rejection.
+                if(work.rails().equals(keys)&&NervRailSourceCoverageR53.covers(trajectories,work.paths()))return result;
+            }
+            if(!allowPending)return evaluateRails(rails);
+            if(assembly.railWork.stream().filter(w->!w.result().isDone()).count()>=2)return null;
+            while(assembly.railWork.size()>=16)
+            {
+                var it=assembly.railWork.iterator();boolean removed=false;
+                while(it.hasNext())if(it.next().result().isDone()){it.remove();removed=true;break;}
+                if(!removed)return null;
+            }
+            // Freeze every error bound before scheduling; the worker never
+            // consults the mutable selected hardware or any game entity.
+            var errors=new IdentityHashMap<DirectoryTrajectoryR52,Double>();
+            for(var path:trajectories)errors.put(path,railError(path));
+            var source=assembly;var paths=trajectories;double budget=maximumError;
+            java.util.concurrent.CompletableFuture<RailEvaluation> result;
+            try
+            {
+                result=NervGeometryWorkR53.submit(()->source.sourceWorkValid,()->{
+                    var worker=new CheckedAssemblySweep(source,paths,budget);
+                    worker.railErrors.putAll(errors);
+                    return worker.evaluateRails(rails);
+                }).handle((value,error)->error==null?value:
+                    new RailEvaluation("carrier_rail_source_failed="+error.getClass().getSimpleName()+":"+error.getMessage()));
+            }
+            catch(java.util.concurrent.RejectedExecutionException busy){return null;}
+            assembly.railWork.add(new RailWork(paths,Set.copyOf(keys),budget,result));
+            return null;
+        }
+        private RailEvaluation evaluateRails(List<CarrierRearGuideR53.Fixed> rails)
+        {
+            for(var rail:rails)
+            {
+                NervGeometryWorkR53.check();
+                if(!intersectsRail(rail))continue;
+                var piece=intersectedPieceR53;
+                return new RailEvaluation("fixed_carrier_rail="+rail.name()+(piece==null?"":
+                    " component="+piece.component()+" leg="+piece.path().leg().id()+" interval="+piece.path().fromFraction()+".."+piece.path().toFraction()));
+            }
+            return new RailEvaluation("");
+        }
+
+        boolean fixedRailsCurrentR53(ServerLevel level,NervCarrierPlatformEntity carrier,
+                                     List<DirectoryTrajectoryR52> paths,Set<UUID> own)
+        {
+            var proof=railCoverage;
+            if(proof==null||proof.level()!=level||proof.tick()!=level.getGameTime()||proof.carrier()!=carrier
+                    ||level.getEntity(assembly.original.eva())!=proof.eva()||level.getEntity(carrier.getUUID())!=carrier
+                    ||!carrier.isAlive()||!proof.eva().isAlive()||!matchesSlices(assembly.original,paths))return false;
+            var expected=new HashSet<>(originalIds());expected.add(carrier.getUUID());if(!expected.equals(own))return false;
+            if(!EvaMechanicalFrameR52.active(proof.eva())||EvaMechanicalFrameR52.capturedGeometry(proof.eva())!=proof.geometry()
+                    ||installed!=proof.provider()||CarrierAssemblyR53.selected()!=proof.profile()
+                    ||CarrierRearGuideR53.fixed()!=proof.rails()||CarrierTransferRailsR53.selected()!=proof.transfer()
+                    ||EvaMechanicalFrameR52.originalCarrierControllerR52(proof.eva())!=carrier
+                    ||!same(EvaMechanicalFrameR52.frame(proof.eva(),1),trajectory.sample(0).evaRoot())
+                    ||!proof.carrierState().equals(carrier.originalCarrierStateR52())||!proof.mount().equals(carrier.carrierMountProfileR53()))return false;
+            var cradle=EvaAirTransportR31.cradleStateR50(proof.eva());
+            return proof.body().equals(cradle.getCompound("Origin"))&&proof.hands().equals(cradle.getCompound(EvaFrozenHandsR52.KEY))
+                    &&proof.bridges().stream().allMatch(b->b.current(level));
+        }
+
+        private double railError(DirectoryTrajectoryR52 path)
+        {return railErrors.computeIfAbsent(path,p->Math.min(maximumError,CarrierRearGuideMotionR53.continuousBudget(p,CarrierRearGuideR53.selected()).error()));}
+
+        private boolean intersectsRail(CarrierRearGuideR53.Fixed rail)
+        {
+            var steel=rail.steel();var bounds=rail.bounds();
+            for(var piece:pieceIndex.query(bounds))
+            {
+                if(piece.mesh()!=null)
+                {
+                    if(!piece.mesh().intersects(steel.mesh(),steel.frame(),steel.frame()))continue;
+                    // A coarse outward envelope may touch harmless nearby steel.
+                    // Refine only that surface/path, retaining the old rear error
+                    // bound rather than turning the coarse touch into a HOLD.
+                    var refined=railRefinements.computeIfAbsent(piece,p->p.surface().mesh().prepare(p.path(),railError(p.path())));
+                    if(refined.intersects(steel.mesh(),steel.frame(),steel.frame())){intersectedPieceR53=piece;return true;}
+                }
+                else
+                {
+                    if(piece.pilot().stream().noneMatch(p->p.box().intersects(bounds)))continue;
+                    var segments=railPilotRefinements.computeIfAbsent(piece.path(),path->{
+                        var pilot=assembly.pilot;double radius=pilot.seatInEva.distanceTo(path.footCentreLocal());
+                        int count=path.divisions(radius,railError(path));double error=path.error(radius,count);var result=new ArrayList<PilotSegment>();
+                        for(int i=0;i<count;i++){double a=i/(double)count,b=(i+1D)/count;
+                            result.add(new PilotSegment(a,b,pilotBox(pilot,path.sample(a).evaRoot().transformPoint(pilot.seatInEva))
+                                    .minmax(pilotBox(pilot,path.sample(b).evaRoot().transformPoint(pilot.seatInEva))).inflate(error)));}
+                        return List.copyOf(result);});
+                    for(var segment:segments)if(segment.box().intersects(bounds)
+                            &&steel.mesh().intersects(steel.frame(),steel.frame(),segment.box(),.003))
+                    {intersectedPieceR53=piece;return true;}
+                }
+            }
+            return false;
         }
         private boolean intersects(NervFlightProofR52.ObstacleMesh obstacle)
         {

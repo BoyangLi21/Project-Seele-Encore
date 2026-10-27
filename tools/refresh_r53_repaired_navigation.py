@@ -55,6 +55,7 @@ def main():
     parser.add_argument('--world', type=Path, required=True)
     parser.add_argument('--access', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--medical-only', action='store_true', help='Retain all outside node validity and edges; refresh only the installed R54 medical room')
     args = parser.parse_args()
     world, out = args.world.resolve(), args.out.resolve()
     out.mkdir(parents=True, exist_ok=True)
@@ -63,6 +64,7 @@ def main():
     assert [row[:3] for row in graph['nodes']] == npc['nodes']
     coords = [tuple(row) for row in npc['nodes']]
     inherited = len(coords)
+    inherited_active = graph.get('node_active', [True] * inherited)[:]
     lookup = {point: i for i, point in enumerate(coords)}
     assert len(lookup) == len(coords)
     access = json.loads(args.access.read_text('utf8'))
@@ -84,6 +86,27 @@ def main():
             point = (x + dx * 5, floor['approach_y'], z + dz * 5)
             requested_landings.append((lift, floor, point))
             permitted.append(list(point))
+    medical_path = world / 'r54_medical_wards.json'
+    medical = json.loads(medical_path.read_text('utf8')) if medical_path.exists() else None
+    def in_medical(point):
+        x, y, z = point
+        return -49 <= x <= -7 and y == -527 and 377 <= z <= 407
+    def near_medical(point):
+        x, y, z = point
+        return -50 <= x <= -6 and y == -527 and 376 <= z <= 408
+    if args.medical_only:
+        assert medical is not None, 'Installed R54 medical declaration required'
+    if medical:
+        for room in [medical['lobby']] + medical['rooms']:
+            x0, x1, z0, z1 = room['bounds']
+            permitted.extend([x, room['floor'] + 1, z]
+                             for x in range(x0, x1 + 1) for z in range(z0, z1 + 1))
+        for room in medical['rooms']:
+            x, y, z = room['entry']
+            permitted.extend([[x - 1, y, z], [x, y, z]])
+    if args.medical_only:
+        permitted = [p for p in permitted if in_medical(p)]
+        permitted.extend(list(p) for p in coords if in_medical(p))
     for point in map(tuple, permitted):
         if point not in lookup:
             lookup[point] = len(coords)
@@ -92,6 +115,8 @@ def main():
     wanted = collections.defaultdict(set)
     selected = collections.defaultdict(set)
     for x, y, z in coords:
+        if args.medical_only and not near_medical((x, y, z)):
+            continue
         for sy in (y - 1, y, y + 1):
             point = (x, sy, z)
             key = (x // 16, z // 16, sy // 16)
@@ -128,6 +153,14 @@ def main():
             point = (x, y + dy, z)
             if states.get(point, '').startswith('projectseele:city_personnel_door['):
                 operations[point] = states[point].replace('open=false', 'open=true')
+    if medical:
+        for room in medical['rooms']:
+            x, y, z = room['entry']
+            for xx in (x - 1, x):
+                for yy in (y, y + 1):
+                    point = (xx, yy, z)
+                    if states.get(point, '').startswith('projectseele:city_personnel_door['):
+                        operations[point] = states[point].replace('open=false', 'open=true')
     unknown = collections.Counter()
 
     def shape(state):
@@ -145,13 +178,18 @@ def main():
 
     safe, foot, head = [], [], []
     rejected = []
-    for point in coords:
+    for index, point in enumerate(coords):
         x, y, z = point
+        if args.medical_only and not near_medical(point):
+            safe.append(inherited_active[index]);foot.append(None);head.append(None)
+            continue
         actual = [states.get((x, y + dy, z), 'UNMEASURED') for dy in (-1, 0, 1)]
         operated = [operations.get((x, y + dy, z), s) for dy, s in zip((-1, 0, 1), actual)]
         floor, f, h = map(shape, operated)
         supported = floor is not None and any(.9 <= b[4] <= 1.001 and b[0] <= .5 <= b[3] and b[2] <= .5 <= b[5] for b in floor)
         valid = supported and free(f, 1) and free(h, .79) and not any(s.startswith(('minecraft:water', 'minecraft:lava', 'projectseele:lcl')) for s in actual[1:])
+        if args.medical_only and not in_medical(point):
+            valid = inherited_active[index]
         safe.append(valid)
         foot.append(f)
         head.append(h)
@@ -159,7 +197,14 @@ def main():
             rejected.append({'point': list(point), 'actual': actual})
 
     # Old edges already exclude operating railway gauge, counterflow and roofs.
-    edges = {(a, b): float(cost) for a, b, cost in npc['walking_edges'] if safe[a] and safe[b]}
+    if args.medical_only:
+        # Inside and crossing edges are rebuilt below. A snapshot of a distant
+        # moving lift must never revoke an inherited route or revive a retired one.
+        edges = {(a, b): float(cost) for a, b, cost in npc['walking_edges']
+                 if not in_medical(coords[a]) and not in_medical(coords[b])}
+        inherited_outside_edges = dict(edges)
+    else:
+        edges = {(a, b): float(cost) for a, b, cost in npc['walking_edges'] if safe[a] and safe[b]}
 
     def boundary(boxes, dx, dz, height, low):
         if boxes is None:
@@ -180,6 +225,8 @@ def main():
             edges[i, j] = edges[j, i] = 1.
 
     for stair in access.get('authored_stairs', []):
+        if args.medical_only:
+            continue
         for a, b in zip(stair, stair[1:]):
             i, j = lookup[tuple(a)], lookup[tuple(b)]
             assert abs(a[1]-b[1]) <= 1 and abs(a[0]-b[0])+abs(a[2]-b[2]) == 1
@@ -198,6 +245,10 @@ def main():
                 if a != b:
                     lift_edges.append({'id': lift['id'], 'a': a['node'], 'b': b['node']})
     train = [row for row in graph['transport_edges'] if safe[row['from']] and safe[row['to']]]
+    if args.medical_only:
+        lift_edges = graph['lift_edges']
+        landings = graph['named_lift_landings']
+        train = graph['transport_edges']
     backwards = [[] for _ in coords]
     for (a, b), cost in edges.items():
         backwards[b].append((a, cost))
@@ -213,6 +264,16 @@ def main():
             issues.append({'kind': 'invalid_goal', 'goal': goal})
         goal_results.append(dijkstra(player_backwards, [goal['node']]))
     active = [safe[i] and all(math.isfinite(row[0][i]) for row in goal_results) for i in range(len(coords))]
+    if args.medical_only:
+        outside_reachability_losses = [list(point) for i, point in enumerate(coords[:inherited])
+                                       if not in_medical(point) and inherited_active[i] and not active[i]]
+        assert not outside_reachability_losses, ('Medical change disconnects inherited outside routes', outside_reachability_losses[:12])
+        for i, point in enumerate(coords):
+            if not in_medical(point):
+                assert i < inherited, 'No outside additions in medical-only mode'
+                active[i] = inherited_active[i]
+        assert {(a, b): cost for (a, b), cost in edges.items()
+                if not in_medical(coords[a]) and not in_medical(coords[b])} == inherited_outside_edges
     for landing in landings:
         if not active[landing['node']]:
             issues.append({'kind': 'disconnected_landing', 'landing': landing})
@@ -255,6 +316,10 @@ def main():
     npc.update(nodes=[list(p) for p in coords], walking_edges=[[a, b, cost] for (a, b), cost in edges.items()], native_lift_edges=lift_edges, native_lift_landings=landings, train_edges=[], native_verified=False)
     (out / 'r53_personnel_walking_graph.json.gz').write_bytes(encode(npc))
     report = {'world_written': False, 'inherited_nodes': inherited, 'added_explicit_nodes': len(coords) - inherited, 'physically_valid_nodes': sum(safe), 'active_nodes': sum(active), 'goal_reachable_counts': [sum(map(math.isfinite, row[0])) for row in goal_results], 'goal_reachability': [[math.isfinite(row[0][g['node']]) for g in graph['goals']] for row in goal_results], 'native_lift_landings': len(landings), 'walking_edges': len(edges), 'player_train_edges': len(train), 'npc_train_edges': 0, 'unknown_states': dict(unknown), 'issues': issues, 'nearest_lift_unresolved': len(unresolved), 'rejected_nodes': rejected}
+    if args.medical_only:
+        report.update(scope='Installed R54 medical room only; original outside active flags, walking edges and transport edges inherited',
+                      outside_active_added=0,outside_active_removed=0,outside_walking_edges_unchanged=True,
+                      outside_reachability_losses=outside_reachability_losses)
     (out / 'REVIEW.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), 'utf8')
     print(json.dumps({k: v for k, v in report.items() if k != 'rejected_nodes'}, ensure_ascii=False), flush=True)
 

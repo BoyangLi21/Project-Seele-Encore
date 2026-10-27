@@ -566,6 +566,42 @@ tasks.register('verifyStaticSpatialIndexR52', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyStaticSpatialIndexR52' }
 
+tasks.register('verifyNervRouteStateR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.NervRouteRuntimeStateR52Test'
+}
+tasks.named('check').configure { dependsOn 'verifyNervRouteStateR53' }
+
+[
+    verifyCarrierRearGuideBudgetR53: 'CarrierRearGuideBudgetR53Test',
+    verifyNervRigidPairSweepR52: 'NervRigidPairSweepR52Test',
+    verifyNervAirTransportStateR53: 'NervAirTransportStateR52Test',
+    verifyEvaMeshRestSupportR53: 'EvaMeshRestSupportR53Test',
+    verifySurfaceAngelRoutingR53: 'SurfaceAngelRoutingR52Test',
+    verifyNervGeometryWorkR53: 'NervGeometryWorkR53Test',
+    verifyNervRigidPairMemoR53: 'NervRigidPairMemoR53Test',
+    verifyNervRailSourceCoverageR53: 'NervRailSourceCoverageR53Test',
+    verifyNervAirframeGeometryR53: 'NervAirframeGeometryR52Test',
+    verifyRescueActorEgressR53: 'NervRescueActorEgressR53Test',
+    verifyAirCradleContactsR53: 'NervAirCradleContactsR53Test'
+].each { taskName, testClass ->
+    tasks.register(taskName, JavaExec) {
+        dependsOn testClasses
+        classpath = sourceSets.test.runtimeClasspath
+        mainClass = "com.projectseele.world.${testClass}"
+    }
+    tasks.named('check').configure { dependsOn taskName }
+}
+
+tasks.register('verifyWholeAssemblyBlockReadsR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.NervCarrierBlockReadsR53Test'
+    args '--whole-source'
+}
+tasks.named('check').configure { dependsOn 'verifyWholeAssemblyBlockReadsR53' }
+
 tasks.register('verifyWayfindingTransitR52', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
@@ -616,6 +652,24 @@ tasks.register('verifyEvaPoseClock', JavaExec) {
     mainClass = 'com.projectseele.entity.EvaPoseSignalClockTest'
 }
 tasks.named('check').configure { dependsOn 'verifyEvaPoseClock' }
+tasks.register('verifyEvaStanceTimingR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.entity.EvaStanceTimingR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyEvaStanceTimingR53' }
+tasks.register('verifyCarrierBankEquipmentR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.CarrierBankEquipmentUpdateR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyCarrierBankEquipmentR53' }
+tasks.register('verifyRescueVegetationR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.NervRescueVegetationR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyRescueVegetationR53' }
 tasks.register('verifyEvaGaitPacketTailR53', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
@@ -628,6 +682,13 @@ tasks.register('verifyPoseSnapshotCodecR45', JavaExec) {
     mainClass = 'com.projectseele.entity.PoseSnapshotCodecR45Test'
 }
 tasks.named('check').configure { dependsOn 'verifyPoseSnapshotCodecR45' }
+
+tasks.register('verifyAuthoredInfluencesR53', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.client.render.AuthoredInfluencesR53Test'
+}
+tasks.named('check').configure { dependsOn 'verifyAuthoredInfluencesR53' }
 
 tasks.register('verifyRamielResourcesR53', JavaExec) {
     dependsOn testClasses

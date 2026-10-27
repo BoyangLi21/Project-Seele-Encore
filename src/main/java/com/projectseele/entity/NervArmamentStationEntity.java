@@ -534,6 +534,28 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
 
     public int payloadR47(){return this.entityData.get(DATA_PAYLOAD_R47);}
     public int rackHalfWidthR47(){return this.payloadR47()==7?14:4;}
+    /** Full-size SMG depth is 12.952 m; its original 7 m interior is retired. */
+    public int rackHalfDepthR54(){return this.payloadR47()==EvaUnit01Entity.WEAPON_RIFLE?8:this.rackHalfWidthR47();}
+
+    @Override
+    protected AABB makeBoundingBox()
+    {
+        if(this.entityData==null||this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE)return super.makeBoundingBox();
+        double width=this.rackHalfWidthR47()+1.5D,depth=this.rackHalfDepthR54()+1.5D;
+        double height=1.0D+this.podTravelR47()*this.entityData.get(DATA_LIFT);
+        return new AABB(this.getX()-width,this.getY(),this.getZ()-depth,
+                this.getX()+width,this.getY()+height,this.getZ()+depth);
+    }
+
+    @Override
+    public AABB getBoundingBoxForCulling()
+    {
+        if(this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE)return super.getBoundingBoxForCulling();
+        double width=2*this.rackHalfWidthR47()+2.0D,depth=this.rackHalfDepthR54()+1.5D;
+        return new AABB(this.getX()-width,this.getY()-this.podTravelR47(),this.getZ()-depth,
+                this.getX()+width,this.getY()+this.podHeightR47()+2.0D,this.getZ()+depth);
+    }
+
     public float podTravelR47(){return this.payloadR47()==7?53.0F:43.0F;}
     public float podHeightR47(){return this.payloadR47()==7?52.0F:42.0F;}
     public void setPayloadR47(int payload)

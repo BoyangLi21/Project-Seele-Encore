@@ -2,22 +2,18 @@ package com.projectseele.entity;
 
 import com.google.gson.JsonObject;
 import com.google.gson.JsonParser;
-import java.io.InputStreamReader;
-import java.nio.charset.StandardCharsets;
 
 /** Old packs retain their sockets; new sockets must belong to the loaded mesh. */
 public final class EvaRifleGeometryR53Test
 {
     public static void main(String[] args) throws Exception
     {
-        JsonObject legacy;
-        try (var input = EvaRifleGeometryR53Test.class.getResourceAsStream(
-                "/assets/projectseele/motion/rifle_clearance_r10.json"))
-        {
-            legacy = JsonParser.parseReader(new InputStreamReader(input, StandardCharsets.UTF_8)).getAsJsonObject();
-        }
+        // The installed resource may already use the mesh-bound replacement schema.
+        var legacy = JsonParser.parseString("""
+                {"schema":1,"points":[[0,1,-1],[0,-1,2]]}
+                """).getAsJsonObject();
         var old = EvaRifleClearance.parse(legacy, null);
-        check(old.points().length > 0, "Public pack has no support hull");
+        check(old.points().length > 0, "Legacy fixture has no support hull");
         check(old.legacyGripFit(), "Old hand fit lost its translation");
         check(Math.abs(old.muzzle().y - 14.616765) < 1e-8, "Legacy muzzle changed");
         var withoutSchema = legacy.deepCopy();

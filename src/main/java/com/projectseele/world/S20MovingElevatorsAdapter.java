@@ -735,6 +735,7 @@ public final class S20MovingElevatorsAdapter
             // A remote first call can load the controller without the car;
             // reconcile only after the actual cage footprint is available.
             for(var stop:spec.stops())level.getChunkAt(stop.cabinCentre());
+            SurfaceLiftThresholdRepairR53.beforeCall(level,spec);
             boolean reconciledForCall=reconcile(level,spec);
             if(!callControllersReadyR43(level,spec.id()))
             {

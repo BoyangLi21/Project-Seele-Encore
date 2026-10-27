@@ -44,11 +44,11 @@ public final class NervSiloDoorRenderer
         if(door.declaredGeometryMissingR52())return;
         var declared=door.declaredSpecR52();
         if(com.projectseele.world.NervR50CarrierModeR53.enabled()&&declared!=null
-                &&declared.serviceColumnPorts()&&declared.separationSign()<0)return;
+                &&declared.serviceColumnPorts()&&declared.separationSign()<0&&!door.declaredGeometryR52().retiredServiceLeavesR53())return;
         float open = door.getOpenProgress(partialTick);
         poses.pushPose();
         var spec=door.declaredSpecR52();if(spec!=null)poses.mulPose(door.actualFrameR52().rotation());
-        TvFacilityMeshes.withBuffers(buffers,()->{if(spec==null)TvFacilityMeshes.shaftHatch(poses,packedLight,open);else TvFacilityMeshes.shaftHatchDeclared(poses,packedLight,open,spec);});
+        TvFacilityMeshes.withBuffers(buffers,()->{if(spec==null)TvFacilityMeshes.shaftHatch(poses,packedLight,open);else TvFacilityMeshes.shaftHatchDeclared(poses,packedLight,open,spec,door.declaredGeometryR52());});
         if(!door.isTvBulkhead())renderSplitLogo(poses, buffers, open,spec);
         poses.popPose();
         super.render(door, yaw, partialTick, poses, buffers, packedLight);

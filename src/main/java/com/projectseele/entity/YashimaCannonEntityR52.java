@@ -80,14 +80,24 @@ public final class YashimaCannonEntityR52 extends Entity
         var base=g.boreWorld(new Quaternionf());var q=new Quaternionf(entityData.get(AIM));
         for(int i=0;i<8;i++)q.rotationTo(base.toVector3f(),target.subtract(g.point(position(),q,g.muzzle())).normalize().toVector3f());
         if(!Float.isFinite(q.lengthSquared()))return false;
-        var before=new Quaternionf(entityData.get(AIM));double angle=2*Math.acos(Math.min(1,Math.abs(before.dot(q))));
+        var before=new Quaternionf(entityData.get(AIM));
+        double sign=before.dot(q)<0?-1:1;
+        double dx=before.x-sign*q.x,dy=before.y-sign*q.y,dz=before.z-sign*q.z,dw=before.w-sign*q.w;
+        // A held bore already on this target performs no articulation. Its
+        // existing hand/forearm contact cannot reject the charge as a new sweep.
+        if(dx*dx+dy*dy+dz*dz+dw*dw<1e-12)
+        {getPersistentData().remove("FixedCannonAimHeldR54");return true;}
+        double angle=2*Math.acos(Math.min(1,Math.abs(before.dot(q))));
         float step=angle<1e-6?1:(float)Math.min(1,Math.toRadians(2)/angle);q=before.slerp(q,step);
-        for(int i=1;i<=4;i++)if(!clearHull(position(),new Quaternionf(entityData.get(AIM)).slerp(q,i/4F)))return false;
-        entityData.set(AIM,q);updateBounds();return true;
+        for(int i=1;i<=4;i++)if(!clearHull(position(),new Quaternionf(entityData.get(AIM)).slerp(q,i/4F)))
+        {getPersistentData().putBoolean("FixedCannonAimHeldR54",true);return false;}
+        getPersistentData().remove("FixedCannonAimHeldR54");entityData.set(AIM,q);updateBounds();return true;
     }
     public boolean resetAimR52()
     {
         if(level().isClientSide)return false;var before=new Quaternionf(entityData.get(AIM));double angle=2*Math.acos(Math.min(1,Math.abs(before.w)));
+        double dw=Math.abs(before.w)-1;
+        if((double)before.x*before.x+(double)before.y*before.y+(double)before.z*before.z+dw*dw<1e-12)return true;
         float step=angle<1e-6?1:(float)Math.min(1,Math.toRadians(2)/angle);var next=new Quaternionf(before).slerp(new Quaternionf(),step);
         for(int i=1;i<=4;i++)if(!clearHull(position(),new Quaternionf(before).slerp(next,i/4F)))return false;
         entityData.set(AIM,next);updateBounds();return Math.abs(next.w)>1-1e-6;

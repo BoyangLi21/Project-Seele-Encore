@@ -102,7 +102,7 @@ public final class UNAnnexR20
         if(active){tickets(l,true);l.resetEmptyTime();}if(!l.hasChunkAt(BUTTONS[0]))return;
         commission(l,s);
         FacilityAudioR21.auxiliary(l,"UN01",s.phase,DOOR);
-        boolean open=s.phase==MilitaryR07Director.Phase.OPEN||s.phase==MilitaryR07Director.Phase.OPENING;NervHangarDoorEntity.reconcile(l,3,DOOR,open);
+        boolean open=s.phase==MilitaryR07Director.Phase.OPEN||s.phase==MilitaryR07Director.Phase.OPENING;NervHangarDoorEntity.reconcileUNR54(l,DOOR,open,s.phase==MilitaryR07Director.Phase.OPEN||s.phase==MilitaryR07Director.Phase.CLOSING?1F:0F);
         if(s.phase==MilitaryR07Director.Phase.DRAINING||s.phase==MilitaryR07Director.Phase.FILLING)
         {
             var liquid=com.projectseele.registry.ModBlocks.LCL_BLOCK.get();

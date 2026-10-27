@@ -255,7 +255,9 @@ public final class EvaHud
             case EvaUnit01Entity.UNIT_02 -> "hud.projectseele.role_assault";
             default -> "hud.projectseele.role_test";
         };
-        guiGraphics.drawString(gui.getFont(), Component.translatable(roleKey).withStyle(ChatFormatting.DARK_GRAY),
+        Component role = eva instanceof com.projectseele.entity.EvaPrototypeEntity un
+                ? Component.literal(com.projectseele.entity.Unit03SourceRigR53.displayName(un.getUNSerial())) : Component.translatable(roleKey);
+        guiGraphics.drawString(gui.getFont(), role.copy().withStyle(ChatFormatting.DARK_GRAY),
                 m + 6, m + 6, 0xFFB8A48D);
 
         int powerTicks = eva.getPowerTicks();
@@ -347,8 +349,8 @@ public final class EvaHud
         guiGraphics.fill(x - 4, y + 35, x + barWidth + 4, y + 36, NERV_ORANGE);
 
         guiGraphics.drawString(gui.getFont(),
-                gui.getFont().plainSubstrByWidth((eva.isExperimentalUnit()
-                        ?Component.translatable("hud.projectseele.role_experimental"):eva.getDisplayName()).getString(),barWidth-58),
+                gui.getFont().plainSubstrByWidth((eva instanceof com.projectseele.entity.EvaPrototypeEntity un
+                        ?Component.literal(com.projectseele.entity.Unit03SourceRigR53.displayName(un.getUNSerial())):eva.getDisplayName()).getString(),barWidth-58),
                 x, y - 10, NERV_ORANGE);
         guiGraphics.drawString(gui.getFont(),
                 String.format("%.0f / %.0f", eva.getHealth(), eva.getMaxHealth()),

@@ -94,12 +94,12 @@ public final class TvEncounterDirectorR45
         var shooter=TvSortiesR32.assignedUnit(l,d,1);
         boolean valid=d.phase.equals("combat")&&owner!=null&&owner.level()==l
                 &&shooter!=null&&shooter.getPilotEntity()!=null&&e.getSource().getEntity()==shooter.getPilotEntity()
-                &&TvEncounterRulesR45.targetFrameReady(l,d,owner)
+                &&TvEncounterRulesR45.fireControlReadyR53(l,d,owner)
                 &&TvEncounterRulesR45.obstruction(l,d).isEmpty()&&phaseEquipmentBlockerR48(l,d).isEmpty();
         // Evaluate live mission permission before the terminal fact revokes it.
         if(valid){d.targetDeathConfirmedR45=true;d.setDirty();TvCampaignDirector.encounterCompleteR45(l,d.active,d.owner,boss.getUUID());}
         else if(!d.phase.equals("cancel"))
-        {TvYashimaDirectorR50.fail(l,d,"目标死亡已确认，但未满足本行动的真实炮击与观测条件。");d.targetDeathConfirmedR45=true;d.setDirty();}
+        {TvYashimaDirectorR50.fail(l,d,"目标死亡已确认，但未满足本行动的原射手炮击条件。");d.targetDeathConfirmedR45=true;d.setDirty();}
 
     }
     @SubscribeEvent public static void logout(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent e)

@@ -87,6 +87,9 @@ public final class EncounterObserverCacheR45
 
     public static void receive(ClientboundEncounterObserverPacket packet)
     {
+        if (packet.kind() == ClientboundEncounterObserverPacket.Kind.NIGHT
+                || packet.kind() == ClientboundEncounterObserverPacket.Kind.DAY)
+        { TvYashimaNightClientR54.receive(packet); return; }
         if (boundLevel != null && boundLevel != Minecraft.getInstance().level) clear(false);
         if (!sameWorld(packet)) return;
         if (packet.kind() == ClientboundEncounterObserverPacket.Kind.CLEAR)

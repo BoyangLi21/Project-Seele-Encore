@@ -11,6 +11,8 @@ public final class NervRigidMeshSweepR52
     private final double[] xyz;private final int[] order;private final Node root;
     private record LeafBounds(RigidTransform from,RigidTransform to,List<AABB> boxes) {}
     private volatile LeafBounds lastLeafBounds;
+    private record Envelope(RigidTransform from,RigidTransform to,AABB bounds){}
+    private volatile Envelope lastEnvelope;
     private static final class Node{AABB box;Node left,right;int start,end;double radius;}
     public NervRigidMeshSweepR52(double[] source)
     {if(source.length==0||source.length%9!=0||Arrays.stream(source).anyMatch(x->!Double.isFinite(x)))throw new IllegalArgumentException("Actual finite triangles required");xyz=source.clone();order=new int[xyz.length/9];for(int i=0;i<order.length;i++)order[i]=i;var bounds=new AABB[order.length];for(int i=0;i<bounds.length;i++)bounds[i]=box(i);root=build(0,order.length,bounds,new BuildBins());}
@@ -128,25 +130,73 @@ public final class NervRigidMeshSweepR52
     public static double angular(RigidTransform from,RigidTransform to){return Math.toRadians(from.rotationErrorDegrees(to));}
     public static double error(double radius,double angle,int divisions){return angle==0?0:radius*angle*angle/(8D*divisions*divisions)+radius*8e-6;}
     public static int divisions(double radius,double angle,double maximumError)
-    {if(!Double.isFinite(maximumError)||maximumError<=radius*8e-6)throw new IllegalArgumentException("Budget must cover real float quaternion error");int n=Math.max(1,(int)Math.ceil(Math.sqrt(radius*angle*angle/(8*(maximumError-radius*8e-6)))));if(n>4096)throw new IllegalArgumentException("Rigid motion subdivision budget exceeded");return n;}
+    {
+        if(!Double.isFinite(radius)||radius<0||!Double.isFinite(angle)||angle<0
+                ||!Double.isFinite(maximumError)||maximumError<=0)
+            throw new IllegalArgumentException("Finite nonnegative radius/angle and positive budget required");
+        // A fixed rotation has no quaternion interpolation error, including
+        // fixed rails whose source coordinates are far from their origin.
+        if(angle==0)return 1;
+        if(maximumError<=radius*8e-6)throw new IllegalArgumentException("Budget must cover real float quaternion error");
+        int n=Math.max(1,(int)Math.ceil(Math.sqrt(radius*angle*angle/(8*(maximumError-radius*8e-6)))));
+        if(n>4096)throw new IllegalArgumentException("Rigid motion subdivision budget exceeded");return n;
+    }
     public static boolean yawOnly(RigidTransform a,RigidTransform b){return a.qx()==0&&a.qz()==0&&b.qx()==0&&b.qz()==0;}
-    public AABB envelope(RigidTransform from,RigidTransform to){double e=error(root.radius,angular(from,to),1);return transformed(root.box,from).minmax(transformed(root.box,to)).inflate(e,yawOnly(from,to)?0:e,e);}
+    public AABB envelope(RigidTransform from,RigidTransform to)
+    {
+        var previous=lastEnvelope;
+        if(previous!=null&&previous.from().equals(from)&&previous.to().equals(to))return previous.bounds();
+        double e=error(root.radius,angular(from,to),1);
+        var bounds=transformed(root.box,from).minmax(transformed(root.box,to)).inflate(e,yawOnly(from,to)?0:e,e);
+        lastEnvelope=new Envelope(from,to,bounds);return bounds;
+    }
     public boolean intersects(RigidTransform from,RigidTransform to,AABB obstacle,double maximumError)
     {return visit(root,from,to,angular(from,to),yawOnly(from,to),obstacle,maximumError);}
     /** Pair BVHs on the same physical time interval. Each narrow test is the
      * two real triangle chord hulls plus certified rotation errors. */
     public boolean intersects(RigidTransform from,RigidTransform to,NervRigidMeshSweepR52 other,RigidTransform otherFrom,RigidTransform otherTo,double maximumError,Vec3 extraError)
+    {return intersects(from,to,other,otherFrom,otherTo,maximumError,extraError,null);}
+    public boolean intersects(RigidTransform from,RigidTransform to,NervRigidMeshSweepR52 other,RigidTransform otherFrom,RigidTransform otherTo,double maximumError,Vec3 extraError,PairQuery query)
     {
         if(!Double.isFinite(extraError.lengthSqr())||extraError.x<0||extraError.y<0||extraError.z<0)throw new IllegalArgumentException("Finite curve certificate required");
-        if(sameRotation(from,to)&&sameRotation(otherFrom,otherTo)&&!otherFrom.translation().equals(otherTo.translation()))
+        // Remove the peer's affine translation at the same physical instant.
+        // Rotation remains in world axes, so both SLERP bounds and curve-error
+        // padding are unchanged, including when either member rotates.
+        var relativeFrom=new RigidTransform(from.translation().subtract(otherFrom.translation()),from.qx(),from.qy(),from.qz(),from.qw());
+        var relativeTo=new RigidTransform(to.translation().subtract(otherTo.translation()),to.qx(),to.qy(),to.qz(),to.qw());
+        var peerFrom=new RigidTransform(Vec3.ZERO,otherFrom.qx(),otherFrom.qy(),otherFrom.qz(),otherFrom.qw());
+        var peerTo=new RigidTransform(Vec3.ZERO,otherTo.qx(),otherTo.qy(),otherTo.qz(),otherTo.qw());
+        // The constructor normalizes float quaternions. Reuse this reference
+        // frame only when it preserves every original rotation exactly.
+        if(sameRotation(from,relativeFrom)&&sameRotation(to,relativeTo)
+            &&sameRotation(otherFrom,peerFrom)&&sameRotation(otherTo,peerTo))
+        {from=relativeFrom;to=relativeTo;otherFrom=peerFrom;otherTo=peerTo;}
+        var a=query==null?new PairMotion(this,from,to,extraError):query.motion(this,from,to,extraError);
+        var b=query==null?new PairMotion(other,otherFrom,otherTo,Vec3.ZERO):query.motion(other,otherFrom,otherTo,Vec3.ZERO);
+        return pair(root,a,other.root,b,maximumError,extraError);
+    }
+    private record MotionKey(NervRigidMeshSweepR52 mesh,RigidTransform from,RigidTransform to,Vec3 extra){}
+    /** Call-local geometry only: exact mesh identity, frames and padding.
+     * Clear moving entries at each interval; stationary entries are bounded
+     * and never retain a world occupancy result or collision decision. */
+    public static final class PairQuery
+    {
+        private final Map<MotionKey,PairMotion> fixed=new LinkedHashMap<>(64,.75f,true);
+        private final Map<MotionKey,PairMotion> moving=new LinkedHashMap<>(64,.75f,true);
+        public void nextInterval(){moving.clear();}
+        private PairMotion motion(NervRigidMeshSweepR52 mesh,RigidTransform from,RigidTransform to,Vec3 extra)
         {
-            // Two world-space swept volumes can overlap at different times.
-            // For affine translations, subtract the peer's motion so every
-            // chord point is tested against that peer at the same instant.
-            var shifted=new RigidTransform(to.translation().subtract(otherTo.translation().subtract(otherFrom.translation())),to.qx(),to.qy(),to.qz(),to.qw());
-            if(sameRotation(to,shifted)){to=shifted;otherTo=otherFrom;}
+            boolean stationary=from.equals(to);var cache=stationary?fixed:moving;
+            var key=new MotionKey(mesh,from,to,extra);var result=cache.get(key);
+            if(result==null)
+            {
+                result=new PairMotion(mesh,from,to,extra,true);cache.put(key,result);
+                // A complete carried body, plug, rack and nearby rail groups
+                // share stationary local projections across route intervals.
+                if(cache.size()>(stationary?128:32))cache.remove(cache.keySet().iterator().next());
+            }
+            return result;
         }
-        return pair(root,new PairMotion(this,from,to,extraError),other.root,new PairMotion(other,otherFrom,otherTo,Vec3.ZERO),maximumError,extraError);
     }
     private static boolean sameRotation(RigidTransform a,RigidTransform b)
     {return a.qx()==b.qx()&&a.qy()==b.qy()&&a.qz()==b.qz()&&a.qw()==b.qw();}
@@ -155,15 +205,41 @@ public final class NervRigidMeshSweepR52
     private static final class PairMotion
     {
         final NervRigidMeshSweepR52 mesh;final RigidTransform from,to,chordFrom,chordTo;final double angle;final boolean yaw;final Vec3 extra;
-        final Map<Node,AABB> boxes=new IdentityHashMap<>();
+        final Map<Node,AABB> boxes=new LinkedHashMap<>(64,.75f,true);
+        final Map<Node,LeafHull> leafHulls=new LinkedHashMap<>(64,.75f,true);
         final TriangleChord[][] chords;
+        final Map<Integer,ChordPage> boundedChords;
+        int cachedChords;
+        private static final class ChordPage{final TriangleChord[] entries=new TriangleChord[256];int count;}
         PairMotion(NervRigidMeshSweepR52 mesh,RigidTransform from,RigidTransform to,Vec3 extra)
-        {this.mesh=mesh;this.from=from;this.to=to;this.extra=extra;angle=angular(from,to);yaw=yawOnly(from,to);chordFrom=from.interpolate(to,0);chordTo=from.interpolate(to,1);chords=new TriangleChord[(mesh.triangleCount()+255)>>>8][];}
+        {this(mesh,from,to,extra,false);}
+        PairMotion(NervRigidMeshSweepR52 mesh,RigidTransform from,RigidTransform to,Vec3 extra,boolean bounded)
+        {this.mesh=mesh;this.from=from;this.to=to;this.extra=extra;angle=angular(from,to);yaw=yawOnly(from,to);chordFrom=from.interpolate(to,0);chordTo=from.interpolate(to,1);chords=bounded?null:new TriangleChord[(mesh.triangleCount()+255)>>>8][];boundedChords=bounded?new LinkedHashMap<>(32,.75f,true):null;}
         AABB box(Node node)
         {
             var bounds=boxes.get(node);
-            if(bounds==null){double e=error(node.radius,angle,1);bounds=transformed(node.box,from).minmax(transformed(node.box,to)).inflate(e+extra.x,(yaw?0:e)+extra.y,e+extra.z);boxes.put(node,bounds);}
+            if(bounds==null){double e=error(node.radius,angle,1);bounds=transformed(node.box,from).minmax(transformed(node.box,to)).inflate(e+extra.x,(yaw?0:e)+extra.y,e+extra.z);boxes.put(node,bounds);if(boundedChords!=null&&boxes.size()>2048)boxes.remove(boxes.keySet().iterator().next());}
             return bounds;
+        }
+        LeafHull leafHull(Node node)
+        {
+            var result=leafHulls.get(node);if(result!=null)return result;
+            var points=new LinkedHashSet<Vec3>();var normals=new ArrayList<Vec3>();
+            for(int i=node.start;i<node.end;i++)
+            {
+                var triangle=chord(mesh.order[i],1,0).points;Collections.addAll(points,triangle);
+                var normal=triangle[1].subtract(triangle[0]).cross(triangle[2].subtract(triangle[0]));
+                if(normal.lengthSqr()<1e-28)continue;normal=normal.normalize();boolean duplicate=false;
+                for(var previous:normals)if(Math.abs(normal.dot(previous))>1-1e-12){duplicate=true;break;}
+                if(!duplicate)normals.add(normal);
+            }
+            result=new LeafHull(points.toArray(Vec3[]::new),normals);
+            leafHulls.put(node,result);
+            // Fixed source joints have over a thousand leaves. Retain their
+            // repeated projections within a bounded geometry working set.
+            int limit=from.equals(to)?2048:256;
+            if(boundedChords!=null&&leafHulls.size()>limit)leafHulls.remove(leafHulls.keySet().iterator().next());
+            return result;
         }
         TriangleChord chord(int triangle,int divisions,int slice)
         {
@@ -173,6 +249,22 @@ public final class NervRigidMeshSweepR52
             // Source triangle IDs are dense. Allocate only the touched pages;
             // every leaf pair can then reuse endpoints without hashing IDs.
             int page=triangle>>>8,slot=triangle&255;
+            if(boundedChords!=null)
+            {
+                var cached=boundedChords.get(page);
+                if(cached!=null&&cached.entries[slot]!=null)return cached.entries[slot];
+                // Keep the same 2048-chord/16-page bound, but let the cache
+                // follow the touched source leaves instead of freezing full.
+                while(cachedChords>=2048||cached==null&&boundedChords.size()>=16)
+                {
+                    var oldest=boundedChords.entrySet().iterator();var removed=oldest.next();
+                    cachedChords-=removed.getValue().count;oldest.remove();cached=boundedChords.get(page);
+                }
+                if(cached==null){cached=new ChordPage();boundedChords.put(page,cached);}
+                var chord=new TriangleChord(mesh.corners(triangle,chordFrom,chordTo));
+                cached.entries[slot]=chord;cached.count++;cachedChords++;
+                return chord;
+            }
             var entries=chords[page];if(entries==null)chords[page]=entries=new TriangleChord[256];
             var chord=entries[slot];if(chord==null)entries[slot]=chord=new TriangleChord(mesh.corners(triangle,chordFrom,chordTo));
             return chord;
@@ -194,14 +286,58 @@ public final class NervRigidMeshSweepR52
             return bounds.maxX+pad.x>b.minX&&bounds.minX-pad.x<b.maxX&&bounds.maxY+pad.y>b.minY&&bounds.minY-pad.y<b.maxY&&bounds.maxZ+pad.z>b.minZ&&bounds.minZ-pad.z<b.maxZ;
         }
     }
+    private record Plane(Vec3 axis,double low,double high){}
+    /** The convex hull of a leaf's actual triangle endpoints is only a
+     * rejection bound. An overlapping hull always reaches the original
+     * per-triangle SAT; cavities and disconnected source members stay intact. */
+    private static final class LeafHull
+    {
+        final Vec3[] points;final List<Plane> planes;
+        LeafHull(Vec3[] points,List<Vec3> axes)
+        {
+            this.points=points;var result=new ArrayList<Plane>();
+            for(var axis:axes)result.add(project(axis));planes=List.copyOf(result);
+        }
+        Plane project(Vec3 axis)
+        {
+            double low=Double.POSITIVE_INFINITY,high=Double.NEGATIVE_INFINITY;
+            for(var point:points){double d=point.dot(axis);low=Math.min(low,d);high=Math.max(high,d);}
+            return new Plane(axis,low,high);
+        }
+        boolean separated(LeafHull other,Vec3 pad)
+        {
+            for(var plane:planes)
+            {
+                var b=other.project(plane.axis());var axis=plane.axis();
+                double error=pad.x*Math.abs(axis.x)+pad.y*Math.abs(axis.y)+pad.z*Math.abs(axis.z);
+                // Outward rounding makes this optional early rejection more
+                // conservative than the unchanged triangle SAT at large roots.
+                double scale=Math.max(Math.max(Math.abs(plane.low()),Math.abs(plane.high())),Math.max(Math.abs(b.low()),Math.abs(b.high())));
+                error+=Math.ulp(scale)*16;
+                if(plane.high()+error<b.low()||plane.low()-error>b.high())return true;
+            }
+            return false;
+        }
+    }
     private static boolean pair(Node a,PairMotion am,Node b,PairMotion bm,double budget,Vec3 extra)
     {
+        NervGeometryWorkR53.check();
         if(!am.box(a).intersects(bm.box(b)))return false;
         if(a.left!=null&&(b.left==null||a.end-a.start>=b.end-b.start))return pair(a.left,am,b,bm,budget,extra)||pair(a.right,am,b,bm,budget,extra);
         if(b.left!=null)return pair(a,am,b.left,bm,budget,extra)||pair(a,am,b.right,bm,budget,extra);
         int n=Math.max(divisions(a.radius,am.angle,budget),divisions(b.radius,bm.angle,budget));
         double ae=error(a.radius,am.angle,n),be=error(b.radius,bm.angle,n);
         var pad=new Vec3(ae+be+extra.x,(am.yaw?0:ae)+(bm.yaw?0:be)+extra.y,ae+be+extra.z);
+        if(a.end-a.start>1||b.end-b.start>1)
+        {
+            // All intermediate chord endpoints lie within the whole-interval
+            // rotation bound. Add the original subinterval SAT padding too,
+            // so this test encloses every existing narrow-phase candidate.
+            double aw=n==1?0:error(a.radius,am.angle,1),bw=n==1?0:error(b.radius,bm.angle,1);
+            var broad=pad.add(aw+bw,(am.yaw?0:aw)+(bm.yaw?0:bw),aw+bw);
+            var ah=am.leafHull(a);var bh=bm.leafHull(b);
+            if(bh.separated(ah,broad)||ah.separated(bh,broad))return false;
+        }
         for(int s=0;s<n;s++)for(int i=a.start;i<a.end;i++)
         {
             var ap=am.chord(am.mesh.order[i],n,s);

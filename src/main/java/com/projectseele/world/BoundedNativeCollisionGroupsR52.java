@@ -98,6 +98,35 @@ public final class BoundedNativeCollisionGroupsR52 {
     }
     public record Result(boolean clear,Plan plan,int nativeReads,int groupedReads,int originalFallbackReads,
                          long readCellEstimate,long obstaclesPassedToNarrowPhase) {}
+    private static final Comparator<AABB> EXACT_BOX_ORDER=Comparator.comparingDouble((AABB b)->b.minX)
+            .thenComparingDouble(b->b.minY).thenComparingDouble(b->b.minZ)
+            .thenComparingDouble(b->b.maxX).thenComparingDouble(b->b.maxY).thenComparingDouble(b->b.maxZ);
+    /** The predicate checks the complete source spatial index, not one piece.
+     * Visit each group's native shapes once. Exact cross-group deduplication
+     * is invocation-local; Double.compare preserves AABB's signed-zero and
+     * equality semantics without its grid-coordinate hash distribution. */
+    public static Result clearWholeSource(List<AABB> pieces,Predicate<AABB> readableGroup,
+            Function<AABB,List<AABB>> liveNativeShapes,Predicate<AABB> wholeSourceIntersects) {
+        Objects.requireNonNull(readableGroup);Objects.requireNonNull(liveNativeShapes);Objects.requireNonNull(wholeSourceIntersects);
+        Plan plan=plan(pieces);var seen=new TreeSet<AABB>(EXACT_BOX_ORDER);
+        int reads=0,groupReads=0,fallbackReads=0;long cells=0,obstacles=0;
+        for(var group:plan.groups) {
+            boolean grouped=readableGroup.test(group.bounds);
+            int count=grouped?1:group.pieces.size();
+            for(int i=0;i<count;i++) {
+                var query=grouped?group.bounds:plan.pieces.get(group.pieces.get(i));
+                if(!grouped&&!readableGroup.test(query))return new Result(false,plan,reads,groupReads,fallbackReads,cells,obstacles);
+                var shapes=liveNativeShapes.apply(query);reads++;if(grouped)groupReads++;else fallbackReads++;
+                cells=add(cells,voxelEstimate(query));
+                for(var obstacle:shapes) {
+                    if(!seen.add(obstacle))continue;
+                    obstacles++;
+                    if(wholeSourceIntersects.test(obstacle))return new Result(false,plan,reads,groupReads,fallbackReads,cells,obstacles);
+                }
+            }
+        }
+        return new Result(true,plan,reads,groupReads,fallbackReads,cells,obstacles);
+    }
     /** All fetched shapes are local to this invocation. The readable predicate
      * lets the caller retain original reads if a merged gap would touch an
      * unloaded region. It must not be an air/material shortcut. The reader

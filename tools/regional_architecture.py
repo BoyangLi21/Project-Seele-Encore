@@ -161,7 +161,12 @@ def furnished_room(p,b,floor,owner,label,purpose,wall=WALL,exit_side='east'):
     ex=x1 if exit_side=='east' else x0
     opening(p,ex,(z0+z1)//2,floor,owner,exit_side,3,3)
     p.sign(ex+(1 if exit_side=='east' else -1),floor+3,(z0+z1)//2+2,[label,purpose,'NERV',''],owner,exit_side)
-    if purpose in ('MEDICAL','QUARTERS'):
+    if owner == 'r04/pyramid/435/06':
+        # This named medical wing now has three private rooms. Never replay
+        # the retired 32-bed grid when rebuilding the original room recipe.
+        from medical_wards_r54 import author_legacy
+        author_legacy(p,floor,owner)
+    elif purpose in ('MEDICAL','QUARTERS'):
         for x in range(x0+4,x1-2,5):
             for z in range(z0+5,z1-2,7):
                 p.bed(x,floor+1,z,owner)

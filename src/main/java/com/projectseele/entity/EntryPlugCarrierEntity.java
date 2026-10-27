@@ -361,7 +361,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     {
         if(!this.level().isClientSide||!this.hasCanonicalPose()||!this.isLockedToEva())return null;
         var unit=this.getLinkedEva();
-        return unit!=null&&(EvaAirTransportR31.active(unit)||EvaShutdownR30.displayed(unit))?EntryPlugKinematics.lockedTransform(unit,Mth.clamp(partial,0,1)):null;
+        return unit!=null&&(EvaMechanicalFrameR52.active(unit)||EvaAirTransportR31.active(unit)||EvaShutdownR30.displayed(unit))?EntryPlugKinematics.lockedTransform(unit,Mth.clamp(partial,0,1)):null;
     }
 
     /** Camera marker inside the sealed capsule, never on its exterior AABB. */
@@ -1137,7 +1137,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     @Override
     protected void positionRider(Entity passenger, Entity.MoveFunction move)
     {
-        if(com.projectseele.world.NervOriginalActorsR52.managed(this)&&!com.projectseele.world.NervOriginalActorsR52.riderUpdatesAllowed((ServerLevel)this.level(),this))return;
+        if(com.projectseele.world.NervOriginalActorsR52.managed(this)&&!com.projectseele.world.NervOriginalActorsR52.riderPositionUpdatesAllowed((ServerLevel)this.level(),this,passenger))return;
         if (!this.hasPassenger(passenger))
         {
             return;

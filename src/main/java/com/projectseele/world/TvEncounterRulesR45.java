@@ -64,6 +64,13 @@ public final class TvEncounterRulesR45
         var seen=SEEN.getOrDefault(l,Map.of()).get(player.getUUID());
         return seen!=null&&seen.target().equals(d.angel)&&seen.generation()==d.generationR43&&l.getGameTime()-seen.observedAt()<=200;
     }
+    /** World target and commander authority govern firing; remote draw acknowledgements govern presentation only. */
+    public static boolean fireControlReadyR53(ServerLevel level,TvCampaignSavedData data,ServerPlayer player)
+    {
+        if(!data.active.equals("ramiel"))return targetFrameReady(level,data,player);
+        return player!=null&&player.level()==level&&data.owner!=null&&data.owner.equals(player.getUUID())
+                &&TvYashimaDirectorR50.targetAvailableR53(level,data);
+    }
     public static boolean issueMissionAtStation(com.projectseele.entity.NervArmamentStationEntity station,EvaUnit01Entity eva,net.minecraft.world.entity.LivingEntity actualPilot)
     {return equipment.issueMissionAtStation(station,eva,actualPilot);}
     public static void pauseNpcUnitForRecoveryR47(EvaUnit01Entity eva)
@@ -178,7 +185,7 @@ public final class TvEncounterRulesR45
                 if(TvMissionEquipmentR45.cannonAuthorized(eva))eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_CANNON);
                 var commander=d.owner==null?null:l.getServer().getPlayerList().getPlayer(d.owner);
                 diagnoseCannonRefusalR50(l,d,eva,pilot,commander,boss);
-                if(!d.phase.equals("combat")||!targetFrameReady(l,d,commander)||!equipmentBlocker(l,d).isEmpty())
+                if(!d.phase.equals("combat")||!fireControlReadyR53(l,d,commander)||!equipmentBlocker(l,d).isEmpty())
                 {equipment.cannonInput(eva,pilot,aim,false,false);return true;}
                 if(!equipment.cannonReady(eva))return true;
                 boolean full=eva.getCannonCharge()>=com.projectseele.config.SeeleConfig.CANNON_CHARGE_TICKS.get();
@@ -197,8 +204,11 @@ public final class TvEncounterRulesR45
         var map=CANNON_DIAGNOSTICS.computeIfAbsent(level,ignored->new java.util.HashMap<>());
         var previous=map.get(eva.getUUID());long now=level.getGameTime();
         if(previous!=null&&now>=previous.checkedAt()&&now-previous.checkedAt()<20)return;
-        boolean frame=targetFrameReady(level,data,commander);
+        boolean frame=fireControlReadyR53(level,data,commander);
         String equipmentReason=equipmentBlocker(level,data),cannonReason=TvYashimaDirectorR50.cannonBlocker(eva);
+        var gun=eva.fixedCannonBodyR52();
+        if(cannonReason.isEmpty()&&gun!=null&&gun.getPersistentData().getBoolean("FixedCannonAimHeldR54"))
+            cannonReason="实际转炮被炮体、操作者或周边碰撞阻挡。";
         boolean ready=equipment.cannonReady(eva);
         // Evaluate the same current physical ray even when the frame gate is
         // blocked. An unissued cannon has no meaningful cannon ray to report.
@@ -261,7 +271,7 @@ public final class TvEncounterRulesR45
         if(!eva.getPersistentData().getBoolean("TvMissionCannonAppliedR45")&&!TvMissionEquipmentR45.cannonAuthorized(eva))return true;
         if(!(eva.level() instanceof ServerLevel l))return false;
         var d=TvCampaignSavedData.get(l);var owner=d.owner==null?null:l.getServer().getPlayerList().getPlayer(d.owner);
-        return owner!=null&&owner.level()==l&&d.phase.equals("combat")&&targetFrameReady(l,d,owner)
+        return owner!=null&&owner.level()==l&&d.phase.equals("combat")&&fireControlReadyR53(l,d,owner)
                 &&obstruction(l,d).isEmpty()&&equipmentBlocker(l,d).isEmpty()&&TvYashimaDirectorR50.cannonBlocker(eva).isEmpty();
     }
     /** Real incoming ray consumer: only this original mission defender can intercept. */

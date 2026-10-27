@@ -5,6 +5,7 @@ import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
 import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
+import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.screens.Screen;
 import net.minecraft.network.chat.Component;
 import java.util.*;
@@ -15,12 +16,16 @@ public final class StaffConversationScreen extends Screen
     private ClientboundStaffConversationPacket view;
     private EditBox input;
     private EditBox transportX,transportY,transportZ;
+    private int transportReturnExit;
     private String mission="sachiel";
     private boolean npcSortie;
     private String sortieEquipment="rifle";
     private int x, y, panelWidth, panelHeight, tab, unit = 1, age, savedScale = -1, replyScroll, replyTop;
     private boolean restoring,scaling;
     private UUID humanPilot;
+    private final Map<AbstractWidget,Integer> controlRows=new LinkedHashMap<>();
+    private int controlsScroll,controlsScrollMax;
+    private boolean buildingControls;
 
     private StaffConversationScreen(ClientboundStaffConversationPacket view)
     {
@@ -83,16 +88,18 @@ public final class StaffConversationScreen extends Screen
                 return;
             }
         }
-        panelWidth = Math.min(560, width - 16); panelHeight = Math.min(320, height - 16);
+        String draft=input==null?"":input.getValue();controlRows.clear();buildingControls=false;
+        panelWidth = Math.min(640, width - 16); panelHeight = Math.min(444, height - 16);
         x = (width - panelWidth) / 2; y = (height - panelHeight) / 2;
         int tabWidth=(panelWidth-24)/5;
-        addButton("交谈",x+12,y+29,tabWidth-3,()->switchTab(0),true);
-        addButton("指挥",x+12+tabWidth,y+29,tabWidth-3,()->switchTab(1),view.canCommand());
-        addButton("作战记录",x+12+tabWidth*2,y+29,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},true);
-        addButton("通讯录",x+12+tabWidth*3,y+29,tabWidth-3,()->switchTab(4),view.radio());
-        addButton("运输部门",x+12+tabWidth*4,y+29,tabWidth-3,()->{switchTab(6);send("TRANSPORT:status");},view.canCommand());
-        addButton("关闭", x + panelWidth - 60, y + 8, 48, this::onClose, true);
+        addTab("交谈",0,x+12,tabWidth-3,()->switchTab(0),true);
+        addTab("指挥",1,x+12+tabWidth,tabWidth-3,()->switchTab(1),view.canCommand());
+        addTab("作战记录",2,x+12+tabWidth*2,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},true);
+        addTab("通讯录",4,x+12+tabWidth*3,tabWidth-3,()->switchTab(4),view.radio());
+        addTab("运输部门",6,x+12+tabWidth*4,tabWidth-3,()->{switchTab(6);send("TRANSPORT:status");},view.canCommand());
+        addButton("关闭", x + panelWidth - 60, y + 12, 48, this::onClose, true);
         int controlsY = controlsTop();
+        buildingControls=true;
         int column = (panelWidth - 32) / 3;
         if (tab == 0)
         {
@@ -216,20 +223,28 @@ public final class StaffConversationScreen extends Screen
         }
         else if(tab==6)
         {
+            String enteredX=transportX==null?null:transportX.getValue(),enteredY=transportY==null?null:transportY.getValue(),enteredZ=transportZ==null?null:transportZ.getValue();
+            var controlled=com.projectseele.world.EvaPilotResolver.controlTarget(minecraft.player);
+            var feet=controlled!=null&&controlled.getPilotEntity()==minecraft.player
+                    ?net.minecraft.core.BlockPos.containing(com.projectseele.world.NervOwnerPlacementR52.actualRoot(controlled).translation())
+                    :minecraft.player.blockPosition();
             for(int i=0;i<3;i++)
             {
                 int selection=i;addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),x+12+i*(column+4),controlsY,column,()->{unit=selection;rebuildWidgets();},true);
             }
             int half=(panelWidth-28)/2;
-            transportX=new EditBox(font,x+12,controlsY+24,column,20,Component.literal("目的地 X"));transportY=new EditBox(font,x+16+column,controlsY+24,column,20,Component.literal("目的地 Y"));transportZ=new EditBox(font,x+20+column*2,controlsY+24,column,20,Component.literal("目的地 Z"));
-            transportY.setMaxLength(10);transportY.setFilter(s->s.matches("-?\\d*"));transportY.setValue(Integer.toString(minecraft.player.getBlockY()));addRenderableWidget(transportY);
+            transportX=new PhoneUiR54.Field(font,x+12,controlsY+24,column,20,Component.literal("目的地 X"),PhoneUiR54.NERV);transportY=new PhoneUiR54.Field(font,x+16+column,controlsY+24,column,20,Component.literal("目的地 Y"),PhoneUiR54.NERV);transportZ=new PhoneUiR54.Field(font,x+20+column*2,controlsY+24,column,20,Component.literal("目的地 Z"),PhoneUiR54.NERV);
+            transportY.setMaxLength(10);transportY.setFilter(s->s.matches("-?\\d*"));transportY.setValue(enteredY==null?Integer.toString(feet.getY()):enteredY);addRenderableWidget(transportY);
             transportX.setHint(Component.literal("X"));transportY.setHint(Component.literal("Y · 脚下高度"));transportZ.setHint(Component.literal("Z"));
             transportX.setMaxLength(10);transportZ.setMaxLength(10);transportX.setFilter(s->s.matches("-?\\d*"));transportZ.setFilter(s->s.matches("-?\\d*"));
-            transportX.setValue(Integer.toString(minecraft.player.getBlockX()));transportZ.setValue(Integer.toString(minecraft.player.getBlockZ()));addRenderableWidget(transportX);addRenderableWidget(transportZ);
+            transportX.setValue(enteredX==null?Integer.toString(feet.getX()):enteredX);transportZ.setValue(enteredZ==null?Integer.toString(feet.getZ()):enteredZ);addRenderableWidget(transportX);addRenderableWidget(transportZ);
+            controlRows.put(transportX,transportX.getY());controlRows.put(transportY,transportY.getY());controlRows.put(transportZ,transportZ.getY());
             addButton("投放至 X / Y / Z",x+12,controlsY+48,column,()->send("TRANSPORT:deliver:"+unit+":"+transportX.getValue()+":"+transportY.getValue()+":"+transportZ.getValue()),true);
-            addButton("空运回库 · 自动选路",x+16+column,controlsY+48,column,()->send("TRANSPORT:recover:"+unit),true);
+            addButton("空运回库",x+16+column,controlsY+48,column,()->send("TRANSPORT:recover:"+unit+(transportReturnExit==0?"":":unit"+unit+"/exit"+transportReturnExit+"/port")),true);
             addButton("取消本机 / 安全返回",x+20+column*2,controlsY+48,column,()->send("TRANSPORT:cancel:"+unit),true);
-            addButton("运输状态",x+12,controlsY+72,panelWidth-24,()->send("TRANSPORT:status"),true);
+            String returnPort=switch(transportReturnExit){case 1->"GeoFront";case 2->"第三新东京";case 3->"箱根";default->"自动选路";};
+            addButton("回库接收口："+returnPort,x+12,controlsY+72,half,()->{String tx=transportX.getValue(),ty=transportY.getValue(),tz=transportZ.getValue();transportReturnExit=(transportReturnExit+1)%4;rebuildWidgets();transportX.setValue(tx);transportY.setValue(ty);transportZ.setValue(tz);},true);
+            addButton("运输状态",x+16+half,controlsY+72,half,()->send("TRANSPORT:status"),true);
         }
         else if (tab == 5)
         {
@@ -265,30 +280,38 @@ public final class StaffConversationScreen extends Screen
             }
             addButton("停止步行引导",x+12,controlsY+66,panelWidth-24,()->send("ROUTE:stop"),true);
         }
+        buildingControls=false;applyControlScroll();
         int parent=parentTab();
         if(parent>=0)addButton("← 返回"+(parent==0?"交谈":parent==1?"指挥分类":parent==2?"作战记录":"城市协同档案"),
-                x+12,y+panelHeight-45,panelWidth-24,()->switchTab(parent),true);
-        input = new EditBox(font, x + 12, y + panelHeight - 21, panelWidth - 83, 17, Component.literal("输入交谈或指令"));
-        input.setMaxLength(160); input.setHint(Component.literal("例如：初号机准备后发射")); addRenderableWidget(input);
-        addButton("发送", x + panelWidth - 64, y + panelHeight - 22, 52, this::submitText, true);
+                x+12,y+panelHeight-55,panelWidth-24,()->switchTab(parent),true);
+        input = new PhoneUiR54.Field(font, x + 13, y + panelHeight - 28, panelWidth - 87, 19, Component.literal("输入交谈或指令"),PhoneUiR54.NERV);
+        input.setMaxLength(160);input.setValue(draft); input.setHint(Component.literal("输入消息或指令 · Enter 发送")); addRenderableWidget(input);
+        addButton("发送", x + panelWidth - 65, y + panelHeight - 29, 52, this::submitText, true);
     }
 
     private void addButton(String title, int left, int top, int width, Runnable action, boolean enabled)
     {
-        var button = new ChannelButton(left, top, width, Component.literal(title), action);
+        boolean selected=title.startsWith("● ");
+        var button = new PhoneUiR54.Action(left, top, width,20, selected?title.substring(2):title, action,PhoneUiR54.NERV,()->selected);
         button.active = enabled; addRenderableWidget(button);
+        if(buildingControls)controlRows.put(button,top);
     }
-    private static final class ChannelButton extends Button
+    private void addTab(String label,int target,int left,int width,Runnable action,boolean enabled)
     {
-        ChannelButton(int x, int y, int width, Component title, Runnable action)
-        { super(x, y, width, 18, title, ignored -> action.run(), DEFAULT_NARRATION); }
-        @Override protected void renderWidget(GuiGraphics graphics, int mouseX, int mouseY, float partial)
+        var button=new PhoneUiR54.Action(left,y+50,width,21,label,action,PhoneUiR54.NERV,()->rootTab()==target);
+        button.active=enabled;addRenderableWidget(button);
+    }
+    private int rootTab(){return switch(tab){case 3->0;case 5,8,9,10,11->1;case 7,12,13,14,15->2;default->tab;};}
+    private int controlsBottom(){return y+panelHeight-60;}
+    private void applyControlScroll()
+    {
+        int end=controlsTop();for(var row:controlRows.entrySet())end=Math.max(end,row.getValue()+row.getKey().getHeight());
+        controlsScrollMax=Math.max(0,end-controlsBottom());controlsScroll=Math.max(0,Math.min(controlsScroll,controlsScrollMax));
+        for(var row:controlRows.entrySet())
         {
-            boolean focused = active && isHoveredOrFocused();
-            graphics.fill(getX(), getY(), getX() + width, getY() + height, focused ? 0xFF40584B : 0xFF203A32);
-            graphics.fill(getX(), getY() + height - 1, getX() + width, getY() + height, focused ? 0xFFE2BB67 : 0xFF527867);
-            graphics.drawCenteredString(Minecraft.getInstance().font, getMessage(), getX() + width / 2, getY() + 5,
-                    active ? focused ? 0xFFEFD18E : 0xFFD5E7D8 : 0xFF738178);
+            var widget=row.getKey();widget.setY(row.getValue()-controlsScroll);
+            widget.visible=widget.getY()>=controlsTop()&&widget.getY()+widget.getHeight()<=controlsBottom();
+            if(!widget.visible&&widget.isFocused())widget.setFocused(false);
         }
     }
     private UUID selectedHuman(){return humanPilot!=null?humanPilot:minecraft.player.getUUID();}
@@ -347,21 +370,20 @@ public final class StaffConversationScreen extends Screen
     private void switchTab(int next)
     {
         if(next!=7&&next!=13&&next!=14&&next!=15)unit=Math.min(unit,2);
-        tab=next;rebuildWidgets();
+        tab=next;controlsScroll=0;replyScroll=0;rebuildWidgets();
     }
     private boolean permitted(String action)
     { return view.canCommand() && com.projectseele.world.StaffAuthorityR25.allows("", view.skin(), action); }
     private int controlsTop()
     {
-        int reserved=switch(tab)
+        int rows=switch(tab)
         {
-            case 8,12 -> 179;
-            case 13,14 -> 157;
-            case 3 -> 135;
-            case 5,7,9,10,11,15,6 -> 113;
-            default -> 91;
+            case 12 -> 6;
+            case 3,6,8,13,14 -> 4;
+            case 1,2,4,7,9,10 -> 3;
+            default -> 2;
         };
-        return y+panelHeight-reserved;
+        return y+Math.max(Math.max(142,Math.min(170,panelHeight-120)),panelHeight-(rows*22+76));
     }
     private void submitText() { if (!input.getValue().isBlank()) { send(input.getValue()); input.setValue(""); } }
     private void send(String request)
@@ -380,35 +402,35 @@ public final class StaffConversationScreen extends Screen
     }
     @Override public boolean mouseScrolled(double mouseX, double mouseY, double delta)
     {
-        if (mouseX >= x && mouseX < x + panelWidth && mouseY >= replyTop && mouseY < controlsTop()-6)
+        if(mouseX>=x+8&&mouseX<x+panelWidth-8&&mouseY>=controlsTop()-20&&mouseY<controlsBottom())
+        {controlsScroll-=(int)Math.signum(delta)*22;applyControlScroll();return true;}
+        if (mouseX >= x && mouseX < x + panelWidth && mouseY >= replyTop-18 && mouseY < controlsTop()-28)
         { replyScroll = Math.max(0, replyScroll - (int) Math.signum(delta) * 2); return true; }
         return super.mouseScrolled(mouseX, mouseY, delta);
     }
     @Override public void render(GuiGraphics graphics, int mouseX, int mouseY, float partial)
     {
         renderBackground(graphics);
-        graphics.fill(x, y, x + panelWidth, y + panelHeight, 0xF010211F);
-        graphics.fill(x, y, x + panelWidth, y + 2, 0xFFE2BB67);
-        graphics.fill(x + 8, y + 53, x + panelWidth - 8, y + 54, 0xFF446058);
-        graphics.drawString(font, view.name() + "  /  " + view.role(), x + 12, y + 10, 0xFFE6DEC1, false);
-        int rowY = y + 60;
-        if(tab<2)
-            for (String row : view.units())
-            { graphics.drawString(font, row, x + 12, rowY, 0xFF92C9AE, false); rowY += 11; }
-        else
-        {graphics.drawString(font,tab==15&&view.participants().size()>unit?view.participants().get(unit):view.radio()?"指挥频道在线":"岗位通信在线",x+12,rowY,0xFF92C9AE,false);rowY+=11;}
-        if (!view.order().isBlank())
-        { graphics.drawString(font, font.plainSubstrByWidth(view.order(), panelWidth - 24), x + 12, rowY + 2, 0xFFE2BB67, false); rowY += 15; }
-        int bottom = controlsTop()-6;
-        replyTop = rowY + 6;
-        var lines = font.split(Component.literal(view.reply()), panelWidth - 34);
-        int visibleLines = Math.max(1, (bottom - replyTop) / 10);
-        replyScroll = Math.min(replyScroll, Math.max(0, lines.size() - visibleLines));
-        graphics.enableScissor(x + 10, rowY + 5, x + panelWidth - 10, bottom);
-        for (int i = replyScroll; i < Math.min(lines.size(), replyScroll + visibleLines); i++)
-            graphics.drawString(font, lines.get(i), x + 12, replyTop + (i - replyScroll) * 10, 0xFFEBEADF, false);
-        graphics.disableScissor();
-        if (lines.size() > visibleLines) graphics.drawString(font, "↕", x + panelWidth - 18, replyTop, 0xFFE2BB67, false);
+        var theme=PhoneUiR54.NERV;
+        PhoneUiR54.frame(graphics,font,theme,x,y,panelWidth,panelHeight,"NERV / 作战通信",
+                view.name()+"  ·  "+view.role()+"  /  "+(view.radio()?"无线电频道":"岗位对话"));
+        int bottom=controlsTop()-28;replyTop=y+99;
+        PhoneUiR54.card(graphics,font,theme,x+8,y+78,panelWidth-16,bottom-(y+78)+4,
+                "状态与回复",view.canCommand()?"指挥权限":"交谈权限");
+        var transcript=new StringBuilder();
+        if(tab<2&&!view.units().isEmpty())transcript.append("机体状态\n").append(String.join("\n",view.units())).append("\n\n");
+        else if(tab==15&&view.participants().size()>unit)transcript.append("当前编成\n").append(view.participants().get(unit)).append("\n\n");
+        if(!view.order().isBlank())transcript.append("当前调度\n").append(view.order()).append("\n\n");
+        transcript.append("回复\n").append(view.reply());
+        replyScroll=PhoneUiR54.text(graphics,font,theme,transcript.toString(),x+16,replyTop,panelWidth-32,
+                Math.max(0,bottom-replyTop),replyScroll);
+        String section=switch(tab){case 0->"交谈主题";case 1->"指挥分类";case 2->"作战档案";case 3->"步行引导";case 4->"通讯录";case 5->"城市升降";case 6->"运输调度 · 目的地 X / Y / Z";case 7->"城市协同档案";case 8->"机体整备与发射";case 9->"驾驶员安排";case 10->"武器井与装备";case 11->"地下出口门控";case 12->"出击与增援编成";case 13->"档案阅读与共享";case 14->"城市供电与复测";case 15->"参与机体与确认";default->"操作";};
+        PhoneUiR54.card(graphics,font,theme,x+8,controlsTop()-21,panelWidth-16,
+                controlsBottom()-controlsTop()+24,section,controlsScrollMax>0?"滚轮浏览":"");
+        PhoneUiR54.scrollbar(graphics,theme,x+panelWidth-10,controlsTop(),controlsBottom()-controlsTop(),
+                controlsBottom()-controlsTop()+controlsScrollMax,controlsBottom()-controlsTop(),controlsScroll);
+        graphics.fill(x+12,y+panelHeight-34,x+panelWidth-12,y+panelHeight-33,theme.border());
+        if(parentTab()<0)graphics.drawString(font,"输入消息与指令    ·    Enter 发送",x+13,y+panelHeight-49,theme.muted(),false);
         super.render(graphics, mouseX, mouseY, partial);
     }
     @Override public void onClose() { send("CLOSE"); super.onClose(); }

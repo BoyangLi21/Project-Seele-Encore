@@ -16,6 +16,7 @@ def build():
   if before==new or allowed is not None and before not in allowed:return
   desired[pos]=new;owners[pos]=owner;counts[owner]+=1
  for room in ROOMS:
+  if room['id']=='r04/pyramid/435/06':continue  # R54 private ward recipe owns this interior.
   x0,x1,z0,z1=room['bounds'];f=room['floor'];kind=room['purpose'];owner=room['id']+'/r10';ex,ey,ez=room['entry'];cx=(x0+x1)//2;cz=(z0+z1)//2
   def clear_entry(x,z):return abs(x-ex)<=3 and abs(z-ez)<=4
   for z in range(z0+1,z1):

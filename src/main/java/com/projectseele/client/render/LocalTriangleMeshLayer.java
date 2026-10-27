@@ -510,7 +510,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             MeshData mesh = new MeshData(stride, Map.copyOf(parts),
                     triangleCount, captureTag,
                     (minimumX + maximumX) * 0.5F, minimumY,
-                    (minimumZ + maximumZ) * 0.5F, resolvedJointSkins(root,parts,stride),
+                    (minimumZ + maximumZ) * 0.5F, resolvedJointSkins(document,parts,stride),
                     new net.minecraft.world.phys.AABB((minimumX - maximumX) / 32F, 0,
                         (minimumZ - maximumZ) / 32F, (maximumX - minimumX) / 32F,
                         (maximumY - minimumY) / 16F, (maximumZ - minimumZ) / 32F));
@@ -567,8 +567,10 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                             net.minecraft.world.phys.AABB standaloneBounds) {}
 
     private record ContactCorrective(Map<String,org.joml.Quaternionf> targets,float activationRadians,float[] sparse) {}
-    private record JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences,Map<String,Matrix4f> inverseBind,ContactCorrective corrective)
+    private record JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences,Map<String,Matrix4f> inverseBind,ContactCorrective corrective,AuthoredInfluencesR53 sparse)
     {
+        JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences,Map<String,Matrix4f> inverseBind,ContactCorrective corrective)
+        {this(other,weights,rest,scratch,influences,inverseBind,corrective,new AuthoredInfluencesR53(influences.values()));}
         JointSkin(String other,float[] weights,float[] rest,float[] scratch){this(other,weights,rest,scratch,Map.of(),Map.of(),null);}
         JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences)
         {this(other,weights,rest,scratch,influences,Map.of(),null);}
@@ -651,18 +653,20 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         }
     }
 
-    private static Map<String,JointSkin> resolvedJointSkins(JsonObject root,Map<String,MeshPart> parts,int stride) throws IOException
+    private static Map<String,JointSkin> resolvedJointSkins(LocalMeshJsonR53.Document document,Map<String,MeshPart> parts,int stride) throws IOException
     {
+        JsonObject root=document.metadata();
         if(!root.has("jointSkins"))return jointSkins(parts,stride);
-        var authored=authoredJointSkins(root.getAsJsonObject("jointSkins"),parts,stride);
+        var authored=authoredJointSkins(document,parts,stride);
         if(!root.has("r37_mouth"))return authored;
         // A new jaw membrane must not disable the source rig's welded knees
         // and elbows simply by adding the first authored skin to this mesh.
         var merged=new HashMap<>(jointSkins(parts,stride));merged.putAll(authored);return Map.copyOf(merged);
     }
 
-    private static Map<String,JointSkin> authoredJointSkins(JsonObject definitions,Map<String,MeshPart> parts,int stride) throws IOException
+    private static Map<String,JointSkin> authoredJointSkins(LocalMeshJsonR53.Document document,Map<String,MeshPart> parts,int stride) throws IOException
     {
+        JsonObject definitions=document.metadata().getAsJsonObject("jointSkins");
         Map<String,JointSkin> result=new HashMap<>();
         for(var entry:definitions.entrySet())
         {
@@ -671,10 +675,10 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             if(definition.has("influences"))
             {
                 int count=part.vertices().length/stride;Map<String,float[]> influences=new HashMap<>();float[] sums=new float[count];
-                for(var row:definition.getAsJsonObject("influences").entrySet())
+                for(var row:document.influences().get(entry.getKey()).entrySet())
                 {
-                    var values=row.getValue().getAsJsonArray();if(values.size()!=count)throw new IOException("Joint influence length");float[] weights=new float[count];
-                    for(int i=0;i<count;i++){float w=values.get(i).getAsFloat();if(!Float.isFinite(w)||w<0||w>1)throw new IOException("Invalid joint influence");weights[i]=w;sums[i]+=w;}
+                    float[] weights=row.getValue();if(weights.length!=count)throw new IOException("Joint influence length");
+                    for(int i=0;i<count;i++){float w=weights[i];if(!Float.isFinite(w)||w<0||w>1)throw new IOException("Invalid joint influence");sums[i]+=w;}
                     influences.put(row.getKey(),weights);
                 }
                 for(float sum:sums)if(Math.abs(sum-1)>.0002)throw new IOException("Joint influences must sum to one");
@@ -693,20 +697,19 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                     }
                     if(inverseBind.size()!=influences.size())throw new IOException("Incomplete authored inverse-bind palette");
                 }
-                float[] rest=part.vertices().clone();result.put(entry.getKey(),new JointSkin("",new float[0],rest,rest.clone(),java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(influences)),Map.copyOf(inverseBind),readContactCorrective(definition,rest.length/stride)));continue;
+                float[] rest=part.vertices().clone();result.put(entry.getKey(),new JointSkin("",new float[0],rest,rest.clone(),java.util.Collections.unmodifiableMap(new java.util.TreeMap<>(influences)),Map.copyOf(inverseBind),readContactCorrective(definition,rest.length/stride,influences.keySet())));continue;
             }
-            var values=definition.getAsJsonArray("weights");
-            if(part==null||values.size()!=part.vertices().length/stride)throw new IOException("Authored joint weight length: "+entry.getKey());
-            float[] weights=new float[values.size()];
-            for(int i=0;i<weights.length;i++){weights[i]=values.get(i).getAsFloat();if(!Float.isFinite(weights[i])||weights[i]<0||weights[i]>1)throw new IOException("Invalid joint weight");}
+            float[] weights=document.pairWeights().get(entry.getKey());
+            if(weights==null||weights.length!=part.vertices().length/stride)throw new IOException("Authored joint weight length: "+entry.getKey());
+            for(float weight:weights)if(!Float.isFinite(weight)||weight<0||weight>1)throw new IOException("Invalid joint weight");
             float[] rest=part.vertices().clone();result.put(entry.getKey(),new JointSkin(definition.get("otherBone").getAsString(),weights,rest,rest.clone()));
         }
         return Map.copyOf(result);
     }
 
-    private static ContactCorrective readContactCorrective(JsonObject definition,int vertices)
+    private static ContactCorrective readContactCorrective(JsonObject definition,int vertices,Set<String> palette)
     {
-        try{return readContactCorrectiveStrict(definition,vertices);}
+        try{return readContactCorrectiveStrict(definition,vertices,palette);}
         catch(RuntimeException invalid)
         {
             ProjectSeele.LOGGER.warn("Optional hand contact corrective rejected; coherent base skin retained",invalid);
@@ -714,10 +717,13 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         }
     }
 
-    private static ContactCorrective readContactCorrectiveStrict(JsonObject definition,int vertices)
+    private static ContactCorrective readContactCorrectiveStrict(JsonObject definition,int vertices,Set<String> palette)
     {
         if(!definition.has("contactCorrectiveR45"))return null;
         var data=definition.getAsJsonObject("contactCorrectiveR45");
+        float positionLimit=data.has("position_limit_model")?data.get("position_limit_model").getAsFloat():2;
+        if(!Float.isFinite(positionLimit)||positionLimit<=0||positionLimit>8)
+            throw new IllegalArgumentException("Contact corrective position limit");
         float degrees=data.get("activation_degrees").getAsFloat();
         if(!Float.isFinite(degrees)||degrees<=0||degrees>60)throw new IllegalArgumentException("Contact corrective activation");
         Map<String,org.joml.Quaternionf> targets=new java.util.TreeMap<>();
@@ -725,7 +731,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         {
             var row=entry.getValue().getAsJsonArray();
             if(!entry.getKey().startsWith("r45_hand_")||row.size()!=4
-                    ||!definition.getAsJsonObject("influences").has(entry.getKey()))throw new IllegalArgumentException("Contact corrective driver");
+                    ||!palette.contains(entry.getKey()))throw new IllegalArgumentException("Contact corrective driver");
             var q=new org.joml.Quaternionf(row.get(0).getAsFloat(),row.get(1).getAsFloat(),row.get(2).getAsFloat(),row.get(3).getAsFloat());
             if(!Float.isFinite(q.lengthSquared())||Math.abs(q.lengthSquared()-1)>.001F)throw new IllegalArgumentException("Contact corrective quaternion");
             targets.put(entry.getKey(),q.normalize());
@@ -739,7 +745,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             if(raw!=vertex||vertex<0||vertex>=vertices||!unique.add(vertex))throw new IllegalArgumentException("Contact corrective vertex");
             for(int k=0;k<7;k++)
             {
-                float value=row.get(k).getAsFloat();if(!Float.isFinite(value)||k>0&&Math.abs(value)>2)throw new IllegalArgumentException("Unbounded contact corrective");
+                float value=row.get(k).getAsFloat();if(!Float.isFinite(value)||k>0&&Math.abs(value)>(k<=3?positionLimit:2))throw new IllegalArgumentException("Unbounded contact corrective");
                 sparse[i*7+k]=value;
             }
         }
@@ -872,7 +878,8 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     {
         var root=bone;while(root.getParent()!=null)root=root.getParent();
         var inverse=EvaRigTransforms.model(bone,commonAncestor).invert();var inverseRotation=EvaRigTransforms.rotation(inverse);int palette=skin.influences().size(),slot=0;
-        float[][] transforms=new float[palette][8],weights=new float[palette][];
+        var sparse=skin.sparse();
+        float[][] transforms=new float[palette][8],weights=sparse.paletteWeights;
         int[] stableBones=new int[palette];
         var stableNames=skin.influences().keySet().stream().sorted().toList();
         for(var entry:skin.influences().entrySet())
@@ -888,18 +895,18 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             if(q.dot(new org.joml.Quaternionf(inverseRotation).mul(global))<0)q.mul(-1);
             var dual=new org.joml.Quaternionf(relative.m30(),relative.m31(),relative.m32(),0).mul(q).mul(.5F);
             stableBones[slot]=stableNames.indexOf(entry.getKey());
-            transforms[slot]=new float[]{q.x,q.y,q.z,q.w,dual.x,dual.y,dual.z,dual.w};weights[slot++]=entry.getValue();
+            transforms[slot++]=new float[]{q.x,q.y,q.z,q.w,dual.x,dual.y,dual.z,dual.w};
         }
         float[] rest=skin.rest(),out=skin.scratch();int stride=mesh.stride();
         for(int vertex=0;vertex<rest.length/stride;vertex++)
         {
             float rx=0,ry=0,rz=0,rw=0,dx=0,dy=0,dz=0,dw=0;
-            int dominant=0;for(int p=1;p<palette;p++)if(weights[p][vertex]>weights[dominant][vertex])dominant=p;
+            int dominant=sparse.dominant[vertex];
             if(DqSkinReferenceR44.REVIEW)dominant=DqSkinReferenceR44.referenceSlot(stableBones,weights,vertex);
             var reference=transforms[dominant];
-            for(int p=0;p<palette;p++)
+            for(int at=sparse.offsets[vertex];at<sparse.offsets[vertex+1];at++)
             {
-                float weight=weights[p][vertex];if(weight==0)continue;var t=transforms[p];
+                float weight=sparse.weights[at];var t=transforms[sparse.slots[at]];
                 if(t[0]*reference[0]+t[1]*reference[1]+t[2]*reference[2]+t[3]*reference[3]<0)weight=-weight;
                 rx+=t[0]*weight;ry+=t[1]*weight;rz+=t[2]*weight;rw+=t[3]*weight;
                 dx+=t[4]*weight;dy+=t[5]*weight;dz+=t[6]*weight;dw+=t[7]*weight;

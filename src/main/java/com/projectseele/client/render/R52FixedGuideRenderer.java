@@ -36,6 +36,8 @@ final class R52FixedGuideRenderer
         fixedDraws = null;
         NervFixedFootGuideRendererR52.clear();
         NervUprightGuideRendererR52.clear();
+        CarrierRearGuideRendererR53.clear();
+        CarrierBayTrayRendererR53.clear();
     }
 
     private static Vec3 point(com.google.gson.JsonArray a)
@@ -89,6 +91,9 @@ final class R52FixedGuideRenderer
     static boolean draw(RenderLevelStageEvent event, ClientLevel level)
     {
         if(!com.projectseele.client.FacilityFrameClientR52.claimed(level))return false;
+        CarrierRearGuideRendererR53.drawFixed(event,level);
+        CarrierBayTrayRendererR53.draw(event,level);
+        CarrierTransferRailsRendererR53.draw(event,level);
         if(com.projectseele.client.FacilityFrameClientR52.continuousUprightR52(level))NervUprightGuideRendererR52.draw(event,level);
         else NervFixedFootGuideRendererR52.draw(event,level);
         if(TripoMachineryR48.selectedRunningDeckR52())

@@ -22,9 +22,86 @@ public final class EvaMechanicalReleaseR52 {
             var frame=hatch.actualFrameR52();var local=frame.inverse().transformPoint(at);var spec=hatch.declaredSpecR52();if(Math.abs(local.x)>spec.openingX()/2||Math.abs(local.z)>spec.openingZ()/2||Math.abs(local.y-1)>.08)continue;if(hatch.actualOpenProgressR52()!=0)return false;double top=Double.NEGATIVE_INFINITY;for(var piece:hatch.declaredGeometryR52().pieces(0)){var xyz=piece.part().xyz();for(int n=0;n<xyz.length;n+=3){var p=piece.local().transformPoint(new Vec3(xyz[n],xyz[n+1],xyz[n+2]));xyz[n]=p.x;xyz[n+1]=p.y;xyz[n+2]=p.z;}top=Math.max(top,NervMappedPlugMechanicsR52.surfaceHeight(xyz,local.x,local.z));}return Double.isFinite(top)&&Math.abs(top-local.y)<.0021;
         }return true;
     }
+    private static double crossR53(Vec3 a,Vec3 b,Vec3 c)
+    { return (b.x-a.x)*(c.z-a.z)-(b.z-a.z)*(c.x-a.x); }
+    private static double areaR53(List<Vec3> polygon)
+    {
+        double area=0;for(int i=0;i<polygon.size();i++){var a=polygon.get(i);var b=polygon.get((i+1)%polygon.size());area+=a.x*b.z-a.z*b.x;}return Math.abs(area)*.5;
+    }
+    private static List<Vec3> overlapR53(List<Vec3> sole,List<Vec3> steel)
+    {
+        double orientation=Math.signum(crossR53(steel.get(0),steel.get(1),steel.get(2)));
+        if(orientation==0)return List.of();var polygon=new ArrayList<>(sole);
+        for(int edge=0;edge<3&&!polygon.isEmpty();edge++)
+        {
+            var a=steel.get(edge);var b=steel.get((edge+1)%3);var next=new ArrayList<Vec3>();
+            Vec3 previous=polygon.get(polygon.size()-1);double last=orientation*crossR53(a,b,previous);
+            for(var current:polygon)
+            {
+                double distance=orientation*crossR53(a,b,current);
+                if((distance>=0)!=(last>=0)){double fraction=last/(last-distance);next.add(previous.add(current.subtract(previous).scale(fraction)));}
+                if(distance>=0)next.add(current);previous=current;last=distance;
+            }
+            polygon=next;
+        }
+        return polygon;
+    }
+    private static List<Vec3> hullR53(List<Vec3> points)
+    {
+        var sorted=new ArrayList<>(points);sorted.sort(Comparator.comparingDouble((Vec3 p)->p.x).thenComparingDouble(p->p.z));
+        var unique=new ArrayList<Vec3>();for(var p:sorted)if(unique.isEmpty()||p.x!=unique.get(unique.size()-1).x||p.z!=unique.get(unique.size()-1).z)unique.add(p);
+        if(unique.size()<3)return List.of();var hull=new ArrayList<Vec3>();
+        for(var p:unique){while(hull.size()>=2&&crossR53(hull.get(hull.size()-2),hull.get(hull.size()-1),p)<=0)hull.remove(hull.size()-1);hull.add(p);}
+        int lower=hull.size();for(int i=unique.size()-2;i>=0;i--){var p=unique.get(i);while(hull.size()>lower&&crossR53(hull.get(hull.size()-2),hull.get(hull.size()-1),p)<=0)hull.remove(hull.size()-1);hull.add(p);}hull.remove(hull.size()-1);return hull;
+    }
+    /** A ribbed closed leaf supports a sole across grooves. Use intersections
+     * of actual lowest sole triangles and actual coplanar top-steel triangles;
+     * their support polygon must surround the finite sole area's centroid. */
+    private static boolean actualShutterBearingR53(ServerLevel level,List<double[]> source,RigidTransform root,List<Vec3> contacts)
+    {
+        if(contacts.isEmpty())return false;var first=contacts.get(0);
+        for(var hatch:level.getEntitiesOfClass(NervSiloDoorEntity.class,new AABB(first,first).inflate(36),h->h.declaredSpecR52()!=null))
+        {
+            var frame=hatch.actualFrameR52();var inverse=frame.inverse();var spec=hatch.declaredSpecR52();
+            boolean inside=true;for(var point:contacts){var p=inverse.transformPoint(point);if(Math.abs(p.x)>spec.openingX()/2||Math.abs(p.z)>spec.openingZ()/2||Math.abs(p.y-SiloHatchMechanism.PANEL_TOP)>.08){inside=false;break;}}
+            if(!inside)continue;if(hatch.actualOpenProgressR52()!=0)return false;
+            double plane=frame.transformPoint(new Vec3(0,SiloHatchMechanism.PANEL_TOP,0)).y;
+            var soles=new ArrayList<List<Vec3>>();Vec3 centre=Vec3.ZERO;double soleArea=0;
+            for(var xyz:source)for(int i=0;i<xyz.length;i+=9)
+            {
+                var triangle=new ArrayList<Vec3>();boolean lowest=true;
+                for(int v=0;v<3;v++){var p=root.transformPoint(new Vec3(xyz[i+v*3],xyz[i+v*3+1],xyz[i+v*3+2]));triangle.add(p);if(Math.abs(p.y-plane)>.0021)lowest=false;}
+                if(!lowest)continue;double area=areaR53(triangle);if(area<=1e-9)continue;
+                soles.add(triangle);centre=centre.add(triangle.get(0).add(triangle.get(1)).add(triangle.get(2)).scale(area/3));soleArea+=area;
+            }
+            if(soleArea<=.0025)return false;centre=centre.scale(1/soleArea);
+            var support=new ArrayList<Vec3>();double contactArea=0;
+            for(var piece:hatch.declaredGeometryR52().pieces(0))
+            {
+                var transform=frame.compose(piece.local());var xyz=piece.part().xyz();
+                for(int i=0;i<xyz.length;i+=9)
+                {
+                    var triangle=new ArrayList<Vec3>();double low=Double.POSITIVE_INFINITY,high=Double.NEGATIVE_INFINITY;
+                    for(int v=0;v<3;v++){var p=transform.transformPoint(new Vec3(xyz[i+v*3],xyz[i+v*3+1],xyz[i+v*3+2]));triangle.add(p);low=Math.min(low,p.y);high=Math.max(high,p.y);}
+                    if(high<plane-.0021||areaR53(triangle)<=1e-9)continue;
+                    for(var sole:soles)
+                    {
+                        var intersection=overlapR53(sole,triangle);double area=areaR53(intersection);if(area<=1e-9)continue;
+                        if(high>plane+.0021)return false;
+                        if(low>=plane-.0021){contactArea+=area;support.addAll(intersection);}
+                    }
+                }
+            }
+            var hull=hullR53(support);if(contactArea<=.0025||hull.size()<3||areaR53(hull)<=.0025)return false;
+            for(int i=0;i<hull.size();i++)if(crossR53(hull.get(i),hull.get((i+1)%hull.size()),centre)<-1e-7)return false;
+            return true;
+        }
+        for(var point:contacts)if(!actualShutterSurfaceR52(level,point))return false;
+        return true;
+    }
     public static boolean actualGroundBearingR52(ServerLevel l,EvaUnit01Entity e,EvaOriginalMeshGeometryR52.Geometry geometry,RigidTransform root) {
-        for(String name:List.of("foot_l","foot_r")){var contacts=new ArrayList<Vec3>();for(var part:geometry.parts())if(part.bone().equals(name)){double low=part.bounds().minY;for(var p:part.vertices())if(p.y<=low+.002){var at=root.transformPoint(p);var block=BlockPos.containing(at.add(0,-.003,0));if(!l.hasChunkAt(block))return false;double top=Double.NEGATIVE_INFINITY;for(var b:l.getBlockState(block).getCollisionShape(l,block).toAabbs()){var world=b.move(block);if(at.x>=world.minX-1e-6&&at.x<=world.maxX+1e-6&&at.z>=world.minZ-1e-6&&at.z<=world.maxZ+1e-6)top=Math.max(top,world.maxY);}if(!Double.isFinite(top)||Math.abs(top-at.y)>.0021||!actualShutterSurfaceR52(l,at))return false;contacts.add(at);}}
-            boolean finite=false;for(int a=0;a<contacts.size()&&!finite;a++)for(int b=a+1;b<contacts.size()&&!finite;b++)for(int c=b+1;c<contacts.size();c++){var x=contacts.get(a);var y=contacts.get(b);var z=contacts.get(c);if(Math.abs((y.x-x.x)*(z.z-x.z)-(z.x-x.x)*(y.z-x.z))>.0025){finite=true;break;}}if(!finite)return false;
+        for(String name:List.of("foot_l","foot_r")){var contacts=new ArrayList<Vec3>();var soleSource=new ArrayList<double[]>();for(var part:geometry.parts())if(part.bone().equals(name)){soleSource.add(part.triangles());double low=part.bounds().minY;for(var p:part.vertices())if(p.y<=low+.002){var at=root.transformPoint(p);var block=BlockPos.containing(at.add(0,-.003,0));if(!l.hasChunkAt(block))return false;double top=Double.NEGATIVE_INFINITY;for(var b:l.getBlockState(block).getCollisionShape(l,block).toAabbs()){var world=b.move(block);if(at.x>=world.minX-1e-6&&at.x<=world.maxX+1e-6&&at.z>=world.minZ-1e-6&&at.z<=world.maxZ+1e-6)top=Math.max(top,world.maxY);}if(!Double.isFinite(top)||Math.abs(top-at.y)>.0021)return false;contacts.add(at);}}
+            boolean finite=false;for(int a=0;a<contacts.size()&&!finite;a++)for(int b=a+1;b<contacts.size()&&!finite;b++)for(int c=b+1;c<contacts.size();c++){var x=contacts.get(a);var y=contacts.get(b);var z=contacts.get(c);if(Math.abs((y.x-x.x)*(z.z-x.z)-(z.x-x.x)*(y.z-x.z))>.0025){finite=true;break;}}if(!finite||!actualShutterBearingR53(l,soleSource,root,contacts))return false;
         }return true;
     }
     public static boolean beginGroundedR52(ServerLevel l,EvaUnit01Entity e,Original o) {

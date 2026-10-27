@@ -1,4 +1,4 @@
-"""Blender intake: preserve supplied masters, prepare textured LOD geometry and one preview."""
+"""Blender intake: preserve source detail; reduced LODs require an explicit face budget."""
 import argparse,json,math,sys
 from pathlib import Path
 import bpy
@@ -11,8 +11,10 @@ def main():
     parser=argparse.ArgumentParser()
     parser.add_argument('--source',type=Path,required=True)
     parser.add_argument('--out',type=Path,required=True)
-    parser.add_argument('--triangles',type=int,default=160000)
+    parser.add_argument('--triangles',type=int,default=0,
+                        help='Explicit reduced-LOD budget; 0 preserves all source triangles (default).')
     args=parser.parse_args(sys.argv[sys.argv.index('--')+1:])
+    if args.triangles<0:parser.error('--triangles must be zero or a positive explicit LOD budget')
     args.source=args.source.resolve();args.out=args.out.resolve()
     args.out.mkdir(parents=True,exist_ok=True)
     bpy.ops.wm.read_factory_settings(use_empty=True)
@@ -21,10 +23,12 @@ def main():
     assert len(meshes)==1,'Inspect multi-object source before assigning joint ownership'
     obj=meshes[0];bpy.context.view_layer.objects.active=obj;obj.select_set(True)
     original_count=sum(len(p.vertices)-2 for p in obj.data.polygons)
-    modifier=obj.modifiers.new('Game surface LOD0','DECIMATE')
-    modifier.decimate_type='COLLAPSE';modifier.ratio=min(1,args.triangles/original_count)
-    modifier.use_collapse_triangulate=True
-    bpy.ops.object.modifier_apply(modifier=modifier.name)
+    reduced=args.triangles>0 and args.triangles<original_count
+    if reduced:
+        modifier=obj.modifiers.new('Explicit reduced distance LOD','DECIMATE')
+        modifier.decimate_type='COLLAPSE';modifier.ratio=args.triangles/original_count
+        modifier.use_collapse_triangulate=True
+        bpy.ops.object.modifier_apply(modifier=modifier.name)
     obj.data.calc_loop_triangles();mesh=obj.data
     vertices=np.asarray([obj.matrix_world@v.co for v in mesh.vertices],dtype=np.float32)
     # Blender Z-up -> the existing native mesh convention used by this project.
@@ -59,7 +63,9 @@ def main():
     bpy.ops.render.render(write_still=True)
     report=dict(source=str(args.source),source_triangles=original_count,lod0_triangles=len(triangles),vertices=len(vertices),
                 bounds=[vertices.min(0).tolist(),vertices.max(0).tolist()],materials=len(mesh.materials),
-                original_master_unchanged=True,rigged=False,game_integrated=False,preview='actual_lod0_preview.png')
+                original_master_unchanged=True,requested_triangle_budget=args.triangles,
+                source_detail_preserved=not reduced,reduced_lod=reduced,
+                rigged=False,game_integrated=False,preview='actual_lod0_preview.png')
     (args.out/'intake_lod0.json').write_text(json.dumps(report,indent=2),'utf8');print(json.dumps(report),flush=True)
 
 if __name__=='__main__':main()

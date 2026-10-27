@@ -79,11 +79,14 @@ public final class TvFacilityMeshes
     public static void cage(PoseStack poses,int light,float closed,int variant)
     {cage(poses,light,closed,variant,Float.NaN);}
     public static void cage(PoseStack poses,int light,float closed,int variant,float lowerProgress)
+    {cage(poses,light,closed,variant,lowerProgress,com.projectseele.world.CarrierMountProfileR53.LEGACY);}
+
+    public static void cage(PoseStack poses,int light,float closed,int variant,float lowerProgress,com.projectseele.world.CarrierMountProfileR53.State mounting)
     {
         float opening=1-closed;
-        boolean tvEnclosure=TvCageEnclosureR44.render(variant,opening,poses,light,lowerProgress);
+        boolean tvEnclosure=TvCageEnclosureR44.render(variant,opening,poses,light,lowerProgress,mounting);
         if(!tvEnclosure)draw("cage_frame",poses,light);
-        boolean measuredShoulders=TvShoulderRestraintsR44.render(variant,opening,poses,light,!tvEnclosure);
+        boolean measuredShoulders=TvShoulderRestraintsR44.render(variant,opening,poses,light,!tvEnclosure,mounting);
         for(int side:new int[]{-1,1})
         {
             poses.pushPose();poses.scale(side,1,1);
@@ -170,8 +173,13 @@ public final class TvFacilityMeshes
     }
     public static void shaftHatchDeclared(PoseStack poses,int light,float open,SiloHatchMechanism.Spec spec)
     {
-        var baked=DECLARED_HATCH_PARTS.computeIfAbsent(spec,k->new HashMap<>());com.projectseele.world.NervSiloHatchGeometryR52 geometry;
+        com.projectseele.world.NervSiloHatchGeometryR52 geometry;
         try{geometry=com.projectseele.world.NervSiloHatchGeometryR52.loadClasspath(spec);}catch(java.io.IOException missing){throw new IllegalStateException("Declared hatch source missing",missing);}
+        shaftHatchDeclared(poses,light,open,spec,geometry);
+    }
+    public static void shaftHatchDeclared(PoseStack poses,int light,float open,SiloHatchMechanism.Spec spec,com.projectseele.world.NervSiloHatchGeometryR52 geometry)
+    {
+        var baked=DECLARED_HATCH_PARTS.computeIfAbsent(spec,k->new HashMap<>());
         for(var piece:geometry.pieces(open))
         {
             var mesh=baked.computeIfAbsent(piece.part().name(),name->{var a=new com.google.gson.JsonArray();for(double value:piece.part().vertices())a.add(value);return RigidMachineryPartR44.triangles(a);});

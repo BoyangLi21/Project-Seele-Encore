@@ -22,6 +22,7 @@ public final class EvaOrdinaryStandingSupportR52
 {
     // Preserve the existing 3cm model support margin (the renderer adds 5cm).
     private static final float CLEARANCE=.006F;
+    private static final float KNEE_RESERVE=(float)Math.toRadians(20);
     private static final Map<Integer,Map<String,Vector3f[]>> SOURCES=new HashMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,MotionMemory> MEMORY=new com.projectseele.util.WeakIdentityMap<>();
     private static final Map<CombatBodyProfiles.Profile,CombatBodyProfiles.Profile> LEG_PROFILES=new java.util.IdentityHashMap<>();
@@ -33,7 +34,7 @@ public final class EvaOrdinaryStandingSupportR52
                 ||e.isFirstBattleActive()||e.isNervLogisticsLocked()||EvaMechanicalFrameR52.serviceSourceHeldR52(e)
                 ||EvaAirTransportR31.active(e)||e.hasFixedCannonR52()||e.fixedCannonOperatingR52()
                 ||e.ordinaryStandingSupportLockedR52()||EvaShutdownR30.disabled(e)
-                ||e.isVisuallyAirborneForRender()||e.isPilotCrouching()||e.isPilotProne()||e.rifleStanceLevel(partial)>.01F
+                ||e.isVisuallyAirborneForRender()
                 ||EvaGameplayMotionR32.airAge(e,partial)>=0
                 ||EvaCombatR31.action(e)!=EvaCombatR31.NONE||CombatReactionsR36.active(e)
                 ||com.projectseele.physics.CombatBodyDynamics.active(e)||CombatFeelR31.beat(e)!=null)
@@ -59,9 +60,23 @@ public final class EvaOrdinaryStandingSupportR52
         {
             // Fade the actual preceding standing correction; no new floor
             // targets or support IK are imposed on a genuine attack pose.
-            memory.applyCached(pose,profile,envelope);return;
+            memory.clearFeet();memory.applyCached(pose,profile,envelope);return;
         }
-        float amount=settleWeight(e.rifleMoveBlend(partial))*envelope;if(amount<=0){memory.correction=null;return;}
+        // A grounded low stance owns its authored contacts, but is still the
+        // same ordinary action. Keep the contact memory warm while its weight
+        // is zero, so standing up does not restart a second twelve-tick fade.
+        float amount=settleWeight(e.rifleMoveBlend(partial))*envelope*stanceWeight(e.rifleStanceLevel(partial));
+        if(amount<=0){memory.correction=null;memory.clearFeet();return;}
+        // The rifle kneeling capture turns the rear shoe sharply before its
+        // toe contact settles. Follow that orientation on the same pose clock,
+        // then derive floor contact from the shoe that will actually be drawn.
+        Quaternionf[] authoredFeet=null;
+        if(e.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE)
+        {
+            authoredFeet=new Quaternionf[]{new Quaternionf(pose.rotations.get("foot_l")),new Quaternionf(pose.rotations.get("foot_r"))};
+            memory.orientFeet(pose,now,amount);
+        }
+        else memory.clearFeet();
         // Match LevelRenderer's baseline, including a just-landed or corrected
         // rider; getPosition uses a different previous-position triplet.
         var origin=e.level().isClientSide?new Vec3(e.xOld+(e.getX()-e.xOld)*partial,
@@ -69,7 +84,7 @@ public final class EvaOrdinaryStandingSupportR52
         float[] floor=new float[2];int index=0;
         for(String side:List.of("l","r"))
         {
-            var low=lowest(e.getUnitVariant(),pose,side);if(low==null)return;
+            var low=lowest(e.getUnitVariant(),pose,side);if(low==null){restoreFeet(pose,authoredFeet);memory.clearFeet();return;}
             var world=new Vector3f(low).mul(EvaScale.RENDER_SCALE)
                     .rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*(float)Math.PI/180)
                     .add((float)origin.x,(float)origin.y,(float)origin.z);
@@ -77,16 +92,21 @@ public final class EvaOrdinaryStandingSupportR52
             var hit=e.level().clip(new ClipContext(point.add(0,4,0),point.add(0,-80,0),
                     ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,e));
             if(hit.getType()!=HitResult.Type.BLOCK)
-            {if(!e.onGround())MEMORY.remove(e);return;}
+            {restoreFeet(pose,authoredFeet);memory.clearFeet();if(!e.onGround())MEMORY.remove(e);return;}
             floor[index++]=(float)((hit.getLocation().y-origin.y)/EvaScale.RENDER_SCALE);
         }
         double leftFloor=origin.y+floor[0]*EvaScale.RENDER_SCALE,rightFloor=origin.y+floor[1]*EvaScale.RENDER_SCALE;
         if(!e.onGround()&&!memory.retainsGroundFloorR52(leftFloor,rightFloor))
-        {MEMORY.remove(e);return;}
+        {restoreFeet(pose,authoredFeet);MEMORY.remove(e);return;}
         if(e.onGround())memory.rememberGroundFloorR52(leftFloor,rightFloor);
         var previous=new Correction(pose);
         apply(e.getUnitVariant(),pose,amount,floor,profile);
         previous.finish(pose);memory.correction=previous;
+    }
+    private static void restoreFeet(EvaBodyPose.Sample pose,Quaternionf[] rotations)
+    {
+        if(rotations==null)return;
+        pose.rotations.put("foot_l",rotations[0]);pose.rotations.put("foot_r",rotations[1]);pose.dirty();
     }
 
     /** Source correction envelope: six ticks into an action, twelve back to
@@ -97,6 +117,7 @@ public final class EvaOrdinaryStandingSupportR52
         private double groundTime=Double.NEGATIVE_INFINITY,groundY,lastPoseClock;
         private double leftGround,rightGround;private boolean groundFloor;
         private Correction correction;
+        private final FootOrientation[] feet={new FootOrientation(),new FootOrientation()};
         public MotionMemory(double now){changed=last=lastPoseClock=now;}
         public double sampleClockR52(double entityTickAndPartial)
         {lastPoseClock=Math.max(lastPoseClock,entityTickAndPartial);return lastPoseClock;}
@@ -124,8 +145,39 @@ public final class EvaOrdinaryStandingSupportR52
         public void remember(EvaBodyPose.Sample before,EvaBodyPose.Sample after)
         {correction=new Correction(before);correction.finish(after);}
         public void clearCached(){correction=null;}
+        public void clearFeet(){for(var foot:feet)foot.clear();}
+        public void orientFeet(EvaBodyPose.Sample pose,double now,float amount)
+        {
+            int at=0;
+            for(String side:List.of("l","r"))
+            {
+                String name="foot_"+side;var authored=pose.matrix(name).getUnnormalizedRotation(new Quaternionf()).normalize();
+                var orientation=new Quaternionf(authored).slerp(feet[at++].follow(authored,now),amount);
+                String parent=pose.rig.get(name).parent();var parentWorld=parent==null?new Quaternionf():pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize();
+                pose.rotations.put(name,parentWorld.invert().mul(orientation));pose.dirty();
+            }
+        }
         public void applyCached(EvaBodyPose.Sample pose,CombatBodyProfiles.Profile profile,float envelope)
         {if(correction!=null&&actionFrom>0)correction.apply(pose,profile,Math.max(0,Math.min(1,envelope/actionFrom)));}
+    }
+    /** Pure clocked orientation follower; repeated render passes cannot add
+     * rotation, and a held endpoint converges to the original captured pose. */
+    public static final class FootOrientation
+    {
+        private static final double RATE=Math.toRadians(120)/20;
+        private Quaternionf shown;private double clock;
+        public void clear(){shown=null;}
+        public Quaternionf follow(Quaternionf desired,double now)
+        {
+            if(shown==null){shown=new Quaternionf(desired);clock=now;return new Quaternionf(shown);}
+            double dt=Math.max(0,now-clock);clock=Math.max(clock,now);
+            if(dt==0)return new Quaternionf(shown);
+            double dot=Math.min(1,Math.abs((double)shown.x*desired.x+(double)shown.y*desired.y+(double)shown.z*desired.z+(double)shown.w*desired.w));
+            double angle=2*Math.acos(dot);
+            double weight=1-Math.exp(-dt/2);
+            if(angle>1e-8)weight=Math.min(weight,RATE*dt/angle);
+            shown.slerp(desired,(float)weight).normalize();return new Quaternionf(shown);
+        }
     }
     private static final class Correction
     {
@@ -182,6 +234,13 @@ public final class EvaOrdinaryStandingSupportR52
         float x=Math.max(0,Math.min(1,move));return 1-x*x*(3-2*x);
     }
 
+    /** Keep both soles supported through crouching, then hand over to the
+     * authored hand/knee contacts on the same continuous stance phase. */
+    public static float stanceWeight(float stance)
+    {
+        float t=Math.max(0,Math.min(1,(stance-1)/.25F));return 1-t*t*(3-2*t);
+    }
+
     /** Pure production solver entry for replaying the actual native bone pose. */
     public static void apply(int variant,EvaBodyPose.Sample pose,float amount,float[] floor,CombatBodyProfiles.Profile profile)
     {
@@ -197,19 +256,24 @@ public final class EvaOrdinaryStandingSupportR52
             orientation[at]=matrix.getUnnormalizedRotation(new Quaternionf()).normalize();
             knees[at]=joint(profile,pose,side);at++;
         }
-        // A full extension cannot reach a lower ankle by stretching the shin.
-        // Lower only the local pelvis enough to put both fixed targets within
-        // their original two-link reach; the entity/world root never changes.
+        // Keep a small physical knee bend instead of approaching the singular
+        // full-extension solution. The law of cosines uses both measured link
+        // lengths; fading support also fades this local pelvis correction.
         float drop=0;at=0;
         for(String side:List.of("l","r"))
         {
             String upper="leg_"+side,foot="foot_"+side;
             var hip=pose.matrix(upper).transformPosition(new Vector3f(pose.rig.get(upper).pivot()));
-            float reach=(knees[at].distance(pose.rig.get(upper).pivot())+knees[at].distance(pose.rig.get(foot).pivot()))*.9999F;
+            float thigh=knees[at].distance(pose.rig.get(upper).pivot()),shin=knees[at].distance(pose.rig.get(foot).pivot());
+            float reach=(float)Math.sqrt(thigh*thigh+shin*shin+2D*thigh*shin*Math.cos(KNEE_RESERVE*amount));
             float dx=hip.x-targets[at].x,dz=hip.z-targets[at].z,horizontal=dx*dx+dz*dz;
             if(horizontal>=reach*reach)return;
             float highest=targets[at].y+(float)Math.sqrt(reach*reach-horizontal);
-            drop=Math.min(drop,highest-hip.y);at++;
+            // Blend into the active reach limit with a continuous derivative.
+            // This rounds downward, so neither shoe loses its fixed target.
+            float required=highest-hip.y,band=(thigh+shin)*.01F*amount;
+            float lower=required>=band?0:required<=-band?required:-(band-required)*(band-required)/(4*band);
+            drop=Math.min(drop,lower);at++;
         }
         if(drop<0){pose.positions.get("root").y+=drop;pose.dirty();}
         at=0;

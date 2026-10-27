@@ -287,10 +287,14 @@ public final class EntryPlugKinematics
         {
             double phase = smoothstep((linear - ALIGN_PHASE_END)
                     / (1.0D - ALIGN_PHASE_END));
+            // The external jaws only translate the lead-in. Rotation belongs
+            // to the socket drive after the tail has been released.
+            double turn = smoothstep((linear - NervAssemblyClocksR52.CRANE_HANDOFF_PROGRESS)
+                    / (1.0D - NervAssemblyClocksR52.CRANE_HANDOFF_PROGRESS));
             plugInSocket = new RigidTransform(
                     new Vec3(0.0D, 0.0D,
                             -LOCK_DEPTH_BLOCKS * phase),
-                    0.0F, 0.0F, (float)Math.sin(Math.PI*phase), (float)Math.cos(Math.PI*phase));
+                    0.0F, 0.0F, (float)Math.sin(Math.PI*turn), (float)Math.cos(Math.PI*turn));
         }
         return socket.compose(plugInSocket);
     }

@@ -86,6 +86,12 @@ public final class CombatMotionResourcesR44
             values.put("physical-body-profiles",com.projectseele.physics.CombatBodyProfiles.fingerprint());
             var hands=new StringBuilder();
             for(int key=0;key<3;key++)hands.append(key).append(':').append(EvaAnatomicalHandsR45.contractFingerprintR45(key)).append(';');
+            var unit03=Unit03ReviewContractR53.current();
+            if(unit03!=null||Unit03SourceRigR53.loaded())
+            {
+                hands.append("4:").append(EvaAnatomicalHandsR45.contractFingerprintR45(4)).append(';');
+                if(unit03!=null)values.put("unit03-fixed-keypose-review",unit03.fingerprint());
+            }
             values.put("anatomical-hand-rigs",digest(hands.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
             fingerprints=Map.copyOf(values);
             ProjectSeele.LOGGER.info("Combat required resource fingerprints: {}",values);

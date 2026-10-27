@@ -3,6 +3,7 @@ from pathlib import Path
 import io, json, struct
 import numpy as np
 from PIL import Image
+from gltf_labpbr_r53 import normal_channels, specular_channels
 
 ROOT = Path(__file__).resolve().parents[1]
 PIPE = ROOT / 'artifacts/rebuild_r48/tripo_pipeline'
@@ -26,16 +27,13 @@ def textures(name):
     base.save(target / f'tripo_{name}_r48.png')
     if 'normalTexture' in mat:
         normal = pixels(mat['normalTexture'])
-        # LabPBR normal: XY tangent normal, B ambient occlusion, A height.
-        n = np.array(normal); n[:, :, 2] = 255; n[:, :, 3] = 255
-        Image.fromarray(n).save(target / f'tripo_{name}_r48_n.png')
+        normal_channels(normal, mat['normalTexture'].get('scale', 1)).save(
+            target / f'tripo_{name}_r48_n.png')
     if 'metallicRoughnessTexture' in pbr:
-        packed = np.array(pixels(pbr['metallicRoughnessTexture']))
-        spec = np.zeros_like(packed)
-        spec[:, :, 0] = 255 - packed[:, :, 1]
-        spec[:, :, 1] = np.where(packed[:, :, 2] > 128, 230, 10)
-        spec[:, :, 3] = 255
-        Image.fromarray(spec).save(target / f'tripo_{name}_r48_s.png')
+        specular_channels(pixels(pbr['metallicRoughnessTexture']),
+                          pbr.get('metallicFactor', 1),
+                          pbr.get('roughnessFactor', 1)).save(
+            target / f'tripo_{name}_r48_s.png')
     return base.size
 
 

@@ -11,6 +11,8 @@ public final class TvYashimaSavedDataR50 extends SavedData
     public UUID owner, boss, fireTarget;
     public long generation, onlineTicks;
     public int shots;
+    public int serviceTicksR53;
+    public long serviceLastTickR53 = -1;
     public boolean coolantReady = true, reloadReady = true, coolantPressed, reloadPressed;
     public boolean fireControlLocked;
     public static TvYashimaSavedDataR50 get(ServerLevel level)
@@ -21,6 +23,7 @@ public final class TvYashimaSavedDataR50 extends SavedData
         if(tag.hasUUID("Owner"))state.owner=tag.getUUID("Owner");
         if(tag.hasUUID("Boss"))state.boss=tag.getUUID("Boss");
         state.generation=tag.getLong("Generation");state.onlineTicks=tag.getLong("OnlineTicks");state.shots=tag.getInt("Shots");
+        state.serviceTicksR53=Math.max(0,Math.min(120,tag.getInt("ServiceTicksR53")));
         state.coolantReady=tag.getBoolean("CoolantReady");state.reloadReady=tag.getBoolean("ReloadReady");
         // A held switch across reload is not a new post-shot service operation.
         state.coolantPressed=tag.getBoolean("CoolantPressed");state.reloadPressed=tag.getBoolean("ReloadPressed");
@@ -32,6 +35,7 @@ public final class TvYashimaSavedDataR50 extends SavedData
     {
         if(owner!=null)tag.putUUID("Owner",owner);if(boss!=null)tag.putUUID("Boss",boss);
         tag.putLong("Generation",generation);tag.putLong("OnlineTicks",onlineTicks);tag.putInt("Shots",shots);
+        tag.putInt("ServiceTicksR53",serviceTicksR53);
         tag.putBoolean("CoolantReady",coolantReady);tag.putBoolean("ReloadReady",reloadReady);
         tag.putBoolean("FireControlLockedR50",fireControlLocked);
         if(fireTarget!=null)tag.putUUID("FireTargetR50",fireTarget);else tag.remove("FireTargetR50");
@@ -52,6 +56,7 @@ public final class TvYashimaSavedDataR50 extends SavedData
         }
         owner=data.owner;boss=data.angel;generation=data.generationR43;onlineTicks=0;shots=0;
         coolantReady=reloadReady=true;coolantPressed=reloadPressed=false;fireControlLocked=false;fireTarget=null;setDirty();
+        serviceTicksR53=0;serviceLastTickR53=-1;
     }
     public void resetFireControlForRetry(TvCampaignSavedData data)
     {if(matches(data)){fireControlLocked=false;fireTarget=null;setDirty();}}

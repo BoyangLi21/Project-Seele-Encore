@@ -33,6 +33,15 @@ public final class NervCentrelineCurveR52Test
         rejects(()->curve(Vec3.ZERO,new Vec3(1,0,0),new Vec3(1,0,0),new Vec3(-1,0,0),new Vec3(-1,0,0),Vec3.ZERO),"Interior zero derivative accepted");
         rejects(()->new NervCentrelineCurveR52(List.of(new NervCentrelineCurveR52.Segment(NervCentrelineCurveR52.Type.LINE,List.of(Vec3.ZERO,new Vec3(1,0,0))),new NervCentrelineCurveR52.Segment(NervCentrelineCurveR52.Type.LINE,List.of(new Vec3(1,0,0),new Vec3(1,1,0))))),"Disconnected tangent accepted");
         var document=fixture();var directory=NervRouteDirectoryR52.parse(document);var route=directory.route("depart_b2l1");var bridge=directory.leg("bridge12_1").centreCurve();var back=bridge.reversed();
+        var transverse=new Vec3(1,0,0);var bound=bridge.transportedFrameSecondDerivativeBound(0,1,transverse);
+        check(bound.x>=0&&bound.y>0&&bound.z>0,"Independent tangent frame has no finite derivative bound");
+        for(int i=1;i<100;i++)
+        {
+            double f=i/100D,h=.0001;var a=guideBasis(bridge,transverse,f-h);var b=guideBasis(bridge,transverse,f);var c=guideBasis(bridge,transverse,f+h);
+            for(int k=0;k<3;k++)check(c[k].subtract(b[k].scale(2)).add(a[k]).length()/Math.pow(h*bridge.length(),2)<=List.of(bound.x,bound.y,bound.z).get(k)+1e-5,"Tangent frame second difference escaped bound");
+        }
+        check(line.transportedFrameSecondDerivativeBound(0,1,new Vec3(0,0,1)).equals(Vec3.ZERO),"Straight guide introduced artificial curvature");
+        rejects(()->bridge.transportedFrameSecondDerivativeBound(0,1,new Vec3(0,1,0)),"Guide tangent singularity admitted");
         check(route.continuousUpright()&&route.cruiseMps()==30&&route.readyNode().equals("dock1_1"),"Explicit continuous speed/profile lost");
         check(NervCentrelineCurveR52.parse(bridge.toJson()).point(.37).distanceTo(bridge.point(.37))==0,"Portable client controls changed actual sampler");
         for(int i=0;i<=12;i++)check(bridge.point(i/12D).distanceTo(back.point(1-i/12D))<=bridge.pointErrorBound()+back.pointErrorBound(),"Reverse arc geometry differs");
@@ -62,5 +71,7 @@ public final class NervCentrelineCurveR52Test
         }
         System.out.println("PASS continuous centre curves: "+checks+" geometry/source checks; no World/game/native acceptance; subdivisions="+divisions+" bound="+error+" inverse="+bridge.pointErrorBound());
     }
+    private static Vec3[] guideBasis(NervCentrelineCurveR52 curve,Vec3 axis,double fraction)
+    {var z=curve.tangent(fraction);var x=axis.subtract(z.scale(z.dot(axis))).normalize();return new Vec3[]{x,z.cross(x).normalize(),z};}
     private NervCentrelineCurveR52Test(){}
 }

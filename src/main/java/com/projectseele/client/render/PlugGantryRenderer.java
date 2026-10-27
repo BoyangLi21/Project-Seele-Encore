@@ -26,8 +26,10 @@ public final class PlugGantryRenderer
     private static final int GREEN=0x566a51, EDGE=0x8d9a86, STEEL=0xadb7bb, DARK=0x222d32, GOLD=0xb69347;
     private final PoseStack poses; private final VertexConsumer buffer; private final int light;private final RigidMachineryPartR44.Builder baking;
     private final MultiBufferSource buffers;
-    private boolean declaredRigR52;
-    private static RigidMachineryPartR44 TOP,YOKE,CHUCK,JAW_LEFT,JAW_RIGHT,HOSES_CLOSED,HOSES_OPEN,ROPE,SHEAVE,LINKS,WHEEL;
+    private boolean declaredRigR52,refittedHoist;
+    private double fabricatedElevation;
+    private static RigidMachineryPartR44 TOP,REFITTED_TOP,YOKE,CHUCK,JAW_LEFT,JAW_RIGHT,HOSES_CLOSED,HOSES_OPEN,ROPE,SHEAVE,LINKS,WHEEL;
+    private static final java.util.Map<String,RigidMachineryPartR44> BEARINGS=new java.util.HashMap<>();
     private PlugGantryRenderer(PoseStack poses, MultiBufferSource buffers, int light)
     {this.poses=poses;this.buffers=buffers;this.buffer=buffers.getBuffer(RenderType.entitySolid(PAINT));this.light=light;this.baking=null;}
     private PlugGantryRenderer(RigidMachineryPartR44.Builder builder){this.poses=new PoseStack();this.buffers=null;this.buffer=null;this.light=15728880;this.baking=builder;}
@@ -36,7 +38,8 @@ public final class PlugGantryRenderer
     private void draw(NervCarrierPlatformEntity entity,float partial)
     {
         declaredRigR52=entity.hasDeclaredMachineFrameR52();
-        gpu(topMesh(),poses,light);
+        refittedHoist=declaredRigR52&&com.projectseele.world.CarrierMountProfileR53.read(entity,partial).aboveFloor();
+        gpu(topMesh(refittedHoist),poses,light);
         // The two surveyed runways run along Z at X = body axis +/- 4.
         // Wheel bottoms meet their Y=-373 running surface; no floating bogies.
         for(double x:new double[]{-4,4})for(double z:new double[]{-2.8,2.8})
@@ -68,10 +71,12 @@ public final class PlugGantryRenderer
             rotation.slerp(stowedRotation,com.projectseele.entity.EvaDorsalMechanism.smooth((float)((rise-2)/Math.max(1,travel-2))));
         }
         Vec3 suppliedMount = TripoMachineryR48.clampMount();
-        if(declaredRigR52)
+        if(declaredRigR52||entity.sourcePlugHoistR53())
         {
-            var machine=com.projectseele.world.RigidTransform.of(entity.getPosition(partial),entity.declaredMachineRotationR52());
-            var state=com.projectseele.world.NervCranePoseR52.evaluate(machine,entity.getCraneBottomOffset(partial),transform,coupled,entity.hasCraneReference()?entity.getPosition(partial).add(entity.getCraneReferenceAnchor()):null,entity.hasCraneReference()?entity.getCraneReferenceRotation():null,suppliedMount);
+            var machine=com.projectseele.world.RigidTransform.of(entity.getPosition(partial),declaredRigR52?entity.declaredMachineRotationR52():new Quaternionf());
+            var observed=new com.projectseele.world.NervCranePoseR52.State(machine,entity.getCraneBottomOffset(partial),transform,coupled,entity.hasCraneReference()?entity.getPosition(partial).add(entity.getCraneReferenceAnchor()):null,entity.hasCraneReference()?entity.getCraneReferenceRotation():null);
+            // UN hoists share the imported clamp, not the NERV planar bearing retrofit.
+            var state=observed.pose(suppliedMount,declaredRigR52);
             lower=state.grip().translation();rotation=state.grip().rotation();released=state.released();
         }
         Vec3 mount = lower;
@@ -83,7 +88,7 @@ public final class PlugGantryRenderer
         Vec3 yoke=suppliedMount==null?lower.add(0,1.6,0):mount.add(0,.45,0);
         for(double x:new double[]{-2.4,2.4})for(double z:new double[]{-.78,.78})
         {
-            Vec3 end=yoke.add(x,0,z);gpuRope(v(x,-.7,z),end,.065);
+            Vec3 end=yoke.add(x,0,z);gpuRope(v(x,(refittedHoist?com.projectseele.world.NervCraneBearingR53.WINCH_DECK:0)-.7,z),end,.065);
             poses.pushPose();poses.translate(end.x,end.y,end.z);gpu(sheaveMesh(),poses,light);poses.popPose();
         }
         poses.pushPose();poses.translate(yoke.x,yoke.y,yoke.z);gpu(yokeMesh(),poses,light);poses.popPose();
@@ -98,7 +103,8 @@ public final class PlugGantryRenderer
         poses.pushPose();poses.translate(lower.x,lower.y,lower.z);
         poses.mulPose(rotation);
         if (TripoMachineryR48.clamp(poses,buffers,light,released))
-        {poses.popPose();return;}
+        {if(declaredRigR52)bearingShoes(released);poses.popPose();return;}
+        if(refittedHoist)throw new IllegalStateException("Refitted hoist requires its complete source clamp");
         gpu(chuckMesh(),poses,light);
         for(double side:new double[]{-1,1})
         {
@@ -111,12 +117,28 @@ public final class PlugGantryRenderer
         poses.popPose();
     }
     public static void clearCache()
-    {TOP=YOKE=CHUCK=JAW_LEFT=JAW_RIGHT=HOSES_CLOSED=HOSES_OPEN=ROPE=SHEAVE=LINKS=WHEEL=null;}
+    {TOP=REFITTED_TOP=YOKE=CHUCK=JAW_LEFT=JAW_RIGHT=HOSES_CLOSED=HOSES_OPEN=ROPE=SHEAVE=LINKS=WHEEL=null;BEARINGS.clear();}
     private static RigidMachineryPartR44 bake(java.util.function.Consumer<PlugGantryRenderer> author)
     {
         var builder=new RigidMachineryPartR44.Builder();author.accept(new PlugGantryRenderer(builder));return builder.finish();
     }
-    private static RigidMachineryPartR44 topMesh(){if(TOP==null)TOP=bake(PlugGantryRenderer::top);return TOP;}
+    private static RigidMachineryPartR44 topMesh(){return topMesh(false);}
+    private static RigidMachineryPartR44 topMesh(boolean refitted)
+    {if(refitted){if(REFITTED_TOP==null)REFITTED_TOP=bake(r->{r.refittedHoist=true;r.top();});return REFITTED_TOP;}if(TOP==null)TOP=bake(PlugGantryRenderer::top);return TOP;}
+    private void bearingShoes(float released)
+    {
+        for(String name:com.projectseele.world.NervCraneBearingR53.names())
+        {
+            var mesh=BEARINGS.computeIfAbsent(name,key->bake(r->{double[] xyz=com.projectseele.world.NervCraneBearingR53.triangles(key);for(int i=0;i<xyz.length;i+=9){var a=v(xyz[i],xyz[i+1],xyz[i+2]);var b=v(xyz[i+3],xyz[i+4],xyz[i+5]);var c=v(xyz[i+6],xyz[i+7],xyz[i+8]);r.quad(a,b,c,c,STEEL);}}));
+            poses.pushPose();
+            if(!name.equals("body"))
+            {
+                boolean left=name.equals("jaw_left");double x=left?-1.74:1.74;
+                poses.translate(x,.45,0);poses.mulPose(new Quaternionf().rotationZ((float)Math.toRadians((left?-1:1)*32*released)));poses.translate(-x,-.45,0);
+            }
+            gpu(mesh,poses,light);poses.popPose();
+        }
+    }
     private static RigidMachineryPartR44 yokeMesh(){if(YOKE==null)YOKE=bake(PlugGantryRenderer::yoke);return YOKE;}
     private static RigidMachineryPartR44 chuckMesh(){if(CHUCK==null)CHUCK=bake(PlugGantryRenderer::chuck);return CHUCK;}
     private static RigidMachineryPartR44 jawMesh(double side)
@@ -169,6 +191,9 @@ public final class PlugGantryRenderer
                     cylinder(v(x+side,.93,z+dz),v(x+side+Math.copySign(.045,side),.93,z+dz),.045,0,DARK,8);
             }
         }
+        if(refittedHoist)for(double x:new double[]{-4,4})for(double z:new double[]{-2.1,2.1})
+            box(x-.18,1.09,z-.18,.36,com.projectseele.world.NervCraneBearingR53.WINCH_DECK-.39,.36,GREEN);
+        fabricatedElevation=refittedHoist?com.projectseele.world.NervCraneBearingR53.WINCH_DECK:0;
         for(double z:new double[]{-2.1,2.1})
         {
             housing(-4.28,.50,z-.24,8.56,.63,.48,.12,GREEN);
@@ -188,11 +213,11 @@ public final class PlugGantryRenderer
         // Rounded motor casings, cooling fins and flexible hydraulic lines are real mesh surfaces.
         for(double side:new double[]{-1,1})
         {
-            Vec3 centre=v(side*3.65,.03,.15);cylinder(centre.add(-.85,0,0),centre.add(.85,0,0),.50,0,GREEN,48);
+            Vec3 centre=v(side*3.65,.60,.15);cylinder(centre.add(-.85,0,0),centre.add(.85,0,0),.50,0,GREEN,48);
             for(int i=0;i<14;i++)cylinder(centre.add(-.72+i*.11,0,0),centre.add(-.68+i*.11,0,0),.54,.49,EDGE,48);
             for(int i=0;i<8;i++){double a=i*Math.PI/4;Vec3 ring=v(0,Math.cos(a)*.39,Math.sin(a)*.39);cylinder(centre.add(.85,0,0).add(ring),centre.add(.90,0,0).add(ring),.045,0,STEEL,10);}
             Vec3 last=centre.add(side*.9,.1,0);
-            for(int i=1;i<=24;i++){double t=i/24D;Vec3 next=v(side*(4.55+Math.sin(t*Math.PI)*.6),.13-Math.sin(t*Math.PI)*.38,t*1.1+.15);rod(last,next,.055,DARK);last=next;}
+            for(int i=1;i<=24;i++){double t=i/24D;Vec3 next=v(side*(4.55+Math.sin(t*Math.PI)*.6),.70*(1-t)+.13*t-Math.sin(t*Math.PI)*.10,t*1.1+.15);rod(last,next,.055,DARK);last=next;}
         }
         // Fabricated service deck and tubular handrail give the assembly
         // an industrial silhouette independent of Minecraft block sizes.
@@ -204,6 +229,7 @@ public final class PlugGantryRenderer
             rod(v(x,.05,1.65),v(x,1.01,3.10),.055,DARK);
             housing(x-.17,1.03,2.34,.34,.46,.40,.07,DARK);
         }
+        fabricatedElevation=0;
     }
     private void yoke()
     {
@@ -314,6 +340,7 @@ public final class PlugGantryRenderer
     }
     private void quad(Vec3 a,Vec3 b,Vec3 c,Vec3 d,int colour)
     {
+        if(fabricatedElevation!=0){a=a.add(0,fabricatedElevation,0);b=b.add(0,fabricatedElevation,0);c=c.add(0,fabricatedElevation,0);d=d.add(0,fabricatedElevation,0);}
         Vec3 n=b.subtract(a).cross(c.subtract(a));if(n.lengthSqr()<1e-12)return;n=n.normalize();
         float red=((colour>>16)&255)/255F,green=((colour>>8)&255)/255F,blue=(colour&255)/255F;
         if(baking!=null)

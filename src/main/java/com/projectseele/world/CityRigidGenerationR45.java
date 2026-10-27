@@ -134,7 +134,16 @@ public final class CityRigidGenerationR45
                     CompoundTag cell = (CompoundTag) raw; BlockPos local = BlockPos.of(cell.getLong("Pos"));
                     BlockPos pos = new BlockPos(tower.centre().getX() + local.getX(), base + local.getY(), tower.centre().getZ() + local.getZ());
                     if ((pos.getX() >> 4) != chunk.getPos().x || (pos.getZ() >> 4) != chunk.getPos().z) continue;
-                    CompoundTag value = cell.copy(); value.putLong("Pos", pos.asLong()); write(binding.level,chunk, value);
+                    CompoundTag value = cell.copy(); value.putLong("Pos", pos.asLong());
+                    // These three imported lots included landscaping soil in their travelling foundations.
+                    // The static bearing patch and future cargo share a finished reinforced plinth.
+                    if (tower.kind().equals("private") && local.getY() <= 3 && !value.contains("NBT"))
+                    {
+                        String material = value.getCompound("State").getString("Name");
+                        if (java.util.Set.of("minecraft:dirt", "minecraft:grass_block", "minecraft:coarse_dirt", "minecraft:rooted_dirt").contains(material))
+                            value.put("State", NbtUtils.writeBlockState(net.minecraft.world.level.block.Blocks.POLISHED_ANDESITE.defaultBlockState()));
+                    }
+                    write(binding.level,chunk, value);
                 }
             }
             chunk.setUnsaved(true);

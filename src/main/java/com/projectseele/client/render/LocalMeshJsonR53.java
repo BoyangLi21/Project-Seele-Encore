@@ -17,13 +17,17 @@ import java.util.zip.CheckedInputStream;
 /** Keeps authored skin metadata, without boxing millions of vertex scalars. */
 final class LocalMeshJsonR53
 {
-    record Document(JsonObject metadata, Map<String, float[]> vertices, long crc) {}
+    record Document(JsonObject metadata, Map<String, float[]> vertices,
+                    Map<String, Map<String, float[]>> influences,
+                    Map<String, float[]> pairWeights, long crc) {}
 
     static Document read(InputStream input) throws IOException
     {
         CRC32 crc = new CRC32();
         JsonObject root = new JsonObject();
         Map<String, float[]> vertices = new HashMap<>();
+        Map<String, Map<String, float[]>> influences = new HashMap<>();
+        Map<String, float[]> pairWeights = new HashMap<>();
         try (var reader = new JsonReader(new InputStreamReader(
                 new CheckedInputStream(input, crc), StandardCharsets.UTF_8)))
         {
@@ -31,6 +35,11 @@ final class LocalMeshJsonR53
             while (reader.hasNext())
             {
                 String name = reader.nextName();
+                if (name.equals("jointSkins"))
+                {
+                    root.add(name, readSkins(reader, influences, pairWeights));
+                    continue;
+                }
                 if (!name.equals("parts"))
                 {
                     root.add(name, JsonParser.parseReader(reader));
@@ -63,7 +72,46 @@ final class LocalMeshJsonR53
             if (reader.peek() != JsonToken.END_DOCUMENT)
                 throw new IOException("Trailing local mesh data");
         }
-        return new Document(root, Map.copyOf(vertices), crc.getValue());
+        return new Document(root, Map.copyOf(vertices), Map.copyOf(influences),
+                Map.copyOf(pairWeights), crc.getValue());
+    }
+
+    private static JsonObject readSkins(JsonReader reader,
+            Map<String, Map<String, float[]>> influences,
+            Map<String, float[]> pairWeights) throws IOException
+    {
+        JsonObject skins = new JsonObject();
+        influences.clear();
+        pairWeights.clear();
+        reader.beginObject();
+        while (reader.hasNext())
+        {
+            String name = reader.nextName();
+            JsonObject skin = new JsonObject();
+            reader.beginObject();
+            while (reader.hasNext())
+            {
+                String field = reader.nextName();
+                if (field.equals("influences"))
+                {
+                    Map<String, float[]> palette = new HashMap<>();
+                    reader.beginObject();
+                    while (reader.hasNext()) palette.put(reader.nextName(), readVertices(reader));
+                    reader.endObject();
+                    influences.put(name, Map.copyOf(palette));
+                    skin.add(field, new JsonObject());
+                }
+                else if (field.equals("weights"))
+                {
+                    pairWeights.put(name, readVertices(reader));
+                }
+                else skin.add(field, JsonParser.parseReader(reader));
+            }
+            reader.endObject();
+            skins.add(name, skin);
+        }
+        reader.endObject();
+        return skins;
     }
 
     private static float[] readVertices(JsonReader reader) throws IOException

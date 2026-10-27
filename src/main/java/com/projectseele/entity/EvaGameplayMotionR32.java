@@ -42,7 +42,7 @@ public final class EvaGameplayMotionR32
     public static boolean serverMovement(EvaUnit01Entity e){return e.getEntityData().get(SERVER_MOVEMENT);}
     public static boolean movementMayComposeR45(EvaUnit01Entity e)
     {
-        if(e instanceof EvaPrototypeEntity||e.isBerserk()||!ready(e)||e.isNervLogisticsLocked()||e.isVisuallyAirborneForRender()
+        if(!Unit03SourceRigR53.sharesGroundActions(e)||e.isBerserk()||!ready(e)||e.isNervLogisticsLocked()||e.isVisuallyAirborneForRender()
                 ||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)||e.rifleStanceLevel(0)>.01F
                 ||EvaCombatR31.action(e)!=EvaCombatR31.NONE)return false;
         return java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(activeGroundClip(e,0));
@@ -138,7 +138,7 @@ public final class EvaGameplayMotionR32
     {var p=profile(variant(e));return p!=null&&p.has("airborne_revision")&&p.get("airborne_revision").getAsInt()>=42;}
     public static boolean sharedJump(EvaUnit01Entity e)
     {
-        return !(e instanceof EvaPrototypeEntity)&&!e.isBerserk()
+        return Unit03SourceRigR53.sharesGroundActions(e)&&!e.isBerserk()
                 &&singleFlight(e)&&EvaBodyPose.hasTerrainStances()
                 &&(sharedWeapon(e)||e.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE);
     }
@@ -582,7 +582,7 @@ public final class EvaGameplayMotionR32
         // The combat advance clips previously replaced it with a cupped guard.
         float low=Mth.clamp(e.rifleStanceLevel(partial),0,1);low=low*low*(3-2*low);
         float guardBlend=e.getEntityData().get(GUARD)*(1-low);
-        boolean fieldLocomotion=!(e instanceof EvaPrototypeEntity)&&!e.isBerserk()&&EvaBodyPose.runtimeLocomotionR44(e)
+        boolean fieldLocomotion=Unit03SourceRigR53.sharesGroundActions(e)&&!e.isBerserk()&&EvaBodyPose.runtimeLocomotionR44(e)
                 &&e.rifleStanceLevel(partial)<1F;
         if(fieldLocomotion)
         {
@@ -647,7 +647,7 @@ public final class EvaGameplayMotionR32
         int weapon=e.getWeapon();boolean shared=sharedWeapon(e),support=EvaCombatSupportR33.ready(e);
         boolean owner=ready(e)&&!legacyPoseVetoR51(e)&&(support&&shared&&actualStance<1
                 ||shared&&!e.isPilotProne()&&!e.isPilotCrouching()&&actualGuard>.01F);
-        boolean field=!(e instanceof EvaPrototypeEntity)&&!e.isBerserk()
+        boolean field=Unit03SourceRigR53.sharesGroundActions(e)&&!e.isBerserk()
                 &&EvaBodyPose.runtimeLocomotionR44(e)&&actualStance<1;
         boolean knife=EvaWeaponHandlingR45.available(e)&&weapon==EvaUnit01Entity.WEAPON_KNIFE
                 &&!EvaWeaponHandlingR45.active(e)&&!EvaFieldActionsR45.active(e)&&!e.hasLiveActionForRender(partial)
@@ -713,7 +713,7 @@ public final class EvaGameplayMotionR32
             reviewWeight(e,"entry_to_action_weight",entry);pose=EvaBodyPose.blend(from,pose,entry);
         }
         if(progress>.86F&&!phrases(e)){var end=e.getEntityData().get(GUARD)>.5F?EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F):base;pose=EvaBodyPose.blend(pose,end,(progress-.86F)/.14F);}
-        if(!(e instanceof EvaPrototypeEntity)&&e.rifleStanceLevel(partial)<.01F
+        if(Unit03SourceRigR53.sharesGroundActions(e)&&e.rifleStanceLevel(partial)<.01F
                 &&e.rifleMoveBlend(partial)>.001F
                 &&java.util.Set.of("jab","cross","hook","heavy","knife_forward","knife_reverse").contains(name))
         {

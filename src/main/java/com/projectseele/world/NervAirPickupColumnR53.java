@@ -28,7 +28,10 @@ final class NervAirPickupColumnR53
         var coordinates=new JsonArray();
         for(var value:root.getAsJsonArray("missions"))
         {
-            var m=value.getAsJsonObject();if(!m.get("intent").getAsString().equals("RECOVER"))continue;
+            var m=value.getAsJsonObject();
+            String intent=m.get("intent").getAsString();
+            if(!intent.equals("RECOVER")&&(m.get("id").getAsString().startsWith("r53/")
+                    ||!Set.of("DELIVER","FAR_MOUNTAIN").contains(intent)))continue;
             var template=receivers.get(m.get("receiver").getAsString());String port="r53/coordinate/"+template.get("port").getAsString();
             if(!receivers.containsKey(port))
             {
@@ -36,6 +39,8 @@ final class NervAirPickupColumnR53
                 receiver.add("reverse_routes",new JsonObject());receiver.add("actual_support_cells",new JsonArray());receiver.add("gates",new JsonArray());
                 root.getAsJsonArray("receivers").add(receiver);receivers.put(port,receiver);
             }
+            // Include commissioned delivery routes as well as recovery:
+            // their receiver region determines legal coordinate destinations.
             // Keep the commissioned cross-layer route. Only its final
             // column moves to the XYZ landing measured at request time.
             var delivery=m.deepCopy();delivery.addProperty("id","r53/coordinate/"+m.get("id").getAsString());

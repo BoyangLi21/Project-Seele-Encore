@@ -154,13 +154,22 @@ public final class TvMissionEquipmentR45
         var loan=state.loans.get(cargo);
         return loan==null||loan.status.equals(STORED)&&loan.source.equals(station.getUUID())&&loan.item.equals(item);
     }
-    /** Only the two declared R50 surface fixtures may bypass an underground well mechanism. */
+    /** Commissioned finite surface fixtures have no underground well mechanism. */
     public static boolean surfaceSupplyRackR50(NervArmamentStationEntity station)
     {
         var tag=station.getPersistentData();
         if(!tag.contains(RACK_UNIT,Tag.TAG_INT)||!tag.getString(SUPPLY_RECEIPT).matches("[0-9a-f]{64}"))return false;
         int unit=tag.getInt(RACK_UNIT);
-        return unit>=0&&unit<=1&&station.getUUID().equals(SUPPLY_RACK[unit]);
+        if(unit<0||unit>1)return false;
+        if(station.getUUID().equals(SUPPLY_RACK[unit]))return true;
+        if(!(station.level() instanceof ServerLevel level))return false;
+        // The installed R52 mountain racks retain their own source UUIDs.
+        // Recognize that existing commissioning receipt; never refill a rack.
+        for(var receipt:state(level).commissioned.values())
+            if(receipt.getInt("Unit")==unit&&receipt.hasUUID("Source")
+                    &&receipt.getUUID("Source").equals(station.getUUID())
+                    &&receipt.getString("Receipt").equals(tag.getString(SUPPLY_RECEIPT)))return true;
+        return false;
     }
     private static boolean context(ServerLevel l,EvaUnit01Entity eva)
     {

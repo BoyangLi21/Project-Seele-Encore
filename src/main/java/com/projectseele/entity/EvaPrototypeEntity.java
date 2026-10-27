@@ -23,6 +23,7 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     public void toggleUNFlight(net.minecraft.server.level.ServerPlayer pilot)
     {
         if(getPilotEntity()!=pilot||CombatFeelR31.restrained(this)||EvaCombatR31.active(this))return;
+        if(Unit03SourceRigR53.uses(this)){pilot.sendSystemMessage(Component.literal("三号机没有独立飞行系统。"));return;}
         if(getUNSerial()!=1){pilot.sendSystemMessage(Component.literal("飞行系统仅配置于 EVA-UN-01。"));return;}
         if(isUNFlying()){entityData.set(LANDING,!isUNLanding());pilot.sendSystemMessage(Component.literal(isUNLanding()?"UN-01 自动降落中。":"UN-01 恢复悬停。"));return;}
         if(isNervLogisticsLocked()||!isPoweredOn()||getActivationTicks()>0||isInsideTestHangar()||isPilotProne()||isPilotCrouching()||isFirstBattleActive())
@@ -75,6 +76,7 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     public Vec3 eyeLaserEnd(){return new Vec3(entityData.get(LASER_END));}
     public void requestEyeLaser(net.minecraft.server.level.ServerPlayer pilot)
     {
+        if(Unit03SourceRigR53.uses(this))return;
         if(getPilotEntity()!=pilot||!isPoweredOn()||isPilotControlLocked()||isFirstBattleActive()||eyeLaserCooldown()>0)return;
         entityData.set(LASER_AGE,0);entityData.set(LASER_COOLDOWN,40);eyeAim(pilot);
         level().playSound(null,getX(),getY()+53,getZ(),com.projectseele.registry.ModSounds.BEAM_CHARGE.get(),net.minecraft.sounds.SoundSource.PLAYERS,.65F,1.45F);
@@ -84,6 +86,17 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     @Override public void tick()
     {
         super.tick();if(level().isClientSide)return;com.projectseele.world.UNRecoveryR22.remember(this);com.projectseele.world.UNPlugDirector.tick(this);if(eyeLaserCooldown()>0)entityData.set(LASER_COOLDOWN,eyeLaserCooldown()-1);
+        if(Unit03SourceRigR53.uses(this))
+        {
+            // A saved former UN01 may still carry experimental capability state.
+            // Finish its controlled landing instead of dropping a loaded pilot.
+            if(isUNFlying())
+            {
+                if(onGround())stopUNFlight();else landUNFlight();
+            }
+            else if(isUNLanding())stopUNFlight();
+            if(isEyeLaserActive())entityData.set(LASER_AGE,-1);
+        }
         if(com.projectseele.world.UNAirLiftR29.waitingForDock(this)){setNervLogisticsLocked(true);setNoGravity(true);setDeltaMovement(Vec3.ZERO);}
         if(isUNFlying())
         {

@@ -83,7 +83,7 @@ public final class EvaUmbilicalCableRenderer
             Vec3 rear = attachment.rear();
             Vec3 right = attachment.right();
             Vec3 up = attachment.up();
-            boolean suppliedConnector=com.projectseele.entity.EvaPowerPortsR48.of(unit)!=null;
+            boolean suppliedConnector=com.projectseele.entity.EvaPowerPortsR48.usesSuppliedMesh(unit);
             Vec3 collarOuter = suppliedConnector?plugTail:plugTail.add(rear.scale(0.35D));
 
             // Machined bayonet collar, tapered strain relief and separate

@@ -43,7 +43,7 @@ public final class UNCommandR29
     public static String status(ServerLevel l,int serial)
     {
         var eva=unit(l,serial);
-        return "EVA-UN-0"+serial+" · 核能 · "+(eva==null?"远端信号接入中":eva.isUNFlying()?(eva.isUNLanding()?"自动降落":"飞行中"):eva.getPilotEntity()==null?"无人驾驶":"驾驶员已接入")+"\n"+UNAirLiftR29.status(l,serial);
+        return Unit03SourceRigR53.displayName(serial)+" · 核能 · "+(eva==null?"远端信号接入中":eva.isUNFlying()?(eva.isUNLanding()?"自动降落":"飞行中"):eva.getPilotEntity()==null?"无人驾驶":"驾驶员已接入")+"\n"+UNAirLiftR29.status(l,serial);
     }
     private static String board(ServerPlayer p,int serial)
     {

@@ -119,6 +119,16 @@ public final class YashimaCannonMeshR52
         for(var part:actual.parts()){var mesh=new NervRigidMeshSweepR52(part.triangles());complete.add(mesh);if(!Set.of("hand_l","hand_r","wrist_l","wrist_r").contains(part.bone()))meshes.add(mesh);}
         cached=new Body(tick,provider.sourceFingerprint(),List.copyOf(meshes),List.copyOf(complete));BODIES.put(eva,cached);return cached;
     }
+    static boolean clearHatchR54(YashimaCannonEntityR52 actor,NervSiloDoorEntity hatch,float from,float to)
+    {
+        var geometry=actor.geometryR52();var spec=actor.cradleR52();if(geometry==null||spec==null)return false;
+        var aim=actor.aimR52(1);var gunFrame=frame(geometry,actor.position(),aim);
+        var source=hatch.declaredGeometryR52();var frame=hatch.actualFrameR52();
+        if(source.intersects(frame,from,to,gun(geometry.scale()),gunFrame,gunFrame))return false;
+        for(var piece:FixedCannonCradleR52.pieces(geometry,spec,actor.position(),aim))
+            if(source.intersects(frame,from,to,piece.mesh(),piece.frame(),piece.frame()))return false;
+        return true;
+    }
     public static boolean clear(ServerLevel level,YashimaCannonEntityR52 actor,Vec3 proposed,Quaternionf aim)
     {
         try

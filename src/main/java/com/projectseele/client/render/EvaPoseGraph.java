@@ -456,7 +456,7 @@ public final class EvaPoseGraph
             String owner=entity.isFirstBattleActive()&&com.projectseele.entity.FirstBattleClip.ownsAnatomicalHandsR52(entity.getUnitVariant())
                     ?motionOwner:com.projectseele.entity.EvaAnatomicalHandsR45.OWNER;
             if(!activeLayers.contains(owner))activeLayers.add(owner);
-            for(var joint:com.projectseele.entity.EvaAnatomicalHandsR45.rig(entity.getUnitVariant()).joints())
+            for(var joint:com.projectseele.entity.EvaAnatomicalHandsR45.forEntityR53(entity).joints())
             {rotationOwners.put(joint.name(),owner);positionOwners.put(joint.name(),owner);scaleOwners.put(joint.name(),owner);}
         }
         List<String> upstreamSources = upstreamSources(entity, partialTick);

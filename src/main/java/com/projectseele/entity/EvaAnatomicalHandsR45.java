@@ -5,6 +5,7 @@ import com.projectseele.ProjectSeele;
 import com.projectseele.util.WeakIdentityMap;
 import net.minecraft.util.Mth;
 import org.joml.Matrix4f;
+import org.joml.Matrix3f;
 import org.joml.Quaternionf;
 import org.joml.Vector3f;
 import java.nio.file.*;
@@ -32,6 +33,7 @@ public final class EvaAnatomicalHandsR45
     public record Rig(List<Joint> joints,Map<String,Joint> named,JsonObject poses,Map<String,Grip> grips,KnifeAttachment knife,KnifeMechanism mechanism,SwordAttachment sword,Map<String,CarryFrame> carry) {}
     public record Pose(String left,String right,Map<String,Quaternionf> rotations) {}
     private static final Map<Integer,Optional<Rig>> RIGS=new HashMap<>();
+    private static final Map<Integer,Map<String,Vector3f>> PUNCH_SOCKETS_R53=new HashMap<>();
     private static final Map<Integer,String> RIG_FINGERPRINTS_R45=new HashMap<>();
     private static final Map<String,String> SWORD_RESOURCE_HASHES_R45=new HashMap<>();
     private record ContractBytesR45(byte[] bytes,String source) {}
@@ -48,8 +50,22 @@ public final class EvaAnatomicalHandsR45
     }
     public static boolean enabled(EvaUnit01Entity eva)
     {
-        return !eva.isExperimentalUnit()&&rig(eva.getUnitVariant())!=null;
+        return forEntityR53(eva) != null;
     }
+    public static int contractKeyR53(EvaUnit01Entity eva)
+    {
+        if(!eva.isExperimentalUnit())return eva.getUnitVariant();
+        if(Unit03SourceRigR53.uses(eva))return 4;
+        // Source-proportioned rig4 is admitted only for the fixed review actor.
+        // A shared-rig marker alone cannot select rig1 hands or unlock gameplay.
+        return eva instanceof EvaPrototypeEntity un&&un.getUNSerial()==1
+                &&Unit03ReviewContractR53.actor(eva.getUUID())
+                &&EvaShutdownR30.mode(eva)==EvaShutdownR30.EMPTY
+                &&EvaShutdownR30.valid(EvaShutdownR30.pose(eva))
+                &&EvaBodyPose.usesUnit01SkeletonR53(eva)?4:-1;
+    }
+    public static Rig forEntityR53(EvaUnit01Entity eva)
+    {int key=contractKeyR53(eva);return key<0?null:rig(key);}
     private static ContractBytesR45 contractBytesR45(int variant)throws Exception
     {
         String directory=System.getProperty("projectseele.handRigDirectoryR45","");
@@ -68,6 +84,7 @@ public final class EvaAnatomicalHandsR45
     {rig(variant);return RIG_FINGERPRINTS_R45.getOrDefault(variant,"ABSENT");}
     public static synchronized Rig rig(int variant)
     {
+        if(variant==4&&Unit03ReviewContractR53.current()==null&&!Unit03SourceRigR53.loaded())return null;
         return RIGS.computeIfAbsent(variant,key->{
             String source="unresolved unit0"+key;
             try
@@ -190,10 +207,33 @@ public final class EvaAnatomicalHandsR45
     }
     private static Vector3f vector(JsonArray a)
     {return new Vector3f(a.get(0).getAsFloat(),a.get(1).getAsFloat(),a.get(2).getAsFloat());}
+    private static synchronized Vector3f punchSocketR53(EvaUnit01Entity entity,String side,Vector3f fallback)
+    {
+        int key=contractKeyR53(entity);
+        var sockets=PUNCH_SOCKETS_R53.computeIfAbsent(key,variant->{
+            String resource="/assets/projectseele/hand_rigs/unit0"+variant+"/punch_socket_r53.json";
+            try(var stream=EvaAnatomicalHandsR45.class.getResourceAsStream(resource))
+            {
+                if(stream==null)return Map.of();
+                var root=JsonParser.parseString(new String(stream.readAllBytes(),StandardCharsets.UTF_8)).getAsJsonObject();
+                if(root.get("rig").getAsInt()!=variant)throw new IllegalArgumentException("Punch socket rig differs");
+                Map<String,Vector3f> result=new HashMap<>();
+                for(String handSide:List.of("l","r"))
+                {
+                    var point=vector(root.getAsJsonObject("sockets_native_bind").getAsJsonArray(handSide));
+                    if(!point.isFinite())throw new IllegalArgumentException("Nonfinite punch socket");
+                    result.put(handSide,point);
+                }
+                return Map.copyOf(result);
+            }
+            catch(Exception error){throw new IllegalStateException("Invalid measured punch socket "+resource,error);}
+        });
+        return new Vector3f(sockets.getOrDefault(side,fallback));
+    }
     public static KnifeAttachment knifeAttachment(EvaUnit01Entity e)
-    {return enabled(e)?rig(e.getUnitVariant()).knife():null;}
+    {return enabled(e)?forEntityR53(e).knife():null;}
     public static KnifeMechanism knifeMechanism(EvaUnit01Entity e)
-    {return enabled(e)?rig(e.getUnitVariant()).mechanism():null;}
+    {return enabled(e)?forEntityR53(e).mechanism():null;}
     public static KnifePose knifePose(EvaUnit01Entity e,Vector3f pivot,Quaternionf authored)
     {
         var k=knifeAttachment(e);if(k==null)return null;
@@ -239,7 +279,7 @@ public final class EvaAnatomicalHandsR45
         if(!enabled(e)||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isBerserk()||!e.isPoweredOn()
                 ||e.isNervLogisticsLocked()||e.isFirstBattleActive()||EvaShutdownR30.disabled(e)
                 ||e.isVisuallyAirborneForRender()||e.getActivationTicks()>0)return;
-        naturalCarryTargetR52(e.getUnitVariant(),body,e.rifleStanceLevel(partial));
+        naturalCarryTargetR52(contractKeyR53(e),body,e.rifleStanceLevel(partial));
     }
     /** Same relaxed wrist FK with explicit prospective ordinary input. */
     public static void naturalCarryTargetR52(int variant,EvaBodyPose.Sample body,float stance)
@@ -275,27 +315,77 @@ public final class EvaAnatomicalHandsR45
         if(!enabled(e)||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isNervLogisticsLocked())return;
         String clip=EvaGameplayMotionR32.activeGroundClip(e,partial);
         if(!java.util.Set.of("jab","cross","hook","heavy").contains(clip))return;
+        float phase=EvaGameplayMotionR32.activeGroundPhase(e,partial);
+        float weight=EvaDorsalMechanism.smooth(phase/.15F)
+                *(1-EvaDorsalMechanism.smooth((phase-.85F)/.15F));
         // Both fists carry weight in the guard: correcting only the striking
         // side leaves the withdrawn hand folded against its forearm.
-        alignPunchWristR53(e,body,"l");
-        alignPunchWristR53(e,body,"r");
+        String leading=clip.equals("jab")||clip.equals("cross")?EvaGameplayMotionR32.side(e,clip):"";
+        alignPunchWristR53(e,body,"l",weight,leading.equals("l"));
+        alignPunchWristR53(e,body,"r",weight,leading.equals("r"));
     }
-    private static void alignPunchWristR53(EvaUnit01Entity e,EvaBodyPose.Sample body,String side)
+    private static void alignPunchWristR53(EvaUnit01Entity e,EvaBodyPose.Sample body,String side,float weight,boolean straight)
     {
         String hand="hand_"+side,forearm="forearm_"+side;
         if(!body.rig.containsKey(hand)||!body.rig.containsKey(forearm))return;
-        var matrix=body.matrix(hand);var palm=matrix.transformDirection(new Vector3f(rig(e.getUnitVariant()).carry().get(side).along())).normalize();
-        var arm=body.matrix(forearm).transformDirection(new Vector3f(body.rig.get(hand).pivot()).sub(body.rig.get(forearm).pivot())).normalize();
-        float angle=(float)Math.acos(Mth.clamp(palm.dot(arm),-1,1));
-        if(angle<=10*Mth.DEG_TO_RAD)return;
-        // Keep the authored fist roll and arm trajectory; remove only the
-        // excessive wrist bend so the knuckles remain in line with the forearm.
-        var correction=new Quaternionf().rotationTo(palm,arm);
-        correction=new Quaternionf().slerp(correction,1-10*Mth.DEG_TO_RAD/angle);
-        var desired=correction.mul(matrix.getUnnormalizedRotation(new Quaternionf()).normalize());
+        var rig=forEntityR53(e);
+        var index=rig.named().get("r45_hand_"+side+"_index_1");
+        var middle=rig.named().get("r45_hand_"+side+"_middle_1");
+        if(index==null||middle==null)return;
+        var wrist=new Vector3f(body.rig.get(hand).pivot());
+        var socket=punchSocketR53(e,side,wrist);
+        // The relaxed finger direction is not the wrist-to-knuckle load axis.
+        // Its built-in slant previously survived the numerical wrist limit.
+        var strikeAxis=new Vector3f(index.head()).add(middle.head()).mul(.5F).sub(wrist);
+        String marker="r30_elbow_socket_"+side;
+        var elbow=body.rig.containsKey(marker)?new Vector3f(body.rig.get(marker).pivot())
+                :new Vector3f(side.equals("l")?-23.489652F:23.489652F,123.435069F,7.737214F).div(16);
+        var socketWorld=body.matrix(forearm).transformPosition(new Vector3f(socket));
+        var arm=new Vector3f(socketWorld)
+                .sub(body.matrix(forearm).transformPosition(new Vector3f(elbow)));
+        if(strikeAxis.lengthSquared()<1e-8F||arm.lengthSquared()<1e-8F)return;
+        strikeAxis.normalize();arm.normalize();
+        var normal=new Vector3f(rig.carry().get(side).normal());
+        normal.fma(-normal.dot(strikeAxis),strikeAxis).normalize();
+        var targetNormal=body.matrix(forearm).transformDirection(new Vector3f(normal));
+        targetNormal.fma(-targetNormal.dot(arm),arm).normalize();
+        if(straight)
+        {
+            // A straight punch has its palm down. Turn the forearm about the
+            // measured elbow-to-cuff line. The imported hand pivot lies in
+            // front of the cuff and cannot define a straight loaded wrist.
+            var palmDown=new Vector3f(0,-1,0);
+            palmDown.fma(-palmDown.dot(arm),arm);
+            if(palmDown.lengthSquared()>.01F)
+            {
+                palmDown.normalize();
+                float angle=(float)Math.atan2(arm.dot(new Vector3f(targetNormal).cross(palmDown)),targetNormal.dot(palmDown));
+                var forearmWorld=body.matrix(forearm);
+                var elbowWorld=forearmWorld.transformPosition(new Vector3f(elbow));
+                var turned=new Matrix4f().translation(elbowWorld)
+                        .rotate(new Quaternionf().rotationAxis(angle*weight,arm))
+                        .translate(new Vector3f(elbowWorld).negate()).mul(forearmWorld);
+                var forearmBone=body.rig.get(forearm);
+                var local=forearmBone.parent()==null?turned:body.matrix(forearmBone.parent()).invert().mul(turned);
+                body.rotations.put(forearm,local.getUnnormalizedRotation(new Quaternionf()).normalize());
+                body.positions.put(forearm,local.transformPosition(new Vector3f(forearmBone.pivot())).sub(forearmBone.pivot()));
+                body.dirty();
+                targetNormal=body.matrix(forearm).transformDirection(new Vector3f(normal));
+                targetNormal.fma(-targetNormal.dot(arm),arm).normalize();
+            }
+        }
+        // Pronation belongs to the forearm. Keeping the old hand roll after
+        // straightening its axis leaves the wrist sleeve twisted shut.
+        var bind=new Matrix3f().setColumn(0,new Vector3f(strikeAxis).cross(normal))
+                .setColumn(1,strikeAxis).setColumn(2,normal);
+        var target=new Matrix3f().setColumn(0,new Vector3f(arm).cross(targetNormal))
+                .setColumn(1,arm).setColumn(2,targetNormal);
+        var desired=new Quaternionf().setFromNormalized(target.mul(bind.transpose()));
         String parent=body.rig.get(hand).parent();
         if(parent!=null)desired=body.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(desired);
-        body.rotations.put(hand,desired);body.dirty();
+        var localSocket=parent==null?new Vector3f(socketWorld):body.matrix(parent).invert().transformPosition(new Vector3f(socketWorld));
+        body.positions.get(hand).lerp(localSocket.sub(wrist),weight);
+        body.rotations.get(hand).slerp(desired,weight);body.dirty();
     }
     public static void attachSwordR45(EvaUnit01Entity e,EvaBodyPose.Sample body)
     {
@@ -350,7 +440,7 @@ public final class EvaAnatomicalHandsR45
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_SWORD_R45)return side.equals("r")?"sword_right":"relaxed";
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_SHIELD_R45)return side.equals("l")?"knife":"relaxed";
         if(EvaFieldActionsR45.active(e)&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS)return "relaxed";
-        if(e.getWeapon()==EvaUnit01Entity.WEAPON_CANNON&&rig(e.getUnitVariant()).poses.has("cannon_"+(side.equals("r")?"right":"left")))
+        if(e.getWeapon()==EvaUnit01Entity.WEAPON_CANNON&&forEntityR53(e).poses.has("cannon_"+(side.equals("r")?"right":"left")))
             return "cannon_"+(side.equals("r")?"right":"left");
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||e.getWeapon()==EvaUnit01Entity.WEAPON_CANNON)
             return side.equals("r")?"rifle_right":"rifle_left";
@@ -404,7 +494,7 @@ public final class EvaAnatomicalHandsR45
         // The existing final renderer and server hand contacts consume the
         // same immutable 34-joint sample while Root owns a rigid carrier.
         if(EvaAirTransportR31.active(e)&&EvaAirTransportR31.cradleStateR50(e).getBoolean("MechanicalFrameR52"))return EvaFrozenHandsR52.frozen(e);
-        Rig rig=rig(e.getUnitVariant());String left=selection(e,"l"),right=selection(e,"r");
+        Rig rig=forEntityR53(e);String left=selection(e,"l"),right=selection(e,"r");
         Map<String,float[]> wanted=controls(rig,left,right);
         if(System.getProperty("projectseele.handPoseR45","").isBlank()
                 &&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&!e.isPilotProne()
@@ -505,7 +595,19 @@ public final class EvaAnatomicalHandsR45
                         &&e.rifleHeldPoseReadinessR45(partial)>=.999F)state.start=time-4;
             }
             else state.target=wanted;
-            float t=Mth.clamp((float)(time-state.start)/4,0,1);t=t*t*t*(10+t*(-15+6*t));
+            float t=Mth.clamp((float)(time-state.start)/4,0,1);
+            if(e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&(left.equals("fist")||right.equals("fist")))
+            {
+                String strike=EvaGameplayMotionR32.activeGroundClip(e,partial);
+                if(java.util.Set.of("jab","cross","hook","heavy").contains(strike))
+                {
+                    // Close during the same wind-up that seats the wrist.
+                    // A late first draw must not restart four ticks of open
+                    // fingers after the actual punch is already extending.
+                    t=Math.max(t,Mth.clamp(EvaGameplayMotionR32.activeGroundPhase(e,partial)/.15F,0,1));
+                }
+            }
+            t=t*t*t*(10+t*(-15+6*t));
             Map<String,float[]> next=new LinkedHashMap<>();
             for(Joint j:rig.joints)
             {
@@ -555,7 +657,7 @@ public final class EvaAnatomicalHandsR45
     }
     public static Vector3f contact(EvaUnit01Entity e,EvaBodyPose.Sample body,String side,float partial)
     {
-        var rig=rig(e.getUnitVariant());var pose=sample(e,partial);Map<String,Matrix4f> matrices=new HashMap<>();
+        var rig=forEntityR53(e);var pose=sample(e,partial);Map<String,Matrix4f> matrices=new HashMap<>();
         Vector3f a=point(rig,pose,body,"r45_hand_"+side+"_index_2",matrices);
         Vector3f b=point(rig,pose,body,"r45_hand_"+side+"_middle_2",matrices);
         return a.lerp(b,.5F);

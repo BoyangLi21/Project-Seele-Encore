@@ -223,7 +223,7 @@ public final class MilitaryR07Director
         if(!level.hasChunkAt(BUTTONS[0]))return;
         FacilityAudioR21.auxiliary(level,"UN00",data.phase,DOOR);
         boolean open=data.phase==Phase.OPEN||data.phase==Phase.OPENING;
-        NervHangarDoorEntity.reconcile(level,3,DOOR,open);
+        NervHangarDoorEntity.reconcileUNR54(level,DOOR,open,data.phase==Phase.OPEN||data.phase==Phase.CLOSING?1F:0F);
         if(data.phase==Phase.DRAINING||data.phase==Phase.FILLING)
         {
             var lcl=BuiltInRegistries.BLOCK.get(new ResourceLocation("projectseele:lcl"));

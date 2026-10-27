@@ -8,6 +8,28 @@ public final class NervRigidPairSweepR52Test
 {
     private static int checks;
     private static void check(boolean b,String text){checks++;if(!b)throw new AssertionError(text);}
+    private static void boundedWorkingSetReuse()throws Exception
+    {
+        var source=new double[4096*9];
+        for(int i=0;i<4096;i++){double x=i*.01;double[] triangle={x,0,0,x+.004,0,0,x,1,0};System.arraycopy(triangle,0,source,i*9,9);}
+        var mesh=new NervRigidMeshSweepR52(source);var frame=RigidTransform.identity();var query=new NervRigidMeshSweepR52.PairQuery();
+        var motion=NervRigidMeshSweepR52.PairQuery.class.getDeclaredMethod("motion",NervRigidMeshSweepR52.class,RigidTransform.class,RigidTransform.class,Vec3.class);motion.setAccessible(true);
+        var cached=motion.invoke(query,mesh,frame,frame,Vec3.ZERO);var chord=cached.getClass().getDeclaredMethod("chord",int.class,int.class,int.class);chord.setAccessible(true);
+        for(int i=0;i<2048;i++)chord.invoke(cached,i,1,0);
+        var late=chord.invoke(cached,3000,1,0);
+        check(late==chord.invoke(cached,3000,1,0),"A full bounded chord cache must still reuse the newly reached source page");
+        var root=NervRigidMeshSweepR52.class.getDeclaredField("root");root.setAccessible(true);Object node=root.get(mesh);
+        var left=node.getClass().getDeclaredField("left");var right=node.getClass().getDeclaredField("right");left.setAccessible(true);right.setAccessible(true);
+        var hull=cached.getClass().getDeclaredMethod("leafHull",node.getClass());hull.setAccessible(true);var queue=new ArrayDeque<Object>();queue.add(node);Object lastLeaf=null;int leaves=0;
+        while(!queue.isEmpty()){node=queue.removeFirst();if(left.get(node)!=null){queue.add(left.get(node));queue.add(right.get(node));}else{hull.invoke(cached,node);lastLeaf=node;leaves++;}}
+        check(leaves>256,"Fixture must move beyond the original frozen leaf cache");
+        check(hull.invoke(cached,lastLeaf)==hull.invoke(cached,lastLeaf),"Newly reached actual leaf projections remain reusable after capacity");
+        var count=cached.getClass().getDeclaredField("cachedChords");count.setAccessible(true);
+        var pages=cached.getClass().getDeclaredField("boundedChords");pages.setAccessible(true);
+        check(count.getInt(cached)<=2048&&((Map<?,?>)pages.get(cached)).size()<=16,"Eviction must retain the original geometry memory bounds");
+        for(int i=0;i<18;i++)motion.invoke(query,new NervRigidMeshSweepR52(new double[]{0,0,0,1,0,0,0,1,0}),frame,frame,Vec3.ZERO);
+        check(cached==motion.invoke(query,mesh,frame,frame,Vec3.ZERO),"One full actor's 18 groups cannot evict every preceding fixed source projection");
+    }
     private static boolean exhaustiveSeparated(Vec3[] a,Vec3[] b,Vec3 error,Vec3 axis)
     {
         if(axis.lengthSqr()<1e-28)return false;
@@ -125,10 +147,16 @@ public final class NervRigidPairSweepR52Test
                     var ap=new Vec3(a[c*3],a[c*3+1],a[c*3+2]);var bp=new Vec3(b[c*3],b[c*3+1],b[c*3+2]);
                     ac[c]=af.interpolate(at,(double)s/n).transformPoint(ap);ac[c+3]=af.interpolate(at,(double)(s+1)/n).transformPoint(ap);
                     bc[c]=bf.interpolate(bt,(double)s/n).transformPoint(bp);bc[c+3]=bf.interpolate(bt,(double)(s+1)/n).transformPoint(bp);
+                    // Independent point-level reference in the same moving
+                    // frame; world swept hulls also admit different times.
+                    var shift0=bf.translation().lerp(bt.translation(),(double)s/n);
+                    var shift1=bf.translation().lerp(bt.translation(),(double)(s+1)/n);
+                    ac[c]=ac[c].subtract(shift0);bc[c]=bc[c].subtract(shift0);
+                    ac[c+3]=ac[c+3].subtract(shift1);bc[c+3]=bc[c+3].subtract(shift1);
                 }
                 brute=TriangleSweepMeshR52.convexSweepPair(ac,bc,pad);
             }
-            check(am.intersects(af,at,bm,bf,bt,.003,extra)==brute,"Cached chord bounds must preserve rotating triangle SAT with certified padding");
+            check(am.intersects(af,at,bm,bf,bt,.003,extra)==brute,"Cached chord bounds must preserve same-time rotating triangle SAT with certified padding");
             if(brute)hit++;else clear++;
         }
         check(hit>0&&clear>0,"Rotating triangle comparison must exercise separated and intersecting surfaces");
@@ -176,6 +204,51 @@ public final class NervRigidPairSweepR52Test
             check(mesh.intersects(a,endA,mesh,b,crossing,.003,pad),"A peer that crosses through the moving face must still collide");
         }
     }
+    private static void farSourceTranslations()
+    {
+        var moving=new NervRigidMeshSweepR52(new double[]{1000,-1062,328,1002,-1062,328,1000,-1060,328});
+        var fixed=new NervRigidMeshSweepR52(new double[]{1000,-1062,329,1002,-1062,329,1000,-1060,329});
+        var id=RigidTransform.identity();var end=new RigidTransform(new Vec3(0,0,2),0,0,0,1);
+        double radius=NervRigidMeshSweepR52.radius(moving.bounds());
+        check(radius>375&&NervRigidMeshSweepR52.divisions(radius,0,.003)==1,"Far source coordinates cannot invent angular error in static or affine motion");
+        check(!moving.intersects(id,id,fixed,id,id,.003,Vec3.ZERO),"Separated far-coordinate static steel must remain clear");
+        check(moving.intersects(id,end,fixed,id,id,.003,Vec3.ZERO),"Pure translation must retain the actual crossing between separated endpoint poses");
+        boolean rotatedRejected=false;try{NervRigidMeshSweepR52.divisions(radius,.001,.003);}catch(IllegalArgumentException expected){rotatedRejected=true;}
+        check(rotatedRejected,"Nonzero rotation must retain the original radius-based precision threshold");
+        for(double[] values:new double[][]{{Double.NaN,0,.003},{radius,Double.NaN,.003},{radius,0,0},{radius,0,Double.POSITIVE_INFINITY}})
+        {
+            boolean rejected=false;try{NervRigidMeshSweepR52.divisions(values[0],values[1],values[2]);}catch(IllegalArgumentException expected){rejected=true;}
+            check(rejected,"Zero-angle shortcut must not admit invalid inputs or nonpositive budgets");
+        }
+    }
+    private static void inclinedLeafSeparation()
+    {
+        // Two source facets per leaf, inclined almost parallel steel with
+        // overlapping world boxes, at both local and actual hangar heights.
+        double[] source={-1,-1,0,1,-1,0,1,1,0,-1,-1,0,1,1,0,-1,1,0};
+        var mesh=new NervRigidMeshSweepR52(source);var rotation=new Quaternionf().rotationX(.6F);
+        var pad=new Vec3(.00004,.00004,.00004);var query=new NervRigidMeshSweepR52.PairQuery();
+        for(double y:new double[]{0,-1062})for(double gap:new double[]{.00001,.0002,.02})for(boolean crossing:new boolean[]{false,true})
+        {
+            var from=RigidTransform.of(new Vec3(30.5,y,328.5),rotation);
+            var normal=from.transformVector(new Vec3(0,0,1));
+            var to=RigidTransform.of(from.translation().add(.1,0,0).add(normal.scale(crossing?gap*2:0)),rotation);
+            var fixed=RigidTransform.of(from.translation().add(normal.scale(gap)),rotation);boolean expected=false;
+            for(int a=0;a<2&&!expected;a++)for(int b=0;b<2&&!expected;b++)
+            {
+                var ac=new Vec3[6];var bc=new Vec3[6];
+                for(int c=0;c<3;c++)
+                {
+                    int i=a*9+c*3,j=b*9+c*3;var p=new Vec3(source[i],source[i+1],source[i+2]);var q=new Vec3(source[j],source[j+1],source[j+2]);
+                    ac[c]=from.interpolate(to,0).transformPoint(p);ac[c+3]=from.interpolate(to,1).transformPoint(p);
+                    bc[c]=fixed.interpolate(fixed,0).transformPoint(q);bc[c+3]=bc[c];
+                }
+                expected=exhaustivePair(ac,bc,pad);
+            }
+            query.nextInterval();
+            check(mesh.intersects(from,to,mesh,fixed,fixed,.003,pad,query)==expected,"Inclined leaf rejection must retain padded contact and crossings at the original hangar root");
+        }
+    }
     private static void affineStaticReuse()throws Exception
     {
         var moving=new NervRigidMeshSweepR52(new double[]{0,0,0,1,0,0,0,1,0});
@@ -220,6 +293,31 @@ public final class NervRigidPairSweepR52Test
         }
         check(collisions>0&&clear>0,"Indexed comparison must exercise both blocked and clear physical sweeps");
     }
+    private static void rotatingCommonTranslation()
+    {
+        var a=new NervRigidMeshSweepR52(new double[]{0,0,0,2,0,0,0,2,0});
+        var b=new NervRigidMeshSweepR52(new double[]{0,.2,-1,0,.2,1,0,1.8,0});
+        var a0=RigidTransform.identity();
+        var a1=RigidTransform.of(Vec3.ZERO,new Quaternionf().rotationY(.15F));
+        var b0=RigidTransform.of(new Vec3(4,0,0),new Quaternionf());
+        var b1=RigidTransform.of(new Vec3(4,0,0),new Quaternionf().rotationZ(-.1F));
+        var crossing=RigidTransform.of(new Vec3(-1,0,0),new Quaternionf().rotationZ(-.1F));
+        check(!a.intersects(a0,a1,b,b0,b1,.005,Vec3.ZERO),"Rotating separated members stay clear in their common moving frame");
+        check(a.intersects(a0,a1,b,b0,crossing,.005,Vec3.ZERO),"A real relative crossing is retained while both members rotate");
+        var query=new NervRigidMeshSweepR52.PairQuery();
+        for(var origin:List.of(new Vec3(72,-930,28),new Vec3(-1200,175,-1500)))
+            for(var travel:List.of(new Vec3(32,7,-25),new Vec3(0,84,0)))
+            {
+                var A0=offset(a0,origin);var A1=offset(a1,origin.add(travel));
+                var B0=offset(b0,origin);var B1=offset(b1,origin.add(travel));
+                var C1=offset(crossing,origin.add(travel));
+                check(!a.intersects(A0,A1,b,B0,B1,.005,Vec3.ZERO,query),"Common carrier travel cannot create an asynchronous rotation collision");
+                check(a.intersects(A0,A1,b,B0,C1,.005,Vec3.ZERO,query),"Common carrier travel cannot hide a real rotating contact");
+                query.nextInterval();
+            }
+    }
+    private static RigidTransform offset(RigidTransform frame,Vec3 displacement)
+    {return new RigidTransform(frame.translation().add(displacement),frame.qx(),frame.qy(),frame.qz(),frame.qw());}
     public static void main(String[] args)throws Exception
     {
         var a=new NervRigidMeshSweepR52(new double[]{0,0,0,10,0,0,0,10,0});var b=new NervRigidMeshSweepR52(new double[]{9,9,-1,9.1,9,1,9,9.1,1});var id=RigidTransform.identity();
@@ -233,9 +331,13 @@ public final class NervRigidPairSweepR52Test
         sparseAndRotatingSweeps();
         compoundTranslationSweeps();
         simultaneousTranslations();
+        farSourceTranslations();
+        inclinedLeafSeparation();
         stationaryEndpointAxes();
         separatedSourceMembers();
         affineStaticReuse();
+        boundedWorkingSetReuse();
+        rotatingCommonTranslation();
         System.out.println("PASS R52 paired actual triangle BVH/chord checks: "+checks);
     }
 }

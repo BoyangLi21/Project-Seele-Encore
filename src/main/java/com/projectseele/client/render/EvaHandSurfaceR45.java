@@ -7,8 +7,13 @@ import net.minecraft.resources.ResourceLocation;
 final class EvaHandSurfaceR45
 {
     static ResourceLocation mesh(EvaUnit01Entity eva)
-    {return new ResourceLocation("projectseele","mesh/eva_unit0"+eva.getUnitVariant()
-            +(com.projectseele.entity.EvaAnatomicalHandsR45.enabled(eva)?"_anatomical_hands_r45.mesh.json":"_original_hands_r45.mesh.json"));}
+    {
+        if (com.projectseele.entity.Unit03SourceRigR53.uses(eva)
+                || com.projectseele.entity.EvaBodyPose.usesUnit01SkeletonR53(eva))
+            return new ResourceLocation("projectseele", "mesh/eva_un01_anatomical_hands_r53.mesh.json");
+        return new ResourceLocation("projectseele","mesh/eva_unit0"+eva.getUnitVariant()
+                +(com.projectseele.entity.EvaAnatomicalHandsR45.enabled(eva)?"_anatomical_hands_r45.mesh.json":"_original_hands_r45.mesh.json"));
+    }
     static boolean applies(EvaUnit01Entity eva)
     {
         // Rejected by the owner: the voxel/box replacement changed the hand's

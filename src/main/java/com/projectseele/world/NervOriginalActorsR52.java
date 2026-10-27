@@ -79,6 +79,17 @@ public final class NervOriginalActorsR52
     {var owner=plugAccess(level);return owner!=null&&original(level,plug)&&passenger.level()==level&&owner.originalBoardingAllowed(level,plug,passenger)&&boardingAnchor(level,plug)!=null;}
     public static boolean riderUpdatesAllowed(ServerLevel level,EntryPlugCarrierEntity plug)
     {return plugAccess(level)!=null&&original(level,plug);}
+    public static boolean riderPositionUpdatesAllowed(ServerLevel level,EntryPlugCarrierEntity plug,Entity passenger)
+    {
+        if(!original(level,plug)||passenger.getVehicle()!=plug||plug.getFirstPassenger()!=passenger)return false;
+        // An already locked original ride chain must follow its moving EVA
+        // while another unit or the plant is still restoring. This admits
+        // seat updates only; hatch, boarding and dismount still need the owner.
+        var eva=plug.getLinkedEva();
+        if(plug.isLockedToEva()&&originalUnit(level,plug.getAssignedVariant(),eva)
+                &&plug.getVehicle()==eva&&eva.getLockedEntryPlug()==plug)return true;
+        return plugAccess(level)!=null;
+    }
     public static boolean launchLock(ServerLevel level,int variant,EvaUnit01Entity eva,EntryPlugCarrierEntity plug)
     {var owner=plugAccess(level);return owner!=null&&originalUnit(level,variant,eva)&&plug!=null&&original(level,plug)&&owner.originalLaunchLock(level,variant,eva,plug);}
     public static boolean cageDock(ServerLevel level,int variant,EvaUnit01Entity eva,EntryPlugCarrierEntity plug)

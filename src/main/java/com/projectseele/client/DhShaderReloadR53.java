@@ -5,6 +5,23 @@ import com.projectseele.ProjectSeele;
 /** Refresh Oculus' cached DH switch before it chooses shader preprocessor defines. */
 public final class DhShaderReloadR53
 {
+    public static void synchronizeRenderPass(boolean shaderOverride)
+    {
+        try
+        {
+            var delayed = Class.forName("com.seibel.distanthorizons.api.DhApi$Delayed");
+            Object proxy = delayed.getField("renderProxy").get(null);
+            if (proxy == null) return;
+            proxy.getClass().getMethod("setDeferTransparentRendering", boolean.class)
+                    .invoke(proxy, shaderOverride);
+        }
+        catch (ClassNotFoundException absent) { }
+        catch (ReflectiveOperationException failure)
+        {
+            ProjectSeele.LOGGER.warn("Could not synchronize the pinned Oculus/DH render pass", failure);
+        }
+    }
+
     public static void synchronize()
     {
         try

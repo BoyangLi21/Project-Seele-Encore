@@ -21,24 +21,48 @@ public final class GiantMoveBlockQueryR53
 
     public static boolean noPaletteMatch(Level level,AABB bounds,Predicate<BlockState> predicate)
     {
-        // Outside the build height and unavailable chunks retain the original
-        // loaded-volume semantics. Never load a chunk to answer this query.
+        return Boolean.TRUE.equals(sectionNoneMatch(level,bounds,predicate,false));
+    }
+
+    private static Boolean sectionNoneMatch(Level level,AABB bounds,Predicate<BlockState> predicate,boolean inspectMatches)
+    {
         if(!Double.isFinite(bounds.minX)||!Double.isFinite(bounds.maxX)
                 ||!Double.isFinite(bounds.minY)||!Double.isFinite(bounds.maxY)
-                ||!Double.isFinite(bounds.minZ)||!Double.isFinite(bounds.maxZ)
-                ||bounds.minY<level.getMinBuildHeight()||bounds.maxY>=level.getMaxBuildHeight())
-            return false;
-        int first=level.getSectionIndex(Mth.floor(bounds.minY));
-        int last=level.getSectionIndex(Mth.floor(bounds.maxY));
-        for(int x=Mth.floor(bounds.minX)>>4;x<=Mth.floor(bounds.maxX)>>4;x++)
+                ||!Double.isFinite(bounds.minZ)||!Double.isFinite(bounds.maxZ))return null;
+        int minX=Mth.floor(bounds.minX),maxX=Mth.floor(bounds.maxX);
+        int minY=Mth.floor(bounds.minY),maxY=Mth.floor(bounds.maxY);
+        int minZ=Mth.floor(bounds.minZ),maxZ=Mth.floor(bounds.maxZ);
+        var absent=net.minecraft.world.level.block.Blocks.VOID_AIR.defaultBlockState();
+        if((minY<level.getMinBuildHeight()||maxY>=level.getMaxBuildHeight())&&predicate.test(absent))return false;
+        minY=Math.max(minY,level.getMinBuildHeight());maxY=Math.min(maxY,level.getMaxBuildHeight()-1);
+        if(minY>maxY)return true;
+        int first=level.getSectionIndex(minY),last=level.getSectionIndex(maxY);
+        for(int x=minX>>4;x<=maxX>>4;x++)for(int z=minZ>>4;z<=maxZ>>4;z++)
         {
-            for(int z=Mth.floor(bounds.minZ)>>4;z<=Mth.floor(bounds.maxZ)>>4;z++)
+            var chunk=level.getChunkSource().getChunk(x,z,ChunkStatus.FULL,false);
+            // ClientLevel.hasChunk always returns true, but its unloaded read
+            // goes through EmptyLevelChunk and returns VOID_AIR. Requesting
+            // false here must not turn that cheap empty read into a full scan.
+            if(chunk==null)
             {
-                var chunk=level.getChunkSource().getChunk(x,z,ChunkStatus.FULL,false);
-                if(chunk==null)return false;
-                var sections=chunk.getSections();
-                for(int y=first;y<=last;y++)
-                    if(sections[y].maybeHas(predicate))return false;
+                if(!level.isClientSide)return null;
+                if(predicate.test(absent))return false;
+                continue;
+            }
+            if(chunk instanceof net.minecraft.world.level.chunk.EmptyLevelChunk)
+            {if(predicate.test(absent))return false;continue;}
+            var sections=chunk.getSections();
+            for(int index=first;index<=last;index++)
+            {
+                var section=sections[index];if(!section.maybeHas(predicate))continue;
+                if(!inspectMatches)return false;
+                int bottom=level.getSectionYFromSectionIndex(index)<<4;
+                // Fire/lava positives only visit palette-positive sections,
+                // clipped to the exact native inclusive BlockPos stream bounds.
+                for(int by=Math.max(minY,bottom);by<=Math.min(maxY,bottom+15);by++)
+                    for(int bz=Math.max(minZ,z<<4);bz<=Math.min(maxZ,(z<<4)+15);bz++)
+                        for(int bx=Math.max(minX,x<<4);bx<=Math.min(maxX,(x<<4)+15);bx++)
+                            if(predicate.test(section.getBlockState(bx&15,by&15,bz&15)))return false;
             }
         }
         return true;
@@ -47,22 +71,25 @@ public final class GiantMoveBlockQueryR53
     public static boolean noneMatch(Entity entity,Stream<BlockState> original,Predicate<BlockState> predicate)
     {
         queries.increment();
-        if(rejected||!noPaletteMatch(entity.level(),entity.getBoundingBox().deflate(1e-6),predicate))
-            return original.noneMatch(predicate);
+        var level=entity.level();var bounds=entity.getBoundingBox().deflate(1e-6);
+        // Preserve getBlockStatesIfLoaded's empty stream on the server and
+        // outside the build range before considering any positive section.
+        if(rejected||!level.hasChunksAt(Mth.floor(bounds.minX),Mth.floor(bounds.minY),Mth.floor(bounds.minZ),
+                Mth.floor(bounds.maxX),Mth.floor(bounds.maxY),Mth.floor(bounds.maxZ)))return original.noneMatch(predicate);
+        var result=sectionNoneMatch(level,bounds,predicate,true);
+        if(result==null)return original.noneMatch(predicate);
         skipped.increment();
         if(VERIFY&&skipped.sum()%64==0)
         {
-            boolean expected=original.noneMatch(predicate);
-            verified.increment();
-            if(!expected)
+            boolean expected=original.noneMatch(predicate);verified.increment();
+            if(expected!=result)
             {
                 rejected=true;
-                ProjectSeele.LOGGER.error("Giant move palette rejection disagreed with native block stream; retaining native queries");
+                ProjectSeele.LOGGER.error("Giant move section query disagreed with native block stream; retaining native queries");
             }
             return expected;
         }
-        original.close();
-        return true;
+        original.close();return result;
     }
 
     public static Map<String,Object> diagnostics()

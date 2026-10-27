@@ -293,9 +293,30 @@ public final class CombatBodyDynamics
                 {
                     if("r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
                         ProjectSeele.LOGGER.info("R40 articulated rest: actor={} ticks={} root={} maxStitchBlocks={} bone={}",entity.getUUID(),s.age,s.position,s.stitchedMax,s.stitchedBone);
-                    AABB sole=new AABB(s.bounds.minX,s.bounds.minY-.4,s.bounds.minZ,s.bounds.maxX,s.bounds.minY+.35,s.bounds.maxZ);double ground=Double.NEGATIVE_INFINITY;
-                    for(var shape:entity.level().getBlockCollisions(entity,sole))for(var box:shape.toAabbs())if(box.maxY<=s.bounds.minY+.35)ground=Math.max(ground,box.maxY);
-                    if(Double.isFinite(ground)){double lift=ground+.025-s.bounds.minY;s.position=s.position.add(0,lift,0);s.bounds=s.bounds.move(0,lift,0);entity.setPos(s.position.x,s.position.y,s.position.z);entity.setBoundingBox(s.bounds);}
+                    if(!eva.isExperimentalUnit()&&eva.getUnitVariant()>=0&&eva.getUnitVariant()<3)
+                    {
+                        // The stitched render skin extends beyond Bullet's bodies. Evaluate
+                        // it once at rest, without sampling the Dynamics-owned body again.
+                        var provider=com.projectseele.world.EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
+                        if(!provider.handContractFingerprint(eva.getUnitVariant()).equals(EvaAnatomicalHandsR45.contractFingerprintR45(eva.getUnitVariant())))
+                            throw new IllegalStateException("Rest hand source differs from selected actual mesh");
+                        var geometry=provider.evaluate(eva.getUnitVariant(),s.pose,EvaAnatomicalHandsR45.sample(eva,0));
+                        var root=com.projectseele.world.RigidTransform.of(s.position,new Quaternionf().rotationY((180-s.yaw)*Mth.DEG_TO_RAD));
+                        var actual=com.projectseele.world.NervRigidMeshSweepR52.transformed(geometry.bounds(),root);
+                        double ceiling=s.bounds.minY+.35;
+                        var support=new AABB(actual.minX,Math.min(actual.minY,s.bounds.minY)-.4,actual.minZ,actual.maxX,ceiling,actual.maxZ);
+                        var tops=new ArrayList<AABB>();
+                        for(var shape:entity.level().getBlockCollisions(entity,support))for(var box:shape.toAabbs())if(box.maxY<=ceiling)tops.add(box);
+                        var rest=com.projectseele.world.EvaMeshRestSupportR53.solve(geometry,root,tops,.025);
+                        s.position=s.position.add(0,rest.lift(),0);s.bounds=s.bounds.move(0,rest.lift(),0).minmax(rest.bounds());
+                    }
+                    else
+                    {
+                        AABB sole=new AABB(s.bounds.minX,s.bounds.minY-.4,s.bounds.minZ,s.bounds.maxX,s.bounds.minY+.35,s.bounds.maxZ);double ground=Double.NEGATIVE_INFINITY;
+                        for(var shape:entity.level().getBlockCollisions(entity,sole))for(var box:shape.toAabbs())if(box.maxY<=s.bounds.minY+.35)ground=Math.max(ground,box.maxY);
+                        if(Double.isFinite(ground)){double lift=ground+.025-s.bounds.minY;s.position=s.position.add(0,lift,0);s.bounds=s.bounds.move(0,lift,0);}
+                    }
+                    entity.setPos(s.position.x,s.position.y,s.position.z);entity.setBoundingBox(s.bounds);
                     EvaShutdownR30.physicalRest(eva,s.pose,s.bounds);cancel(entity);continue;
                 }
                 if(s.age%2==0)send(entity,s,s.recoveryAge<0?1:2);

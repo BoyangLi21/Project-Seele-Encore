@@ -30,8 +30,8 @@ public final class StaffRecoveryR47
     private static final class Job
     {
         int unit;
-        UUID eva, owner, officer, pilot;
-        long expires;
+        UUID eva, owner, officer, pilot, airTask;
+        long expires, nextAirRequest;
         String stage = "LOCATE";
         boolean consoleRequested, exitRequested, npc;
     }
@@ -49,6 +49,8 @@ public final class StaffRecoveryR47
                 job.officer = row.getUUID("Officer"); job.expires = row.getLong("Expires"); job.stage = row.getString("Stage");
                 // In-memory physical console orders do not survive a restart.
                 job.npc=row.getBoolean("Npc");if(row.hasUUID("Pilot"))job.pilot=row.getUUID("Pilot");
+                if(row.hasUUID("AirTask"))job.airTask=row.getUUID("AirTask");
+                job.nextAirRequest=row.getLong("NextAirRequest");
                 // The original navigation dispatcher revalidates a resumed exit.
                 job.exitRequested = false; state.jobs.putIfAbsent(unit, job);
             }
@@ -63,6 +65,8 @@ public final class StaffRecoveryR47
                 row.putUUID("Owner", job.owner); row.putUUID("Officer", job.officer); row.putLong("Expires", job.expires);
                 row.putString("Stage", job.stage); row.putBoolean("ExitRequested", job.exitRequested); rows.add(row);
                 row.putBoolean("Npc",job.npc);if(job.pilot!=null)row.putUUID("Pilot",job.pilot);
+                if(job.airTask!=null)row.putUUID("AirTask",job.airTask);
+                row.putLong("NextAirRequest",job.nextAirRequest);
             }
             tag.put("Jobs", rows); return tag;
         }
@@ -178,11 +182,34 @@ public final class StaffRecoveryR47
                 { stage(state, job, "WAIT_SAFE_STATE"); continue; }
                 if(NervRouteRuntimeR52.claimed(level))
                 {
-                    if(NervAirTransportRuntimeR52.pending(level,eva)){stage(state,job,"R52_ACTUAL_RECOVERY");continue;}
+                    var transport=NervAirTransportRuntimeR52.state(level);
+                    var active=transport.payload(job.eva);
+                    if(active!=null)
+                    {
+                        if(!active.task().equals(job.airTask)){job.airTask=active.task();state.setDirty();}
+                        stage(state,job,"R52_ACTUAL_RECOVERY");continue;
+                    }
+                    // Ground recovery may also dispatch an aircraft, so check the
+                    // prior flight before entering either dispatch path.
+                    if(job.airTask!=null)
+                    {
+                        var attempted=transport.job(job.airTask);
+                        String next=attempted!=null&&attempted.active()?"R53_AIR_HANDOFF_WAIT":"R53_AIR_STOPPED";
+                        if(next.equals("R53_AIR_STOPPED")&&!next.equals(job.stage))
+                            NervStaffDialogue.say(owner,"NERV 运输联络","本次空运已停止，未重新派机。请查看运输状态；确认可以继续后，取消后续操作并重新请求回收。"
+                                    +(attempted==null?"":attempted.waiting()));
+                        stage(state,job,next);continue;
+                    }
+                    if(level.getGameTime()<job.nextAirRequest)continue;
+                    job.nextAirRequest=level.getGameTime()+200;state.setDirty();
                     var ground=NervRouteRuntimeR52.recover(owner,job.unit);
-                    if(ground.accepted()){stage(state,job,"R52_ACTUAL_RECOVERY");continue;}
+                    active=transport.payload(job.eva);
+                    if(active!=null){job.airTask=active.task();state.setDirty();}
+                    if(ground.accepted()||active!=null){stage(state,job,"R52_ACTUAL_RECOVERY");continue;}
                     String reply=NervAirTransportRuntimeR52.request(owner,job.unit,true,0,0);
-                    boolean accepted=NervAirTransportRuntimeR52.pending(level,eva);
+                    active=transport.payload(job.eva);
+                    boolean accepted=active!=null;
+                    if(accepted){job.airTask=active.task();state.setDirty();}
                     String next=accepted?"R52_ACTUAL_RECOVERY":"R53_AIR_WAIT:"+reply;
                     if(!next.equals(job.stage))NervStaffDialogue.say(owner,"NERV 运输联络",reply);
                     stage(state,job,next);continue;

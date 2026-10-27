@@ -59,26 +59,20 @@ final class TvShoulderRestraintsR44
     static boolean render(int variant,float opening,PoseStack poses,int light)
     {return render(variant,opening,poses,light,true);}
     static boolean render(int variant,float opening,PoseStack poses,int light,boolean fixedMounts)
+    {return render(variant,opening,poses,light,fixedMounts,com.projectseele.world.CarrierMountProfileR53.LEGACY);}
+
+    static boolean render(int variant,float opening,PoseStack poses,int light,boolean fixedMounts,com.projectseele.world.CarrierMountProfileR53.State mounting)
     {
         load();if(variant<0||variant>2||PADS.size()!=6)return false;
         if(fixedMounts)draw("shoulder_fixed_mounts",poses,light);
-        for(var pad:PADS)
+        try
         {
-            if(pad.variant!=variant)continue;
-            Vec3 move=com.projectseele.world.NervShoulderBearingR52.movement(pad.variant,pad.side,opening);
-            poses.pushPose();poses.translate(move.x,move.y,move.z);draw(pad.part,poses,light);poses.popPose();
-            for(int i=0;i<2;i++)
+            for(var part:com.projectseele.world.NervShoulderBearingR52.transforms(variant,com.projectseele.world.RigidTransform.identity(),1-opening,mounting))
             {
-                Vec3 anchor=pad.anchors.get(i),end=pad.links.get(i).add(move),delta=end.subtract(anchor);
-                double length=delta.length();if(length<=2.22)throw new IllegalStateException("Shoulder actuator exhausted its real stroke");
-                var direction=new Vector3f((float)(delta.x/length),(float)(delta.y/length),(float)(delta.z/length));
-                poses.pushPose();poses.translate(anchor.x,anchor.y,anchor.z);
-                poses.mulPose(new Quaternionf().rotationTo(new Vector3f(0,0,1),direction));
-                draw("shoulder_joint",poses,light);draw("shoulder_barrel",poses,light);
-                poses.pushPose();poses.translate(0,0,2.18);poses.scale(1,1,(float)(length-2.18));draw("shoulder_piston_unit",poses,light);poses.popPose();
-                poses.translate(0,0,length);draw("shoulder_joint",poses,light);poses.popPose();
+                var p=part.frame().translation();poses.pushPose();poses.translate(p.x,p.y,p.z);poses.mulPose(part.frame().rotation());poses.scale(1,1,(float)part.stretch());draw(part.part(),poses,light);poses.popPose();
             }
         }
+        catch(java.io.IOException unavailable){throw new IllegalStateException("Shared source shoulder frames unavailable",unavailable);}
         return true;
     }
     private TvShoulderRestraintsR44(){}

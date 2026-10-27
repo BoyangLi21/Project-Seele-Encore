@@ -23,7 +23,7 @@ final class EvaChargingPlugLayerR48 extends GeoRenderLayer<EvaUnit01Entity>
                                         MultiBufferSource buffers,VertexConsumer ignored,float partial,int light,int overlay)
     {
         if(!bone.getName().equals("torso_upper")||bone.isHidden()||!entity.isUmbilicalConnected()
-                ||EvaPowerPortsR48.of(entity)==null)return;
+                ||!EvaPowerPortsR48.usesSuppliedMesh(entity))return;
         LocalTriangleMeshLayer.renderRigidAttachment(poses,buffers,MESH[entity.getUnitVariant()],TEXTURE,
                 "torso_upper",light,overlay);
     }
