@@ -32,7 +32,7 @@ from inspect_map_assets import (  # noqa: E402
 AIR = {"minecraft:air", "minecraft:cave_air", "minecraft:void_air"}
 
 
-def iter_lod_source_chunks(world: Path, dimension: str, selected):
+def iter_lod_source_chunks(world: Path, dimension: str, selected, *, skip_unfinished=False):
     """Exact FULL chunk sections, saved light and biome samples for offline LODs.
 
     No heightmap-based clipping: edited underground roofs can outlive a stale
@@ -44,6 +44,7 @@ def iter_lod_source_chunks(world: Path, dimension: str, selected):
             min(z for x,z in wanted),max(z for x,z in wanted))
     for cx,cz,chunk in iter_chunks(dimension_dir(world,dimension),bounds,wanted):
         if str(chunk.get('Status','')).removeprefix('minecraft:')!='full':
+            if skip_unfinished:continue
             raise ValueError(f'LOD source chunk {(cx,cz)} is not FULL')
         sections=[]
         for section in chunk.get('sections',[]):

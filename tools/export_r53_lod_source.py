@@ -10,7 +10,7 @@ import numpy as np
 from query_blocks import iter_lod_source_chunks
 
 
-def export_tile(world,tile,destination):
+def export_tile(world,tile,destination,allow_partial=False):
     tx,tz=tile;chunks={(tx*4+x,tz*4+z)for x in range(4)for z in range(4)}
     pairs=[];lookup={}
     def pair(biome,state):
@@ -19,7 +19,7 @@ def export_tile(world,tile,destination):
         return lookup[key]
     values=np.full((64,64,1665),0xffffffff,dtype=np.uint32)
     present=set();unlit=[]
-    for cx,cz,sections,lit in iter_lod_source_chunks(world,'projectseele:geofront',chunks):
+    for cx,cz,sections,lit in iter_lod_source_chunks(world,'projectseele:geofront',chunks,skip_unfinished=allow_partial):
         present.add((cx,cz))
         if not lit:unlit.append([cx,cz])
         x,z=(cx-tx*4)*16,(cz-tz*4)*16;seen=set()
@@ -34,18 +34,22 @@ def export_tile(world,tile,destination):
         if seen!=set(range(-84,20)):raise ValueError(f'Missing source sections {(cx,cz)}: {set(range(-84,20))-seen}')
         top_biomes=[pairs[int(v)&0xffffff][0]for v in values[x:x+16,z:z+16,1663].ravel()]
         values[x:x+16,z:z+16,1664]=np.asarray([pair(b,'minecraft:air')for b in top_biomes],dtype=np.uint32).reshape(16,16)
-    if present!=chunks:raise ValueError(f'Missing source chunks {chunks-present}')
+    if not present:raise ValueError(f'No saved source chunks in tile {tile}')
+    if present!=chunks and not allow_partial:raise ValueError(f'Missing source chunks {chunks-present}')
     header=json.dumps(dict(tile=tile,min_y=-1344,height=1664,pairs=pairs,
-                          source_unlit_chunks=unlit)).encode('utf8')
+                          source_unlit_chunks=unlit,missing_chunks=sorted(chunks-present))).encode('utf8')
     out=destination/f'{tx}_{tz}.columns.gz'
     with gzip.open(out,'wb',compresslevel=3)as stream:
         stream.write(struct.pack('>I',len(header)));stream.write(header)
         for column in values.reshape(4096,1665):
+            if column[0]==0xffffffff:
+                stream.write(struct.pack('>H',0));continue
             starts=np.r_[0,np.flatnonzero(column[1:]!=column[:-1])+1]
             ends=np.r_[starts[1:],1665];codes=column[starts].astype(np.uint64)
             spans=(codes&0xffffff)|((ends-starts).astype(np.uint64)<<32)|(starts.astype(np.uint64)<<44)|((codes>>24)<<60)
             stream.write(struct.pack('>H',len(spans)));stream.write(spans[::-1].astype('>u8').tobytes())
-    return dict(tile=tile,bytes=out.stat().st_size,states=len(pairs),unlit_chunks=unlit)
+    return dict(tile=tile,bytes=out.stat().st_size,states=len(pairs),unlit_chunks=unlit,
+                saved_chunks=len(present),missing_chunks=sorted(chunks-present))
 
 
 def verify_import(world,directory):
