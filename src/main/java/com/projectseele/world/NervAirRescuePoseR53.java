@@ -95,6 +95,10 @@ final class NervAirRescuePoseR53
             targetHands.rotations().forEach((name,rotation)->joints.put(name,new Quaternionf(rotation)));
             TARGETS.put(eva,new TargetCache(skinA,provider,targetTag.copy(),Map.copyOf(joints),skinB));
         }
+        // Normal recovery already holds the payload in its cleared pickup/lift
+        // corridor. Articulating the supported body is not a second flight
+        // admission: strict per-joint padding can engulf otherwise empty space.
+        if(!NervTraversalPolicyR53.strict(level))return skinB;
         var geometryA=NervFlightProofR52.occupiedPoseGeometryR53(eva,initial,skinA,pilot);
         var geometryB=NervFlightProofR52.occupiedPoseGeometryR53(eva,target,skinB,pilot);
         double totalAngle=0;

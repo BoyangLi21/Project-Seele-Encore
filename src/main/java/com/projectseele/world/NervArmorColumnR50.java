@@ -48,7 +48,9 @@ public final class NervArmorColumnR50
             try
             {
                 var o=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-                if(o.get("schema").getAsInt()!=50||!o.get("dimension").getAsString().equals(l.dimension().location().toString()))throw new IllegalArgumentException("Armor column identity");
+                // A shared world-root column file does not install armor in other dimensions.
+                if(!o.get("dimension").getAsString().equals(l.dimension().location().toString()))return Optional.empty();
+                if(o.get("schema").getAsInt()!=50)throw new IllegalArgumentException("Armor column identity");
                 var bounds=o.getAsJsonArray("hole_bounds");BlockPos min=pos(bounds.get(0).getAsJsonArray()),max=pos(bounds.get(1).getAsJsonArray());
                 int protect=o.get("protected_below_y").getAsInt();var t=o.getAsJsonArray("terminal_pos");Vec3 terminal=new Vec3(t.get(0).getAsDouble(),t.get(1).getAsDouble(),t.get(2).getAsDouble());
                 List<Layer> layers=new ArrayList<>();int last=Integer.MAX_VALUE;

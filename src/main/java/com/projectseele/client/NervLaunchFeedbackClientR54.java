@@ -8,7 +8,7 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.world.phys.Vec3;
 
-/** Short guide-scale exhaust and sparks from server-committed contact points. */
+/** Broad pressure plumes and sparks from server-committed guide contacts. */
 public final class NervLaunchFeedbackClientR54
 {
     private static final Map<ClientLevel,Map<Integer,Long>> LAST=new java.util.WeakHashMap<>();
@@ -22,23 +22,34 @@ public final class NervLaunchFeedbackClientR54
         if(com.projectseele.config.SeeleConfig.FX_INTENSITY.get()<=0)return;
         var camera=mc.gameRenderer.getMainCamera().getPosition();var random=mc.level.random;
         double strength=Math.min(1,packet.speed()/100D);
+        Vec3 centre=Vec3.ZERO;
+        for(var contact:packet.contacts())centre=centre.add(contact.point());
+        if(!packet.contacts().isEmpty())centre=centre.scale(1D/packet.contacts().size());
         for(var contact:packet.contacts())
         {
             var point=contact.point();if(camera.distanceToSqr(point)>192*192)continue;
-            int clouds=packet.burst()?6:2;
+            Vec3 tangent=contact.tangent();
+            Vec3 outward=point.subtract(centre);outward=outward.subtract(tangent.scale(outward.dot(tangent)));
+            if(outward.lengthSqr()<1e-6)outward=tangent.cross(Math.abs(tangent.y)>.9?new Vec3(0,0,1):new Vec3(0,1,0));
+            outward=outward.normalize();
+            // The measured facets are pressed against steel. Release the
+            // visible plume beyond that contact instead of inside the bearing.
+            Vec3 nozzle=point.add(outward.scale(3.5)).add(tangent.scale(-1.5));
+            int clouds=packet.burst()?12:4;
             for(int i=0;i<clouds;i++)
             {
-                var origin=point.add((random.nextDouble()-.5)*1.2,(random.nextDouble()-.5)*.8,(random.nextDouble()-.5)*1.2);
-                Vec3 jet=contact.tangent().scale(-(.35+strength*.9));
+                var origin=nozzle.add((random.nextDouble()-.5)*2.8,(random.nextDouble()-.5)*1.8,(random.nextDouble()-.5)*2.8);
+                Vec3 jet=outward.scale(.7+random.nextDouble()*.6).add(tangent.scale(-(.7+strength*1.2)));
                 var particle=mc.particleEngine.createParticle(ParticleTypes.CLOUD,origin.x,origin.y,origin.z,jet.x,jet.y,jet.z);
-                if(particle!=null){particle.scale(packet.burst()?10F:7F);particle.setLifetime(packet.burst()?18:12);}
+                // createParticle already enqueues the instance in ParticleEngine.
+                if(particle!=null){particle.scale(packet.burst()?36F:28F);particle.setColor(.94F,.97F,1F);particle.setLifetime(packet.burst()?36:28);}
             }
-            int sparks=packet.burst()?8:2+(int)(strength*3);
+            int sparks=packet.burst()?16:3+(int)(strength*5);
             for(int i=0;i<sparks;i++)
             {
-                var velocity=contact.tangent().scale(-(.6+strength*1.8)).add((random.nextDouble()-.5)*.4,(random.nextDouble()-.5)*.4,(random.nextDouble()-.5)*.4);
-                var particle=mc.particleEngine.createParticle(ParticleTypes.ELECTRIC_SPARK,point.x,point.y,point.z,velocity.x,velocity.y,velocity.z);
-                if(particle!=null){particle.scale(3F);particle.setLifetime(8);}
+                var velocity=outward.scale(.35).add(tangent.scale(-(.8+strength*2.2))).add((random.nextDouble()-.5)*.7,(random.nextDouble()-.5)*.7,(random.nextDouble()-.5)*.7);
+                var particle=mc.particleEngine.createParticle(ParticleTypes.ELECTRIC_SPARK,nozzle.x,nozzle.y,nozzle.z,velocity.x,velocity.y,velocity.z);
+                if(particle!=null){particle.scale(5F);particle.setLifetime(12);}
             }
         }
     }

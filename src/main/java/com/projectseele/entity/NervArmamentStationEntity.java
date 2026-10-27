@@ -358,7 +358,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
             return false;
         }
         if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
-        {this.maintainSurfaceSupplyR50();return this.isStocked();}
+        {this.deployQueued=true;this.maintainSurfaceSupplyR50();return this.isStocked();}
         if(this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE&&!this.isStocked())return false;
         if (this.getStationState() == EMPTY
                 || this.getStationState() == DOOR_CLOSING
@@ -382,7 +382,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     public boolean recall()
     {
         if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
-        {if(!this.level().isClientSide)this.maintainSurfaceSupplyR50();return false;}
+        {if(this.level().isClientSide)return false;this.deployQueued=false;this.maintainSurfaceSupplyR50();return true;}
         if (this.level().isClientSide
                 || (this.getStationState() != READY
                 && this.getStationState() != DOOR_OPENING))
@@ -451,12 +451,17 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         if(!com.projectseele.world.TvMissionEquipmentR45.commissionNewSupply(this,unit,receipt))return false;
         this.entityData.set(DATA_STOCKED,true);return true;
     }
-    /** The declared open surface frame stays above ground; this never replenishes an item. */
+    /** Surface racks have no underground well; only their front doors move. */
     private void maintainSurfaceSupplyR50()
     {
         boolean stocked=com.projectseele.world.TvMissionEquipmentR45.physicalStockPresent(this);
-        this.entityData.set(DATA_STOCKED,stocked);this.setLift(1F);this.setHatch(1F);this.setDoor(1F);
-        this.entityData.set(DATA_STATE,stocked?READY:EMPTY);this.phaseTicks=0;this.deployQueued=false;
+        this.entityData.set(DATA_STOCKED,stocked);this.setLift(1F);this.setHatch(1F);
+        if(!stocked)this.deployQueued=false;
+        boolean open=stocked&&this.deployQueued;
+        float door=Mth.clamp(this.entityData.get(DATA_DOOR)+(open?1F:-1F)/DOOR_TICKS,0F,1F);
+        this.setDoor(door);
+        this.entityData.set(DATA_STATE,door==1?READY:door==0?STOWED:open?DOOR_OPENING:DOOR_CLOSING);
+        this.phaseTicks=0;
     }
     /** Atomic fixed-gun transfer updates this same finite rack's display without replenishing a payload. */
     public void refreshFiniteMissionStockR52()
@@ -576,7 +581,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     @Override
     public boolean isPickable()
     {
-        return this.getStationState() != STOWED;
+        return this.getStationState() != STOWED || this.entityData.get(DATA_LIFT)>0;
     }
 
     @Override

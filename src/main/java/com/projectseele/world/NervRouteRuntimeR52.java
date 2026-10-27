@@ -182,6 +182,17 @@ public final class NervRouteRuntimeR52
     }
     public static EvaLogisticsDirector.ActionResult recover(ServerLevel level,int variant)
     {var c=LIVE.get(level);return c==null||!ready(level)?unavailable():c.recover(variant);}
+    public static boolean atRecoveryPortR54(ServerLevel level,int variant)
+    {
+        var c=LIVE.get(level);var job=c==null?null:c.saved.job(variant);
+        if(job==null||job.phase()!=Phase.DEPLOYED)return false;
+        var original=job.snapshot().original();
+        if(!(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva))return false;
+        var data=job.ownerData().copy();
+        data.putString("AssemblyKindR52",EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())
+                ?Kind.HULL_ONLY_RECOVERY.name():Kind.OCCUPIED.name());
+        return c.owner.actualRecoveryRegion(level,original,data)!=null;
+    }
     public static EvaLogisticsDirector.ActionResult recover(ServerPlayer caller,int variant)
     {var c=LIVE.get(caller.serverLevel());if(c==null||!ready(caller.serverLevel()))return unavailable();var job=c.saved.job(variant);return job==null||!job.snapshot().original().owner().equals(caller.getUUID())?new EvaLogisticsDirector.ActionResult(false,"本次原编队的回收指挥者不符。"):c.recover(variant);}
     public static EvaLogisticsDirector.ActionResult cancel(ServerLevel level,int variant)
@@ -363,11 +374,8 @@ public final class NervRouteRuntimeR52
             var region=owner.actualRecoveryRegion(level,original,data);var feet=owner.actualFootBearingCentre(level,original,data);if(region==null||feet==null)return unavailable();
             var route=pool.nearestRecovery(original,region,feet,(port,reverse)->owner.approachReachable(level,original,port,reverse,data),kind);
             if(route.isEmpty())return new EvaLogisticsDirector.ActionResult(false,"同一原机没有可达且空闲的对应回收口。");
-            // The outlet lid is not a central receiving platform. Do not take
-            // ground custody or open it beneath a body waiting for its rack.
-            if(((!(owner instanceof NervAssemblyOwnerR52 actualOwner)
-                    ||!actualOwner.groundReceiverBearingReadyR53(level,original,route.get().port(),kind,data))))
-                return NervAirTransportRuntimeR52.requestRecoveryReceiver(level,variant,original.owner(),route.get().port());
+            // The local receiver aligns its original body and raises its rack.
+            // A lowered rack is a preparation step, not a reason for air pickup.
             var result=pool.reserve(UUID.randomUUID(),original,route.get().id(),nativeAccess,kind);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
             saved.put(new Job(result.state(),Phase.RETURNING,data,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,kind==Kind.HULL_ONLY_RECOVERY?"原无人机体沿真实逆向线路回库；已分离的原栓与驾驶员保持原位。":"原机体沿该入口绑定的真实逆向线路回库。");
         }
@@ -481,7 +489,11 @@ public final class NervRouteRuntimeR52
 
                 if(phased!=null&&phased.bankStop()&&at==phased.stop()&&!data.contains("ContinuousBrakeR52"))
                 {
-                    if(!owner.prepareContinuousRouteR52(level,snapshot.original(),route,data)||!owner.prepareBankHeadsR53(level,snapshot.original(),route,snapshot.task(),data))
+                    boolean countdownRunning=!route.recovery()&&data.getInt("PaCountdownTicksR53")>0&&data.getInt("PaCountdownTicksR53")<60;
+                    // The stopped assembly was prepared before "three". Keep
+                    // the voice clock free of repeated whole-route preparation;
+                    // the completed countdown and first move still recheck it.
+                    if(!countdownRunning&&(!owner.prepareContinuousRouteR52(level,snapshot.original(),route,data)||!owner.prepareBankHeadsR53(level,snapshot.original(),route,snapshot.task(),data)))
                     {saved.put(job.update(snapshot,route.recovery()?Phase.RETURNING:Phase.PREPARING,data,"等待停稳后的真实滑靴换轨与承托锁定"));return;}
                     boolean requested=route.recovery()||data.getBoolean("ContinuousAutoLaunchR52")||data.getBoolean("ReleaseWhenReady");
                     if(!requested){saved.put(job.update(snapshot,Phase.READY,data,""));return;}

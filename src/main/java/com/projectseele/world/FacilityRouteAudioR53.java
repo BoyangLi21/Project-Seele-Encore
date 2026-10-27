@@ -86,7 +86,7 @@ final class FacilityRouteAudioR53
         int age=data.getInt("PaCountdownTicksR53");
         if(age%20==0&&level.getEntity(job.snapshot().original().eva()) instanceof EvaUnit01Entity eva)
         {
-            if(age==0)mechanical(level,eva,eva.position().add(0,2,0),com.projectseele.registry.ModSounds.FACILITY.get("facility_hydraulic_charge_r48").get(),1,.55F,1);
+            if(age==0)mechanical(level,eva,eva.position().add(0,2,0),com.projectseele.registry.ModSounds.FACILITY.get("facility_hydraulic_charge_r48").get(),2.4F,.9F,.9F);
             FacilityPaR31.announce(level,eva.position().add(0,52,0),"pa_"+(3-age/20));
         }
         data.putLong("PaCountdownAtR53",level.getGameTime());

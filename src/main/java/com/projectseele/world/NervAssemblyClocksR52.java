@@ -5,11 +5,12 @@ public final class NervAssemblyClocksR52
     public static int bridgeRemaining(int age){return Math.max(0,9-(int)Math.ceil(Math.max(0,age)*9D/40));}
     public static final double CRANE_HANDOFF_PROGRESS = .80;
     public static final int INSERT_HANDOFF_TICK = 132;
+    /** Legacy in-progress saves only; new preparations use the original clocks. */
     public static final int QUICK_INSERTION_TICKS_R54 = 100;
     public static final int QUICK_HANDOFF_TICK_R54 = 72;
     public static final int QUICK_BRIDGE_TICKS_R54 = 20;
     public static final int QUICK_RAISE_TICKS_R54 = 48;
-    public static final int HEAD_SUBSTEPS_R54 = 3;
+    public static final int HEAD_SUBSTEPS_R54 = 1;
     public static final int EXTRACT_HANDOFF_TICK = 64;
     public static final int EXTRACT_GRIP_TICK = 100;
     public static double insertionProgress(int age)

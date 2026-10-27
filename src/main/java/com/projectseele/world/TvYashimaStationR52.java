@@ -57,7 +57,13 @@ public final class TvYashimaStationR52
     public static Optional<Plan> plan(ServerLevel level)
     {
         return CACHE.computeIfAbsent(level,l->{var file=l.getServer().getWorldPath(LevelResource.ROOT).resolve(FILE);if(!Files.isRegularFile(file))return Optional.empty();
-            try{return Optional.of(parse(JsonParser.parseString(Files.readString(file)).getAsJsonObject(),l.dimension().location().toString()));}
+            try
+            {
+                var root=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
+                // The world-root file is shared by every dimension's right-click events.
+                if(!root.get("dimension").getAsString().equals(l.dimension().location().toString()))return Optional.empty();
+                return Optional.of(parse(root,l.dimension().location().toString()));
+            }
             catch(Exception error){com.projectseele.ProjectSeele.LOGGER.error("Installed fixed Yashima cannon rejected",error);return Optional.empty();}});
     }
     /** Called only by the explicit, hash-checked Root installation bundle. */

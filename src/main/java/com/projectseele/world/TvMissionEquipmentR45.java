@@ -569,7 +569,7 @@ public final class TvMissionEquipmentR45
     public static boolean issueFromStation(NervArmamentStationEntity station,EvaUnit01Entity eva,LivingEntity pilot)
     {
         if(!(station.level() instanceof ServerLevel l)||!context(l,eva)||!operational(eva)||!assignedPilot(l,eva,pilot)
-                ||!station.isReadyAndStocked()||!withinReach(station,eva))return false;
+                ||!withinReach(station,eva))return false;
         if(eva.getUnitVariant()==0&&(eva.getArmamentMask()&EvaUnit01Entity.ARMAMENT_MASK_SHIELD_R45)!=0)return false;
         var stock=station.getPersistentData();if(!stock.hasUUID(CARGO_ID)||!stock.contains(CARGO,Tag.TAG_COMPOUND))return false;
         var cargo=stock.getUUID(CARGO_ID);var item=stock.getCompound(CARGO).copy();if(cargoUnit(ItemStack.of(item))!=eva.getUnitVariant())return false;
@@ -578,6 +578,7 @@ public final class TvMissionEquipmentR45
         // A stale duplicated rack snapshot cannot issue an already borrowed ID.
         if(!rackOwns(state,station,cargo,item)||old!=null&&(!old.status.equals(STORED)||!old.item.equals(item)))return false;
         if(loanFor(state,eva)!=null)return false;
+        if(!station.isReadyAndStocked()){station.deploy();return false;}
         var d=TvCampaignSavedData.get(l);var loan=new Loan();loan.cargo=cargo;loan.source=station.getUUID();
         loan.eva=eva.getUUID();loan.owner=d.owner;loan.generation=d.generationR43;loan.unit=eva.getUnitVariant();
         loan.dimension=l.dimension().location().toString();loan.item=item;loan.pilot=pilot.getUUID();

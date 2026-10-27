@@ -618,12 +618,11 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var assembling=EvaMechanicalFrameR52.originalCarrierControllerR52(e);
         if(assembling!=null&&CarrierMountProfileR53.read(assembling,1).supportOnly()){hold(o,"actual_carrier_equipment_installation_in_progress");return Preparation.WAITING;}
         e.stowBayEquipmentR53();
-        if(!data.contains("Prepare")){if(!pose(capsule.getCanonicalTransform(),p.dock())||e.position().distanceToSqr(p.bay().translation())>1e-6||!bridgeMatches(l,p,9)||!personnelDoors(l,p,false)){hold(o,"original_dock_bay_bridge_or_personnel_door_not_actual");return Preparation.WAITING;}rememberBridge(data,9);data.putBoolean("QuickPreparationR54",true);data.putInt("BridgeStartAmount",9);capsule.beginCabinPreparation();e.setNervLogisticsLocked(true);data.putString("Prepare",Prepare.HATCH.name());data.putInt("PrepareTicks",0);}
+        if(!data.contains("Prepare")){if(!pose(capsule.getCanonicalTransform(),p.dock())||e.position().distanceToSqr(p.bay().translation())>1e-6||!bridgeMatches(l,p,9)||!personnelDoors(l,p,false)){hold(o,"original_dock_bay_bridge_or_personnel_door_not_actual");return Preparation.WAITING;}rememberBridge(data,9);data.remove("QuickPreparationR54");data.putInt("BridgeStartAmount",9);capsule.beginCabinPreparation();e.setNervLogisticsLocked(true);data.putString("Prepare",Prepare.HATCH.name());data.putInt("PrepareTicks",0);}
         if(!savedBridgeMatches(l,p,data)){hold(o,"actual_bridge_or_saved_owner_epoch_changed");return Preparation.WAITING;}
         Prepare phase=Prepare.valueOf(data.getString("Prepare"));int ticks=data.getInt("PrepareTicks");Set<UUID> own=TransportMembershipR52.members(o,Kind.OCCUPIED);
         boolean quick=data.getBoolean("QuickPreparationR54");
         int bridgeTicks=quick?NervAssemblyClocksR52.QUICK_BRIDGE_TICKS_R54:40;
-        if(quick)preopenDepartureGatesR54(l,o,p,own);
         var front=gates.get("bay_"+p.variant()+"_front");
         var recovery=frontSealRecoveryR53(phase,hasWetFloorSealR52(front),gateAtRest(l,front,true));
         if(recovery!=phase){
@@ -678,7 +677,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                     if(!fixedCarrierBayR53(l,p))gantry.setRestraintProgress(1-rise);
                     else if(gantry.getRestraintProgress()!=0)return Preparation.WAITING;
                     data.remove("DryVerified");
-                    if(accepted==p.lcl().size()&&dryBay(l,p)){if(quick)gate(l,front,true,own);if(rise==1)advance(data,Prepare.FRONT_SEAL_OPEN);}
+                    if(accepted==p.lcl().size()&&dryBay(l,p)&&rise==1)advance(data,Prepare.FRONT_SEAL_OPEN);
                 }
             }
             case LOWER_FRAME_OPEN -> {var oldGantry=gantry(l,p);if(oldGantry!=null)oldGantry.setLowerFrameProgressR52(1);advance(data,Prepare.PIT_OPEN);break;}
@@ -727,21 +726,6 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             case READY -> {return originalLaunchLock(l,p.variant(),e,capsule)&&EvaMechanicalFrameR52.active(e)?Preparation.READY:Preparation.WAITING;}
         }
         if(phase.name().equals(data.getString("Prepare")))data.putInt("PrepareTicks",ticks+1);return Preparation.WAITING;
-    }
-    private void preopenDepartureGatesR54(ServerLevel level,Original original,UnitPlant plant,Set<UUID> own)
-    {
-        var context=NervRouteRuntimeR52.flightContext(level);if(context==null)return;
-        var lease=context.pool().groundTaskR52(original);if(lease==null)return;
-        var route=directory.route(lease.route());if(route==null||route.recovery()||!context.pool().resourcesHeldR52(lease.task(),directory.resources(route)))return;
-        for(String legId:route.legs())
-        {
-            var leg=directory.leg(legId);if(leg.from().equals(route.readyNode()))break;
-            for(String id:leg.doors())
-            {
-                if(id.equals("bay_"+plant.variant()+"_front")||id.equals(servicePits.get(plant.variant())))continue;
-                var gate=gates.get(id);if(gate!=null)gate(level,gate,true,own);
-            }
-        }
     }
     @Override public boolean requiresPreparationRecoveryR53(ServerLevel l,Original o,CompoundTag data)
     {
@@ -1270,34 +1254,52 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     private boolean captureR50ReceiverR53(ServerLevel level,Original original,Route route,Leg leg,CompoundTag data)
     {
         var receiver=receivers.get(route.port());var eva=hull(level,original);
-        // A walking return that is not already physically received is routed
-        // through the original aircraft before reserving this ground job.
-        if(!route.recovery()||receiver==null||eva==null
-                ||!groundReceiverBearingReadyR53(level,original,route.port(),kind(data),data))
-            return hold(original,"original_receiver_requires_supported_air_handoff_before_capture");
-        if(carrierActuatorAdmissionR52(level,original,data)==null)return hold(original,"original_receiver_space_lease_missing");
+        if(!route.recovery()||receiver==null||eva==null||!fixed(level,receiver.supports()))return hold(original,"receiver_foundation_unavailable");
         if(!EvaMechanicalFrameR52.active(eva))
         {
-            boolean accepted;
-            if(kind(data)==Kind.HULL_ONLY_RECOVERY)
-            {var observed=preview(level,original);accepted=observed!=null&&EvaMechanicalFrameR52.captureHull(eva,original,observed.capture());}
-            else accepted=EvaMechanicalFrameR52.captureOccupiedRecovery(eva,original,occupiedPreviews.get(original.eva()));
-            if(!accepted)return hold(original,"same_original_recovery_capture_failed");
+            var binding=originalBinding(level,original,data);if(binding==null)return hold(original,"stopped_original_recovery_pose_unavailable");
+            var feet=actualFootBearingCentre(level,original,data);if(!receiver.domain().contains(feet))return hold(original,"outside_receiver_platform");
+            boolean captured;
+            if(kind(data)==Kind.HULL_ONLY_RECOVERY){var proof=preview(level,original);captured=proof!=null&&EvaMechanicalFrameR52.captureHull(eva,original,proof.capture());}
+            else captured=EvaMechanicalFrameR52.captureOccupiedRecovery(eva,original,occupiedPreviews.get(original.eva()));
+            if(!captured)return hold(original,"same_original_recovery_capture_failed");
+            data.putBoolean("ReceiverAlignmentR53",true);
+            data.remove("ReceiverBodyR53");data.remove("ReceiverHandsR53");data.putInt("ReceiverPoseTicksR53",0);
         }
-        var rack=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);
-        try
+        var binding=EvaMechanicalFrameR52.measuredBinding(eva,original);var current=EvaMechanicalFrameR52.frame(eva,1);
+        var target=directory.sample(leg,0,binding).evaRoot();double distance=current.translation().distanceTo(target.translation()),angle=current.rotationErrorDegrees(target);
+        double step=Math.min(1,Math.min(distance>.25?.25/distance:1,angle>3?3/angle:1));
+        var next=current.interpolate(target,step);
+        var from=new FootSupportFrameR52.Sample(current,current.transformPoint(binding.leftFoot()),current.transformPoint(binding.rightFoot()),current.compose(binding.plugInEva()));
+        var to=new FootSupportFrameR52.Sample(next,next.transformPoint(binding.leftFoot()),next.transformPoint(binding.rightFoot()),next.compose(binding.plugInEva()));
+        if(!EvaMechanicalFrameR52.applyVerified(eva,original,from,to))return hold(original,"receiver_alignment_original_chain_changed");
+        var rack=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);if(rack==null)return hold(original,"original_receiver_rack_unavailable");
+        boolean rackReady=NervOriginalCarrierR52.alignR50ReceiverR53(rack,CarrierMountProfileR53.read(rack,1).controllerFrame(target));
+        float rise=Math.min(1,eva.carrierRiseProgress(1)+1F/receiver.carrierTicks());eva.setCarrierRiseProgress(rise);NervOriginalCarrierR52.restoreR50RiseR53(rack,rise);
+        if(!pose(next,target)||!rackReady||rise!=1)return hold(original,"receiver_alignment_in_progress");
+        if(kind(data)==Kind.OCCUPIED&&data.getInt("ReceiverPoseTicksR53")<40)
         {
-            if(rack==null||NervOriginalCarrierR52.progress(rack,1)!=1
-                    ||!NervOriginalCarrierR52.carrierFootBearingR52(level,rack,eva,EvaMechanicalFrameR52.capturedGeometry(eva),EvaMechanicalFrameR52.frame(eva,1)))
-                return hold(original,"original_receiver_actual_sole_contact_changed");
+            if(!data.contains("ReceiverBodyR53"))
+            {
+                data.put("ReceiverBodyR53",EvaShutdownR30.encode(EvaMechanicalFrameR52.frozenLocalPose(eva)));
+                data.put("ReceiverHandsR53",EvaFrozenHandsR52.capture(eva,1));
+            }
+            int age=data.getInt("ReceiverPoseTicksR53")+1;float t=age/40F;t=t*t*(3-2*t);
+            var start=EvaBodyPose.neutralForTransportR32(eva);EvaShutdownR30.decode(data.getCompound("ReceiverBodyR53"),start);
+            var body=EvaBodyPose.blend(start,EvaBodyPose.neutralForTransportR32(eva),t);
+            var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
+            var fromHands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),data.getCompound("ReceiverHandsR53"));
+            var goalHands=EvaAnatomicalHandsR45.ordinaryReleaseTargetR52(eva.getUnitVariant(),false);
+            var joints=new java.util.LinkedHashMap<String,org.joml.Quaternionf>();
+            for(String name:fromHands.rotations().keySet())joints.put(name,new org.joml.Quaternionf(fromHands.rotations().get(name)).slerp(goalHands.rotations().get(name),t));
+            var hands=new EvaAnatomicalHandsR45.Pose(goalHands.left(),goalHands.right(),java.util.Map.copyOf(joints));
+            if(!EvaMechanicalFrameR52.applyGroundedPoseR52(eva,original,body,hands,provider.evaluate(eva.getUnitVariant(),body,hands)))return hold(original,"receiver_posture_adjustment_waiting");
+            data.putInt("ReceiverPoseTicksR53",age);if(age<40)return hold(original,"receiver_posture_adjustment_in_progress");
+            eva.stowHandsForShutdownR30();
         }
-        catch(java.io.IOException missing){return hold(original,"original_receiver_source_unavailable");}
-        // Mirror the already raised real actuator, without moving it or the load.
-        eva.setCarrierRiseProgress(1);
-        if(!captureAssembly(level,original,data))return false;data.remove("ReceiverAlignmentR53");return true;
+        if(!captureAssembly(level,original,data))return false;
+        data.remove("ReceiverAlignmentR53");return true;
     }
-
-
     @Override public boolean actualFrameMatches(ServerLevel l,Original o,FootSupportFrameR52.Sample sample,CompoundTag data){var e=hull(l,o);return e!=null&&EvaMechanicalFrameR52.active(e)&&pose(EvaMechanicalFrameR52.frame(e,1),sample.evaRoot())&&(kind(data)==Kind.HULL_ONLY_RECOVERY||plug(l,o)!=null&&pose(plug(l,o).getCanonicalTransform(),sample.plugWorld()));}
     @Override public boolean applyVerifiedWholeAssembly(ServerLevel l,Original o,FootSupportFrameR52.Sample from,FootSupportFrameR52.Sample to,CompoundTag data){if(!actualFrameMatches(l,o,from,data))return false;var e=hull(l,o);var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier==null)return !EvaMechanicalFrameR52.hasOriginalCarrierControllerR52(e)&&EvaMechanicalFrameR52.applyVerified(e,o,from,to);var route=directory.route(data.getString("RouteR52"));var binding=EvaMechanicalFrameR52.measuredBinding(e,o);DirectoryTrajectoryR52 curve=null;if(route!=null)for(int i=0;i<route.legs().size();i++){var leg=directory.leg(route.legs().get(i));int clock=data.getString("LegClockRouteR52").equals(route.id())&&data.getInt("LegClockIndexR52")==i?data.getInt("LegClockR52"):0;if(clock<0||clock>=leg.ticks())continue;double a=NervMechanicalTravelR52.fraction(clock,leg.ticks()),b=NervMechanicalTravelR52.fraction(clock+1,leg.ticks());if(pose(directory.sample(leg,a,binding).evaRoot(),from.evaRoot())&&pose(directory.sample(leg,b,binding).evaRoot(),to.evaRoot())){curve=new DirectoryTrajectoryR52(directory,leg,binding,a,b);break;}}if(curve==null)return hold(o,"actual_original_carrier_requires_same_declared_whole_assembly_curve");if(curve.leg().motion()==Motion.FOOT_BEARING_TURN)try{var spec=turnSpecR52(curve.leg(),binding);var a=turnAdmissionR52(l,o,data,curve.leg(),carrier.getUUID());if(spec==null||a==null)return false;var proof=NervTurnStationRuntimeR52.checkTurn(l,carrier,spec,a,turnOwnR52(o,kind(data),carrier.getUUID(),spec),data,curve.fromFraction(),curve.toFraction());if(proof==null||!proof.current(l)||!EvaMechanicalFrameR52.applyVerified(e,o,from,to))return false;return NervTurnStationRuntimeR52.commitTurn(l,proof,data);}catch(java.io.IOException unavailable){return false;}var members=new HashSet<>(TransportMembershipR52.members(o,kind(data)));members.add(carrier.getUUID());try{var proof=NervOriginalCarrierR52.propose(l,carrier,curve,1,1,Set.copyOf(members));if(proof==null)return hold(o,"actual_original_carrier_same_curve_sweep_or_guide_admission_held");if(!carrierSpaceCoveredR52(l,curve.leg(),proof))return hold(o,"actual_original_carrier_guide_envelope_outside_same_ground_space_lease");if(!EvaMechanicalFrameR52.applyVerified(e,o,from,to))return false;return proof.commit(l);}catch(java.io.IOException missing){return false;}}
     @Override public NervFlightProofR52.FlightPickupPreview previewFlight(ServerLevel l,Original o,Kind requested,CompoundTag data)

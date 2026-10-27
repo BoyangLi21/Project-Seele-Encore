@@ -223,7 +223,10 @@ public final class NervAirTransportRuntimeR52
             }
             var ground=ground();if(ground==null||!saved.fault().isEmpty())return status(level);var original=original(variant,commander);if(original==null)return "原 EVA、原插入栓、实际驾驶员或任务归属尚未就绪。";
             if(intent==Intent.RECOVER&&NervRouteRuntimeR52.originalForFlight(level,variant,commander)==null)return "原 EVA 的出击记录与回库承接尚未接通，原机体保持原位。";
-            if(saved.payload(original.eva())!=null)return "同一原 EVA 已有运输任务。";var eva=(EvaUnit01Entity)level.getEntity(original.eva());Kind kind=EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())?Kind.HULL_ONLY_RECOVERY:Kind.OCCUPIED;
+            if(saved.payload(original.eva())!=null)return "同一原 EVA 已有运输任务。";
+            if(intent==Intent.RECOVER&&receiverId==null&&NervRouteRuntimeR52.atRecoveryPortR54(level,variant))
+                return NervRouteRuntimeR52.recover(level,variant).message();
+            var eva=(EvaUnit01Entity)level.getEntity(original.eva());Kind kind=EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())?Kind.HULL_ONLY_RECOVERY:Kind.OCCUPIED;
             var data=new CompoundTag();data.putString("AssemblyKindR52",kind.name());data.putBoolean("Returning",intent==Intent.RECOVER);data.putString("Intent",intent.name());var preview=ground.owner().previewFlight(level,original,kind,data);if(preview==null)return "原机体须在真实支撑上停稳；空运不能替换原姿势、乘员或夹具。";
             Vec3 actualFoot=preview.root().transformPoint(preview.binding().contactCentre());var region=manifest.region(actualFoot);if(region==null)return "当前位置尚未开放空运接载。";
             var candidates=manifest.missions().values().stream().filter(m->(m.intent()==intent||intent==Intent.DELIVER&&m.intent()==Intent.FAR_MOUNTAIN)&&m.variants().contains(variant)&&m.region()==region)

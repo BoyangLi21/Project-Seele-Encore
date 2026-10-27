@@ -46,7 +46,9 @@ public final class TvMarineSiteR50
             try
             {
                 var o=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-                if(o.get("schema").getAsInt()!=50||!o.get("dimension").getAsString().equals(l.dimension().location().toString()))throw new IllegalArgumentException("Marine site identity");
+                // A shared world-root site file does not install a site in other dimensions.
+                if(!o.get("dimension").getAsString().equals(l.dimension().location().toString()))return Optional.empty();
+                if(o.get("schema").getAsInt()!=50)throw new IllegalArgumentException("Marine site identity");
                 if(!o.has("installed")||!o.get("installed").getAsBoolean())return Optional.empty();
                 var buttons=o.getAsJsonArray("cannon_controls");if(buttons.size()!=2)throw new IllegalArgumentException("Two original artillery posts required");
                 BlockPos[] controls=new BlockPos[2];for(int i=0;i<2;i++){var a=buttons.get(i).getAsJsonArray();controls[i]=new BlockPos(a.get(0).getAsInt(),a.get(1).getAsInt(),a.get(2).getAsInt());}

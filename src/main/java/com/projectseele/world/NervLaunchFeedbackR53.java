@@ -65,8 +65,8 @@ public final class NervLaunchFeedbackR53
         if(burst)
         {
             feedback.putLong("BurstAt",now);
-            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.LAUNCH_ELECTRIC_BURST_R53.get(),4F,.8F,.88F);
-            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.FACILITY.get("facility_hydraulic_launch").get(),3.6F,.75F,1F);
+            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.LAUNCH_ELECTRIC_BURST_R53.get(),8F,1.35F,.82F);
+            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.FACILITY.get("facility_hydraulic_launch").get(),7F,1.2F,.85F);
         }
         // A single startup cloud remained behind the accelerating 60 m body.
         // Emit a short continuous pressure release at the measured moving heads,
@@ -88,7 +88,7 @@ public final class NervLaunchFeedbackR53
         {
             feedback.putLong("LastFriction",now);
             FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.LAUNCH_RAIL_FRICTION_R53.get(),
-                    .6F+(float)strength*1.5F,.25F+(float)strength*.3F,.92F+(float)strength*.11F);
+                    1.4F+(float)strength*3F,.65F+(float)strength*.6F,.85F+(float)strength*.2F);
         }
     }
 
