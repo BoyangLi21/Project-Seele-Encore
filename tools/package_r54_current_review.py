@@ -171,6 +171,7 @@ def build_inputs(a):
         payload[prefix+'R54_BATCH.json']=jsonbytes(batch)
         payload[prefix+'R54_QUICKSTART.zh.md']=ROOT/'docs/R54_FRIENDS_QUICKSTART.zh.md'
         payload[prefix+'R54_REQUIREMENTS_LOG.zh.md']=ROOT/'docs/R54_REQUIREMENTS_LOG.zh.md'
+        payload[prefix+'R54_FIX2_DELIVERY_20261028.zh.md']=ROOT/'docs/R54_FIX2_DELIVERY_20261028.zh.md'
     for payload in (server,pcl):
         for n,p in payload.items():
             if isinstance(p,Path):assert p.is_file(),p
