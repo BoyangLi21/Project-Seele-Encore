@@ -147,8 +147,8 @@ def build_inputs(a):
         if (client/n).is_file():current[n]=client/n
     world_files={p.relative_to(world).as_posix():p for p in files(world,True)};world_files.update(world_lod)
     assert any(n.startswith('dimensions/projectseele/geofront/data/city_rigid_generation_r45/') for n in world_files)
-    template=a.delivery/'Project_SEELE_Encore_R53_20261025_Server.zip'
-    client_template=a.delivery/'Project_SEELE_Encore_R53_20261025_Client_PCL.zip'
+    template=a.delivery/'Project_SEELE_Encore_R54_20261028_fix2_Server.zip'
+    client_template=a.delivery/'Project_SEELE_Encore_R54_20261028_fix2_Client_PCL.zip'
     with zipfile.ZipFile(template) as z:
         server_mods={n for n in z.namelist() if n.startswith('mods/') and n.endswith('.jar')}
         server_mods.add(DH_SERVER_MOD)
