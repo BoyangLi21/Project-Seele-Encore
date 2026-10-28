@@ -16,13 +16,14 @@ final class NervOriginalCarrierRendererR52 {
   var relative=root.translation().subtract(dispatcher);poses.pushPose();poses.translate(relative.x,relative.y,relative.z);poses.mulPose(root.rotation());
   if(CarrierAssemblyR53.selected()!=null)
   {
-   if(!parked)
-   {
+   // The selected assembly owns a real stationary deck and sole bearings.
+   // Its mast retracts on the shared actuator; parked is not a visibility state.
+   // Hiding it at rise=0 exposed the equipment tray and made the mast vanish
+   // after only its declared 12 m stroke, while collision still retained it.
     boolean outlet=NervR50CarrierModeR53.launchDeckDropR53(root,0)!=0;
     poses.translate(0,NervR50CarrierModeR53.launchDeckDropR53(root,rise),0);
     CarrierAssemblyRendererR53.draw(poses,buffers,light,outlet?1:rise,outlet?NervR50CarrierModeR53.launchJawReleaseR53(rise):0,0,e.getUnitVariant(),mounting);
-   }
-   poses.popPose();if(!parked&&!mounting.supportOnly())CarrierRearGuideRendererR53.drawMoving(e,partial,poses,buffers,light,root,rise);return;
+   poses.popPose();if(!mounting.supportOnly())CarrierRearGuideRendererR53.drawMoving(e,partial,poses,buffers,light,root,rise);return;
   }
   if(parked)
   {

@@ -23,6 +23,8 @@ public final class StaffConversationScreen extends Screen
     private int x, y, panelWidth, panelHeight, tab, unit = 1, age, savedScale = -1, replyScroll, replyTop;
     private boolean restoring,scaling;
     private UUID humanPilot;
+    private final Map<Integer,String> sortieCrewR54=new LinkedHashMap<>();
+    private boolean sortieCrewInitializedR54;
     private final Map<AbstractWidget,Integer> controlRows=new LinkedHashMap<>();
     private int controlsScroll,controlsScrollMax;
     private boolean buildingControls;
@@ -57,7 +59,7 @@ public final class StaffConversationScreen extends Screen
         {
             var replacement = new StaffConversationScreen(packet);
             if (mc.screen instanceof StaffConversationScreen old)
-            { replacement.unit = old.unit; replacement.tab = packet.canCommand() ? old.tab : 0;replacement.mission=old.mission;replacement.npcSortie=old.npcSortie;replacement.sortieEquipment=old.sortieEquipment; }
+            { replacement.unit = old.unit; replacement.tab = packet.canCommand() ? old.tab : 0;replacement.mission=old.mission;replacement.npcSortie=old.npcSortie;replacement.sortieEquipment=old.sortieEquipment;replacement.sortieCrewR54.putAll(old.sortieCrewR54);replacement.sortieCrewInitializedR54=old.sortieCrewInitializedR54; }
             mc.setScreen(replacement);
             mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(com.projectseele.registry.ModSounds.STAFF_RADIO_CONNECT.get(),1,.4F));
         }
@@ -176,6 +178,7 @@ public final class StaffConversationScreen extends Screen
         }
         else if(tab==12)
         {
+            if(!sortieCrewInitializedR54){sortieCrewR54.put(1,minecraft.player.getUUID().toString());sortieCrewInitializedR54=true;}
             int half = (panelWidth - 28) / 2;
             int choice=(panelWidth-36)/4;
             String[] chapters={"sachiel","shamshel","ramiel","gaghiel"};String[] chapterNames={"萨基尔","夏姆榭尔","屋岛","港区"};
@@ -183,15 +186,17 @@ public final class StaffConversationScreen extends Screen
             {
                 String selected=chapters[i];
                 addButton((mission.equals(selected)?"● ":"")+chapterNames[i],x+12+i*(choice+4),controlsY,choice,
-                        ()->{mission=selected;send("CAMPAIGN:select:"+selected);rebuildWidgets();},permitted("campaign"));
+                        ()->{mission=selected;if(selected.equals("ramiel")){sortieCrewR54.putIfAbsent(0,"npc");String self=minecraft.player.getUUID().toString();sortieCrewR54.putIfAbsent(1,sortieCrewR54.containsValue(self)?"npc":self);}send("CAMPAIGN:select:"+selected);rebuildWidgets();},permitted("campaign"));
             }
-            for(int i=0;i<3;i++){int selection=i;addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),x+12+i*(column+4),controlsY+22,column,()->{unit=selection;rebuildWidgets();},true);}
-            addButton((!npcSortie?"● ":"")+"亲自驾驶",x+12,controlsY+44,half,()->{npcSortie=false;rebuildWidgets();},true);
-            addButton((npcSortie?"● ":"")+com.projectseele.entity.TrainingPilotEntity.pilotName(unit)+"出战",x+16+half,controlsY+44,half,()->{npcSortie=true;rebuildWidgets();},true);
-            addButton("常规出击装备："+equipmentLabel()+" / 切换",x+12,controlsY+66,panelWidth-24,()->{cycleEquipment();rebuildWidgets();},true);
-            addButton("出击 / 加入增援",x+12,controlsY+88,half,()->send(sortieRequest(mission,unit,npcSortie,sortieEquipment)),permitted("campaign"));
-            addButton("撤销当前作战",x+16+half,controlsY+88,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
-            addButton("查看所选简报",x+12,controlsY+110,half,()->send("TOPIC:campaign"),true);
+            for(int i=0;i<3;i++)
+            {
+                int selection=i;
+                addButton(com.projectseele.world.NervStaffDialogue.unitName(i)+"："+crewLabelR54(i)+" / 切换驾驶员",x+12,controlsY+22+i*22,panelWidth-24,()->{cycleCrewR54(selection);rebuildWidgets();},true);
+            }
+            addButton("常规装备："+(sortieEquipment.equals("rifle")?"步枪":"近战")+" / 切换",x+12,controlsY+88,panelWidth-24,()->{sortieEquipment=sortieEquipment.equals("rifle")?"melee":"rifle";rebuildWidgets();},true);
+            addButton("整队出击 / 加入增援",x+12,controlsY+110,half,()->send(formationRequestR54()),permitted("campaign")&&!sortieCrewR54.isEmpty());
+            addButton("撤销当前作战",x+16+half,controlsY+110,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
+            addButton("查看作战编队",x+12,controlsY+132,panelWidth-24,()->send("TOPIC:campaign"),true);
         }
         else if(tab==7)
         {
@@ -315,6 +320,29 @@ public final class StaffConversationScreen extends Screen
         }
     }
     private UUID selectedHuman(){return humanPilot!=null?humanPilot:minecraft.player.getUUID();}
+    private String crewLabelR54(int slot)
+    {
+        String selected=sortieCrewR54.get(slot);if(selected==null)return "不出战";
+        if(selected.equals("npc"))return com.projectseele.entity.TrainingPilotEntity.pilotName(slot)+"（NPC）";
+        var player=minecraft.getConnection().getPlayerInfo(UUID.fromString(selected));
+        return player==null?"离线玩家":player.getProfile().getName();
+    }
+    private void cycleCrewR54(int slot)
+    {
+        var options=new ArrayList<String>();options.add("npc");
+        minecraft.getConnection().getOnlinePlayers().stream().sorted(Comparator.comparing(p->p.getProfile().getName()))
+                .forEach(p->options.add(p.getProfile().getId().toString()));
+        int next=options.indexOf(sortieCrewR54.get(slot))+1;
+        if(next>=options.size()){sortieCrewR54.remove(slot);return;}
+        String selected=options.get(next);
+        if(!selected.equals("npc"))sortieCrewR54.values().removeIf(selected::equals);
+        sortieCrewR54.put(slot,selected);
+    }
+    private String formationRequestR54()
+    {
+        String rows=String.join(";",sortieCrewR54.entrySet().stream().sorted(Map.Entry.comparingByKey()).map(e->e.getKey()+","+e.getValue()).toList());
+        return "CAMPAIGN:formation:"+mission+":"+rows+":"+(sortieEquipment.equals("rifle")?"rifle":"melee");
+    }
     private String humanPilotName()
     {
         if(humanPilot==null||humanPilot.equals(minecraft.player.getUUID()))return "我";

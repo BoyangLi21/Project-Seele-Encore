@@ -52,6 +52,14 @@ public final class NervServiceFootDriveR52 {
   * drives rendering, persistence and this admission. */
  public static boolean clearBridge(ServerLevel l,NervCarrierPlatformEntity machine,double from,double to,Set<UUID> own)throws IOException {
   var spec=machine.declaredServiceFootDriveR52();if(spec==null||!foundationsBear(l,spec)||!Double.isFinite(from)||!Double.isFinite(to)||from<0||from>1||to<0||to>1)return false;
+  if(!NervTraversalPolicyR53.strict(l)){
+   for(int division=0;division<16;division++){
+    double a=from+(to-from)*division/16,b=from+(to-from)*(division+1)/16;
+    var first=pieces(spec,a);var last=pieces(spec,b);double error=6*1.5/.2/.2*(b-a)*(b-a)/8+.000002;
+    for(int i=0;i<first.size();i++)if(first.get(i).moving()&&!EntryPlugEjectionR48.loaded(l,first.get(i).mesh().envelope(first.get(i).frame(),last.get(i).frame()).inflate(error)))return false;
+   }
+   return true;
+  }
   // This synchronous admission never advances actors. Reuse their exact current
   // surfaces only within this call; the next admission reads every pose again.
   var actors=new IdentityHashMap<Entity,List<BoundedObstacle>>();var structure=bounded(NervPlantMotionR52.actualStructuralMeshesR52(machine));var first=pieces(spec,from);

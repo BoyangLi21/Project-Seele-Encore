@@ -227,7 +227,7 @@ public final class CarrierRearGuideMotionR53
             // is .22 m. This encloses its whole rendered path and connector.
             var cable=new AABB(eva.getUmbilicalMountPosition(),eva.getUmbilicalSocketPosition())
                 .minmax(new AABB(reel,reel)).inflate(3);
-            for(int i=0;i<a.size();i++)if(!NervTraversalPolicyR53.bypass(level)&&!a.get(i).frame().equals(b.get(i).frame())
+            for(int i=0;i<a.size();i++)if(NervTraversalPolicyR53.strict(level)&&!a.get(i).frame().equals(b.get(i).frame())
                 &&a.get(i).mesh().intersects(a.get(i).frame(),b.get(i).frame(),cable,.003))
                 return rejected(a.get(i).name()+" / actual rack power lead envelope");
         }
@@ -465,10 +465,9 @@ public final class CarrierRearGuideMotionR53
             area=area==null?bounds:area.minmax(bounds);
         }
         if(area==null)return rejected("rear_empty_motion");
-        // During authored travel the carrier/tray checks its physical body.
-        // Per-triangle articulation of rear fittings is a STRICT diagnostic;
-        // it must not stall normal transport on decorative joint meshes.
-        if(bypass||!strict&&!stopped)
+        // Authored travel and independent service actuators share the normal
+        // intersection policy; full mesh clearance remains a STRICT diagnostic.
+        if(bypass||!strict)
         {
             for(var pair:pairs)if(!EntryPlugEjectionR48.loaded(level,pair.bounds()))
                 return rejected(pair.from().name()+" / unloaded "+pair.bounds());
@@ -491,7 +490,7 @@ public final class CarrierRearGuideMotionR53
             if(!level.hasChunkAt(anchor.at()))return rejected("rear_native_support_unloaded="+anchor.at());
             if(!CarrierRearGuideR53.anchorBears(level,anchor))return rejected("rear_native_support_changed="+anchor.at());
         }
-        if(bypass)return new Result(List.copyOf(boxes),null);
+        if(bypass||!strict)return new Result(List.copyOf(boxes),null);
         var obstacles=new ArrayList<Obstacle>();var carried=new ArrayList<Obstacle>();var actual=NervOriginalCarrierR52.actualRoot(carrier,1);
         var shiftFrom=rootFrom.compose(actual.inverse());var shiftTo=rootTo.compose(actual.inverse());
         for(var actor:level.getEntities((Entity)null,area.inflate(100),e->e.isAlive()&&!e.getUUID().equals(carrier.getUUID())&&(strict||!own.contains(e.getUUID()))

@@ -355,6 +355,21 @@ public final class EvaMechanicalFrameR52
     private record ClientContinuousReceiptR52(long sequence,long receivedNanos,boolean initialSnapshot){}
     private static final Map<EvaUnit01Entity,ClientContinuousReceiptR52> CLIENT_CONTINUOUS_RECEIPTS_R52=new WeakHashMap<>();
     private static final Map<EvaUnit01Entity,ClientFrameR54> CLIENT_FRAMES_R54=new WeakHashMap<>();
+    private static final Map<EvaUnit01Entity,ClientRecoveryPoseR54> CLIENT_RECOVERY_POSES_R54=new WeakHashMap<>();
+    private static final class ClientRecoveryPoseR54
+    {
+        final MechanicalVisualClockR54 clock=new MechanicalVisualClockR54();
+        EvaBodyPose.Sample from,to;long stamp=Long.MIN_VALUE;
+        EvaBodyPose.Sample sample(EvaBodyPose.Sample target,long next,long now)
+        {
+            if(to==null||stamp!=next)
+            {
+                from=to==null?EvaBodyPose.copy(target):com.projectseele.world.NervHullGroundRecoveryR52.mix(from,to,(float)clock.fraction(now));
+                to=EvaBodyPose.copy(target);stamp=next;clock.receive(next,now);
+            }
+            return com.projectseele.world.NervHullGroundRecoveryR52.mix(from,to,(float)clock.fraction(now));
+        }
+    }
     private static final class ClientFrameR54
     {
         private final MechanicalVisualClockR54 clock=new MechanicalVisualClockR54();
@@ -452,12 +467,21 @@ public final class EvaMechanicalFrameR52
     {
         var t=eva.getEntityData().get(SAMPLE);var current=decode(t.getCompound("Current"));
         if(!eva.level().isClientSide)return current;
+        if(flightCustody(eva))
+        {
+            var carried=com.projectseele.world.NervAircraftFrameR52.renderedCargoR54(eva,partial);
+            if(carried!=null)return carried;
+        }
         synchronized(CLIENT_CONTINUOUS_R52)
         {
             var visual=CLIENT_FRAMES_R54.computeIfAbsent(eva,ignored->new ClientFrameR54());
             visual.receive(current,System.nanoTime());
             long now=MechanicalVisualClockR54.presentationTime(eva.level().getGameTime(),partial);
-            if(continuousWindowR52(eva))return visual.remember(continuousFrameR52(eva,t,current,partial),true);
+            // Received rail windows can skip ticks on a remote server. Starting
+            // each new one-tick window at its own first point jumps over the
+            // undrawn tail. Retarget from the last displayed frame instead;
+            // the attached carrier and capsule use this exact same sample.
+            if(continuousWindowR52(eva))return visual.remember(visual.sample(now),false);
             var originalCarrier=originalCarrierControllerR52(eva);
             if(originalCarrier!=null&&com.projectseele.world.NervOriginalCarrierR52.attachedTo(originalCarrier,eva)
                     &&originalCarrier.originalCarrierStateR52().getLong("At")==t.getLong("AcceptedAt")
@@ -657,7 +681,15 @@ public final class EvaMechanicalFrameR52
     public static EvaBodyPose.Sample sample(EvaUnit01Entity eva,EvaBodyPose.Sample result,float partial,CompoundTag origin)
     {
         EvaShutdownR30.decode(origin,result);
-        var recovery=eva.getEntityData().get(SAMPLE);if(eva.level().isClientSide&&!continuousWindowR52(eva)&&recovery.contains("RecoveryPreviousBodyR52")){var previous=new EvaBodyPose.Sample(result.rig);EvaShutdownR30.decode(recovery.getCompound("RecoveryPreviousBodyR52"),previous);float blend=(float)Mth.clamp(eva.level().getGameTime()-recovery.getLong("RecoveryAtR52")+(double)partial,0,1);result=com.projectseele.world.NervHullGroundRecoveryR52.mix(previous,result,blend);}
+        var recovery=eva.getEntityData().get(SAMPLE);
+        if(eva.level().isClientSide&&!continuousWindowR52(eva)&&recovery.contains("RecoveryPreviousBodyR52"))
+        {
+            // The supported body and aircraft jaws consume the same local
+            // presentation time, including delayed and batched pose packets.
+            long now=MechanicalVisualClockR54.presentationTime(eva.level().getGameTime(),partial);
+            result=CLIENT_RECOVERY_POSES_R54.computeIfAbsent(eva,ignored->new ClientRecoveryPoseR54())
+                    .sample(result,recovery.getLong("RecoveryAtR52"),now);
+        }
         var outer=new Quaternionf().rotationY((180-baseYaw(eva))*Mth.DEG_TO_RAD);
         var composed=FootSupportFrameR52.composeModelRoot(result.rig.get("root").pivot(),result.positions.get("root"),
                 result.rotations.get("root"),outer,frame(eva,partial).rotation());

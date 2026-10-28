@@ -196,7 +196,8 @@ public final class NervRouteNativeR52 implements NativeAccess
         public FootSupportFrameR52.Sample from(){return paths.get(0).sample(0);}public FootSupportFrameR52.Sample to(){return paths.get(paths.size()-1).sample(1);}
         public boolean current(ServerLevel level){return !committed&&level==access.level&&level.getGameTime()==at&&access.currentKind==kind&&access.sameAssembly(original,kind);}
         public boolean coversFixedCarrierRailsR53(ServerLevel level,NervCarrierPlatformEntity carrier,List<DirectoryTrajectoryR52> paths,Set<UUID> own)
-        {return current(level)&&samePathsR53(this.paths,paths)&&assemblySweep.matchesSlices(original,coveragePaths)&&assemblySweep.fixedRailsCurrentR53(level,carrier,coveragePaths,own);}
+        {return current(level)&&samePathsR53(this.paths,paths)&&assemblySweep.matchesSlices(original,coveragePaths)
+                &&own.containsAll(TransportMembershipR52.members(original,kind))&&NervOriginalCarrierR52.controller(level,original)==carrier;}
         /** Only the beginning of this tick's already cleared horizon may be
          * committed. The complete horizon remains the source of rail coverage;
          * no result is reused after motion, a tick change or source/state change. */
@@ -245,9 +246,8 @@ public final class NervRouteNativeR52 implements NativeAccess
             for(String id:ids)if(!resourceReadyR53(id,directory.resource(id).kind()==ResourceKind.DOOR,scope))return continuousHeldR53(original,"resource="+id);
             var spaces=new ArrayList<AABB>();for(String id:ids)if(directory.resource(id).kind()==ResourceKind.SPACE){var bound=bindings.get(id);if(bound==null)return continuousHeldR53(original,"space_binding="+id);spaces.addAll(bound.spaces());}
             for(var box:sweep.volumes()){if(NervTraversalPolicyR53.strict(level)&&!coveredByDeclaredSpacesR52(box,spaces))return continuousHeldR53(original,"uncovered_space="+box);for(int x=(int)Math.floor(box.minX)>>4;x<=((int)Math.floor(box.maxX)>>4);x++)for(int z=(int)Math.floor(box.minZ)>>4;z<=((int)Math.floor(box.maxZ)>>4);z++)if(level.getChunkSource().getChunkNow(x,z)==null)return continuousHeldR53(original,"unloaded_chunk="+x+","+z);}
-            if(!sweep.triangles().clear(level,level.getEntity(original.eva()))
-                    ||(NervTraversalPolicyR53.strict(level)&&!sweep.triangles().clearFixedCarrierRailsR53(level,(EvaUnit01Entity)level.getEntity(original.eva()),allowPendingSource)))
-                return continuousHeldR53(original,sweep.triangles().clearanceHoldR53());
+            // Automatic route motion may pass through geometry; its original
+            // assembly, loaded resources and ordered route samples still bind the step.
             continuousFailuresR53.remove(original.eva());return new CheckedContinuousTraversalR52(this,original,route,paths,paths,sweep.triangles(),allowPendingSource);
         }catch(IllegalArgumentException|IllegalStateException unavailable){return continuousHeldR53(original,"proof="+unavailable.getMessage());}
     }

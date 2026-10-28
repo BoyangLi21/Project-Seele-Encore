@@ -99,6 +99,23 @@ public final class NervStaffDialogue
                 int result=com.projectseele.event.TvCampaignDirector.select(player,text.substring("CAMPAIGN:select:".length()));
                 reply(player,npc,com.projectseele.event.TvCampaignDirector.briefing(player));return result;
             }
+            if(text.startsWith("CAMPAIGN:formation:"))
+            {
+                try
+                {
+                    String[] fields=text.split(":");if(fields.length!=5||!Set.of("rifle","melee").contains(fields[4]))return 0;
+                    var crew=new java.util.ArrayList<com.projectseele.event.TvCampaignDirector.CrewR54>();
+                    for(String row:fields[3].split(";"))
+                    {
+                        String[] choice=row.split(",");if(choice.length!=2||crew.size()>=3)return 0;
+                        boolean npcPilot=choice[1].equals("npc");
+                        crew.add(new com.projectseele.event.TvCampaignDirector.CrewR54(Integer.parseInt(choice[0]),npcPilot?player.getUUID():java.util.UUID.fromString(choice[1]),npcPilot));
+                    }
+                    int result=com.projectseele.event.TvCampaignDirector.beginFormationR54(player,fields[2],crew,fields[4].equals("rifle"));
+                    reply(player,npc,com.projectseele.event.TvCampaignDirector.briefing(player));return result;
+                }
+                catch(IllegalArgumentException invalid){reply(player,npc,"编队或驾驶员选择无效，请重新选择。");return 0;}
+            }
             if(text.startsWith("CAMPAIGN:sortie:"))
             {
                 try

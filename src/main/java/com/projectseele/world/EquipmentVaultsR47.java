@@ -186,5 +186,17 @@ public final class EquipmentVaultsR47
         }
         return false;
     }
+    /** The original mountain shield shares the existing wells' occupant-safe physical cover. */
+    public static boolean surfaceShieldLidR54(NervArmamentStationEntity station)
+    {
+        if(!(station.level() instanceof ServerLevel level)||station.payloadR47()!=7)return true;
+        int phase=station.getStationState();
+        if(Objects.equals(LID_PHASES.get(station),phase))return true;
+        List<BlockPos> lids=new ArrayList<>();
+        BlockPos centre=station.blockPosition().below();
+        for(int x=-14;x<=14;x++)for(int z=-14;z<=14;z++)lids.add(centre.offset(x,0,z));
+        updateLid(level,station,new Vault("surface-shield",7,station.getX(),station.getY(),station.getZ(),lids));
+        return phase!=NervArmamentStationEntity.CLOSING||Objects.equals(LID_PHASES.get(station),phase);
+    }
     private EquipmentVaultsR47(){}
 }

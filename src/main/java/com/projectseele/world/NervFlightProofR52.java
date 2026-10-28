@@ -429,11 +429,16 @@ public final class NervFlightProofR52
         var initialWreckShapes=captureNativeSupportR54(l,e,NervObstacleMeshesR53.body(geometry),frame);
         if(initialWreckShapes==null)return null;
         var result=new FlightPickupPreview(o,kind,binding,frame,hull,occupied,hp,geometry,anchors,surfaces,seat,half,carrierVisible,rise,release,e.recoveryRackR39(),contacts,EvaShutdownR30.encode(body),hands,EvaMechanicalFrameR52.carrierDeckTravelR52(e),detached,EvaMechanicalFrameR52.carrierFrameR52(e,1),true,initialWreckShapes);
-        result.captureActorContactsR53(l);return result;
+        if(NervTraversalPolicyR53.strict(l))result.captureActorContactsR53(l);return result;
     }
     private static Set<AABB> captureNativeSupportR54(ServerLevel level,Entity actor,
             List<NervRigidMeshSweepR52> surfaces,RigidTransform frame)
     {
+        if(!NervTraversalPolicyR53.strict(level))
+        {
+            for(var mesh:surfaces)if(!EntryPlugEjectionR48.loaded(level,mesh.envelope(frame,frame)))return null;
+            return Set.of();
+        }
         var initial=new HashSet<AABB>();
         for(var mesh:surfaces)
         {
@@ -543,7 +548,7 @@ public final class NervFlightProofR52
         {
             var sweep=prepared.sweep;var boxes=prepared.envelopes();var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return false;declared.addAll(b.spaces());}
             if(!authorizedDynamicSpacesR52(manifest,boxes,spaces,bindings))return false;
-            var own=new HashSet<UUID>();own.add(aircraft);if(movingCargo){own.addAll(preview.members());if(sweep.airframeIntersectsCargo(preview.surfaces,from.cargo(),to.cargo()))return false;}return clear(l,p,preview,from,to,sweep,boxes,declared,own,movingCargo,plan);
+            var own=new HashSet<UUID>();own.add(aircraft);if(movingCargo){own.addAll(preview.members());if(NervTraversalPolicyR53.strict(l)&&sweep.airframeIntersectsCargo(preview.surfaces,from.cargo(),to.cargo()))return false;}return clear(l,p,preview,from,to,sweep,boxes,declared,own,movingCargo,plan);
         }
         catch(IllegalArgumentException|IllegalStateException blocked){return false;}
     }
@@ -581,13 +586,13 @@ public final class NervFlightProofR52
         if(!clear(level,plane,preview,from,to,prepared.sweep,prepared.envelopes(),declared,own,true,null,canopy,false))return false;
         return !compress||!canopy.empty()&&canopy.compress();
     }
-    /** Explicit debugging skips obstacles, never source identity, loaded world
-     * coverage or the current-tick proof/lease used by the real actuators. */
+    /** Normal automatic transport permits overlap; strict diagnostics can
+     * still inspect geometry without changing actor ownership or loading. */
     private static boolean stepObstaclesClearR53(ServerLevel level,Entity aircraft,FlightPickupPreview preview,
             Frame from,Frame to,NervAirframeGeometryR52.Sweep sweep,List<AABB> envelopes,List<AABB> declared,
             Set<UUID> own,boolean movingCargo,NervRescueVegetationR53 canopy)
     {
-        if(NervTraversalPolicyR53.bypass(level))
+        if(!NervTraversalPolicyR53.strict(level))
         {
             for(var box:envelopes)
                 if(!NervAirspaceCoverageR52.covered(box,declared)||!EntryPlugEjectionR48.loaded(level,box))return false;
@@ -601,6 +606,11 @@ public final class NervFlightProofR52
     private static boolean clear(ServerLevel l,Entity p,FlightPickupPreview preview,Frame from,Frame to,NervAirframeGeometryR52.Sweep sweep,List<AABB> envelopes,List<AABB> declared,Set<UUID> own,boolean movingCargo,NervFlightGatePlanR52 plan,NervRescueVegetationR53 canopy,boolean staticBodyOnly)
     {
         if(plan!=null&&!plan.current(l))return false;
+        if(!NervTraversalPolicyR53.strict(l))
+        {
+            for(var box:envelopes)if(!EntryPlugEjectionR48.loaded(l,box))return false;
+            return true;
+        }
         // Closing the clamps leaves the captured wreck exactly where it was.
         // Its pre-existing overlap is not a new movement collision; only the
         // moving clamp/airframe is swept until extraction actually starts.

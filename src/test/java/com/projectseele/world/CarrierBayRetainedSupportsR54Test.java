@@ -6,7 +6,7 @@ import java.util.*;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.phys.*;
 
-/** The complete six original rail bearings and their shelf links fit the refit. */
+/** Original bay and adjacent-route rail bearings remain outside the moving refit. */
 public final class CarrierBayRetainedSupportsR54Test
 {
     static int checks;
@@ -19,7 +19,7 @@ public final class CarrierBayRetainedSupportsR54Test
         var profile=CarrierAssemblyR53.selected();var hardware=CarrierRearGuideR53.readHardware(EvaOriginalMeshGeometryR52.classpathBytes(CarrierRearGuideR53.HARDWARE),"bearing-refit-fixture");
         var mounting=new CarrierMountProfileR53.State(false,0,1,true);var meshes=new LinkedHashMap<String,NervRigidMeshSweepR52>();
         profile.parts().forEach((name,surface)->meshes.put(name,new NervRigidMeshSweepR52(surface.positions())));
-        check(supports.getAsJsonArray("anchors").size()==6&&supports.getAsJsonArray("cells").size()==11,"Complete three-bay bearings and their outer-platform links");
+        check(supports.getAsJsonArray("anchors").size()==21&&supports.getAsJsonArray("cells").size()==26,"Complete three-bay and adjacent-route bearings with their outer-platform links");
         for(var raw:resource(CarrierBayTrayR53.RESOURCE).getAsJsonArray("bays"))
         {
             var row=raw.getAsJsonObject();int variant=row.get("variant").getAsInt();var at=row.getAsJsonArray("root");
@@ -33,7 +33,7 @@ public final class CarrierBayRetainedSupportsR54Test
             }
             var bay=new CarrierBayTrayR53.Bay(variant,UUID.fromString(row.get("eva").getAsString()),root,BlockPos.ZERO,BlockPos.ZERO,List.of(),rails);
             var samples=new ArrayList<List<NervOriginalCarrierR52.Part>>();
-            for(float rise:new float[]{0,.9F,.95F,1})
+            for(float rise:new float[]{0,.9F,.915F,.96F,.98F,1})
             {
                 var parts=new ArrayList<NervOriginalCarrierR52.Part>();
                 for(var entry:meshes.entrySet())parts.add(new NervOriginalCarrierR52.Part(entry.getKey(),NervOriginalCarrierR52.Role.STRUCTURE,entry.getValue(),root.compose(profile.frame(entry.getKey(),rise,0,0,mounting))));
@@ -47,7 +47,7 @@ public final class CarrierBayRetainedSupportsR54Test
                 var cell=value.getAsJsonObject();if(cell.get("variant").getAsInt()!=variant)continue;
                 var p=cell.getAsJsonArray("at");var position=new BlockPos(p.get(0).getAsInt(),p.get(1).getAsInt(),p.get(2).getAsInt());var box=new AABB(position);
                 check(!CarrierBayLiftSlotsR54.contains(position),"Fixed bearing shelf cannot be treated as optional slot air");
-                for(int segment=0;segment<3;segment++)for(int i=0;i<samples.get(segment).size();i++)
+                for(int segment=0;segment+1<samples.size();segment++)for(int i=0;i<samples.get(segment).size();i++)
                 {
                     var a=samples.get(segment).get(i);var b=samples.get(segment+1).get(i);
                     check(!a.mesh().intersects(a.frame(),b.frame(),box,.003),"Restored shelf conflicts with "+a.name()+" at "+position);

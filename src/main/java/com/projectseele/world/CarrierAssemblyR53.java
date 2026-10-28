@@ -19,7 +19,7 @@ public final class CarrierAssemblyR53
     public static final float RISE_END = .9F;
     public static final String SELECTION = "eva/carrier_assembly_r53_sources.json";
     public static final String MESH = "mesh/carrier_mk2_r53.json";
-    public static final String MAST_SLOT_REVISION = "rear-slot-xneg8p6-z6p4-closed-v1";
+    public static final String MAST_SLOT_REVISION = "rear-slot-xneg15-z6p4-closed-v2";
     private static boolean checked;
     private static Profile installed;
 
@@ -167,7 +167,7 @@ public final class CarrierAssemblyR53
             require(revision.get("schema").getAsString().equals("projectseele.carrier-mast-slot.r54.v1")
                     &&revision.get("revision").getAsString().equals(MAST_SLOT_REVISION),"Declared rear service slot required");
             var cut=revision.getAsJsonObject("cut");
-            require(cut.get("min_x").getAsDouble()==-8.6&&cut.get("min_z").getAsDouble()==6.4,"Fixed original foot-isolation boundary required");
+            require(cut.get("min_x").getAsDouble()==-15&&cut.get("min_z").getAsDouble()==6.4,"Fixed original foot-isolation boundary required");
             for(String name:Set.of("deck","toe_l","toe_r"))
             {
                 var original=parts.get(name);var report=revision.getAsJsonObject("report").getAsJsonObject(name);
@@ -176,7 +176,7 @@ public final class CarrierAssemblyR53
                 require(encoded.length%24==0&&report.get("closure_triangles").getAsInt()>0,"Complete capped slot triangles required");
                 for(int i=0;i<encoded.length;i++)
                 {encoded[i]=values.get(i).getAsFloat();require(Float.isFinite(encoded[i]),"Finite rear refit vertices required");}
-                for(int i=0;i<encoded.length;i+=8)require(encoded[i]<=-8.6+1e-5||encoded[i+2]<=6.4+1e-5,"Rear vertical channel must remain clear");
+                for(int i=0;i<encoded.length;i+=8)require(encoded[i]<=-15+1e-5||encoded[i+2]<=6.4+1e-5,"Rear vertical channel must remain clear");
                 parts.put(name,new Surface(encoded,original.texture));
             }
         }

@@ -10,7 +10,7 @@ import net.minecraft.world.entity.*;
 import net.minecraft.world.phys.*;
 
 /** Original sealed capsule and native seated rider on the actual canonical
- * interpolation. No shell box, collision suppression or replacement actor. */
+ * interpolation. Service intersections are optional strict diagnostics. */
 public final class NervMappedPlugMechanicsR52
 {
     private static FullAssemblyGeometryR52.Provider sources;
@@ -33,8 +33,9 @@ public final class NervMappedPlugMechanicsR52
         if(sources==null||!NervOriginalActorsR52.managed(plug)||!plug.isHatchFullySealed()||plug.getHatchOpenAmount()!=0||plug.getAssignedVariant()!=eva.getUnitVariant()
                 ||!same(plug.getCanonicalTransform(),from)||!plug.isVehicle()||!(plug.getFirstPassenger() instanceof LivingEntity pilot)||pilot.getVehicle()!=plug)return false;
         var fleet=EvaFleetSavedData.get(l.getServer()).entry(eva.getUnitVariant()).orElse(null);if(fleet==null||!eva.getUUID().equals(fleet.canonicalId())||!plug.getUUID().equals(fleet.entryPlugId()))return false;
-        // R50 scripted service follows the original sealed capsule; full mesh sweeps remain diagnostic.
-        if(NervR50CarrierModeR53.enabled())return loaded(l,plug.getBoundingBox().move(to.translation().subtract(from.translation())));
+        // Normal automatic insertion/extraction keeps the same sealed capsule
+        // and passenger while allowing intersections along its authored motion.
+        if(!NervTraversalPolicyR53.strict(l)||NervR50CarrierModeR53.enabled())return loaded(l,plug.getBoundingBox().minmax(plug.getBoundingBox().move(to.translation().subtract(from.translation()))));
         Set<UUID> own=new HashSet<>(Set.of(eva.getUUID(),plug.getUUID(),pilot.getUUID()));if(crane!=null)own.add(crane);var meshes=CAPSULES.get(eva.getUnitVariant());
         for(var mesh:meshes){var bound=mesh.envelope(from,to);if(!loaded(l,bound))return false;for(var shape:l.getBlockCollisions(plug,bound))for(var obstacle:shape.toAabbs())if(mesh.intersects(from,to,obstacle,.003))return false;for(var entity:l.getEntities((Entity)null,bound,e->!own.contains(e.getUUID())&&e.isAlive()&&(e instanceof LivingEntity||e.canBeCollidedWith())))if(mesh.intersects(from,to,entity.getBoundingBox(),.003))return false;}
         // Existing native passenger dimensions stay world aligned. The
@@ -57,7 +58,7 @@ public final class NervMappedPlugMechanicsR52
      * rise channel is affine vertical motion, including the recovery deck. */
     public static boolean clearCarrierRise(ServerLevel l,EvaUnit01Entity eva,RigidTransform root,float from,float to,Set<UUID> own)
     {
-        if(sources==null||from<0||from>1||to<0||to>1)return false;
+        if(sources==null||!Float.isFinite(from+to)||from<0||from>1||to<0||to>1)return false;
         var selected=CarrierAssemblyR53.selected();
         if(selected!=null&&Math.min(from,to)<CarrierAssemblyR53.RISE_END&&Math.max(from,to)>CarrierAssemblyR53.RISE_END)
             return clearCarrierRise(l,eva,root,from,CarrierAssemblyR53.RISE_END,own)&&clearCarrierRise(l,eva,root,CarrierAssemblyR53.RISE_END,to,own);
@@ -69,6 +70,13 @@ public final class NervMappedPlugMechanicsR52
             var first=root.compose(selected==null?new RigidTransform(new Vec3(0,-speed*(1-from),0),0,0,0,1):selected.frame(row.getKey(),from,0,deckTravel));
             var end=root.compose(selected==null?new RigidTransform(new Vec3(0,-speed*(1-to),0),0,0,0,1):selected.frame(row.getKey(),to,0,deckTravel));var bound=mesh.envelope(first,end);
             if(!loaded(l,bound))return false;
+            if(!NervTraversalPolicyR53.strict(l))
+            {
+                if(EvaMechanicalFrameR52.carrierDeckTravelR52(eva)==64)
+                    for(var machine:l.getEntitiesOfClass(NervCarrierPlatformEntity.class,bound.inflate(80),m->m.isRestraintGantry()&&m.hasDeclaredMachineFrameR52()&&m.getUnitVariant()==eva.getUnitVariant()))
+                        if(!machine.lowerFrameDeclaredR52()||machine.lowerFrameProgressR52(1)!=1)return false;
+                continue;
+            }
             for(var shape:l.getBlockCollisions(eva,bound))for(var b:shape.toAabbs())if(mesh.intersects(first,end,b,.003))return false;
             for(var actor:l.getEntities((Entity)null,bound,e->!own.contains(e.getUUID())&&e.isAlive()&&(e instanceof LivingEntity||e.canBeCollidedWith())))if(mesh.intersects(first,end,actor.getBoundingBox(),.003))return false;
             for(var machine:l.getEntitiesOfClass(NervCarrierPlatformEntity.class,bound.inflate(80),m->m.isRestraintGantry()&&m.hasDeclaredMachineFrameR52()))
@@ -112,7 +120,7 @@ public final class NervMappedPlugMechanicsR52
     {return EvaMechanicalFrameR52.flightCustody(eva)?EvaMechanicalFrameR52.flightCarrierVisible(eva):(!EvaAirTransportR31.active(eva)||EvaMechanicalFrameR52.active(eva))&&(eva.hasActiveCarrierMotion()||EvaMechanicalFrameR52.active(eva)||EvaMechanicalFrameR52.plantCarrierDeclaredR52(eva)||eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR||eva.carrierRiseProgress(1)>.001F);}
     public static boolean clearCarrierClosure(ServerLevel level,EvaUnit01Entity eva,Collection<NervAssemblyOwnerR52.Cell> cells)
     {
-        if(sources==null)return false;if(cells.stream().allMatch(c->level.hasChunkAt(c.at())&&level.getBlockState(c.at()).equals(c.closed())))return true;
+        if(sources==null)return false;if(!NervTraversalPolicyR53.strict(level))return cells.stream().allMatch(c->level.hasChunkAt(c.at()));if(cells.stream().allMatch(c->level.hasChunkAt(c.at())&&level.getBlockState(c.at()).equals(c.closed())))return true;
         boolean visible=actualCarrierVisibleR52(eva);
         if(!visible)return true;var root=EvaMechanicalFrameR52.carrierFrameR52(eva,1);float rise=eva.carrierRiseProgress(1),release=eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR?EvaDorsalMechanism.smooth(1-(eva.getLaunchTicks()-1)/18F):0;
         var meshes=new LinkedHashMap<NervRigidMeshSweepR52,RigidTransform>();for(var row:CARRIERS.get(eva.getUnitVariant()*4+(eva.recoveryRackR39()?2:0)+(EvaMechanicalFrameR52.carrierDeckTravelR52(eva)==64?1:0)).entrySet()){String name=row.getKey();if(name.startsWith("sole_bearing_")&&EvaMechanicalFrameR52.carrierDeckTravelR52(eva)!=64)continue;double speed=name.equals("deck")?EvaMechanicalFrameR52.carrierDeckTravelR52(eva):64;var local=new RigidTransform(new Vec3(0,-speed*(1-rise),name.equals("contact_pads")?1.5F*release:0),0,0,0,1);var selected=CarrierAssemblyR53.selected();if(selected!=null)local=selected.frame(name,rise,release,NervR50CarrierModeR53.enabled()?0:EvaMechanicalFrameR52.carrierDeckTravelR52(eva));meshes.put(row.getValue(),root.compose(local));}

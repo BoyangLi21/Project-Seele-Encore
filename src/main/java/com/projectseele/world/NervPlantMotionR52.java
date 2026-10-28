@@ -114,13 +114,12 @@ public final class NervPlantMotionR52
     public static boolean clearRestraints(ServerLevel l,int variant,RigidTransform root,float before,float after,Set<UUID> own)
     {
         if(components==null||!Float.isFinite(before+after)||before<0||after<0||before>1||after>1)return false;
-        for(var c:components){if(c.motion.equals("fixed")||c.variant>=0&&c.variant!=variant)continue;var a=move(c,before);var b=move(c,after);for(var box:c.boxes){var local=box.move(a).minmax(box.move(b));var swept=NervRigidMeshSweepR52.transformed(local,root);if(!EntryPlugEjectionR48.loaded(l,swept))return false;for(var shape:l.getBlockCollisions((Entity)null,swept))for(var obstacle:shape.toAabbs())if(swept.intersects(obstacle))return false;for(var e:l.getEntities((Entity)null,swept,e->!own.contains(e.getUUID())&&e.isAlive()&&!e.isSpectator()&&(e instanceof LivingEntity||e.canBeCollidedWith())))if(swept.intersects(e.getBoundingBox()))return false;}}
+        for(var c:components){if(c.motion.equals("fixed")||c.variant>=0&&c.variant!=variant)continue;var a=move(c,before);var b=move(c,after);for(var box:c.boxes){var local=box.move(a).minmax(box.move(b));var swept=NervRigidMeshSweepR52.transformed(local,root);if(!EntryPlugEjectionR48.loaded(l,swept))return false;if(!NervTraversalPolicyR53.strict(l))continue;for(var shape:l.getBlockCollisions((Entity)null,swept))for(var obstacle:shape.toAabbs())if(swept.intersects(obstacle))return false;for(var e:l.getEntities((Entity)null,swept,e->!own.contains(e.getUUID())&&e.isAlive()&&!e.isSpectator()&&(e instanceof LivingEntity||e.canBeCollidedWith())))if(swept.intersects(e.getBoundingBox()))return false;}}
         return true;
     }
-    /** Original bridge segments change as complete owned voxel members.
-     * Both removal and extension stop for a real outside occupant; extension
-     * placement additionally goes through exact native collision checks. */
+    /** Original bridge segments keep their owned cells and loaded region;
+     * occupant intersections are checked only during strict diagnostics. */
     public static boolean clearBridgeStep(ServerLevel l,List<NervAssemblyOwnerR52.Cell> cells,Set<UUID> own)
-    {for(var c:cells){if(!l.hasChunkAt(c.at()))return false;var at=new AABB(c.at()).expandTowards(0,2,0);if(!l.getEntities((Entity)null,at,e->!own.contains(e.getUUID())&&e.isAlive()&&!e.isSpectator()&&(e instanceof LivingEntity||e.canBeCollidedWith())).isEmpty())return false;}return true;}
+    {for(var c:cells){if(!l.hasChunkAt(c.at()))return false;if(!NervTraversalPolicyR53.strict(l))continue;var at=new AABB(c.at()).expandTowards(0,2,0);if(!l.getEntities((Entity)null,at,e->!own.contains(e.getUUID())&&e.isAlive()&&!e.isSpectator()&&(e instanceof LivingEntity||e.canBeCollidedWith())).isEmpty())return false;}return true;}
     private NervPlantMotionR52(){}
 }

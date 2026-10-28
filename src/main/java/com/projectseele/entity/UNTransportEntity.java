@@ -41,7 +41,7 @@ public final class UNTransportEntity extends Entity
     {super(type,level);noPhysics=true;noCulling=true;setNoGravity(true);setInvulnerable(true);}
     @Override protected void defineSynchedData(){entityData.define(SERIAL,0);entityData.define(CARGO,false);entityData.define(KIND,0);entityData.define(CARGO_ID,-1);entityData.define(DEPLOY,0F);entityData.define(NERV,false);entityData.define(HOIST,84F);com.projectseele.world.NervAircraftFrameR52.define(entityData);}
     public float hoistDistance(){return entityData.get(HOIST);}
-    public void setHoistDistance(float length){entityData.set(HOIST,Mth.clamp(length,84,144));}
+    public void setHoistDistance(float length){entityData.set(HOIST,Mth.clamp(length,24,144));}
     public boolean isNerv(){return entityData.get(NERV);}
     public void setNerv(){entityData.set(NERV,true);}
     public void configure(int serial,boolean cargo){entityData.set(SERIAL,serial);entityData.set(CARGO,cargo);}

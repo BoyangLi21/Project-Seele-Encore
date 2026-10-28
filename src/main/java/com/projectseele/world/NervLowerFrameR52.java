@@ -106,6 +106,19 @@ public final class NervLowerFrameR52 {
     public static Set<String> measuredPeerHitsR52(double from,double to)throws IOException {var hits=new TreeSet<String>();for(int d=0;d<16;d++){double a=from+(to-from)*d/16,b=from+(to-from)*(d+1)/16;var first=pieces(a,true);var last=pieces(b,true);double error=6*6.22/.075/.075*(b-a)*(b-a)/8+.000002;for(int i=0;i<first.size();i++)for(int j=i+1;j<first.size();j++){var p=first.get(i);var q=first.get(j);if(!namedJoint(p,q,a,b)&&chordPair(p,last.get(i),q,last.get(j),error))hits.add(p.name()+" vs "+q.name());}}return Set.copyOf(hits);}
     public static boolean measuredCellHitR52(AABB localCell)throws IOException {for(var p:pieces(0))if(p.kind().equals("fixed")&&!p.name().equals("original_fixed_columns_r52")&&p.mesh().intersects(p.local(),p.local(),localCell,.003))return true;for(int tick=0;tick<OPEN_TICKS;tick++){double from=tick/(double)OPEN_TICKS,to=(tick+1)/(double)OPEN_TICKS;for(int d=0;d<16;d++){double a=from+(to-from)*d/16,b=from+(to-from)*(d+1)/16;var first=pieces(a,true);var last=pieces(b,true);double error=6*6.22/.075/.075*(b-a)*(b-a)/8+.000002;for(int i=0;i<first.size();i++)if(!first.get(i).kind().equals("fixed")&&chordBox(first.get(i),last.get(i),RigidTransform.identity(),localCell,error))return true;}}return false;}
     public static boolean clearAdvance(ServerLevel l,NervCarrierPlatformEntity machine,double from,double to,Set<UUID> own)throws IOException {
+        if(!Double.isFinite(from+to)||from<0||from>1||to<0||to>1)return false;
+        if(!NervTraversalPolicyR53.strict(l))
+        {
+            var frame=RigidTransform.of(machine.position(),machine.declaredMachineRotationR52());
+            for(int division=0;division<16;division++)
+            {
+                double a=from+(to-from)*division/16,b=from+(to-from)*(division+1)/16;
+                var first=pieces(a,true);var last=pieces(b,true);
+                double error=6*6.22/.075/.075*(b-a)*(b-a)/8+.000002;
+                for(int i=0;i<first.size();i++)if(!first.get(i).kind().equals("fixed")&&!EntryPlugEjectionR48.loaded(l,envelope(first.get(i),last.get(i),frame,error)))return false;
+            }
+            return true;
+        }
         var root=RigidTransform.of(machine.position(),machine.declaredMachineRotationR52());for(int division=0;division<16;division++){double a=from+(to-from)*division/16,b=from+(to-from)*(division+1)/16;var first=pieces(a,true);var last=pieces(b,true);double error=6*6.22/.075/.075*(b-a)*(b-a)/8+.000002;for(int index=0;index<first.size();index++){var p=first.get(index);var q=last.get(index);if(p.kind().equals("fixed"))continue;var box=envelope(p,q,root,error);if(!EntryPlugEjectionR48.loaded(l,box))return false;for(var shape:l.getBlockCollisions(machine,box))for(var obstacle:shape.toAabbs())if(chordBox(p,q,root,obstacle,error))return false;for(var actor:l.getEntities((Entity)null,box,e->!own.contains(e.getUUID())&&!e.getUUID().equals(machine.getUUID())&&e.isAlive()&&(e instanceof LivingEntity||e.canBeCollidedWith()))){var actual=NervFlightProofR52.actualObstacleMeshes(actor);if(actual==null||actual.isEmpty()){if(chordBox(p,q,root,actor.getBoundingBox(),error))return false;}else for(var m:actual)for(int i=0;i<p.rgb().length;i+=18)if(m.mesh().intersectsChord(chord(p,q,root,i),new Vec3(error,error,error),m.frame(),m.endFrame()))return false;}}
             for(int i=0;i<first.size();i++)for(int j=i+1;j<first.size();j++){var p=first.get(i);var q=first.get(j);if(namedJoint(p,q,a,b))continue;if(chordPair(p,last.get(i),q,last.get(j),error))return false;}
         }return true;

@@ -19,7 +19,7 @@ public final class NervAirTransportManifestR52
     {public Airport{occupancy=Set.copyOf(occupancy);}}
     public record Rig(float hoist,float deployment,float jaws)
     {
-        public Rig{require(Float.isFinite(hoist+deployment+jaws)&&hoist>=84&&hoist<=144&&deployment>=0&&deployment<=1&&jaws>=0&&jaws<=1,"Actual original hoist/deployment/jaw range required");}
+        public Rig{require(Float.isFinite(hoist+deployment+jaws)&&hoist>=24&&hoist<=144&&deployment>=0&&deployment<=1&&jaws>=0&&jaws<=1,"Actual original hoist/deployment/jaw range required");}
         public Rig interpolate(Rig b,double t){return new Rig((float)(hoist+(b.hoist-hoist)*t),(float)(deployment+(b.deployment-deployment)*t),(float)(jaws+(b.jaws-jaws)*t));}
     }
     public record Frame(RigidTransform plane,RigidTransform cargo,Rig rig)

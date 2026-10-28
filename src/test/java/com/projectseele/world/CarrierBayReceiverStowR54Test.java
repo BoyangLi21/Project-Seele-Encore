@@ -35,8 +35,9 @@ public final class CarrierBayReceiverStowR54Test
         for(int i=0;i<a.size();i++)
         {
             var p=a.get(i);var q=b.get(i);
-            if(p.name().contains("/ball")||p.name().contains("/lateral/"))check(p.frame().equals(q.frame()),"Side receiver remains at its independent upper stop");
-            if(p.role().equals("source_weld"))check(Math.abs(q.frame().translation().y-p.frame().translation().y-12)<1e-8,"Original mast attachment still rises 12 metres");
+            if(p.name().contains("/ball")||p.name().contains("/lateral/"))check(Math.abs(p.frame().translation().y-q.frame().translation().y)<1e-8
+                    &&Math.abs(p.frame().translation().z-q.frame().translation().z+7.5)<1e-8,"Side receiver keeps its independent upper height and follows the rear guide withdrawal");
+            if(p.role().equals("source_weld"))check(Math.abs(q.frame().translation().y-p.frame().translation().y-54)<1e-8,"Original mast attachment completes its 54 metre stroke");
         }
         if(args.length>0)
         {
@@ -48,6 +49,6 @@ public final class CarrierBayReceiverStowR54Test
             }
             for(int i=0;i<a.size();i++)for(var box:boxes)check(!a.get(i).mesh().intersects(a.get(i).frame(),b.get(i).frame(),box,.003),"Actual native personnel/tray shape still obstructs "+a.get(i).name()+" "+box);
         }
-        System.out.println("PASS R54 independent receiver stow, twelve-metre mast, finite sleeves and native side obstacles: "+checks);
+        System.out.println("PASS R54 independent receiver stow, full mast stroke, finite sleeves and native side obstacles: "+checks);
     }
 }

@@ -66,12 +66,13 @@ public final class CarrierRearGuideR53
             require(mounting.transverse()==0||parts.stream().anyMatch(p->p.role().equals("lateral_rod")),"Transverse motion requires the actual telescoping source");
             var body=mounting.bodyFrame(root,rise);
             var lifted=mounting.headLiftFrame(root,rise,lift);
-            var frames=new HashMap<String,RigidTransform>();frames.put("ROOT",body);frames.put("LIFT",lifted);
+            var frames=new HashMap<String,RigidTransform>();frames.put("ROOT",mounting.guideRootFrame(root,rise));frames.put("LIFT",lifted);
             for(var mount:mounts)frames.put(mount.name(),headFrame(lifted,mount.name(),direction));
             var result=new ArrayList<NervLegacyCarrierRideR52.Piece>();
             for(var part:CarrierMountProfileR53.rearTemplates(this,mounting))
             {
-                var frame=Objects.requireNonNull(frames.get(part.frame()));
+                var frame=mounting.shallowBay()&&(part.role().equals("source_weld")||part.name().contains("/mount/0"))
+                        ?body:Objects.requireNonNull(frames.get(part.frame()));
                 if(NervBankHeadTransferR53.slides(part.role()))frame=frame.compose(new RigidTransform(new Vec3(0,0,slide),0,0,0,1));
                 frame=CarrierMountProfileR53.transverseFrame(root,frame,part,mounting);
                 result.add(new NervLegacyCarrierRideR52.Piece(part.name(),part.mesh(),part.rgb(),frame,part.role()));

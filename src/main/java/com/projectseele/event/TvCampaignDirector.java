@@ -94,6 +94,48 @@ public final class TvCampaignDirector
     public static int begin(ServerPlayer player)
     {var level=level(player);return beginAssigned(player,1,level!=null&&selected(player,TvCampaignSavedData.get(level)).id().equals("ramiel"),false);}
     public static int beginAssigned(ServerPlayer player,int variant,boolean npc,boolean rifle)
+    {return beginAssigned(player,variant,npc,rifle,null);}
+    public record CrewR54(int unit,UUID pilot,boolean npc){}
+    public static int beginFormationR54(ServerPlayer commander,String mission,List<CrewR54> crew,boolean rifle)
+    {
+        var level=level(commander);
+        if(level==null||commander.level()!=level||!NervStaffDialogue.authorized(commander))return 0;
+        if(crew.isEmpty()||crew.size()>3)return message(commander,"请选择出战机体和驾驶员。",false);
+        var data=TvCampaignSavedData.get(level);var units=new HashSet<Integer>();var humans=new HashSet<UUID>();
+        if(!data.active.isEmpty()&&!data.active.equals(mission))return message(commander,"请先结束当前作战。",false);
+        for(var choice:crew)
+        {
+            if(choice.unit()<0||choice.unit()>2||!units.add(choice.unit()))return message(commander,"每台机体只能编入一次。",false);
+            // An active sortie accepts additions only. A reopened panel can
+            // carry local defaults; they must never replace its real pilots.
+            if(!data.active.isEmpty()&&data.sorties.containsKey(choice.unit()))continue;
+            var pilot=choice.npc()?null:level.getServer().getPlayerList().getPlayer(choice.pilot());
+            if(!choice.npc()&&(pilot==null||pilot.level()!=level||!NervStaffDialogue.authorized(pilot)||!humans.add(choice.pilot())))
+                return message(commander,"真人驾驶员需在线并位于本作战世界，每人只能驾驶一台机体。",false);
+            if(!data.active.isEmpty()&&!choice.npc()&&data.sorties.values().stream().anyMatch(s->s.unit!=choice.unit()&&!s.npc&&s.commander.equals(choice.pilot())))
+                return message(commander,"该驾驶员已驾驶另一台出战机体。",false);
+            if(StaffRecoveryR47.pending(level,choice.unit())||PilotReturnR39.pending(level,choice.unit()))return message(commander,TvSortiesR32.name(choice.unit())+"仍在回库交接。",false);
+            var eva=TvSortiesR32.unit(level,choice.unit());
+            if(eva!=null&&(TvMissionEquipmentR45.awaitingPhysicalReturn(eva)||eva.getPilotEntity()!=null
+                    &&(choice.npc()?!(eva.getPilotEntity() instanceof TrainingPilotEntity npcPilot&&npcPilot.getAssignedVariant()==choice.unit()):eva.getPilotEntity()!=pilot)))
+                return message(commander,TvSortiesR32.name(choice.unit())+"当前驾驶员或装备尚未交接。",false);
+            String blocker=TvEncounterRulesR45.formationSlotBlockerR47(level,mission,choice.unit());
+            if(!blocker.isEmpty())return message(commander,blocker,false);
+        }
+        if(!data.active.isEmpty())
+        {
+            int result=1;
+            for(var choice:crew)if(!data.sorties.containsKey(choice.unit()))
+                result&=TvSortiesR32.reinforce(choice.npc()?commander:level.getServer().getPlayerList().getPlayer(choice.pilot()),choice.unit(),choice.npc(),rifle);
+            if(result!=0)message(commander,"增援编队已接受，已出战机体保持原驾驶员。",true);
+            return result;
+        }
+        if(mission.equals("ramiel")&&!(units.contains(0)&&units.contains(1)))return message(commander,"屋岛作战需要先选定零号机与初号机的驾驶员。",false);
+        if(select(commander,mission)==0)return 0;
+        var primary=crew.stream().filter(c->c.unit()==1).findFirst().orElse(crew.get(0));
+        return beginAssigned(commander,primary.unit(),primary.npc(),rifle,List.copyOf(crew));
+    }
+    private static int beginAssigned(ServerPlayer player,int variant,boolean npc,boolean rifle,List<CrewR54> formation)
     {
         if(variant<0||variant>4||npc&&variant>2)return message(player,"NPC 驾驶员对应零号机、初号机、二号机；UN 机体可由玩家加入。",false);
         if (!NervStaffDialogue.authorized(player)) return message(player, "作战下达需要 NERV 通行权限。", false);
@@ -109,7 +151,8 @@ public final class TvCampaignDirector
         if(acceptedUnit!=null&&TvMissionEquipmentR45.awaitingPhysicalReturn(acceptedUnit))
             return message(player,"原任务炮盾仍需完成实际回收入库，不能直接编入下一场。",false);
         if(acceptedUnit!=null&&acceptedUnit.getPilotEntity()!=null
-                &&(npc?!(acceptedUnit.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==variant):acceptedUnit.getPilotEntity()!=player))
+                &&(npc?!(acceptedUnit.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==variant)
+                    :!acceptedUnit.getPilotEntity().getUUID().equals(formation==null?player.getUUID():formation.stream().filter(c->c.unit()==variant).findFirst().orElseThrow().pilot())))
             return message(player,"这台机体已有其他驾驶员。请确认当前驾驶员安排后再编入。",false);
         if(Set.of("cancel","failure","combat_victory").contains(data.phase)||data.targetDeathConfirmedR45)
             return message(player,"当前行动等待恢复或交接，不能追加出击或隐式重新发射。",false);
@@ -117,7 +160,7 @@ public final class TvCampaignDirector
         if (!chapter.playable()) return message(player, "这一章仍在准备中。", false);
         if(SurfaceAngelPlanR52.handles(level,chapter.id()))
         {String blocker=SurfaceAngelPlanR52.startBlocker(level,chapter.id());if(!blocker.isEmpty())return message(player,blocker,false);}
-        if(chapter.id().equals("ramiel"))
+        if(chapter.id().equals("ramiel")&&formation==null)
         {String blocker=yashimaDefaultFormationBlocker(level,variant);if(!blocker.isEmpty())return message(player,blocker,false);}
         if(TvEncounterRulesR45.handles(chapter.id()))
         {
@@ -130,8 +173,9 @@ public final class TvCampaignDirector
         data.generationR43++;
         data.episodeStateR45="";data.equipmentReturnedR45=false;data.targetDeathConfirmedR45=false;
         data.owner = player.getUUID(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = "出击编成："+TvSortiesR32.name(variant)+" · "+(npc?TrainingPilotEntity.pilotName(variant):"司令亲自驾驶"); data.angel = null; data.lastPosition = null; data.setDirty();
-        data.assign(variant,player.getUUID(),npc,npc&&rifle);
-        if(chapter.id().equals("ramiel"))
+        if(formation!=null)for(var choice:formation)data.assign(choice.unit(),choice.npc()?player.getUUID():choice.pilot(),choice.npc(),choice.npc()&&rifle);
+        else data.assign(variant,player.getUUID(),npc,npc&&rifle);
+        if(chapter.id().equals("ramiel")&&formation==null)
             for(int unit:new int[]{0,1})if(!data.sorties.containsKey(unit))data.assign(unit,player.getUUID(),true,false);
         data.rayPreloadCursorR45=data.missingTicksR45=0;
         data.encounterSiteR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::id).orElse("");

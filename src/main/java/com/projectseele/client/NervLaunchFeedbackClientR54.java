@@ -35,16 +35,16 @@ public final class NervLaunchFeedbackClientR54
             // The measured facets are pressed against steel. Release the
             // visible plume beyond that contact instead of inside the bearing.
             Vec3 nozzle=point.add(outward.scale(3.5)).add(tangent.scale(-1.5));
-            int clouds=packet.burst()?12:4;
+            int clouds=packet.burst()?28:8;
             for(int i=0;i<clouds;i++)
             {
                 var origin=nozzle.add((random.nextDouble()-.5)*2.8,(random.nextDouble()-.5)*1.8,(random.nextDouble()-.5)*2.8);
                 Vec3 jet=outward.scale(.7+random.nextDouble()*.6).add(tangent.scale(-(.7+strength*1.2)));
                 var particle=mc.particleEngine.createParticle(ParticleTypes.CLOUD,origin.x,origin.y,origin.z,jet.x,jet.y,jet.z);
                 // createParticle already enqueues the instance in ParticleEngine.
-                if(particle!=null){particle.scale(packet.burst()?36F:28F);particle.setColor(.94F,.97F,1F);particle.setLifetime(packet.burst()?36:28);}
+                if(particle!=null){particle.scale(packet.burst()?60F:42F);particle.setColor(.94F,.97F,1F);particle.setLifetime(packet.burst()?55:38);}
             }
-            int sparks=packet.burst()?16:3+(int)(strength*5);
+            int sparks=packet.burst()?32:6+(int)(strength*8);
             for(int i=0;i<sparks;i++)
             {
                 var velocity=outward.scale(.35).add(tangent.scale(-(.8+strength*2.2))).add((random.nextDouble()-.5)*.7,(random.nextDouble()-.5)*.7,(random.nextDouble()-.5)*.7);

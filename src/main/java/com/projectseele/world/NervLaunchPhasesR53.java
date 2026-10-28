@@ -23,14 +23,16 @@ public final class NervLaunchPhasesR53
             if(data.getCompound("ContinuousClockR52").getDouble("SpeedMps")!=0)throw new IllegalStateException("New phase authority cannot replace a moving clock");
             tag=new CompoundTag();tag.putInt("Version",1);tag.putUUID("Task",task);tag.putString("Directory",directory.fingerprint());tag.putString("Route",route.id());
             Stage initial=route.recovery()?(at>ready?Stage.RETURN_TRANSFER:Stage.DESCENT):Stage.PRELAUNCH;
-            tag.putString("Stage",initial.name());data.put(KEY,tag);
+            tag.putString("Stage",initial.name());tag.putBoolean("NormalTransferR54",true);data.put(KEY,tag);
         }
         if(tag.getInt("Version")!=1||!tag.hasUUID("Task")||!tag.getUUID("Task").equals(task)||!tag.getString("Directory").equals(directory.fingerprint())||!tag.getString("Route").equals(route.id()))throw new IllegalStateException("Original task/phase/directory authority changed");
         Stage stage=Stage.valueOf(tag.getString("Stage"));boolean bank=stage==Stage.PRELAUNCH||stage==Stage.DESCENT;
         if(route.recovery()!=(stage==Stage.DESCENT||stage==Stage.RETURN_TRANSFER)||at<0||at>total||bank&&at>ready+1e-6||!bank&&at<ready-1e-6)throw new IllegalStateException("Actual distance is outside its persisted motion phase");
         boolean transfer=stage==Stage.PRELAUNCH||stage==Stage.RETURN_TRANSFER;
         var speed=transfer?route.motionProfile().prelaunch():route.motionProfile().launch();
-        if(transfer)speed=new NervRouteDirectoryR52.SpeedProfile(speed.cruiseMps()*4,speed.accelerationMps2()*16,speed.decelerationMps2()*16);
+        // Existing saved jobs retain the profile with which their clock was
+        // created. New jobs use the original normal-speed transfer.
+        if(transfer&&!tag.getBoolean("NormalTransferR54"))speed=new NervRouteDirectoryR52.SpeedProfile(speed.cruiseMps()*4,speed.accelerationMps2()*16,speed.decelerationMps2()*16);
         return new Run(stage,bank?ready:total,speed);
     }
     /** A complete native distance clock is necessary; a request flag cannot skip the stop. */

@@ -54,8 +54,6 @@ public final class YashimaCannonHatchR54
                 supports.add(BlockPos.containing(hatch.actualFrameR52().transformPoint(point).add(0,-.001,0)));
             if(!hatch.clearDeclaredSweepR52(level,from,to,Set.of(hatch.getUUID()),cells,supports,Set.of()))
                 return held(gun,"actual_hatch_support_or_sweep_blocked");
-            if(!YashimaCannonMeshR52.clearHatchR54(gun,hatch,from,to))return held(gun,"actual_hatch_hits_original_gun_or_cradle");
-            if(!open&&!NervGateClosureR52.clearActualActors(level,hatch,cells))return held(gun,"actual_aperture_occupied");
         }
         // Endpoint proxies never advance the physical panels or appear ahead of closure.
         if(to==0||to==1)

@@ -7,7 +7,7 @@ import net.minecraft.world.phys.*;
 /** Two source-box bridge rails descend into the rear equipment slot. */
 public final class CarrierBayLiftRailsR54
 {
-    public static final double START = 6, END = 19, DROP = 12;
+    public static final double START = 6, END = 23, DROP = CarrierMountProfileR53.SUBMERGED_BAY_STROKE;
     private static final Map<CarrierBayTrayR53.Bay,List<NervLegacyCarrierRideR52.Piece>> SOURCE = new IdentityHashMap<>();
 
     public static double drop(float rise)

@@ -178,17 +178,14 @@ public final class CarrierTransferRailsR53
                                          Set<UUID> own, Set<BlockPos> moving, Set<BlockPos> supports)
     {
         var source = selected();if (source == null) return true;
-        if (door.actualOpenProgressR52() != from) return false;
+        if (door.actualOpenProgressR52() != from || !Float.isFinite(to) || to < 0 || to > 1) return false;
         var a0 = bridgeParts(door, from);if (a0.isEmpty()) return true;
         var knots = new ArrayList<Float>();knots.add(from);
         for (float k : new float[]{.9F, .95F}) if (k > Math.min(from, to) && k < Math.max(from, to)) knots.add(k);
         knots.add(to);knots.sort(from <= to ? Comparator.naturalOrder() : Comparator.reverseOrder());
-        var geo = door.declaredGeometryR52();var gateFrame = door.actualFrameR52();
-        var fixed = CarrierRearGuideR53.fixed();
+        var gateFrame = door.actualFrameR52();
         for (var anchor : gateSupportAnchors(source,gateFrame))
             if (!CarrierRearGuideR53.anchorBears(level, anchor)) return false;
-        for (var rail : fixed.index().query(geo.sweptBounds(gateFrame, from, to)))
-            if (geo.intersects(gateFrame, from, to, rail.steel().mesh(), rail.steel().frame())) return false;
         for (int k = 0; k + 1 < knots.size(); k++)
         {
             float p = knots.get(k), q = knots.get(k + 1);
@@ -198,33 +195,7 @@ public final class CarrierTransferRailsR53
             {
                 var first = a.get(i).steel();var last = b.get(i).steel();
                 var bounds = first.mesh().envelope(first.frame(), last.frame());
-                if (!EntryPlugEjectionR48.loaded(level, bounds)
-                        || geo.intersects(gateFrame, p, q, first.mesh(), first.frame(), last.frame())) return false;
-                for (var at : BlockPos.betweenClosed(BlockPos.containing(bounds.minX, bounds.minY, bounds.minZ),
-                                                     BlockPos.containing(bounds.maxX, bounds.maxY, bounds.maxZ)))
-                {
-                    if (moving.contains(at)) continue;
-                    for (var box : level.getBlockState(at).getCollisionShape(level, at, CollisionContext.of(door)).toAabbs())
-                        if (first.mesh().intersects(first.frame(), last.frame(), box.move(at), .003)) return false;
-                }
-                for (var actor : level.getEntities(door, bounds.inflate(100), e -> e.isAlive() && !e.isSpectator()))
-                {
-                    var meshes = NervFlightProofR52.actualObstacleMeshes(actor);
-                    if (meshes == null || meshes.isEmpty())
-                    { if (first.mesh().intersects(first.frame(), last.frame(), actor.getBoundingBox(), .003)) return false; }
-                    else for (var mesh : meshes)
-                        if (first.mesh().intersects(first.frame(), last.frame(), mesh.mesh(), mesh.frame(), mesh.endFrame(), .003, Vec3.ZERO)) return false;
-                }
-                for (var rail : fixed.index().query(bounds.inflate(.003)))
-                    if (!separated(first, last, rail.steel(), rail.steel())
-                            && first.mesh().intersects(first.frame(), last.frame(), rail.steel().mesh(), rail.steel().frame(), rail.steel().frame(), .003, Vec3.ZERO)) return false;
-                for (int j = i + 1; j < a.size(); j++)
-                {
-                    var r = a.get(j).steel();var s = b.get(j).steel();
-                    if (NervAirTransportManifestR52.same(first.frame().inverse().compose(r.frame()), last.frame().inverse().compose(s.frame()))) continue;
-                    if (!separated(first, last, r, s)
-                            && first.mesh().intersects(first.frame(), last.frame(), r.mesh(), r.frame(), s.frame(), .003, Vec3.ZERO)) return false;
-                }
+                if (!EntryPlugEjectionR48.loaded(level, bounds)) return false;
             }
         }
         return true;

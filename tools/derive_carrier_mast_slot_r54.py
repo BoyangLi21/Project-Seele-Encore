@@ -1,12 +1,12 @@
 """Finite original deck/toe rear-slot refit; keep all source vertices ahead of Z6.4."""
-import sys,json
+import sys,json,argparse,zipfile
 from pathlib import Path
 ROOT=Path(__file__).resolve().parents[1]
 sys.path.append(str(ROOT/'.Codex/geometry-deps'))
 import shapely
 from shapely.geometry import LineString,box
 from shapely.ops import polygonize,polygonize_full,unary_union
-X,Z=-8.6,6.4
+X,Z=-15,6.4
 SOURCE=ROOT/'build/resources/main/assets/projectseele/mesh/carrier_mk2_r53.json'
 OUT=ROOT/'src/main/resources/assets/projectseele/mesh/carrier_mast_slot_r54.json'
 
@@ -91,7 +91,11 @@ def derive(encoded,open_toe_shell=False):
  return [q for v in result for q in v],dict(original_triangles=len(tris),derived_triangles=len(result)//3,closure_triangles=caps,closure_area=areas,untouched_front_triangles=len(original_front))
 
 def main():
- source=json.loads(SOURCE.read_text('utf8'));parts={};report={}
+ parser=argparse.ArgumentParser();parser.add_argument('--jar',type=Path);args=parser.parse_args()
+ if args.jar:
+  with zipfile.ZipFile(args.jar) as archive:source=json.loads(archive.read('assets/projectseele/mesh/carrier_mk2_r53.json'))
+ else:source=json.loads(SOURCE.read_text('utf8'))
+ parts={};report={}
  for name in ['deck','toe_l','toe_r']:parts[name],report[name]=derive(source['parts'][name],name.startswith('toe_'))
  # The retired rear right foot sat inside the mast channel. Both replacement
  # rear bearing shoes now land on the fixed front rail, directly below the
@@ -103,6 +107,6 @@ def main():
   for corners,normal in [([0,4,6,2],[-1,0,0]),([1,3,7,5],[1,0,0]),([0,1,5,4],[0,-1,0]),([2,6,7,3],[0,1,0]),([0,2,3,1],[0,0,-1]),([4,5,7,6],[0,0,1])]:
    for idx in [0,1,2,0,2,3]:parts['deck']+=verts[corners[idx]]+[0.,0.]+normal
  report['deck']['derived_triangles']+=24;report['deck']['new_closed_support_shoes']=shoes
- doc=dict(schema='projectseele.carrier-mast-slot.r54.v1',revision='rear-slot-xneg8p6-z6p4-closed-v1',source=source['schema'],cut=dict(min_x=X,min_z=Z,vertical='through',six_sole_pad_max_z=5.559728145599365),parts=parts,report=report)
+ doc=dict(schema='projectseele.carrier-mast-slot.r54.v1',revision='rear-slot-xneg15-z6p4-closed-v2',source=source['schema'],cut=dict(min_x=X,min_z=Z,vertical='through',six_sole_pad_max_z=5.559728145599365),parts=parts,report=report)
  OUT.parent.mkdir(parents=True,exist_ok=True);OUT.write_text(json.dumps(doc,separators=(',',':')),'utf8');print(json.dumps(report))
 if __name__=='__main__':main()

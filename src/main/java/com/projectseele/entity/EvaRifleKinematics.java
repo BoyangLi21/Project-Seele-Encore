@@ -94,6 +94,15 @@ public final class EvaRifleKinematics
         Vec3 pocket=shoulder.add(bodyRight.scale(lateralOffset)).add(bodyForward.scale(forwardOffset)).add(0,pocketY,0);
         Vector3f headPoint=new Matrix4f(world).mul(body.matrix("head")).transformPosition(new Vector3f(body.rig.get("head").pivot()));
         Vec3 joint=new Vec3(headPoint.x,headPoint.y,headPoint.z);
+        // Keep the carry offset in the aim frame while the chassis catches up
+        // with a turn. Otherwise the fixed chest offset crosses the pilot's
+        // sight line and the same rifle drifts from the right to screen centre.
+        Vec3 horizontalAim=new Vec3(optical.x,0,optical.z);
+        if(horizontalAim.lengthSqr()>1e-6&&bodyForward.lengthSqr()>1e-6)
+        {
+            var turn=new Quaternionf().rotationTo(bodyForward.toVector3f(),horizontalAim.normalize().toVector3f());
+            pocket=joint.add(new Vec3(turn.transform(pocket.subtract(joint).toVector3f())));
+        }
         Vector3f eyeLocal=EvaBodyPose.eyePoint(entity).sub(body.rig.get("head").pivot()).mul(EvaScale.RENDER_SCALE);
         Quaternionf baseHead=facing(optical),head=new Quaternionf(baseHead);
         Vector3f initialEye=baseHead.transform(new Vector3f(eyeLocal));

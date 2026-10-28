@@ -177,7 +177,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
             GeckoLibUtil.createInstanceCache(this);
     private RigidTransform clientPreviousRotation = RigidTransform.identity();
     private RigidTransform clientCurrentRotation = RigidTransform.identity();
-    private int clientRotationUpdateTick = Integer.MIN_VALUE;
+    private final MechanicalVisualClockR54 clientPoseClock=new MechanicalVisualClockR54();
+    private long clientPoseRevision;
     private Vec3 clientPreviousPosePosition=Vec3.ZERO;
     private Vec3 clientCurrentPosePosition=Vec3.ZERO;
     private boolean clientPoseInitialized;
@@ -306,10 +307,12 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         {
             return this.getCanonicalTransform().rotation();
         }
-        if (this.tickCount != this.clientRotationUpdateTick)
-        {
-            return this.clientCurrentRotation.rotation();
-        }
+        float alpha=(float)this.clientPoseClock.fraction(MechanicalVisualClockR54.presentationTime(this.level().getGameTime(),partialTick));
+        return this.clientPoseRotation(alpha);
+    }
+
+    private Quaternionf clientPoseRotation(float alpha)
+    {
         /*
          * The dock and socket frames cross the quaternion hemisphere seam
          * near the first insertion movement.  Canonical persistence keeps
@@ -327,7 +330,6 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         {
             current.set(-current.x, -current.y, -current.z, -current.w);
         }
-        float alpha = Mth.clamp(partialTick, 0.0F, 1.0F);
         return new Quaternionf(
                 Mth.lerp(alpha, previous.x, current.x),
                 Mth.lerp(alpha, previous.y, current.y),
@@ -345,12 +347,11 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         {
             return this.getCanonicalTransform();
         }
-        float alpha = Mth.clamp(partialTick, 0.0F, 1.0F);
+        float alpha=(float)this.clientPoseClock.fraction(MechanicalVisualClockR54.presentationTime(this.level().getGameTime(),partialTick));
         // A vehicle correction can change vanilla position history after the
         // pose packet. The shell, hatch and cabin instead share this stream.
         Vec3 translation=!clientPoseInitialized?getCanonicalTransform().translation()
-                :this.tickCount==clientRotationUpdateTick?clientPreviousPosePosition.lerp(clientCurrentPosePosition,alpha)
-                :clientCurrentPosePosition;
+                :clientPreviousPosePosition.lerp(clientCurrentPosePosition,alpha);
         Quaternionf rotation = this.getCanonicalRotation(partialTick);
         return new RigidTransform(translation, rotation.x, rotation.y,
                 rotation.z, rotation.w);
@@ -691,10 +692,15 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public void unlockFromEva()
     {
         if(this.level().isClientSide)return;
+        RigidTransform seated=this.getVehicle() instanceof EvaUnit01Entity host
+                ?EntryPlugKinematics.lockedTransform(host,0):this.getCanonicalTransform();
         if (this.getVehicle() instanceof EvaUnit01Entity)
         {
             this.stopRiding();
         }
+        // Vanilla dismount moves a passenger to the vehicle's feet. Extraction
+        // starts at the existing neck socket, before the shell becomes visible.
+        this.snapCanonicalTransformR31(seated);
         this.hostEvaUuid = null;
         this.entityData.set(DATA_HOST_EVA_ID, -1);
         this.entityData.set(DATA_SHELL_VISIBLE, true);
@@ -1917,29 +1923,26 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         if(!this.hasCanonicalPose()||!poseChanged&&!hard)return;
         RigidTransform pose=this.getCanonicalTransform();
         RigidTransform rotation=new RigidTransform(Vec3.ZERO,pose.qx(),pose.qy(),pose.qz(),pose.qw());
+        long now=System.nanoTime();
         if(hard||!this.clientPoseInitialized)
         {
             this.clientPreviousPosePosition=this.clientCurrentPosePosition=pose.translation();
             this.clientPreviousRotation=this.clientCurrentRotation=rotation;
-            this.clientRotationUpdateTick=Integer.MIN_VALUE;
             this.setPos(pose.translation());this.lerpSteps=0;
             this.xo=this.xOld=this.getX();this.yo=this.yOld=this.getY();this.zo=this.zOld=this.getZ();
             this.clientPoseInitialized=true;
         }
         else
         {
-            // Several complete batches can arrive in one client tick. They
-            // replace one target while retaining the same tick-start sample.
-            if(this.clientRotationUpdateTick!=this.tickCount)
-            {
-                this.clientPreviousPosePosition=this.clientCurrentPosePosition;
-                this.clientPreviousRotation=this.clientCurrentRotation;
-            }
+            // Continue from the pose already displayed when packets bunch up.
+            float alpha=(float)this.clientPoseClock.fraction(now);
+            this.clientPreviousPosePosition=this.clientPreviousPosePosition.lerp(this.clientCurrentPosePosition,alpha);
+            this.clientPreviousRotation=RigidTransform.of(Vec3.ZERO,this.clientPoseRotation(alpha));
             this.clientCurrentPosePosition=pose.translation();this.clientCurrentRotation=rotation;
-            this.clientRotationUpdateTick=this.tickCount;
             this.setPos(pose.translation());this.lerpSteps=0;
             this.xo=this.clientPreviousPosePosition.x;this.yo=this.clientPreviousPosePosition.y;this.zo=this.clientPreviousPosePosition.z;
         }
+        this.clientPoseClock.receive(++this.clientPoseRevision,now);
         for(Entity passenger:this.getPassengers())this.positionRider(passenger,Entity::setPos);
     }
 

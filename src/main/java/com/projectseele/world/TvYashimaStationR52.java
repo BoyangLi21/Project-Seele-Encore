@@ -155,6 +155,8 @@ public final class TvYashimaStationR52
     }
     private static void bind(EvaUnit01Entity eva,YashimaCannonEntityR52 gun)
     {gun.getPersistentData().putUUID("OperatingEvaR52",eva.getUUID());eva.bindFixedCannonR52(gun.getId(),true);}
+    private static boolean aligned(EvaUnit01Entity eva,Plan p)
+    {return Math.abs(net.minecraft.util.Mth.wrapDegrees(p.yaw()-eva.getYRot()))<=1;}
     private static void release(EvaUnit01Entity eva,YashimaCannonEntityR52 gun)
     {gun.getPersistentData().remove("OperatingEvaR52");eva.bindFixedCannonR52(gun.getId(),false);eva.suspendFixedCannonR52();}
     /** Both human release and NPC fire gates use complete prone posture, original grips and the real mounted bore. */
@@ -244,13 +246,22 @@ public final class TvYashimaStationR52
             else
             {
                 operating.bindFixedCannonR52(gun.getId(),true);
-                if(!operating.isPilotProne())
+                if(!aligned(operating,p))
                 {
-                    operating.setYRot(net.minecraft.util.Mth.approachDegrees(operating.getYRot(),p.yaw(),4));operating.yBodyRot=operating.yHeadRot=operating.getYRot();
-                    if(Math.abs(net.minecraft.util.Mth.wrapDegrees(p.yaw()-operating.getYRot()))>1)return;
+                    // Keep the accepted pilot and gun while the existing
+                    // stance transition raises a misaligned prone chassis.
+                    operating.fixedCannonProneR52(operating.getPilotEntity(),false);
+                    if(operating.rifleStanceLevel(0)<.05F)
+                    {
+                        operating.setYRot(net.minecraft.util.Mth.approachDegrees(operating.getYRot(),p.yaw(),4));
+                        operating.yBodyRot=operating.yHeadRot=operating.getYRot();
+                    }
                 }
-                operating.fixedCannonProneR52(operating.getPilotEntity(),true);
-                if(operating.isPilotProne()&&operating.rifleProneBlend(0)>.99)aim(operating,operating.fixedCannonAimTargetR52(operating.getPilotEntity()));
+                else
+                {
+                    operating.fixedCannonProneR52(operating.getPilotEntity(),true);
+                    if(operating.isPilotProne()&&operating.rifleStanceLevel(0)>2.99F)aim(operating,operating.fixedCannonAimTargetR52(operating.getPilotEntity()));
+                }
             }
         }
         advance(level,p,gun,hatch,!active&&gun.loadedR52());

@@ -92,6 +92,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
     private float clientDoor;
     private float clientDoorO;
     private boolean deployQueued;
+    private boolean surfaceStateInitializedR54;
 
     public NervArmamentStationEntity(
             EntityType<? extends NervArmamentStationEntity> type, Level level)
@@ -358,7 +359,7 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
             return false;
         }
         if(com.projectseele.world.TvMissionEquipmentR45.surfaceSupplyRackR50(this))
-        {this.deployQueued=true;this.maintainSurfaceSupplyR50();return this.isStocked();}
+        {this.surfaceStateInitializedR54=true;this.deployQueued=true;this.maintainSurfaceSupplyR50();return this.isStocked();}
         if(this.payloadR47()!=EvaUnit01Entity.WEAPON_RIFLE&&!this.isStocked())return false;
         if (this.getStationState() == EMPTY
                 || this.getStationState() == DOOR_CLOSING
@@ -451,16 +452,42 @@ public final class NervArmamentStationEntity extends Entity implements com.proje
         if(!com.projectseele.world.TvMissionEquipmentR45.commissionNewSupply(this,unit,receipt))return false;
         this.entityData.set(DATA_STOCKED,true);return true;
     }
-    /** Surface racks have no underground well; only their front doors move. */
+    /** The mountain shield uses its well; the original fixed-gun source stays at its service level. */
     private void maintainSurfaceSupplyR50()
     {
         boolean stocked=com.projectseele.world.TvMissionEquipmentR45.physicalStockPresent(this);
-        this.entityData.set(DATA_STOCKED,stocked);this.setLift(1F);this.setHatch(1F);
-        if(!stocked)this.deployQueued=false;
+        this.entityData.set(DATA_STOCKED,stocked);
+        var mission=com.projectseele.world.TvCampaignSavedData.get((ServerLevel)this.level());
+        if(!stocked||java.util.Set.of("cancel","failure","combat_victory","episode_archived").contains(mission.phase)
+                ||!surfaceStateInitializedR54&&mission.active.isEmpty())this.deployQueued=false;
+        surfaceStateInitializedR54=true;
         boolean open=stocked&&this.deployQueued;
-        float door=Mth.clamp(this.entityData.get(DATA_DOOR)+(open?1F:-1F)/DOOR_TICKS,0F,1F);
-        this.setDoor(door);
-        this.entityData.set(DATA_STATE,door==1?READY:door==0?STOWED:open?DOOR_OPENING:DOOR_CLOSING);
+        if(this.payloadR47()!=7)
+        {
+            this.setLift(1F);this.setHatch(1F);
+            float door=Mth.clamp(this.entityData.get(DATA_DOOR)+(open?1F:-1F)/DOOR_TICKS,0F,1F);
+            this.setDoor(door);
+            this.entityData.set(DATA_STATE,door==1?READY:door==0?STOWED:open?DOOR_OPENING:DOOR_CLOSING);
+            this.phaseTicks=0;return;
+        }
+        if(!com.projectseele.world.EquipmentVaultsR47.surfaceShieldLidR54(this))return;
+        float door=this.entityData.get(DATA_DOOR),lift=this.entityData.get(DATA_LIFT),hatch=this.entityData.get(DATA_HATCH);
+        if(open)
+        {
+            hatch=Mth.clamp(hatch+1F/HATCH_TICKS,0,1);
+            if(hatch>=1)lift=Mth.clamp(lift+1F/RISE_TICKS,0,1);
+            if(lift>=1)door=Mth.clamp(door+1F/DOOR_TICKS,0,1);
+        }
+        else
+        {
+            door=Mth.clamp(door-1F/DOOR_TICKS,0,1);
+            if(door<=0)lift=Mth.clamp(lift-1F/LOWER_TICKS,0,1);
+            if(lift<=0)hatch=Mth.clamp(hatch-1F/HATCH_TICKS,0,1);
+        }
+        this.setDoor(door);this.setLift(lift);this.setHatch(hatch);
+        this.entityData.set(DATA_STATE,open?(hatch<1?OPENING:lift<1?RISING:door<1?DOOR_OPENING:READY)
+                :(door>0?DOOR_CLOSING:lift>0?LOWERING:hatch>0?CLOSING:STOWED));
+        com.projectseele.world.EquipmentVaultsR47.surfaceShieldLidR54(this);
         this.phaseTicks=0;
     }
     /** Atomic fixed-gun transfer updates this same finite rack's display without replenishing a payload. */

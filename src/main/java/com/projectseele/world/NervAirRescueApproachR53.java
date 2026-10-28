@@ -32,7 +32,7 @@ public final class NervAirRescueApproachR53
             data.put("RescueObservedHandsR53",preview.handSnapshotR52());
         }
         if(data.getBoolean("RescuePlannedR53"))return "";
-        String precheckMode=NervTraversalPolicyR53.mode(level).name();
+        String precheckMode=NervTraversalPolicyR53.strict(level)?"STRICT":"OVERLAP_R54";
         if(!precheckMode.equals(data.getString("RescuePrecheckModeR53")))
         {
             data.remove("RescueSearchR53");data.remove("RescueRejectedR53");
@@ -78,7 +78,7 @@ public final class NervAirRescueApproachR53
             if(!loaded(level,aircraft))
             {data.putInt("RescueSearchR53",cursor);return "正在载入附近起吊区域";}
             boolean aircraftClear=true;
-            if(!NervTraversalPolicyR53.bypass(level))for(var shape:level.getBlockCollisions(eva,aircraft))
+            if(NervTraversalPolicyR53.strict(level))for(var shape:level.getBlockCollisions(eva,aircraft))
             {
                 for(var obstacle:shape.toAabbs())if(aircraftSweep.intersects(obstacle)){aircraftClear=false;break;}
                 if(!aircraftClear)break;

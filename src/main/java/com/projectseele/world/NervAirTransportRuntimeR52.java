@@ -313,7 +313,9 @@ public final class NervAirTransportRuntimeR52
             }
             boolean ready=needed.stream().allMatch(id->ground().nativeAccess().resourceReady(id,true));
             if(!ready)ready=ground().owner().prepareFlightGates(level,j.original(),j.kind(),needed,data)&&needed.stream().allMatch(id->ground().nativeAccess().resourceReady(id,true));
-            if(!ready){save(j.update(j.leg(),j.age(),Phase.HOLD,j.carrying(),j.payloadTransferred(),j.spaces(),j.mechanisms(),data,"舱门正在开启"));}
+            // Door actuators advance once per call. HOLD retries only every
+            // ten ticks and would stretch a normal opening tenfold.
+            if(!ready){save(j.update(j.leg(),j.age(),Phase.PREPARE,j.carrying(),j.payloadTransferred(),j.spaces(),j.mechanisms(),data,"舱门正在开启"));}
             return new GatePreparation(j,ready);
         }
         Set<String> pickupSpaces(Mission m,NervFlightProofR52.FlightPickupPreview p){return manifest.directory().dynamicSpacesR52().domains().isEmpty()?manifest.node(m.pickupNode()).spaces():manifest.directory().dynamicSpacesR52().required(manifest.dimension(),p.cargoEnvelopes(p.root(),p.root()),ground().bindings());}
@@ -332,10 +334,19 @@ public final class NervAirTransportRuntimeR52
                 double half=Math.sqrt(.5);
                 double legacyDot=(declared.cargo().qy()-declared.cargo().qz())*half;
                 if(Math.abs(legacyDot)>1-1e-6)
+                {
                     cargo=new RigidTransform(cargo.translation(),0,(float)half,(float)half,0);
+                    if(p!=null&&data.getBoolean("CompactFlightR54"))
+                    {
+                        double keel=NervRigidMeshSweepR52.transformed(geometry.bodyMesh().bounds(),plane).minY;
+                        double top=p.cargoEnvelopes(cargo,cargo).stream().mapToDouble(box->box.maxY).max().orElse(cargo.translation().y);
+                        cargo=RigidTransform.of(cargo.translation().add(0,Math.max(0,keel-4-top),0),cargo.rotation());
+                    }
+                }
             }
             var receiver=manifest.receiver(m.receiver());if(loaded&&node.equals(receiver.node())&&!receiver.delivery()){if(p!=null&&p.kind()==Kind.HULL_ONLY_RECOVERY){var plan=recoveryPlan(m,p,data);if(plan==null)throw new IllegalStateException("Actual original hull source cannot plan this declared receiver");cargo=plan.waitingRoot();}else{var resolved=resolvedReceiver(m,p,data);if(resolved==null)throw new IllegalStateException("Actual original binding cannot resolve this typed receiver");cargo=resolved.stopped();}plane=RigidTransform.of(plane.translation().add(cargo.translation().subtract(receiver.stopped().translation())),plane.rotation());}
-            return NervAirRescueApproachR53.frame(m,node,new Frame(plane,cargo,new Rig(declared.rig().hoist(),loaded?1:0,loaded?0:1)),data);
+            float hoist=loaded&&cargo!=null&&data.getBoolean("CompactFlightR54")?(float)Math.max(24,plane.translation().y-cargo.translation().y):declared.rig().hoist();
+            return NervAirRescueApproachR53.frame(m,node,new Frame(plane,cargo,new Rig(hoist,loaded?1:0,loaded?0:1)),data);
         }
         Receiver resolvedReceiver(Mission m,NervFlightProofR52.FlightPickupPreview p,CompoundTag data)
         {var r=manifest.receiver(m.receiver());if(r.delivery())return NervAirDeliveryTargetR53.receiver(r,data);if(p==null)return null;RigidTransform root;if(p.kind()==Kind.HULL_ONLY_RECOVERY){var plan=recoveryPlan(m,p,data);root=plan==null?null:plan.stoppedRoot();}else root=ground().owner().resolveFlightReceiverCargoRootR52(level,p.original(),p.kind(),r.port(),data);return root==null?null:new Receiver(r.port(),r.region(),r.node(),root,r.reverseRoutes(),false,r.supports(),r.gates());}
@@ -610,6 +621,7 @@ public final class NervAirTransportRuntimeR52
         }
         boolean nativeBlockHitR53(UNTransportEntity plane,NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to)
         {
+            if(!NervTraversalPolicyR53.strict(level))return false;
             double clock=NervAircraftFrameR52.rotorClock(plane);
             var sweep=geometry.sweep(from,to,p.anchors(),p.jawAxes(),clock,clock+1,.005);
             var boxes=new ArrayList<>(sweep.envelopes());boxes.addAll(p.cargoEnvelopes(from.cargo(),to.cargo()));
@@ -636,6 +648,7 @@ public final class NervAirTransportRuntimeR52
             catch(IllegalArgumentException|IllegalStateException outside){return 2;}
             tickets(spaces);var declared=new ArrayList<net.minecraft.world.phys.AABB>();for(String id:spaces)declared.addAll(ground().bindings().get(id).spaces());
             for(var box:boxes){if(!NervAirspaceCoverageR52.covered(box,declared))return 2;if(!EntryPlugEjectionR48.loaded(level,box))return 0;}
+            if(!NervTraversalPolicyR53.strict(level))return 1;
             var fixed=NervFlightProofR52.detachedCarrierObstacles(level);if(fixed==null)return 0;
             for(var box:boxes)
             {
@@ -791,7 +804,8 @@ public final class NervAirTransportRuntimeR52
             var refreshed=p!=null&&p.current(level)?p:ground().owner().previewFlight(level,j.original(),j.kind(),data);if(refreshed==null){hold(j,"等待原机体在真实支撑上停稳，原飞机保持原泊位");return;}p=refreshed;previews.put(j.task(),p);data.put("PickupRoot",NervAircraftFrameR52.encodeRigid(p.root()));
             if(!data.getBoolean("FlightWaitingR52")&&!j.cancelRequested())
             {
-                data.putBoolean("RescueLiftBeforeAlignR53",true);
+                data.putBoolean("RescueLiftBeforeAlignR53",false);
+                data.putBoolean("CompactFlightR54",true);
                 String approach=NervAirRescueApproachR53.prepare(level,manifest,m,p,data,geometry);
                 if(!approach.isEmpty())
                 {
@@ -954,6 +968,12 @@ public final class NervAirTransportRuntimeR52
             if(receiver!=null&&receiver.delivery()&&!NervFlightProofR52.deliverySupportReady(level,p,current.cargo(),receiver)
                     &&NervAirDeliveryTargetR53.refreshStoppedSupports(level,p,receiver,data))receiver=resolvedReceiver(m,p,data);
             if(receiver==null||!(receiver.delivery()?NervFlightProofR52.deliverySupportReady(level,p,current.cargo(),receiver)&&receiver.gates().stream().allMatch(g->ground().nativeAccess().resourceReady(g,true)):ground().owner().receiverReady(level,receiver.port(),j.original(),j.kind(),receiver.stopped(),data))){save(j.update(0,j.age(),Phase.RELEASE,true,false,j.spaces(),j.mechanisms(),data,"等待实际接应夹具/原转移架连续承托到位"));return;}
+            if(!data.getBoolean("TouchdownPlayedR54")&&level.getEntity(j.original().eva()) instanceof EvaUnit01Entity eva)
+            {
+                CombatFoleyR36.airliftTouchdown(eva,receiver.stopped().translation());
+                data.putBoolean("TouchdownPlayedR54",true);
+                j=j.update(j.leg(),j.age(),j.phase(),j.carrying(),j.payloadTransferred(),j.spaces(),j.mechanisms(),data,j.waiting());save(j);
+            }
             p=ground().owner().previewFlight(level,j.original(),j.kind(),data);if(p==null){hold(j,"实际接应架到位后完整原组几何不可读");return;}previews.put(j.task(),p);float t=Math.min(1,(j.age()+1)/20F);var next=new Frame(current.plane(),receiver.stopped(),new Rig(current.rig().hoist(),1,t));var checked=proof(j.aircraft(),p,current,next,j.spaces(),true);if(checked==null||!ground().owner().applyFlightStep(level,checked,data)||!NervAircraftFrameR52.apply((UNTransportEntity)level.getEntity(j.aircraft()),checked)){hold(j,"承托后原夹具连续卸载 sweep 受阻");return;}NervAircraftFrameR52.putFrame(data,"Frame",next);
             if(t<1){save(j.update(0,j.age()+1,Phase.RELEASE,true,false,j.spaces(),j.mechanisms(),data,""));return;}
             j=j.update(0,20,Phase.RELEASE,true,false,j.spaces(),j.mechanisms(),data,"");save(j);var stopped=proof(j.aircraft(),p,next,next,j.spaces(),true);var receipt=NervFlightProofR52.receiver(level,stopped,receiver,ground().owner(),data);if(!receiver.delivery()&&(receipt==null||!ground().owner().acceptAirReceiver(level,receipt,data))){hold(j,"原接应实际端点接管失败");return;}

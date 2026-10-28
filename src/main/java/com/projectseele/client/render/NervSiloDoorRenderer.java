@@ -64,7 +64,7 @@ public final class NervSiloDoorRenderer
             return;
         }
         VertexConsumer consumer = buffers.getBuffer(
-                RenderType.entityTranslucent(texture));
+                RenderType.entityCutout(texture));
         for(int side:new int[]{-1,1})for(int index=0;index<SiloHatchMechanism.PANELS;index++)
         {
             double width=spec==null?SiloHatchMechanism.WIDTH:spec.panelWidth();double a=index*width;

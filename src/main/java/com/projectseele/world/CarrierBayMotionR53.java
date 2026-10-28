@@ -61,7 +61,7 @@ public final class CarrierBayMotionR53
                 && !supportedPair(level, carrier, bay, root, endRoot, directionFrom, directionTo, leg, mounting,from,to))
             return no("shallow_tray_source_or_finite_load_bearing_missing");
         var times = new ArrayList<Float>();times.add(from);
-        for(float knot : new float[]{CarrierAssemblyR53.RISE_END, (1 + CarrierAssemblyR53.RISE_END) / 2})
+        for(float knot : CarrierMountProfileR53.BAY_ACTUATOR_KNOTS)
             if (Math.min(from, to) < knot && Math.max(from, to) > knot) times.add(knot);
         times.sort(from <= to ? Comparator.naturalOrder() : Comparator.reverseOrder());
         times.add(to);var boxes = new ArrayList<AABB>();
@@ -86,6 +86,18 @@ public final class CarrierBayMotionR53
             for(var rail:CarrierBayTrayR53.railsAt(bay,times.get(segment+1)))
                 if(!rail.name().contains("/bank_foot_"))withRailsB.add(new NervOriginalCarrierR52.Part(rail.name(),NervOriginalCarrierR52.Role.STRUCTURE,rail.mesh(),rail.frame()));
             a=List.copyOf(withRailsA);b=List.copyOf(withRailsB);
+            // Authored service motion may intersect its surroundings. Keep
+            // source clocks, support sequencing and loaded-region bounds.
+            if(!NervTraversalPolicyR53.strict(level))
+            {
+                for(int i=0;i<a.size();i++)
+                {
+                    var bounds=a.get(i).mesh().envelope(a.get(i).frame(),b.get(i).frame()).inflate(error);
+                    if(!EntryPlugEjectionR48.loaded(level,bounds))return no("shallow_tray_unloaded="+bounds);
+                    boxes.add(bounds);
+                }
+                continue;
+            }
             var failure = NervOriginalCarrierR52.nativeBlockRejectionR53(a, b, error,
                     bound -> EntryPlugEjectionR48.loaded(level, bound), bound ->
                     { var shapes = new ArrayList<AABB>();for (var shape : level.getBlockCollisions(carrier, bound)) shapes.addAll(shape.toAabbs());return shapes; });

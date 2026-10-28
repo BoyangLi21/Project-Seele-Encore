@@ -289,7 +289,7 @@ public final class EvaCapturedLocomotionR44
     private static int variant(EvaUnit01Entity e){return e instanceof EvaPrototypeEntity un?3+un.getUNSerial():e.getUnitVariant();}
     private static boolean eligible(EvaUnit01Entity e)
     {return !e.isRemoved()&&!RETIRED_LEVELS.getOrDefault(e.level(),false)&&e.isPoweredOn()&&!e.isNervLogisticsLocked()&&!e.isFirstBattleActive()&&!e.isBerserk()&&!e.isCrucified()
-            &&e.getActivationTicks()==0&&e.getVisualPose()==0&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS;}
+            &&e.getActivationTicks()==0&&e.getVisualPose()==0&&!e.fixedCannonOperatingR52()&&e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS;}
     private static boolean stable(String name){return List.of("idle","walk","run","crouch_idle","crouch_walk","prone_hold","crawl").contains(name);}
     private static float ease(float value){value=Mth.clamp(value,0,1);return value*value*value*(10+value*(-15+6*value));}
     private static float phase(EvaUnit01Entity e,String name,Clip clip,float elapsed,float partial)

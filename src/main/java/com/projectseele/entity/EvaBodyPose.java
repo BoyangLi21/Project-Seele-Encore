@@ -580,7 +580,7 @@ public final class EvaBodyPose
         float idlePhase=(float)((((double)entity.level().getGameTime()+partial)/20.0/idleClip.duration())%1.0);
         float move=entity.rifleMoveBlend(partial),run=entity.rifleRunBlend(partial),crouch=entity.rifleCrouchBlend(partial),prone=entity.rifleProneBlend(partial);prone=prone*prone*prone*(10+prone*(-15+6*prone));
         float dash=EvaSprintR50.blend(entity,partial);boolean supported=d.clips().containsKey("rifle_stance");float stance=entity.rifleStanceLevel(partial);
-        Sample body=ordinaryClipBaseR52(d,variant,phase,idlePhase,move,run,crouch,prone,stance,dash,entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE);
+        Sample body=ordinaryClipBaseR52(d,variant,phase,idlePhase,move,run,crouch,prone,stance,dash,entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||entity.fixedCannonOperatingR52());
         var capturedLocomotion=EvaCapturedLocomotionR44.sample(entity,variant,d.rigs().get(variant),partial);
         boolean capturedLocomotionOwns=capturedLocomotion!=null;
         if(capturedLocomotionOwns)body=capturedLocomotion;

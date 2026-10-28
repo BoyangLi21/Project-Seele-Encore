@@ -72,20 +72,25 @@ public final class NervRouteReservationsR52
     /** Read only the actually admitted EVA actor claim, never a provisional
      * save, available route or UUID found by proximity. */
     public synchronized Snapshot groundTaskR52(Original original){UUID task=actors.get(original.eva());if(task==null)return null;var state=tasks.get(task);return state!=null&&state.original().equals(original)&&state.stage()!=Stage.CANCELLED?state:null;}
-    /** Every physical resource is already owned by this exact task. Its one
+    /** Every exclusive mechanism is already owned by this exact task. SPACE
+     * remains descriptive and never excludes another automatic movement. Its one
      * admitted hardware/flight companion may share only their existing legal
      * relation; mere availability never satisfies this receipt. */
     public synchronized boolean resourcesHeldR52(UUID task,Set<String> ids)
     {
-        if(task==null||ids.isEmpty())return false;for(String id:ids){if(directory.resource(id)==null)return false;UUID ground=resources.get(id),steel=hardwareResources.get(id);if(!task.equals(ground)&&!task.equals(steel))return false;
+        if(task==null||ids.isEmpty())return false;for(String id:ids){if(directory.resource(id)==null)return false;if(isSpace(id))continue;UUID ground=resources.get(id),steel=hardwareResources.get(id);if(!task.equals(ground)&&!task.equals(steel))return false;
             if(ground!=null&&!ground.equals(task)){var h=hardware.get(task);var f=flights.get(ground);if(h==null||f==null||!ground.equals(h.companionFlight())||f.payloadTransferred()||f.original().variant()!=h.variant()||h.epoch()!=directory.epoch()||!h.directoryFingerprint().equals(directory.fingerprint()))return false;}
             if(steel!=null&&!steel.equals(task)){var h=hardware.get(steel);var f=flights.get(task);if(h==null||f==null||!task.equals(h.companionFlight())||f.payloadTransferred()||f.original().variant()!=h.variant()||h.epoch()!=directory.epoch()||!h.directoryFingerprint().equals(directory.fingerprint()))return false;}
         }return true;
     }
+    private boolean isSpace(String id)
+    {var resource=directory.resource(id);return resource!=null&&resource.kind()==ResourceKind.SPACE;}
+    private void claimResources(UUID task,Set<String> ids)
+    {for(String id:ids)if(!isSpace(id))resources.put(id,task);}
     private boolean hardwareAvailable(UUID ownTask,String id)
-    {UUID held=hardwareResources.get(id);if(held==null||held.equals(ownTask))return true;var h=hardware.get(held);return h!=null&&ownTask!=null&&ownTask.equals(h.companionFlight());}
+    {if(isSpace(id))return true;UUID held=hardwareResources.get(id);if(held==null||held.equals(ownTask))return true;var h=hardware.get(held);return h!=null&&ownTask!=null&&ownTask.equals(h.companionFlight());}
     public synchronized boolean resourcesAvailable(UUID ownTask,Set<String> ids)
-    {for(String id:ids){if(directory.resource(id)==null||!hardwareAvailable(ownTask,id))return false;var owner=resources.get(id);if(owner!=null&&!owner.equals(ownTask))return false;}return true;}
+    {for(String id:ids){if(directory.resource(id)==null)return false;if(isSpace(id))continue;if(!hardwareAvailable(ownTask,id))return false;var owner=resources.get(id);if(owner!=null&&!owner.equals(ownTask))return false;}return true;}
     public synchronized boolean flightQuarantined(UUID task){return quarantinedFlights.contains(task);}
     public synchronized boolean groundQuarantined(UUID task){return quarantinedGround.containsKey(task);}
     /** Provisional claims are intentionally absent from query(): the native
@@ -94,13 +99,13 @@ public final class NervRouteReservationsR52
     {
         Objects.requireNonNull(saved);var route=directory.route(saved.route());var previous=quarantinedGround.get(saved.task());if(previous!=null)return previous.equals(saved);
         if(tasks.containsKey(saved.task())||flights.containsKey(saved.task())||hardware.containsKey(saved.task())||route==null||!context(saved.original(),route).isEmpty()||!saved.directoryFingerprint().equals(directory.fingerprint())||saved.stage()==Stage.CANCELLED||saved.leg()<0||saved.leg()>=route.legs().size()||!Double.isFinite(saved.fraction())||saved.fraction()<0||saved.fraction()>1||!free(saved.original(),route,saved.kind()))return false;
-        for(String id:directory.resources(route))resources.put(id,saved.task());for(UUID id:TransportMembershipR52.members(saved.original(),saved.kind()))actors.put(id,saved.task());quarantinedGround.put(saved.task(),saved);return true;
+        claimResources(saved.task(),directory.resources(route));for(UUID id:TransportMembershipR52.members(saved.original(),saved.kind()))actors.put(id,saved.task());quarantinedGround.put(saved.task(),saved);return true;
     }
     public synchronized Set<UUID> leasedMembers(UUID task){var result=new HashSet<UUID>();actors.forEach((actor,owner)->{if(owner.equals(task))result.add(actor);});return Set.copyOf(result);}
-    public synchronized boolean available(Route route){return directory.resources(route).stream().noneMatch(id->resources.containsKey(id)||hardwareResources.containsKey(id));}
+    public synchronized boolean available(Route route){return resourcesAvailable(null,directory.resources(route));}
     /** Empty steel has its own actor lease. It never acquires an EVA/pilot/plug
-     * membership or changes the existing flight's control owner. Shared SPACE
-     * with its one companion aircraft still requires both actual mesh proofs. */
+     * membership or changes the existing flight's control owner. SPACE stays
+     * in its declaration for loading/display; mechanisms retain their owners. */
     public synchronized boolean reserveHardware(HardwareLease lease,HardwareAccess actual,boolean restoring)
     {
         if(!directory.installed()||lease.epoch()!=directory.epoch()||!lease.directoryFingerprint().equals(directory.fingerprint())||lease.variant()<0||lease.variant()>2||lease.resources().isEmpty()||tasks.containsKey(lease.task())||flights.containsKey(lease.task())||quarantinedGround.containsKey(lease.task()))return false;
@@ -109,9 +114,9 @@ public final class NervRouteReservationsR52
         UUID actor=actors.get(lease.controller());if(actor!=null&&!actor.equals(lease.task()))return false;
         FlightLease companion=lease.companionFlight()==null?null:flights.get(lease.companionFlight());if(lease.companionFlight()!=null&&(companion==null||companion.payloadTransferred()||companion.original().variant()!=lease.variant()||companion.original().pilot().equals(lease.controller())))return false;
         var declared=new HashSet<Resource>();for(String id:lease.resources())
-        {var resource=directory.resource(id);if(resource==null||!Set.of(ResourceKind.RAIL,ResourceKind.SPACE,ResourceKind.DOOR,ResourceKind.SUPPORT).contains(resource.kind()))return false;UUID moving=resources.get(id),steel=hardwareResources.get(id);if(steel!=null&&!steel.equals(lease.task())||moving!=null&&!moving.equals(lease.task())&&!moving.equals(lease.companionFlight()))return false;declared.add(resource);}
+        {var resource=directory.resource(id);if(resource==null||!Set.of(ResourceKind.RAIL,ResourceKind.SPACE,ResourceKind.DOOR,ResourceKind.SUPPORT).contains(resource.kind()))return false;declared.add(resource);if(resource.kind()==ResourceKind.SPACE)continue;UUID moving=resources.get(id),steel=hardwareResources.get(id);if(steel!=null&&!steel.equals(lease.task())||moving!=null&&!moving.equals(lease.task())&&!moving.equals(lease.companionFlight()))return false;}
         if(!actual.sameOriginalCarrier(lease.controller(),lease.variant(),lease.epoch())||!actual.checkedCarrierGeometry(lease.controller(),Set.copyOf(declared),restoring))return false;
-        hardwareResources.entrySet().removeIf(entry->entry.getValue().equals(lease.task())&&!lease.resources().contains(entry.getKey()));for(String id:lease.resources())hardwareResources.put(id,lease.task());actors.put(lease.controller(),lease.task());hardware.put(lease.task(),lease);return true;
+        hardwareResources.entrySet().removeIf(entry->entry.getValue().equals(lease.task())&&(isSpace(entry.getKey())||!lease.resources().contains(entry.getKey())));for(String id:lease.resources())if(!isSpace(id))hardwareResources.put(id,lease.task());actors.put(lease.controller(),lease.task());hardware.put(lease.task(),lease);return true;
     }
     public synchronized boolean releaseHardware(UUID task,UUID controller)
     {var lease=hardware.get(task);if(lease==null||!lease.controller().equals(controller))return false;hardwareResources.entrySet().removeIf(e->e.getValue().equals(task));actors.entrySet().removeIf(e->e.getValue().equals(task));hardware.remove(task);return true;}
@@ -161,7 +166,7 @@ public final class NervRouteReservationsR52
     {return available(route)&&TransportMembershipR52.members(original,kind).stream().noneMatch(actors::containsKey);}
     private void claim(Snapshot state,Route route)
     {
-        for(String resource:directory.resources(route))resources.put(resource,state.task());
+        claimResources(state.task(),directory.resources(route));
         for(UUID actor:TransportMembershipR52.members(state.original(),state.kind()))actors.put(actor,state.task());tasks.put(state.task(),state);
     }
     private void release(Snapshot state)
@@ -234,9 +239,8 @@ public final class NervRouteReservationsR52
     public record OutletSpaceResultR53(boolean accepted,Set<String> resources,String reason)
     { public OutletSpaceResultR53 { resources=Set.copyOf(resources); } }
     /** The completed ground task retains its original membership and route.
-     * Its actual catapult source may acquire additional declared SPACE through
-     * the same broker before moving, including after a saved partial launch.
-     * The existing completion release removes these claims with the route. */
+     * Additional outlet SPACE is returned for loading/display, without an
+     * exclusive claim against other automatic movement. */
     public synchronized OutletSpaceResultR53 reserveGroundOutletSpacesR53(UUID task,
             net.minecraft.server.level.ServerLevel level,com.projectseele.entity.EvaUnit01Entity eva,
             NervBallisticHandoffR52.Proof proof,Map<String,NervRouteNativeR52.Binding> bindings)
@@ -262,13 +266,10 @@ public final class NervRouteReservationsR52
         var admitted=new HashSet<>(directory.resources(route));admitted.addAll(required);
         for(String id:required)
         {
-            var resource=directory.resource(id);UUID holder=resources.get(id);
+            var resource=directory.resource(id);
             if(resource==null||resource.kind()!=ResourceKind.SPACE)
                 return new OutletSpaceResultR53(false,Set.of(),"outlet_undeclared_space / "+id);
-            if(!hardwareAvailable(task,id)||holder!=null&&!holder.equals(task))
-                return new OutletSpaceResultR53(false,Set.of(),"outlet_space_reserved_by_another_task / "+id);
         }
-        for(String id:required)resources.put(id,task);
         return new OutletSpaceResultR53(true,Set.copyOf(admitted),"");
     }
     public synchronized boolean releaseCompletion(UUID task,UUID owner)
@@ -321,7 +322,7 @@ public final class NervRouteReservationsR52
         if(saved.kind()==Kind.HULL_ONLY_RECOVERY&&!route.recovery())return new Result(false,null,"Hull-only save cannot restore a departure");
         var provisional=quarantinedGround.get(saved.task());
         if(provisional!=null&&(!provisional.original().equals(saved.original())||!provisional.route().equals(saved.route())||provisional.kind()!=saved.kind()||provisional.leg()!=saved.leg()||provisional.fraction()!=saved.fraction()||!provisional.directoryFingerprint().equals(saved.directoryFingerprint())))return new Result(false,null,"Saved provisional physical progress changed");
-        boolean free=directory.resources(route).stream().allMatch(id->hardwareAvailable(saved.task(),id)&&(resources.get(id)==null||saved.task().equals(resources.get(id))))&&TransportMembershipR52.members(saved.original(),saved.kind()).stream().allMatch(id->actors.get(id)==null||saved.task().equals(actors.get(id)));
+        boolean free=resourcesAvailable(saved.task(),directory.resources(route))&&TransportMembershipR52.members(saved.original(),saved.kind()).stream().allMatch(id->actors.get(id)==null||saved.task().equals(actors.get(id)));
         if(tasks.containsKey(saved.task())||flights.containsKey(saved.task())||hardware.containsKey(saved.task())||!free)return new Result(false,null,"Restore would collide with an existing reservation");
         if(!nativeAccess.sameAssembly(saved.original(),saved.kind())||!nativeAccess.canRestoreAssembly(saved.original(),saved.kind(),route,saved.leg(),saved.fraction()))return new Result(false,null,"Native restore membership/geometry was not confirmed");
         Snapshot restored=new Snapshot(saved.task(),saved.original(),saved.directoryFingerprint(),saved.route(),saved.leg(),saved.fraction(),Stage.HOLD,"Restored in place; native sweep required before continuing",saved.kind());claim(restored,route);quarantinedGround.remove(saved.task());return new Result(true,restored,"");
@@ -335,7 +336,7 @@ public final class NervRouteReservationsR52
                 ||state.stage()==Stage.COMPLETE||state.stage()==Stage.CANCELLED||!context(state.original(),next).isEmpty())return new Result(false,state,"Not a compatible stopped preparation");
         Route previous=directory.route(state.route());
         for(int i=0;i<state.leg();i++)if(!previous.legs().get(i).equals(next.legs().get(i)))return new Result(false,state,"Different completed physical prefix");
-        for(String id:directory.resources(next)){UUID held=resources.get(id);if(!hardwareAvailable(task,id)||held!=null&&!held.equals(task))return new Result(false,state,"New route space is already reserved");}
+        if(!resourcesAvailable(task,directory.resources(next)))return new Result(false,state,"New route mechanism is already reserved");
         if(!actual.sameOriginalAssembly(state.original())||!actual.canRestore(state.original(),next,state.leg(),0))return new Result(false,state,"Actual stopped assembly/new route geometry not confirmed");
         release(state);var changed=new Snapshot(task,state.original(),state.directoryFingerprint(),newRouteId,state.leg(),0,Stage.HOLD,"Continue physical preparation from the same node");claim(changed,next);return new Result(true,changed,"");
     }
@@ -352,14 +353,14 @@ public final class NervRouteReservationsR52
     {return aircraft!=null&&claimFlight(new FlightLease(task,original,directory.fingerprint(),spaces,aircraft,kind,false,mechanisms),actual,false);}
     public synchronized boolean restoreFlight(FlightLease saved,FlightAccess actual)
     {return claimFlight(saved,actual,true);}
-    /** Cold-load uncertainty blocks the same saved physical space/members,
+    /** Cold-load uncertainty retains the same saved mechanisms/members,
      * but grants no motion or geometry admission. A real checked retarget is
      * still required before any controller applies an aircraft/body step. */
     public synchronized boolean quarantineFlight(FlightLease saved)
     {
         Objects.requireNonNull(saved);var original=saved.original();var unit=directory.unit(original.variant());var previous=flights.get(saved.task());if(previous!=null)return previous.equals(saved);
         if(!directory.installed()||original.epoch()!=directory.epoch()||unit==null||!unit.eva().equals(original.eva())||!unit.plug().equals(original.plug())||!directory.knowsDimension(original.dimension())||!saved.directoryFingerprint().equals(directory.fingerprint())||saved.aircraft()==null||List.of(original.eva(),original.plug(),original.pilot()).contains(saved.aircraft())||tasks.containsKey(saved.task())||hardware.containsKey(saved.task())||quarantinedGround.containsKey(saved.task())||flightMembers(saved).stream().anyMatch(actors::containsKey)||flightResources(saved,null)==null)return false;
-        for(String id:flightResourceIds(saved))resources.put(id,saved.task());for(UUID actor:flightMembers(saved))actors.put(actor,saved.task());flights.put(saved.task(),saved);quarantinedFlights.add(saved.task());return true;
+        claimResources(saved.task(),flightResourceIds(saved));for(UUID actor:flightMembers(saved))actors.put(actor,saved.task());flights.put(saved.task(),saved);quarantinedFlights.add(saved.task());return true;
     }
     private boolean claimFlight(FlightLease lease,FlightAccess actual,boolean restoring)
     {
@@ -369,7 +370,7 @@ public final class NervRouteReservationsR52
                 ||lease.aircraft()!=null&&List.of(original.eva(),original.plug(),original.pilot()).contains(lease.aircraft())
                 ||flightMembers(lease).stream().anyMatch(actors::containsKey))return false;
         var declared=flightResources(lease,null);if(declared==null||!checkedFlight(lease,declared,actual,restoring))return false;
-        for(String id:flightResourceIds(lease))resources.put(id,lease.task());for(UUID actor:flightMembers(lease))actors.put(actor,lease.task());flights.put(lease.task(),lease);return true;
+        claimResources(lease.task(),flightResourceIds(lease));for(UUID actor:flightMembers(lease))actors.put(actor,lease.task());flights.put(lease.task(),lease);return true;
     }
     private static Set<UUID> flightMembers(FlightLease lease)
     {var ids=new HashSet<UUID>();if(!lease.payloadTransferred())ids.addAll(TransportMembershipR52.members(lease.original(),lease.kind()));if(lease.aircraft()!=null)ids.add(lease.aircraft());return Set.copyOf(ids);}
@@ -383,7 +384,7 @@ public final class NervRouteReservationsR52
         for(String id:flightResourceIds(lease))
         {
             Resource r=directory.resource(id);UUID held=resources.get(id);
-            if(r==null||!hardwareAvailable(ownTask,id)||lease.spaces().contains(id)&&r.kind()!=ResourceKind.SPACE||lease.mechanisms().contains(id)&&r.kind()!=ResourceKind.DOOR||held!=null&&!held.equals(ownTask))return null;
+            if(r==null||lease.spaces().contains(id)&&r.kind()!=ResourceKind.SPACE||lease.mechanisms().contains(id)&&r.kind()!=ResourceKind.DOOR||r.kind()!=ResourceKind.SPACE&&(!hardwareAvailable(ownTask,id)||held!=null&&!held.equals(ownTask)))return null;
             result.add(r);
         }
         return Set.copyOf(result);
@@ -394,29 +395,29 @@ public final class NervRouteReservationsR52
         return lease.payloadTransferred()?lease.aircraft()!=null&&actual.checkedAircraftOnlyGeometry(lease.aircraft(),declared,restoring)
                 :actual.sameMovingAssembly(lease.original(),lease.kind())&&actual.checkedFlightGeometry(lease.original(),declared,restoring);
     }
-    /** Acquire the next segment before releasing previous space. A failed
+    /** Acquire the next segment's mechanisms before releasing previous ones. A failed
      * actual geometry/identity check leaves every existing lease intact. */
     public synchronized boolean retargetFlightSpaces(UUID task,Set<String> spaces,Set<String> mechanisms,FlightAccess actual)
     {
         FlightLease previous=flights.get(task);if(previous==null||!spaceArgumentsValidR52(spaces))return false;
         var proved=actual.checkedSourceSpacesR52();var next=new FlightLease(task,previous.original(),previous.directoryFingerprint(),proved==null?spaces:proved,previous.aircraft(),previous.kind(),previous.payloadTransferred(),mechanisms);
         var declared=flightResources(next,task);if(declared==null||!checkedFlight(next,declared,actual,false))return false;
-        resources.entrySet().removeIf(e->e.getValue().equals(task)&&!flightResourceIds(next).contains(e.getKey()));
-        for(String id:flightResourceIds(next))resources.put(id,task);flights.put(task,next);quarantinedFlights.remove(task);return true;
+        resources.entrySet().removeIf(e->e.getValue().equals(task)&&(isSpace(e.getKey())||!flightResourceIds(next).contains(e.getKey())));
+        claimResources(task,flightResourceIds(next));flights.put(task,next);quarantinedFlights.remove(task);return true;
     }
     /** Only a supported, released original occupied assembly can leave a
-     * flight lease without a mechanical reverse route. Aircraft return space
-     * remains owned throughout; a failed receipt releases no actor/resource. */
+     * flight lease without a mechanical reverse route. The return aircraft
+     * remains owned throughout; a failed receipt releases no actor/mechanism. */
     public synchronized boolean handoffFlightToDelivery(UUID task,Set<String> spaces,Set<String> mechanisms,FlightAccess actual)
     {
         var flight=flights.get(task);if(flight==null||quarantinedFlights.contains(task)||flight.aircraft()==null||flight.payloadTransferred()||flight.kind()!=Kind.OCCUPIED)return false;
         var proved=actual.checkedSourceSpacesR52();var plane=new FlightLease(task,flight.original(),flight.directoryFingerprint(),proved==null?spaces:proved,flight.aircraft(),flight.kind(),true,mechanisms);var declared=flightResources(plane,task);if(declared==null||!checkedFlight(plane,declared,actual,false))return false;
         if(!actual.checkedSupportedDelivery(flight.original(),flight.kind()))return false;
-        release(task);for(String id:flightResourceIds(plane))resources.put(id,task);actors.put(plane.aircraft(),task);flights.put(task,plane);return true;
+        release(task);claimResources(task,flightResourceIds(plane));actors.put(plane.aircraft(),task);flights.put(task,plane);return true;
     }
     /** The real controller must already have verified positive receiver
-     * support and retracted clamps. Remaining aircraft space must no longer
-     * overlap the complete ground route. No actor/resource is released on a
+     * support and retracted clamps. Remaining aircraft mechanisms must not
+     * overlap the ground route; SPACE may overlap. No actor/resource is released on a
      * failed handoff, and the aircraft keeps its own return-flight lease. */
     public synchronized Result handoffFlightToGround(UUID flightTask,UUID groundTask,String routeId,
                                                      Set<String> remainingSpaces,Set<String> remainingMechanisms,
@@ -428,13 +429,13 @@ public final class NervRouteReservationsR52
         String blocker=context(flight.original(),route);if(!blocker.isEmpty())return new Result(false,null,blocker);
         var proved=aircraftActual.checkedSourceSpacesR52();var aircraft=new FlightLease(flightTask,flight.original(),flight.directoryFingerprint(),proved==null?remainingSpaces:proved,flight.aircraft(),flight.kind(),true,remainingMechanisms);
         var declared=flightResources(aircraft,flightTask);
-        if(declared==null||!Collections.disjoint(flightResourceIds(aircraft),directory.resources(route))
-                ||!checkedFlight(aircraft,declared,aircraftActual,false))return new Result(false,null,"Aircraft has not physically cleared receiver ground space");
-        for(String id:directory.resources(route)){UUID held=resources.get(id);if(!hardwareAvailable(flightTask,id)||held!=null&&!held.equals(flightTask))return new Result(false,null,"Receiver/ground route is reserved by another original task");}
+        if(declared==null||!Collections.disjoint(aircraft.mechanisms(),directory.resources(route))
+                ||!checkedFlight(aircraft,declared,aircraftActual,false))return new Result(false,null,"Aircraft geometry or receiver mechanism ownership is not ready");
+        if(!resourcesAvailable(flightTask,directory.resources(route)))return new Result(false,null,"Receiver/ground route is reserved by another original task");
         if(!receiverActual.sameAssembly(flight.original(),flight.kind())
                 ||!receiverActual.canRestoreAssembly(flight.original(),flight.kind(),route,0,0))return new Result(false,null,"Actual original receiver placement/support was not confirmed");
         for(UUID actor:TransportMembershipR52.members(flight.original(),flight.kind()))if(!flightTask.equals(actors.get(actor)))return new Result(false,null,"Original payload lease changed");
-        release(flightTask);for(String id:flightResourceIds(aircraft))resources.put(id,flightTask);actors.put(flight.aircraft(),flightTask);flights.put(flightTask,aircraft);
+        release(flightTask);claimResources(flightTask,flightResourceIds(aircraft));actors.put(flight.aircraft(),flightTask);flights.put(flightTask,aircraft);
         var snapshot=new Snapshot(groundTask,flight.original(),directory.fingerprint(),routeId,0,0,Stage.RESERVED,"",flight.kind());claim(snapshot,route);
         return new Result(true,snapshot,"");
     }

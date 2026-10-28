@@ -135,10 +135,15 @@ public final class NervHangarDoorEntity extends Entity
 
     public float getOpenProgress(float partialTick)
     {
-        if(declaredStackR52()!=null){if(!level().isClientSide)return actualOpenProgressR52();var data=entityData.get(DATA_STACK_R52);double t=Mth.clamp(level().getGameTime()-data.getLong("At")+(double)partialTick,0,1);return EvaDorsalMechanism.smooth(Mth.lerp((float)t,data.getFloat("PreviousRaw"),data.getFloat("CurrentRaw")));}
-        if(!this.level().isClientSide)return this.entityData.get(DATA_OPEN);
-        return Mth.lerp(partialTick, this.clientOpenO, this.clientOpen);
+        boolean declared=declaredStackR52()!=null;
+        if(!level().isClientSide)return declared?actualOpenProgressR52():entityData.get(DATA_OPEN);
+        long now=MechanicalVisualClockR54.presentationTime(level().getGameTime(),partialTick);
+        visualOpenR54.receive(entityData.get(DATA_OPEN),now);
+        float raw=(float)visualOpenR54.sample(now);
+        return declared?EvaDorsalMechanism.smooth(raw):raw;
     }
+
+    private final MechanicalVisualClockR54.Value visualOpenR54=new MechanicalVisualClockR54.Value();
 
     public static void reconcile(ServerLevel level,int variant,Vec3 centre,boolean open)
     {reconcile(level,variant,centre,open,1F);}
@@ -307,34 +312,11 @@ public final class NervHangarDoorEntity extends Entity
     }
     public boolean clearDeclaredSweepR52(ServerLevel level,float from,float to,Set<UUID> own,Set<BlockPos> moving,Set<BlockPos> supports)
     {
-        if(invalidStackR52||declaredStackR52()==null||actualOpenProgressR52()!=from)return false;var geo=declaredGeometryR52();var frame=actualFrameR52();var detached=com.projectseele.world.NervFlightProofR52.detachedCarrierObstacles(level);if(detached==null)return false;for(var mesh:detached)if(geo.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame()))return false;if(to<from&&!com.projectseele.world.NervGateClosureR52.clearActualActors(level,this,moving))return false;
+        if(invalidStackR52||declaredStackR52()==null||actualOpenProgressR52()!=from||!Float.isFinite(to)||to<0||to>1)return false;var geo=declaredGeometryR52();var frame=actualFrameR52();
         if(!declaredSupportsBearR52(level,supports))return false;
-        var seen=new HashSet<BlockPos>();
         for(var box:geo.envelopes(frame,from,to))
         {
             if(!com.projectseele.world.EntryPlugEjectionR48.loaded(level,box))return false;
-            for(var at:BlockPos.betweenClosed(BlockPos.containing(box.minX,box.minY,box.minZ),BlockPos.containing(box.maxX,box.maxY,box.maxZ)))
-            {
-                var key=at.immutable();if(!seen.add(key)||moving.contains(key))continue;
-                var state=level.getBlockState(key);if(state.isAir())continue;
-                for(var shape:state.getCollisionShape(level,key,CollisionContext.of(this)).toAabbs())if(geo.intersects(frame,from,to,shape.move(key)))return false;
-            }
-        }
-        // The union includes every former per-leaf search area. Snapshot live
-        // actors once; exact full-motion geometry still decides obstruction.
-        for(var actor:level.getEntities(this,geo.sweptBounds(frame,from,to).inflate(200),e->e.isAlive()&&!e.isSpectator()&&(e instanceof net.minecraft.world.entity.LivingEntity||e.canBeCollidedWith()||e instanceof UNTransportEntity||e instanceof EntryPlugCarrierEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof NervCarrierPlatformEntity)))
-        {
-            var meshes=com.projectseele.world.NervFlightProofR52.actualObstacleMeshes(actor);
-            if(meshes==null)
-            {
-                var bounds=actor instanceof UNTransportEntity aircraft?aircraft.getBoundingBoxForCulling():actor.getBoundingBox();
-                if(geo.intersects(frame,from,to,bounds))return false;
-            }
-            else if(meshes.isEmpty())
-            {
-                if(geo.intersects(frame,from,to,actor.getBoundingBox()))return false;
-            }
-            else for(var mesh:meshes)if(geo.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame()))return false;
         }
         return com.projectseele.world.CarrierTransferRailsR53.clearGateSweep(level,this,from,to,own,moving,supports);
     }

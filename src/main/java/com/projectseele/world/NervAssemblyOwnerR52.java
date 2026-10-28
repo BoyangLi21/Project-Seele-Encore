@@ -43,6 +43,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     private final NervRouteDirectoryR52 directory;
     private final Map<Integer,UnitPlant> units;
     private final Map<String,Gate> gates;
+    private Map<String,List<Gate>> launchGateLayersR54=Map.of();
     private final Map<String,List<FixedCell>> resources;
     public record Receiver(String port,Region region,AABB domain,RigidTransform stoppedFrame,List<FixedCell> supports,List<String> gates,int carrierTicks)
     {public Receiver{supports=List.copyOf(supports);gates=List.copyOf(gates);}}
@@ -154,11 +155,22 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         else if(groundGuidesDeclared){if(!NervFixedFootGuidesR52.matchesDirectory(directory))return commissioningHoldR52("fixed_foot_guides/directory","selected_path_sha="+NervFixedFootGuidesR52.SOURCE_SHA+" directory="+directory.fingerprint());String anchor=NervFixedFootGuidesR52.firstMissingAnchor(level);if(!anchor.equals("MATCH"))return commissioningHoldR52("fixed_foot_guides/finite_anchor",anchor);for(var p:units.values())if(!commissionOriginalCarrierR52(level,p))return commissioningHoldR52("unit_"+p.variant()+"/original_carrier_controller","uuid="+carrierControllers.get(p.variant())+" original="+p.eva()+" actual="+level.getEntity(carrierControllers.get(p.variant()))+" source="+NervOriginalCarrierR52.SOURCE_SHA);NervFixedFootGuidesR52.enable(level,directory);if(!commissionStationsR52(level))return false;}
         commissioned=true;commissioningDiagnosticR52="commissioned";return true;
     }
-    /** Restart reuses every declared machine. Missing or unloaded saved
-     * actors hold restoration; this entry cannot create replacements. */
+    /** Restart reuses saved machines. Explicit added hatch layers are first
+     * commissioned only when that identity has never existed in this save. */
     public boolean resumeExistingR52(ServerLevel level)throws java.io.IOException {
         var machines=new HashSet<UUID>();for(var p:units.values()){machines.add(p.gantry().id());machines.add(p.crane().visual().id());var carrier=carrierControllers.get(p.variant());if(carrier==null)return commissioningHoldR52("resume/carrier_identity","variant="+p.variant());machines.add(carrier);}for(var g:gates.values())machines.add(g.visual());for(String id:canonicalTurnsR52())machines.add(NervFootGuideStationR52.proposedIdentityR52(epoch,id));
-        for(var id:machines){var actor=level.getEntity(id);if(actor==null||!actor.isAlive())return commissioningHoldR52("resume/original_controller_not_loaded","uuid="+id);}
+        var addedLayers=new HashMap<UUID,Gate>();for(var group:launchGateLayersR54.values())for(int i=1;i<group.size();i++)addedLayers.put(group.get(i).visual(),group.get(i));
+        var saved=NervRouteRuntimeR52.installationStateR52(level);
+        for(var id:machines)
+        {
+            var actor=level.getEntity(id);
+            if(actor==null&&addedLayers.containsKey(id)&&saved!=null&&!saved.installationActorChunks().containsKey(id))
+            {
+                if(!commissionDoor(level,addedLayers.get(id)))return commissioningHoldR52("resume/new_launch_layer","uuid="+id);
+                actor=level.getEntity(id);
+            }
+            if(actor==null||!actor.isAlive())return commissioningHoldR52("resume/original_controller_not_loaded","uuid="+id);
+        }
         CarrierEquipmentUpdateR53.verifyPendingBank(level,NervRouteRuntimeR52.installationStateR52(level),directory);
         return commission(level);
     }
@@ -204,7 +216,32 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var fleet=EvaFleetSavedData.get(l.getServer());var row=fleet.entry(variant).orElseThrow();fleet.put(variant,row.withPhase(EvaFleetSavedData.Phase.PARKED,0,0,p.lcl().size()));captured.remove(eva.getUUID());continuousGeometryR52.remove(eva.getUUID());ballistic.remove(eva.getUUID());previews.remove(eva.getUUID());occupiedPreviews.remove(eva.getUUID());holds.remove(eva.getUUID());receiverTicks.remove(eva.getUUID());return eva;
     }
     private boolean carrierSupportReadyR53(ServerLevel l,EvaUnit01Entity eva){var installed=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);if(installed!=null&&CarrierMountProfileR53.read(installed,1).supportOnly())return false;if(installed!=null&&CarrierMountProfileR53.read(installed,1).shallowBay())return NervMappedPlugMechanicsR52.actualCarrierFootBearing(l,eva);var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(eva);return carrier!=null&&NervOriginalCarrierR52.declared(carrier)&&eva.carrierRiseProgress(1)==1&&pose(NervOriginalCarrierR52.actualRoot(carrier,1),NervOwnerPlacementR52.actualRoot(eva));}
-    private boolean acceptCarrierActuatorR52(ServerLevel l,EvaUnit01Entity e,RigidTransform root,float from,float to,Set<UUID> own,Original o,CompoundTag data){var n=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(n!=null&&CarrierMountProfileR53.read(n,1).shallowBay()){var admission=carrierActuatorAdmissionR52(l,o,data);if(admission==null)return hold(o,"shallow_bay_original_space_lease_missing");var members=new HashSet<>(own);members.add(n.getUUID());try{var step=Finish.EJECT_LOWER.name().equals(data.getString("Finish"))?NervOriginalCarrierR52.proposeOutletReturnR53(l,n,e,data.getString("RouteR52"),from,to,Set.copyOf(members)):NervR50CarrierModeR53.launchDeckDropR53(NervOriginalCarrierR52.actualRoot(n,1),0)==-64?NervOriginalCarrierR52.proposeReceiverActuatorR53(l,n,from,to,Set.copyOf(members)):NervOriginalCarrierR52.proposeShallowBayActuatorR53(l,n,from,to,Set.copyOf(members));if(step==null||!step.current(l)||!admission.pool().resourcesHeldR52(admission.task(),admission.resources())||NervTraversalPolicyR53.strict(l)&&!NervTurnStationRuntimeR52.covered(admission,step.envelopes())||!step.commit(l))return hold(o,"shallow_bay_complete_source_stroke_held");}catch(java.io.IOException missing){return false;}}else if(n!=null)NervOriginalCarrierR52.restoreR50RiseR53(n,to);e.setCarrierRiseProgress(to);return true;}
+    private boolean acceptCarrierActuatorR52(ServerLevel l,EvaUnit01Entity e,RigidTransform root,float from,float to,Set<UUID> own,Original o,CompoundTag data)
+    {
+        var n=EvaMechanicalFrameR52.originalCarrierControllerR52(e);
+        if(n!=null&&CarrierMountProfileR53.read(n,1).shallowBay())
+        {
+            var admission=carrierActuatorAdmissionR52(l,o,data);
+            if(admission==null)return hold(o,"shallow_bay_original_space_lease_missing");
+            var members=new HashSet<>(own);members.add(n.getUUID());
+            if(from==0&&to>0)CarrierBayLiftSlotsR54.setClosed(l,n,false);
+            try
+            {
+                var step=Finish.EJECT_LOWER.name().equals(data.getString("Finish"))
+                        ?NervOriginalCarrierR52.proposeOutletReturnR53(l,n,e,data.getString("RouteR52"),from,to,Set.copyOf(members))
+                        :NervR50CarrierModeR53.launchDeckDropR53(NervOriginalCarrierR52.actualRoot(n,1),0)==-64
+                        ?NervOriginalCarrierR52.proposeReceiverActuatorR53(l,n,from,to,Set.copyOf(members))
+                        :NervOriginalCarrierR52.proposeShallowBayActuatorR53(l,n,from,to,Set.copyOf(members));
+                if(step==null||!step.current(l)||!admission.pool().resourcesHeldR52(admission.task(),admission.resources())
+                        ||NervTraversalPolicyR53.strict(l)&&!NervTurnStationRuntimeR52.covered(admission,step.envelopes())
+                        ||!step.commit(l))return hold(o,"shallow_bay_complete_source_stroke_held");
+            }
+            catch(java.io.IOException missing){return false;}
+            if(to==0)CarrierBayLiftSlotsR54.setClosed(l,n,true);
+        }
+        else if(n!=null)NervOriginalCarrierR52.restoreR50RiseR53(n,to);
+        e.setCarrierRiseProgress(to);return true;
+    }
 
     public String holdReason(UUID original){return holds.getOrDefault(original,"");}
     private boolean hold(Original original,String reason){holds.put(original.eva(),reason);return false;}
@@ -276,7 +313,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             boolean originalLiquid=c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())&&current.is(c.closed().getBlock());
             if(!originalLiquid&&!NervMechanicalMaterialR53.samePhase(current,c.closed())&&!NervMechanicalMaterialR53.samePhase(current,c.open()))return false;
             var next=open?c.open():c.closed();
-            if(!NervMechanicalMaterialR53.samePhase(current,next))for(var box:next.getCollisionShape(l,c.at()).toAabbs())
+            if(NervTraversalPolicyR53.strict(l)&&!NervMechanicalMaterialR53.samePhase(current,next))for(var box:next.getCollisionShape(l,c.at()).toAabbs())
             {
                 var worldBox=box.move(c.at());
                 for(var entity:l.getEntities((Entity)null,worldBox,e->!own.contains(e.getUUID())&&e.isAlive()))
@@ -657,6 +694,8 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             case DRAIN ->
             {
                 var installed=EvaMechanicalFrameR52.originalCarrierControllerR52(e);
+                if(ticks==0&&installed!=null&&CarrierMountProfileR53.read(installed,1).shallowBay()
+                        &&e.carrierRiseProgress(1)==0)data.putBoolean("DrainBeforeRaiseR54",true);
                 if(installed!=null&&!data.getBoolean("LclGuardsRestoredR53"))
                 {CarrierBayTrayR53.restoreResetGuardsR53(l,installed,p.lcl());data.putBoolean("LclGuardsRestoredR53",true);}
                 var legacyClamp=gantry(l,p);
@@ -671,9 +710,12 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                 int removed=NervAssemblyClocksR52.drainingLayers(p.lcl().size(),(ticks+1)*(quick?2:1));int accepted=data.getInt("DrainedLayers");while(accepted<removed){if(!change(l,p.lcl().get(p.lcl().size()-1-accepted),true,own)){hold(o,"actual_lcl_layer_not_owned_"+accepted);return Preparation.WAITING;}data.putInt("DrainedLayers",++accepted);}
                 var gantry=gantry(l,p);if(gantry==null)return Preparation.WAITING;gantry.setLclVisualLevel(p.lcl().size()-NervAssemblyClocksR52.liquidLayers(p.lcl().size(),(ticks+1)*(quick?2:1)));
                 {
-                    float progress=Math.min(1,(ticks+1)/(float)Math.max(quick?NervAssemblyClocksR52.QUICK_RAISE_TICKS_R54:p.raiseTicks(),p.lcl().size()*(quick?1:NervAssemblyClocksR52.LCL_TICKS_PER_LAYER)));
+                    int drainTicks=p.lcl().size()*(quick?1:NervAssemblyClocksR52.LCL_TICKS_PER_LAYER);
+                    int raiseAge=data.getBoolean("DrainBeforeRaiseR54")?Math.max(0,ticks+1-drainTicks):ticks+1;
+                    float progress=Math.min(1,raiseAge/(float)Math.max(quick?NervAssemblyClocksR52.QUICK_RAISE_TICKS_R54:p.raiseTicks(),drainTicks));
                     float rise=EvaDorsalMechanism.smooth(progress);
-                    if(!acceptCarrierActuatorR52(l,e,p.bay(),e.carrierRiseProgress(1),rise,own,o,data))return Preparation.WAITING;
+                    if(rise!=e.carrierRiseProgress(1)
+                            &&!acceptCarrierActuatorR52(l,e,p.bay(),e.carrierRiseProgress(1),rise,own,o,data))return Preparation.WAITING;
                     if(!fixedCarrierBayR53(l,p))gantry.setRestraintProgress(1-rise);
                     else if(gantry.getRestraintProgress()!=0)return Preparation.WAITING;
                     data.remove("DryVerified");
@@ -847,8 +889,8 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             var gate=gates.get(id);boolean nearby=strict||context!=null&&context.nativeAccess().resourceNearbyR53(id,scope);
             if(gate!=null&&nearby&&context!=null)
             {var bound=context.bindings().get(id);if(bound!=null)for(var cell:bound.cells())chunks.add(new net.minecraft.world.level.ChunkPos(cell.position()));}
-            if(gate!=null&&nearby)
-            {chunks.add(new net.minecraft.world.level.ChunkPos(BlockPos.containing(gate.frame().translation())));for(var cell:gate.supports())chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));for(var step:gate.collisionSteps())for(var cell:step)chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));{chunks.addAll(CarrierTransferRailsR53.gateSupportChunks(gate.frame()));}}
+            if(gate!=null&&nearby)for(var member:gateGroupR54(gate))
+            {chunks.add(new net.minecraft.world.level.ChunkPos(BlockPos.containing(member.frame().translation())));for(var cell:member.supports())chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));for(var step:member.collisionSteps())for(var cell:step)chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));chunks.addAll(CarrierTransferRailsR53.gateSupportChunks(member.frame()));}
             if(strict)
             {for(var cell:resources.getOrDefault(id,List.of()))chunks.add(new net.minecraft.world.level.ChunkPos(cell.at()));if(context!=null){var bound=context.bindings().get(id);if(bound!=null)for(var cell:bound.cells())chunks.add(new net.minecraft.world.level.ChunkPos(cell.position()));}}
         }
@@ -890,11 +932,32 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(!missing.isEmpty())advancePreparingChunkTasksR53(l,o,route);
         boolean ready=true;String pending="";if(geometry.strict())for(var chunk:missing)if(chunks.getChunkNow(chunk.x,chunk.z)==null){ready=false;pending="route_chunk/"+chunk.x+"/"+chunk.z;}
         var context=NervRouteRuntimeR52.flightContext(l);if(context==null)return false;var lease=context.pool().groundTaskR52(o);if(lease==null||!lease.route().equals(route.id())||!context.pool().resourcesHeldR52(lease.task(),directory.resources(route)))return hold(o,"continuous_full_route_lease_missing");
+        double travelled=data.getDouble("ContinuousDistanceR52");
+        boolean stagedLaunch=route.phased()&&!route.recovery();
+        boolean atBank=stagedLaunch&&travelled>=directory.readyDistanceR53(route)-1e-6;
+        var launchDoors=new ArrayList<Gate>();
+        if(stagedLaunch)for(String legId:route.legs())for(String id:directory.leg(legId).doors())
+        {
+            var gate=gates.get(id);
+            if(gate!=null&&gate.kind()==GateKind.SILO&&id.startsWith("bank_"+route.bank()+"_"))
+                for(var member:gateGroupR54(gate))if(!launchDoors.contains(member))launchDoors.add(member);
+        }
+        launchDoors.sort(Comparator.comparingDouble(g->g.frame().translation().y));
+        if(!route.id().equals(data.getString("LaunchDoorsRouteR54")))
+        {data.remove("LaunchDoorsStartedR54");data.putString("LaunchDoorsRouteR54",route.id());}
+        if(atBank&&!data.contains("LaunchDoorsStartedR54"))data.putLong("LaunchDoorsStartedR54",l.getGameTime());
+        for(int i=0;atBank&&i<launchDoors.size();i++)
+        {
+            var door=launchDoors.get(i);
+            boolean started=l.getGameTime()-data.getLong("LaunchDoorsStartedR54")>=i*12L;
+            if(!started||!gateLeafR54(l,door,true,TransportMembershipR52.members(o,kind(data)))){ready=false;pending="opening_launch_gate/"+door.resource();}
+        }
         for(String id:geometry.resources())
         {
             var r=directory.resource(id);var scope=geometry.strict()?null:geometry.resourceScope();
             if(r.kind()==ResourceKind.DOOR)
             {
+                if(stagedLaunch&&launchDoors.stream().anyMatch(g->g.resource().equals(id)))continue;
                 if(scope!=null&&!context.nativeAccess().resourceNearbyR53(id,scope))continue;
                 var g=gates.get(id);boolean open=g!=null&&gate(l,g,true,TransportMembershipR52.members(o,kind(data)));
                 if(geometry.strict()&&!open){ready=false;pending="route_gate/"+id;}
@@ -1123,6 +1186,15 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     }
     private boolean gate(ServerLevel l,Gate g,boolean open,Set<UUID> own)
     {
+        if(g==null)return false;
+        boolean ready=true;
+        for(var member:gateGroupR54(g))if(!gateLeafR54(l,member,open,own))ready=false;
+        return ready;
+    }
+    private List<Gate> gateGroupR54(Gate gate)
+    {return launchGateLayersR54.getOrDefault(gate.resource(),List.of(gate));}
+    private boolean gateLeafR54(ServerLevel l,Gate g,boolean open,Set<UUID> own)
+    {
         if(g!=null&&NervR50CarrierModeR53.retiredPit(g.resource()))return true;
         if(g==null||!fixed(l,g.supports())||!declaredDoor(l,g))return false;float proposed;
         if(hasWetFloorSealR52(g)){boolean rest=gateAtRest(l,g,open);var p=units.get(g.variant());if(!wetSealMotionPermitR52(rest,wetSealBayDryR52(l,g),p!=null&&gateAtRest(l,servicePit(p),true)))return false;if(rest)return true;}
@@ -1131,9 +1203,9 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(g.kind()==GateKind.SILO&&Objects.equals(servicePits.get(g.variant()),g.resource())&&gateAtRest(l,g,open))return true;
         // No actuator or proxy write is required at the requested endpoint.
         // Native identity, support and every collision cell are still read back.
-        if(gateAtRest(l,g,open))return true;
+        if(gateLeafAtRestR54(l,g,open))return true;
         if(open)for(var p:units.values())if(g.resource().equals(servicePits.get(p.variant()))){var gantry=gantry(l,p);if(!dryBay(l,p)||gantry==null||gantry.getLclVisualLevel(1)!=0||!gantry.lowerFrameDeclaredR52()||gantry.lowerFrameProgressR52(1)!=1)return false;}
-        if(gateTicks.getOrDefault(g.resource(),Long.MIN_VALUE)==l.getGameTime())return gateAtRest(l,g,open);
+        if(gateTicks.getOrDefault(g.resource(),Long.MIN_VALUE)==l.getGameTime())return gateLeafAtRestR54(l,g,open);
         if(l.getEntity(g.visual()) instanceof NervHangarDoorEntity door){door.applyDeclaredR52(g.variant(),g.hangarStack(),open);proposed=door.proposedDeclaredProgressR52(open);}
         else {var door=(NervSiloDoorEntity)l.getEntity(g.visual());door.configureDeclaredR52(g.variant(),g.stage(),g.frame(),open,g.siloHatch());proposed=door.proposedDeclaredProgressR52(open);}
         int completed=proposed==1?g.collisionSteps().size():0;
@@ -1152,13 +1224,18 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             {var carrier=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(carrier!=null)proxyOwner.add(carrier.getUUID());}
         }
         for(int i=0;i<g.collisionSteps().size();i++)if(!canChange(l,g.collisionSteps().get(i),i<completed,proxyOwner))return false;
-
-        for(int i=0;i<g.collisionSteps().size();i++)if(!canChange(l,g.collisionSteps().get(i),i<completed,proxyOwner))return false;
         for(int i=0;i<g.collisionSteps().size();i++)if(!change(l,g.collisionSteps().get(i),i<completed,proxyOwner))return false;
         if(l.getEntity(g.visual()) instanceof NervHangarDoorEntity door)door.advanceDeclaredR52(open);else ((NervSiloDoorEntity)l.getEntity(g.visual())).advanceDeclaredR52(open);
-        gateTicks.put(g.resource(),l.getGameTime());return gateAtRest(l,g,open);
+        if(open&&actual==0&&proposed>0)
+        {
+            var at=g.frame().translation();
+            l.playSound(null,at.x,at.y,at.z,com.projectseele.registry.ModSounds.FACILITY.get("facility_hydraulic").get(),net.minecraft.sounds.SoundSource.BLOCKS,4F,.8F);
+        }
+        gateTicks.put(g.resource(),l.getGameTime());return gateLeafAtRestR54(l,g,open);
     }
     private boolean gateAtRest(ServerLevel l,Gate g,boolean open)
+    {return g!=null&&gateGroupR54(g).stream().allMatch(member->gateLeafAtRestR54(l,member,open));}
+    private boolean gateLeafAtRestR54(ServerLevel l,Gate g,boolean open)
     {if(g!=null&&NervR50CarrierModeR53.retiredPit(g.resource()))return true;if(g==null||!declaredDoor(l,g)||!fixed(l,g.supports()))return false;float actual=l.getEntity(g.visual()) instanceof NervHangarDoorEntity door?door.actualOpenProgressR52():((NervSiloDoorEntity)l.getEntity(g.visual())).actualOpenProgressR52();return (open?actual==1:actual==0)&&g.collisionSteps().stream().allMatch(c->matches(l,c,open));}
     @Override public NervFlightGatePlanR52 previewFlightGates(ServerLevel l,Original o,Kind k,Set<String> ids)
     {return commissioned&&plant(o)!=null&&originalGraph(l,o,k==Kind.OCCUPIED)?NervFlightGatePlanR52.inspect(l,gates,ids,TransportMembershipR52.members(o,k)):null;}
@@ -1693,7 +1770,22 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var root=JsonParser.parseString(new String(approvedBytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();var parent=file.toAbsolutePath().normalize().getParent().toRealPath();
         for(var row:root.getAsJsonArray("units")){var u=row.getAsJsonObject();for(String field:List.of("lcl","bridge_states"))if(u.get(field).isJsonObject())u.add(field,componentTable(parent,u.getAsJsonObject(field)));}
         for(var row:root.getAsJsonArray("gates")){var gate=row.getAsJsonObject();if(gate.get("collision_steps").isJsonObject())gate.add("collision_steps",componentTable(parent,gate.getAsJsonObject("collision_steps")));}
+        var layerFile=parent.resolve("launch_hatch_layers_r54.json");
+        if(Files.isRegularFile(layerFile))root.add("launch_layers_r54",JsonParser.parseString(Files.readString(layerFile)).getAsJsonArray());
         return root;
+    }
+    private static Map<String,List<Gate>> launchGateLayersR54(JsonObject root,Map<String,Gate> gates,long epoch)
+    {
+        var groups=new HashMap<String,List<Gate>>();
+        if(!root.has("launch_layers_r54"))return Map.of();
+        for(var raw:root.getAsJsonArray("launch_layers_r54"))
+        {
+            var row=raw.getAsJsonObject();String parent=row.get("linked_to").getAsString(),id=row.get("resource").getAsString();var source=gates.get(parent);
+            require(source!=null&&source.kind()==GateKind.SILO&&parent.startsWith("bank_")&&!gates.containsKey(id),"Launch layer must share an existing silo resource");
+            var layer=new Gate(id,proposedGateIdentityR53(epoch,id),GateKind.SILO,source.variant(),source.stage(),frame(row.getAsJsonObject("frame")),source.width(),source.height(),steps(row.getAsJsonArray("collision_steps")),fixedCells(row.getAsJsonArray("supports")),source.siloHatch());
+            gates.put(id,layer);groups.computeIfAbsent(parent,key->new ArrayList<>(List.of(source))).add(layer);
+        }
+        return groups.entrySet().stream().collect(java.util.stream.Collectors.toUnmodifiableMap(Map.Entry::getKey,e->List.copyOf(e.getValue())));
     }
     private static JsonArray componentTable(Path parent,JsonObject reference)throws java.io.IOException
     {
@@ -1714,10 +1806,12 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var units=new HashMap<Integer,UnitPlant>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();int v=u.get("variant").getAsInt();var cr=u.getAsJsonObject("crane");var c=new Crane(visual(cr.getAsJsonObject("visual")),frame(cr.getAsJsonObject("stow_frame")),number(cr,"initial_bottom"),number(cr,"stow_bottom"),vector(cr.getAsJsonArray("rail_axis_local")),number(cr,"rail_min"),number(cr,"rail_max"),number(cr,"hoist_step"),fixedCells(cr.getAsJsonArray("frame_cells")));
         var p=new UnitPlant(v,uuid(u,"eva"),uuid(u,"plug"),uuid(u,"original_npc"),uuid(u,"original_seat"),frame(u.getAsJsonObject("bay_frame")),frame(u.getAsJsonObject("dock_frame")),vector(u.getAsJsonArray("boarding")),points(u.getAsJsonArray("dismount")),bridgeStates(u.getAsJsonArray("bridge_states")),steps(u.getAsJsonArray("lcl")),visual(u.getAsJsonObject("gantry")),c,fixedCells(u.getAsJsonArray("carrier_support")),u.get("carrier_raise_ticks").getAsInt(),frame(u.getAsJsonObject("seat_frame")),fixedCells(u.getAsJsonArray("chair")),vector(u.getAsJsonArray("phone")),vector(u.getAsJsonArray("standby")),points(u.getAsJsonArray("board_path")),points(u.getAsJsonArray("return_path")),number(u,"boarding_radius"),u.has("hull_handoff")?new HullHandoff(fixedCells(u.getAsJsonObject("hull_handoff").getAsJsonArray("supports")),u.getAsJsonObject("hull_handoff").get("lower_ticks").getAsInt()):null,steps(u.getAsJsonArray("personnel_doors")));require(units.putIfAbsent(v,p)==null,"Duplicate original plant");}
         var gates=new HashMap<String,Gate>();for(var raw:root.getAsJsonArray("gates")){var g=raw.getAsJsonObject();String id=g.get("resource").getAsString();var item=new Gate(id,uuid(g,"visual"),GateKind.valueOf(g.get("kind").getAsString()),g.get("variant").getAsInt(),g.get("stage").getAsInt(),frame(g.getAsJsonObject("frame")),g.get("width").getAsFloat(),g.get("height").getAsFloat(),steps(g.getAsJsonArray("collision_steps")),fixedCells(g.getAsJsonArray("supports")),g.has("silo_hatch")?siloSpec(g.getAsJsonObject("silo_hatch")):null,g.has("hangar_stack")?hangarSpec(g):null);if((g.has("floor_seal_original_cells"))){var retired=new HashSet<BlockPos>();for(var position:g.getAsJsonArray("floor_seal_original_cells"))retired.add(position(position.getAsJsonArray()));var spec=item.hangarStack();item=new Gate(item.resource(),item.visual(),item.kind(),item.variant(),item.stage(),item.frame(),item.width(),item.height(),item.collisionSteps().stream().map(row->row.stream().filter(cell->!retired.contains(cell.at())).toList()).toList(),item.supports(),item.siloHatch(),new NervHangarGateGeometryR52.Spec(spec.width(),spec.height(),spec.openTicks(),spec.closeTicks(),spec.depthDirection(),null,spec.leafLowerExtensionM()));}require(directory.resource(id)!=null&&directory.resource(id).kind()==ResourceKind.DOOR&&gates.putIfAbsent(id,item)==null,"Unbound/duplicate declared gate");if(hasWetFloorSealR52(item)){if(item.hangarStack().bottomSeal().version()==2)require(directory.schemaVersionR52()==2&&g.has("floor_seal_original_cells"),"Expanded actual floor seal requires the new directory and complete exact source-cell trace");if(g.has("floor_seal_original_cells")){var trace=new HashSet<BlockPos>();for(var cell:g.getAsJsonArray("floor_seal_original_cells"))require(trace.add(position(cell.getAsJsonArray())),"Duplicate actual floor-seal original cell");require(trace.equals(wetFloorSealCellsR52(item).stream().map(Cell::at).collect(java.util.stream.Collectors.toSet())),"Actual floor boxes and original floor-cell trace differ");}}if(directory.schemaVersionR52()==2&&item.siloHatch()!=null&&item.siloHatch().serviceColumnPorts())require(g.getAsJsonObject("silo_hatch").has("service_gantry_yaw_degrees"),"Current service pit requires an explicit actual gantry-relative yaw");}
+        var launchLayers=launchGateLayersR54(root,gates,directory.epoch());
         var resources=new HashMap<String,List<FixedCell>>();for(var row:root.getAsJsonObject("resources").entrySet())require(resources.putIfAbsent(row.getKey(),fixedCells(row.getValue().getAsJsonArray()))==null,"Duplicate physical resource");
         var receivers=new HashMap<String,Receiver>();for(var raw:root.getAsJsonArray("receivers")){var r=raw.getAsJsonObject();String id=r.get("port").getAsString();var b=r.getAsJsonArray("domain");require(b.size()==6,"Explicit recovery domain required");var low=new Vec3(b.get(0).getAsDouble(),b.get(1).getAsDouble(),b.get(2).getAsDouble());var high=new Vec3(b.get(3).getAsDouble(),b.get(4).getAsDouble(),b.get(5).getAsDouble());require(Double.isFinite(low.lengthSqr()+high.lengthSqr())&&low.x<high.x&&low.y<high.y&&low.z<high.z,"Actual positive recovery domain required");var ids=new ArrayList<String>();for(var g:r.getAsJsonArray("gates")){String gate=g.getAsString();require(gates.containsKey(gate),"Unknown receiver gate");ids.add(gate);}var item=new Receiver(id,Region.valueOf(r.get("region").getAsString()),new AABB(low,high),frame(r.getAsJsonObject("stopped_frame")),fixedCells(r.getAsJsonArray("supports")),ids,r.get("carrier_ticks").getAsInt());require(directory.ports().containsKey(id)&&directory.ports().get(id).region()==item.region()&&item.carrierTicks()>0&&!item.supports().isEmpty()&&receivers.putIfAbsent(id,item)==null,"Unbound/duplicate physical receiver");}
         for(var gate:gates.values())validateEarlyGuideRoleR53(gate.resource(),gate.variant(),gate.siloHatch());
         require(receivers.keySet().equals(directory.ports().keySet()),"Every real port needs its exact receiving mechanism");var owner=new NervAssemblyOwnerR52(directory,directory.epoch(),status.equals("installed"),units,gates,resources,receivers,root.getAsJsonObject("mechanism_sources").get("mesh/tv_shoulder_shells_r44.json").getAsString());
+        owner.launchGateLayersR54=launchLayers;
         var pits=new HashMap<Integer,String>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("service_pit")){require(!status.equals("installed"),"Installed original bay requires its actual dry service pit gate");continue;}int v=u.get("variant").getAsInt();String id=u.get("service_pit").getAsString();var gate=gates.get(id);require(gate!=null&&gate.kind()==GateKind.SILO&&gate.variant()==v&&gate.siloHatch().separationSign()==-1&&gate.siloHatch().serviceColumnPorts()&&pits.putIfAbsent(v,id)==null,"Actual original-bay downward pit gate required");}owner.servicePits=Map.copyOf(pits);for(var pit:pits.entrySet()){var unit=units.get(pit.getKey());var gate=gates.get(pit.getValue());require(pose(unit.gantry().frame(),gate.frame().compose(gate.siloHatch().serviceGantryRelativeFrame())),"Actual gantry and service pit frame differ from the explicit port-relative transform");}var lower=new HashSet<Integer>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("lower_frame")){require(!status.equals("installed"),"Installed original bay requires actual lower crossbar mechanism");continue;}var spec=u.getAsJsonObject("lower_frame");require(spec.get("source_sha256").getAsString().equals(NervLowerFrameR52.SOURCE_SHA)&&spec.get("open_ticks").getAsInt()==NervLowerFrameR52.OPEN_TICKS&&spec.get("close_ticks").getAsInt()==NervLowerFrameR52.CLOSE_TICKS,"Actual selected lower-frame source and physical clocks required");lower.add(u.get("variant").getAsInt());}owner.lowerFrames=Set.copyOf(lower);if(root.has("ground_guides")){var guide=root.getAsJsonObject("ground_guides");boolean continuous=directory.routes().values().stream().allMatch(Route::continuousUpright);if(continuous){require(guide.has("mode")&&guide.get("mode").getAsString().equals("continuous_upright")&&guide.get("source_sha256").getAsString().equals(NervOuterCarrierGuideR52.SOURCE_SHA)&&guide.get("paths_sha256").getAsString().matches("[0-9a-f]{64}")&&!guide.get("paths_sha256").getAsString().equals("0".repeat(64))&&!guide.has("dock_foundations")&&!guide.has("dock_source_sha256"),"Actual explicit continuous captured model/paths source required; old Dock cannot be reused");owner.continuousGuidesR52=true;owner.continuousGuidePathsShaR52=guide.get("paths_sha256").getAsString();}else require(guide.get("source_sha256").getAsString().equals(NervFootGuideRigR52.SOURCE_SHA)&&guide.get("paths_sha256").getAsString().equals(NervFixedFootGuidesR52.SOURCE_SHA),"Actual selected engineered foot-guide source required");owner.groundGuidesDeclared=false;if(!continuous&&guide.has("dock_foundations")){require(guide.has("dock_source_sha256")&&guide.get("dock_source_sha256").getAsString().equals(NervFootGuideDockR52.SOURCE_SHA),"Actual fixed turn station source required");var foundation=new HashMap<String,Double>();for(var rawTop:guide.getAsJsonArray("dock_foundations")){var row=rawTop.getAsJsonObject();String id=row.get("leg").getAsString();double top=row.get("foundation_top_m").getAsDouble();require(Double.isFinite(top)&&directory.leg(id)!=null&&directory.leg(id).motion()==Motion.FOOT_BEARING_TURN&&id.equals(NervFootGuideStationR52.canonicalLeg(id))&&foundation.putIfAbsent(id,top)==null,"Explicit Root canonical station foundation required");}owner.dockFoundationsR52=Map.copyOf(foundation);}else require(continuous||!status.equals("installed"),"Installed legacy turn stations need explicit Root dock_foundations");var controllers=new HashMap<Integer,UUID>();for(var raw:root.getAsJsonArray("units")){var u=raw.getAsJsonObject();if(!u.has("carrier_controller")){require(!status.equals("installed"),"Installed original full carrier requires its independent actual controller");continue;}var c=u.getAsJsonObject("carrier_controller");int v=u.get("variant").getAsInt();var id=uuid(c,"id");require(c.get("source_sha256").getAsString().equals(NervOriginalCarrierR52.SOURCE_SHA)&&id.equals(NervOriginalCarrierR52.proposedIdentityR52(owner.epoch,uuid(u,"eva")))&&controllers.putIfAbsent(v,id)==null,"Actual original single-carrier source/identity required");}owner.carrierControllers=Map.copyOf(controllers);}else require(!status.equals("installed"),"Installed foot-driven plant requires explicit ground_guides source");
         var staff=new ArrayList<StaffBinding>();var identities=new HashSet<UUID>();var posts=new HashSet<String>();if(root.has("staff"))for(var raw:root.getAsJsonArray("staff")){var row=raw.getAsJsonObject();var id=uuid(row,"original_uuid");String post=row.get("id").getAsString();require(identities.add(id)&&posts.add(post),"Duplicate original staff identity/post");var station=new NervStaffDirector.Station(post,row.get("name").getAsString(),row.get("role").getAsString(),row.get("skin").getAsString(),position(row.getAsJsonArray("feet")),row.get("yaw").getAsFloat());staff.add(new StaffBinding(id,station,fixedCells(row.getAsJsonArray("support"))));}owner.staff=List.copyOf(staff);return owner;
     }

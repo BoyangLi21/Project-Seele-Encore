@@ -98,7 +98,7 @@ public final class NervLiftDoorRenderer
         if (door.getDoorStyle() == NervLiftDoorEntity.STYLE_NERV_BLACK)
         {
             renderSplitLogo(poses, buffers, leftX, rightX, leafWidth,
-                    door.getDoorHeight());
+                    door.getDoorHeight(), packedLight);
         }
         poses.popPose();
         poses.popPose();
@@ -114,7 +114,7 @@ public final class NervLiftDoorRenderer
 
     private static void renderSplitLogo(PoseStack poses,
             MultiBufferSource buffers, double leftX, double rightX,
-            float leafWidth, int height)
+            float leafWidth, int height, int light)
     {
         ResourceLocation logo = TreeOfLifeWallClient.nervLogoTexture(
                 Minecraft.getInstance());
@@ -123,34 +123,40 @@ public final class NervLiftDoorRenderer
             return;
         }
         VertexConsumer consumer = buffers.getBuffer(
-                RenderType.entityTranslucent(logo));
+                RenderType.entityCutout(logo));
         double y0 = Math.max(0.25D, height * 0.08D);
         double y1 = height - y0;
         logoHalf(poses, consumer, leftX, leftX + leafWidth,
-                y0, y1, -0.108D, 1.0F, 0.5F);
+                y0, y1, -0.15D, 1.0F, 0.5F, light);
         logoHalf(poses, consumer, rightX, rightX + leafWidth,
-                y0, y1, -0.108D, 0.5F, 0.0F);
+                y0, y1, -0.15D, 0.5F, 0.0F, light);
+        logoHalf(poses, consumer, leftX + leafWidth, leftX,
+                y0, y1, 0.15D, 0.5F, 0.0F, light);
+        logoHalf(poses, consumer, rightX + leafWidth, rightX,
+                y0, y1, 0.15D, 1.0F, 0.5F, light);
     }
 
     private static void logoHalf(PoseStack poses, VertexConsumer consumer,
             double x0, double x1, double y0, double y1, double z,
-            float u0, float u1)
+            float u0, float u1, int light)
     {
         Matrix4f matrix = poses.last().pose();
         Matrix3f normal = poses.last().normal();
-        logoVertex(consumer, matrix, normal, x0, y0, z, u0, 1.0F);
-        logoVertex(consumer, matrix, normal, x1, y0, z, u1, 1.0F);
-        logoVertex(consumer, matrix, normal, x1, y1, z, u1, 0.0F);
-        logoVertex(consumer, matrix, normal, x0, y1, z, u0, 0.0F);
+        float normalZ = x1 > x0 ? -1 : 1;
+        logoVertex(consumer, matrix, normal, x0, y1, z, u0, 0.0F, light, normalZ);
+        logoVertex(consumer, matrix, normal, x1, y1, z, u1, 0.0F, light, normalZ);
+        logoVertex(consumer, matrix, normal, x1, y0, z, u1, 1.0F, light, normalZ);
+        logoVertex(consumer, matrix, normal, x0, y0, z, u0, 1.0F, light, normalZ);
     }
 
     private static void logoVertex(VertexConsumer consumer, Matrix4f pose,
-            Matrix3f normal, double x, double y, double z, float u, float v)
+            Matrix3f normal, double x, double y, double z, float u, float v,
+            int light, float normalZ)
     {
         consumer.vertex(pose, (float)x, (float)y, (float)z)
                 .color(255, 255, 255, 255).uv(u, v)
                 .overlayCoords(OverlayTexture.NO_OVERLAY)
-                .uv2(0x00F000F0).normal(normal, 0.0F, 0.0F, -1.0F)
+                .uv2(light).normal(normal, 0.0F, 0.0F, normalZ)
                 .endVertex();
     }
 

@@ -163,11 +163,28 @@ public final class NervCarrierPlatformRenderer
         }
         // Keep the surface through integer crossings too: the next physical
         // layer can already be removed while this visual sample is in flight.
-        var out=buffers.getBuffer(EnergyGlowR24.SMOKE);
+        var out=buffers.getBuffer(net.minecraft.client.renderer.RenderType.translucent());
+        var sprite=net.minecraft.client.Minecraft.getInstance().getTextureAtlas(InventoryMenu.BLOCK_ATLAS)
+                .apply(new ResourceLocation("projectseele","block/lcl_still"));
         float y=level+.93F;
-        int tint=com.projectseele.fluid.LclFluidType.TINT;
-        for(float[] p:new float[][]{{-19.5F,26.5F,0,1},{19.5F,26.5F,1,1},{19.5F,-26.5F,1,0},{-19.5F,-26.5F,0,0}})
-            out.vertex(poses.last().pose(),p[0],y,p[1]).color((tint>>16)&255,(tint>>8)&255,tint&255,(tint>>>24)&255).endVertex();
+        int tint=com.projectseele.client.HangarCoolantVisualR52.tint(entity.level(),entity.blockPosition().above((int)level));
+        int red=(tint>>16)&255,green=(tint>>8)&255,blue=tint&255,alpha=(tint>>>24)&255;
+        float u0=sprite.getU0(),u1=sprite.getU1(),v0=sprite.getV0(),v1=sprite.getV1();
+        var pose=poses.last();
+        // The fractional layer is the same animated fluid as the pool below,
+        // not an opaque, unlit smoke quad sliding over the whole reservoir.
+        for(int x=0;x<39;x++)for(int z=0;z<53;z++)
+        {
+            float left=x-19.5F,front=z-26.5F;
+            out.vertex(pose.pose(),left,y,front+1).color(red,green,blue,alpha)
+                    .uv(u0,v1).uv2(packedLight).normal(pose.normal(),0,1,0).endVertex();
+            out.vertex(pose.pose(),left+1,y,front+1).color(red,green,blue,alpha)
+                    .uv(u1,v1).uv2(packedLight).normal(pose.normal(),0,1,0).endVertex();
+            out.vertex(pose.pose(),left+1,y,front).color(red,green,blue,alpha)
+                    .uv(u1,v0).uv2(packedLight).normal(pose.normal(),0,1,0).endVertex();
+            out.vertex(pose.pose(),left,y,front).color(red,green,blue,alpha)
+                    .uv(u0,v0).uv2(packedLight).normal(pose.normal(),0,1,0).endVertex();
+        }
     }
 
     /**

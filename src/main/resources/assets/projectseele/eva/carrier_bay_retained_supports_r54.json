@@ -1,6 +1,6 @@
 {
   "schema": "projectseele.carrier-bay-retained-supports.r54",
-  "revision": "six-original-rear-anchors-and-five-shelf-links",
+  "revision": "original-bay-and-adjacent-route-bearings-r54",
   "cells": [
     {
       "variant": 2,
@@ -111,6 +111,156 @@
       ],
       "state": "projectseele:nerv_floor_panel",
       "role": "original_bearing_shelf_connection"
+    },
+    {
+      "variant": 2,
+      "at": [
+        4,
+        -1063,
+        313
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 2,
+      "at": [
+        2,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 2,
+      "at": [
+        -28,
+        -1063,
+        315
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 2,
+      "at": [
+        -28,
+        -1063,
+        305
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 2,
+      "at": [
+        -26,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 0,
+      "at": [
+        88,
+        -1063,
+        313
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 0,
+      "at": [
+        86,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 0,
+      "at": [
+        56,
+        -1063,
+        315
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 0,
+      "at": [
+        56,
+        -1063,
+        305
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 0,
+      "at": [
+        58,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 1,
+      "at": [
+        46,
+        -1063,
+        313
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 1,
+      "at": [
+        44,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 1,
+      "at": [
+        14,
+        -1063,
+        315
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 1,
+      "at": [
+        14,
+        -1063,
+        305
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "role": "original_route_rail_anchor"
+    },
+    {
+      "variant": 1,
+      "at": [
+        16,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "role": "original_route_rail_anchor"
     }
   ],
   "anchors": [
@@ -191,6 +341,321 @@
       "mount": "rear_r",
       "bearing": "(16.549999999999997, -1062.0, 314.5)",
       "normal": "(0.0, 1.0, 0.0)"
+    },
+    {
+      "variant": 2,
+      "at": [
+        4,
+        -1063,
+        313
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit2/original_incline",
+      "mount": "rear_l",
+      "bearing": [
+        4.15,
+        -1062.0,
+        313.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 2,
+      "at": [
+        2,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "leg": "unit2/original_incline",
+      "mount": "rear_l",
+      "bearing": [
+        2.45,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 2,
+      "at": [
+        -28,
+        -1063,
+        315
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit2/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        -27.15,
+        -1062.0,
+        315.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 2,
+      "at": [
+        -28,
+        -1063,
+        305
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit2/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        -27.15,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 2,
+      "at": [
+        -26,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "leg": "unit2/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        -25.450000000000003,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 0,
+      "at": [
+        88,
+        -1063,
+        313
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit0/original_incline",
+      "mount": "rear_l",
+      "bearing": [
+        88.15,
+        -1062.0,
+        313.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 0,
+      "at": [
+        86,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "leg": "unit0/original_incline",
+      "mount": "rear_l",
+      "bearing": [
+        86.44999999999999,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 0,
+      "at": [
+        56,
+        -1063,
+        315
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit0/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        56.85,
+        -1062.0,
+        315.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 0,
+      "at": [
+        56,
+        -1063,
+        305
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit0/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        56.85,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 0,
+      "at": [
+        58,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "leg": "unit0/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        58.55,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 1,
+      "at": [
+        46,
+        -1063,
+        313
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit1/original_incline",
+      "mount": "rear_l",
+      "bearing": [
+        46.15,
+        -1062.0,
+        313.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 1,
+      "at": [
+        44,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "leg": "unit1/original_incline",
+      "mount": "rear_l",
+      "bearing": [
+        44.45,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 1,
+      "at": [
+        14,
+        -1063,
+        315
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit1/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        14.85,
+        -1062.0,
+        315.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 1,
+      "at": [
+        14,
+        -1063,
+        305
+      ],
+      "state": "projectseele:nerv_floor_panel",
+      "leg": "unit1/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        14.85,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
+    },
+    {
+      "variant": 1,
+      "at": [
+        16,
+        -1063,
+        305
+      ],
+      "state": "minecraft:polished_basalt[axis=y]",
+      "leg": "unit1/original_incline",
+      "mount": "rear_r",
+      "bearing": [
+        16.549999999999997,
+        -1062.0,
+        305.5
+      ],
+      "normal": [
+        0,
+        1,
+        0
+      ]
     }
   ],
   "outer_endpoints": [

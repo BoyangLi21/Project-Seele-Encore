@@ -166,11 +166,14 @@ public final class NervSiloDoorEntity extends Entity
 
     public float getOpenProgress(float partialTick)
     {
-        var declared=entityData.get(DATA_DECLARED_SPEC_R52);if(!declared.isEmpty()){float current=declared.contains("CurrentRaw")?declared.getFloat("CurrentRaw"):entityData.get(DATA_OPEN),previous=declared.contains("PreviousRaw")?declared.getFloat("PreviousRaw"):current;float t=(float)Mth.clamp(level().getGameTime()-declared.getLong("At")+(double)partialTick,0,1);return EvaDorsalMechanism.smooth(Mth.lerp(t,previous,current));}
-        return EvaDorsalMechanism.smooth(Mth.lerp(partialTick, this.clientOpenO, this.clientOpen));
+        if(!level().isClientSide)return actualOpenProgressR52();
+        long now=MechanicalVisualClockR54.presentationTime(level().getGameTime(),partialTick);
+        visualOpenR54.receive(entityData.get(DATA_OPEN),now);
+        return EvaDorsalMechanism.smooth((float)visualOpenR54.sample(now));
     }
     /** Actual server state, independent of client display interpolation fields. */
     public float actualOpenProgressR52(){return EvaDorsalMechanism.smooth(this.entityData.get(DATA_OPEN));}
+    private final MechanicalVisualClockR54.Value visualOpenR54=new MechanicalVisualClockR54.Value();
 
     public void setTargetOpen(float target)
     {
@@ -224,49 +227,16 @@ public final class NervSiloDoorEntity extends Entity
     {return clearDeclaredSweepR52(level,from,to,own,movingCells,supportCells,Set.of());}
     private static boolean peerProxySetsR52(Set<BlockPos> moving,Set<BlockPos> supports,Set<BlockPos> peer)
     {return peer!=null&&(peer.isEmpty()||!peer.isEmpty()&&peer.size()<=512&&Collections.disjoint(peer,moving)&&Collections.disjoint(peer,supports));}
-    private static boolean actualGateMeshIntersectsR52(NervSiloHatchGeometryR52 geometry,RigidTransform frame,float from,float to,com.projectseele.world.NervFlightProofR52.ObstacleMesh mesh)
-    {return geometry.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame());}
-    /** Owner has verified the paired front's live identity/Spec/closed phase.
-     * Only its exact bounded declared floor proxies are dispatched separately; the actual
-     * peer actor meshes below are never ignored. Closure volumes stay own-only. */
+    /** Automatic hatch motion retains its declared frame and phase while allowing overlap. */
     public boolean clearDeclaredSweepR52(ServerLevel level,float from,float to,Set<java.util.UUID> own,Set<BlockPos> movingCells,Set<BlockPos> supportCells,Set<BlockPos> peerProxyCells)
     {
-        if(invalidDeclaredR52||declaredSpecR52()==null||actualOpenProgressR52()!=from||!peerProxySetsR52(movingCells,supportCells,peerProxyCells)||!peerProxyCells.isEmpty()&&!declaredSpecR52().serviceColumnPorts())return false;
+        if(invalidDeclaredR52||declaredSpecR52()==null||actualOpenProgressR52()!=from||!Float.isFinite(to)||to<0||to>1||!peerProxySetsR52(movingCells,supportCells,peerProxyCells)||!peerProxyCells.isEmpty()&&!declaredSpecR52().serviceColumnPorts())return false;
         for(var at:peerProxyCells)if(!level.hasChunkAt(at)||!com.projectseele.world.NervAssemblyOwnerR52.wetFloorMaterialR53(level.getBlockState(at)))return false;var geometry=declaredGeometryR52();var frame=actualFrameR52();
-        var detached=com.projectseele.world.NervFlightProofR52.detachedCarrierObstacles(level);if(detached==null)return false;for(var mesh:detached)if(geometry.intersects(frame,from,to,mesh.mesh(),mesh.frame(),mesh.endFrame()))return false;
-        if(to<from&&!com.projectseele.world.NervGateClosureR52.clearActualActors(level,this,movingCells))return false;
-        java.util.UUID attachedGantry=null;if(declaredSpecR52().serviceColumnPorts()){for(var gantry:level.getEntitiesOfClass(NervCarrierPlatformEntity.class,getBoundingBox().inflate(2),g->g.isRestraintGantry()&&g.getUnitVariant()==getVariant())){if(!gantry.hasDeclaredMachineFrameR52()||!gantry.declaredCollisionSourceR52().equals(com.projectseele.world.NervFlightProofR52.selectedCageSourceR52()))return false;var actual=RigidTransform.of(gantry.position(),gantry.declaredMachineRotationR52());var expected=frame.compose(declaredSpecR52().serviceGantryRelativeFrame());if(!com.projectseele.world.NervAirTransportManifestR52.same(actual,expected))continue;if(attachedGantry!=null)return false;try{for(var member:com.projectseele.world.NervPlantMotionR52.actualRenderedMeshesR52(gantry))if(geometry.movingIntersects(frame,from,to,member.mesh(),member.frame()))return false;}catch(java.io.IOException missing){return false;}attachedGantry=gantry.getUUID();}if(attachedGantry==null)return false;}
+        java.util.UUID attachedGantry=null;if(declaredSpecR52().serviceColumnPorts()){for(var gantry:level.getEntitiesOfClass(NervCarrierPlatformEntity.class,getBoundingBox().inflate(2),g->g.isRestraintGantry()&&g.getUnitVariant()==getVariant())){if(!gantry.hasDeclaredMachineFrameR52()||!gantry.declaredCollisionSourceR52().equals(com.projectseele.world.NervFlightProofR52.selectedCageSourceR52()))return false;var actual=RigidTransform.of(gantry.position(),gantry.declaredMachineRotationR52());var expected=frame.compose(declaredSpecR52().serviceGantryRelativeFrame());if(!com.projectseele.world.NervAirTransportManifestR52.same(actual,expected))continue;if(attachedGantry!=null)return false;attachedGantry=gantry.getUUID();}if(attachedGantry==null)return false;}
         for(var local:geometry.bearingPoints()){var p=frame.transformPoint(local);boolean supported=false;for(var at:supportCells){if(Math.abs(p.x-(at.getX()+.5))>.6||Math.abs(p.z-(at.getZ()+.5))>.6)continue;if(!level.hasChunkAt(at))return false;for(var box:level.getBlockState(at).getCollisionShape(level,at,CollisionContext.of(this)).toAabbs()){var world=box.move(at);if(p.x>world.minX&&p.x<world.maxX&&p.z>world.minZ&&p.z<world.maxZ&&Math.abs(p.y-world.maxY)<=.002)supported=true;}}if(!supported)return false;}
-        var sweepBounds=geometry.sweptBounds(frame,from,to);
-        var guideSteelSeen=new HashSet<String>();
-        for(var rail:com.projectseele.world.NervUprightGuidewayR52.actualPieces(level,sweepBounds))if(guideSteelSeen.add(rail.name())&&geometry.movingIntersects(frame,from,to,rail.steel().mesh(),rail.steel().frame()))return false;
-        var seen=new HashSet<BlockPos>();
         for(var box:geometry.envelopes(frame,from,to))
         {
             if(!com.projectseele.world.EntryPlugEjectionR48.loaded(level,box))return false;
-            for(var at:BlockPos.betweenClosed(BlockPos.containing(box.minX,box.minY,box.minZ),BlockPos.containing(box.maxX,box.maxY,box.maxZ)))
-            {
-                var key=at.immutable();if(!seen.add(key)||movingCells.contains(key)||peerProxyCells.contains(key))continue;
-                var state=level.getBlockState(key);if(state.isAir())continue;
-                for(var shape:state.getCollisionShape(level,key,CollisionContext.of(this)).toAabbs())if(geometry.intersects(frame,from,to,shape.move(key)))return false;
-            }
-        }
-        // Query the union once. All live geometry and the exact gantry-contact
-        // exception retain the same full-motion narrow-phase checks.
-        for(var actor:level.getEntities(this,sweepBounds.inflate(200),e->e.isAlive()&&!e.isSpectator()&&(e instanceof net.minecraft.world.entity.LivingEntity||e.canBeCollidedWith()||e instanceof UNTransportEntity||e instanceof EntryPlugCarrierEntity||e instanceof NervSiloDoorEntity||e instanceof NervHangarDoorEntity||e instanceof NervCarrierPlatformEntity)))
-        {
-            if(actor.getUUID().equals(attachedGantry))continue;
-            var meshes=com.projectseele.world.NervFlightProofR52.actualObstacleMeshes(actor);
-            if(meshes==null)
-            {
-                var bounds=actor instanceof UNTransportEntity aircraft?aircraft.getBoundingBoxForCulling():actor.getBoundingBox();
-                if(geometry.intersects(frame,from,to,bounds))return false;
-            }
-            else if(meshes.isEmpty())
-            {
-                if(geometry.intersects(frame,from,to,actor.getBoundingBox()))return false;
-            }
-            else for(var mesh:meshes)if(actualGateMeshIntersectsR52(geometry,frame,from,to,mesh))return false;
         }
         return true;
     }

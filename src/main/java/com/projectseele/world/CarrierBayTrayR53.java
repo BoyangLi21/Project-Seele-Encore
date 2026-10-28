@@ -195,6 +195,7 @@ public final class CarrierBayTrayR53
                 return false;
             }
             var actual = level.getBlockState(cell.at());
+            if(CarrierBayLiftSlotsR54.closedCover(level,cell.at()))continue;
             // These declared mast openings are non-bearing wet-bay volume.
             // Refill may occupy them with actual LCL without restoring the retired slab.
             if (CarrierBayLiftSlotsR54.contains(cell.at())

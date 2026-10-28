@@ -12,7 +12,9 @@ public final class CarrierMountProfileR53
 {
     public static final double LOAD_ELEVATION = 4.25;
     public static final double BAY_STROKE = 1;
-    public static final double SUBMERGED_BAY_STROKE = 12;
+    public static final double SUBMERGED_BAY_STROKE = 54;
+    public static final double BAY_GUIDE_REAR_TRAVEL=5.5;
+    public static final List<Float> BAY_ACTUATOR_KNOTS=List.of(.9F,.915F,.96F,.98F);
     public static final double TRANSVERSE_TRAVEL = .65;
     public static final String BAY_RECEIVER_REVISION = "independent-upper-receiver-slotted-sleeve-r54";
     public static final State LEGACY = new State(false, 0, 0);
@@ -114,7 +116,19 @@ public final class CarrierMountProfileR53
         }
 
         public RigidTransform bodyFrame(RigidTransform controller, float rise)
-        { return controller.compose(translation(elevation + bodyDrop(rise))); }
+        { return controller.compose(new RigidTransform(new Vec3(0,elevation+bodyDrop(rise),bayRearward(rise)),0,0,0,1)); }
+
+        private double bayRearward(float rise)
+        {
+            double opening=Math.max(0,Math.min(1,(1D-rise)/(1D-CarrierAssemblyR53.RISE_END)));
+            return shallowBay?2*Math.max(0,Math.min(1,opening/.2)):0;
+        }
+
+        public RigidTransform guideRootFrame(RigidTransform controller,float rise)
+        {
+            return controller.compose(new RigidTransform(new Vec3(0,elevation+bodyDrop(rise),
+                    (1+BAY_GUIDE_REAR_TRAVEL/2)*bayRearward(rise)),0,0,0,1));
+        }
 
         public RigidTransform headLiftFrame(RigidTransform controller, float rise, double lift)
         {
@@ -123,7 +137,8 @@ public final class CarrierMountProfileR53
             // A shallow bay's independently stowed receiver stays above the
             // personnel edge while the mast slides through its long sleeves.
             // At the raised stop this is the unchanged route mating frame.
-            return controller.compose(translation((shallowBay ? 0 : bodyDrop(rise)) + lift));
+            return controller.compose(new RigidTransform(new Vec3(0,(shallowBay?0:bodyDrop(rise))+lift,
+                    (1+BAY_GUIDE_REAR_TRAVEL/2)*bayRearward(rise)),0,0,0,1));
         }
 
         public RigidTransform carrierLocalFrame(CarrierAssemblyR53.Profile source, String part,
@@ -137,9 +152,17 @@ public final class CarrierMountProfileR53
                 boolean deck = part.equals("deck") || part.startsWith("toe_");
                 double opening = Math.max(Math.min(1, (1D - rise) / (1D - CarrierAssemblyR53.RISE_END)), release);
                 boolean rod = part.startsWith("clamp_") || part.startsWith("jaw_rod_");
-                boolean carriage = part.startsWith("jaw_carriage_");
-                double x = rod ? (part.endsWith("_l") ? -1 : 1) * 1.5 * Math.min(1, opening * 2) : 0;
-                double z = rod || carriage ? 2 * Math.max(0, opening * 2 - 1) : 0;
+                boolean jaw=rod||part.startsWith("jaw_");
+                // First move behind the original gantry posts, then withdraw
+                // each complete jaw module sideways and behind the mast.
+                double finalOut=rod?(part.contains("upper")?-.6:1.5):part.contains("lower")?.1:-1.1;
+                double out=1.5*Math.max(0,Math.min(1,(opening-.2)/.2))
+                        -(1.5-finalOut)*Math.max(0,(opening-.85)/.15);
+                double x=jaw?(part.endsWith("_l")?-1:1)*out:0;
+                // Two metres clear the gantry before the jaws open;
+                // keeping it forward also clears the unchanged fixed lead rails.
+                double z=deck?0:bayRearward(rise)
+                        +(jaw?(part.contains("upper")?5.5:6.5)*Math.max(0,Math.min(1,(opening-.4)/.45)):0);
                 return new RigidTransform(new Vec3(x, deck ? 0 : bodyDrop(rise), z), 0, 0, 0, 1);
             }
             if (!aboveFloor && !shallowBay) return original;
@@ -183,6 +206,37 @@ public final class CarrierMountProfileR53
             {
                 boolean sleeve=p.name().contains("/lift_sleeve/"),tie=p.name().contains("/lift_tie/"),isRod=p.name().endsWith("/lift_rod");
                 boolean bracket=p.name().contains("/lift_bracket/"),cross=p.name().endsWith("/mount/2");
+                boolean runner=p.name().endsWith("/mount/0"),leg=p.name().endsWith("/mount/1");
+                if(runner||leg)
+                {
+                    var box=p.mesh().bounds();double sign=box.getCenter().x<0?-1:1,centre=sign*7.2;
+                    if(runner)
+                    {
+                        double half=box.getXsize()/2;
+                        result.add(bayGuideBoxR54(p,p.name(),new net.minecraft.world.phys.AABB(centre-half,box.minY,box.minZ,centre+half,box.maxY,box.maxZ+BAY_GUIDE_REAR_TRAVEL)));
+                        result.add(bayGuideBoxR54(p,p.name()+"/root_link",new net.minecraft.world.phys.AABB(Math.min(box.minX,centre-half),box.minY,box.minZ,Math.max(box.maxX,centre+half),box.maxY,box.minZ+.16)));
+                    }
+                    else
+                    {
+                        var rail=hardware.parts().stream().filter(q->q.name().equals(p.name().substring(0,p.name().length()-1)+"0")).findFirst().orElseThrow();
+                        // The complete upper face slides against the underside
+                        // of the real longitudinal support arm.
+                        result.add(bayGuideBoxR54(p,p.name(),new net.minecraft.world.phys.AABB(centre-.08,box.minY,box.minZ,centre+.08,rail.mesh().bounds().minY,box.maxZ)));
+                    }
+                    continue;
+                }
+                if(p.name().contains("/rear_r/")&&p.name().endsWith("/mount/4"))
+                {
+                    var box=p.mesh().bounds();double outer=17.25,frontOfSleeve=15.15;
+                    result.add(bayGuideBoxR54(p,p.name()+"/rod_neck",new net.minecraft.world.phys.AABB(box.minX,box.minY,frontOfSleeve,box.maxX,box.maxY,box.maxZ)));
+                    double underRail=box.minY-2.105;
+                    result.add(bayGuideBoxR54(p,p.name()+"/rear_link",new net.minecraft.world.phys.AABB(box.minX,underRail,frontOfSleeve-.08,outer+.08,underRail+.16,frontOfSleeve+.08)));
+                    result.add(bayGuideBoxR54(p,p.name()+"/rear_inner_riser",new net.minecraft.world.phys.AABB(box.minX,underRail,frontOfSleeve-.08,box.maxX,box.maxY,frontOfSleeve+.08)));
+                    result.add(bayGuideBoxR54(p,p.name()+"/rear_outer_riser",new net.minecraft.world.phys.AABB(outer-.08,underRail,frontOfSleeve-.08,outer+.08,box.maxY,frontOfSleeve+.08)));
+                    result.add(bayGuideBoxR54(p,p.name()+"/outer_arm",new net.minecraft.world.phys.AABB(outer-.08,box.minY,box.minZ,outer+.08,box.maxY,frontOfSleeve)));
+                    result.add(bayGuideBoxR54(p,p.name()+"/front_link",new net.minecraft.world.phys.AABB(box.minX,box.minY,box.minZ,outer+.08,box.maxY,box.minZ+.16)));
+                    continue;
+                }
                 if(!sleeve&&!tie&&!isRod&&!bracket&&!cross){result.add(p);continue;}
                 if(!CarrierRearLateralR53.rectangular(p.mesh()))throw new IllegalStateException("Complete original rectangular guide required");
                 String prefix=p.name().substring(0,p.name().indexOf('/',5));
@@ -192,8 +246,8 @@ public final class CarrierMountProfileR53
                 {result.add(bayGuideBoxR54(p,p.name(),box.move(centre>0?-.14:.14,0,0)));continue;}
                 if(cross)
                 {
-                    var trimmed=centre>0?new net.minecraft.world.phys.AABB(box.minX,box.minY,box.minZ,centre-.205,box.maxY,box.maxZ)
-                            :new net.minecraft.world.phys.AABB(centre+.205,box.minY,box.minZ,box.maxX,box.maxY,box.maxZ);
+                    var trimmed=centre>0?new net.minecraft.world.phys.AABB(7.2,box.minY,box.minZ,centre-.205,box.maxY,box.maxZ)
+                            :new net.minecraft.world.phys.AABB(centre+.205,box.minY,box.minZ,-7.2,box.maxY,box.maxZ);
                     result.add(bayGuideBoxR54(p,p.name(),trimmed));continue;
                 }
                 double top=rod.mesh().bounds().minY+CarrierRearGuideR53.STOW_LIFT+SUBMERGED_BAY_STROKE+.35;

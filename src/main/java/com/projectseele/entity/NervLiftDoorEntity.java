@@ -63,6 +63,7 @@ public final class NervLiftDoorEntity extends Entity
     public static final int STYLE_GLASS = 2;
     private float clientOpen;
     private float clientOpenO;
+    private final MechanicalVisualClockR54.Value visualOpen = new MechanicalVisualClockR54.Value();
 
     public NervLiftDoorEntity(EntityType<? extends NervLiftDoorEntity> type,
                               Level level)
@@ -165,7 +166,9 @@ public final class NervLiftDoorEntity extends Entity
     public float getOpenProgress(float partialTick)
     {
         if (!this.level().isClientSide) return this.entityData.get(DATA_OPEN);
-        return Mth.lerp(partialTick, this.clientOpenO, this.clientOpen);
+        long now = MechanicalVisualClockR54.presentationTime(level().getGameTime(), partialTick);
+        visualOpen.receive(entityData.get(DATA_OPEN), now);
+        return (float)visualOpen.sample(now);
     }
 
     public void setOpen(boolean open)
