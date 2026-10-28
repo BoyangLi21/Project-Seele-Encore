@@ -9,6 +9,7 @@ import java.util.UUID;
 import java.util.function.Function;
 import java.util.function.Predicate;
 import net.minecraft.server.level.ServerLevel;
+import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.phys.Vec3;
@@ -41,6 +42,108 @@ public final class NervOriginalActorsR52
         default void maintainOriginalStaff(ServerLevel level){}
     }
     private NervOriginalActorsR52(){}
+    private static final String SAVED_SEAT_R54="NervOriginalSeatR54";
+    private static final java.util.Map<ServerPlayer,Integer> SEAT_RESTORE_R54=new java.util.WeakHashMap<>();
+    private static final java.util.Map<ServerPlayer,UUID> DISCONNECT_SEATS_R54=new java.util.WeakHashMap<>();
+
+    /** World-owned roots must not migrate into one player's RootVehicle save.
+     * This identity check is independent of the owner's installation readiness. */
+    public static boolean worldOwnedVehicleR54(Entity actor)
+    {
+        if(!(actor.level() instanceof ServerLevel level))return false;
+        if(actor instanceof EntryPlugCarrierEntity plug)
+        {
+            if(plug.laboratorySlotR47()>=0||plug.isIndependentUNPlug())return false;
+            var fleet=EvaFleetSavedData.get(level.getServer()).entry(plug.getAssignedVariant()).orElse(null);
+            return fleet!=null&&plug.getUUID().equals(fleet.entryPlugId());
+        }
+        if(actor instanceof EvaUnit01Entity eva&&!eva.isExperimentalUnit())
+        {
+            var fleet=EvaFleetSavedData.get(level.getServer()).entry(eva.getUnitVariant()).orElse(null);
+            return fleet!=null&&eva.getUUID().equals(fleet.canonicalId());
+        }
+        return false;
+    }
+
+    private static void rememberSeatR54(ServerPlayer player,EntryPlugCarrierEntity plug)
+    {
+        var saved=new net.minecraft.nbt.CompoundTag();saved.putUUID("Player",player.getUUID());
+        saved.putUUID("Seat",plug.getUUID());saved.putInt("Variant",plug.getAssignedVariant());
+        saved.putString("Dimension",plug.level().dimension().location().toString());
+        var chunk=plug.getRootVehicle().chunkPosition();saved.putInt("ChunkX",chunk.x);saved.putInt("ChunkZ",chunk.z);
+        player.getPersistentData().put(SAVED_SEAT_R54,saved);
+    }
+
+    /** A player save holds only its own seat reference, never another actor copy. */
+    @SubscribeEvent(priority=net.minecraftforge.eventbus.api.EventPriority.LOWEST)
+    public static void rememberSeatMountR54(EntityMountEvent event)
+    {
+        if(event.isCanceled()||!(event.getEntityMounting() instanceof ServerPlayer player)
+                ||!(event.getEntityBeingMounted() instanceof EntryPlugCarrierEntity plug)||!worldOwnedVehicleR54(plug))return;
+        if(event.isMounting())rememberSeatR54(player,plug);
+        else if(!plug.getUUID().equals(DISCONNECT_SEATS_R54.get(player)))player.getPersistentData().remove(SAVED_SEAT_R54);
+    }
+
+    @SubscribeEvent public static void retainSeatOnLogoutR54(net.minecraftforge.event.entity.player.PlayerEvent.PlayerLoggedOutEvent event)
+    {
+        if(!(event.getEntity() instanceof ServerPlayer player))return;
+        SEAT_RESTORE_R54.remove(player);
+        // Forge fires this before vanilla saves the player and unmounts it.
+        if(player.getVehicle() instanceof EntryPlugCarrierEntity plug&&worldOwnedVehicleR54(plug))
+        {rememberSeatR54(player,plug);DISCONNECT_SEATS_R54.put(player,plug.getUUID());}
+        else player.getPersistentData().remove(SAVED_SEAT_R54);
+    }
+
+    /** Logout removes the player link, without performing a manual hatch exit. */
+    public static boolean retainSeatStateOnLogoutR54(Entity passenger,EntryPlugCarrierEntity plug)
+    {
+        if(!(passenger instanceof ServerPlayer player)||!plug.getUUID().equals(DISCONNECT_SEATS_R54.get(player)))return false;
+        DISCONNECT_SEATS_R54.remove(player);return true;
+    }
+
+    public static boolean resumeSavedSeatR54(ServerPlayer player)
+    {
+        var saved=player.getPersistentData().getCompound(SAVED_SEAT_R54);
+        if(player.isPassenger())return false;
+        var fleet=EvaFleetSavedData.get(player.getServer()).entry(saved.getInt("Variant")).orElse(null);
+        if(!saved.hasUUID("Player")||!saved.getUUID("Player").equals(player.getUUID())||!saved.hasUUID("Seat")
+                ||fleet==null||!saved.getUUID("Seat").equals(fleet.entryPlugId())
+                ||!saved.getString("Dimension").equals(player.serverLevel().dimension().location().toString()))
+        {player.getPersistentData().remove(SAVED_SEAT_R54);return false;}
+        SEAT_RESTORE_R54.put(player,player.tickCount+200);
+        tryResumeSeatR54(player);return true;
+    }
+
+    private static void tryResumeSeatR54(ServerPlayer player)
+    {
+        var saved=player.getPersistentData().getCompound(SAVED_SEAT_R54);var level=player.serverLevel();
+        if(player.isPassenger()||!saved.hasUUID("Seat")||!saved.hasUUID("Player")
+                ||!saved.getUUID("Player").equals(player.getUUID())
+                ||!saved.getString("Dimension").equals(level.dimension().location().toString()))
+        {SEAT_RESTORE_R54.remove(player);return;}
+        var actor=saved.hasUUID("Seat")?level.getEntity(saved.getUUID("Seat")):null;
+        if(actor instanceof EntryPlugCarrierEntity plug&&worldOwnedVehicleR54(plug)&&plug.isAlive())
+        {
+            SEAT_RESTORE_R54.remove(player);
+            if(!plug.isVehicle()&&!player.isPassenger()&&player.startRiding(plug,true))
+            {plug.syncPilotPositionNow();rememberSeatR54(player,plug);}
+            else if(player.getVehicle()!=plug)player.getPersistentData().remove(SAVED_SEAT_R54);
+            return;
+        }
+        if(player.isPassenger()||player.tickCount>=SEAT_RESTORE_R54.getOrDefault(player,0))
+        {SEAT_RESTORE_R54.remove(player);return;}
+        // The reference can only name this player's existing canonical seat.
+        // Vanilla's short ticket expires; it does not create an entity.
+        level.getChunkSource().addRegionTicket(net.minecraft.server.level.TicketType.POST_TELEPORT,
+                new net.minecraft.world.level.ChunkPos(saved.getInt("ChunkX"),saved.getInt("ChunkZ")),2,player.getId());
+    }
+
+    @SubscribeEvent public static void resumeSeatTickR54(net.minecraftforge.event.TickEvent.PlayerTickEvent event)
+    {
+        if(event.phase==net.minecraftforge.event.TickEvent.Phase.END&&event.player instanceof ServerPlayer player
+                &&player.tickCount%5==0&&SEAT_RESTORE_R54.containsKey(player))tryResumeSeatR54(player);
+    }
+
     public static <T> T originalOnly(UUID original,Function<UUID,T> lookup,Predicate<T> valid)
     {if(original==null)return null;T actor=lookup.apply(original);return actor!=null&&valid.test(actor)?actor:null;}
     static boolean holdDismount(boolean managed,boolean alive,boolean mounting,boolean verifiedAnchor)
@@ -116,6 +219,8 @@ public final class NervOriginalActorsR52
         if(!(event.getEntityBeingMounted() instanceof EntryPlugCarrierEntity plug)||!managed(plug)
                 ||!(plug.level() instanceof ServerLevel level))return;
         Entity passenger=event.getEntityMounting();if(!passenger.isAlive()||passenger.isRemoved())return;
+        if(!event.isMounting()&&passenger instanceof ServerPlayer player
+                &&plug.getUUID().equals(DISCONNECT_SEATS_R54.get(player)))return;
         if(plug.getPersistentData().getBoolean("AdministrativeResetR53"))return;
         // Vanilla restores saved passenger graphs with forced startRiding at load,
         // before Root installs its owner. New boarding is gated in the capsule API.

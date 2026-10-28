@@ -1056,6 +1056,7 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         // A client passenger-list refresh must not abort insertion, open the
         // cabin or change synchronized progress. The server owns those edges.
         if(this.level().isClientSide){passengerAuthorityTraceR44(passenger,"plug_after_client_graph_only");return;}
+        if(com.projectseele.world.NervOriginalActorsR52.retainSeatStateOnLogoutR54(passenger,this))return;
         if(com.projectseele.world.NervOriginalActorsR52.managed(this))
         {
             // The owner already admitted a safe original dock/field exit in
@@ -1666,6 +1667,15 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     public boolean removeWhenFarAway(double distanceToClosestPlayer)
     {
         return false;
+    }
+
+    @Override
+    public boolean hasExactlyOnePlayerPassenger()
+    {
+        // Vanilla uses this predicate for chunk saving, RootVehicle saving and
+        // logout removal. The canonical facility capsule belongs to the world.
+        return !com.projectseele.world.NervOriginalActorsR52.worldOwnedVehicleR54(this)
+                &&super.hasExactlyOnePlayerPassenger();
     }
 
     @Override

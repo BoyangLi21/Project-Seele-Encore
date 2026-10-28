@@ -8032,6 +8032,15 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
 
     @Override
+    public boolean hasExactlyOnePlayerPassenger()
+    {
+        // A locked capsule makes the canonical EVA the root of the same
+        // world-owned ride graph; never move it into a player's RootVehicle.
+        return !com.projectseele.world.NervOriginalActorsR52.worldOwnedVehicleR54(this)
+                &&super.hasExactlyOnePlayerPassenger();
+    }
+
+    @Override
     protected SoundEvent getHurtSound(DamageSource source)
     {
         return SoundEvents.IRON_GOLEM_DAMAGE;

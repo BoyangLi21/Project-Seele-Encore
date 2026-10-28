@@ -138,6 +138,7 @@ public final class GeoFrontCommands
         {
             return;
         }
+        if(com.projectseele.world.NervOriginalActorsR52.resumeSavedSeatR54(player))return;
         // Vanilla restores RootVehicle/Attach before PlayerLoggedIn. A live
         // restored ride (including EVA -> original plug -> pilot or MTR) is
         // manual play, not a detached Visual Lab camera. Explicit developer
