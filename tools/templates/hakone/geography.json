@@ -1,0 +1,31 @@
+{
+  "revision": 1,
+  "status": "georeferenced_design_before_world_installation",
+  "geographic_bounds_wsen": [138.92, 35.14, 139.20, 35.33],
+  "anchor": {
+    "name": "Sengokuhara basin / retained Tokyo-3 lift district",
+    "longitude": 139.0085,
+    "latitude": 35.2662,
+    "elevation_m": 647.1,
+    "world_xyz": [30, 80, 220],
+    "basis": "Town sources identify the Sengokuhara area, not an exact fictional city centre. This basin point is an explicit project alignment choice. GSI elevation API returned 647.1 m on 2026-10-29."
+  },
+  "metres_per_block": 4.0,
+  "projection": "local equirectangular using WGS84 curvature radii at the anchor, east +X, south +Z; regional distance approximation, not a survey projection",
+  "scale_reason": "One uniform 1:4 geographic scale preserves mountain slopes and relative distances, fits the existing height ceiling, and retains the existing 448-block lift district and underground network. Buildings, EVA and retained facilities keep their playable dimensions.",
+  "dimension_y": [-1344, 320],
+  "dem_zoom": 14,
+  "vector_zoom": 14,
+  "retained_city_box_xz": [-194, -4, 254, 444],
+  "retained_city_surface_y": 80,
+  "city_blend_blocks": 96,
+  "source_urls": {
+    "dem_specification": "https://maps.gsi.go.jp/development/demtile.html",
+    "dem_tiles": "https://cyberjapandata.gsi.go.jp/xyz/dem_png/{z}/{x}/{y}.png",
+    "vector_specification": "https://github.com/gsi-cyberjapan/optimal_bvmap",
+    "vector_tiles": "https://cyberjapandata.gsi.go.jp/xyz/optimal_bvmap-v1/{z}/{x}/{y}.pbf",
+    "vector_snapshot": "2023-10-01 traditional tile endpoint; adequate for the geographic baseline, not a claim about current timetables or facilities",
+    "attribution": "国土地理院 / Geospatial Information Authority of Japan; DEM and optimized vector tiles, transformed and adapted for Project SEELE",
+    "terms": "https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html"
+  }
+}
