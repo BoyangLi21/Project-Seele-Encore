@@ -21,12 +21,21 @@ def grade_retired_edges(c,rows,cross,protected,frame,height):
         c.layer(y,mask&(y>target),'minecraft:air')
 
 
-def connect(c,protected):
+def connect(c,protected,south_layout=False):
     # Endpoints are actual asphalt/centreline columns in the captured world,
     # not coordinates guessed from the former regional directory.
     routes=[('west', [(-310,200),(-318,200),(-318,176),(-344,176)],84),
             ('north',[(-50,40),(-110,40),(-110,-8)],80),
             ('south',[(30,560),(30,576)],80)]
+    if south_layout:
+        routes=[('west',[(-310,240),(-326,240),(-326,232),(-344,232)],84),
+                ('north',[(-50,40),(-110,40),(-110,-8)],80),
+                ('south',[(30,680),(30,688)],80)]
+    paving={'minecraft:black_concrete','minecraft:white_concrete','minecraft:gray_concrete','minecraft:smooth_stone'}
+    for name,anchors,end_y in routes:
+        x,z=anchors[-1]
+        actual=c.palette[int(c.before[end_y+128,z-c.z0,x-c.x0])].split('[')[0]
+        if actual not in paving:raise ValueError(f'Unmeasured street endpoint {name}: {(x,end_y,z)} {actual}')
     result=[]
     for name,anchors,end_y in routes:
         path=[]

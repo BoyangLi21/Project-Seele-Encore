@@ -18,7 +18,7 @@ from plan_hakone_relocations import unpack
 from prepare_hakone_city_cross import packed, contains
 from prepare_hakone_main_terrain import sample_grid
 from transplant_s22_authority import read_region, parse_chunk
-from author_hakone_corner_blocks import retire_old_lots,build_parcels,parcel_mask
+from author_hakone_corner_blocks import retire_old_lots,build_parcels,parcel_mask,configure as configure_parcels
 from author_hakone_maintenance import author as author_maintenance
 from author_hakone_street_connections import grade_retired_edges,connect as connect_retained_streets
 
@@ -77,6 +77,16 @@ class Canvas:
             if old!=row.get('Before'):raise ValueError(f'Current inventory changed at {pos}')
             self.be.pop(pos,None)
             if 'After'in row:self.be[pos]=copy.deepcopy(row['After'])
+    def retain_surface_recipes(self,world,frame):
+        folder=world/DATA/'city_rigid_generation_r45/surface'
+        for cz in range(Z0//16,Z1//16+1):
+            for cx in range(X0//16,X1//16+1):
+                file=folder/f'{cx}_{cz}.dat'
+                if not file.exists():continue
+                for span in nbtlib.load(file).get('Spans',[]):
+                    x,z,lo,hi,_=map(int,span)
+                    if X0<=x<=X1 and Z0<=z<=Z1 and hi>=Y0 and lo<Y1 and not frame[z-Z0,x-X0]:
+                        self.assigned[max(Y0,lo)-Y0:min(Y1,hi+1)-Y0,z-Z0,x-X0]=True
     def put(self,x,y,z,state):
         if not(X0<=x<=X1 and Z0<=z<=Z1 and Y0<=y<Y1):raise ValueError((x,y,z))
         if self.keep[y-Y0,z-Z0,x-X0]:return
@@ -171,7 +181,7 @@ def road_network(cross,blocked):
     def valid(x,z,r=4):
         return X0+r<=x<=X1-r and Z0+r<=z<=Z1-r and np.all(cross[z-Z0-r:z-Z0+r+1,x-X0-r:x-X0+r+1])and not np.any(blocked[z-Z0-r:z-Z0+r+1,x-X0-r:x-X0+r+1])
     for x in range(-310,371,40):
-        for z in range(0,561,40):
+        for z in range(0,Z1-20,40):
             if valid(x,z):nodes[x,z]=set()
     for p in list(nodes):
         for q in ((p[0]+40,p[1]),(p[0],p[1]+40)):
@@ -279,6 +289,9 @@ def export(canvas,out,world,base,world_id,report):
 
 
 def prepare(args):
+    global Z1,SHAPE
+    if args.south_layout:Z1=719;SHAPE=(Y1-Y0,Z1-Z0+1,X1-X0+1)
+    if args.parcel_layout:configure_parcels(args.parcel_layout)
     if args.out.exists():raise ValueError('Choose a fresh output directory')
     args.out.mkdir(parents=True)
     topo_file=next((args.city/'after'/DATA).glob('projectseele_city_rigid_topology_r45_*.dat'))
@@ -286,9 +299,28 @@ def prepare(args):
     source_plan=Path(json.loads((args.city/'manifest.json').read_text(encoding='utf-8'))['source_plan'])
     plan=json.loads(source_plan.read_text(encoding='utf-8'))
     canvas=Canvas();canvas.capture(args.world,args.source_snapshot);canvas.overlay_city(args.city)
+    if args.south_layout:
+        moved={r['index']for r in plan['towers']if any(r['delta'])}
+        old_maintenance=json.loads((args.gis/'city-stage-one/maintenance.json').read_text('utf8'))
+        for row in old_maintenance['connections']:
+            if row['index']not in moved:continue
+            x,z=row['ladder'];base=row['landing']
+            canvas.fill(x-1,-111,z-3,x+2,base+3,z+1,'minecraft:air')
     piers,rail_footprint,rail_segments=preserve_transit(canvas,args.world)
-    old_lots=retire_old_lots(canvas,args.gis/'displaced-city-lots')
+    old_lots=retire_old_lots(canvas,args.old_lots or args.gis/'displaced-city-lots')
     xx,zz,footprint,frame,cores,towers=topology_masks(top)
+    canvas.retain_surface_recipes(args.world,frame)
+    retained=np.zeros(xx.shape,bool);retained_rows=[];reroute_retained=[]
+    if args.retained_neighbourhood:
+        retained_rows=json.loads(args.retained_neighbourhood.read_text('utf8'))
+        for row in retained_rows:
+            a,_,b,d,_,e=row['bounds']
+            retained[b-2-Z0:e+3-Z0,a-2-X0:d+3-X0]=True
+            if any(frame[z-Z0,x-X0]for x,y,z in row.get('footway',[])):
+                reroute_retained.append(row)
+            else:
+                for x,y,z in row.get('footway',[]):retained[z-Z0-1:z-Z0+2,x-X0-1:x-X0+2]=True
+        canvas.keep[24-Y0:]|=retained[None,:,:]
     cross=np.zeros(xx.shape,bool)
     for a,b,c,d in plan['cross_rectangles_xz']:cross|=(xx>=a)&(xx<=c)&(zz>=b)&(zz<=d)
     reserve=(xx>=-80)&(xx<=140)&(zz>=-100)&(zz<=8)
@@ -296,7 +328,7 @@ def prepare(args):
     for x,y,z in canvas.be:
         if y>=24:device[z-Z0,x-X0]=True
     device=expand(device,2);actors,actor_rows=protected_actors(args.world)
-    protected=reserve|device|actors|cores|piers
+    protected=reserve|device|actors|cores|piers|retained
     nodes,edges,centre,direction=road_network(cross,footprint|protected)
     carriage=expand(centre,2);paved=expand(centre,4);walk=paved&~carriage
     paths=np.zeros(xx.shape,bool);entrances=[];allowed=cross&~expand(footprint|protected,1)
@@ -354,7 +386,7 @@ def prepare(args):
     approach_height=np.full(xx.shape,80,np.int16);approach_goal=paved.copy()
     neighbourhood_paths=[]
     allowed_neighbourhood=~expand(footprint|neighbourhood_footprint|protected,1)
-    for row in neighbourhood:
+    for row in neighbourhood+reroute_retained:
         start=tuple(row['approach_start']);path=point_path(start,approach_goal,allowed_neighbourhood)
         if not path:raise ValueError(f'No public footway for replacement {row["id"]}')
         final=path[-1];end_y=int(approach_height[final[1]-Z0,final[0]-X0]);start_y=row['centre'][1]
@@ -405,7 +437,7 @@ def prepare(args):
         if not(X0+2<=x<=X1-2 and Z0+2<=z<=Z1-2)or np.any((frame|protected|paths|rail_footprint)[z-Z0-1:z-Z0+2,x-X0-1:x-X0+2]):continue
         canvas.put(x,80,z,'minecraft:polished_andesite');canvas.fill(x,81,z,x,84,z,'minecraft:polished_basalt[axis=y]')
         canvas.put(x,85,z,'minecraft:sea_lantern');canvas.put(x,86,z,'minecraft:smooth_stone_slab[type=bottom,waterlogged=false]');lamps.append([x,80,z])
-    street_connections=connect_retained_streets(canvas,protected|neighbourhood_footprint)
+    street_connections=connect_retained_streets(canvas,protected|neighbourhood_footprint,south_layout=args.south_layout)
     (args.out/'street-connections.json').write_text(json.dumps(street_connections,ensure_ascii=False,indent=2),encoding='utf-8')
     maintenance=author_maintenance(canvas,towers)
     (args.out/'maintenance.json').write_text(json.dumps(maintenance,ensure_ascii=False,indent=2),encoding='utf-8')
@@ -421,6 +453,7 @@ def prepare(args):
                    'Route real streams and trunk-road handoffs around the fictional lift structure','Cold install and changed LOD refresh'])
     (args.out/'streets.json').write_text(json.dumps(dict(nodes=[list(p)for p in nodes],edges=edges,entrances=entrances,crossings=crossings,trees=trees,lamps=lamps),ensure_ascii=False,indent=2),encoding='utf-8')
     (args.out/'neighbourhood.json').write_text(json.dumps(neighbourhood,ensure_ascii=False,indent=2),encoding='utf-8')
+    if retained_rows:(args.out/'retained-neighbourhood.json').write_text(json.dumps(retained_rows,ensure_ascii=False,indent=2),encoding='utf8')
     np.savez_compressed(args.out/'surface.npz',bounds=np.array([X0,Z0,X1,Z1]),cross=cross,frame=frame,protected=protected,
                         carriage=carriage,paved=paved,paths=paths,retired=retired,height=height)
     export(canvas,args.out,args.world,args.city,top['WorldUUID'],report)
@@ -430,7 +463,9 @@ def prepare(args):
 def main():
     p=argparse.ArgumentParser();p.add_argument('--world',type=Path,required=True);p.add_argument('--gis',type=Path,required=True)
     p.add_argument('--city',type=Path,required=True);p.add_argument('--out',type=Path,required=True)
-    p.add_argument('--source-snapshot',type=Path,help='Explicit reusable authoring snapshot; never used to overwrite current progress');args=p.parse_args()
+    p.add_argument('--source-snapshot',type=Path,help='Explicit reusable authoring snapshot; never used to overwrite current progress')
+    p.add_argument('--south-layout',action='store_true');p.add_argument('--old-lots',type=Path)
+    p.add_argument('--parcel-layout',type=Path);p.add_argument('--retained-neighbourhood',type=Path);args=p.parse_args()
     with stopped_world(args.world):prepare(args)
 
 

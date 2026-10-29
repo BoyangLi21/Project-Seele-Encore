@@ -28,15 +28,17 @@ def footprint(tower,centre,margin=4):
             x+int(p.get("MaxX",half))+margin,z+int(p.get("MaxZ",half))+margin]
 
 
-def city_plan(world):
+def city_plan(world,layout_offset=(0,0),arm_half_width=104):
     folder=world/"dimensions/projectseele/geofront/data"
     sources=list(folder.glob("projectseele_city_rigid_topology_r45_*.dat"))
     if len(sources)!=1:
         raise ValueError("One authoritative city topology is required")
     data=nbtlib.load(sources[0])["data"]
     origin=unpack(data["Origin"]);ox,oy,oz=origin
+    ox+=int(layout_offset[0]);oz+=int(layout_offset[1])
     towers=list(data["Towers"])
-    arm_half_width=104;arm_reach=344
+    arm_reach=344
+    if arm_half_width<104 or arm_half_width>=arm_reach:raise ValueError('Invalid cross arm width')
     cross=[[ox-arm_half_width,oz-arm_reach,ox+arm_half_width,oz+arm_reach],
            [ox-arm_reach,oz-arm_half_width,ox+arm_reach,oz+arm_half_width]]
     # The original three private-building centres remain outside the indexed
@@ -66,7 +68,7 @@ def city_plan(world):
             pending.append((row,tower))
         rows.append(row)
     candidates=[(ox+x,oy,oz+z) for x in range(-320,321,40) for z in range(-320,321,40)
-                if abs(x)<=80 or abs(z)<=80]
+                if abs(x)<=arm_half_width-24 or abs(z)<=arm_half_width-24]
     # Native line identities stay in place. Move a new building slot instead
     # of cutting an elevated railway when the complete component is installed.
     transit=json.loads((world/'native_transit_r28.json').read_text(encoding='utf-8'))
@@ -98,9 +100,9 @@ def city_plan(world):
     # Geometric checks concern an offline plan only; never gate game ticks.
     if len(rows)!=len(towers) or len({tuple(r['target_centre']) for r in rows})!=len(rows):
         raise ValueError("Each original tower must retain exactly one target")
-    return dict(status="placement proposal only; not installed",source_topology=str(sources[0]),origin=origin,
+    return dict(status="placement proposal only; not installed",source_topology=str(sources[0]),origin=origin,layout_centre=[ox,oy,oz],
                 shape="two intersecting arms; ordinary surrounding districts remain irregular",
-                cross_rectangles_xz=cross,retained_towers=sum(r["status"]=="retain" for r in rows),
+                cross_rectangles_xz=cross,arm_half_width=arm_half_width,retained_towers=sum(r["status"]=="retain" for r in rows),
                 moved_towers=sum(r["status"]!="retain" for r in rows),towers=rows,private_archives=private,
                 reserved_interfaces=reserved,
                 mandatory_migration=["complete current cargo with inventories and NBT","fixed supports, shaft liners and street covers",
@@ -142,7 +144,7 @@ def plot_city(plan,out):
     plt.rcParams["font.sans-serif"]=["Microsoft YaHei","SimHei","DejaVu Sans"]
     plt.rcParams["axes.unicode_minus"]=False
     fig,axes=plt.subplots(1,2,figsize=(13,7),constrained_layout=True)
-    ox,_,oz=plan["origin"]
+    ox,_,oz=plan.get("layout_centre",plan["origin"])
     for target,ax in enumerate(axes):
         for x0,z0,x1,z1 in plan["cross_rectangles_xz"]:
             ax.add_patch(Rectangle((x0,z0),x1-x0,z1-z0,fc="#f1e8ce",ec="none",alpha=.5))
@@ -159,9 +161,9 @@ def plot_city(plan,out):
         ax.text((x0+x1)/2,z0-12,"原 EVA 出口",ha="center",fontsize=9,color="#a52e43")
         ax.set_xlim(ox-390,ox+390);ax.set_ylim(oz+390,oz-390);ax.set_aspect("equal")
         ax.set_xlabel("X / 东");ax.set_ylabel("Z / 南")
-        ax.set_title("当前方形楼阵" if not target else "十字形排布候选",fontsize=14)
-    axes[1].legend(handles=[Patch(color="#607d83",label="70 座原位保留"),Patch(color="#d2853d",label="30 座整体迁移"),
-                            Patch(color="#6d5d96",label="3 座私有楼体原位保留")],loc="lower right",fontsize=9)
+        ax.set_title("当前已安装楼阵" if not target else "十字形排布候选",fontsize=14)
+    axes[1].legend(handles=[Patch(color="#607d83",label=f"{plan['retained_towers']} 座原位保留"),Patch(color="#d2853d",label=f"{plan['moved_towers']} 座整体迁移"),
+                            Patch(color="#6d5d96",label=f"{len(plan['private_archives'])} 座私有楼体原位保留")],loc="lower right",fontsize=9)
     fig.suptitle("保留原楼体与升降身份，重组城区轮廓",fontsize=18)
     fig.text(.012,.006,"当前存档 SavedData → 布局候选；尚未迁移方块、控制器或实体。轴向与臂宽仍需结合原设定和街区深化。",fontsize=9)
     fig.savefig(out/"city-cross-plan.png",dpi=150);plt.close(fig)

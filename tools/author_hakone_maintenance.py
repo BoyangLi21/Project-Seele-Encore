@@ -10,7 +10,8 @@ def author(c,towers):
         for i in range(n+1):
             x=round(a[0]+(b[0]-a[0])*i/max(1,n));z=round(a[1]+(b[1]-a[1])*i/max(1,n))
             paths[z-c.z0,x-c.x0]=True
-    line((30,40),(30,548));line((-302,220),(350,220))
+    south=max(548,max(t['z']+t['half']+6 for t in towers if t['kind']=='generated'))
+    line((30,40),(30,south));line((-302,220),(350,220))
     # The stairwell approach goes around its north wall, entering the first
     # flat landing from the west instead of crossing underneath a flight.
     line((30,76),(-194,76));line((-194,76),(-194,84));line((-194,84),(-188,84))

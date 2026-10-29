@@ -143,10 +143,10 @@ def sample_dem(mosaic, lon, lat):
     return np.where(good, value, np.nan)
 
 
-def vectors(config, out, frame):
+def vectors(config, out, frame, wanted=None, output_name='features.world.geojson.gz'):
     import mapbox_vector_tile
     zoom = config["vector_zoom"]
-    wanted = {"Anno", "RdCL", "RailCL", "RvrCL", "WA", "WStrL", "TpgphArea"}
+    if wanted is None:wanted = {"Anno", "RdCL", "RailCL", "RvrCL", "WA", "WStrL", "TpgphArea"}
     features, counts = [], Counter()
     for path in sorted((out / f"tiles/optimal_bvmap-v1/{zoom}").glob("*/*.pbf")):
         tx, ty = int(path.parent.name), int(path.stem)
@@ -173,7 +173,7 @@ def vectors(config, out, frame):
                                      geometry=dict(type=feature["geometry"]["type"],
                                                    coordinates=convert(feature["geometry"]["coordinates"]))))
                 counts[layer_name] += 1
-    with gzip.open(out / "features.world.geojson.gz", "wt", encoding="utf-8") as stream:
+    with gzip.open(out / output_name, "wt", encoding="utf-8") as stream:
         json.dump(dict(type="FeatureCollection", coordinate_system="Project SEELE X/Z blocks; see geography.json",
                        attribution=config["source_urls"]["attribution"], features=features), stream, ensure_ascii=False)
     print("GIS feature counts", dict(counts), flush=True)
@@ -220,13 +220,14 @@ def build(config, out):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("action", choices=["fetch", "build"])
+    parser.add_argument("action", choices=["fetch", "build", "buildings"])
     parser.add_argument("--config", type=Path, default=CONFIG)
     parser.add_argument("--out", type=Path, required=True)
     args = parser.parse_args()
     config = json.loads(args.config.read_text(encoding="utf-8"))
     args.out.mkdir(parents=True, exist_ok=True)
-    (fetch if args.action == "fetch" else build)(config, args.out)
+    if args.action=='buildings':vectors(config,args.out,Frame(config),{'BldA','SpcfArea'},'buildings.world.geojson.gz')
+    else:(fetch if args.action == "fetch" else build)(config, args.out)
 
 
 if __name__ == "__main__":

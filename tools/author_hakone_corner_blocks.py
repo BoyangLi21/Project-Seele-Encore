@@ -20,6 +20,14 @@ SITES={
  'tokyo_south/13-01':(190,416,101,13,12,'minecraft:smooth_sandstone','minecraft:orange_terracotta'),
 }
 PARK=(-165,81,-123,105,82)
+PARKS={'tokyo_west/09-08':PARK}
+
+
+def configure(file):
+    global SITES,PARKS
+    data=json.loads(Path(file).read_text('utf8'))
+    SITES={k:tuple(v)for k,v in data['buildings'].items()}
+    PARKS={k:tuple(v)for k,v in data['parks'].items()}
 
 
 def retire_old_lots(c,folder):
@@ -43,7 +51,7 @@ def retire_old_lots(c,folder):
 
 def parcel_mask(c,rows):
     mask=np.zeros(c.blocks.shape[1:],bool)
-    a,b,d,e,_=PARK;mask[b-c.z0:e+1-c.z0,a-c.x0:d+1-c.x0]=True
+    for a,b,d,e,_ in PARKS.values():mask[b-c.z0:e+1-c.z0,a-c.x0:d+1-c.x0]=True
     for row in rows:
         if row['id']not in SITES:continue
         x,z,f,hx,hz,_,_=SITES[row['id']]
@@ -128,17 +136,36 @@ def build_parcels(c,rows,protected):
         elif '商店'in name:
             for zz in (z0+10,z0+15):c.fill(x1-7,f+1,zz,x1-2,f+2,zz,'minecraft:bookshelf')
         moved=[];chests=sorted([d for d in row['devices']if str(d['nbt']['id'])=='minecraft:chest'],key=lambda d:d['source'][1])
-        for level,d in enumerate(chests):moved.append(place_device(c,d,(x1-3,f+level*5+1,z0+3)))
+        floor_chests={}
+        for d in chests:
+            level=(d['source'][1]-row['floor']-1)//5;slot=floor_chests.get(level,0);floor_chests[level]=slot+1
+            if not 0<=level<n or slot>2:raise ValueError('Unassigned original inventory floor')
+            moved.append(place_device(c,d,(x1-3-slot*2,f+level*5+1,z0+3)))
+        bed_feet=sorted([d['source']for d in row['devices']if str(d['nbt']['id'])=='minecraft:bed'and 'part=foot'in d['state']],key=lambda p:(p[1],p[0],p[2]))
+        bed_positions={};floor_beds={}
+        for foot in bed_feet:
+            level=(foot[1]-row['floor']-1)//5;slot=floor_beds.get(level,0);floor_beds[level]=slot+1
+            if not 0<=level<n or slot>1:raise ValueError('Unassigned original bed floor')
+            bed_positions[foot]=(x1-5-slot*6,f+level*5+1,z0+10)
         for d in row['devices']:
             kind=str(d['nbt']['id'])
             if kind=='minecraft:chest':continue
             if kind=='minecraft:sign':pos=(x+4,f+3,z1+1)
-            elif kind=='minecraft:bed':pos=(x1-5,f+1,z0+8+(1 if 'part=head'in d['state']else 0))
+            elif kind=='minecraft:bed':
+                facing=next(v for v in ('north','south','east','west')if 'facing='+v in d['state'])
+                dx,dz={'north':(0,-1),'south':(0,1),'east':(1,0),'west':(-1,0)}[facing]
+                head='part=head'in d['state'];sx,sy,sz=d['source'];foot=(sx-dx,sy,sz-dz)if head else(sx,sy,sz)
+                bx,by,bz=bed_positions[foot];pos=(bx+dx,by,bz+dz)if head else(bx,by,bz)
             else:raise ValueError(f'Unassigned preserved device {kind}')
             moved.append(place_device(c,d,pos))
         reports.append(dict(id=row['id'],kind='building',use=name,centre=[x,f,z],bounds=[x0,f,z0,x1,roof+3,z1],
             floors=n,door=[x,f+1,z1],approach_start=[x,z1+3],devices=moved))
-    x0,z0,x1,z1,f=PARK;x=(x0+x1)//2
+    for name,bounds in PARKS.items():reports.append(build_park(c,name,bounds))
+    return reports,footprint
+
+
+def build_park(c,name,bounds):
+    x0,z0,x1,z1,f=bounds;x=(x0+x1)//2
     c.fill(x0,24,z0,x1,24,z1,'projectseele:nerv_structural_panel')
     c.fill(x0,25,z0,x1,f-1,z1,'minecraft:stone')
     c.fill(x0,f,z0,x1,f,z1,'minecraft:grass_block[snowy=false]')
@@ -151,6 +178,5 @@ def build_parcels(c,rows,protected):
         c.fill(xx-1,f+6,zz-1,xx+1,f+6,zz+1,'minecraft:oak_leaves[distance=7,persistent=true,waterlogged=false]')
     for xx in (x0+11,x1-11):
         c.fill(xx-1,f+1,z0+10,xx+1,f+1,z0+10,'minecraft:oak_stairs[facing=south,half=bottom,shape=straight,waterlogged=false]')
-    reports.append(dict(id='tokyo_west/09-08',kind='park',use='街角公园',centre=[x,f,(z0+z1)//2],
-        bounds=[x0,f,z0,x1,f+6,z1],floors=0,door=[x,f+1,z1],approach_start=[x,z1+3],devices=[]))
-    return reports,footprint
+    return dict(id=name,kind='park',use='街角公园',centre=[x,f,(z0+z1)//2],
+        bounds=[x0,f,z0,x1,f+6,z1],floors=0,door=[x,f+1,z1],approach_start=[x,z1+3],devices=[])

@@ -67,6 +67,8 @@ def main():
     parser.add_argument('--patch-list',type=Path,help='UTF-8 text, one installed forward.jsonl[.gz] per line')
     parser.add_argument('--installation',type=Path,help='Successful array installation receipt containing changed tiles')
     parser.add_argument('--workers',type=int,choices=range(1,5),default=2)
+    parser.add_argument('--allow-partial',action='store_true',help='R54 importer keeps absent columns unknown; never invent source blocks')
+    parser.add_argument('--resume-failed',action='store_true',help='Retry only unavailable tiles from this exact completed export attempt')
     parser.add_argument('--plan-only',action='store_true',help='List affected tiles without opening the world')
     parser.add_argument('--deps',type=Path,help='Optional directory containing nbtlib; appended after installed runtime packages')
     args=parser.parse_args();paths=list(args.patches)
@@ -88,7 +90,7 @@ def main():
     out.mkdir(parents=True,exist_ok=True)
     report=dict(world=str(world),dimension='projectseele:geofront',tile_size=64,tiles=tiles,
                 total=len(tiles),inputs=inputs,format='SavedColumnLodImporterR53 unchanged',
-                import_directory=str(out/'columns'),world_written=False,sqlite_written=False)
+                import_directory=str(out/'columns'),world_written=False,sqlite_written=False,allow_partial=args.allow_partial)
     write_json(out/'tile-plan.json',report)
     if args.plan_only:
         print(f'Planned {len(tiles)} changed tiles from {len(paths)} patches; world not opened.')
@@ -101,22 +103,27 @@ def main():
     expected={f'{x}_{z}.columns.gz'for x,z in tiles}
     extra=[f.name for f in columns.glob('*.columns.gz')if f.name not in expected]
     if extra:raise ValueError('Output contains other tile exports; use a new output directory: '+str(extra[:8]))
-    start=time.monotonic();rows=[];missing=[]
+    start=time.monotonic();rows=[];missing=[];requested=tiles
+    if args.resume_failed:
+        previous=json.loads((out/'export.json').read_text('utf8'))
+        if previous['world']!=str(world)or previous['tiles']!=[list(p)for p in tiles]:raise ValueError('Resume requires the exact original world and tile set')
+        rows=previous['exported'];requested=[tuple(r['tile'])for r in previous['missing']]
+        if not requested:raise ValueError('Export is already complete')
     def export(tile):
-        row=export_tile(world,tile,staging)
+        row=export_tile(world,tile,staging,allow_partial=args.allow_partial)
         name=f'{tile[0]}_{tile[1]}.columns.gz'
         os.replace(staging/name,columns/name)
         return row
     with stopped_world(world):
         with ThreadPoolExecutor(max_workers=args.workers,thread_name_prefix='seele-column-export')as pool:
-            jobs={pool.submit(export,tile):tile for tile in tiles}
+            jobs={pool.submit(export,tile):tile for tile in requested}
             for future in as_completed(jobs):
                 try:rows.append(future.result())
                 except Exception as error:missing.append(dict(tile=jobs[future],error=str(error)))
                 progress=dict(completed=len(rows),failed=len(missing),total=len(tiles),seconds=round(time.monotonic()-start))
                 write_json(out/'progress.json',progress)
                 if (len(rows)+len(missing))%10==0 or len(rows)+len(missing)==len(tiles):print(progress,flush=True)
-    rows.sort(key=lambda row:row['tile']);missing.sort(key=lambda row:row['tile'])
+    rows.sort(key=lambda row:tuple(row['tile']));missing.sort(key=lambda row:tuple(row['tile']))
     write_json(out/'export.json',dict(report,done=not missing,exported=rows,missing=missing,seconds=round(time.monotonic()-start)))
     if missing:raise SystemExit(f'{len(missing)} tiles unavailable; do not import a partial set. Details: {out / "export.json"}')
     print(f'Export complete: {len(rows)} tiles. Native importer directory: {columns}',flush=True)

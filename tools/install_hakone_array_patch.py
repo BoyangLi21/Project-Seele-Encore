@@ -129,29 +129,38 @@ def install(a):
     if a.backup.exists(): raise ValueError('Choose a fresh installation directory; never replay automatically')
     manifests = [json.loads((c/'manifest.json').read_text('utf8')) for c in a.candidate]
     if any(Path(m['world']).resolve() != a.world.resolve() for m in manifests): raise ValueError('Wrong actual world')
-    city = a.candidate[-1]
-    check = json.loads((city/'functional-check.json').read_text('utf8'))
+    final = a.candidate[-1]
+    check = json.loads((final/'functional-check.json').read_text('utf8'))
     if check['errors']: raise ValueError('Unresolved authored path errors')
-    for preserved in (city/'preserved').glob('*control*.dat'):
-        old = nbtlib.load(preserved)['data']; current = nbtlib.load(a.world/DATA/preserved.name)['data']
-        for key in ('WorldUUID','Phase','Depth','Target','Journey','WorldTouched'):
-            if current.get(key) != old.get(key): raise ValueError(f'City moved since authoring: {key}')
+    for candidate in a.candidate:
+        for preserved in (candidate/'preserved').glob('*control*.dat'):
+            old = nbtlib.load(preserved)['data']; current = nbtlib.load(a.world/DATA/preserved.name)['data']
+            for key in ('WorldUUID','Phase','Depth','Target','Journey','WorldTouched'):
+                if current.get(key) != old.get(key): raise ValueError(f'City moved since authoring: {key}')
     files = defaultdict(list)
     for candidate in a.candidate:
         for file in (candidate/'delta').glob('*.npz'):
             _, rx, rz, _ = file.name.split('.'); files[int(rx), int(rz)].append(file)
     devices = defaultdict(lambda: defaultdict(dict))
-    for r in nbtlib.load(city/'block-entities.dat')['Changes']:
-        tag = r.get('Before', r.get('After')); x,y,z = (int(tag[k]) for k in ('x','y','z'))
-        devices[x//512, z//512][x//16, z//16][x,y,z] = r
-        files.setdefault((x//512,z//512), [])
+    for candidate in a.candidate:
+        file=candidate/'block-entities.dat'
+        if not file.exists():continue
+        for r in nbtlib.load(file)['Changes']:
+            tag = r.get('Before', r.get('After')); x,y,z = (int(tag[k]) for k in ('x','y','z'))
+            previous=devices[x//512,z//512][x//16,z//16].get((x,y,z))
+            if previous is not None and previous!=r:raise ValueError(f'Conflicting device changes at {(x,y,z)}')
+            devices[x//512, z//512][x//16, z//16][x,y,z] = r
+            files.setdefault((x//512,z//512), [])
     metadata = []
-    for after in (city/'after').rglob('*.dat'):
-        relative = after.relative_to(city/'after'); current = a.world/relative; prior = city/'before'/relative
-        if prior.exists():
-            if not current.exists() or nbtlib.load(prior) != nbtlib.load(current): raise ValueError(f'Changed metadata: {relative}')
-        elif current.exists(): raise ValueError(f'New metadata already exists: {relative}')
-        metadata.append((current, after))
+    metadata_targets=set()
+    for candidate in a.candidate:
+        for after in (candidate/'after').rglob('*.dat'):
+            relative = after.relative_to(candidate/'after'); current = a.world/relative; prior = candidate/'before'/relative
+            if current in metadata_targets:raise ValueError(f'Overlapping metadata candidates: {relative}')
+            if prior.exists():
+                if not current.exists() or nbtlib.load(prior) != nbtlib.load(current): raise ValueError(f'Changed metadata: {relative}')
+            elif current.exists(): raise ValueError(f'New metadata already exists: {relative}')
+            metadata.append((current, after));metadata_targets.add(current)
     a.backup.mkdir(parents=True)
     stage = a.backup/'prepared'; original = a.backup/'original'; stage.mkdir(); original.mkdir()
     journal = dict(status='preparing', world=str(a.world), candidates=[str(c) for c in a.candidate], files=[], progress_files_written=[])
@@ -166,9 +175,11 @@ def install(a):
         tile_set.update((cx//4,cz//4) for cx,cz in chunks)
         print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s', flush=True)
     plans.extend(metadata)
-    prepared_jar = stage/'projectseele-0.1.0-all.jar'
-    jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar)
-    plans.append((a.installed_jar, prepared_jar))
+    jar_classes = 0
+    if a.installed_jar:
+        prepared_jar = stage/'projectseele-0.1.0-all.jar'
+        jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar)
+        plans.append((a.installed_jar, prepared_jar))
     for i, (target, source) in enumerate(plans):
         backup = original/str(i)
         if target.exists(): shutil.copy2(target, backup)
@@ -201,9 +212,11 @@ def install(a):
 
 def main():
     p = argparse.ArgumentParser(__doc__)
-    for name in ('world','backup','installed-jar','compiled-jar'): p.add_argument('--'+name, type=Path, required=True)
-    p.add_argument('--candidate', type=Path, action='append', required=True, help='Ordered arrays; final city candidate takes precedence')
+    for name in ('world','backup'): p.add_argument('--'+name, type=Path, required=True)
+    for name in ('installed-jar','compiled-jar'): p.add_argument('--'+name, type=Path)
+    p.add_argument('--candidate', type=Path, action='append', required=True, help='Ordered arrays; later candidate takes precedence')
     a = p.parse_args()
+    if bool(a.installed_jar)!=bool(a.compiled_jar):p.error('Supply both JAR paths or neither')
     with stopped_world(a.world): install(a)
 
 
