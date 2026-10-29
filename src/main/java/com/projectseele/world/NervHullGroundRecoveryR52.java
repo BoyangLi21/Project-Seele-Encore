@@ -140,17 +140,40 @@ public final class NervHullGroundRecoveryR52
         var nearby=new ArrayList<SourceObstacle>();for(var source:obstacles)if(whole.intersects(source.envelope()))nearby.add(source);
         for(var chord:chords){for(var box:boxes)if(chord.box().intersects(box)&&TriangleSweepMeshR52.convexSweepBox(chord.vertices(),chord.error(),box))return false;for(var source:nearby)if(!bearingTangent(chord,source)&&intersects(chord,source))return false;}return true;
     }
-    /** Only this full source/world check can create a committable small pose step. */
+    /** Preserve the original pose sequence; detailed world sweeps are STRICT diagnostics. */
     public static AcceptedRecoveryStep check(ServerLevel level,UUID task,UUID aircraft,NervAirframeGeometryR52 source,Plan plan,int age,Frame current,Set<String> spaces,Map<String,NervRouteNativeR52.Binding> bindings)
     {
         if(plan==null||age<0||age>=TICKS||!(level.getEntity(plan.original.eva()) instanceof EvaUnit01Entity e)||!originalHull(e,plan.original)||!(level.getEntity(aircraft) instanceof UNTransportEntity p)||!p.carrying()||current.cargo()==null||current.rig().deployment()!=1||current.rig().jaws()!=0)return null;
         var context=NervRouteRuntimeR52.flightContext(level);if(context==null)return null;var lease=context.pool().queryFlight(task);if(lease==null||!lease.original().equals(plan.original)||!lease.aircraft().equals(aircraft)||lease.kind()!=Kind.HULL_ONLY_RECOVERY||!lease.spaces().containsAll(spaces))return null;
         if(!NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),plan.root(age))||!NervAirTransportManifestR52.same(current.cargo(),plan.root(age))||!sameBody(EvaMechanicalFrameR52.frozenLocalPose(e),plan.body(e,age))||!EvaFrozenHandsR52.capture(e,1).equals(plan.hands))return null;
-        var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return null;declared.addAll(b.spaces());}
-        var own=new HashSet<>(TransportMembershipR52.members(plan.original,Kind.HULL_ONLY_RECOVERY));own.add(aircraft);double rotor=NervAircraftFrameR52.rotorClock(p);
+        double rotor=NervAircraftFrameR52.rotorClock(p);if(!Double.isFinite(rotor))return null;
         var bodyFrom=EvaMechanicalFrameR52.frozenLocalPose(e);var geometryFrom=EvaMechanicalFrameR52.capturedGeometry(e);var contactsFrom=NervAirCradleContactsR52.evaluate(geometryFrom,desiredAnchors(bodyFrom));var after=EvaShutdownR30.encode(plan.body(e,age+1));
         var next=new Frame(current.plane(),plan.root(age+1),current.rig());var bodyTo=decode(e,after);boolean unchanged=sameBody(bodyFrom,bodyTo);var geometryTo=unchanged?geometryFrom:evaluate(e,bodyTo,plan.hands);var contactsTo=unchanged?contactsFrom:NervAirCradleContactsR52.evaluate(geometryTo,desiredAnchors(bodyTo));
         if(!NervAircraftFrameR52.anchors(p).equals(contactsFrom.stream().map(NervAirCradleContactsR52.Contact::centre).toList())||!NervAircraftFrameR52.jawAxes(p).equals(contactsFrom.stream().map(NervAirCradleContactsR52.Contact::axis).toList()))return null;
+        if(!NervTraversalPolicyR53.strict(level))
+        {
+            // The displayed next pose and six moving clamp contacts are needed
+            // for the commit. Collision chords, rotor sweeps and support scans
+            // are not: recovery keeps the same full 120 + 80 step sequence.
+            // The hoist can put the aircraft above the block build ceiling.
+            // Its horizontal chunks must be loaded; that ceiling is not a flight limit.
+            var planeBounds=p.getBoundingBox();
+            for(int x=((int)Math.floor(planeBounds.minX))>>4;x<=((int)Math.floor(planeBounds.maxX))>>4;x++)
+                for(int z=((int)Math.floor(planeBounds.minZ))>>4;z<=((int)Math.floor(planeBounds.maxZ))>>4;z++)
+                    if(level.getChunkSource().getChunkNow(x,z)==null)return null;
+            if(!EntryPlugEjectionR48.loaded(level,NervRigidMeshSweepR52.transformed(geometryFrom.bounds(),current.cargo()))
+                    ||!EntryPlugEjectionR48.loaded(level,NervRigidMeshSweepR52.transformed(geometryTo.bounds(),next.cargo())))return null;
+            if(age+1==TICKS)
+            {
+                var carrier=NervOriginalCarrierR52.controller(level,plan.original);
+                if(carrier==null||!NervOriginalCarrierR52.declared(carrier)||NervOriginalCarrierR52.progress(carrier,1)!=1
+                        ||!carrier.originalCarrierStateR52().getUUID("OriginalEva").equals(e.getUUID())
+                        ||!EntryPlugEjectionR48.loaded(level,carrier.getBoundingBox()))return null;
+            }
+            return new AcceptedRecoveryStep(level,plan.original,aircraft,EvaAirTransportR31.cradleStateR50(e).getCompound("Origin"),after,plan.hands,current,next,geometryTo,binding(e,bodyTo,geometryTo),contactsTo,rotor);
+        }
+        var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return null;declared.addAll(b.spaces());}
+        var own=new HashSet<>(TransportMembershipR52.members(plan.original,Kind.HULL_ONLY_RECOVERY));own.add(aircraft);
         int subdivisions=unchanged?1:4;
         for(int sample=0;sample<subdivisions;sample++)
         {

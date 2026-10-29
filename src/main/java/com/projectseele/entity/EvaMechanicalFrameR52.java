@@ -305,9 +305,15 @@ public final class EvaMechanicalFrameR52
         if(!originalHull(eva,original)||!geometryInstalled||eva.isNervLogisticsLocked()||!EvaShutdownR30.displayed(eva)||EvaShutdownR30.pose(eva).isEmpty()
                 ||EvaAirTransportR31.active(eva)||eva.hasActiveCarrierMotion()||eva.isLaunchSequenceActive()||eva.isFirstBattleActive()
                 ||com.projectseele.physics.CombatBodyDynamics.active(eva)||EvaShutdownR30.collapse(eva,1)!=1)return null;
-        var actual=EvaBodyPose.sample(eva,1);var retained=EvaBodyPose.neutralForTransportR32(eva);EvaShutdownR30.decode(EvaShutdownR30.pose(eva),retained);
-        if(!samePose(actual,retained))return null;
-        return new HullCapture(original,EvaShutdownR30.pose(eva),EvaFrozenHandsR52.capture(eva,1),eva.position(),EvaAirTransportR31.frameYaw(eva,1));
+        var actual=EvaBodyPose.sample(eva,1);
+        if(com.projectseele.world.NervTraversalPolicyR53.strict((ServerLevel)eva.level()))
+        {
+            var retained=EvaBodyPose.neutralForTransportR32(eva);EvaShutdownR30.decode(EvaShutdownR30.pose(eva),retained);
+            if(!samePose(actual,retained))return null;
+        }
+        // Ejection changes the dorsal mechanism after the impact pose was
+        // saved. Lift the body as it is now, including that opened mechanism.
+        return new HullCapture(original,EvaShutdownR30.encode(actual),EvaFrozenHandsR52.capture(eva,1),eva.position(),EvaAirTransportR31.frameYaw(eva,1));
     }
 
     /** Observed occupied field custody before any plant lock; same frozen
@@ -614,8 +620,9 @@ public final class EvaMechanicalFrameR52
         if(hull)
         {
             if(hullCapture==null||!hullCapture.original.equals(original)||eva.position().distanceToSqr(hullCapture.position)>1e-12
-                    ||!EvaShutdownR30.pose(eva).equals(hullCapture.stopped)||eva.yBodyRot!=hullCapture.yaw||com.projectseele.physics.CombatBodyDynamics.active(eva))return false;
+                    ||eva.yBodyRot!=hullCapture.yaw||com.projectseele.physics.CombatBodyDynamics.active(eva))return false;
             pose=EvaBodyPose.neutralForTransportR32(eva);EvaShutdownR30.decode(hullCapture.stopped,pose);hands=hullCapture.hands.copy();
+            if(com.projectseele.world.NervTraversalPolicyR53.strict((ServerLevel)eva.level())&&!samePose(pose,EvaBodyPose.sample(eva,1)))return false;
         }
         else if(occupiedCapture!=null)
         {if(!occupiedCapture.original.equals(original)||eva.isNervLogisticsLocked()||eva.position().distanceToSqr(occupiedCapture.position)>1e-12||!same(plug.getCanonicalTransform(),occupiedCapture.plug)||eva.yBodyRot!=occupiedCapture.yaw)return false;pose=EvaBodyPose.neutralForTransportR32(eva);EvaShutdownR30.decode(occupiedCapture.body,pose);if(!samePose(pose,EvaBodyPose.sample(eva,1))||!EvaFrozenHandsR52.capture(eva,1).equals(occupiedCapture.hands))return false;hands=occupiedCapture.hands.copy();}

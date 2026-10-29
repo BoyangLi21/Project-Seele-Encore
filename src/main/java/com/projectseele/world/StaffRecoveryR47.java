@@ -81,7 +81,22 @@ public final class StaffRecoveryR47
         var level = caller.serverLevel();
         if(!level.dimension().equals(FacilitySchemaV2.DIMENSION))return "请先进入第三新东京市，再安排本部机体回收。";
         var state = state(level);
-        if (state.jobs.containsKey(unit)) return "这台机体的回收已经在安排，请查看运输状态。";
+        var queued=state.jobs.get(unit);
+        if(queued!=null)
+        {
+            if(!queued.owner.equals(caller.getUUID())&&!caller.hasPermissions(2))
+                return "这台机体已有其他指挥员安排回收，请保持通信。";
+            if(queued.stage.startsWith("R53_AIR_WAIT:"))
+            {
+                // A queued request is not an aircraft dispatch. Keep the same
+                // order and expose its actual admission reply on another click.
+                queued.nextAirRequest=0;
+                queued.expires=level.getGameTime()+20*60*12;
+                state.setDirty();
+                return "运输机尚未派出："+queued.stage.substring("R53_AIR_WAIT:".length())+" 正在重新确认接载条件。";
+            }
+            return "这台机体的回收已经在安排，请查看运输状态。";
+        }
         var receipt = EvaFleetSavedData.get(level.getServer()).entry(unit).orElse(null);
         if (receipt == null) return "原机体登记尚未接通，不能安排回收。";
         if (receipt.phase() != EvaFleetSavedData.Phase.DEPLOYED && receipt.phase() != EvaFleetSavedData.Phase.PARKED
