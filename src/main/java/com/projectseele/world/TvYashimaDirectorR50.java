@@ -101,6 +101,13 @@ public final class TvYashimaDirectorR50
             {
                 var receipt=rack.getPersistentData().getString(TvMissionEquipmentR45.SUPPLY_RECEIPT);
                 for(int unit=0;unit<=1;unit++)rack.commissionTvMissionSupplyR50(unit,receipt);
+                if(rack.payloadR47()==EvaUnit01Entity.WEAPON_SHIELD_R45)
+                {
+                    var data=TvCampaignSavedData.get(level);var cover=TvSortiesR32.assignedUnit(level,data,0);
+                    if(cover!=null&&TvSortiesR32.readyAssigned(level,data.sorties.get(0))&&TvMissionEquipmentR45.operational(cover)
+                            &&rack.position().subtract(cover.position()).horizontalDistance()<=96
+                            &&EquipmentVaultsR47.physicalHandoffFloorR49(rack,cover)&&TvMissionEquipmentR45.stockedFor(rack,cover))rack.deploy();
+                }
             }
         }
     }
@@ -229,9 +236,17 @@ public final class TvYashimaDirectorR50
         if(shooter==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(1))||!TvMissionEquipmentR45.operational(shooter))
             return "等待初号机抵达炮位。";
         var equipment=TvEncounterEquipmentControlR45.serverCargoAndCannonR45();
-        if(!TvMissionEquipmentR45.cannonAuthorized(shooter)||!equipment.cannonReady(shooter))return "原预装阳电子炮与本场借用登记尚未接通。";
-        if(!TvYashimaStationR52.fireBlocker(shooter).isEmpty())
-            return "射手尚未在炮位停稳，等待到场交接。";
+        var gun=TvYashimaStationR52.gun(level);
+        if(!TvMissionEquipmentR45.cannonAuthorized(shooter)||gun==null||!gun.loadedR52())return "原预装阳电子炮与本场借用登记尚未接通。";
+        if(!TvYashimaStationR52.atPlatformR52(shooter))
+        {
+            var position=TvYashimaStationR52.operatorPositionR52(level);
+            String lift=gun.readyR52()?"阳电子炮已升起；":"炮井在接近时自动展开；";
+            return position==null?"等待初号机抵达炮位。":lift+"初号机请前往炮位（"+net.minecraft.util.Mth.floor(position.x)+"，"+net.minecraft.util.Mth.floor(position.y+.01)+"，"+net.minecraft.util.Mth.floor(position.z)+"）并停稳。";
+        }
+        if(!gun.readyR52())return "初号机已到炮位，炮井正在开启并升起阳电子炮。";
+        if(!shooter.fixedCannonOperatingR52())return "阳电子炮已升起；请从驾驶舱看向炮体，右键接入炮位。";
+        String cannon=TvYashimaStationR52.fireBlocker(shooter);if(!cannon.isEmpty())return cannon;
         var cover=TvSortiesR32.assignedUnit(level,data,0);
         if(cover==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(0))||!TvMissionEquipmentR45.operational(cover)
                 ||!equipment.shieldEquipped(cover))return "等待零号机携盾就位。";

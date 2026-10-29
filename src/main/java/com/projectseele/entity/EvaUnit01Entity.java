@@ -4735,6 +4735,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.entityData.set(DATA_UMBILICAL_SEVERED,false);
             this.powerCheckCooldown=0;return;
         }
+        // The pilot cannot use the airframe while its mechanical owner still
+        // holds it. Start spending the onboard reserve after actual release.
+        if (this.isNervLogisticsLocked() && EvaMechanicalFrameR52.active(this))
+        {
+            this.setUmbilicalAnchor(null);
+            return;
+        }
         boolean marinePower = com.projectseele.world.TvMarineDirectorR50.marinePowerAllowed(this);
         java.util.function.Predicate<BlockPos> allowedSocket = socket ->
                 com.projectseele.world.NervAirTransportRuntimeR52.sameOperatingRegion(
@@ -5229,11 +5236,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if (entityHit != null)
         {
             end = entityHit.getLocation();
-            if (entityHit.getEntity() instanceof RamielEntity ramiel && ramiel.isCoreShot(from, dir))
+            if (entityHit.getEntity() instanceof RamielEntity ramiel)
             {
-                // The Yashima shot: two clean core hits end the Angel.
-                ramiel.hurt((pilot instanceof ServerPlayer player?this.damageSources().playerAttack(player):this.damageSources().mobAttack(pilot)),
-                        SeeleConfig.CANNON_CORE_DAMAGE.get().floatValue());
+                // No ordinary-damage fallback for a sealed core or a shell
+                // hit, even when melee has already exhausted its A.T. Field.
+                if (ramiel.isCoreShot(from, dir))
+                    ramiel.hurt((pilot instanceof ServerPlayer player?this.damageSources().playerAttack(player):this.damageSources().mobAttack(pilot)),
+                            SeeleConfig.CANNON_CORE_DAMAGE.get().floatValue());
             }
             else
             {

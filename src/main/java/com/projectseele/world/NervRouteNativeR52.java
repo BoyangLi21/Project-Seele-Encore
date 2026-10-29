@@ -138,9 +138,10 @@ public final class NervRouteNativeR52 implements NativeAccess
     public boolean resourceReadyR53(String id,boolean openGate,List<AABB> scope)
     {
         var resource=directory.resource(id);var binding=bindings.get(id);if(resource==null||binding==null||!resource.component().equals(binding.component()))return false;
+        if(!NervTraversalPolicyR53.strict(level)&&resource.kind()!=ResourceKind.DOOR)return true;
         if(scope!=null&&resource.kind()==ResourceKind.DOOR&&!resourceNearbyR53(id,scope))return true;
         boolean scoped=scope!=null&&(resource.kind()==ResourceKind.RAIL||resource.kind()==ResourceKind.SUPPORT);
-        var cells=scoped?binding.cells().stream().filter(cell->cellNearbyR53(cell.position(),scope)).toList():binding.cells();
+        var cells=!NervTraversalPolicyR53.strict(level)?List.<Cell>of():scoped?binding.cells().stream().filter(cell->cellNearbyR53(cell.position(),scope)).toList():binding.cells();
         boolean retiredPitSupports=((binding.mechanicalRail()!=null
                 &&binding.mechanicalRail().kind()==NervMechanicalRailBindingR52.Kind.LEGACY_RUNNING_HEAD
                 ||RETIRED_PIT_SUPPORTS_R53.contains(id)));
@@ -196,7 +197,7 @@ public final class NervRouteNativeR52 implements NativeAccess
         public FootSupportFrameR52.Sample from(){return paths.get(0).sample(0);}public FootSupportFrameR52.Sample to(){return paths.get(paths.size()-1).sample(1);}
         public boolean current(ServerLevel level){return !committed&&level==access.level&&level.getGameTime()==at&&access.currentKind==kind&&access.sameAssembly(original,kind);}
         public boolean coversFixedCarrierRailsR53(ServerLevel level,NervCarrierPlatformEntity carrier,List<DirectoryTrajectoryR52> paths,Set<UUID> own)
-        {return current(level)&&samePathsR53(this.paths,paths)&&assemblySweep.matchesSlices(original,coveragePaths)
+        {return current(level)&&samePathsR53(this.paths,paths)&&(!NervTraversalPolicyR53.strict(level)||assemblySweep!=null&&assemblySweep.matchesSlices(original,coveragePaths))
                 &&own.containsAll(TransportMembershipR52.members(original,kind))&&NervOriginalCarrierR52.controller(level,original)==carrier;}
         /** Only the beginning of this tick's already cleared horizon may be
          * committed. The complete horizon remains the source of rail coverage;
@@ -238,6 +239,13 @@ public final class NervRouteNativeR52 implements NativeAccess
         if(route==null||!route.continuousUpright()||paths==null||paths.isEmpty()||paths.size()>2048||!sameAssembly(original,currentKind)||currentKind==Kind.HULL_ONLY_RECOVERY&&!route.recovery())return continuousHeldR53(original,"original_assembly_or_route");
         if(currentKind==Kind.OCCUPIED&&!EntryPlugDirector.hasLaunchLock(level,original.variant(),(EvaUnit01Entity)level.getEntity(original.eva())))return continuousHeldR53(original,"occupied_launch_lock");
         var ids=new HashSet<String>();for(var path:paths){if(!path.directory().fingerprint().equals(directory.fingerprint())||!route.legs().contains(path.leg().id())||path.leg().motion()==Motion.FOOT_BEARING_TURN)return continuousHeldR53(original,"route_slice");ids.addAll(path.leg().resources());}
+        if(!NervTraversalPolicyR53.strict(level))
+        {
+            if(!owner.actualFrameMatches(level,original,paths.get(0).sample(0),ownerData))return continuousHeldR53(original,"actual_source_frame");
+            for(String id:ids)if(directory.resource(id).kind()!=ResourceKind.SPACE&&!resourceReady(id,directory.resource(id).kind()==ResourceKind.DOOR))return continuousHeldR53(original,"resource="+id);
+            continuousFailuresR53.remove(original.eva());
+            return new CheckedContinuousTraversalR52(this,original,route,paths,paths,null,allowPendingSource);
+        }
         // Whole-source fixed-rail diagnostics are explicit; normal travel checks the current motion.
         try{var sweep=owner.sweptContinuousAssemblyR52(level,original,paths,ownerData);var own=TransportMembershipR52.members(original,currentKind);if(sweep==null||sweep.triangles()==null||!sweep.assembly().equals(own)||!sweep.triangles().matchesSlices(original,paths)||!sweep.triangles().matchesSamples(paths.get(0).sample(0),paths.get(paths.size()-1).sample(1)))return continuousHeldR53(original,"captured_source_or_samples");
             // One block admits adjacent physical bearing cells; prefetch margin

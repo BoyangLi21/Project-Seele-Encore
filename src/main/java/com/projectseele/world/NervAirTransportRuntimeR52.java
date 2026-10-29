@@ -318,7 +318,7 @@ public final class NervAirTransportRuntimeR52
             if(!ready){save(j.update(j.leg(),j.age(),Phase.PREPARE,j.carrying(),j.payloadTransferred(),j.spaces(),j.mechanisms(),data,"舱门正在开启"));}
             return new GatePreparation(j,ready);
         }
-        Set<String> pickupSpaces(Mission m,NervFlightProofR52.FlightPickupPreview p){return manifest.directory().dynamicSpacesR52().domains().isEmpty()?manifest.node(m.pickupNode()).spaces():manifest.directory().dynamicSpacesR52().required(manifest.dimension(),p.cargoEnvelopes(p.root(),p.root()),ground().bindings());}
+        Set<String> pickupSpaces(Mission m,NervFlightProofR52.FlightPickupPreview p){return !NervTraversalPolicyR53.strict(level)||manifest.directory().dynamicSpacesR52().domains().isEmpty()?manifest.node(m.pickupNode()).spaces():manifest.directory().dynamicSpacesR52().required(manifest.dimension(),p.cargoEnvelopes(p.root(),p.root()),ground().bindings());}
         Frame startFrame(Mission m,Corridor c,NervFlightProofR52.FlightPickupPreview p,CompoundTag data,boolean loaded)
         {return frameAt(m,c.from(),p,data,loaded);}
         Frame endFrame(Mission m,Corridor c,NervFlightProofR52.FlightPickupPreview p,CompoundTag data,boolean loaded)
@@ -356,8 +356,8 @@ public final class NervAirTransportRuntimeR52
             if(!data.getCompound("HullGroundRecoveryR52").isEmpty()&&!data.getCompound("HullGroundRecoveryR52").getString("Port").equals(m.receiver())){data.remove("HullGroundRecoveryR52");data.remove("HullRecoveryAgeR52");}
             try{var next=NervHullGroundRecoveryR52.plan(level,p,manifest.receiver(m.receiver()),data);if(next!=null)hullPlans.put(p.original().eva(),next);return next;}catch(java.io.IOException|IllegalArgumentException|IllegalStateException missing){return null;}
         }
-        Set<String> sourceSpaces(NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,boolean movingCargo,double rotorFrom,double rotorTo,Set<String> fallback){if(manifest.directory().dynamicSpacesR52().domains().isEmpty())return fallback;return sourceSpaces(NervFlightProofR52.prepareSourceSweepR52(level,geometry,p,from,to,rotorFrom,rotorTo,movingCargo),fallback);}
-        Set<String> sourceSpaces(NervFlightProofR52.PreparedSourceSweepR52 prepared,Set<String> fallback){if(manifest.directory().dynamicSpacesR52().domains().isEmpty())return fallback;return manifest.directory().dynamicSpacesR52().required(manifest.dimension(),prepared.envelopes(),ground().bindings());}
+        Set<String> sourceSpaces(NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,boolean movingCargo,double rotorFrom,double rotorTo,Set<String> fallback){if(!NervTraversalPolicyR53.strict(level)||manifest.directory().dynamicSpacesR52().domains().isEmpty())return fallback;return sourceSpaces(NervFlightProofR52.prepareSourceSweepR52(level,geometry,p,from,to,rotorFrom,rotorTo,movingCargo),fallback);}
+        Set<String> sourceSpaces(NervFlightProofR52.PreparedSourceSweepR52 prepared,Set<String> fallback){if(!NervTraversalPolicyR53.strict(level)||manifest.directory().dynamicSpacesR52().domains().isEmpty())return fallback;return manifest.directory().dynamicSpacesR52().required(manifest.dimension(),prepared.envelopes(),ground().bindings());}
         NervFlightProofR52.CheckedFlightStep proof(UUID plane,NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,Set<String> spaces,boolean movingCargo)
         {return proof(plane,p,from,to,spaces,movingCargo,false);}
         NervFlightProofR52.CheckedFlightStep towProof(UUID plane,NervFlightProofR52.FlightPickupPreview p,Frame from,Frame to,Set<String> spaces)
@@ -376,7 +376,7 @@ public final class NervAirTransportRuntimeR52
             double clock=level.getEntity(plane) instanceof UNTransportEntity entity?NervAircraftFrameR52.rotorClock(entity):0;
             // Keep the waiting EVA's space from the initial reservation until
             // pickup; the hold flag is set only after that reservation is used.
-            try{var job=saved.aircraft(plane);var prepared=NervFlightProofR52.prepareSourceSweepR52(level,geometry,p,from,to,clock,clock+1,movingCargo);var actual=sourceSpaces(prepared,spaces);if(!manifest.directory().dynamicSpacesR52().domains().isEmpty()&&!movingCargo&&p!=null&&from.cargo()==null&&to.cargo()==null&&(job==null||!job.payloadTransferred()&&!job.carrying())){var union=new HashSet<>(actual);union.addAll(manifest.directory().dynamicSpacesR52().required(manifest.dimension(),p.cargoEnvelopes(p.root(),p.root()),ground().bindings()));actual=Set.copyOf(union);}
+            try{var job=saved.aircraft(plane);var prepared=NervFlightProofR52.prepareSourceSweepR52(level,geometry,p,from,to,clock,clock+1,movingCargo);var actual=sourceSpaces(prepared,spaces);if(NervTraversalPolicyR53.strict(level)&&!manifest.directory().dynamicSpacesR52().domains().isEmpty()&&!movingCargo&&p!=null&&from.cargo()==null&&to.cargo()==null&&(job==null||!job.payloadTransferred()&&!job.carrying())){var union=new HashSet<>(actual);union.addAll(manifest.directory().dynamicSpacesR52().required(manifest.dimension(),p.cargoEnvelopes(p.root(),p.root()),ground().bindings()));actual=Set.copyOf(union);}
                 tickets(actual);
                 if(p==null&&job!=null&&job.payloadTransferred())return NervFlightProofR52.checkAircraftStep(level,manifest,geometry,plane,job.original(),job.kind(),from,to,actual,ground().bindings(),clock,clock+1,prepared);
                 var checked=NervFlightProofR52.checkStep(level,manifest,geometry,plane,p,from,to,actual,ground().bindings(),clock,clock+1,movingCargo,prepared);

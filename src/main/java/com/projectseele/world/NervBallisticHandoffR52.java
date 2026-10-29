@@ -49,9 +49,25 @@ public final class NervBallisticHandoffR52 {
         private StepR53(Proof proof,ServerLevel level,EvaUnit01Entity eva)
         {
             this.proof=proof;checkedAt=level.getGameTime();fromTick=EvaMechanicalFrameR52.ballisticTicksR52(eva);
-            from=EvaMechanicalFrameR52.frame(eva,1);to=proof.root(fromTick+1);
+            from=EvaMechanicalFrameR52.frame(eva,1);
+            var target=proof.root(fromTick+1);
+            if(!NervTraversalPolicyR53.strict(level))
+            {
+                // A pre-update save may already be above the outlet. Carry
+                // its current offset forward once, then consume that offset
+                // over the remaining landing clock without rewinding it.
+                int landingStart=CARRIER_TICKS/2+CLOSE_TICKS;
+                double a=Math.max(0,(fromTick-landingStart)/(double)(FLIGHT_TICKS-landingStart));
+                double b=Math.max(0,(fromTick+1-landingStart)/(double)(FLIGHT_TICKS-landingStart));
+                double remaining=1-a*a*a*(10+a*(-15+6*a));
+                double nextRemaining=1-b*b*b*(10+b*(-15+6*b));
+                double residual=from.translation().y-proof.root(fromTick).translation().y;
+                if(remaining>0&&residual!=0)target=new RigidTransform(target.translation().add(0,residual*nextRemaining/remaining,0),
+                        target.qx(),target.qy(),target.qz(),target.qw());
+            }
+            to=target;
             var grouped=new HashMap<UUID,List<NervFlightProofR52.ObstacleMesh>>();var boxes=new ArrayList<AABB>();
-            for(var s:proof.payload)
+            if(NervTraversalPolicyR53.strict(level))for(var s:proof.payload)
             {
                 var a=from.compose(s.local());var b=to.compose(s.local());
                 grouped.computeIfAbsent(s.actor(),key->new ArrayList<>()).add(new NervFlightProofR52.ObstacleMesh(s.mesh(),a,b));
@@ -60,6 +76,8 @@ public final class NervBallisticHandoffR52 {
             grouped.replaceAll((key,value)->List.copyOf(value));actors=Map.copyOf(grouped);
             pilotSweep=proof.pilot.move(from.transformPoint(proof.seat).subtract(proof.start.transformPoint(proof.seat)))
                     .minmax(proof.pilot.move(to.transformPoint(proof.seat).subtract(proof.start.transformPoint(proof.seat))));
+            if(!NervTraversalPolicyR53.strict(level))boxes.add(proof.nativeBody.move(from.translation().subtract(proof.start.translation()))
+                    .minmax(proof.nativeBody.move(to.translation().subtract(proof.start.translation()))));
             boxes.add(pilotSweep);envelopes=List.copyOf(boxes);
         }
         public Original original(){return proof.original;}
@@ -81,23 +99,23 @@ public final class NervBallisticHandoffR52 {
         private Proof(Original o,String source,RigidTransform start,double gravity,Profile profile,List<Surface> payload,AABB body,AABB pilot,Vec3 seat,FootSupportFrameR52.Binding binding){original=o;this.source=source;this.start=start;this.gravity=gravity;this.profile=profile;this.payload=List.copyOf(payload);nativeBody=body;this.pilot=pilot;this.seat=seat;this.binding=binding;}
         public Profile profile(){return profile;}
         public Original original(){return original;}
-        public double launchVelocity(){return NervBallisticHandoffR52.launchVelocity(gravity,profile);}
-        public RigidTransform root(int ticks){return new RigidTransform(start.translation().add(0,height(ticks,gravity,profile),0),start.qx(),start.qy(),start.qz(),start.qw());}
+        public double launchVelocity(){return 0;}
+        public RigidTransform root(int ticks){
+            if(ticks<0||ticks>FLIGHT_TICKS)throw new IllegalArgumentException("Outlet clock outside admitted handoff");
+            int landingStart=CARRIER_TICKS/2+CLOSE_TICKS;
+            double t=Math.max(0,(ticks-landingStart)/(double)(FLIGHT_TICKS-landingStart));
+            double height=profile.landingDelta()*t*t*t*(10+t*(-15+6*t));
+            return new RigidTransform(start.translation().add(0,height,0),start.qx(),start.qy(),start.qz(),start.qw());
+        }
         public boolean current(EvaUnit01Entity e){return original.eva().equals(e.getUUID())&&EvaMechanicalFrameR52.active(e)&&EvaMechanicalFrameR52.kind(e)==TransportMembershipR52.Kind.OCCUPIED&&EvaMechanicalFrameR52.epoch(e)==original.epoch()&&EvaMechanicalFrameR52.capturedGeometry(e).sourceFingerprint().equals(source)&&Math.abs(e.getAttributeValue(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get())-gravity)<1e-12;}
-        public AABB envelope(){AABB b=null;for(int t=0;t<=FLIGHT_TICKS;t++){var shift=root(t).translation().subtract(start.translation());var a=nativeBody.move(shift);b=b==null?a:b.minmax(a);}return b;}
+        public AABB envelope(){return nativeBody.minmax(nativeBody.move(0,profile.landingDelta(),0));}
         private List<AABB> sourceEnvelopesR53;
         /** The fixed source only translates vertically during this finite impulse.
          * Its extrema enclose every intermediate body, plug and pilot step. */
         public List<AABB> sourceEnvelopesR53()
         {
             if(sourceEnvelopesR53!=null)return sourceEnvelopesR53;
-            int low=0,high=0;
-            for(int t=1;t<=FLIGHT_TICKS;t++)
-            {
-                if(height(t,gravity,profile)<height(low,gravity,profile))low=t;
-                if(height(t,gravity,profile)>height(high,gravity,profile))high=t;
-            }
-            var from=root(low);var to=root(high);var boxes=new ArrayList<AABB>();
+            var from=root(0);var to=root(FLIGHT_TICKS);var boxes=new ArrayList<AABB>();
             for(var surface:payload)boxes.add(surface.mesh().envelope(from.compose(surface.local()),to.compose(surface.local())));
             boxes.add(pilot.move(from.translation().subtract(start.translation()))
                     .minmax(pilot.move(to.translation().subtract(start.translation()))));
@@ -105,7 +123,10 @@ public final class NervBallisticHandoffR52 {
         }
         public boolean placement(ServerLevel l,EvaUnit01Entity e) {
             if(!current(e))return false;int age=EvaMechanicalFrameR52.ballisticTicksR52(e);if(age<0||age>FLIGHT_TICKS+4)return false;
-            var actual=EvaMechanicalFrameR52.frame(e,1);var expected=root(Math.min(age,FLIGHT_TICKS));if(actual.translation().distanceToSqr(expected.translation())>4e-4||actual.rotationErrorDegrees(expected)>.04)return false;
+            var actual=EvaMechanicalFrameR52.frame(e,1);var expected=root(Math.min(age,FLIGHT_TICKS));
+            boolean priorFlight=!NervTraversalPolicyR53.strict(l)&&EvaMechanicalFrameR52.ballisticCustodyR52(e)&&age<FLIGHT_TICKS;
+            if((priorFlight?actual.translation().subtract(expected.translation()).horizontalDistanceSqr():actual.translation().distanceToSqr(expected.translation()))>4e-4
+                    ||!Double.isFinite(actual.translation().y)||actual.rotationErrorDegrees(expected)>.04)return false;
             if(!(l.getEntity(original.plug()) instanceof EntryPlugCarrierEntity p)||p.getVehicle()!=e||p.getFirstPassenger()==null||!p.getFirstPassenger().getUUID().equals(original.pilot())||p.getCanonicalTransform().translation().distanceToSqr(actual.compose(binding.plugInEva()).translation())>4e-6)return false;
             return true;
         }
@@ -119,6 +140,8 @@ public final class NervBallisticHandoffR52 {
                     ||EvaMechanicalFrameR52.ballisticTicksR52(eva)>=FLIGHT_TICKS)return rejectR53("ballistic_original_or_clock_changed");
             var step=new StepR53(this,level,eva);AABB area=step.pilotSweep();
             for(var box:step.envelopes()){if(!loadedBallistic(level,box))return rejectR53("ballistic_column_not_loaded");area=area.minmax(box);}
+            if(!NervTraversalPolicyR53.strict(level))
+                return NervOriginalCarrierR52.controller(level,original)==null?rejectR53("ballistic_original_rack_missing"):step;
             var blocks=new ArrayList<AABB>();for(var shape:level.getBlockCollisions(eva,area))blocks.addAll(shape.toAabbs());
             var blockIndex=new NervStaticSpatialIndexR52<AABB>(blocks,box->box);
             var own=new HashSet<>(TransportMembershipR52.members(original,TransportMembershipR52.Kind.OCCUPIED));
@@ -181,13 +204,14 @@ public final class NervBallisticHandoffR52 {
             {rejectionR53="ballistic_hatch_identity_changed";return false;}
             float from=door.actualOpenProgressR52(),to=door.proposedDeclaredProgressR52(false);
             if(to>from){rejectionR53="ballistic_hatch_reversed";return false;}
+            var carrier=NervOriginalCarrierR52.controller(level,original);
+            if(carrier==null||NervOriginalCarrierR52.progress(carrier,1)!=0)
+            {rejectionR53="ballistic_hatch_rack_not_stowed";return false;}
+            if(!NervTraversalPolicyR53.strict(level))return true;
             var moving=new HashSet<net.minecraft.core.BlockPos>();var supports=new HashSet<net.minecraft.core.BlockPos>();
             for(var row:hatch.collisionSteps())for(var cell:row)moving.add(cell.at());
             for(var cell:hatch.supports())supports.add(cell.at());
             var own=new HashSet<>(TransportMembershipR52.members(original,TransportMembershipR52.Kind.OCCUPIED));
-            var carrier=NervOriginalCarrierR52.controller(level,original);
-            if(carrier==null||NervOriginalCarrierR52.progress(carrier,1)!=0)
-            {rejectionR53="ballistic_hatch_rack_not_stowed";return false;}
             own.add(carrier.getUUID());
             if(!door.clearDeclaredSweepR52(level,from,to,own,moving,supports))
             {rejectionR53="ballistic_hatch_world_sweep";return false;}
@@ -233,6 +257,7 @@ public final class NervBallisticHandoffR52 {
         }
         public boolean clearLaunch(ServerLevel l,EvaUnit01Entity e,NervAssemblyOwnerR52.Gate hatch) {
             if(!current(e)||!placement(l,e)||hatch.kind()!=NervAssemblyOwnerR52.GateKind.SILO||hatch.siloHatch()==null||hatch.siloHatch().closeTicks()!=CLOSE_TICKS)return false;
+            if(!NervTraversalPolicyR53.strict(l))return loadedBallistic(l,envelope());
             var own=TransportMembershipR52.members(original,TransportMembershipR52.Kind.OCCUPIED);
             for(int t=1;t<=FLIGHT_TICKS;t++) {
                 var from=root(t-1);var to=root(t);var shiftA=from.translation().subtract(start.translation());var shiftB=to.translation().subtract(start.translation());

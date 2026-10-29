@@ -85,10 +85,10 @@ public final class TvCampaignDirector
         var level = level(player); if (level == null) return "本世界尚未配置 TV 作战区域。";
         var data = TvCampaignSavedData.get(level); var chapter = selected(player,data);
         String constraint=SurfaceAngelPlanR52.handles(level,chapter.id())?SurfaceAngelPlanR52.startBlocker(level,chapter.id()):TvEncounterRulesR45.handles(chapter.id())?TvEncounterDirectorR45.startBlocker(level,chapter.id()):CityBattlefieldR29.obstruction(level);
-        String activity = data.active.isEmpty() ? "尚未下达本章指令" : switch (data.phase)
+        String activity = data.active.isEmpty() ? "选择任一已开放作战，可反复出击" : switch (data.phase)
         { case "alert" -> "使徒信号确认中 · 总部进入战斗配置";case "approach" -> "作战已接受，等待出击机体抵达"; case "combat" -> "目标正在交战";case "combat_victory" -> "目标已击破 · 等待回收与交接";case "episode_archived" -> "本次行动已结束"; case "cancel" -> "正在结束本次行动";case "failure" -> "作战暂停 · 回收整备后可重新出击"; default -> "等待下一步指令"; };
         return "TV 1995 · 第 " + chapter.episode() + " 话 / " + chapter.title() + "\n"
-                + (chapter.playable() ? constraint.isEmpty()?"可执行作战":"作战准备中" : "后续制作档案 · 尚不可开始") + " · 已完成 " + data.completed.size() + " 章\n"
+                + (chapter.playable() ? constraint.isEmpty()?"自由作战 · 可重复游玩":"作战准备中" : "制作中 · 尚不可开始") + "\n"
                 + activity + "\n" + TvSortiesR32.roster(data) + "\n" + chapter.briefing().replace("东北迎击大道", CityBattlefieldR29.name(level)) + "\n" + constraint + "\n" + data.notice;
     }
     public static int begin(ServerPlayer player)
@@ -102,6 +102,8 @@ public final class TvCampaignDirector
         if(level==null||commander.level()!=level||!NervStaffDialogue.authorized(commander))return 0;
         if(crew.isEmpty()||crew.size()>3)return message(commander,"请选择出战机体和驾驶员。",false);
         var data=TvCampaignSavedData.get(level);var units=new HashSet<Integer>();var humans=new HashSet<UUID>();
+        if(!data.active.isEmpty()&&(Set.of("cancel","failure","combat_victory").contains(data.phase)||data.targetDeathConfirmedR45))
+            return message(commander,"本场已停止接受增援。完成回收与装备交接；失败时先点“结束当前作战”，随后可重打本场或选择其他作战。",false);
         if(!data.active.isEmpty()&&!data.active.equals(mission))return message(commander,"请先结束当前作战。",false);
         for(var choice:crew)
         {
@@ -157,7 +159,7 @@ public final class TvCampaignDirector
         if(Set.of("cancel","failure","combat_victory").contains(data.phase)||data.targetDeathConfirmedR45)
             return message(player,"当前行动等待恢复或交接，不能追加出击或隐式重新发射。",false);
         if (!data.active.isEmpty()) return TvSortiesR32.reinforce(player,variant,npc,rifle);
-        if (!chapter.playable()) return message(player, "这一章仍在准备中。", false);
+        if (!chapter.playable()) return message(player, "这场作战仍在制作中。", false);
         if(SurfaceAngelPlanR52.handles(level,chapter.id()))
         {String blocker=SurfaceAngelPlanR52.startBlocker(level,chapter.id());if(!blocker.isEmpty())return message(player,blocker,false);}
         if(chapter.id().equals("ramiel")&&formation==null)
@@ -170,6 +172,7 @@ public final class TvCampaignDirector
         }
         var replay = FirstBattleSavedData.get(level);
         if (replay.active != null || replay.missionOwner != null) return message(player, "已有独立迎击或重播占用作战区，请先结束该行动。", false);
+        player.getPersistentData().putString("SeeleMissionChoiceR30",chapter.id());
         data.generationR43++;
         data.episodeStateR45="";data.equipmentReturnedR45=false;data.targetDeathConfirmedR45=false;
         data.owner = player.getUUID(); data.active = chapter.id(); data.phase = "alert";data.assignedVariant=variant;data.npcPilot=npc;data.autoArmament=npc&&rifle;data.pilotDispatchRequested=false; data.alertStarted=level.getGameTime();data.alertLine=0;data.notice = "出击编成："+TvSortiesR32.name(variant)+" · "+(npc?TrainingPilotEntity.pilotName(variant):"司令亲自驾驶"); data.angel = null; data.lastPosition = null; data.setDirty();
@@ -201,9 +204,14 @@ public final class TvCampaignDirector
     }
     private static TvCampaignCatalog.Chapter selected(ServerPlayer player,TvCampaignSavedData data)
     {
-        String id=data.active.isEmpty()?player.getPersistentData().getString("SeeleMissionChoiceR30"):data.active;
-        return TvCampaignCatalog.find(id).orElse(TvCampaignCatalog.at(data.chapter));
+        if(!data.active.isEmpty())return TvCampaignCatalog.find(data.active).orElse(TvCampaignCatalog.at(0));
+        return TvCampaignCatalog.find(player.getPersistentData().getString("SeeleMissionChoiceR30"))
+                .filter(TvCampaignCatalog.Chapter::playable)
+                .or(()->TvCampaignCatalog.find(data.episodeChapterR45).filter(TvCampaignCatalog.Chapter::playable))
+                .orElse(TvCampaignCatalog.at(0));
     }
+    public static String selectedMissionR54(ServerPlayer player)
+    {var level=level(player);return level==null?"sachiel":selected(player,TvCampaignSavedData.get(level)).id();}
     public static int select(ServerPlayer player,String id)
     {
         if(!NervStaffDialogue.authorized(player))return message(player,"需要 NERV 指挥权限。",false);
@@ -230,7 +238,7 @@ public final class TvCampaignDirector
         PilotReturnR39.enqueue(level,java.util.List.copyOf(data.sorties.values()));
         data.phase = "cancel"; data.setDirty();
         clearCombatBar(level);
-        return message(player, "作战已撤销，不计通关。机体仍需按正常流程回收。", true);
+        return message(player, "当前作战已结束。完成机体回收与装备交接后，可重打本场或自由选择其他作战。", true);
     }
     private static int message(ServerPlayer player, String text, boolean accepted)
     { player.sendSystemMessage(Component.literal(text)); return accepted ? 1 : 0; }

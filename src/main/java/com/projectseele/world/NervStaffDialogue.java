@@ -65,7 +65,7 @@ public final class NervStaffDialogue
             menu.append(option("整备后发射 01",prefix+"整备后发射 01")).append(option("取消后续操作",prefix+"停止操作"));
         }
         player.sendSystemMessage(menu);
-        player.sendSystemMessage(option("道路指引",prefix+"TOPIC:directions").append(option("同步与驾驶",prefix+"TOPIC:sync")).append(option("插入栓",prefix+"TOPIC:plug")).append(option("作战记录",prefix+"TOPIC:campaign")).append(option("值班闲聊",prefix+"TOPIC:duty")));
+        player.sendSystemMessage(option("道路指引",prefix+"TOPIC:directions").append(option("同步与驾驶",prefix+"TOPIC:sync")).append(option("插入栓",prefix+"TOPIC:plug")).append(option("自由作战",prefix+"TOPIC:campaign")).append(option("值班闲聊",prefix+"TOPIC:duty")));
     }
     public static boolean authorized(ServerPlayer player)
     {

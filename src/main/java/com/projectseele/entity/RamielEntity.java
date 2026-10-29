@@ -85,7 +85,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> DATA_DRILL_DEPTH =
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.FLOAT);
-    // Core exposure: the only window in which Ramiel can be damaged at all.
+    // Shell presentation mirrors the actual beam's sniping window.
     private static final EntityDataAccessor<Boolean> DATA_EXPOSED =
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> DATA_AT_ENERGY =
@@ -97,13 +97,11 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     public static final int BEAM_RENDER_TICKS = 16;
     public static final int BEAM_SOLID_TICKS = 6;
 
-    // Operation-Yashima rules: the shell opens for the final stretch of the
-    // charge and stays open briefly after firing — snipe the core or nothing.
+    // Operation-Yashima sniping is accepted only while the actual 16-tick
+    // beam is active, and only when the shot threads the core.
     // Geometry enlarged again after playtest: the Angel should dominate half a city block.
     // Aim tolerance matches the rendered core octahedron (~3.2 blocks).
     public static final float CORE_RADIUS = 4.25F;
-    private static final int EXPOSE_CHARGE_WINDOW = 20;
-    private static final int EXPOSED_AFTER_FIRE_TICKS = 60;
     private static final double AT_FIELD_PUSH_RANGE = 17.5D;
     private static final float SHELL_SURFACE_RADIUS = 8.5F;
 
@@ -124,7 +122,6 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             this.getDisplayName(), BossEvent.BossBarColor.BLUE, BossEvent.BossBarOverlay.PROGRESS);
 
     private int beamCooldown = 60;
-    private int exposedTimer;
     private int rippleCooldown;
 
     /** The mission armour controller is the only writer of the accepted drilling front. */
@@ -202,6 +199,12 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         var at = new BlockPos.MutableBlockPos();
         int minY = Math.max(first.getY(), this.level().getMinBuildHeight());
         int maxY = Math.min(last.getY(), this.level().getMaxBuildHeight() - 1);
+        if (minY > maxY) return;
+        int firstSection = this.level().getSectionIndex(minY);
+        int sectionCount = this.level().getSectionIndex(maxY) - firstSection + 1;
+        var inspectedAfter = new long[columns * rows * sectionCount];
+        var empty = new boolean[inspectedAfter.length];
+        long callbackGeneration = 1;
         java.util.function.Predicate<BlockState> customAir = state -> state.isAir()
                 && !state.is(net.minecraft.world.level.block.Blocks.AIR)
                 && !state.is(net.minecraft.world.level.block.Blocks.CAVE_AIR)
@@ -213,9 +216,17 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                 for (int z = first.getZ(); z <= last.getZ();)
                 {
                     int endZ = Math.min(last.getZ(), (z & ~15) + 15);
+                    int sectionIndex = this.level().getSectionIndex(y);
                     var section = chunks[(x >> 4) - firstChunkX][(z >> 4) - firstChunkZ]
-                            .getSections()[this.level().getSectionIndex(y)];
-                    if (section.hasOnlyAir() && !section.maybeHas(customAir)) { z = endZ + 1;continue; }
+                            .getSections()[sectionIndex];
+                    int slot = (((x >> 4) - firstChunkX) * rows + (z >> 4) - firstChunkZ)
+                            * sectionCount + sectionIndex - firstSection;
+                    if (inspectedAfter[slot] != callbackGeneration)
+                    {
+                        empty[slot] = section.hasOnlyAir() && !section.maybeHas(customAir);
+                        inspectedAfter[slot] = callbackGeneration;
+                    }
+                    if (empty[slot]) { z = endZ + 1;continue; }
                     for (; z <= endZ; z++)
                     {
                         var state = section.getBlockState(x & 15, y & 15, z & 15);
@@ -227,6 +238,9 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                         {
                             state.entityInside(this.level(), at, this);
                             this.onInsideBlock(state);
+                            // A callback may change any later section. Reuse an
+                            // empty palette only until the next real callback.
+                            callbackGeneration++;
                         }
                         catch (Throwable failure)
                         {
@@ -356,7 +370,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
 
     public boolean isExposed()
     {
-        return this.entityData.get(DATA_EXPOSED);
+        return this.getBeamTicks() > 0;
     }
 
     private void setExposed(boolean exposed)
@@ -405,7 +419,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     /** Eased 0..1 shell separation for the renderer. */
     public float getExposeProgress(float partialTick)
     {
-        return Mth.lerp(partialTick, this.exposeProgressO, this.exposeProgress);
+        return this.isExposed() ? Mth.lerp(partialTick, this.exposeProgressO, this.exposeProgress) : 0;
     }
 
     public boolean isDrilling()
@@ -454,6 +468,14 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     @Override
     public void tick()
     {
+        if (!this.level().isClientSide)
+        {
+            // Decrement before AI can fire. A new shot keeps all 16 ticks,
+            // and the synced beam clock also controls the exposed model.
+            int remaining = Math.max(0, this.getBeamTicks() - 1);
+            this.entityData.set(DATA_BEAM_TICKS, remaining);
+            this.setExposed(remaining > 0);
+        }
         super.tick();
         if (this.level().isClientSide)
         {
@@ -462,6 +484,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             this.exposeProgressO = this.exposeProgress;
             float target = this.isExposed() ? 1.0F : 0.0F;
             this.exposeProgress += (target - this.exposeProgress) * 0.16F;
+            if (!this.isExposed()) this.exposeProgressO = this.exposeProgress = 0;
         }
     }
 
@@ -541,15 +564,6 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         if (this.rippleCooldown > 0)
         {
             this.rippleCooldown--;
-        }
-        if (this.exposedTimer > 0 && --this.exposedTimer == 0 && !this.isCharging())
-        {
-            this.setExposed(false);
-        }
-        int beamTicks = this.entityData.get(DATA_BEAM_TICKS);
-        if (beamTicks > 0)
-        {
-            this.entityData.set(DATA_BEAM_TICKS, beamTicks - 1);
         }
         if (this.hasAtField() && this.tickCount % 5 == 0)
         {
@@ -681,15 +695,12 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         // the protected plug/pilot. Ordinary unshielded beams retain their blast.
         if (!stoppedByShield && !yashima) this.level().explode(this, end.x, end.y, end.z,
                 SeeleConfig.BEAM_EXPLOSION_RADIUS.get().floatValue(), Level.ExplosionInteraction.MOB);
-        // The shell stays open after the shot — this is the sniping window.
-        this.exposedTimer = EXPOSED_AFTER_FIRE_TICKS;
-        this.setExposed(true);
-
         // The beam itself is rendered client-side from this synced state; the
         // impact gets the full nuke treatment: flash + fireball + cross light
         // client-side, mushroom column via server particles.
         this.entityData.set(DATA_BEAM_END, new Vector3f((float) end.x, (float) end.y, (float) end.z));
         this.entityData.set(DATA_BEAM_TICKS, BEAM_RENDER_TICKS);
+        this.setExposed(true);
         if (this.level() instanceof ServerLevel serverLevel)
         {
             SeeleNetwork.CHANNEL.send(
@@ -939,11 +950,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         {
             this.ramiel.setCharging(false);
             this.ramiel.beamCooldown = SeeleConfig.BEAM_COOLDOWN_TICKS.get();
-            // Interrupted before firing: seal the shell again immediately.
-            if (this.ramiel.exposedTimer <= 0)
-            {
-                this.ramiel.setExposed(false);
-            }
+            // Cancelling charge cannot create or extend a firing window.
+            this.ramiel.setExposed(this.ramiel.getBeamTicks() > 0);
         }
 
         @Override
@@ -965,11 +973,6 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             if (--this.chargeTicks <= 0)
             {
                 this.ramiel.fireBeam(target);
-            }
-            else if (this.chargeTicks == EXPOSE_CHARGE_WINDOW)
-            {
-                // The shell parts for the final stretch of the charge.
-                this.ramiel.setExposed(true);
             }
         }
     }

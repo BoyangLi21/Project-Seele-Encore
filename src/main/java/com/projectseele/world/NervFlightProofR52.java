@@ -160,6 +160,7 @@ public final class NervFlightProofR52
             if(stopped.rig().deployment()!=0||!current(level)||!(aircraft instanceof UNTransportEntity)
                     ||!NervAirTransportManifestR52.same(stopped.plane(),NervAircraftFrameR52.actual((UNTransportEntity)aircraft))
                     ||stopped.cargo()!=null&&!NervAirTransportManifestR52.same(stopped.cargo(),root))return false;
+            if(!NervTraversalPolicyR53.strict(level)){pickupSupportCapturedR54=true;return true;}
             // The waiting owner can clear the shutdown flag while retaining
             // this exact mechanical capture. Admission follows that capture,
             // not its obsolete damage mode. Read with the flight's same actor
@@ -179,6 +180,7 @@ public final class NervFlightProofR52
         }
         public boolean beginClampRetractionR53(ServerLevel level,NervAirframeGeometryR52 source,Frame current,Frame next,CompoundTag data)
         {
+            if(!NervTraversalPolicyR53.strict(level))return false;
             var sweep=source.sweep(current,next,anchors,jawAxes(),0,1,.005);var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
             for(int variant=0;variant<3;variant++)
             {
@@ -196,6 +198,7 @@ public final class NervFlightProofR52
         }
         public boolean prepareClampRetractionR53(ServerLevel level,NervAirframeGeometryR52 source,CompoundTag data)
         {
+            if(!NervTraversalPolicyR53.strict(level))return true;
             var tag=data.getCompound("RescueClampRetractionR53");if(!tag.hasUUID("Actor")||!(level.getEntity(tag.getUUID("Actor")) instanceof EvaUnit01Entity actor)||!frozenActorR53(actor))return false;
             var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var pose=EvaBodyPose.sample(actor,1);var hands=EvaFrozenHandsR52.capture(actor,1);var frame=NervOwnerPlacementR52.actualRoot(actor);
             var savedRoot=NervAircraftFrameR52.decodeRigid(tag.getCompound("Root"));
@@ -488,7 +491,25 @@ public final class NervFlightProofR52
      * grants no actor, SPACE or motion admission by itself. */
     public static final class PreparedSourceSweepR52 {
         private final ServerLevel level;private final long at;private final NervAirframeGeometryR52 geometry;private final FlightPickupPreview preview;private final Frame from,to;private final double rotorFrom,rotorTo;private final boolean movingCargo;private final NervAirframeGeometryR52.Sweep sweep;private final List<AABB> envelopes;
-        private PreparedSourceSweepR52(ServerLevel level,NervAirframeGeometryR52 geometry,FlightPickupPreview preview,Frame from,Frame to,double rotorFrom,double rotorTo,boolean movingCargo){this.level=level;this.at=level==null?Long.MIN_VALUE:level.getGameTime();this.geometry=geometry;this.preview=preview;this.from=from;this.to=to;this.rotorFrom=rotorFrom;this.rotorTo=rotorTo;this.movingCargo=movingCargo;sweep=geometry.sweep(from,to,preview==null?List.of():preview.anchors(),preview==null?List.of():preview.jawAxes(),rotorFrom,rotorTo,.005);var boxes=new ArrayList<AABB>(sweep.envelopes());if(movingCargo){if(preview==null)throw new IllegalArgumentException("Actual captured cargo source required");boxes.addAll(preview.cargoEnvelopes(root(preview,from),root(preview,to)));}envelopes=List.copyOf(boxes);}
+        private PreparedSourceSweepR52(ServerLevel level,NervAirframeGeometryR52 geometry,FlightPickupPreview preview,Frame from,Frame to,double rotorFrom,double rotorTo,boolean movingCargo)
+        {
+            this.level=level;this.at=level==null?Long.MIN_VALUE:level.getGameTime();this.geometry=geometry;this.preview=preview;this.from=from;this.to=to;this.rotorFrom=rotorFrom;this.rotorTo=rotorTo;this.movingCargo=movingCargo;
+            var boxes=new ArrayList<AABB>();
+            if(level!=null&&!NervTraversalPolicyR53.strict(level))
+            {
+                // Loading/display needs source bounds, not thousands of swept
+                // clamp/rotor triangles whose collisions are permitted.
+                sweep=null;boxes.add(geometry.bodyMesh().envelope(from.plane(),to.plane()));
+                for(int i=0;i<4;i++)boxes.add(geometry.rotorMesh(i).envelope(from.plane().compose(geometry.rotorLocalFrame(i,rotorFrom)),to.plane().compose(geometry.rotorLocalFrame(i,rotorTo))));
+            }
+            else
+            {
+                sweep=geometry.sweep(from,to,preview==null?List.of():preview.anchors(),preview==null?List.of():preview.jawAxes(),rotorFrom,rotorTo,.005);
+                boxes.addAll(sweep.envelopes());
+            }
+            if(movingCargo){if(preview==null)throw new IllegalArgumentException("Actual captured cargo source required");boxes.addAll(preview.cargoEnvelopes(root(preview,from),root(preview,to)));}
+            envelopes=List.copyOf(boxes);
+        }
         public List<AABB> envelopes(){return envelopes;}
         NervAirframeGeometryR52.Sweep sourceSweepR52(){return sweep;}
         boolean matchesR52(ServerLevel level,NervAirframeGeometryR52 geometry,FlightPickupPreview preview,Frame from,Frame to,double rotorFrom,double rotorTo,boolean movingCargo){return level!=null&&this.level==level&&at==level.getGameTime()&&this.geometry==geometry&&this.preview==preview&&this.from.equals(from)&&this.to.equals(to)&&Double.compare(this.rotorFrom,rotorFrom)==0&&Double.compare(this.rotorTo,rotorTo)==0&&this.movingCargo==movingCargo;}
@@ -514,7 +535,9 @@ public final class NervFlightProofR52
         if(prepared==null||!prepared.matchesR52(l,geometry,preview,from,to,rotorFrom,rotorTo,movingCargo))return null;
         if(!(l.getEntity(aircraft) instanceof UNTransportEntity p)||!NervAircraftFrameR52.contextMatches(p,manifest)||!NervAirTransportManifestR52.same(NervAircraftFrameR52.actual(p),from.plane())||movingCargo&&(preview==null||!preview.shapeCurrent(l)))return null;
         var sweep=prepared.sweep;if(preview==null)return null;
-        var proof=new CheckedFlightStep(l,aircraft,preview,from,to,sweep,manifest.fingerprint(),movingCargo,preview.original(),preview.kind(),spaces,rotorFrom,rotorTo,geometry,prepared.envelopes());var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null||manifest.directory().resource(id)==null||manifest.directory().resource(id).kind()!=ResourceKind.SPACE)return null;declared.addAll(b.spaces());}
+        var proof=new CheckedFlightStep(l,aircraft,preview,from,to,sweep,manifest.fingerprint(),movingCargo,preview.original(),preview.kind(),spaces,rotorFrom,rotorTo,geometry,prepared.envelopes());
+        if(!NervTraversalPolicyR53.strict(l))return proof;
+        var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null||manifest.directory().resource(id)==null||manifest.directory().resource(id).kind()!=ResourceKind.SPACE)return null;declared.addAll(b.spaces());}
         if(!authorizedDynamicSpacesR52(manifest,proof.envelopes(),spaces,bindings)||!stepObstaclesClearR53(l,p,preview,from,to,sweep,proof.envelopes(),declared,proof.own,movingCargo,staticCanopy))return null;
         return proof;
     }
@@ -537,13 +560,16 @@ public final class NervFlightProofR52
     {
         if(prepared==null||!prepared.matchesR52(l,geometry,null,from,to,rotorFrom,rotorTo,false))return null;
         if(!(l.getEntity(aircraft) instanceof UNTransportEntity p)||!NervAircraftFrameR52.contextMatches(p,manifest)||p.carrying()||from.rig().deployment()!=0||to.rig().deployment()!=0||!NervAirTransportManifestR52.same(NervAircraftFrameR52.actual(p),from.plane())||!NervAircraftFrameR52.frame(p,1).rig().equals(from.rig()))return null;
-        var sweep=prepared.sweep;var proof=new CheckedFlightStep(l,aircraft,null,from,to,sweep,manifest.fingerprint(),false,original,kind,spaces,rotorFrom,rotorTo,geometry,prepared.envelopes());var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return null;declared.addAll(b.spaces());}
+        var sweep=prepared.sweep;var proof=new CheckedFlightStep(l,aircraft,null,from,to,sweep,manifest.fingerprint(),false,original,kind,spaces,rotorFrom,rotorTo,geometry,prepared.envelopes());
+        if(!NervTraversalPolicyR53.strict(l))return proof;
+        var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return null;declared.addAll(b.spaces());}
         return authorizedDynamicSpacesR52(manifest,proof.envelopes(),spaces,bindings)&&stepObstaclesClearR53(l,p,null,from,to,sweep,proof.envelopes(),declared,Set.of(aircraft),false,null)?proof:null;
     }
     public static boolean pathClear(ServerLevel l,NervAirTransportManifestR52 manifest,NervAirframeGeometryR52 geometry,UUID aircraft,FlightPickupPreview preview,Frame from,Frame to,Set<String> spaces,Map<String,NervRouteNativeR52.Binding> bindings,boolean movingCargo,int ticks,NervFlightGatePlanR52 plan,PreparedSourceSweepR52 prepared)
     {
         if(prepared==null||!prepared.matchesR52(l,geometry,preview,from,to,0,ticks,movingCargo))return false;
         if(preview==null||!(l.getEntity(aircraft) instanceof UNTransportEntity p))return false;
+        if(!NervTraversalPolicyR53.strict(l))return true;
         try
         {
             var sweep=prepared.sweep;var boxes=prepared.envelopes();var declared=new ArrayList<AABB>();for(String id:spaces){var b=bindings.get(id);if(b==null)return false;declared.addAll(b.spaces());}
@@ -594,8 +620,6 @@ public final class NervFlightProofR52
     {
         if(!NervTraversalPolicyR53.strict(level))
         {
-            for(var box:envelopes)
-                if(!NervAirspaceCoverageR52.covered(box,declared)||!EntryPlugEjectionR48.loaded(level,box))return false;
             return true;
         }
         if(movingCargo&&sweep.airframeIntersectsCargo(preview.surfaces,root(preview,from),root(preview,to)))return false;
@@ -608,7 +632,6 @@ public final class NervFlightProofR52
         if(plan!=null&&!plan.current(l))return false;
         if(!NervTraversalPolicyR53.strict(l))
         {
-            for(var box:envelopes)if(!EntryPlugEjectionR48.loaded(l,box))return false;
             return true;
         }
         // Closing the clamps leaves the captured wreck exactly where it was.

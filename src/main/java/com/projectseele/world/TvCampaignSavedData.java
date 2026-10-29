@@ -6,7 +6,7 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.saveddata.SavedData;
 import java.util.*;
 
-/** One cooperative TV chronology per world; replays use the old independent system. */
+/** One cooperative operation at a time; legacy chapter records never gate replay. */
 public final class TvCampaignSavedData extends SavedData
 {
     public int chapter;
@@ -148,9 +148,9 @@ public final class TvCampaignSavedData extends SavedData
     public boolean archiveEpisode(String id,UUID commander,long generation)
     {
         if(!canArchiveEpisode(id,commander,generation))return false;
-        boolean replay=completed.contains(id);if(!replay)completed.add(id);
-        while(chapter<TvCampaignCatalog.CHAPTERS.size()&&completed.contains(TvCampaignCatalog.at(chapter).id()))chapter++;
-        clear(replay?"本次演习回收与装备交接已完成。":"机体、驾驶员和装备交接完成，这次行动结束了。");
+        if(!completed.contains(id))completed.add(id);
+        // Legacy chapter/completed data remains readable, but never selects or unlocks a mission.
+        clear("本次作战回收与装备交接已完成。可重打本场，或自由选择其他已开放作战。");
         episodeStateR45=phase="episode_archived";episodeChapterR45=id;episodeGenerationR45=generation;setDirty();return true;
     }
 }

@@ -40,10 +40,12 @@ public final class NervMechanicalTravelR52
     public static ContinuousClock continuousClock(CompoundTag data,String route,String fingerprint,double currentMetres,double totalMetres,double stopMetres,double cruise,double acceleration,double deceleration)
     {
         var stored=data.getCompound("ContinuousClockR52");if(stored.isEmpty()&&currentMetres!=0&&!data.getBoolean("ContinuousCheckedStartR52"))throw new IllegalStateException("Moved original lost its continuous distance/speed clock");if(stored.isEmpty())return new ContinuousClock(new ContinuousProfile(currentMetres,stopMetres,cruise,acceleration,deceleration),0);
-        // Apply the requested doubled transfer speed from its current position
+        // Apply the requested transfer speed from its current position
         // and velocity, including a trip saved before the update.
         if(stored.getString("Route").equals(route)&&stored.getString("Directory").equals(fingerprint)&&stored.getDouble("TotalMetres")==totalMetres&&stored.getDouble("ToMetres")==stopMetres
-                &&cruise==stored.getDouble("CruiseMps")*2&&acceleration==stored.getDouble("AccelerationMps2")*4&&deceleration==stored.getDouble("DecelerationMps2")*4&&!data.contains("ContinuousBrakeR52"))
+                &&((cruise==stored.getDouble("CruiseMps")*2&&acceleration==stored.getDouble("AccelerationMps2")*4&&deceleration==stored.getDouble("DecelerationMps2")*4)
+                    ||(cruise==stored.getDouble("CruiseMps")*4&&acceleration==stored.getDouble("AccelerationMps2")*16&&deceleration==stored.getDouble("DecelerationMps2")*16))
+                &&!data.contains("ContinuousBrakeR52"))
         {
             var before=new ContinuousClock(new ContinuousProfile(stored.getDouble("FromMetres"),stopMetres,stored.getDouble("CruiseMps"),stored.getDouble("AccelerationMps2"),stored.getDouble("DecelerationMps2"),stored.getDouble("InitialMps")),stored.getLong("Ticks"));
             if(Math.abs(before.distance()-currentMetres)>1e-6||Math.abs(before.speed()-stored.getDouble("SpeedMps"))>1e-9)throw new IllegalStateException("Speed update requires the actual current distance and velocity");

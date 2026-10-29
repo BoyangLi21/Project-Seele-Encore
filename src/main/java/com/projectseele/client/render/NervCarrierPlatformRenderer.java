@@ -42,6 +42,15 @@ public final class NervCarrierPlatformRenderer
     }
     private void renderAuthored(NervCarrierPlatformEntity entity,float yaw,float partialTick,PoseStack poses,MultiBufferSource buffers,int packedLight)
     {
+        if (entity.isRestraintGantry())
+        {
+            // Shader shadow passes can bypass the renderer admission above.
+            // Fixed wet bays beyond the actual camera's range cannot contribute
+            // visible surfaces; avoid rebuilding their fluid and hardware.
+            var client = net.minecraft.client.Minecraft.getInstance();
+            double range = client.options.getEffectiveRenderDistance() * 16.0D + 128.0D;
+            if (entity.position().distanceToSqr(client.gameRenderer.getMainCamera().getPosition()) > range * range) return;
+        }
         if (entity.isRestraintGantry() && hasEarlierGantryCopy(entity))
         {
             return;
@@ -217,12 +226,19 @@ public final class NervCarrierPlatformRenderer
                 ||com.projectseele.world.NervOriginalCarrierR52.declared(entity)
                 ||com.projectseele.world.NervFootGuideStationR52.declared(entity))
         {
-            // These mechanisms are much larger than the entity's tiny
-            // physical AABB.  Frustum-testing only that origin box made fixed
-            // gantries blink and made a suspended plug crane disappear while
-            // its lower spreader was still plainly in view. Original carriers
-            // and persistent turn stations have the same small-origin issue.
-            return true;
+            // Include the whole moving mechanism, but do not draw every loaded
+            // underground bay from the surface. Unconditional rendering also
+            // rebuilt thousands of LCL quads in every distant shadow pass.
+            double extent = entity.isPlugCrane()
+                    ? Math.max(128.0D, Math.abs(entity.getCraneBottomOffset(1.0F)) + 32.0D)
+                    : 128.0D;
+            AABB visible = entity.getBoundingBox().inflate(extent);
+            double dx = Math.max(visible.minX - cameraX, Math.max(0.0D, cameraX - visible.maxX));
+            double dy = Math.max(visible.minY - cameraY, Math.max(0.0D, cameraY - visible.maxY));
+            double dz = Math.max(visible.minZ - cameraZ, Math.max(0.0D, cameraZ - visible.maxZ));
+            double distance = net.minecraft.client.Minecraft.getInstance().options.getEffectiveRenderDistance() * 16.0D;
+            return dx * dx + dy * dy + dz * dz <= distance * distance
+                    && frustum.isVisible(visible);
         }
         return super.shouldRender(entity, frustum, cameraX, cameraY,
                 cameraZ);

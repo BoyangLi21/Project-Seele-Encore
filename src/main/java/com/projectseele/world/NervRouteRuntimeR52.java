@@ -490,10 +490,11 @@ public final class NervRouteRuntimeR52
                 if(phased!=null&&phased.bankStop()&&at==phased.stop()&&!data.contains("ContinuousBrakeR52"))
                 {
                     boolean countdownRunning=!route.recovery()&&data.getInt("PaCountdownTicksR53")>0&&data.getInt("PaCountdownTicksR53")<60;
-                    // The stopped assembly was prepared before "three". Keep
-                    // the voice clock free of repeated whole-route preparation;
-                    // the completed countdown and first move still recheck it.
-                    if(!countdownRunning&&(!owner.prepareContinuousRouteR52(level,snapshot.original(),route,data)||!owner.prepareBankHeadsR53(level,snapshot.original(),route,snapshot.task(),data)))
+                    // Door clocks are owner-driven, not autonomous entity ticks.
+                    // Keep their upward cascade moving during the voice countdown;
+                    // stopping preparation here used to freeze every unfinished leaf.
+                    boolean routePrepared=owner.prepareContinuousRouteR52(level,snapshot.original(),route,data);
+                    if(!countdownRunning&&(!routePrepared||!owner.prepareBankHeadsR53(level,snapshot.original(),route,snapshot.task(),data)))
                     {saved.put(job.update(snapshot,route.recovery()?Phase.RETURNING:Phase.PREPARING,data,"等待停稳后的真实滑靴换轨与承托锁定"));return;}
                     boolean requested=route.recovery()||data.getBoolean("ContinuousAutoLaunchR52")||data.getBoolean("ReleaseWhenReady");
                     if(!requested){saved.put(job.update(snapshot,Phase.READY,data,""));return;}

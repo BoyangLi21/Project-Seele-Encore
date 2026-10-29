@@ -11,6 +11,16 @@ public final class NervMechanicalTravelR52Test
     private static void check(boolean ok,String why){checks++;if(!ok)throw new AssertionError(why);}
     public static void main(String[] args)throws Exception
     {
+        for(long tick:new long[]{0,10,100,600,1600})
+        {
+            var old=new NervMechanicalTravelR52.ContinuousClock(new NervMechanicalTravelR52.ContinuousProfile(0,600,8,8,8),tick);
+            var saved=new CompoundTag();NervMechanicalTravelR52.rememberContinuous(saved,"transfer","current",600,old);
+            var updated=NervMechanicalTravelR52.continuousClock(saved,"transfer","current",old.distance(),600,600,32,128,128);
+            check(updated.distance()==old.distance()&&updated.speed()==old.speed(),"Transfer speed update changed the accepted position or velocity");
+            var restored=NervMechanicalTravelR52.continuousClock(saved.copy(),"transfer","current",updated.distance(),600,600,32,128,128);
+            check(restored.equals(updated),"Saved transfer upgrade was not stable on reload");
+            if(!old.complete())check(updated.next().distance()>updated.distance(),"Upgraded transfer cannot advance");
+        }
         for(int ticks:new int[]{18,40,197,640,2000})
         {
             double previous=-1;check(NervMechanicalTravelR52.fraction(0,ticks)==0&&NervMechanicalTravelR52.fraction(ticks,ticks)==1,"Exact leg endpoints changed");

@@ -134,7 +134,9 @@ public final class TvYashimaStationR52
     {
         var level=commander.serverLevel();var data=TvCampaignSavedData.get(level);var p=plan(level).orElse(null);var gun=gun(level);var eva=TvSortiesR32.assignedUnit(level,data,1);
         if(!authority(commander,data)||p==null||gun==null)return "原固定炮或本场指挥授权未接通。";
-        if(eva==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(1))||!at(eva,p))return "请先让本场原初号机到实际炮位平台停稳，再下令升炮。";
+        if(eva==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(1))
+                ||eva.position().subtract(p.prone()).horizontalDistance()>96||Math.abs(eva.getY()-p.prone().y)>4
+                ||AirCradleClearanceR31.touchdownContact(eva)==null)return "初号机接近炮位后将自动升炮，请继续前往屋岛阵地。";
         if(!gun.loadedR52()||!TvMissionEquipmentR45.cannonAuthorized(eva))return "原底仓任务炮尚未完成同一货物的预装登记，未补造炮。";
         var phase=gun.getPersistentData().getString("LiftPhaseR52");
         if(phase.equals("ready"))return "原炮已升起；初号机右键接入实际炮位，完成趴姿后使用。";
@@ -151,7 +153,7 @@ public final class TvYashimaStationR52
         Vec3 eye=player.getEyePosition();var hit=YashimaCannonMeshR52.rayHitR52(gun,eye,eye.add(player.getLookAngle().scale(128)));
         if(hit==null||level.clip(new net.minecraft.world.level.ClipContext(eye,hit,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,player)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)
             return "请从驾驶舱看向已升起的原炮实际炮体并右键接入。";
-        bind(eva,gun);return "固定炮位已接入；完成完整趴姿和实际握把接触后，可蓄力瞄准与开火。";
+        bind(eva,gun);return "固定炮位已接入，可蓄力瞄准与开火。";
     }
     private static void bind(EvaUnit01Entity eva,YashimaCannonEntityR52 gun)
     {gun.getPersistentData().putUUID("OperatingEvaR52",eva.getUUID());eva.bindFixedCannonR52(gun.getId(),true);}
@@ -159,12 +161,16 @@ public final class TvYashimaStationR52
     {return Math.abs(net.minecraft.util.Mth.wrapDegrees(p.yaw()-eva.getYRot()))<=1;}
     private static void release(EvaUnit01Entity eva,YashimaCannonEntityR52 gun)
     {gun.getPersistentData().remove("OperatingEvaR52");eva.bindFixedCannonR52(gun.getId(),false);eva.suspendFixedCannonR52();}
-    /** Both human release and NPC fire gates use complete prone posture, original grips and the real mounted bore. */
+    /** Keep the original mounted gun binding; precise pose/grip alignment is diagnostic only. */
     public static String fireBlocker(EvaUnit01Entity eva)
     {
         if(!(eva.level() instanceof ServerLevel level))return "固定炮位由服务器确认。";
         var p=plan(level).orElse(null);var gun=gun(level);
         if(p==null||gun==null||!gun.loadedR52()||!gun.readyR52()||!TvMissionEquipmentR45.fixedCannonAuthorizedR52(eva,gun)||boundEva(level,gun)!=eva||!eva.fixedCannonOperatingR52()||!at(eva,p))return "等待原固定炮升起并完成实际炮位接入。";
+        // The pose continues to animate after binding. It must not disable an
+        // otherwise authorized gun while hands or posture settle visually.
+        // Mission phase, pilot input, power and charge remain enforced by callers.
+        if(!NervTraversalPolicyR53.strict(level))return "";
         if(!eva.isPilotProne()||eva.rifleProneBlend(0)<.99F||eva.hasLiveActionForRender(0)||EvaWeaponHandlingR45.active(eva))return "初号机完整趴姿尚未稳定。";
         var left=gun.gripR52(true);var right=gun.gripR52(false);
         if(left==null||right==null||EvaGameplayMotionR32.hand(eva,"l",0).distanceTo(left)>p.gripRadius()
@@ -238,6 +244,13 @@ public final class TvYashimaStationR52
             {TrainingPilotDirector.retainOriginalPilotR47(level,1);var pilot=TrainingPilotDirector.existingPilotR45(level,1);if(pilot!=null){sortie.pilotR45=pilot.getUUID();data.setDirty();}}
             if(sortie.pilotR45!=null&&TvMissionEquipmentR45.reserveFixedCannonR52(level,eva,sortie.pilotR45,gun,source,p.weapon()))
             {gun.loadedR52(true);eva.fixedCannonRangeR52((float)p.attackRange());eva.bindFixedCannonR52(gun.getId(),eva.fixedCannonOperatingR52());tag.putUUID("AssignedEvaR52",eva.getUUID());}
+            // Arrival requests the same installed lift for either pilot type.
+            // Human pilots remain in control and explicitly right-click to bind.
+            if(gun.loadedR52()&&(tag.getString("LiftPhaseR52").isEmpty()||tag.getString("LiftPhaseR52").equals("idle")))
+            {
+                var commander=data.owner==null?null:level.getServer().getPlayerList().getPlayer(data.owner);
+                if(commander!=null&&commander.level()==level)raise(commander);
+            }
         }
         var operating=boundEva(level,gun);
         if(operating!=null)

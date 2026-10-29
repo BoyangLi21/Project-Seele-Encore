@@ -11,8 +11,12 @@ import net.minecraftforge.network.NetworkEvent;
 public record ClientboundStaffConversationPacket(UUID session, UUID person, int entityId,
         String name, String role, String skin, boolean open, boolean valid,
         boolean canCommand, boolean radio, String reply, String order, List<String> units,
-        long coordinationFormationRevision,long coordinationEvidenceRevision,List<String> participants)
+        long coordinationFormationRevision,long coordinationEvidenceRevision,List<String> participants,String selectedMission)
 {
+    public ClientboundStaffConversationPacket(UUID session,UUID person,int entityId,String name,String role,String skin,
+            boolean open,boolean valid,boolean canCommand,boolean radio,String reply,String order,List<String> units,
+            long coordinationFormationRevision,long coordinationEvidenceRevision,List<String> participants)
+    {this(session,person,entityId,name,role,skin,open,valid,canCommand,radio,reply,order,units,coordinationFormationRevision,coordinationEvidenceRevision,participants,"");}
     public ClientboundStaffConversationPacket(UUID session,UUID person,int entityId,String name,String role,String skin,
             boolean open,boolean valid,boolean canCommand,boolean radio,String reply,String order,List<String> units)
     {this(session,person,entityId,name,role,skin,open,valid,canCommand,radio,reply,order,units,0,0,List.of());}
@@ -21,7 +25,7 @@ public record ClientboundStaffConversationPacket(UUID session, UUID person, int 
         this(buffer.readUUID(), buffer.readUUID(), buffer.readVarInt(),
                 buffer.readUtf(80), buffer.readUtf(40), buffer.readUtf(40),
                 buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(), buffer.readBoolean(),
-                buffer.readUtf(1400), buffer.readUtf(180), readUnits(buffer),buffer.readLong(),buffer.readLong(),readParticipants(buffer));
+                buffer.readUtf(1400), buffer.readUtf(180), readUnits(buffer),buffer.readLong(),buffer.readLong(),readParticipants(buffer),buffer.readUtf(40));
     }
 
     private static List<String> readUnits(FriendlyByteBuf buffer)
@@ -47,6 +51,7 @@ public record ClientboundStaffConversationPacket(UUID session, UUID person, int 
         for (String row : units) buffer.writeUtf(row, 120);
         buffer.writeLong(coordinationFormationRevision);buffer.writeLong(coordinationEvidenceRevision);buffer.writeVarInt(participants.size());
         for(String row:participants)buffer.writeUtf(row,80);
+        buffer.writeUtf(selectedMission,40);
     }
 
     public void handle(Supplier<NetworkEvent.Context> supplier)

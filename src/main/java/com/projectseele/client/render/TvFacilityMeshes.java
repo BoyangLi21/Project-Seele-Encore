@@ -16,6 +16,9 @@ import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.ArrayList;
+import java.util.List;
+import net.minecraft.world.phys.Vec3;
 
 /** Original TV-style rigid machinery, with each moving assembly baked only once. */
 public final class TvFacilityMeshes
@@ -189,7 +192,67 @@ public final class TvFacilityMeshes
     public static void hangarStackDeclared(PoseStack poses,int light,float open,com.projectseele.world.NervHangarGateGeometryR52.Spec spec)
     {
         var baked=DECLARED_STACK_PARTS.computeIfAbsent(spec,k->new HashMap<>());com.projectseele.world.NervHangarGateGeometryR52 geometry;try{geometry=com.projectseele.world.NervHangarGateGeometryR52.loadClasspath(spec);}catch(java.io.IOException missing){throw new IllegalStateException("Declared side-stack source missing",missing);}
-        for(var piece:geometry.pieces(open)){var mesh=baked.computeIfAbsent(piece.part().name(),name->{var a=new com.google.gson.JsonArray();for(double value:piece.part().vertices())a.add(value);return RigidMachineryPartR44.triangles(a);});poses.pushPose();var p=piece.local().translation();poses.translate(p.x,p.y,p.z);mesh.draw(poses,currentBuffers(),light);poses.popPose();}
+        var pieces=geometry.pieces(open);
+        baked.computeIfAbsent("fixed/exterior",name->hangarFrameExterior(pieces)).draw(poses,currentBuffers(),light);
+        for(var piece:pieces){if(!piece.moving())continue;var mesh=baked.computeIfAbsent(piece.part().name(),name->{var a=new com.google.gson.JsonArray();for(double value:piece.part().vertices())a.add(value);return RigidMachineryPartR44.triangles(a);});poses.pushPose();var p=piece.local().translation();poses.translate(p.x,p.y,p.z);mesh.draw(poses,currentBuffers(),light);poses.popPose();}
+    }
+
+    /** The fixed jamb/front/header boxes overlap. Draw their exterior once,
+     * retaining the original physical parts and their bearing surfaces. */
+    private static RigidMachineryPartR44 hangarFrameExterior(List<com.projectseele.world.NervHangarGateGeometryR52.Piece> pieces)
+    {
+        var boxes=new ArrayList<double[]>();
+        for(var piece:pieces)if(!piece.moving())
+        {
+            var vertices=piece.part().vertices();
+            var box=new double[]{Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY,
+                    Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY,
+                    vertices[3],vertices[4],vertices[5]};
+            for(int i=0;i<vertices.length;i+=6)for(int axis=0;axis<3;axis++)
+            {box[axis]=Math.min(box[axis],vertices[i+axis]);box[axis+3]=Math.max(box[axis+3],vertices[i+axis]);}
+            boxes.add(box);
+        }
+        var builder=new RigidMachineryPartR44.Builder();
+        for(int index=0;index<boxes.size();index++)for(int axis=0;axis<3;axis++)for(int sign:new int[]{-1,1})
+        {
+            var box=boxes.get(index);int u=(axis+1)%3,v=(axis+2)%3;
+            double plane=box[axis+(sign>0?3:0)];
+            List<double[]> faces=new ArrayList<>();faces.add(new double[]{box[u],box[v],box[u+3],box[v+3]});
+            for(int other=0;other<boxes.size();other++)
+            {
+                if(other==index)continue;var cover=boxes.get(other);
+                boolean inside=plane>cover[axis]+1e-8&&plane<cover[axis+3]-1e-8;
+                boolean adjoining=Math.abs(plane-cover[axis+(sign>0?0:3)])<1e-8;
+                boolean shared=other<index&&Math.abs(plane-cover[axis+(sign>0?3:0)])<1e-8;
+                if(!inside&&!adjoining&&!shared)continue;
+                var remaining=new ArrayList<double[]>();
+                for(var face:faces)
+                {
+                    double a=Math.max(face[0],cover[u]),b=Math.max(face[1],cover[v]);
+                    double c=Math.min(face[2],cover[u+3]),d=Math.min(face[3],cover[v+3]);
+                    if(a>=c||b>=d){remaining.add(face);continue;}
+                    if(face[0]<a)remaining.add(new double[]{face[0],face[1],a,face[3]});
+                    if(c<face[2])remaining.add(new double[]{c,face[1],face[2],face[3]});
+                    if(face[1]<b)remaining.add(new double[]{a,face[1],c,b});
+                    if(d<face[3])remaining.add(new double[]{a,d,c,face[3]});
+                }
+                faces=remaining;
+            }
+            int color=((int)box[6]<<16)|((int)box[7]<<8)|(int)box[8];
+            for(var face:faces)
+            {
+                Vec3[] corners=new Vec3[4];
+                for(int i=0;i<4;i++)
+                {
+                    var point=new double[3];point[axis]=plane;
+                    point[u]=face[i==1||i==2?2:0];point[v]=face[i>=2?3:1];
+                    corners[i]=new Vec3(point[0],point[1],point[2]);
+                }
+                if(sign>0)builder.quad(corners[0],corners[1],corners[2],corners[3],color);
+                else builder.quad(corners[3],corners[2],corners[1],corners[0],color);
+            }
+        }
+        return builder.finish();
     }
     private TvFacilityMeshes() {}
 }

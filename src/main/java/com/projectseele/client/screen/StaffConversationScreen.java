@@ -32,6 +32,7 @@ public final class StaffConversationScreen extends Screen
     private StaffConversationScreen(ClientboundStaffConversationPacket view)
     {
         super(Component.literal("NERV 通信")); this.view = view;
+        if(!view.selectedMission().isEmpty())mission=view.selectedMission();
     }
 
     public static void receive(ClientboundStaffConversationPacket packet)
@@ -46,7 +47,9 @@ public final class StaffConversationScreen extends Screen
             }
             boolean changed = screen.view.canCommand() != packet.canCommand()
                     ||screen.view.coordinationFormationRevision()!=packet.coordinationFormationRevision()
-                    ||screen.view.coordinationEvidenceRevision()!=packet.coordinationEvidenceRevision();
+                    ||screen.view.coordinationEvidenceRevision()!=packet.coordinationEvidenceRevision()
+                    ||!packet.selectedMission().isEmpty()&&!screen.mission.equals(packet.selectedMission());
+            if(!packet.selectedMission().isEmpty())screen.mission=packet.selectedMission();
             if (!screen.view.reply().equals(packet.reply()))
             {
                 screen.replyScroll = 0;
@@ -59,7 +62,7 @@ public final class StaffConversationScreen extends Screen
         {
             var replacement = new StaffConversationScreen(packet);
             if (mc.screen instanceof StaffConversationScreen old)
-            { replacement.unit = old.unit; replacement.tab = packet.canCommand() ? old.tab : 0;replacement.mission=old.mission;replacement.npcSortie=old.npcSortie;replacement.sortieEquipment=old.sortieEquipment;replacement.sortieCrewR54.putAll(old.sortieCrewR54);replacement.sortieCrewInitializedR54=old.sortieCrewInitializedR54; }
+            { replacement.unit = old.unit; replacement.tab = packet.canCommand() ? old.tab : 0;replacement.npcSortie=old.npcSortie;replacement.sortieEquipment=old.sortieEquipment;replacement.sortieCrewR54.putAll(old.sortieCrewR54);replacement.sortieCrewInitializedR54=old.sortieCrewInitializedR54; }
             mc.setScreen(replacement);
             mc.getSoundManager().play(net.minecraft.client.resources.sounds.SimpleSoundInstance.forUI(com.projectseele.registry.ModSounds.STAFF_RADIO_CONNECT.get(),1,.4F));
         }
@@ -96,7 +99,7 @@ public final class StaffConversationScreen extends Screen
         int tabWidth=(panelWidth-24)/5;
         addTab("交谈",0,x+12,tabWidth-3,()->switchTab(0),true);
         addTab("指挥",1,x+12+tabWidth,tabWidth-3,()->switchTab(1),view.canCommand());
-        addTab("作战记录",2,x+12+tabWidth*2,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},true);
+        addTab("自由作战",2,x+12+tabWidth*2,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},true);
         addTab("通讯录",4,x+12+tabWidth*3,tabWidth-3,()->switchTab(4),view.radio());
         addTab("运输部门",6,x+12+tabWidth*4,tabWidth-3,()->{switchTab(6);send("TRANSPORT:status");},view.canCommand());
         addButton("关闭", x + panelWidth - 60, y + 12, 48, this::onClose, true);
@@ -173,19 +176,19 @@ public final class StaffConversationScreen extends Screen
         else if(tab==2)
         {
             addButton("查看当前简报",x+12,controlsY,panelWidth-24,()->send("TOPIC:campaign"),true);
-            addButton("出击与增援编成",x+12,controlsY+22,panelWidth-24,()->switchTab(12),permitted("campaign"));
+            addButton("选择作战 / 重打 / 增援",x+12,controlsY+22,panelWidth-24,()->switchTab(12),permitted("campaign"));
             addButton("城市协同档案",x+12,controlsY+44,panelWidth-24,()->{switchTab(7);send("COORD:status");},view.canCommand());
         }
         else if(tab==12)
         {
             if(!sortieCrewInitializedR54){sortieCrewR54.put(1,minecraft.player.getUUID().toString());sortieCrewInitializedR54=true;}
             int half = (panelWidth - 28) / 2;
-            int choice=(panelWidth-36)/4;
-            String[] chapters={"sachiel","shamshel","ramiel","gaghiel"};String[] chapterNames={"萨基尔","夏姆榭尔","屋岛","港区"};
-            for(int i=0;i<chapters.length;i++)
+            var missions=com.projectseele.world.TvCampaignCatalog.CHAPTERS.stream().filter(com.projectseele.world.TvCampaignCatalog.Chapter::playable).toList();
+            int choice=(panelWidth-24-4*(missions.size()-1))/missions.size();
+            for(int i=0;i<missions.size();i++)
             {
-                String selected=chapters[i];
-                addButton((mission.equals(selected)?"● ":"")+chapterNames[i],x+12+i*(choice+4),controlsY,choice,
+                var entry=missions.get(i);String selected=entry.id();
+                addButton((mission.equals(selected)?"● ":"")+(selected.equals("ramiel")?"屋岛":entry.target()),x+12+i*(choice+4),controlsY,choice,
                         ()->{mission=selected;if(selected.equals("ramiel")){sortieCrewR54.putIfAbsent(0,"npc");String self=minecraft.player.getUUID().toString();sortieCrewR54.putIfAbsent(1,sortieCrewR54.containsValue(self)?"npc":self);}send("CAMPAIGN:select:"+selected);rebuildWidgets();},permitted("campaign"));
             }
             for(int i=0;i<3;i++)
@@ -194,8 +197,8 @@ public final class StaffConversationScreen extends Screen
                 addButton(com.projectseele.world.NervStaffDialogue.unitName(i)+"："+crewLabelR54(i)+" / 切换驾驶员",x+12,controlsY+22+i*22,panelWidth-24,()->{cycleCrewR54(selection);rebuildWidgets();},true);
             }
             addButton("常规装备："+(sortieEquipment.equals("rifle")?"步枪":"近战")+" / 切换",x+12,controlsY+88,panelWidth-24,()->{sortieEquipment=sortieEquipment.equals("rifle")?"melee":"rifle";rebuildWidgets();},true);
-            addButton("整队出击 / 加入增援",x+12,controlsY+110,half,()->send(formationRequestR54()),permitted("campaign")&&!sortieCrewR54.isEmpty());
-            addButton("撤销当前作战",x+16+half,controlsY+110,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
+            addButton("出击 / 重打 / 增援",x+12,controlsY+110,half,()->send(formationRequestR54()),permitted("campaign")&&!sortieCrewR54.isEmpty());
+            addButton("结束当前作战",x+16+half,controlsY+110,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
             addButton("查看作战编队",x+12,controlsY+132,panelWidth-24,()->send("TOPIC:campaign"),true);
         }
         else if(tab==7)
@@ -287,7 +290,7 @@ public final class StaffConversationScreen extends Screen
         }
         buildingControls=false;applyControlScroll();
         int parent=parentTab();
-        if(parent>=0)addButton("← 返回"+(parent==0?"交谈":parent==1?"指挥分类":parent==2?"作战记录":"城市协同档案"),
+        if(parent>=0)addButton("← 返回"+(parent==0?"交谈":parent==1?"指挥分类":parent==2?"自由作战":"城市协同档案"),
                 x+12,y+panelHeight-55,panelWidth-24,()->switchTab(parent),true);
         input = new PhoneUiR54.Field(font, x + 13, y + panelHeight - 28, panelWidth - 87, 19, Component.literal("输入交谈或指令"),PhoneUiR54.NERV);
         input.setMaxLength(160);input.setValue(draft); input.setHint(Component.literal("输入消息或指令 · Enter 发送")); addRenderableWidget(input);

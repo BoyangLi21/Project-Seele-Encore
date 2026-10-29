@@ -38,15 +38,18 @@ final class LaunchChamberFinishR53
             for(int y = 0; y < 5; y++)
             {
                 double width=door.declaredStackR52().panelWidth(),bottom=y*15D;
-                for(double z : new double[]{-.012,.98})
+                // Both skins build outward from the original Z=0..0.98 leaf.
+                // The old rear trim was only 2 mm above its plate and its
+                // details extended through that plate toward the inner leaf.
+                for(int side:new int[]{-1,1})
                 {
-                    box(builder,.045,bottom+.055,z,width-.09,14.89,.012,0x9ba493);
-                    box(builder,.09,bottom+.10,z-.002,.045,14.80,.016,0xc2c6b5);
+                    skinBox(builder,side,.045,bottom+.055,0,width-.09,14.89,.06,0x9ba493);
+                    skinBox(builder,side,.09,bottom+.10,.06,.045,14.80,.03,0xc2c6b5);
                     for(double bx:new double[]{.28,width-.40})
                         for(double by:new double[]{bottom+.40,bottom+14.48})
-                            box(builder,bx,by,z-.006,.12,.12,.024,0x475345);
-                    box(builder,.65,bottom+1.35,z-.004,1.7,2.1,.022,0x788773);
-                    box(builder,.72,bottom+1.42,z-.009,1.56,1.96,.030,0x9aa28f);
+                            skinBox(builder,side,bx,by,.06,.12,.12,.04,0x475345);
+                    skinBox(builder,side,.65,bottom+1.35,.06,1.7,2.1,.04,0x788773);
+                    skinBox(builder,side,.72,bottom+1.42,.10,1.56,1.96,.03,0x9aa28f);
                 }
             }
             leaf = builder.finish();
@@ -60,6 +63,10 @@ final class LaunchChamberFinishR53
             leaf.draw(poses,buffers,light);poses.popPose();
         }
     }
+
+    private static void skinBox(RigidMachineryPartR44.Builder b,int side,double x,double y,
+            double offset,double width,double height,double depth,int color)
+    {box(b,x,y,side<0?-offset-depth:.98+offset,width,height,depth,color);}
 
     static void fixed(NervHangarDoorEntity door, PoseStack poses, MultiBufferSource buffers, int light)
     {

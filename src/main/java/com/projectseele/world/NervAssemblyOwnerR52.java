@@ -373,7 +373,11 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var c=EvaMechanicalFrameR52.originalCarrierControllerR52(e);if(c==null||!NervOriginalCarrierR52.declared(c))return false;
         var mounting=CarrierMountProfileR53.read(c,1);if(!mounting.shallowBay()&&!mounting.supportOnly())return false;
         var bay=CarrierBayTrayR53.bay(c);var root=NervOriginalCarrierR52.actualRoot(c,1);
-        if(!pose(root,p.bay())||!pose(NervOwnerPlacementR52.actualRoot(e),p.bay())||!CarrierBayTrayR53.ready(l,bay)||!CarrierBayTrayR53.bears(bay,root))return false;
+        if(!pose(root,p.bay())||!pose(NervOwnerPlacementR52.actualRoot(e),p.bay()))return false;
+        // Maintenance clears the motion mesh after parking the original body
+        // and tray. Normal servicing must not wait for a retired motion proof.
+        if(!NervTraversalPolicyR53.strict(l))return true;
+        if(!CarrierBayTrayR53.ready(l,bay)||!CarrierBayTrayR53.bears(bay,root))return false;
         var body=EvaMechanicalFrameR52.active(e)?EvaMechanicalFrameR52.capturedGeometry(e):EvaMechanicalFrameR52.serviceSourceHeldR52(e)?EvaMechanicalFrameR52.serviceGeometryR52(e):null;
         return body!=null&&CarrierFootBearingR53.bears(CarrierFootBearingR53.selected(),body,NervOwnerPlacementR52.actualRoot(e),root,mounting,CarrierAssemblyR53.selected());
     }
@@ -950,7 +954,11 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         {
             var door=launchDoors.get(i);
             boolean started=l.getGameTime()-data.getLong("LaunchDoorsStartedR54")>=i*12L;
-            if(!started||!gateLeafR54(l,door,true,TransportMembershipR52.members(o,kind(data)))){ready=false;pending="opening_launch_gate/"+door.resource();}
+            boolean open=started&&gateLeafR54(l,door,true,TransportMembershipR52.members(o,kind(data)));
+            // Open each higher leaf twelve ticks later, while the stopped
+            // carrier retracts and changes guide axis below. In NORMAL mode
+            // animation completion is not a prerequisite for those actuators.
+            if(geometry.strict()&&!open){ready=false;pending="opening_launch_gate/"+door.resource();}
         }
         for(String id:geometry.resources())
         {
@@ -1253,7 +1261,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     @Override public boolean prepareEmptyCarrierTurnR52(ServerLevel l,Original o,UUID id,Leg leg,CompoundTag data){try{var carrier=NervOriginalCarrierR52.controller(l,o);if(carrier==null||!carrier.getUUID().equals(id))return false;var spec=turnSpecR52(leg,NervOriginalCarrierR52.nominalBinding(o.variant()));var a=turnAdmissionR52(l,o,data,leg,id);return spec!=null&&a!=null&&(pose(NervOriginalCarrierR52.actualRoot(carrier,1),NervFootGuideDockR52.root(spec,new NervFootGuideDockR52.Sample(NervFootGuideDockR52.Stage.COUPLE,0)))?NervTurnStationRuntimeR52.beforeTurn(l,carrier,spec,a,Set.of(id,NervFootGuideStationR52.proposedIdentityR52(epoch,leg.id())),data):NervTurnStationRuntimeR52.prepare(l,spec,a));}catch(java.io.IOException unavailable){return false;}}
     @Override public boolean applyEmptyCarrierTurnR52(ServerLevel l,Original o,UUID id,DirectoryTrajectoryR52 curve,CompoundTag data){try{var carrier=NervOriginalCarrierR52.controller(l,o);if(carrier==null||!carrier.getUUID().equals(id))return false;var spec=turnSpecR52(curve.leg(),curve.binding());var a=turnAdmissionR52(l,o,data,curve.leg(),id);if(spec==null||a==null)return false;var proof=NervTurnStationRuntimeR52.checkTurn(l,carrier,spec,a,Set.of(id,NervFootGuideStationR52.proposedIdentityR52(epoch,curve.leg().id())),data,curve.fromFraction(),curve.toFraction());return NervTurnStationRuntimeR52.commitTurn(l,proof,data);}catch(java.io.IOException unavailable){return false;}}
     @Override public boolean finishEmptyCarrierTurnR52(ServerLevel l,Original o,UUID id,Leg leg,CompoundTag data){try{var carrier=NervOriginalCarrierR52.controller(l,o);if(carrier==null||!carrier.getUUID().equals(id))return false;var spec=turnSpecR52(leg,NervOriginalCarrierR52.nominalBinding(o.variant()));var a=turnAdmissionR52(l,o,data,leg,id);return spec!=null&&a!=null&&NervTurnStationRuntimeR52.afterTurn(l,carrier,spec,a,Set.of(id,NervFootGuideStationR52.proposedIdentityR52(epoch,leg.id())),data);}catch(java.io.IOException unavailable){return false;}}
-    private boolean carrierSpaceCoveredR52(ServerLevel l,Leg leg,NervOriginalCarrierR52.CheckedStep proof){var context=NervRouteRuntimeR52.flightContext(l);if(context==null)return false;var spaces=new ArrayList<AABB>();for(String id:leg.resources())if(directory.resource(id).kind()==ResourceKind.SPACE){var binding=context.bindings().get(id);if(binding==null)return false;spaces.addAll(binding.spaces());}return proof.envelopes().stream().allMatch(box->NervAirspaceCoverageR52.covered(box,spaces));}
+    private boolean carrierSpaceCoveredR52(ServerLevel l,Leg leg,NervOriginalCarrierR52.CheckedStep proof){if(!NervTraversalPolicyR53.strict(l))return true;var context=NervRouteRuntimeR52.flightContext(l);if(context==null)return false;var spaces=new ArrayList<AABB>();for(String id:leg.resources())if(directory.resource(id).kind()==ResourceKind.SPACE){var binding=context.bindings().get(id);if(binding==null)return false;spaces.addAll(binding.spaces());}return proof.envelopes().stream().allMatch(box->NervAirspaceCoverageR52.covered(box,spaces));}
 
     @Override public boolean finishEmptyStationIdleR52(ServerLevel level,Original original,UUID controller,CompoundTag data)
     {
@@ -1545,9 +1553,12 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var proof = ballistic.get(original.eva());
         var context = NervRouteRuntimeR52.flightContext(level);
         if (proof == null || context == null) return outletPairHeldR53(original, "outlet_actual_ballistic_source_or_context_missing");
-        var claim = context.pool().reserveGroundOutletSpacesR53(admission.task(), level, eva, proof, context.bindings());
-        if (!claim.accepted()) return outletPairHeldR53(original, claim.reason());
-        admission = new NervTurnStationRuntimeR52.Admission(admission.task(), claim.resources(), context.bindings(), context.pool());
+        if (NervTraversalPolicyR53.strict(level))
+        {
+            var claim = context.pool().reserveGroundOutletSpacesR53(admission.task(), level, eva, proof, context.bindings());
+            if (!claim.accepted()) return outletPairHeldR53(original, claim.reason());
+            admission = new NervTurnStationRuntimeR52.Admission(admission.task(), claim.resources(), context.bindings(), context.pool());
+        }
         var members = new HashSet<>(own);members.add(carrier.getUUID());
         try
         {
@@ -1555,6 +1566,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                     NervOriginalCarrierR52.progress(carrier, 1), next, Set.copyOf(members), payload);
             if (rack == null) return outletPairHeldR53(original, "outlet_rack_sweep / " + NervOriginalCarrierR52.lastRejectionR53(carrier));
             if (!rack.current(level)) return outletPairHeldR53(original, "outlet_rack_step_not_current");
+            if (!NervTraversalPolicyR53.strict(level)) return rack;
             String failure = outletSpaceFailureR53(admission, rack.envelopes(), "rack");
             if (failure == null) failure = outletSpaceFailureR53(admission, payload.envelopes(), "payload");
             return failure == null ? rack : outletPairHeldR53(original, failure);

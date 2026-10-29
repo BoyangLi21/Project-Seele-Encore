@@ -98,6 +98,7 @@ public final class NervOriginalCarrierR52 {
   var root=actualRoot(carrier,1);var mount=CarrierMountProfileR53.read(carrier,1);
   if(!mount.shallowBay()||mount.supportOnly()||mount.aboveFloor()||mount.elevation()!=0||mount.transverse()!=0
       ||NervR50CarrierModeR53.launchDeckDropR53(root,0)!=-64||NervR50CarrierModeR53.launchDeckDropR53(root,progress(carrier,1))!=0)return false;
+  if(!NervTraversalPolicyR53.strict(level))return EntryPlugEjectionR48.loaded(level,eva.getBoundingBox());
   var pads=CarrierFootBearingR53.selected();return pads!=null&&CarrierFootBearingR53.bears(pads,EvaMechanicalFrameR52.capturedGeometry(eva),
       EvaMechanicalFrameR52.frame(eva,1),root,mount,CarrierAssemblyR53.selected());
  }

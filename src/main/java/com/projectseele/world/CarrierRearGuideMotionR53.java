@@ -208,6 +208,9 @@ public final class CarrierRearGuideMotionR53
             ||CarrierRearGuideR53.actualLift(carrier,1)!=CarrierRearGuideR53.STOW_LIFT
             ||NervOriginalCarrierR52.headSlideR53(carrier,1)!=0)
             return rejected("rear_lateral_requires_original_raised_body_and_stowed_head");
+        if(!NervTraversalPolicyR53.strict(level))
+            return own.contains(carrier.getUUID())&&EntryPlugEjectionR48.loaded(level,carrier.getBoundingBox())
+                    ?new Result(List.of(carrier.getBoundingBox()),null):rejected("rear_lateral_original_or_loaded_column_missing");
         var hardware=CarrierRearGuideR53.selected();
         if(hardware==null||!CarrierRearLateralR53.bearings(hardware,from.transverse(),to.transverse()))
             return rejected("rear_lateral_finite_source_bearings_missing");
@@ -242,6 +245,9 @@ public final class CarrierRearGuideMotionR53
         if(mounting.transverse()!=0)return rejected("rear_transverse_must_expand_before_bank_capture");
         var a=NervBankHeadTransferR53.pose(state,state.getInt("Clock"));
         var b=NervBankHeadTransferR53.pose(state,state.getInt("Clock")+step);
+        if(!NervTraversalPolicyR53.strict(level))
+            return own.contains(carrier.getUUID())&&EntryPlugEjectionR48.loaded(level,carrier.getBoundingBox())
+                    ?new Result(List.of(carrier.getBoundingBox()),null):rejected("rear_bank_original_or_loaded_column_missing");
         var A=hardware.partsAt(root,1,a.direction(),a.slide(),CarrierRearGuideR53.bankLift(state,state.getInt("Clock")),mounting);
         var B=hardware.partsAt(root,1,b.direction(),b.slide(),CarrierRearGuideR53.bankLift(state,state.getInt("Clock")+step),mounting);
         double angle=Math.acos(Math.max(-1,Math.min(1,a.direction().dot(b.direction()))));
@@ -269,6 +275,23 @@ public final class CarrierRearGuideMotionR53
         if(mounting.transverse()!=0&&lift!=CarrierRearGuideR53.STOW_LIFT)return rejected("rear_transverse_requires_stowed_head");
         if(CarrierRearLateralR53.supported()&&lift==CarrierRearGuideR53.STOW_LIFT&&mounting.transverse()!=1)
             return rejected("rear_transverse_original_actuator_not_stowed");
+        if(!NervTraversalPolicyR53.strict(level))
+        {
+            if(!own.contains(carrier.getUUID()))return rejected("rear_original_not_owned");
+            var actual=NervOriginalCarrierR52.actualRoot(carrier,1).translation();
+            for(var path:paths)
+            {
+                if(!path.pureTranslation()||!fixed.directory().equals(path.directory().fingerprint())
+                        ||!NervUprightGuidewayR52.enabledForDirectoryR52(level,path.directory()))
+                    return rejected("rear_route_source_or_root_changed");
+                var bounds=carrier.getBoundingBox().move(path.sample(0).evaRoot().translation().subtract(actual))
+                        .minmax(carrier.getBoundingBox().move(path.sample(.5).evaRoot().translation().subtract(actual)))
+                        .minmax(carrier.getBoundingBox().move(path.sample(1).evaRoot().translation().subtract(actual)));
+                if(!EntryPlugEjectionR48.loaded(level,bounds))return rejected("rear_route_column_unloaded");
+                boxes.add(bounds);
+            }
+            return new Result(List.copyOf(boxes),null);
+        }
         if(coverage!=null&&NervTraversalPolicyR53.strict(level))
         {
             String source=fixedSource(level,paths,hardware,fixed,mounting,lift,geometry);
@@ -454,6 +477,14 @@ public final class CarrierRearGuideMotionR53
         var rails=CarrierRearGuideR53.fixed();var context=NervRouteRuntimeR52.flightContext(level);
         if(context==null||!rails.directory().equals(context.directory().fingerprint())
             ||!rails.legacySource().equals(NervRouteRuntimeR52.uprightGuideSourceR52(level)))return rejected("rear_actual_world_binding_changed");
+        if(!strict)
+        {
+            var actual=NervOriginalCarrierR52.actualRoot(carrier,1).translation();
+            var bounds=carrier.getBoundingBox().move(rootFrom.translation().subtract(actual))
+                    .minmax(carrier.getBoundingBox().move(rootTo.translation().subtract(actual)));
+            return own.contains(carrier.getUUID())&&EntryPlugEjectionR48.loaded(level,bounds)
+                    ?new Result(List.of(bounds),null):rejected("rear_original_or_loaded_column_missing");
+        }
         error=sweptError(from,to,error,stopped);
         var pairs=new ArrayList<Pair>();var boxes=new ArrayList<AABB>();AABB area=null;
         for(int i=0;i<from.size();i++)

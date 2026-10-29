@@ -28,6 +28,8 @@ public final class CarrierBayMotionR53
                 || !CarrierTransferRailsR53.selected().directory().equals(path.directory().fingerprint()))
             return no("shallow_tray_actual_route_equipment_source_missing");
         var mounting = CarrierMountProfileR53.read(carrier, 1);var boxes = new ArrayList<AABB>();
+        if (!NervTraversalPolicyR53.strict(level))
+            return check(level, carrier, path.sample(0).evaRoot(), path.sample(1).evaRoot(), 1, 1, mounting, own);
         var budget = CarrierRearGuideMotionR53.continuousBudget(path.translationSecondDerivativeBound(), path.samplingErrorBound());
         String leg = CarrierRearGuideR53.canonicalPath(path);
         for (int i = 0; i < budget.divisions(); i++)
@@ -57,6 +59,15 @@ public final class CarrierBayMotionR53
             return no("shallow_tray_source_or_finite_load_bearing_missing");
         if(from!=to&&mounting.shallowBay()&&CarrierRearGuideR53.actualLift(carrier,1)!=CarrierRearGuideR53.STOW_LIFT)
             return no("shallow_tray_receiver_must_reach_independent_upper_stop_before_mast_stroke");
+        if (!NervTraversalPolicyR53.strict(level))
+        {
+            var actual = NervOriginalCarrierR52.actualRoot(carrier, 1).translation();
+            var bounds = carrier.getBoundingBox().move(root.translation().subtract(actual))
+                    .minmax(carrier.getBoundingBox().move(endRoot.translation().subtract(actual)));
+            if (from != to) bounds = bounds.expandTowards(0, -CarrierMountProfileR53.SUBMERGED_BAY_STROKE, 0);
+            if (!EntryPlugEjectionR48.loaded(level, bounds)) return no("shallow_tray_unloaded=" + bounds);
+            return new CarrierRearGuideMotionR53.Result(List.of(bounds), null);
+        }
         if ((directionFrom == null || NervTraversalPolicyR53.strict(level))
                 && !supportedPair(level, carrier, bay, root, endRoot, directionFrom, directionTo, leg, mounting,from,to))
             return no("shallow_tray_source_or_finite_load_bearing_missing");

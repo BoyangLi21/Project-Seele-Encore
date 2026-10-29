@@ -33,6 +33,16 @@ public final class CarrierOutletMotionR53
                 || leg == null || !guide.pureTranslation()
                 || !NervUprightGuidewayR52.enabledForDirectoryR52(level, guide.directory()))
             return no("actual_vertical_source_missing");
+        if (!NervTraversalPolicyR53.strict(level))
+        {
+            // Normal authored motion does not run a geometry diagnosis.
+            var bounds = carrier.getBoundingBox()
+                    .move(physicalRoot(root, from).translation().subtract(root.translation()))
+                    .minmax(carrier.getBoundingBox()
+                            .move(physicalRoot(root, to).translation().subtract(root.translation())));
+            if (!EntryPlugEjectionR48.loaded(level, bounds)) return no("column_not_loaded");
+            return new CarrierRearGuideMotionR53.Result(List.of(bounds), null);
+        }
         var hardware = CarrierRearGuideR53.selected();var fixed = CarrierRearGuideR53.fixed();
         if (hardware == null || fixed == null || !fixed.directory().equals(guide.directory().fingerprint())
                 || !fixed.legacySource().equals(NervRouteRuntimeR52.uprightGuideSourceR52(level)))

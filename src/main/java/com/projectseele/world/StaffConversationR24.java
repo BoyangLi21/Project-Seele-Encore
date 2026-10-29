@@ -116,7 +116,7 @@ public final class StaffConversationR24
         var packet = new ClientboundStaffConversationPacket(session.nonce, npc.getUUID(), npc.getId(),
                 npc.getName().getString(), role(npc), npc.skin(), open, true, canCommand, session.radio,
                 session.reply, order, List.copyOf(units),current?coordination.formationRevisionR45:0,
-                current?coordination.evidenceRevisionR45:0,List.copyOf(participants));
+                current?coordination.evidenceRevisionR45:0,List.copyOf(participants),com.projectseele.event.TvCampaignDirector.selectedMissionR54(player));
         SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
     }
 
