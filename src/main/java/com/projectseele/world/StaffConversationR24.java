@@ -62,13 +62,13 @@ public final class StaffConversationR24
 
     private static boolean available(ServerPlayer player, NervStaffEntity npc, Session session)
     {
-        return npc.isAlive() && player.level() == npc.level()
-                && (session.radio ? radioAllowed(player) : player.distanceToSqr(npc) <= 100);
+        return npc.isAlive() && (session.radio ? radioAllowed(player)
+                :player.level() == npc.level()&&player.distanceToSqr(npc) <= 100);
     }
 
     public static void open(ServerPlayer player, NervStaffEntity npc, boolean radio)
     {
-        if (player.level() != npc.level() || radio && !radioAllowed(player) || !radio && player.distanceToSqr(npc) > 100) return;
+        if (radio ? !radioAllowed(player) : player.level() != npc.level() || player.distanceToSqr(npc) > 100) return;
         var session = new Session(npc, radio, StaffDialogueCatalogR24.line(StaffDialogueCatalogR24.profile(npc), npc.staffRole(), "greeting", player.tickCount / 100));
         sessions(player).put(player.getUUID(), session); send(player, npc, session, true);
     }
@@ -352,20 +352,31 @@ public final class StaffConversationR24
             default -> "";
         };
         if (skin.isEmpty()) { player.sendSystemMessage(Component.literal("可联络：美里、律子、冬月、摩耶。")); return 0; }
-        if (connect(player, skin)) return 1;
-        PENDING.computeIfAbsent(player.server, key -> new HashMap<>()).put(player.getUUID(), new Pending(skin, player.server.getTickCount() + 200));
+        var pending=PENDING.computeIfAbsent(player.server, key -> new HashMap<>());
+        if (connect(player, skin)) { pending.remove(player.getUUID()); return 1; }
+        var previous=pending.get(player.getUUID());
+        if(previous!=null&&previous.skin().equals(skin))return 1;
+        pending.put(player.getUUID(), new Pending(skin, System.nanoTime() + 10_000_000_000L));
         player.sendSystemMessage(Component.literal("正在连接指挥频道……")); return 1;
     }
 
     private static boolean connect(ServerPlayer player, String skin)
     {
-        var level = player.serverLevel();
+        if(connect(player,skin,player.serverLevel()))return true;
+        for(var level:player.server.getAllLevels())
+            if(level!=player.serverLevel()&&connect(player,skin,level))return true;
+        return false;
+    }
+    private static boolean connect(ServerPlayer player,String skin,ServerLevel level)
+    {
         var station = NervStaffDirector.roster(level).stream().filter(post -> post.skin().equals(skin)).findFirst().orElse(null);
         if (station == null) return false;
-        UUID id = NervStaffSavedData.get(level).identity(station.id());
+        UUID id = NervRouteRuntimeR52.claimed(level)?NervOriginalActorsR52.staffIdentity(level,station.id())
+                :NervStaffSavedData.get(level).identity(station.id());
+        if(id==null)return false;
+        if (level.getEntity(id) instanceof NervStaffEntity npc&&npc.isAlive())
+        { load(level,npc.blockPosition()); open(player, npc, true); return true; }
         load(level, station.feet());
-        if (id != null && level.getEntity(id) instanceof NervStaffEntity npc)
-        { open(player, npc, true); return true; }
         if (System.getProperty("projectseele.regionalBuild", "").startsWith("r24-") && player.server.getTickCount() % 20 == 0)
             ProjectSeele.LOGGER.info("R24 RADIO LOAD person={} uuid={} post={} entityTicking={} loadedNPCs={}",
                     station.id(), id, station.feet(), level.isPositionEntityTicking(station.feet()),
@@ -374,9 +385,9 @@ public final class StaffConversationR24
     }
     private static void load(ServerLevel level, BlockPos at)
     {
-        for (int x = (at.getX() >> 4) - 1; x <= (at.getX() >> 4) + 1; x++)
-            for (int z = (at.getZ() >> 4) - 1; z <= (at.getZ() >> 4) + 1; z++)
-            { var chunk = new ChunkPos(x, z); level.getChunkSource().addRegionTicket(TICKET, chunk, 2, chunk); level.getChunk(x, z); }
+        // One entity-ticking ticket already retains its neighbours. Never wait
+        // for disk/generation from the radio request or its retry tick.
+        var chunk = new ChunkPos(at);level.getChunkSource().addRegionTicket(TICKET, chunk, 2, chunk);
     }
 
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
@@ -393,7 +404,7 @@ public final class StaffConversationR24
             var player = event.getServer().getPlayerList().getPlayer(entry.getKey());
             if (player == null || !radioAllowed(player)) { pending.remove(entry.getKey()); continue; }
             if (connect(player, entry.getValue().skin())) { pending.remove(entry.getKey()); continue; }
-            if (event.getServer().getTickCount() > entry.getValue().until())
+            if (System.nanoTime() > entry.getValue().until())
             {
                 pending.remove(entry.getKey()); player.sendSystemMessage(Component.literal("该岗位暂时无法接通，请稍后再试。"));
             }

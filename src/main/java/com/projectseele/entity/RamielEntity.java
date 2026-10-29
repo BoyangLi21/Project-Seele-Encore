@@ -79,6 +79,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     // Beam presentation state, synced so every client renders the same shot.
     private static final EntityDataAccessor<Integer> DATA_BEAM_TICKS =
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.INT);
+    private static final EntityDataAccessor<Integer> DATA_BEAM_DURATION_R54 =
+            SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Vector3f> DATA_BEAM_END =
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.VECTOR3);
     private static final EntityDataAccessor<Boolean> DATA_DRILLING =
@@ -95,9 +97,10 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     // constants left here are presentation/geometry, not tuning knobs.
     /** Total client-visible beam lifetime: solid flash then afterglow fade-out. */
     public static final int BEAM_RENDER_TICKS = 16;
+    public static final int YASHIMA_BEAM_TICKS_R54 = 60;
     public static final int BEAM_SOLID_TICKS = 6;
 
-    // Operation-Yashima sniping is accepted only while the actual 16-tick
+    // Operation-Yashima sniping is accepted only while the actual three-second
     // beam is active, and only when the shot threads the core.
     // Geometry enlarged again after playtest: the Angel should dominate half a city block.
     // Aim tolerance matches the rendered core octahedron (~3.2 blocks).
@@ -123,6 +126,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
 
     private int beamCooldown = 60;
     private long beamCooldownReadyAtR54;
+    private long beamEndsAtR54;
     private int rippleCooldown;
 
     private static int pacedRemainingR54(int ticks,long readyAt)
@@ -376,6 +380,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         this.entityData.define(DATA_MODEL_SCALE_R52,1F);
         this.entityData.define(DATA_CHARGING, false);
         this.entityData.define(DATA_BEAM_TICKS, 0);
+        this.entityData.define(DATA_BEAM_DURATION_R54, BEAM_RENDER_TICKS);
         this.entityData.define(DATA_BEAM_END, new Vector3f());
         this.entityData.define(DATA_DRILLING, false);
         this.entityData.define(DATA_DRILL_DEPTH, 0.0F);
@@ -457,6 +462,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     {
         return this.entityData.get(DATA_BEAM_TICKS);
     }
+    public int getBeamDurationR54(){return this.entityData.get(DATA_BEAM_DURATION_R54);}
 
     public Vec3 getBeamEnd()
     {
@@ -481,14 +487,27 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     }
 
     @Override
+    public void travel(Vec3 input)
+    {
+        Vec3 anchor=com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this);
+        if(anchor!=null)
+        {
+            // The commissioned drilling target hovers at its original anchor.
+            // Its oversized vanilla hull must not push that anchor away.
+            this.setPos(anchor);this.setDeltaMovement(Vec3.ZERO);return;
+        }
+        super.travel(input);
+    }
+
+    @Override
     public void tick()
     {
         if (!this.level().isClientSide)
         {
-            // Decrement before AI can fire. A new shot keeps all 16 ticks,
+            // Decrement before AI can fire. A new shot keeps its full window,
             // and the synced beam clock also controls the exposed model.
             int previous=this.getBeamTicks();
-            int remaining = Math.max(0, previous - 1);
+            int remaining = previous>0?pacedRemainingR54(Math.max(0,previous-1),this.beamEndsAtR54):0;
             this.entityData.set(DATA_BEAM_TICKS, remaining);
             this.setExposed(remaining > 0);
             if(previous>0&&remaining==0)com.projectseele.world.TvYashimaCombatCommsR54.onBeamEnded(this,
@@ -659,7 +678,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     private boolean beamLineOfSightR45(LivingEntity target)
     {
         if(com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this)==null)return this.hasLineOfSight(target);
-        return this.level().clip(new ClipContext(this.beamOrigin(),target.getEyePosition(),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this))
+        return com.projectseele.world.TvYashimaFirelineR53.clip((ServerLevel)this.level(),new ClipContext(this.beamOrigin(),target.getEyePosition(),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this)).hit()
                 .getType()==net.minecraft.world.phys.HitResult.Type.MISS;
     }
 
@@ -670,8 +689,9 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         Vec3 from = this.beamOrigin();
         Vec3 dir = target.getEyePosition().subtract(from).normalize();
         Vec3 farEnd = from.add(dir.scale(this.effectiveBeamRangeR45()));
-        BlockHitResult blockHit = this.level().clip(
+        var terrain = com.projectseele.world.TvYashimaFirelineR53.clip((ServerLevel)this.level(),
                 new ClipContext(from, farEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+        BlockHitResult blockHit = terrain.hit();
         Vec3 end = blockHit.getLocation();
 
         // Compare the same complete terrain-clipped segment for shield and
@@ -711,16 +731,19 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         // A stopped ray has no damaging explosion on the rear of the shield.
         // Yashima applies its explicit chassis hit only, never blast damage to
         // the protected plug/pilot. Ordinary unshielded beams retain their blast.
-        if (!stoppedByShield && !yashima) this.level().explode(this, end.x, end.y, end.z,
+        if (!stoppedByShield && !yashima && (terrain.complete()||bodyHit!=null||blockHit.getType()==net.minecraft.world.phys.HitResult.Type.BLOCK)) this.level().explode(this, end.x, end.y, end.z,
                 SeeleConfig.BEAM_EXPLOSION_RADIUS.get().floatValue(), Level.ExplosionInteraction.MOB);
-        // The beam itself is rendered client-side from this synced state; the
-        // impact gets the full nuke treatment: flash + fireball + cross light
-        // client-side, mushroom column via server particles.
+        // Yashima sustains a visible cutting beam; a nuclear flash and hundreds
+        // of smoke particles would hide its sniping window and shield contact.
         this.entityData.set(DATA_BEAM_END, new Vector3f((float) end.x, (float) end.y, (float) end.z));
-        this.entityData.set(DATA_BEAM_TICKS, BEAM_RENDER_TICKS);
+        int duration=yashima?YASHIMA_BEAM_TICKS_R54:BEAM_RENDER_TICKS;
+        this.entityData.set(DATA_BEAM_DURATION_R54,duration);
+        this.entityData.set(DATA_BEAM_TICKS,duration);
+        this.beamEndsAtR54=yashima?System.nanoTime()+duration*50_000_000L:0;
         this.setExposed(true);
         com.projectseele.world.TvYashimaCombatCommsR54.onFire(this);
-        if (this.level() instanceof ServerLevel serverLevel)
+        if (this.level() instanceof ServerLevel serverLevel && !yashima
+                && (terrain.complete() || bodyHit != null || blockHit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK))
         {
             SeeleNetwork.CHANNEL.send(
                     PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(
@@ -973,7 +996,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         {
             this.ramiel.setCharging(false);
             boolean yashima=com.projectseele.world.ShieldCoverR48.yashima(this.ramiel);
-            this.ramiel.beamCooldown = yashima?SeeleConfig.YASHIMA_BEAM_COOLDOWN_TICKS.get():SeeleConfig.BEAM_COOLDOWN_TICKS.get();
+            this.ramiel.beamCooldown = yashima?SeeleConfig.YASHIMA_BEAM_COOLDOWN_TICKS.get()+this.ramiel.getBeamTicks():SeeleConfig.BEAM_COOLDOWN_TICKS.get();
             this.ramiel.beamCooldownReadyAtR54=yashima?System.nanoTime()+this.ramiel.beamCooldown*50_000_000L:0;
             this.chargeReadyAtR54=0;
             com.projectseele.world.TvYashimaCombatCommsR54.onChargeCancelled(this.ramiel);

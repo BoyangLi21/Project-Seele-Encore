@@ -1887,6 +1887,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         return List.copyOf(result);
     }
     @Override public List<NervStaffDirector.Station> originalStaffRoster(ServerLevel l){return staff.stream().map(StaffBinding::station).toList();}
+    @Override public UUID originalStaffIdentity(ServerLevel l,String post){return staff.stream().filter(p->p.station().id().equals(post)).map(StaffBinding::original).findFirst().orElse(null);}
     public List<NervNpcResetR53.Target> npcResetTargetsR53(ServerLevel l)
     {
         var result=new ArrayList<NervNpcResetR53.Target>();

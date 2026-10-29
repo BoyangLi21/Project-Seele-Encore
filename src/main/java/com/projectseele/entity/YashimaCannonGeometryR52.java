@@ -11,6 +11,25 @@ import org.joml.Vector3f;
 /** The normalized standalone original gun has one transform for rendering, muzzle, grips and native hull checks. */
 public final class YashimaCannonGeometryR52
 {
+    /** Follow the target sector with aiming error space, without allowing the long barrel to overturn. */
+    public static Quaternionf aimWithinSectorR54(Geometry g,Vec3 origin,Vec3 target,Vec3 centre)
+    {
+        var base=g.boreWorld(new Quaternionf());var pivot=g.point(origin,new Quaternionf(),g.pivot());
+        var sector=centre==null?base:centre.subtract(pivot).normalize();
+        if(sector.lengthSqr()<1e-8)sector=base;
+        double yaw=Math.atan2(sector.x,sector.z),pitch=Math.asin(Math.max(-1,Math.min(1,sector.y)));
+        var q=new Quaternionf().rotationTo(base.toVector3f(),sector.toVector3f());
+        for(int i=0;i<8;i++)
+        {
+            var wanted=target.subtract(g.point(origin,q,g.muzzle())).normalize();
+            if(wanted.lengthSqr()<1e-8)break;
+            double delta=Math.atan2(Math.sin(Math.atan2(wanted.x,wanted.z)-yaw),Math.cos(Math.atan2(wanted.x,wanted.z)-yaw));
+            double y=yaw+Math.max(-Math.toRadians(12),Math.min(Math.toRadians(12),delta));
+            double p=pitch+Math.max(-Math.toRadians(8),Math.min(Math.toRadians(8),Math.asin(Math.max(-1,Math.min(1,wanted.y)))-pitch));
+            q.rotationTo(base.toVector3f(),new Vector3f((float)(Math.sin(y)*Math.cos(p)),(float)Math.sin(p),(float)(Math.cos(y)*Math.cos(p)))).normalize();
+        }
+        return q;
+    }
     public record Geometry(Vec3 translation,Quaternionf rotation,float scale,AABB bounds,Vec3 pivot,Vec3 bore,Vec3 muzzle,Vec3 left,Vec3 right)
     {
         public Matrix4f base(){return new Matrix4f().translation(translation.toVector3f()).rotate(rotation).scale(scale);}

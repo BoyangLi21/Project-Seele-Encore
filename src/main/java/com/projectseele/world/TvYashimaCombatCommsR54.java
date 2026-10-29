@@ -22,6 +22,7 @@ public final class TvYashimaCombatCommsR54
 
     enum ShotResult
     {
+        UNCONFIRMED("弹道前方地形尚未加载，未确认命中。保持瞄准，重新充能。"),
         MISS("炮击未命中拉米尔。修正瞄准，等待下一次核心暴露。"),
         CORE_CLOSED("命中外壳，但核心尚未开放，未造成核心损伤。等它开火后再射击。"),
         AT_BLOCKED("命中外壳，核心尚未开放，A.T. 力场仍在，炮击未造成核心损伤。"),
@@ -47,7 +48,7 @@ public final class TvYashimaCombatCommsR54
 
     /** Called once after the actual cannon ray and direct damage have resolved. */
     public static void onCannonShot(EvaUnit01Entity shooter,Entity hit,boolean exposed,boolean atField,
-                                    boolean coreShot,boolean accepted,float healthBefore,float healthAfter)
+                                    boolean coreShot,boolean accepted,float healthBefore,float healthAfter,boolean traceComplete)
     {
         if(!(shooter.level() instanceof ServerLevel level))return;
         var data=TvCampaignSavedData.get(level);
@@ -58,7 +59,7 @@ public final class TvYashimaCombatCommsR54
                 ||!TvEncounterDirectorR45.owned(boss,data))return;
         // The lethal shot can already have changed the mission to victory.
         // Keep its real result even though the boss is no longer alive.
-        var result=shotResult(hit==boss,exposed,atField,coreShot,accepted,healthBefore,healthAfter);
+        var result=!traceComplete?ShotResult.UNCONFIRMED:shotResult(hit==boss,exposed,atField,coreShot,accepted,healthBefore,healthAfter);
         report(boss,data,result==ShotResult.MISS||result==ShotResult.CORE_MISSED?"葛城美里":"赤木律子",result.line,false);
     }
 
@@ -110,6 +111,9 @@ public final class TvYashimaCombatCommsR54
             return true;
         }
     }
+
+    public static int chargeRemainingR54(RamielEntity boss)
+    {var pulse=PULSES.get(boss);return pulse!=null&&pulse.charging?pulse.remaining:0;}
 
     private static TvCampaignSavedData mission(RamielEntity boss)
     {
@@ -181,7 +185,7 @@ public final class TvYashimaCombatCommsR54
         var data = mission(boss);
         if (data == null || boss.getBeamTicks() <= 0
                 || !PULSES.computeIfAbsent(boss, key -> new Pulse()).fire()) return;
-        report(boss, data, "葛城美里", "光束来了！核心暴露，初号机开火！", false);
+        report(boss, data, "葛城美里", "光束来了！核心暴露约"+seconds(boss.getBeamDurationR54())+"秒，初号机开火！", false);
     }
 
     /** Call when the actual beam changes from one remaining tick to zero. */

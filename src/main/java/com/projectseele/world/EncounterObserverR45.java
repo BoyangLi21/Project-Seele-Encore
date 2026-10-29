@@ -26,7 +26,6 @@ public final class EncounterObserverR45
 {
     private static final int CAPABILITY_LEASE = 120;
     private static final int MAX_OBSERVERS = 16;
-    private static String expectedRamielResource = "";
     private record Sent(UUID target, long tick) {}
     private static final class Session
     {
@@ -42,16 +41,6 @@ public final class EncounterObserverR45
         { owner = data.owner; generation = data.generationR43; created = now; }
     }
     private static final Map<ServerLevel, Map<UUID, Session>> SESSIONS = new WeakHashMap<>();
-
-    /** Root supplies the approved real-model resource manifest hash on the server; absent means no ready ACK. */
-    public static void installRamielResourceContract(String approvedSha256)
-    {
-        if (approvedSha256 == null || !approvedSha256.matches("[0-9a-f]{64}"))
-            throw new IllegalArgumentException("Actual Ramiel resource contract hash");
-        if (approvedSha256.equals(expectedRamielResource)) return;
-        for (var level : java.util.List.copyOf(SESSIONS.keySet())) clear(level);
-        expectedRamielResource = approvedSha256;
-    }
 
     private static boolean live(TvCampaignSavedData data)
     {
@@ -182,7 +171,7 @@ public final class EncounterObserverR45
                 || !level.dimension().location().equals(ack.dimension())) return;
         var data = TvCampaignSavedData.get(level); long now = level.getGameTime();
         if (!live(data) || !participant(level, data, player) || session.generation != data.generationR43
-                || !session.owner.equals(data.owner) || !expectedRamielResource.equals(ack.resourceSha256())
+                || !session.owner.equals(data.owner)
                 || !ClientboundEncounterObserverPacket.RENDERER_ID.equals(ack.rendererId())
                 || ack.serverTick() > now
                 || now - ack.serverTick() > CAPABILITY_LEASE

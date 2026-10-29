@@ -5231,8 +5231,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         Vec3 from = muzzle;
         double range = this.effectiveCannonRangeR45();
         Vec3 farEnd = from.add(dir.scale(range));
-        BlockHitResult blockHit = level.clip(
+        var terrain = com.projectseele.world.TvYashimaFirelineR53.clip(level,
                 new ClipContext(from, farEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
+        BlockHitResult blockHit = terrain.hit();
         Vec3 end = blockHit.getLocation();
 
         EntityHitResult entityHit = com.projectseele.physics.CombatDamageTargetsR44.ray(level,from,end,.3,this,pilot);
@@ -5260,18 +5261,22 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             }
         }
 
+        boolean confirmedImpact=terrain.complete()||entityHit!=null||blockHit.getType()==net.minecraft.world.phys.HitResult.Type.BLOCK;
         com.projectseele.world.TvYashimaCombatCommsR54.onCannonShot(this,
-                entityHit==null?null:entityHit.getEntity(),coreExposed,atField,coreShot,damageAccepted,healthBefore,healthAfter);
+                entityHit==null?null:entityHit.getEntity(),coreExposed,atField,coreShot,damageAccepted,healthBefore,healthAfter,
+                confirmedImpact);
 
         // The shot itself detonates: damage is immediate, while the mountain-
         // scale crater is carved across later server ticks so one frame never
         // attempts millions of block updates.
         com.projectseele.visual.StanceContactR41Review.actualCannonShotR45(this,pilot,muzzle,dir,end,entityHit==null?null:entityHit.getEntity());
-        StrategicExplosionDirector.startCannon(level, end, this);
+        if(confirmedImpact)StrategicExplosionDirector.startCannon(level, end, this);
         final Vec3 impact = end;
 
         SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
                 new ClientboundCannonBeamPacket(muzzle.x, muzzle.y, muzzle.z, end.x, end.y, end.z));
+        if(confirmedImpact)
+        {
         SeeleNetwork.CHANNEL.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(
                         impact.x, impact.y, impact.z, 320.0D, level.dimension())),
                 new ClientboundNukeFxPacket(impact.x, impact.y, impact.z, 3.6F, false));
@@ -5285,6 +5290,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         level.sendParticles(ParticleTypes.CAMPFIRE_COSY_SMOKE,
                 impact.x, impact.y + 25.0D, impact.z, 70, 9.5D, 2.5D, 9.5D, 0.02D);
+        }
         com.projectseele.world.PositronAudioR45.fire(level, this, pilot instanceof ServerPlayer player?player:null, muzzle);
     }
 
@@ -5306,7 +5312,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(!this.getPersistentData().getBoolean("TvMissionCannonAppliedR45")&&!com.projectseele.world.TvMissionEquipmentR45.cannonAuthorized(this))return true;
         Vec3 direction=this.pilotAimDirection(pilot);var fixed=this.fixedCannonBodyR52();if(fixed!=null&&fixed.boreR52()!=null)direction=fixed.boreR52();
         Vec3 from=this.cannonMuzzlePosition(direction);
-        Vec3 to=level.clip(new ClipContext(from,from.add(direction.scale(this.effectiveCannonRangeR45())),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this)).getLocation();
+        Vec3 to=com.projectseele.world.TvYashimaFirelineR53.clip(level,new ClipContext(from,from.add(direction.scale(this.effectiveCannonRangeR45())),ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this)).hit().getLocation();
         var body=com.projectseele.physics.CombatDamageTargetsR44.ray(level,from,to,.3,this,pilot);
         if(body!=null&&com.projectseele.physics.CombatDamageTargetsR44.parent(body.getEntity()) instanceof EvaUnit01Entity friendly)
         {

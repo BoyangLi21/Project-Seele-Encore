@@ -39,6 +39,7 @@ public final class NervOriginalActorsR52
         default TrainingPilotEntity originalPilot(ServerLevel level,int variant){return null;}
         default void retainOriginalPilotSections(ServerLevel level,int variant){}
         default List<NervStaffDirector.Station> originalStaffRoster(ServerLevel level){return List.of();}
+        default UUID originalStaffIdentity(ServerLevel level,String post){return null;}
         default void maintainOriginalStaff(ServerLevel level){}
     }
     private NervOriginalActorsR52(){}
@@ -212,6 +213,8 @@ public final class NervOriginalActorsR52
     {var owner=personnelAccess(level);if(owner!=null)owner.retainOriginalPilotSections(level,variant);}
     public static List<NervStaffDirector.Station> roster(ServerLevel level)
     {var owner=personnelAccess(level);return owner==null?List.of():List.copyOf(owner.originalStaffRoster(level));}
+    public static UUID staffIdentity(ServerLevel level,String post)
+    {var owner=personnelAccess(level);return owner==null?null:owner.originalStaffIdentity(level,post);}
     public static void tickStaff(ServerLevel level)
     {var owner=personnelAccess(level);if(owner!=null)owner.maintainOriginalStaff(level);}
     @SubscribeEvent public static void mount(EntityMountEvent event)

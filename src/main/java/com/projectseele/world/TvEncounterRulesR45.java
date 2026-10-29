@@ -159,15 +159,13 @@ public final class TvEncounterRulesR45
         {
             var side=TvYashimaArrivalR50.shieldSide(l);
             if(side==null||site==null){eva.stopAutonomousR30();d.notice="原盾侧待命通路尚未确认。";return true;}
-            // Only a real incoming attack calls the defender into the lane.
-            // Initial arrival and the attack cooldown both remain on the flank.
-            boolean counterattack=boss instanceof com.projectseele.entity.RamielEntity ramiel
-                    &&ramiel.isAlive()&&ramiel.isCharging();
-            Vec3 shieldGoal=counterattack?site.cover():side;
+            boolean counterattack=boss instanceof com.projectseele.entity.RamielEntity ramiel&&ramiel.isAlive()
+                    &&TvYashimaArrivalR50.enterCoverR54(ramiel.isCharging(),TvYashimaCombatCommsR54.chargeRemainingR54(ramiel),ramiel.getBeamTicks());
             eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45);
-            // Clearing the gun line is as urgent as entering cover; ordinary
-            // walking across this lane consumes almost the entire core window.
-            NervPilotCombatR30.tacticalMoveR50(eva,pilot,shieldGoal,aim,true);
+            // The end-of-tick finite guard slide owns lane entry/withdrawal,
+            // including wreck evacuation. Ordinary walking cannot clear the
+            // sixty-metre plate during the actual sixteen-tick firing window.
+            eva.autonomousDriveR30(pilot,Vec3.ZERO,aim,false);
             equipment.shieldInput(eva,pilot,counterattack&&TvMissionEquipmentR45.operational(eva)&&equipment.shieldEquipped(eva));
             return true;
         }

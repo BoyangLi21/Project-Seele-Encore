@@ -48,8 +48,10 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         // The supplied expanded form reaches 15.462 model units from its core.
         double radius = 16 * entity.modelScaleR52();
         double y = entity.getY() + entity.getBbHeight() * .5;
-        return frustum.isVisible(new AABB(entity.getX() - radius, y - radius, entity.getZ() - radius,
-                entity.getX() + radius, y + radius, entity.getZ() + radius));
+        var bounds=new AABB(entity.getX() - radius, y - radius, entity.getZ() - radius,
+                entity.getX() + radius, y + radius, entity.getZ() + radius);
+        if(entity.getBeamTicks()>0)bounds=bounds.minmax(new AABB(entity.getPosition(1),entity.getBeamEnd()).inflate(10));
+        return frustum.isVisible(bounds);
     }
 
     @Override
@@ -152,10 +154,10 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
 
     /** The same selected model, drawn from the real server UUID snapshot. No client entity is spawned. */
     public static void renderObservedR52(com.projectseele.network.ClientboundEncounterObserverPacket.Snapshot state,
-            float partial,PoseStack poses,MultiBufferSource buffers)
+            float partial,long age,PoseStack poses,MultiBufferSource buffers)
     {
         float scale=state.height()/15F,center=state.height()*.5F;
-        boolean exposed=(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.EXPOSED)!=0;
+        boolean exposed=state.beamTicks()>age&&(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.EXPOSED)!=0;
         boolean charging=(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.CHARGING)!=0;
         float time=state.poseTick()+partial,gap=exposed?3.75F:0;
         poses.pushPose();poses.translate(0,center,0);poses.scale(scale,scale,scale);poses.mulPose(Axis.YP.rotationDegrees(time*.75F));
@@ -172,13 +174,14 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         }
         poses.popPose();
         var glow=buffers.getBuffer(RenderType.lightning());
-        if(state.beamTicks()>0)
+        if(state.beamTicks()>age)
         {
             Vec3 delta=state.beamEnd().subtract(state.position());var start=new Vector3f(0,center,0);var end=delta.toVector3f();
-            float alpha=Mth.clamp((state.beamTicks()-partial)/10F,0,1);
-            drawStarRibbon(poses.last().pose(),glow,start,end,2.6F,1.5F,.95F,.45F,.9F,alpha*.55F);
-            drawStarRibbon(poses.last().pose(),glow,start,end,1.05F,.62F,1,.98F,.96F,alpha*.95F);
+            renderSustainedBeam(poses.last().pose(),glow,start,end,state.beamTicks()-age-partial,
+                    RamielEntity.YASHIMA_BEAM_TICKS_R54,time);
         }
+        if(charging)
+        { poses.pushPose();poses.translate(0,center,0);drawChargeRays(time,poses,glow);poses.popPose(); }
         if((state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.DRILLING)!=0&&state.drillDepth()>0)
             drawStarRibbon(poses.last().pose(),glow,new Vector3f(0,center,0),new Vector3f(0,center-state.drillDepth(),0),2.6F,2.6F,.35F,.65F,1,.75F);
     }
@@ -198,22 +201,38 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
                 (float) (endWorld.y - entityPos.y),
                 (float) (endWorld.z - entityPos.z));
 
-        float fadeWindow = RamielEntity.BEAM_RENDER_TICKS - RamielEntity.BEAM_SOLID_TICKS;
-        float alpha = beamTicks >= fadeWindow ? 1.0F : beamTicks / fadeWindow;
-        // Brief muzzle flash right as the shot lands.
-        float flash = beamTicks > RamielEntity.BEAM_RENDER_TICKS - 2.0F ? 1.45F : 1.0F;
-
         VertexConsumer consumer = buffer.getBuffer(RenderType.lightning());
         poseStack.pushPose();
-        Matrix4f pose = poseStack.last().pose();
-
-        // Outer violet halo, then inner white-hot core.
-        drawStarRibbon(pose, consumer, start, end, 2.6F * flash, 1.5F * flash,
-                BEAM_HALO_RGB[0], BEAM_HALO_RGB[1], BEAM_HALO_RGB[2], alpha * 0.55F);
-        drawStarRibbon(pose, consumer, start, end, 1.05F * flash, 0.62F * flash,
-                BEAM_CORE_RGB[0], BEAM_CORE_RGB[1], BEAM_CORE_RGB[2], alpha * 0.95F);
-
+        renderSustainedBeam(poseStack.last().pose(),consumer,start,end,beamTicks,
+                entity.getBeamDurationR54(),entity.tickCount+partialTick);
         poseStack.popPose();
+    }
+
+    private static void renderSustainedBeam(Matrix4f pose,VertexConsumer out,Vector3f start,Vector3f end,
+            float remaining,int duration,float time)
+    {
+        float alpha=Mth.clamp(remaining/4F,0,1);
+        float pulse=1F+.06F*Mth.sin(time*1.8F);
+        float flash=remaining>duration-2?1.35F:1F;
+        drawStarRibbon(pose,out,start,end,8F*pulse,5F*pulse,.65F,.28F,1F,alpha*.16F);
+        drawStarRibbon(pose,out,start,end,4F*flash,2.7F*flash,
+                BEAM_HALO_RGB[0],BEAM_HALO_RGB[1],BEAM_HALO_RGB[2],alpha*.65F);
+        drawStarRibbon(pose,out,start,end,1.8F*flash,1.25F*flash,
+                BEAM_CORE_RGB[0],BEAM_CORE_RGB[1],BEAM_CORE_RGB[2],alpha);
+        // A bounded contact ring supplies impact motion without spawning particle clouds.
+        Vector3f axis=new Vector3f(end).sub(start);
+        if(axis.lengthSquared()<.001F)return;
+        axis.normalize();
+        Vector3f across=new Vector3f(axis).cross(Math.abs(axis.y)<.9F?new Vector3f(0,1,0):new Vector3f(1,0,0)).normalize();
+        Vector3f up=new Vector3f(axis).cross(across).normalize();
+        float radius=5F+2F*(.5F+.5F*Mth.sin(time*.7F));
+        for(int i=0;i<16;i++)
+        {
+            float a=i*Mth.TWO_PI/16F,b=(i+1)*Mth.TWO_PI/16F;
+            Vector3f p=new Vector3f(end).fma(radius*Mth.cos(a),across).fma(radius*Mth.sin(a),up);
+            Vector3f q=new Vector3f(end).fma(radius*Mth.cos(b),across).fma(radius*Mth.sin(b),up);
+            drawStarRibbon(pose,out,p,q,.3F,.3F,1F,.7F,1F,alpha*.7F);
+        }
     }
 
     private static void drawStarRibbon(Matrix4f pose, VertexConsumer consumer, Vector3f start, Vector3f end,
@@ -243,9 +262,11 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
 
     private static void drawChargeRays(RamielEntity entity, float partialTick,
                                        PoseStack poseStack, VertexConsumer consumer)
+    { drawChargeRays(entity.tickCount+partialTick,poseStack,consumer); }
+
+    private static void drawChargeRays(float time,PoseStack poseStack,VertexConsumer consumer)
     {
         Matrix4f pose = poseStack.last().pose();
-        float time = entity.tickCount + partialTick;
         for (int i = 0; i < 8; i++)
         {
             float azimuth = (float) Math.toRadians(i * 45.0F + time * 1.8F);

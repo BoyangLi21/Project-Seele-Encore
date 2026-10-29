@@ -21,7 +21,7 @@ public record ServerboundEncounterObserverReadyPacket(Kind kind, UUID nonce, lon
         Objects.requireNonNull(kind); Objects.requireNonNull(nonce); Objects.requireNonNull(dimension);
         Objects.requireNonNull(resourceSha256); Objects.requireNonNull(rendererId);
         if (generation < 1 || sequence < 0 || serverTick < 0 || dimension.toString().length() > 128
-                || !resourceSha256.matches("[0-9a-f]{64}")
+                || !resourceSha256.matches("[a-zA-Z0-9_.:/-]{3,64}")
                 || !rendererId.matches("[a-zA-Z0-9_.:/-]{3,64}")
                 || ((kind == Kind.FRAME || kind == Kind.RECEIPT) && target == null))
             throw new IllegalArgumentException("Observer ACK identity/capability");

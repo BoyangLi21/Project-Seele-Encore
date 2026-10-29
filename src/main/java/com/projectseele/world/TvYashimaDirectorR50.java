@@ -96,7 +96,8 @@ public final class TvYashimaDirectorR50
     {
         for(var position:plan.supply())
         {
-            retain(level,position);level.getChunk(position.getX()>>4,position.getZ()>>4);
+            retain(level,position);
+            if(level.getChunkSource().getChunkNow(position.getX()>>4,position.getZ()>>4)==null)continue;
             for(var rack:level.getEntitiesOfClass(com.projectseele.entity.NervArmamentStationEntity.class,new net.minecraft.world.phys.AABB(position).inflate(3)))
             {
                 var receipt=rack.getPersistentData().getString(TvMissionEquipmentR45.SUPPLY_RECEIPT);
@@ -115,9 +116,6 @@ public final class TvYashimaDirectorR50
     /** Only the accepted mission creates this one boss; fleet/equipment are never fabricated. */
     public static boolean begin(ServerLevel level,TvCampaignSavedData data)
     {
-        var resource=RamielRemoteResourcesR52.classpathHash().orElse(null);
-        if(resource==null){data.notice="原拉米尔远距离绘制资源未接通，未接受盲射作战。";return false;}
-        EncounterObserverR45.installRamielResourceContract(resource);
         var site=TvEncounterSitesR45.site(level,"ramiel").orElse(null);
         if(site==null||data.owner==null||!data.active.equals("ramiel"))return false;
         var plan=controls(level);if(plan!=null)supply(level,plan);

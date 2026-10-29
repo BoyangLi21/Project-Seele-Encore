@@ -133,6 +133,32 @@ public final class EvaShieldRigR47
         return new Vec3(-p.x*16-pivot.x,p.y*16-pivot.y,p.z*16-pivot.z);
     }
 
+    /** Analytic tactical placement only; damage still uses the real triangles. */
+    public record GuardPlaneR54(Vec3 centre,Vec3 normal,Vec3 right,Vec3 up,double halfWidth,double halfHeight)
+    {
+        public boolean intersects(Vec3 shift,Vec3 from,Vec3 to,double margin)
+        {
+            Vec3 ray=to.subtract(from);double divisor=ray.dot(normal);
+            if(Math.abs(divisor)<1e-8)return false;
+            double t=centre.add(shift).subtract(from).dot(normal)/divisor;
+            if(t<0||t>1)return false;
+            Vec3 local=from.add(ray.scale(t)).subtract(centre.add(shift));
+            return Math.abs(local.dot(right))<=Math.max(0,halfWidth-margin)
+                    &&Math.abs(local.dot(up))<=Math.max(0,halfHeight-margin);
+        }
+    }
+    public static GuardPlaneR54 guardPlaneR54(EvaUnit01Entity e)
+    {
+        if(!equipped(e))return null;
+        var pose=EvaBodyPose.sample(e,0);if(!pose.rig.containsKey("shield"))return null;
+        var matrix=EvaRifleKinematics.world(e,0).mul(pose.matrix("shield"));var mesh=surface();var b=mesh.bounds();
+        Vec3 middle=b.getCenter().add(mesh.pivot());
+        var centre=matrix.transformPosition(new Vector3f((float)-middle.x/16,(float)middle.y/16,(float)middle.z/16));
+        var right=matrix.transformDirection(new Vector3f(-1,0,0));var up=matrix.transformDirection(new Vector3f(0,1,0));
+        double width=b.getXsize()*right.length()/32,height=b.getYsize()*up.length()/32;
+        right.normalize();up.normalize();var normal=new Vector3f(right).cross(up).normalize();
+        return new GuardPlaneR54(new Vec3(centre),new Vec3(normal),new Vec3(right),new Vec3(up),width,height);
+    }
     public static Optional<Vec3> intercept(EvaUnit01Entity e,Vec3 from,Vec3 to)
     {
         if(!equipped(e))return Optional.empty();

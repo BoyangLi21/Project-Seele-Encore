@@ -33,6 +33,15 @@ public final class FixedCannonPoseR52
         var joint=rig.named().get(name);if(joint==null)return new Matrix4f();
         var p=joint.pivot();return fingerMatrix(rig,pose,joint.parent()).translate(p).rotate(pose.rotations().get(name)).translate(-p.x,-p.y,-p.z);
     }
+    static Quaternionf palmOrientationR54(Quaternionf current,EvaAnatomicalHandsR45.Grip grip,Vector3f desired)
+    {
+        // A wrist-to-curled-finger vector is not a palm normal. Using it made
+        // finger curl turn the entire hand into the barrel. Retain the existing
+        // wrist roll and align the measured palm surface instead.
+        var normal=new Vector3f(grip.across()).cross(grip.along()).normalize();
+        current.transform(normal);
+        return new Quaternionf().rotationTo(normal,desired).mul(current).normalize();
+    }
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample pose,float partial)
     {
         if(e.isExperimentalUnit()||e.isBerserk()||e.isFirstBattleActive()||e.isNervLogisticsLocked()||EvaAirTransportR31.active(e)
@@ -55,17 +64,19 @@ public final class FixedCannonPoseR52
         var g=gun.geometryR52();if(g==null)return;
         var gunMatrix=g.matrix(e.level().isClientSide?gun.getPosition(partial):gun.position(),gun.aimR52(e.level().isClientSide?partial:1));
         var handRig=EvaAnatomicalHandsR45.enabled(e)?EvaAnatomicalHandsR45.forEntityR53(e):null;
-        // Finger controls do not change while the arm IK iterates. Sampling all
-        // 34 finger joints eight times per body sample only repeats the same work.
-        var handPose=handRig==null?null:EvaAnatomicalHandsR45.sample(e,partial);
+        // Measured palm pads are independent of finger curl. Legacy contracts
+        // without pads still sample their finger contacts just once per body.
+        var handPose=handRig==null||handRig.grips().containsKey("cannon_l")&&handRig.grips().containsKey("cannon_r")?null:EvaAnatomicalHandsR45.sample(e,partial);
         for(String side:List.of("l","r"))
         {
             var marker=side.equals("l")?g.left():g.right();Vector3f goal=inverse.transformPosition(gunMatrix.transformPosition(marker.toVector3f()));String hand="hand_"+side;
             var normal=com.projectseele.world.YashimaCannonMeshR52.normalR52(marker);
             var desired=inverse.transformDirection(gunMatrix.transformDirection(normal.toVector3f())).normalize().negate();
-            var contact=handRig==null?localPalm(pose,side):localPalm(handRig,handPose,side);
+            var grip=handRig==null?null:handRig.grips().get("cannon_"+side);
+            var contact=grip!=null?new Vector3f(grip.palm()):handRig==null?localPalm(pose,side):localPalm(handRig,handPose,side);
             var handMatrix=pose.matrix(hand);var wrist=handMatrix.transformPosition(new Vector3f(pose.rig.get(hand).pivot()));var offset=handMatrix.transformPosition(new Vector3f(contact)).sub(wrist);
-            var orientation=new Quaternionf().rotationTo(new Vector3f(offset).normalize(),desired).mul(pose.matrix(hand).getUnnormalizedRotation(new Quaternionf()).normalize());
+            var current=handMatrix.getUnnormalizedRotation(new Quaternionf()).normalize();
+            var orientation=grip==null?new Quaternionf().rotationTo(new Vector3f(offset).normalize(),desired).mul(current):palmOrientationR54(current,grip,desired);
             String parent=pose.rig.get(hand).parent();pose.rotations.put(hand,pose.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(orientation));pose.dirty();
             for(int i=0;i<3;i++)
             {

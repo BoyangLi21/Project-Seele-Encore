@@ -4,7 +4,6 @@ import com.mojang.blaze3d.systems.RenderSystem;
 import com.mojang.blaze3d.vertex.BufferBuilder;
 import com.projectseele.client.render.RamielRenderer;
 import com.projectseele.network.ClientboundEncounterObserverPacket;
-import com.projectseele.world.RamielRemoteResourcesR52;
 import java.util.UUID;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -25,21 +24,18 @@ public final class RamielDistantViewR52
     public static final class ReloadRegistration
     {
         @SubscribeEvent public static void register(net.minecraftforge.client.event.RegisterClientReloadListenersEvent event)
-        {event.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)manager->{resources=null;hash="";reported=null;});}
+        {event.registerReloadListener((net.minecraft.server.packs.resources.ResourceManagerReloadListener)manager->{resources=null;resourceId="";reported=null;});}
         private ReloadRegistration(){}
     }
     private static final MultiBufferSource.BufferSource BUFFERS=MultiBufferSource.immediate(new BufferBuilder(8192));
-    private static boolean installed;private static Object resources;private static String hash="";private static UUID reported;
-    private static String resourceHash()
+    private static boolean installed;private static Object resources;private static String resourceId="";private static UUID reported;
+    private static String availableResource()
     {
-        var manager=Minecraft.getInstance().getResourceManager();if(resources==manager&&!hash.isEmpty())return hash;
-        resources=manager;hash="";
-        hash=RamielRemoteResourcesR52.resourceHash(path->{
-            var found=manager.getResource(new ResourceLocation("projectseele",path.substring("assets/projectseele/".length())));
-            if(found.isEmpty())return null;
-            try(var input=found.get().open()){return input.readAllBytes();}
-        }).orElse("");
-        return hash;
+        var manager=Minecraft.getInstance().getResourceManager();if(resources==manager)return resourceId;
+        resources=manager;
+        resourceId=manager.getResource(new ResourceLocation("projectseele","mesh/ramiel_source_r53.json")).isPresent()
+                ?"ramiel-source-r53-v1":manager.getResource(new ResourceLocation("projectseele","textures/entity/ramiel.png")).isPresent()?"ramiel-crystal-v1":"";
+        return resourceId;
     }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent event)
     {
@@ -48,8 +44,8 @@ public final class RamielDistantViewR52
         {
             EncounterObserverCacheR45.installRendererSupport(new EncounterObserverCacheR45.RendererSupport(){
                 @Override public boolean supports(ResourceLocation type,int schema){return ClientboundEncounterObserverPacket.RAMIEL.equals(type)&&schema==ClientboundEncounterObserverPacket.SCHEMA;}
-                @Override public boolean resourcesReady(ResourceLocation type){return ClientboundEncounterObserverPacket.RAMIEL.equals(type)&&!resourceHash().isEmpty();}
-                @Override public String resourceSha256(ResourceLocation type){return resourceHash();}
+                @Override public boolean resourcesReady(ResourceLocation type){return ClientboundEncounterObserverPacket.RAMIEL.equals(type)&&!availableResource().isEmpty();}
+                @Override public String resourceSha256(ResourceLocation type){return availableResource();}
                 @Override public String rendererId(){return ClientboundEncounterObserverPacket.RENDERER_ID;}
             });installed=true;
         }
@@ -70,6 +66,7 @@ public final class RamielDistantViewR52
         var packet=view.current();var state=packet.snapshot();if((state.flags()&ClientboundEncounterObserverPacket.ALIVE)==0)return;
         var camera=event.getCamera().getPosition();float scale=state.height()/15F,radius=16*scale;
         var box=new AABB(state.position().add(-radius,state.height()*.5-radius,-radius),state.position().add(radius,state.height()*.5+radius,radius));
+        if(state.beamTicks()>view.ageClientTicks())box=box.minmax(new AABB(state.position(),state.beamEnd()).inflate(10));
         if(!event.getFrustum().isVisible(box))return;
         var poses=event.getPoseStack();float fogStart=RenderSystem.getShaderFogStart(),fogEnd=RenderSystem.getShaderFogEnd();
         poses.pushPose();poses.translate(state.position().x-camera.x,state.position().y-camera.y,state.position().z-camera.z);
@@ -77,7 +74,7 @@ public final class RamielDistantViewR52
         {
             float distance=(float)state.position().distanceTo(camera);
             RenderSystem.setShaderFogStart(Math.max(fogStart,distance+64));RenderSystem.setShaderFogEnd(Math.max(fogEnd,distance+512));
-            RamielRenderer.renderObservedR52(state,event.getPartialTick(),poses,BUFFERS);BUFFERS.endBatch();
+            RamielRenderer.renderObservedR52(state,event.getPartialTick(),view.ageClientTicks(),poses,BUFFERS);BUFFERS.endBatch();
             if(EncounterObserverCacheR45.markDrawn(packet)&&!state.target().equals(reported))
             {reported=state.target();com.projectseele.ProjectSeele.LOGGER.info("R52 real distant Ramiel frame drawn: uuid={} generation={} distance={} scale={} sequence={}",state.target(),packet.generation(),distance,scale,packet.sequence());}
         }

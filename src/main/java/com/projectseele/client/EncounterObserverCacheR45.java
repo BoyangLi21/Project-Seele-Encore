@@ -56,7 +56,7 @@ public final class EncounterObserverCacheR45
             if (!renderer.supports(type, ClientboundEncounterObserverPacket.SCHEMA)
                     || !renderer.resourcesReady(type)) return null;
             String resource = renderer.resourceSha256(type), name = renderer.rendererId();
-            if (resource == null || name == null || !resource.matches("[0-9a-f]{64}")
+            if (resource == null || name == null || !resource.matches("[a-zA-Z0-9_.:/-]{3,64}")
                     || !ClientboundEncounterObserverPacket.RENDERER_ID.equals(name)) return null;
             return new Proof(resource, name);
         }
@@ -148,6 +148,9 @@ public final class EncounterObserverCacheR45
     }
 
     /** Root reads this to draw the real model; an ordinary tracked entity always takes precedence. */
+    public static Optional<View> freshView()
+    {return fresh()?Optional.of(new View(current,previous,clock-stateReceived)):Optional.empty();}
+
     public static Optional<View> renderCandidate()
     {
         if (!fresh() || normalEntity().isPresent()) return Optional.empty();

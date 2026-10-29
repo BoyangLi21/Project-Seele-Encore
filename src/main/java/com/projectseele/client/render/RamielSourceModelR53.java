@@ -4,9 +4,7 @@ import com.google.gson.JsonParser;
 import com.mojang.blaze3d.vertex.PoseStack;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.ArrayList;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.client.renderer.LightTexture;
@@ -44,7 +42,6 @@ final class RamielSourceModelR53
                 {
                     require(stream != null, "Selected Ramiel resource missing");
                     byte[] bytes = stream.readAllBytes();
-                    require(HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(resource.getValue().getAsString()), "Selected Ramiel source changed");
                     if (resource.getKey().equals("mesh/ramiel_source_r53.json")) mesh = bytes;
                 }
             }
@@ -83,7 +80,7 @@ final class RamielSourceModelR53
             checked = true;
             return true;
         }
-        catch (IOException | java.security.NoSuchAlgorithmException failure)
+        catch (IOException failure)
         {
             throw new IllegalStateException("Selected Ramiel source unavailable", failure);
         }

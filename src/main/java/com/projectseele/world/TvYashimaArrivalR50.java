@@ -9,11 +9,13 @@ import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
 
 /** One original far landing, then separate real walks. No fallback flight or old hero pullback. */
+@net.minecraftforge.fml.common.Mod.EventBusSubscriber(modid="projectseele")
 public final class TvYashimaArrivalR50
 {
     public record Next(Vec3 point,boolean hold){}
     private record Plan(List<Vec3> access,List<Vec3> cover,Vec3 equipment,Vec3 side,double radius){}
     private static final Map<ServerLevel,Optional<Plan>> CACHE=new WeakHashMap<>();
+    private static final Map<EvaUnit01Entity,Vec3> GUARD_POSITIONS_R54=new WeakHashMap<>();
     private static List<Vec3> points(JsonArray rows)
     {var out=new ArrayList<Vec3>();if(rows!=null)for(var row:rows)out.add(YashimaCannonGeometryR52.vector(row.getAsJsonArray()));return List.copyOf(out);}
     private static void route(List<Vec3> points)
@@ -42,7 +44,97 @@ public final class TvYashimaArrivalR50
             return Optional.of(new Plan(access,cover,equipment,side,radius));
         }catch(Exception error){com.projectseele.ProjectSeele.LOGGER.error("Installed separate far shield walk unavailable",error);return Optional.empty();}}).orElse(null);
     }
-    public static Vec3 shieldSide(ServerLevel level){var p=plan(level);return p==null?null:p.side();}
+    public static Vec3 shieldSide(ServerLevel level)
+    {
+        var p=plan(level);if(p==null)return null;
+        var data=TvCampaignSavedData.get(level);var shooter=TvSortiesR32.assignedUnit(level,data,1);
+        var boss=data.angel==null?null:level.getEntity(data.angel);
+        if(shooter==null||boss==null)return p.side();
+        Vec3 eye=EvaBodyPose.opticalEye(shooter,1),target=boss.getBoundingBox().getCenter();
+        var gun=TvYashimaStationR52.gun(level);Vec3 muzzle=gun==null?eye:gun.muzzleR52();if(muzzle==null)muzzle=eye;
+        Vec3 best=p.side();double widest=-1;
+        for(int i=p.cover().size()-1;i>=0;i--)
+        {
+            Vec3 point=p.cover().get(i);
+            double clear=Math.min(laneDistanceR54(point,eye,target),laneDistanceR54(point,muzzle,target));
+            if(clear>widest){widest=clear;best=point;}if(clear>=64)return point;
+        }
+        return best;
+    }
+    static double laneDistanceR54(Vec3 point,Vec3 from,Vec3 to)
+    {
+        Vec3 line=to.subtract(from).multiply(1,0,1).normalize(),offset=point.subtract(from);
+        return Math.abs(offset.x*line.z-offset.z*line.x);
+    }
+    static boolean enterCoverR54(boolean charging,int remaining,int beamTicks)
+    {return beamTicks>0||charging&&remaining>0&&remaining<=20;}
+    static Vec3 guardStepR54(Vec3 current,Vec3 goal)
+    {Vec3 delta=goal.subtract(current);return delta.lengthSqr()<=64?goal:current.add(delta.normalize().scale(8));}
+
+    @net.minecraftforge.eventbus.api.SubscribeEvent
+    public static void guardTickR54(net.minecraftforge.event.TickEvent.ServerTickEvent event)
+    {
+        if(event.phase!=net.minecraftforge.event.TickEvent.Phase.END)return;
+        var level=event.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(level==null)return;
+        var data=TvCampaignSavedData.get(level);var assignment=data.sorties.get(0);
+        if(!data.active.equals("ramiel")||!Set.of("approach","combat").contains(data.phase)||assignment==null||!assignment.npc)return;
+        var eva=TvSortiesR32.assignedUnit(level,data,0);var shooter=TvSortiesR32.assignedUnit(level,data,1);
+        var site=TvEncounterSitesR45.site(level,"ramiel").orElse(null);var side=shieldSide(level);
+        if(eva==null||shooter==null||site==null||side==null||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()
+                ||eva.hasActiveCarrierMotion()||EvaAirTransportR31.active(eva)||NervAirTransportRuntimeR52.ownsMotion(eva)
+                ||StaffRecoveryR47.pending(level,0)||!EvaLogisticsDirector.status(level,0).phase().equals("DEPLOYED"))return;
+        boolean wreck=EvaShutdownR30.wreck(eva);
+        if(!wreck&&!TvMissionEquipmentR45.shieldAuthorized(eva))return;
+        var boss=data.angel==null?null:level.getEntity(data.angel);
+        boolean incoming=!wreck&&boss instanceof RamielEntity ramiel&&enterCoverR54(ramiel.isCharging(),
+                TvYashimaCombatCommsR54.chargeRemainingR54(ramiel),ramiel.getBeamTicks());
+        // This finite tactical slide owns only the original NPC defender.
+        // Keep its real health/plate; a wreck must clear the gun lane too.
+        eva.stopAutonomousR30();
+        if(!wreck&&eva.getPilotEntity() instanceof TrainingPilotEntity pilot)
+        {
+            eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45);
+            eva.autonomousDriveR30(pilot,Vec3.ZERO,boss==null?site.angel():boss.getBoundingBox().getCenter(),false);
+            eva.autonomousShieldBraceR47(pilot,incoming);
+        }
+        if(incoming)GUARD_POSITIONS_R54.computeIfAbsent(eva,key->defensivePositionR54(eva,shooter,boss,side,site.cover().y));
+        else GUARD_POSITIONS_R54.remove(eva);
+        Vec3 goal=incoming?GUARD_POSITIONS_R54.getOrDefault(eva,side):side;
+        if(eva.position().subtract(goal).horizontalDistanceSqr()<.0025)return;
+        if(wreck&&com.projectseele.physics.CombatBodyDynamics.active(eva))
+        {
+            EvaShutdownR30.physicalRest(eva,EvaBodyPose.sample(eva,0),eva.getBoundingBox());
+            com.projectseele.physics.CombatBodyDynamics.cancel(eva);
+        }
+        if(!wreck&&eva.getPilotEntity() instanceof TrainingPilotEntity pilot)
+            eva.autonomousDriveR30(pilot,Vec3.ZERO,boss==null?site.angel():boss.getBoundingBox().getCenter(),true);
+        eva.setPos(guardStepR54(eva.position(),goal));eva.setDeltaMovement(Vec3.ZERO);eva.resetFallDistance();
+    }
+    private static Vec3 defensivePositionR54(EvaUnit01Entity eva,EvaUnit01Entity shooter,net.minecraft.world.entity.Entity boss,Vec3 side,double y)
+    {
+        var plate=EvaShieldRigR47.guardPlaneR54(eva);var gun=TvYashimaStationR52.gun((ServerLevel)eva.level());
+        if(plate==null||gun==null||gun.muzzleR52()==null)return side;
+        Vec3 target=boss.getBoundingBox().getCenter(),body=shooter.getEyePosition(),eye=EvaBodyPose.opticalEye(shooter,1),muzzle=gun.muzzleR52();
+        Vec3 solved=guardPositionR54(plate,eva.position(),body,eye,muzzle,target,y);
+        return solved==null?side:solved;
+    }
+    static Vec3 guardPositionR54(EvaShieldRigR47.GuardPlaneR54 plate,Vec3 root,Vec3 body,Vec3 eye,Vec3 muzzle,Vec3 target,double y)
+    {
+        Vec3 forward=target.subtract(body).multiply(1,0,1).normalize(),right=new Vec3(forward.z,0,-forward.x);
+        // Solve translation from the actual plate centre, so shield size and
+        // attachment offset do not turn a grid of EVA root guesses into misses.
+        for(double along:new double[]{3,8,16})for(double edge:new double[]{0,.5,-.5})
+        {
+            Vec3 desired=body.add(forward.scale(along)).add(right.scale(edge*Math.max(0,plate.halfWidth()-2)));
+            Vec3 shift=desired.subtract(plate.centre());shift=new Vec3(shift.x,y-root.y,shift.z);
+            Vec3 point=root.add(shift);
+            if(!plate.intersects(shift,target,body,1)||plate.intersects(shift,eye,target,-4)||plate.intersects(shift,muzzle,target,-2))continue;
+            var hull=new net.minecraft.world.phys.AABB(point.add(-8.5,0,-8.5),point.add(8.5,60,8.5));
+            if(hull.contains(eye)||hull.clip(eye,target).isPresent()||hull.contains(muzzle)||hull.clip(muzzle,target).isPresent())continue;
+            return point;
+        }
+        return null;
+    }
     public static String startBlockerR52(ServerLevel level)
     {return plan(level)==null?"零号机独立落点、原盾架与实际盾位的步行接口尚未接通。":"";}
     private static boolean at(EvaUnit01Entity eva,Vec3 point,double radius)

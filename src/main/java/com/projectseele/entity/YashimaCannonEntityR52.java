@@ -75,14 +75,20 @@ public final class YashimaCannonEntityR52 extends Entity
         // Commit only the <=.5m actuator step admitted against native block
         // shapes and complete original triangles. Vanilla's global gun AABB
         // would fill the long diagonal barrel's surrounding empty air.
-        setDeltaMovement(delta);setPos(position().add(delta));updateBounds();return position().distanceTo(destination)<=.01;
+        setDeltaMovement(Vec3.ZERO);setPos(position().add(delta));updateBounds();return position().distanceTo(destination)<=.01;
     }
     public boolean aimAtR52(Vec3 target)
     {
         if(!readyR52()||level().isClientSide||target==null||!Double.isFinite(target.lengthSqr()))return false;
         var g=geometryR52();if(g==null)return false;
-        var base=g.boreWorld(new Quaternionf());var q=new Quaternionf(entityData.get(AIM));
-        for(int i=0;i<8;i++)q.rotationTo(base.toVector3f(),target.subtract(g.point(position(),q,g.muzzle())).normalize().toVector3f());
+        Vec3 centre=null;
+        if(level() instanceof ServerLevel server)
+        {
+            var mission=com.projectseele.world.TvCampaignSavedData.get(server);
+            if(mission.active.equals("ramiel")&&mission.angel!=null&&server.getEntity(mission.angel) instanceof RamielEntity boss
+                    &&com.projectseele.event.TvEncounterDirectorR45.owned(boss,mission))centre=boss.getBoundingBox().getCenter();
+        }
+        var q=YashimaCannonGeometryR52.aimWithinSectorR54(g,position(),target,centre);
         if(!Float.isFinite(q.lengthSquared()))return false;
         var before=new Quaternionf(entityData.get(AIM));
         double sign=before.dot(q)<0?-1:1;
@@ -119,7 +125,7 @@ public final class YashimaCannonEntityR52 extends Entity
         }
         setBoundingBox(cachedBounds);
     }
-    @Override public void tick(){previousAim.set(entityData.get(AIM));super.tick();updateBounds();}
+    @Override public void tick(){previousAim.set(entityData.get(AIM));setDeltaMovement(Vec3.ZERO);super.tick();updateBounds();}
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key){super.onSyncedDataUpdated(key);if(key==GEOMETRY||key==CRADLE||key==AIM)updateBounds();}
     @Override protected void readAdditionalSaveData(CompoundTag tag)
     {if(tag.contains("GunGeometryR52"))entityData.set(GEOMETRY,tag.getCompound("GunGeometryR52").copy());if(tag.contains("GunCradleR52"))entityData.set(CRADLE,tag.getCompound("GunCradleR52").copy());var a=tag.getList("GunAimR52",Tag.TAG_FLOAT);if(a.size()==4)entityData.set(AIM,new Quaternionf(a.getFloat(0),a.getFloat(1),a.getFloat(2),a.getFloat(3)));entityData.set(LOADED,tag.getBoolean("GunLoadedR52"));entityData.set(READY,tag.getBoolean("GunReadyR52"));updateBounds();}
