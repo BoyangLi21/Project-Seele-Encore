@@ -43,8 +43,8 @@ public final class CityLowriseAddonR48
         BlockPos origin = BlockPos.of(topology.getLong("Origin"));
         for (int i=0; i<ORIGINAL_COUNT; i++)
         {
-            require(originals.getCompound(i).equals(rows.getCompound(i)), "An original96 owner/frame/anchor was changed");
-            require(owners.add(owner(topology.getString("WorldUUID"), origin, parsed.get(i).centre())), "Duplicate original city owner");
+            require(CityRigidTopologyR45.retainsOriginalFrame(originals.getCompound(i), rows.getCompound(i)), "An original96 identity/frame was changed beyond translation");
+            require(owners.add(parsed.get(i).owner(topology.getString("WorldUUID"), origin)), "Duplicate original city owner");
         }
         for (int i=0; i<CENTRES.size(); i++)
         {
@@ -70,6 +70,12 @@ public final class CityLowriseAddonR48
                 require(separated,"Low-rise sweep overlaps an original/peer city footprint");
             }
         }
+    }
+
+    static int journalCount(CompoundTag ledger)
+    {
+        return ledger.getList(ledger.contains("JournalEntries", Tag.TAG_LIST)
+                ? "JournalEntries" : "JournalSHA256s", Tag.TAG_STRING).size();
     }
 
     private static UUID owner(String world, BlockPos origin, BlockPos centre)
@@ -139,7 +145,7 @@ public final class CityLowriseAddonR48
         if (ledger.getInt("SavedPlans")==EXTENDED_COUNT)
         {
             int endpoint=ledger.getBoolean("Rollback")?ledger.getInt("JourneySourceDepth"):ledger.getInt("JourneyTargetDepth");
-            require(ledger.getBoolean("WorldTouched") && ledger.getList("JournalSHA256s",Tag.TAG_STRING).size()==EXTENDED_COUNT
+            require(ledger.getBoolean("WorldTouched") && journalCount(ledger)==EXTENDED_COUNT
                     && ledger.hasUUID("Journey") && original.hasUUID("Journey")
                     && !ledger.getUUID("Journey").equals(original.getUUID("Journey"))
                     && ledger.getInt("Depth")==endpoint && ledger.getInt("Target")==endpoint
@@ -159,7 +165,7 @@ public final class CityLowriseAddonR48
         require(!original.isEmpty() && original.getString("Phase").equals("IDLE")
                 && original.getInt("Depth")==0 && original.getInt("Target")==0 && original.getInt("Queued")==-1
                 && original.getInt("SavedPlans")==ORIGINAL_COUNT && original.getInt("Created")==ORIGINAL_COUNT
-                && original.getList("JournalSHA256s",Tag.TAG_STRING).size()==ORIGINAL_COUNT
+                && journalCount(original)==ORIGINAL_COUNT
                 && observed.equals(original),"Original settled96 ledger changed before the first complete100 journey; no template fallback/reset");
         return ledger;
     }

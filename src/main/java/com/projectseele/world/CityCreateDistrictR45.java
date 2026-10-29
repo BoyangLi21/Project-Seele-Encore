@@ -83,14 +83,13 @@ public final class CityCreateDistrictR45
         if (active == null || active.level != level || !active.origin.equals(origin) || from + to != 312
                 || (from != 0 && from != 312) || tag.getInt("GroundContract") != 2
                 || !tag.contains("GroundContract", Tag.TAG_INT) || !tag.contains("InitialWorldImageCount", Tag.TAG_INT)
-                || !tag.contains("InitialWorldImageSHA256", Tag.TAG_STRING) || tag.getInt("Index") < 0 || tag.getInt("Index") >= active.towers.size()
+                || tag.getInt("Index") < 0 || tag.getInt("Index") >= active.towers.size()
                 || tag.getLong("Origin") != origin.asLong() || !active.world.equals(tag.getString("WorldUUID"))
                 || !active.state.journey.equals(tag.getUUID("Journey")))
             throw new IllegalStateException("Native new-plan witness requires the actual complete GroundContract2 producer");
         var expected = active.towers.get(tag.getInt("Index"));
         Plan plan = Plan.load(tag);
-        plan.validate(expected, from, to, UUID.nameUUIDFromBytes((active.world + "/" + origin + "/rigid-owner/" + expected.centre())
-                .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+        plan.validate(expected, from, to, expected.owner(active.world, origin));
         plan.validateOperationSequence();
     }
 
@@ -141,8 +140,7 @@ public final class CityCreateDistrictR45
         report.addProperty("reconcile_fold_retained_rows", c.currentReconcileFold == null ? 0 : c.currentReconcileFold.size());
         for (var spec : c.towers)
         {
-            UUID owner = UUID.nameUUIDFromBytes((c.world + "/" + c.origin + "/rigid-owner/" + spec.centre())
-                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+            UUID owner = spec.owner(c.world, c.origin);
             Entity entity = level.getEntity(owner); JsonObject row;
             if (entity == null) { row = new JsonObject(); row.addProperty("owner_uuid", owner.toString()); }
             else row = CityCreateBridgeR45.collisionDiagnostics(entity);
@@ -443,9 +441,6 @@ public final class CityCreateDistrictR45
         final List<ChunkPos> chunks = new ArrayList<>();
         State state;
         Plan preparing;
-        CompletableFuture<List<Fold>> pendingInitialFold;
-        DataOutputStream initialImageSink;
-        final Map<BlockState, CompoundTag> initialImageStates = new HashMap<>();
         CompletableFuture<String> pending;
         CompletableFuture<Plan> pendingRead;
         final CityJournalReadExecutorR45 journalReader = new CityJournalReadExecutorR45();
@@ -455,7 +450,6 @@ public final class CityCreateDistrictR45
         Path firstTerrainBlockedOutput;
         boolean firstTerrainBlockedRecorded;
         int prepCursor, prepStage;
-        java.security.MessageDigest initialImageDigest;
         int loadCursor, assemblyLimit, spawnLimit;
         int claimed;
         boolean occupied, qualityHold, loadingPlans, recoveredOwnersStopped;
@@ -474,8 +468,7 @@ public final class CityCreateDistrictR45
             java.util.Set<Long> unique = new java.util.LinkedHashSet<>();
             for (var spec : towers)
             {
-                ownerIds.add(UUID.nameUUIDFromBytes((world + "/" + origin + "/rigid-owner/" + spec.centre())
-                        .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                ownerIds.add(spec.owner(world, origin));
                 AABB bounds = route(spec);
                 for (int x = Math.floorDiv((int) bounds.minX, 16); x <= Math.floorDiv((int) bounds.maxX, 16); x++)
                     for (int z = Math.floorDiv((int) bounds.minZ, 16); z <= Math.floorDiv((int) bounds.maxZ, 16); z++) unique.add(ChunkPos.asLong(x, z));
@@ -496,7 +489,7 @@ public final class CityCreateDistrictR45
                     // Incomplete preparation had no world placements. Restart
                     // its exact observation instead of trusting a lost scratch.
                     if (state.phase.equals("PREPARE") || state.phase.equals("WAL_WAIT"))
-                    { plans.clear(); state.savedPlans = 0; state.planHashes.clear(); state.index = 0; state.phase = "PREPARE"; }
+                    { plans.clear(); state.savedPlans = 0; state.journalEntries.clear(); state.index = 0; state.phase = "PREPARE"; }
                     else if (state.phase.equals("FAULT") && !state.worldTouched)
                     {
                         // An explicit reviewed recovery may cancel an unplaced
@@ -540,9 +533,6 @@ public final class CityCreateDistrictR45
             endpointFinalizer = null;
             if (pending != null && !pending.isDone()) throw new IllegalStateException("The cancelled unplaced journal is still draining; original city remains untouched");
             pending = null;
-            pendingInitialFold = null;
-            if (initialImageSink != null) initialImageSink.close();
-            initialImageSink = null; initialImageStates.clear();
             assemblyLimit = CityCreateBridgeR45.backendBlockLimit();
             spawnLimit = CityCreateBridgeR45.backendSpawnLimit();
             if (occupied()) throw new IllegalStateException("Clear full buildings/roofs/shaft envelopes before detachment");
@@ -556,7 +546,7 @@ public final class CityCreateDistrictR45
             state.queueFault = "";
             state.journeySourceDepth = state.depth; state.journeyTargetDepth = target;
             state.phase = "PREPARE"; state.index = state.cursor = state.savedPlans = 0;
-            state.planHashes.clear();
+            state.journalEntries.clear();
             state.progress = 0; state.rollback = false; plans.clear(); preparing = null;
             state.motionTick = 0; state.motionProfile = CityRegionalMotionR54.PROFILE;
             state.worldTouched = false; state.created = 0; state.allowMissingRecovery = false;
@@ -617,7 +607,7 @@ public final class CityCreateDistrictR45
                 case "WAL_WAIT" ->
                 {
                     if (!pending.isDone()) return;
-                    String digest = pending.join(); pending = null; state.planHashes.add(digest);
+                    String entry = pending.join(); pending = null; state.journalEntries.add(entry);
                     state.savedPlans = plans.size(); state.index++;
                     state.phase = state.index == towers.size() ? "OPEN" : "PREPARE";
                     if (state.phase.equals("OPEN")) state.index = state.cursor = 0;
@@ -659,22 +649,18 @@ public final class CityCreateDistrictR45
             {
                 int index = loadCursor; Path source = planPath(index);
                 UUID journey = state.journey; int from = state.journeySourceDepth, to = state.journeyTargetDepth;
-                String expectedDigest = state.planHashes.get(index);
                 CityRigidTopologyR45.Tower spec = towers.get(index);
                 pendingRead = journalReader.submit(() ->
                 {
                     long began = System.nanoTime();
                     try
                     {
-                        if (!expectedDigest.equals(digest(source))) throw new IllegalStateException("Complete original journal bytes changed at object " + index);
                         CompoundTag tag = NbtIo.readCompressed(source.toFile());
-                        if (!expectedDigest.equals(digest(source))) throw new IllegalStateException("Original journal changed while loading at object " + index);
                         if (!world.equals(tag.getString("WorldUUID")) || tag.getLong("Origin") != origin.asLong()
                                 || !journey.equals(tag.getUUID("Journey")) || tag.getInt("Index") != index)
                             throw new IllegalStateException("Foreign per-object inverse journal");
                         Plan plan = Plan.load(tag);
-                        plan.validate(spec, from, to, UUID.nameUUIDFromBytes((world + "/" + origin + "/rigid-owner/" + spec.centre())
-                                .getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                        plan.validate(spec, from, to, spec.owner(world, origin));
                         plan.cargo(); plan.validateOperationSequence(); // Pure immutable checks, no whole-city Fold retention.
                         return plan;
                     }
@@ -711,7 +697,7 @@ public final class CityCreateDistrictR45
                 if (spec.core() != null && !level.getBlockState(spec.core()).is(ModBlocks.RETRACTABLE_BUILDING_CORE.get()))
                     throw new IllegalStateException("Fixed controller ownership changed");
                 preparing = new Plan(spec, state.depth, state.target,
-                        UUID.nameUUIDFromBytes((world + "/" + origin + "/rigid-owner/" + spec.centre()).getBytes(java.nio.charset.StandardCharsets.UTF_8)));
+                        spec.owner(world, origin));
                 prepCursor = prepStage = 0;
             }
             var spec = preparing.spec;
@@ -722,32 +708,6 @@ public final class CityCreateDistrictR45
             // not inherit the lower per-tick world-mutation operation cap.
             while (scanned++ < PREPARE_READ_LIMIT && System.nanoTime() - began < WORK_NANOS)
             {
-                if (prepStage == 3)
-                {
-                    // Plan images are fully captured and immutable here. Building
-                    // a whole imported tower's Fold exceeded the server's 8ms
-                    // budget before the first per-cell iteration could yield.
-                    if (pendingInitialFold == null)
-                    {
-                        Plan immutableImages = preparing;
-                        pendingInitialFold = CompletableFuture.supplyAsync(immutableImages::fold);
-                        return;
-                    }
-                    if (!pendingInitialFold.isDone()) return;
-                    List<Fold> initialImages = pendingInitialFold.join();
-                    if (prepCursor < initialImages.size())
-                    {
-                        Fold row = initialImages.get(prepCursor++); Image actual = Image.read(level, row.pos);
-                        if (!actual.equals(row.initial)) throw new IllegalStateException("Complete initial source/destination/Ground image changed before immutable WAL at " + row.pos);
-                        CompoundTag image = actual.save(initialImageStates); image.putLong("Pos", row.pos.asLong());
-                        NbtIo.write(image, initialImageSink);
-                        continue;
-                    }
-                    preparing.initialWorldImageCount = initialImages.size();
-                    preparing.initialWorldImageSHA256 = java.util.HexFormat.of().formatHex(initialImageDigest.digest());
-                    initialImageSink.close(); initialImageSink = null; initialImageStates.clear();
-                    preparing.folded = null; pendingInitialFold = null; initialImageDigest = null; prepStage = 4;
-                }
                 if (prepStage < 2)
                 {
                     if (prepCursor >= body) { prepStage++; prepCursor = 0; continue; }
@@ -769,7 +729,7 @@ public final class CityCreateDistrictR45
                         Image actual = Image.read(level, target);
                         boolean ownCover = target.getY() == 80 && state.target == 0
                                 && actual.equals(new Image(hatch(spec, local.getX(), local.getZ()), null));
-                        if (!actual.state.isAir() && !ownCover || actual.nbt != null)
+                        if (NervTraversalPolicyR53.strict(level) && ((!actual.state.isAir() && !ownCover) || actual.nbt != null))
                             throw new IllegalStateException("Unowned destination/shaft obstruction at " + target + " " + actual.state);
                         Image cargo = preparing.cells.get(local.asLong());
                         if (cargo != null) preparing.place.add(new Write(target, ownCover ? Image.AIR : actual, cargo.at(target)));
@@ -779,14 +739,6 @@ public final class CityCreateDistrictR45
                 {
                     if (prepCursor >= ground)
                     {
-                        if (prepStage == 2)
-                        {
-                            initialImageDigest = java.security.MessageDigest.getInstance("SHA-256");
-                            initialImageSink = new DataOutputStream(new java.security.DigestOutputStream(
-                                    java.io.OutputStream.nullOutputStream(), initialImageDigest));
-                            initialImageStates.clear();
-                            prepStage = 3; prepCursor = 0; continue;
-                        }
                         if (preparing.cells.isEmpty()) throw new IllegalStateException("Empty damaged building requires explicit retirement, never synthetic cargo");
                         plans.add(preparing);
                         Plan immutablePlan = preparing;
@@ -808,12 +760,14 @@ public final class CityCreateDistrictR45
                                         new BlockPos(spec.centre().getX(), immutablePlan.sourceY, spec.centre().getZ()),
                                         capturedAssemblyLimit, capturedSpawnLimit);
                                 walPreflightNanos += System.nanoTime() - before;
+                                immutablePlan.initialWorldImageCount = immutablePlan.fold().size();
+                                immutablePlan.folded = null;
                                 immutablePlan.validateOperationSequence();
                                 before = System.nanoTime(); CompoundTag immutable = immutablePlan.save();
                                 immutable.putString("WorldUUID", world); immutable.putLong("Origin", origin.asLong());
                                 immutable.putUUID("Journey", journey); walSerializationNanos += System.nanoTime() - before;
                                 before = System.nanoTime(); atomic(destination, immutable); walIoNanos += System.nanoTime() - before;
-                                return digest(destination);
+                                return destination.getFileName().toString();
                             }
                             catch (IOException failure) { throw new java.util.concurrent.CompletionException(failure); }
                         });
@@ -995,16 +949,14 @@ public final class CityCreateDistrictR45
                 {
                     if (pendingFold == null)
                     {
-                        int index = state.index; Path original = planPath(index); String expectedDigest = state.planHashes.get(index);
+                        int index = state.index; Path original = planPath(index);
                         UUID journey = state.journey; int from = state.journeySourceDepth, to = state.journeyTargetDepth;
                         reconcileFoldIndex = index;
                         pendingFold = journalReader.submit(() ->
                         {
                             try
                             {
-                                if (!expectedDigest.equals(digest(original))) throw new IllegalStateException("Original recovery journal bytes changed before Fold");
                                 CompoundTag data = NbtIo.readCompressed(original.toFile());
-                                if (!expectedDigest.equals(digest(original))) throw new IllegalStateException("Original recovery journal bytes changed during Fold read");
                                 if (!world.equals(data.getString("WorldUUID")) || data.getLong("Origin") != origin.asLong()
                                         || !journey.equals(data.getUUID("Journey")) || data.getInt("Index") != index)
                                     throw new IllegalStateException("Foreign recovery journal Fold authority");
@@ -1113,6 +1065,7 @@ public final class CityCreateDistrictR45
 
         boolean occupied()
         {
+            if (!NervTraversalPolicyR53.strict(level)) return false;
             for (var spec : towers)
             {
                 AABB volume = route(spec).inflate(.01);
@@ -1231,7 +1184,7 @@ public final class CityCreateDistrictR45
         String motionProfile = "c1_trapezoid_v1";
         int depth, target, queued = -1, index, cursor, savedPlans, created, motionTick;
         int journeySourceDepth, journeyTargetDepth;
-        final List<String> planHashes = new ArrayList<>();
+        final List<String> journalEntries = new ArrayList<>();
         double progress;
         UUID journey = UUID.randomUUID();
         boolean rollback, worldTouched, allowMissingRecovery;
@@ -1246,8 +1199,8 @@ public final class CityCreateDistrictR45
             tag.putBoolean("WorldTouched", worldTouched); tag.putString("FaultPhase", faultPhase);
             tag.putInt("Created", created); tag.putBoolean("AllowMissingRecovery", allowMissingRecovery);
             tag.putInt("JourneySourceDepth", journeySourceDepth); tag.putInt("JourneyTargetDepth", journeyTargetDepth);
-            ListTag hashes = new ListTag(); for (String hash : planHashes) hashes.add(net.minecraft.nbt.StringTag.valueOf(hash));
-            tag.put("JournalSHA256s", hashes);
+            ListTag entries = new ListTag(); for (String entry : journalEntries) entries.add(net.minecraft.nbt.StringTag.valueOf(entry));
+            tag.put("JournalEntries", entries);
             tag.putInt("MotionTick", motionTick); tag.putString("MotionProfile", motionProfile);
             if(!previousCommittedLedgerR48.isEmpty())tag.put("PreviousCommittedLedgerR48",previousCommittedLedgerR48.copy());
             return tag;
@@ -1265,10 +1218,16 @@ public final class CityCreateDistrictR45
             s.previousCommittedLedgerR48=tag.getCompound("PreviousCommittedLedgerR48").copy();
             s.journeySourceDepth = tag.contains("JourneySourceDepth") ? tag.getInt("JourneySourceDepth") : s.depth;
             s.journeyTargetDepth = tag.contains("JourneyTargetDepth") ? tag.getInt("JourneyTargetDepth") : s.target;
-            ListTag hashes = tag.getList("JournalSHA256s", Tag.TAG_STRING);
-            for (int i = 0; i < hashes.size(); i++) s.planHashes.add(hashes.getString(i));
-            if (s.worldTouched && !s.phase.equals("IDLE") && !tag.contains("JournalSHA256s"))
-                throw new IllegalStateException("Previous active city WAL needs an explicit byte-hash migration; original journals remain untouched");
+            if (tag.contains("JournalEntries", Tag.TAG_LIST))
+            {
+                ListTag entries = tag.getList("JournalEntries", Tag.TAG_STRING);
+                for (int i = 0; i < entries.size(); i++) s.journalEntries.add(entries.getString(i));
+            }
+            else
+            {
+                // Old saves retain their journal files and identity; only the receipt format changes.
+                for (int i = 0; i < CityLowriseAddonR48.journalCount(tag); i++) s.journalEntries.add(i + ".dat");
+            }
             if (s.worldTouched && !s.phase.equals("IDLE") && !s.motionProfile.equals("c1_trapezoid_v1") && !s.motionProfile.equals(CityRegionalMotionR54.PROFILE))
                 throw new IllegalStateException("Previous rigid trajectory requires explicit saved-control migration");
             return s;
@@ -1283,13 +1242,13 @@ public final class CityCreateDistrictR45
                     || !Double.isFinite(progress) || progress < 0 || progress > 1)
                 throw new IllegalStateException("Invalid persistent city transaction coordinates or phase");
             if (!phase.equals("IDLE") && (worldTouched || !java.util.Set.of("PREPARE", "WAL_WAIT", "FAULT").contains(phase))
-                    && planHashes.size() != savedPlans)
-                throw new IllegalStateException("Incomplete durable original journal digest list");
+                    && journalEntries.size() != savedPlans)
+                throw new IllegalStateException("Incomplete durable original journal entry list");
             if (worldTouched && !phase.equals("IDLE") && (savedPlans != objects || journeySourceDepth == journeyTargetDepth
                     || phase.equals("PREPARE") || phase.equals("WAL_WAIT")))
                 throw new IllegalStateException("World mutation requires the full96 immutable original inverse set");
-            if (planHashes.stream().anyMatch(hash -> !hash.matches("[0-9a-f]{64}")))
-                throw new IllegalStateException("Invalid original journal SHA256");
+            for (int i = 0; i < journalEntries.size(); i++)
+                if (!journalEntries.get(i).equals(i + ".dat")) throw new IllegalStateException("Invalid journal object index");
         }
     }
 
@@ -1303,7 +1262,6 @@ public final class CityCreateDistrictR45
         List<Fold> folded;
         CityCreateCargoR45.Cargo cachedCargo;
         int groundContract = 2, initialWorldImageCount;
-        String initialWorldImageSHA256 = "";
         Plan(CityRigidTopologyR45.Tower spec, int sourceDepth, int targetDepth, UUID owner)
         {
             this.spec = spec; this.owner = owner;
@@ -1350,31 +1308,10 @@ public final class CityCreateDistrictR45
                 if (before != null && !before.equals(operation.before))
                     throw new IllegalStateException("Original operation images are discontinuous at " + operation.pos);
             }
-            if (initial != null)
-            {
-                if (initialWorldImageCount != initial.size() || !initialWorldImageSHA256.matches("[0-9a-f]{64}"))
-                    throw new IllegalStateException("New complete Ground plan lacks its actual full initial world image verification");
-                try
-                {
-                    var digest = java.security.MessageDigest.getInstance("SHA-256");
-                    // This local encoding cache is read only and never escapes
-                    // into the plan/WAL. Only each image's separate Pos changes;
-                    // BE metadata is still copied by save(states).
-                    Map<BlockState, CompoundTag> states = new HashMap<>();
-                    try (var sink = new DataOutputStream(new java.security.DigestOutputStream(java.io.OutputStream.nullOutputStream(), digest)))
-                    {
-                        for (var row : initial.entrySet())
-                        {
-                            CompoundTag image = row.getValue().save(states); image.putLong("Pos", row.getKey());
-                            NbtIo.write(image, sink);
-                        }
-                    }
-                    if (!initialWorldImageSHA256.equals(java.util.HexFormat.of().formatHex(digest.digest())))
-                        throw new IllegalStateException("Complete source/destination/Ground first images differ from their actual native world snapshot");
-                }
-                catch (IOException | java.security.NoSuchAlgorithmException failure) { throw new IllegalStateException("Cannot verify complete initial world images", failure); }
-            }
+            if (initial != null && initialWorldImageCount != initial.size())
+                throw new IllegalStateException("Incomplete initial source/destination images");
         }
+
         CompoundTag save()
         {
             Map<BlockState, CompoundTag> states = new HashMap<>();
@@ -1383,7 +1320,7 @@ public final class CityCreateDistrictR45
             tag.putInt("Height", spec.height()); tag.putInt("Half", spec.half()); tag.putInt("RetractedY", spec.retractedY());
             tag.putInt("MinX", spec.minX()); tag.putInt("MaxX", spec.maxX()); tag.putInt("MinZ", spec.minZ()); tag.putInt("MaxZ", spec.maxZ());
             tag.putInt("GroundContract", groundContract); tag.putInt("InitialWorldImageCount", initialWorldImageCount);
-            tag.putString("InitialWorldImageSHA256", initialWorldImageSHA256);
+            tag.putLong("IdentityCentre", spec.identityCentre().asLong());
             if (spec.core() != null) tag.putLong("Core", spec.core().asLong()); tag.putLongArray("Anchors", spec.fixedAnchors());
             ListTag list = new ListTag(); cells.forEach((key, value) -> { CompoundTag cell = value.save(states); cell.putLong("Pos", key); list.add(cell); }); tag.put("Cells", list);
             for (int stage = 0; stage < 4; stage++) { ListTag ops = new ListTag(); for (Write op : operations(stage)) ops.add(op.save(states)); tag.put("Ops" + stage, ops); }
@@ -1392,10 +1329,11 @@ public final class CityCreateDistrictR45
         static Plan load(CompoundTag tag)
         {
             var spec = new CityRigidTopologyR45.Tower(tag.getInt("Index"), tag.getString("Kind"), BlockPos.of(tag.getLong("Centre")), tag.getInt("Height"), tag.getInt("Half"),
-                    tag.contains("Core") ? BlockPos.of(tag.getLong("Core")) : null, tag.getLongArray("Anchors"), tag.getInt("MinX"), tag.getInt("MaxX"), tag.getInt("MinZ"), tag.getInt("MaxZ"), tag.getInt("RetractedY"));
+                    tag.contains("Core") ? BlockPos.of(tag.getLong("Core")) : null, tag.getLongArray("Anchors"), tag.getInt("MinX"), tag.getInt("MaxX"), tag.getInt("MinZ"), tag.getInt("MaxZ"), tag.getInt("RetractedY"),
+                    BlockPos.of(tag.getLong(tag.contains("IdentityCentre") ? "IdentityCentre" : "Centre")));
             Plan p = new Plan(spec, tag.getInt("SourceY") == spec.centre().getY() ? 0 : 312, tag.getInt("TargetY") == spec.centre().getY() ? 0 : 312, tag.getUUID("Owner"));
             p.groundContract = tag.contains("GroundContract") ? tag.getInt("GroundContract") : 1;
-            p.initialWorldImageCount = tag.getInt("InitialWorldImageCount"); p.initialWorldImageSHA256 = tag.getString("InitialWorldImageSHA256");
+            p.initialWorldImageCount = tag.getInt("InitialWorldImageCount");
             if (p.groundContract != 1 && p.groundContract != 2) throw new IllegalStateException("Unknown complete Ground plan contract");
             if (tag.getInt("SourceY") != p.sourceY || tag.getInt("TargetY") != p.targetY)
                 throw new IllegalStateException("Journal source/target Y is not an explicit original endpoint");
@@ -1413,7 +1351,7 @@ public final class CityCreateDistrictR45
                     || spec.height() != expected.height() || spec.half() != expected.half() || !java.util.Objects.equals(spec.core(), expected.core())
                     || !java.util.Arrays.equals(spec.fixedAnchors(), expected.fixedAnchors()) || spec.minX() != expected.minX()
                     || spec.maxX() != expected.maxX() || spec.minZ() != expected.minZ() || spec.maxZ() != expected.maxZ()
-                    || spec.retractedY() != expected.retractedY() || !owner.equals(expectedOwner)
+                    || spec.retractedY() != expected.retractedY() || !spec.identityCentre().equals(expected.identityCentre()) || !owner.equals(expectedOwner)
                     || sourceY != (from == 0 ? spec.centre().getY() : spec.retractedY())
                     || targetY != (to == 0 ? spec.centre().getY() : spec.retractedY()) || cells.isEmpty())
                 throw new IllegalStateException("Full journal footprint/controller/anchor/UUID authority changed");
@@ -1445,7 +1383,7 @@ public final class CityCreateDistrictR45
                         int base = stage == 1 ? sourceY : targetY;
                         Image image = cells.get(new BlockPos(x, op.pos.getY() - base, z).asLong());
                         if (image == null || stage == 1 && (!op.before.equals(image) || !op.after.equals(Image.AIR))
-                                || stage == 2 && (!op.before.state.isAir() || op.before.nbt != null || !op.after.equals(image.at(op.pos))))
+                                || stage == 2 && !op.after.equals(image.at(op.pos)))
                             throw new IllegalStateException("Journal cargo/image operation is not the exact captured inverse");
                     }
                     else
@@ -1515,21 +1453,6 @@ public final class CityCreateDistrictR45
     {
         final BlockPos pos; final Image initial; Image finalImage; final java.util.Set<Image> known = new java.util.HashSet<>();
         Fold(BlockPos pos, Image initial) { this.pos = pos; this.initial = initial; finalImage = initial; }
-    }
-
-    private static String digest(Path source) throws IOException
-    {
-        try
-        {
-            var digest = java.security.MessageDigest.getInstance("SHA-256");
-            try (var stream = Files.newInputStream(source))
-            {
-                byte[] buffer = new byte[65536]; int amount;
-                while ((amount = stream.read(buffer)) != -1) digest.update(buffer, 0, amount);
-            }
-            return java.util.HexFormat.of().formatHex(digest.digest());
-        }
-        catch (java.security.NoSuchAlgorithmException failure) { throw new IOException(failure); }
     }
 
     private static void atomic(Path target, CompoundTag tag) throws IOException

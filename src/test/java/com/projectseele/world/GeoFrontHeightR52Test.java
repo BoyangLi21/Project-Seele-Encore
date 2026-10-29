@@ -30,11 +30,12 @@ public final class GeoFrontHeightR52Test
         try(var stream=GeoFrontHeightR52Test.class.getResourceAsStream(name))
         {if(stream==null)throw new AssertionError("Height resource missing: "+name);return JsonParser.parseReader(new InputStreamReader(stream,StandardCharsets.UTF_8)).getAsJsonObject();}
     }
-    private static long oldBlocks(ChunkAccess chunk)
+    private static int[] oldBlocks(ChunkAccess chunk)
     {
-        long hash=17;var pos=new BlockPos.MutableBlockPos();int x0=chunk.getPos().getMinBlockX(),z0=chunk.getPos().getMinBlockZ();
-        for(int y=GeoFrontHeightR52.LEGACY_MIN_Y;y<GeoFrontHeightR52.MAX_Y_EXCLUSIVE;y++)for(int z=z0;z<z0+16;z++)for(int x=x0;x<x0+16;x++)hash=hash*31+Block.getId(chunk.getBlockState(pos.set(x,y,z)));
-        return hash;
+        int[] states=new int[(GeoFrontHeightR52.MAX_Y_EXCLUSIVE-GeoFrontHeightR52.LEGACY_MIN_Y)*256];
+        int index=0;var pos=new BlockPos.MutableBlockPos();int x0=chunk.getPos().getMinBlockX(),z0=chunk.getPos().getMinBlockZ();
+        for(int y=GeoFrontHeightR52.LEGACY_MIN_Y;y<GeoFrontHeightR52.MAX_Y_EXCLUSIVE;y++)for(int z=z0;z<z0+16;z++)for(int x=x0;x<x0+16;x++)states[index++]=Block.getId(chunk.getBlockState(pos.set(x,y,z)));
+        return states;
     }
     public static void main(String[] args)throws Exception
     {
@@ -98,11 +99,11 @@ public final class GeoFrontHeightR52Test
             chunk.setBlockState(pos.set(x,y,z),block.defaultBlockState(),false);
         }
         Heightmap.primeHeightmaps(chunk,EnumSet.of(Heightmap.Types.WORLD_SURFACE_WG,Heightmap.Types.OCEAN_FLOOR_WG));
-        long before=oldBlocks(chunk);int surface=chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG,0,0);
+        int[] before=oldBlocks(chunk);int surface=chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG,0,0);
         var originalSections=chunk.getSections().clone();var originalMaps=new EnumMap<Heightmap.Types,long[]>(Heightmap.Types.class);
         for(var entry:chunk.getHeightmaps())originalMaps.put(entry.getKey(),entry.getValue().getRawData().clone());
         GeoFrontHeightR52.fillFoundation(chunk);
-        check(oldBlocks(chunk)==before,"Foundation rewrote an original section/city block");
+        check(Arrays.equals(oldBlocks(chunk),before),"Foundation rewrote an original section/city block");
         for(int i=42;i<originalSections.length;i++)check(chunk.getSection(i)==originalSections[i],"Original upper section replaced");
         for(var entry:chunk.getHeightmaps())check(Arrays.equals(originalMaps.get(entry.getKey()),entry.getValue().getRawData()),"An existing high heightmap column changed");
         for(int i=0;i<42;i++)
@@ -127,7 +128,7 @@ public final class GeoFrontHeightR52Test
             check(previous.getBlockState(pos.set(x,y,z)).is(y==-960?Blocks.BEDROCK:Blocks.DEEPSLATE),"Existing -960 dimension lost its native bottom");
         var priorColumn=GeoFrontHeightR52.extendColumn(new NoiseColumn(-672,new net.minecraft.world.level.block.state.BlockState[]{Blocks.GOLD_BLOCK.defaultBlockState()}),previousHeight);
         check(priorColumn.getBlock(-960).is(Blocks.BEDROCK)&&priorColumn.getBlock(-959).is(Blocks.DEEPSLATE)&&priorColumn.getBlock(-672).is(Blocks.GOLD_BLOCK),"Old accessor column bottom/old absolute data changed");
-        var legacy=new ProtoChunk(new ChunkPos(0,0),UpgradeData.EMPTY,oldHeight,registry,null);legacy.setBlockState(new BlockPos(1,-672,1),Blocks.GOLD_BLOCK.defaultBlockState(),false);long legacyBefore=oldBlocks(legacy);GeoFrontHeightR52.fillFoundation(legacy);check(oldBlocks(legacy)==legacyBefore,"Legacy dimension was altered");
+        var legacy=new ProtoChunk(new ChunkPos(0,0),UpgradeData.EMPTY,oldHeight,registry,null);legacy.setBlockState(new BlockPos(1,-672,1),Blocks.GOLD_BLOCK.defaultBlockState(),false);int[] legacyBefore=oldBlocks(legacy);GeoFrontHeightR52.fillFoundation(legacy);check(Arrays.equals(oldBlocks(legacy),legacyBefore),"Legacy dimension was altered");
         System.out.println("GeoFront height PASS checks="+checks+": build -1344..320, 42 added solid sections, prior -960 bedrock preserved, exact unchanged old noise columns/context/top, detached old blocks unchanged, new native 11-bit heightmaps; no world save/game");
     }
 }

@@ -66,7 +66,11 @@ public final class CityRigidTopologyR45
 
     public static List<Tower> towers(ServerLevel level, BlockPos origin)
     {
-        CompoundTag data = installed(level, origin);
+        return towers(installed(level, origin));
+    }
+
+    static List<Tower> towers(CompoundTag data)
+    {
         List<Tower> result = new ArrayList<>();
         for (Tag raw : data.getList("Towers", Tag.TAG_COMPOUND))
         {
@@ -82,7 +86,8 @@ public final class CityRigidTopologyR45
             int minZ = footprint.isEmpty() ? -half : footprint.getInt("MinZ"), maxZ = footprint.isEmpty() ? half : footprint.getInt("MaxZ");
             result.add(new Tower(result.size(), row.getString("Kind"), centre, height, half, core,
                     row.getLongArray("NegativeDomeAnchorMask"), minX, maxX, minZ, maxZ,
-                    row.contains("RetractedBaseY") ? row.getInt("RetractedBaseY") : undergroundBaseY(height)));
+                    row.contains("RetractedBaseY") ? row.getInt("RetractedBaseY") : undergroundBaseY(height),
+                    row.contains("IdentityCentre") ? BlockPos.of(row.getLong("IdentityCentre")) : centre));
         }
         CityLowriseAddonR48.validate(data,result);
         return result;
@@ -137,6 +142,38 @@ public final class CityRigidTopologyR45
     }
 
     private record Cache(long modified, long size, CompoundTag tag) {}
+    /** A translated installation retains the original identity frame and all non-positional metadata. */
+    static boolean retainsOriginalFrame(CompoundTag original, CompoundTag current)
+    {
+        if (original.equals(current)) return true;
+        if (!current.contains("IdentityCentre", Tag.TAG_LONG)
+                || current.getLong("IdentityCentre") != original.getLong("Centre")) return false;
+        BlockPos before = BlockPos.of(original.getLong("Centre"));
+        BlockPos after = BlockPos.of(current.getLong("Centre"));
+        if (before.getY() != after.getY()) return false;
+        BlockPos reverse = before.subtract(after);
+        CompoundTag normalized = current.copy();
+        normalized.remove("IdentityCentre");
+        normalized.putLong("Centre", before.asLong());
+        if (normalized.contains("FixedCorePos"))
+            normalized.putLong("FixedCorePos", BlockPos.of(normalized.getLong("FixedCorePos")).offset(reverse).asLong());
+        long[] anchors = normalized.getLongArray("NegativeDomeAnchorMask");
+        for (int i = 0; i < anchors.length; i++) anchors[i] = BlockPos.of(anchors[i]).offset(reverse).asLong();
+        normalized.putLongArray("NegativeDomeAnchorMask", anchors);
+        return original.equals(normalized);
+    }
+
     public record Tower(int index, String kind, BlockPos centre, int height, int half, BlockPos core, long[] fixedAnchors,
-                        int minX, int maxX, int minZ, int maxZ, int retractedY) {}
+                        int minX, int maxX, int minZ, int maxZ, int retractedY, BlockPos identityCentre)
+    {
+        public Tower(int index, String kind, BlockPos centre, int height, int half, BlockPos core, long[] fixedAnchors,
+                     int minX, int maxX, int minZ, int maxZ, int retractedY)
+        { this(index, kind, centre, height, half, core, fixedAnchors, minX, maxX, minZ, maxZ, retractedY, centre); }
+
+        public java.util.UUID owner(String world, BlockPos origin)
+        {
+            return java.util.UUID.nameUUIDFromBytes((world + "/" + origin + "/rigid-owner/" + identityCentre)
+                    .getBytes(java.nio.charset.StandardCharsets.UTF_8));
+        }
+    }
 }

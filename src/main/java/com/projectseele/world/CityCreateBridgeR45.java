@@ -149,6 +149,7 @@ public final class CityCreateBridgeR45
 
     public static boolean blockedByTerrain(Entity entity, Vec3 target, boolean endpoint) throws Exception
     {
+        if (entity.level() instanceof ServerLevel level && !NervTraversalPolicyR53.strict(level)) return false;
         Vec3 delta = target.subtract(entity.position());
         if (delta.lengthSqr() == 0) return false;
         entity.getClass().getMethod("setContraptionMotion", Vec3.class).invoke(entity, delta);

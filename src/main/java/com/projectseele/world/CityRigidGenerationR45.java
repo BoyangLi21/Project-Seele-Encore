@@ -114,7 +114,8 @@ public final class CityRigidGenerationR45
                 CompoundTag building = cargo.getList("Buildings", Tag.TAG_COMPOUND).getCompound(0);
                 // After a completed trip, use its immutable last observed full
                 // cells rather than restoring an older install inventory.
-                if (!recipeEpoch.isEmpty() && CityLowriseAddonR48.hasCommittedRecipeJournal(recipeEpoch.getInt("SavedPlans"),index,binding.towers.size()))
+                if (!useRelocationSnapshot(building, recipeEpoch) && !recipeEpoch.isEmpty()
+                        && CityLowriseAddonR48.hasCommittedRecipeJournal(recipeEpoch.getInt("SavedPlans"),index,binding.towers.size()))
                 {
                     Path journal = binding.root.resolve("city_rigid_journal_r45").resolve(recipeEpoch.getUUID("Journey").toString()).resolve(index + ".dat");
                     CompoundTag plan = NbtIo.readCompressed(journal.toFile());
@@ -149,6 +150,13 @@ public final class CityRigidGenerationR45
             chunk.setUnsaved(true);
         }
         catch (Exception failure) { throw new IllegalStateException("Failed exact future96 topology/cargo; no legacy generation fallback", failure); }
+    }
+
+    /** A cold relocation captures current inventories without rewriting historical journeys. */
+    static boolean useRelocationSnapshot(CompoundTag building, CompoundTag epoch)
+    {
+        return building.hasUUID("RelocationSnapshotJourney") && epoch.hasUUID("Journey")
+                && building.getUUID("RelocationSnapshotJourney").equals(epoch.getUUID("Journey"));
     }
 
     private static void write(ServerLevel level,ChunkAccess chunk, CompoundTag cell)
