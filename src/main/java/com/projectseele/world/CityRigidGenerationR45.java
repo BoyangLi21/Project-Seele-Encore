@@ -187,6 +187,14 @@ public final class CityRigidGenerationR45
                     chunk.removeBlockEntity(pos);
                     chunk.setBlockState(pos, states[stateId], false);
                 });
+        for (Tag raw : data.getList("BlockEntities", Tag.TAG_COMPOUND))
+        {
+            CompoundTag cell = (CompoundTag) raw;
+            int stateId = cell.getInt("StateId");
+            if (stateId < 0 || stateId >= states.length || !states[stateId].hasBlockEntity())
+                throw new IllegalStateException("Invalid authored surface inventory state");
+            write(binding.level, chunk, cell, states[stateId]);
+        }
     }
 
     static void visitSurfaceSpans(CompoundTag data, int chunkX, int chunkZ, int minY, int maxY,

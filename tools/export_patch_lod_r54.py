@@ -65,6 +65,7 @@ def main():
     parser.add_argument('output',type=Path)
     parser.add_argument('patches',type=Path,nargs='*')
     parser.add_argument('--patch-list',type=Path,help='UTF-8 text, one installed forward.jsonl[.gz] per line')
+    parser.add_argument('--installation',type=Path,help='Successful array installation receipt containing changed tiles')
     parser.add_argument('--workers',type=int,choices=range(1,5),default=2)
     parser.add_argument('--plan-only',action='store_true',help='List affected tiles without opening the world')
     parser.add_argument('--deps',type=Path,help='Optional directory containing nbtlib; appended after installed runtime packages')
@@ -74,8 +75,16 @@ def main():
             line=line.strip()
             if line and not line.startswith('#'):paths.append(Path(line))
     paths=list(dict.fromkeys(path.resolve() for path in paths))
-    if not paths:parser.error('Provide installed forward patches or --patch-list')
+    if not paths and not args.installation:parser.error('Provide installed forward patches, --patch-list or --installation')
     world=args.world.resolve();out=args.output.resolve();tiles,inputs=patch_tiles(paths)
+    if args.installation:
+        installed=json.loads(args.installation.read_text(encoding='utf8'))
+        if installed.get('status')!='installed' or Path(installed['world']).resolve()!=world:
+            raise ValueError('Expected a completed installation for this exact world')
+        if any(len(p)!=2 or any(type(v)is not int for v in p) for p in installed['tiles']):
+            raise ValueError('Invalid installed tile coordinates')
+        tiles=sorted(set(tiles)|{tuple(p)for p in installed['tiles']})
+        inputs.append(dict(installation=str(args.installation),changed_cells=installed['cells'],tiles=len(installed['tiles'])))
     out.mkdir(parents=True,exist_ok=True)
     report=dict(world=str(world),dimension='projectseele:geofront',tile_size=64,tiles=tiles,
                 total=len(tiles),inputs=inputs,format='SavedColumnLodImporterR53 unchanged',
