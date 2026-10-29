@@ -755,7 +755,8 @@ def apply_chunk(root: nbtlib.File, chunk_changes: list[Change],
 def rewrite_region(path: Path,
                    changes_by_chunk: dict[tuple[int, int], list[Change]],
                    removable_block_entities: set[tuple[int, int, int]] | None = None,
-                   block_entity_additions: dict[tuple[int, int, int], nbtlib.Compound] | None = None
+                   block_entity_additions: dict[tuple[int, int, int], nbtlib.Compound] | None = None,
+                   surface_rebuild: bool = False
                    ) -> bytes:
     source = path.read_bytes()
     if len(source) < HEADER_BYTES:
@@ -794,6 +795,13 @@ def rewrite_region(path: Path,
                     or int(root.get("zPos", chunk_z)) != chunk_z:
                 raise RuntimeError(f"chunk coordinate mismatch at {chunk_x},{chunk_z}")
             apply_chunk(root, selected, removable_block_entities)
+            if surface_rebuild:
+                root.pop('Heightmaps', None)
+                root.pop('isLightOn', None)
+                root.pop('starlight.light_version', None)
+                for section in root.get('sections', []):
+                    for key in ('BlockLight', 'SkyLight', 'starlight.blocklight_state', 'starlight.skylight_state'):
+                        section.pop(key, None)
             additions = {pos: entry for pos, entry in (block_entity_additions or {}).items()
                          if pos[0] >> 4 == chunk_x and pos[2] >> 4 == chunk_z}
             if additions:

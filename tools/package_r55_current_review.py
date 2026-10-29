@@ -8,7 +8,7 @@ import package_r54_current_review as base
 
 NAME = 'EVANGELION_Encore_R55'
 JIT = 'jit-recovery-r54.json'
-JVM = '-XX:CompilerDirectivesFile=' + JIT
+JVM = '-XX:+UnlockDiagnosticVMOptions -XX:CompilerDirectivesFile=' + JIT
 
 
 def inputs(a):

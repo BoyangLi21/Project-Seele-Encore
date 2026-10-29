@@ -19,7 +19,8 @@ def smooth(t):
  t=np.clip(t,0,1);return t*t*(3-2*t)
 
 def main():
- ap=argparse.ArgumentParser();ap.add_argument('--world',type=Path,required=True);ap.add_argument('--output',type=Path,required=True);a=ap.parse_args()
+ ap=argparse.ArgumentParser();ap.add_argument('--world',type=Path,required=True);ap.add_argument('--output',type=Path,required=True);ap.add_argument('--geometry',type=Path);a=ap.parse_args()
+ geometry=json.loads(a.geometry.read_text('utf8')) if a.geometry else None
  w=MeasuredWorld(a.world);w.box(LO,HI);w.load();ox,_,oz=LO;nx=HI[0]-ox+1;nz=HI[2]-oz+1
  top=np.full((nz,nx),47,np.int16);highest=top.copy();foreign=np.zeros(top.shape,bool);full=np.zeros(top.shape,bool)
  for (cx,cz),status in w.status.items():
@@ -39,14 +40,31 @@ def main():
  z,x=np.mgrid[oz:oz+nz,ox:ox+nx];t=smooth((z-1120)/600);centre=-1000+170*t+12*np.sin(z/97)
  d=np.sqrt(((x-centre)/(100+130*t))**2+((z-1420)/300)**2)+.018*np.sin(z/39)+.013*np.cos(x/31)
  lake=d<1;shore=(d>=1)&(d<1.16)
+ if geometry:
+  polygon=np.asarray(geometry['lake_polygon'],dtype=float)
+  # Round coarse geographic tracing corners without changing lake orientation.
+  for _ in range(2):
+   following=np.roll(polygon,-1,axis=0);polygon=np.stack((.75*polygon+.25*following,.25*polygon+.75*following),axis=1).reshape(-1,2)
+  lake=np.zeros(x.shape,bool);edge_distance=np.full(x.shape,np.inf)
+  for aa,bb in zip(polygon,np.roll(polygon,-1,axis=0)):
+   vx,vz=bb-aa;length=vx*vx+vz*vz
+   along=np.clip(((x-aa[0])*vx+(z-aa[1])*vz)/max(length,1e-9),0,1)
+   edge_distance=np.minimum(edge_distance,np.hypot(x-aa[0]-along*vx,z-aa[1]-along*vz))
+   if abs(vz)>1e-9:lake^=((aa[1]>z)!=(bb[1]>z))&(x<(bb[0]-aa[0])*(z-aa[1])/vz+aa[0])
+  shore_width=geometry.get('shore_width',24);shore=(~lake)&(edge_distance<shore_width)
  if np.any((lake|shore)&(~full|protected)):
   bad=np.argwhere((lake|shore)&(~full|protected));print('Rejected boundary',len(bad),'bounds',bad.min(0)+[oz,ox],bad.max(0)+[oz,ox],'incomplete',int(((lake|shore)&~full).sum()),'artificial',int(((lake|shore)&protected).sum()),flush=True)
   raise RuntimeError('Whole lake/shore intersects incomplete or artificial columns; no partial lake emitted')
  target=top.copy();target[lake]=WATER-np.ceil(2+10*np.sqrt(np.maximum(0,1-d[lake]))).astype(np.int16)
  target[shore]=np.rint((WATER+1)*(1-smooth((d[shore]-1)/.16))+np.maximum(top[shore],WATER+1)*smooth((d[shore]-1)/.16)).astype(np.int16)
+ if geometry:
+  target[lake]=WATER-np.ceil(2+10*np.sqrt(np.minimum(1,edge_distance[lake]/70))).astype(np.int16)
+  blend=smooth(edge_distance[shore]/shore_width)
+  target[shore]=np.rint((WATER+1)*(1-blend)+np.maximum(top[shore],WATER+1)*blend).astype(np.int16)
  active=lake|shore
  # One continuous south-ward approach, with a short east-shore turnout.
  paths=[dict(id='ashi_east_approach',points=[[-560,80,960],[-590,76,1080],[-575,72,1230],[-560,72,1500],[-610,72,1660]],halfwidth=4),dict(id='ashi_view_spur',points=[[-567,72,1380],[-690,68,1380]],halfwidth=3),dict(id='ashi_north_walk',points=[[-1120,104,1020],[-1108,104,1020],[-980,80,1020],[-980,68,1100],[-970,68,1110]],halfwidth=2)]
+ if geometry:paths=geometry['paths']
  JOIN={'minecraft:black_concrete','minecraft:white_concrete','minecraft:smooth_stone','minecraft:light_gray_concrete','minecraft:gray_concrete','minecraft:yellow_concrete','minecraft:smooth_stone_slab[type=bottom,waterlogged=false]'}
  def join(q):return (abs(q[0]+560)<=12 and 952<=q[1]<=972)or(-1128<=q[0]<=-1108 and abs(q[1]-1020)<=8)
  road={}
@@ -65,12 +83,30 @@ def main():
       road[q]=yy
  road_mask=np.zeros(top.shape,bool);road_height=np.zeros(top.shape,np.float32)
  for (xx,zz),yy in road.items():road_mask[zz-oz,xx-ox]=True;road_height[zz-oz,xx-ox]=yy
+ if geometry:
+  # A diagonal brush or branch overlap must not leave a one-block step.
+  for _ in range(8):
+   previous=road_height.copy()
+   for dst,src in [(np.s_[1:,:],np.s_[:-1,:]),(np.s_[:-1,:],np.s_[1:,:]),(np.s_[:,1:],np.s_[:,:-1]),(np.s_[:,:-1],np.s_[:,1:])]:
+    shared=road_mask[dst]&road_mask[src]
+    road_height[dst]=np.where(shared,np.minimum(road_height[dst],road_height[src]+.5),road_height[dst])
+   if np.array_equal(previous,road_height):break
+  for q in road:road[q]=float(road_height[q[1]-oz,q[0]-ox])
+  for path in (p for p in paths if p['id']!='ashi_view_spur'):
+   xx,yy,zz=path['points'][0]
+   assert road[xx,zz]==yy,('Retained port height changed',path['id'])
  distance=np.where(road_mask,0,1000).astype(np.int16);near_y=road_height.copy()
  for _ in range(64):
   for dst,src in [(np.s_[1:,:],np.s_[:-1,:]),(np.s_[:-1,:],np.s_[1:,:]),(np.s_[:,1:],np.s_[:,:-1]),(np.s_[:,:-1],np.s_[:,1:])]:
    candidate=distance[src]+1;take=candidate<distance[dst];near_y[dst]=np.where(take,near_y[src],near_y[dst]);distance[dst]=np.minimum(distance[dst],candidate)
  width=np.minimum(64,10+2*np.abs(near_y-top));shoulder=(distance<width)&~active&~road_mask&~protected&full
+ if geometry:
+  # Preserve existing foundations. Fill the natural approach shoulders right
+  # up to retained road ports, and blend across authored shore terrain.
+  shoulder=(distance<width)&~lake&~road_mask&~foreign&full&(~protected|(near_y>=top))
+  top_for_grade=target.copy()
  target[shoulder]=np.rint(top[shoulder]+(near_y[shoulder]-top[shoulder])*(1-smooth(distance[shoulder]/width[shoulder]))).astype(np.int16)
+ if geometry:target[shoulder]=np.rint(top_for_grade[shoulder]+(near_y[shoulder]-top_for_grade[shoulder])*(1-smooth(distance[shoulder]/width[shoulder]))).astype(np.int16)
  active|=shoulder
  a.output.mkdir(parents=True,exist_ok=True);counts=collections.Counter();cells=0;bounds=[list(HI),list(LO)]
  with gzip.open(a.output/'forward.jsonl.gz','wt',encoding='utf8')as fw,gzip.open(a.output/'inverse.jsonl.gz','wt',encoding='utf8')as inv:
@@ -80,7 +116,7 @@ def main():
    if old is None:raise RuntimeError(('Unread',q))
    if old==after:return
    if old.split('[')[0]not in NATURAL:raise RuntimeError(('Artificial cell',q,old))
-   r=dict(pos=q,before=old,after=after,before_nbt=None,after_nbt=None,owner='r54/ashi_surface',reason=reason)
+   r=dict(pos=q,before=old,after=after,before_nbt=None,after_nbt=None,owner=('r55' if geometry else 'r54')+'/ashi_surface',reason=reason)
    fw.write(json.dumps(r)+'\n');r['before'],r['after']=after,old;inv.write(json.dumps(r)+'\n');cells+=1;counts[reason]+=1
    for k in range(3):bounds[0][k]=min(bounds[0][k],q[k]);bounds[1][k]=max(bounds[1][k],q[k])
   for iz,ix in np.argwhere(active):
@@ -99,10 +135,15 @@ def main():
     surface=('minecraft:smooth_stone_slab[type=bottom,waterlogged=false]'if edge else'minecraft:polished_blackstone_slab[type=bottom,waterlogged=false]')if half else('minecraft:light_gray_concrete'if edge else'minecraft:black_concrete')
     after='minecraft:air'if yy>new else surface if yy==new else'minecraft:stone'
     emit((xx,yy,zz),after,'Authorized continuous south-ward to east-shore road')
- np.savez_compressed(a.output/'surface_plan.npz',origin=[ox,oz],before=top,after=target,lake=lake,shore=shore,foreign=foreign)
+ np.savez_compressed(a.output/'surface_plan.npz',origin=[ox,oz],before=top,after=target,lake=lake,shore=shore,foreign=foreign,road_mask=road_mask,road_height=road_height)
  manifest=dict(world=str(a.world),dimension='projectseele:geofront',cells=cells,bounds=bounds,counts=dict(counts),lake_water_y=WATER,lake_columns=int(lake.sum()),positiveEditMask='exact pos set in forward.jsonl.gz',underground_untouched_below_y=48,identity_progress_files_modified=False,native_verified=False,visual_verified=False,paths=paths,adaptation='Original compressed Lake Ashi southwest of the existing city. Existing New Hakone is an invented west-side town, not geographically Hakone-Yumoto.',references=['https://www.gsi.go.jp/kihonjohochousa/kihonjohochousa40038.html','https://www.hakone.or.jp/files/AddB016_2025060916211130996.pdf','https://www.hakone-geopark.jp/global-image/units/upfiles/20016-1-20260331202209_b69cbae61d46a1.pdf'])
  (a.output/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf8')
- (a.output/'surface_geography_r54.json').write_text(json.dumps(dict(revision=54,landmarks=[dict(id='ashi_lake',name='芦之湖（缩尺改编）',pos=[-900,67,1370]),dict(id='ashi_east_shore',name='芦之湖东岸',pos=[-617,73,1380])],paths=paths,existing_towns_not_relocated=True,geographic_one_to_one=False),ensure_ascii=False,indent=2),encoding='utf8')
+ if geometry:
+  manifest.update(geometry_source=geometry,revision=55)
+  (a.output/'manifest.json').write_text(json.dumps(manifest,ensure_ascii=False,indent=2),encoding='utf8')
+ revision=55 if geometry else 54
+ landmarks=[dict(id='ashi_lake',name='芦之湖（缩尺改编）',pos=[-940,67,1400] if geometry else [-900,67,1370]),dict(id='ashi_east_shore',name='芦之湖东岸',pos=[-776,69,1500] if geometry else [-617,73,1380])]
+ (a.output/f'surface_geography_r{revision}.json').write_text(json.dumps(dict(revision=revision,landmarks=landmarks,paths=paths,existing_towns_not_relocated=True,geographic_one_to_one=False),ensure_ascii=False,indent=2),encoding='utf8')
  print(json.dumps(manifest,ensure_ascii=False))
 
 if __name__=='__main__':main()
