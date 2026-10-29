@@ -26,6 +26,19 @@ public final class TvYashimaArrivalR50
             var equipment=YashimaCannonGeometryR52.vector(row.getAsJsonObject("equipment_approach").getAsJsonArray("0"));var side=YashimaCannonGeometryR52.vector(row.getAsJsonArray("shield_wait_port"));double radius=row.get("route_arrival_radius").getAsDouble();
             if(!Double.isFinite(radius)||radius<.5||radius>2||access.get(0).distanceTo(site.landings().get(0).point())>2
                     ||access.get(access.size()-1).distanceTo(equipment)>2||cover.get(0).distanceTo(equipment)>2||cover.get(cover.size()-1).distanceTo(side)>2)throw new IllegalArgumentException("Original shield landing/supply/side endpoints rejected");
+            // The old waiting point left the full-size upright shield beside
+            // the optical/fire line. Stop earlier on the same authored walk,
+            // far enough to keep both the airframe and its plate in the flank.
+            Vec3 line=site.angel().subtract(site.hero()).multiply(1,0,1).normalize();
+            int flank=cover.size()-1;double widest=-1;
+            for(int i=cover.size()-1;i>=0;i--)
+            {
+                Vec3 offset=cover.get(i).subtract(site.hero());
+                double clearance=Math.abs(offset.x*line.z-offset.z*line.x);
+                if(clearance>widest){widest=clearance;flank=i;}
+                if(clearance>=64){flank=i;break;}
+            }
+            side=cover.get(flank);cover=List.copyOf(cover.subList(0,flank+1));
             return Optional.of(new Plan(access,cover,equipment,side,radius));
         }catch(Exception error){com.projectseele.ProjectSeele.LOGGER.error("Installed separate far shield walk unavailable",error);return Optional.empty();}}).orElse(null);
     }
@@ -44,6 +57,11 @@ public final class TvYashimaArrivalR50
         var tag=eva.getPersistentData();
         if(tag.getLong("R50YashimaRouteGeneration")!=data.generationR43||!tag.getString("R50YashimaRouteLayout").equals(data.encounterLayoutR45))
         {tag.putLong("R50YashimaRouteGeneration",data.generationR43);tag.putString("R50YashimaRouteLayout",data.encounterLayoutR45);tag.putInt("R50YashimaRouteCursor",0);tag.putInt("R50YashimaCoverCursor",0);tag.putBoolean("R50YashimaRampDone",false);tag.putBoolean("R50YashimaCoverDone",false);}
+        // A shield issued in the hangar already arrived with this same pilot.
+        // Walk from its landing straight along the flank to standby instead of
+        // visiting the now-empty supply rack and walking the entire loop again.
+        if(equipped&&!tag.getBoolean("R50YashimaRampDone"))
+        {tag.putBoolean("R50YashimaRampDone",true);tag.putInt("R50YashimaCoverCursor",p.cover().size()-1);}
         if(!tag.getBoolean("R50YashimaRampDone"))
         {if(at(eva,p.equipment(),1.5))tag.putBoolean("R50YashimaRampDone",true);else return follow(eva,p.access(),"R50YashimaRouteCursor",p.radius());}
         if(!equipped)return new Next(null,false); // The actual finite original shield rack owns its handoff.

@@ -101,7 +101,7 @@ public final class TvEncounterRulesR45
         var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
         if(site==null)return null;
         if(d.active.equals("ramiel"))return switch(unit)
-        {case 0->site.cover();case 1->TvYashimaStationR52.operatorPositionR52(l);case 2->site.supportReady()?site.support():null;default->null;};
+        {case 0->TvYashimaArrivalR50.shieldSide(l);case 1->TvYashimaStationR52.operatorPositionR52(l);case 2->site.supportReady()?site.support():null;default->null;};
         return unit==site.primaryUnit()?site.hero():site.supportReady()?site.support():null;
     }
     public static boolean visibleToCommander(ServerLevel l,TvCampaignSavedData d,ServerPlayer commander)
@@ -159,13 +159,16 @@ public final class TvEncounterRulesR45
         {
             var side=TvYashimaArrivalR50.shieldSide(l);
             if(side==null||site==null){eva.stopAutonomousR30();d.notice="原盾侧待命通路尚未确认。";return true;}
-            boolean counterattack=boss instanceof com.projectseele.entity.RamielEntity ramiel&&ramiel.isCharging();
+            // Only a real incoming attack calls the defender into the lane.
+            // Initial arrival and the attack cooldown both remain on the flank.
+            boolean counterattack=boss instanceof com.projectseele.entity.RamielEntity ramiel
+                    &&ramiel.isAlive()&&ramiel.isCharging();
             Vec3 shieldGoal=counterattack?site.cover():side;
             eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45);
             // Clearing the gun line is as urgent as entering cover; ordinary
             // walking across this lane consumes almost the entire core window.
             NervPilotCombatR30.tacticalMoveR50(eva,pilot,shieldGoal,aim,true);
-            equipment.shieldInput(eva,pilot,TvMissionEquipmentR45.operational(eva)&&equipment.shieldEquipped(eva));
+            equipment.shieldInput(eva,pilot,counterattack&&TvMissionEquipmentR45.operational(eva)&&equipment.shieldEquipped(eva));
             return true;
         }
         Vec3 delta=goal.subtract(eva.position()).multiply(1,0,1);

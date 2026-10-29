@@ -5236,17 +5236,22 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         Vec3 end = blockHit.getLocation();
 
         EntityHitResult entityHit = com.projectseele.physics.CombatDamageTargetsR44.ray(level,from,end,.3,this,pilot);
+        boolean coreExposed=false,atField=false,coreShot=false,damageAccepted=false;
+        float healthBefore=0,healthAfter=0;
 
         if (entityHit != null)
         {
             end = entityHit.getLocation();
             if (entityHit.getEntity() instanceof RamielEntity ramiel)
             {
+                coreExposed=ramiel.isExposed();atField=ramiel.hasAtField();
+                coreShot=ramiel.isCoreShot(from,dir);healthBefore=ramiel.getHealth();
                 // No ordinary-damage fallback for a sealed core or a shell
                 // hit, even when melee has already exhausted its A.T. Field.
-                if (ramiel.isCoreShot(from, dir))
-                    ramiel.hurt((pilot instanceof ServerPlayer player?this.damageSources().playerAttack(player):this.damageSources().mobAttack(pilot)),
+                if (coreShot)
+                    damageAccepted=ramiel.hurt((pilot instanceof ServerPlayer player?this.damageSources().playerAttack(player):this.damageSources().mobAttack(pilot)),
                             SeeleConfig.CANNON_CORE_DAMAGE.get().floatValue());
+                healthAfter=ramiel.getHealth();
             }
             else
             {
@@ -5254,6 +5259,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                         SeeleConfig.CANNON_MOB_DAMAGE.get().floatValue(),end,dir,com.projectseele.physics.CombatDamageTargetsR44.Weapon.PROJECTILE,muzzle);
             }
         }
+
+        com.projectseele.world.TvYashimaCombatCommsR54.onCannonShot(this,
+                entityHit==null?null:entityHit.getEntity(),coreExposed,atField,coreShot,damageAccepted,healthBefore,healthAfter);
 
         // The shot itself detonates: damage is immediate, while the mountain-
         // scale crater is carved across later server ticks so one frame never

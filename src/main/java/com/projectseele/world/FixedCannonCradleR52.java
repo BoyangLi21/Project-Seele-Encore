@@ -48,8 +48,10 @@ public final class FixedCannonCradleR52
             var d=contacts.get(1).rest.subtract(contacts.get(0).rest).multiply(1,0,1);cross=new Vec3(-d.z,0,d.x).normalize();rail=beam("platform_rail",d.length(),.2,8,0);hanger=beam("rail_hanger",2.2,.12,8,0);
         }
         List<Piece> pieces(Vec3 origin,Quaternionf aim)
+        {return pieces(origin,aim,false);}
+        List<Piece> pieces(Vec3 origin,Quaternionf aim,boolean strict)
         {
-            double rise=origin.y-spec.closedRootY();if(rise<-.01||rise>spec.raisedRootY()-spec.closedRootY()+.01)throw new IllegalArgumentException("Cannon cradle outside its actual lift stroke");
+            double rise=origin.y-spec.closedRootY();if(strict&&(rise<-.01||rise>spec.raisedRootY()-spec.closedRootY()+.01))throw new IllegalArgumentException("Cannon cradle outside its actual lift stroke");
             var result=new ArrayList<Piece>();var m=gun.matrix(origin,aim);var gunFrame=RigidTransform.of(new Vec3(m.getTranslation(new Vector3f())),m.getUnnormalizedRotation(new Quaternionf()).normalize());
             for(int i=0;i<contacts.size();i++)
             {
@@ -58,7 +60,10 @@ public final class FixedCannonCradleR52
                 for(int k=1;k<=6;k++)add(result,sleeves.get(k-1),translation(xz.add(0,spec.floorTop()+.3+rise*k/6,0)));
                 add(result,crosshead,translation(xz.add(0,spec.floorTop()+3.2+rise,0)));
                 var base=xz.add(0,spec.floorTop()+3.75+rise,0);var normal=new Vec3(aim.transform(c.restNormal.toVector3f())).normalize();var end=gun.point(origin,aim,c.local).add(normal.scale(.37));var axis=end.subtract(base);double length=axis.length();
-                if(2*c.member-length<.15||length<c.member+.15)throw new IllegalArgumentException("Real fixed cannon aim strut overlap/stroke exhausted");axis=axis.normalize();var rotation=new Quaternionf().rotationTo(new Vector3f(0,1,0),axis.toVector3f());
+                // Normal aiming may overlap/extend the visual struts. Their
+                // diagnostic stroke limit must never abort a server tick or draw.
+                if(strict&&(2*c.member-length<.15||length<c.member+.15))throw new IllegalArgumentException("Real fixed cannon aim strut overlap/stroke exhausted");
+                axis=length>1e-9?axis.scale(1/length):new Vec3(0,1,0);var rotation=new Quaternionf().rotationTo(new Vector3f(0,1,0),axis.toVector3f());
                 add(result,c.tube,RigidTransform.of(base,rotation));add(result,c.rod,RigidTransform.of(end.subtract(axis.scale(c.member)),rotation));add(result,ball,translation(end));add(result,ball,translation(base));
             }
             for(int side:new int[]{-1,1})
@@ -70,7 +75,7 @@ public final class FixedCannonCradleR52
         }
     }
     public static List<Piece> pieces(Geometry gun,Spec spec,Vec3 position,Quaternionf aim){return model(gun,spec).pieces(position,aim);}
-    public static AABB bounds(Geometry gun,Spec spec,Vec3 position,Quaternionf aim){AABB all=null;for(var p:pieces(gun,spec,position,aim)){var b=p.mesh.envelope(p.frame,p.frame);all=all==null?b:all.minmax(b);}return all;}
+    public static AABB bounds(Geometry gun,Spec spec,Vec3 position,Quaternionf aim){AABB all=null;for(var p:pieces(gun,spec,position,aim)){var b=NervRigidMeshSweepR52.transformed(p.mesh.bounds(),p.frame);all=all==null?b:all.minmax(b);}return all;}
     private record Interval(NervRigidMeshSweepR52 mesh,RigidTransform from,RigidTransform to,Vec3 curve,AABB box){}
     public static final class Sweep
     {
@@ -81,7 +86,7 @@ public final class FixedCannonCradleR52
             var out=new ArrayList<Interval>();AABB all=null;double error=model.curveCoefficient*angle*angle/(8D*divisions*divisions)+.000002;var curve=new Vec3(error,error,error);
             for(int i=0;i<divisions;i++)
             {
-                float x=i/(float)divisions,y=(i+1)/(float)divisions;var A=model.pieces(from.lerp(to,x),new Quaternionf(a).slerp(b,x));var B=model.pieces(from.lerp(to,y),new Quaternionf(a).slerp(b,y));
+                float x=i/(float)divisions,y=(i+1)/(float)divisions;var A=model.pieces(from.lerp(to,x),new Quaternionf(a).slerp(b,x),true);var B=model.pieces(from.lerp(to,y),new Quaternionf(a).slerp(b,y),true);
                 for(int j=0;j<A.size();j++){var p=A.get(j);var q=B.get(j);var box=p.mesh.envelope(p.frame,q.frame).inflate(error);out.add(new Interval(p.mesh,p.frame,q.frame,curve,box));all=all==null?box:all.minmax(box);}
             }
             intervals=List.copyOf(out);bounds=all;

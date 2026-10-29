@@ -35,6 +35,10 @@ public final class YashimaCannonEntityR52 extends Entity
     private static final EntityDataAccessor<Boolean> READY=SynchedEntityData.defineId(YashimaCannonEntityR52.class,EntityDataSerializers.BOOLEAN);
     private YashimaCannonGeometryR52.Geometry decoded;private CompoundTag decodedTag;private Quaternionf previousAim=new Quaternionf();
     private com.projectseele.world.FixedCannonCradleR52.Spec cradle;private CompoundTag cradleTag;
+    private YashimaCannonGeometryR52.Geometry boundsGeometry;
+    private com.projectseele.world.FixedCannonCradleR52.Spec boundsCradle;
+    private Vec3 boundsPosition;private Quaternionf boundsAim;
+    private net.minecraft.world.phys.AABB cachedBounds;
     public YashimaCannonEntityR52(EntityType<? extends YashimaCannonEntityR52> type,Level level)
     {super(type,level);setNoGravity(true);setInvulnerable(true);}
     @Override protected void defineSynchedData(){entityData.define(GEOMETRY,new CompoundTag());entityData.define(CRADLE,new CompoundTag());entityData.define(AIM,new Quaternionf());entityData.define(LOADED,false);entityData.define(READY,false);}
@@ -102,7 +106,19 @@ public final class YashimaCannonEntityR52 extends Entity
         for(int i=1;i<=4;i++)if(!clearHull(position(),new Quaternionf(before).slerp(next,i/4F)))return false;
         entityData.set(AIM,next);updateBounds();return Math.abs(next.w)>1-1e-6;
     }
-    private void updateBounds(){var g=geometryR52();if(g!=null){var bounds=g.worldBounds(position(),entityData.get(AIM));var spec=cradleR52();if(spec!=null)bounds=bounds.minmax(com.projectseele.world.FixedCannonCradleR52.bounds(g,spec,position(),entityData.get(AIM)));setBoundingBox(bounds);}}
+    private void updateBounds()
+    {
+        var g=geometryR52();if(g==null)return;var spec=cradleR52();var at=position();var aim=entityData.get(AIM);
+        // Synced aim, the station and entity tick can all reach this in one
+        // tick. A stationary gun needs no repeated cradle geometry evaluation.
+        if(cachedBounds==null||g!=boundsGeometry||spec!=boundsCradle||!at.equals(boundsPosition)||!aim.equals(boundsAim))
+        {
+            cachedBounds=g.worldBounds(at,aim);
+            if(spec!=null)cachedBounds=cachedBounds.minmax(com.projectseele.world.FixedCannonCradleR52.bounds(g,spec,at,aim));
+            boundsGeometry=g;boundsCradle=spec;boundsPosition=at;boundsAim=new Quaternionf(aim);
+        }
+        setBoundingBox(cachedBounds);
+    }
     @Override public void tick(){previousAim.set(entityData.get(AIM));super.tick();updateBounds();}
     @Override public void onSyncedDataUpdated(EntityDataAccessor<?> key){super.onSyncedDataUpdated(key);if(key==GEOMETRY||key==CRADLE||key==AIM)updateBounds();}
     @Override protected void readAdditionalSaveData(CompoundTag tag)

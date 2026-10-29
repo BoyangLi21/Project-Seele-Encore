@@ -1,22 +1,66 @@
 package com.projectseele.world;
 
 import com.projectseele.entity.RamielEntity;
+import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.event.TvEncounterDirectorR45;
 import com.projectseele.registry.ModSounds;
 import net.minecraft.core.Holder;
 import net.minecraft.network.protocol.game.ClientboundSoundPacket;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundSource;
+import net.minecraft.world.entity.Entity;
 
 import java.util.LinkedHashSet;
 import java.util.Map;
 import java.util.UUID;
 import java.util.WeakHashMap;
 
-/** Reports real Ramiel attack events. This class never schedules or advances an attack. */
+/** Reports real attack and cannon results without scheduling or advancing attacks. */
 public final class TvYashimaCombatCommsR54
 {
     private static final Map<RamielEntity, Pulse> PULSES = new WeakHashMap<>();
+
+    enum ShotResult
+    {
+        MISS("炮击未命中拉米尔。修正瞄准，等待下一次核心暴露。"),
+        CORE_CLOSED("命中外壳，但核心尚未开放，未造成核心损伤。等它开火后再射击。"),
+        AT_BLOCKED("命中外壳，核心尚未开放，A.T. 力场仍在，炮击未造成核心损伤。"),
+        CORE_MISSED("击中外壳，弹道偏离了暴露的核心。调整瞄准，准备下一发。"),
+        NO_DAMAGE("弹道触及核心，但未确认有效损伤。重新充能，继续观察核心。"),
+        CORE_HIT("确认核心命中，目标受到有效损伤！重新充能，保持瞄准。"),
+        CORE_DESTROYED("确认核心命中，目标生命反应归零。保持警戒，等待战果确认。");
+
+        final String line;
+        ShotResult(String line){this.line=line;}
+    }
+
+    static ShotResult shotResult(boolean hitBoss,boolean exposed,boolean atField,boolean coreShot,
+                                 boolean accepted,float healthBefore,float healthAfter)
+    {
+        if(!hitBoss)return ShotResult.MISS;
+        if(!exposed)return atField?ShotResult.AT_BLOCKED:ShotResult.CORE_CLOSED;
+        if(!coreShot)return ShotResult.CORE_MISSED;
+        if(!accepted||!Float.isFinite(healthBefore)||!Float.isFinite(healthAfter)||healthBefore<=healthAfter)
+            return ShotResult.NO_DAMAGE;
+        return healthAfter<=0?ShotResult.CORE_DESTROYED:ShotResult.CORE_HIT;
+    }
+
+    /** Called once after the actual cannon ray and direct damage have resolved. */
+    public static void onCannonShot(EvaUnit01Entity shooter,Entity hit,boolean exposed,boolean atField,
+                                    boolean coreShot,boolean accepted,float healthBefore,float healthAfter)
+    {
+        if(!(shooter.level() instanceof ServerLevel level))return;
+        var data=TvCampaignSavedData.get(level);
+        var state=TvYashimaSavedDataR50.get(level);
+        if(!data.active.equals("ramiel")||data.angel==null||!state.matches(data)
+                ||TvSortiesR32.assignedUnit(level,data,1)!=shooter
+                ||!(level.getEntity(data.angel) instanceof RamielEntity boss)
+                ||!TvEncounterDirectorR45.owned(boss,data))return;
+        // The lethal shot can already have changed the mission to victory.
+        // Keep its real result even though the boss is no longer alive.
+        var result=shotResult(hit==boss,exposed,atField,coreShot,accepted,healthBefore,healthAfter);
+        report(boss,data,result==ShotResult.MISS||result==ShotResult.CORE_MISSED?"葛城美里":"赤木律子",result.line,false);
+    }
 
     static final class Pulse
     {
