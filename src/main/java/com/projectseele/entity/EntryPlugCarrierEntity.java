@@ -1149,6 +1149,14 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
         {
             return;
         }
+        if(this.hasCanonicalPose()&&(!this.isLockedToEva()||this.usesPhysicalPilotSeatR52()))
+        {
+            // Cabin LCL must not switch a seated pilot between the swimming
+            // and standing bounding boxes while the reclining renderer runs.
+            passenger.setSwimming(false);
+            passenger.setPose(net.minecraft.world.entity.Pose.STANDING);
+            passenger.setDeltaMovement(Vec3.ZERO);
+        }
         Vec3 seat = this.hasCanonicalPose()
                 ? this.transformPlugMarker(EntryPlugKinematics.PILOT_SEAT_P)
                 : this.position().add(0.0D, 0.35D, 0.0D);

@@ -228,7 +228,7 @@ public final class TvCageCollisionR44
     public static boolean canMove(ServerLevel level, EvaUnit01Entity owner,
                                   NervCarrierPlatformEntity gantry, float requested)
     {
-        if (!enabled()) return true;
+        if (!NervTraversalPolicyR53.strict(level) || !enabled()) return true;
         if (!load()) return false;
         float before = gantry.getRestraintProgress();
         if (Math.abs(before - requested) < .0001) return true;

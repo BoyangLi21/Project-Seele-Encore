@@ -7073,7 +7073,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
 
     /** Called only after the real shield surface intercepted one accepted mission shot. */
-    public boolean receiveYashimaShieldHitR48(DamageSource source,boolean second)
+    public boolean receiveYashimaShieldHitR48(DamageSource source,boolean third)
     {
         if(!actualYashimaRayR48(source)||!EvaShieldRigR47.equipped(this)
                 ||!(com.projectseele.world.TvMissionEquipmentR45.shieldLoanAuthorizedR48(this)
@@ -7081,9 +7081,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         float before=getHealth();
         entityData.set(DATA_AT_ON,false);entityData.set(DATA_AT_ENERGY,0F);
         getPersistentData().putBoolean("R48YashimaFieldBurnout",true);
-        if(second||before<=getMaxHealth()*.5F)EvaShutdownR30.fail(this);
-        else setHealth(before-getMaxHealth()*.5F);
-        ProjectSeele.LOGGER.info("Yashima shield impact: eva={} second={} health={} -> {}",getUUID(),second,before,getHealth());
+        float damage=getMaxHealth()/3F;
+        if(third||before<=damage)EvaShutdownR30.fail(this);
+        else setHealth(before-damage);
+        ProjectSeele.LOGGER.info("Yashima shield impact: eva={} third={} health={} -> {}",getUUID(),third,before,getHealth());
         return true;
     }
 

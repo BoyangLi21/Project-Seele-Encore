@@ -73,6 +73,10 @@ public final class NervCarrierVisuals
                     "NERV fixed restraint gantry engaged: eva={} gantry={}",
                     unit.getStringUUID(), gantry.getStringUUID());
         }
+        gantry.setRepairProgressR33(com.projectseele.entity.EvaBayRepairR33.active(unit)?com.projectseele.entity.EvaBayRepairR33.progress(unit,0):-1);
+        // The installed plant owns its clamp pose. Service arms follow the
+        // repair clock independently of legacy clamp movement and interlocks.
+        if (gantry.hasDeclaredMachineFrameR52()) return true;
         gantry.configureRestraintGantry();
         gantry.assignVariant(unit.getUnitVariant());
         gantry.holdStatic(x, y + 0.04D, z);
@@ -81,7 +85,6 @@ public final class NervCarrierVisuals
             return false;
         }
         gantry.setRestraintProgress(restraintProgress);
-        gantry.setRepairProgressR33(com.projectseele.entity.EvaBayRepairR33.active(unit)?com.projectseele.entity.EvaBayRepairR33.progress(unit,0):-1);
         gantry.holdStatic(x, y + 0.04D, z);
         if (level.getGameTime() % 5L == 0L)
         {

@@ -48,7 +48,7 @@ public final class TvYashimaArrivalR50
     static boolean enterCoverR54(boolean charging,int remaining,int beamTicks)
     {return beamTicks>0||charging&&remaining>0&&remaining<=20;}
     static Vec3 guardStepR54(Vec3 current,Vec3 goal)
-    {Vec3 delta=goal.subtract(current);return delta.lengthSqr()<=64?goal:current.add(delta.normalize().scale(8));}
+    {Vec3 delta=goal.subtract(current).multiply(1,0,1);return delta.horizontalDistanceSqr()<=2.25?current:goal;}
 
     @net.minecraftforge.eventbus.api.SubscribeEvent
     public static void guardTickR54(net.minecraftforge.event.TickEvent.ServerTickEvent event)
@@ -61,7 +61,8 @@ public final class TvYashimaArrivalR50
         var site=TvEncounterSitesR45.site(level,"ramiel").orElse(null);var side=shieldSide(level);
         if(eva==null||shooter==null||site==null||side==null||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()
                 ||eva.hasActiveCarrierMotion()||EvaAirTransportR31.active(eva)||NervAirTransportRuntimeR52.ownsMotion(eva)
-                ||StaffRecoveryR47.pending(level,0)||!EvaLogisticsDirector.status(level,0).phase().equals("DEPLOYED"))return;
+                ||StaffRecoveryR47.pending(level,0)||!EvaLogisticsDirector.status(level,0).phase().equals("DEPLOYED")
+                ||!TvYashimaTransitR52.landed(level,data,eva))return;
         boolean wreck=eva.getHealth()<=0||EvaShutdownR30.wreck(eva);
         if(wreck){eva.stopAutonomousR30();return;}
         if(!TvMissionEquipmentR45.shieldAuthorized(eva))return;
@@ -80,10 +81,9 @@ public final class TvYashimaArrivalR50
         if(NervTraversalPolicyR53.strict(level)&&boss!=null)GUARD_POSITIONS_R54.computeIfAbsent(eva,key->defensivePositionR54(eva,shooter,boss,side,site.cover().y));
         else GUARD_POSITIONS_R54.remove(eva);
         Vec3 goal=side;
-        if(eva.position().distanceToSqr(goal)<.0025)return;
+        if(guardStepR54(eva.position(),goal).equals(eva.position()))return;
         if(eva.getPilotEntity() instanceof TrainingPilotEntity pilot)
-            eva.autonomousDriveR30(pilot,Vec3.ZERO,boss==null?site.angel():boss.getBoundingBox().getCenter(),true);
-        eva.setPos(guardStepR54(eva.position(),goal));eva.setDeltaMovement(Vec3.ZERO);eva.resetFallDistance();
+            NervPilotCombatR30.tacticalMoveR50(eva,pilot,goal,goal.add(0,45,0),false);
     }
     private static Vec3 defensivePositionR54(EvaUnit01Entity eva,EvaUnit01Entity shooter,net.minecraft.world.entity.Entity boss,Vec3 side,double y)
     {
@@ -133,6 +133,7 @@ public final class TvYashimaArrivalR50
         var side=shieldSide(level);
         if(side!=null&&eva.position().subtract(side).horizontalDistanceSqr()<=2.25)
         {tag.putBoolean("R50YashimaCoverDone",true);tag.putLong("R50YashimaCoverReadyGeneration",data.generationR43);}
+        else if(side!=null)return new Next(side,false);
         return new Next(null,false);
     }
     private static Next follow(EvaUnit01Entity eva,List<Vec3> points,String key,double radius)

@@ -157,8 +157,8 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
             float partial,long age,PoseStack poses,MultiBufferSource buffers)
     {
         float scale=state.height()/15F,center=state.height()*.5F;
-        boolean exposed=state.beamTicks()>age&&(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.EXPOSED)!=0;
         boolean charging=(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.CHARGING)!=0;
+        boolean exposed=(charging&&age<20||state.beamTicks()>age)&&(state.flags()&com.projectseele.network.ClientboundEncounterObserverPacket.EXPOSED)!=0;
         float time=state.poseTick()+partial,gap=exposed?3.75F:0;
         poses.pushPose();poses.translate(0,center,0);poses.scale(scale,scale,scale);poses.mulPose(Axis.YP.rotationDegrees(time*.75F));
         if (!RamielSourceModelR53.draw(poses,buffers,exposed?1:0,time,charging,LightTexture.pack(0,15)))
@@ -214,10 +214,10 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         float alpha=Mth.clamp(remaining/4F,0,1);
         float pulse=1F+.06F*Mth.sin(time*1.8F);
         float flash=remaining>duration-2?1.35F:1F;
-        drawStarRibbon(pose,out,start,end,8F*pulse,5F*pulse,.65F,.28F,1F,alpha*.16F);
-        drawStarRibbon(pose,out,start,end,4F*flash,2.7F*flash,
+        RibbonRenderer.drawSoftStarRibbon(pose,out,start,end,10F*pulse,10F*pulse,.65F,.28F,1F,alpha*.3F);
+        drawStarRibbon(pose,out,start,end,4F*flash,4F*flash,
                 BEAM_HALO_RGB[0],BEAM_HALO_RGB[1],BEAM_HALO_RGB[2],alpha*.65F);
-        drawStarRibbon(pose,out,start,end,1.8F*flash,1.25F*flash,
+        drawStarRibbon(pose,out,start,end,2.2F*flash,2.2F*flash,
                 BEAM_CORE_RGB[0],BEAM_CORE_RGB[1],BEAM_CORE_RGB[2],alpha);
         // A bounded contact ring supplies impact motion without spawning particle clouds.
         Vector3f axis=new Vector3f(end).sub(start);
@@ -225,6 +225,15 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         axis.normalize();
         Vector3f across=new Vector3f(axis).cross(Math.abs(axis.y)<.9F?new Vector3f(0,1,0):new Vector3f(1,0,0)).normalize();
         Vector3f up=new Vector3f(axis).cross(across).normalize();
+        // Eight travelling bands give the sustained column visible energy flow.
+        float length=start.distance(end);
+        for(int band=0;band<8;band++)
+        {
+            float along=((time*.025F+band/8F)%1F)*length;
+            Vector3f center=new Vector3f(start).fma(along,axis);
+            Vector3f tail=new Vector3f(center).fma(Math.min(12F,length-along),axis);
+            drawStarRibbon(pose,out,center,tail,4.6F,4.6F,.9F,.55F,1F,alpha*.4F);
+        }
         float radius=5F+2F*(.5F+.5F*Mth.sin(time*.7F));
         for(int i=0;i<16;i++)
         {

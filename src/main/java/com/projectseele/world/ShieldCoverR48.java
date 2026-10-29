@@ -157,11 +157,11 @@ public final class ShieldCoverR48
         }
         ListTag shots = hits.getList("Shots", Tag.TAG_STRING);
         if (shots.stream().anyMatch(entry -> entry.getAsString().equals(shot.toString()))) return;
-        int count = Math.min(2, hits.getInt("Hits") + 1);
+        int count = Math.min(3, hits.getInt("Hits") + 1);
         Boolean previous = EXACT_DAMAGE.get(); EXACT_DAMAGE.set(true);
         try
         {
-            if (holder.receiveYashimaShieldHitR48(source, count >= 2))
+            if (holder.receiveYashimaShieldHitR48(source, count >= 3))
             {
                 shots.add(StringTag.valueOf(shot.toString())); hits.put("Shots", shots);
                 while(shots.size()>16)shots.remove(0);

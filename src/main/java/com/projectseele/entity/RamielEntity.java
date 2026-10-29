@@ -390,7 +390,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
 
     public boolean isExposed()
     {
-        return this.getBeamTicks() > 0;
+        return this.entityData.get(DATA_EXPOSED);
     }
 
     private void setExposed(boolean exposed)
@@ -509,7 +509,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             int previous=this.getBeamTicks();
             int remaining = previous>0?pacedRemainingR54(Math.max(0,previous-1),this.beamEndsAtR54):0;
             this.entityData.set(DATA_BEAM_TICKS, remaining);
-            this.setExposed(remaining > 0);
+            int chargeRemaining=com.projectseele.world.TvYashimaCombatCommsR54.chargeRemainingR54(this);
+            this.setExposed(remaining > 0 || this.isCharging() && chargeRemaining > 0 && chargeRemaining <= 20);
             if(previous>0&&remaining==0)com.projectseele.world.TvYashimaCombatCommsR54.onBeamEnded(this,
                     pacedRemainingR54(this.beamCooldown,this.beamCooldownReadyAtR54));
         }
@@ -687,7 +688,14 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         if(com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this)!=null
                 &&!com.projectseele.world.ShieldCoverR48.missionBeamAllowed(this))return;
         Vec3 from = this.beamOrigin();
-        Vec3 dir = target.getEyePosition().subtract(from).normalize();
+        boolean yashima = com.projectseele.world.ShieldCoverR48.yashima(this);
+        Vec3 targetPoint=target.getEyePosition();
+        if(yashima&&target instanceof EvaUnit01Entity defender&&com.projectseele.world.ShieldCoverR48.authorized(defender))
+        {
+            var plate=EvaShieldRigR47.guardPlaneR54(defender);
+            if(plate!=null)targetPoint=plate.centre();
+        }
+        Vec3 dir = targetPoint.subtract(from).normalize();
         Vec3 farEnd = from.add(dir.scale(this.effectiveBeamRangeR45()));
         var terrain = com.projectseele.world.TvYashimaFirelineR53.clip((ServerLevel)this.level(),
                 new ClipContext(from, farEnd, ClipContext.Block.COLLIDER, ClipContext.Fluid.NONE, this));
@@ -708,7 +716,6 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         if (stoppedByShield) end = shieldHit.get().point();
         else if (bodyHit != null) end = bodyHit.getLocation();
         final Vec3 impact = end;
-        boolean yashima = com.projectseele.world.ShieldCoverR48.yashima(this);
         var source = this.damageSources().mobAttack(this);
         if (stoppedByShield)
         {
@@ -1022,6 +1029,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             }
 
             this.chargeTicks=pacedRemainingR54(Math.max(0,this.chargeTicks-1),this.chargeReadyAtR54);
+            if(com.projectseele.world.ShieldCoverR48.yashima(this.ramiel)&&this.chargeTicks>0&&this.chargeTicks<=20)
+                this.ramiel.setExposed(true);
             com.projectseele.world.TvYashimaCombatCommsR54.onChargeTick(this.ramiel,this.chargeTicks);
             if (this.chargeTicks <= 0)
             {

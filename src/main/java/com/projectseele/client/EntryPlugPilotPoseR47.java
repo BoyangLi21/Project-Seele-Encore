@@ -28,10 +28,22 @@ public final class EntryPlugPilotPoseR47
         // Cancel vanilla body yaw after applying the same backrest frame as
         // the authoritative seat/eye markers. A negative recline put the head
         // at the foot end of the capsule.
+        float headYaw=Mth.rotLerp(partial,rider.yHeadRotO,rider.yHeadRot);
+        float vehicleYaw=Mth.rotLerp(partial,plug.yBodyRotO,plug.yBodyRot);
+        float headDelta=Mth.clamp(Mth.wrapDegrees(headYaw-vehicleYaw),-85F,85F);
+        float bodyYaw=headYaw-headDelta;
+        if(headDelta*headDelta>2500F)bodyYaw+=headDelta*.2F;
         var rotation=new Quaternionf(frame.qx(),frame.qy(),frame.qz(),frame.qw())
                 .rotateX(com.projectseele.world.EntryPlugKinematics.pilotReclineRadiansR48())
-                .rotateY((Mth.rotLerp(partial,rider.yBodyRotO,rider.yBodyRot)-180F)*Mth.DEG_TO_RAD);
+                .rotateY((bodyYaw-180F)*Mth.DEG_TO_RAD);
         pose.pushPose();
+        // Vanilla interpolates the passenger's separate movement packets.
+        // Anchor the whole body to the shell's pose sample instead, or the
+        // rotating capsule moves out from under its apparently standing rider.
+        var seat=frame.transformPoint(com.projectseele.world.EntryPlugKinematics.PILOT_SEAT_P);
+        pose.translate(seat.x-Mth.lerp((double)partial,rider.xOld,rider.getX()),
+                seat.y-rider.getBbHeight()*.5-Mth.lerp((double)partial,rider.yOld,rider.getY()),
+                seat.z-Mth.lerp((double)partial,rider.zOld,rider.getZ()));
         pose.translate(0,rider.getBbHeight()*.5,0);
         pose.mulPose(rotation);
         pose.translate(0,-rider.getBbHeight()*.5,0);

@@ -24,7 +24,7 @@ public final class TvYashimaCombatCommsR54
     {
         UNCONFIRMED("弹道前方地形尚未加载，未确认命中。保持瞄准，重新充能。"),
         MISS("炮击未命中拉米尔。修正瞄准，等待下一次核心暴露。"),
-        CORE_CLOSED("命中外壳，但核心尚未开放，未造成核心损伤。等它开火后再射击。"),
+        CORE_CLOSED("命中外壳，但核心尚未开放，未造成核心损伤。等核心暴露再射击。"),
         AT_BLOCKED("命中外壳，核心尚未开放，A.T. 力场仍在，炮击未造成核心损伤。"),
         CORE_MISSED("击中外壳，弹道偏离了暴露的核心。调整瞄准，准备下一发。"),
         NO_DAMAGE("弹道触及核心，但未确认有效损伤。重新充能，继续观察核心。"),
@@ -175,8 +175,8 @@ public final class TvYashimaCombatCommsR54
         var data = mission(boss);
         if (data == null) return;
         report(boss, data, "葛城美里", cue == 3
-                ? "还有约3秒！零号机保持掩护。初号机瞄准核心，等它开火！"
-                : "距离开火约1秒！初号机，准备射击！", false);
+                ? "还有约3秒！零号机保持掩护。初号机瞄准核心！"
+                : "核心已经暴露，约1秒后发射光束！初号机，可以射击！", false);
     }
 
     /** Call only after the actual beam state has been committed. */

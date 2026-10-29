@@ -37,7 +37,7 @@ public final class EvaBayRepairR33
         if(eligible&&!(e instanceof EvaPrototypeEntity)&&(active(e)||e.tickCount%20==0))
         {
             var level=(ServerLevel)e.level();var bay=EvaFleetSavedData.get(level.getServer()).entry(e.getUnitVariant()).orElse(null);
-            if(bay!=null&&bay.phase()==EvaFleetSavedData.Phase.PARKED)
+            if(bay!=null&&(bay.phase()==EvaFleetSavedData.Phase.PARKED||bay.phase()==EvaFleetSavedData.Phase.FILLING))
             {
                 var bed=EvaLogisticsDirector.assignedHangarBedR33(level,e.getUnitVariant());
                 NervCarrierVisuals.updateRestraints(level,e,bed.getX()+.5,bed.getY(),bed.getZ()+.5,1);
