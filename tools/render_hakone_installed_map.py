@@ -95,6 +95,7 @@ def render(gis, installation, out, view='city', source_snapshot=None):
     panels=[('main-map',(x0,z0,x1,z1),'已安装地图 · 主城区与山地'),
             ('city-detail',(-352,-128,415,719),'已安装地图 · 十字城区街道')]
     if view=='lake':panels=[('lake-map',(x0,z0,x1,z1),'已安装地图 · 完整芦之湖与周边地形')]
+    if view=='districts':panels=[('district-map',(x0,z0,x1,z1),'已安装地图 · 真实道路与外围街区')]
     if source_snapshot:panels=[('city-south-map',(x0,z0,x1,z1),'已安装地图 · 南移后的十字城区与街道')]
     for name,bounds,title in panels:
         fig,ax = plt.subplots(figsize=(14,11),facecolor='#f6f5ef')
@@ -106,12 +107,14 @@ def render(gis, installation, out, view='city', source_snapshot=None):
         labels = [(30,-45,'EVA 发射区'),(30,220,'十字升降城区\n当前为收纳状态'),(322,300,'保留的高架换乘区')]
         if source_snapshot:labels=[(30,-45,'保留的 EVA 发射区'),(30,340,'十字布局中心南移\n机械原点与身份保持'),(-230,140,'迁入的住宅和店铺'),(260,140,'迁入的商住街区'),(322,300,'原高架换乘区'),(-150,390,'首批邻里建筑保留'),(30,686,'南侧街道接入')]
         elif view=='lake':labels=[(-476,880,'原街角商店保留\n已抬高并接回原街道'),(-870,1350,'旧缩尺湖已退役\n恢复真实山地'),(15,1760,'芦之湖\n岸线依据 GSI 水域'),(-150,805,'南部旧街区 · 后续重构')]
+        elif view=='districts':labels=[(30,340,'十字升降城区\n原运行身份保留'),(30,-45,'原 EVA 发射区'),(-200,-300,'北部沿路街区'),(-500,270,'西部街区与坡道'),(-240,800,'南部街区'),(650,600,'强罗方向\n车站铁路下一阶段'),(600,25,'原机场设施保留'),(-180,990,'芦之湖北岸方向')]
         elif name=='main-map': labels += [(-500,250,'西部旧街区 · 待重建'),(-200,-350,'北部旧街区 · 待重建'),(-200,720,'南部旧街区 · 待重建')]
         else: labels += [(-146,61,'重建诊所 / 公园'),(-148,395,'重建住宅 / 商店'),(201,48,'重建诊所 / 书店'),(201,397,'重建住宅 / 咖啡馆')]
         for x,z,text in labels:
             ax.annotate(text,(x,z),xytext=(8,-12),textcoords='offset points',fontsize=10,
                         bbox=dict(boxstyle='round,pad=.3',fc='#fffef5',ec='#9ea99c',alpha=.92))
         caption='实际已写入方块的俯视简化着色；桃源台站、码头和湖岸街景尚未建设。灰黑缺口为未记录区域。' if view=='lake' else '地表最高可见方块的简化着色；地下楼体不展开。外围旧街区、完整湖岸和新铁路仍在施工。'
+        if view=='districts':caption='实际方块俯视图；153 个原地块整体重排，原物品保留。车站、湖岸、交通运营与街道细节继续施工。'
         fig.text(.08,.025,caption,fontsize=11,color='#52645d')
         fig.subplots_adjust(bottom=.10,top=.89); fig.savefig(out/(name+'.png'),dpi=160); plt.close(fig)
     (out/'provenance.json').write_text(json.dumps(dict(installation=str(installation),world=receipt['world'],
@@ -122,6 +125,6 @@ def render(gis, installation, out, view='city', source_snapshot=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
     for n in ('gis','installation','out'):p.add_argument('--'+n,type=Path,required=True)
-    p.add_argument('--view',choices=('city','lake'),default='city')
+    p.add_argument('--view',choices=('city','lake','districts'),default='city')
     p.add_argument('--source-snapshot',type=Path,help='Measured dense city source captured before this installation')
     a=p.parse_args();render(a.gis,a.installation,a.out,a.view,a.source_snapshot)
