@@ -130,7 +130,7 @@ public final class TransportReturnR39Review
                 }
                 if(!UNAirLiftR29.active(l,0))
                 {
-                    var e=TvSortiesR32.unit(l,3);check("un_delivered_original",e!=null&&e.position().subtract(UNAirLiftR29.apron(0)).horizontalDistance()<.1&&e.getY()>=UNAirLiftR29.apron(0).y&&e.getY()<UNAirLiftR29.apron(0).y+4);
+                    var e=TvSortiesR32.unit(l,3);check("un_delivered_original",e!=null&&e.position().subtract(UNAirLiftR29.apron(l,0)).horizontalDistance()<.1&&e.getY()>=UNAirLiftR29.apron(l,0).y&&e.getY()<UNAirLiftR29.apron(l,0).y+4);
                     report.addProperty("un_long_flight_ticks",stageAge);check("un_long_flight_bounded",stageAge<4000);finish(true,null);
                 }
             }

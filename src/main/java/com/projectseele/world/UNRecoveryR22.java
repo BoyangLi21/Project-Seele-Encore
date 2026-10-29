@@ -37,7 +37,8 @@ public final class UNRecoveryR22
         if(!p.equals(s.positions.get(eva.getUUID()))){s.positions.put(eva.getUUID(),p);s.setDirty();}
     }
     public static UUID identity(ServerLevel l,int serial){return serial==0?MilitaryR07Director.state(l).entities.get("prototype"):UNAnnexR20.state(l).unitId;}
-    public static Vec3 home(int serial){return serial==0?new Vec3(6442.5,77,-6205.5):UNAnnexR20.HOME;}
+    public static Vec3 originalHome(int serial){return new Vec3(serial==1?6282.5:6442.5,77,-6205.5);}
+    public static Vec3 home(ServerLevel level,int serial){return FacilitySites.un(level,originalHome(serial));}
     public static BlockPos lastKnownPosition(ServerLevel level,UUID id){return locations(level).positions.get(id);}
     private static void load(ServerLevel l,BlockPos p)
     {
@@ -67,7 +68,7 @@ public final class UNRecoveryR22
         var jobs=JOBS.get(l);if(jobs==null)return;
         for(var it=jobs.values().iterator();it.hasNext();)
         {
-            var job=it.next();UUID id=identity(l,job.serial());Vec3 home=home(job.serial());
+            var job=it.next();UUID id=identity(l,job.serial());Vec3 home=home(l,job.serial());
             load(l,locations(l).positions.getOrDefault(id,BlockPos.containing(home)));load(l,BlockPos.containing(home));
             if(event.getServer().getTickCount()-job.started()>200){job.source().sendFailure(Component.literal("原机体或插入栓仍未加载，未删除或复制实体"));it.remove();continue;}
             if(!(l.getEntity(id) instanceof EvaPrototypeEntity eva))continue;

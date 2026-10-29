@@ -109,8 +109,8 @@ public final class AirLiftR30Review
                 }
                 if(timer==1)UNRecoveryR22.request(operator.createCommandSourceStack(),UN_SERIAL,true);
                 if(timer<80||!(l.getEntity(unId) instanceof EvaPrototypeEntity e)||UNPlugDirector.capsule(e)==null)return;
-                plugId=UNPlugDirector.capsule(e).getUUID();check("original_un_at_home",e.position().distanceTo(UNRecoveryR22.home(UN_SERIAL))<.1);
-                report.addProperty("un_deliver_reply",UNAirLiftR29.request(operator,UN_SERIAL,false,(int)UNRecoveryR22.home(UN_SERIAL).x,-5980));check("delivery_started",UNAirLiftR29.active(l,UN_SERIAL));next(1);return;
+                plugId=UNPlugDirector.capsule(e).getUUID();check("original_un_at_home",e.position().distanceTo(UNRecoveryR22.home(l,UN_SERIAL))<.1);
+                report.addProperty("un_deliver_reply",UNAirLiftR29.request(operator,UN_SERIAL,false,(int)UNRecoveryR22.home(l,UN_SERIAL).x,-5980));check("delivery_started",UNAirLiftR29.active(l,UN_SERIAL));next(1);return;
             }
             if(stage<4)
             {
@@ -136,11 +136,11 @@ public final class AirLiftR30Review
                     // the deck. Require its real owned receiver contact, not a
                     // nominal entity coordinate that would push it into metal.
                     check("un_delivered_to_intake",bearing!=null&&e.position().subtract(pad).horizontalDistance()<.2&&receiver.position().distanceTo(pad)<.1);
-                    check("un_wreck_not_healed",e.getHealth()==0);check("un_waits_before_docking",e.isNervLogisticsLocked()&&e.position().distanceTo(UNRecoveryR22.home(UN_SERIAL))>50);
+                    check("un_wreck_not_healed",e.getHealth()==0);check("un_waits_before_docking",e.isNervLogisticsLocked()&&e.position().distanceTo(UNRecoveryR22.home(l,UN_SERIAL))>50);
                     report.addProperty("dock_reply",UNAirLiftR29.requestDock(operator,UN_SERIAL));check("ground_dock_started",UNAirLiftR29.active(l,UN_SERIAL));next(3);return;
                 }
                 if(stage==3&&!UNAirLiftR29.active(l,UN_SERIAL))
-                {check("un_original_home_reached",e.position().distanceTo(UNRecoveryR22.home(UN_SERIAL))<.1);check("wreck_remains_for_repair",e.getHealth()==0&&EvaShutdownR30.wreck(e)||R40&&EvaBayRepairR33.active(e));if(UN_ONLY){report.addProperty("un_serial",UN_SERIAL);report.addProperty("passed",true);finish(l,path);}else next(4);return;}
+                {check("un_original_home_reached",e.position().distanceTo(UNRecoveryR22.home(l,UN_SERIAL))<.1);check("wreck_remains_for_repair",e.getHealth()==0&&EvaShutdownR30.wreck(e)||R40&&EvaBayRepairR33.active(e));if(UN_ONLY){report.addProperty("un_serial",UN_SERIAL);report.addProperty("passed",true);finish(l,path);}else next(4);return;}
             }
             if(stage==4)
             {

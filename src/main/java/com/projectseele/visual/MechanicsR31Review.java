@@ -54,7 +54,7 @@ public final class MechanicsR31Review
     private static void next(Stage next){stage=next;stageName=next.name().toLowerCase(Locale.ROOT);ticks=phase=0;requested=false;lookPitch=0;ProjectSeele.LOGGER.info("R31 MECHANICS phase={} serial={}",next,serial);}
     private static void input(int action){inputAction=action;inputEpoch++;}
     private static void reset(){player.server.getCommands().performPrefixedCommand(player.createCommandSourceStack().withPermission(4),"seele military reset 0"+serial);}
-    private static boolean home(){return eva!=null&&eva.position().distanceTo(UNRecoveryR22.home(serial))<.05;}
+    private static boolean home(){return eva!=null&&eva.position().distanceTo(UNRecoveryR22.home(level,serial))<.05;}
     private static String stateInfo()
     {
         if(eva==null)return "serial="+serial+" eva=unloaded transport="+UNAirLiftR29.phaseName(level,serial);
@@ -72,7 +72,7 @@ public final class MechanicsR31Review
         if(empty<0)for(int i=9;i<36;i++)if(inventory.getItem(i).isEmpty()){inventory.setItem(i,inventory.getItem(inventory.selected));inventory.setItem(inventory.selected,net.minecraft.world.item.ItemStack.EMPTY);empty=inventory.selected;break;}
         if(empty<0)throw new IllegalStateException("Review observer needs one empty inventory slot; no inventory items were discarded");
         inventory.selected=empty;inventory.setChanged();player.containerMenu.broadcastChanges();player.connection.send(new net.minecraft.network.protocol.game.ClientboundSetCarriedItemPacket(empty));
-        var home=UNRecoveryR22.home(serial);player.teleportTo(level,home.x+18,home.y+47,home.z+55,135,5);player.getAbilities().flying=true;player.onUpdateAbilities();observerTarget=home.add(0,30,0);
+        var home=UNRecoveryR22.home(level,serial);player.teleportTo(level,home.x+18,home.y+47,home.z+55,135,5);player.getAbilities().flying=true;player.onUpdateAbilities();observerTarget=home.add(0,30,0);
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
@@ -149,7 +149,7 @@ public final class MechanicsR31Review
     {
         if(phase==0)
         {
-            Vec3 at=UNAirLiftR29.apron(0).add(42,0,12);level.getChunkAt(BlockPos.containing(at));int surfaceY=level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,(int)Math.floor(at.x),(int)Math.floor(at.z+5));
+            Vec3 at=UNAirLiftR29.apron(level,0).add(42,0,12);level.getChunkAt(BlockPos.containing(at));int surfaceY=level.getHeight(net.minecraft.world.level.levelgen.Heightmap.Types.MOTION_BLOCKING_NO_LEAVES,(int)Math.floor(at.x),(int)Math.floor(at.z+5));
             check("scrap_fixture_has_real_floor",!level.getBlockState(new BlockPos((int)Math.floor(at.x),surfaceY-1,(int)Math.floor(at.z+5))).getCollisionShape(level,new BlockPos((int)Math.floor(at.x),surfaceY-1,(int)Math.floor(at.z+5))).isEmpty());at=new Vec3(at.x,surfaceY+EntryPlugKinematics.BODY_OBB_HALF_EXTENTS.y,at.z);
             normal=fixture(at.add(18,0,0),EntryPlugCarrierEntity.STAGE_SUSPENDED);occupied=fixture(at.add(-18,0,0),EntryPlugCarrierEntity.STAGE_FIELD_LANDED);scrap=fixture(at,EntryPlugCarrierEntity.STAGE_FIELD_LANDED);scrapId=scrap.getId();
             occupant=ModEntities.TRAINING_PILOT.get().create(level);if(occupant==null)throw new IllegalStateException("Occupant fixture factory");occupant.addTag("seele_r31_scrap_fixture");occupant.setNoAi(true);occupant.setTrainingStage(TrainingPilotEntity.STAGE_STANDBY);occupant.setPos(at);level.addFreshEntity(occupant);check("occupied_fixture_boarded",occupant.startRiding(occupied,true));

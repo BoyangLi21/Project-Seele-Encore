@@ -22,7 +22,7 @@ public final class EvaBayRepairR33
     {
         if(!(e.level() instanceof ServerLevel level)||e.hasActiveCarrierMotion()||e.isLaunchSequenceActive()||EvaAirTransportR31.active(e))return false;
         if(e instanceof EvaPrototypeEntity un)
-            return e.getUUID().equals(UNRecoveryR22.identity(level,un.getUNSerial()))&&e.position().distanceToSqr(UNRecoveryR22.home(un.getUNSerial()))<16;
+            return e.getUUID().equals(UNRecoveryR22.identity(level,un.getUNSerial()))&&e.position().distanceToSqr(UNRecoveryR22.home(level,un.getUNSerial()))<16;
         var fleet=EvaFleetSavedData.get(level.getServer()).entry(e.getUnitVariant()).orElse(null);
         return e.isNervLogisticsLocked()&&EvaLogisticsDirector.inAssignedHangarR33(level,e)&&fleet!=null&&fleet.canonicalId().equals(e.getUUID())
                 &&(fleet.phase()==EvaFleetSavedData.Phase.PARKED||fleet.phase()==EvaFleetSavedData.Phase.FILLING);

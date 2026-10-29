@@ -41,7 +41,7 @@ import java.util.*;
 public final class MilitaryR07Director
 {
     public enum Phase { WET,DRAINING,DRY,OPENING,OPEN,CLOSING,FILLING }
-    private static final Vec3 HOME=new Vec3(6442.5,77,-6205.5),DOOR=new Vec3(6442.5,77,-6135.5);
+    private static final Vec3 DOOR=new Vec3(6442.5,77,-6135.5);
     private static final BlockPos[] BUTTONS={new BlockPos(6394,78,-6141),new BlockPos(6398,78,-6141),new BlockPos(6406,78,-6141)};
     private static final TicketType<ChunkPos> TICKET=TicketType.create("seele_experimental_cell",Comparator.comparingLong(ChunkPos::toLong),100);
     private static final String DATA="projectseele_military_r07";
@@ -101,6 +101,7 @@ public final class MilitaryR07Director
     private static void say(Player player,String text) { if(player!=null)player.displayClientMessage(Component.literal(text),true); }
     public static String request(ServerLevel level,String action,Player operator)
     {
+        Vec3 home=UNRecoveryR22.home(level,0);
         State data=state(level);if(!data.commissioned)return "设施尚未完成调试";
         if(operator!=null&&!card(operator))return "需要 NERV 身份卡";
         var repairId=UNRecoveryR22.identity(level,0);
@@ -129,7 +130,7 @@ public final class MilitaryR07Director
             case "fill" -> {
                 if(data.phase!=Phase.DRY)return "请先关闭舱门";
                 Entity unit=entity(level,data,"prototype");
-                if(unit==null||unit.position().distanceTo(HOME)>3||unit.isVehicle())return "试验机须归位并解除驾驶";
+                if(unit==null||unit.position().distanceTo(home)>3||unit.isVehicle())return "试验机须归位并解除驾驶";
                 if(!level.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(level,0),p->!p.isSpectator()).isEmpty())return "请先离开 LCL 试验区";
                 data.phase=Phase.FILLING;data.cursor=0;
             }
@@ -149,6 +150,7 @@ public final class MilitaryR07Director
     }
     private static boolean occupiedDoor(ServerLevel level)
     {
+        if(!NervTraversalPolicyR53.strict(level))return false;
         return !level.getEntities((Entity)null,UNHangarDimensionsR31.sweep(level,0),e->!(e instanceof NervHangarDoorEntity)&&!(e instanceof ArmorStand stand&&stand.isMarker())
                 &&e.isAlive()&&!e.isSpectator()&&(e instanceof net.minecraft.world.entity.LivingEntity||e.isVehicle()||e.getTags().contains("seele_r07_owned"))).isEmpty();
     }
@@ -160,7 +162,8 @@ public final class MilitaryR07Director
     }
     private static void tickets(ServerLevel level,boolean keep)
     {
-        for(int x=6400>>4;x<=6496>>4;x++)for(int z=-6240>>4;z<=-6128>>4;z++)
+        BlockPos low=FacilitySites.un(level,6400,0,-6240),high=FacilitySites.un(level,6496,0,-6128);
+        for(int x=low.getX()>>4;x<=high.getX()>>4;x++)for(int z=low.getZ()>>4;z<=high.getZ()>>4;z++)
         {
             ChunkPos p=new ChunkPos(x,z);
             if(keep)level.getChunkSource().addRegionTicket(TICKET,p,2,p);else level.getChunkSource().removeRegionTicket(TICKET,p,2,p);
@@ -168,22 +171,26 @@ public final class MilitaryR07Director
     }
     private static boolean barrier(ServerLevel level,boolean closed)
     {
-        int low=UNHangarDimensionsR31.minimum(level,0).getX(),high=UNHangarDimensionsR31.maximum(level,0).getX();
-        for(int x=low;x<=high;x++)for(int y=77;y<=141;y++)
+        BlockPos minimum=UNHangarDimensionsR31.minimum(level,0);
+        int low=minimum.getX(),high=UNHangarDimensionsR31.maximum(level,0).getX(),bottom=minimum.getY(),doorZ=minimum.getZ()+90;
+        if(NervTraversalPolicyR53.strict(level))for(int x=low;x<=high;x++)for(int y=bottom;y<=bottom+64;y++)
         {
-            BlockState old=level.getBlockState(new BlockPos(x,y,-6136));
+            BlockState old=level.getBlockState(new BlockPos(x,y,doorZ));
             if(!old.isAir()&&!old.is(Blocks.BARRIER))return false;
         }
         BlockState state=(closed?Blocks.BARRIER:Blocks.AIR).defaultBlockState();
-        for(int x=low;x<=high;x++)for(int y=77;y<=141;y++)level.setBlock(new BlockPos(x,y,-6136),state,2);
+        for(int x=low;x<=high;x++)for(int y=bottom;y<=bottom+64;y++){
+            BlockPos pos=new BlockPos(x,y,doorZ);var old=level.getBlockState(pos);
+            if(old.isAir()||old.is(Blocks.BARRIER))level.setBlock(pos,state,2);
+        }
         return true;
     }
     @SubscribeEvent public static void interact(PlayerInteractEvent.RightClickBlock event)
     {
         if(!(event.getLevel() instanceof ServerLevel level)||!level.dimension().equals(FacilitySchemaV2.DIMENSION)||plan(level)==null)return;
-        String action=null;for(int i=0;i<BUTTONS.length;i++)if(BUTTONS[i].equals(event.getPos()))action=new String[]{"drain","door","fill"}[i];
-        if(event.getPos().equals(new BlockPos(6400,76,-6545)))action="defense";
-        if(event.getPos().equals(new BlockPos(6404,76,-6545)))action="power";
+        String action=null;for(int i=0;i<BUTTONS.length;i++)if(FacilitySites.un(level,BUTTONS[i]).equals(event.getPos()))action=new String[]{"drain","door","fill"}[i];
+        if(event.getPos().equals(FacilitySites.un(level,6400,76,-6545)))action="defense";
+        if(event.getPos().equals(FacilitySites.un(level,6404,76,-6545)))action="power";
         if(action==null)return;
         event.setCanceled(true);
         event.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);
@@ -220,18 +227,19 @@ public final class MilitaryR07Director
             // out; vanilla otherwise stops entity ticks after 300 idle ticks.
             level.resetEmptyTime();
         }
-        if(!level.hasChunkAt(BUTTONS[0]))return;
-        FacilityAudioR21.auxiliary(level,"UN00",data.phase,DOOR);
+        if(!level.hasChunkAt(FacilitySites.un(level,BUTTONS[0])))return;
+        Vec3 home=UNRecoveryR22.home(level,0),door=FacilitySites.un(level,DOOR);
+        FacilityAudioR21.auxiliary(level,"UN00",data.phase,door);
         boolean open=data.phase==Phase.OPEN||data.phase==Phase.OPENING;
-        NervHangarDoorEntity.reconcileUNR54(level,DOOR,open,data.phase==Phase.OPEN||data.phase==Phase.CLOSING?1F:0F);
+        NervHangarDoorEntity.reconcileUNR54(level,door,open,data.phase==Phase.OPEN||data.phase==Phase.CLOSING?1F:0F);
         if(data.phase==Phase.DRAINING||data.phase==Phase.FILLING)
         {
             var lcl=BuiltInRegistries.BLOCK.get(new ResourceLocation("projectseele:lcl"));
-            int minimumX=UNHangarDimensionsR31.minimum(level,0).getX();
+            BlockPos minimum=UNHangarDimensionsR31.minimum(level,0);
             for(int n=0;n<512&&data.cursor<total;n++,data.cursor++)
             {
                 int layer=data.cursor/layerSize,within=data.cursor%layerSize;
-                BlockPos pos=new BlockPos(minimumX+within%width,data.phase==Phase.DRAINING?120-layer:77+layer,-6226+within/width);
+                BlockPos pos=minimum.offset(within%width,data.phase==Phase.DRAINING?43-layer:layer,within/width);
                 BlockState old=level.getBlockState(pos);
                 if(data.phase==Phase.DRAINING&&old.is(lcl))level.setBlock(pos,Blocks.AIR.defaultBlockState(),Block.UPDATE_CLIENTS|Block.UPDATE_KNOWN_SHAPE);
                 if(data.phase==Phase.FILLING&&(old.isAir()||old.is(lcl)))level.setBlock(pos,lcl.defaultBlockState(),Block.UPDATE_CLIENTS|Block.UPDATE_KNOWN_SHAPE);
@@ -245,7 +253,7 @@ public final class MilitaryR07Director
         }
         else if(data.phase==Phase.OPENING||data.phase==Phase.CLOSING)
         {
-            var doors=level.getEntitiesOfClass(NervHangarDoorEntity.class,new AABB(DOOR,DOOR).inflate(3),e->e.getVariant()==3);
+            var doors=level.getEntitiesOfClass(NervHangarDoorEntity.class,new AABB(door,door).inflate(3),e->e.getVariant()==3);
             if(!doors.isEmpty())
             {
                 float progress=doors.get(0).getOpenProgress(1);
@@ -265,7 +273,7 @@ public final class MilitaryR07Director
         if(unit instanceof EvaPrototypeEntity prototype&&!UNAirLiftR29.ownsMotion(level,0))
         {
             if(data.phase==Phase.OPEN&&!EvaBayRepairR33.active(prototype)){prototype.setNervLogisticsLocked(false);prototype.setNoGravity(false);}
-            else if(prototype.position().distanceTo(HOME)<4&&!prototype.isVehicle())
+            else if(prototype.position().distanceTo(home)<4&&!prototype.isVehicle())
             {
                 prototype.setNervLogisticsLocked(true);prototype.setNoGravity(true);
                 if(prototype.isUmbilicalSevered()||prototype.isEntryPlugInserted()||prototype.getWeapon()!=com.projectseele.entity.EvaUnit01Entity.WEAPON_FISTS)
@@ -275,14 +283,15 @@ public final class MilitaryR07Director
     }
     private static void powerAndDefense(ServerLevel level,State data)
     {
-        BlockPos basePower=new BlockPos(6360,75,-6038),portPower=new BlockPos(1330,69,474);
+        BlockPos basePower=FacilitySites.un(level,6360,75,-6038),portPower=FacilitySites.port(level,new BlockPos(1330,69,474));
         if(level.hasChunkAt(basePower)) { boolean present=level.getBlockState(basePower).is(Blocks.IRON_BLOCK);if(present!=data.baseGenerator){data.baseGenerator=present;data.setDirty();} }
         if(level.hasChunkAt(portPower)) { boolean present=level.getBlockState(portPower).is(Blocks.IRON_BLOCK);if(present!=data.portGenerator){data.portGenerator=present;data.setDirty();} }
         for(var entry:data.entities.entrySet())
         {
             Entity e=level.getEntity(entry.getValue());if(e==null||!entry.getKey().startsWith("vehicle/"))continue;
-            boolean supplied=data.power&&(data.baseGenerator&&e.getX()>6300&&e.getX()<6900&&e.getZ()>-7090&&e.getZ()<-5900
-                    ||data.portGenerator&&e.getX()>1200&&e.getX()<1656&&e.getZ()>280&&e.getZ()<640);
+            Vec3 base=FacilitySites.original(level,FacilitySites.Site.UN_BASE,e.position()),port=FacilitySites.original(level,FacilitySites.Site.PORT,e.position());
+            boolean supplied=data.power&&(data.baseGenerator&&base.x>6300&&base.x<6900&&base.z>-7090&&base.z<-5900
+                    ||data.portGenerator&&port.x>1200&&port.x<1656&&port.z>280&&port.z<640);
             if(supplied)e.getCapability(ForgeCapabilities.ENERGY).ifPresent(storage->storage.receiveEnergy(2000,false));
             if(e.getTags().contains("seele_r07_defense")&&!TvMarineDirectorR50.marineCannonControlledR50(e))
             {

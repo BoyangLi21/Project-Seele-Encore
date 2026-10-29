@@ -59,7 +59,19 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     public int getUNSerial(){return entityData.get(UN_SERIAL);}
     public void setUNSerial(int serial){entityData.set(UN_SERIAL,net.minecraft.util.Mth.clamp(serial,0,1));}
     @Override public String experimentalAssetName(){return getUNSerial()==1?"eva_un01":"eva_prototype";}
-    public Vec3 homePosition(){return new Vec3(getUNSerial()==1?6282.5:6442.5,77,-6205.5);}
+    public Vec3 homePosition()
+    {
+        if(level() instanceof net.minecraft.server.level.ServerLevel server)
+            return com.projectseele.world.UNRecoveryR22.home(server,getUNSerial());
+        return com.projectseele.world.UNRecoveryR22.originalHome(getUNSerial())
+                .add(Vec3.atLowerCornerOf(entityData.get(SITE_OFFSET)));
+    }
+    private static final net.minecraft.network.syncher.EntityDataAccessor<net.minecraft.core.BlockPos> SITE_OFFSET=net.minecraft.network.syncher.SynchedEntityData.defineId(EvaPrototypeEntity.class,net.minecraft.network.syncher.EntityDataSerializers.BLOCK_POS);
+    private void syncSite()
+    {
+        if(level() instanceof net.minecraft.server.level.ServerLevel server)
+            entityData.set(SITE_OFFSET,com.projectseele.world.FacilitySites.offset(server,com.projectseele.world.FacilitySites.Site.UN_BASE));
+    }
     private static final net.minecraft.network.syncher.EntityDataAccessor<Integer> LASER_AGE=net.minecraft.network.syncher.SynchedEntityData.defineId(EvaPrototypeEntity.class,net.minecraft.network.syncher.EntityDataSerializers.INT);
     private static final net.minecraft.network.syncher.EntityDataAccessor<Integer> LASER_COOLDOWN=net.minecraft.network.syncher.SynchedEntityData.defineId(EvaPrototypeEntity.class,net.minecraft.network.syncher.EntityDataSerializers.INT);
     private static final net.minecraft.network.syncher.EntityDataAccessor<Float> EYE_YAW=net.minecraft.network.syncher.SynchedEntityData.defineId(EvaPrototypeEntity.class,net.minecraft.network.syncher.EntityDataSerializers.FLOAT);
@@ -67,7 +79,7 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     private static final net.minecraft.network.syncher.EntityDataAccessor<org.joml.Vector3f> LASER_END=net.minecraft.network.syncher.SynchedEntityData.defineId(EvaPrototypeEntity.class,net.minecraft.network.syncher.EntityDataSerializers.VECTOR3);
     private static final net.minecraft.network.syncher.EntityDataAccessor<Integer> UN_SERIAL=net.minecraft.network.syncher.SynchedEntityData.defineId(EvaPrototypeEntity.class,net.minecraft.network.syncher.EntityDataSerializers.INT);
     private final EvaPoseSignalClock eyeClock=new EvaPoseSignalClock();
-    @Override protected void defineSynchedData(){super.defineSynchedData();entityData.define(FLIGHT,false);entityData.define(LANDING,false);entityData.define(UN_SERIAL,0);entityData.define(LASER_AGE,-1);entityData.define(LASER_COOLDOWN,0);entityData.define(EYE_YAW,0F);entityData.define(EYE_PITCH,0F);entityData.define(LASER_END,new org.joml.Vector3f());}
+    @Override protected void defineSynchedData(){super.defineSynchedData();entityData.define(SITE_OFFSET,net.minecraft.core.BlockPos.ZERO);entityData.define(FLIGHT,false);entityData.define(LANDING,false);entityData.define(UN_SERIAL,0);entityData.define(LASER_AGE,-1);entityData.define(LASER_COOLDOWN,0);entityData.define(EYE_YAW,0F);entityData.define(EYE_PITCH,0F);entityData.define(LASER_END,new org.joml.Vector3f());}
     public boolean isEyeLaserActive(){return entityData.get(LASER_AGE)>=0;}
     public float eyeLaserAge(float partial){return level().isClientSide?eyeClock.sample(FirstBattleSignals.clientFrameTime()):entityData.get(LASER_AGE);}
     public int eyeLaserCooldown(){return entityData.get(LASER_COOLDOWN);}
@@ -85,6 +97,7 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     {entityData.set(EYE_YAW,getYRot()+net.minecraft.util.Mth.clamp(net.minecraft.util.Mth.wrapDegrees(p.getYRot()-getYRot()),-65,65));entityData.set(EYE_PITCH,net.minecraft.util.Mth.clamp(p.getXRot(),-35,35));}
     @Override public void tick()
     {
+        syncSite();
         super.tick();if(level().isClientSide)return;com.projectseele.world.UNRecoveryR22.remember(this);com.projectseele.world.UNPlugDirector.tick(this);if(eyeLaserCooldown()>0)entityData.set(LASER_COOLDOWN,eyeLaserCooldown()-1);
         if(Unit03SourceRigR53.uses(this))
         {
@@ -129,7 +142,7 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     }
     @Override public void onSyncedDataUpdated(net.minecraft.network.syncher.EntityDataAccessor<?> key){super.onSyncedDataUpdated(key);if(key.equals(LASER_AGE)&&eyeClock!=null&&level().isClientSide)eyeClock.accept(entityData.get(LASER_AGE),false,true);}
     @Override public void addAdditionalSaveData(net.minecraft.nbt.CompoundTag t){super.addAdditionalSaveData(t);t.putInt("UNSerial",getUNSerial());t.putInt("UNEyeCooldown",eyeLaserCooldown());t.putBoolean("UNFlight",isUNFlying());t.putBoolean("UNLanding",isUNLanding());}
-    @Override public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag t){super.readAdditionalSaveData(t);setUNSerial(t.getInt("UNSerial"));entityData.set(LASER_COOLDOWN,t.getInt("UNEyeCooldown"));entityData.set(LASER_AGE,-1);entityData.set(FLIGHT,getUNSerial()==1&&t.getBoolean("UNFlight"));entityData.set(LANDING,t.getBoolean("UNLanding"));}
+    @Override public void readAdditionalSaveData(net.minecraft.nbt.CompoundTag t){super.readAdditionalSaveData(t);setUNSerial(t.getInt("UNSerial"));syncSite();entityData.set(LASER_COOLDOWN,t.getInt("UNEyeCooldown"));entityData.set(LASER_AGE,-1);entityData.set(FLIGHT,getUNSerial()==1&&t.getBoolean("UNFlight"));entityData.set(LANDING,t.getBoolean("UNLanding"));}
     public EvaPrototypeEntity(EntityType<? extends EvaUnit01Entity> type,Level level)
     {
         super(type,level);
@@ -143,11 +156,12 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
 
     public boolean isInsideTestHangar()
     {
+        Vec3 home=homePosition();
         return this.level().dimension().equals(com.projectseele.world.FacilitySchemaV2.DIMENSION)
-                && Math.abs(this.getX()-homePosition().x)<=58
-                && this.getY()>=76 && this.getY()<=160
-                && this.getZ()>=-6288 && this.getZ()<=-6136
-                && this.level().getBlockState(net.minecraft.core.BlockPos.containing(homePosition().add(0,-1,0)))
+                && Math.abs(this.getX()-home.x)<=58
+                && this.getY()>=home.y-1 && this.getY()<=home.y+83
+                && this.getZ()>=home.z-82.5 && this.getZ()<=home.z+69.5
+                && this.level().getBlockState(net.minecraft.core.BlockPos.containing(home.add(0,-1,0)))
                     .is(com.projectseele.registry.ModBlocks.NERV_FLOOR_PANEL.get());
     }
 

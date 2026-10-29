@@ -64,7 +64,7 @@ public final class UNR29ResumeReview
                 if(stage==0&&timer>100){UNCommandR29.receive(player,"board",1,0,0);next(1);}
                 else if(stage==1&&eva.getPilotEntity()==player&&eva.getActivationTicks()==0&&eva.getPersistentData().getInt("UNSequenceTicks")>=60)
                 {UNCommandR29.receive(player,"deliver",1,32,195);next(2);}
-                else if(stage==2&&phase.equals("CRUISE")&&eva.position().distanceTo(UNRecoveryR22.home(1))>1500)
+                else if(stage==2&&phase.equals("CRUISE")&&eva.position().distanceTo(UNRecoveryR22.home(level,1))>1500)
                 {
                     check("occupied_original_ride",player.getVehicle()==plug&&eva.getPilotEntity()==player);check("away_from_base_before_save",true);
                     var receipt=new JsonObject();receipt.addProperty("pilot",player.getUUID().toString());receipt.addProperty("eva",eva.getUUID().toString());receipt.addProperty("plug",plug.getUUID().toString());receipt.addProperty("phase",phase);receipt.addProperty("x",eva.getX());receipt.addProperty("y",eva.getY());receipt.addProperty("z",eva.getZ());Files.writeString(world.resolve("r29_un_reload_checkpoint.json"),receipt.toString());finish("");
@@ -74,7 +74,7 @@ public final class UNR29ResumeReview
             if(stage==10)
             {
                 if(eva.getPilotEntity()!=player){if(timer>400)throw new IllegalStateException("Saved UN ride was not restored");return;}
-                check("original_ride_after_jvm_restart",player.getVehicle()==plug);check("still_away_from_base",eva.position().distanceTo(UNRecoveryR22.home(1))>1000);next(11);
+                check("original_ride_after_jvm_restart",player.getVehicle()==plug);check("still_away_from_base",eva.position().distanceTo(UNRecoveryR22.home(level,1))>1000);next(11);
             }
             else if(stage==11&&!UNAirLiftR29.active(level,1))
             {
@@ -105,7 +105,7 @@ public final class UNR29ResumeReview
                 if(phase.equals("CRUISE")&&!canceled){UNCommandR29.receive(player,"cancel",1,0,0);canceled=true;check("airborne_cancel_requested",true);}
                 if(canceled&&!UNAirLiftR29.active(level,1))
                 {
-                    check("cancel_returned_original_home",eva.position().distanceTo(UNRecoveryR22.home(1))<.2);check("safe_automatic_extraction",!player.isPassenger()&&plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_SUSPENDED);check("continuous_nuclear_samples",powerSamples>600);checks.addProperty("power_samples",powerSamples);finish("");
+                    check("cancel_returned_original_home",eva.position().distanceTo(UNRecoveryR22.home(level,1))<.2);check("safe_automatic_extraction",!player.isPassenger()&&plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_SUSPENDED);check("continuous_nuclear_samples",powerSamples>600);checks.addProperty("power_samples",powerSamples);finish("");
                 }
             }
         }

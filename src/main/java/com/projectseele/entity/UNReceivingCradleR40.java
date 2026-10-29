@@ -11,13 +11,15 @@ public final class UNReceivingCradleR40
     public record Fit(float yaw,Vec3 offset,double score) {}
     public static Fit fit(EvaUnit01Entity eva,float yaw)
     {
+        if(eva.level() instanceof net.minecraft.server.level.ServerLevel level
+                &&!com.projectseele.world.NervTraversalPolicyR53.strict(level))return new Fit(yaw,Vec3.ZERO,0);
         var pose=EvaAirTransportR31.active(eva)?EvaAirTransportR31.origin(eva):EvaBodyPose.sample(eva,0);
         return fit(eva,yaw,com.projectseele.world.VerticalCarrierSweepR40.localVertices(eva,pose));
     }
     private static Fit fit(EvaUnit01Entity eva,float yaw,List<Vec3> points)
     {
         if(!(eva instanceof EvaPrototypeEntity un)||!(eva.level() instanceof net.minecraft.server.level.ServerLevel level))return new Fit(yaw,Vec3.ZERO,0);
-        var home=com.projectseele.world.UNRecoveryR22.home(un.getUNSerial());var min=com.projectseele.world.UNHangarDimensionsR31.minimum(level,un.getUNSerial());var max=com.projectseele.world.UNHangarDimensionsR31.maximum(level,un.getUNSerial());
+        var home=com.projectseele.world.UNRecoveryR22.home(level,un.getUNSerial());var min=com.projectseele.world.UNHangarDimensionsR31.minimum(level,un.getUNSerial());var max=com.projectseele.world.UNHangarDimensionsR31.maximum(level,un.getUNSerial());
         double c=Math.cos((180-yaw)*Mth.DEG_TO_RAD),s=Math.sin((180-yaw)*Mth.DEG_TO_RAD);
         double x0=Double.POSITIVE_INFINITY,x1=Double.NEGATIVE_INFINITY,z0=x0,z1=x1;
         for(var p:points){double x=c*p.x+s*p.z,z=-s*p.x+c*p.z;x0=Math.min(x0,x);x1=Math.max(x1,x);z0=Math.min(z0,z);z1=Math.max(z1,z);}
@@ -33,6 +35,9 @@ public final class UNReceivingCradleR40
         var pose=EvaAirTransportR31.active(eva)?EvaAirTransportR31.origin(eva):EvaBodyPose.sample(eva,0);
         var up=pose.matrix("torso_lower").transformDirection(new Vector3f(0,1,0)).normalize();
         if(!EvaShutdownR30.disabled(eva)&&Math.abs(up.y)>.65)return 0;
+        if(eva.level() instanceof net.minecraft.server.level.ServerLevel level
+                &&!com.projectseele.world.NervTraversalPolicyR53.strict(level))
+            return Mth.wrapDegrees(180+(float)Math.atan2(up.x,up.z)*Mth.RAD_TO_DEG);
         var points=com.projectseele.world.VerticalCarrierSweepR40.localVertices(eva,pose);double best=Double.POSITIVE_INFINITY;float angle=Float.NaN;
         for(int yaw=-180;yaw<180;yaw++)
         {

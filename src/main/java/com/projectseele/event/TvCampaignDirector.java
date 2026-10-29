@@ -333,7 +333,7 @@ public final class TvCampaignDirector
                     recovered=fleet!=null&&fleet.canonicalId().equals(sortie.eva)&&fleet.phase()==EvaFleetSavedData.Phase.PARKED
                             &&EvaLogisticsDirector.inAssignedHangarR33(level,eva)&&EvaLogisticsDirector.recoveryMotionSettled(eva);
                 }
-                else recovered=eva.position().distanceToSqr(UNRecoveryR22.home(sortie.unit-3))<16&&eva.onGround()
+                else recovered=eva.position().distanceToSqr(UNRecoveryR22.home(level,sortie.unit-3))<16&&eva.onGround()
                         &&eva.getDeltaMovement().lengthSqr()<.001;
             }
             if(!recovered)

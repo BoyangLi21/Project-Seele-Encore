@@ -99,8 +99,8 @@ def city_plan(world):
 
 def un_plan(world,gis):
     design=np.load(gis/"terrain-design.npz")
-    # Includes R31 western annex and R40 receiving aprons, not only the R07 fence.
-    source=[6208,64,-6712,6896,176,-5944]
+    # Includes the R23 north flight line, R31 western annex and R40 aprons.
+    source=[6208,64,-7088,6896,176,-5944]
     delta=[-2608,-150,5812]
     target=[source[i]+delta[i%3] for i in range(6)]
     xs,zs=design["x"],design["z"]
@@ -108,7 +108,8 @@ def un_plan(world,gis):
     selection=np.ix_(iz,ix);height=design["height_y"][selection]
     sea=design["sea"][selection];water=design["inland_water"][selection]
     installation=json.loads((world/"r07_installations.json").read_text("utf8"))
-    assigned=[entry["key"] for entry in installation["entities"] if entry["position"][0]>6000]
+    readiness=json.loads((world/"military_readiness_r23.json").read_text("utf8"))
+    assigned=[entry["key"] for entry in installation["entities"]+readiness["vehicles"] if entry["position"][0]>6000]
     return dict(status="Odawara northern plain siting proposal; not installed",source_bounds=source,target_bounds=target,delta=delta,
                 old_floor=74,target_floor=74+delta[1],
                 terrain_y_percentiles=list(map(float,np.nanpercentile(height,[0,25,50,75,100]))),

@@ -96,7 +96,7 @@ public final class UNR29Review
                 {
                     if(!UNAirLiftR29.active(level,serial)&&timer>200)
                     {
-                        check("delivered_away_from_home_"+serial,eva.position().distanceTo(UNRecoveryR22.home(serial))>120);check("delivered_unlocked_"+serial,!eva.isNervLogisticsLocked());
+                        check("delivered_away_from_home_"+serial,eva.position().distanceTo(UNRecoveryR22.home(level,serial))>120);check("delivered_unlocked_"+serial,!eva.isNervLogisticsLocked());
                         player.teleportTo(level,eva.getX()+20,eva.getY()+1,eva.getZ()+20,135,0);next(3);
                     }
                 }
@@ -146,19 +146,19 @@ public final class UNR29Review
                 case 8 -> {if(timer==20){UNCommandR29.receive(player,"recover",serial,0,0);}if(UNAirLiftR29.active(level,serial))next(9);else if(timer>160)throw new IllegalStateException("Occupied recovery did not start");}
                 case 9 ->
                 {
-                    boolean extracting=R30&&dockRequested[serial]&&eva.position().distanceTo(UNRecoveryR22.home(serial))<.2
+                    boolean extracting=R30&&dockRequested[serial]&&eva.position().distanceTo(UNRecoveryR22.home(level,serial))<.2
                             &&plug!=null&&(plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_EJECTING||plug.getInsertionStage()==EntryPlugCarrierEntity.STAGE_SUSPENDED);
                     if(extracting)check("original_capsule_extraction_"+serial,!player.isPassenger()||player.getVehicle()==plug);
                     else if(!phase.equals("RETREAT")&&!phase.equals("RETURN_FLIGHT")&&!phase.equals("IDLE"))check("ride_retained_"+serial,eva.getPilotEntity()==player&&player.getVehicle()==plug);
                     else check("safe_extraction_chain_"+serial,!player.isPassenger()||player.getVehicle()==plug);
                     if(!UNAirLiftR29.active(level,serial)&&timer>200)
                     {
-                        if(R30&&eva.position().distanceTo(UNRecoveryR22.home(serial))>=.2)
+                        if(R30&&eva.position().distanceTo(UNRecoveryR22.home(level,serial))>=.2)
                         {
-                            if(!dockRequested[serial]&&eva.position().distanceTo(UNAirLiftR29.apron(serial))<8){UNCommandR29.receive(player,"dock",serial,0,0);dockRequested[serial]=true;}
+                            if(!dockRequested[serial]&&eva.position().distanceTo(UNAirLiftR29.apron(level,serial))<8){UNCommandR29.receive(player,"dock",serial,0,0);dockRequested[serial]=true;}
                             break;
                         }
-                        check("home_return_"+serial,eva.position().distanceTo(UNRecoveryR22.home(serial))<.2);
+                        check("home_return_"+serial,eva.position().distanceTo(UNRecoveryR22.home(level,serial))<.2);
                         eva.exitEva(player);next(10);
                     }
                 }
