@@ -7784,10 +7784,22 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // a prone body. Terrain-section culling can hide that hull while the
         // sixty-metre model is still in plain view above the terrain.
         double reach = EvaScale.NORMAL_HEIGHT * .5D + 4;
-        return this.getBoundingBox().minmax(new AABB(
+        AABB visible=this.getBoundingBox().minmax(new AABB(
                 this.getX() - reach, this.getY() - 8, this.getZ() - reach,
                 this.getX() + reach, this.getY() + EvaScale.NORMAL_HEIGHT + 12,
                 this.getZ() + reach));
+        if(this.level().isClientSide&&EvaMechanicalFrameR52.active(this))
+        {
+            // The shell is drawn on the mechanical presentation clock, which
+            // can lag the newest native position during flight and handoff.
+            // Cull the presented frame as well; never build collision meshes.
+            var first=EvaMechanicalFrameR52.frame(this,0).translation();
+            var last=EvaMechanicalFrameR52.frame(this,1).translation();
+            visible=visible.minmax(new AABB(first,last).inflate(EvaScale.NORMAL_HEIGHT+12));
+        }
+        else if(this.level().isClientSide&&this.hasActiveCarrierMotion())
+            visible=visible.minmax(new AABB(this.carrierRenderPosition(0),this.carrierRenderPosition(1)).inflate(EvaScale.NORMAL_HEIGHT+12));
+        return visible;
     }
 
     @Override
