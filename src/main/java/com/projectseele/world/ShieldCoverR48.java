@@ -2,6 +2,7 @@ package com.projectseele.world;
 
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaShieldRigR47;
+import com.projectseele.entity.EvaShutdownR30;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.RamielEntity;
 import com.projectseele.physics.CombatDamageTargetsR44;
@@ -137,10 +138,10 @@ public final class ShieldCoverR48
         var site = TvEncounterSitesR45.site(level, data.active).orElse(null);
         var cover = TvSortiesR32.assignedUnit(level, data, 0);
         var shooter = TvSortiesR32.assignedUnit(level, data, 1);
-        return site != null && cover != null && shooter != null
-                && cover.position().distanceTo(site.cover()) <= 12
+        var target = cover != null && cover.isAlive() && cover.getHealth() > 0 && !EvaShutdownR30.wreck(cover) ? cover : shooter;
+        return site != null && shooter != null && target != null
                 && shooter.position().distanceTo(site.hero()) <= 12
-                && boss.effectiveBeamRangeR45() >= boss.getBoundingBox().getCenter().distanceTo(shooter.getEyePosition());
+                && boss.effectiveBeamRangeR45() >= boss.getBoundingBox().getCenter().distanceTo(target.getEyePosition());
     }
 
     /** Called once by fireBeam, never by the afterglow renderer or damage ticks. */

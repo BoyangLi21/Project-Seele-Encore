@@ -1,5 +1,7 @@
 package com.projectseele.world;
 
+import com.projectseele.entity.EvaShutdownR30;
+
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.TrainingPilotEntity;
 import net.minecraft.server.level.ServerLevel;
@@ -136,14 +138,14 @@ public final class TvEncounterRulesR45
         if(site==null||!equipment.rangesReady(shooter,Math.max(site.separation(),site.attackRange())))return "远程火控仍在整备中。";
         if(!TvMissionEquipmentR45.cannonAuthorized(shooter)||!equipment.cannonReady(shooter))return "初号机尚未装配阳离子炮。";
         if(!TvMissionEquipmentR45.shieldAuthorized(cover)||!equipment.shieldEquipped(cover))return "零号机尚未装备防护盾。";
-        if(cover.position().distanceTo(site.cover())>12)return "零号机请抵达防护站位，挡在初号机与目标之间。";
+        var side=TvYashimaArrivalR50.shieldSide(l);
+        if(side==null||cover.position().distanceTo(side)>12)return "零号机请抵达左侧防护站位。";
         if(shooter.position().distanceTo(site.hero())>12)return "初号机请抵达炮击阵地。";
         var boss=d.angel==null?null:l.getEntity(d.angel);
         Vec3 from=boss==null?site.angel().add(0,7.5,0):boss.getBoundingBox().getCenter();
-        Vec3 to=shooter.getEyePosition();
+        Vec3 to=cover.getEyePosition();
         if(boss!=null&&(!(boss instanceof BeamRangeSource range)||range.effectiveBeamRangeR45()<from.distanceTo(to)))
             return "目标火控仍在校准中，请保持阵地。";
-        if(!equipment.shieldRayIntersects(cover,from,to))return "零号机请调整盾面，遮挡目标到初号机的射线。";
         return "";
     }
     /** Pure role intent; uses the same real root equipment API as human inputs. */
@@ -159,14 +161,10 @@ public final class TvEncounterRulesR45
         {
             var side=TvYashimaArrivalR50.shieldSide(l);
             if(side==null||site==null){eva.stopAutonomousR30();d.notice="原盾侧待命通路尚未确认。";return true;}
-            boolean counterattack=boss instanceof com.projectseele.entity.RamielEntity ramiel&&ramiel.isAlive()
-                    &&TvYashimaArrivalR50.enterCoverR54(ramiel.isCharging(),TvYashimaCombatCommsR54.chargeRemainingR54(ramiel),ramiel.getBeamTicks());
             eva.autonomousWeaponR30(pilot,EvaUnit01Entity.WEAPON_SHIELD_R45);
-            // The end-of-tick finite guard slide owns lane entry/withdrawal,
-            // including wreck evacuation. Ordinary walking cannot clear the
-            // sixty-metre plate during the actual sixteen-tick firing window.
+            // Arrival owns the single fixed station; no phase-dependent walk.
             eva.autonomousDriveR30(pilot,Vec3.ZERO,aim,false);
-            equipment.shieldInput(eva,pilot,counterattack&&TvMissionEquipmentR45.operational(eva)&&equipment.shieldEquipped(eva));
+            equipment.shieldInput(eva,pilot,TvMissionEquipmentR45.operational(eva)&&equipment.shieldEquipped(eva));
             return true;
         }
         Vec3 delta=goal.subtract(eva.position()).multiply(1,0,1);
@@ -258,13 +256,23 @@ public final class TvEncounterRulesR45
         var owner=l.getServer().getPlayerList().getPlayer(d.owner);
         var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
         var shooter=TvSortiesR32.assignedUnit(l,d,1);
+        var cover=TvSortiesR32.assignedUnit(l,d,0);
+        var target=cover!=null&&cover.isAlive()&&cover.getHealth()>0&&!EvaShutdownR30.wreck(cover)?cover:shooter;
         var exposure=TvYashimaSavedDataR50.get(l);
         // Once exposed, putting the cannon down or leaving its crown does not
         // remove the threat. Actual beam range and world LOS still own reach.
-        return owner!=null&&owner.level()==l&&site!=null&&site.geometryValidated()&&site.modelReady()
+        boolean allowed=owner!=null&&owner.level()==l&&site!=null&&site.geometryValidated()&&site.modelReady()
                 &&site.id().equals(d.encounterSiteR45)&&site.fingerprint().equals(d.encounterLayoutR45)
-                &&exposure.matches(d)&&exposure.fireControlLocked&&shooter!=null&&shooter.isAlive()
-                &&shooter.getUUID().equals(exposure.fireTarget)&&boss.getTarget()==shooter;
+                &&exposure.matches(d)&&exposure.fireControlLocked&&target!=null&&target.isAlive()
+                &&target.getHealth()>0&&!EvaShutdownR30.wreck(target);
+        if(allowed)
+        {
+            // Switch immediately on defender loss, without restarting warning
+            // or waiting for the director's slower update.
+            if(!target.getUUID().equals(exposure.fireTarget)){exposure.fireTarget=target.getUUID();exposure.setDirty();}
+            if(boss.getTarget()!=target)boss.setTarget(target);
+        }
+        return allowed;
     }
     public static boolean cannonPermissionR50(EvaUnit01Entity eva)
     {

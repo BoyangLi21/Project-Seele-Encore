@@ -453,16 +453,27 @@ public final class NervAirTransportRuntimeR52
             {
                 if(!j.active()&&!j.hasStatusReport())continue;
                 String note=phaseLabelR52(j.phase())+" · "+humanWaitingR52(j.waiting());
+                var data=j.ownerData();
+                var reported=data.getList("ReportSeenR54",Tag.TAG_STRING);
+                // Retry/recovery can alternate between HOLD and the same
+                // phase. Each task reports each meaningful state only once.
+                if(j.hasStatusReport())
+                {
+                    var previous=StringTag.valueOf(j.lastStatusReportNote());
+                    if(!reported.contains(previous))reported.add(previous);
+                }
+                var key=StringTag.valueOf(note);
+                if(reported.contains(key))continue;
                 long last=j.lastStatusReportTime();
-                boolean changed=!note.equals(j.lastStatusReportNote());
-                if(!changed||j.active()&&now-last<1500&&now>=last)continue;
+                if(j.active()&&now-last<1500&&now>=last)continue;
                 var owner=level.getServer().getPlayerList().getPlayer(j.original().owner());
                 var plane=level.getEntity(j.aircraft());
-                if(owner!=null&&plane instanceof UNTransportEntity aircraft)
-                    owner.sendSystemMessage(net.minecraft.network.chat.Component.literal("[NERV 运输管制] 运输机"
+                if(owner==null||!(plane instanceof UNTransportEntity aircraft))continue;
+                owner.sendSystemMessage(net.minecraft.network.chat.Component.literal("[NERV 运输管制] 运输机"
                             +aircraft.serial()+" · "+plane.blockPosition().toShortString()+" · "
                             +NervStaffDialogue.unitName(j.original().variant())+" · "+note));
-                var data=j.ownerData();data.putLong("ReportAtR53",now);data.putString("ReportNoteR53",note);
+                reported.add(key);data.put("ReportSeenR54",reported);
+                data.putLong("ReportAtR53",now);data.putString("ReportNoteR53",note);
                 save(j.update(j.leg(),j.age(),j.phase(),j.carrying(),j.payloadTransferred(),j.spaces(),j.mechanisms(),data,j.waiting()));
             }
         }

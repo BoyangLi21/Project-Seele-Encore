@@ -246,12 +246,12 @@ public final class TvYashimaDirectorR50
         if(!shooter.fixedCannonOperatingR52())return "阳电子炮已升起；请从驾驶舱看向炮体，右键接入炮位。";
         String cannon=TvYashimaStationR52.fireBlocker(shooter);if(!cannon.isEmpty())return cannon;
         var cover=TvSortiesR32.assignedUnit(level,data,0);
+        if(cover!=null&&(cover.getHealth()<=0||EvaShutdownR30.wreck(cover)))return "";
         if(cover==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(0))||!TvMissionEquipmentR45.operational(cover)
                 ||!equipment.shieldEquipped(cover))return "等待零号机携盾就位。";
         var side=TvYashimaArrivalR50.shieldSide(level);
-        boolean center=cover.position().subtract(site.cover()).horizontalDistance()<=1.5&&Math.abs(cover.getY()-site.cover().y)<=1.35;
-        boolean standby=side!=null&&cover.position().subtract(side).horizontalDistance()<=1.5&&Math.abs(cover.getY()-side.y)<=1.35;
-        if((!center&&!standby)||AirCradleClearanceR31.touchdownContact(cover)==null)return "等待零号机进入防护位置。";
+        boolean standby=side!=null&&cover.position().subtract(side).horizontalDistance()<=1.5;
+        if(!standby)return "等待零号机进入左侧防护位置。";
         return "";
     }
     /** Gate only this accepted mission's fire intent, never the actors' damage/collision. */
@@ -327,17 +327,21 @@ public final class TvYashimaDirectorR50
         boss.missionDrillR50(true,(float)Math.max(0,boss.getBoundingBox().getCenter().y-NervArmorColumnR50.frontY(level)));
         var shooter=TvSortiesR32.assignedUnit(level,data,1);
         if(shooter!=null&&EvaShutdownR30.wreck(shooter)){fail(level,data,"原初号机已失去炮击能力。");return;}
+        var cover=TvSortiesR32.assignedUnit(level,data,0);
+        var target=cover!=null&&cover.isAlive()&&cover.getHealth()>0&&!EvaShutdownR30.wreck(cover)?cover:shooter;
         String setup=service.fireControlLocked?"":firstFireLockBlocker(level,data,site,shooter);
         if(!service.fireControlLocked&&setup.isEmpty())
         {
-            service.fireControlLocked=true;service.fireTarget=shooter.getUUID();service.setDirty();
+            service.fireControlLocked=true;service.fireTarget=target.getUUID();service.setDirty();
             ProjectSeele.LOGGER.info("R50 Yashima original cannon emplacement exposed: boss={} shooter={} owner={} generation={}",data.angel,service.fireTarget,data.owner,data.generationR43);
         }
         boss.setNoAi(false);
-        boss.setTarget(service.fireControlLocked&&shooter!=null&&shooter.isAlive()&&shooter.getUUID().equals(service.fireTarget)?shooter:null);
+        if(service.fireControlLocked&&target!=null&&target.isAlive()&&target.getHealth()>0&&!EvaShutdownR30.wreck(target))
+        {if(!target.getUUID().equals(service.fireTarget)){service.fireTarget=target.getUUID();service.setDirty();}boss.setTarget(target);}
+        else boss.setTarget(null);
         if(!boss.blockPosition().equals(data.lastPosition)){data.lastPosition=boss.blockPosition();data.setDirty();}
         if(data.phase.equals("alert")&&TvMissionAlertR30.tick(level,data,owner)){data.phase="approach";data.setDirty();}
-        if(data.phase.equals("approach")&&boss.getTarget()==shooter&&shooter!=null
+        if(data.phase.equals("approach")&&boss.getTarget()!=null&&shooter!=null
                 &&TvMissionEquipmentR45.cannonAuthorized(shooter)&&TvEncounterEquipmentControlR45.serverCargoAndCannonR45().cannonReady(shooter)
                 &&TvYashimaStationR52.atPlatformR52(shooter)&&TvEncounterRulesR45.fireControlReadyR53(level,data,owner))
         {data.phase="combat";data.setDirty();}
