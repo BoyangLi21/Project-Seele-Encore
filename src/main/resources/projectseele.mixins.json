@@ -6,6 +6,7 @@
   "refmap": "projectseele.refmap.json",
   "minVersion": "0.8",
   "mixins": [
+    "LclPlayerSwimmingR54Mixin",
     "DhColumnExtentR53Mixin",
     "DhServerLogoutR53Mixin",
     "FacilityTrackingRangeR54Mixin",
@@ -41,6 +42,7 @@
     "CitySavedOwnerUnionMixinR45"
   ],
   "client": [
+    "client.LclBubbleR54Mixin",
     "client.GeoFrontMissionDayTimeR54Mixin",
     "client.GeoFrontMissionSunR54Mixin",
     "client.RamielDistantProjectionR52Mixin",

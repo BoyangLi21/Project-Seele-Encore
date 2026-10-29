@@ -22,6 +22,8 @@ public final class LclFluidType extends FluidType
             "projectseele", "block/lcl_flow");
     private static final ResourceLocation OVERLAY = new ResourceLocation(
             "minecraft", "block/water_overlay");
+    private static final ResourceLocation UNDERWATER = new ResourceLocation(
+            "minecraft", "textures/misc/underwater.png");
     // R45 inherits water animation, normals and transparency. Only the tint
     // differs; do not force the atlas sprite to opaque or replace water math.
     public static final int TINT = 0xFFDB5420;
@@ -66,6 +68,12 @@ public final class LclFluidType extends FluidType
             public ResourceLocation getOverlayTexture()
             {
                 return OVERLAY;
+            }
+
+            @Override
+            public ResourceLocation getRenderOverlayTexture(net.minecraft.client.Minecraft minecraft)
+            {
+                return UNDERWATER;
             }
 
             @Override
