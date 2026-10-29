@@ -4258,7 +4258,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     public void setPilotCrouching(ServerPlayer pilot, boolean crouching)
     {
-        if (this.getControllingPassenger() != pilot || this.isPilotControlLocked()
+        if (this.getControllingPassenger() != pilot || this.isPilotControlLocked() || this.fixedCannonOperatingR52()
                 || this.isPilotCrouching() == crouching)
         {
             return;
@@ -4285,7 +4285,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     public void toggleProne(ServerPlayer pilot)
     {
-        if (this.getControllingPassenger() != pilot || this.isPilotControlLocked())
+        if (this.getControllingPassenger() != pilot || this.isPilotControlLocked() || this.fixedCannonOperatingR52())
         {
             return;
         }
@@ -7345,6 +7345,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     public boolean isControlledByLocalInstance()
     {
+        if(this.fixedCannonOperatingR52())return !this.level().isClientSide;
         if(this.level().isClientSide&&EvaMechanicalFrameR52.active(this))return false;
         if(EvaMechanicalFrameR52.ballisticCustodyR52(this))return !this.level().isClientSide;
         if(EvaShutdownR30.disabled(this))return !this.level().isClientSide;
@@ -7373,7 +7374,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 this.entityData.set(DATA_CANNON_AIM_PITCH, aimPitch);
             }
         }
-        if (this.isCrucified() || this.isPilotControlLocked())
+        if (this.fixedCannonOperatingR52() || this.isCrucified() || this.isPilotControlLocked())
         {
             // Activation interlocks, launch rails and ritual restraints all
             // own the chassis transform. Pilot view input must not rotate it.

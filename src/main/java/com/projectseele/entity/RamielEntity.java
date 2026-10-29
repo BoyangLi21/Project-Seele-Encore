@@ -122,7 +122,16 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             this.getDisplayName(), BossEvent.BossBarColor.BLUE, BossEvent.BossBarOverlay.PROGRESS);
 
     private int beamCooldown = 60;
+    private long beamCooldownReadyAtR54;
     private int rippleCooldown;
+
+    private static int pacedRemainingR54(int ticks,long readyAt)
+    {
+        // A burst of catch-up ticks must not consume the spoken warning or
+        // recovery interval. Simulation ticks also keep these paused in menus.
+        long remaining=readyAt==0?0:Math.max(0,readyAt-System.nanoTime());
+        return Math.max(ticks,(int)((remaining+49_999_999L)/50_000_000L));
+    }
 
     /** The mission armour controller is the only writer of the accepted drilling front. */
     public void missionDrillR50(boolean active,float depth)
@@ -320,12 +329,18 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         super.addAdditionalSaveData(tag);
         // Save the authored base scale; loading must not multiply it again.
         tag.putFloat("AtFieldEnergy", this.getAtFieldEnergy());tag.putFloat("ModelScaleR52",this.entityData.get(DATA_MODEL_SCALE_R52));
+        tag.putInt("BeamCooldownR54",pacedRemainingR54(this.beamCooldown,this.beamCooldownReadyAtR54));
     }
 
     @Override
     public void readAdditionalSaveData(CompoundTag tag)
     {
         super.readAdditionalSaveData(tag);
+        if(tag.contains("BeamCooldownR54"))
+        {
+            this.beamCooldown=Mth.clamp(tag.getInt("BeamCooldownR54"),0,2400);
+            this.beamCooldownReadyAtR54=System.nanoTime()+this.beamCooldown*50_000_000L;
+        }
         this.entityData.set(DATA_MODEL_SCALE_R52,tag.contains("ModelScaleR52")?net.minecraft.util.Mth.clamp(tag.getFloat("ModelScaleR52"),1,16):1F);
         this.entityData.set(DATA_AT_ENERGY,
                 tag.contains("AtFieldEnergy") ? tag.getFloat("AtFieldEnergy") : this.getAtFieldMax());
@@ -472,9 +487,12 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         {
             // Decrement before AI can fire. A new shot keeps all 16 ticks,
             // and the synced beam clock also controls the exposed model.
-            int remaining = Math.max(0, this.getBeamTicks() - 1);
+            int previous=this.getBeamTicks();
+            int remaining = Math.max(0, previous - 1);
             this.entityData.set(DATA_BEAM_TICKS, remaining);
             this.setExposed(remaining > 0);
+            if(previous>0&&remaining==0)com.projectseele.world.TvYashimaCombatCommsR54.onBeamEnded(this,
+                    pacedRemainingR54(this.beamCooldown,this.beamCooldownReadyAtR54));
         }
         super.tick();
         if (this.level().isClientSide)
@@ -701,6 +719,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         this.entityData.set(DATA_BEAM_END, new Vector3f((float) end.x, (float) end.y, (float) end.z));
         this.entityData.set(DATA_BEAM_TICKS, BEAM_RENDER_TICKS);
         this.setExposed(true);
+        com.projectseele.world.TvYashimaCombatCommsR54.onFire(this);
         if (this.level() instanceof ServerLevel serverLevel)
         {
             SeeleNetwork.CHANNEL.send(
@@ -900,6 +919,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     {
         private final RamielEntity ramiel;
         private int chargeTicks;
+        private long chargeReadyAtR54;
 
         BeamAttackGoal(RamielEntity ramiel)
         {
@@ -912,7 +932,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         {
             LivingEntity target = this.ramiel.getTarget();
             double range = this.ramiel.effectiveBeamRangeR45();
-            return this.ramiel.beamCooldown <= 0
+            return pacedRemainingR54(this.ramiel.beamCooldown,this.ramiel.beamCooldownReadyAtR54) <= 0
                     && com.projectseele.world.TvYashimaDirectorR50.fireAiAllowedR50(this.ramiel)
                     && (!this.ramiel.isDrilling()||com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this.ramiel)!=null)
                     && target != null && target.isAlive()
@@ -937,10 +957,13 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         @Override
         public void start()
         {
-            this.chargeTicks = this.ramiel.isEnraged()
+            boolean yashima=com.projectseele.world.ShieldCoverR48.yashima(this.ramiel);
+            this.chargeTicks = yashima?SeeleConfig.YASHIMA_BEAM_CHARGE_TICKS.get():this.ramiel.isEnraged()
                     ? SeeleConfig.BEAM_CHARGE_TICKS_ENRAGED.get()
                     : SeeleConfig.BEAM_CHARGE_TICKS.get();
+            this.chargeReadyAtR54=yashima?System.nanoTime()+this.chargeTicks*50_000_000L:0;
             this.ramiel.setCharging(true);
+            com.projectseele.world.TvYashimaCombatCommsR54.onCharge(this.ramiel,this.chargeTicks);
             this.ramiel.playSound(ModSounds.BEAM_CHARGE.get(), 3.0F,
                     this.ramiel.isEnraged() ? 1.35F : 1.0F);
         }
@@ -949,7 +972,11 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         public void stop()
         {
             this.ramiel.setCharging(false);
-            this.ramiel.beamCooldown = SeeleConfig.BEAM_COOLDOWN_TICKS.get();
+            boolean yashima=com.projectseele.world.ShieldCoverR48.yashima(this.ramiel);
+            this.ramiel.beamCooldown = yashima?SeeleConfig.YASHIMA_BEAM_COOLDOWN_TICKS.get():SeeleConfig.BEAM_COOLDOWN_TICKS.get();
+            this.ramiel.beamCooldownReadyAtR54=yashima?System.nanoTime()+this.ramiel.beamCooldown*50_000_000L:0;
+            this.chargeReadyAtR54=0;
+            com.projectseele.world.TvYashimaCombatCommsR54.onChargeCancelled(this.ramiel);
             // Cancelling charge cannot create or extend a firing window.
             this.ramiel.setExposed(this.ramiel.getBeamTicks() > 0);
         }
@@ -957,6 +984,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         @Override
         public void tick()
         {
+            if (this.chargeTicks <= 0) return;
             LivingEntity target = this.ramiel.getTarget();
             if (target == null)
             {
@@ -970,7 +998,9 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                 serverLevel.sendParticles(CHARGE_DUST, core.x, core.y, core.z, 4, 1.6D, 1.6D, 1.6D, 0.0D);
             }
 
-            if (--this.chargeTicks <= 0)
+            this.chargeTicks=pacedRemainingR54(Math.max(0,this.chargeTicks-1),this.chargeReadyAtR54);
+            com.projectseele.world.TvYashimaCombatCommsR54.onChargeTick(this.ramiel,this.chargeTicks);
+            if (this.chargeTicks <= 0)
             {
                 this.ramiel.fireBeam(target);
             }

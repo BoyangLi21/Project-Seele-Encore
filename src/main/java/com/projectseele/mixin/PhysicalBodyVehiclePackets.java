@@ -35,7 +35,7 @@ public abstract class PhysicalBodyVehiclePackets
         // Remember ownership on the server tick so release still rebases its
         // first ordinary packet after the final rail interpolation sample.
         var eva=com.projectseele.world.EvaPilotResolver.controlTarget(player);
-        if(eva!=null&&EvaMechanicalFrameR52.active(eva))
+        if(eva!=null&&(eva.fixedCannonOperatingR52()||EvaMechanicalFrameR52.active(eva)))
             seele$mechanicalVehicle=eva.getUUID();
     }
     @Inject(method="handleMoveVehicle",at=@At("HEAD"),cancellable=true)
@@ -43,13 +43,19 @@ public abstract class PhysicalBodyVehiclePackets
     {
         if(!player.serverLevel().getServer().isSameThread())return;
         var controlled=com.projectseele.world.EvaPilotResolver.controlTarget(player);
-        if(controlled!=null&&EvaMechanicalFrameR52.active(controlled))
+        if(controlled!=null&&(controlled.fixedCannonOperatingR52()||EvaMechanicalFrameR52.active(controlled)))
         {
             // During insertion the root vehicle can still be the capsule.
             // The original airframe owns both forms of the passenger chain.
             seele$mechanicalVehicle=controlled.getUUID();
             var root=player.getRootVehicle();
             lastVehicle=root;vehicleFirstGoodX=vehicleLastGoodX=root.getX();vehicleFirstGoodY=vehicleLastGoodY=root.getY();vehicleFirstGoodZ=vehicleLastGoodZ=root.getZ();aboveGroundVehicleTickCount=0;
+            // A packet already in flight before the binding flag arrived must
+            // not restore the pilot's former position or steering yaw.
+            if(controlled.fixedCannonOperatingR52()&&(root.distanceToSqr(packet.getX(),packet.getY(),packet.getZ())>.0001
+                    ||Math.abs(net.minecraft.util.Mth.wrapDegrees(root.getYRot()-packet.getYRot()))>.01F
+                    ||Math.abs(root.getXRot()-packet.getXRot())>.01F))
+                player.connection.send(new ClientboundMoveVehiclePacket(root));
             callback.cancel();return;
         }
         if(!(player.getRootVehicle() instanceof LivingEntity actor))

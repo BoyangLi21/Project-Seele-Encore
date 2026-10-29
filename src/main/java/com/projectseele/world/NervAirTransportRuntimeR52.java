@@ -286,9 +286,13 @@ public final class NervAirTransportRuntimeR52
             return blocked;
         }
         boolean nearDestination(Mission m,int x,int z){var p=manifest.receiver(m.receiver()).stopped().translation();return Math.abs(p.x-x)<=.5&&Math.abs(p.z-z)<=.5;}
-        boolean cells(List<Cell> cells){for(var c:cells)if(!level.hasChunkAt(c.position())||!BlockStateParser.serialize(level.getBlockState(c.position())).equals(c.state()))return false;return true;}
+        boolean cells(List<Cell> cells){for(var c:cells)if(!level.hasChunkAt(c.position())||NervTraversalPolicyR53.strict(level)&&!BlockStateParser.serialize(level.getBlockState(c.position())).equals(c.state()))return false;return true;}
         boolean aircraftSupported(Aircraft aircraft)
         {
+            if(!NervTraversalPolicyR53.strict(level))
+                return level.getEntity(aircraft.entity()) instanceof UNTransportEntity plane
+                        &&plane.isNerv()&&!plane.groundCart()&&plane.serial()==aircraft.serial()
+                        &&EntryPlugEjectionR48.loaded(level,plane.getBoundingBox());
             if(!cells(aircraft.support()))return false;var plane=manifest.node(aircraft.stand()).frame().plane();for(var local:geometry.bearingPatches()){var patch=NervRigidMeshSweepR52.transformed(local,plane);var surface=new net.minecraft.world.phys.AABB(patch.minX,patch.minY-.001,patch.minZ,patch.maxX,patch.minY,patch.maxZ);var supports=new ArrayList<net.minecraft.world.phys.AABB>();for(var cell:aircraft.support())for(var shape:level.getBlockState(cell.position()).getCollisionShape(level,cell.position()).toAabbs()){var actual=shape.move(cell.position());if(Math.abs(actual.maxY-patch.minY)<=.002)supports.add(new net.minecraft.world.phys.AABB(actual.minX,patch.minY-.001,actual.minZ,actual.maxX,patch.minY,actual.maxZ));}if(!NervAirspaceCoverageR52.covered(surface,supports))return false;}return true;
         }
         boolean gates(Corridor c){for(String id:c.gates())if(!ground().nativeAccess().resourceReady(id,true))return false;return cells(manifest.node(c.to()).cells());}
@@ -451,7 +455,7 @@ public final class NervAirTransportRuntimeR52
                 String note=phaseLabelR52(j.phase())+" · "+humanWaitingR52(j.waiting());
                 long last=j.lastStatusReportTime();
                 boolean changed=!note.equals(j.lastStatusReportNote());
-                if(!changed&&(!j.active()||now-last<10000&&now>=last)||changed&&j.active()&&now-last<1500&&now>=last)continue;
+                if(!changed||j.active()&&now-last<1500&&now>=last)continue;
                 var owner=level.getServer().getPlayerList().getPlayer(j.original().owner());
                 var plane=level.getEntity(j.aircraft());
                 if(owner!=null&&plane instanceof UNTransportEntity aircraft)
@@ -785,7 +789,7 @@ public final class NervAirTransportRuntimeR52
         void preflight(Job j,Mission m,NervFlightProofR52.FlightPickupPreview p,Frame current,CompoundTag data)
         {
             var stand=manifest.aircraft().get(m.aircraft());if(!aircraftSupported(stand)||!NervAirTransportManifestR52.same(current.plane(),manifest.node(stand.stand()).frame().plane())){hold(j,"原泊位真实支持/机体帧已改变");return;}
-            if(!j.cancelRequested())
+            if(NervTraversalPolicyR53.strict(level)&&!j.cancelRequested())
             {
                 var junctions=new HashSet<String>();
                 for(var chain:List.of(m.outbound(),m.loaded(),m.retreat()))for(String id:chain)
@@ -825,7 +829,7 @@ public final class NervAirTransportRuntimeR52
             var aircraftProof=proof(j.aircraft(),p,current,current,j.spaces(),false);var actualPickup=pickupSpaces(m,p);data.put("PickupHeldSpaces",writeList(actualPickup));var wait=NervFlightProofR52.holdPickup(level,ground().pool(),j.task(),aircraftProof,p,actualPickup,ground().bindings());
             if(j.cancelRequested())
             {if(data.getBoolean("FlightWaitingR52")&&(wait==null||!ground().owner().releaseWaitingPickup(level,wait,data))){hold(j,"正在确认机体停稳");return;}ground().pool().cancel(j.task(),j.original().owner());save(j.update(0,0,Phase.CANCELLED,false,false,j.spaces(),j.mechanisms(),data,"取消于原泊位，未起飞"));return;}
-            if(wait==null){save(j.update(0,0,Phase.PREPARE,false,false,j.spaces(),j.mechanisms(),data,"等待机体在地面或平台上停稳"));return;}
+            if(wait==null){save(j.update(0,0,Phase.PREPARE,false,false,j.spaces(),j.mechanisms(),data,"等待原机体、运输机与接载区块就绪"));return;}
             if(!ground().owner().holdFlightPickup(level,wait,data)){save(j.update(0,0,Phase.PREPARE,false,false,j.spaces(),j.mechanisms(),data,"正在固定机体，等待起飞"));return;}
             // A stopped payload keeps its mesh acceleration structures while
             // the actual pose, hands, carrier and root still match the capture.

@@ -190,7 +190,7 @@ public final class TvYashimaStationR52
         // The pose continues to animate after binding. It must not disable an
         // otherwise authorized gun while hands or posture settle visually.
         // Mission phase, pilot input, power and charge remain enforced by callers.
-        if(!NervTraversalPolicyR53.strict(level))return eva.position().distanceToSqr(p.prone())>.0025?"正在对接炮位，完成后开始充能。":"";
+        if(!NervTraversalPolicyR53.strict(level))return eva.position().distanceToSqr(p.prone())>.0025||!aligned(eva,p)||!eva.isPilotProne()?"正在对接炮位，完成后开始充能。":"";
         if(!eva.isPilotProne()||eva.rifleProneBlend(0)<.99F||eva.hasLiveActionForRender(0)||EvaWeaponHandlingR45.active(eva))return "初号机完整趴姿尚未稳定。";
         var left=gun.gripR52(true);var right=gun.gripR52(false);
         if(left==null||right==null||EvaGameplayMotionR32.hand(eva,"l",0).distanceTo(left)>p.gripRadius()
@@ -282,28 +282,22 @@ public final class TvYashimaStationR52
             {
                 operating.bindFixedCannonR52(gun.getId(),true);
                 Vec3 docking=p.prone().subtract(operating.position());
+                // The accepted docking request owns both chassis coordinates
+                // and yaw. Pilot look remains independent for barrel aiming.
+                operating.setYRot(net.minecraft.util.Mth.approachDegrees(operating.getYRot(),p.yaw(),4));
+                operating.yBodyRot=operating.yHeadRot=operating.getYRot();
+                operating.setDeltaMovement(Vec3.ZERO);
                 if(docking.lengthSqr()>.0025)
                 {
                     // Binding is the pilot's explicit docking request. The
                     // accepted operation moves through scenery like other lifts.
                     operating.fixedCannonProneR52(operating.getPilotEntity(),false);
                     operating.setPos(operating.position().add(docking.scale(Math.min(1,.8/docking.length()))));
-                    operating.setDeltaMovement(Vec3.ZERO);
-                }
-                else if(!aligned(operating,p))
-                {
-                    // Keep the accepted pilot and gun while the existing
-                    // stance transition raises a misaligned prone chassis.
-                    operating.fixedCannonProneR52(operating.getPilotEntity(),false);
-                    if(operating.rifleStanceLevel(0)<.05F)
-                    {
-                        operating.setYRot(net.minecraft.util.Mth.approachDegrees(operating.getYRot(),p.yaw(),4));
-                        operating.yBodyRot=operating.yHeadRot=operating.getYRot();
-                    }
                 }
                 else
                 {
-                    operating.fixedCannonProneR52(operating.getPilotEntity(),true);
+                    operating.setPos(p.prone());
+                    operating.fixedCannonProneR52(operating.getPilotEntity(),aligned(operating,p));
                     if(operating.isPilotProne()&&operating.rifleStanceLevel(0)>2.99F)aim(operating,operating.fixedCannonAimTargetR52(operating.getPilotEntity()));
                 }
             }

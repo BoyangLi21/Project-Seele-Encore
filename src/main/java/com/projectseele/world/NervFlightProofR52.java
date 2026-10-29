@@ -820,6 +820,15 @@ public final class NervFlightProofR52
     public static CheckedPickupHold holdPickup(ServerLevel level,NervRouteReservationsR52 pool,UUID task,CheckedFlightStep aircraft,FlightPickupPreview preview,Set<String> cargoSpaces,Map<String,NervRouteNativeR52.Binding> bindings)
     {
         var context=NervRouteRuntimeR52.flightContext(level);var lease=pool.queryFlight(task);if(context==null||context.pool()!=pool||lease==null||preview==null||aircraft==null||!aircraft.current(level)||!preview.current(level)||!lease.original().equals(preview.original())||lease.kind()!=preview.kind()||!lease.aircraft().equals(aircraft.aircraft())||aircraft.from().cargo()!=null||aircraft.to().cargo()!=null||aircraft.from().rig().deployment()!=0||!lease.spaces().containsAll(cargoSpaces)||!positiveBearing(level,preview))return null;
+        // Field casualties may lie outside the authored pickup aperture. The
+        // same task freezes that observed body before the aircraft approaches;
+        // NORMAL needs its loaded original, not a second space-coverage proof.
+        if(!NervTraversalPolicyR53.strict(level))
+        {
+            var eva=level.getEntity(preview.original().eva());
+            return eva!=null&&EntryPlugEjectionR48.loaded(level,eva.getBoundingBox())
+                    ?new CheckedPickupHold(aircraft,preview,task):null;
+        }
         var boxes=preview.cargoEnvelopes(preview.root(),preview.root());var declared=new ArrayList<AABB>();for(String id:cargoSpaces){var b=bindings.get(id);if(b==null)return null;declared.addAll(b.spaces());}
         for(var box:boxes)if(!NervAirspaceCoverageR52.covered(box,declared)||!EntryPlugEjectionR48.loaded(level,box))return null;
         return new CheckedPickupHold(aircraft,preview,task);

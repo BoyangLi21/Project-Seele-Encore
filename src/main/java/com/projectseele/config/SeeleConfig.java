@@ -32,6 +32,8 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.IntValue BEAM_CHARGE_TICKS;
     public static final ForgeConfigSpec.IntValue BEAM_CHARGE_TICKS_ENRAGED;
     public static final ForgeConfigSpec.IntValue BEAM_COOLDOWN_TICKS;
+    public static final ForgeConfigSpec.IntValue YASHIMA_BEAM_CHARGE_TICKS;
+    public static final ForgeConfigSpec.IntValue YASHIMA_BEAM_COOLDOWN_TICKS;
     public static final ForgeConfigSpec.DoubleValue BEAM_RANGE;
     public static final ForgeConfigSpec.DoubleValue DRILL_DAMAGE;
     public static final ForgeConfigSpec.IntValue DRILL_COOLDOWN_TICKS;
@@ -173,6 +175,12 @@ public final class SeeleConfig
         BEAM_COOLDOWN_TICKS = common
                 .comment("Cooldown between beam shots in ticks.")
                 .defineInRange("beamCooldownTicks", 90, 10, 2000);
+        YASHIMA_BEAM_CHARGE_TICKS = common
+                .comment("Operation Yashima warning and charge duration, including phase two. 20 ticks per second.")
+                .defineInRange("yashimaBeamChargeTicks", 160, 20, 1200);
+        YASHIMA_BEAM_COOLDOWN_TICKS = common
+                .comment("Operation Yashima recovery time after each beam. 20 ticks per second.")
+                .defineInRange("yashimaBeamCooldownTicks", 600, 20, 2400);
         BEAM_RANGE = common
                 .comment("Beam sniping range in blocks.")
                 .defineInRange("beamRange", 64.0D, 8.0D, 256.0D);
