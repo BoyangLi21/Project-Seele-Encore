@@ -62,9 +62,16 @@ public final class CityRigidGenerationR45
         Binding binding = BINDINGS.get(generator);
         if (binding == null || chunk.getStatus().isOrAfter(ChunkStatus.FULL)) return;
         Path file = binding.recipe.resolve("chunks").resolve(chunk.getPos().x + "_" + chunk.getPos().z + ".dat");
-        if (!Files.exists(file)) return;
+        Path surface = binding.recipe.resolve("surface").resolve(chunk.getPos().x + "_" + chunk.getPos().z + ".dat");
+        if (!Files.exists(file) && !Files.exists(surface)) return;
         try
         {
+            if (!Files.exists(file))
+            {
+                applySurface(binding, chunk, surface);
+                chunk.setUnsaved(true);
+                return;
+            }
             CompoundTag data = NbtIo.readCompressed(file.toFile());
             if (data.getInt("Version") != 1 || !binding.world.equals(data.getString("WorldUUID")))
                 throw new IllegalStateException("Foreign future-city chunk recipe");
@@ -92,6 +99,9 @@ public final class CityRigidGenerationR45
                     cell.getCompound("State").getCompound("Properties").putString("armed", Boolean.toString(depth > 0));
                 write(binding.level,chunk, cell);
             }
+            // Authored streets also cover retired shaft AIR recipes. Moving
+            // cargo and its current street cover remain the final authority.
+            applySurface(binding, chunk, surface);
             if (detached) return; // Source/target chunks are leased during travel; never duplicate held cargo.
             for (Tag raw : data.getList("Ground", Tag.TAG_COMPOUND))
             {
@@ -157,6 +167,42 @@ public final class CityRigidGenerationR45
     {
         return building.hasUUID("RelocationSnapshotJourney") && epoch.hasUUID("Journey")
                 && building.getUUID("RelocationSnapshotJourney").equals(epoch.getUUID("Journey"));
+    }
+
+    /** Compact, complete vertical spans written only while generating a new chunk. */
+    private static void applySurface(Binding binding, ChunkAccess chunk, Path file) throws java.io.IOException
+    {
+        if (!Files.isRegularFile(file)) return;
+        CompoundTag data = NbtIo.readCompressed(file.toFile());
+        if (data.getInt("Version") != 1 || !binding.world.equals(data.getString("WorldUUID")))
+            throw new IllegalStateException("Foreign city surface recipe");
+        var palette = data.getList("Palette", Tag.TAG_COMPOUND);
+        BlockState[] states = new BlockState[palette.size()];
+        for (int i = 0; i < states.length; i++)
+            states[i] = NbtUtils.readBlockState(BuiltInRegistries.BLOCK.asLookup(), palette.getCompound(i));
+        visitSurfaceSpans(data, chunk.getPos().x, chunk.getPos().z, chunk.getMinBuildHeight(),
+                chunk.getMaxBuildHeight(), (pos, stateId) ->
+                {
+                    if (!NervArmorColumnR50.permitsGenerationR50(binding.level, pos, states[stateId])) return;
+                    chunk.removeBlockEntity(pos);
+                    chunk.setBlockState(pos, states[stateId], false);
+                });
+    }
+
+    static void visitSurfaceSpans(CompoundTag data, int chunkX, int chunkZ, int minY, int maxY,
+                                  java.util.function.BiConsumer<BlockPos, Integer> visitor)
+    {
+        int paletteSize = data.getList("Palette", Tag.TAG_COMPOUND).size();
+        for (Tag raw : data.getList("Spans", Tag.TAG_INT_ARRAY))
+        {
+            int[] span = ((net.minecraft.nbt.IntArrayTag) raw).getAsIntArray();
+            if (span.length != 5 || (span[0] >> 4) != chunkX || (span[1] >> 4) != chunkZ
+                    || span[2] < minY || span[3] >= maxY || span[2] > span[3]
+                    || span[4] < 0 || span[4] >= paletteSize)
+                throw new IllegalStateException("Invalid authored city surface span");
+            for (int y = span[2]; y <= span[3]; y++)
+                visitor.accept(new BlockPos(span[0], y, span[1]), span[4]);
+        }
     }
 
     private static void write(ServerLevel level,ChunkAccess chunk, CompoundTag cell)

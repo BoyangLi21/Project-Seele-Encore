@@ -67,6 +67,18 @@ def city_plan(world):
         rows.append(row)
     candidates=[(ox+x,oy,oz+z) for x in range(-320,321,40) for z in range(-320,321,40)
                 if abs(x)<=80 or abs(z)<=80]
+    # Native line identities stay in place. Move a new building slot instead
+    # of cutting an elevated railway when the complete component is installed.
+    transit=json.loads((world/'native_transit_r28.json').read_text(encoding='utf-8'))
+    rails=np.asarray([p for curve in transit['curves'] if curve['mode']=='TRAIN'
+                      for p in curve['points'] if ox-400<=p[0]<=ox+400 and oz-400<=p[2]<=oz+400],dtype=float)
+    def occupies_rail(tower,centre):
+        if not len(rails):return False
+        box=footprint(tower,centre,margin=7)
+        base=int(tower.get('RetractedBaseY',19-int(tower['Height'])))
+        return bool(np.any((rails[:,0]>=box[0])&(rails[:,0]<=box[2])
+            &(rails[:,2]>=box[1])&(rails[:,2]<=box[3])
+            &(rails[:,1]+8>=base-1)&(rails[:,1]-3<=centre[1]+int(tower['Height'])+3)))
     # Largest existing footprints get first choice; retained towers are fixed.
     pending.sort(key=lambda item:-(item[0]["source_footprint"][2]-item[0]["source_footprint"][0])
                                   *(item[0]["source_footprint"][3]-item[0]["source_footprint"][1]))
@@ -76,7 +88,7 @@ def city_plan(world):
         for candidate in choices:
             candidate=[candidate[0],old[1],candidate[2]]
             box=footprint(tower,candidate)
-            if not inside(box) or any(intersects(box,p) for p in occupied) or any(intersects(box,p["box"]) for p in reserved):
+            if not inside(box) or any(intersects(box,p) for p in occupied) or any(intersects(box,p["box"]) for p in reserved) or occupies_rail(tower,candidate):
                 continue
             row.update(target_centre=candidate,delta=[candidate[i]-old[i] for i in range(3)],status="relocate complete existing tower")
             occupied.append(box)

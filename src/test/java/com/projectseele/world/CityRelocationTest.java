@@ -40,6 +40,23 @@ public final class CityRelocationTest
         epoch.putUUID("Journey", java.util.UUID.randomUUID());
         check(!CityRigidGenerationR45.useRelocationSnapshot(cargo, epoch), "Later completed inventory changes ignored");
         check(!CityRigidGenerationR45.useRelocationSnapshot(cargo, new CompoundTag()), "Missing epoch treated as matching");
+        CompoundTag surface = new CompoundTag();
+        var palette = new net.minecraft.nbt.ListTag();
+        for (String name : java.util.List.of("minecraft:air", "minecraft:stone"))
+        { var state = new CompoundTag(); state.putString("Name", name); palette.add(state); }
+        surface.put("Palette", palette);
+        var spans = new net.minecraft.nbt.ListTag();
+        spans.add(new net.minecraft.nbt.IntArrayTag(new int[] {-1, 16, -1, 1, 1}));
+        spans.add(new net.minecraft.nbt.IntArrayTag(new int[] {-1, 16, 2, 3, 0}));
+        surface.put("Spans", spans);
+        var written = new java.util.HashMap<BlockPos, Integer>();
+        CityRigidGenerationR45.visitSurfaceSpans(surface, -1, 1, -128, 320, written::put);
+        check(written.size() == 5 && written.get(new BlockPos(-1, -1, 16)) == 1
+                && written.get(new BlockPos(-1, 3, 16)) == 0, "Surface lost negative Y, end cell or authored AIR");
+        boolean foreignRejected = false;
+        try { CityRigidGenerationR45.visitSurfaceSpans(surface, 0, 1, -128, 320, (pos, id) -> {}); }
+        catch (IllegalStateException expected) { foreignRejected = true; }
+        check(foreignRejected, "Surface recipe wrote into a neighbouring chunk");
         if (args.length == 1)
         {
             var candidate = java.nio.file.Path.of(args[0]);
@@ -64,6 +81,25 @@ public final class CityRelocationTest
             for (int i = 0; i < 100; i++) entries.add(net.minecraft.nbt.StringTag.valueOf(i + ".dat"));
             modern.put("JournalEntries", entries); modern.remove("JournalSHA256s");
             CityLowriseAddonR48.validateRetainedLedger(afterTag, modern);
+            var surfaceDirectory = candidate.resolve("after/dimensions/projectseele/geofront/data/city_rigid_generation_r45/surface");
+            if (java.nio.file.Files.isDirectory(surfaceDirectory))
+            {
+                long files = 0; var cells = new java.util.concurrent.atomic.AtomicLong();
+                try (var stream = java.nio.file.Files.list(surfaceDirectory))
+                {
+                    for (var file : stream.filter(p -> p.toString().endsWith(".dat")).toList())
+                    {
+                        var xy = file.getFileName().toString().replace(".dat", "").split("_");
+                        var tag = net.minecraft.nbt.NbtIo.readCompressed(file.toFile());
+                        check(tag.getString("WorldUUID").equals(afterTag.getString("WorldUUID")), "Foreign actual surface owner");
+                        CityRigidGenerationR45.visitSurfaceSpans(tag, Integer.parseInt(xy[0]), Integer.parseInt(xy[1]),
+                                -128, 320, (pos, id) -> cells.incrementAndGet());
+                        files++;
+                    }
+                }
+                check(files > 0 && cells.get() > 0, "Empty authored surface");
+                System.out.println("Actual authored surface: " + files + " chunk recipes / " + cells.get() + " assigned cells decoded");
+            }
             System.out.println("Actual candidate: 100 original owners, 30 translations, retained endpoints accepted by production topology parser");
         }
         System.out.println("City relocation identity, frame and inventory epoch checks passed");
