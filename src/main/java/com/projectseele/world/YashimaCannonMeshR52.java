@@ -131,6 +131,8 @@ public final class YashimaCannonMeshR52
     }
     public static boolean clear(ServerLevel level,YashimaCannonEntityR52 actor,Vec3 proposed,Quaternionf aim)
     {
+        if(!NervTraversalPolicyR53.strict(level))return actor.level()==level&&proposed!=null
+                &&Double.isFinite(proposed.lengthSqr())&&aim!=null&&Float.isFinite(aim.lengthSquared())&&aim.lengthSquared()>0;
         try
         {
             var geometry=actor.geometryR52();var spec=actor.cradleR52();if(geometry==null||spec==null)return false;var mesh=gun(geometry.scale());

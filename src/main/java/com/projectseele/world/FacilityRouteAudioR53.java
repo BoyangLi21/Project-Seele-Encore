@@ -2,6 +2,7 @@ package com.projectseele.world;
 
 import com.projectseele.entity.EvaUnit01Entity;
 import java.util.Map;
+import java.util.UUID;
 import java.util.WeakHashMap;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.server.level.ServerLevel;
@@ -10,6 +11,25 @@ import net.minecraft.server.level.ServerLevel;
 final class FacilityRouteAudioR53
 {
     private static final Map<EvaUnit01Entity,String> PREVIOUS=new WeakHashMap<>();
+    private static final Map<EvaUnit01Entity,Countdown> COUNTDOWNS=new WeakHashMap<>();
+
+    static final class Countdown
+    {
+        final UUID task;
+        private int next=3;
+        private long announcedAt;
+        Countdown(UUID task){this.task=task;}
+        int advance(long now,boolean prepared)
+        {
+            if(next<0)return 0;
+            if(next<3&&now-announcedAt<1_000_000_000L)return -1;
+            if(next<=1&&!prepared)return -1;
+            // Start each interval when its cue is actually sent. Never consume
+            // missed intervals after a stall or a burst of server catch-up ticks.
+            announcedAt=now;
+            return next--;
+        }
+    }
 
     static void tick(ServerLevel level,NervRouteRuntimeStateR52.Job job)
     {
@@ -79,18 +99,21 @@ final class FacilityRouteAudioR53
         PREVIOUS.put(eva,clip);FacilityPaR31.announce(level,speaker,clip);
     }
 
-    static boolean countdown(ServerLevel level,NervRouteRuntimeStateR52.Job job,CompoundTag data)
+    static boolean countdown(ServerLevel level,NervRouteRuntimeStateR52.Job job,CompoundTag data,boolean prepared)
     {
-        if(data.getInt("PaCountdownTicksR53")>=60)return true;
-        if(data.contains("PaCountdownAtR53")&&data.getLong("PaCountdownAtR53")==level.getGameTime())return false;
-        int age=data.getInt("PaCountdownTicksR53");
-        if(age%20==0&&level.getEntity(job.snapshot().original().eva()) instanceof EvaUnit01Entity eva)
-        {
-            if(age==0)mechanical(level,eva,eva.position().add(0,2,0),com.projectseele.registry.ModSounds.FACILITY.get("facility_hydraulic_charge_r48").get(),2.4F,.9F,.9F);
-            FacilityPaR31.announce(level,eva.position().add(0,52,0),"pa_"+(3-age/20));
-        }
+        if(data.getInt("PaCountdownTicksR53")>=60)return prepared;
+        if(!(level.getEntity(job.snapshot().original().eva()) instanceof EvaUnit01Entity eva))return false;
+        var clock=COUNTDOWNS.get(eva);
+        if(clock==null||!clock.task.equals(job.snapshot().task()))
+        {clock=new Countdown(job.snapshot().task());COUNTDOWNS.put(eva,clock);}
+        int cue=clock.advance(System.nanoTime(),prepared);
+        if(cue<0)return false;
         data.putLong("PaCountdownAtR53",level.getGameTime());
-        data.putInt("PaCountdownTicksR53",age+1);
+        if(cue==0){data.putInt("PaCountdownTicksR53",60);COUNTDOWNS.remove(eva);return true;}
+        if(cue==3)mechanical(level,eva,eva.position().add(0,2,0),com.projectseele.registry.ModSounds.FACILITY.get("facility_hydraulic_charge_r48").get(),2.4F,.9F,.9F);
+        FacilityPaR31.announce(level,eva.position().add(0,52,0),"pa_"+cue);
+        clock.announcedAt=System.nanoTime();
+        data.putInt("PaCountdownTicksR53",(3-cue)*20+1);
         return false;
     }
 

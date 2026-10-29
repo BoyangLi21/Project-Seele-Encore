@@ -201,6 +201,18 @@ public final class FullAssemblyGeometryR52
         {return new CheckedAssemblySweep(this,List.of(new DirectoryTrajectoryR52(directory,leg,binding,from,to)),maximumError);}
         public CheckedAssemblySweep sweep(List<DirectoryTrajectoryR52> paths,double maximumError)
         {return new CheckedAssemblySweep(this,paths,maximumError);}
+        /** Loading scope only: no triangle preparation, subdivision or collision proof. */
+        public List<AABB> loadingEnvelopesR54(List<DirectoryTrajectoryR52> paths)
+        {
+            var boxes=new ArrayList<AABB>();
+            for(var path:paths)
+            {
+                AABB box=pilot==null?null:pilotEnvelope(pilot,path);
+                for(var surface:surfaces){var bounds=surface.mesh.envelope(path);box=box==null?bounds:box.minmax(bounds);}
+                if(box!=null)boxes.add(box);
+            }
+            return List.copyOf(boxes);
+        }
     }
     /** Concrete immutable proof input. It contains source geometry and the
      * real directory curve; no arbitrary Boolean/callback can claim clearance. */

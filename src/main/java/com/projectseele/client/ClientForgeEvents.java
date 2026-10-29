@@ -399,6 +399,7 @@ public final class ClientForgeEvents
                 && (eva.getWeapon() == EvaUnit01Entity.WEAPON_CANNON
                     || eva.getWeapon() == EvaUnit01Entity.WEAPON_N2)
                 && minecraft.screen == null
+                && (!eva.fixedCannonOperatingR52() || !minecraft.player.isShiftKeyDown())
                 && minecraft.options.keyUse.isDown();
         if (wantCharge != chargeHeld)
         {

@@ -876,14 +876,14 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         var carrier=NervOriginalCarrierR52.controller(level,o);var mount=MountedPayloadTrajectoryR53.Mount.capture(carrier);
         double rearLift=carrier==null?CarrierRearGuideR53.STOW_LIFT:CarrierRearGuideR53.actualLift(carrier,1);
         var known=continuousGeometryR52.get(o.eva());
-        if(known!=null&&known.route().equals(route.id())&&known.binding().equals(binding)&&known.source()==source&&known.mount().equals(mount)&&known.rearLift()==rearLift&&known.strict()==strict
+        if(known!=null&&known.route().equals(route.id())&&known.binding().equals(binding)&&known.source()==source&&(!strict||known.mount().equals(mount)&&known.rearLift()==rearLift)&&known.strict()==strict
             &&(strict?(!atCurrent||known.from()==at):known.from()==from&&known.to()>=required))return known;
         // Reuse one bounded window while advancing through its 32 m starting bin.
         double to=strict?total:Math.min(total,Math.ceil(required/32)*32+32);
         var paths=continuousPathsR52(route,from,to,binding);var chunks=new HashSet<net.minecraft.world.level.ChunkPos>();var scope=new ArrayList<AABB>();
-        if(!paths.isEmpty())for(var box:source.sweep(paths,.005).envelopes())
+        if(!paths.isEmpty())for(var box:strict?source.sweep(paths,.005).envelopes():source.loadingEnvelopesR54(paths))
         {var nearby=strict?box:box.inflate(32);scope.add(nearby);addContinuousChunksR53(chunks,nearby);}
-        {try{chunks.addAll(CarrierRearGuideMotionR53.continuousSupportChunks(paths,rearLift,mount.state()));}
+        if(strict){try{chunks.addAll(CarrierRearGuideMotionR53.continuousSupportChunks(paths,rearLift,mount.state()));}
         catch(java.io.IOException invalid){hold(o,"continuous_rear_support_scope="+invalid.getMessage());return null;}}
         var ids=new HashSet<String>();if(strict)ids.addAll(directory.resources(route));else for(var path:paths)ids.addAll(path.leg().resources());
         var context=NervRouteRuntimeR52.flightContext(level);
@@ -1018,7 +1018,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                 return hold(o,"rear_lateral_actual_sweep_outside_original_lease");
             if(!proof.token().current(carrier))return hold(o,"rear_lateral_scene_changed_before_commit");
             carrier.acceptCarrierMountProfileR53(proof.token());
-            carrier.setBoundingBox(NervOriginalCarrierR52.boundsR52(carrier));continuousGeometryR52.remove(o.eva());
+            carrier.setBoundingBox(NervOriginalCarrierR52.boundsR52(carrier));if(NervTraversalPolicyR53.strict(l))continuousGeometryR52.remove(o.eva());
             if(CarrierMountProfileR53.read(carrier,1).transverse()!=target)return hold(o,"rear_lateral_original_actuator_in_progress");
             return true;
         }
@@ -1066,7 +1066,8 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
             if(!NervBankHeadTransferR53.pose(head,0).direction().equals(from)||!NervBankHeadTransferR53.pose(head,NervBankHeadTransferR53.TICKS).direction().equals(to))return hold(o,"bank_head_saved_route_axes_changed");
             if(head.getInt("Clock")<NervBankHeadTransferR53.TICKS)
             {
-                for(int substep=0;substep<NervAssemblyClocksR52.HEAD_SUBSTEPS_R54&&head.getInt("Clock")<NervBankHeadTransferR53.TICKS;substep++)
+                int substeps=NervTraversalPolicyR53.strict(l)?NervAssemblyClocksR52.HEAD_SUBSTEPS_R54:3;
+                for(int substep=0;substep<substeps&&head.getInt("Clock")<NervBankHeadTransferR53.TICKS;substep++)
                 {
                 var own=new HashSet<>(TransportMembershipR52.members(o,kind(data)));own.add(carrier.getUUID());var proof=NervOriginalCarrierR52.proposeBankHeadStepR53(l,carrier,head,Set.copyOf(own));if(proof==null||!proof.current(l))return hold(o,"bank_head_full_mesh_sweep_or_original_four_pad_support_held");
                 if(NervTraversalPolicyR53.strict(l)&&!bankHeadSpaceCoveredR53(context,route,proof))return hold(o,"bank_head_actual_sweep_exceeds_original_lease");

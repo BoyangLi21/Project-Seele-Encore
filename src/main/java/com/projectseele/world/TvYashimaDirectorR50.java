@@ -237,14 +237,14 @@ public final class TvYashimaDirectorR50
             return "等待初号机抵达炮位。";
         var equipment=TvEncounterEquipmentControlR45.serverCargoAndCannonR45();
         var gun=TvYashimaStationR52.gun(level);
-        if(!TvMissionEquipmentR45.cannonAuthorized(shooter)||gun==null||!gun.loadedR52())return "原预装阳电子炮与本场借用登记尚未接通。";
+        if(!TvMissionEquipmentR45.cannonAuthorized(shooter)||gun==null||!gun.loadedR52())return "阳电子炮正在准备交接。";
         if(!TvYashimaStationR52.atPlatformR52(shooter))
         {
             var position=TvYashimaStationR52.operatorPositionR52(level);
             String lift=gun.readyR52()?"阳电子炮已升起；":"炮井在接近时自动展开；";
-            return position==null?"等待初号机抵达炮位。":lift+"初号机请前往炮位（"+net.minecraft.util.Mth.floor(position.x)+"，"+net.minecraft.util.Mth.floor(position.y+.01)+"，"+net.minecraft.util.Mth.floor(position.z)+"）并停稳。";
+            return position==null?"等待初号机抵达炮位。":lift+"请靠近炮台（"+net.minecraft.util.Mth.floor(position.x)+"，"+net.minecraft.util.Mth.floor(position.y+.01)+"，"+net.minecraft.util.Mth.floor(position.z)+"），右键接入。";
         }
-        if(!gun.readyR52())return "初号机已到炮位，炮井正在开启并升起阳电子炮。";
+        if(!gun.readyR52())return "炮台正在展开并关闭井盖，请稍候。";
         if(!shooter.fixedCannonOperatingR52())return "阳电子炮已升起；请从驾驶舱看向炮体，右键接入炮位。";
         String cannon=TvYashimaStationR52.fireBlocker(shooter);if(!cannon.isEmpty())return cannon;
         var cover=TvSortiesR32.assignedUnit(level,data,0);
@@ -275,7 +275,7 @@ public final class TvYashimaDirectorR50
     public static void fail(ServerLevel level,TvCampaignSavedData data,String reason)
     {
         if(data.phase.equals("failure")||data.targetDeathConfirmedR45)return;
-        data.phase="failure";data.notice=reason+" 本行动未计通关；原机体、驾驶员与装备按正常流程回收。";data.setDirty();
+        data.phase="failure";data.notice=reason+" 作战未完成，正在安排撤离。";data.setDirty();
         TvYashimaFirelineR53.clear(level);
         TvMissionEquipmentR45.revokeMission(level);TvEncounterRulesR45.stopEquipment(level,data);
         NervArmorColumnR50.pause(level);

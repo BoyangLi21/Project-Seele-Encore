@@ -165,8 +165,7 @@ public final class TvEncounterRulesR45
             // Clearing the gun line is as urgent as entering cover; ordinary
             // walking across this lane consumes almost the entire core window.
             NervPilotCombatR30.tacticalMoveR50(eva,pilot,shieldGoal,aim,true);
-            boolean atCover=eva.position().subtract(site.cover()).horizontalDistance()<=1.2&&Math.abs(eva.getY()-site.cover().y)<=1.35;
-            equipment.shieldInput(eva,pilot,counterattack&&atCover&&TvMissionEquipmentR45.operational(eva)&&equipment.shieldEquipped(eva));
+            equipment.shieldInput(eva,pilot,TvMissionEquipmentR45.operational(eva)&&equipment.shieldEquipped(eva));
             return true;
         }
         Vec3 delta=goal.subtract(eva.position()).multiply(1,0,1);

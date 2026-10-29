@@ -150,7 +150,7 @@ public final class TvCampaignSavedData extends SavedData
         if(!canArchiveEpisode(id,commander,generation))return false;
         if(!completed.contains(id))completed.add(id);
         // Legacy chapter/completed data remains readable, but never selects or unlocks a mission.
-        clear("本次作战回收与装备交接已完成。可重打本场，或自由选择其他已开放作战。");
+        clear("机体和装备已归队。可重新选择任务出击。");
         episodeStateR45=phase="episode_archived";episodeChapterR45=id;episodeGenerationR45=generation;setDirty();return true;
     }
 }

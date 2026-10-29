@@ -332,6 +332,7 @@ public final class NervRouteRuntimeR52
                 preparation.putUUID("ResumedPreparationTaskR53",stopped.task());
             }
             var result=pool.reserve(UUID.randomUUID(),original,route,nativeAccess);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
+            if(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva)TvMissionEquipmentR45.issueFromRecoveryStorage(eva,eva.getPilotEntity());
             saved.put(new Job(result.state(),Phase.PREPARING,preparation,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"原编队已登记；按真实机械反馈整备并转移到预备位。");
         }
         EvaLogisticsDirector.ActionResult launch(int variant,String intent)
@@ -489,16 +490,17 @@ public final class NervRouteRuntimeR52
 
                 if(phased!=null&&phased.bankStop()&&at==phased.stop()&&!data.contains("ContinuousBrakeR52"))
                 {
-                    boolean countdownRunning=!route.recovery()&&data.getInt("PaCountdownTicksR53")>0&&data.getInt("PaCountdownTicksR53")<60;
                     // Door clocks are owner-driven, not autonomous entity ticks.
-                    // Keep their upward cascade moving during the voice countdown;
-                    // stopping preparation here used to freeze every unfinished leaf.
+                    // Keep gates and guide transfer advancing during the countdown.
                     boolean routePrepared=owner.prepareContinuousRouteR52(level,snapshot.original(),route,data);
-                    if(!countdownRunning&&(!routePrepared||!owner.prepareBankHeadsR53(level,snapshot.original(),route,snapshot.task(),data)))
+                    if(!routePrepared)
                     {saved.put(job.update(snapshot,route.recovery()?Phase.RETURNING:Phase.PREPARING,data,"等待停稳后的真实滑靴换轨与承托锁定"));return;}
+                    boolean headsPrepared=owner.prepareBankHeadsR53(level,snapshot.original(),route,snapshot.task(),data);
+                    if(route.recovery()&&!headsPrepared)
+                    {saved.put(job.update(snapshot,Phase.RETURNING,data,"滑靴转回转移导向"));return;}
                     boolean requested=route.recovery()||data.getBoolean("ContinuousAutoLaunchR52")||data.getBoolean("ReleaseWhenReady");
                     if(!requested){saved.put(job.update(snapshot,Phase.READY,data,""));return;}
-                    if(!route.recovery()&&!FacilityRouteAudioR53.countdown(level,job,data)){saved.put(job.update(snapshot,Phase.READY,data,"发射倒计时"));return;}
+                    if(!route.recovery()&&!FacilityRouteAudioR53.countdown(level,job,data,headsPrepared)){saved.put(job.update(snapshot,Phase.READY,data,"发射倒计时"));return;}
                     phased=NervLaunchPhasesR53.crossStoppedBank(data,snapshot.task(),directory,route,at);
                     continuousPrimedR52.remove(snapshot.task());stored=data.getCompound("ContinuousClockR52");
                     job=job.update(snapshot,route.recovery()?Phase.RETURNING:Phase.DEPARTING,data,"");saved.put(job);

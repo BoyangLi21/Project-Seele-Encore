@@ -19,7 +19,11 @@ public final class YashimaCannonInputR52
         var eva=EvaPilotResolver.controlTarget(player);if(eva==null||!eva.hasFixedCannonR52()||eva.getPilotEntity()!=player)return;
         var gun=eva.fixedCannonBodyR52();if(gun==null||!gun.readyR52()||!gun.loadedR52())return;
         if(eva.fixedCannonOperatingR52()&&!player.isShiftKeyDown())return;
-        var eye=player.getEyePosition();if(!eva.fixedCannonOperatingR52()&&YashimaCannonMeshR52.rayHitR52(gun,eye,eye.add(player.getLookAngle().scale(128)))==null)return;
+        var camera=mc.gameRenderer.getMainCamera();var eye=camera.getPosition();
+        var end=eye.add(new net.minecraft.world.phys.Vec3(camera.getLookVector()).scale(128));
+        boolean nearby=gun.getBoundingBox().inflate(com.projectseele.entity.NervArmamentStationEntity.EVA_PICKUP_RANGE,4,
+                com.projectseele.entity.NervArmamentStationEntity.EVA_PICKUP_RANGE).contains(eva.position().add(0,1,0));
+        if(!eva.fixedCannonOperatingR52()&&!nearby&&gun.getBoundingBox().inflate(2).clip(eye,end).isEmpty())return;
         event.setCanceled(true);event.setSwingHand(false);
         if(lastTick!=player.tickCount){lastTick=player.tickCount;SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_FIXED_CANNON_R52,gun.getId()));}
     }

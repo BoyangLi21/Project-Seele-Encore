@@ -1096,7 +1096,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         if(this.level().isClientSide||pilot==null||pilot!=this.getPilotEntity()||!this.hasFixedCannonR52()||this.isNervLogisticsLocked()
                 ||this.isLaunchSequenceActive()||EvaAirTransportR31.active(this)||this.isFirstBattleActive()||EvaShutdownR30.disabled(this))return false;
-        if(!prone&&!this.hasStandingRoom())return false;
+        if(!prone&&(!this.fixedCannonOperatingR52()||com.projectseele.world.NervTraversalPolicyR53.strict((ServerLevel)this.level()))
+                &&!this.hasStandingRoom())return false;
         if(prone&&!com.projectseele.world.TvMissionEquipmentR45.cannonAuthorized(this))return false;
         if(this.getWeapon()!=WEAPON_CANNON)this.selectWeapon(WEAPON_CANNON);
         if(EvaWeaponHandlingR45.active(this)||this.hasLiveActionForRender(0))return false;
@@ -3201,7 +3202,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void setChargingHeld(boolean held)
     {
         this.chargingHeld = held && !this.isPilotControlLocked()
-                &&(this.getWeapon()!=WEAPON_CANNON||com.projectseele.world.TvEncounterRulesR45.cannonPermissionR50(this));
+                &&(this.fixedCannonOperatingR52()||this.getWeapon()!=WEAPON_CANNON
+                    ||com.projectseele.world.TvEncounterRulesR45.cannonPermissionR50(this));
     }
 
     /** Left-click from the plug: Tiger-reviewed strikes and weapon clips. */
@@ -4221,6 +4223,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public void releaseCannon(LivingEntity pilot)
     {
         if(pilot==null||this.getPilotEntity()!=pilot||this.level().isClientSide)return;
+        if(this.fixedCannonOperatingR52()&&pilot instanceof ServerPlayer player&&player.isShiftKeyDown())
+        {this.chargingHeld=false;this.entityData.set(DATA_CANNON_CHARGE,0);return;}
         if(this.fixedCannonOperatingR52()&&!com.projectseele.world.TvYashimaStationR52.aim(this,this.fixedCannonAimTargetR52(pilot)))
         {this.suspendFixedCannonR52();return;}
         this.chargingHeld = false;
@@ -7735,6 +7739,19 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private float bodyCollisionWidthR30()
     {
         return this.rifleStanceInitialized&&this instanceof EvaPrototypeEntity un&&EvaBodyPose.hasOwnUnRig(this)?un.getUNSerial()==1?28F:22F:NORMAL_WIDTH;
+    }
+
+    @Override
+    public AABB getBoundingBoxForCulling()
+    {
+        // The narrow movement hull omits arms, the carried shield and most of
+        // a prone body. Terrain-section culling can hide that hull while the
+        // sixty-metre model is still in plain view above the terrain.
+        double reach = EvaScale.NORMAL_HEIGHT * .5D + 4;
+        return this.getBoundingBox().minmax(new AABB(
+                this.getX() - reach, this.getY() - 8, this.getZ() - reach,
+                this.getX() + reach, this.getY() + EvaScale.NORMAL_HEIGHT + 12,
+                this.getZ() + reach));
     }
 
     @Override

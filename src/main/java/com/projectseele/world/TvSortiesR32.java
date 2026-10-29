@@ -70,10 +70,10 @@ public final class TvSortiesR32
         String supportBlocker=TvEncounterRulesR45.formationSlotBlockerR47(l,d.active,unit);
         if(!supportBlocker.isEmpty()){caller.sendSystemMessage(Component.literal(supportBlocker));return 0;}
         var current=d.sorties.get(unit);
-        if(current!=null){caller.sendSystemMessage(Component.literal(name(unit)+"已经在出击编成中。"));return 1;}
+        if(current!=null){caller.sendSystemMessage(Component.literal(name(unit)+"已加入出击编队。"));return 1;}
         var e=unit(l,unit);
         if(e!=null&&TvMissionEquipmentR45.awaitingPhysicalReturn(e))
-        {caller.sendSystemMessage(Component.literal("原任务装备仍需完成实际回收入库，不能追加新的出击。"));return 0;}
+        {caller.sendSystemMessage(Component.literal("炮、盾尚未归还，请完成装备回收后再出击。"));return 0;}
         if(e!=null&&e.getPilotEntity()!=null&&(npc?!(e.getPilotEntity() instanceof TrainingPilotEntity pilot&&pilot.getAssignedVariant()==unit):e.getPilotEntity()!=caller))
         {caller.sendSystemMessage(Component.literal("这台机体已有其他驾驶员，不能接管。"));return 0;}
         d.assign(unit,caller.getUUID(),npc,rifle&&npc);
@@ -81,7 +81,7 @@ public final class TvSortiesR32
         return 1;
     }
     public static String roster(TvCampaignSavedData data)
-    {return "出击编成："+String.join("、",data.sorties.values().stream().map(s->name(s.unit)+"（"+(s.npc?TrainingPilotEntity.pilotName(s.unit):"玩家")+"）").toList());}
+    {return "出击编队："+String.join("、",data.sorties.values().stream().map(s->name(s.unit)+"（"+(s.npc?TrainingPilotEntity.pilotName(s.unit):"玩家驾驶")+"）").toList());}
     public static void updateTarget(ServerLevel l,TvCampaignSavedData d)
     {
         if(d.angel==null||!(l.getEntity(d.angel) instanceof Mob enemy))return;

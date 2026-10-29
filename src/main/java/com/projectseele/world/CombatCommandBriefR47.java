@@ -103,7 +103,7 @@ public final class CombatCommandBriefR47
         var target = event.getEntity();
         var campaign = TvCampaignSavedData.get(level);
         if (campaign.angel == null || !campaign.angel.equals(target.getUUID()) || DEATHS.put(target, true) != null) return;
-        say(level, null, "葛城美里 · 作战通信", "目标生命反应消失。各机保持警戒，按原流程回收。");
+        say(level, null, "葛城美里 · 作战通信", "目标生命反应消失。各机保持警戒，准备返回机库。");
     }
 
     @SubscribeEvent

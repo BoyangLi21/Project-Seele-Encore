@@ -21,11 +21,14 @@ public final class YashimaCannonHatchR54
         if(spec==null||box.length!=6||box[1]!=box[4]||box[3]<box[0]||box[5]<box[2])return Set.of();
         long size=((long)box[3]-box[0]+1)*((long)box[5]-box[2]+1);
         if(size<=0||size>8192)return Set.of();
-        var aperture=NervRigidMeshSweepR52.transformed(new AABB(-spec.openingX()/2D,0,-spec.openingZ()/2D,
-                spec.openingX()/2D,.001,spec.openingZ()/2D),hatch.actualFrameR52());
-        if((int)Math.floor(aperture.minX+.001)!=box[0]||(int)Math.floor(aperture.minY)!=box[1]
-                ||(int)Math.floor(aperture.minZ+.001)!=box[2]||(int)Math.floor(aperture.maxX-.001)!=box[3]
-                ||(int)Math.floor(aperture.maxZ-.001)!=box[5])return Set.of();
+        if(!(hatch.level() instanceof ServerLevel level)||NervTraversalPolicyR53.strict(level))
+        {
+            var aperture=NervRigidMeshSweepR52.transformed(new AABB(-spec.openingX()/2D,0,-spec.openingZ()/2D,
+                    spec.openingX()/2D,.001,spec.openingZ()/2D),hatch.actualFrameR52());
+            if((int)Math.floor(aperture.minX+.001)!=box[0]||(int)Math.floor(aperture.minY)!=box[1]
+                    ||(int)Math.floor(aperture.minZ+.001)!=box[2]||(int)Math.floor(aperture.maxX-.001)!=box[3]
+                    ||(int)Math.floor(aperture.maxZ-.001)!=box[5])return Set.of();
+        }
         var cells=new HashSet<BlockPos>();
         for(var at:BlockPos.betweenClosed(box[0],box[1],box[2],box[3],box[4],box[5]))cells.add(at.immutable());
         return Set.copyOf(cells);
@@ -38,16 +41,19 @@ public final class YashimaCannonHatchR54
                 ||!plan.fingerprint().equals(gun.getPersistentData().getString("StationLayoutR52")))
             return held(gun,"original_station_identity_changed");
         var cells=proxyCells(hatch);if(cells.isEmpty())return held(gun,"declared_cannon_aperture_missing");
+        boolean strict=NervTraversalPolicyR53.strict(level);
         for(var at:cells)
         {
-            if(!level.hasChunkAt(at)||level.getBlockEntity(at)!=null)return held(gun,"proxy_unloaded_or_block_entity="+at);
+            if(!level.hasChunkAt(at))return held(gun,"proxy_unloaded="+at);
+            if(!strict)continue;
+            if(level.getBlockEntity(at)!=null)return held(gun,"proxy_block_entity="+at);
             var state=level.getBlockState(at);
             if(!state.isAir()&&!state.is(Blocks.BARRIER))return held(gun,"original_proxy_state_changed="+at);
         }
         float from=hatch.actualOpenProgressR52(),to=hatch.proposedDeclaredProgressR52(open);
         // Holding an endpoint moves no panel. A wreck beside an already open
         // hatch must not turn that idle state into a new obstructed movement.
-        if(from!=to)
+        if(strict&&from!=to)
         {
             var supports=new HashSet<BlockPos>();
             for(var point:hatch.declaredGeometryR52().bearingPoints())
@@ -59,7 +65,11 @@ public final class YashimaCannonHatchR54
         if(to==0||to==1)
         {
             var target=(to==1?Blocks.AIR:Blocks.BARRIER).defaultBlockState();
-            for(var at:cells)if(!level.getBlockState(at).equals(target))level.setBlock(at,target,2);
+            for(var at:cells)
+            {
+                var current=level.getBlockState(at);
+                if((current.isAir()||current.is(Blocks.BARRIER))&&!current.equals(target))level.setBlock(at,target,2);
+            }
         }
         hatch.advanceDeclaredR52(open);
         gun.getPersistentData().remove("FixedCannonHatchHoldR54");

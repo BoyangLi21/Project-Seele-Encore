@@ -382,13 +382,13 @@ public final class TvMissionEquipmentR45
     {
         if(!(eva.level() instanceof ServerLevel level)||!context(level,eva)||!operational(eva)||!assignedPilot(level,eva,pilot))return false;
         if(eva.getUnitVariant()==0&&(eva.getArmamentMask()&EvaUnit01Entity.ARMAMENT_MASK_SHIELD_R45)!=0)return false;
-        var data=TvCampaignSavedData.get(level);if(!java.util.Set.of("approach","combat").contains(data.phase))return false;
+        var data=TvCampaignSavedData.get(level);if(!java.util.Set.of("alert","approach","combat").contains(data.phase))return false;
         var state=state(level);if(loanFor(state,eva)!=null)return false;
         for(var stock:state.physical.values())
         {
             if(!stock.container||stock.position==null||stock.rack!=null||stock.carrier!=null||!storageWithinReach(stock.position,eva)
                     ||cargoUnit(ItemStack.of(stock.item))!=eva.getUnitVariant())continue;
-            retainStock(level,stock.position);
+            retainStock(level,stock.position);level.getChunkAt(stock.position);
             if(!(level.getBlockEntity(stock.position) instanceof Container container)||stock.slot<0||stock.slot>=container.getContainerSize()
                     ||!stock.item.equals(container.getItem(stock.slot).save(new CompoundTag())))continue;
             var prior=state.loans.get(stock.cargo);if(prior==null||!prior.status.equals(STORED)||!prior.item.equals(stock.item))continue;
@@ -412,7 +412,7 @@ public final class TvMissionEquipmentR45
             if(eva!=null&&eva.getUUID().equals(loan.eva))returnToRecoveryStorage(eva);
         }
         var data=TvCampaignSavedData.get(level);
-        if(!data.active.equals("ramiel")||!java.util.Set.of("approach","combat").contains(data.phase)||data.targetDeathConfirmedR45)return;
+        if(!data.active.equals("ramiel")||!java.util.Set.of("alert","approach","combat").contains(data.phase)||data.targetDeathConfirmedR45)return;
         for(int unit=0;unit<=1;unit++)
         {var eva=TvSortiesR32.assignedUnit(level,data,unit);if(eva!=null&&eva.getPilotEntity()!=null)issueFromRecoveryStorage(eva,eva.getPilotEntity());}
     }

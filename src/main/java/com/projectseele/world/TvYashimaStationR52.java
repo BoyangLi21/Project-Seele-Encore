@@ -123,8 +123,18 @@ public final class TvYashimaStationR52
     public static EvaUnit01Entity boundEva(ServerLevel level,YashimaCannonEntityR52 gun)
     {var tag=gun.getPersistentData();return tag.hasUUID("OperatingEvaR52")&&level.getEntity(tag.getUUID("OperatingEvaR52")) instanceof EvaUnit01Entity eva?eva:null;}
     private static boolean at(EvaUnit01Entity eva,Plan p)
-    {return eva.position().subtract(p.prone()).horizontalDistance()<=p.radius()&&Math.abs(eva.getY()-p.prone().y)<=1.35
-            &&!eva.isNervLogisticsLocked()&&!eva.isLaunchSequenceActive()&&!EvaAirTransportR31.active(eva)&&AirCradleClearanceR31.touchdownContact(eva)!=null;}
+    {
+        if(eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()||EvaAirTransportR31.active(eva))return false;
+        if(eva.level() instanceof ServerLevel level&&!NervTraversalPolicyR53.strict(level))
+        {
+            var gun=gun(level);
+            if(gun!=null&&eva.fixedCannonOperatingR52()&&boundEva(level,gun)==eva)return true;
+            return gun!=null&&gun.getBoundingBox().inflate(NervArmamentStationEntity.EVA_PICKUP_RANGE,4,
+                    NervArmamentStationEntity.EVA_PICKUP_RANGE).contains(eva.position().add(0,1,0));
+        }
+        return eva.position().subtract(p.prone()).horizontalDistance()<=p.radius()&&Math.abs(eva.getY()-p.prone().y)<=1.35
+                &&AirCradleClearanceR31.touchdownContact(eva)!=null;
+    }
     private static boolean authority(ServerPlayer commander,TvCampaignSavedData data)
     {return data.owner!=null&&data.owner.equals(commander.getUUID())&&data.active.equals("ramiel")&&!Set.of("cancel","failure","combat_victory","episode_archived").contains(data.phase)&&!data.targetDeathConfirmedR45&&NervStaffDialogue.authorized(commander);}
     public static Vec3 operatorPositionR52(ServerLevel level){return plan(level).map(Plan::prone).orElse(null);}
@@ -140,20 +150,30 @@ public final class TvYashimaStationR52
         if(!gun.loadedR52()||!TvMissionEquipmentR45.cannonAuthorized(eva))return "原底仓任务炮尚未完成同一货物的预装登记，未补造炮。";
         var phase=gun.getPersistentData().getString("LiftPhaseR52");
         if(phase.equals("ready"))return "原炮已升起；初号机右键接入实际炮位，完成趴姿后使用。";
-        if(Set.of("opening","raising").contains(phase))return "原炮正在实际开盖升起，请等待完整升降。";
+        if(Set.of("opening","raising","closing_raised").contains(phase))return "炮台正在展开并关闭井盖，请稍候。";
         if(Set.of("lowering","closing").contains(phase))return "原炮仍在撤离归仓，请等待完整归仓。";
         gun.getPersistentData().putString("LiftPhaseR52","opening");return "升炮指令已接受；原盖开启后，炮体沿实际底仓升起。";
     }
     public static String interact(ServerPlayer player,YashimaCannonEntityR52 gun)
     {
         var level=player.serverLevel();var data=TvCampaignSavedData.get(level);var p=plan(level).orElse(null);var eva=EvaPilotResolver.controlTarget(player);
-        if(p==null||!p.cannon().equals(gun.getUUID())||eva==null||eva!=TvSortiesR32.assignedUnit(level,data,1)||eva.getPilotEntity()!=player||!at(eva,p))return "请驾驶本场原初号机到实际炮位平台，右键原炮接入。";
-        if(eva.fixedCannonOperatingR52()){release(eva,gun);return "已退出固定炮位，初号机解除操纵占位，可撤离平台。";}
-        if(!gun.readyR52()||!TvMissionEquipmentR45.cannonAuthorized(eva))return "原炮尚未完全升起，请由指挥员下令并等候真实升降完成。";
-        Vec3 eye=player.getEyePosition();var hit=YashimaCannonMeshR52.rayHitR52(gun,eye,eye.add(player.getLookAngle().scale(128)));
-        if(hit==null||level.clip(new net.minecraft.world.level.ClipContext(eye,hit,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,player)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)
-            return "请从驾驶舱看向已升起的原炮实际炮体并右键接入。";
-        bind(eva,gun);return "固定炮位已接入，可蓄力瞄准与开火。";
+        if(p==null||!p.cannon().equals(gun.getUUID())||eva==null||eva!=TvSortiesR32.assignedUnit(level,data,1)||eva.getPilotEntity()!=player)return "请驾驶初号机接入炮位。";
+        if(player.isShiftKeyDown())
+        {
+            if(eva.fixedCannonOperatingR52())release(eva,gun);
+            return "已退出炮位，可以自由驾驶。";
+        }
+        if(eva.fixedCannonOperatingR52())return "已接入炮位。按住右键蓄力，松开发射。";
+        if(!at(eva,p))return "请靠近炮台，再右键接入。";
+        if(!gun.readyR52()||!TvMissionEquipmentR45.cannonAuthorized(eva))return "炮台还在展开，请等待井盖关闭。";
+        if(NervTraversalPolicyR53.strict(level))
+        {
+            Vec3 eye=eva.getPilotCameraSeatPosition(player,1).add(0,player.getEyeHeight(),0);
+            var hit=YashimaCannonMeshR52.rayHitR52(gun,eye,eye.add(player.getLookAngle().scale(128)));
+            if(hit==null||level.clip(new net.minecraft.world.level.ClipContext(eye,hit,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,player)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)
+                return "请看向炮身并右键接入。";
+        }
+        bind(eva,gun);return "正在对接炮位。按住右键蓄力，松开发射；Shift＋右键可退出。";
     }
     private static void bind(EvaUnit01Entity eva,YashimaCannonEntityR52 gun)
     {gun.getPersistentData().putUUID("OperatingEvaR52",eva.getUUID());eva.bindFixedCannonR52(gun.getId(),true);}
@@ -170,7 +190,7 @@ public final class TvYashimaStationR52
         // The pose continues to animate after binding. It must not disable an
         // otherwise authorized gun while hands or posture settle visually.
         // Mission phase, pilot input, power and charge remain enforced by callers.
-        if(!NervTraversalPolicyR53.strict(level))return "";
+        if(!NervTraversalPolicyR53.strict(level))return eva.position().distanceToSqr(p.prone())>.0025?"正在对接炮位，完成后开始充能。":"";
         if(!eva.isPilotProne()||eva.rifleProneBlend(0)<.99F||eva.hasLiveActionForRender(0)||EvaWeaponHandlingR45.active(eva))return "初号机完整趴姿尚未稳定。";
         var left=gun.gripR52(true);var right=gun.gripR52(false);
         if(left==null||right==null||EvaGameplayMotionR32.hand(eva,"l",0).distanceTo(left)>p.gripRadius()
@@ -196,7 +216,7 @@ public final class TvYashimaStationR52
         var p=plan(level).orElse(null);var gun=gun(level);if(p==null||gun==null)return new TvYashimaArrivalR50.Next(null,true);
         var tag=eva.getPersistentData();if(tag.getLong("FixedCannonRouteGenerationR52")!=data.generationR43)
         {tag.putLong("FixedCannonRouteGenerationR52",data.generationR43);tag.putInt("FixedCannonRouteCursorR52",0);}
-        if(!at(eva,p))
+        if(!at(eva,p)||eva.position().subtract(p.prone()).horizontalDistance()>p.radius()||Math.abs(eva.getY()-p.prone().y)>1.35)
         {
             int cursor=Math.max(0,Math.min(tag.getInt("FixedCannonRouteCursorR52"),p.access().size()));
             while(cursor<p.access().size()&&eva.position().subtract(p.access().get(cursor)).horizontalDistance()<=.8&&Math.abs(eva.getY()-p.access().get(cursor).y)<=1.35)cursor++;
@@ -220,7 +240,9 @@ public final class TvYashimaStationR52
         switch(phase)
         {
             case "opening"->{if(YashimaCannonHatchR54.advance(level,p,gun,hatch,true))tag.putString("LiftPhaseR52","raising");}
-            case "raising"->{if(!YashimaCannonHatchR54.advance(level,p,gun,hatch,true))return;if(gun.liftStepR52(p.raised(),p.closed().distanceTo(p.raised())/p.riseTicks())){tag.putString("LiftPhaseR52","ready");gun.readyR52(true);}}
+            case "raising"->{if(!YashimaCannonHatchR54.advance(level,p,gun,hatch,true))return;if(gun.liftStepR52(p.raised(),p.closed().distanceTo(p.raised())/p.riseTicks())){tag.putString("LiftPhaseR52","closing_raised");gun.readyR52(false);}}
+            case "closing_raised"->{if(YashimaCannonHatchR54.advance(level,p,gun,hatch,false)){tag.putString("LiftPhaseR52","ready");gun.readyR52(true);}}
+            case "ready"->{if(hatch.actualOpenProgressR52()>0){gun.readyR52(false);tag.putString("LiftPhaseR52","closing_raised");}}
             case "lowering"->{if(!YashimaCannonHatchR54.advance(level,p,gun,hatch,true))return;if(!gun.resetAimR52())return;if(gun.liftStepR52(p.closed(),p.closed().distanceTo(p.raised())/p.returnTicks()))tag.putString("LiftPhaseR52","closing");}
             case "closing"->{if(YashimaCannonHatchR54.advance(level,p,gun,hatch,false))tag.putString("LiftPhaseR52","idle");}
             default->{}
@@ -259,7 +281,16 @@ public final class TvYashimaStationR52
             else
             {
                 operating.bindFixedCannonR52(gun.getId(),true);
-                if(!aligned(operating,p))
+                Vec3 docking=p.prone().subtract(operating.position());
+                if(docking.lengthSqr()>.0025)
+                {
+                    // Binding is the pilot's explicit docking request. The
+                    // accepted operation moves through scenery like other lifts.
+                    operating.fixedCannonProneR52(operating.getPilotEntity(),false);
+                    operating.setPos(operating.position().add(docking.scale(Math.min(1,.8/docking.length()))));
+                    operating.setDeltaMovement(Vec3.ZERO);
+                }
+                else if(!aligned(operating,p))
                 {
                     // Keep the accepted pilot and gun while the existing
                     // stance transition raises a misaligned prone chassis.

@@ -8,13 +8,13 @@ public final class TvCampaignCatalog
     public record Chapter(String id, String episode, String title, String target, int angel, boolean playable, String briefing) {}
     public static final List<Chapter> CHAPTERS = List.of(
             new Chapter("sachiel", "01–02", "首次出击", "萨基尔", 3, true,
-                    "驾驶初号机，经机库整备与发射流程前往东北迎击大道。近战削弱目标后，满足站姿、距离和场地条件时进入自主行动演出。"),
+                    "前往东北迎击大道迎击萨基尔。观察目标动作，避开正面攻击，用近战削弱A.T.力场后攻击核心。注意机体损伤与供电。"),
             new Chapter("shamshel", "03", "第二次迎击", "夏姆榭尔", 4, true,
-                    "初号机前往东北迎击大道。观察光鞭蓄势，横向闪避后以渐进刀近身。保留供电与撤回余量；本次不会用自动演出代替作战。"),
+                    "前往东北迎击大道迎击夏姆榭尔。看到光鞭蓄势时横向闪避，趁攻击间隙用渐进刀近身。留意电量，必要时撤回补给。"),
             new Chapter("rain", "04", "雨中的间奏", "", 0, false, "城际列车与山间步行叙事尚在制作。"),
-            new Chapter("ramiel", "05–06", "屋岛作战", "拉米尔", 5, true, "初号机与零号机经原出击、运输流程抵达箱根山地阵地。接通三路电网，初号机操作地面固定阳电子炮，零号机携盾防护；瞄准第三新东京市上空拉米尔的核心窗口开火。战后回收原机并归还装备。"),
+            new Chapter("ramiel", "05–06", "屋岛作战", "拉米尔", 5, true, "前往箱根阵地。初号机负责阳电子炮，零号机持盾掩护。接通阵地三路电网，初号机停在炮位、看向炮身并右键接入。充能后瞄准核心，在拉米尔发射光束时开火；打中外壳无效。"),
             new Chapter("jet_alone", "07", "反应堆事故", "J.A.", 0, false, "非使徒章节；待制作事故处置流程。"),
-            new Chapter("gaghiel", "08", "海上迎击", "迦基尔", 6, false, "港口作战筹备中，原舰与机体完整交战、回收流程尚未交付。R52 暂不开放正式开始。"),
+            new Chapter("gaghiel", "08", "海上迎击", "迦基尔", 6, false, "海上迎击尚未开放。"),
             new Chapter("israfel", "09", "同步作战", "伊斯拉斐尔", 7, false, "待制作双机协调与双核心同步判定。"),
             new Chapter("sandalphon", "10", "火山行动", "圣德芬", 8, false, "待制作耐热装备与火山救援。"),
             new Chapter("matarael", "11", "停电迎击", "雨天使", 9, false, "待制作总部停电与人工出动。"),
@@ -34,6 +34,6 @@ public final class TvCampaignCatalog
     public static Chapter at(int index) { return CHAPTERS.get(Math.max(0, Math.min(index, CHAPTERS.size() - 1))); }
     public static java.util.Optional<Chapter> find(String id){return CHAPTERS.stream().filter(c->c.id().equals(id)).findFirst();}
     public static String preparationBlockerR52(String id)
-    {return switch(id){case "gaghiel"->"港口作战筹备中，R52 暂不开放正式开始或重试。";default->"";};}
+    {return switch(id){case "gaghiel"->"海上迎击尚未开放，请选择其他任务。";default->"";};}
     private TvCampaignCatalog() {}
 }

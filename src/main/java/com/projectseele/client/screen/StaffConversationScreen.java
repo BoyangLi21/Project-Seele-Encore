@@ -99,7 +99,7 @@ public final class StaffConversationScreen extends Screen
         int tabWidth=(panelWidth-24)/5;
         addTab("交谈",0,x+12,tabWidth-3,()->switchTab(0),true);
         addTab("指挥",1,x+12+tabWidth,tabWidth-3,()->switchTab(1),view.canCommand());
-        addTab("自由作战",2,x+12+tabWidth*2,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},true);
+        addTab("作战",2,x+12+tabWidth*2,tabWidth-3,()->{switchTab(2);send("TOPIC:campaign");},true);
         addTab("通讯录",4,x+12+tabWidth*3,tabWidth-3,()->switchTab(4),view.radio());
         addTab("运输部门",6,x+12+tabWidth*4,tabWidth-3,()->{switchTab(6);send("TRANSPORT:status");},view.canCommand());
         addButton("关闭", x + panelWidth - 60, y + 12, 48, this::onClose, true);
@@ -175,31 +175,33 @@ public final class StaffConversationScreen extends Screen
         }
         else if(tab==2)
         {
-            addButton("查看当前简报",x+12,controlsY,panelWidth-24,()->send("TOPIC:campaign"),true);
-            addButton("选择作战 / 重打 / 增援",x+12,controlsY+22,panelWidth-24,()->switchTab(12),permitted("campaign"));
+            addButton("任务简报",x+12,controlsY,panelWidth-24,()->send("TOPIC:campaign"),true);
+            addButton("选择任务与编队",x+12,controlsY+22,panelWidth-24,()->switchTab(12),permitted("campaign"));
             addButton("城市协同档案",x+12,controlsY+44,panelWidth-24,()->{switchTab(7);send("COORD:status");},view.canCommand());
         }
         else if(tab==12)
         {
-            if(!sortieCrewInitializedR54){sortieCrewR54.put(1,minecraft.player.getUUID().toString());sortieCrewInitializedR54=true;}
+            if(!sortieCrewInitializedR54){sortieCrewR54.put(1,minecraft.player.getUUID().toString());if(mission.equals("ramiel"))sortieCrewR54.put(0,"npc");sortieCrewInitializedR54=true;}
             int half = (panelWidth - 28) / 2;
             var missions=com.projectseele.world.TvCampaignCatalog.CHAPTERS.stream().filter(com.projectseele.world.TvCampaignCatalog.Chapter::playable).toList();
             int choice=(panelWidth-24-4*(missions.size()-1))/missions.size();
             for(int i=0;i<missions.size();i++)
             {
                 var entry=missions.get(i);String selected=entry.id();
-                addButton((mission.equals(selected)?"● ":"")+(selected.equals("ramiel")?"屋岛":entry.target()),x+12+i*(choice+4),controlsY,choice,
+                addButton((mission.equals(selected)?"● ":"")+entry.title(),x+12+i*(choice+4),controlsY,choice,
                         ()->{mission=selected;if(selected.equals("ramiel")){sortieCrewR54.putIfAbsent(0,"npc");String self=minecraft.player.getUUID().toString();sortieCrewR54.putIfAbsent(1,sortieCrewR54.containsValue(self)?"npc":self);}send("CAMPAIGN:select:"+selected);rebuildWidgets();},permitted("campaign"));
             }
             for(int i=0;i<3;i++)
             {
                 int selection=i;
-                addButton(com.projectseele.world.NervStaffDialogue.unitName(i)+"："+crewLabelR54(i)+" / 切换驾驶员",x+12,controlsY+22+i*22,panelWidth-24,()->{cycleCrewR54(selection);rebuildWidgets();},true);
+                addButton(com.projectseele.world.NervStaffDialogue.unitName(i)+"："+crewLabelR54(i)+"（点击更换）",x+12,controlsY+22+i*22,panelWidth-24,()->{cycleCrewR54(selection);rebuildWidgets();},true);
             }
-            addButton("常规装备："+(sortieEquipment.equals("rifle")?"步枪":"近战")+" / 切换",x+12,controlsY+88,panelWidth-24,()->{sortieEquipment=sortieEquipment.equals("rifle")?"melee":"rifle";rebuildWidgets();},true);
-            addButton("出击 / 重打 / 增援",x+12,controlsY+110,half,()->send(formationRequestR54()),permitted("campaign")&&!sortieCrewR54.isEmpty());
-            addButton("结束当前作战",x+16+half,controlsY+110,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
-            addButton("查看作战编队",x+12,controlsY+132,panelWidth-24,()->send("TOPIC:campaign"),true);
+            if(mission.equals("ramiel"))
+                addButton("任务装备：初号机用炮，零号机持盾",x+12,controlsY+88,panelWidth-24,()->{},false);
+            else addButton("装备："+(sortieEquipment.equals("rifle")?"步枪":"近战")+"（点击更换）",x+12,controlsY+88,panelWidth-24,()->{sortieEquipment=sortieEquipment.equals("rifle")?"melee":"rifle";rebuildWidgets();},true);
+            addButton("确认出击",x+12,controlsY+110,half,()->send(formationRequestR54()),permitted("campaign")&&!sortieCrewR54.isEmpty());
+            addButton("结束任务",x+16+half,controlsY+110,half,()->send("CAMPAIGN:cancel"),permitted("campaign"));
+            addButton("任务进度与编队",x+12,controlsY+132,panelWidth-24,()->send("TOPIC:campaign"),true);
         }
         else if(tab==7)
         {
@@ -290,7 +292,7 @@ public final class StaffConversationScreen extends Screen
         }
         buildingControls=false;applyControlScroll();
         int parent=parentTab();
-        if(parent>=0)addButton("← 返回"+(parent==0?"交谈":parent==1?"指挥分类":parent==2?"自由作战":"城市协同档案"),
+        if(parent>=0)addButton("← 返回"+(parent==0?"交谈":parent==1?"指挥分类":parent==2?"作战":"城市协同档案"),
                 x+12,y+panelHeight-55,panelWidth-24,()->switchTab(parent),true);
         input = new PhoneUiR54.Field(font, x + 13, y + panelHeight - 28, panelWidth - 87, 19, Component.literal("输入交谈或指令"),PhoneUiR54.NERV);
         input.setMaxLength(160);input.setValue(draft); input.setHint(Component.literal("输入消息或指令 · Enter 发送")); addRenderableWidget(input);
@@ -325,8 +327,9 @@ public final class StaffConversationScreen extends Screen
     private UUID selectedHuman(){return humanPilot!=null?humanPilot:minecraft.player.getUUID();}
     private String crewLabelR54(int slot)
     {
-        String selected=sortieCrewR54.get(slot);if(selected==null)return "不出战";
-        if(selected.equals("npc"))return com.projectseele.entity.TrainingPilotEntity.pilotName(slot)+"（NPC）";
+        String selected=sortieCrewR54.get(slot);if(selected==null)return "待命";
+        if(selected.equals("npc"))return com.projectseele.entity.TrainingPilotEntity.pilotName(slot);
+        if(selected.equals(minecraft.player.getUUID().toString()))return "我";
         var player=minecraft.getConnection().getPlayerInfo(UUID.fromString(selected));
         return player==null?"离线玩家":player.getProfile().getName();
     }
@@ -344,7 +347,7 @@ public final class StaffConversationScreen extends Screen
     private String formationRequestR54()
     {
         String rows=String.join(";",sortieCrewR54.entrySet().stream().sorted(Map.Entry.comparingByKey()).map(e->e.getKey()+","+e.getValue()).toList());
-        return "CAMPAIGN:formation:"+mission+":"+rows+":"+(sortieEquipment.equals("rifle")?"rifle":"melee");
+        return "CAMPAIGN:formation:"+mission+":"+rows+":"+(!mission.equals("ramiel")&&sortieEquipment.equals("rifle")?"rifle":"melee");
     }
     private String humanPilotName()
     {
@@ -447,15 +450,16 @@ public final class StaffConversationScreen extends Screen
                 view.name()+"  ·  "+view.role()+"  /  "+(view.radio()?"无线电频道":"岗位对话"));
         int bottom=controlsTop()-28;replyTop=y+99;
         PhoneUiR54.card(graphics,font,theme,x+8,y+78,panelWidth-16,bottom-(y+78)+4,
-                "状态与回复",view.canCommand()?"指挥权限":"交谈权限");
+                tab==2||tab==12?"任务简报":"状态与回复",view.canCommand()?"指挥权限":"交谈权限");
         var transcript=new StringBuilder();
         if(tab<2&&!view.units().isEmpty())transcript.append("机体状态\n").append(String.join("\n",view.units())).append("\n\n");
         else if(tab==15&&view.participants().size()>unit)transcript.append("当前编成\n").append(view.participants().get(unit)).append("\n\n");
         if(!view.order().isBlank())transcript.append("当前调度\n").append(view.order()).append("\n\n");
-        transcript.append("回复\n").append(view.reply());
+        if(tab!=2&&tab!=12)transcript.append("回复\n");
+        transcript.append(view.reply());
         replyScroll=PhoneUiR54.text(graphics,font,theme,transcript.toString(),x+16,replyTop,panelWidth-32,
                 Math.max(0,bottom-replyTop),replyScroll);
-        String section=switch(tab){case 0->"交谈主题";case 1->"指挥分类";case 2->"作战档案";case 3->"步行引导";case 4->"通讯录";case 5->"城市升降";case 6->"运输调度 · 目的地 X / Y / Z";case 7->"城市协同档案";case 8->"机体整备与发射";case 9->"驾驶员安排";case 10->"武器井与装备";case 11->"地下出口门控";case 12->"出击与增援编成";case 13->"档案阅读与共享";case 14->"城市供电与复测";case 15->"参与机体与确认";default->"操作";};
+        String section=switch(tab){case 0->"交谈主题";case 1->"指挥分类";case 2->"作战任务";case 3->"步行引导";case 4->"通讯录";case 5->"城市升降";case 6->"运输调度 · 目的地 X / Y / Z";case 7->"城市协同档案";case 8->"机体整备与发射";case 9->"驾驶员安排";case 10->"武器井与装备";case 11->"地下出口门控";case 12->"任务与出击编队";case 13->"档案阅读与共享";case 14->"城市供电与复测";case 15->"参与机体与确认";default->"操作";};
         PhoneUiR54.card(graphics,font,theme,x+8,controlsTop()-21,panelWidth-16,
                 controlsBottom()-controlsTop()+24,section,controlsScrollMax>0?"滚轮浏览":"");
         PhoneUiR54.scrollbar(graphics,theme,x+panelWidth-10,controlsTop(),controlsBottom()-controlsTop(),
