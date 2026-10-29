@@ -20,6 +20,46 @@ public final class TvYashimaCombatCommsR54
 {
     private static final Map<RamielEntity, Pulse> PULSES = new WeakHashMap<>();
 
+    public static void autoAtFieldR54(EvaUnit01Entity eva)
+    {
+        if(!(eva.level() instanceof ServerLevel level)||eva.getPilotEntity()==null||eva.isNervLogisticsLocked()
+                ||eva.isLaunchSequenceActive()||eva.hasActiveCarrierMotion()||com.projectseele.entity.EvaAirTransportR31.active(eva))return;
+        var data=TvCampaignSavedData.get(level);
+        if(!data.active.equals("ramiel")||!java.util.Set.of("approach","combat").contains(data.phase)
+                ||TvSortiesR32.assignedUnit(level,data,eva.getUnitVariant())!=eva)return;
+        var tag=eva.getPersistentData();
+        if(tag.getLong("R54AtDeployment") == data.generationR43&&!tag.getBoolean("R54YashimaAtRecharge"))return;
+        if(eva.isAtFieldOn()||eva.raiseAtFieldR54())
+        {tag.putLong("R54AtDeployment",data.generationR43);tag.remove("R54YashimaAtRecharge");}
+    }
+
+    /** Called only on a real off-to-on transition, shared by manual and NPC input. */
+    public static void onAtFieldRaised(EvaUnit01Entity eva)
+    {
+        if(!(eva.level() instanceof ServerLevel level)||!eva.isAtFieldOn())return;
+        var data=TvCampaignSavedData.get(level);var recipients=new LinkedHashSet<UUID>();
+        if(eva.getPilotEntity() instanceof net.minecraft.server.level.ServerPlayer pilot)recipients.add(pilot.getUUID());
+        if(TvSortiesR32.assignedUnit(level,data,eva.getUnitVariant())==eva)
+        {
+            if(data.owner!=null)recipients.add(data.owner);
+            for(var sortie:data.sorties.values())
+            {if(sortie.commander!=null)recipients.add(sortie.commander);if(!sortie.npc&&sortie.pilotR45!=null)recipients.add(sortie.pilotR45);}
+        }
+        String unit=switch(eva.getUnitVariant()){case 0->"零号机";case 1->"初号机";case 2->"二号机";default->"EVA";};
+        String speaker=eva.getPilotEntity() instanceof com.projectseele.entity.TrainingPilotEntity
+                ?switch(eva.getUnitVariant()){case 0->"绫波丽";case 1->"碇真嗣";case 2->"明日香";default->"驾驶员";}:"伊吹摩耶";
+        for(var id:recipients)
+        {
+            var player=level.getServer().getPlayerList().getPlayer(id);if(player==null||player.level()!=level)continue;
+            NervStaffDialogue.say(player,speaker+" · 作战通信",unit+"，AT 力场展开。");
+            if(player.getEyePosition().distanceToSqr(eva.position().add(0,eva.getBbHeight()*.55D,0))>40*40)
+            {
+                var ear=player.getEyePosition();player.connection.send(new ClientboundSoundPacket(
+                        Holder.direct(ModSounds.EVA_AT_PRESSURE.get()),SoundSource.BLOCKS,ear.x,ear.y,ear.z,.45F,1F,level.getRandom().nextLong()));
+            }
+        }
+    }
+
     enum ShotResult
     {
         UNCONFIRMED("弹道前方地形尚未加载，未确认命中。保持瞄准，重新充能。"),

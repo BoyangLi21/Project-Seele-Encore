@@ -75,6 +75,8 @@ public final class EvaBayRepairR33
         {
             TvMissionEquipmentR45.completeShieldBayServiceR50(e,job.getCompound("ShieldServiceR50"));
             data.remove("R48YashimaFieldBurnout");
+            data.remove("R54YashimaAtRecharge");
+            data.remove("R54AtDeployment");
             data.remove("R48YashimaShieldHits");
             e.setHealth(e.getMaxHealth());data.remove("R33Repair");e.getEntityData().set(ELAPSED,-1);
             EvaShutdownR30.clear(e);

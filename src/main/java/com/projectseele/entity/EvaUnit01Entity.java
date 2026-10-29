@@ -3188,15 +3188,26 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return;
         }
         boolean on = !this.isAtFieldOn();
-        this.entityData.set(DATA_AT_ON, on);
+        if(on&&!this.raiseAtFieldR54())return;
+        if(!on){this.entityData.set(DATA_AT_ON,false);this.getPersistentData().remove("R54YashimaAtRecharge");}
         pilot.displayClientMessage(Component.translatable(
                 on ? "msg.projectseele.at_field_on" : "msg.projectseele.at_field_off"), true);
-        this.playSound(ModSounds.CRYSTAL_HIT.get(), 2.0F, on ? 0.8F : 0.5F);
-        if (on && this.level() instanceof ServerLevel serverLevel)
+        if(!on)this.playSound(ModSounds.CRYSTAL_HIT.get(),2F,.5F);
+    }
+
+    public boolean raiseAtFieldR54()
+    {
+        if(!(this.level() instanceof ServerLevel serverLevel)||this.isAtFieldOn()||this.isPilotControlLocked()
+                ||EvaShutdownR30.disabled(this)||!this.isPoweredOn()||this.getAtFieldEnergy()<AT_FIELD_MIN_TO_RAISE)return false;
+        this.entityData.set(DATA_AT_ON,true);
+        serverLevel.playSound(null,this.getX(),this.getY()+this.getBbHeight()*.55D,this.getZ(),
+                ModSounds.EVA_AT_PRESSURE.get(),SoundSource.HOSTILE,2.5F,1F);
         {
             Vec3 front = this.position().add(this.getForward().scale(Math.max(7.5D,this.getBbWidth()))).add(0.0D,this.getBbHeight()*.55D,0.0D);
             AtFieldFX.ripple(serverLevel,front,this.getForward(),Math.max(10.5F,this.getBbHeight()*.58F));
         }
+        com.projectseele.world.TvYashimaCombatCommsR54.onAtFieldRaised(this);
+        return true;
     }
 
     public void setChargingHeld(boolean held)
@@ -4517,7 +4528,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
     }
     public void stopAutonomousR30(){if(!this.level().isClientSide){this.xxa=this.zza=0;this.autonomousInputR30=Vec3.ZERO;this.autonomousInputAtR30=this.level().getGameTime();this.pilotMovementRequested=false;this.entityData.set(DATA_SPRINTING,false);}}
-    public void autonomousGuardR30(TrainingPilotEntity pilot){if(autonomousPilotR30(pilot))this.entityData.set(DATA_AT_ON,true);}
+    public void autonomousGuardR30(TrainingPilotEntity pilot){if(autonomousPilotR30(pilot))this.raiseAtFieldR54();}
     public void settleAutonomousAttackR30(TrainingPilotEntity pilot)
     {
         if(!autonomousPilotR30(pilot))return;
@@ -5823,7 +5834,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.entityData.set(DATA_N2_ARM_TICKS, 0);
         }
 
-        if(this.getPersistentData().getBoolean("R48YashimaFieldBurnout"))
+        var fieldData=this.getPersistentData();
+        int shieldHits=fieldData.getCompound("R48YashimaShieldHits").getInt("Hits");
+        if(fieldData.getBoolean("R48YashimaFieldBurnout")&&shieldHits>0&&shieldHits<3
+                &&this.getHealth()>0&&!EvaShutdownR30.wreck(this))
+        {fieldData.remove("R48YashimaFieldBurnout");fieldData.putBoolean("R54YashimaAtRecharge",true);}
+        if(fieldData.getBoolean("R48YashimaFieldBurnout"))
         {
             this.entityData.set(DATA_AT_ON,false);
             this.entityData.set(DATA_AT_ENERGY,0F);
@@ -5842,6 +5858,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.entityData.set(DATA_AT_ON, false);
             this.playSound(ModSounds.CRYSTAL_BREAK.get(), 2.0F, 1.2F);
         }
+        com.projectseele.world.TvYashimaCombatCommsR54.autoAtFieldR54(this);
         if (this.getControllingPassenger() == null
                 && !this.getTags().contains("seele_motion_lab"))
         {
@@ -7079,9 +7096,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 ||!(com.projectseele.world.TvMissionEquipmentR45.shieldLoanAuthorizedR48(this)
                    ||com.projectseele.world.EquipmentVaultsR47.physicalShieldLoanAuthorizedR48(this)))return false;
         float before=getHealth();
+        boolean fieldRaised=isAtFieldOn()&&getAtFieldEnergy()>0;
         entityData.set(DATA_AT_ON,false);entityData.set(DATA_AT_ENERGY,0F);
-        getPersistentData().putBoolean("R48YashimaFieldBurnout",true);
-        float damage=getMaxHealth()/3F;
+        getPersistentData().remove("R48YashimaFieldBurnout");
+        getPersistentData().putBoolean("R54YashimaAtRecharge",true);atRegenDelay=AT_FIELD_REGEN_DELAY;
+        this.playSound(ModSounds.CRYSTAL_BREAK.get(),2F,1.2F);
+        float damage=fieldRaised?getMaxHealth()/3F:getMaxHealth()*.5F;
         if(third||before<=damage)EvaShutdownR30.fail(this);
         else setHealth(before-damage);
         ProjectSeele.LOGGER.info("Yashima shield impact: eva={} third={} health={} -> {}",getUUID(),third,before,getHealth());
