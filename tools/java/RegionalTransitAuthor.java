@@ -12,6 +12,11 @@ import org.mtr.libraries.it.unimi.dsi.fastutil.objects.ObjectArrayList;
 /** Uses the installed MTR 4.0.5 engine to author its own native save format. */
 public final class RegionalTransitAuthor
 {
+    private static final class AuthoringSimulator extends Simulator
+    {
+        AuthoringSimulator(String dim,String[] dims,Path root){super(dim,dims,root,false);}
+        void authoringClock(long millis){setCurrentMillis(millis);}
+    }
     private static final Gson GSON=new GsonBuilder().setPrettyPrinting().create();
     private static Position pos(JsonArray a) { return new Position(a.get(0).getAsLong(),a.get(1).getAsLong(),a.get(2).getAsLong()); }
     private static JsonObject json(SerializedDataBase value) { JsonObject out=new JsonObject();value.serializeFullData(new JsonWriter(out));return out; }
@@ -50,7 +55,7 @@ public final class RegionalTransitAuthor
                 .noneMatch(part->part.toString().equalsIgnoreCase(".Codex")))
             throw new IllegalStateException("Append validation is restricted to a copied .Codex staging directory");
         String dim="projectseele/geofront";
-        Simulator simulator=new Simulator(dim,new String[]{"minecraft/overworld",dim,"minecraft/the_nether","minecraft/the_end"},root,false);
+        AuthoringSimulator simulator=new AuthoringSimulator(dim,new String[]{"minecraft/overworld",dim,"minecraft/the_nether","minecraft/the_end"},root);
         if(!append && (!simulator.rails.isEmpty()||!simulator.stations.isEmpty()))throw new IllegalStateException("Use a new staging directory; never replace an existing railway");
         Map<String,JsonObject> oldRails=snapshot(simulator.rails),oldRoutes=snapshot(simulator.routes),oldStations=snapshot(simulator.stations),oldPlatforms=snapshot(simulator.platforms),oldSidings=snapshot(simulator.sidings),oldDepots=snapshot(simulator.depots),oldLifts=snapshot(simulator.lifts);
         JsonArray retiredRails=new JsonArray();
@@ -73,7 +78,7 @@ public final class RegionalTransitAuthor
         }
         Map<String,Rail> rails=new LinkedHashMap<>();Map<String,JsonObject> definitions=new LinkedHashMap<>();
         UpdateDataRequest railRequest=new UpdateDataRequest(simulator);
-        JsonArray samples=new JsonArray();
+        JsonArray samples=new JsonArray(),geometryErrors=new JsonArray();
         for(JsonElement entry:plan.getAsJsonArray("rails"))
         {
             JsonObject r=entry.getAsJsonObject();String id=r.get("id").getAsString();
@@ -88,7 +93,7 @@ public final class RegionalTransitAuthor
             else if(kind.equals("turnback"))rail=Rail.newTurnBackRail(a,aa,b,ab,Rail.Shape.QUADRATIC,radius,styles,mode);
             else rail=Rail.newRail(a,aa,b,ab,Rail.Shape.QUADRATIC,radius,styles,
                     integer(r,"speed",80),integer(r,"reverse_speed",integer(r,"speed",80)),false,false,true,kind.equals("runway"),true,mode);
-            if(!rail.isValid())throw new IllegalStateException("Invalid native rail geometry "+id+" "+r);
+            if(!rail.isValid()){geometryErrors.add(r);continue;}
             railRequest.addRail(rail);rails.put(id,rail);definitions.put(id,r);
             JsonObject sample=new JsonObject();sample.addProperty("id",id);sample.addProperty("kind",kind);sample.addProperty("mode",mode.name());
             sample.addProperty("length",rail.railMath.getLength());JsonArray points=new JsonArray();
@@ -98,6 +103,7 @@ public final class RegionalTransitAuthor
             }
             sample.add("points",points);samples.add(sample);
         }
+        if(!geometryErrors.isEmpty())throw new IllegalStateException("Invalid native rail geometries: "+geometryErrors);
         // Rail creation owns platform/siding identities. Metadata must use those actual IDs.
         railRequest.update();simulator.sync();
         Map<String,Platform> platforms=new LinkedHashMap<>();Map<String,Siding> sidings=new LinkedHashMap<>();
@@ -176,6 +182,7 @@ public final class RegionalTransitAuthor
         }
         if(!append)simulator.setGameTime(0,1200000,true);Depot.generateDepots(simulator,depots);
         Map<String,Set<Long>> progress=new LinkedHashMap<>();lineSidings.keySet().forEach(k->progress.put(k,new HashSet<>()));
+        Map<String,Map<String,Set<Long>>> vehicleProgress=new LinkedHashMap<>();lineSidings.keySet().forEach(k->vehicleProgress.put(k,new LinkedHashMap<>()));
         boolean deployed=false;
         for(int tick=0;tick<5000;tick++)
         {
@@ -187,13 +194,31 @@ public final class RegionalTransitAuthor
                 // it through the native engine; retain existing live vehicles.
                 for(Depot depot:depots)
                     if(!freshDepots.contains(depot) && json(lineSidings.get(depotKeys.get(depot))).getAsJsonArray("vehicles").isEmpty())freshDepots.add(depot);
-                simulator.instantDeployDepots(freshDepots);deployed=true;
+                int warmupSeconds=integer(plan,"warmup_seconds",0);
+                if(warmupSeconds>0)
+                {
+                    // Native instantDeploy simulates a whole day, which is
+                    // unnecessary for a short isolated commissioning check.
+                    long clock=simulator.getCurrentMillis();
+                    for(int second=1;second<=warmupSeconds;second++)
+                    {
+                        simulator.authoringClock(clock+second*1000L);
+                        for(Depot depot:freshDepots)for(Siding siding:depot.savedRails)siding.simulateTrain(1000,null);
+                    }
+                    simulator.authoringClock(clock);
+                }
+                else simulator.instantDeployDepots(freshDepots);
+                deployed=true;
             }
             if(tick%100==0)
             {
                 for(var entry:lineSidings.entrySet())
                     for(JsonElement vehicle:json(entry.getValue()).getAsJsonArray("vehicles"))
-                        progress.get(entry.getKey()).add(Math.round(vehicle.getAsJsonObject().get("railProgress").getAsDouble()));
+                    {
+                        JsonObject v=vehicle.getAsJsonObject();long p=Math.round(v.get("railProgress").getAsDouble());
+                        progress.get(entry.getKey()).add(p);
+                        vehicleProgress.get(entry.getKey()).computeIfAbsent(v.get("id").getAsString(),k->new HashSet<>()).add(p);
+                    }
             }
             if(tick%500==0)System.out.println("MTR native validation tick="+tick+" depots="+depots.stream().map(d->d.getName()+":"+d.getLastGeneratedStatus()).toList());
             if(tick>800 && deployed && progress.values().stream().allMatch(p->p.size()>=5))break;
@@ -202,9 +227,11 @@ public final class RegionalTransitAuthor
         for(int i=0;i<depots.size();i++)
         {
             Depot depot=depots.get(i);String key=depotKeys.get(depot);
-            boolean passed=depot.getLastGeneratedStatus().name().equals("SUCCESSFUL") && progress.get(key).size()>=5;all&=passed;
+            int moving=vehicleProgress.get(key).values().stream().mapToInt(Set::size).max().orElse(0);
+            boolean passed=depot.getLastGeneratedStatus().name().equals("SUCCESSFUL") && moving>=5;all&=passed;
             JsonObject result=new JsonObject();result.addProperty("line",key);result.addProperty("status",depot.getLastGeneratedStatus().name());
             result.addProperty("path_segments",depot.getPath().size());result.addProperty("distinct_vehicle_positions",progress.get(key).size());result.addProperty("passed",passed);results.add(result);
+            result.addProperty("one_vehicle_distinct_positions",moving);
         }
         retained(oldRails,snapshot(simulator.rails),"rail geometry",true);retained(oldRoutes,snapshot(simulator.routes),"route",true);
         retained(oldStations,snapshot(simulator.stations),"station",false);retained(oldPlatforms,snapshot(simulator.platforms),"platform",false);
