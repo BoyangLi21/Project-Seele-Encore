@@ -64,6 +64,13 @@ class Editor:
             np.savez_compressed(path,coordinates=np.asarray(coords,np.int32),ranges=np.asarray(ranges,np.int64),indices=np.concatenate(indices),
                 before=np.concatenate(before),after=np.concatenate(after),palette=np.asarray(r['names']))
             rows.append(dict(path='delta/'+r['name'],cells=ranges[-1]))
+        # Composition can touch only some measured regions. Keep the already
+        # prepared terrain deltas in all other regions in the manifest too.
+        recorded={Path(row['path']).name for row in rows}
+        for path in sorted((self.folder/'delta').glob('*.npz')):
+            if path.name in recorded:continue
+            with np.load(path)as saved:count=int(saved['ranges'][-1])
+            if count:rows.append(dict(path='delta/'+path.name,cells=count))
         return rows
 
 

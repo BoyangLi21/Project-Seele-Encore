@@ -14,8 +14,17 @@ public final class RegionalTransitAuthor
 {
     private static final class AuthoringSimulator extends Simulator
     {
-        AuthoringSimulator(String dim,String[] dims,Path root){super(dim,dims,root,false);}
-        void authoringClock(long millis){setCurrentMillis(millis);}
+        private final java.lang.reflect.Field previousClock;
+        AuthoringSimulator(String dim,String[] dims,Path root) throws Exception
+        {
+            super(dim,dims,root,false);previousClock=Simulator.class.getDeclaredField("lastMillis");previousClock.setAccessible(true);
+        }
+        void authoringClock(long millis) throws Exception
+        {
+            // Native departure matching observes the interval between these
+            // clocks. Move both, exactly as native instantDeploy does.
+            previousClock.setLong(this,getCurrentMillis());setCurrentMillis(millis);
+        }
     }
     private static final Gson GSON=new GsonBuilder().setPrettyPrinting().create();
     private static Position pos(JsonArray a) { return new Position(a.get(0).getAsLong(),a.get(1).getAsLong(),a.get(2).getAsLong()); }
@@ -163,7 +172,20 @@ public final class RegionalTransitAuthor
             metadata.addRoute(route).addDepot(depot);depots.add(depot);depotKeys.put(depot,key);lineSidings.put(key,siding);
             JsonObject ids=new JsonObject();ids.addProperty("line",key);ids.addProperty("route_id",route.getId());ids.addProperty("depot_id",depot.getId());ids.addProperty("siding_id",siding.getId());lineIds.add(ids);
         }
-        metadata.update();ObjectArrayList<Depot> freshDepots=new ObjectArrayList<>(depots);
+        metadata.update();simulator.sync();
+        // UpdateDataRequest owns canonical runtime instances. New depot DTOs
+        // do not carry the synchronized savedRails association; generating
+        // those detached objects creates a route but never dispatches a train.
+        for(int index=0;index<depots.size();index++)
+        {
+            Depot requested=depots.get(index);String key=depotKeys.remove(requested);
+            Depot installed=simulator.depots.stream().filter(d->d.getId()==requested.getId()).findFirst().orElseThrow();
+            depots.set(index,installed);depotKeys.put(installed,key);
+            long sidingId=lineSidings.get(key).getId();
+            lineSidings.put(key,simulator.sidings.stream().filter(s->s.getId()==sidingId).findFirst().orElseThrow());
+            if(installed.savedRails.isEmpty())throw new IllegalStateException("Depot has no synchronized siding: "+key);
+        }
+        ObjectArrayList<Depot> freshDepots=new ObjectArrayList<>(depots);
         if(plan.has("regenerate_depots"))for(JsonElement e:plan.getAsJsonArray("regenerate_depots"))
         {
             JsonObject j=e.getAsJsonObject();String key=j.get("line").getAsString();
@@ -199,13 +221,17 @@ public final class RegionalTransitAuthor
                 {
                     // Native instantDeploy simulates a whole day, which is
                     // unnecessary for a short isolated commissioning check.
-                    long clock=simulator.getCurrentMillis();
+                    // End at the real commissioning clock. Advancing into
+                    // the future then rewinding strands dwell-based trains
+                    // at a future departure time after the author is saved.
+                    long clock=simulator.getCurrentMillis()-warmupSeconds*1000L;
+                    simulator.authoringClock(clock);
                     for(int second=1;second<=warmupSeconds;second++)
                     {
                         simulator.authoringClock(clock+second*1000L);
                         for(Depot depot:freshDepots)for(Siding siding:depot.savedRails)siding.simulateTrain(1000,null);
                     }
-                    simulator.authoringClock(clock);
+                    simulator.authoringClock(clock+warmupSeconds*1000L);
                 }
                 else simulator.instantDeployDepots(freshDepots);
                 deployed=true;
