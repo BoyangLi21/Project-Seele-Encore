@@ -63,17 +63,18 @@ def selected(chunks):
     return {p: set(map(int, np.unique(at//4096 + Y0//16))) for p, (at, _, _) in chunks.items() if len(at)}
 
 
-def prepare_region(world, region_key, chunks, devices, palette, destination):
+def prepare_region(world, region_key, chunks, devices, palette, destination, expected_statuses=None):
     rx, rz = region_key; path = dimension_dir(world, DIM)/'region'/f'r.{rx}.{rz}.mca'
     times, raw = read_region(path)
     decoded = {(cx, cz, sy): (palette.codes(names), ids) for cx, cz, sy, names, ids
-               in iter_selected_sections(world, DIM, selected(chunks))}
+               in iter_selected_sections(world, DIM, selected(chunks),expected_statuses=expected_statuses)}
     for cx, cz in chunks.keys() | devices.keys():
         slot = (cz % 32)*32 + cx % 32
         if raw[slot] is None: raise ValueError(f'Missing chunk {(cx,cz)}')
         root = parse_chunk(raw[slot])
-        if str(root.get('Status', '')).removeprefix('minecraft:') != 'full':
-            raise ValueError(f'Unfinished chunk {(cx,cz)}')
+        expected='full' if expected_statuses is None else expected_statuses.get((cx,cz),'full')
+        if str(root.get('Status', '')).removeprefix('minecraft:') != expected:
+            raise ValueError(f'Changed chunk generation status {(cx,cz)}')
         sections = {int(s['Y']): s for s in root['sections']}
         at, before, after = chunks.get((cx, cz), (np.array([], dtype=int),)*3)
         for sy in np.unique(at//4096 + Y0//16):
@@ -117,7 +118,7 @@ def prepare_jar(installed, compiled, target):
         names = [n for n in new.namelist() if n.startswith('com/projectseele/') and n.endswith('.class')]
         if 'com/projectseele/world/CityRigidGenerationR45.class' not in names: raise ValueError('Missing native city generation class')
         class_count=len(names)
-        for name in ('projectseele.mixins.json','projectseele.refmap.json'):
+        for name in ('projectseele.mixins.json','projectseele.refmap.json','data/projectseele/worldgen/hakone_surface.bin.gz'):
             if name not in new.namelist():raise ValueError('Missing compiled mixin resource '+name)
             names.append(name)
         new_names = set(names)
@@ -133,6 +134,13 @@ def prepare_jar(installed, compiled, target):
 def install(a):
     if a.backup.exists(): raise ValueError('Choose a fresh installation directory; never replay automatically')
     manifests = [json.loads((c/'manifest.json').read_text('utf8')) for c in a.candidate]
+    expected_statuses={}
+    for m in manifests:
+        for cx,cz,status in m.get('preserved_generation_statuses',[]):
+            if status not in ('noise','surface','carvers','features','initialize_light','light','spawn','full'):
+                raise ValueError('Boundary repair requires an already generated terrain column')
+            if(cx,cz)in expected_statuses and expected_statuses[cx,cz]!=status:raise ValueError('Conflicting generation states')
+            expected_statuses[cx,cz]=status
     if any(Path(m['world']).resolve() != a.world.resolve() for m in manifests): raise ValueError('Wrong actual world')
     final = a.candidate[-1]
     check = json.loads((final/'functional-check.json').read_text('utf8'))
@@ -166,6 +174,15 @@ def install(a):
                 if not current.exists() or nbtlib.load(prior) != nbtlib.load(current): raise ValueError(f'Changed metadata: {relative}')
             elif current.exists(): raise ValueError(f'New metadata already exists: {relative}')
             metadata.append((current, after));metadata_targets.add(current)
+        manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
+        for name in manifest.get('native_members',[]):
+            relative=Path(name)
+            if relative.is_absolute()or'..'in relative.parts or relative.parts[:3]!=('mtr','projectseele','geofront'):
+                raise ValueError('Unexpected native member destination')
+            current=a.world/relative;prior=candidate/'before'/relative;after=candidate/'after'/relative
+            if current in metadata_targets:raise ValueError('Overlapping native member repair')
+            if current.read_bytes()!=prior.read_bytes():raise ValueError('Native service changed after repair preparation')
+            metadata.append((current,after));metadata_targets.add(current)
     a.backup.mkdir(parents=True)
     stage = a.backup/'prepared'; original = a.backup/'original'; stage.mkdir(); original.mkdir()
     journal = dict(status='preparing', world=str(a.world), candidates=[str(c) for c in a.candidate], files=[], progress_files_written=[])
@@ -175,7 +192,7 @@ def install(a):
     for region_key, inputs in sorted(files.items()):
         palette = Palette(); chunks = compose(inputs, palette)
         relative = DATA.parent/'region'/f'r.{region_key[0]}.{region_key[1]}.mca'
-        prepare_region(a.world, region_key, chunks, devices[region_key], palette, stage/relative)
+        prepare_region(a.world, region_key, chunks, devices[region_key], palette, stage/relative,expected_statuses)
         plans.append((a.world/relative, stage/relative)); total += sum(len(v[0]) for v in chunks.values())
         tile_set.update((cx//4,cz//4) for cx,cz in chunks)
         print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s', flush=True)
@@ -199,7 +216,7 @@ def install(a):
         # Read back changed sections, not untouched regions or whole-save data.
         for region_key, inputs in sorted(files.items()):
             palette = Palette(); chunks = compose(inputs, palette); pending = selected(chunks)
-            for cx,cz,sy,names,ids in iter_selected_sections(a.world, DIM, pending):
+            for cx,cz,sy,names,ids in iter_selected_sections(a.world, DIM, pending,expected_statuses=expected_statuses):
                 at, _, after = chunks[cx,cz]; mask = at//4096 + Y0//16 == sy
                 actual = palette.codes(names)[ids[at[mask]%4096]]
                 if np.any(actual != after[mask]): raise ValueError(f'Installed section mismatch {(cx,cz,sy)}')

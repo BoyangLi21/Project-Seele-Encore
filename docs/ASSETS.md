@@ -469,3 +469,7 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 - 10 月 18 日水下可见度修订：按负责人参考画面的连续棱线要求，宣传水材质改为直线透视透射与 Fresnel 反射分开控制，保留细波反光，将吸收密度降为 0.003、散射密度降为 0.00015；这是有意的美术处理，不宣称严格物理折射。摄影机抬高以避开近岸对真实湖底尖点的遮挡，实际地图和已确认的金字塔几何均未改动。生成器为 tools/render_r53_clear_water_promo.py。
 
 - 同日补齐实际草坪内缘的 378 格青蓝灯；湖底尖点灯圈由 18 格宽扩大到 28 格宽，实际存档与宣传场景同步。水面保留环境与场景倒影以及细波法线，不扭曲水下棱线。按负责人反馈移除额外摄影反射卡，并排除摄影面光源的镜面倒影，避免湖中出现长方形亮斑。没有导入参考图或其他新增图像素材；此摄影反射与透射处理没有作为实时游戏水材质交付。
+
+## R55 箱根高程资源
+
+`data/projectseele/worldgen/hakone_surface.bin.gz` 出典为国土地理院[地理院瓦片](https://maps.gsi.go.jp/development/ichiran.html)和[最适化矢量数据](https://github.com/gsi-cyberjapan/optimal_bvmap)，由本项目加工为 1:4 游戏坐标高程和水面。复用本地缓存，没有嵌入旅游照片或动画图像。42 个局部陆地 DEM 缺值经过邻域补齐；海床和芦之湖水下深度是游戏适配，不是水下测绘。来源、锚点及加工见 HAKONE_GEOGRAPHY_WORK.md。

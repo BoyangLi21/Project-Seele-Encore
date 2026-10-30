@@ -136,7 +136,7 @@ def author(a):
         path=None
         for goal in targets:
             if math.dist(start,goal)>100:continue
-            gy=int(d['road2'][goal[1]-z0,goal[0]-x0])//2
+            gy=int((d['road2'][goal[1]-z0,goal[0]-x0]+1)//2)
             proposal=route(start,goal,blocked,[x0,z0,x1,z1],14000)
             if proposal and len(proposal)>=abs(gy-y)+2:path=proposal;break
         if path is None:raise ValueError('No street approach for '+row['label'])
@@ -211,7 +211,7 @@ def author(a):
                     if not fits(x,z,rx,rz):continue
                     gx,gz=map(round,curb)
                     if not(x0<=gx<=x1 and z0<=gz<=z1)or not d['walk'][gz-z0,gx-x0]:continue
-                    floor=int(d['road2'][gz-z0,gx-x0])//2
+                    floor=int((d['road2'][gz-z0,gx-x0]+1)//2)
                     plot=d['target'][z-rz-z0-3:z+rz-z0+4,x-rx-x0-3:x+rx-x0+4]
                     if np.max(np.abs(plot.astype(np.int32)-floor))>12:continue
                     site=dict(centre=[x,z],floor=floor,half=[hx,hz],rotation=rot,floors=2 if counts[v]%3 else 1,variant=len(buildings))
@@ -223,7 +223,7 @@ def author(a):
                     proposed_blocked=d['held']|track|builtmask
                     proposed_blocked[z-rz-z0-1:z+rz-z0+2,x-rx-x0-1:x+rx-x0+2]=True
                     path=route((approach[0],approach[2]),goal,proposed_blocked,[x0,z0,x1,z1],14000)
-                    goal_y=int(d['road2'][goal[1]-z0,goal[0]-x0])//2
+                    goal_y=int((d['road2'][goal[1]-z0,goal[0]-x0]+1)//2)
                     if not path or len(path)<abs(goal_y-floor)+2 or len(path)>60:continue
                     reserve(site);row=make_building(s,site,labels[counts[v]%len(labels)]);row['kind']='village';row['village']=v
                     connect(row,goal);buildings.append(row);counts[v]+=1

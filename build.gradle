@@ -617,6 +617,13 @@ tasks.register('verifyGeoFrontHeightR52', JavaExec) {
     doFirst { workingDir.mkdirs() }
 }
 tasks.named('check').configure { dependsOn 'verifyGeoFrontHeightR52' }
+tasks.register('verifyHakoneSurface', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.HakoneSurfaceFieldTest'
+    maxHeapSize = '1G'
+}
+tasks.named('check').configure { dependsOn 'verifyHakoneSurface' }
 
 tasks.register('verifyCityRelocation', JavaExec) {
     dependsOn testClasses

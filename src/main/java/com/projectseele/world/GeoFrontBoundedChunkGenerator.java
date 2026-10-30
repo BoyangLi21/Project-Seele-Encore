@@ -157,7 +157,29 @@ public final class GeoFrontBoundedChunkGenerator
     @Override
     public NoiseColumn getBaseColumn(int x,int z,LevelHeightAccessor bounds,RandomState state)
     {
-        return GeoFrontHeightR52.extendColumn(super.getBaseColumn(x,z,bounds,state),bounds);
+        NoiseColumn column = GeoFrontHeightR52.extendColumn(super.getBaseColumn(x,z,bounds,state),bounds);
+        if (!tvPreview) return column;
+        int from = bounds.getMinBuildHeight(), to = bounds.getMaxBuildHeight();
+        int nativeGround = -128;
+        for (int y = to - 1; y >= Math.max(from, -128); y--)
+            if (!column.getBlock(y).isAir() && column.getBlock(y).getFluidState().isEmpty())
+            { nativeGround = y; break; }
+        var surveyed = HakoneSurfaceField.sample(x, z, nativeGround);
+        if (surveyed == null) return column;
+        var blocks = new net.minecraft.world.level.block.state.BlockState[to - from];
+        for (int y = from; y < to; y++)
+            blocks[y - from] = y < Math.max(-128, Math.min(nativeGround, surveyed.ground()) - 3)
+                    ? column.getBlock(y)
+                    : (y > surveyed.ground() ? (y <= surveyed.water() ? Blocks.WATER : Blocks.AIR)
+                    : y == surveyed.ground() ? (surveyed.water() > y ? Blocks.GRAVEL : Blocks.GRASS_BLOCK)
+                    : y >= surveyed.ground() - 3 ? Blocks.DIRT : Blocks.STONE).defaultBlockState();
+        return new NoiseColumn(from, blocks);
+    }
+
+    @Override
+    public int getSeaLevel()
+    {
+        return tvPreview ? HakoneSurfaceField.SEA_Y + 1 : super.getSeaLevel();
     }
 
     @Override
@@ -170,7 +192,18 @@ public final class GeoFrontBoundedChunkGenerator
         // The vanilla no-match result otherwise uses the expanded accessor
         // minimum even though its sampled noise still starts at -672.
         var legacy=LevelHeightAccessor.create(from,Math.max(0,bounds.getMaxBuildHeight()-from));
-        return super.getBaseHeight(x,z,type,legacy,state);
+        int nativeHeight = super.getBaseHeight(x,z,tvPreview ? Heightmap.Types.OCEAN_FLOOR_WG : type,legacy,state);
+        if (tvPreview)
+        {
+            var surveyed = HakoneSurfaceField.sample(x, z, nativeHeight - 1);
+            if (surveyed != null)
+            {
+                int top = type.isOpaque().test(Blocks.WATER.defaultBlockState())
+                        ? Math.max(surveyed.ground(), surveyed.water()) : surveyed.ground();
+                return Math.max(from, Math.min(bounds.getMaxBuildHeight(), top + 1));
+            }
+        }
+        return nativeHeight;
     }
 
     /**

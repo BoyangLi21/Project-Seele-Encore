@@ -7,6 +7,7 @@ from prepare_hakone_main_terrain import sample_grid,smooth,MIN_Y,MAX_Y
 from prepare_hakone_lake_basin import distance_from
 from plan_ashi_landscape_r54 import NATURAL
 from plan_hakone_main_districts import ROAD_MATERIALS
+from hakone_earthworks import road_blocks
 
 
 def prepare(a):
@@ -42,6 +43,11 @@ def prepare(a):
     # component. Valley work changes natural ground, not device identities.
     protected[(zz>=578)&(zz<=699)&(xx>=900)&(xx<=1023)]=True
     held=np.asarray(Image.fromarray(protected).filter(ImageFilter.MaxFilter(9)),bool)
+    lake=np.zeros(shape,bool)
+    if getattr(a,'preserve_lake',False):
+        with np.load(a.gis/'lake-basin-mask.npz')as f:water_grid={k:f[k]for k in ('x','z','lake')}
+        lake=sample_grid(water_grid,'lake',xx,zz,True)
+        held=held|lake
     border=np.minimum.reduce([xx-x0,x1-xx,zz-z0,z1-zz]);blend=smooth(np.minimum(distance_from(held,32),border)/32)
     target=np.rint(m['top']+(height-m['top'])*blend).astype(np.int16);target=np.clip(target,-120,305)
     features=json.load(gzip.open(a.gis/'features.world.geojson.gz','rt',encoding='utf8'))['features']
@@ -103,7 +109,7 @@ def prepare(a):
             band=(~held[area])[None,:,:]&(yy>=lower)&(yy<=upper)
             proposed=np.where(yy>h,0,np.where(yy==h,3,np.where(yy>=h-3,2,1))).astype(np.uint16)
             proposed[wet[area][None,:,:]&(yy>h)&(yy<=water_y[area])]=4
-            w=walk[area];r=road[area];y=road2[area]//2;odd=road2[area]%2==1
+            w=walk[area];r=road[area];y,odd=road_blocks(road2[area])
             # Finished top is y+1 for a full block and y+.5 for a bottom slab.
             topcode=np.where(r,np.where(marking[area]&(xx[area]%9<5),7,5),6)
             topcode=np.where(odd,np.where(topcode==5,8,np.where(topcode==7,10,9)),topcode)
@@ -131,5 +137,6 @@ def prepare(a):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
+    p.add_argument('--preserve-lake',action='store_true',help='Keep the already installed full lake basin; compose shore infrastructure separately')
     for name in('gis','source','out'):p.add_argument('--'+name,type=Path,required=True)
     prepare(p.parse_args())

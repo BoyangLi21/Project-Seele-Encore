@@ -84,8 +84,23 @@ public final class TvWorldPreviewTerrain
             {
                 int nativeGround = chunk.getHeight(Heightmap.Types.OCEAN_FLOOR_WG, x & 15, z & 15);
                 int surfaceTop = nativeGround;
+                HakoneSurfaceField.Surface surveyed = HakoneSurfaceField.sample(x, z, nativeGround);
                 double cityDistance = rectangleDistance(x, z, -194, -4, 254, 444);
-                if (cityDistance < 160)
+                if (surveyed != null)
+                {
+                    surfaceTop = surveyed.ground();
+                    int oldTop = chunk.getHeight(Heightmap.Types.WORLD_SURFACE_WG, x & 15, z & 15);
+                    int top = Math.max(oldTop, Math.max(surfaceTop, surveyed.water()));
+                    for (int y = Math.max(-128, Math.min(nativeGround, surfaceTop) - 3); y <= top; y++)
+                    {
+                        BlockState state = y > surfaceTop
+                                ? (y <= surveyed.water() ? Blocks.WATER : Blocks.AIR).defaultBlockState()
+                                : (y == surfaceTop ? (surveyed.water() > surfaceTop ? Blocks.GRAVEL : Blocks.GRASS_BLOCK)
+                                : y >= surfaceTop - 3 ? Blocks.DIRT : Blocks.STONE).defaultBlockState();
+                        chunk.setBlockState(p.set(x, y, z), state, false);
+                    }
+                }
+                else if (cityDistance < 160)
                 {
                     double grade = 1 - smooth(cityDistance / 160);
                     int top = (int) Math.round(nativeGround * (1 - grade) + 79 * grade);
@@ -101,7 +116,7 @@ public final class TvWorldPreviewTerrain
                 }
                 // The custom fixed biome has no vanilla surface-rule branch.
                 // Give future explored land the same soil as the finished core.
-                if (surfaceTop >= 64)
+                if (surveyed == null && surfaceTop >= 64)
                     for (int d = 0; d < 4; d++)
                         chunk.setBlockState(p.set(x, surfaceTop - d, z),
                                 (d == 0 ? Blocks.GRASS_BLOCK : Blocks.DIRT).defaultBlockState(), false);

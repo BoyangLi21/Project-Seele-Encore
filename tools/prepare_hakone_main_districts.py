@@ -13,6 +13,7 @@ from author_hakone_district_blocks import author
 from plan_hakone_main_districts import ROAD_MATERIALS
 from plan_ashi_landscape_r54 import NATURAL
 from prepare_hakone_main_terrain import sample_grid
+from hakone_earthworks import grade_ground,grade_development,edge_defects
 
 
 def line(a,b):
@@ -45,6 +46,25 @@ def prepare(a):
     with np.load(a.candidate/'measured.npz')as file:m={k:file[k]for k in file.files}
     rows={r['id']:r for r in json.loads((a.parcels/'manifest.json').read_text('utf8'))['plots']}
     shape=d['target'].shape;target=d['target'].copy();oldlot=np.zeros(shape,bool);owned=defaultdict(list)
+    retained_station_file=a.candidate/'retained-station-ground.json'
+    station_ground=json.loads(retained_station_file.read_text('utf8'))if retained_station_file.exists()else[]
+    def below_station_soil(x,y,z):
+        # An old native deck below the new hillside is a separate vertical
+        # layer. Treating it as a soil anchor cut the mountain beneath Owakudani
+        # by almost ninety blocks. Its physical volume remains preserved.
+        return any(height-y>max(left-x,0,x-right)+max(top-z,0,z-bottom)
+                   for left,top,right,bottom,height in station_ground)
+    zz,xx=np.mgrid[z0:z1+1,x0:x1+1]
+    with np.load(a.candidate.parent/'lake-basin-mask.npz')as f:lake_grid={k:f[k]for k in('x','z','lake')}
+    lake=sample_grid(lake_grid,'lake',xx,zz,True)
+    # Coarse GSI inland-water pixels also cover river ribbons. Keeping the
+    # previous world's soil height under all those pixels left scattered old
+    # ridges beside the new streets. Only the installed lake is immutable;
+    # rivers are authored below as channels in the same terrain surface.
+    released_water=d['water']&~lake
+    with np.load(a.candidate.parent/'terrain-design.npz')as f:grid={k:f[k]for k in('x','z','height_y')}
+    surveyed=np.rint(sample_grid(grid,'height_y',xx,zz)).astype(np.int16)
+    target[released_water]=surveyed[released_water];d['water']=lake
     for row in rows.values():
         b=row['source_bounds_xyz'];oldlot[b[2]-z0:b[5]-z0+1,b[0]-x0:b[3]-x0+1]=True
         for cx in range(b[0]//16,b[3]//16+1):
@@ -59,6 +79,11 @@ def prepare(a):
         ImageDraw.Draw(walk_image).line(points,fill=1,width=street['width']+4 if street['width']else 3)
     road=np.asarray(road_image,bool)&~d['fixed']&~d['water'];walk=np.asarray(walk_image,bool)&~d['fixed']&~d['water']
     detour_file=a.candidate/'road-detours.json'
+    port_file=a.candidate/'retained-port-profiles.json'
+    port_profiles=json.loads(port_file.read_text('utf8'))if port_file.exists()else[]
+    subsurface_ports=[p for p in port_profiles if any(below_station_soil(x,y,z)for x,y,z in p['points'])]
+    port_profiles=[p for p in port_profiles if p not in subsurface_ports]
+    prior_port_walk=walk.copy()
     if detour_file.exists():
         retained=np.load(a.candidate/'road-retained-interfaces.npy');road&=~retained;walk&=~retained
         road_image=Image.fromarray(road.astype(np.uint8));walk_image=Image.fromarray(walk.astype(np.uint8))
@@ -66,6 +91,12 @@ def prepare(a):
             points=[(x-x0,z-z0)for x,z in path['points']]
             ImageDraw.Draw(road_image).line(points,fill=1,width=path['width'])
             ImageDraw.Draw(walk_image).line(points,fill=1,width=path['width']+4)
+        prior_port_walk=np.asarray(walk_image,bool).copy()
+        for path in port_profiles:
+            if not path['points']:raise ValueError('Unresolved retained street interface')
+            points=[(x-x0,z-z0)for x,y,z in path['points']]
+            ImageDraw.Draw(road_image).line(points,fill=1,width=path['width'])
+            ImageDraw.Draw(walk_image).line(points,fill=1,width=path['walk_width'])
         road=np.asarray(road_image,bool);walk=np.asarray(walk_image,bool)
     # Acute vector joins can rasterize a narrow stroke a pixel beyond a wider
     # one. Every carriageway cell must participate in grading and construction.
@@ -73,8 +104,10 @@ def prepare(a):
     # Streets follow surveyed relief rather than inherited flat railway
     # terraces. Old native rail remains below overpasses where appropriate.
     zz,xx=np.mgrid[z0:z1+1,x0:x1+1]
-    with np.load(a.candidate.parent/'terrain-design.npz')as file:grid={k:file[k]for k in ('x','z','height_y')}
-    roadheight=np.rint(sample_grid(grid,'height_y',xx,zz)).astype(np.int16)
+    # Roads and soil must start from the SAME terrain surface, including the
+    # interfaces with the retained city. Raw DEM road heights over blended old
+    # soil previously produced vertical roadside walls of more than 30 blocks.
+    roadheight=target.copy()
     roadheight=np.clip(roadheight,32,290)
     for _ in range(32):
         for dst,src in [(np.s_[1:,:],np.s_[:-1,:]),(np.s_[:-1,:],np.s_[1:,:]),(np.s_[:,1:],np.s_[:,:-1]),(np.s_[:,:-1],np.s_[:,1:])]:
@@ -131,7 +164,8 @@ def prepare(a):
         x,z=site['centre'];hx,hz=site['half'];rx,rz=(hx,hz)if site['rotation']%2==0 else(hz,hx)
         footprint[z-rz-z0-2:z+rz-z0+3,x-rx-x0-2:x+rx-x0+3]=True
     operations=[];reports=[];devices=[];walkpoints=[];doors=[];footways=[];components=[]
-    path_blocked=d['held']|d['rail']|d['water']|footprint
+    tunnel_border=np.asarray(Image.fromarray(tunnel).filter(ImageFilter.MaxFilter(3)),bool)
+    path_blocked=d['held']|d['rail']|d['water']|footprint|tunnel_border
     prior_paths=np.zeros(shape,bool)
     for site in plan['parcels']:
         px,pz=site['street'];site=copy.deepcopy(site);site['floor']=int(street_height[pz-z0,px-x0])+1
@@ -207,8 +241,43 @@ def prepare(a):
             changed+=int(active.sum());target[dst][active]=target[src][active]+1
         if not changed:break
     else:raise ValueError('Street grade propagation did not converge')
+    plot_areas=[]
     for c,report in components:
-        ax,_,az=report['approach'];floor=int(target[az-z0,ax-x0]);dy=floor-c.site['floor'];c.site['floor']=floor
+        x,z=c.site['centre'];hx,hz=c.site['half'];rx,rz=(hx,hz)if c.site['rotation']%2==0 else(hz,hx)
+        plot_areas.append(np.s_[z-rz-z0-2:z+rz-z0+3,x-rx-x0-2:x+rx-x0+3])
+    # Treat the original city streets as real ports with measured heights.
+    # A later junction solve must not silently lift their first step.
+    fixed_grades=np.zeros(shape,bool)
+    city=json.loads((a.candidate.parent/'city-south-layout-preserved/plan.json').read_text('utf8'))
+    for left,top,right,bottom in city['cross_rectangles_xz']:
+        area=np.s_[max(0,top-z0):min(shape[0],bottom-z0+1),max(0,left-x0):min(shape[1],right-x0+1)]
+        target[area]=80;fixed_grades[area]=True
+    target[lake]=99;fixed_grades|=lake
+    if station_ground:
+        for left,top,right,bottom,y in station_ground:
+            area=np.s_[max(0,top-z0):min(shape[0],bottom-z0+1),max(0,left-x0):min(shape[1],right-x0+1)]
+            land=~lake[area];target[area][land]=y;fixed_grades[area]|=land
+    for sx,sy,sz in[(-344,84,232),(30,80,688)]:
+        area=np.s_[sz-z0-2:sz-z0+3,sx-x0-2:sx-x0+3]
+        target[area]=sy;fixed_grades[area]=True
+    retained_grades=a.candidate/'retained-road-grades.json'
+    if retained_grades.exists():
+        for row in json.loads(retained_grades.read_text('utf8'))['anchors']:
+            x,y,z=row['point']
+            if prior_port_walk[z-z0,x-x0]and not below_station_soil(x,y,z):target[z-z0,x-x0]=y;fixed_grades[z-z0,x-x0]=True
+    for profile in port_profiles:
+        for x,y,z in profile['points']:
+            target[z-z0,x-x0]=y;fixed_grades[z-z0,x-x0]=True
+    port_surfaces=a.candidate/'retained-port-surface-grades.json'
+    if port_surfaces.exists():
+        for x,y,z in json.loads(port_surfaces.read_text('utf8')):
+            if walk[z-z0,x-x0]and not below_station_soil(x,y,z):target[z-z0,x-x0]=y;fixed_grades[z-z0,x-x0]=True
+    try:target=grade_development(target,walk|footprint,plot_areas,fixed=fixed_grades)
+    except ValueError:
+        np.savez_compressed(a.candidate/'failed-grade-constraints.npz',bounds=bounds,target=target,fixed=fixed_grades)
+        raise
+    for (c,report),plot_area in zip(components,plot_areas):
+        floor=int(target[plot_area][0,0]);dy=floor-c.site['floor'];c.site['floor']=floor
         if dy:
             for op in c.operations:op[1]+=dy;op[4]+=dy
             for point in c.walk+c.doors:point[1]+=dy
@@ -242,13 +311,41 @@ def prepare(a):
             fraction=np.clip((np.dot([z,x],axis)-lo)/max(1,hi-lo),0,1)
             y=round(y0+(y1-y0)*float(fraction))
             if walk[z,x]and abs(int(target[z,x])-y)<=3:y=int(target[z,x])
+            elif walk[z,x]and 3<int(target[z,x])-y<6:y=int(target[z,x])-6
             tunnel_floor[z,x]=y
+    # A surface footway crossing over a shallow tunnel owns its own level.
+    # Keep the ceiling at or below that floor, then grade the tunnel approach.
+    for _ in range(128):
+        changed=False
+        for dst,src in[(np.s_[1:,:],np.s_[:-1,:]),(np.s_[:-1,:],np.s_[1:,:]),(np.s_[:,1:],np.s_[:,:-1]),(np.s_[:,:-1],np.s_[:,1:])]:
+            use=tunnel[dst]&tunnel[src]&(tunnel_floor[dst]>tunnel_floor[src]+1)
+            if use.any():tunnel_floor[dst][use]=tunnel_floor[src][use]+1;changed=True
+        if not changed:break
     for iz,ix in np.argwhere(tunnel):
         x,z,y=int(ix+x0),int(iz+z0),int(tunnel_floor[iz,ix]);material='minecraft:black_concrete'if tunnel_distance[iz,ix]<=9 else'minecraft:smooth_stone'
         tunnel_operations.extend([[x,y-1,z,x,y-1,z,'minecraft:stone_bricks'],[x,y,z,x,y,z,material],
                                   [x,y+1,z,x,y+5,z,'minecraft:air'],[x,y+6,z,x,y+6,z,'minecraft:stone_bricks']])
     for point in tunnel_walk:point[1]=int(tunnel_floor[point[2]-z0,point[0]-x0])+1
+    tunnel_structures={id(op)for op in tunnel_operations if op[-1]=='minecraft:stone_bricks'}
+    tunnel_geometry={id(op)for op in tunnel_operations}
     operations.extend(tunnel_operations);walkpoints.extend(tunnel_walk)
+    soil_anchors=(walk|footprint|fixed_grades)&~tunnel&~ramp
+    graded,conflicts=grade_ground(target,soil_anchors,target)
+    if getattr(a,'surface_only',False):
+        active=~d['fixed']&~d['water']
+        final_ground=np.where(active,graded,m['top'])
+        final_ground[walk|footprint]=target[walk|footprint]
+        edges=edge_defects(final_ground,soil_anchors)
+        np.savez_compressed(a.candidate/'coupled-grading.npz',bounds=bounds,target=target,graded=graded,
+            anchors=soil_anchors,conflicts=conflicts,walk=walk,road=road,footprint=footprint,tunnel=tunnel,ramp=ramp,final_ground=final_ground)
+        (a.candidate/'ground-interface-errors.json').write_text(json.dumps([[x+x0,z+z0,axis,height]for x,z,axis,height in edges]),'utf8')
+        (a.candidate/'neighbourhood-design.json').write_text(json.dumps(reports,ensure_ascii=False),'utf8')
+        print('Offline surface design:',int(conflicts.sum()),'contradictory grade cells; no block patch emitted',flush=True)
+        return
+    if conflicts.any():
+        raise ValueError('Conflicting district terrace grades: '+str(int(conflicts.sum())))
+    flexible=~d['fixed']&~d['water']&~tunnel&~ramp
+    target[flexible]=graded[flexible]
     # Adjacent path widths share one surface. Reconcile their centre elevations
     # after all junctions, before emitting walking evidence or block arrays.
     for report in reports:
@@ -298,9 +395,16 @@ def prepare(a):
             oldroads=paved[old]&d['legacy'][area]&(yy>=d['legacy_y'][area]-2)&(yy<=d['legacy_y'][area]+8)
             allow|=oldroads
             h=target[area];land_h=np.where(tunnel[area]|ramp[area],d['target'][area],h)
-            active=(~d['held'][area]|oldlot[area]|footprint[area])&~d['fixed'][area]&~d['water'][area]
+            # An overhead rail beam must not freeze a whole 448-block soil
+            # column into a mesa. Preserve its complete vertical structure and
+            # air volume while grading the surrounding natural ground.
+            foreign=~allow
+            structure_low=np.where(foreign,yy,320).min(0)-1
+            structure_high=np.where(foreign,yy,-129).max(0)+6
+            structure_volume=(yy>=structure_low)&(yy<=structure_high)
+            active=~d['fixed'][area]&~d['water'][area]
             lower=np.maximum(32,np.minimum(m['top'][area],land_h)-3);upper=np.maximum(m['highest'][area],land_h+6)
-            band=active&(yy>=lower)&(yy<=upper)&allow
+            band=active&(yy>=lower)&(yy<=upper)&allow&~structure_volume
             proposed=np.where(yy>land_h,air,np.where(yy==land_h,grass,np.where(yy>=land_h-3,dirt,stone))).astype(np.uint16)
             new[band]=proposed[band]
             # Old component shells can extend beyond soil-level grading bands.
@@ -312,21 +416,31 @@ def prepare(a):
                 mask=wet&(yy==land_h+dy)&allow;new[mask]=material
             rw=walk[area]&~d['water'][area];rh=target[area]
             surface_band=rw&(yy>=rh-1)&(yy<=rh+5)
-            ground_obstruction[area]=((yy>=rh-1)&(yy<=rh+5)&~allow).any(0)
+            ground_obstruction[area]=((yy>rh)&(yy<=rh+5)&~allow).any(0)
             collision=ground_obstruction[area]&rw
             if collision.any():
                 for zz,xx in np.argwhere(collision):obstructed.append([int(cx*16+xx),int(rh[zz,xx]),int(cz*16+zz)])
             rw&=~collision
             clear=rw&(yy>rh)&(yy<=rh+5);new[clear]=air
-            new[rw&(yy==rh-1)]=stone
+            new[rw&(yy==rh-1)&allow]=stone
             material=np.where(road[area],asphalt,paving)
             zz,xx=np.mgrid[cz*16:cz*16+16,cx*16:cx*16+16]
             material=np.where(road[area]&d['centre'][area]&((xx+zz)%9<5),stripe,material)
-            mask=rw&(yy==rh);new[mask]=np.broadcast_to(material,new.shape)[mask]
+            mask=rw&(yy==rh)&allow;new[mask]=np.broadcast_to(material,new.shape)[mask]
             for op in op_by_chunk[cx,cz]:
                 lo=np.maximum([cx*16,-128,cz*16],op[:3]);hi=np.minimum([cx*16+16,320,cz*16+16],np.array(op[3:6])+1)
                 s=np.s_[lo[1]+128:hi[1]+128,lo[2]-cz*16:hi[2]-cz*16,lo[0]-cx*16:hi[0]-cx*16]
-                if not allow[s].all():raise ValueError(f'New building intersects retained device at {lo}')
+                if not allow[s].all():
+                    # A tunnel ceiling may meet the underside of an existing
+                    # concrete railway deck. Keep that load-bearing block;
+                    # it already closes the roof and has no device to replace.
+                    if id(op)in tunnel_structures:
+                        new[s][allow[s]]=code(op[-1]);continue
+                    local=np.argwhere(~allow[s])[0];pos=[int(lo[0]+local[2]),int(lo[1]+local[0]),int(lo[2]+local[1])]
+                    if id(op)in tunnel_geometry:
+                        if op[-1]=='minecraft:air':errors.append(['tunnel-retained-crossing',pos,op])
+                        new[s][allow[s]]=code(op[-1]);continue
+                    raise ValueError(f'Authored geometry {op} intersects retained {palette[old[tuple(local+np.array([lo[1]+128,lo[2]-cz*16,lo[0]-cx*16]))]]} at {pos}')
                 new[s]=code(op[-1])
             def state(p):return palette[new[p[1]+128,p[2]-cz*16,p[0]-cx*16]]
             for point in check_points[cx,cz]:
@@ -362,7 +476,7 @@ def prepare(a):
     (a.candidate/'neighbourhood.json').write_text(json.dumps(reports,ensure_ascii=False,indent=2),'utf8')
     (a.candidate/'street-connections.json').write_text(json.dumps(links,indent=2),'utf8')
     np.savez_compressed(a.candidate/'district-surface.npz',bounds=bounds,target=target,road=road,walk=walk,ground_obstruction=ground_obstruction,top=surface_top,palette=np.asarray(surface_palette),states=surface_ids)
-    result=dict(errors=errors,road_conflicts=obstructed,parcels=len(reports),preserved_devices=len(devices),walk_points=len(walkpoints)+len(footways),visual_verified=False)
+    result=dict(errors=errors,road_conflicts=obstructed,subsurface_ports_pending=subsurface_ports,parcels=len(reports),preserved_devices=len(devices),walk_points=len(walkpoints)+len(footways),visual_verified=False)
     (a.candidate/'functional-check.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),'utf8')
     print('Prepared districts:',len(reports),'functional path issues:',len(errors),'road interfaces:',len(obstructed),flush=True)
     if errors:raise ValueError('Resolve authored path errors before installing')
@@ -370,5 +484,6 @@ def prepare(a):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
+    p.add_argument('--surface-only',action='store_true',help='Produce an offline grading design without authoring block arrays')
     for name in ('candidate','parcels'):p.add_argument('--'+name,type=Path,required=True)
     prepare(p.parse_args())

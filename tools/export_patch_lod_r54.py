@@ -103,11 +103,12 @@ def main():
     expected={f'{x}_{z}.columns.gz'for x,z in tiles}
     extra=[f.name for f in columns.glob('*.columns.gz')if f.name not in expected]
     if extra:raise ValueError('Output contains other tile exports; use a new output directory: '+str(extra[:8]))
-    start=time.monotonic();rows=[];missing=[];requested=tiles
+    start=time.monotonic();rows=[];missing=[];unbuilt=[];requested=tiles
     if args.resume_failed:
         previous=json.loads((out/'export.json').read_text('utf8'))
         if previous['world']!=str(world)or previous['tiles']!=[list(p)for p in tiles]:raise ValueError('Resume requires the exact original world and tile set')
         rows=previous['exported'];requested=[tuple(r['tile'])for r in previous['missing']]
+        unbuilt=previous.get('unbuilt_tiles',[])
         if not requested:raise ValueError('Export is already complete')
     def export(tile):
         row=export_tile(world,tile,staging,allow_partial=args.allow_partial)
@@ -119,12 +120,17 @@ def main():
             jobs={pool.submit(export,tile):tile for tile in requested}
             for future in as_completed(jobs):
                 try:rows.append(future.result())
-                except Exception as error:missing.append(dict(tile=jobs[future],error=str(error)))
-                progress=dict(completed=len(rows),failed=len(missing),total=len(tiles),seconds=round(time.monotonic()-start))
+                except Exception as error:
+                    if args.allow_partial and str(error).startswith('No saved source chunks in tile '):
+                        # A repaired protochunk is deliberately still not a
+                        # FULL world column. Do not invent an all-air LOD.
+                        unbuilt.append(dict(tile=jobs[future],reason='No FULL saved columns; native generation will provide the distant terrain'))
+                    else:missing.append(dict(tile=jobs[future],error=str(error)))
+                progress=dict(completed=len(rows),failed=len(missing),unbuilt=len(unbuilt),total=len(tiles),seconds=round(time.monotonic()-start))
                 write_json(out/'progress.json',progress)
                 if (len(rows)+len(missing))%10==0 or len(rows)+len(missing)==len(tiles):print(progress,flush=True)
     rows.sort(key=lambda row:tuple(row['tile']));missing.sort(key=lambda row:tuple(row['tile']))
-    write_json(out/'export.json',dict(report,done=not missing,exported=rows,missing=missing,seconds=round(time.monotonic()-start)))
+    write_json(out/'export.json',dict(report,done=not missing,exported=rows,missing=missing,unbuilt_tiles=unbuilt,seconds=round(time.monotonic()-start)))
     if missing:raise SystemExit(f'{len(missing)} tiles unavailable; do not import a partial set. Details: {out / "export.json"}')
     print(f'Export complete: {len(rows)} tiles. Native importer directory: {columns}',flush=True)
 

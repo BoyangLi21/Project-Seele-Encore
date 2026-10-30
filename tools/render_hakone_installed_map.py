@@ -42,7 +42,7 @@ def render(gis, installation, out, view='city', source_snapshot=None):
         with np.load(source_snapshot/'blocks.npz')as a:volumes=a['blocks'].copy();palette=list(map(str,a['palette']))
         x0,z0=-352,-128;x1,z1=x0+volumes.shape[2]-1,z0+volumes.shape[1]-1
     else:
-        extents=[json.loads((c/'manifest.json').read_text('utf8'))['bounds_xz']for c in candidates]
+        extents=[m['bounds_xz']for c in candidates if 'bounds_xz'in(m:=json.loads((c/'manifest.json').read_text('utf8')))]
         x0=min(b[0]for b in extents);z0=min(b[1]for b in extents);x1=max(b[2]for b in extents);z1=max(b[3]for b in extents)
     shape = (z1-z0+1,x1-x0+1)
     rgb = np.zeros((*shape,3), np.float32); heights = np.full(shape,-129,np.int16)
@@ -70,6 +70,8 @@ def render(gis, installation, out, view='city', source_snapshot=None):
         for candidate in candidates:
             source=candidate/'source'/source_name
             if not source.exists():continue
+            manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
+            generation={(x,z):s for x,z,s in manifest.get('preserved_generation_statuses',[])}
             with np.load(source)as a:
                 remap=[]
                 for state in map(str,a['palette']):
@@ -78,6 +80,7 @@ def render(gis, installation, out, view='city', source_snapshot=None):
                 remap=np.asarray(remap,np.uint16)
                 for p,b in zip(a['coordinates'],a['blocks']):
                     key=tuple(p)
+                    if generation.get(key,'full')!='full':continue
                     if key in row:continue
                     row[key]=len(coordinates);coordinates.append(key);chunks.append(remap[b])
         volumes=np.asarray(chunks);del chunks
@@ -92,6 +95,7 @@ def render(gis, installation, out, view='city', source_snapshot=None):
                 remap = np.asarray(remap,np.uint16)
                 points,ranges,indices,after = (a[k] for k in ('coordinates','ranges','indices','after'))
                 for i,p in enumerate(points):
+                    if tuple(p)not in row:continue
                     left,right = ranges[i:i+2]
                     volumes[row[tuple(p)]].reshape(-1)[indices[left:right]] = remap[after[left:right]]
         colors = np.asarray([color(s) for s in palette],np.float32)
@@ -117,6 +121,9 @@ def render(gis, installation, out, view='city', source_snapshot=None):
     if view=='valley':panels=[('tozan-valley-map',(896,565,2431,1407),'已安装地图 · 强罗—箱根汤本铁路与河谷街区'),
                               ('funicular-map',(608,608,1020,831),'已安装地图 · 早云山—强罗登山缆车'),
                               ('yumoto-detail',(2030,980,2390,1320),'已安装地图 · 箱根汤本站前街区')]
+    if view=='repair':panels=[('repair-overview',(-832,-640,3120,1407),'R55 已装地图修复 · 人工验收总览'),
+                             ('repair-city',(-800,-550,1030,1050),'R55 已装地图修复 · 主城与山地街区'),
+                             ('repair-valley',(900,600,3000,1407),'R55 已装地图修复 · 河谷及原高水墙接缝')]
     if source_snapshot:panels=[('city-south-map',(x0,z0,x1,z1),'已安装地图 · 南移后的十字城区与街道')]
     for name,bounds,title in panels:
         figure_height=max(7,min(12,14*(bounds[3]-bounds[1])/(bounds[2]-bounds[0])+2)) if view=='stations'else 11
@@ -145,6 +152,8 @@ def render(gis, installation, out, view='city', source_snapshot=None):
             labels=[(934,643,'强罗'),(989,762,'雕刻之森'),(1047,936,'小涌谷'),(1265,886,'宫之下'),(1513,980,'大平台'),(1560,1091,'上大平台折返'),(1840,1162,'出山折返'),(1974,1098,'塔之泽'),(2213,1119,'箱根汤本')]
             if name=='funicular-map':labels=[(653,766,'早云山\n下层缆车 / 上层索道'),(918,653,'强罗换乘区'),(747,724,'缆车下穿公路桥')]
             if name=='yumoto-detail':labels=[(2214,1172,'汤本站房'),(2213,1119,'原生登山铁路站台'),(2310,1180,'沿街商住建筑')]
+        elif view=='repair':labels=[(30,340,'十字升降城区'),(-367,931,'南侧街区整坡'),(-285,1000,'桃源台'),(272,830,'大涌谷'),
+                                  (950,643,'强罗'),(1001,733,'雕刻之森'),(1265,886,'宫之下'),(1513,980,'大平台'),(2214,1172,'箱根汤本'),(2432,1087,'原高水墙接缝')]
         elif name=='main-map': labels += [(-500,250,'西部旧街区 · 待重建'),(-200,-350,'北部旧街区 · 待重建'),(-200,720,'南部旧街区 · 待重建')]
         else: labels += [(-146,61,'重建诊所 / 公园'),(-148,395,'重建住宅 / 商店'),(201,48,'重建诊所 / 书店'),(201,397,'重建住宅 / 咖啡馆')]
         for x,z,text in labels:
@@ -154,6 +163,7 @@ def render(gis, installation, out, view='city', source_snapshot=None):
         if view=='districts':caption='实际方块俯视图；153 个原地块整体重排，原物品保留。车站、湖岸、交通运营与街道细节继续施工。'
         if view=='stations':caption='实际已安装方块；金色线为已安装的原生索道。强罗—汤本铁路及其余湖岸街区继续施工。'
         if view=='valley':caption='实际已安装方块与原生轨道；含三处折返、登山缆车、6 座新站房及 67 栋沿街建筑。公交、河岸和山林细节继续施工。'
+        if view=='repair':caption='实际已装方块的俯视简化着色；灰黑区域为本批未采集范围，并非存档空洞。新扩建等待人工验收通过。'
         fig.text(.08,.025,caption,fontsize=11,color='#52645d')
         fig.subplots_adjust(bottom=.10,top=.89); fig.savefig(out/(name+'.png'),dpi=160); plt.close(fig)
     (out/'provenance.json').write_text(json.dumps(dict(installation=str(installation),world=receipt['world'],
@@ -164,6 +174,6 @@ def render(gis, installation, out, view='city', source_snapshot=None):
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
     for n in ('gis','installation','out'):p.add_argument('--'+n,type=Path,required=True)
-    p.add_argument('--view',choices=('city','lake','districts','stations','valley'),default='city')
+    p.add_argument('--view',choices=('city','lake','districts','stations','valley','repair'),default='city')
     p.add_argument('--source-snapshot',type=Path,help='Measured dense city source captured before this installation')
     a=p.parse_args();render(a.gis,a.installation,a.out,a.view,a.source_snapshot)

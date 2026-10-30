@@ -10,6 +10,11 @@ def check(a):
     data=json.loads((a.candidate/'valley-buildings.json').read_text('utf8'))
     manifest=json.loads((a.candidate/'manifest.json').read_text('utf8'))
     e=Editor(a.candidate);x0,z0,x1,z1=manifest['bounds_xz'];errors=[];rows=[]
+    overlay=getattr(a,'main_overlay',None)
+    if overlay:
+        main=Editor(overlay);original_state=e.state
+        e.state=lambda x,y,z: main.state(x,y,z)if x<=1023 and z<=1023 else original_state(x,y,z)
+        data['buildings']=[r for r in data['buildings']if r['site']['centre'][0]<=1023 and r['site']['centre'][1]<=1023]
     def clear(state):
         name=state.split('[')[0]
         return name in('minecraft:air','minecraft:cave_air','minecraft:void_air')or name.endswith('_door')
@@ -46,12 +51,21 @@ def check(a):
         if missing:errors.append([index,row['label'],'unreachable',missing])
         rows.append(dict(index=index,label=row['label'],connected=not missing,visited=len(seen),goals=goals))
     report=dict(errors=errors,buildings=len(rows),public_goals=sum(len(r['goals'])for r in rows),rows=rows,method='Final block-state traversal with interactable doors and one-block stairs; offline only')
-    (a.candidate/'public-access.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
-    check=json.loads((a.candidate/'functional-check.json').read_text('utf8'));check['errors']=[*check['errors'],*errors];check['public_routes_pending']=bool(errors);check['public_goals']=report['public_goals']
+    (a.candidate/('public-access-main-merge.json'if overlay else'public-access.json')).write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
+    check=json.loads((a.candidate/'functional-check.json').read_text('utf8'))
+    if overlay:
+        labels={row['label']for row in data['buildings']}
+        check['errors']=[r for r in check['errors']if not(isinstance(r,list)and len(r)>1 and r[1]in labels)]
+        check['merged_western_public_goals']=report['public_goals']
+        check['public_goals']=json.loads((a.candidate/'public-access.json').read_text('utf8'))['public_goals']
+    else:check['public_goals']=report['public_goals']
+    check['errors']=[*check['errors'],*errors];check['public_routes_pending']=bool(check['errors'])
     (a.candidate/'functional-check.json').write_text(json.dumps(check,ensure_ascii=False,indent=2),'utf8')
     print(json.dumps(dict(buildings=len(rows),public_goals=report['public_goals'],errors=errors[:16],error_count=len(errors)),ensure_ascii=False),flush=True)
     if errors:raise ValueError('Public access needs a bounded local repair')
 
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(__doc__);p.add_argument('--candidate',type=Path,required=True);check(p.parse_args())
+    p=argparse.ArgumentParser(__doc__);p.add_argument('--candidate',type=Path,required=True)
+    p.add_argument('--main-overlay',type=Path,help='Only recheck the western station touched by the merged main-city repair')
+    check(p.parse_args())
