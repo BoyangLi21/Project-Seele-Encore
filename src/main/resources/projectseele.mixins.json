@@ -33,6 +33,7 @@
     "MovingElevatorRemoteAccessor",
     "TransportPassengerDiagnosticsMixin",
     "MtrRouteEndpointMixin",
+    "HakoneRopewayHeadwayMixin",
     "UNFlightSpeedR22Mixin",
     "SbwDefenseOwnerMixin",
     "SbwDefenseLoadedLosR56Mixin",

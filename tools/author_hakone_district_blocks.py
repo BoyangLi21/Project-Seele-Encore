@@ -114,6 +114,9 @@ def author(site,row,folder):
     roof=n*5;c.fill(-hx,roof,-hz,hx,roof,hz,'minecraft:stone_bricks')
     if residential and n<=4:
         for step in range(5):
+            for x in (-hx,hx):
+                c.fill(x,roof+1+step,-hz+step+1,x,roof+1+step,hz-step-1,wall)
+        for step in range(5):
             for sign in (-1,1):c.fill(-hx-1,roof+1+step,sign*(hz-step),hx+1,roof+1+step,sign*(hz-step),'minecraft:dark_oak_planks')
         c.fill(-hx-1,roof+5,-hz+4,hx+1,roof+5,hz-4,'minecraft:dark_oak_planks')
     else:

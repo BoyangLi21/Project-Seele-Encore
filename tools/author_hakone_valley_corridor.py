@@ -51,6 +51,11 @@ def make_building(s,site,label,station=False):
         c.fill(-hx+1,y+5,-hz+6,-hx+3,y+5,-hz+7,PAVE)
     roof=levels*5;c.fill(-hx-1,roof,-hz-1,hx+1,roof,hz+1,accent)
     if station or variant%3:
+        # Close both gable ends beneath the sloping shell. The old template
+        # left the whole attic open, which looked like a sliced building.
+        for step in range(min(5,hz)):
+            for x in (-hx,hx):
+                c.fill(x,roof+1+step,-hz+step,x,roof+1+step,hz-step,wall)
         for step in range(min(5,hz)):
             for sign in(-1,1):c.fill(-hx-1,roof+1+step,sign*(hz+1-step),hx+1,roof+1+step,sign*(hz+1-step),'minecraft:dark_oak_planks')
         c.fill(-hx-1,roof+min(5,hz),-max(0,hz-4),hx+1,roof+min(5,hz),max(0,hz-4),'minecraft:dark_oak_planks')
@@ -207,7 +212,8 @@ def author(a):
                     gx,gz=map(round,curb)
                     if not(x0<=gx<=x1 and z0<=gz<=z1)or not d['walk'][gz-z0,gx-x0]:continue
                     floor=int(d['road2'][gz-z0,gx-x0])//2
-                    if abs(int(d['target'][z-z0,x-x0])-floor)>12:continue
+                    plot=d['target'][z-rz-z0-3:z+rz-z0+4,x-rx-x0-3:x+rx-x0+4]
+                    if np.max(np.abs(plot.astype(np.int32)-floor))>12:continue
                     site=dict(centre=[x,z],floor=floor,half=[hx,hz],rotation=rot,floors=2 if counts[v]%3 else 1,variant=len(buildings))
                     # Use the side pavement as the public goal, not the centre
                     # of a two-way national road.

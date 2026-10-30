@@ -21,7 +21,10 @@ def plan(a):
         start=points[0];end=[start[0]-8,start[1],start[2]]
         rails.append(dict(id=key+'-depot',**{'from':end,'to':start[:3]},from_angle='E',to_angle='W',mode='CABLE_CAR',kind='siding'))
         lines.append(dict(id=key,name='箱根索道 '+('桃源台—姥子—大涌谷'if key=='HRW'else'大涌谷—早云山'),mode='CABLE_CAR',
-                          platforms=[f'{key}-{i}'for i in platform_order],siding=key+'-depot',cars=[car],frequency=6,repeat=True,dwell=6000))
+                          platforms=[f'{key}-{i}'for i in platform_order],siding=key+'-depot',cars=[car],frequency=6,repeat=False,dwell=6000))
+        # CABLE_CAR dispatch is inherently continuous. Infinite route repetition
+        # makes each old cabin circle forever while new cabins keep spawning.
+        # The return cable and depot exit close each trip through native paths.
     west=[[-296,120,1006,'E'],[-289,120,1006,'E'],[-275,120,1006,'E'],
           [-244,high(-244,977),977,'NE'],[-164,high(-164,918),918,'NEE'],[-98,high(-98,871),871,'NE'],
           [-33,151,822,'E'],[-15,151,822,'E'],[60,high(60,822),822,'E'],[150,high(150,824),824,'E'],

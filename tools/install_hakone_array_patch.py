@@ -111,18 +111,23 @@ def prepare_region(world, region_key, chunks, devices, palette, destination):
 
 def prepare_jar(installed, compiled, target):
     # The live distribution has large authored models absent from the small
-    # code build. Replace only our compiled classes, preserving all resources.
+    # code build. Keep authored assets, but carry the mixin declarations and
+    # mappings with their new classes so newly added compatibility fixes load.
     with zipfile.ZipFile(installed) as old, zipfile.ZipFile(compiled) as new:
         names = [n for n in new.namelist() if n.startswith('com/projectseele/') and n.endswith('.class')]
         if 'com/projectseele/world/CityRigidGenerationR45.class' not in names: raise ValueError('Missing native city generation class')
+        class_count=len(names)
+        for name in ('projectseele.mixins.json','projectseele.refmap.json'):
+            if name not in new.namelist():raise ValueError('Missing compiled mixin resource '+name)
+            names.append(name)
         new_names = set(names)
         with zipfile.ZipFile(target, 'x', compression=zipfile.ZIP_DEFLATED, compresslevel=1) as out:
             for entry in old.infolist():
-                if entry.filename.startswith('com/projectseele/') and entry.filename.endswith('.class'):
+                if entry.filename in new_names or (entry.filename.startswith('com/projectseele/') and entry.filename.endswith('.class')):
                     continue
                 out.writestr(entry, old.read(entry.filename))
             for name in names: out.writestr(name, new.read(name))
-    return len(new_names)
+    return class_count
 
 
 def install(a):
