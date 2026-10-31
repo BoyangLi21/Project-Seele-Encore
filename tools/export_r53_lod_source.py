@@ -10,6 +10,27 @@ import numpy as np
 from query_blocks import iter_lod_source_chunks
 
 
+def encoded_columns(values):
+    """Encode all column runs together instead of 4096 NumPy setup loops."""
+    columns=values.reshape(4096,1665);present=np.flatnonzero(columns[:,0]!=0xffffffff)
+    counts=np.zeros(4096,np.int32)
+    if not len(present):return bytes(8192)
+    selected=columns[present];boundary=np.empty(selected.shape,bool);boundary[:,0]=True
+    boundary[:,1:]=selected[:,1:]!=selected[:,:-1]
+    row,starts=np.nonzero(boundary);ends=np.r_[starts[1:],1665]
+    ends[np.r_[row[1:]!=row[:-1],True]]=1665
+    codes=selected[row,starts].astype(np.uint64)
+    spans=(codes&0xffffff)|((ends-starts).astype(np.uint64)<<32)|(starts.astype(np.uint64)<<44)|((codes>>24)<<60)
+    counts[present]=np.bincount(row,minlength=len(present))
+    payload=bytearray(int(counts.sum())*8+8192);cursor=offset=0
+    for count in counts:
+        count=int(count);struct.pack_into('>H',payload,cursor,count);cursor+=2
+        if count:
+            payload[cursor:cursor+count*8]=spans[offset:offset+count][::-1].astype('>u8').tobytes()
+            offset+=count;cursor+=count*8
+    return payload
+
+
 def export_tile(world,tile,destination,allow_partial=False):
     tx,tz=tile;chunks={(tx*4+x,tz*4+z)for x in range(4)for z in range(4)}
     pairs=[];lookup={}
@@ -41,13 +62,7 @@ def export_tile(world,tile,destination,allow_partial=False):
     out=destination/f'{tx}_{tz}.columns.gz'
     with gzip.open(out,'wb',compresslevel=3)as stream:
         stream.write(struct.pack('>I',len(header)));stream.write(header)
-        for column in values.reshape(4096,1665):
-            if column[0]==0xffffffff:
-                stream.write(struct.pack('>H',0));continue
-            starts=np.r_[0,np.flatnonzero(column[1:]!=column[:-1])+1]
-            ends=np.r_[starts[1:],1665];codes=column[starts].astype(np.uint64)
-            spans=(codes&0xffffff)|((ends-starts).astype(np.uint64)<<32)|(starts.astype(np.uint64)<<44)|((codes>>24)<<60)
-            stream.write(struct.pack('>H',len(spans)));stream.write(spans[::-1].astype('>u8').tobytes())
+        stream.write(encoded_columns(values))
     return dict(tile=tile,bytes=out.stat().st_size,states=len(pairs),unlit_chunks=unlit,
                 saved_chunks=len(present),missing_chunks=sorted(chunks-present))
 

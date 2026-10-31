@@ -142,9 +142,9 @@ def install(a):
             if(cx,cz)in expected_statuses and expected_statuses[cx,cz]!=status:raise ValueError('Conflicting generation states')
             expected_statuses[cx,cz]=status
     if any(Path(m['world']).resolve() != a.world.resolve() for m in manifests): raise ValueError('Wrong actual world')
-    final = a.candidate[-1]
-    check = json.loads((final/'functional-check.json').read_text('utf8'))
-    if check['errors']: raise ValueError('Unresolved authored path errors')
+    for candidate in a.candidate:
+        check = json.loads((candidate/'functional-check.json').read_text('utf8'))
+        if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
     for candidate in a.candidate:
         for preserved in (candidate/'preserved').glob('*control*.dat'):
             old = nbtlib.load(preserved)['data']; current = nbtlib.load(a.world/DATA/preserved.name)['data']

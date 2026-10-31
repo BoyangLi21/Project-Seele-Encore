@@ -101,6 +101,10 @@ def render(gis, installation, out, view='city', source_snapshot=None):
         colors = np.asarray([color(s) for s in palette],np.float32)
         visible = np.asarray([s.split(':')[-1].split('[')[0] not in invisible for s in palette])
         for p,volume in zip(coordinates,volumes):
+            if p[0]*16<x0 or p[0]*16+15>x1 or p[1]*16<z0 or p[1]*16+15>z1:
+                # A composed repair may also contain distant station shells.
+                # They stay installed, but are outside this map panel's source.
+                continue
             top = volume.shape[0]-1-np.argmax(visible[volume[::-1]],axis=0)
             ids = np.take_along_axis(volume,top[None,:,:],axis=0)[0]
             x,z = int(p[0])*16-x0,int(p[1])*16-z0

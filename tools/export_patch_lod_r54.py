@@ -6,8 +6,8 @@ No world/SQLite/player/entity/traffic data is written. --plan-only reads patches
 only; actual export holds a read lock on the stopped world's session.lock.
 """
 from __future__ import annotations
-import argparse,contextlib,gzip,json,os,sys,time
-from concurrent.futures import ThreadPoolExecutor,as_completed
+import argparse,contextlib,gzip,json,os,struct,sys,time
+from concurrent.futures import ProcessPoolExecutor,as_completed
 from pathlib import Path
 
 os.environ.setdefault('OPENBLAS_NUM_THREADS','1')
@@ -59,6 +59,25 @@ def write_json(path,value):
     os.replace(temporary,path)
 
 
+def export_one(world,tile,staging,columns,allow_partial):
+    from export_r53_lod_source import export_tile
+    row=export_tile(world,tile,staging,allow_partial=allow_partial)
+    name=f'{tile[0]}_{tile[1]}.columns.gz'
+    os.replace(staging/name,columns/name)
+    return row
+
+
+def published_row(path,tile):
+    # Only completed files are atomically published here; staging is never reused.
+    with gzip.open(path,'rb') as stream:
+        size=struct.unpack('>I',stream.read(4))[0]
+        header=json.loads(stream.read(size))
+    if header['tile']!=list(tile):raise ValueError('Published tile header disagrees with filename: '+str(path))
+    absent=header.get('missing_chunks',[])
+    return dict(tile=tile,bytes=path.stat().st_size,states=len(header['pairs']),
+                unlit_chunks=header.get('source_unlit_chunks',[]),saved_chunks=16-len(absent),missing_chunks=absent)
+
+
 def main():
     parser=argparse.ArgumentParser(__doc__)
     parser.add_argument('world',type=Path)
@@ -69,6 +88,7 @@ def main():
     parser.add_argument('--workers',type=int,choices=range(1,5),default=2)
     parser.add_argument('--allow-partial',action='store_true',help='R54 importer keeps absent columns unknown; never invent source blocks')
     parser.add_argument('--resume-failed',action='store_true',help='Retry only unavailable tiles from this exact completed export attempt')
+    parser.add_argument('--resume-existing',action='store_true',help='Resume interrupted export using atomically published columns for the same source plan')
     parser.add_argument('--plan-only',action='store_true',help='List affected tiles without opening the world')
     parser.add_argument('--deps',type=Path,help='Optional directory containing nbtlib; appended after installed runtime packages')
     args=parser.parse_args();paths=list(args.patches)
@@ -91,6 +111,12 @@ def main():
     report=dict(world=str(world),dimension='projectseele:geofront',tile_size=64,tiles=tiles,
                 total=len(tiles),inputs=inputs,format='SavedColumnLodImporterR53 unchanged',
                 import_directory=str(out/'columns'),world_written=False,sqlite_written=False,allow_partial=args.allow_partial)
+    if args.resume_existing:
+        previous=json.loads((out/'tile-plan.json').read_text('utf8'))
+        for key in ('world','tiles','inputs','allow_partial'):
+            if previous[key]!=json.loads(json.dumps(report[key])):
+                raise ValueError('Interrupted resume requires the exact original plan: '+key)
+    if args.resume_existing and args.resume_failed:parser.error('Choose one resume mode')
     write_json(out/'tile-plan.json',report)
     if args.plan_only:
         print(f'Planned {len(tiles)} changed tiles from {len(paths)} patches; world not opened.')
@@ -98,7 +124,6 @@ def main():
     if not tiles:
         write_json(out/'export.json',dict(report,done=True,exported=[],missing=[]));print('No block-state changes; existing cache retained.');return
     if args.deps:sys.path.append(str(args.deps.resolve()))
-    from export_r53_lod_source import export_tile
     columns=out/'columns';staging=out/'staging';columns.mkdir(exist_ok=True);staging.mkdir(exist_ok=True)
     expected={f'{x}_{z}.columns.gz'for x,z in tiles}
     extra=[f.name for f in columns.glob('*.columns.gz')if f.name not in expected]
@@ -110,14 +135,14 @@ def main():
         rows=previous['exported'];requested=[tuple(r['tile'])for r in previous['missing']]
         unbuilt=previous.get('unbuilt_tiles',[])
         if not requested:raise ValueError('Export is already complete')
-    def export(tile):
-        row=export_tile(world,tile,staging,allow_partial=args.allow_partial)
-        name=f'{tile[0]}_{tile[1]}.columns.gz'
-        os.replace(staging/name,columns/name)
-        return row
     with stopped_world(world):
-        with ThreadPoolExecutor(max_workers=args.workers,thread_name_prefix='seele-column-export')as pool:
-            jobs={pool.submit(export,tile):tile for tile in requested}
+        if args.resume_existing:
+            rows=[published_row(columns/f'{x}_{z}.columns.gz',(x,z))for x,z in tiles if (columns/f'{x}_{z}.columns.gz').is_file()]
+            completed={tuple(row['tile'])for row in rows}
+            requested=[tile for tile in tiles if tuple(tile)not in completed]
+            print(f'Resuming {len(rows)} completed tiles; {len(requested)} remaining.',flush=True)
+        with ProcessPoolExecutor(max_workers=args.workers)as pool:
+            jobs={pool.submit(export_one,world,tile,staging,columns,args.allow_partial):tile for tile in requested}
             for future in as_completed(jobs):
                 try:rows.append(future.result())
                 except Exception as error:

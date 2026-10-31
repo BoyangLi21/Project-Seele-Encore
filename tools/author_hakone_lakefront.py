@@ -57,7 +57,11 @@ class Editor:
                 if not len(at):continue
                 coords.append(p);indices.append(at);before.append(b.ravel()[at]);after.append(a.ravel()[at]);ranges.append(ranges[-1]+len(at))
             path=self.folder/'delta'/r['name']
-            if not coords:continue
+            if not coords:
+                # A later composition can deliberately restore every cell in
+                # this loaded region. Do not leave its superseded delta active.
+                path.unlink(missing_ok=True)
+                continue
             backup=self.folder/'before-lakefront'/r['name']
             if path.exists() and not backup.exists():
                 backup.parent.mkdir(exist_ok=True);shutil.copy2(path,backup)
