@@ -325,6 +325,7 @@ def main():
     ap.add_argument("--body", required=True)
     ap.add_argument("--bandai", required=True)
     ap.add_argument("--g1", default="", help="G1 Moves BVH root (free_mocap_sources/g1_moves)")
+    ap.add_argument("--hand-poses", default="", help="fitted anatomical hand poses (fist_fit.py)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     bandai = lambda name: os.path.join(a.bandai, f"dataset-1_{name}.bvh")  # noqa: E731
@@ -366,6 +367,9 @@ def main():
         if a.g1:
             clips.update(build_actions(a.g1, rt, variant))
         pack["variants"][str(variant)] = {"clips": clips}
+    if a.hand_poses:
+        with open(a.hand_poses, encoding="utf-8") as f:
+            pack["hand_poses"] = json.load(f)
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(pack, f, separators=(",", ":"))
     print("wrote", a.out, os.path.getsize(a.out) // 1024, "KiB")

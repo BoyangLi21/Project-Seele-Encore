@@ -200,7 +200,24 @@ public final class EvaAnatomicalHandsR45
                     if(!Float.isFinite(along.lengthSquared())||!Float.isFinite(normal.lengthSquared()))throw new IllegalArgumentException("Invalid natural hand frame");
                     carry.put(side,new CarryFrame(along,normal));
                 }
-                return Optional.of(new Rig(List.copyOf(joints),Map.copyOf(named),root.getAsJsonObject("pose_controls"),Map.copyOf(grips),knife,mechanism,sword,Map.copyOf(carry)));
+                // Fitted poses from the motion pack replace per-joint angles of
+                // named controls; the contract bytes and fingerprint are untouched.
+                var poses=root.getAsJsonObject("pose_controls");
+                var fitted=com.projectseele.anim.MotionPack.handPoses(key);
+                if(fitted!=null)
+                {
+                    poses=poses.deepCopy();
+                    for(var pose:fitted.entrySet())
+                    {
+                        if(!poses.has(pose.getKey()))continue;
+                        var control=poses.getAsJsonObject(pose.getKey());
+                        var angles=control.has("bone_angles")?control.getAsJsonObject("bone_angles"):new JsonObject();
+                        for(var bone:pose.getValue().getAsJsonObject().getAsJsonObject("bone_angles").entrySet())
+                            if(named.containsKey(bone.getKey()))angles.add(bone.getKey(),bone.getValue());
+                        control.add("bone_angles",angles);
+                    }
+                }
+                return Optional.of(new Rig(List.copyOf(joints),Map.copyOf(named),poses,Map.copyOf(grips),knife,mechanism,sword,Map.copyOf(carry)));
             }
             catch(Exception error){throw new IllegalStateException("Rejected hand rig "+source,error);}
         }).orElse(null);

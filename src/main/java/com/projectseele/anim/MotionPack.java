@@ -171,11 +171,20 @@ public final class MotionPack
 
     public final Map<Integer, Variant> variants;
     public final String source;
+    private final Map<Integer, JsonObject> handPoses;
 
-    private MotionPack(Map<Integer, Variant> variants, String source)
+    private MotionPack(Map<Integer, Variant> variants, Map<Integer, JsonObject> handPoses, String source)
     {
         this.variants = Map.copyOf(variants);
+        this.handPoses = Map.copyOf(handPoses);
         this.source = source;
+    }
+
+    /** Fitted anatomical hand poses for a rig key ({pose: {bone_angles}}), or null. */
+    public static JsonObject handPoses(int rigKey)
+    {
+        MotionPack pack = get();
+        return pack == null ? null : pack.handPoses.get(rigKey);
     }
 
     /** The active pack, or null when no pack is installed. */
@@ -257,9 +266,17 @@ public final class MotionPack
                 }
                 variants.put(Integer.parseInt(entry.getKey()), new Variant(clips));
             }
-            ProjectSeele.LOGGER.info("SEELE motion pack loaded: source={} variants={} clips={}", source,
-                    variants.keySet(), variants.values().stream().mapToInt(v -> v.clips.size()).sum());
-            return new MotionPack(variants, source);
+            Map<Integer, JsonObject> handPoses = new HashMap<>();
+            if (json.has("hand_poses"))
+            {
+                for (var entry : json.getAsJsonObject("hand_poses").entrySet())
+                {
+                    handPoses.put(Integer.parseInt(entry.getKey()), entry.getValue().getAsJsonObject());
+                }
+            }
+            ProjectSeele.LOGGER.info("SEELE motion pack loaded: source={} variants={} clips={} handPoses={}", source,
+                    variants.keySet(), variants.values().stream().mapToInt(v -> v.clips.size()).sum(), handPoses.keySet());
+            return new MotionPack(variants, handPoses, source);
         }
         catch (Exception failure)
         {
