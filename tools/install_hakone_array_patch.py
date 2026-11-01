@@ -9,11 +9,13 @@ from collections import defaultdict
 import argparse, copy, json, shutil, time, zipfile
 import nbtlib
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor,as_completed
 from query_blocks import iter_selected_sections, dimension_dir
 from regional_voxels import canonical_state
 from transplant_s22_authority import read_region, parse_chunk, build_region
 from apply_s20_approved_semantic_repairs import parse_state, encode_indices, chunk_blob, atomic_replace
 from install_r53_carrier_trays import stopped_world
+from map_pipeline.install.invariants import assert_chunk_preserved
 
 DIM = 'projectseele:geofront'
 DATA = Path('dimensions/projectseele/geofront/data')
@@ -48,6 +50,11 @@ def compose(files, palette):
                     common, ai, bi = np.intersect1d(old_at, at, return_indices=True)
                     if np.any(old_before[ai] != before[bi]):
                         raise ValueError(f'Candidates disagree about original states in {key}')
+                    conflicting = np.flatnonzero(old_after[ai] != after[bi])
+                    if len(conflicting):
+                        offset = int(common[int(conflicting[0])])
+                        pos = (key[0]*16+offset%16, Y0+offset//256, key[1]*16+(offset//16)%16)
+                        raise ValueError(f'Conflicting final states at {pos}; resolve geometry before installation')
                     all_at = np.union1d(old_at, at)
                     all_before = np.empty(len(all_at), np.int32); all_after = all_before.copy()
                     oi = np.searchsorted(all_at, old_at); ni = np.searchsorted(all_at, at)
@@ -72,11 +79,17 @@ def prepare_region(world, region_key, chunks, devices, palette, destination, exp
         slot = (cz % 32)*32 + cx % 32
         if raw[slot] is None: raise ValueError(f'Missing chunk {(cx,cz)}')
         root = parse_chunk(raw[slot])
+        original = copy.deepcopy(root)
         expected='full' if expected_statuses is None else expected_statuses.get((cx,cz),'full')
         if str(root.get('Status', '')).removeprefix('minecraft:') != expected:
             raise ValueError(f'Changed chunk generation status {(cx,cz)}')
         sections = {int(s['Y']): s for s in root['sections']}
         at, before, after = chunks.get((cx, cz), (np.array([], dtype=int),)*3)
+        for tag in root.get('block_entities', []):
+            pos = tuple(int(tag[k]) for k in ('x','y','z'))
+            offset = (pos[1]-Y0)*256+(pos[2]%16)*16+pos[0]%16
+            if np.any(at == offset) and pos not in devices.get((cx, cz), {}):
+                raise ValueError(f'Undeclared device host edit at {pos}')
         for sy in np.unique(at//4096 + Y0//16):
             mask = at//4096 + Y0//16 == sy; offsets = at[mask] % 4096
             remap, ids = decoded.get((cx, cz, int(sy)), (np.array([0]), np.zeros(4096, np.int32)))
@@ -105,7 +118,10 @@ def prepare_region(world, region_key, chunks, devices, palette, destination, exp
         for key in ('Heightmaps', 'isLightOn', 'starlight.light_version'): root.pop(key, None)
         for section in root['sections']:
             for key in ('BlockLight','SkyLight','starlight.blocklight_state','starlight.skylight_state'): section.pop(key, None)
-        raw[slot] = chunk_blob(root)
+        serialized = chunk_blob(root)
+        assert_chunk_preserved(original, parse_chunk(serialized),
+            set(map(int, np.unique(at//4096 + Y0//16))), devices.get((cx, cz), {}))
+        raw[slot] = serialized
     destination.parent.mkdir(parents=True, exist_ok=True)
     atomic_replace(destination, build_region(times, raw))
 
@@ -129,6 +145,13 @@ def prepare_jar(installed, compiled, target):
                 out.writestr(entry, old.read(entry.filename))
             for name in names: out.writestr(name, new.read(name))
     return class_count
+
+
+def stage_region_job(world,region_key,inputs,devices,stage,expected_statuses):
+    palette=Palette();chunks=compose(inputs,palette)
+    relative=DATA.parent/'region'/f'r.{region_key[0]}.{region_key[1]}.mca'
+    prepare_region(world,region_key,chunks,devices,palette,stage/relative,expected_statuses)
+    return world/relative,stage/relative,sum(len(v[0])for v in chunks.values()),{(cx//4,cz//4)for cx,cz in chunks}
 
 
 def install(a):
@@ -171,7 +194,12 @@ def install(a):
             relative = after.relative_to(candidate/'after'); current = a.world/relative; prior = candidate/'before'/relative
             if current in metadata_targets:raise ValueError(f'Overlapping metadata candidates: {relative}')
             if prior.exists():
-                if not current.exists() or nbtlib.load(prior) != nbtlib.load(current): raise ValueError(f'Changed metadata: {relative}')
+                if not current.exists():raise ValueError(f'Missing current metadata: {relative}')
+                # Captured recipe files are normally byte-identical copies.
+                # Decode potentially large NBT only if their bytes changed;
+                # semantic equality still accepts harmless recompression.
+                if prior.read_bytes()!=current.read_bytes() and nbtlib.load(prior)!=nbtlib.load(current):
+                    raise ValueError(f'Changed metadata: {relative}')
             elif current.exists(): raise ValueError(f'New metadata already exists: {relative}')
             metadata.append((current, after));metadata_targets.add(current)
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
@@ -189,13 +217,15 @@ def install(a):
     receipt = a.backup/'installation.json'
     def save(): atomic_replace(receipt, json.dumps(journal, indent=2).encode())
     save(); start = time.monotonic(); total = 0; tile_set = set(); plans = []
-    for region_key, inputs in sorted(files.items()):
-        palette = Palette(); chunks = compose(inputs, palette)
-        relative = DATA.parent/'region'/f'r.{region_key[0]}.{region_key[1]}.mca'
-        prepare_region(a.world, region_key, chunks, devices[region_key], palette, stage/relative,expected_statuses)
-        plans.append((a.world/relative, stage/relative)); total += sum(len(v[0]) for v in chunks.values())
-        tile_set.update((cx//4,cz//4) for cx,cz in chunks)
-        print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s', flush=True)
+    # Workers only prepare separate region files. The parent retains the world
+    # lock; backup, publication and rollback stay serialized below.
+    with ProcessPoolExecutor(max_workers=getattr(a,'workers',1))as pool:
+        jobs=[pool.submit(stage_region_job,a.world,key,inputs,dict(devices[key]),stage,expected_statuses)for key,inputs in sorted(files.items())]
+        for future in as_completed(jobs):
+            target,prepared,cells,tiles=future.result()
+            plans.append((target,prepared));total+=cells;tile_set.update(tiles)
+            print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s',flush=True)
+    plans.sort(key=lambda row:str(row[0]))
     plans.extend(metadata)
     jar_classes = 0
     if a.installed_jar:
@@ -236,7 +266,8 @@ def main():
     p = argparse.ArgumentParser(__doc__)
     for name in ('world','backup'): p.add_argument('--'+name, type=Path, required=True)
     for name in ('installed-jar','compiled-jar'): p.add_argument('--'+name, type=Path)
-    p.add_argument('--candidate', type=Path, action='append', required=True, help='Ordered arrays; later candidate takes precedence')
+    p.add_argument('--candidate', type=Path, action='append', required=True, help='Compatible arrays; conflicting final states are rejected')
+    p.add_argument('--workers',type=int,choices=range(1,5),default=1,help='Parallel staging only; publication stays under the parent world lock')
     a = p.parse_args()
     if bool(a.installed_jar)!=bool(a.compiled_jar):p.error('Supply both JAR paths or neither')
     with stopped_world(a.world): install(a)

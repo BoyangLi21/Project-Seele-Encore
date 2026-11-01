@@ -4,6 +4,7 @@ from pathlib import Path
 from collections import defaultdict
 import nbtlib
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor,as_completed
 from author_hakone_lakefront import Editor
 from apply_s20_approved_semantic_repairs import parse_state
 from repair_hakone_surface_ownership import load_grid,sampled
@@ -99,6 +100,8 @@ def run(a):
             if exists:prior.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(original,prior)
             data.save(out,gzipped=True);recipes+=1
         e.regions.clear();print('Prepared current generation recipes',file.name,recipes,flush=True)
+    if getattr(a,'recipe_worker',False):
+        return dict(errors=errors,recipes=recipes,devices=devices,newrecipes=newrecipes)
     preserve=a.candidate/'preserved';preserve.mkdir(exist_ok=True)
     for f in(a.world/DATA).glob('*control*.dat'):shutil.copy2(f,preserve/f.name)
     check.update(errors=errors)
@@ -108,6 +111,40 @@ def run(a):
         check.update(devices_checked=devices,updated_recipes=recipes,new_complete_surface_recipes=newrecipes)
     (a.candidate/'functional-check.json').write_text(json.dumps(check,indent=2),'utf8')
     print('Prepared',recipes,'recipes; devices',devices,'unresolved',len(errors),flush=True)
+
+def parallel_recipes(a):
+    """Region workers own disjoint chunk recipes; only the parent publishes QA."""
+    files=sorted(f.name for f in (a.candidate/'delta').glob('*.npz'))
+    if a.regions:files=[f for f in files if f in a.regions]
+    if not files:return run(a)
+    check=json.loads((a.candidate/'functional-check.json').read_text('utf8'))
+    reports=[]
+    with ProcessPoolExecutor(max_workers=a.workers)as pool:
+        jobs=[]
+        for group in range(min(a.workers,len(files))):
+            task=copy.copy(a);task.regions=files[group::a.workers];task.recipe_worker=True
+            jobs.append(pool.submit(run,task))
+        for future in as_completed(jobs):reports.append(future.result())
+    if not a.regions:
+        wanted=set()
+        for name in files:
+            with np.load(a.candidate/'delta'/name)as source:wanted.update(f'{int(x)}_{int(z)}.dat'for x,z in source['coordinates'])
+        for side in ('before','after'):
+            for prepared in(a.candidate/side/DATA/'city_rigid_generation_r45/surface').glob('*.dat'):
+                if prepared.name not in wanted:prepared.unlink()
+    errors={json.dumps(row,sort_keys=True):row for report in reports for row in report['errors']}
+    summary=dict(regions=files,recipes=sum(r['recipes']for r in reports),devices_checked=sum(r['devices']for r in reports),workers=a.workers)
+    check.update(errors=list(errors.values()))
+    if a.regions:check['last_recipe_refresh']=summary
+    else:
+        check.pop('last_recipe_refresh',None)
+        check.update(devices_checked=summary['devices_checked'],updated_recipes=summary['recipes'],
+            new_complete_surface_recipes=sum(r['newrecipes']for r in reports),recipe_workers=a.workers)
+    preserve=a.candidate/'preserved';preserve.mkdir(exist_ok=True)
+    for file in(a.world/DATA).glob('*control*.dat'):shutil.copy2(file,preserve/file.name)
+    (a.candidate/'functional-check.json').write_text(json.dumps(check,indent=2),'utf8')
+    print('Prepared parallel recipes',summary['recipes'],'devices',summary['devices_checked'],'errors',len(errors),flush=True)
+
 
 def field(a):
     d=load_grid(a.plan/'network.npz')
@@ -171,4 +208,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__);p.add_argument('--phase',choices=('recipes','field','future'),required=True)
     for n in('candidate','world','plan','resource','out','unfinished'):p.add_argument('--'+n,type=Path)
     p.add_argument('--regions',nargs='*')
-    a=p.parse_args();{'recipes':run,'field':field,'future':future}[a.phase](a)
+    p.add_argument('--workers',type=int,default=1)
+    a=p.parse_args();{'recipes':parallel_recipes if a.workers>1 else run,'field':field,'future':future}[a.phase](a)
