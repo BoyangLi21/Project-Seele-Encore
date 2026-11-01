@@ -126,7 +126,8 @@ public final class MotionPackTest
                 }
                 System.out.printf("variant %s %-10s planted ankle error %.3f, lowest ankle %.3f (rest %.3f)%n",
                         entry.getKey(), clip.name, worst, lowest, restAnkle);
-                check(worst < 0.45F, "planted ankle leaves the ground: " + clip.name + " " + worst);
+                // attacks plant on the ball of the foot; loops must keep the whole sole down
+                check(worst < (clip.loop ? 0.45F : 0.65F), "planted ankle leaves the ground: " + clip.name + " " + worst);
                 check(lowest > restAnkle - 0.45F, "ankle sinks below ground: " + clip.name + " " + lowest);
             }
         }

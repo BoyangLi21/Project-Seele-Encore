@@ -172,6 +172,159 @@ def load_mesh_parts(arm, mesh_path, texture_path=None, name="body"):
     return objs
 
 
+SEAM_JOINTS = (("elbow", "arm_{s}", "forearm_{s}"), ("ankle", "shin_{s}", "foot_{s}"),
+               ("wrist", "forearm_{s}", "hand_{s}"), ("hip", "torso_lower", "leg_{s}"),
+               ("waist", "torso_lower", "torso_upper"))
+
+
+def runtime_seam_weights(parts):
+    """Port of LocalTriangleMeshLayer.jointSkins: per part, {other bone: weights}
+    plus snapped rest points for welded seam vertices (pixel space)."""
+    import mathutils.kdtree as kdt
+    stride = 8
+    eps = 0.002
+    out = {}  # part -> {"influence": {bone: [w...]}, "rest": [[x,y,z]...]}
+
+    def rest_points(name):
+        p = parts[name]
+        v, piv = p["vertices"], p["pivot"]
+        return [(v[i] + piv[0], v[i + 1] + piv[1], v[i + 2] + piv[2]) for i in range(0, len(v), stride)]
+
+    def entry(name):
+        if name not in out:
+            pts = rest_points(name)
+            out[name] = {"own": [1.0] * len(pts), "influence": {}, "rest": pts}
+        return out[name]
+
+    for joint, up_t, lo_t in SEAM_JOINTS:
+        for s in ("l", "r"):
+            if joint == "waist" and s == "r":
+                continue
+            upper, lower = up_t.format(s=s), lo_t.format(s=s)
+            if upper not in parts or lower not in parts:
+                continue
+            a_pts, b_pts = rest_points(upper), rest_points(lower)
+            tree = kdt.KDTree(len(b_pts))
+            for i, p in enumerate(b_pts):
+                tree.insert(p, i)
+            tree.balance()
+            seam = []
+            for p in a_pts:
+                co, idx, dist = tree.find(p)
+                if dist is not None and dist <= eps:
+                    c = (mathutils.Vector(p) + co) * 0.5
+                    if all((c - q).length > eps for q in seam[-64:]):
+                        seam.append(c)
+            if len(seam) < 3:
+                continue
+            st = kdt.KDTree(len(seam))
+            for i, p in enumerate(seam):
+                st.insert(p, i)
+            st.balance()
+            for name, other in ((upper, lower), (lower, upper)):
+                e = entry(name)
+                infl = e["influence"].setdefault(other, [0.0] * len(e["rest"]))
+                for i, p in enumerate(e["rest"]):
+                    co, _, dist = st.find(p)
+                    if dist <= eps:
+                        w = 0.5
+                        e["rest"][i] = tuple(co)
+                    else:
+                        t = max(0.0, 1.0 - dist / 6.0)
+                        w = 0.5 * t * t * (3 - 2 * t)
+                    take = min(e["own"][i], w)
+                    e["own"][i] -= take
+                    infl[i] += take
+    if "head" in parts and "torso_upper" in parts:
+        e = entry("head")
+        piv = parts["head"]["pivot"]
+        infl = e["influence"].setdefault("torso_upper", [0.0] * len(e["rest"]))
+        for i, (x, y, z) in enumerate(e["rest"]):
+            blend = max(0.0, min(1.0, (piv[1] + 1.5 - y) / 7.0))
+            if y > piv[1] - 3 and z < -6:
+                blend = 0.0
+            w = blend * blend * (3 - 2 * blend)
+            take = min(e["own"][i], w)
+            e["own"][i] -= take
+            infl[i] += take
+    return out
+
+
+def load_mesh_skinned(arm, mesh_path, texture_path=None, name="body"):
+    """Mesh parts deformed like the game: rigid per bone plus dual-quaternion
+    seams (Armature modifier, preserve volume) from runtime_seam_weights."""
+    mesh = load_json(mesh_path)
+    stride = mesh.get("stride", 8)
+    seams = runtime_seam_weights(mesh["parts"])
+    # authored influences (pivot-rig rest = identity, no inverse bind) take precedence
+    for part, js in (mesh.get("jointSkins") or {}).items():
+        if "influences" in js and "inverseBindColumnMajor" not in js and part in mesh["parts"]:
+            p = mesh["parts"][part]
+            raw, piv = p["vertices"], p["pivot"]
+            pts = [(raw[i] + piv[0], raw[i + 1] + piv[1], raw[i + 2] + piv[2]) for i in range(0, len(raw), stride)]
+            infl = dict(js["influences"])
+            own = infl.pop(part, [0.0] * len(pts))
+            seams[part] = {"own": list(own), "influence": infl, "rest": pts}
+    mat = None
+    if texture_path and os.path.isfile(texture_path):
+        mat = bpy.data.materials.new(name + "_mat")
+        mat.use_nodes = True
+        nt = mat.node_tree
+        bsdf = nt.nodes.get("Principled BSDF")
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(texture_path)
+        tex.interpolation = 'Closest'
+        nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        bsdf.inputs["Roughness"].default_value = 0.55
+    for b in arm.data.bones:
+        b.use_deform = True
+    objs = []
+    for bone_name, part in mesh["parts"].items():
+        if bone_name not in arm.data.bones:
+            continue
+        raw, piv = part["vertices"], part["pivot"]
+        n = len(raw) // stride
+        if n < 3:
+            continue
+        sk = seams.get(bone_name)
+        pts = sk["rest"] if sk else [(raw[i * stride] + piv[0], raw[i * stride + 1] + piv[1], raw[i * stride + 2] + piv[2])
+                                      for i in range(n)]
+        verts = [model_to_blender(px_to_model(p)) for p in pts]
+        uvs = [(raw[i * stride + 3], 1.0 - raw[i * stride + 4]) for i in range(n)]
+        faces = [(i, i + 1, i + 2) for i in range(0, n - 2, 3)]
+        me = bpy.data.meshes.new(f"{name}_{bone_name}")
+        me.from_pydata(verts, [], faces)
+        uv = me.uv_layers.new(name="UV")
+        for poly in me.polygons:
+            for li in poly.loop_indices:
+                uv.data[li].uv = uvs[me.loops[li].vertex_index]
+        me.update()
+        ob = bpy.data.objects.new(f"{name}_{bone_name}", me)
+        bpy.context.scene.collection.objects.link(ob)
+        if mat:
+            ob.data.materials.append(mat)
+        own = ob.vertex_groups.new(name=bone_name)
+        if sk:
+            for i, w in enumerate(sk["own"]):
+                if w > 0:
+                    own.add([i], w, 'REPLACE')
+            for other, ws in sk["influence"].items():
+                if other not in arm.data.bones:
+                    continue
+                g = ob.vertex_groups.new(name=other)
+                for i, w in enumerate(ws):
+                    if w > 0:
+                        g.add([i], w, 'REPLACE')
+        else:
+            own.add(list(range(n)), 1.0, 'REPLACE')
+        ob.parent = arm
+        mod = ob.modifiers.new("arm", 'ARMATURE')
+        mod.object = arm
+        mod.use_deform_preserve_volume = True
+        objs.append(ob)
+    return objs
+
+
 def apply_frame(arm, bone_names, frame, frame_index=None):
     """Write one profile frame (EvaBodyPose schema 2) onto the armature pose."""
     rots = frame["rotation_wxyz"]

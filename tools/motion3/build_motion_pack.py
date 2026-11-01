@@ -141,6 +141,59 @@ def hold_clip(res, src, frame, seconds=4.0, rate_out=60, breathe=True):
             "q": out, "root": root, "contact": np.ones((m, 2), dtype=bool)}
 
 
+def action_clip(res, src, a, b, rate_out=60, lean=4.0, leading=None, smooth_s=0.3):
+    """One non-looping action window [a, b] at source timing (the runtime applies
+    its own playback rate).  The root is split into the server-owned travel path
+    (smoothed horizontal displacement from the start; the entity moves along it)
+    and the in-place residual the pose keeps (sway, bob, weight shift)."""
+    L = b - a
+    quats = {n: mat_to_quat(res["local"][n])[a:b + 1] for n in ANIMATED if n in res["local"]}
+    root = res["root"][a:b + 1].copy()
+    root[:, 0] -= root[0, 0]
+    root[:, 2] -= root[0, 2]
+    k = max(1, int(round(smooth_s * src.rate)))
+    traj = np.zeros_like(root)
+    for i in range(L + 1):
+        lo, hi = max(0, i - k // 2), min(L, i + k // 2)
+        traj[i, 0] = root[lo:hi + 1, 0].mean()
+        traj[i, 2] = root[lo:hi + 1, 2].mean()
+    traj -= traj[0]
+    residual = root - traj
+    # leading hand: the faster of the two within the window; contact at its speed peak
+    speed = {}
+    for s in ("l", "r"):
+        p = src.P["hand_" + s][a:b + 1]
+        v = np.zeros(L + 1)
+        v[1:] = np.linalg.norm(np.diff(p, axis=0), axis=1) * src.rate
+        speed[s] = v
+    for s in ("l", "r"):
+        p = src.P["foot_" + s][a:b + 1]
+        v = np.zeros(L + 1)
+        v[1:] = np.linalg.norm(np.diff(p, axis=0), axis=1) * src.rate
+        speed["foot_" + s] = v
+    effector = leading or max(("l", "r"), key=lambda s: speed[s].max())
+    peak = int(np.argmax(speed[effector]))
+    side = effector[-1]
+    contact_phase = min(0.95, (peak + 1) / L)
+    dur = L / src.rate
+    m = max(2, int(round(dur * rate_out)) + 1)
+    pos = np.linspace(0, L, m)
+    i0 = np.minimum(np.floor(pos).astype(int), L - 1)
+    fr = pos - i0
+    i1 = i0 + 1
+    rq = {n: slerp_q(q[i0], q[i1], fr) for n, q in quats.items()}
+    rr = residual[i0] * (1 - fr)[:, None] + residual[i1] * fr[:, None]
+    rt = traj[i0] * (1 - fr)[:, None] + traj[i1] * fr[:, None]
+    cl = foot_contacts(src, "l")[a:b + 1]
+    cr = foot_contacts(src, "r")[a:b + 1]
+    ri = np.round(pos).astype(int)
+    clip = {"rate": rate_out, "loop": False, "frames": m, "duration": dur, "stride": 0.0,
+            "q": rq, "root": rr, "contact": np.stack([cl[ri], cr[ri]], axis=1),
+            "trajectory": rt, "contact_phase": contact_phase, "leading_side": side,
+            "release_phase": min(0.95, contact_phase + 0.55 * (1 - contact_phase))}
+    return stylize(clip, lean=lean)
+
+
 def _qmul(a, b):
     w1, x1, y1, z1 = a[..., 0], a[..., 1], a[..., 2], a[..., 3]
     w2, x2, y2, z2 = b[..., 0], b[..., 1], b[..., 2], b[..., 3]
@@ -173,7 +226,13 @@ def stylize(clip, lean=7.0, head_keep=0.8, arm_keep=0.7):
 def encode(clip):
     names = [n for n in ANIMATED if n in clip["q"]]
     q = np.stack([clip["q"][n] for n in names], axis=1)  # frames, bones, 4
-    return {
+    extra = {}
+    if "trajectory" in clip:
+        extra = {"trajectory": [round(float(x), 5) for x in np.asarray(clip["trajectory"]).reshape(-1)],
+                 "contact_phase": round(float(clip["contact_phase"]), 5),
+                 "release_phase": round(float(clip["release_phase"]), 5),
+                 "leading_side": clip["leading_side"]}
+    return extra | {
         "rate": clip["rate"], "loop": clip["loop"], "frames": int(clip["frames"]),
         "duration": round(float(clip["duration"]), 5), "stride": round(float(clip["stride"]), 5),
         "bones": names,
@@ -183,10 +242,47 @@ def encode(clip):
     }
 
 
+# Owner-selected unarmed set (Phase T group C, Phase U K1): G1 Moves windows at 60 fps.
+# name -> (file, first frame, last frame, mirrored, leading effector)
+ACTIONS = {
+    "jab": ("M_Move17/M_Move17.bvh", 1036, 1081, False, None),        # right forward drive
+    "cross": ("M_Move17/M_Move17.bvh", 1221, 1285, False, None),      # left long double strike
+    "hook": ("M_Move17/M_Move17.bvh", 1498, 1532, True, None),        # right short downward smash
+    "kick": ("karate_kicks/M_Move10.bvh", 1468, 1552, False, "foot_l"),  # left side kick
+}
+ACTION_PAD = 12
+_G1_CACHE = {}
+
+
+def build_actions(root, rt, variant):
+    out = {}
+    for name, (file, fa, fb, mirror, lead) in ACTIONS.items():
+        path = os.path.join(root, file)
+        if path not in _G1_CACHE:
+            _G1_CACHE[path] = Bvh(path)
+        bvh = _G1_CACHE[path]
+        lo, hi = max(0, fa - ACTION_PAD), min(bvh.frames - 1, fb + ACTION_PAD)
+        full = Source(bvh, "g1", align_frame=fa)
+        if mirror:
+            full = full.mirrored()
+        # frame 0 of every G1 take is a relaxed standing pose (arms down)
+        cal = Calibration(full, 0)
+        src = full.window(lo, hi)
+        res = rt.run(src, cal)
+        clip = action_clip(res, src, fa - lo, fb - lo, leading=lead, lean=4.0)
+        out[name] = encode(clip)
+        print(variant, name, "frames", clip["frames"], "contact", round(clip["contact_phase"], 3),
+              "side", clip["leading_side"], "travel", np.round(clip["trajectory"][-1], 3))
+    # the selected three-stage combo also requires its loop-back clip
+    out["jab_loop"] = out["jab"]
+    return out
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--body", required=True)
     ap.add_argument("--bandai", required=True)
+    ap.add_argument("--g1", default="", help="G1 Moves BVH root (free_mocap_sources/g1_moves)")
     ap.add_argument("--out", required=True)
     a = ap.parse_args()
     bandai = lambda name: os.path.join(a.bandai, f"dataset-1_{name}.bvh")  # noqa: E731
@@ -223,6 +319,8 @@ def main():
         isrc = Source(idle_bvh, "bandai", align_frame=8)
         ires = rt.run(isrc, cal)
         clips["idle"] = encode(stylize(hold_clip(ires, isrc, 8), lean=LEAN["idle"]))
+        if a.g1:
+            clips.update(build_actions(a.g1, rt, variant))
         pack["variants"][str(variant)] = {"clips": clips}
     with open(a.out, "w", encoding="utf-8") as f:
         json.dump(pack, f, separators=(",", ":"))

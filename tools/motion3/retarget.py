@@ -26,6 +26,16 @@ SKELETONS = {
         "thigh_r": "UpperLeg_R", "shin_r": "LowerLeg_R", "foot_r": "Foot_R", "toe_r": "Toes_R",
         "unit": 0.01,  # cm -> m
     },
+    # G1 Moves (MOVIN TRACIN capture, CC BY 4.0): Mixamo naming, metres, T-pose rest
+    "g1": {
+        "hips": "Hips", "spine": "Spine", "chest": "Spine1", "neck": "Neck", "head": "Head",
+        "clav_l": "LeftShoulder", "arm_l": "LeftArm", "fore_l": "LeftForeArm", "hand_l": "LeftHand",
+        "clav_r": "RightShoulder", "arm_r": "RightArm", "fore_r": "RightForeArm", "hand_r": "RightHand",
+        "thigh_l": "LeftUpLeg", "shin_l": "LeftLeg", "foot_l": "LeftFoot", "toe_l": "LeftToeBase",
+        "thigh_r": "RightUpLeg", "shin_r": "RightLeg", "foot_r": "RightFoot", "toe_r": "RightToeBase",
+        "hand_tip_l": "LeftHandMiddle1", "hand_tip_r": "RightHandMiddle1",
+        "unit": 1.0,
+    },
 }
 
 
@@ -70,17 +80,44 @@ class Source:
         self.n = bvh.frames
         self.rate = bvh.rate
 
+    def window(self, a, b):
+        """Frames [a, b] as a new source (same alignment)."""
+        out = Source.__new__(Source)
+        out.skel, out.bvh, out.G, out.rate = self.skel, self.bvh, self.G, self.rate
+        out.P = {k: v[a:b + 1].copy() for k, v in self.P.items()}
+        out.R = {k: v[a:b + 1].copy() for k, v in self.R.items()}
+        out.n = b - a + 1
+        return out
+
+    def mirrored(self):
+        """Left/right mirror across the sagittal (x = 0) plane of the aligned frame."""
+        M = np.diag([-1.0, 1.0, 1.0])
+        out = Source.__new__(Source)
+        # aligned = G raw; mirrored aligned = (M G M)(M raw)
+        out.skel, out.bvh, out.G, out.n, out.rate = self.skel, self.bvh, M @ self.G @ M, self.n, self.rate
+        swap = lambda k: k[:-2] + ("_r" if k.endswith("_l") else "_l") if k[-2:] in ("_l", "_r") else k  # noqa: E731
+        out.P = {swap(k): v * np.array([-1.0, 1.0, 1.0]) for k, v in self.P.items()}
+        out.R = {swap(k): np.einsum("ij,njk,kl->nil", M, v, M) for k, v in self.R.items()}
+        return out
+
 
 class Calibration:
     """Source joint world rotations at a neutral pose (aligned frame)."""
 
     def __init__(self, source, frame=0):
-        self.R = {k: v[frame].copy() for k, v in source.R.items()}
-        self.P = {k: v[frame].copy() for k, v in source.P.items()}
+        # stored in the raw capture frame so any clip alignment can use it
+        Gt = source.G.T
+        self.R = {k: Gt @ v[frame] for k, v in source.R.items()}
+        self.P = {k: Gt @ v[frame] for k, v in source.P.items()}
 
     def delta(self, source, key):
-        # world rotation change since the neutral pose
-        return np.einsum("nij,kj->nik", source.R[key], self.R[key])
+        """World rotation change since the neutral pose, in the source's aligned frame:
+        G R_raw(f) R_raw(cal)^T G^T."""
+        return np.einsum("nij,kj->nik", source.R[key], self.R[key]) @ source.G.T
+
+    def dir(self, source, a, b):
+        """Neutral-pose direction a -> b expressed in the source's aligned frame."""
+        return source.G @ _n(self.P[b] - self.P[a])
 
 
 def two_bone(hip, ankle, l1, l2, pole):
@@ -137,23 +174,36 @@ class Retargeter:
         up_c = _n(P["neck"] - P["chest"])
         W["torso_upper"] = align(self.rest_dir("torso_upper", "neck") if "neck" in rig.pivot else UP,
                                  FWD, up_c, np.cross(up_c, right_c))
-        # head from its rotation delta, neck halfway
-        Wh = np.einsum("nij,njk->nik", cal.delta(src, "head"), np.tile(np.eye(3), (n, 1, 1)))
-        hd = np.einsum("nij,j->ni", Wh, UP)
-        hf = np.einsum("nij,j->ni", Wh, FWD)
-        W["head"] = align(UP, FWD, hd, hf)
+        # head: tilt follows the neck line, facing follows the chest (no
+        # calibration-frame rotation, which is unreliable for end joints)
+        chest_fwd = np.einsum("nij,j->ni", W["torso_upper"], FWD)
+        neck_up = _n(P["head"] - P["neck"]) if np.linalg.norm(P["head"] - P["neck"], axis=-1).min() > 1e-4 else up_c
+        W["head"] = align(UP, FWD, neck_up, chest_fwd)
         W["neck"] = slerp_mats(W["torso_upper"], W["head"], 0.5)
-        # --- arms: direction from positions, twist from rotation delta
+        W["aim_pitch"] = W["torso_upper"]
+        # --- arms: the elbow is a hinge shared by upper arm and forearm; the
+        # hand follows the forearm with a limited wrist bend.
         for s in ("l", "r"):
-            W["aim_pitch"] = W["torso_upper"]
             W["clavicle_" + s] = swing_to(W["torso_upper"], self.rest_dir("clavicle_" + s, "arm_" + s),
                                           P["arm_" + s] - P["clav_" + s])
-            for bone, a, b, key in (("arm_", "arm_", "fore_", "arm_"), ("forearm_", "fore_", "hand_", "fore_")):
-                base = cal.delta(src, key + s)
-                d_rest = self.rest_dir(bone + s, ("forearm_" if bone == "arm_" else "wrist_") + s)
-                W[bone + s] = swing_to(base, d_rest, P[b + s] - P[a + s])
+            up_dir = P["fore_" + s] - P["arm_" + s]
+            lo_dir = P["hand_" + s] - P["fore_" + s]
+            rest_up = self.rest_dir("arm_" + s, "forearm_" + s)
+            rest_lo = self.rest_dir("forearm_" + s, "wrist_" + s)
+            hinge_rest = _n(np.cross(rest_up, FWD))
+            # seed: the chest's lateral axis, then carried frame to frame
+            seed = np.einsum("nij,j->ni", W["torso_upper"], hinge_rest)
+            hinge = hinge_track(up_dir, lo_dir, seed)
+            W["arm_" + s] = align(rest_up, hinge_rest, up_dir, hinge)
+            W["forearm_" + s] = align(rest_lo, hinge_rest, lo_dir, hinge)
             W["wrist_" + s] = W["forearm_" + s]
-            W["hand_" + s] = cal.delta(src, "hand_" + s)
+            tip = "hand_tip_" + s
+            if tip in P:
+                rest_hand = self.rest_dir("hand_" + s, "finger_middle_axis_" + s) \
+                    if "finger_middle_axis_" + s in rig.pivot else rest_lo
+                W["hand_" + s] = limited_swing(W["forearm_" + s], rest_hand, P[tip] - P["hand_" + s], np.radians(35))
+            else:
+                W["hand_" + s] = W["forearm_" + s]
         # --- legs: IK on scaled ankle targets, knee plane from source knee
         knees = {}
         for s in ("l", "r"):
@@ -162,11 +212,11 @@ class Retargeter:
             # hips follow the pelvis orientation around the scaled hip centre
             hip_t = hip_mid_t + np.einsum("nij,j->ni", W["torso_lower"], hip_t_rest)
             knee_src_dir = P["shin_" + s] - 0.5 * (P["thigh_" + s] + P["foot_" + s])
-            # straight-leg fallback: knee forward from the thigh rotation delta
-            fwd_delta = np.einsum("nij,j->ni", cal.delta(src, "thigh_" + s), FWD)
+            # straight-leg fallback: knees point along the pelvis forward
+            fwd_pelvis = np.einsum("nij,j->ni", W["torso_lower"], FWD)
             bent = np.linalg.norm(knee_src_dir, axis=-1, keepdims=True)
             w = np.clip(bent / 0.04, 0, 1)
-            pole = _n(knee_src_dir) * w + fwd_delta * (1 - w)
+            pole = _n(knee_src_dir) * w + fwd_pelvis * (1 - w)
             knee_t = two_bone(hip_t, ankle_t, self.l_thigh[s], self.l_shin[s], pole)
             knees[s] = (hip_t, knee_t, ankle_t)
             thigh_d = knee_t - hip_t
@@ -174,10 +224,16 @@ class Retargeter:
             W["leg_" + s] = align(self.rest_dir("leg_" + s, "shin_" + s), FWD, thigh_d, _n(pole))
             W["shin_" + s] = align(self.rest_dir("shin_" + s, "ankle_" + s), FWD, shin_d, _n(pole))
             W["ankle_" + s] = W["shin_" + s]
-            foot_delta = cal.delta(src, "foot_" + s)
-            # the neutral source foot maps onto the EVA rest foot
-            toe_rest = _n(cal.P["toe_" + s] - cal.P["foot_" + s])
-            W["foot_" + s] = swing_to(foot_delta, toe_rest, P["toe_" + s] - P["foot_" + s])
+            # foot from positions: heading and pitch of the ankle->toe line,
+            # rolled level with the ground.  The source's own planted pitch
+            # defines "flat", so a planted source foot lands flat on the EVA.
+            toe = P["toe_" + s] - P["foot_" + s]
+            contact = foot_contacts(src, s)
+            tn = _n(toe)
+            pitches = np.arcsin(np.clip(-tn[:, 1], -1, 1))
+            flat = np.median(pitches[contact]) if contact.any() else np.median(pitches)
+            toe_rest = np.array([0.0, -np.sin(flat), -np.cos(flat)])
+            W["foot_" + s] = align(toe_rest, UP, toe, np.tile(UP, (n, 1)))
         # --- convert world rotations to local
         local = {}
         world = {}
@@ -201,6 +257,51 @@ class Retargeter:
             root_t[:, 0] = 0
             root_t[:, 2] = 0
         return {"local": local, "root": root_t, "scale": scale, "knees": knees, "rate": src.rate}
+
+
+def hinge_track(upper, lower, seed, bend_on=np.radians(12), bend_full=np.radians(30)):
+    """Elbow hinge axis per frame: the bend plane normal while the elbow is bent,
+    otherwise the previous axis kept perpendicular to the upper arm (continuous,
+    no dependence on a calibration pose)."""
+    n = upper.shape[0]
+    u = _n(upper)
+    lo = _n(lower)
+    out = np.empty((n, 3))
+    prev = None
+    for i in range(n):
+        geo = np.cross(u[i], lo[i])
+        s = np.linalg.norm(geo)
+        bend = np.arctan2(s, np.dot(u[i], lo[i]))
+        carried = seed[i] if prev is None else prev
+        carried = carried - u[i] * np.dot(carried, u[i])
+        carried /= max(np.linalg.norm(carried), 1e-9)
+        if s > 1e-6:
+            geo = geo / s
+            if np.dot(geo, carried) < 0:
+                geo = -geo
+            w = np.clip((bend - bend_on) / (bend_full - bend_on), 0, 1)
+            h = geo * w + carried * (1 - w)
+            h = h - u[i] * np.dot(h, u[i])
+            h /= max(np.linalg.norm(h), 1e-9)
+        else:
+            h = carried
+        out[i] = h
+        prev = h
+    return out
+
+
+def limited_swing(parent_world, d_rest, d_post, max_angle):
+    """Child = parent rotated by the swing toward d_post, clamped to max_angle."""
+    cur = _n(np.einsum("nij,j->ni", parent_world, d_rest))
+    tgt = _n(d_post)
+    axis = np.cross(cur, tgt)
+    s = np.linalg.norm(axis, axis=-1)
+    c = np.clip(np.sum(cur * tgt, axis=-1), -1, 1)
+    ang = np.minimum(np.arctan2(s, c), max_angle)
+    out = np.empty_like(parent_world)
+    for i in range(parent_world.shape[0]):
+        out[i] = parent_world[i] if s[i] < 1e-9 else axis_angle(axis[i] / s[i], ang[i]) @ parent_world[i]
+    return out
 
 
 def slerp_mats(a, b, t):
