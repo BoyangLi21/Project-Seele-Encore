@@ -518,6 +518,16 @@ tasks.register('verifyBiomeCornerCache', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyBiomeCornerCache' }
 
+tasks.register('verifyMotionPack', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.anim.MotionPackTest'
+    // Optional private inputs: -PseeleMotionPack=<pack.json> -PseeleBodyProfile=<eva_body_r44.json>
+    systemProperty 'seele.motionPack', project.findProperty('seeleMotionPack') ?: ''
+    systemProperty 'seele.bodyProfile', project.findProperty('seeleBodyProfile') ?: ''
+}
+tasks.named('check').configure { dependsOn 'verifyMotionPack' }
+
 tasks.register('verifyLocalMeshJsonR53', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath

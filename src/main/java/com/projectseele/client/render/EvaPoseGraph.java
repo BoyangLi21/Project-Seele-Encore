@@ -199,6 +199,14 @@ public final class EvaPoseGraph
             var held=EvaShutdownPoseR30.apply(entity,model,partialTick);
             return finish(entity,model,partialTick,modelToWorld,held,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         }
+        if(com.projectseele.anim.EvaAnimator.owns(entity,partialTick))
+        {
+            // The motion pack owns the complete body; the legacy layer stack
+            // is not evaluated, so its histories must not go stale.
+            EvaMotionEngineV2.resetEntityR30(entity);
+            var animated=EvaAnimatorGecko.apply(entity,model,partialTick);
+            return finish(entity,model,partialTick,modelToWorld,animated,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
+        }
         if(com.projectseele.entity.EvaCombatSupportR33.ready(entity)
                 &&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(entity,partialTick)
                 &&(com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity)
@@ -326,6 +334,7 @@ public final class EvaPoseGraph
                 &&(com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity)
                     ||com.projectseele.entity.EvaGameplayMotionR32.sharedJumpActive(entity,partialTick)))
             transitions=EvaPoseTransition.applySharedExitR45(entity,model,partialTick);
+        EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(motionWrites.owner())?EvaAnimatorGecko.OWNER:"LEGACY");
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         JointAuditR38.capture(entity,model,partialTick);

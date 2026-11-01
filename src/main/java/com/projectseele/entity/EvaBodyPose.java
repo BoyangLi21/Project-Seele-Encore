@@ -575,6 +575,12 @@ public final class EvaBodyPose
             if(head!=null)head.rotationX(-.72F*EvaDorsalMechanism.bow(entity));
             locked.dirty();return locked;
         }
+        if(com.projectseele.anim.EvaAnimator.owns(entity,partial))
+        {
+            var animated=com.projectseele.anim.EvaAnimator.sample(entity,partial);
+            EvaCombatSupportR33.rememberFinalFeetR44(entity,animated,partial);
+            return animated;
+        }
         float time=((entity.level().getGameTime()%24000)+partial)/20;
         var idleClip=d.combatClips().getOrDefault(variant,Map.of()).getOrDefault("idle",d.clips().get("idle"));
         float idlePhase=(float)((((double)entity.level().getGameTime()+partial)/20.0/idleClip.duration())%1.0);

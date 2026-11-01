@@ -1484,8 +1484,17 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             float move=Mth.approach(oldMove,moving?1F:holdGait?oldMove:0F,.16F);
             float run=Mth.approach(oldRun,holdGait?oldRun:moving&&this.isPilotSprinting()&&!this.isPilotCrouching()?1F:0F,.14F);
             this.entityData.set(DATA_RIFLE_MOVE,move);this.entityData.set(DATA_RIFLE_RUN,run);
-            double capturedCycle=EvaCapturedLocomotionR44.serverCycle(this,run,moving?dx:0,moving?dz:0);
-            if(moving)
+            boolean packGait=com.projectseele.anim.EvaAnimator.handlesGait(this);
+            double capturedCycle=packGait?0:EvaCapturedLocomotionR44.serverCycle(this,run,moving?dx:0,moving?dz:0);
+            if(moving&&packGait)
+            {
+                // Distance-driven phase over the pack's measured stride keeps
+                // planted feet fixed to the ground at every speed.
+                double stride=com.projectseele.anim.EvaAnimator.strideWorld(this,run,EvaSprintR50.blend(this,1));
+                double sign=dx*this.getForward().x+dz*this.getForward().z<0?-1:1;
+                float phase=this.entityData.get(DATA_RIFLE_GAIT)+(float)(sign*distance/stride);phase-=Mth.floor(phase);this.entityData.set(DATA_RIFLE_GAIT,phase);
+            }
+            else if(moving)
             {
                 if(capturedCycle>0)
                 {
