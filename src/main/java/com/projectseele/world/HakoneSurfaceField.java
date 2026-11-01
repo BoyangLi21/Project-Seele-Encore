@@ -34,7 +34,7 @@ public final class HakoneSurfaceField
                 if (in.readInt() != 0x484B3535) throw new IOException("Invalid surface format");
                 int x = in.readInt(), z = in.readInt(), step = in.readInt();
                 int width = in.readInt(), depth = in.readInt();
-                if (step < 1 || width < 2 || depth < 2 || (long) width * depth > 10000000)
+                if (step < 1 || width < 2 || depth < 2 || (long) width * depth > 12000000)
                     throw new IOException("Invalid surface dimensions");
                 short[] heights = new short[width * depth], waters = new short[width * depth];
                 for (int i = 0; i < heights.length; i++) heights[i] = in.readShort();

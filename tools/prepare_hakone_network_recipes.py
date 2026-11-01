@@ -134,7 +134,12 @@ def future(a):
     for row in rows:
         if row['status']!='missing':raise ValueError('Future recipe expects genuinely ungenerated chunk')
         cx,cz=row['chunk'];rel=DATA/'city_rigid_generation_r45/surface'/f'{cx}_{cz}.dat'
-        if (a.world/rel).exists():raise ValueError('Existing recipe requires explicit merge')
+        original=a.world/rel
+        if original.exists():
+            saved=nbtlib.load(original)
+            if saved['WorldUUID']!=identity or len(saved.get('BlockEntities',[])):
+                raise ValueError('Future recipe contains a different world or retained devices')
+            prior=a.candidate/'before'/rel;prior.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(original,prior)
         data=nbtlib.File({'Version':nbtlib.Int(1),'WorldUUID':copy.deepcopy(identity),'Palette':nbtlib.List[nbtlib.Compound](),
             'Spans':nbtlib.List[nbtlib.IntArray](),'BlockEntities':nbtlib.List[nbtlib.Compound]()});codes={}
         def code(name):

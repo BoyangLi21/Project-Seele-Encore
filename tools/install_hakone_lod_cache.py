@@ -19,9 +19,15 @@ def install(a):
     incomplete=a.export/'invalidate-incomplete.json'
     if incomplete.exists():
         invalidated=json.loads((a.export/'incomplete-invalidation.json').read_text('utf8'))
-        partial=json.loads((a.export/'partial-columns/native-import.json').read_text('utf8'))
         plan=json.loads(incomplete.read_text('utf8'))
-        if not invalidated['done'] or not partial['done'] or partial['completed']!=len(plan['partial_tiles']):
+        if plan.get('invalidated_before_full_import'):
+            covered={tuple(r['tile'])for r in exported['exported']}
+            partial_done=all(tuple(tile)in covered for tile in plan['partial_tiles'])
+            partial_done&=(a.export/'columns/native-import.json').stat().st_mtime>=(a.export/'incomplete-invalidation.json').stat().st_mtime
+        else:
+            partial=json.loads((a.export/'partial-columns/native-import.json').read_text('utf8'))
+            partial_done=partial['done'] and partial['completed']==len(plan['partial_tiles'])
+        if not invalidated['done'] or not partial_done:
             raise ValueError('Incomplete-source cache invalidation and partial reimport must finish')
     with stopped_world(a.world),stopped_world(a.cache):
         with sqlite3.connect((a.cache/REL).resolve().as_uri()+'?mode=ro',uri=True)as src:
