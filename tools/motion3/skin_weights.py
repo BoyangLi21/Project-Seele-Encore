@@ -8,9 +8,10 @@ position of every vertex regardless of which part holds it.  Coincident
 vertices in neighbouring parts therefore receive identical weights and move
 together, so the shoulder, hip, knee and neck stop tearing like the seams the
 runtime already welds.  Separate armour islands (every island but the largest of
-a part) take, vertex by vertex, the weights of the nearest body-surface point:
-a plate is glued to the surface it covers and cannot separate at a joint, and
-plates away from joints stay rigid because the skin under them is.
+a part) take, vertex by vertex, the weights of the nearest point on their own
+part's body surface: a plate is glued to the surface it covers and cannot
+separate at a joint, and plates away from joints stay rigid because the skin
+under them is.
 Weights are written as runtime-authored influences (no inverse bind: the
 pivot rig's rest transforms are identity).
 """
@@ -46,8 +47,10 @@ def joints_for(piv):
         out.append(("torso_upper", "head", piv["head"], (0, 1, 0), 3.0, 11.0))
     for s in ("l", "r"):
         if has("arm_" + s, "forearm_" + s):
+            # armoured shoulder: only the socket blends, so the chest shell
+            # does not follow the arm swing
             out.append(("torso_upper", "arm_" + s, piv["arm_" + s],
-                        unit(piv["forearm_" + s] - piv["arm_" + s]), 5.0, 10.0))
+                        unit(piv["forearm_" + s] - piv["arm_" + s]), 3.5, 7.0))
             out.append(("arm_" + s, "forearm_" + s, piv["forearm_" + s],
                         unit(piv["wrist_" + s] - piv["forearm_" + s]), 4.5, 8.0))
         if has("forearm_" + s, "hand_" + s, "finger_middle_axis_" + s):
@@ -140,8 +143,6 @@ def main():
     # only the articulated body takes part: pylons, the dorsal hatch and the jaw
     # keep their own animated bones untouched
     skin_parts = {p for z in zones for p in z[:2]} & set(mesh["parts"])
-    neighbours = {p: {p} | {z[1] for z in zones if z[0] == p} | {z[0] for z in zones if z[1] == p}
-                  for p in skin_parts}
 
     def nearest_surface(points, allowed):
         cand = np.nonzero(np.isin(surf_owner, list(allowed)))[0]
@@ -161,7 +162,9 @@ def main():
         weights = {k: w for k, w in field(name, pts).items()}
         if plate.any():
             pidx = np.nonzero(plate)[0]
-            near = nearest_surface(pts[pidx], neighbours[name])
+            # own surface only: a chest plate beside the shoulder must not
+            # pick up the arm's weights from the arm surface next to it
+            near = nearest_surface(pts[pidx], {name})
             for k in weights:
                 weights[k][pidx] = 0.0
             for owner in [str(o) for o in np.unique(surf_owner[near])]:

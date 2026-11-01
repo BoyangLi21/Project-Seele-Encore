@@ -224,16 +224,17 @@ class Retargeter:
             W["leg_" + s] = align(self.rest_dir("leg_" + s, "shin_" + s), FWD, thigh_d, _n(pole))
             W["shin_" + s] = align(self.rest_dir("shin_" + s, "ankle_" + s), FWD, shin_d, _n(pole))
             W["ankle_" + s] = W["shin_" + s]
-            # foot from positions: heading and pitch of the ankle->toe line,
-            # rolled level with the ground.  The source's own planted pitch
-            # defines "flat", so a planted source foot lands flat on the EVA.
+            # Foot: in the air it hinges about the shin's lateral axis toward
+            # the source toe line (limited plantar/dorsal flexion, no roll or
+            # twist against the shin); planted it lies level along the source
+            # heading.  The source's own planted pitch defines "flat".
             toe = P["toe_" + s] - P["foot_" + s]
             contact = foot_contacts(src, s)
             tn = _n(toe)
             pitches = np.arcsin(np.clip(-tn[:, 1], -1, 1))
             flat = np.median(pitches[contact]) if contact.any() else np.median(pitches)
             toe_rest = np.array([0.0, -np.sin(flat), -np.cos(flat)])
-            W["foot_" + s] = align(toe_rest, UP, toe, np.tile(UP, (n, 1)))
+            W["foot_" + s] = foot_orientation(W["shin_" + s], toe_rest, tn, contact)
         # --- convert world rotations to local
         local = {}
         world = {}
@@ -257,6 +258,42 @@ class Retargeter:
             root_t[:, 0] = 0
             root_t[:, 2] = 0
         return {"local": local, "root": root_t, "scale": scale, "knees": knees, "rate": src.rate}
+
+
+def foot_orientation(shin, toe_rest, toe_dir, contact, plantar=np.radians(50), dorsal=np.radians(30),
+                     settle=6):
+    """Foot world rotation per frame (see Retargeter.run)."""
+    from evarig import mat_to_quat, quat_to_mat
+    n = shin.shape[0]
+    hinge = shin[:, :, 0]  # the shin frame's lateral axis
+    rest_toe = np.einsum("nij,j->ni", shin, toe_rest)
+    d = toe_dir - hinge * np.sum(toe_dir * hinge, axis=1, keepdims=True)
+    d = _n(d)
+    # signed angle rest_toe -> d about the hinge; + lifts the toes (dorsal)
+    ang = np.arctan2(np.sum(np.cross(rest_toe, d) * hinge, axis=1), np.sum(rest_toe * d, axis=1))
+    ang = np.clip(ang, -plantar, dorsal)
+    air = np.empty_like(shin)
+    for i in range(n):
+        air[i] = axis_angle(hinge[i], ang[i]) @ shin[i]
+    # level foot along the source heading (planted frames)
+    flat = toe_dir.copy()
+    flat[:, 1] = 0
+    fl = np.linalg.norm(flat, axis=1, keepdims=True)
+    shin_fwd = np.einsum("nij,j->ni", shin, FWD)
+    shin_fwd[:, 1] = 0
+    flat = np.where(fl > 0.2, flat, shin_fwd)
+    # the rest foot is level, so a planted foot is the rest foot turned in yaw
+    ground = align(FWD, UP, _n(flat), np.tile(UP, (n, 1)))
+    # contact weight eased over a few frames so landing and lift-off blend
+    w = contact.astype(float)
+    k = np.ones(settle) / settle
+    w = np.convolve(np.pad(w, (settle // 2, settle - 1 - settle // 2), mode="edge"), k, mode="valid")
+    w = w * w * (3 - 2 * w)
+    qa, qg = mat_to_quat(air), mat_to_quat(ground)
+    dot = np.sum(qa * qg, axis=1, keepdims=True)
+    qg = np.where(dot < 0, -qg, qg)
+    q = qa * (1 - w)[:, None] + qg * w[:, None]
+    return quat_to_mat(q / np.linalg.norm(q, axis=1, keepdims=True))
 
 
 def hinge_track(upper, lower, seed, bend_on=np.radians(12), bend_full=np.radians(30)):

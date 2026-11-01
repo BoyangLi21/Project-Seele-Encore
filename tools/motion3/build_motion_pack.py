@@ -21,8 +21,8 @@ from evarig import Rig, mat_to_quat, quat_to_mat  # noqa: E402
 from retarget import Calibration, Retargeter, Source, foot_contacts  # noqa: E402
 
 VARIANTS = (0, 1, 2, 4)
-# forward chest lean (degrees) per clip; faster gaits drive the chest further over the hips
-LEAN = {"idle": 5.0, "walk": 8.0, "run": 11.0, "sprint": 14.0, "walk_back": 3.0}
+# forward chest lean over the pelvis (degrees) per clip; faster gaits drive the chest further over the hips
+LEAN = {"idle": 4.0, "walk": 6.0, "run": 10.0, "sprint": 14.0, "walk_back": 3.0}
 ANIMATED = ("root", "torso_lower", "torso_upper", "aim_pitch", "neck", "head",
             "clavicle_l", "arm_l", "forearm_l", "wrist_l", "hand_l",
             "clavicle_r", "arm_r", "forearm_r", "wrist_r", "hand_r",
@@ -223,6 +223,48 @@ def stylize(clip, lean=7.0, head_keep=0.8, arm_keep=0.7):
     return clip
 
 
+def _q2m(q):
+    return quat_to_mat(np.asarray(q))
+
+
+def _yxz(R):
+    yaw = np.arctan2(R[:, 0, 2], R[:, 2, 2])
+    pitch = np.arcsin(np.clip(-R[:, 1, 2], -1, 1))
+    roll = np.arctan2(R[:, 1, 0], R[:, 1, 1])
+    return yaw, pitch, roll
+
+
+def _from_yxz(yaw, pitch, roll):
+    cy, sy, cp, sp, cr, sr = np.cos(yaw), np.sin(yaw), np.cos(pitch), np.sin(pitch), np.cos(roll), np.sin(roll)
+    n = len(yaw)
+    Ry = np.zeros((n, 3, 3)); Ry[:, 0, 0] = cy; Ry[:, 0, 2] = sy; Ry[:, 1, 1] = 1; Ry[:, 2, 0] = -sy; Ry[:, 2, 2] = cy
+    Rx = np.zeros((n, 3, 3)); Rx[:, 0, 0] = 1; Rx[:, 1, 1] = cp; Rx[:, 1, 2] = -sp; Rx[:, 2, 1] = sp; Rx[:, 2, 2] = cp
+    Rz = np.zeros((n, 3, 3)); Rz[:, 0, 0] = cr; Rz[:, 0, 1] = -sr; Rz[:, 1, 0] = sr; Rz[:, 1, 1] = cr; Rz[:, 2, 2] = 1
+    return Ry @ Rx @ Rz
+
+
+def retune_trunk(clip, lean, damping=0.6):
+    """EVA chest over the pelvis: the captured chest yaw/roll are centred (a
+    symmetric gait has no mean twist; the source actors stand with posture
+    bias) and their swing damped, and the chest pitch is set to an EVA lean
+    (degrees forward) around which the captured breathing/bob stays.  Head and
+    arms take back most of the pitch change so the gaze stays level and the
+    arms keep hanging under gravity; legs hang from the pelvis, untouched."""
+    q = clip["q"]
+    R = _q2m(q["torso_upper"])
+    yaw, pitch, roll = _yxz(R)
+    yaw = (yaw - np.arctan2(np.sin(yaw).mean(), np.cos(yaw).mean())) * damping
+    roll = (roll - np.arctan2(np.sin(roll).mean(), np.cos(roll).mean())) * damping
+    new_pitch = pitch - pitch.mean() - np.radians(lean)
+    q["torso_upper"] = mat_to_quat(_from_yxz(yaw, new_pitch, roll))
+    delta = new_pitch - pitch
+    for name, keep in (("head", 0.8), ("arm_l", 0.7), ("arm_r", 0.7)):
+        if name in q:
+            comp = _from_yxz(np.zeros_like(delta), -delta * keep, np.zeros_like(delta))
+            q[name] = mat_to_quat(comp @ _q2m(q[name]))
+    return clip
+
+
 def encode(clip):
     names = [n for n in ANIMATED if n in clip["q"]]
     q = np.stack([clip["q"][n] for n in names], axis=1)  # frames, bones, 4
@@ -300,7 +342,9 @@ def main():
                 "method": "landmark + rotation-delta retarget, two-bone leg IK, in-place loops",
                 "tool": "tools/motion3/build_motion_pack.py"}}
     bvhs = {k: Bvh(bandai(v)) for k, v in specs.items()}
-    idle_bvh = Bvh(bandai("walk_giant_001"))
+    # neutral giant stance: just before the bow starts (both feet planted,
+    # ankles ~8 deg, knees ~15 deg, arms hanging)
+    idle_bvh, idle_frame = Bvh(bandai("bow_giant_001")), 28
     for variant in VARIANTS:
         rig = Rig.from_body_profile(a.body, variant)
         rt = Retargeter(rig)
@@ -313,12 +357,12 @@ def main():
                 # travel is backwards: face the opposite way
                 src = Source(bvh, "bandai", travel=(cb, ca))
             res = rt.run(src, cal)
-            clip = stylize(cycle_clip(res, src, ca, cb), lean=LEAN[key])
+            clip = retune_trunk(cycle_clip(res, src, ca, cb), lean=LEAN[key])
             clips[key] = encode(clip)
             print(variant, key, "cycle", ca, cb, "frames60", clip["frames"], "stride", round(clip["stride"], 3))
-        isrc = Source(idle_bvh, "bandai", align_frame=8)
+        isrc = Source(idle_bvh, "bandai", align_frame=idle_frame)
         ires = rt.run(isrc, cal)
-        clips["idle"] = encode(stylize(hold_clip(ires, isrc, 8), lean=LEAN["idle"]))
+        clips["idle"] = encode(retune_trunk(hold_clip(ires, isrc, idle_frame), lean=LEAN["idle"], damping=0.0))
         if a.g1:
             clips.update(build_actions(a.g1, rt, variant))
         pack["variants"][str(variant)] = {"clips": clips}
