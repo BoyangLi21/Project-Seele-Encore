@@ -126,11 +126,21 @@ def prepare_region(world, region_key, chunks, devices, palette, destination, exp
     atomic_replace(destination, build_region(times, raw))
 
 
-def prepare_jar(installed, compiled, target):
+def prepare_jar(installed, compiled, target, resources_only=False):
     # The live distribution has large authored models absent from the small
     # code build. Keep authored assets, but carry the mixin declarations and
     # mappings with their new classes so newly added compatibility fixes load.
     with zipfile.ZipFile(installed) as old, zipfile.ZipFile(compiled) as new:
+        if resources_only:
+            resource='data/projectseele/worldgen/hakone_surface.bin.gz'
+            if resource not in new.namelist():raise ValueError('Missing compiled terrain resource')
+            # Map-only deliveries must not replace a collaborator's entity,
+            # animation or renderer classes from a separate working copy.
+            with zipfile.ZipFile(target,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=1)as out:
+                for entry in old.infolist():
+                    if entry.filename!=resource:out.writestr(entry,old.read(entry.filename))
+                out.writestr(resource,new.read(resource))
+            return 0
         names = [n for n in new.namelist() if n.startswith('com/projectseele/') and n.endswith('.class')]
         if 'com/projectseele/world/CityRigidGenerationR45.class' not in names: raise ValueError('Missing native city generation class')
         class_count=len(names)
@@ -230,7 +240,7 @@ def install(a):
     jar_classes = 0
     if a.installed_jar:
         prepared_jar = stage/'projectseele-0.1.0-all.jar'
-        jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar)
+        jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar,getattr(a,'terrain_resource_only',False))
         plans.append((a.installed_jar, prepared_jar))
     for i, (target, source) in enumerate(plans):
         backup = original/str(i)
@@ -266,10 +276,12 @@ def main():
     p = argparse.ArgumentParser(__doc__)
     for name in ('world','backup'): p.add_argument('--'+name, type=Path, required=True)
     for name in ('installed-jar','compiled-jar'): p.add_argument('--'+name, type=Path)
+    p.add_argument('--terrain-resource-only',action='store_true',help='Replace only the compiled terrain resource; retain all installed code and assets')
     p.add_argument('--candidate', type=Path, action='append', required=True, help='Compatible arrays; conflicting final states are rejected')
     p.add_argument('--workers',type=int,choices=range(1,5),default=1,help='Parallel staging only; publication stays under the parent world lock')
     a = p.parse_args()
     if bool(a.installed_jar)!=bool(a.compiled_jar):p.error('Supply both JAR paths or neither')
+    if a.terrain_resource_only and not a.installed_jar:p.error('Terrain resource mode requires both JAR paths')
     with stopped_world(a.world): install(a)
 
 
