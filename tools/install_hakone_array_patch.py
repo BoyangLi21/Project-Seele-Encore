@@ -16,6 +16,7 @@ from transplant_s22_authority import read_region, parse_chunk, build_region
 from apply_s20_approved_semantic_repairs import parse_state, encode_indices, chunk_blob, atomic_replace
 from install_r53_carrier_trays import stopped_world
 from map_pipeline.install.invariants import assert_chunk_preserved
+from map_pipeline.launch_protection import load as launch_protection, check_candidate
 
 DIM = 'projectseele:geofront'
 DATA = Path('dimensions/projectseele/geofront/data')
@@ -175,6 +176,8 @@ def install(a):
             if(cx,cz)in expected_statuses and expected_statuses[cx,cz]!=status:raise ValueError('Conflicting generation states')
             expected_statuses[cx,cz]=status
     if any(Path(m['world']).resolve() != a.world.resolve() for m in manifests): raise ValueError('Wrong actual world')
+    protection = launch_protection(a.world)
+    launch_checks = [check_candidate(protection, candidate) for candidate in a.candidate]
     for candidate in a.candidate:
         check = json.loads((candidate/'functional-check.json').read_text('utf8'))
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
@@ -230,7 +233,7 @@ def install(a):
             metadata.append((current,after));metadata_targets.add(current)
     a.backup.mkdir(parents=True)
     stage = a.backup/'prepared'; original = a.backup/'original'; stage.mkdir(); original.mkdir()
-    journal = dict(status='preparing', world=str(a.world), candidates=[str(c) for c in a.candidate], files=[], progress_files_written=[])
+    journal = dict(status='preparing', world=str(a.world), candidates=[str(c) for c in a.candidate], files=[], progress_files_written=[], launch_protection=launch_checks)
     receipt = a.backup/'installation.json'
     def save(): atomic_replace(receipt, json.dumps(journal, indent=2).encode())
     save(); start = time.monotonic(); total = 0; tile_set = set(); plans = []

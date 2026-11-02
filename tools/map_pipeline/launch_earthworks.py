@@ -62,6 +62,8 @@ def plan(source, historical, out):
 
 
 def compose(source, plan_path, out, world, catalog, curves):
+    from map_pipeline.launch_protection import load, check_candidate
+    launch_guard=load(world)
     out.mkdir(parents=True,exist_ok=False)
     for d in ('source','delta'):(out/d).mkdir()
     for f in (source/'source').glob('*.npz'):os.link(f,out/'source'/f.name)
@@ -98,7 +100,7 @@ def compose(source, plan_path, out, world, catalog, curves):
                     active=valid&d['active'][iz,ix]
                     if not active.any():continue
                     h=d['target'][iz,ix];old=d['old'][iz,ix]
-                    protect=np.zeros(v.shape,bool)
+                    protect=launch_guard.chunk_mask(cx,cz)
                     for bx,by,bz,bX,bY,bZ in boxes:
                         if bx>cx*16+15 or bX<cx*16 or bz>cz*16+15 or bZ<cz*16:continue
                         protect|=(xx>=bx)&(xx<=bX)&(zz>=bz)&(zz<=bZ)&(yy>=by)&(yy<=bY)
@@ -106,7 +108,9 @@ def compose(source, plan_path, out, world, catalog, curves):
                         protect[max(0,py+128):min(448,py+135),pz%16,px%16]=True
                     # Never fill pre-existing subsurface rooms. Only the
                     # measured exterior skin up to the new datum is mutable.
-                    band=active&(yy>=np.minimum(old,h)-3)&(yy>=25)&~protect
+                    # The exterior band follows both measured datums. A
+                    # fixed Y25 floor truncated legitimate low slope toes.
+                    band=active&(yy>=np.minimum(old,h)-3)&~protect
                     cut=band&(yy>h)&soil[v]
                     fill=band&(yy<=h)&(soil[v]|empty[v])
                     counts[path.stem+'_cut']+=int(cut.sum());counts[path.stem+'_fill']+=int((fill&empty[v]).sum())
@@ -119,6 +123,7 @@ def compose(source, plan_path, out, world, catalog, curves):
                   preserved_launch_boxes=boxes[-7:],earthworks=dict(counts))
     (out/'manifest.json').write_text(json.dumps(manifest,indent=2),'utf8')
     (out/'functional-check.json').write_text(json.dumps(dict(errors=[],visual_verified=False,progress_records_written=False),indent=2),'utf8')
+    (out/'launch-protection.json').write_text(json.dumps(check_candidate(launch_guard,out),indent=2),'utf8')
     print(manifest['cells'],dict(counts),flush=True)
 
 
