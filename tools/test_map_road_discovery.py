@@ -4,9 +4,24 @@ from pathlib import Path
 import numpy as np
 from map_pipeline.roads import road_layers,layer_graph
 from install_hakone_array_patch import prepare_jar
+from map_pipeline.world_roads import chunk_layers
 
 
 class RoadDiscovery(unittest.TestCase):
+    def test_deep_and_top_world_layers_keep_separate_coordinates(self):
+        chunk={'sections':[{'Y':-84,'block_states':{'palette':[{'Name':'minecraft:black_concrete'}]}},
+                           {'Y':19,'block_states':{'palette':[{'Name':'minecraft:black_concrete'}]}}]}
+        rows=chunk_layers(chunk)
+        self.assertEqual(sorted(set(rows[:,1])),[-1329,319])
+        labels=layer_graph(rows)
+        self.assertEqual(len(set(labels)),2)
+
+    def test_truncated_indices_are_not_read_as_air(self):
+        chunk={'sections':[{'Y':-30,'block_states':{'palette':[
+            {'Name':'minecraft:air'},{'Name':'minecraft:black_concrete'}],'data':[]}}]}
+        with self.assertRaisesRegex(ValueError,'truncated'):
+            chunk_layers(chunk)
+
     def test_buried_and_stacked_roads_are_discovered(self):
         names=['minecraft:air','minecraft:black_concrete','minecraft:stone']
         v=np.zeros((448,16,16),np.uint16)

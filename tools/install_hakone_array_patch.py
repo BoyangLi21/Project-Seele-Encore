@@ -178,6 +178,13 @@ def install(a):
     for candidate in a.candidate:
         check = json.loads((candidate/'functional-check.json').read_text('utf8'))
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
+        manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
+        if 'streets' in manifest:
+            verified=json.loads((candidate/'independent-check.json').read_text('utf8'))
+            expected={r['id']:r['walk_columns'] for r in manifest['streets'] if r['status']=='prepared'}
+            observed={r['id']:r['full_width_columns'] for r in verified['streets']}
+            if verified['errors'] or expected!=observed:
+                raise ValueError('Incomplete independent corridor verification: '+str(candidate))
     for candidate in a.candidate:
         for preserved in (candidate/'preserved').glob('*control*.dat'):
             old = nbtlib.load(preserved)['data']; current = nbtlib.load(a.world/DATA/preserved.name)['data']

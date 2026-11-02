@@ -34,11 +34,39 @@ public final class IsolateCacheLodInputR55 {
             throw new IllegalStateException("Cache server must have no players");
         Path receipt = Path.of(output).toAbsolutePath().normalize();
         if (receipt.startsWith(allowed) || Files.exists(receipt)) throw new IllegalArgumentException("Fresh external receipt required");
+        int events = disableVoidMethods(shared, loader, Set.of("chunkLoadEvent", "chunkBlockChangedEvent"),
+                "(Lcom/seibel/distanthorizons/core/wrapperInterfaces/chunk/IChunkWrapper;Lcom/seibel/distanthorizons/core/wrapperInterfaces/world/ILevelWrapper;)V", instrumentation);
+        if (events != 2) throw new IllegalStateException("Expected exactly two event adapters");
+        call(shared.getField("INSTANCE").get(null), "clearQueuedChunkUpdates");
+        // The cache exists only to import saved columns. Entity simulation can
+        // invoke unrelated vehicle synchronization and stall its server thread.
+        // Pause that entry point in this guarded JVM; no actor is removed/reset.
+        Class<?> level = Class.forName("net.minecraft.server.level.ServerLevel", true, loader);
+        int entityTicks = disableVoidMethods(level, loader, Set.of("tickNonPassenger", "m_8647_"),
+                "(Lnet/minecraft/world/entity/Entity;)V", instrumentation);
+        if (entityTicks != 1) throw new IllegalStateException("Expected one cache entity tick entry point");
+        Files.writeString(receipt, "{\"cache_only\":true,\"saved_columns_only\":true,\"event_adapters_disabled\":2,\"entity_ticks_paused\":true,\"entities_removed_or_reset\":false,\"disk_mods_changed\":false,\"world_blocks_written\":false}\n", StandardOpenOption.CREATE_NEW);
+    }
+    private static int disableVoidMethods(Class<?> target, ClassLoader loader, Set<String> names,
+                                         String expectedDescriptor, Instrumentation instrumentation) throws Exception {
         Class<?> readerType = Class.forName("org.objectweb.asm.ClassReader", true, loader);
         Class<?> nodeType = Class.forName("org.objectweb.asm.tree.ClassNode", true, loader);
         Class<?> writerType = Class.forName("org.objectweb.asm.ClassWriter", true, loader);
-        byte[] original;
-        try (var stream = shared.getResourceAsStream("SharedApi.class")) { original = stream.readAllBytes(); }
+        // Capture the already transformed definition: raw Minecraft jar bytes
+        // would discard Forge/Mixin fields and cannot safely be redefined.
+        final byte[][] captured = new byte[1][];
+        ClassFileTransformer capture = new ClassFileTransformer() {
+            @Override public byte[] transform(ClassLoader ignored, String name, Class<?> redefining,
+                                              java.security.ProtectionDomain domain, byte[] bytes) {
+                if (redefining == target) captured[0] = bytes.clone();
+                return null;
+            }
+        };
+        instrumentation.addTransformer(capture, true);
+        try { instrumentation.retransformClasses(target); }
+        finally { instrumentation.removeTransformer(capture); }
+        byte[] original = captured[0];
+        if (original == null) throw new IllegalStateException("Live cache definition unavailable");
         Object reader = readerType.getConstructor(byte[].class).newInstance((Object)original);
         Object node = nodeType.getConstructor().newInstance();
         call(reader, "accept", node, 0);
@@ -47,9 +75,8 @@ public final class IsolateCacheLodInputR55 {
             Class<?> mt = method.getClass();
             String name = (String)mt.getField("name").get(method);
             String descriptor = (String)mt.getField("desc").get(method);
-            if (!Set.of("chunkLoadEvent", "chunkBlockChangedEvent").contains(name)) continue;
-            if (!descriptor.equals("(Lcom/seibel/distanthorizons/core/wrapperInterfaces/chunk/IChunkWrapper;Lcom/seibel/distanthorizons/core/wrapperInterfaces/world/ILevelWrapper;)V"))
-                throw new IllegalStateException("Unexpected DH event signature");
+            if (!names.contains(name)) continue;
+            if (!descriptor.equals(expectedDescriptor)) throw new IllegalStateException("Unexpected cache method signature");
             Object instructions = mt.getField("instructions").get(method);
             call(instructions, "clear");
             Object ret = Class.forName("org.objectweb.asm.tree.InsnNode", true, loader).getConstructor(int.class).newInstance(177);
@@ -62,11 +89,9 @@ public final class IsolateCacheLodInputR55 {
             mt.getField("maxLocals").setInt(method, 3);
             changed++;
         }
-        if (changed != 2) throw new IllegalStateException("Expected exactly two event adapters");
         Object writer = writerType.getConstructor(int.class).newInstance(0);
         call(node, "accept", writer);
-        instrumentation.redefineClasses(new ClassDefinition(shared, (byte[])call(writer, "toByteArray")));
-        call(shared.getField("INSTANCE").get(null), "clearQueuedChunkUpdates");
-        Files.writeString(receipt, "{\"cache_only\":true,\"saved_columns_only\":true,\"event_adapters_disabled\":2,\"disk_mods_changed\":false,\"world_blocks_written\":false}\n", StandardOpenOption.CREATE_NEW);
+        instrumentation.redefineClasses(new ClassDefinition(target, (byte[])call(writer, "toByteArray")));
+        return changed;
     }
 }

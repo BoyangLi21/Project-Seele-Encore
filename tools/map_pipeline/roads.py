@@ -23,7 +23,7 @@ MARKING = {'minecraft:white_concrete', 'minecraft:yellow_concrete',
 EMPTY = AIR | PLANTS | {'minecraft:light', 'minecraft:structure_void'}
 
 
-def road_layers(v, names):
+def road_layers(v, names, min_y=-128):
     bare = [s.split('[')[0] for s in names]
     asphalt = np.array([s in ASPHALT for s in bare])
     marking = np.array([s in MARKING for s in bare])
@@ -51,7 +51,7 @@ def road_layers(v, names):
     for dy in range(1, 17):
         alive &= (iy >= dy) & empty[v[np.maximum(0, iy-dy), iz, ix]]
         gap += alive
-    return np.column_stack((ix, iy-128, iz, 2*(iy-128)+offsets[material],
+    return np.column_stack((ix, iy+min_y, iz, 2*(iy+min_y)+offsets[material],
                             asphalt[material], soil_hits, object_hits, gap)).astype(np.int32)
 
 
@@ -75,9 +75,9 @@ def extract_region(job):
 def keys(x, z, h):
     # Fixed bias/stride is explicit and collision-free within the recorded
     # world bounds. This is coordinate indexing, not a file fingerprint.
-    if np.any(abs(x) >= 32768) or np.any(abs(z) >= 32768) or np.any((h < -256) | (h > 640)):
+    if np.any(abs(x) >= 32768) or np.any(abs(z) >= 32768) or np.any((h < -2700) | (h > 650)):
         raise ValueError('Road coordinate outside supported encoding')
-    return ((x.astype(np.int64)+32768)*65536 + z+32768)*1024 + h+256
+    return ((x.astype(np.int64)+32768)*65536 + z+32768)*4096 + h+2700
 
 
 def layer_graph(points):
