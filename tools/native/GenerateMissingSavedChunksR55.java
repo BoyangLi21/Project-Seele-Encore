@@ -46,6 +46,52 @@ public final class GenerateMissingSavedChunksR55
         Object targetLevel = level;
         Object gson = type("com.google.gson.Gson").getConstructor().newInstance();
         List<?> chunks = (List<?>) call(gson, "fromJson", Files.readString(directory.resolve("chunks.json")), List.class);
+        Map<?,?> plan = (Map<?,?>) call(gson, "fromJson", Files.readString(directory.resolve("plan.json")), Map.class);
+        if (chunks.isEmpty() || chunks.size() > 65536 || new HashSet<>(chunks).size() != chunks.size())
+            throw new IllegalArgumentException("A finite, nonempty set of distinct source chunks is required");
+        if (!chunks.equals(plan.get("chunks")))
+            throw new IllegalArgumentException("Native target list differs from the reviewed plan");
+        for (Object value : chunks)
+        {
+            if (!(value instanceof List<?> pair) || pair.size() != 2)
+                throw new IllegalArgumentException("Invalid native target coordinate");
+            for (Object coordinate : pair)
+                if (!(coordinate instanceof Number number) || !Double.isFinite(number.doubleValue())
+                        || number.doubleValue() != number.intValue() || Math.abs(number.longValue()) > 1874999)
+                    throw new IllegalArgumentException("Native target coordinates must be bounded integers");
+        }
+        if (((Number) call(targetLevel, "getSeed/m_7328_")).longValue()
+                != Long.parseLong(Files.readString(directory.resolve("seed.txt")).strip()))
+            throw new IllegalStateException("Authoring seed differs from the actual save");
+        Object generator = call(call(targetLevel, "getChunkSource/m_7726_"), "getGenerator/m_8481_");
+        if (!generator.getClass().getName().equals("com.projectseele.world.GeoFrontBoundedChunkGenerator"))
+            throw new IllegalStateException("Unexpected native terrain generator");
+        var bindings = type("com.projectseele.world.CityRigidGenerationR45").getDeclaredField("BINDINGS");
+        bindings.setAccessible(true);
+        Object binding = ((Map<?,?>) bindings.get(null)).get(generator);
+        if (binding == null || !call(binding, "world").equals(plan.get("world_uuid")))
+            throw new IllegalStateException("Actual future-generation authority is not bound");
+        for (String name : List.of("hakone_surface.bin.gz", "hakone_surface_blend.bin.gz"))
+            try (var input = loader.getResourceAsStream("data/projectseele/worldgen/" + name))
+            {
+                if (input == null || !Arrays.equals(input.readAllBytes(), Files.readAllBytes(directory.resolve("terrain-inputs").resolve(name))))
+                    throw new IllegalStateException("Native generator has different terrain input: " + name);
+            }
+        Object players = call(server, "getPlayerList/m_6846_");
+        if (((Number) call(players, "getPlayerCount/m_11309_")).intValue() != 0)
+            throw new IllegalStateException("Isolated generation requires zero connected players");
+        Map<String,Object> preflight = new LinkedHashMap<>();
+        preflight.put("cache_only", true);
+        preflight.put("cache_world", expected.toString());
+        preflight.put("seed_matches", true);
+        preflight.put("seed", Files.readString(directory.resolve("seed.txt")).strip());
+        preflight.put("terrain_matches", true);
+        preflight.put("generator", generator.getClass().getName());
+        preflight.put("recipe_directory", String.valueOf(call(binding, "recipe")));
+        preflight.put("world_uuid", plan.get("world_uuid"));
+        preflight.put("requested_chunks", chunks.size());
+        preflight.put("pid", ProcessHandle.current().pid());
+        Files.writeString(directory.resolve("native-preflight.json"), (String) call(gson, "toJson", preflight));
         new Thread(() -> {
             int completed = 0;
             try
@@ -64,7 +110,8 @@ public final class GenerateMissingSavedChunksR55
                             Map.of("completed", completed, "total", chunks.size(), "generated", completed == chunks.size(), "save_required", true)));
                 }
                 // Normal server shutdown flushes these native FULL chunks. The
-                // caller then merges only originally absent chunk slots.
+                // caller then merges only these exact originally unfinished
+                // slots, after comparing their full original saved payloads.
             }
             catch (Throwable error)
             {
