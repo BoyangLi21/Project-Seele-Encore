@@ -6,7 +6,7 @@ The existing query_blocks reader and region writer own the Anvil format.
 """
 from pathlib import Path
 from collections import defaultdict
-import argparse, copy, json, shutil, time, zipfile
+import argparse, copy, io, json, shutil, time, zipfile
 import nbtlib
 import numpy as np
 from concurrent.futures import ProcessPoolExecutor,as_completed
@@ -195,7 +195,29 @@ def prepare_jar(installed, compiled, target, resources_only=False, terrain_consu
     return class_count
 
 
-def stage_region_job(world,region_key,inputs,devices,stage,expected_statuses):
+def encode_device_changes(devices):
+    """Carry typed inventory/sign NBT across spawn workers as NBT bytes.
+
+    nbtlib's generated List[String]/List[Compound] classes cannot be pickled
+    reliably. JSON would lose tag types and large integer identity values.
+    """
+    rows=[]
+    for chunk,changes in sorted(devices.items()):
+        for pos,change in sorted(changes.items()):
+            rows.append(nbtlib.Compound({'Chunk':nbtlib.IntArray(chunk),'Pos':nbtlib.IntArray(pos),'Change':copy.deepcopy(change)}))
+    stream=io.BytesIO();nbtlib.File({'Changes':nbtlib.List[nbtlib.Compound](rows)}).write(stream)
+    return stream.getvalue()
+
+
+def decode_device_changes(payload):
+    result=defaultdict(dict)
+    for row in nbtlib.File.parse(io.BytesIO(payload))['Changes']:
+        result[tuple(map(int,row['Chunk']))][tuple(map(int,row['Pos']))]=row['Change']
+    return dict(result)
+
+
+def stage_region_job(world,region_key,inputs,device_payload,stage,expected_statuses):
+    devices=decode_device_changes(device_payload)
     palette=Palette();chunks=compose(inputs,palette)
     relative=DATA.parent/'region'/f'r.{region_key[0]}.{region_key[1]}.mca'
     prepare_region(world,region_key,chunks,devices,palette,stage/relative,expected_statuses)
@@ -295,12 +317,16 @@ def install(a):
     save(); start = time.monotonic(); total = 0; tile_set = set(); plans = []
     # Workers only prepare separate region files. The parent retains the world
     # lock; backup, publication and rollback stay serialized below.
-    with ProcessPoolExecutor(max_workers=getattr(a,'workers',1))as pool:
-        jobs=[pool.submit(stage_region_job,a.world,key,inputs,dict(devices[key]),stage,expected_statuses)for key,inputs in sorted(files.items())]
-        for future in as_completed(jobs):
-            target,prepared,cells,tiles=future.result()
-            plans.append((target,prepared));total+=cells;tile_set.update(tiles)
-            print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s',flush=True)
+    try:
+        with ProcessPoolExecutor(max_workers=getattr(a,'workers',1))as pool:
+            jobs=[pool.submit(stage_region_job,a.world,key,inputs,encode_device_changes(devices[key]),stage,expected_statuses)for key,inputs in sorted(files.items())]
+            for future in as_completed(jobs):
+                target,prepared,cells,tiles=future.result()
+                plans.append((target,prepared));total+=cells;tile_set.update(tiles)
+                print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s',flush=True)
+    except BaseException as error:
+        journal.update(status='staging-failed',actual_files_written=0,error_type=type(error).__name__);save()
+        raise
     plans.sort(key=lambda row:str(row[0]))
     plans.extend(metadata)
     jar_classes = 0
@@ -337,7 +363,17 @@ def install(a):
                 if np.any(actual != after[mask]): raise ValueError(f'Installed section mismatch {(cx,cz,sy)}')
                 pending[cx,cz].discard(sy)
             if any(pending.values()): raise ValueError(f'Missing written sections {region_key}')
-        journal.update(status='installed', seconds=round(time.monotonic()-start), changed_section_readback=True, lod='required'); save()
+        device_count=0
+        for (rx,rz),chunks in devices.items():
+            _,raw=read_region(dimension_dir(a.world,DIM)/'region'/f'r.{rx}.{rz}.mca')
+            for (cx,cz),changes in chunks.items():
+                root=parse_chunk(raw[(cz%32)*32+cx%32])
+                actual={tuple(int(tag[k])for k in('x','y','z')):tag for tag in root.get('block_entities',[])}
+                for pos,change in changes.items():
+                    if actual.get(pos)!=change.get('After'):raise ValueError(f'Installed device NBT mismatch {pos}')
+                    device_count+=1
+        journal.update(status='installed', seconds=round(time.monotonic()-start), changed_section_readback=True,
+            changed_device_nbt_readback=device_count,lod='required'); save()
         print(json.dumps({k:v for k,v in journal.items() if k not in ('files','tiles')}), flush=True)
     except BaseException:
         for item in reversed(written):
