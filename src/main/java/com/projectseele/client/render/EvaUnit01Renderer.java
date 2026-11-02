@@ -221,7 +221,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
     public static void prewarmLocalBodyMeshes(ResourceManager resourceManager)
     {
         LocalTriangleMeshLayer.prewarm(resourceManager,
-                MESH_00, MESH_01, MESH_02,
+                MESH_00, MESH_01, MESH_02, skinnedR55(MESH_00), skinnedR55(MESH_01), skinnedR55(MESH_02),
                 new ResourceLocation(ProjectSeele.MODID,"mesh/eva_prototype.mesh.json"),
                 new ResourceLocation(ProjectSeele.MODID,"mesh/eva_un01.mesh.json"),
                 new ResourceLocation(ProjectSeele.MODID,"mesh/eva_charger_unit00_r48.mesh.json"),
@@ -567,12 +567,21 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
 
     public static ResourceLocation meshResourceForVariant(int variant)
     {
-        return switch (variant)
+        ResourceLocation original = switch (variant)
         {
             case EvaUnit01Entity.UNIT_00 -> MESH_00;
             case EvaUnit01Entity.UNIT_02 -> MESH_02;
             default -> MESH_01;
         };
+        // Same triangles, continuous authored joint weights. Only the renderer
+        // reads this copy: the server geometry, its receipts and saved frozen
+        // poses stay bound to the unchanged original resource.
+        var skinned = skinnedR55(original);
+        return LocalTriangleMeshLayer.available(skinned) ? skinned : original;
+    }
+    private static ResourceLocation skinnedR55(ResourceLocation original)
+    {
+        return new ResourceLocation(original.getNamespace(), original.getPath().replace(".mesh.json", "_skin_r55.mesh.json"));
     }
 
     /** Keep body vertices on a variant-owned buffer, never a weapon buffer. */

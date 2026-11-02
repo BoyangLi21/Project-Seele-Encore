@@ -421,6 +421,12 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 packedLight,packedOverlay,-values[index+5],values[index+6],values[index+7]);
     }
 
+    /** Whether a mesh resource exists and parsed (cached, including absence). */
+    public static boolean available(ResourceLocation meshResource)
+    {
+        return getMesh(meshResource) != null;
+    }
+
     public static String captureTag(ResourceLocation meshResource)
     {
         MeshData mesh = getMesh(meshResource);
