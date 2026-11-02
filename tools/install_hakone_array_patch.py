@@ -17,6 +17,7 @@ from apply_s20_approved_semantic_repairs import parse_state, encode_indices, chu
 from install_r53_carrier_trays import stopped_world
 from map_pipeline.install.invariants import assert_chunk_preserved
 from map_pipeline.launch_protection import load as launch_protection, check_candidate
+from native_transit_additions import prepare as prepare_native_additions, assert_preserved as assert_native_preserved
 
 DIM = 'projectseele:geofront'
 DATA = Path('dimensions/projectseele/geofront/data')
@@ -285,7 +286,7 @@ def install(a):
             if previous is not None and previous!=r:raise ValueError(f'Conflicting device changes at {(x,y,z)}')
             devices[x//512, z//512][x//16, z//16][x,y,z] = r
             files.setdefault((x//512,z//512), [])
-    metadata = []
+    metadata = [];native_snapshots=[];native_additions=set()
     metadata_targets=set()
     for candidate in a.candidate:
         for after in (candidate/'after').rglob('*.dat'):
@@ -309,6 +310,13 @@ def install(a):
             if current in metadata_targets:raise ValueError('Overlapping native member repair')
             if current.read_bytes()!=prior.read_bytes():raise ValueError('Native service changed after repair preparation')
             metadata.append((current,after));metadata_targets.add(current)
+        additions=manifest.get('native_additions',[])
+        if additions:
+            pairs,baseline,added=prepare_native_additions(candidate,a.world,additions)
+            for current,after in pairs:
+                if current in metadata_targets:raise ValueError('Overlapping native service addition')
+                metadata.append((current,after));metadata_targets.add(current)
+            native_snapshots.append(baseline);native_additions.update(added)
     a.backup.mkdir(parents=True)
     stage = a.backup/'prepared'; original = a.backup/'original'; stage.mkdir(); original.mkdir()
     journal = dict(status='preparing', world=str(a.world), candidates=[str(c) for c in a.candidate], files=[], progress_files_written=[], launch_protection=launch_checks)
@@ -349,6 +357,7 @@ def install(a):
     written = []
     try:
         unchanged_jar()
+        for baseline in native_snapshots:assert_native_preserved(a.world,baseline)
         for item in journal['files']:
             target = Path(item['target']); target.parent.mkdir(parents=True, exist_ok=True)
             if a.installed_jar and target==a.installed_jar:unchanged_jar()
@@ -364,6 +373,9 @@ def install(a):
                 pending[cx,cz].discard(sy)
             if any(pending.values()): raise ValueError(f'Missing written sections {region_key}')
         device_count=0
+        for target,source in metadata:
+            if target.read_bytes()!=source.read_bytes():raise ValueError('Installed metadata mismatch: '+str(target))
+        for baseline in native_snapshots:assert_native_preserved(a.world,baseline,native_additions)
         for (rx,rz),chunks in devices.items():
             _,raw=read_region(dimension_dir(a.world,DIM)/'region'/f'r.{rx}.{rz}.mca')
             for (cx,cz),changes in chunks.items():
@@ -373,7 +385,8 @@ def install(a):
                     if actual.get(pos)!=change.get('After'):raise ValueError(f'Installed device NBT mismatch {pos}')
                     device_count+=1
         journal.update(status='installed', seconds=round(time.monotonic()-start), changed_section_readback=True,
-            changed_device_nbt_readback=device_count,lod='required'); save()
+            changed_device_nbt_readback=device_count,metadata_readback=len(metadata),
+            native_additions=len(native_additions),existing_native_members_exact=bool(native_snapshots),lod='required'); save()
         print(json.dumps({k:v for k,v in journal.items() if k not in ('files','tiles')}), flush=True)
     except BaseException:
         for item in reversed(written):
