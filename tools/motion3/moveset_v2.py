@@ -111,7 +111,13 @@ def build(rt, take, kind, lean, scale, pad=6):
     n = take.frames
     if kind == "loop":
         take = LoopPadded(take, pad)
-        src = Source(take, "mixamo", travel=(pad, pad + n - 1))
+        hips = take.pos("Hips")
+        travel = hips[pad + n - 1] - hips[pad]
+        # stationary loops have no travel direction: face along the pelvis instead
+        if np.hypot(travel[0], travel[2]) > 0.1:
+            src = Source(take, "mixamo", travel=(pad, pad + n - 1))
+        else:
+            src = Source(take, "mixamo", align_frame=pad)
     else:
         src = Source(take, "mixamo", align_frame=0)
     res = rt.run(src, None)

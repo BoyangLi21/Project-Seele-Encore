@@ -250,10 +250,60 @@ def runtime_seam_weights(parts):
     return out
 
 
+def load_mesh_weighted(arm, mesh, texture_path=None, name="angel"):
+    """A single model-space part with a per-vertex "skin" block (Angel meshes:
+    four bone indices and weights per vertex), linear-blend skinned."""
+    stride = mesh.get("stride", 8)
+    part = next(iter(mesh["parts"].values()))
+    raw, piv = part["vertices"], part["pivot"]
+    n = len(raw) // stride
+    verts = [model_to_blender(px_to_model((raw[i * stride] + piv[0], raw[i * stride + 1] + piv[1], raw[i * stride + 2] + piv[2])))
+             for i in range(n)]
+    uvs = [(raw[i * stride + 3], 1.0 - raw[i * stride + 4]) for i in range(n)]
+    me = bpy.data.meshes.new(name)
+    me.from_pydata(verts, [], [(i, i + 1, i + 2) for i in range(0, n - 2, 3)])
+    uv = me.uv_layers.new(name="UV")
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            uv.data[li].uv = uvs[me.loops[li].vertex_index]
+    me.update()
+    ob = bpy.data.objects.new(name, me)
+    bpy.context.scene.collection.objects.link(ob)
+    if texture_path and os.path.isfile(texture_path):
+        mat = bpy.data.materials.new(name + "_mat")
+        mat.use_nodes = True
+        nt = mat.node_tree
+        bsdf = nt.nodes.get("Principled BSDF")
+        tex = nt.nodes.new("ShaderNodeTexImage")
+        tex.image = bpy.data.images.load(texture_path)
+        tex.interpolation = 'Closest'
+        nt.links.new(tex.outputs["Color"], bsdf.inputs["Base Color"])
+        bsdf.inputs["Roughness"].default_value = 0.6
+        ob.data.materials.append(mat)
+    skin = mesh["skin"]
+    bones = skin["bones"]
+    k = len(skin["indices"]) // n
+    groups = {b: ob.vertex_groups.new(name=b) for b in bones if b in arm.data.bones}
+    for v in range(n):
+        for j in range(k):
+            w = skin["weights"][v * k + j]
+            b = bones[skin["indices"][v * k + j]]
+            if w > 1e-4 and b in groups:
+                groups[b].add([v], w, 'ADD')
+    for b in arm.data.bones:
+        b.use_deform = True
+    ob.parent = arm
+    mod = ob.modifiers.new("arm", 'ARMATURE')
+    mod.object = arm
+    return [ob]
+
+
 def load_mesh_skinned(arm, mesh_path, texture_path=None, name="body"):
     """Mesh parts deformed like the game: rigid per bone plus dual-quaternion
     seams (Armature modifier, preserve volume) from runtime_seam_weights."""
     mesh = load_json(mesh_path)
+    if "skin" in mesh and "parts" in mesh and len(mesh["parts"]) == 1:
+        return load_mesh_weighted(arm, mesh, texture_path, name)
     stride = mesh.get("stride", 8)
     seams = runtime_seam_weights(mesh["parts"])
     # authored influences (pivot-rig rest = identity, no inverse bind) take precedence
