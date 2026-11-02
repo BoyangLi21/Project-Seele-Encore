@@ -77,7 +77,7 @@ def alignment(row):
     return curve,along
 
 
-def retain_bearings(target,old,walk,bearings,bounds,slope):
+def retain_bearings(target,old,walk,bearings,bounds,slope,relative=False):
     """Carry retained foundation grades out into the daylight slope."""
     x,z,X,Z=bounds;lower=np.full(old.shape,-30000.,float);seed=np.zeros(old.shape,bool)
     for a,b,c,A,B,C in bearings:
@@ -88,7 +88,7 @@ def retain_bearings(target,old,walk,bearings,bounds,slope):
         # from an air column below a platform or roof.
         if not np.any(target[area]!=old[area]):continue
         seed[area]|=old[area]>-129
-    lower[seed]=old[seed]
+    lower[seed]=0 if relative else old[seed]
     queue=[(-float(lower[iz,ix]),int(iz),int(ix))for iz,ix in np.argwhere(seed)]
     heapq.heapify(queue)
     steps=[(dz,dx,slope*np.hypot(dz,dx))for dz in (-1,0,1)for dx in (-1,0,1)if dz or dx]
@@ -99,7 +99,7 @@ def retain_bearings(target,old,walk,bearings,bounds,slope):
             j,i=iz+dz,ix+dx
             if 0<=j<old.shape[0] and 0<=i<old.shape[1] and lower[j,i]<value-cost:
                 lower[j,i]=value-cost;heapq.heappush(queue,(-lower[j,i],j,i))
-    upper=np.full(old.shape,30000.,float);upper[seed]=old[seed]
+    upper=np.full(old.shape,30000.,float);upper[seed]=0 if relative else old[seed]
     queue=[(float(upper[iz,ix]),int(iz),int(ix))for iz,ix in np.argwhere(seed)];heapq.heapify(queue)
     while queue:
         value,iz,ix=heapq.heappop(queue)
@@ -110,7 +110,7 @@ def retain_bearings(target,old,walk,bearings,bounds,slope):
                 upper[j,i]=value+cost;heapq.heappush(queue,(upper[j,i],j,i))
     low,high=np.rint(lower).astype(np.int16),np.rint(upper).astype(np.int16)
     if np.any(low>high):raise ValueError('Retained foundation grades require explicit retaining walls')
-    fitted=np.clip(target,low,high)
+    fitted=np.clip(target-old,low,high)+old if relative else np.clip(target,low,high)
     if np.any(walk&(fitted!=target)):
         iz,ix=np.argwhere(walk&(fitted!=target))[0]
         raise ValueError(('Road and retained building bearings require a different grade or retaining structure',
@@ -164,12 +164,21 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
     if np.any(walk&~known): raise ValueError((row['id'],'unknown ground under commissioned corridor'))
     hy,slab=road_blocks(grade2)
     bridge=row.get('bridge',{})
+    tunnel=row.get('tunnel',{})
+    if bridge and tunnel:raise ValueError('One corridor cannot be both a bridge and a tunnel')
     span=np.zeros(walk.shape,bool)
     if bridge:
         s0,s1=map(float,bridge['along'])
         span=(along[nearest]>=s0)&(along[nearest]<=s1)&(distance<=bridge.get('terrain_span_halfwidth',radius+row.get('sidewalk_width',2)+2))
         if not np.any(walk&span) or np.any(span[[0,-1]]) or np.any(span[:,[0,-1]]):
             raise ValueError('Bridge span must be finite and interior')
+    bore=np.zeros(walk.shape,bool)
+    if tunnel:
+        t0,t1=map(float,tunnel['along'])
+        # A bored road does not publish its floor as the mountain surface.
+        bore=(along[nearest]>=t0)&(along[nearest]<=t1)
+        if not np.any(bore&walk):raise ValueError('Tunnel has no commissioned roadway')
+        span|=bore
     shoulder_distance,shoulder_nearest=distance_transform_edt(~(walk&~span),return_indices=True)
     # Half-slab ramps have integer subbase steps. Fit the daylight slope from
     # the nearest full-width edge rather than treating those discrete steps as
@@ -177,10 +186,22 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
     edge_base=(hy-1)[tuple(shoulder_nearest)]
     allowance=shoulder_distance*row.get('earth_slope',.5)
     target=np.rint(np.clip(old,edge_base-allowance,edge_base+allowance)).astype(np.int16)
-    target=retain_bearings(target,old,walk,bearings,row['bounds'],row.get('earth_slope',.5))
+    incremental=row.get('incremental_earthworks',False)
+    if incremental:
+        delta=edge_base-old[tuple(shoulder_nearest)]
+        target=np.rint(old+np.sign(delta)*np.maximum(0,abs(delta)-allowance)).astype(np.int16)
+    target=retain_bearings(target,old,walk,bearings,row['bounds'],row.get('earth_slope',.5),incremental)
     # A bridge spans the measured terrain/rail void; its deck grade is never
     # published as a new soil column or turned into a solid embankment.
     target[span]=old[span]
+    if tunnel:
+        # The portal face is confined to the lined opening. Continue the
+        # untouched hillside down outside it, rather than ending every cut at
+        # the same transverse plane and leaving a wide rectangular cliff.
+        portal_distance,portal_near=distance_transform_edt(~bore,return_indices=True)
+        shoulder=np.rint(old[tuple(portal_near)]-portal_distance*row.get('earth_slope',.5)).astype(np.int16)
+        outside=~walk&~bore
+        target[outside]=np.maximum(target[outside],np.minimum(old,shoulder)[outside])
     target[~known]=old[~known]
     if existing is not None:
         retained=base_walk&~walk
@@ -274,7 +295,7 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
         # Full slab base and five blocks of vehicle space. The declared
         # retirement volume is the only permission to remove an old road layer.
         allowed=SOIL|EMPTY|PAVEMENT
-        depth=int(bridge.get('deck_depth',2)) if span[iz,ix] else 1
+        depth=int(bridge.get('deck_depth',2)) if bridge and span[iz,ix] else 1
         for y in range(floor-depth,floor+row.get('clearance',5)+1):
             owned_aux=auxiliary_at(x,y,z)
             if y>floor:
@@ -282,7 +303,7 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
                 if material in PAVEMENT and not any(a<=x<=A and b<=y<=B and c<=z<=C for a,b,c,A,B,C in retired):
                     blockers.append([x,y,z,'another pavement layer requires explicit ownership',e.state(x,y,z)]);continue
                 put(x,y,z,'minecraft:air','full-width clearance',allowed|owned_aux)
-            elif y<floor:put(x,y,z,'minecraft:stone_bricks' if span[iz,ix] else 'minecraft:stone','continuous subbase',allowed|owned_aux)
+            elif y<floor:put(x,y,z,'minecraft:stone_bricks' if bridge and span[iz,ix] else 'minecraft:stone','continuous subbase',allowed|owned_aux)
             else:
                 marking=carriage[iz,ix] and distance[iz,ix]<.55 and int(along[nearest[iz,ix]]//5)%2==0
                 if slab[iz,ix]:
@@ -291,6 +312,25 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
                     material+='[type=bottom,waterlogged=false]'
                 else:material='minecraft:white_concrete'if marking else'minecraft:black_concrete'if carriage[iz,ix]else'minecraft:smooth_stone'
                 put(x,y,z,material,'road and sidewalk',allowed|owned_aux)
+        if bore[iz,ix]:
+            for y in range(floor+row.get('clearance',5)+1,floor+row.get('clearance',5)+3):
+                light=y==floor+row.get('clearance',5)+1 and distance[iz,ix]<.8 and along[nearest[iz,ix]]%12<1.5
+                put(x,y,z,'minecraft:sea_lantern' if light else 'minecraft:stone_bricks','tunnel crown',allowed|owned_aux)
+    wall=np.zeros(walk.shape,bool)
+    wing=np.zeros(walk.shape,bool)
+    if tunnel:
+        wall=binary_dilation(bore&walk,structure=np.ones((3,3)))&~walk
+        for iz,ix in np.argwhere(wall):
+            x,z,floor=int(xx[iz,ix]),int(zz[iz,ix]),int(hy[iz,ix])
+            for y in range(floor-1,floor+row.get('clearance',5)+3):
+                put(x,y,z,'minecraft:stone_bricks','tunnel lining',SOIL|EMPTY|PAVEMENT)
+        wing=binary_dilation(walk,structure=np.ones((3,3)))&~walk&~wall&~bore
+        if existing is not None:wing&=~base_walk
+        wing&=target>hy+1
+        for iz,ix in np.argwhere(wing):
+            x,z,floor=int(xx[iz,ix]),int(zz[iz,ix]),int(hy[iz,ix])
+            for y in range(floor-1,int(target[iz,ix])):
+                put(x,y,z,'minecraft:stone_bricks','portal wing wall',SOIL|EMPTY|PAVEMENT)
     parapet=np.zeros(walk.shape,bool)
     if bridge:
         # The parapet has its own edge deck outside the commissioned clear
@@ -324,7 +364,8 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
                 counts=dict(counts),ports=row['points'][::len(row['points'])-1],bounds=row['bounds']),
            (writes,dict(bounds=row['bounds'],old=old,target=target,active=active,
                         walk=walk,road=carriage,grade2=grade2,retired_walk=retired_walk,clearance=row.get('clearance',5),
-                        bridge_span=span,deck_depth=bridge.get('deck_depth',1))))
+                        bridge_span=span&bool(bridge),deck_depth=bridge.get('deck_depth',1),
+                        tunnel=bore&walk,tunnel_wall=wall,portal_wing=wing)))
 
 
 def publish_plan(candidate,base):
@@ -339,6 +380,8 @@ def publish_plan(candidate,base):
             d[key][area][q.get('retired_walk',np.zeros(mask.shape,bool))]=False
         d['walk'][area]|=mask
         for key in ('road','grade2'):d[key][area][mask]=q[key][mask]
+        d['tunnel'][area][q.get('retired_walk',np.zeros(mask.shape,bool))]=False
+        d['tunnel'][area][mask]=q.get('tunnel',np.zeros(mask.shape,bool))[mask]
         d['ground'][area][q['active']]=q['target'][q['active']]
         for iz,ix in np.argwhere(mask):
             y,_=road_blocks(q['grade2'][iz,ix]);state=e.state(x+int(ix),int(y),z+int(iz))
@@ -359,6 +402,14 @@ def main(a):
     shutil.copy2(a.design,a.out/'authored-design.json')
     for sub in ('source','delta','earthworks'):(a.out/sub).mkdir()
     for p in(a.source/'source').glob('*.npz'):os.link(p,a.out/'source'/p.name)
+    inherited=list((a.source/'delta').glob('*.npz'))
+    if inherited:
+        retirement=json.loads((a.source/'retirement-check.json').read_text('utf8'))
+        previous=json.loads((a.source/'manifest.json').read_text('utf8'))
+        if retirement['errors'] or Path(previous['world']).resolve()!=Path(design['world']).resolve():
+            raise ValueError('Only a verified retirement for this same world may precede a corridor')
+        for p in inherited:shutil.copy2(p,a.out/'delta'/p.name)
+        for name in ('retirement-check.json','retired-surface.npz'):shutil.copy2(a.source/name,a.out/name)
     bearings=[r['occupied_bounds']for r in json.loads((a.plan/'catalog.json').read_text('utf8'))]
     boxes=[[x,y-3,z,X,Y,Z]for x,y,z,X,Y,Z in bearings]
     boxes+=json.loads((a.plan/'station-volumes.json').read_text('utf8'))

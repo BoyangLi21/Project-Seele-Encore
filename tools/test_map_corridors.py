@@ -63,6 +63,24 @@ class CorridorRegression(unittest.TestCase):
         self.assertTrue(np.all(abs(fitted[2:5,12]-170)<=1))
         self.assertLessEqual(abs(np.diff(fitted[2:5,2:13],axis=1)).max(),1)
 
+    def test_bored_road_keeps_the_ridge_above_its_lined_crown(self):
+        class Mountain(FlatStreet):
+            def state(self,x,y,z):
+                if abs(x)<=4:return 'minecraft:stone'if y<=100 else'minecraft:air'
+                return super().state(x,y,z)
+        terrain=np.full((25,31),79,np.int16);terrain[:,11:20]=100
+        row=self.row();row['tunnel']=dict(along=[4,12])
+        with patch('map_pipeline.corridors.ground',return_value=terrain):
+            report,compiled=compile_street(Mountain(),row,[],np.empty((0,3)))
+        self.assertEqual(report['status'],'prepared')
+        writes,field=compiled
+        self.assertEqual(field['target'][12,15],100)
+        self.assertEqual(writes[0,85,0],'minecraft:air')
+        self.assertEqual(writes[0,87,0],'minecraft:stone_bricks')
+        self.assertNotIn((0,90,0),writes)
+        self.assertTrue(field['tunnel'][12,15])
+        self.assertFalse(field['bridge_span'].any())
+
     @patch('map_pipeline.corridors.ground',return_value=np.full((25,31),79,np.int16))
     def test_earthworks_do_not_retire_paving_outside_walk(self,_):
         row=self.row();row['points']=[[-8,84,0],[8,84,0]];row['carriage_width']=1;row['sidewalk_width']=0
@@ -84,6 +102,15 @@ class CorridorRegression(unittest.TestCase):
         fitted=retain_bearings(target,old,walk,[[8,81,12,12,110,14]],[0,0,20,20],.5)
         self.assertTrue(np.all(fitted[12:15,8:13]==80))
         self.assertTrue(np.all(fitted[2]==84))
+
+    def test_local_bearing_adjustment_preserves_the_existing_steep_hillside(self):
+        old=np.tile(np.arange(21,dtype=np.int16)*2+60,(21,1))
+        target=old.copy();target[9:12,9:12]+=2
+        walk=np.zeros_like(old,bool)
+        fitted=retain_bearings(target,old,walk,[[10,81,10,10,100,10]],[0,0,20,20],.6,relative=True)
+        self.assertEqual(fitted[10,10],old[10,10])
+        self.assertTrue(np.array_equal(fitted[:,0],old[:,0]))
+        self.assertTrue(np.array_equal(fitted[:,-1],old[:,-1]))
 
     @patch('map_pipeline.corridors.ground',return_value=np.full((25,31),79,np.int16))
     def test_retiring_one_buried_light_does_not_authorize_another(self,_):

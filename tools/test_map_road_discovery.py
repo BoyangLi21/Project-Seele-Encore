@@ -39,7 +39,7 @@ class RoadDiscovery(unittest.TestCase):
     def test_map_resource_install_retains_collaborator_classes(self):
         with tempfile.TemporaryDirectory()as t:
             root=Path(t);resource='data/projectseele/worldgen/hakone_surface.bin.gz'
-            with zipfile.ZipFile(root/'installed.jar','w')as f:
+            with zipfile.ZipFile(root/'installed.jar','w',compression=zipfile.ZIP_DEFLATED)as f:
                 f.writestr('com/projectseele/client/EvaRenderer.class',b'collaborator-code')
                 f.writestr('assets/projectseele/model.glb',b'authored-model');f.writestr(resource,b'old')
             with zipfile.ZipFile(root/'compiled.jar','w')as f:
@@ -49,6 +49,8 @@ class RoadDiscovery(unittest.TestCase):
                 self.assertEqual(f.read('com/projectseele/client/EvaRenderer.class'),b'collaborator-code')
                 self.assertEqual(f.read('assets/projectseele/model.glb'),b'authored-model')
                 self.assertEqual(f.read(resource),b'new')
+                self.assertEqual(len(f.namelist()),len(set(f.namelist())))
+                self.assertEqual(f.getinfo('assets/projectseele/model.glb').compress_type,zipfile.ZIP_DEFLATED)
 
 
 if __name__=='__main__':unittest.main()

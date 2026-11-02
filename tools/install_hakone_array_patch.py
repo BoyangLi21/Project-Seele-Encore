@@ -138,8 +138,33 @@ def prepare_jar(installed, compiled, target, resources_only=False):
             # Map-only deliveries must not replace a collaborator's entity,
             # animation or renderer classes from a separate working copy.
             with zipfile.ZipFile(target,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=1)as out:
-                for entry in old.infolist():
-                    if entry.filename!=resource:out.writestr(entry,old.read(entry.filename))
+                # Retain the original compressed records verbatim. Large
+                # collaborator models need neither decoding nor recompression
+                # to replace one small map resource. ZipFile writes fresh
+                # central-directory offsets when the archive closes.
+                entries=sorted(old.infolist(),key=lambda entry:entry.header_offset)
+                if len({entry.filename for entry in entries})!=len(entries):
+                    raise ValueError('Installed JAR has ambiguous duplicate entries')
+                for i,entry in enumerate(entries):
+                    if entry.filename==resource:continue
+                    end=entries[i+1].header_offset if i+1<len(entries)else old.start_dir
+                    start=entry.header_offset;updated=copy.copy(entry);updated.header_offset=out.fp.tell()
+                    # Central ZIP64 offsets refer to the old archive. Sizes
+                    # and new offsets are regenerated from ZipInfo below.
+                    extra=bytearray();offset=0
+                    while offset<len(updated.extra):
+                        kind=int.from_bytes(updated.extra[offset:offset+2],'little')
+                        size=int.from_bytes(updated.extra[offset+2:offset+4],'little');limit=offset+4+size
+                        if limit>len(updated.extra):raise ValueError('Malformed installed ZIP extra record')
+                        if kind!=1:extra.extend(updated.extra[offset:limit])
+                        offset=limit
+                    updated.extra=bytes(extra);old.fp.seek(start);remaining=end-start
+                    while remaining:
+                        block=old.fp.read(min(1024*1024,remaining))
+                        if not block:raise ValueError('Truncated installed JAR record')
+                        out.fp.write(block);remaining-=len(block)
+                    out.filelist.append(updated);out.NameToInfo[updated.filename]=updated
+                out.start_dir=out.fp.tell();out.comment=old.comment
                 out.writestr(resource,new.read(resource))
             return 0
         names = [n for n in new.namelist() if n.startswith('com/projectseele/') and n.endswith('.class')]
@@ -188,6 +213,12 @@ def install(a):
             observed={r['id']:r['full_width_columns'] for r in verified['streets']}
             if verified['errors'] or expected!=observed:
                 raise ValueError('Incomplete independent corridor verification: '+str(candidate))
+            design=json.loads((candidate/'authored-design.json').read_text('utf8'))
+            tunnels={r['id']for r in design['streets']if r.get('tunnel')}
+            if tunnels:
+                tunnel_check=json.loads((candidate/'tunnel-check.json').read_text('utf8'))
+                if tunnel_check['errors'] or {r['id']for r in tunnel_check['tunnels']}!=tunnels:
+                    raise ValueError('Incomplete independent tunnel verification: '+str(candidate))
     for candidate in a.candidate:
         for preserved in (candidate/'preserved').glob('*control*.dat'):
             old = nbtlib.load(preserved)['data']; current = nbtlib.load(a.world/DATA/preserved.name)['data']
@@ -248,9 +279,16 @@ def install(a):
     plans.sort(key=lambda row:str(row[0]))
     plans.extend(metadata)
     jar_classes = 0
+    def jar_version():
+        info=a.installed_jar.stat();return info.st_size,info.st_mtime_ns
+    def unchanged_jar():
+        if a.installed_jar and jar_version()!=original_jar_version:
+            raise ValueError('Installed JAR changed during map staging; retain the collaborator update and rebuild the resource-only merge')
     if a.installed_jar:
+        original_jar_version=jar_version()
         prepared_jar = stage/'projectseele-0.1.0-all.jar'
         jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar,getattr(a,'terrain_resource_only',False))
+        unchanged_jar()
         plans.append((a.installed_jar, prepared_jar))
     for i, (target, source) in enumerate(plans):
         backup = original/str(i)
@@ -259,8 +297,10 @@ def install(a):
     journal.update(status='prepared', cells=total, regions=len(files), metadata_files=len(metadata), jar_classes=jar_classes, tiles=sorted(tile_set)); save()
     written = []
     try:
+        unchanged_jar()
         for item in journal['files']:
             target = Path(item['target']); target.parent.mkdir(parents=True, exist_ok=True)
+            if a.installed_jar and target==a.installed_jar:unchanged_jar()
             atomic_replace(target, Path(item['staged']).read_bytes()); written.append(item)
         journal['status'] = 'written'; save()
         # Read back changed sections, not untouched regions or whole-save data.
