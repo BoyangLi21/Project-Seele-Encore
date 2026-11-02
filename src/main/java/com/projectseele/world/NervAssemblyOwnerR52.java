@@ -651,6 +651,26 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                 &&capsule.getInsertionStage()==EntryPlugCarrierEntity.STAGE_OCCUPIED
                 &&savedBridgeMatches(level,p,data)&&personnelDoors(level,p,false);
     }
+    /** Pilot abort before the capsule leaves the dock: the bridge is extended
+     * back through the same atomic bridge states, one per 4 ticks, and the
+     * cabin returns to its recovered idle state. True once fully restored. */
+    boolean restoreDockAfterAbortR55(ServerLevel level,Original original,CompoundTag data)
+    {
+        var p=plant(original);var e=hull(level,original);var capsule=plug(level,original);
+        if(p==null||e==null||capsule==null||!originalGraph(level,original,true))return hold(original,"abort_original_custody_missing");
+        if(!pose(capsule.getCanonicalTransform(),p.dock())||capsule.getInsertionStage()!=EntryPlugCarrierEntity.STAGE_OCCUPIED
+                ||e.position().distanceToSqr(p.bay().translation())>1e-6)return hold(original,"abort_capsule_or_body_left_dock");
+        if(!savedBridgeMatches(level,p,data))return hold(original,"abort_saved_bridge_differs_from_actual");
+        int amount=data.getInt("BridgeAmount");
+        if(amount<9)
+        {
+            int age=data.getInt("AbortBridgeTicksR55")+1;data.putInt("AbortBridgeTicksR55",age);
+            if(age%4==0&&!applyBridgeState(level,p,amount+1,data,TransportMembershipR52.members(original,Kind.OCCUPIED)))
+                return hold(original,"abort_bridge_extension_blocked_"+(amount+1));
+            return false;
+        }
+        capsule.setCabinRecoveryProgress(0);holds.remove(original.eva());return true;
+    }
     @Override public Preparation prepareOriginal(ServerLevel l,Original o,CompoundTag data)
     {
         var p=plant(o);var e=hull(l,o);var capsule=plug(l,o);if(p==null||e==null||capsule==null||!originalGraph(l,o,true)){hold(o,"original_custody_or_manifest_missing");return Preparation.WAITING;}

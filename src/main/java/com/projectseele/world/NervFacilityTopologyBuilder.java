@@ -114,7 +114,6 @@ public final class NervFacilityTopologyBuilder
         if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "NervFacilityTopologyBuilder");
-        PerformanceCounters.recordBuilderCall();
         buildB20CommandRing(level, origin);
         buildCommandSupportConnection(level, origin);
         buildMagiConnection(level, origin);
@@ -1612,7 +1611,6 @@ public final class NervFacilityTopologyBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

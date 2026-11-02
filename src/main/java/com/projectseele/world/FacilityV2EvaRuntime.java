@@ -1012,7 +1012,6 @@ public final class FacilityV2EvaRuntime
         }
         level.setBlock(position, state,
                 Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE);
-        PerformanceCounters.recordWorldBlockWrites(1);
     }
 
     private static boolean contains(FacilitySchemaV2.IntBox box,

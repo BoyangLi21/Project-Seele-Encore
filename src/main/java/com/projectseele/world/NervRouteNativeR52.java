@@ -117,7 +117,11 @@ public final class NervRouteNativeR52 implements NativeAccess
         if(plug.getLinkedEva()!=null&&plug.getLinkedEva()!=eva||eva.getPilotEntity()!=null&&eva.getPilotEntity()!=r)return false;
         boolean transport=ownerData.getBoolean("Returning")||ownerData.getBoolean("FlightTransportR53");
         if(!transport&&!AutoSortieR32.missionToken(level,original.variant()).equals(original.mission()))return false;
-        var tag=eva.getPersistentData();if(tag.hasUUID("R32SortieCommander")&&!tag.getUUID("R32SortieCommander").equals(original.owner()))return false;
+        // The current operation's own crew record outranks a commander stamp
+        // left on the airframe by an earlier session or another player.
+        var sortie=original.mission().isEmpty()?null:TvCampaignSavedData.get(level).sorties.get(original.variant());
+        boolean missionCrew=sortie!=null&&sortie.npc==(r instanceof TrainingPilotEntity)&&original.owner().equals(sortie.commander);
+        var tag=eva.getPersistentData();if(!missionCrew&&tag.hasUUID("R32SortieCommander")&&!tag.getUUID("R32SortieCommander").equals(original.owner()))return false;
         if(!transport&&AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),original.mission()))return false;
         if(r instanceof TrainingPilotEntity pilot&&original.mission().isEmpty())
             return NervRouteRuntimeR52.manualOriginalNpcR60(level,directory,owner,original,eva,pilot);

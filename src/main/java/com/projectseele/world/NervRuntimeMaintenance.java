@@ -110,7 +110,6 @@ public final class NervRuntimeMaintenance
         }
         if (level.dimension().equals(GeoFrontCommands.GEOFRONT))
         {
-            PerformanceCounters.recordForcedChunkSnapshot(retainedChunkLinks);
         }
         if (removedOwners > 0)
         {
@@ -185,7 +184,6 @@ public final class NervRuntimeMaintenance
 
     private static SweepResult sweepLoaded(ServerLevel level)
     {
-        PerformanceCounters.recordGlobalEntityScan();
         int loaded = 0;
         int debris = 0;
         int ambientMobs = 0;

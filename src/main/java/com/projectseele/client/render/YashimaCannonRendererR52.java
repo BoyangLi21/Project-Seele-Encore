@@ -18,6 +18,9 @@ public final class YashimaCannonRendererR52 extends EntityRenderer<YashimaCannon
     @Override public void render(YashimaCannonEntityR52 gun,float yaw,float partial,PoseStack poses,MultiBufferSource buffers,int light)
     {
         var g=gun.geometryR52();var spec=gun.cradleR52();if(g==null||spec==null)return;var aim=gun.aimR52(partial);var origin=gun.getPosition(partial);
+        // The operator's scope is the fire-control picture; the gun body and
+        // cradle sit on that sight line and would fill the zoomed view.
+        if(scopedByLocalOperatorR55(gun))return;
         if(gun.loadedR52()){poses.pushPose();poses.mulPoseMatrix(g.matrix(Vec3.ZERO,aim));LocalTriangleMeshLayer.renderStandalone(poses,buffers,MESH,TEXTURE,light,OverlayTexture.NO_OVERLAY);poses.popPose();}
         for(var part:com.projectseele.world.FixedCannonCradleR52.pieces(g,spec,origin,aim))
         {
@@ -28,4 +31,11 @@ public final class YashimaCannonRendererR52 extends EntityRenderer<YashimaCannon
         super.render(gun,yaw,partial,poses,buffers,light);
     }
     @Override public ResourceLocation getTextureLocation(YashimaCannonEntityR52 gun){return TEXTURE;}
+    private static boolean scopedByLocalOperatorR55(YashimaCannonEntityR52 gun)
+    {
+        var minecraft=net.minecraft.client.Minecraft.getInstance();var camera=minecraft.getCameraEntity();
+        if(camera==null||!minecraft.options.getCameraType().isFirstPerson()||ShaderShadowPassR44.active())return false;
+        var eva=com.projectseele.world.EvaPilotResolver.controlTarget(camera);
+        return eva!=null&&eva.fixedCannonOperatingR52()&&eva.fixedCannonBodyR52()==gun&&com.projectseele.client.ClientForgeEvents.isCannonScopeActive(eva);
+    }
 }

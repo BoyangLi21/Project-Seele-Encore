@@ -190,6 +190,7 @@ public final class TvCampaignDirector
         else data.assign(variant,player.getUUID(),npc,npc&&rifle);
         if(chapter.id().equals("ramiel")&&formation==null)
             for(int unit:new int[]{0,1})if(!data.sorties.containsKey(unit))data.assign(unit,player.getUUID(),true,false);
+        for(var sortie:data.sorties.values())TvSortiesR32.stampCommanderR55(level,sortie);
         data.rayPreloadCursorR45=data.missingTicksR45=0;
         data.encounterSiteR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::id).orElse("");
         data.encounterLayoutR45=TvEncounterSitesR45.site(level,chapter.id()).map(TvEncounterSitesR45.Site::fingerprint).orElse("");

@@ -135,7 +135,6 @@ public final class EvaHangarBuilder
         if(NervLegacyGenerationGuardR52.retired(level))return inspect(level,origin);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "EvaHangarBuilder.buildMechanicalOnly");
-        PerformanceCounters.recordBuilderCall();
         for (int variant = 0; variant < 3; variant++)
         {
             buildChamber(level, origin, variant);
@@ -165,7 +164,6 @@ public final class EvaHangarBuilder
         {
             return;
         }
-        PerformanceCounters.recordBuilderCall();
         buildChamber(level, origin, variant);
 
         BlockPos bed = hangarBed(origin, variant);
@@ -249,7 +247,6 @@ public final class EvaHangarBuilder
         {
             return;
         }
-        PerformanceCounters.recordBuilderCall();
         buildObservationGallery(level, origin);
 
         int minX = IntegratedNervMapBuilder.LIFT_X[0] - HALF_WIDTH
@@ -303,7 +300,6 @@ public final class EvaHangarBuilder
         {
             return;
         }
-        PerformanceCounters.recordBuilderCall();
         buildTransportTunnel(level, origin, variant);
         BlockPos bed = hangarBed(origin, variant);
         BlockPos lower = IntegratedNervMapBuilder.lowerLiftBed(level, variant);
@@ -362,7 +358,6 @@ public final class EvaHangarBuilder
         {
             return;
         }
-        PerformanceCounters.recordBuilderCall();
         int floorY = origin.getY() + GALLERY_Y;
         int shaftOuter = IntegratedNervMapBuilder.SHAFT_OUTER_RADIUS;
         BlockPos westWell = IntegratedNervMapBuilder.lowerLiftBed(level, 0);
@@ -599,7 +594,6 @@ public final class EvaHangarBuilder
                                                 BlockPos origin)
     {
         if(NervLegacyGenerationGuardR52.retired(level))return;
-        PerformanceCounters.recordBuilderCall();
         clearGalleryConcourse(level, origin);
         for (int variant = 0; variant < 3; variant++)
         {
@@ -1195,7 +1189,6 @@ public final class EvaHangarBuilder
         if (level.getFluidState(position).getFluidType() == ModFluids.LCL_TYPE.get())
         {
             level.setBlock(position, Blocks.AIR.defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_ALL);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 
@@ -2739,7 +2732,6 @@ public final class EvaHangarBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

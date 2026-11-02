@@ -57,7 +57,6 @@ public final class GeoFrontLandscapeBuilder
     public static LandscapeAudit build(ServerLevel level, BlockPos origin)
     {
         if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
-        PerformanceCounters.recordBuilderCall();
         buildLclShore(level, origin);
         buildServiceRoad(level, origin);
         buildDocks(level, origin);
@@ -1180,7 +1179,6 @@ public final class GeoFrontLandscapeBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

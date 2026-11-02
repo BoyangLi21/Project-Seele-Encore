@@ -184,7 +184,7 @@ public final class NervRouteRuntimeStateR52 extends SavedData
     public static boolean allowed(Phase from,Phase to)
     {
         if(from==to||to==Phase.CANCELLED)return true;
-        return switch(from){case PREPARING->to==Phase.READY||to==Phase.DEPARTING;case READY->to==Phase.DEPARTING||to==Phase.PREPARING;case DEPARTING,RETURNING->to==Phase.FINISHING;case FINISHING->to==Phase.DEPLOYED||to==Phase.PARKED;case DEPLOYED->to==Phase.RETURNING;case PARKED->to==Phase.PREPARING;case CANCELLED->to==Phase.PREPARING||to==Phase.RETURNING;};
+        return switch(from){case PREPARING->to==Phase.READY||to==Phase.DEPARTING;case READY->to==Phase.DEPARTING||to==Phase.PREPARING;case DEPARTING,RETURNING->to==Phase.FINISHING;case FINISHING->to==Phase.DEPLOYED||to==Phase.PARKED;case DEPLOYED->to==Phase.RETURNING;case PARKED->to==Phase.PREPARING;case CANCELLED->to==Phase.PREPARING||to==Phase.RETURNING||to==Phase.PARKED;};
     }
     public static String legacyPhase(Job job)
     {

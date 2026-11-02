@@ -86,8 +86,9 @@ public final class NervPilotCombatR30
                 if(EvaShutdownR30.wreck(eva)||eva.getHealth()<=0||EvaBayRepairR33.active(eva))
                 {d.notice="原机体仍有损毁或检修，驾驶员保持待命，等待真实整备完成。";return;}
                 var tag=eva.getPersistentData();
+                // A parked unit has no live lease; the accepted sortie's
+                // commander replaces any stamp from an earlier session.
                 if(!NervStaffDialogue.authorized(owner)
-                        ||tag.hasUUID("R32SortieCommander")&&!owner.getUUID().equals(tag.getUUID("R32SortieCommander"))
                         ||AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),AutoSortieR32.missionToken(l)))
                 {d.notice="原机体出击许可已取消或指挥权已变化，未追加登机指令。";return;}
                 // dispatchRequested is an accepted-order receipt, not a permanent

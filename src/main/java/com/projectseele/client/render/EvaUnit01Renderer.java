@@ -161,7 +161,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 entity -> entity.isExperimentalUnit()
                         ? new ResourceLocation(ProjectSeele.MODID, "textures/entity/" + entity.experimentalAssetName() + ".png")
                         : textureResourceForVariant(entity.getUnitVariant()),
-                (entity,bone) -> (!entity.hasFixedCannonR52()||ShaderShadowPassR44.active()||!isLocalPilotView(Minecraft.getInstance(),entity))
+                (entity,bone) -> (!entity.fixedCannonOperatingR52()||ShaderShadowPassR44.active()||!isLocalPilotView(Minecraft.getInstance(),entity))
                         &&EvaHandSurfaceR45.applies(entity)&&(bone.getName().startsWith("hand_")||bone.getName().startsWith("r45_hand_"))));
         this.addRenderLayer(new EvaChargingPlugLayerR48(this));
         this.addRenderLayer(new LocalTriangleMeshLayer<>(this,
@@ -501,7 +501,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                                   float blue, float alpha)
     {
         EvaUnit01Entity entity = this.getAnimatable();
-        if(this.pilotView&&entity!=null&&entity.hasFixedCannonR52())return;
+        if(this.pilotView&&entity!=null&&entity.fixedCannonOperatingR52())return;
         boolean bodyMesh = entity != null && LocalTriangleMeshLayer.hasPart(
                 meshResourceForEntity(entity), bone.getName());
         boolean cannonMesh = entity != null
@@ -655,7 +655,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         String surface=bone.getName().startsWith("r21_join_")&&bone.getParent()!=null?bone.getParent().getName():bone.getName();
         // The fixed emplacement has its own world renderer. Its optical view
         // must not look through the prone EVA's arms or enclosing armour.
-        boolean visible=!entity.hasFixedCannonR52()&&!PILOT_CAMERA_MESH_COVER.contains(surface);
+        // Merely reserving the gun for the sortie keeps the ordinary first-person hands.
+        boolean visible=!entity.fixedCannonOperatingR52()&&!PILOT_CAMERA_MESH_COVER.contains(surface);
         if(visible&&(entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||entity.getWeapon()==EvaUnit01Entity.WEAPON_CANNON))
             visible=surface.startsWith("forearm_")||surface.startsWith("wrist_")||surface.startsWith("hand_")||surface.startsWith("r45_hand_");
         EvaShadowProbeR44.admission(entity,bone.getName(),visible);

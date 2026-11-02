@@ -970,7 +970,6 @@ public final class Tokyo3LandscapeBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

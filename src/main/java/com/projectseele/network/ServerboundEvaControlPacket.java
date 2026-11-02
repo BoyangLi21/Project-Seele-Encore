@@ -143,6 +143,19 @@ public class ServerboundEvaControlPacket
                     default -> { }
                 }
             }
+            else if (sender != null && this.action == ACTION_CANCEL_LAUNCH
+                    && sender.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity plug
+                    && plug.getAssignedVariant() >= 0
+                    && com.projectseele.world.NervRouteRuntimeR52.claimed(sender.serverLevel()))
+            {
+                // Before the plug locks, the seated pilot has no EVA to steer
+                // but may still abort the dock preparation.
+                var result = com.projectseele.world.NervRouteRuntimeR52.pilotAbortR55(
+                        sender.serverLevel(), plug.getAssignedVariant(), sender.getUUID());
+                sender.displayClientMessage(net.minecraft.network.chat.Component.literal(result.message())
+                        .withStyle(result.accepted() ? net.minecraft.ChatFormatting.GREEN
+                                : net.minecraft.ChatFormatting.RED), true);
+            }
             else if (Boolean.getBoolean("projectseele.visualCapture"))
             {
                 ProjectSeele.LOGGER.warn(

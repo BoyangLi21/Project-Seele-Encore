@@ -337,7 +337,6 @@ public final class FacilityV2ArchitectureDirector
             return 0;
         }
         level.setBlock(position, target, Block.UPDATE_CLIENTS);
-        PerformanceCounters.recordWorldBlockWrites(1);
         return 1;
     }
 

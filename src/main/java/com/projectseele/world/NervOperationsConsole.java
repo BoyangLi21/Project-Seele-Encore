@@ -1126,7 +1126,6 @@ public final class NervOperationsConsole
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, flags);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
     private static void removeLegacyRow(ServerLevel level, BlockPos origin)

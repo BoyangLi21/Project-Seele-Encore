@@ -30,7 +30,6 @@ import com.projectseele.world.FacilitySchemaV2;
 import com.projectseele.world.FacilityV2CommandInteriorDirector;
 import net.minecraft.world.level.block.Blocks;
 import com.projectseele.world.NervOperationsCentreBuilder;
-import com.projectseele.world.PerformanceCounters;
 import com.projectseele.world.S20CommandPresentationDirector;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.Screenshot;
@@ -254,7 +253,6 @@ public final class EvaCommandFeedClient
         try
         {
             full = captureFirstPersonFrame(minecraft, partialTick);
-            PerformanceCounters.recordFramebufferCapture();
             if(Boolean.getBoolean("projectseele.feedReviewR06"))REVIEW_CAPTURED.incrementAndGet();
         }
         catch (RuntimeException exception)
@@ -405,7 +403,6 @@ public final class EvaCommandFeedClient
             byte[] png = encoded.bytes();
             if(Boolean.getBoolean("projectseele.feedReviewR06")) { REVIEW_ENCODED.incrementAndGet();REVIEW_MAX_BYTES.accumulateAndGet(png.length,Math::max); }
             compressionHint=encoded.quality();
-            PerformanceCounters.recordPngEncode();
             if (png.length <= ServerboundEvaVideoFramePacket.MAX_FRAME_BYTES)
             {
                 int frameId = NEXT_CAPTURE_FRAME_ID.incrementAndGet();
@@ -660,14 +657,12 @@ public final class EvaCommandFeedClient
                 || !level.dimension().equals(GeoFrontCommands.GEOFRONT))
         {
             activeLevel = level;
-            PerformanceCounters.leaveClientScenario();
             return;
         }
         boolean r52Headquarters=FacilityFrameClientR52.claimed(level);
         if(r52Headquarters&&!FacilityFrameClientR52.headquartersBound(level))return;
         if(r52Headquarters&&!FacilityFrameClientR52.insidePyramid(level,event.getCamera().getPosition()))
-        {PerformanceCounters.leaveClientScenario();return;}
-        PerformanceCounters.recordClientFrame();
+        {return;}
         if (activeLevel != level)
         {
             activeLevel = level;

@@ -306,7 +306,6 @@ public final class TrainingPilotDirector
     public static List<TrainingPilotEntity> pilots(ServerLevel level)
     {
         if(NervRouteRuntimeR52.claimed(level)){var result=new ArrayList<TrainingPilotEntity>();for(int v=0;v<3;v++){var p=NervOriginalActorsR52.pilot(level,v);if(p!=null)result.add(p);}return List.copyOf(result);}
-        PerformanceCounters.recordGlobalEntityScan();
         List<TrainingPilotEntity> result = new ArrayList<>();
         for (Entity entity : level.getAllEntities())
         {
@@ -1392,8 +1391,6 @@ public final class TrainingPilotDirector
         right = right.lengthSqr() < 1.0E-6D
                 ? new Vec3(1.0D, 0.0D, 0.0D) : right.normalize();
         Vec3 up = right.cross(forward).normalize();
-        PerformanceCounters.recordRaycasts(
-                (long) SAMPLE_WIDTH * SAMPLE_HEIGHT);
         for (int row = 0; row < SAMPLE_HEIGHT; row++)
         {
             double vertical = (1.0D - (row + 0.5D)
@@ -1576,7 +1573,6 @@ public final class TrainingPilotDirector
             writeChunk(output, "IDAT", compressed.toByteArray());
             writeChunk(output, "IEND", new byte[0]);
             output.flush();
-            PerformanceCounters.recordPngEncode();
             return png.toByteArray();
         }
         catch (IOException exception)

@@ -58,7 +58,6 @@ public final class TerminalDogmaBuilder
     public static TerminalDogmaAudit build(ServerLevel level, BlockPos origin)
     {
         if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
-        PerformanceCounters.recordBuilderCall();
         BlockPos facilityOrigin = origin.offset(0, FACILITY_Y_OFFSET, 0);
         buildChamber(level, facilityOrigin);
         buildLclSealLake(level, facilityOrigin);
@@ -1012,7 +1011,6 @@ public final class TerminalDogmaBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

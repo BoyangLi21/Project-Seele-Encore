@@ -366,7 +366,6 @@ public final class Tokyo3RecoveryConsole
         if (!level.getBlockState(position).isAir())
         {
             level.setBlock(position, Blocks.AIR.defaultBlockState(), UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 
@@ -376,7 +375,6 @@ public final class Tokyo3RecoveryConsole
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

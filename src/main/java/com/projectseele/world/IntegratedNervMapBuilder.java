@@ -148,7 +148,6 @@ public final class IntegratedNervMapBuilder
         if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "IntegratedNervMapBuilder.build");
-        PerformanceCounters.recordBuilderCall();
         requireBuildHeight(level);
         boolean stagedEvaWorld = LocalMapAssetLoader.stagedEvaWorld(level);
         ProjectSeele.LOGGER.info(
@@ -276,7 +275,6 @@ public final class IntegratedNervMapBuilder
     {
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "IntegratedNervMapBuilder.prepareRuntime");
-        PerformanceCounters.recordRepairCall();
         long startedAt = System.nanoTime();
         boolean installed = isInstalled(level);
         if (!installed)
@@ -1507,7 +1505,6 @@ public final class IntegratedNervMapBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

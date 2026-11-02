@@ -207,6 +207,13 @@ public final class EvaPoseGraph
             var animated=EvaAnimatorGecko.apply(entity,model,partialTick);
             return finish(entity,model,partialTick,modelToWorld,animated,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         }
+        if(EvaFixedCannonBodyR55.applies(entity))
+        {
+            EvaMotionEngineV2.resetEntityR30(entity);
+            var body=EvaFixedCannonBodyR55.apply(entity,model,partialTick);
+            var hands=EvaHandPoseR28.apply(entity,model,partialTick);
+            return finish(entity,model,partialTick,modelToWorld,body,EvaMotionEngineV2.BoneWrites.empty(),hands);
+        }
         if(com.projectseele.entity.EvaCombatSupportR33.ready(entity)
                 &&com.projectseele.entity.EvaGameplayMotionR32.sharedBody(entity,partialTick)
                 &&(com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity)
@@ -334,7 +341,8 @@ public final class EvaPoseGraph
                 &&(com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity)
                     ||com.projectseele.entity.EvaGameplayMotionR32.sharedJumpActive(entity,partialTick)))
             transitions=EvaPoseTransition.applySharedExitR45(entity,model,partialTick);
-        EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(motionWrites.owner())?EvaAnimatorGecko.OWNER:"LEGACY");
+        String continuityOwner=motionWrites.owner();
+        EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY");
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         JointAuditR38.capture(entity,model,partialTick);

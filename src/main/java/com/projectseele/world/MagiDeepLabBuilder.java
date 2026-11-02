@@ -78,7 +78,6 @@ public final class MagiDeepLabBuilder
         if (NervLegacyGenerationGuardR52.retired(level)) return inspect(level, origin);
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "MagiDeepLabBuilder.build");
-        PerformanceCounters.recordBuilderCall();
         boolean[] online = new boolean[CORE_NAMES.length];
         for (int index = 0; index < online.length; index++)
         {
@@ -115,7 +114,6 @@ public final class MagiDeepLabBuilder
         {
             return inspect(level, origin);
         }
-        PerformanceCounters.recordRepairCall();
         for (int index = 0; index < CORE_NAMES.length; index++)
         {
             BlockPos control = controlPosition(origin, index);
@@ -768,7 +766,6 @@ public final class MagiDeepLabBuilder
         if (NervLegacyGenerationGuardR52.retired(level)) return;
         if (level.setBlock(position, state, UPDATE_CLIENTS))
         {
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

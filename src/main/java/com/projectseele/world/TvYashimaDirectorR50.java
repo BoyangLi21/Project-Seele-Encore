@@ -250,8 +250,13 @@ public final class TvYashimaDirectorR50
         if(cover==null||!TvSortiesR32.readyAssigned(level,data.sorties.get(0))||!TvMissionEquipmentR45.operational(cover)
                 ||!equipment.shieldEquipped(cover))return "等待零号机携盾就位。";
         var side=TvYashimaArrivalR50.shieldSide(level);
-        boolean standby=side!=null&&cover.position().subtract(side).horizontalDistance()<=1.5;
-        if(!standby)return "等待零号机进入左侧防护位置。";
+        // The NPC guard walks onto this exact point; a human pilot gets the
+        // coordinates and an EVA-scale tolerance instead of an unmarked 1.5 blocks.
+        var coverSortie=data.sorties.get(0);
+        double tolerance=coverSortie!=null&&!coverSortie.npc?8:1.5;
+        boolean standby=side!=null&&cover.position().subtract(side).horizontalDistance()<=tolerance;
+        if(!standby)return side==null?"等待零号机进入左侧防护位置。":"等待零号机进入左侧防护位置（"+net.minecraft.util.Mth.floor(side.x)
+                +"，"+net.minecraft.util.Mth.floor(side.y+.01)+"，"+net.minecraft.util.Mth.floor(side.z)+"）。";
         return "";
     }
     /** Gate only this accepted mission's fire intent, never the actors' damage/collision. */

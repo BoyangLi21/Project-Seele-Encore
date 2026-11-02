@@ -68,7 +68,6 @@ public final class GeoFrontBuilder
         if (NervLegacyGenerationGuardR52.retired(level)) return;
         FacilityWorldPolicy.requireLegacyGenerationAllowed(
                 level.getServer(), "GeoFrontBuilder.build");
-        PerformanceCounters.recordBuilderCall();
         if (!SeeleConfig.rescueMode()
                 && SeeleConfig.TRANSPARENT_GEOFRONT_SHELL.get())
         {
@@ -1841,7 +1840,6 @@ public final class GeoFrontBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

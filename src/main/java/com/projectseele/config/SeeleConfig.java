@@ -97,6 +97,7 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.DoubleValue PLUG_APPROACH_CLEARANCE;
     public static final ForgeConfigSpec.DoubleValue PLUG_APPROACH_HEIGHT;
     public static final ForgeConfigSpec.BooleanValue PLUG_MECHANICAL_ARM;
+    public static final ForgeConfigSpec.BooleanValue ALL_PLAYERS_AUTHORIZED;
 
     // ----- client -----
     public static final ForgeConfigSpec.BooleanValue ALARM_VIGNETTE;
@@ -359,6 +360,13 @@ public final class SeeleConfig
         PLUG_MECHANICAL_ARM = common
                 .comment("Draw the physical crane arm and cables that carry the plug.")
                 .define("mechanicalArm", true);
+        common.pop();
+
+        common.push("multiplayer");
+        ALL_PLAYERS_AUTHORIZED = common
+                .comment("Treat every non-spectator player as NERV staff (doors, formation, equipment, launch).",
+                        "Off: only operators or holders of a NERV card are authorized.")
+                .define("allPlayersAuthorized", true);
         common.pop();
 
         COMMON_SPEC = common.build();

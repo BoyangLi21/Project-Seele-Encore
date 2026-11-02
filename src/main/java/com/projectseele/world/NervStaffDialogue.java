@@ -69,6 +69,7 @@ public final class NervStaffDialogue
     }
     public static boolean authorized(ServerPlayer player)
     {
+        if(!player.isSpectator()&&com.projectseele.config.SeeleConfig.ALL_PLAYERS_AUTHORIZED.get())return true;
         return player.createCommandSourceStack().hasPermission(2)||java.util.stream.Stream.concat(player.getInventory().items.stream(),player.getInventory().offhand.stream()).anyMatch(s->s.is(ModItems.NERV_EMPLOYEE_CARD.get())||s.is(ModItems.TERMINAL_DOGMA_ACCESS_CARD.get()));
     }
     public static int talk(ServerPlayer player,String target,String text)

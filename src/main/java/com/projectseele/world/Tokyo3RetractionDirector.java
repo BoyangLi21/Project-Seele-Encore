@@ -698,7 +698,6 @@ public final class Tokyo3RetractionDirector
                 level.setBlock(core,
                         state.setValue(RetractableBuildingCoreBlock.ARMED, armed),
                         net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
-                PerformanceCounters.recordWorldBlockWrites(1);
             }
         }
     }

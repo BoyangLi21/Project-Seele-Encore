@@ -1427,7 +1427,6 @@ public final class CityCreateDistrictR45
                 if (entity == null) throw new IllegalStateException("Cannot restore full cargo BE at " + pos);
                 level.setBlockEntity(entity); entity.setChanged(); level.sendBlockUpdated(pos, state, state, Block.UPDATE_CLIENTS);
             }
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
         CompoundTag save() { CompoundTag tag = new CompoundTag(); tag.put("State", NbtUtils.writeBlockState(state)); if (nbt != null) tag.put("Data", nbt.copy()); return tag; }
         CompoundTag save(Map<BlockState, CompoundTag> states)

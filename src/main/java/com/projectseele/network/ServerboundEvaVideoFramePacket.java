@@ -12,7 +12,6 @@ import com.projectseele.visual.GeoFrontCommands;
 import com.projectseele.world.IntegratedNervMapBuilder;
 import com.projectseele.world.EvaPilotResolver;
 import com.projectseele.world.FacilityV2SavedData;
-import com.projectseele.world.PerformanceCounters;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.FriendlyByteBuf;
 import net.minecraft.server.MinecraftServer;
@@ -195,7 +194,6 @@ public final class ServerboundEvaVideoFramePacket
             {
                 ClientboundEvaVideoFramePacket.send(viewer, this.variant,
                         frame);
-                PerformanceCounters.recordVideoFrame(frame.length);
                 viewers++;
             }
         }
@@ -289,7 +287,6 @@ public final class ServerboundEvaVideoFramePacket
             if (isCommandViewer(level, viewer.position()))
             {
                 ClientboundEvaVideoFramePacket.send(viewer, variant, png);
-                PerformanceCounters.recordVideoFrame(png.length);
             }
         }
     }

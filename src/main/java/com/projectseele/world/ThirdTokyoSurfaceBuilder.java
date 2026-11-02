@@ -1916,7 +1916,6 @@ public final class ThirdTokyoSurfaceBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, flags);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

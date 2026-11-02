@@ -1505,7 +1505,6 @@ public final class LocalMapAssetLoader
     {
         if (level.setBlock(position, state, UPDATE_CLIENTS))
         {
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 
@@ -1528,7 +1527,6 @@ public final class LocalMapAssetLoader
         // an item on every layer, producing tens of thousands of drops.
         if (level.setBlock(position, state, Block.UPDATE_CLIENTS | Block.UPDATE_KNOWN_SHAPE | Block.UPDATE_SUPPRESS_DROPS))
         {
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
         return 1;
     }

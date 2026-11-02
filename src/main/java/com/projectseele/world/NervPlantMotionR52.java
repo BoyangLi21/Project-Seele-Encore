@@ -52,9 +52,14 @@ public final class NervPlantMotionR52
         for(int i=0;i<values.length;i+=9){boolean lowerBar=false;double top=Math.max(values[i+1],Math.max(values[i+4],values[i+7]));if(top<=-.61999)for(var box:boxes){boolean inside=true;for(int c=0;c<9;c+=3)for(int axis=0;axis<3;axis++){double p=values[i+c+axis];inside&=p>=box[axis]-1e-5&&p<=box[axis+3]+1e-5;}lowerBar|=inside;}if(!lowerBar){System.arraycopy(values,i,points,count,9);count+=9;}}
         if(count/9!=4912)throw new IllegalStateException("Complete actual columns including all eight bottom triangles required");fixedColumnsR52=new NervRigidMeshSweepR52(Arrays.copyOf(points,count));return fixedColumnsR52;
     }
+    private static String localCageShaR55;
     public static synchronized void install(String expected)throws IOException
     {
-        if(expected.equals(installedSha)&&components!=null)return;byte[] bytes=EvaOriginalMeshGeometryR52.classpathBytes("mesh/tv_shoulder_shells_r44.json");String sha;try{sha=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception e){throw new IllegalStateException(e);}if(!sha.equals(expected))throw new IllegalStateException("Actual cage selection changed");
+        if(expected.equals(installedSha)&&components!=null)return;
+        // A server declaring different cage bytes would otherwise re-read and
+        // hash this 21 MB asset on every client collision query.
+        if(localCageShaR55!=null&&!localCageShaR55.equals(expected))throw new IllegalStateException("Actual cage selection changed");
+        byte[] bytes=EvaOriginalMeshGeometryR52.classpathBytes("mesh/tv_shoulder_shells_r44.json");String sha;try{sha=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception e){throw new IllegalStateException(e);}localCageShaR55=sha;if(!sha.equals(expected))throw new IllegalStateException("Actual cage selection changed");
         var root=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(!root.get("frame").getAsString().equals("fixed_gantry_local_metres_world_axes"))throw new IllegalStateException("Actual cage basis changed");var rows=new ArrayList<Component>();
         for(var value:root.getAsJsonArray("components")){var c=value.getAsJsonObject();String part=c.get("part").getAsString(),motion=c.get("motion").getAsString();if(part.startsWith("thin_side_rails"))continue;var boxes=new ArrayList<AABB>();for(var b:root.getAsJsonObject("collision_parts").getAsJsonArray(part)){var pair=b.getAsJsonArray();var lo=point(pair.get(0).getAsJsonArray());var hi=point(pair.get(1).getAsJsonArray());if(!(lo.x<hi.x&&lo.y<hi.y&&lo.z<hi.z))throw new IllegalStateException("Actual positive machinery volume required");boxes.add(new AABB(lo,hi));}
         Vec3 normal=Vec3.ZERO,translation=Vec3.ZERO;double outboard=0;float a=0,b=1;if(motion.equals("translation_only_with_exact_facet_pad")){normal=point(c.getAsJsonArray("normal"));outboard=c.get("outboard_m").getAsDouble();if(Math.abs(normal.length()-1)>.0001||Math.abs(Math.abs(outboard)-5.35)>.0001||c.get("normal_lift_m").getAsDouble()!=2.1)throw new IllegalStateException("Original facet release mismatch");}else if(motion.equals("telescoping_translation")){translation=point(c.getAsJsonArray("translation_open_local"));a=c.getAsJsonArray("opening_interval").get(0).getAsFloat();b=c.getAsJsonArray("opening_interval").get(1).getAsFloat();if(a<0||b>1||a>=b)throw new IllegalStateException("Actual release interval required");}else if(!motion.equals("fixed"))throw new IllegalStateException("Unknown original mechanism");rows.add(new Component(part,c.has("variant")?c.get("variant").getAsInt():-1,motion,normal,outboard,translation,a,b,List.copyOf(boxes)));}
@@ -78,14 +83,18 @@ public final class NervPlantMotionR52
     private static JsonObject cageReceiptR52;
     private static JsonObject cageReceiptR52()
     {if(cageReceiptR52==null)try{cageReceiptR52=JsonParser.parseString(new String(EvaOriginalMeshGeometryR52.classpathBytes("eva/cage_collision_r52_sources.json"),StandardCharsets.UTF_8)).getAsJsonObject();}catch(IOException missing){throw new IllegalStateException("Actual cage source receipt absent",missing);}return cageReceiptR52;}
+    private static double cageRadiusR55=Double.NaN;
     static double cageCollisionRadiusR57()
-    {double radius=cageReceiptR52().get("broadphase_radius_m").getAsDouble();if(!Double.isFinite(radius)||radius<=0)throw new IllegalStateException("Source-derived inventory radius required");return radius;}
+    {
+        double cached=cageRadiusR55;if(!Double.isNaN(cached))return cached;
+        double radius=cageReceiptR52().get("broadphase_radius_m").getAsDouble();if(!Double.isFinite(radius)||radius<=0)throw new IllegalStateException("Source-derived inventory radius required");return cageRadiusR55=radius;
+    }
     /** Client prediction uses the same declared source and synchronized machine
      * frame; it never queries the retired absolute R44 bay positions. */
     public static List<net.minecraft.world.phys.shapes.VoxelShape> declaredClientCollisions(net.minecraft.world.level.Level l,Entity actor,AABB query,List<net.minecraft.world.phys.shapes.VoxelShape> original)
     {
         if(!l.isClientSide||actor instanceof EvaUnit01Entity||actor instanceof NervCarrierPlatformEntity)return original;
-        var receipt=cageReceiptR52();double radius=receipt.get("broadphase_radius_m").getAsDouble();if(!Double.isFinite(radius)||radius<=0)throw new IllegalStateException("Source-derived inventory radius required");var machines=l.getEntitiesOfClass(NervCarrierPlatformEntity.class,query.inflate(radius),e->e.isRestraintGantry()&&e.hasDeclaredMachineFrameR52()&&!e.declaredCollisionSourceR52().isEmpty());
+        double radius=cageCollisionRadiusR57();var machines=l.getEntitiesOfClass(NervCarrierPlatformEntity.class,query.inflate(radius),e->e.isRestraintGantry()&&e.hasDeclaredMachineFrameR52()&&!e.declaredCollisionSourceR52().isEmpty());
         if(machines.isEmpty())return original;var result=new ArrayList<>(original);
         for(var machine:machines){try{install(machine.declaredCollisionSourceR52());}catch(IOException|IllegalStateException missing){return original;}var frame=RigidTransform.of(machine.position(),machine.declaredMachineRotationR52());result.addAll(actualCollisionMembers(machine.getUnitVariant(),frame,machine.getRestraintProgress(),machine.lowerFrameProgressR52(1),query,CarrierMountProfileR53.read(machine,1)));try{result.addAll(NervServiceFootDriveR52.collisions(machine,1,query));}catch(IOException missing){throw new IllegalStateException("Declared service drive source unavailable",missing);}}return result;
     }

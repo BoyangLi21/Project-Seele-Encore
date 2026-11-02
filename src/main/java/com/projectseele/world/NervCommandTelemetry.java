@@ -333,7 +333,6 @@ public final class NervCommandTelemetry
     {
         List<Entity> angels = new ArrayList<>();
         RamielEntity ramiel = null;
-        PerformanceCounters.recordGlobalEntityScan();
         for (Entity entity : level.getAllEntities())
         {
             if (entity.isAlive() && entity instanceof Angel)
@@ -552,7 +551,6 @@ public final class NervCommandTelemetry
     {
         Entity nearest = null;
         double nearestDistance = Double.MAX_VALUE;
-        PerformanceCounters.recordGlobalEntityScan();
         for (Entity entity : level.getAllEntities())
         {
             if (!(entity instanceof Angel) || !entity.isAlive())

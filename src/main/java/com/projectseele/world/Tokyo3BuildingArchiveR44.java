@@ -471,7 +471,6 @@ public final class Tokyo3BuildingArchiveR44 extends SavedData
                 BlockEntity entity=((net.minecraft.world.level.block.EntityBlock)state.getBlock()).newBlockEntity(pos,state);
                 if (entity!=null) level.setBlockEntity(entity);
             }
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
         CompoundTag save(Map<BlockState, CompoundTag> stateTags)
         {

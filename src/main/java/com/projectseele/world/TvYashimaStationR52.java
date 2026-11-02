@@ -136,7 +136,7 @@ public final class TvYashimaStationR52
                 &&AirCradleClearanceR31.touchdownContact(eva)!=null;
     }
     private static boolean authority(ServerPlayer commander,TvCampaignSavedData data)
-    {return data.owner!=null&&data.owner.equals(commander.getUUID())&&data.active.equals("ramiel")&&!Set.of("cancel","failure","combat_victory","episode_archived").contains(data.phase)&&!data.targetDeathConfirmedR45&&NervStaffDialogue.authorized(commander);}
+    {return (data.owner!=null&&data.owner.equals(commander.getUUID())||data.sorties.values().stream().anyMatch(s->!s.npc&&commander.getUUID().equals(s.commander)))&&data.active.equals("ramiel")&&!Set.of("cancel","failure","combat_victory","episode_archived").contains(data.phase)&&!data.targetDeathConfirmedR45&&NervStaffDialogue.authorized(commander);}
     public static Vec3 operatorPositionR52(ServerLevel level){return plan(level).map(Plan::prone).orElse(null);}
     public static boolean atPlatformR52(EvaUnit01Entity eva)
     {return eva.level() instanceof ServerLevel level&&plan(level).filter(p->at(eva,p)).isPresent();}

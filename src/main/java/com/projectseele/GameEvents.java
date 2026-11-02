@@ -17,7 +17,6 @@ import com.projectseele.world.NervOperationsConsole;
 import com.projectseele.world.CommandRoomSlidingDoorDirector;
 import com.projectseele.world.LiftSlidingDoorDirector;
 import com.projectseele.world.NervRuntimeMaintenance;
-import com.projectseele.world.PerformanceCounters;
 import com.projectseele.world.S20CommandPresentationDirector;
 import com.projectseele.world.S20CommandRoomRepairs;
 import com.projectseele.world.S20CommandTransitDirector;
@@ -134,11 +133,9 @@ public class GameEvents
     {
         if (event.phase == TickEvent.Phase.START)
         {
-            PerformanceCounters.beginServerTick(event.getServer());
         }
         else
         {
-            PerformanceCounters.markServerEndPhase(event.getServer());
         }
     }
 
@@ -149,10 +146,8 @@ public class GameEvents
         {
             return;
         }
-        PerformanceCounters.beginProjectTickWork(event.getServer());
         if (EvaMotionLabDirector.tick(event.getServer()))
         {
-            PerformanceCounters.endServerTick(event.getServer());
             return;
         }
         maintainFacilityEnvironment(event.getServer());
@@ -282,7 +277,6 @@ public class GameEvents
             ServerboundEvaVideoFramePacket.syncCaptureDemand(
                     event.getServer());
         }
-        PerformanceCounters.endServerTick(event.getServer());
     }
 
     @SubscribeEvent
@@ -706,6 +700,5 @@ public class GameEvents
         GeoFrontFabricDirector.resetRuntime();
         NervFacilityTopologyBuilder.resetRuntime();
         NervRuntimeMaintenance.reset();
-        PerformanceCounters.reset();
     }
 }

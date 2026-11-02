@@ -25,7 +25,6 @@ import com.projectseele.world.EntryPlugDirector;
 import com.projectseele.world.EntryPlugKinematics;
 import com.projectseele.world.FacilityV2EvaRuntime;
 import com.projectseele.world.NervCarrierVisuals;
-import com.projectseele.world.PerformanceCounters;
 import com.projectseele.world.RigidTransform;
 import com.projectseele.world.UmbilicalPylonBlockEntity;
 import net.minecraft.core.BlockPos;
@@ -2206,7 +2205,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return;
         }
         EvaLogisticsDirector.ActionResult result =
-                EvaLogisticsDirector.requestCancel(serverLevel, this.getUnitVariant());
+                com.projectseele.world.NervRouteRuntimeR52.claimed(serverLevel)
+                        ? com.projectseele.world.NervRouteRuntimeR52.pilotAbortR55(serverLevel,
+                                this.getUnitVariant(), pilot.getUUID())
+                        : EvaLogisticsDirector.requestCancel(serverLevel, this.getUnitVariant());
         pilot.displayClientMessage(Component.literal(result.message())
                 .withStyle(result.accepted()
                         ? ChatFormatting.GREEN : ChatFormatting.RED), true);
@@ -6443,14 +6445,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     if (!serverLevel.getBlockState(block).equals(desired))
                     {
                         serverLevel.setBlock(block, desired, 2);
-                        PerformanceCounters.recordWorldBlockWrites(1);
                     }
                 }
                 else if (serverLevel.getBlockState(block).is(Blocks.IRON_BLOCK)
                         || serverLevel.getBlockState(block).is(Blocks.LIGHT_GRAY_CONCRETE))
                 {
                     serverLevel.setBlock(block, Blocks.AIR.defaultBlockState(), 2);
-                    PerformanceCounters.recordWorldBlockWrites(1);
                 }
             }
         }
@@ -6497,14 +6497,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     if (!level.getBlockState(deck).equals(desired))
                     {
                         level.setBlock(deck, desired, 2);
-                        PerformanceCounters.recordWorldBlockWrites(1);
                     }
                 }
                 else if (level.getBlockState(deck).is(Blocks.IRON_BLOCK)
                         || level.getBlockState(deck).is(Blocks.LIGHT_GRAY_CONCRETE))
                 {
                     level.setBlock(deck, Blocks.AIR.defaultBlockState(), 2);
-                    PerformanceCounters.recordWorldBlockWrites(1);
                 }
             }
         }
@@ -8042,6 +8040,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 &&EvaGameplayMotionR32.sharedWeapon(this))
             return EvaBodyPose.opticalEye(this,partial).subtract(0,passenger.getEyeHeight(),0);
         if((this.getWeapon()==WEAPON_FISTS||this.getWeapon()==WEAPON_KNIFE)&&this.isPoweredOn()&&this.getVisualPose()==VISUAL_NORMAL&&!this.isVisuallyAirborneForRender()&&!this.hasLiveActionForRender(partial)&&EvaBodyPose.hasTerrainStances())
+            return EvaBodyPose.opticalEye(this,partial).subtract(0,passenger.getEyeHeight(),0);
+        // At the fixed emplacement the drawn head, the camera and the shot's
+        // optical origin are the same solved point.
+        if(this.fixedCannonOperatingR52()&&this.getWeapon()==WEAPON_CANNON&&this.isPilotProne()&&this.isPoweredOn()&&!this.isBerserk())
             return EvaBodyPose.opticalEye(this,partial).subtract(0,passenger.getEyeHeight(),0);
         // The pilot rides at the animated rig's head socket. First person sees
         // the same world entity and the same evaluated bones as third person.

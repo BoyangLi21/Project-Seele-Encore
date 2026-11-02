@@ -383,7 +383,14 @@ public final class ClientForgeEvents
         // Send sprint start/stop before C on the same channel, including Ctrl+C's first frame.
         while(contextualCClicksR45-->0)
         {
-            if(eva==null)continue;
+            if(eva==null)
+            {
+                // Seated in a docked plug that is not locked to its EVA yet.
+                if(player.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity)
+                    SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(
+                            ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,-1));
+                continue;
+            }
             boolean originalCancel=eva.isExperimentalUnit()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive();
             if(!originalCancel&&minecraft.screen!=null)continue;
             int directions=originalCancel?-1:(minecraft.options.keyUp.isDown()?1:0)

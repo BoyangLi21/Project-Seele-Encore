@@ -2342,13 +2342,11 @@ public final class EvaLogisticsDirector
                     level.setBlock(position, rim
                             ? net.minecraft.world.level.block.Blocks.IRON_BLOCK.defaultBlockState()
                             : net.minecraft.world.level.block.Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState(), 2);
-                    PerformanceCounters.recordWorldBlockWrites(1);
                 }
                 else
                 {
                     level.setBlock(position,
                             net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
-                    PerformanceCounters.recordWorldBlockWrites(1);
                 }
             }
         }
@@ -2356,7 +2354,6 @@ public final class EvaLogisticsDirector
         {
             level.setBlock(new BlockPos(shaft.getX(), y, shaft.getZ()),
                     net.minecraft.world.level.block.Blocks.LODESTONE.defaultBlockState(), 2);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 
@@ -2536,8 +2533,6 @@ public final class EvaLogisticsDirector
                 "NERV EVA-0{} logistics route tickets {}: changed={} range=[{},{}]..[{},{}]",
                 variant, forced ? "ACQUIRED" : "RELEASED", changed,
                 minChunkX, minChunkZ, maxChunkX, maxChunkZ);
-        PerformanceCounters.recordForcedChunkDelta(
-                forced ? changed : -changed);
     }
 
     private static void loadFleetStations(ServerLevel level)
@@ -2626,7 +2621,6 @@ public final class EvaLogisticsDirector
     /** Temporary tickets cover station terrain and the separately saved pilot. */
     private static void loadVariantStations(ServerLevel level, int variant)
     {
-        PerformanceCounters.recordSyncChunkLoads(5);
         for (BlockPos station : List.of(hangarBed(level, variant),
                 lowerLiftBed(level, variant), surfaceLiftBed(level, variant),
                 BlockPos.containing(EntryPlugDirector.plugRestPosition(level, variant)),
@@ -2640,7 +2634,6 @@ public final class EvaLogisticsDirector
 
     private static List<EvaUnit01Entity> loadedFleet(ServerLevel level)
     {
-        PerformanceCounters.recordGlobalEntityScan();
         List<EvaUnit01Entity> units = new ArrayList<>();
         for (Entity entity : level.getAllEntities())
         {

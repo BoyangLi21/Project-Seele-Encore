@@ -53,7 +53,6 @@ public final class NervOperationsCentreBuilder
     public static void build(ServerLevel level, BlockPos origin)
     {
         if (NervLegacyGenerationGuardR52.retired(level)) return;
-        PerformanceCounters.recordBuilderCall();
         boolean localCommand =
                 LocalMapAssetLoader.placeCommandModule(level, origin);
         buildLowerConcourse(level, origin);
@@ -2138,7 +2137,6 @@ public final class NervOperationsCentreBuilder
         if (!level.getBlockState(position).equals(state))
         {
             level.setBlock(position, state, UPDATE_CLIENTS);
-            PerformanceCounters.recordWorldBlockWrites(1);
         }
     }
 

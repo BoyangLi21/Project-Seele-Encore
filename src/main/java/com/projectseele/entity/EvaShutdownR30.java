@@ -125,7 +125,9 @@ public final class EvaShutdownR30
         {
             if(!e.isExperimentalUnit()&&piloted&&e.isEntryPlugInserted()&&e.isPowerDepleted()&&e.getActivationTicks()==0&&!e.isNervLogisticsLocked())begin(e,POWER_LOCK);
             else if(memory.pilot&&!piloted&&!e.isNervLogisticsLocked()&&!e.isLaunchSequenceActive()&&!e.hasActiveCarrierMotion())begin(e,EMPTY);
-            else if(e.isPoweredOn())memory.last=encode(EvaBodyPose.sample(e,1));
+            // Only a fallback until the pilot client confirms its frozen pose;
+            // a full body sample plus NBT encode every tick per EVA is not needed.
+            else if(e.isPoweredOn()&&(memory.last.isEmpty()||e.tickCount%5==0))memory.last=encode(EvaBodyPose.sample(e,1));
         }
         if(piloted)memory.lastPilot=e.getPilotEntity().getUUID();
         memory.pilot=piloted;
