@@ -16,6 +16,7 @@ DATA=Path('dimensions/projectseele/geofront/data')
 
 def run(a):
     e=Editor(a.candidate);check=json.loads((a.candidate/'functional-check.json').read_text('utf8'));errors=list(check['errors'])
+    generation={tuple(row[:2]):row[2]for row in json.loads((a.candidate/'manifest.json').read_text('utf8')).get('preserved_generation_statuses',[])}
     migrations={}
     path=a.candidate/'block-entities.dat'
     if path.exists():
@@ -61,7 +62,8 @@ def run(a):
                 if key not in lookup:lookup[key]=len(palette);palette.append(s)
                 codes[name]=lookup[key];return lookup[key]
             l,h=ra[i:i+2];columns=defaultdict(list)
-            if exists:
+            sparse=exists or generation.get(q,'full')!='full'
+            if sparse:
                 for offset,value in zip(at[l:h],vs[l:h]):columns[int(offset)%256].append((int(offset)//256-128,code(names[value])))
             else:
                 # Complete saved surface, not a sparse change set applied to
@@ -89,11 +91,12 @@ def run(a):
                     if int(cell['Pos'])not in {packed(p)for p in migrations}:retained.append(cell)
                 data['BlockEntities']=nbtlib.List[nbtlib.Compound](retained)
                 wanted={p:t for p,t in tags[q].items()if p in migrations}
+            elif sparse:wanted={p:t for p,t in tags[q].items()if p in migrations}
             else:wanted=tags[q]
             for pos,tag in wanted.items():
                 if pos[1]<-128:continue
                 # Only attach inventories covered by the new complete surface.
-                if not exists and pos[1]<bottoms[pos[2]%16*16+pos[0]%16]:continue
+                if not sparse and pos[1]<bottoms[pos[2]%16*16+pos[0]%16]:continue
                 state=e.state(*pos)
                 data['BlockEntities'].append(nbtlib.Compound({'Pos':nbtlib.Long(packed(pos)),'StateId':nbtlib.Int(code(state)),'NBT':copy.deepcopy(tag)}))
             prior=a.candidate/'before'/rel;out=a.candidate/'after'/rel;out.parent.mkdir(parents=True,exist_ok=True)

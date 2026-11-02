@@ -9,11 +9,12 @@ from plan_ashi_landscape_r54 import SOIL,NATURAL
 from install_r53_carrier_trays import stopped_world
 
 def region(job):
-    world,out,rx,rz=job;world=Path(world);out=Path(out)
+    world,out,rx,rz=job[:4];world=Path(world);out=Path(out)
+    wanted=('noise','surface','carvers')if len(job)>4 and job[4]=='early'else('full','features','initialize_light','light','spawn')
     coords=[];blocks=[];palette=['minecraft:air'];lookup={palette[0]:0};statuses=[];devices=[];counts=Counter()
     for cx,cz,chunk in iter_chunks(dimension_dir(world,'projectseele:geofront'),(rx*32,rx*32+31,rz*32,rz*32+31)):
         status=str(chunk.get('Status','')).removeprefix('minecraft:');counts[status]+=1
-        if status not in ('full','features','initialize_light','light','spawn'):continue
+        if status not in wanted:continue
         v=np.zeros((448,16,16),np.uint16)
         for sec in chunk.get('sections',[]):
             sy=int(sec.get('Y',-1000))
@@ -51,7 +52,8 @@ def main(a):
     for q in ['current/source','current/delta','proto/source','proto/delta','measure']:(a.out/q).mkdir(parents=True,exist_ok=True)
     jobs=[]
     for f in (dimension_dir(a.world,'projectseele:geofront')/'region').glob('r.*.*.mca'):
-        _,rx,rz=f.stem.split('.');jobs.append((str(a.world),str(a.out),int(rx),int(rz)))
+        _,rx,rz=f.stem.split('.');job=(str(a.world),str(a.out),int(rx),int(rz))
+        jobs.append((*job,'early')if getattr(a,'early_stages_only',False)else job)
     # Capture witness regions first, then all remaining saved regions.
     jobs.sort(key=lambda j:(0 if (j[2],j[3])in[(0,1),(0,-1),(-4,2),(1,2)]else 1,j[2],j[3]))
     rows=[]
@@ -74,5 +76,6 @@ def main(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
     p.add_argument('--world',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--workers',type=int,default=2)
+    p.add_argument('--early-stages-only',action='store_true',help='Capture existing noise/surface/carvers chunks without advancing generation')
     main(p.parse_args())
 

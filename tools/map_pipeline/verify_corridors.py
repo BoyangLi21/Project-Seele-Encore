@@ -12,20 +12,19 @@ from verify_hakone_network_candidate import PAVEMENT
 
 def write_replay_expected(candidate):
     import nbtlib
-    from prepare_hakone_city_cross import packed
     from apply_s20_approved_semantic_repairs import parse_state
-    chunks=[]
+    destination=candidate/'recipe-replay-expected';destination.mkdir(exist_ok=True)
     for path in sorted((candidate/'delta').glob('*.npz')):
         with np.load(path)as f:
             coordinates,ranges,indices,values,names=(f[k]for k in ('coordinates','ranges','indices','after','palette'))
+        chunks=[]
         for i,(cx,cz)in enumerate(coordinates):
-            cells=[];lo,hi=ranges[i:i+2]
-            for offset,value in zip(indices[lo:hi],values[lo:hi]):
-                offset=int(offset);pos=(int(cx)*16+offset%16,offset//256-128,int(cz)*16+offset%256//16)
-                cells.append(nbtlib.Compound({'Pos':nbtlib.Long(packed(pos)),'State':parse_state(str(names[value]))}))
+            lo,hi=ranges[i:i+2]
             chunks.append(nbtlib.Compound({'X':nbtlib.Int(int(cx)),'Z':nbtlib.Int(int(cz)),
-                'Cells':nbtlib.List[nbtlib.Compound](cells)}))
-    nbtlib.File({'Chunks':nbtlib.List[nbtlib.Compound](chunks)}).save(candidate/'recipe-replay-expected.dat',gzipped=True)
+                'Offsets':nbtlib.IntArray(indices[lo:hi].astype(np.int32)),
+                'StateIds':nbtlib.IntArray(values[lo:hi].astype(np.int32))}))
+        nbtlib.File({'Version':nbtlib.Int(2),'Palette':nbtlib.List[nbtlib.Compound]([parse_state(str(n))for n in names]),
+            'Chunks':nbtlib.List[nbtlib.Compound](chunks)}).save(destination/(path.stem+'.dat'),gzipped=True)
 
 
 def main(a):

@@ -58,17 +58,24 @@ class LaunchProtection:
     def assert_delta(self, path, y0=-128, height=448):
         checked = 0
         with np.load(path) as d:
-            for i, (cx, cz) in enumerate(d['coordinates']):
-                a, b = d['ranges'][i:i + 2]
-                at = d['indices'][a:b].astype(np.int64)
+            coordinates,ranges,indices,before,after=(d[k]for k in('coordinates','ranges','indices','before','after'))
+            for i, (cx, cz) in enumerate(coordinates):
+                a, b = ranges[i:i + 2]
+                at = indices[a:b].astype(np.int64)
                 if np.any((at < 0) | (at >= height * 256)):
                     raise ValueError('Map delta exceeds its declared vertical extent')
                 # An unchanged entry does not grant permission to change later.
-                at = at[d['before'][a:b] != d['after'][a:b]]
-                p = np.column_stack((int(cx)*16+at % 16,
-                                     y0+at // 256,
-                                     int(cz)*16+(at // 16) % 16))
-                self.assert_positions(p)
+                at = at[before[a:b] != after[a:b]]
+                key=int(cx),int(cz)
+                if key in self.by_chunk:
+                    # Large natural-terrain batches contain millions of cells
+                    # far from any launch volume. Use the same exact finite
+                    # mask for this chunk before constructing point records.
+                    protected=self.chunk_mask(*key,y0=y0,height=height).reshape(-1)[at]
+                    if protected.any():
+                        offset=int(at[np.flatnonzero(protected)[0]])
+                        self.assert_positions([(key[0]*16+offset%16,y0+offset//256,
+                                                key[1]*16+(offset//16)%16)])
                 checked += len(at)
         return checked
 

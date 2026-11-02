@@ -127,14 +127,24 @@ def prepare_region(world, region_key, chunks, devices, palette, destination, exp
     atomic_replace(destination, build_region(times, raw))
 
 
-def prepare_jar(installed, compiled, target, resources_only=False):
+def prepare_jar(installed, compiled, target, resources_only=False, terrain_consumer_only=False):
     # The live distribution has large authored models absent from the small
     # code build. Keep authored assets, but carry the mixin declarations and
     # mappings with their new classes so newly added compatibility fixes load.
     with zipfile.ZipFile(installed) as old, zipfile.ZipFile(compiled) as new:
-        if resources_only:
+        if resources_only or terrain_consumer_only:
             resource='data/projectseele/worldgen/hakone_surface.bin.gz'
             if resource not in new.namelist():raise ValueError('Missing compiled terrain resource')
+            replace={resource}
+            blend='data/projectseele/worldgen/hakone_surface_blend.bin.gz'
+            if blend in new.namelist():replace.add(blend)
+            class_count=0
+            if terrain_consumer_only:
+                if blend not in replace:raise ValueError('Terrain consumer requires its matching blend field')
+                for suffix in ('','\u0024Field','\u0024Surface'):
+                    name='com/projectseele/world/HakoneSurfaceField'+suffix+'.class'
+                    if name not in new.namelist():raise ValueError('Missing selected terrain consumer '+name)
+                    replace.add(name);class_count+=1
             # Map-only deliveries must not replace a collaborator's entity,
             # animation or renderer classes from a separate working copy.
             with zipfile.ZipFile(target,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=1)as out:
@@ -146,7 +156,7 @@ def prepare_jar(installed, compiled, target, resources_only=False):
                 if len({entry.filename for entry in entries})!=len(entries):
                     raise ValueError('Installed JAR has ambiguous duplicate entries')
                 for i,entry in enumerate(entries):
-                    if entry.filename==resource:continue
+                    if entry.filename in replace:continue
                     end=entries[i+1].header_offset if i+1<len(entries)else old.start_dir
                     start=entry.header_offset;updated=copy.copy(entry);updated.header_offset=out.fp.tell()
                     # Central ZIP64 offsets refer to the old archive. Sizes
@@ -165,14 +175,16 @@ def prepare_jar(installed, compiled, target, resources_only=False):
                         out.fp.write(block);remaining-=len(block)
                     out.filelist.append(updated);out.NameToInfo[updated.filename]=updated
                 out.start_dir=out.fp.tell();out.comment=old.comment
-                out.writestr(resource,new.read(resource))
-            return 0
+                for name in sorted(replace):out.writestr(name,new.read(name))
+            return class_count
         names = [n for n in new.namelist() if n.startswith('com/projectseele/') and n.endswith('.class')]
         if 'com/projectseele/world/CityRigidGenerationR45.class' not in names: raise ValueError('Missing native city generation class')
         class_count=len(names)
         for name in ('projectseele.mixins.json','projectseele.refmap.json','data/projectseele/worldgen/hakone_surface.bin.gz'):
             if name not in new.namelist():raise ValueError('Missing compiled mixin resource '+name)
             names.append(name)
+        blend='data/projectseele/worldgen/hakone_surface_blend.bin.gz'
+        if blend in new.namelist():names.append(blend)
         new_names = set(names)
         with zipfile.ZipFile(target, 'x', compression=zipfile.ZIP_DEFLATED, compresslevel=1) as out:
             for entry in old.infolist():
@@ -207,6 +219,19 @@ def install(a):
         check = json.loads((candidate/'functional-check.json').read_text('utf8'))
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
+        if 'legacy_water_banks' in manifest:
+            banks=json.loads((candidate/'water-bank-check.json').read_text('utf8'))
+            if banks['errors'] or banks['exposed_Y62_water_faces']:
+                raise ValueError('Unclosed legacy water bank candidate')
+        if 'terrain_inputs' in manifest:
+            if not a.compiled_jar:raise ValueError('Pending-terrain candidate requires its matching terrain delivery')
+            with zipfile.ZipFile(a.compiled_jar)as bundle:
+                for name,relative in manifest['terrain_inputs'].items():
+                    if name not in ('data/projectseele/worldgen/hakone_surface.bin.gz','data/projectseele/worldgen/hakone_surface_blend.bin.gz'):
+                        raise ValueError('Unrecognized terrain dependency')
+                    path=(candidate/relative).resolve()
+                    if not path.is_relative_to(candidate.resolve()):raise ValueError('Invalid terrain dependency path')
+                    if bundle.read(name)!=path.read_bytes():raise ValueError('Compiled terrain differs from the pending-chunk candidate input')
         if 'streets' in manifest:
             verified=json.loads((candidate/'independent-check.json').read_text('utf8'))
             expected={r['id']:r['walk_columns'] for r in manifest['streets'] if r['status']=='prepared'}
@@ -287,7 +312,7 @@ def install(a):
     if a.installed_jar:
         original_jar_version=jar_version()
         prepared_jar = stage/'projectseele-0.1.0-all.jar'
-        jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar,getattr(a,'terrain_resource_only',False))
+        jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar,getattr(a,'terrain_resource_only',False),getattr(a,'terrain_consumer_only',False))
         unchanged_jar()
         plans.append((a.installed_jar, prepared_jar))
     for i, (target, source) in enumerate(plans):
@@ -327,11 +352,14 @@ def main():
     for name in ('world','backup'): p.add_argument('--'+name, type=Path, required=True)
     for name in ('installed-jar','compiled-jar'): p.add_argument('--'+name, type=Path)
     p.add_argument('--terrain-resource-only',action='store_true',help='Replace only the compiled terrain resource; retain all installed code and assets')
+    p.add_argument('--terrain-consumer-only',action='store_true',help='Replace only HakoneSurfaceField and its two data records plus both matching terrain resources')
     p.add_argument('--candidate', type=Path, action='append', required=True, help='Compatible arrays; conflicting final states are rejected')
     p.add_argument('--workers',type=int,choices=range(1,5),default=1,help='Parallel staging only; publication stays under the parent world lock')
     a = p.parse_args()
     if bool(a.installed_jar)!=bool(a.compiled_jar):p.error('Supply both JAR paths or neither')
     if a.terrain_resource_only and not a.installed_jar:p.error('Terrain resource mode requires both JAR paths')
+    if a.terrain_consumer_only and not a.installed_jar:p.error('Terrain consumer mode requires both JAR paths')
+    if a.terrain_resource_only and a.terrain_consumer_only:p.error('Choose one terrain delivery mode')
     with stopped_world(a.world): install(a)
 
 

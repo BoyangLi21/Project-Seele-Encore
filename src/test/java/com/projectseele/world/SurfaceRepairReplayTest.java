@@ -16,8 +16,17 @@ public final class SurfaceRepairReplayTest
         if (args.length != 2) throw new IllegalArgumentException("candidate actual_world required");
         Path candidate = Path.of(args[0]), world = Path.of(args[1]);
         Path relative = Path.of("dimensions/projectseele/geofront/data/city_rigid_generation_r45");
-        CompoundTag expected = NbtIo.readCompressed(candidate.resolve("recipe-replay-expected.dat").toFile());
+        java.util.List<Path> sources;
+        if(Files.isDirectory(candidate.resolve("recipe-replay-expected")))
+        {
+            try(var files=Files.list(candidate.resolve("recipe-replay-expected")))
+            { sources=files.filter(p->p.toString().endsWith(".dat")).sorted().toList(); }
+        }
+        else sources=java.util.List.of(candidate.resolve("recipe-replay-expected.dat"));
         int chunks = 0, cells = 0, retiredStaticChunks = 0;
+        for(Path source:sources)
+        {
+        CompoundTag expected=NbtIo.readCompressed(source.toFile());
         for (Tag raw : expected.getList("Chunks", Tag.TAG_COMPOUND))
         {
             CompoundTag row = (CompoundTag) raw;
@@ -26,7 +35,20 @@ public final class SurfaceRepairReplayTest
             CompoundTag surface = NbtIo.readCompressed(candidate.resolve("after").resolve(relative)
                     .resolve("surface").resolve(name).toFile());
             var wanted = new HashMap<BlockPos, CompoundTag>();
-            for (Tag cellRaw : row.getList("Cells", Tag.TAG_COMPOUND))
+            if(expected.getInt("Version")==2)
+            {
+                int[] offsets=row.getIntArray("Offsets"),states=row.getIntArray("StateIds");
+                var sourcePalette=expected.getList("Palette",Tag.TAG_COMPOUND);
+                if(offsets.length!=states.length)throw new AssertionError("Truncated replay expectation");
+                for(int i=0;i<offsets.length;i++)
+                {
+                    int offset=offsets[i];
+                    if(offset<0||offset>=448*256||states[i]<0||states[i]>=sourcePalette.size())
+                        throw new AssertionError("Invalid replay expectation index");
+                    wanted.put(new BlockPos(x*16+offset%16,offset/256-128,z*16+(offset/16)%16),sourcePalette.getCompound(states[i]));
+                }
+            }
+            else for (Tag cellRaw : row.getList("Cells", Tag.TAG_COMPOUND))
             {
                 CompoundTag cell = (CompoundTag) cellRaw;
                 wanted.put(BlockPos.of(cell.getLong("Pos")), cell.getCompound("State"));
@@ -51,6 +73,7 @@ public final class SurfaceRepairReplayTest
                     throw new AssertionError("Future surface differs at " + cell.getKey());
             }
             chunks++; cells += wanted.size();
+        }
         }
         if (chunks == 0 || cells == 0) throw new AssertionError("No candidate cells replayed");
         System.out.println("Production surface replay: " + chunks + " chunks, " + cells
