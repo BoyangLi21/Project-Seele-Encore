@@ -37,6 +37,8 @@ def main(a):
     px,pz,_,_=map(int,p['bounds'])
     for path in(a.candidate/'earthworks').glob('*.npz'):
         with np.load(path)as f:d={k:f[k]for k in f.files}
+        spec=design.get(path.stem,{})
+        keep={tuple(q['pos']):q['state']for q in spec.get('retire_keep_points',[])}
         x,z,X,Z=map(int,d['bounds']);walk=d['walk'];floor,slab=road_blocks(d['grade2'])
         observed=np.full(walk.shape,-32768,np.int32)
         for iz,ix in np.argwhere(walk):
@@ -46,7 +48,9 @@ def main(a):
             for yy in range(y+1,y+int(d.get('clearance',5))+1):
                 if e.state(xx,yy,zz).split('[')[0]not in AIR|PLANTS|{'minecraft:light'}:
                     errors.append(['clearance',xx,yy,zz,e.state(xx,yy,zz)])
-            for yy in range(min(int(d['old'][iz,ix]),y)-1,y):
+            span=d.get('bridge_span',np.zeros(walk.shape,bool))
+            support_start=y-int(d['deck_depth']) if span[iz,ix] else min(int(d['old'][iz,ix]),y)-1
+            for yy in range(support_start,y):
                 if e.state(xx,yy,zz).split('[')[0]in AIR|{'minecraft:water','minecraft:lava'}:
                     errors.append(['support',xx,yy,zz,e.state(xx,yy,zz)])
         base_walk=p['walk'][z-pz:Z-pz+1,x-px:X-px+1].copy()
@@ -55,6 +59,10 @@ def main(a):
         base_walk[retired]=False
         for iz,ix in np.argwhere(retired):
             yy,_=road_blocks(base_grade[iz,ix]);yy=int(yy)
+            pos=(x+int(ix),yy,z+int(iz))
+            if pos in keep:
+                if e.state(*pos)!=keep[pos]:errors.append(['retained underlying support changed',*pos])
+                continue
             if e.state(x+int(ix),yy,z+int(iz)).split('[')[0] in PAVEMENT:
                 errors.append(['old retired pavement remains',x+int(ix),yy,z+int(iz)])
         checked_interfaces=0

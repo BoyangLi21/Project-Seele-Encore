@@ -34,6 +34,26 @@ class CorridorRegression(unittest.TestCase):
         row=self.row();row['points']=[[-8,81,0],[8,100,0]]
         with self.assertRaisesRegex(ValueError,'grade exceeds'):alignment(row)
 
+    def test_cross_sections_reject_incompatible_side_branch_levels(self):
+        walk=np.zeros((7,9),bool);walk[2:5,2:7]=True
+        old=np.full(walk.shape,160,np.int16);old[1]=170
+        retained=np.zeros_like(walk);retained[1,2:7]=True;retained[5,2:7]=True
+        sections=[{(z,x)for z in range(2,5)}for x in range(2,7)]
+        with self.assertRaisesRegex(ValueError,'wider or longer'):
+            fit_ports(walk,np.full_like(old,165),retained,old,sections)
+
+    @patch('map_pipeline.corridors.ground',return_value=np.full((41,49),79,np.int16))
+    def test_bridge_keeps_the_void_below_its_structural_deck(self,_):
+        row=self.row();row['points']=[[-8,84,0],[8,84,0]]
+        row['bounds']=[-24,-20,24,20]
+        row['bridge']=dict(along=[4,12],deck_depth=2)
+        report,compiled=compile_street(FlatStreet(),row,[],np.empty((0,3)))
+        self.assertEqual(report['status'],'prepared')
+        writes,field=compiled
+        self.assertEqual(writes[0,80,0],'minecraft:air')
+        self.assertEqual(writes[0,81,0],'minecraft:stone_bricks')
+        self.assertEqual(field['target'][20,24],79)
+
     def test_full_width_interfaces_constrain_both_ends_and_raster_steps(self):
         walk=np.zeros((7,15),bool);walk[2:5,2:13]=True
         retained=np.zeros_like(walk);retained[2:5,1]=True;retained[2:5,13]=True

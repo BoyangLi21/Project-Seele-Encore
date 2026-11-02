@@ -15,7 +15,7 @@ from pathlib import Path
 import numpy as np
 from scipy.interpolate import PchipInterpolator
 from scipy.spatial import cKDTree
-from scipy.ndimage import distance_transform_edt
+from scipy.ndimage import distance_transform_edt,binary_dilation
 
 from author_hakone_lakefront import Editor
 from hakone_earthworks import road_blocks
@@ -27,7 +27,7 @@ from verify_hakone_network_candidate import PAVEMENT
 EMPTY = AIR | PLANTS | {'minecraft:light'}
 
 
-def fit_ports(walk, desired, existing_walk, existing_grade):
+def fit_ports(walk, desired, existing_walk, existing_grade, cross_sections=()):
     """Fit half-block steps to every retained interface across the full width."""
     lower=np.full(walk.shape,-30000,np.int32);upper=-lower
     for dz,dx in ((1,0),(-1,0),(0,1),(0,-1)):
@@ -37,13 +37,18 @@ def fit_ports(walk, desired, existing_walk, existing_grade):
         lower[boundary]=np.maximum(lower[boundary],values[boundary]-1)
         upper[boundary]=np.minimum(upper[boundary],values[boundary]+1)
 
+    across={}
+    for section in cross_sections:
+        for point in section:
+            across.setdefault(point,set()).update(q for q in section if q!=point)
+
     def envelope(values):
         values=values.copy();queue=[(int(values[z,x]),int(z),int(x))for z,x in np.argwhere(walk& (values<30000))]
         heapq.heapify(queue)
         while queue:
             value,z,x=heapq.heappop(queue)
             if value!=values[z,x]:continue
-            for Z,X in ((z+1,x),(z-1,x),(z,x+1),(z,x-1)):
+            for Z,X in ((z+1,x),(z-1,x),(z,x+1),(z,x-1),*across.get((z,x),())):
                 if 0<=Z<walk.shape[0] and 0<=X<walk.shape[1] and walk[Z,X] and values[Z,X]>value+1:
                     values[Z,X]=value+1;heapq.heappush(queue,(value+1,Z,X))
         return values
@@ -147,11 +152,25 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
         blend=blend*blend*(3-2*blend)
         use=walk&base_walk
         grade2[use]=np.rint(grade2[use]*(1-blend[use])+base_grade[use]*blend[use]).astype(np.int16)
-        grade2=fit_ports(walk,grade2,base_walk,base_grade)
+        sections=[]
+        if not row.get('pedestrian',False):
+            for i in range(1,len(curve)-1,4):
+                tangent=curve[i+1,[0,2]]-curve[i-1,[0,2]];tangent/=np.linalg.norm(tangent)
+                normal=np.array([-tangent[1],tangent[0]])
+                q=np.rint(curve[i,[0,2]]+np.linspace(-radius+.5,radius-.5,int(row['carriage_width']))[:,None]*normal).astype(int)
+                sections.append({(int(z-bz),int(x-bx))for x,z in q if walk[z-bz,x-bx]})
+        grade2=fit_ports(walk,grade2,base_walk,base_grade,sections)
     old=ground(e,row['bounds']); known=old>-129
     if np.any(walk&~known): raise ValueError((row['id'],'unknown ground under commissioned corridor'))
     hy,slab=road_blocks(grade2)
-    shoulder_distance,shoulder_nearest=distance_transform_edt(~walk,return_indices=True)
+    bridge=row.get('bridge',{})
+    span=np.zeros(walk.shape,bool)
+    if bridge:
+        s0,s1=map(float,bridge['along'])
+        span=(along[nearest]>=s0)&(along[nearest]<=s1)&(distance<=bridge.get('terrain_span_halfwidth',radius+row.get('sidewalk_width',2)+2))
+        if not np.any(walk&span) or np.any(span[[0,-1]]) or np.any(span[:,[0,-1]]):
+            raise ValueError('Bridge span must be finite and interior')
+    shoulder_distance,shoulder_nearest=distance_transform_edt(~(walk&~span),return_indices=True)
     # Half-slab ramps have integer subbase steps. Fit the daylight slope from
     # the nearest full-width edge rather than treating those discrete steps as
     # mutually contradictory continuous terrain pins.
@@ -159,6 +178,9 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
     allowance=shoulder_distance*row.get('earth_slope',.5)
     target=np.rint(np.clip(old,edge_base-allowance,edge_base+allowance)).astype(np.int16)
     target=retain_bearings(target,old,walk,bearings,row['bounds'],row.get('earth_slope',.5))
+    # A bridge spans the measured terrain/rail void; its deck grade is never
+    # published as a new soil column or turned into a solid embankment.
+    target[span]=old[span]
     target[~known]=old[~known]
     if existing is not None:
         retained=base_walk&~walk
@@ -171,6 +193,7 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
     local_boxes=[b for b in protected if b[0]<=bX and b[3]>=bx and b[2]<=bZ and b[5]>=bz]
     local_rail=rail[(rail[:,0]>=bx-5)&(rail[:,0]<=bX+5)&(rail[:,2]>=bz-5)&(rail[:,2]<=bZ+5)]
     railtree=cKDTree(local_rail[:,[0,2]])if len(local_rail)else None
+    sweep=np.asarray(bridge.get('train_boxes',[]),float).reshape(-1,6)
     writes={}; blockers=[]; counts=Counter(); retired=row.get('retire_volumes',[])+complete_retirements
     auxiliary_points={tuple(r['pos']):r['state'] for r in row.get('retire_auxiliary_points',[])}
     for pos,expected in auxiliary_points.items():
@@ -183,9 +206,15 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
         if (x,y,z) in auxiliary_points:result.add(auxiliary_points[x,y,z].split('[')[0])
         return result
 
-    def protected_at(x,y,z):
+    def protected_at(x,y,z,retiring=False):
         if any(a<=x<=A and b<=y<=B and c<=z<=C for a,b,c,A,B,C in local_boxes):return True
-        if railtree:
+        if len(sweep) and railtree:
+            ids=railtree.query_ball_point((x+.5,z+.5),2.5)
+            if any(local_rail[i,1]-3<=y+1 and y<local_rail[i,1]+.01 for i in ids):return True
+        if len(sweep) and not retiring:
+            from map_pipeline.train_clearance import intersects
+            if intersects(sweep,x,y,z):return True
+        elif not len(sweep) and railtree:
             ids=railtree.query_ball_point((x,z),4)
             if any(local_rail[i,1]-3<=y<=local_rail[i,1]+8 for i in ids):return True
         return False
@@ -193,7 +222,7 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
     def put(x,y,z,state,purpose,allowed):
         oldstate=e.state(x,y,z); bare=oldstate.split('[')[0]
         if writes.get((x,y,z),oldstate)==state:return
-        if protected_at(x,y,z):
+        if protected_at(x,y,z,purpose=='superseded roadway' and row.get('retire_planned_surface_only',False)):
             blockers.append([x,y,z,'retained finite object',oldstate,purpose]);return
         if bare not in allowed:
             blockers.append([x,y,z,'unowned material',oldstate,purpose]);return
@@ -210,8 +239,17 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
                 if row.get('retire_only_within_walk',True) and [a,b,c,A,B,C] not in complete_retirements and not walk[z-bz,x-bx]:continue
                 for y in range(b,B+1):
                     state=e.state(x,y,z).split('[')[0]
-                    if state in PAVEMENT | set(row.get('retire_auxiliary_materials',[])):
-                        put(x,y,z,'minecraft:air','superseded roadway',PAVEMENT | set(row.get('retire_auxiliary_materials',[])))
+                    keep=next((p for p in row.get('retire_keep_points',[])if p['pos']==[x,y,z]),None)
+                    if keep:
+                        if e.state(x,y,z)!=keep['state']:raise ValueError('Retained underlying support changed')
+                        continue
+                    if row.get('retire_planned_surface_only',False):
+                        if existing is None:raise ValueError('Planned surface retirement needs its original grade')
+                        ix,iz=x-bx,z-bz
+                        if not (existing['road'][area][iz,ix] or existing['walk'][area][iz,ix]) or y!=int(base_floor[iz,ix]):continue
+                    materials=set(row.get('retire_materials',PAVEMENT)) | set(row.get('retire_auxiliary_materials',[]))
+                    if state in materials:
+                        put(x,y,z,'minecraft:air','superseded roadway',materials)
     for pos,expected in auxiliary_points.items():
         put(*pos,'minecraft:air','explicit buried remnant',{expected.split('[')[0]})
     for iz,ix in np.argwhere(active|walk):
@@ -228,19 +266,23 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
                     replacement=('minecraft:stone' if y<after-2 or walk[iz,ix] else
                                  'minecraft:grass_block[snowy=false]' if y==after else 'minecraft:dirt')
                     put(x,y,z,replacement,'supported embankment',SOIL|PLANTS|AIR|PAVEMENT|auxiliary_at(x,y,z))
+        if bridge and walk[iz,ix] and not span[iz,ix] and min(abs(along[nearest[iz,ix]]-s0),abs(along[nearest[iz,ix]]-s1))<=2:
+            for y in range(min(before,after)-1,int(hy[iz,ix])):
+                put(x,y,z,'minecraft:stone_bricks','bridge abutment',SOIL|EMPTY|PAVEMENT)
         if not walk[iz,ix]:continue
         floor=int(hy[iz,ix])
         # Full slab base and five blocks of vehicle space. The declared
         # retirement volume is the only permission to remove an old road layer.
         allowed=SOIL|EMPTY|PAVEMENT
-        for y in range(floor-1,floor+row.get('clearance',5)+1):
+        depth=int(bridge.get('deck_depth',2)) if span[iz,ix] else 1
+        for y in range(floor-depth,floor+row.get('clearance',5)+1):
             owned_aux=auxiliary_at(x,y,z)
             if y>floor:
                 material=e.state(x,y,z).split('[')[0]
                 if material in PAVEMENT and not any(a<=x<=A and b<=y<=B and c<=z<=C for a,b,c,A,B,C in retired):
                     blockers.append([x,y,z,'another pavement layer requires explicit ownership',e.state(x,y,z)]);continue
                 put(x,y,z,'minecraft:air','full-width clearance',allowed|owned_aux)
-            elif y<floor:put(x,y,z,'minecraft:stone','continuous subbase',allowed|owned_aux)
+            elif y<floor:put(x,y,z,'minecraft:stone_bricks' if span[iz,ix] else 'minecraft:stone','continuous subbase',allowed|owned_aux)
             else:
                 marking=carriage[iz,ix] and distance[iz,ix]<.55 and int(along[nearest[iz,ix]]//5)%2==0
                 if slab[iz,ix]:
@@ -249,6 +291,19 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
                     material+='[type=bottom,waterlogged=false]'
                 else:material='minecraft:white_concrete'if marking else'minecraft:black_concrete'if carriage[iz,ix]else'minecraft:smooth_stone'
                 put(x,y,z,material,'road and sidewalk',allowed|owned_aux)
+    parapet=np.zeros(walk.shape,bool)
+    if bridge:
+        # The parapet has its own edge deck outside the commissioned clear
+        # sidewalk. A fence placed inside that sidewalk would reduce its width.
+        parapet=binary_dilation(span&walk,structure=np.ones((3,3)))&~walk
+        for iz,ix in np.argwhere(parapet):
+            x,z,floor=int(xx[iz,ix]),int(zz[iz,ix]),int(hy[iz,ix])
+            for y in range(floor-int(bridge.get('deck_depth',2)),floor+1):
+                put(x,y,z,'minecraft:stone_bricks','parapet edge beam',SOIL|EMPTY|PAVEMENT)
+            sides={k:('low' if 0<=iz+dz<walk.shape[0] and 0<=ix+dx<walk.shape[1] and parapet[iz+dz,ix+dx] else 'none')
+                   for k,dz,dx in [('east',0,1),('north',-1,0),('south',1,0),('west',0,-1)]}
+            state='minecraft:stone_brick_wall['+','.join(f'{k}={v}'for k,v in sorted({**sides,'up':'true','waterlogged':'false'}.items()))+']'
+            put(x,floor+1,z,state,'bridge parapet',SOIL|EMPTY|PAVEMENT)
     # Devices are not inferred from materials: their exact captured locations
     # become one-cell protected volumes in the caller.
     if blockers:
@@ -260,7 +315,7 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
         x,z,y=int(xx[iz,ix]),int(zz[iz,ix]),int(hy[iz,ix])
         if state(x,y,z)not in PAVEMENT:errors.append([x,y,z,'floor'])
         if state(x,y-1,z)in EMPTY:errors.append([x,y-1,z,'unsupported deck'])
-        if any(state(x,Y,z)in EMPTY for Y in range(min(int(old[iz,ix]),y)-1,y)):
+        if not span[iz,ix] and any(state(x,Y,z)in EMPTY for Y in range(min(int(old[iz,ix]),y)-1,y)):
             errors.append([x,y,z,'gap below subbase'])
         if any(state(x,Y,z)not in EMPTY for Y in range(y+1,y+row.get('clearance',5)+1)):
             errors.append([x,y,z,'clearance'])
@@ -268,7 +323,8 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
     return (dict(id=row['id'],status='prepared',changed_cells=len(writes),walk_columns=int(walk.sum()),
                 counts=dict(counts),ports=row['points'][::len(row['points'])-1],bounds=row['bounds']),
            (writes,dict(bounds=row['bounds'],old=old,target=target,active=active,
-                        walk=walk,road=carriage,grade2=grade2,retired_walk=retired_walk,clearance=row.get('clearance',5))))
+                        walk=walk,road=carriage,grade2=grade2,retired_walk=retired_walk,clearance=row.get('clearance',5),
+                        bridge_span=span,deck_depth=bridge.get('deck_depth',1))))
 
 
 def publish_plan(candidate,base):
