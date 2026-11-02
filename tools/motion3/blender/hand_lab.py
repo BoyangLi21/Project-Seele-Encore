@@ -145,7 +145,10 @@ class HandRig:
         return R
 
     def model_mats(self, pose):
-        ctl = self.controls(pose) if pose else {}
+        return self.model_mats_from(self.controls(pose) if pose else None)
+
+    def model_mats_from(self, ctl):
+        pose = ctl is not None
         mats = {}
 
         def model(name):
@@ -178,6 +181,11 @@ def main():
     ap.add_argument("--poses", default="relaxed,fist,open,grab")
     ap.add_argument("--hands", default="", help="override hands mesh json")
     ap.add_argument("--contract", default="", help="override hand rig contract")
+    ap.add_argument("--overrides", default="", help="fitted hand poses (fist_fit.py) merged over the contract")
+    ap.add_argument("--sequence", default="", help="A:B -> frames A..B..A for a video")
+    ap.add_argument("--frames", type=int, default=36)
+    ap.add_argument("--hold", type=int, default=12)
+    ap.add_argument("--res", type=int, default=480)
     ap.add_argument("--out", required=True)
     a = ap.parse_args(argv)
     base = os.path.join(a.assets, "assets", "projectseele")
@@ -190,6 +198,13 @@ def main():
     pts = np.stack([-(raw[:, 0] + piv[0]) / 16, (raw[:, 1] + piv[1]) / 16, (raw[:, 2] + piv[2]) / 16], 1)
     weights = {b: np.asarray(w, float) for b, w in js["influences"].items()}
     ib = {b: np.array(v).reshape(4, 4).T for b, v in js.get("inverseBindColumnMajor", {}).items()}
+    if a.overrides:
+        fitted = lab.load_json(a.overrides).get(str(int(a.unit)), {})
+        for pose, ctl in fitted.items():
+            if pose in contract["pose_controls"]:
+                merged = dict(contract["pose_controls"][pose])
+                merged["bone_angles"] = dict(merged.get("bone_angles", {}), **ctl["bone_angles"])
+                contract["pose_controls"][pose] = merged
     rig = HandRig(contract, a.side)
     lab.clear_scene()
     lab.setup_render(640, 640)
@@ -206,6 +221,9 @@ def main():
     os.makedirs(a.out, exist_ok=True)
     paths = []
     centre = pts.mean(0)
+    if a.sequence:
+        lab_sequence(a, rig, pts, raw, weights, ib, centre, mat)
+        return
     for pose in a.poses.split(","):
         mats = rig.model_mats(pose)
         M = {b: (mats.get(b, np.eye(4)) @ ib.get(b, np.eye(4))) for b in weights}
@@ -232,6 +250,43 @@ def main():
             paths.append(p)
         ob.hide_render = True
     lab.contact_sheet(paths, 3, os.path.join(a.out, f"hand_u{a.unit}_{a.side}.png"))
+
+
+def lab_sequence(a, rig, pts, raw, weights, ib, centre, mat):
+    """Frames easing pose A -> B, holding, and back, seen side-on to the finger curl."""
+    pa, pb = a.sequence.split(":")
+    ca, cb = rig.controls(pa), rig.controls(pb)
+    ts = []
+    for k in range(a.frames):
+        ts.append(k / (a.frames - 1))
+    ts = [0.0] * a.hold + ts + [1.0] * a.hold + ts[::-1] + [0.0] * a.hold
+    sc = bpy.context.scene
+    sc.render.resolution_x = sc.render.resolution_y = a.res
+    cam = lab.add_camera("seq", (0.9, 2.4, 0.35), (0, 0, -0.1))
+    cam.data.lens = 50
+    sc.camera = cam
+    me = bpy.data.meshes.new("hand")
+    n = len(pts)
+    me.from_pydata([(0, 0, 0)] * n, [], [(i, i + 1, i + 2) for i in range(0, n - 2, 3)])
+    uv = me.uv_layers.new(name="UV")
+    for poly in me.polygons:
+        for li in poly.loop_indices:
+            vi = me.loops[li].vertex_index
+            uv.data[li].uv = (raw[vi, 3], 1.0 - raw[vi, 4])
+    ob = bpy.data.objects.new("hand", me)
+    ob.data.materials.append(mat)
+    sc.collection.objects.link(ob)
+    for f, t in enumerate(ts):
+        e = t * t * (3 - 2 * t)
+        ctl = {k: [ca[k][i] + (cb[k][i] - ca[k][i]) * e for i in range(3)] for k in ca}
+        mats = rig.model_mats_from(ctl)
+        M = {b: (mats.get(b, np.eye(4)) @ ib.get(b, np.eye(4))) for b in weights}
+        out = dq_skin(pts, weights, M) - centre
+        bl = np.stack([out[:, 0], -out[:, 2], out[:, 1]], 1)
+        me.vertices.foreach_set("co", bl.ravel())
+        me.update()
+        sc.render.filepath = os.path.join(a.out, f"f{f:05d}.png")
+        bpy.ops.render.render(write_still=True)
 
 
 if __name__ == "__main__":

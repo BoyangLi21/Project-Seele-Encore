@@ -37,15 +37,20 @@ public final class EvaWeaponHandlingR45
                 ||EvaBodyPose.hasTerrainStances()&&EvaGameplayMotionR32.sharedWeapon(e))
                 &&!e.isNervLogisticsLocked()&&!e.isFirstBattleActive()&&!EvaShutdownR30.disabled(e);
     }
-    private static EvaBodyPose.Sample hold(EvaUnit01Entity e,EvaBodyPose.Sample body)
+    private static EvaBodyPose.Sample hold(EvaUnit01Entity e,EvaBodyPose.Sample body,float partial)
     {
         var end=EvaBodyPose.gameplayClip(e,"knife_draw",1);
+        // The drawn-knife arm is a standing pose. Lying down, the prone arm
+        // keeps the knife along the ground instead of driving it through it.
+        float prone=e.rifleProneBlend(partial),upright=1-prone*prone*(3-2*prone);
         for(String name:java.util.List.of("arm_r","forearm_r","wrist_r","hand_r"))
         {
-            body.rotations.put(name,new org.joml.Quaternionf(end.rotations.get(name)));
-            body.positions.put(name,new org.joml.Vector3f(end.positions.get(name)));
+            body.rotations.put(name,new org.joml.Quaternionf(body.rotations.get(name)).slerp(end.rotations.get(name),upright));
+            body.positions.put(name,new org.joml.Vector3f(body.positions.get(name)).lerp(end.positions.get(name),upright));
         }
-        body.dirty();return body;
+        body.dirty();
+        if(upright<1)EvaProneKnifeR56.stab(e,body,partial,1-upright);
+        return body;
     }
     public static boolean request(EvaUnit01Entity e,int weapon)
     {
@@ -112,7 +117,7 @@ public final class EvaWeaponHandlingR45
     }
     public static EvaBodyPose.Sample apply(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial)
     {
-        if(!active(e))return holding(e,partial)?hold(e,base):base;
+        if(!active(e))return holding(e,partial)?hold(e,base,partial):base;
         var state=e.getEntityData().get(STATE);float t=phase(e,partial);
         var pose=EvaBodyPose.gameplayClip(e,state.getBoolean("draw")?"knife_draw":"knife_stow",t);
         var rackLocal=pose.matrix("torso_upper").invert().mul(pose.matrix("knife"));
@@ -126,7 +131,7 @@ public final class EvaWeaponHandlingR45
         // independently through the fingers during the release window.
         if(t>.75F)
         {
-            var end=state.getBoolean("draw")?hold(e,base):base;
+            var end=state.getBoolean("draw")?hold(e,base,partial):base;
             pose=EvaBodyPose.blend(pose,end,ease((t-.75F)/.25F));
         }
         if(drawPhase(e,partial)>=.54F)EvaAnatomicalHandsR45.attachKnife(e,pose);

@@ -102,6 +102,14 @@ final class EvaPoseContinuity
                 state.trigger = !key.equals(state.key) ? state.key + "->" + key : "pop";
             }
         }
+        Map<String, float[]> raw = null;
+        if (state.offsets != null && !repeat)
+        {
+            Map<String, float[]> captured = new HashMap<>();
+            forEach(model, bone -> captured.put(bone.getName(), new float[] {bone.getRotX(), bone.getRotY(), bone.getRotZ(),
+                    bone.getPosX(), bone.getPosY(), bone.getPosZ()}));
+            raw = captured;
+        }
         if (state.offsets != null)
         {
             float t = (now - state.blendStart) / (float) state.blendNanos;
@@ -134,6 +142,44 @@ final class EvaPoseContinuity
                     bone.setPosZ(bone.getPosZ() + o[6] * w);
                 });
             }
+        }
+        // Pops were only caught with no blend running, so a target that jumped
+        // mid-blend (a combo strike taking over the previous one) reached the
+        // screen in one frame. Restart the blend from the last drawn pose.
+        if (raw != null && state.offsets != null && now != state.blendStart && popped(model, state))
+        {
+            Map<String, float[]> offsets = new HashMap<>();
+            for (var entry : raw.entrySet())
+            {
+                float[] prev = state.last.get(entry.getKey()), r = entry.getValue();
+                if (prev == null)
+                {
+                    continue;
+                }
+                Quaternionf before = new Quaternionf().rotationZYX(prev[2], prev[1], prev[0]);
+                Quaternionf delta = new Quaternionf().rotationZYX(r[2], r[1], r[0]).conjugate().mul(before).normalize();
+                offsets.put(entry.getKey(), new float[] {delta.x, delta.y, delta.z, delta.w, prev[3] - r[3], prev[4] - r[4], prev[5] - r[5]});
+            }
+            long remaining = state.blendStart + state.blendNanos - now;
+            state.offsets = offsets;
+            state.blendStart = now;
+            state.blendNanos = Math.max(POP_NANOS, remaining);
+            state.trigger = state.trigger + "+pop";
+            State s = state;
+            forEach(model, bone ->
+            {
+                float[] prev = s.last.get(bone.getName());
+                if (prev == null || !offsets.containsKey(bone.getName()))
+                {
+                    return;
+                }
+                bone.setRotX(prev[0]);
+                bone.setRotY(prev[1]);
+                bone.setRotZ(prev[2]);
+                bone.setPosX(prev[3]);
+                bone.setPosY(prev[4]);
+                bone.setPosZ(prev[5]);
+            });
         }
         if (DIAG && !state.last.isEmpty())
         {
@@ -254,7 +300,7 @@ final class EvaPoseContinuity
     }
 
     /** Development: record the arm-end bones after one pose graph stage. */
-    static void traceBegin(EvaUnit01Entity entity)
+    static void traceBegin(EvaUnit01Entity entity, BakedGeoModel model)
     {
         if (!DIAG)
         {
@@ -273,6 +319,38 @@ final class EvaPoseContinuity
             state.traceFrame = now;
         }
         state.trace = new java.util.ArrayList<>();
+        trace(entity, model, "begin");
+    }
+
+    /** Development: per traced bone, the pose graph stages that turned it this frame. */
+    static String writers(EvaUnit01Entity entity)
+    {
+        State state = DIAG ? STATES.get(entity) : null;
+        if (state == null)
+        {
+            return "";
+        }
+        StringBuilder b = new StringBuilder();
+        for (int column = 1; column <= TRACE_BONES.length; column++)
+        {
+            b.append(TRACE_BONES[column - 1]).append(':');
+            float[] before = null;
+            for (Object[] row : state.trace)
+            {
+                float[] now = (float[]) row[column];
+                if (before != null && now != null
+                        && degrees(new Quaternionf().rotationZYX(now[2], now[1], now[0]), before) > .5F)
+                {
+                    b.append(row[0]).append(',');
+                }
+                if (now != null)
+                {
+                    before = now;
+                }
+            }
+            b.append(';');
+        }
+        return b.toString();
     }
 
     static void trace(EvaUnit01Entity entity, BakedGeoModel model, String stage)
@@ -296,7 +374,7 @@ final class EvaPoseContinuity
         state.trace.add(row);
     }
 
-    private static final String[] TRACE_BONES = {"hand_l", "hand_r", "forearm_l", "forearm_r", "arm_l", "arm_r"};
+    private static final String[] TRACE_BONES = {"hand_l", "hand_r", "forearm_l", "forearm_r", "arm_l", "arm_r", "cannon", "torso_upper"};
 
     /** Per stage, how far the popped bone moved since the same stage last frame. */
     private static String traceDelta(State state, String boneName)

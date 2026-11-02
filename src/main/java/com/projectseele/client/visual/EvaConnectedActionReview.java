@@ -41,7 +41,8 @@ public final class EvaConnectedActionReview
     private static final boolean R10="r10-motion".equals(System.getProperty("projectseele.regionalBuild",""));
     /** Transition tour: every stance/weapon change the pilot can make, back to back (pose continuity review). */
     private static final boolean TOUR=Boolean.getBoolean("projectseele.transitionTour");
-    private static final int TOUR_END=1360;
+    private static final int TOUR_START=Integer.getInteger("projectseele.tourStart",0);
+    private static final int TOUR_END=Integer.getInteger("projectseele.tourEnd",1600)-TOUR_START;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     private static int wait;
     private static int tick;
@@ -223,24 +224,33 @@ public final class EvaConnectedActionReview
 
     private static void tour(Minecraft mc,EvaUnit01Entity eva)
     {
-        boolean move=tick>=40&&tick<140||tick>=360&&tick<420||tick>=500&&tick<580||tick>=720&&tick<800
-                ||tick>=840&&tick<900||tick>=1000&&tick<1060||tick>=1270&&tick<1330;
+        int t=tick+TOUR_START;
+        boolean move=t>=40&&t<140||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
+                ||t>=840&&t<900||t>=1000&&t<1060||t>=1270&&t<1330||t>=1470&&t<1530;
         mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
-        mc.player.setYRot(0);mc.player.setXRot(0);
-        if(at(70))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
-        if(at(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
-        if(at(170)||at(182)||at(194)||at(206))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(at(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
-        if(at(290))send(ServerboundEvaControlPacket.ACTION_STOMP);
-        if(at(340)||at(820))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
-        if(at(440)||at(920))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
-        if(at(470)||at(600)||at(940)||at(1080))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
-        if(at(660))mc.player.connection.sendCommand("seele motionlab weapon unit01 rifle");
-        if((tick>=680&&tick<900||tick>=970&&tick<1000)&&tick/4!=previousTick/4)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
-        if(at(1130))mc.player.connection.sendCommand("seele motionlab weapon unit01 knife");
-        if(at(1150)||at(1165)||at(1180))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(at(1220))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        // Turn about between the bare-hand and rifle parts so the long walk
+        // stays inside the open review ground, then back for the knife.
+        mc.player.setYRot(t>=610&&t<1085?180:0);mc.player.setXRot(0);
+        if(tourAt(70))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(tourAt(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(tourAt(170)||tourAt(182)||tourAt(194)||tourAt(206))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(tourAt(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        if(tourAt(290))send(ServerboundEvaControlPacket.ACTION_STOMP);
+        if(tourAt(340)||tourAt(820))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
+        if(tourAt(440)||tourAt(920))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
+        if(tourAt(470)||tourAt(600)||tourAt(940)||tourAt(1080)||tourAt(1340)||tourAt(1550))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
+        if(tourAt(660))mc.player.connection.sendCommand("seele motionlab weapon unit01 rifle");
+        if((t>=680&&t<900||t>=970&&t<1000)&&tick/4!=previousTick/4)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
+        if(tourAt(1130))mc.player.connection.sendCommand("seele motionlab weapon unit01 knife");
+        if(tourAt(1150)||tourAt(1165)||tourAt(1180)||tourAt(1370)||tourAt(1385)||tourAt(1400))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(tourAt(1220)||tourAt(1430))send(ServerboundEvaControlPacket.ACTION_SMASH);
         positionCamera(mc,eva);
+    }
+
+    /** A tour event at its script tick, with -Dprojectseele.tourStart skipping the script's beginning. */
+    private static boolean tourAt(int scriptTick)
+    {
+        return scriptTick>=TOUR_START&&at(scriptTick-TOUR_START);
     }
 
     private static void controlsR05(Minecraft mc,EvaUnit01Entity eva)
@@ -394,20 +404,30 @@ public final class EvaConnectedActionReview
         row.addProperty("entityTick", eva.tickCount + partialTick);
         row.addProperty("key", eva.poseTransitionKey(partialTick));
         row.addProperty("heavyActive", eva.isHeavyMotionActive());
+        if (TOUR) row.addProperty("writers", com.projectseele.client.render.EvaPoseGraph.traceWriters(eva));
         if (eva.isHeavyMotionActive()) row.addProperty("heavyPhase", eva.heavyMotionProgress(partialTick));
         JsonArray world = new JsonArray();
         world.add(eva.getX()); world.add(eva.getY()); world.add(eva.getZ());
         row.add("world", world);
+        // The drawn position and heading at this frame's partial tick.
+        var drawn = eva.getPosition(partialTick);
+        JsonArray position = new JsonArray();
+        position.add(drawn.x); position.add(drawn.y); position.add(drawn.z);
+        row.add("drawnPosition", position);
+        row.addProperty("bodyYaw", net.minecraft.util.Mth.rotLerp(partialTick, eva.yBodyRotO, eva.yBodyRot));
         JsonObject transforms = new JsonObject();
-        for (String name : EvaPoseGraph.contract().boneOrder())
+        // Every bone, anatomical hand joints included, so offline renders can
+        // skin the hands the game actually draws.
+        java.util.ArrayDeque<software.bernie.geckolib.cache.object.GeoBone> open = new java.util.ArrayDeque<>(model.topLevelBones());
+        while (!open.isEmpty())
         {
-            model.getBone(name).ifPresent(bone ->
-            {
-                JsonArray values = new JsonArray();
-                values.add(bone.getRotX()); values.add(bone.getRotY()); values.add(bone.getRotZ());
-                values.add(bone.getPosX()); values.add(bone.getPosY()); values.add(bone.getPosZ());
-                transforms.add(name, values);
-            });
+            var bone = open.pop();
+            open.addAll(bone.getChildBones());
+            JsonArray values = new JsonArray();
+            values.add(bone.getRotX()); values.add(bone.getRotY()); values.add(bone.getRotZ());
+            values.add(bone.getPosX()); values.add(bone.getPosY()); values.add(bone.getPosZ());
+            if (bone.isHidden()) values.add(1);
+            transforms.add(bone.getName(), values);
         }
         row.add("bones", transforms);
         if (RIFLE && eva.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE)

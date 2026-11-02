@@ -904,9 +904,21 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             transforms[slot++]=new float[]{q.x,q.y,q.z,q.w,dual.x,dual.y,dual.z,dual.w};
         }
         float[] rest=skin.rest(),out=skin.scratch();int stride=mesh.stride();
+        int[] leaders=sparse.leaders(rest,stride);float[] spins=sparse.spins();
         for(int vertex=0;vertex<rest.length/stride;vertex++)
         {
+            int i=vertex*stride,lead=leaders[vertex];
             float rx=0,ry=0,rz=0,rw=0,dx=0,dy=0,dz=0,dw=0;
+            if(lead!=vertex)
+            {
+                // A repeated corner of an already skinned surface point:
+                // same position, only its own normal still turns.
+                int s=lead*4,j=lead*stride;rx=spins[s];ry=spins[s+1];rz=spins[s+2];rw=spins[s+3];
+                out[i]=out[j];out[i+1]=out[j+1];out[i+2]=out[j+2];
+                float x=-rest[i+5],y=rest[i+6],z=rest[i+7],ax=2*(ry*z-rz*y),ay=2*(rz*x-rx*z),az=2*(rx*y-ry*x);
+                out[i+5]=-(x+rw*ax+ry*az-rz*ay);out[i+6]=y+rw*ay+rz*ax-rx*az;out[i+7]=z+rw*az+rx*ay-ry*ax;
+                continue;
+            }
             int dominant=sparse.dominant[vertex];
             if(DqSkinReferenceR44.REVIEW)dominant=DqSkinReferenceR44.referenceSlot(stableBones,weights,vertex);
             var reference=transforms[dominant];
@@ -920,7 +932,8 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             float inv=1F/(float)Math.sqrt(rx*rx+ry*ry+rz*rz+rw*rw);rx*=inv;ry*=inv;rz*=inv;rw*=inv;dx*=inv;dy*=inv;dz*=inv;dw*=inv;
             float dot=rx*dx+ry*dy+rz*dz+rw*dw;dx-=rx*dot;dy-=ry*dot;dz-=rz*dot;dw-=rw*dot;
             float tx=2*(-dw*rx+dx*rw-dy*rz+dz*ry),ty=2*(-dw*ry+dx*rz+dy*rw-dz*rx),tz=2*(-dw*rz-dx*ry+dy*rx+dz*rw);
-            int i=vertex*stride;float x=-(rest[i]+part.pivotX())/16,y=(rest[i+1]+part.pivotY())/16,z=(rest[i+2]+part.pivotZ())/16;
+            int s=vertex*4;spins[s]=rx;spins[s+1]=ry;spins[s+2]=rz;spins[s+3]=rw;
+            float x=-(rest[i]+part.pivotX())/16,y=(rest[i+1]+part.pivotY())/16,z=(rest[i+2]+part.pivotZ())/16;
             float ax=2*(ry*z-rz*y),ay=2*(rz*x-rx*z),az=2*(rx*y-ry*x);
             out[i]=-(x+rw*ax+ry*az-rz*ay+tx)*16-part.pivotX();out[i+1]=(y+rw*ay+rz*ax-rx*az+ty)*16-part.pivotY();out[i+2]=(z+rw*az+rx*ay-ry*ax+tz)*16-part.pivotZ();
             x=-rest[i+5];y=rest[i+6];z=rest[i+7];ax=2*(ry*z-rz*y);ay=2*(rz*x-rx*z);az=2*(rx*y-ry*x);

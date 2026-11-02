@@ -745,6 +745,7 @@ public final class EvaBodyPose
         com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;
     }
+    private static final float PRONE_FIREARM_CHEST=Float.parseFloat(System.getProperty("projectseele.proneFirearmChestR56","34"));
     private static void supportProneFirearmChestR45(EvaUnit01Entity entity,Sample body,float partial)
     {
         if(entity.getWeapon()!=EvaUnit01Entity.WEAPON_RIFLE&&entity.getWeapon()!=EvaUnit01Entity.WEAPON_CANNON)return;
@@ -757,7 +758,10 @@ public final class EvaBodyPose
         // A twelve-degree chest left almost the entire prone look-up angle to
         // the neck, swinging the helmet through its dorsal collar. Support the
         // upper trunk first; the same chest drives both arm IK and gun optics.
-        float minimum=52*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
+        // Fifty-two degrees lifted the shoulders so high the elbows could not
+        // reach the ground and the gun hung in the air; with the pylons and
+        // dorsal cover folded back a lower chest keeps the helmet clear.
+        float minimum=PRONE_FIREARM_CHEST*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
         var headWorld=body.matrix("head").getUnnormalizedRotation(new Quaternionf()).normalize();
         float horizontal=(float)Math.hypot(up.x,up.z);if(horizontal<1e-6F)return;
         float target=Mth.lerp(support,elevation,minimum),radius=(float)Math.cos(target);

@@ -148,6 +148,12 @@ public final class EvaPoseGraph
         return contract;
     }
 
+    /** Development (-Dprojectseele.poseDiag=true): the stages that turned the traced bones in the last commit. */
+    public static String traceWriters(EvaUnit01Entity entity)
+    {
+        return EvaPoseContinuity.writers(entity);
+    }
+
     public static Snapshot observe(EvaUnit01Entity entity, float partialTick)
     {
         return snapshot(entity, partialTick,
@@ -164,7 +170,7 @@ public final class EvaPoseGraph
     public static Snapshot commit(EvaUnit01Entity entity,BakedGeoModel model,float partialTick,org.joml.Matrix4f modelToWorld)
     {
         EvaPoseTransition.beginFrameR45(entity);
-        EvaPoseContinuity.traceBegin(entity);
+        EvaPoseContinuity.traceBegin(entity,model);
         EvaMechanicalResetR30.apply(entity);
         if (!contract.ready())
         {
@@ -362,7 +368,8 @@ public final class EvaPoseGraph
                 &&(com.projectseele.entity.EvaGameplayMotionR32.sharedWeapon(entity)
                     ||com.projectseele.entity.EvaGameplayMotionR32.sharedJumpActive(entity,partialTick)))
             transitions=EvaPoseTransition.applySharedExitR45(entity,model,partialTick);
-        EvaShoulderClearanceR25.proneTilt(entity,model,partialTick);
+        EvaStanceFinishR56.apply(entity,model,partialTick,modelToWorld);
+        EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
         String continuityOwner=motionWrites.owner();
         EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);

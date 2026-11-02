@@ -4309,11 +4309,15 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         if (this.getControllingPassenger() != pilot || this.isPilotControlLocked() || this.fixedCannonOperatingR52())
         {
+            ProjectSeele.LOGGER.info("EVA pilot stance change refused: eva={} pilot={} locked={} weaponHandling={} fixedCannon={}",
+                    this.getStringUUID(), this.getControllingPassenger() == pilot, this.isPilotControlLocked(false),
+                    EvaWeaponHandlingR45.active(this), this.fixedCannonOperatingR52());
             return;
         }
         boolean prone = !this.isPilotProne();
         if (!prone && !this.hasStandingRoom())
         {
+            ProjectSeele.LOGGER.info("EVA pilot stance change refused: eva={} no standing room at {}", this.getStringUUID(), this.position());
             pilot.displayClientMessage(Component.translatable("msg.projectseele.cannot_stand"), true);
             return;
         }
@@ -7428,6 +7432,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 : PILOT_BODY_IDLE_DEAD_ZONE;
         boolean longHull=this.rifleStanceInitialized && this.entityData.get(DATA_RIFLE_STANCE)>1.05F;
         if(longHull)deadZone=0;
+        // A held rifle keeps turning the hull onto the sight line; the chest
+        // twist covers the lag, so the stock never has to leave the chest.
+        if(this.getWeapon()==WEAPON_RIFLE)deadZone=0;
         float maxTurn = moving ? PILOT_BODY_MOVING_TURN_PER_TICK
                 : PILOT_BODY_IDLE_TURN_PER_TICK;
         if(EvaGameplayMotionR32.directed(this)&&EvaCombatSupportR33.strike(this))

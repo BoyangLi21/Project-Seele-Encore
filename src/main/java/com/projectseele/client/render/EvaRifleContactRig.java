@@ -40,10 +40,13 @@ public final class EvaRifleContactRig
                 ||eva.isCrucified()||eva.getVisualPose()!=0||eva.getActivationTicks()>0||root==null)return EvaMotionEngineV2.BoneWrites.empty();
         if(model.getBone("wrist_l").isEmpty()||model.getBone("wrist_r").isEmpty()||model.getBone("finger_middle_l").isEmpty())return EvaMotionEngineV2.BoneWrites.empty();
         var body=EvaBodyPose.sample(eva,partial);Set<String> rotations=new LinkedHashSet<>(),positions=new LinkedHashSet<>();
+        Vec3 sight=eva.getAimDirectionForPoseCapture(partial);float twist=EvaRifleKinematics.twistDegrees(eva,partial,sight);
+        boolean airborne=eva.isVisuallyAirborneForRender();
+        if(!airborne)EvaRifleKinematics.twist(body,twist);
         for(String n:body.rig.keySet())
         {
             GeoBone b=model.getBone(n).orElse(null);if(b==null||!bodyBone(n))continue;
-            if(eva.isVisuallyAirborneForRender())
+            if(airborne)
             {
                 // Keep the accepted airborne body, while its real shoulder still carries the gun.
                 body.rotations.put(n,new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX()));
@@ -56,7 +59,14 @@ public final class EvaRifleContactRig
                 rotations.add(n);positions.add(n);
             }
         }
-        body.dirty();var f=EvaRifleKinematics.sample(eva,partial,eva.getAimDirectionForPoseCapture(partial),body,root);
+        if(airborne&&twist!=0&&model.getBone("torso_upper").isPresent())
+        {
+            // The airborne limbs stay as accepted; the chest still turns to the sight line.
+            EvaRifleKinematics.twist(body,twist);
+            EvaRigTransforms.rotate(model.getBone("torso_upper").get(),body.rotations.get("torso_upper"));
+            rotations.add("torso_upper");
+        }
+        body.dirty();var f=EvaRifleKinematics.sample(eva,partial,sight,body,root);
         Vector3f right=f.right().toVector3f(),forward=f.forward().toVector3f(),up=f.up().toVector3f();
         Matrix3f basis=new Matrix3f().setColumn(0,right).setColumn(1,new Vector3f(forward).negate()).setColumn(2,new Vector3f(up).negate());
         Quaternionf gunRotation=new Quaternionf().setFromNormalized(basis);

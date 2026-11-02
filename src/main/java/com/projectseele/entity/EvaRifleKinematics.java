@@ -18,6 +18,25 @@ public final class EvaRifleKinematics
     public static final double CAP_DOWN=-EvaRifleClearance.muzzle().z;
     private static final double STOCK_BACK=-EvaRifleClearance.stock().y;
     private static final double STOCK_UP=EvaRifleClearance.stock().z;
+    /**
+     * Stock pocket relative to the right shoulder joint (blocks; lateral + is
+     * the EVA's right): on the right pectoral plate below the joint, so the
+     * stock rests against the right side of the chest instead of under the
+     * chin. Lying down, it moves ahead of the shoulder along the ground.
+     */
+    private static final double POCKET_LATERAL=property("projectseele.rifleStockLateral",-2.4),
+            POCKET_FORWARD=property("projectseele.rifleStockForward",4.4),
+            POCKET_DOWN=property("projectseele.rifleStockDown",-2.0),
+            POCKET_FORWARD_PRONE=property("projectseele.rifleStockForwardProne",1.0),
+            POCKET_DOWN_PRONE=property("projectseele.rifleStockDownProne",-2.4),
+            /** Rise of the stock from low ready to aimed fire. */
+            SIGHT_LIFT=property("projectseele.rifleSightLift",0.8);
+    /** The chest turns at most this far from the hips toward the sight line; beyond it the barrel pivots on the stock. */
+    private static final float TWIST_LIMIT=50;
+    /** The drawn barrel converges on the sight line no nearer than this, so a wall or the floor close ahead cannot swing it. */
+    private static final double MIN_CONVERGENCE=96;
+    // Server and client threads share this JVM in single player.
+    private static final java.util.Map<EvaUnit01Entity,double[]> CONVERGENCE=java.util.Collections.synchronizedMap(new java.util.WeakHashMap<>());
     public record Frame(Vec3 grip,Vec3 muzzle,Vec3 stock,Vec3 forward,Vec3 up,Vec3 right,
                         float ready,float recoil,Vec3 eye,Quaternionf headRotation) {}
 
@@ -38,7 +57,59 @@ public final class EvaRifleKinematics
 
     public static Frame sample(EvaUnit01Entity entity,float partial,Vec3 direction)
     {
-        return sample(entity,partial,direction,EvaBodyPose.sample(entity,partial),world(entity,partial));
+        var body=EvaBodyPose.sample(entity,partial);
+        twist(body,twistDegrees(entity,partial,direction));
+        return sample(entity,partial,direction,body,world(entity,partial));
+    }
+
+    private static double property(String key,double fallback)
+    {
+        return Double.parseDouble(System.getProperty(key,String.valueOf(fallback)));
+    }
+
+    /**
+     * Yaw (degrees, Minecraft sense) the chest turns from the hips toward the
+     * sight line. The hull follows the pilot's view slowly; the chest takes up
+     * the difference so the stock stays on the chest instead of orbiting it.
+     */
+    public static float twistDegrees(EvaUnit01Entity entity,float partial,Vec3 direction)
+    {
+        if(EvaRifleClearance.usesLegacyGripFit()||direction.x*direction.x+direction.z*direction.z<1e-6)return 0;
+        float body=entity.level().isClientSide?Mth.rotLerp(partial,entity.yBodyRotO,entity.yBodyRot):entity.yBodyRot;
+        float aim=(float)Math.toDegrees(Math.atan2(-direction.x,direction.z));
+        float weight=(.35F+.65F*entity.rifleReadyBlend(partial))*(1-entity.rifleProneBlend(partial));
+        return Mth.clamp(Mth.wrapDegrees(aim-body),-TWIST_LIMIT,TWIST_LIMIT)*weight;
+    }
+
+    /** Turns the chest of a sampled body about the vertical through its waist joint. */
+    public static void twist(EvaBodyPose.Sample body,float degrees)
+    {
+        if(Math.abs(degrees)<.01F||!body.rig.containsKey("torso_upper")||!body.rig.containsKey("torso_lower"))return;
+        var parent=body.matrix("torso_lower").getNormalizedRotation(new Quaternionf());
+        // Minecraft yaw grows clockwise from above; model space turns the other way.
+        var yaw=new Quaternionf().rotationY(-degrees*Mth.DEG_TO_RAD);
+        body.rotations.put("torso_upper",new Quaternionf(parent).invert().mul(yaw).mul(parent).mul(body.rotations.get("torso_upper")));
+        body.dirty();
+    }
+
+    /**
+     * Distance along the sight line the barrel converges on: the sighted
+     * surface, never nearer than {@link #MIN_CONVERGENCE}, eased over about a
+     * quarter second so sweeping across near and far surfaces does not twitch
+     * the weapon.
+     */
+    private static double convergence(EvaUnit01Entity entity,double sighted)
+    {
+        // Ballistics keep the exact sighted point; only the drawn weapon eases.
+        if(!entity.level().isClientSide)return sighted;
+        double wanted=Math.max(MIN_CONVERGENCE,sighted);
+        long now=System.nanoTime();
+        double[] state=CONVERGENCE.get(entity);
+        if(state==null){CONVERGENCE.put(entity,new double[]{wanted,now});return wanted;}
+        double dt=Math.min(.5,Math.max(0,(now-state[1])/1e9));
+        state[0]+=(wanted-state[0])*(1-Math.exp(-dt/.25));
+        state[1]=now;
+        return state[0];
     }
 
     private static Quaternionf facing(Vec3 forward)
@@ -60,6 +131,9 @@ public final class EvaRifleKinematics
         Vector3f lateral=chest.transformDirection(new Vector3f(1,0,0)).normalize();
         Vec3 bodyRight=new Vec3(lateral.x,lateral.y,lateral.z);
         Vector3f f=world.transformDirection(new Vector3f(0,0,-1)).normalize();
+        float twist=twistDegrees(entity,partial,optical);
+        // The caller turned the chest by the same yaw; carry the pocket with it.
+        if(twist!=0)f.rotateY(-twist*Mth.DEG_TO_RAD);
         Vec3 bodyForward=new Vec3(f.x,0,f.z).normalize();
         float ready=entity.rifleReadyBlend(partial),recoil=entity.rifleRecoilBlend(partial);
         boolean supported=EvaBodyPose.hasSupportedStances();
@@ -82,23 +156,29 @@ public final class EvaRifleKinematics
         float sight=entity.rifleSightBlendR45(partial);sight=sight*sight*(3-2*sight);
         double stockLift=measuredGrip?5*sight:5;
         double pocketY=supported?-3.1:Mth.lerp(entity.rifleProneBlend(partial),-1.5D,.2D);
-        if(!EvaRifleClearance.usesLegacyGripFit())
-        {
-            // The imported receiver extends above and behind its grip. Carry
-            // its complete frame clear of the chest; both arm targets and the
-            // server muzzle must follow, rather than moving only the mesh.
-            lateralOffset-=3.7;
-            forwardOffset+=3.8;
-            pocketY+=1.8;
-        }
+        boolean chestPocket=!EvaRifleClearance.usesLegacyGripFit();
         Vec3 pocket=shoulder.add(bodyRight.scale(lateralOffset)).add(bodyForward.scale(forwardOffset)).add(0,pocketY,0);
+        if(chestPocket)
+        {
+            // The stock rests against the right side of the chest and only
+            // rises a little to aim. (The earlier carry moved it six blocks
+            // inboard and five up, under the chin, with the barrel across the
+            // face.) Standing or crouched it rides the chest plate as the
+            // chest leans; lying down it stays level ahead of the shoulder.
+            float prone=entity.rifleProneBlend(partial);
+            Vector3f chestForward=chest.transformDirection(new Vector3f(0,0,-1)).normalize(),chestUp=chest.transformDirection(new Vector3f(0,1,0)).normalize();
+            Vec3 riding=shoulder.add(bodyRight.scale(POCKET_LATERAL)).add(new Vec3(chestForward).scale(POCKET_FORWARD)).add(new Vec3(chestUp).scale(POCKET_DOWN));
+            Vec3 lying=shoulder.add(bodyRight.scale(POCKET_LATERAL)).add(bodyForward.scale(POCKET_FORWARD_PRONE)).add(0,POCKET_DOWN_PRONE,0);
+            pocket=riding.lerp(lying,prone);
+            stockLift=SIGHT_LIFT*sight;
+        }
         Vector3f headPoint=new Matrix4f(world).mul(body.matrix("head")).transformPosition(new Vector3f(body.rig.get("head").pivot()));
         Vec3 joint=new Vec3(headPoint.x,headPoint.y,headPoint.z);
         // Keep the carry offset in the aim frame while the chassis catches up
         // with a turn. Otherwise the fixed chest offset crosses the pilot's
         // sight line and the same rifle drifts from the right to screen centre.
         Vec3 horizontalAim=new Vec3(optical.x,0,optical.z);
-        if(horizontalAim.lengthSqr()>1e-6&&bodyForward.lengthSqr()>1e-6)
+        if(!chestPocket&&horizontalAim.lengthSqr()>1e-6&&bodyForward.lengthSqr()>1e-6)
         {
             var turn=new Quaternionf().rotationTo(bodyForward.toVector3f(),horizontalAim.normalize().toVector3f());
             pocket=joint.add(new Vec3(turn.transform(pocket.subtract(joint).toVector3f())));
@@ -115,7 +195,7 @@ public final class EvaRifleKinematics
             Vec3 carriedPocket=pocket.add(0,carryLift,0);
             Vec3 end=eye.add(optical.scale(SeeleConfig.EVA_RIFLE_RANGE.get()));
             var hit=entity.level().clip(new ClipContext(eye,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,entity));
-            Vec3 target=hit.getType()==HitResult.Type.MISS?end:hit.getLocation();
+            Vec3 target=eye.add(optical.scale(convergence(entity,hit.getType()==HitResult.Type.MISS?end.distanceTo(eye):hit.getLocation().distanceTo(eye))));
             Vec3 aim=target.subtract(carriedPocket.add(0,stockLift,0)).normalize();
             if(aim.lengthSqr()<1e-8)aim=optical;
             for(int pass=0;pass<2;pass++)

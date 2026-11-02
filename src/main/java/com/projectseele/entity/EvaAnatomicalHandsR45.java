@@ -476,12 +476,19 @@ public final class EvaAnatomicalHandsR45
         if(e.hasLiveActionForRender(0)||!e.pilotLocomotionRequestedR45()&&EvaGameplayMotionR32.guardWeight(e)>.12F)return "fist";
         return "relaxed";
     }
+    /**
+     * Closed-fist thumb (flex, twist, splay per joint). The authored contact
+     * left the thumb standing off the side of the fist; it folds across the
+     * middle phalanges of the index and middle fingers instead.
+     */
+    private static final float[][] FIST_THUMB={{45,20,-20},{35,0,0},{25,0,0}};
     private static Map<String,float[]> controls(Rig rig,String left,String right)
     {
         Map<String,float[]> values=new LinkedHashMap<>();
         for(Joint j:rig.joints)
         {
-            var p=rig.poses.getAsJsonObject(j.side.equals("l")?left:right);
+            String pose=j.side.equals("l")?left:right;
+            var p=rig.poses.getAsJsonObject(pose);
             if(p==null)throw new IllegalArgumentException("Unknown anatomical hand pose");
             float[] v=new float[3];JsonArray explicit=null;
             if(p.has("bone_angles")&&p.getAsJsonObject("bone_angles").has(j.name))explicit=p.getAsJsonObject("bone_angles").getAsJsonArray(j.name);
@@ -492,6 +499,7 @@ public final class EvaAnatomicalHandsR45
                 v[0]=p.getAsJsonArray(p.has(j.digit)?j.digit:"fingers").get(j.index).getAsFloat();
                 if(j.index==0&&p.has("splay")&&p.getAsJsonObject("splay").has(j.digit))v[2]=p.getAsJsonObject("splay").get(j.digit).getAsFloat();
             }
+            if(pose.equals("fist")&&j.digit.equals("thumb")&&j.index<FIST_THUMB.length)v=FIST_THUMB[j.index].clone();
             for(int i=0;i<3;i++)v[i]=Mth.clamp(v[i],j.limits[i][0],j.limits[i][1]);values.put(j.name,v);
         }
         return values;
