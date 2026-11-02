@@ -370,6 +370,7 @@ public final class EvaPoseGraph
             transitions=EvaPoseTransition.applySharedExitR45(entity,model,partialTick);
         EvaStanceFinishR56.apply(entity,model,partialTick,modelToWorld);
         EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
+        EvaFollowThroughR56.apply(entity,model,partialTick);
         String continuityOwner=motionWrites.owner();
         EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);

@@ -12,10 +12,11 @@ import software.bernie.geckolib.cache.object.BakedGeoModel;
 /**
  * Last touches on a crouched or prone body, whichever pose owner drew it.
  * <p>
- * Lying flat turns the shoulder pylons and the dorsal cover from upright to
- * pointing past the raised helmet, hiding it and crowding its back: as the
- * chest goes down, fold them back flat over the shoulders and lift the
- * helmet clear of the collar (feet: {@link EvaGroundContactR56}). Free hands
+ * The shoulder pylons ride the upper arms, taking half of each arm's swing,
+ * whatever the action; raised arms tip them back. The dorsal cover folds
+ * back as the helmet tips back toward it, and further as the chest lies
+ * down, where the neck also reaches out of the collar (feet:
+ * {@link EvaGroundContactR56}). Free hands
  * reach for the ground on the way down and lie palm down on it; the captured
  * pose rolled them onto their edges with the wrist bent outward.
  * <p>
@@ -24,10 +25,11 @@ import software.bernie.geckolib.cache.object.BakedGeoModel;
  */
 final class EvaStanceFinishR56
 {
-    private static final float PYLON_TILT=Float.parseFloat(System.getProperty("projectseele.proneTiltR56","110"));
-    /** Pylons also splay outward this far, opening the gap over the helmet. */
-    private static final float PYLON_SPLAY=12;
+    /** Share of the upper arm's swing each shoulder pylon takes up. */
+    private static final float PYLON_FOLLOW=Float.parseFloat(System.getProperty("projectseele.pylonFollowR56",".5"));
     private static final float COVER_TILT=Float.parseFloat(System.getProperty("projectseele.proneCoverTiltR56","90"));
+    /** Helmet tip-back (degrees from the chest) the cover allows before folding, and its fold per degree beyond. */
+    private static final float COVER_FREE=8,COVER_PER_DEGREE=1.3F,COVER_MAX=100;
     /** The neck reaches this far along the chest (model pixels), lifting the helmet out of the collar. */
     private static final float NECK_REACH=2.5F,NECK_DROP=2.5F;
     /** Chest tilt from upright (degrees) from which the back folds, and by which it is folded. */
@@ -43,15 +45,12 @@ final class EvaStanceFinishR56
     {
         if(eva instanceof EvaPrototypeEntity||eva.isNervLogisticsLocked()||eva.isFirstBattleActive())return;
         float prone=smooth(Math.max(eva.rifleProneBlend(partial),EvaFixedCannonBodyR55.applies(eva)?1F:0F));
+        followArms(model);
         float fold=prone>.01F?fold(model)*smooth(prone/.15F):0;
+        float cover=Math.max(COVER_TILT*fold,Mth.clamp((headTipBack(model)-COVER_FREE)*COVER_PER_DEGREE,0,COVER_MAX));
+        if(cover>.5F)model.getBone("dorsal_cover").ifPresent(b->b.setRotX(b.getRotX()+cover*Mth.DEG_TO_RAD));
         if(fold>.01F)
-        {
-            float tilt=PYLON_TILT*Mth.DEG_TO_RAD*fold,splay=PYLON_SPLAY*Mth.DEG_TO_RAD*fold;
-            model.getBone("pylon_l").ifPresent(b->{b.setRotX(b.getRotX()+tilt);b.setRotZ(b.getRotZ()+splay);});
-            model.getBone("pylon_r").ifPresent(b->{b.setRotX(b.getRotX()+tilt);b.setRotZ(b.getRotZ()-splay);});
-            model.getBone("dorsal_cover").ifPresent(b->b.setRotX(b.getRotX()+COVER_TILT*Mth.DEG_TO_RAD*fold));
             model.getBone("neck").ifPresent(b->{b.setPosY(b.getPosY()+NECK_REACH*fold);b.setPosZ(b.getPosZ()-NECK_DROP*fold);});
-        }
         if(eva.hasLiveActionForRender(partial)||eva.hasLegacyStrikeForRender()||eva.getOrdinaryAttackStage()>=0)return;
         int weapon=eva.getWeapon();
         boolean emptyLeft=weapon==EvaUnit01Entity.WEAPON_FISTS||weapon==EvaUnit01Entity.WEAPON_KNIFE;
@@ -105,6 +104,36 @@ final class EvaStanceFinishR56
         }
         var parent=EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(hand.getParent())));
         EvaRigTransforms.rotate(hand,parent.invert().mul(wanted));
+    }
+
+    /** Each pylon turns with its upper arm by {@link #PYLON_FOLLOW} of the arm's swing (its twist ignored). */
+    private static void followArms(BakedGeoModel model)
+    {
+        var chest=model.getBone("torso_upper").orElse(null);
+        if(chest==null||PYLON_FOLLOW<=0)return;
+        var chestRotation=EvaRigTransforms.rotation(EvaRigTransforms.model(chest));
+        for(String side:new String[]{"l","r"})
+        {
+            var arm=model.getBone("arm_"+side).orElse(null);var pylon=model.getBone("pylon_"+side).orElse(null);
+            if(arm==null||pylon==null||pylon.getParent()!=chest)continue;
+            var relative=new Quaternionf(chestRotation).invert().mul(EvaRigTransforms.rotation(EvaRigTransforms.model(arm)));
+            // At rest the arm hangs along -Y.
+            var swing=new Quaternionf().rotationTo(new Vector3f(0,-1,0),relative.transform(new Vector3f(0,-1,0)));
+            var follow=new Quaternionf().slerp(swing,PYLON_FOLLOW);
+            EvaRigTransforms.rotate(pylon,follow.mul(new Quaternionf().rotationZYX(pylon.getRotZ(),pylon.getRotY(),pylon.getRotX())));
+        }
+    }
+
+    /** Degrees the helmet is tipped back from the chest, toward the dorsal cover. */
+    private static float headTipBack(BakedGeoModel model)
+    {
+        var chest=model.getBone("torso_upper").orElse(null);var head=model.getBone("head").orElse(null);
+        if(chest==null||head==null)return 0;
+        var relative=new Quaternionf(EvaRigTransforms.rotation(EvaRigTransforms.model(chest))).invert()
+                .mul(EvaRigTransforms.rotation(EvaRigTransforms.model(head)));
+        // The helmet's up axis leans toward +Z (the back) as it tips back.
+        var up=relative.transform(new Vector3f(0,1,0));
+        return (float)Math.toDegrees(Math.atan2(up.z,up.y));
     }
 
     /**

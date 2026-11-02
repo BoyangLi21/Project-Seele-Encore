@@ -426,7 +426,11 @@ public final class EvaConnectedActionReview
             JsonArray values = new JsonArray();
             values.add(bone.getRotX()); values.add(bone.getRotY()); values.add(bone.getRotZ());
             values.add(bone.getPosX()); values.add(bone.getPosY()); values.add(bone.getPosZ());
-            if (bone.isHidden()) values.add(1);
+            // Hidden flag, then the scale when it is not one (weapons are
+            // drawn at a fraction of their mesh size).
+            boolean scaled = bone.getScaleX() != 1 || bone.getScaleY() != 1 || bone.getScaleZ() != 1;
+            if (bone.isHidden() || scaled) values.add(bone.isHidden() ? 1 : 0);
+            if (scaled) { values.add(bone.getScaleX()); values.add(bone.getScaleY()); values.add(bone.getScaleZ()); }
             transforms.add(bone.getName(), values);
         }
         row.add("bones", transforms);

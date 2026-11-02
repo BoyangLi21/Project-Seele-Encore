@@ -70,11 +70,66 @@ final class EvaGroundContactR56
         settleFoot(eva,model,root,hulls,"r",floor,left,now);
         float lowest=lowest(model,root,hulls);
         float gap=Mth.clamp(lowest-ground,-MAX_LIFT,MAX_DROP);
-        if(Math.abs(gap)<.02F)return;
         var base=model.getBone("root").orElse(null);
         if(base==null)return;
         // Root offsets are model pixels; the world frame only turns and scales.
-        base.setPosY(base.getPosY()-gap*16/EvaScale.RENDER_SCALE);
+        float grounded=base.getPosY()-gap*16/EvaScale.RENDER_SCALE;
+        float walking=eva.isPilotProne()?0:Mth.clamp(eva.rifleMoveBlend(partial),0,1);
+        float drawn=easePelvis(eva,grounded,walking,now);
+        base.setPosY(drawn);
+        // The eased pelvis sits this far above (+) or below (-) the grounded
+        // one: planted legs take up the difference so their soles stay down.
+        float lift=(drawn-grounded)*EvaScale.RENDER_SCALE/16;
+        if(Math.abs(lift)>.01F)
+            for(String side:new String[]{"l","r"})
+            {
+                var last=ANKLES.get(eva.getId()+side);
+                // A stance foot takes the whole difference; a partial share
+                // left the sole floating while the foot eased onto the ground.
+                if(last!=null&&last.planted()>.1F)reachGround(model,root,side,lift*step((last.planted()-.1F)/.3F));
+            }
+    }
+
+    private record Pelvis(float height,float speed,long time) {}
+    private static final Map<Integer,Pelvis> PELVIS=new HashMap<>();
+    /** Stiffness (1/s) of the walking pelvis spring, and its largest lag behind the grounded height (model pixels). */
+    private static final float PELVIS_RATE=18F,PELVIS_LAG=1.1F;
+
+    /**
+     * Walking, the pelvis height follows the grounded one through a critically
+     * damped spring. Pinning the lowest sole every frame dropped the pelvis
+     * about a block within one tick at each footfall and threw it back up:
+     * the body shook all through a walk.
+     */
+    private static float easePelvis(EvaUnit01Entity eva,float grounded,float walking,long now)
+    {
+        var last=PELVIS.get(eva.getId());
+        if(last!=null&&last.time()==now)return Mth.lerp(walking,grounded,Mth.clamp(last.height(),grounded-PELVIS_LAG,grounded+PELVIS_LAG));
+        float dt=last==null?0:(now-last.time())/1e9F;
+        float height=grounded,speed=0;
+        if(last!=null&&dt>0&&dt<.25F)
+        {
+            float error=last.height()-grounded,step=(last.speed()+PELVIS_RATE*error)*dt,decay=(float)Math.exp(-PELVIS_RATE*dt);
+            height=grounded+(error+step)*decay;
+            speed=(last.speed()-PELVIS_RATE*step)*decay;
+        }
+        height=Mth.clamp(height,grounded-PELVIS_LAG,grounded+PELVIS_LAG);
+        if(PELVIS.size()>32)PELVIS.clear();
+        PELVIS.put(eva.getId(),new Pelvis(height,speed,now));
+        return Mth.lerp(walking,grounded,height);
+    }
+
+    /** Bend or reach a planted leg so its sole moves down by {@code drop} blocks (up when negative). */
+    private static void reachGround(BakedGeoModel model,Matrix4f root,String side,float drop)
+    {
+        var leg=model.getBone("leg_"+side).orElse(null);var shin=model.getBone("shin_"+side).orElse(null);
+        var ankle=model.getBone("ankle_"+side).orElse(null);var foot=model.getBone("foot_"+side).orElse(null);
+        if(leg==null||shin==null||ankle==null||foot==null)return;
+        var footWorld=new Matrix4f(root).mul(EvaRigTransforms.model(foot));
+        var target=EvaRigTransforms.point(foot,EvaRigTransforms.pivot(foot),root).add(0,-drop,0);
+        var hip=EvaRigTransforms.point(leg,EvaRigTransforms.pivot(leg),root);
+        var knee=EvaRigTransforms.point(leg,EvaRigTransforms.knee(shin),root);
+        EvaRigTransforms.solveLeg(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(footWorld),knee.sub(hip),root);
     }
 
     private static boolean applies(EvaUnit01Entity eva)

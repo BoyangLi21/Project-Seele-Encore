@@ -6,7 +6,8 @@ blender -b --factory-startup --python render_recorded.py -- --assets <dir> --pos
 
 Each record holds the final GeckoLib bone channels the game drew at one
 tick (radians, model pixels; X position mirrored as GeckoLib applies it),
-the hidden flag of every bone, and the entity position.  Records are
+the hidden flag and scale of every bone (weapons are drawn at 0.72 of
+their mesh size), and the entity position.  Records are
 interpolated on their exact entity time, so the frames show the runtime
 poses at a steady frame rate without launching the game.
 
@@ -202,9 +203,11 @@ def main():
             pb = arm.pose.bones.get(name)
             if pb is None:
                 continue
-            q, pos = states[name]
+            q, pos, scale = states[name]
             pb.rotation_quaternion = lab.quat_model_to_blender(mathutils.Quaternion(q))
             pb.location = lab.model_to_blender(mathutils.Vector(pos))
+            # Weapons are drawn scaled uniformly; Blender bone axes differ.
+            pb.scale = (float(scale.mean()),) * 3
         # The game skips the blocky body hands while the anatomical ones draw.
         anatomical = hands is not None and near.get("anatomicalHands", True)
         for name, ob in parts.items():

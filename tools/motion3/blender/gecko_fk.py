@@ -2,9 +2,9 @@
 
 A baked GeckoLib bone keeps its geo pivot with X negated and its initial
 rotation with X and Y negated.  Drawing it applies, from the parent:
-translate(-posX, posY, posZ) / 16, translate(pivot), Rz * Ry * Rx,
+translate(-posX, posY, posZ) / 16, translate(pivot), Rz * Ry * Rx, scale,
 translate(-pivot).  Recorded channels are the final getRot*/getPos* values,
-initial rotation included.
+initial rotation included, then optionally a hidden flag and the scale.
 """
 
 import json
@@ -52,25 +52,26 @@ def quat_matrix(q):
 
 
 def channel_state(ch):
-    """Recorded [rx, ry, rz, px, py, pz(, hidden)] -> (quaternion, model-space offset)."""
-    return euler_quat(ch[0], ch[1], ch[2]), np.array([-ch[3], ch[4], ch[5]], float) / 16.0
+    """Recorded [rx, ry, rz, px, py, pz(, hidden(, sx, sy, sz))] -> (quaternion, model-space offset, scale)."""
+    scale = np.array(ch[7:10], float) if len(ch) >= 10 else np.ones(3)
+    return euler_quat(ch[0], ch[1], ch[2]), np.array([-ch[3], ch[4], ch[5]], float) / 16.0, scale
 
 
 def blend_states(a, b, t):
-    return quat_slerp(a[0], b[0], t), a[1] + (b[1] - a[1]) * t
+    return quat_slerp(a[0], b[0], t), a[1] + (b[1] - a[1]) * t, a[2] + (b[2] - a[2]) * t
 
 
 def model_matrices(rig, states):
-    """states: bone -> (quaternion, offset); bones without a state stay at bind."""
+    """states: bone -> (quaternion, offset, scale); bones without a state stay at bind."""
     out = {}
 
     def get(name):
         if name in out:
             return out[name]
         b = rig[name]
-        q, pos = states.get(name) or (euler_quat(*b["bind"]), np.zeros(3))
+        q, pos, scale = states.get(name) or (euler_quat(*b["bind"]), np.zeros(3), np.ones(3))
         local = np.eye(4)
-        local[:3, :3] = quat_matrix(q)
+        local[:3, :3] = quat_matrix(q) * scale
         local[:3, 3] = pos + b["pivot"] - local[:3, :3] @ b["pivot"]
         out[name] = (get(b["parent"]) if b["parent"] else np.eye(4)) @ local
         return out[name]
