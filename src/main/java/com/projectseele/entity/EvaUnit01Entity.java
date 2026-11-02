@@ -398,8 +398,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private float rifleCrouchPrevious,riflePronePrevious,rifleReadyPrevious,rifleRecoilPrevious;
     private final float[] rifleSignalPrevious=new float[8],rifleSignalCurrent=new float[8];
     private final int[] rifleSignalTicks=new int[8];
-    private final EvaPoseSignalClock[] poseSignalClocks={new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock()};
-    private final EvaPoseSignalClock actionSignalClock=new EvaPoseSignalClock();
+    private final EvaPoseSignalClock[] poseSignalClocks={new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock().extrapolating(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock()};
+    private final EvaPoseSignalClock actionSignalClock=new EvaPoseSignalClock().extrapolating();
     private float rifleStanceVelocity;
     private boolean rifleStanceInitialized;
     private double riflePreviousX=Double.NaN,riflePreviousZ;
@@ -4583,7 +4583,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     SeeleConfig.EVA_RIFLE_DAMAGE.get().floatValue(),end,shotDirection,com.projectseele.physics.CombatDamageTargetsR44.Weapon.PROJECTILE,muzzle);
         }
 
-        SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
+        SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension),
                 new ClientboundRifleTracerPacket(this.getId(), muzzle.x,
                         muzzle.y, muzzle.z, end.x, end.y, end.z));
         if (entityHit == null
@@ -4682,8 +4682,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         Vec3 groundZero = this.position();
         Vec3 flash = groundZero.add(0.0D, 5.0D, 0.0D);
         StrategicExplosionDirector.startN2(level, groundZero, this);
-        SeeleNetwork.CHANNEL.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(
-                        flash.x, flash.y, flash.z, 1024.0D, level.dimension())),
+        SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension),
                 new ClientboundNukeFxPacket(flash.x, flash.y, flash.z, 10.8F, false));
         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER,
                 flash.x, flash.y, flash.z, 24, 12.0D, 7.0D, 12.0D, 0.0D);
@@ -5295,12 +5294,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(confirmedImpact)StrategicExplosionDirector.startCannon(level, end, this);
         final Vec3 impact = end;
 
-        SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
+        SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension),
                 new ClientboundCannonBeamPacket(muzzle.x, muzzle.y, muzzle.z, end.x, end.y, end.z));
         if(confirmedImpact)
         {
-        SeeleNetwork.CHANNEL.send(PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(
-                        impact.x, impact.y, impact.z, 320.0D, level.dimension())),
+        SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(level::dimension),
                 new ClientboundNukeFxPacket(impact.x, impact.y, impact.z, 3.6F, false));
         level.sendParticles(ParticleTypes.END_ROD, impact.x, impact.y, impact.z, 54, 1.4D, 1.4D, 1.4D, 0.24D);
         level.sendParticles(ParticleTypes.EXPLOSION_EMITTER,

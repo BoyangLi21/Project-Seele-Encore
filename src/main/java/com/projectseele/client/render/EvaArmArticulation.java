@@ -19,7 +19,11 @@ final class EvaArmArticulation
             var target=EvaRigTransforms.point(hand,EvaRigTransforms.pivot(hand),root);var orientation=EvaRigTransforms.rotation(EvaRigTransforms.model(hand));
             var centre=EvaRigTransforms.elbow(lower,side);var shoulder=EvaRigTransforms.point(upper,EvaRigTransforms.pivot(upper),root);var elbow=EvaRigTransforms.point(upper,centre,root);
             float reach=new Vector3f(centre).sub(EvaRigTransforms.pivot(upper)).length()+EvaRigTransforms.pivot(hand).sub(centre).length();
-            if(target.distance(shoulder)>reach-.001F)continue;
+            // A near-straight arm hovers at full reach: skipping the solve there
+            // alternated solved and unsolved wrists between frames. Pull the
+            // target just inside reach instead so the solution stays continuous.
+            float span=target.distance(shoulder);
+            if(span>reach-.001F)target.set(new Vector3f(target).sub(shoulder).mul((reach-.001F)/Math.max(span,1e-6F)).add(shoulder));
             EvaRigTransforms.solveArm(upper,lower,wrist,hand,side,target,orientation,elbow.sub(shoulder),root);
             rotations.addAll(Set.of("arm_"+side,"forearm_"+side,"wrist_"+side,"hand_"+side));positions.addAll(Set.of("forearm_"+side,"wrist_"+side,"hand_"+side));
         }

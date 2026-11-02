@@ -78,7 +78,7 @@ public final class AngelGrappleSurfaceR31
     {
         Matrix4f old=cache.get(name);if(old!=null)return old;Bone bone=p.bones.get(name);Vector3f start=new Vector3f(bone.idle),offset=new Vector3f();
         if(victim instanceof SachielEntity s&&s.isStrikeActive()&&SachielGameplayMotionR32.ready())
-        {var shared=SachielGameplayMotionR32.pose(s,s.strikeAge(pose.partial));if(shared.rotations.containsKey(name)){shared.rotations.get(name).getEulerAnglesZYX(start);offset.set(shared.positions.get(name));}}
+        {var shared=SachielGameplayMotionR32.pose(s,s.strikeAge(pose.partial));if(shared.rotations.containsKey(name)){start.set(com.projectseele.util.QuaternionChannelsR45.euler(shared.rotations.get(name)));offset.set(shared.positions.get(name));}}
         Vector3f r=rotation(victim,name,start,pose),q=bone.pivot;
         Matrix4f m=new Matrix4f().translation(offset).translate(q).rotateZYX(r.z,r.y,r.x).translate(-q.x,-q.y,-q.z);
         if(bone.parent!=null)m=new Matrix4f(matrix(victim,p,bone.parent,pose,cache)).mul(m);cache.put(name,m);return m;

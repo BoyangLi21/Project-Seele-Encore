@@ -753,8 +753,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                 && (terrain.complete() || bodyHit != null || blockHit.getType() == net.minecraft.world.phys.HitResult.Type.BLOCK))
         {
             SeeleNetwork.CHANNEL.send(
-                    PacketDistributor.NEAR.with(() -> new PacketDistributor.TargetPoint(
-                            impact.x, impact.y, impact.z, 256.0D, serverLevel.dimension())),
+                    PacketDistributor.DIMENSION.with(serverLevel::dimension),
                     new ClientboundNukeFxPacket(impact.x, impact.y, impact.z, 2.6F, true));
             serverLevel.sendParticles(ParticleTypes.END_ROD, impact.x, impact.y, impact.z, 64, 2.0D, 2.0D, 2.0D, 0.22D);
             serverLevel.sendParticles(ParticleTypes.EXPLOSION_EMITTER, impact.x, impact.y + 2.0D, impact.z, 9, 5.0D, 2.5D, 5.0D, 0.0D);

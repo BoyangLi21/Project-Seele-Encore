@@ -136,9 +136,9 @@ public class ZeruelEntity extends Monster implements Angel, SiegeAnchorAware, so
         var hit=com.projectseele.physics.CombatEntityQueryR44.ray(server,from,impact,.3,
                 entity->entity!=this&&entity.isAlive()&&(entity instanceof EvaUnit01Entity||entity instanceof Player));
         if(hit!=null)impact=hit.getLocation();
-        SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
+        SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(server::dimension),
                 new ClientboundCannonBeamPacket(from.x, from.y, from.z, impact.x, impact.y, impact.z));
-        SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(() -> this),
+        SeeleNetwork.CHANNEL.send(PacketDistributor.DIMENSION.with(server::dimension),
                 new ClientboundNukeFxPacket(impact.x, impact.y, impact.z, 2.2F, true));
         if(hit!=null)hit.getEntity().hurt(this.damageSources().mobAttack(this),125.0F);
         server.explode(this, impact.x, impact.y, impact.z, 10.0F, ExplosionInteraction.MOB);

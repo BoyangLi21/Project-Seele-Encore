@@ -8,16 +8,35 @@ public final class EvaPoseSignalClock
     private final long minimumWindow,maximumWindow;
     private boolean initialized;
     private Object actionSourceR52;
+    /** Monotonic progress clocks keep moving past a late packet instead of holding. */
+    private boolean extrapolate,cyclicSignal;
+    private float rate;
     public EvaPoseSignalClock(){this(50_000_000L,100_000_000L);}
     public EvaPoseSignalClock(long fixedWindow){this(fixedWindow,fixedWindow);}
     private EvaPoseSignalClock(long minimum,long maximum)
     {if(minimum<=0||maximum<minimum)throw new IllegalArgumentException("Invalid pose interpolation window");minimumWindow=minimum;maximumWindow=maximum;window=minimum;}
+    /**
+     * For a monotonic 0..1 progress signal or a forward-running cyclic phase:
+     * after reaching the newest packet the clock continues at the packet rate
+     * for at most one more window (progress clamped to 1), so a packet arriving
+     * a frame late no longer freezes the pose for that frame and then jumps two
+     * frames' worth.  The next packet redirects from the value actually drawn,
+     * as before.
+     */
+    public EvaPoseSignalClock extrapolating(){extrapolate=true;return this;}
     public void snap(float value){snapAt(value,System.nanoTime());}
-    void snapAt(float value,long now){from=to=raw=value;start=lastAccepted=now;window=minimumWindow;initialized=true;}
+    void snapAt(float value,long now){from=to=raw=value;start=lastAccepted=now;window=minimumWindow;initialized=true;rate=0;}
     public float sample(long now)
     {
-        float t=(float)Math.max(0,Math.min(1,(now-start)/(double)window));
-        return from+(to-from)*t;
+        double elapsed=(now-start)/(double)window;
+        float t=(float)Math.max(0,Math.min(1,elapsed));
+        float value=from+(to-from)*t;
+        if(extrapolate&&elapsed>1&&rate>0)
+        {
+            value=to+rate*(float)(Math.min(elapsed-1,1)*window);
+            if(!cyclicSignal)value=Math.min(1F,value);
+        }
+        return value;
     }
     public void accept(float value,boolean cyclic,boolean restartOnBackward)
     {
@@ -45,7 +64,15 @@ public final class EvaPoseSignalClock
         // Accepted packet endpoints own travelled phase. Measuring from the
         // lagging rendered value reverses forward bursts crossing half a cycle.
         if(cyclic){float d=value-raw;d-=Math.round(d);target=to+d;}
-        window=Math.max(minimumWindow,Math.min(maximumWindow,now-lastAccepted));
+        long gap=now-lastAccepted;
+        cyclicSignal=cyclic;
+        if(extrapolate)
+        {
+            float step=value-raw;
+            if(cyclic)step-=Math.round(step);
+            rate=gap>0&&step>0?step/(float)gap:0;
+        }
+        window=Math.max(minimumWindow,Math.min(maximumWindow,gap));
         from=current;to=target;raw=value;start=lastAccepted=now;
     }
 }

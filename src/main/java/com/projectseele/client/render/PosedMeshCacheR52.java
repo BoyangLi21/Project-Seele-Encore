@@ -24,6 +24,8 @@ final class PosedMeshCacheR52
     private long frame = Long.MIN_VALUE;
     private int partial;
     private long revision;
+    /** About 0.09 degrees, 1/50 model pixel and 0.05 percent: below what a frame can show. */
+    private static final float ROTATION_EPSILON = 0.0015F, POSITION_EPSILON = 0.02F, SCALE_EPSILON = 0.0005F;
     private final Set<Object> sampled = Collections.newSetFromMap(new IdentityHashMap<>());
 
     PosedMeshCacheR52() { this(null, Set.of(), Set.of()); }
@@ -65,24 +67,24 @@ final class PosedMeshCacheR52
         int at = 0;
         for (GeoBone bone : this.bones)
         {
-            changed |= channel(at++, bone.getRotX());
-            changed |= channel(at++, bone.getRotY());
-            changed |= channel(at++, bone.getRotZ());
-            changed |= channel(at++, bone.getPosX());
-            changed |= channel(at++, bone.getPosY());
-            changed |= channel(at++, bone.getPosZ());
-            changed |= channel(at++, bone.getScaleX());
-            changed |= channel(at++, bone.getScaleY());
-            changed |= channel(at++, bone.getScaleZ());
-            changed |= channel(at++, bone.getPivotX());
-            changed |= channel(at++, bone.getPivotY());
-            changed |= channel(at++, bone.getPivotZ());
+            changed |= channel(at++, bone.getRotX(), ROTATION_EPSILON);
+            changed |= channel(at++, bone.getRotY(), ROTATION_EPSILON);
+            changed |= channel(at++, bone.getRotZ(), ROTATION_EPSILON);
+            changed |= channel(at++, bone.getPosX(), POSITION_EPSILON);
+            changed |= channel(at++, bone.getPosY(), POSITION_EPSILON);
+            changed |= channel(at++, bone.getPosZ(), POSITION_EPSILON);
+            changed |= channel(at++, bone.getScaleX(), SCALE_EPSILON);
+            changed |= channel(at++, bone.getScaleY(), SCALE_EPSILON);
+            changed |= channel(at++, bone.getScaleZ(), SCALE_EPSILON);
+            changed |= channel(at++, bone.getPivotX(), 0.0F);
+            changed |= channel(at++, bone.getPivotY(), 0.0F);
+            changed |= channel(at++, bone.getPivotZ(), 0.0F);
         }
         for (GeoBone bone : this.correctiveBones)
         {
-            changed |= channel(at++, bone.getRotX());
-            changed |= channel(at++, bone.getRotY());
-            changed |= channel(at++, bone.getRotZ());
+            changed |= channel(at++, bone.getRotX(), ROTATION_EPSILON);
+            changed |= channel(at++, bone.getRotY(), ROTATION_EPSILON);
+            changed |= channel(at++, bone.getRotZ(), ROTATION_EPSILON);
         }
         if (changed)
         {
@@ -134,12 +136,19 @@ final class PosedMeshCacheR52
     { for (GeoBone at = bone; at != ancestor; at = at.getParent()) watched.add(at); }
     GeoBone commonAncestor() { return this.commonAncestor; }
 
-    private boolean channel(int at, float value)
+    /**
+     * A channel counts as changed once it drifts past its tolerance from the
+     * value the cached skin was evaluated with.  Interpolated finger and seam
+     * rotations differ in their last bits every frame; bit-exact comparison
+     * re-skinned and re-uploaded every skinned vertex on every frame.
+     */
+    private boolean channel(int at, float value, float epsilon)
     {
         int bits = Float.floatToRawIntBits(value);
-        boolean changed = this.channels[at] != bits;
+        if (this.channels[at] == bits) return false;
+        if (epsilon > 0.0F && Math.abs(value - Float.intBitsToFloat(this.channels[at])) <= epsilon) return false;
         this.channels[at] = bits;
-        return changed;
+        return true;
     }
 
     private static void collect(GeoBone bone, ArrayList<GeoBone> result)

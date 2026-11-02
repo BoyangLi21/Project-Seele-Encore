@@ -232,9 +232,8 @@ public final class FirstBattleDirector
         var record=data.active;if(record==null||record.deathResolved)return;record.deathResolved=true;data.setDirty();
         Vec3 p=angel==null?eva.position().add(0,40,0):FirstBattleClip.point(record.spec,false,"core_blocks",Math.min(18.6F,record.age/20F));
         var finale=new com.projectseele.network.ClientboundBattleFinalePacket(p.x,record.spec.origin().y,p.z);
-        for(var observer:level.players())
-            if(observer==pilot||observer.position().distanceToSqr(p)<1024*1024)
-                com.projectseele.network.SeeleNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.PLAYER.with(()->observer),finale);
+        // Every player in the dimension sees the finale, not only those near the battle.
+        com.projectseele.network.SeeleNetwork.CHANNEL.send(net.minecraftforge.network.PacketDistributor.DIMENSION.with(level::dimension),finale);
         if(angel!=null)angel.finishFirstBattle(eva,pilot);
         ProjectSeele.LOGGER.info("R10 FIRST BATTLE DEATH ONCE angel={} pilot={} age={}",record.angel,record.pilot,record.age);
     }

@@ -39,6 +39,9 @@ public final class EvaConnectedActionReview
     private static final boolean R05 = Boolean.getBoolean("projectseele.motionReviewR05");
     private static final boolean R06 = Boolean.getBoolean("projectseele.motionReviewR06");
     private static final boolean R10="r10-motion".equals(System.getProperty("projectseele.regionalBuild",""));
+    /** Transition tour: every stance/weapon change the pilot can make, back to back (pose continuity review). */
+    private static final boolean TOUR=Boolean.getBoolean("projectseele.transitionTour");
+    private static final int TOUR_END=1360;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     private static int wait;
     private static int tick;
@@ -113,6 +116,13 @@ public final class EvaConnectedActionReview
             {
                 throw new IllegalStateException("Unable to create action review", exception);
             }
+        }
+        if (TOUR)
+        {
+            tour(mc, eva);
+            previousTick = tick;
+            if (tick >= TOUR_END) finish(mc, "complete");
+            return;
         }
         if (RIFLE)
         {
@@ -209,6 +219,28 @@ public final class EvaConnectedActionReview
         if (at(offset+275) || at(offset+355)) send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
         if (local >= 30 && local < 510 && tick / 8 != previousTick / 8) send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
         positionCamera(mc, eva);
+    }
+
+    private static void tour(Minecraft mc,EvaUnit01Entity eva)
+    {
+        boolean move=tick>=40&&tick<140||tick>=360&&tick<420||tick>=500&&tick<580||tick>=720&&tick<800
+                ||tick>=840&&tick<900||tick>=1000&&tick<1060||tick>=1270&&tick<1330;
+        mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        if(at(70))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(at(170)||at(182)||at(194)||at(206))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        if(at(290))send(ServerboundEvaControlPacket.ACTION_STOMP);
+        if(at(340)||at(820))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
+        if(at(440)||at(920))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
+        if(at(470)||at(600)||at(940)||at(1080))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
+        if(at(660))mc.player.connection.sendCommand("seele motionlab weapon unit01 rifle");
+        if((tick>=680&&tick<900||tick>=970&&tick<1000)&&tick/4!=previousTick/4)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
+        if(at(1130))mc.player.connection.sendCommand("seele motionlab weapon unit01 knife");
+        if(at(1150)||at(1165)||at(1180))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(1220))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        positionCamera(mc,eva);
     }
 
     private static void controlsR05(Minecraft mc,EvaUnit01Entity eva)
@@ -412,6 +444,9 @@ public final class EvaConnectedActionReview
         }
         if (!ENABLED || finished || poses == null || event.phase != TickEvent.Phase.END
                 || tick == capturedTick) return;
+        // The tour measures per-frame continuity: a screenshot per tick would
+        // halve the frame rate, so it keeps one still every two seconds.
+        if (TOUR && !Boolean.getBoolean("projectseele.tourCapture") && tick % 40 != 0) return;
         Minecraft mc = Minecraft.getInstance();
         capturedTick = tick;
         frame++;

@@ -153,8 +153,8 @@ public final class EvaRifleContactRig
         float out=1,down=.7F;
         float highAim=net.minecraft.util.Mth.clamp((float)(f.forward().y-.35)/.35F,0,1);
         Vector3f rightPole=new Vector3f(right).mul(out-.35F*highAim).add(0,-down,0);
-        rightPole=groundedPole(model,"r",rightTarget,rightPole,root,(float)eva.getY()+3.5F,prone);
-        leftPole=groundedPole(model,"l",leftTarget,leftPole,root,(float)eva.getY()+3.5F,Math.max(prone,support));
+        rightPole=groundedPole(eva.getId(),model,"r",rightTarget,rightPole,root,(float)eva.getY()+3.5F,prone);
+        leftPole=groundedPole(eva.getId(),model,"l",leftTarget,leftPole,root,(float)eva.getY()+3.5F,Math.max(prone,support));
         double re=solve(model,"r",rightTarget,qR,rightPole,root);
         double le=solve(model,"l",leftTarget,qL,leftPole,root);
         if(com.projectseele.visual.UNR29Review.R30&&le>.5&&eva.tickCount%20==0)
@@ -200,9 +200,12 @@ public final class EvaRifleContactRig
         return new Quaternionf(rotation).mul(new Quaternionf().setFromNormalized(handFrame(oldAlong,oldAcross).mul(handFrame(along,across).transpose())));
     }
 
-    private static Vector3f groundedPole(BakedGeoModel model,String side,Vector3f target,Vector3f preferred,Matrix4f root,float height,float weight)
+    /** Last grounded elbow direction per EVA and side: keeps the choice between the two mirror solutions stable. */
+    private static final java.util.Map<String,Vector3f> GROUNDED=new java.util.HashMap<>();
+    private static Vector3f groundedPole(int entity,BakedGeoModel model,String side,Vector3f target,Vector3f preferred,Matrix4f root,float height,float weight)
     {
-        if(weight<.001F)return preferred;
+        String key=entity+side;
+        if(weight<.001F){GROUNDED.remove(key);return preferred;}
         var upper=model.getBone("arm_"+side).orElseThrow();var hand=model.getBone("hand_"+side).orElseThrow();
         var shoulder=EvaRigTransforms.point(upper,EvaRigTransforms.pivot(upper),root);float scale=root.getScale(new Vector3f()).y;
         var centreLocal=EvaRigTransforms.elbow(model.getBone("forearm_"+side).orElseThrow(),side);
@@ -216,7 +219,15 @@ public final class EvaRifleContactRig
         float cosine=net.minecraft.util.Mth.clamp((height-centre.y)/(radius*vertical.y),-.999F,.999F);float sine=(float)Math.sqrt(1-cosine*cosine);
         var sideAxis=new Vector3f(direction).cross(vertical);var first=new Vector3f(vertical).mul(cosine).fma(sine,sideAxis);
         var second=new Vector3f(vertical).mul(cosine).fma(-sine,sideAxis);
-        var chosen=first.dot(preferred)>second.dot(preferred)?first:second;
+        // Two mirror elbows reach the same floor height. Choosing by the
+        // preferred pole alone flipped the elbow between them whenever the two
+        // scored alike; follow the side chosen last frame unless the other is
+        // clearly closer to the preferred pole.
+        var previous=GROUNDED.get(key);
+        float bias=previous==null?0:(first.dot(previous)>second.dot(previous)?.35F:-.35F);
+        var chosen=first.dot(preferred)+bias>second.dot(preferred)?first:second;
+        if(GROUNDED.size()>64)GROUNDED.clear();
+        GROUNDED.put(key,new Vector3f(chosen));
         return new Vector3f(preferred).normalize().lerp(chosen,weight);
     }
 }
