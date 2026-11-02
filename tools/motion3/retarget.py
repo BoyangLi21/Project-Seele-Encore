@@ -37,6 +37,8 @@ SKELETONS = {
         "unit": 1.0,
     },
 }
+# Mixamo FBX baked by blender/bake_fbx.py (prefix stripped, metres)
+SKELETONS["mixamo"] = SKELETONS["g1"]
 
 
 def _n(v):

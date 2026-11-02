@@ -77,11 +77,8 @@ public final class ClientFxManager
 
     public static void addAtFieldRipple(ClientboundAtFieldRipplePacket packet)
     {
-        if (com.projectseele.config.SeeleConfig.FX_INTENSITY.get() > 0.0D)
-        {
-            ACTIVE.add(new AtFieldRipple(new Vec3(packet.x, packet.y, packet.z),
-                    new Vector3f(packet.nx, packet.ny, packet.nz),packet.radius));
-        }
+        AtFieldEffects.impact(new Vec3(packet.x, packet.y, packet.z),
+                new Vector3f(packet.nx, packet.ny, packet.nz), packet.radius, fxIntensity());
     }
 
     public static void addCannonBeam(ClientboundCannonBeamPacket packet)
@@ -258,8 +255,7 @@ public final class ClientFxManager
             poseStack.pushPose();
             poseStack.translate(fx.pos.x - cam.x, fx.pos.y - cam.y, fx.pos.z - cam.z);
             VertexConsumer target = fx instanceof KabbalahTree
-                    ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof AtFieldRipple
-                    ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.AT_FIELD) : fx instanceof CrossExplosion || fx instanceof NukeExplosion || fx instanceof RifleTracer
+                    ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof CrossExplosion || fx instanceof NukeExplosion || fx instanceof RifleTracer
                     // Vanilla lightning writes depth even for translucent
                     // rings, cutting a hard empty band through the smoke.
                     ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.CROSS) : buffer.getBuffer(RenderType.lightning());
@@ -268,7 +264,6 @@ public final class ClientFxManager
         }
         buffer.endBatch(RenderType.lightning());
         buffer.endBatch(com.projectseele.client.render.EnergyGlowR24.CROSS);
-        buffer.endBatch(com.projectseele.client.render.EnergyGlowR24.AT_FIELD);
         buffer.endBatch(TREE_GEOMETRY);
 
         // World-space lettering uses the same pose as the luminous geometry,
@@ -389,40 +384,6 @@ public final class ClientFxManager
                         1.0F * this.scale, 1.0F, 0.62F, 0.30F, ringAlpha);
                 poseStack.popPose();
             }
-        }
-    }
-
-    /**
-     * A.T. Field cue: translucent octagonal bands in the event's world plane.
-     */
-    private static final class AtFieldRipple extends WorldFx
-    {
-        static final int LIFETIME = 18;
-
-        private final Vector3f u;
-        private final Vector3f v;
-        private final float radius;
-
-        AtFieldRipple(Vec3 pos, Vector3f normal,float radius)
-        {
-            super(pos);
-            this.radius=radius;
-            Vector3f[] basis = RibbonRenderer.planeBasis(normal);
-            this.u = basis[0];
-            this.v = basis[1];
-        }
-
-        @Override
-        int lifetime()
-        {
-            return LIFETIME;
-        }
-
-        @Override
-        void render(PoseStack poseStack, VertexConsumer consumer, float partialTick)
-        {
-            float t = (this.age + partialTick) / LIFETIME;
-            com.projectseele.client.render.TvAtFieldSurfaceR44.impact(poseStack.last().pose(),consumer,this.u,this.v,t,fxIntensity(),this.radius);
         }
     }
 
