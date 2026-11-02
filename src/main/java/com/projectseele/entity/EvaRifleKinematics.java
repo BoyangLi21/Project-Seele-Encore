@@ -20,15 +20,12 @@ public final class EvaRifleKinematics
     private static final double STOCK_UP=EvaRifleClearance.stock().z;
     /**
      * Stock pocket relative to the right shoulder joint (blocks; lateral + is
-     * the EVA's right): over the right pectoral plate below the joint, so the
+     * the EVA's right): on the right pectoral plate below the joint, so the
      * stock rests against the right side of the chest instead of under the
-     * chin. The rifle's rear is a box eight blocks tall reaching 0.7 behind
-     * the stock point, so the pocket stands far enough out for that box to
-     * clear the plate (4.4 put it inside the chest). Lying down, it moves
-     * ahead of the shoulder along the ground.
+     * chin. Lying down, it moves ahead of the shoulder along the ground.
      */
     private static final double POCKET_LATERAL=property("projectseele.rifleStockLateral",-2.4),
-            POCKET_FORWARD=property("projectseele.rifleStockForward",6.0),
+            POCKET_FORWARD=property("projectseele.rifleStockForward",4.4),
             POCKET_DOWN=property("projectseele.rifleStockDown",-2.0),
             POCKET_FORWARD_PRONE=property("projectseele.rifleStockForwardProne",1.0),
             POCKET_DOWN_PRONE=property("projectseele.rifleStockDownProne",-2.4),
@@ -115,38 +112,6 @@ public final class EvaRifleKinematics
         return state[0];
     }
 
-    /** A chest axis without its sideways part, or the fallback when nothing is left. */
-    private static Vec3 lean(Vector3f axis,Vec3 right,Vec3 fallback)
-    {
-        Vec3 v=new Vec3(axis.x,axis.y,axis.z);v=v.subtract(right.scale(v.dot(right)));
-        return v.lengthSqr()<1e-6?fallback:v.normalize();
-    }
-
-    /** Front of the chest plate in torso coordinates (model units, -Z ahead) and the gap kept in front of it (blocks). */
-    private static final float CHEST_FRONT=-13.5F/16,CHEST_GAP=.3F;
-
-    private static Vec3 chestNormal(Matrix4f chest)
-    {
-        Vector3f n=chest.transformDirection(new Vector3f(0,0,-1)).normalize();
-        return new Vec3(n.x,n.y,n.z);
-    }
-
-    /** How far (blocks) the rifle's rear box reaches behind the chest plate, gap included; zero when clear. */
-    private static double chestPlateDepth(Matrix4f chest,EvaBodyPose.Sample body,Vec3 grip,Vec3 right,Vec3 aim,Vec3 up)
-    {
-        Vector3f origin=chest.transformPosition(new Vector3f(0,body.rig.get("torso_upper").pivot().y,CHEST_FRONT));
-        Vec3 plate=new Vec3(origin.x,origin.y,origin.z),normal=chestNormal(chest);
-        var box=EvaRifleClearance.rearBox();
-        double deepest=0;
-        for(int i=0;i<8;i++)
-        {
-            Vec3 corner=grip.add(right.scale((i&1)==0?box[0].x:box[1].x)).add(aim.scale((i&2)==0?box[0].y:box[1].y))
-                    .add(up.scale((i&4)==0?box[0].z:box[1].z));
-            deepest=Math.max(deepest,CHEST_GAP-corner.subtract(plate).dot(normal));
-        }
-        return deepest;
-    }
-
     private static Quaternionf facing(Vec3 forward)
     {
         Vec3 right=forward.cross(new Vec3(0,1,0));
@@ -201,12 +166,8 @@ public final class EvaRifleKinematics
             // face.) Standing or crouched it rides the chest plate as the
             // chest leans; lying down it stays level ahead of the shoulder.
             float prone=entity.rifleProneBlend(partial);
-            // Follow the chest's lean only: the captured chest is also turned
-            // about twelve degrees, which slid the pocket a block outward
-            // into the shoulder.
-            Vec3 chestForward=lean(chest.transformDirection(new Vector3f(0,0,-1)),bodyRight,bodyForward);
-            Vec3 chestUp=lean(chest.transformDirection(new Vector3f(0,1,0)),bodyRight,new Vec3(0,1,0));
-            Vec3 riding=shoulder.add(bodyRight.scale(POCKET_LATERAL)).add(chestForward.scale(POCKET_FORWARD)).add(chestUp.scale(POCKET_DOWN));
+            Vector3f chestForward=chest.transformDirection(new Vector3f(0,0,-1)).normalize(),chestUp=chest.transformDirection(new Vector3f(0,1,0)).normalize();
+            Vec3 riding=shoulder.add(bodyRight.scale(POCKET_LATERAL)).add(new Vec3(chestForward).scale(POCKET_FORWARD)).add(new Vec3(chestUp).scale(POCKET_DOWN));
             Vec3 lying=shoulder.add(bodyRight.scale(POCKET_LATERAL)).add(bodyForward.scale(POCKET_FORWARD_PRONE)).add(0,POCKET_DOWN_PRONE,0);
             pocket=riding.lerp(lying,prone);
             stockLift=SIGHT_LIFT*sight;
@@ -254,20 +215,6 @@ public final class EvaRifleKinematics
             Vec3 up=right.cross(aim).normalize();
             Vec3 stock=carriedPocket.add(up.scale(stockLift)).subtract(aim.scale(recoil*.22));
             Vec3 grip=stock.add(aim.scale(STOCK_BACK)).subtract(up.scale(STOCK_UP));
-            if(chestPocket)
-            {
-                // The receiver and stock form a box eight blocks tall behind
-                // the grip: keep all of it in front of the chest plate, however
-                // the chest leans, by sliding the weapon out along its barrel.
-                double inside=chestPlateDepth(chest,body,grip,right,aim,up);
-                if(inside>0)
-                {
-                    Vec3 along=new Vec3(aim.x,0,aim.z);along=along.lengthSqr()<1e-6?bodyForward:along.normalize();
-                    double slide=inside/Math.max(.25,along.dot(chestNormal(chest)));
-                    grip=grip.add(along.scale(slide));stock=stock.add(along.scale(slide));
-                    pocket=pocket.add(along.scale(slide));
-                }
-            }
             // During kneel/prone handoffs the magazine or receiver can reach
             // the floor before the muzzle. Lift the complete held weapon by
             // its measured support hull; both hands and the optical solution

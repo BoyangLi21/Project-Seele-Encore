@@ -12,8 +12,8 @@ import software.bernie.geckolib.cache.object.BakedGeoModel;
 /**
  * Last touches on a crouched or prone body, whichever pose owner drew it.
  * <p>
- * The shoulder pylons ride the upper arms, taking half of each arm's swing,
- * whatever the action; raised arms tip them back. The dorsal cover folds
+ * The shoulder pylons keep their authored motion (riding the arms is off by
+ * default: it set them swinging through every walk). The dorsal cover folds
  * back as the helmet tips back toward it, and further as the chest lies
  * down, where the neck also reaches out of the collar (feet:
  * {@link EvaGroundContactR56}). Free hands
@@ -26,7 +26,7 @@ import software.bernie.geckolib.cache.object.BakedGeoModel;
 final class EvaStanceFinishR56
 {
     /** Share of the upper arm's swing each shoulder pylon takes up. */
-    private static final float PYLON_FOLLOW=Float.parseFloat(System.getProperty("projectseele.pylonFollowR56",".5"));
+    private static final float PYLON_FOLLOW=Float.parseFloat(System.getProperty("projectseele.pylonFollowR56","0"));
     private static final float COVER_TILT=Float.parseFloat(System.getProperty("projectseele.proneCoverTiltR56","90"));
     /** Helmet tip-back (degrees from the chest) the cover allows before folding, and its fold per degree beyond. */
     private static final float COVER_FREE=8,COVER_PER_DEGREE=1.3F,COVER_MAX=100;

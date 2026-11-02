@@ -55,24 +55,6 @@ public final class EvaRifleClearance
     public static Vec3 dominantPad(){return HULL.dominant();}
     public static Vec3 supportingPad(){return HULL.supporting();}
     public static boolean usesLegacyGripFit(){return HULL.legacyGripFit();}
-    private static Vec3[] rearBox;
-    /**
-     * Bounds (right, forward, up; min then max) of the hull behind the grip
-     * hand: the receiver, magazine and stock that sit against the chest.
-     */
-    public static Vec3[] rearBox()
-    {
-        if(rearBox!=null)return rearBox;
-        double[] lo={Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY,Double.POSITIVE_INFINITY},hi={Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY,Double.NEGATIVE_INFINITY};
-        for(Vec3 p:HULL.points())
-        {
-            if(p.y>stock().y*.5)continue;
-            lo[0]=Math.min(lo[0],p.x);lo[1]=Math.min(lo[1],p.y);lo[2]=Math.min(lo[2],p.z);
-            hi[0]=Math.max(hi[0],p.x);hi[1]=Math.max(hi[1],p.y);hi[2]=Math.max(hi[2],p.z);
-        }
-        if(!Double.isFinite(lo[0]))return rearBox=new Vec3[]{stock(),stock()};
-        return rearBox=new Vec3[]{new Vec3(lo[0],lo[1],lo[2]),new Vec3(hi[0],hi[1],hi[2])};
-    }
     public static double lift(Vec3 grip,Vec3 right,Vec3 forward,Vec3 up,double floor)
     {
         double minimum=Double.POSITIVE_INFINITY;
