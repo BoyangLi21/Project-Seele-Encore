@@ -17,6 +17,9 @@ public final class AircraftRenderClockR21
     public static double simulationSeconds;
     public static long frame;
     public static double seconds=1D/60;
+    /** One timestamp per rendered frame: the main and shadow passes of the same
+     * frame must evaluate time-driven poses identically. */
+    public static long frameNanos(){return frameStarted==0?System.nanoTime():frameStarted;}
     public static double availableSeconds()
     {return presented==0?1D/60:Math.max(0,(System.nanoTime()-presented)/1e9);}
     public static long simulationMillis()

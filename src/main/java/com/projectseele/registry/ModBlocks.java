@@ -187,7 +187,9 @@ public final class ModBlocks
             () -> new LiquidBlock(ModFluids.LCL_SOURCE,
                     BlockBehaviour.Properties.copy(Blocks.WATER)
                             .mapColor(net.minecraft.world.level.material.MapColor.COLOR_ORANGE)
-                            .lightLevel(state -> 4).noLootTable()));
+                            // No emission: draining 44 layers (~91k cells) re-lit the whole
+                            // bay and stalled the render thread; the cages have floodlights.
+                            .noLootTable()));
 
     private ModBlocks() {}
 }

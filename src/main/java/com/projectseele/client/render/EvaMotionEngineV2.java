@@ -232,11 +232,16 @@ public final class EvaMotionEngineV2
             runtime.actionTime = 0.0D;
             runtime.selectionKey = "";
         }
-        long now = System.nanoTime();
+        long now = com.projectseele.client.AircraftRenderClockR21.frameNanos();
         double dt;
         if (runtime.lastNanos == 0L)
         {
             dt = 1.0D / 60.0D;
+        }
+        else if (now == runtime.lastNanos)
+        {
+            // Second pass (shadow/feed) of the same frame: same pose, no extra time.
+            dt = 0.0D;
         }
         else
         {

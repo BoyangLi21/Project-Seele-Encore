@@ -147,10 +147,11 @@ final class RigidMachineryPartR44
         return bounds.clone();
     }
 
+    private static final boolean CRANE_MESH_WITNESS=Boolean.getBoolean("projectseele.r44NativeCraneMeshWitness");
     void draw(PoseStack poses, MultiBufferSource buffers, int light)
     {
         if(RigidMachineryGpuR44.enabled()&&!(buffers instanceof OutlineBufferSource)
-                &&!ShaderShadowPassR44.active()&&!Boolean.getBoolean("projectseele.r44NativeCraneMeshWitness")
+                &&!ShaderShadowPassR44.active()&&!CRANE_MESH_WITNESS
                 &&outsideClipR60(bounds,RenderSystem.getProjectionMatrix(),RenderSystem.getModelViewMatrix(),poses.last().pose()))return;
         drawWithProofR52(poses,buffers,light);
     }

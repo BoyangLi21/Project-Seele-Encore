@@ -124,6 +124,7 @@ public final class RigidCapsuleGpu
     }
     private static boolean drawExternal(Object key,long revision,float[] vertices,int stride,float px,float py,float pz,ResourceLocation texture,PoseStack poses,int light,int overlay,float r,float g,float b,RenderType type)
     {
+        light=quantizedLightR55(light);
         var material=materialIds();if(material==null)return false;
         type.setupRenderState();var active=RenderSystem.getShader();
         if(active==null||!active.getClass().getName().contains("ExtendedShader")){type.clearRenderState();return false;}
@@ -212,12 +213,20 @@ public final class RigidCapsuleGpu
         Runnable release=()->{PARTS.values().forEach(p->p.buffer().close());PARTS.clear();EXTERNAL_PARTS.values().forEach(v->v.variants.clear());EXTERNAL_PARTS.clear();if(uploadBuilder!=null)uploadBuilder.clear();};
         if(RenderSystem.isOnRenderThread())release.run();else RenderSystem.recordRenderCall(release::run);
     }
-    static BufferBuilder beginUpload()
+    static BufferBuilder beginUpload(){return beginUpload(VertexFormat.Mode.TRIANGLES);}
+    static BufferBuilder beginUpload(VertexFormat.Mode mode)
     {
         RenderSystem.assertOnRenderThread();
         if(uploadBuilder==null){uploadBuilder=new BufferBuilder(256);uploadBuilderCreations++;}
-        uploadBuilder.begin(VertexFormat.Mode.TRIANGLES,DefaultVertexFormat.NEW_ENTITY);
+        uploadBuilder.begin(mode,DefaultVertexFormat.NEW_ENTITY);
         return uploadBuilder;
+    }
+    /** Shader packs bake light into the cached vertices. Six steps per channel
+     * keep a carrier rising past shaft lamps from re-uploading on every level. */
+    static int quantizedLightR55(int packed)
+    {
+        int block=Math.min(15,((packed>>>4&15)+1)/3*3),sky=Math.min(15,((packed>>>20&15)+1)/3*3);
+        return block<<4|sky<<20;
     }
     private static boolean upload(VertexBuffer buffer,BufferBuilder builder)
     {

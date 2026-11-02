@@ -244,7 +244,18 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     }
 
     public String holdReason(UUID original){return holds.getOrDefault(original,"");}
-    private boolean hold(Original original,String reason){holds.put(original.eva(),reason);return false;}
+    private record LoggedHoldR55(String reason,long at){}
+    private final Map<UUID,LoggedHoldR55> loggedHoldsR55=new HashMap<>();
+    private boolean hold(Original original,String reason)
+    {
+        holds.put(original.eva(),reason);
+        // These holds were invisible in a review log. Log a changed reason, at
+        // most once a second per unit (holds are re-asserted every waiting tick).
+        long now=System.currentTimeMillis();var last=loggedHoldsR55.get(original.eva());
+        if(last==null||!last.reason().equals(reason)&&now-last.at()>=1000)
+        {loggedHoldsR55.put(original.eva(),new LoggedHoldR55(reason,now));com.projectseele.ProjectSeele.LOGGER.info("R55 original hold EVA-0{}: {}",original.variant(),reason);}
+        return false;
+    }
     private UnitPlant plant(Original o){var p=units.get(o.variant());return p!=null&&o.eva().equals(p.eva())&&o.plug().equals(p.plug())&&o.epoch()==epoch?p:null;}
     private EvaUnit01Entity hull(ServerLevel l,Original o){return l.getEntity(o.eva()) instanceof EvaUnit01Entity e&&e.getUnitVariant()==o.variant()&&!e.isExperimentalUnit()?e:null;}
     private EntryPlugCarrierEntity plug(ServerLevel l,Original o){return l.getEntity(o.plug()) instanceof EntryPlugCarrierEntity p&&p.getAssignedVariant()==o.variant()?p:null;}
@@ -339,7 +350,10 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         return true;
     }
     private static boolean change(ServerLevel l,List<Cell> cells,boolean open,Set<UUID> own)
-    {if(!canChange(l,cells,open,own))return false;for(var c:cells){if(CarrierBayTrayR53.retainsLiquidCell(l,c))continue;var next=open?c.open():c.closed();if(!NervMechanicalMaterialR53.samePhase(l.getBlockState(c.at()),next))l.setBlock(c.at(),next,c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())?2:3);}return matches(l,cells,open);}
+    {if(!canChange(l,cells,open,own))return false;for(var c:cells){if(CarrierBayTrayR53.retainsLiquidCell(l,c))continue;var next=open?c.open():c.closed();if(!NervMechanicalMaterialR53.samePhase(l.getBlockState(c.at()),next))l.setBlock(c.at(),next,c.closed().is(com.projectseele.registry.ModBlocks.LCL_BLOCK.get())?LCL_FLAGS_R55:3);}return matches(l,cells,open);}
+    // UPDATE_CLIENTS|UPDATE_KNOWN_SHAPE: a drained or refilled layer must not run
+    // six neighbour shape updates (and a scheduled fluid tick) for each of its ~2k cells.
+    private static final int LCL_FLAGS_R55=net.minecraft.world.level.block.Block.UPDATE_CLIENTS|net.minecraft.world.level.block.Block.UPDATE_KNOWN_SHAPE;
     private static void validateOriginalLcl(List<List<Cell>> layers)
     {
         require(layers.size()==44&&layers.stream().mapToInt(List::size).sum()==90947,"Complete original 44-layer/90947-cell wet bay required");int previousY=Integer.MIN_VALUE;var unique=new HashSet<BlockPos>();
@@ -1160,6 +1174,15 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         // FULL prefetch does not make the destination entity-ticking. Preserve
         // each original member in native lookup across its own setPos boundary.
         for(var point:points){var chunk=new net.minecraft.world.level.ChunkPos(point);level.getChunkSource().addRegionTicket(CONTINUOUS_ACTOR_TICKET_R63,chunk,2,chunk);}
+        // A ticket added in the same tick never makes its chunk entity-ticking in
+        // time, so every chunk crossing used to brake the carrier to 0 m/s and
+        // restart it. Hold the chunks ahead of the motion before they are needed.
+        if(delta.lengthSqr()>1e-8)
+        {
+            var ahead=delta.normalize();
+            for(var id:members){var actor=level.getEntity(id);if(actor==null)continue;
+                for(int metres=16;metres<=48;metres+=16){var chunk=new net.minecraft.world.level.ChunkPos(BlockPos.containing(actor.position().add(ahead.scale(metres))));level.getChunkSource().addRegionTicket(CONTINUOUS_ACTOR_TICKET_R63,chunk,2,chunk);}}
+        }
         for(var point:points)
         {
             var chunk=new net.minecraft.world.level.ChunkPos(point);

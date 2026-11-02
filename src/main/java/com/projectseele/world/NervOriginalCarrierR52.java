@@ -18,7 +18,10 @@ public final class NervOriginalCarrierR52 {
  public enum Role { STRUCTURE,SOLE_BEARING,GUIDE,RUNNING_BOGIE }
  public record Part(String name,Role role,NervRigidMeshSweepR52 mesh,RigidTransform frame){}
  private static final Map<Integer,Map<String,NervRigidMeshSweepR52>> BASE=new HashMap<>();
- public static UUID proposedIdentityR52(long epoch,UUID eva){return UUID.nameUUIDFromBytes(("projectseele:r52:original-carrier:"+epoch+":"+eva).getBytes(StandardCharsets.UTF_8));}
+ private record IdentityKeyR55(long epoch,UUID eva){}
+ // controller() runs several times per tick per unit; the name UUID is an MD5.
+ private static final Map<IdentityKeyR55,UUID> IDENTITIES_R55=new java.util.concurrent.ConcurrentHashMap<>();
+ public static UUID proposedIdentityR52(long epoch,UUID eva){return IDENTITIES_R55.computeIfAbsent(new IdentityKeyR55(epoch,eva),k->UUID.nameUUIDFromBytes(("projectseele:r52:original-carrier:"+k.epoch()+":"+k.eva()).getBytes(StandardCharsets.UTF_8)));}
  private static CompoundTag encode(RigidTransform f){return NervAircraftFrameR52.encodeRigid(f);}
  private static RigidTransform decode(CompoundTag t){return NervAircraftFrameR52.decodeRigid(t);}
  public static boolean declared(NervCarrierPlatformEntity e){var t=e.originalCarrierReadStateR53();return t.getString("Source").equals(SOURCE_SHA)&&t.getString("GuideSource").equals(NervFootGuideRigR52.SOURCE_SHA)&&t.hasUUID("OriginalEva")&&t.getLong("Epoch")>0;}

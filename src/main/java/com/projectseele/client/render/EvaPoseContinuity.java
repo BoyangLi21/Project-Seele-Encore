@@ -36,7 +36,7 @@ final class EvaPoseContinuity
 
     static void settle(EvaUnit01Entity entity, BakedGeoModel model, String owner)
     {
-        long now = System.nanoTime();
+        long now = com.projectseele.client.AircraftRenderClockR21.frameNanos();
         State state = STATES.get(entity);
         if (state == null)
         {

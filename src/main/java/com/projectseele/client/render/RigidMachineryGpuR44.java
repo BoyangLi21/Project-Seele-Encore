@@ -30,7 +30,10 @@ public final class RigidMachineryGpuR44
     private static boolean resolved, logged;
     private static long draws, uploads, uploadedVertices, clears, releasedBytes;
 
-    public static boolean enabled()
+    // JVM flags; read once instead of twice per machinery draw call.
+    private static final boolean ENABLED = readEnabled();
+    public static boolean enabled() { return ENABLED; }
+    private static boolean readEnabled()
     {
         String configured = System.getProperty("projectseele.rigidMachineryGpu");
         if (configured != null) return Boolean.parseBoolean(configured);
@@ -94,14 +97,15 @@ public final class RigidMachineryGpuR44
                 }
                 catch (ReflectiveOperationException failure) { return false; }
             }
-            var key = new Key(active, external, mirror,triangles, external ? light : 0, entity, blockEntity, item);
+            int bakedLight = external ? RigidCapsuleGpu.quantizedLightR55(light) : 0;
+            var key = new Key(active, external, mirror,triangles, bakedLight, entity, blockEntity, item);
             var variants = PARTS.computeIfAbsent(identity, ignored -> new LinkedHashMap<>(16, .75F, true));
             Mesh mesh = variants.get(key);
             if (mesh == null)
             {
                 int count = triangles?vertices.length/44*3:vertices.length/11;
-                var builder = new BufferBuilder(Math.max(1024, count * 96 + 64));
-                builder.begin(triangles?VertexFormat.Mode.TRIANGLES:VertexFormat.Mode.QUADS, DefaultVertexFormat.NEW_ENTITY);
+                // One shared upload builder: a new native builder per cache miss is never freed in 1.20.1.
+                var builder = RigidCapsuleGpu.beginUpload(triangles?VertexFormat.Mode.TRIANGLES:VertexFormat.Mode.QUADS);
                 for (int quad = 0; quad < vertices.length; quad += 44)
                 {
                     int corners=triangles?3:4;
@@ -114,7 +118,7 @@ public final class RigidMachineryGpuR44
                         builder.vertex(sign * vertices[offset], vertices[offset + 1], vertices[offset + 2],
                                 vertices[offset + 3], vertices[offset + 4], vertices[offset + 5], 1,
                                 vertices[offset + 9], vertices[offset + 10], OverlayTexture.NO_OVERLAY,
-                                external ? light : 0, sign * vertices[offset + 6], vertices[offset + 7], vertices[offset + 8]);
+                                bakedLight, sign * vertices[offset + 6], vertices[offset + 7], vertices[offset + 8]);
                     }
                 }
                 var uploaded = new VertexBuffer(VertexBuffer.Usage.STATIC);

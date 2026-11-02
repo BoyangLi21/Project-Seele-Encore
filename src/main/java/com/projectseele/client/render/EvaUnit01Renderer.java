@@ -227,6 +227,22 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 new ResourceLocation(ProjectSeele.MODID,"mesh/eva_charger_unit00_r48.mesh.json"),
                 new ResourceLocation(ProjectSeele.MODID,"mesh/eva_charger_unit01_r48.mesh.json"),
                 new ResourceLocation(ProjectSeele.MODID,"mesh/eva_charger_unit02_r48.mesh.json"));
+        // First drawn mid-sortie (boarding, plug transfer, surfacing); parsing
+        // them then stalled the render thread for 0.1-1 s each.
+        LocalTriangleMeshLayer.prewarm(resourceManager,
+                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_unit00_anatomical_hands_r45.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_unit01_anatomical_hands_r45.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_unit02_anatomical_hands_r45.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/eva_un01_anatomical_hands_r53.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/entry_plug_unit00.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/entry_plug_unit01.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/entry_plug_unit02.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/entry_plug_un.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/synch_cradle_r47.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/positron_cannon.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/positron_cannon_payload_r50.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/yashima_shield.mesh.json"),
+                new ResourceLocation(ProjectSeele.MODID,"mesh/yashima_shield_payload.mesh.json"));
     }
 
     @Override

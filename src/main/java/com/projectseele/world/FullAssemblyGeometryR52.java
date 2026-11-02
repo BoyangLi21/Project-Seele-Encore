@@ -170,10 +170,8 @@ public final class FullAssemblyGeometryR52
         require(same(plug.getCanonicalTransform(),actualFrame.plugWorld())&&same(actualFrame.evaRoot().compose(binding.plugInEva()),actualFrame.plugWorld()),"Original capsule is not on this same rigid sample");
         var current=pilot.getBoundingBox();var seatInEva=binding.plugInEva().transformPoint(EntryPlugKinematics.PILOT_SEAT_P);var expected=actualFrame.evaRoot().transformPoint(seatInEva);
         require(current.getCenter().distanceToSqr(expected)<=1e-10,"Actual native pilot body is not at the physical capsule seat");
-        var surfaces=new ArrayList<Surface>();for(var part:actualEva.parts())surfaces.add(new Surface("eva/"+part.bone(),actualEva.sourceFingerprint(),new TriangleSweepMeshR52(part.triangles())));
-        provider.carrierParts(eva.getUnitVariant(),1,eva.recoveryRackR39(),0,EvaMechanicalFrameR52.carrierDeckTravelR52(eva)).forEach((n,p)->surfaces.add(new Surface("carrier/"+n,provider.sourceFingerprint(),new TriangleSweepMeshR52(p))));
-        provider.closedPlugParts(original.variant()).forEach((n,p)->surfaces.add(new Surface("capsule/"+n,provider.sourceFingerprint(),new TriangleSweepMeshR52(transform(p,binding.plugInEva())))));
-        return new Captured(original,binding,List.copyOf(surfaces),new NativePilot(original.pilot(),new Vec3(current.getXsize()/2,current.getYsize()/2,current.getZsize()/2),seatInEva),actualEva.sourceFingerprint()+":"+provider.sourceFingerprint(),Kind.OCCUPIED);
+        var surfaces=surfacesR55(actualEva,eva,provider,binding.plugInEva(),original.variant(),false);
+        return new Captured(original,binding,surfaces,new NativePilot(original.pilot(),new Vec3(current.getXsize()/2,current.getYsize()/2,current.getZsize()/2),seatInEva),actualEva.sourceFingerprint()+":"+provider.sourceFingerprint(),Kind.OCCUPIED);
     }
     /** Only the original stopped empty hull and its actual carrier are carried.
      * Original capsule/pilot UUIDs remain provenance; neither is queried as a
@@ -185,9 +183,28 @@ public final class FullAssemblyGeometryR52
         require(actualFrozenHull.variant()==original.variant()&&eva.getUnitVariant()==original.variant()&&!eva.isExperimentalUnit()&&eva.getPassengers().isEmpty()
                 &&!eva.isEntryPlugInserted()&&eva.carrierRiseProgress(1)==1&&eva.getLaunchPhase()!=EvaUnit01Entity.LAUNCH_CLEAR
                 &&EntryPlugEjectionR48.originalFieldEjection(level,original.variant(),eva,original.pilot())&&TransportMembershipR52.originalEjectionReceipts(original,eva.getPersistentData()),"Actual stopped original ejected hull/raised carrier required");
-        var surfaces=new ArrayList<Surface>();for(var part:actualFrozenHull.parts())surfaces.add(new Surface("eva/"+part.bone(),actualFrozenHull.sourceFingerprint(),new TriangleSweepMeshR52(part.triangles())));
-        provider.carrierParts(eva.getUnitVariant(),1,eva.recoveryRackR39(),0,EvaMechanicalFrameR52.carrierDeckTravelR52(eva)).forEach((n,p)->surfaces.add(new Surface("carrier/"+n,provider.sourceFingerprint(),new TriangleSweepMeshR52(p))));
-        return new Captured(original,binding,List.copyOf(surfaces),null,actualFrozenHull.sourceFingerprint()+":"+provider.sourceFingerprint(),Kind.HULL_ONLY_RECOVERY);
+        var surfaces=surfacesR55(actualFrozenHull,eva,provider,null,original.variant(),true);
+        return new Captured(original,binding,surfaces,null,actualFrozenHull.sourceFingerprint()+":"+provider.sourceFingerprint(),Kind.HULL_ONLY_RECOVERY);
+    }
+    private record SurfaceMemoR55(boolean rack,double deck,RigidTransform plug,String provider,boolean hull,List<Surface> surfaces){}
+    /** The triangle sweep structures depend only on the captured mesh, the carrier
+     * parts and the capsule binding. A unit waiting for its carrier to bear
+     * retries every tick; rebuilding ~55k triangles of BVH each time stalled the server. */
+    private static final Map<EvaOriginalMeshGeometryR52.Geometry,SurfaceMemoR55> SURFACES_R55=new IdentityHashMap<>();
+    private static List<Surface> surfacesR55(EvaOriginalMeshGeometryR52.Geometry geometry,EvaUnit01Entity eva,Provider provider,RigidTransform plug,int variant,boolean hull)
+    {
+        boolean rack=eva.recoveryRackR39();double deck=EvaMechanicalFrameR52.carrierDeckTravelR52(eva);String source=provider.sourceFingerprint();
+        synchronized(SURFACES_R55)
+        {
+            var memo=SURFACES_R55.get(geometry);
+            if(memo!=null&&memo.rack()==rack&&memo.deck()==deck&&Objects.equals(memo.plug(),plug)&&memo.provider().equals(source)&&memo.hull()==hull)return memo.surfaces();
+        }
+        var surfaces=new ArrayList<Surface>();for(var part:geometry.parts())surfaces.add(new Surface("eva/"+part.bone(),geometry.sourceFingerprint(),new TriangleSweepMeshR52(part.triangles())));
+        provider.carrierParts(eva.getUnitVariant(),1,rack,0,deck).forEach((n,p)->surfaces.add(new Surface("carrier/"+n,source,new TriangleSweepMeshR52(p))));
+        if(!hull)provider.closedPlugParts(variant).forEach((n,p)->surfaces.add(new Surface("capsule/"+n,source,new TriangleSweepMeshR52(transform(p,plug)))));
+        var result=List.copyOf(surfaces);
+        synchronized(SURFACES_R55){if(SURFACES_R55.size()>=8)SURFACES_R55.clear();SURFACES_R55.put(geometry,new SurfaceMemoR55(rack,deck,plug,source,hull,result));}
+        return result;
     }
     public static final class Captured
     {
