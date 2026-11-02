@@ -81,7 +81,7 @@ def compose(source, plan_path, out, world, catalog, curves):
             for X in range(x-2,x+3):
                 for Z in range(z-2,z+3):rail[X//16,Z//16].append((X,y,Z))
     e=Editor(out);counts=Counter();yy=np.arange(-128,320)[:,None,None]
-    for path in plan_path.glob('*.npz'):
+    for path in sorted(plan_path.glob('*.npz')):
         with np.load(path)as f:d={k:f[k]for k in f.files}
         x,z,X,Z=map(int,d['bounds'])
         for rx in range(x//512,X//512+1):
@@ -133,7 +133,7 @@ def update_field(plan_path,resource,out):
     data=gzip.decompress(original);magic,x,z,step,w,h=struct.unpack('>6i',data[:24])
     heights=np.frombuffer(data[24:24+w*h*2],'>i2').reshape(h,w).copy()
     changed=0
-    for path in plan_path.glob('*.npz'):
+    for path in sorted(plan_path.glob('*.npz')):
         with np.load(path)as f:d={k:f[k]for k in f.files}
         bx,bz,bX,bZ=map(int,d['bounds']);xs=x+np.arange(w)*step;zs=z+np.arange(h)*step
         ix=np.flatnonzero((xs>=bx)&(xs<=bX));iz=np.flatnonzero((zs>=bz)&(zs<=bZ))

@@ -2,7 +2,7 @@
 import unittest
 from unittest.mock import patch
 import numpy as np
-from map_pipeline.corridors import compile_street,alignment,fit_ports
+from map_pipeline.corridors import compile_street,alignment,fit_ports,retain_bearings
 
 
 class FlatStreet:
@@ -49,6 +49,33 @@ class CorridorRegression(unittest.TestCase):
         result,compiled=compile_street(FlatStreet(),row,[],np.empty((0,3)))
         self.assertEqual(result['status'],'prepared')
         self.assertNotIn((0,80,2),compiled[0])
+
+    def test_foundation_and_road_are_joined_without_undermining(self):
+        old=np.full((21,21),80,np.int16);old[12:15,8:13]=84
+        target=np.full_like(old,80);walk=np.zeros_like(old,bool);walk[2]=True
+        fitted=retain_bearings(target,old,walk,[[8,85,12,12,110,14]],[0,0,20,20],.5)
+        self.assertTrue(np.all(fitted[12:15,8:13]==84))
+        self.assertTrue(np.all(fitted[2]==80))
+        self.assertLessEqual(abs(np.diff(fitted,axis=0)).max(),1)
+
+    def test_embankment_cannot_fill_the_retained_ground_floor(self):
+        old=np.full((21,21),80,np.int16);target=np.full_like(old,84)
+        walk=np.zeros_like(old,bool);walk[2]=True
+        fitted=retain_bearings(target,old,walk,[[8,81,12,12,110,14]],[0,0,20,20],.5)
+        self.assertTrue(np.all(fitted[12:15,8:13]==80))
+        self.assertTrue(np.all(fitted[2]==84))
+
+    @patch('map_pipeline.corridors.ground',return_value=np.full((25,31),79,np.int16))
+    def test_retiring_one_buried_light_does_not_authorize_another(self,_):
+        class Lamps(FlatStreet):
+            def state(self,x,y,z):
+                if (x,y,z) in ((0,80,0),(0,81,1)):
+                    return 'minecraft:lantern[hanging=true,waterlogged=false]'
+                return super().state(x,y,z)
+        row=self.row();row['retire_auxiliary_points']=[dict(pos=[0,80,0],state=Lamps().state(0,80,0))]
+        result,compiled=compile_street(Lamps(),row,[],np.empty((0,3)))
+        self.assertEqual(result['status'],'blocked');self.assertIsNone(compiled)
+        self.assertTrue(any(p[:3]==[0,81,1]for p in result['blockers']))
 
 
 if __name__=='__main__':unittest.main()

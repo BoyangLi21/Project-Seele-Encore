@@ -30,7 +30,10 @@ def write_replay_expected(candidate):
 
 def main(a):
     e=Editor(a.candidate);errors=[];rows=[]
-    with np.load(a.plan/'network.npz')as f:p={k:f[k]for k in ('bounds','walk','grade2')}
+    final_plan=a.candidate/'plan/network.npz'
+    with np.load(final_plan if final_plan.exists() else a.plan/'network.npz')as f:p={k:f[k]for k in ('bounds','walk','grade2')}
+    design_path=a.candidate/'authored-design.json'
+    design={r['id']:r for r in json.loads(design_path.read_text('utf8'))['streets']} if design_path.exists() else {}
     px,pz,_,_=map(int,p['bounds'])
     for path in(a.candidate/'earthworks').glob('*.npz'):
         with np.load(path)as f:d={k:f[k]for k in f.files}
@@ -46,8 +49,14 @@ def main(a):
             for yy in range(min(int(d['old'][iz,ix]),y)-1,y):
                 if e.state(xx,yy,zz).split('[')[0]in AIR|{'minecraft:water','minecraft:lava'}:
                     errors.append(['support',xx,yy,zz,e.state(xx,yy,zz)])
-        base_walk=p['walk'][z-pz:Z-pz+1,x-px:X-px+1]
+        base_walk=p['walk'][z-pz:Z-pz+1,x-px:X-px+1].copy()
         base_grade=p['grade2'][z-pz:Z-pz+1,x-px:X-px+1]
+        retired=d.get('retired_walk',np.zeros(walk.shape,bool))&~base_walk
+        base_walk[retired]=False
+        for iz,ix in np.argwhere(retired):
+            yy,_=road_blocks(base_grade[iz,ix]);yy=int(yy)
+            if e.state(x+int(ix),yy,z+int(iz)).split('[')[0] in PAVEMENT:
+                errors.append(['old retired pavement remains',x+int(ix),yy,z+int(iz)])
         checked_interfaces=0
         for dz,dx in ((1,0),(0,1)):
             joined=walk&np.roll(walk,(-dz,-dx),(0,1))
@@ -82,9 +91,36 @@ def main(a):
             if key not in lookup:errors.append(['not in actual clear paving graph',*key])
             else:commissioned.add(lookup[key])
         if len(commissioned)!=1:errors.append(['disconnected full-width pavement',path.stem,len(commissioned)])
+        crossfall=None
+        spec=design.get(path.stem,{})
+        if spec and not spec.get('pedestrian',False):
+            from map_pipeline.corridors import alignment
+            curve,_=alignment(spec);crossfall=0
+            radius=spec['carriage_width']/2-.5
+            for i in range(1,len(curve)-1,4):
+                t=curve[i+1,[0,2]]-curve[i-1,[0,2]];t/=np.linalg.norm(t)
+                normal=np.array([-t[1],t[0]])
+                left=np.rint(curve[i,[0,2]]+radius*normal).astype(int)
+                right=np.rint(curve[i,[0,2]]-radius*normal).astype(int)
+                crossfall=max(crossfall,abs(int(observed[left[1]-z,left[0]-x])-int(observed[right[1]-z,right[0]-x]))/2)
+            if crossfall>spec.get('maximum_crossfall',.5):errors.append(['carriage crossfall',path.stem,crossfall])
         rows.append(dict(id=path.stem,full_width_columns=int(walk.sum()),outside_interfaces=checked_interfaces,
-                         actual_paving_layers_in_review=len(points),commissioned_components=len(commissioned)))
+                         actual_paving_layers_in_review=len(points),commissioned_components=len(commissioned),
+                         retired_exterior_pavement_columns=int(retired.sum()),maximum_carriage_crossfall=crossfall))
         e.regions.clear()
+    catalog=json.loads((a.plan/'catalog.json').read_text('utf8'))
+    for path in (a.candidate/'delta').glob('*.npz'):
+        with np.load(path)as f:
+            names=f['palette'];air=np.asarray([s.split('[')[0]in AIR for s in names])
+            for i,(cx,cz)in enumerate(f['coordinates']):
+                lo,hi=f['ranges'][i:i+2];at=f['indices'][lo:hi].astype(np.int64)
+                removed=air[f['after'][lo:hi]]&~air[f['before'][lo:hi]]
+                q=np.column_stack((cx*16+at[removed]%16,at[removed]//256-128,cz*16+(at[removed]//16)%16))
+                for record in catalog:
+                    bx,by,bz,bX,bY,bZ=record['occupied_bounds']
+                    if bx>cx*16+15 or bX<cx*16 or bz>cz*16+15 or bZ<cz*16:continue
+                    bad=(q[:,0]>=bx)&(q[:,0]<=bX)&(q[:,2]>=bz)&(q[:,2]<=bZ)&(q[:,1]<by)
+                    if bad.any():errors.append(['retained building undermined',record['id'],q[bad][0].tolist(),int(bad.sum())])
     report=dict(errors=errors,streets=rows,scope='candidate volumes and their existing street interfaces',
                 whole_map_completion=False,visual_verified=False)
     (a.candidate/'independent-check.json').write_text(json.dumps(report,indent=2),'utf8')
