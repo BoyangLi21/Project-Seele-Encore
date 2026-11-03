@@ -42,6 +42,7 @@ public final class EvaConnectedActionReview
     /** Transition tour: every stance/weapon change the pilot can make, back to back (pose continuity review). */
     private static final boolean TOUR=Boolean.getBoolean("projectseele.transitionTour");
     private static final int TOUR_START=Integer.getInteger("projectseele.tourStart",0);
+    private static final boolean COMBO=Boolean.getBoolean("projectseele.tourComboR57");
     private static final int TOUR_END=Integer.getInteger("projectseele.tourEnd",1600)-TOUR_START;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     private static int wait;
@@ -234,8 +235,10 @@ public final class EvaConnectedActionReview
         mc.player.setYRot(TOUR_START==0&&t>=610&&t<1085?180:0);mc.player.setXRot(0);
         if(tourAt(70))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
         if(tourAt(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
-        if(tourAt(170)||tourAt(182)||tourAt(194)||tourAt(206))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(tourAt(170)||tourAt(182)||!COMBO&&(tourAt(194)||tourAt(206)))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(tourAt(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        // Optional chain check: the heavy pressed during the punch string.
+        if(COMBO&&tourAt(193))send(ServerboundEvaControlPacket.ACTION_SMASH);
         if(tourAt(290))send(ServerboundEvaControlPacket.ACTION_STOMP);
         if(tourAt(340)||tourAt(820))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
         if(tourAt(440)||tourAt(920))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
