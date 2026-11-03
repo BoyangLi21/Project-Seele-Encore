@@ -488,3 +488,5 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 - `r32_air_strike`：`human-addon-animations.glb` 的 `Attack_Ground_Pound` 第 0–63 帧（举拳→下砸），去掉根骨骼位移，空中下砸时收腿；
 - `r32_air_kick`：`human-mocap-animations.glb` 的 `Kick_Breach` 第 18–81 帧（提膝→蹬出→收回），去掉根骨骼位移，支撑腿换成腾空姿势的屈腿，形成空中蹬踢（参照 TV 第 9 话双机同步飞踢的意象，未使用任何官方素材）。
 原先的 Tuffles `AerialSlapDownwards` / `LegsDivekickFightingGameInspired` 空中动作不再使用。
+
+走/跑防滑：`eva_body_r44.json` 中三台机体原有的走、跑循环（来源不变）用官方步幅变形 `warp_locomotion_r44` 压到运行时步幅（走 25.8、跑 31.4 格/周期），保持用户要求的快步频，支撑脚不再以身体速度的 1.8–2.3 倍后滑。原片段没有着地标记，按“前掌相对身体后移且处于高度下部”推断着地，压缩量按游戏内实测的支撑脚/身体位移比校准；生成脚本为本机 `motion-work/toolroot/walk_run_warp_r57.py`。不涉及新素材来源。

@@ -363,13 +363,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     // speed without changing the human joint curves or their phase.
     private static final double WALK_CADENCE_GAIN = 1.75D;
     private static final double RUN_CADENCE_GAIN = 3.50D;
-    /**
-     * Blocks a planted foot travels per gait cycle in the walk and run clips
-     * of the rigs without a locomotion contract, measured in game. The old
-     * 25.8 and 31.4 turned the clips 2.2 and 2.05 times too fast: every stance
-     * foot slid backward along the ground.
-     */
-    private static final double WALK_CLIP_STRIDE_R57 = 57.1D, RUN_CLIP_STRIDE_R57 = 64.4D;
     private static final double CROUCH_CYCLE_SECONDS = 1.0D;
     private static final double CRAWL_CYCLE_SECONDS = 1.4D;
 
@@ -1518,8 +1511,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 else
                 {
                 double standingStride=Mth.lerp(run,
-                        EvaBodyPose.locomotionRuntimeStrideR44(this,"walk",EvaBodyPose.locomotionStrideR43(this,"walk",WALK_CLIP_STRIDE_R57*WALK_CADENCE_GAIN)/WALK_CADENCE_GAIN),
-                        EvaBodyPose.locomotionRuntimeStrideR44(this,"run",EvaBodyPose.locomotionStrideR43(this,"run",RUN_CLIP_STRIDE_R57*RUN_CADENCE_GAIN)/RUN_CADENCE_GAIN));
+                        EvaBodyPose.locomotionRuntimeStrideR44(this,"walk",EvaBodyPose.locomotionStrideR43(this,"walk",25.8334D*WALK_CADENCE_GAIN)/WALK_CADENCE_GAIN),
+                        EvaBodyPose.locomotionRuntimeStrideR44(this,"run",EvaBodyPose.locomotionStrideR43(this,"run",31.3944D*RUN_CADENCE_GAIN)/RUN_CADENCE_GAIN));
                 standingStride=Mth.lerp(EvaSprintR50.blend(this,1),standingStride,
                         EvaBodyPose.locomotionRuntimeStrideR44(this,"dash_run",standingStride));
                 double stride=stance<=1?Mth.lerp(stance,standingStride,15D):Mth.lerp((stance-1)/2,15D,12D);
