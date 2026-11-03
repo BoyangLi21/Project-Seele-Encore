@@ -34,11 +34,12 @@ def publish(a):
     for key in ('ground','old_ground'):g[key][area]=d[key]
     np.savez_compressed(a.out/'network.npz',**g)
     updated={r['id']:r for r in json.loads((a.candidate/'plan/buildings.json').read_text('utf8'))}
-    footways={r['parcel']:r['points']for r in json.loads((a.candidate/'plan/footways.json').read_text('utf8'))}
+    footways={r['parcel']:r['points']for r in json.loads((a.candidate/'plan/footways.json').read_text('utf8'))if 'parcel'in r}
     catalog={r['id']:r for r in json.loads((a.previous/'catalog.json').read_text('utf8'))}
     for plan in a.overlay_plan:
         if (plan/'catalog.json').exists():catalog.update({r['id']:r for r in json.loads((plan/'catalog.json').read_text('utf8'))})
     catalog=list(catalog.values())
+    fixtures=json.loads((a.candidate/'street-details.json').read_text('utf8')).get('native_fixtures',[])if (a.candidate/'street-details.json').exists()else[]
     for row in catalog:
         if row.get('id')not in updated:continue
         revised=updated[row['id']];dy=revised['dy'];row['site']=copy.deepcopy(revised['site']);row['door']=revised['door'];row['approach']=revised['approach']
@@ -53,6 +54,13 @@ def publish(a):
                 py=float(d['grade2'][j,i])/2+1 if d['walk'][j,i]else revised['site']['floor']+1
                 if not path or path[-1]!=[px,py,pz]:path.append([px,py,pz])
         row['footway']=path;row['installed_neighbourhood']=a.candidate.name
+        owned=[f for f in fixtures if f['parcel']==row['id']]
+        if owned:
+            row['native_frontage_fixtures']=owned
+            for fixture in owned:
+                px,py,pz=fixture['pos'];b=row['occupied_bounds']
+                b[0]=min(b[0],px-1);b[3]=max(b[3],px+1);b[2]=min(b[2],pz-1);b[5]=max(b[5],pz+1)
+                b[1]=min(b[1],py-1);b[4]=max(b[4],py+fixture['upper_cells'])
     save_json(a.out/'catalog.json',catalog)
     save_json(a.out/'neighbourhood-authority.json',dict(installation=str(a.installation),candidate=str(a.candidate),previous=str(a.previous),overlaid_current_plans=[str(p)for p in a.overlay_plan],planning_bounds=g['bounds'].tolist(),outside_frame_keeps_its_separate_installed_authority=True,parcels_updated=len(updated),retired_unwalkable_old_columns=retired,current_neighbourhood_public_columns=int(d['walk'].sum()),parcel_moves_already_installed=True,whole_map_complete=False,global_legacy_connectivity_report_requires_refresh=True))
     print('Published current planning authority:',len(updated),'parcel addresses;',retired,'retired old surface columns',flush=True)

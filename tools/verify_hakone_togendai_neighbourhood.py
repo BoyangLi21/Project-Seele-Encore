@@ -15,15 +15,19 @@ from query_blocks import AIR
 def verify(candidate):
     with np.load(candidate/'plan/network.npz')as f:d={k:f[k]for k in f.files}
     x,z,X,Z=map(int,d['bounds']);e=Editor(candidate);errors=[];walk=d['walk'];g=d['grade2'];checked=0
+    specs=json.loads((candidate/'plan/authored-design.json').read_text('utf8'))
+    pavement=PAVEMENT|set(specs.get('retained_pavement_materials',[]))
     empty=AIR|{'minecraft:light','minecraft:grass','minecraft:tall_grass','minecraft:fern','minecraft:large_fern'}
     for j,i in np.argwhere(walk):
         px,pz=int(i+x),int(j+z);floor,slab=road_blocks(g[j,i]);floor=int(floor);state=e.state(px,floor,pz)
-        if state.split('[')[0]not in PAVEMENT or ('type=bottom'in state)!=bool(slab):errors.append(['pavement',px,floor,pz,state,bool(slab)])
+        if state.split('[')[0]not in pavement or ('type=bottom'in state)!=bool(slab):errors.append(['pavement',px,floor,pz,state,bool(slab)])
         for Y in range(floor+1,floor+4):
             state=e.state(px,Y,pz)
             if state.split('[')[0]not in empty:errors.append(['headroom',px,Y,pz,state])
         checked+=1
-    seen=np.zeros(walk.shape,bool);start=(1000-z,-287-x);queue=deque([start]);seen[start]=True
+    seed=specs.get('connectivity_seed',[-287,1000]);start=(seed[1]-z,seed[0]-x)
+    if not walk[start]:raise ValueError(('Connectivity seed is not public pavement',seed))
+    seen=np.zeros(walk.shape,bool);queue=deque([start]);seen[start]=True
     while queue:
         j,i=queue.popleft()
         for J,I in ((j-1,i),(j+1,i),(j,i-1),(j,i+1)):
@@ -77,17 +81,65 @@ def verify(candidate):
         for py in ys:
             if e.state(px,py,pz)!=e.state(px,py,pz,True):errors.append(['native cable swept volume changed',px,py,pz])
             cable_cells+=1
+    train_cells=0
+    if specs.get('preserve_train_corridors',False):
+        columns={}
+        for row in json.loads((candidate/'plan/native-curves.json').read_text('utf8'))['trains']:
+            for px,py,pz in row['points']:
+                px,py,pz=map(int,np.floor([px,py,pz]))
+                if px<x-8 or px>X+8 or pz<z-8 or pz>Z+8 or py<-100 or py>310:continue
+                for Q in range(px-8,px+9):
+                    for R in range(pz-8,pz+9):
+                        if not(x<=Q<=X and z<=R<=Z):continue
+                        lo,hi=columns.get((Q,R),(320,-129));columns[Q,R]=(min(lo,py-30),max(hi,py+7))
+        for (px,pz),(lo,hi)in columns.items():
+            r=e.region(px,pz);idx=r['index'][px//16,pz//16];a,b=max(-128,lo)+128,min(319,hi)+129
+            original=r['before'][idx,a:b,pz%16,px%16];actual=r['after'][idx,a:b,pz%16,px%16]
+            if not np.array_equal(original,actual):errors.append(['native rail structure or clearance changed',px,pz,int((original!=actual).sum())])
+            train_cells+=original.size
     changes=nbtlib.load(candidate/'block-entities.dat')['Changes'];before={};after={}
     for r in changes:
         for key,table in [('Before',before),('After',after)]:
             if key in r:
                 tag=r[key];pos=tuple(int(tag[k])for k in ('x','y','z'));table[pos]=tag
+    preserved_cells=0
+    for box in specs.get('protected_volumes',[]):
+        for cx in range(box[0]//16,box[3]//16+1):
+            for cz in range(box[2]//16,box[5]//16+1):
+                r=e.region(cx*16,cz*16);idx=r['index'].get((cx,cz))
+                if idx is None:raise ValueError(('Protected native volume outside captured FULL chunks',box,cx,cz))
+                a,b=max(box[1],-128)+128,min(box[4],319)+129
+                area=np.s_[a:b,max(box[2]-cz*16,0):min(box[5]-cz*16+1,16),max(box[0]-cx*16,0):min(box[3]-cx*16+1,16)]
+                original=r['before'][idx][area];actual=r['after'][idx][area]
+                if not np.array_equal(original,actual):errors.append(['native room or mechanism volume changed',box,cx,cz,int((original!=actual).sum())])
+                preserved_cells+=original.size
+    moved_positions={tuple(pos)for row in rows for pos in row['devices']}
+    retained_tags=0
+    for pos,tag in originals.items():
+        if pos in moved_positions:continue
+        if pos in before or pos in after:errors.append(['unexpected retained device NBT change',pos])
+        if e.state(*pos)!=e.state(*pos,True):errors.append(['retained device block changed',pos])
+        retained_tags+=1
     checked_tags=0
     for row in rows:
         for pos in row['devices']:
             pos=tuple(pos);tag=originals[pos];q=(pos[0],pos[1]+row['dy'],pos[2]);new=copy.deepcopy(tag);new['y']=nbtlib.Int(q[1])
             if before.get(pos)!=tag or after.get(q)!=new:errors.append(['full device NBT changed',row['id'],pos])
             checked_tags+=1
+    added_fixtures=0
+    if (candidate/'street-details.json').is_file():
+        for fixture in json.loads((candidate/'street-details.json').read_text('utf8')).get('native_fixtures',[]):
+            pos=tuple(fixture['pos']);kind=fixture['kind'];tag=after.get(pos);state=e.state(*pos)
+            if pos in originals or pos in before or not tag or str(tag.get('id'))!='projectseele:period_fixture' or 'kind='+kind not in state:
+                errors.append(['new native fixture identity',pos,kind])
+            for dy in range(1,fixture['upper_cells']+1):
+                if e.state(pos[0],pos[1]+dy,pos[2])!=f'projectseele:period_fixture_part[offset={dy}]':errors.append(['native fixture upper picking cell',pos,dy])
+            for dx in (-1,0,1):
+                for dz in (-1,0,1):
+                    if dx==dz==0:continue
+                    for dy in range(3):
+                        if e.state(pos[0]+dx,pos[1]+dy,pos[2]+dz).split('[')[0]not in empty:errors.append(['native fixture mesh clearance',pos,dx,dy,dz])
+            added_fixtures+=1
     specs=json.loads((candidate/'plan/authored-design.json').read_text('utf8'));profiles=[]
     for row in specs['streets']:
         curve,s=alignment(row);samples=np.arange(0,s[-1]+.1,1.0);cx=np.rint(np.interp(samples,s,curve[:,0])).astype(int);cz=np.rint(np.interp(samples,s,curve[:,2])).astype(int)
@@ -109,7 +161,8 @@ def verify(candidate):
                         contacts+=1;break
         seams.append(dict(street=row['id'],contacts=contacts))
         if contacts==0:errors.append(['retained street disconnected',row['id']])
-    report=dict(errors=errors,full_width_columns=checked,reachable_columns=int(seen.sum()),parcel_payload_cells_checked=payload_cells,parcel_payload_cells_exact=payload_cells-payload_exceptions,approved_outdoor_cells=payload_exceptions,complete_device_tags_exact=checked_tags,native_cable_swept_cells_unchanged=cable_cells,parcel_goals=goals,streets=profiles,retained_interfaces=seams,visual_verified=False,world_written=False)
+    report=dict(errors=errors,full_width_columns=checked,reachable_columns=int(seen.sum()),parcel_payload_cells_checked=payload_cells,parcel_payload_cells_exact=payload_cells-payload_exceptions,approved_outdoor_cells=payload_exceptions,complete_device_tags_exact=checked_tags,retained_device_tags_unchanged=retained_tags,native_room_volume_cells_unchanged=preserved_cells,native_rail_corridor_cells_unchanged=train_cells,native_cable_swept_cells_unchanged=cable_cells,parcel_goals=goals,streets=profiles,retained_interfaces=seams,visual_verified=False,world_written=False)
+    report['new_native_fixtures_checked']=added_fixtures
     save_json(candidate/'independent-check.json',report)
     prior=json.loads((candidate/'functional-check.json').read_text('utf8'));prior.setdefault('composition_errors',prior['errors']);prior['independent_verification_errors']=errors;prior['errors']=prior['composition_errors']+errors;save_json(candidate/'functional-check.json',prior)
     print(json.dumps({k:v for k,v in report.items()if k not in ('errors','parcel_goals')},ensure_ascii=False),flush=True)

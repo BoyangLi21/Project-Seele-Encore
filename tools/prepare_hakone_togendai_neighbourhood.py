@@ -30,6 +30,19 @@ def rect(bounds,box):
     x,z,X,Z=map(int,bounds);a,c,A,C=map(int,box)
     return np.s_[max(c,z)-z:min(C,Z)-z+1,max(a,x)-x:min(A,X)-x+1]
 
+
+def station_forecourt(bounds,old,road,walk,grade2,mark):
+    x,z,_,_=map(int,bounds)
+    forecourt=rect(bounds,[-326,979,-246,996]);walk[forecourt]=True;grade2[forecourt]=218
+    road[forecourt]=False;road[rect(bounds,[-324,980,-248,985])]=True
+    walk[rect(bounds,[-326,989,-246,990])]=True;grade2[rect(bounds,[-326,989,-246,990])]=218
+    mark[forecourt]=False
+    for px in range(-326,-245):
+        for pz in range(989,997):
+            if any(old.state(px,y,pz).split('[')[0]not in EMPTY|SOIL for y in range(110,113)):
+                walk[pz-z,px-x]=False
+    walk[rect(bounds,[-289,997,-285,1002])]=True;grade2[rect(bounds,[-289,997,-285,1002])]=218
+
 def design(a):
     a.out.mkdir(parents=True,exist_ok=False)
     with np.load(a.survey/'surface.npz')as f:d={k:f[k]for k in f.files}
@@ -52,15 +65,7 @@ def design(a):
         streets.append(dict(id=row['id'],length=float(along[-1]),maximum_continuous_grade=float((abs(np.diff(curve[:,1]))/np.linalg.norm(np.diff(curve[:,[0,2]],axis=0),axis=1)).max())))
     # Preserve existing station entrance and shelters. Rebuild its carriageway
     # at one datum, with a generous continuous passenger pavement in front.
-    forecourt=rect(bounds,[-326,979,-246,996]);walk[forecourt]=True;grade2[forecourt]=218
-    road[forecourt]=False;road[rect(bounds,[-324,980,-248,985])]=True
-    walk[rect(bounds,[-326,989,-246,990])]=True;grade2[rect(bounds,[-326,989,-246,990])]=218
-    mark[forecourt]=False
-    for px in range(-326,-245):
-        for pz in range(989,997):
-            if any(old.state(px,y,pz).split('[')[0]not in EMPTY|SOIL for y in range(110,113)):
-                walk[pz-z,px-x]=False
-    walk[rect(bounds,[-289,997,-285,1002])]=True;grade2[rect(bounds,[-289,997,-285,1002])]=218
+    if design.get('togendai_forecourt',True):station_forecourt(bounds,old,road,walk,grade2,mark)
     with np.load(a.catalog.parent/'network.npz')as f:
         bx,bz,_,_=map(int,f['bounds']);area=np.s_[z-bz:Z-bz+1,x-bx:X-bx+1]
         previous_walk=f['walk'][area].copy();previous_grade=f['grade2'][area].copy()
@@ -72,6 +77,17 @@ def design(a):
         ports|=(np.hypot(xx-px,zz-pz)<port.get('radius',18))&((xx-px)*outward[0]+(zz-pz)*outward[1]>0)
     retained_walk=previous_walk&ports&~walk
     grade2=fit_ports(walk,grade2,retained_walk,previous_grade)
+    # Retained junctions can have curbs, planting strips or a rounded cap.
+    # Include only their existing standing pavement, without widening them
+    # through protected structures or silently accepting an unpaved cell.
+    materials=PAVEMENT|set(design.get('retained_pavement_materials',[]))
+    for box in design.get('trim_retained_pavement',[]):
+        zone=np.zeros(shape,bool);zone[rect(bounds,box)]=True
+        for j,i in np.argwhere(walk&zone):
+            h,slab=road_blocks(grade2[j,i]);state=old.state(int(i+x),int(h),int(j+z))
+            valid=state.split('[')[0]in materials and ('type=bottom'in state)==bool(slab)
+            valid&=all(old.state(int(i+x),int(h)+k,int(j+z)).split('[')[0]in EMPTY for k in (1,2,3))
+            if not valid:walk[j,i]=False;road[j,i]=False;mark[j,i]=False
     plots=np.zeros(shape,bool);plotfloor=np.zeros(shape,np.int16);newrows=[]
     for row in rows:
         box=row['payload_bounds'];px0,_,pz0,px1,_,pz1=box
@@ -85,6 +101,12 @@ def design(a):
     # Explicit footways have their own grade; complete surfaces are solved
     # before any terrain is composed. They never cross a retained wall.
     footways=[]
+    for spec in design.get('public_paths',[]):
+        curve,along=alignment(spec);dist,near=cKDTree(curve[:,[0,2]]).query(np.column_stack([xx.ravel(),zz.ravel()]));dist=dist.reshape(shape);near=near.reshape(shape)
+        w=dist<=spec.get('width',3)/2;h2=np.rint((curve[near,1]-1)*2).astype(np.int16)
+        if np.any(w&plots):raise ValueError(('public path crosses parcel',spec['id']))
+        h2=fit_ports(w&~walk,h2,walk,grade2);use=w&~walk;walk|=w;grade2[use]=h2[use]
+        footways.append(dict(id=spec['id'],points=spec['points'],length=float(along[-1])))
     for spec in design['footways']:
         row=next(r for r in newrows if r['id']==spec['parcel']);path=np.asarray(spec['points'],float)
         start=np.asarray(row['approach'],float);end=path[-1]
@@ -130,19 +152,22 @@ def design(a):
         fixed[rect(bounds,[px0-3,pz0-3,px1+3,pz1+3])]=True
         retained.append(box)
     fixed&=known
-    station_soil=np.zeros(shape,bool);station_soil[rect(bounds,[-316,994,-255,1115])]=True
+    station_soil=np.zeros(shape,bool)
+    for box in design.get('retained_soil_areas',[[-316,994,-255,1115]]):station_soil[rect(bounds,box)]=True
     # The retained four-level station already has structural walls. Its lower
     # soil is preserved without forcing a natural slope through those rooms.
     fixed&=~station_soil
+    bridge=np.zeros(shape,bool)
+    for box in design.get('bridge_spans',[]):bridge[rect(bounds,box)]=True
     innerplots=binary_erosion(plots,iterations=2)
-    anchor=walk|innerplots|fixed;anchor_y=d['old_ground'].copy();anchor_y[walk]=(grade2[walk]+1)//2-1;anchor_y[innerplots]=plotfloor[innerplots]-3
+    anchor=(walk&~bridge)|innerplots|fixed;anchor_y=d['old_ground'].copy();anchor_y[walk]=(grade2[walk]+1)//2-1;anchor_y[innerplots]=plotfloor[innerplots]-3
     target,conflict=grade_ground(surveyed,anchor,anchor_y,slope=1)
     np.savez_compressed(a.out/'debug-grades.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,plots=plots,plotfloor=plotfloor,fixed=fixed,anchor_y=anchor_y,wet=wet,conflict=conflict,target=target,old_ground=d['old_ground'])
-    if np.any(conflict & (walk|innerplots)):
-        j,i=np.argwhere(conflict&(walk|innerplots))[0];raise ValueError(('terrain anchor conflict',int(i+x),int(j+z)))
-    target[wet|fixed|station_soil|~known]=d['old_ground'][wet|fixed|station_soil|~known]
+    if np.any(conflict & ((walk&~bridge)|innerplots)):
+        j,i=np.argwhere(conflict&((walk&~bridge)|innerplots))[0];raise ValueError(('terrain anchor conflict',int(i+x),int(j+z)))
+    target[wet|fixed|station_soil|bridge|~known]=d['old_ground'][wet|fixed|station_soil|bridge|~known]
     if any(np.any(edge)for edge in((target-d['old_ground'])[0],(target-d['old_ground'])[-1],(target-d['old_ground'])[:,0],(target-d['old_ground'])[:,-1])):raise ValueError('Nonzero earthwork at crop edge')
-    np.savez_compressed(a.out/'design.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,marking=mark,plots=plots,plotfloor=plotfloor,ground=target,old_ground=d['old_ground'],wet=wet,core=core,retained_walk=retained_walk,ports=ports)
+    np.savez_compressed(a.out/'design.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,marking=mark,plots=plots,plotfloor=plotfloor,ground=target,old_ground=d['old_ground'],wet=wet,core=core,retained_walk=retained_walk,ports=ports,bridge=bridge)
     save_json(a.out/'buildings.json',newrows);save_json(a.out/'streets.json',streets);save_json(a.out/'footways.json',footways);shutil.copy2(a.design,a.out/'authored-design.json')
     save_json(a.out/'retained-buildings.json',retained)
     save_json(a.out/'design-report.json',dict(buildings=len(rows),moves=sum(r['dy']!=0 for r in newrows),maximum_lift=max(r['dy']for r in newrows),streets=streets,road_columns=int(road.sum()),public_columns=int(walk.sum()),earthwork_columns=int((target!=d['old_ground']).sum()),world_written=False))

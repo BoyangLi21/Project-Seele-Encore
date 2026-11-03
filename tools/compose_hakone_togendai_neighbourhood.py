@@ -24,6 +24,7 @@ def compose(a):
     shutil.copy2(a.base_plan/'native-curves.json',a.out/'plan/native-curves.json')
     with np.load(a.design/'design.npz')as f:d={k:f[k]for k in f.files}
     bounds=d['bounds'];x,z,X,Z=map(int,bounds);shape=d['walk'].shape
+    bridge=d.get('bridge',np.zeros(shape,bool))
     rows=json.loads((a.design/'buildings.json').read_text('utf8'))
     capture=json.loads((a.source/'capture.json').read_text('utf8'));world=Path(capture['world'])
     devices={tuple(int(t[k])for k in('x','y','z')):t for t in nbtlib.load(a.survey/'captured-devices.dat')['Devices']}
@@ -74,12 +75,10 @@ def compose(a):
     for box in design_spec.get('retire_road_areas',[]):rebuild[rect(bounds,box)]=True
     rebuild[d['ports']&~d['walk']]=False
     retired_scope=rebuild&oldowned
-    retired_scope[rect(bounds,[-326,979,-246,996])]=True
+    if design_spec.get('togendai_forecourt',True):retired_scope[rect(bounds,[-326,979,-246,996])]=True
     retained=json.loads((a.design/'retained-buildings.json').read_text('utf8'))
     boxes=[[b[0]-2,b[1]-3,b[2]-2,b[3]+2,b[4]+8,b[5]+2]for b in retained]
-    boxes += [[-316,95,997,-255,135,1048],[-316,90,1049,-255,112,1090]]
-    # Shelter roofs, benches, signs and posts stay at the operating 1F datum.
-    boxes += [[-328,110,989,-244,125,998]]
+    boxes += design_spec.get('protected_volumes',[[-316,95,997,-255,135,1048],[-316,90,1049,-255,112,1090],[-328,110,989,-244,125,998]])
     # Native cable cars hang below their guide line. A conservative swept
     # volume protects both movement directions, independently of station boxes.
     cable=defaultdict(list)
@@ -89,6 +88,16 @@ def compose(a):
             px,py,pz=map(int,np.floor([px,py,pz]))
             for Q in range(px-3,px+4):
                 for R in range(pz-3,pz+4):cable[Q//16,R//16].append((Q,py,R))
+    trains=defaultdict(dict)
+    if design_spec.get('preserve_train_corridors',False):
+        for row in curves['trains']:
+            for px,py,pz in row['points']:
+                px,py,pz=map(int,np.floor([px,py,pz]))
+                if px<x-8 or px>X+8 or pz<z-8 or pz>Z+8 or py<-100 or py>310:continue
+                for Q in range(px-8,px+9):
+                    for R in range(pz-8,pz+9):
+                        lo,hi=trains[Q//16,R//16].get((Q,R),(320,-129))
+                        trains[Q//16,R//16][Q,R]=(min(lo,py-30),max(hi,py+7))
     yy=np.arange(-128,320)[:,None,None];retired=[]
     for file in sorted((a.out/'source').glob('*.npz')):
         rx,rz=map(int,file.stem.split('.')[1:])
@@ -111,6 +120,7 @@ def compose(a):
                 if q[0]>cx*16+15 or q[3]<cx*16 or q[2]>cz*16+15 or q[5]<cz*16:continue
                 protect|=(xx>=q[0])&(xx<=q[3])&(zz>=q[2])&(zz<=q[5])&(yy>=q[1])&(yy<=q[4])
             for Q,Y,R in cable[cx,cz]:protect[max(0,Y-10+128):min(448,Y+7+128),R%16,Q%16]=True
+            for (Q,R),(lo,hi)in trains[cx,cz].items():protect[max(0,lo+128):min(448,hi+129),R%16,Q%16]=True
             for pos in devices.keys()-moved:
                 if pos[0]//16==cx and pos[2]//16==cz:protect[pos[1]+128,pos[2]%16,pos[0]%16]=True
             own=retire&~protect&(yy>=old-4)&(yy<=np.maximum(old+12,(oldgrade[iz,ix]+1)//2+8))
@@ -125,9 +135,10 @@ def compose(a):
                 px,pz=int(xx[j,i]),int(zz[j,i]);h=int(floor[j,i]);j0,i0=int(iz[j,i]),int(ix[j,i])
                 # Native station floor is retained, not filled through rooms.
                 if protect[h+128,j,i]:
-                    if not pave[v[h+128,j,i]]:errors.append(['protected road floor',px,h,pz,r['names'][v[h+128,j,i]]])
+                    if not pave[v[h+128,j,i]] and r['names'][v[h+128,j,i]].split('[')[0]not in design_spec.get('retained_pavement_materials',[]):errors.append(['protected road floor',px,h,pz,r['names'][v[h+128,j,i]]])
                     continue
-                for Y in range(min(int(old[j,i])-2,h-2),h+4):
+                deck=bool(bridge[j0,i0])
+                for Y in range(h-2 if deck else min(int(old[j,i])-2,h-2),h+4):
                     if protect[Y+128,j,i]:continue
                     state=int(v[Y+128,j,i]);allowed=natural[state]or empty[state]or (pave[state]and retire[j,i])
                     if not allowed:
@@ -177,13 +188,14 @@ def compose(a):
                     outdoor.append(dict(parcel=row['id'],pos=[Q,Y,R],before=before,after=new));e.put(Q,Y,R,new)
     # Move the original station lamp out of the new sidewalk. It has no block
     # entity; all five original block states are retained at the new position.
-    lamp_source=[-249,110,997];lamp_target=[-235,0,1004];j,i=lamp_target[2]-z,lamp_target[0]-x;lamp_target[1]=int(d['ground'][j,i])+1
-    if d['walk'][j,i]:raise ValueError('Lamp would obstruct commissioned pavement')
     lamp=[]
-    for k in range(5):
-        p=(lamp_source[0],lamp_source[1]+k,lamp_source[2]);q=(lamp_target[0],lamp_target[1]+k,lamp_target[2]);state=e.state(*p,original=True)
-        if state.split('[')[0]not in {'minecraft:iron_bars','minecraft:lantern'}or e.state(*q).split('[')[0]not in EMPTY:raise ValueError(('Station lamp relocation blocked',p,q))
-        lamp.append(dict(before=list(p),after=list(q),state=state));e.put(*p,'minecraft:air');e.put(*q,state)
+    if design_spec.get('togendai_forecourt',True):
+        lamp_source=[-249,110,997];lamp_target=[-235,0,1004];j,i=lamp_target[2]-z,lamp_target[0]-x;lamp_target[1]=int(d['ground'][j,i])+1
+        if d['walk'][j,i]:raise ValueError('Lamp would obstruct commissioned pavement')
+        for k in range(5):
+            p=(lamp_source[0],lamp_source[1]+k,lamp_source[2]);q=(lamp_target[0],lamp_target[1]+k,lamp_target[2]);state=e.state(*p,original=True)
+            if state.split('[')[0]not in {'minecraft:iron_bars','minecraft:lantern'}or e.state(*q).split('[')[0]not in EMPTY:raise ValueError(('Station lamp relocation blocked',p,q))
+            lamp.append(dict(before=list(p),after=list(q),state=state));e.put(*p,'minecraft:air');e.put(*q,state)
     save_json(a.out/'outdoor-apron-corrections.json',outdoor);save_json(a.out/'retained-lamp-move.json',lamp)
     patches=e.save();e.regions.clear()
     records=[nbtlib.Compound({'Pos':nbtlib.Long(packed(pos)),**row})for pos,row in sorted(changes.items())]

@@ -246,6 +246,8 @@ def install(a):
             expected=manifest['neighbourhood_verification'];verified=json.loads((candidate/'independent-check.json').read_text('utf8'))
             if verified['errors'] or verified['full_width_columns']!=expected['public_columns'] or verified['reachable_columns']!=expected['public_columns'] or len(verified['parcel_goals'])!=expected['parcels'] or verified['complete_device_tags_exact']!=expected['devices']:
                 raise ValueError('Incomplete independent neighbourhood verification: '+str(candidate))
+            if verified.get('new_native_fixtures_checked',0)!=expected.get('new_native_fixtures',0):
+                raise ValueError('Incomplete native fixture mesh/NBT verification: '+str(candidate))
         if 'legacy_water_banks' in manifest:
             banks=json.loads((candidate/'water-bank-check.json').read_text('utf8'))
             if banks['errors'] or banks['exposed_Y62_water_faces']:

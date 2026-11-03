@@ -104,6 +104,8 @@ def alignment(row):
         ports=np.interp(distance,along,physical)
         curve[:,1]=PchipInterpolator(ports,points[:,1])(physical)
         along=physical
+    if row.get('linear_grade',False):
+        curve[:,1]=np.interp(along,ports if row.get('arc_length_grade',False)else distance,points[:,1])
     slope=abs(np.diff(curve[:,1]))/ds
     if slope.max()>row.get('maximum_grade',.25)+1e-6:
         raise ValueError((row['id'],'alignment grade exceeds design',float(slope.max())))
