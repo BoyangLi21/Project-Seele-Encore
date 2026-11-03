@@ -33,13 +33,15 @@ def prepare(a):
             tile_refs[key]=dict(tile=t,rec=rec,rgba=np.array(t.image()),height=unpack_heights(t.heights),top=unpack_heights(t.top_heights),version=rec['cache'].versions[k])
         return tile_refs[key]
     changes={}
-    for folder in a.candidate:
-        report=json.loads((folder/'functional-check.json').read_text('utf8'))
-        if report['errors']:raise ValueError('Unverified surface candidate')
+    for folder,colour_only in [(p,False)for p in a.candidate]+[(p,True)for p in getattr(a,'palette_source',[])]:
+        report_path=folder/'functional-check.json'
+        if report_path.exists()and json.loads(report_path.read_text('utf8'))['errors']:raise ValueError('Unverified surface candidate')
+        if not colour_only and not report_path.exists():raise ValueError('Surface candidate has no verification')
         e=Editor(folder)
-        for f in (folder/'delta').glob('*.npz'):
+        for f in (folder/('source'if colour_only else'delta')).glob('*.npz'):
             rx,rz=map(int,f.stem.split('.')[1:]);r=e.region(rx*512,rz*512);names=r['names'];bases=[s.split('[')[0]for s in names];visible=np.array([s not in INVISIBLE for s in bases])
             for (cx,cz),before,after in zip(r['coords'],r['before'],r['after']):
+                if colour_only:before=after
                 cx,cz=int(cx),int(cz);h0=np.where(visible[before],np.arange(448)[:,None,None],0).max(0);h1=np.where(visible[after],np.arange(448)[:,None,None],0).max(0)
                 s0=np.take_along_axis(before,h0[None],0)[0];s1=np.take_along_axis(after,h1[None],0)[0]
                 t=tile(0,cx//4,cz//4)
@@ -107,7 +109,7 @@ def prepare(a):
             assert np.array_equal(np.asarray(checked.tiles[k].image()),ref['rgba'])
             assert np.array_equal(unpack_heights(checked.tiles[k].heights),ref['height'])
         files.append(rel.as_posix())
-    result=dict(cache_root=str(a.cache),candidates=[str(c)for c in a.candidate],files=files,pixels=len(changes),leaf_tiles=leaf_count,all_zoom_tiles=len(changed_tiles),levels=levels,native_palette=palette,errors=[],live_cache_written=False)
+    result=dict(cache_root=str(a.cache),candidates=[str(c)for c in a.candidate],palette_sources=[str(c)for c in getattr(a,'palette_source',[])],files=files,pixels=len(changes),leaf_tiles=leaf_count,all_zoom_tiles=len(changed_tiles),levels=levels,native_palette=palette,errors=[],live_cache_written=False)
     (a.out/'manifest.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),'utf8')
     print(json.dumps({k:v for k,v in result.items()if k not in ('native_palette','files')}),flush=True)
 
@@ -115,4 +117,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
     for n in ('cache','out'):p.add_argument('--'+n,type=Path,required=True)
     p.add_argument('--candidate',type=Path,action='append',required=True)
+    p.add_argument('--palette-source',type=Path,action='append',default=[],help='Additional exact current captures or installed candidates; sample colours only, never publish their pixels')
     prepare(p.parse_args())

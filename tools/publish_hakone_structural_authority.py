@@ -46,7 +46,7 @@ def run(a):
                     for k in ('walk','grade2'):
                         target=g[k][dst];target[public]=f[k][src][public]
                     for k in ('road','marking','tunnel'):g[k][dst][public]=False
-                    spaces.append(dict(id='sounzan-connected-outdoor-stair',candidate=str(C),footprint_plan=str(C/'plan/network.npz'),contacts=functional['door_and_street_contacts']))
+                    spaces.append(dict(id=functional.get('public_space_id','sounzan-connected-outdoor-stair'),candidate=str(C),footprint_plan=str(C/'plan/network.npz'),contacts=functional['door_and_street_contacts']))
         if 'sniper'in C.name:spaces.append(dict(id='expanded-yashima-forecourt',candidate=str(C),floor=174,footprint_plan=str(C/'plan/network.npz'),mechanical_well_exclusions=json.loads((C/'design.json').read_text('utf8'))['well_volumes']))
     np.savez_compressed(a.out/'network.npz',**g)
     report=dict(installation=str(a.installation),retired_invalid_old_walk_columns=retired,additional_supported_spaces=spaces,whole_map_acceptance=False)
