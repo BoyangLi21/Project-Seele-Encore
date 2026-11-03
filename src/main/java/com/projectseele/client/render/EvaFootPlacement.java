@@ -38,7 +38,8 @@ public final class EvaFootPlacement
     }
     private static double ground(EvaUnit01Entity eva,Vector3f point)
     {
-        Vec3 from=new Vec3(point.x,point.y+3.5,point.z),to=new Vec3(point.x,point.y-4,point.z);
+        // Reach a kerb up to a full step above the sole, or the ground a step below.
+        Vec3 from=new Vec3(point.x,point.y+STEP+1,point.z),to=new Vec3(point.x,point.y-STEP-1,point.z);
         for(int i=0;i<5;i++)
         {
             var hit=eva.level().clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,eva));if(hit.getType()!=HitResult.Type.BLOCK)return Double.NaN;
@@ -65,7 +66,7 @@ public final class EvaFootPlacement
             if(selected==null)continue;Vector3f lowest=matrix.transformPosition(new Vector3f(selected));
             double ground=ground(eva,lowest),lift=lowest.y-eva.getY();
             double plant=1-Math.max(0,Math.min(1,(lift-.35)/1.7));
-            double correction=ease(eva.getId()*2+(s.equals("l")?0:1),Double.isFinite(ground)?Math.max(-2.6,Math.min(2.6,ground+.05-lowest.y))*plant:0);
+            double correction=ease(eva.getId()*2+(s.equals("l")?0:1),Double.isFinite(ground)?Math.max(-STEP,Math.min(STEP,ground+.05-lowest.y))*plant:0);
             witness[index++]=lowest.y;witness[index++]=ground;witness[index++]=correction;
             if(Math.abs(correction)<.005)continue;
             Vector3f target=EvaRigTransforms.point(foot,EvaRigTransforms.pivot(foot),root).add(0,(float)correction,0);
@@ -77,6 +78,8 @@ public final class EvaFootPlacement
         if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),witness);
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(changed),"MOTION_ENGINE_LIVE_ACTION");
     }
+    /** The EVA's step height (blocks): a sole is set on ground this far above or below it. */
+    private static final double STEP=8;
     private record Eased(double value,long time) {}
     private static final Map<Integer,Eased> EASED=new HashMap<>();
     /**

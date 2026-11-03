@@ -719,7 +719,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public EvaUnit01Entity(EntityType<? extends EvaUnit01Entity> type, Level level)
     {
         super(type, level);
-        this.setMaxUpStep(2.6F);
+        // A stair-sized step for a giant: about a sixth of its height. The
+        // drawn body rises onto it smoothly (EvaStepSmoothingR57); taller
+        // ledges are climbed.
+        this.setMaxUpStep(8F);
     }
 
     public static AttributeSupplier.Builder createAttributes()
@@ -3474,6 +3477,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(this.getWeapon()==WEAPON_SWORD_R45){EvaSwordActionsR45.request(this,pilot,true);return;}
         if(CombatFeelR31.restrained(this)){EvaCombatIntentR32.offer(this,pilot,1);return;}
         if(EvaCombatR31.attack(this,true))return;
+        // Standing bare-handed, the heavy is the side kick (it had its own B
+        // key): it chains after the punches and owns its cooldown and contact.
+        if(this.getWeapon()==WEAPON_FISTS&&!this.isPilotCrouching()&&!this.isPilotProne()&&this.heavyTicks<=0)
+        {this.stompAttack(pilot);return;}
         if(this.heavyTicks>0){this.queueHeavyR51(pilot);return;}
         if (this.getWeapon() == WEAPON_FISTS && ((!this.isPilotProne() && !this.isPilotCrouching()) || EvaGameplayMotionR32.lowAttackReadyR44(this))
                 && !this.isPilotControlLocked() && this.smashCooldown == 0

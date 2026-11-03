@@ -15,11 +15,11 @@ final class EvaGaitClockR57
 {
     static final boolean ENABLED=Boolean.parseBoolean(System.getProperty("projectseele.gaitClockR57","true"));
     /** Seconds over which the cycles-per-block rate is averaged. */
-    private static final double RATE_WINDOW=.25;
+    private static final double RATE_WINDOW=.6;
     /** Seconds over which the drawn phase closes its distance to the synchronised one. */
-    private static final double PULL=.4;
+    private static final double PULL=1.0;
     /** A synchronised phase this far away (cycles) is a real jump: take it. */
-    private static final double RESYNC=.3;
+    private static final double RESYNC=.45;
     /** Drawn travel beyond this in one frame (blocks) is a teleport, not a step. */
     private static final double TELEPORT=6;
 

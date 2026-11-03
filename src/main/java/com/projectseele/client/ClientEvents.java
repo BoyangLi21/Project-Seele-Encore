@@ -160,7 +160,6 @@ public class ClientEvents
         event.register(Keybinds.COMMAND_RADIO);
         event.register(Keybinds.TOGGLE_AT_FIELD);
         event.register(Keybinds.EXIT_EVA);
-        event.register(Keybinds.STOMP);
         event.register(Keybinds.TOGGLE_PRONE);
         event.register(Keybinds.CANCEL_LAUNCH);
         event.register(Keybinds.SELF_LAUNCH);

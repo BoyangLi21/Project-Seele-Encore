@@ -73,7 +73,6 @@
   "key.projectseele.cycle_weapon": "EVA：切换武器",
   "key.projectseele.toggle_at_field": "EVA：展开/收起 A.T. Field",
   "key.projectseele.exit_eva": "EVA：弹出插入栓",
-  "key.projectseele.stomp": "EVA：侧踹",
   "key.projectseele.toggle_prone": "EVA：趴下/起身",
   "key.projectseele.cancel_launch": "取消发射／闪避／翻滚",
   "key.projectseele.self_launch": "EVA：测试自助发射",
@@ -323,7 +322,7 @@
   "subtitles.projectseele.pressure_door_motion": "舱门滑轨运转",
   "block.projectseele.entry_plug_bridge_deck": "插入栓检修桥面",
   "block.projectseele.entry_plug_bridge_guard": "插入栓检修桥护栏",
-  "key.projectseele.eva_dash": "疾跑（TV）",
+  "key.projectseele.eva_dash": "EVA：狂奔",
   "entity.projectseele.gaghiel": "鱼天使",
   "subtitles.projectseele.launch_electric_burst_r53": "发射轨道：电流爆发",
   "subtitles.projectseele.launch_rail_friction_r53": "发射轨道：高速摩擦"

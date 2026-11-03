@@ -73,7 +73,6 @@
   "key.projectseele.cycle_weapon": "EVA: Cycle Weapon",
   "key.projectseele.toggle_at_field": "EVA: Toggle A.T. Field",
   "key.projectseele.exit_eva": "EVA: Eject Entry Plug",
-  "key.projectseele.stomp": "EVA: Side Kick",
   "key.projectseele.toggle_prone": "EVA: Toggle Prone",
   "key.projectseele.cancel_launch": "Cancel Launch / Evade / Roll",
   "key.projectseele.self_launch": "EVA: TEST Self Launch",
@@ -321,7 +320,7 @@
   "subtitles.projectseele.pressure_door_motion": "Pressure door track moves",
   "block.projectseele.entry_plug_bridge_deck": "Entry Plug Inspection Deck",
   "block.projectseele.entry_plug_bridge_guard": "Entry Plug Inspection Guard",
-  "key.projectseele.eva_dash": "Dash (TV)",
+  "key.projectseele.eva_dash": "EVA: Full Sprint",
   "entity.projectseele.gaghiel": "Gaghiel",
   "subtitles.projectseele.launch_electric_burst_r53": "Launch rails discharge",
   "subtitles.projectseele.launch_rail_friction_r53": "Launch rails spark and scrape"

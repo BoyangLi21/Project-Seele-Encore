@@ -214,7 +214,7 @@ public final class CombatR31Client
         if(event.phase==TickEvent.Phase.START&&(driving||shutdown&&CombatR31Review.inputAction==9)&&epoch!=CombatR31Review.inputEpoch)
         {
             epoch=CombatR31Review.inputEpoch;int action=CombatR31Review.inputAction;
-                KeyMapping key=switch(action){case 1->mc.options.keyAttack;case 2->mc.options.keyUse;case 3->Keybinds.EVA_GRAPPLE;case 4->Keybinds.TOGGLE_AT_FIELD;case 5->Keybinds.STOMP;case 6->Keybinds.CYCLE_WEAPON;case 10->com.projectseele.visual.StanceContactR41Review.FIELD_INPUT_R45?Keybinds.CANCEL_LAUNCH:null;case 7->shutdown?Keybinds.EXIT_EVA:null;case 9->shutdown?mc.options.keyUse:null;default->null;};
+                KeyMapping key=switch(action){case 1->mc.options.keyAttack;case 2->mc.options.keyUse;case 3->Keybinds.EVA_GRAPPLE;case 4->Keybinds.TOGGLE_AT_FIELD;case 5->mc.options.keyUse;case 6->Keybinds.CYCLE_WEAPON;case 10->com.projectseele.visual.StanceContactR41Review.FIELD_INPUT_R45?Keybinds.CANCEL_LAUNCH:null;case 7->shutdown?Keybinds.EXIT_EVA:null;case 9->shutdown?mc.options.keyUse:null;default->null;};
             if(shutdown&&action==7&&mc.level.getEntity(CombatR31Review.evaId) instanceof EvaUnit01Entity target)
             {
                 try{com.projectseele.visual.StanceContactR41Review.shutdownAtExitKeyR45=shutdownCacheR45(target,"live");}

@@ -252,13 +252,6 @@ public final class ClientForgeEvents
                 send(ServerboundEvaControlPacket.ACTION_EXIT);
             }
         }
-        while (Keybinds.STOMP.consumeClick())
-        {
-            if (eva != null && eva.isMeleeWeapon())
-            {
-                send(ServerboundEvaControlPacket.ACTION_STOMP);
-            }
-        }
         while (Keybinds.TOGGLE_PRONE.consumeClick())
         {
             if (eva != null)

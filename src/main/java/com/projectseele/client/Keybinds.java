@@ -19,8 +19,6 @@ public final class Keybinds
             "key.projectseele.toggle_at_field", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_G, CATEGORY);
     public static final KeyMapping EXIT_EVA = new KeyMapping(
             "key.projectseele.exit_eva", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_V, CATEGORY);
-    public static final KeyMapping STOMP = new KeyMapping(
-            "key.projectseele.stomp", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_B, CATEGORY);
     public static final KeyMapping TOGGLE_PRONE = new KeyMapping(
             "key.projectseele.toggle_prone", InputConstants.Type.KEYSYM, GLFW.GLFW_KEY_Z, CATEGORY);
     public static final KeyMapping UN_EYE_LASER=new KeyMapping("key.projectseele.un_eye_laser",InputConstants.Type.KEYSYM,GLFW.GLFW_KEY_K,CATEGORY);

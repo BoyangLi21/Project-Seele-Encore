@@ -39,6 +39,8 @@ public final class EvaSprintR50
         Float previous=PREVIOUS.get(e);
         return e.level().isClientSide?Mth.lerp(partial,previous==null?current:previous,current):current;
     }
-    public static float speed(EvaUnit01Entity e){return 1+.2F*blend(e,1);}
+    /** Full sprint speed over the ordinary sprint (Left Alt): the TV 12 dash covers ground at three times the run. */
+    private static final float GAIN=3F;
+    public static float speed(EvaUnit01Entity e){return 1+(GAIN-1)*blend(e,1);}
     private EvaSprintR50(){}
 }

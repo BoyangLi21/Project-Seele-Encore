@@ -293,9 +293,20 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         }
         try
         {
-            super.render(entity, entityYaw, partialTick, poseStack, bufferSource,
-                    entity.isCrucified() || nervFloodlit
-                            ? LightTexture.FULL_BRIGHT : packedLight);
+            // A kerb climbed this tick is risen onto over a third of a second.
+            float step=com.projectseele.client.EvaStepSmoothingR57.offset(entity,partialTick);
+            poseStack.pushPose();
+            poseStack.translate(0,step,0);
+            try
+            {
+                super.render(entity, entityYaw, partialTick, poseStack, bufferSource,
+                        entity.isCrucified() || nervFloodlit
+                                ? LightTexture.FULL_BRIGHT : packedLight);
+            }
+            finally
+            {
+                poseStack.popPose();
+            }
         }
         finally
         {

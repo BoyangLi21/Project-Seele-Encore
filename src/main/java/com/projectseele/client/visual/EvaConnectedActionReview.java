@@ -43,6 +43,8 @@ public final class EvaConnectedActionReview
     private static final boolean TOUR=Boolean.getBoolean("projectseele.transitionTour");
     private static final int TOUR_START=Integer.getInteger("projectseele.tourStart",0);
     private static final boolean COMBO=Boolean.getBoolean("projectseele.tourComboR57");
+    private static final boolean DASH=Boolean.getBoolean("projectseele.tourDashR57");
+    private static final boolean STEPS=Boolean.getBoolean("projectseele.tourStepsR57");
     private static final int TOUR_END=Integer.getInteger("projectseele.tourEnd",1600)-TOUR_START;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     private static int wait;
@@ -234,6 +236,19 @@ public final class EvaConnectedActionReview
         // (A tour started part-way has room ahead and does not turn.)
         mc.player.setYRot(TOUR_START==0&&t>=610&&t<1085?180:0);mc.player.setXRot(0);
         if(tourAt(70))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        // Optional checks: a full sprint over the run, and kerbs on the walk.
+        // The client re-syncs held sprint and dash to the real keys, so hold them.
+        if(DASH)com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=70&&t<110);
+        if(STEPS&&at(1))
+        {
+            mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:stone");
+            mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:stone");
+        }
+        if(STEPS&&at(TOUR_END-2))
+        {
+            mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:air");
+            mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:air");
+        }
         if(tourAt(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
         if(tourAt(170)||tourAt(182)||!COMBO&&(tourAt(194)||tourAt(206)))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(tourAt(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
@@ -414,7 +429,7 @@ public final class EvaConnectedActionReview
         world.add(eva.getX()); world.add(eva.getY()); world.add(eva.getZ());
         row.add("world", world);
         // The drawn position and heading at this frame's partial tick.
-        var drawn = eva.getPosition(partialTick);
+        var drawn = eva.getPosition(partialTick).add(0, com.projectseele.client.EvaStepSmoothingR57.offset(eva, partialTick), 0);
         JsonArray position = new JsonArray();
         position.add(drawn.x); position.add(drawn.y); position.add(drawn.z);
         row.add("drawnPosition", position);

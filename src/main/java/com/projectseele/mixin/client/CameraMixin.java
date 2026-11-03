@@ -180,7 +180,8 @@ public abstract class CameraMixin
             double dt=Math.min(.1,Math.max(0,(now-projectseele$carrierFrame)/1e9));
             boolean mechanical=com.projectseele.entity.EvaMechanicalFrameR52.active(controlled);
             Vec3 base=mechanical?com.projectseele.entity.EvaMechanicalFrameR52.frame(controlled,partialTick).translation()
-                    :controlled.hasActiveCarrierMotion()?controlled.carrierRenderPosition(partialTick):controlled.getPosition(partialTick);
+                    :controlled.hasActiveCarrierMotion()?controlled.carrierRenderPosition(partialTick)
+                    :controlled.getPosition(partialTick).add(0,com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick),0);
             // A 60-metre EVA needs a chest-height orbit even when the silo
             // wall contracts its zoom. Never inherit the low rider seat or
             // ease back toward the old 30-metre waist pivot.
@@ -233,7 +234,7 @@ public abstract class CameraMixin
         }
         if(!detached&&controlled!=null&&controlled.isPoweredOn()&&!controlled.isActivationCinematicActive())
         {
-            Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight(),0);
+            Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight()+com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick),0);
             optical=com.projectseele.client.PilotOpticsContinuity.apply(controlled,partialTick,optical);
             this.setPosition(optical.x,optical.y,optical.z);return;
         }
