@@ -311,7 +311,7 @@ def install(a):
             if current.read_bytes()!=prior.read_bytes():raise ValueError('Native service changed after repair preparation')
             metadata.append((current,after));metadata_targets.add(current)
         additions=manifest.get('native_additions',[])
-        if additions:
+        if additions or manifest.get('preserve_native_members',False):
             pairs,baseline,added=prepare_native_additions(candidate,a.world,additions)
             for current,after in pairs:
                 if current in metadata_targets:raise ValueError('Overlapping native service addition')

@@ -27,6 +27,34 @@ from verify_hakone_network_candidate import PAVEMENT
 EMPTY = AIR | PLANTS | {'minecraft:light'}
 
 
+def relax_exterior_earthworks(target, old, walk):
+    """Reduce earthwork at retained edges without spreading its finite scope.
+
+    Existing terraces may be steeper than a new daylight slope. Attenuating
+    only the new cut/fill preserves those terraces and the commissioned road,
+    while preventing a new cliff where a slope meets retained pavement.
+    Every move approaches the original height, so this terminates and never
+    adds an edited column or deepens a cut beside a retained foundation.
+    """
+    result=target.copy()
+    budget=int(abs(result.astype(np.int32)-old).sum())
+    for _ in range(budget+1):
+        moved=0
+        for dz,dx in ((1,0),(-1,0),(0,1),(0,-1)):
+            ys=slice(max(0,-dz),min(result.shape[0],result.shape[0]-dz))
+            xs=slice(max(0,-dx),min(result.shape[1],result.shape[1]-dx))
+            yt=slice(max(0,dz),min(result.shape[0],result.shape[0]+dz))
+            xt=slice(max(0,dx),min(result.shape[1],result.shape[1]+dx))
+            a,b=result[ys,xs],result[yt,xt]
+            delta=a-old[ys,xs];step=-np.sign(delta)
+            limit=np.maximum(3,abs(old[ys,xs]-old[yt,xt])+1)
+            bad=(~walk[ys,xs])&(~walk[yt,xt])&(abs(a-b)>limit)
+            change=bad&(delta!=0)&(abs(a+step-b)<abs(a-b))
+            moved+=int(change.sum());a[change]+=step[change]
+        if not moved:return result
+    raise ValueError('Exterior slope relaxation did not converge')
+
+
 def fit_ports(walk, desired, existing_walk, existing_grade, cross_sections=()):
     """Fit half-block steps to every retained interface across the full width."""
     lower=np.full(walk.shape,-30000,np.int32);upper=-lower
@@ -71,6 +99,11 @@ def alignment(row):
     along=np.linspace(0,distance[-1],int(np.ceil(distance[-1]*4))+1)
     curve=np.column_stack([PchipInterpolator(distance,points[:,i])(along)for i in range(3)])
     ds=np.linalg.norm(np.diff(curve[:,[0,2]],axis=0),axis=1)
+    if row.get('arc_length_grade',False):
+        physical=np.r_[0,np.cumsum(ds)]
+        ports=np.interp(distance,along,physical)
+        curve[:,1]=PchipInterpolator(ports,points[:,1])(physical)
+        along=physical
     slope=abs(np.diff(curve[:,1]))/ds
     if slope.max()>row.get('maximum_grade',.25)+1e-6:
         raise ValueError((row['id'],'alignment grade exceeds design',float(slope.max())))
@@ -206,6 +239,8 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
     if existing is not None:
         retained=base_walk&~walk
         target[retained]=old[retained]
+    if row.get('preserve_exterior_slopes',False):
+        target=relax_exterior_earthworks(target,old,walk)
     active=known&(target!=old)
     if any(np.any(edge)for edge in(active[0],active[-1],active[:,0],active[:,-1])):
         raise ValueError((row['id'],'earthworks do not meet untouched ground before design boundary'))
@@ -327,6 +362,9 @@ def compile_street(e,row,protected,rail,existing=None,bearings=()):
         wing=binary_dilation(walk,structure=np.ones((3,3)))&~walk&~wall&~bore
         if existing is not None:wing&=~base_walk
         wing&=target>hy+1
+        for x,z,X,Z in row.get('portal_wing_openings',[]):
+            if not (bx<=x<=X<=bX and bz<=z<=Z<=bZ):raise ValueError('Wing opening outside design')
+            wing&=~((xx>=x)&(xx<=X)&(zz>=z)&(zz<=Z))
         for iz,ix in np.argwhere(wing):
             x,z,floor=int(xx[iz,ix]),int(zz[iz,ix]),int(hy[iz,ix])
             for y in range(floor-1,int(target[iz,ix])):
@@ -373,7 +411,10 @@ def publish_plan(candidate,base):
     out=candidate/'plan';out.mkdir(exist_ok=True)
     with np.load(base/'network.npz')as f:d={k:f[k]for k in f.files}
     x0,z0,_,_=map(int,d['bounds']);e=Editor(candidate);ids=[]
-    for path in sorted((candidate/'earthworks').glob('*.npz')):
+    design=json.loads((candidate/'authored-design.json').read_text('utf8'))
+    paths=[candidate/'earthworks'/(row['id']+'.npz')for row in design['streets']]
+    for path in paths:
+        if not path.exists():continue
         with np.load(path)as f:q={k:f[k]for k in f.files}
         x,z,X,Z=map(int,q['bounds']);area=np.s_[z-z0:Z-z0+1,x-x0:X-x0+1];mask=q['walk']
         for key in ('walk','road','marking'):
