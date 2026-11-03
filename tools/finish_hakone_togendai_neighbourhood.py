@@ -45,6 +45,9 @@ def finish(source,out,detail_plan=None):
         details['crossings'].append(dict(centre=[-313,106,938],kind='neighbourhood crossing'))
     from detail_hakone_nerv_streets import preservation_mask
     preserved=preservation_mask(out,spec)
+    if spec.get('retained_road_lamp_payloads'):
+        from map_pipeline.retained_street_lamps import reseat
+        reseat(e,d,spec,details,preserved)
     empty=AIR|PLANTS|{'minecraft:light'};distance=distance_transform_edt(~(d['walk']|d['plots']))
     for row in spec['streets']:
         curve,s=alignment(row)

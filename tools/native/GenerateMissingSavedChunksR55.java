@@ -99,15 +99,21 @@ public final class GenerateMissingSavedChunksR55
                 for (Object value : chunks)
                 {
                     List<?> pair = (List<?>) value; int x = ((Number) pair.get(0)).intValue(), z = ((Number) pair.get(1)).intValue();
+                    Files.writeString(directory.resolve("working-chunk.json"), (String) call(gson, "toJson",
+                        Map.of("x", x, "z", z, "completed", completed, "started_millis", System.currentTimeMillis())));
                     CompletableFuture<Void> ready = new CompletableFuture<>();
                     ((Executor) server).execute(() -> {
                         try { call(targetLevel, "getChunk/m_6325_", x, z); ready.complete(null); }
                         catch (Throwable error) { ready.completeExceptionally(error); }
                     });
-                    ready.get(180, TimeUnit.SECONDS); completed++;
+                    ready.get(600, TimeUnit.SECONDS); completed++;
                     if (completed % 16 == 0 || completed == chunks.size())
                         Files.writeString(directory.resolve("progress.json"), (String) call(gson, "toJson",
                             Map.of("completed", completed, "total", chunks.size(), "generated", completed == chunks.size(), "save_required", true)));
+                    // Let the server finish its tick before queuing another
+                    // synchronous generation request. Otherwise a long run can
+                    // consume one tick until the watchdog aborts a healthy bake.
+                    Thread.sleep(100);
                 }
                 // Normal server shutdown flushes these native FULL chunks. The
                 // caller then merges only these exact originally unfinished
@@ -119,6 +125,6 @@ public final class GenerateMissingSavedChunksR55
                 try { var text = new java.io.StringWriter(); error.printStackTrace(new java.io.PrintWriter(text)); Files.writeString(directory.resolve("error.txt"), text.toString()); }
                 catch (Exception ignored) { }
             }
-        }, "SEELE isolated lake chunk generation").start();
+        }, "SEELE isolated terrain chunk generation").start();
     }
 }

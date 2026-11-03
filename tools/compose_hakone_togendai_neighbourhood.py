@@ -74,7 +74,7 @@ def compose(a):
     for remnant in design_spec.get('retire_street_remnants',[]):
         pos=remnant['pos']
         if tuple(pos)in devices or e.state(*pos,original=True)!=remnant['state']:raise ValueError(('Changed street remnant',pos))
-        e.put(*pos,'minecraft:air');stats['explicit_old_lamp_remnants']+=1
+        e.put(*pos,remnant.get('after','minecraft:air'));stats['explicit_old_lamp_remnants']+=1
     oldnet=np.load(a.base_plan/'network.npz');bx,bz,_,_=map(int,oldnet['bounds']);area=np.s_[z-bz:Z-bz+1,x-bx:X-bx+1]
     oldwalk=oldnet['walk'][area].copy();oldgrade=oldnet['grade2'][area].copy();oldnet.close()
     for row in rows:
@@ -117,7 +117,13 @@ def compose(a):
             if q[0]>cx*16+15 or q[3]<cx*16 or q[2]>cz*16+15 or q[5]<cz*16:continue
             protect|=(xx>=q[0])&(xx<=q[3])&(zz>=q[2])&(zz<=q[5])&(yy>=q[1])&(yy<=q[4])
         for Q,Y,R in cable[cx,cz]:protect[max(0,Y-10+128):min(448,Y+7+128),R%16,Q%16]=True
-        for (Q,R),(lo,hi)in trains[cx,cz].items():protect[max(0,lo+128):min(448,hi+129),R%16,Q%16]=True
+        for (Q,R),(lo,hi)in trains[cx,cz].items():
+            lo,hi=max(-128,lo),min(319,hi)
+            keep=np.ones(hi-lo+1,bool)
+            if design_spec.get('train_underpasses') and x<=Q<=X and z<=R<=Z:
+                from map_pipeline.rail_underpasses import editable_underpass_column
+                keep&=~editable_underpass_column(e,Q,R,lo,hi,design_spec['train_underpasses'],oldwalk[R-z,Q-x],oldgrade[R-z,Q-x])
+            protect[lo+128:hi+129,R%16,Q%16]|=keep
         for pos in devices.keys()-moved:
             if pos[0]//16==cx and pos[2]//16==cz:protect[pos[1]+128,pos[2]%16,pos[0]%16]=True
         protected_chunks[cx,cz]=protect
@@ -139,13 +145,23 @@ def compose(a):
         air,stone,dirt,grass,asphalt,paving,stripe,aslab,pslab,sslab=[code(s)for s in ('minecraft:air','minecraft:stone','minecraft:dirt','minecraft:grass_block[snowy=false]','minecraft:black_concrete','minecraft:smooth_stone','minecraft:white_concrete','projectseele:road_asphalt_slab[type=bottom,waterlogged=false]','minecraft:smooth_stone_slab[type=bottom,waterlogged=false]','projectseele:road_marking_slab[type=bottom,waterlogged=false]')]
         natural=np.array([s.split('[')[0]in SOIL|PLANTS for s in r['names']]);empty=np.array([s.split('[')[0]in EMPTY for s in r['names']]);pave=np.array([s.split('[')[0]in PAVE for s in r['names']]);soil=np.array([s.split('[')[0]in SOIL for s in r['names']])
         decor=np.array([s.split('[')[0]in {'minecraft:iron_bars','minecraft:sea_lantern','minecraft:stone_brick_wall','minecraft:polished_andesite','minecraft:polished_deepslate'}for s in r['names']])
+        civil=np.array([s.split('[')[0]in set(design_spec.get('retire_civil_materials',[]))for s in r['names']])
         for (cx,cz),before,v in zip(r['coords'],r['before'],r['after']):
             cx,cz=int(cx),int(cz);zz,xx=np.mgrid[cz*16:cz*16+16,cx*16:cx*16+16];inside=(xx>=x)&(xx<=X)&(zz>=z)&(zz<=Z)
             iz=np.clip(zz-z,0,shape[0]-1);ix=np.clip(xx-x,0,shape[1]-1)
             walk=d['walk'][iz,ix]&inside;new=d['ground'][iz,ix];old=d['old_ground'][iz,ix];active=inside&(new!=old)&(old>-129)
             retire=retired_scope[iz,ix]&inside
-            if not (active|walk|retire).any():continue
+            explicit=np.zeros((448,16,16),bool)
+            for ax,ay,az,bX,bY,bZ in design_spec.get('retire_civil_volumes',[]):
+                if ax>cx*16+15 or bX<cx*16 or az>cz*16+15 or bZ<cz*16:continue
+                if not(x<=ax<=bX<=X and z<=az<=bZ<=Z and -128<=ay<=bY<320):raise ValueError('Civil retirement exceeds captured scope')
+                explicit|=(xx>=ax)&(xx<=bX)&(zz>=az)&(zz<=bZ)&(yy>=ay)&(yy<=bY)
+            if not (active|walk|retire).any() and not explicit.any():continue
             protect=protected_chunk(cx,cz)
+            owned_civil=explicit&~protect&civil[v]
+            replacement=np.where(yy>new,air,np.where(yy==new,grass,np.where(yy>=new-3,dirt,stone)))
+            v[owned_civil]=np.broadcast_to(replacement,v.shape)[owned_civil]
+            stats['explicit_retired_legacy_civil_cells']+=int(owned_civil.sum())
             own=retire&~protect&(yy>=old-4)&(yy<=np.maximum(old+12,(oldgrade[iz,ix]+1)//2+8))
             retiredmask=own&(pave[v]|decor[v]);stats['retired_pavement_and_details']+=int(retiredmask.sum());v[retiredmask]=air
             # Only the exterior skin is moved. Existing underground voids,
@@ -161,7 +177,7 @@ def compose(a):
                     if not pave[v[h+128,j,i]] and r['names'][v[h+128,j,i]].split('[')[0]not in design_spec.get('retained_pavement_materials',[]):errors.append(['protected road floor',px,h,pz,r['names'][v[h+128,j,i]]])
                     continue
                 deck=bool(bridge[j0,i0])
-                for Y in range(h-2 if deck else min(int(old[j,i])-2,h-2),h+4):
+                for Y in range(h-2 if deck else min(int(old[j,i])-2,h-2),h+(5 if d['road'][j0,i0]else 4)):
                     if protect[Y+128,j,i]:continue
                     state=int(v[Y+128,j,i]);allowed=natural[state]or empty[state]or (pave[state]and retire[j,i])
                     if not allowed:

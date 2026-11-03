@@ -144,6 +144,9 @@ def design(a):
         except ValueError as exc:raise ValueError((row['id'],str(exc)))from exc
         use=w&~walk;walk|=w;grade2[use]=h2[use];footways.append(dict(parcel=row['id'],points=path.tolist(),length=float(along[-1])))
     core=np.zeros(shape,bool);core[rect(bounds,design['core'])]=True
+    for area in design.get('additional_core_areas',[]):
+        if not(x<=area[0]<=area[2]<=X and z<=area[1]<=area[3]<=Z):raise ValueError('Additional reconstruction area outside capture')
+        core[rect(bounds,area)]=True
     active=binary_dilation(core|walk|plots,iterations=8)
     blend_distance=float(design.get('earthwork_blend_distance',55))
     if blend_distance<=0:raise ValueError('Earthwork blend distance must be positive')

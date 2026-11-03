@@ -22,9 +22,18 @@ def verify(candidate):
     for j,i in np.argwhere(walk):
         px,pz=int(i+x),int(j+z);floor,slab=road_blocks(g[j,i]);floor=int(floor);state=e.state(px,floor,pz)
         if state.split('[')[0]not in pavement or ('type=bottom'in state)!=bool(slab):errors.append(['pavement',px,floor,pz,state,bool(slab)])
-        for Y in range(floor+1,floor+4):
+        for Y in range(floor+1,floor+(5 if d['road'][j,i] else 4)):
             state=e.state(px,Y,pz)
             if state.split('[')[0]not in empty:errors.append(['headroom',px,Y,pz,state])
+        # The deck needs a real bearing immediately below it. A passable top
+        # surface alone would still accept a floating or hollow road tray.
+        for Y in range(floor-2,floor):
+            state=e.state(px,Y,pz)
+            if state.split('[')[0]in AIR|{'minecraft:water','minecraft:light'}:
+                pocket=[px,Y,pz]in specs.get('retained_water_bearing_pockets',[])
+                bank=any(e.state(px+dx,Y,pz+dz).split('[')[0]in SOIL for dx,dz in ((-1,0),(1,0),(0,-1),(0,1)))
+                if not(pocket and Y==floor-2 and state==e.state(px,Y,pz,True) and state.startswith('minecraft:water') and bank):
+                    errors.append(['pavement bearing',px,Y,pz,state])
         checked+=1
     seed=specs.get('connectivity_seed',[-287,1000]);start=(seed[1]-z,seed[0]-x)
     if not walk[start]:raise ValueError(('Connectivity seed is not public pavement',seed))
@@ -85,6 +94,10 @@ def verify(candidate):
             cable_cells+=1
     train_cells=0
     if specs.get('preserve_train_corridors',False):
+        underpass_prior=None
+        if specs.get('train_underpasses'):
+            with np.load(Path(specs['train_underpass_prior_plan'])/'network.npz')as f:
+                underpass_prior={k:f[k]for k in ('bounds','walk','grade2')}
         columns={}
         for row in json.loads((candidate/'plan/native-curves.json').read_text('utf8'))['trains']:
             for px,py,pz in row['points']:
@@ -97,7 +110,12 @@ def verify(candidate):
         for (px,pz),(lo,hi)in columns.items():
             r=e.region(px,pz);idx=r['index'][px//16,pz//16];a,b=max(-128,lo)+128,min(319,hi)+129
             original=r['before'][idx,a:b,pz%16,px%16];actual=r['after'][idx,a:b,pz%16,px%16]
-            if not np.array_equal(original,actual):errors.append(['native rail structure or clearance changed',px,pz,int((original!=actual).sum())])
+            keep=np.ones(len(original),bool)
+            if underpass_prior is not None:
+                from map_pipeline.rail_underpasses import editable_underpass_column
+                ux,uz,_,_=map(int,underpass_prior['bounds'])
+                keep&=~editable_underpass_column(e,px,pz,a-128,b-129,specs['train_underpasses'],underpass_prior['walk'][pz-uz,px-ux],underpass_prior['grade2'][pz-uz,px-ux])
+            if not np.array_equal(original[keep],actual[keep]):errors.append(['native rail structure or clearance changed',px,pz,int(((original!=actual)&keep).sum())])
             train_cells+=original.size
     changes=nbtlib.load(candidate/'block-entities.dat')['Changes'];before={};after={}
     for r in changes:
@@ -105,7 +123,13 @@ def verify(candidate):
             if key in r:
                 tag=r[key];pos=tuple(int(tag[k])for k in ('x','y','z'));table[pos]=tag
     preserved_cells=0
-    for box in specs.get('protected_volumes',[]):
+    retained_boxes=json.loads((candidate/'plan/retained-buildings.json').read_text('utf8'))
+    retained_boxes=[[b[0]-2,b[1]-3,b[2]-2,b[3]+2,b[4]+8,b[5]+2]for b in retained_boxes]
+    for box in list(specs.get('protected_volumes',[]))+retained_boxes:
+        # Designs can carry the complete global station inventory. Only the
+        # intersection with this finite capture can be edited or verified.
+        box=[max(box[0],x),box[1],max(box[2],z),min(box[3],X),box[4],min(box[5],Z)]
+        if box[0]>box[3] or box[2]>box[5]:continue
         for cx in range(box[0]//16,box[3]//16+1):
             for cz in range(box[2]//16,box[5]//16+1):
                 r=e.region(cx*16,cz*16);idx=r['index'].get((cx,cz))
@@ -131,6 +155,11 @@ def verify(candidate):
             checked_tags+=1
     added_fixtures=0
     if (candidate/'street-details.json').is_file():
+        from map_pipeline.retained_street_lamps import verify as verify_lamps
+        details=json.loads((candidate/'street-details.json').read_text('utf8'))
+        errors.extend(verify_lamps(e,details))
+        if len(details.get('retained_lamps',[]))!=len(specs.get('retained_road_lamp_payloads',[])):
+            errors.append(['complete retained lamp count'])
         for fixture in json.loads((candidate/'street-details.json').read_text('utf8')).get('native_fixtures',[]):
             pos=tuple(fixture['pos']);kind=fixture['kind'];tag=after.get(pos);state=e.state(*pos)
             if pos in originals or pos in before or not tag or str(tag.get('id'))!='projectseele:period_fixture' or 'kind='+kind not in state:

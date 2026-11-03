@@ -1,0 +1,1922 @@
+[
+  {
+    "pos": [
+      599,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      600,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      601,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      599,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      600,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      601,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      599,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      600,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      601,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      599,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      600,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      601,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      599,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      600,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      601,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      599,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      600,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      601,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      599,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      600,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      601,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      599,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      600,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      601,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      647,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      648,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      649,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      647,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      648,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      649,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      647,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      648,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      649,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      647,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      648,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      649,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      647,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      648,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      649,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      647,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      648,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      649,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      647,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      648,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      649,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      647,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      648,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      649,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      695,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      696,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      697,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      695,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      696,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      697,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      695,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      696,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      697,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      695,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      696,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      697,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      695,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      696,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      697,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      695,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      696,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      697,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      695,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      696,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      697,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      695,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      696,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      697,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      743,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      744,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      745,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      743,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      744,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      745,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      743,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      744,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      745,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      743,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      744,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      745,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      743,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      744,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      745,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      743,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      744,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      745,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      743,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      744,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      745,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      743,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      744,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      745,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      791,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      792,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      793,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      791,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      792,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      793,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      791,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      792,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      793,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      791,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      792,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      793,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      791,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      792,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      793,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      791,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      792,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      793,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      791,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      792,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      793,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      791,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      792,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      793,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      839,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      840,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      841,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      839,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      840,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      841,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      839,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      840,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      841,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      839,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      840,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      841,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      839,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      840,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      841,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      839,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      840,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      841,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      839,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      840,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      841,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      839,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      840,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      841,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      887,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      888,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      889,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      887,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      888,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      889,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      887,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      888,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      889,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      887,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      888,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      889,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      887,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      888,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      889,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      887,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      888,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      889,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      887,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      888,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      889,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      887,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      888,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      889,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      935,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      936,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      937,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      935,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      936,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      937,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      935,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      936,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      937,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      935,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      936,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      937,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      935,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      936,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      937,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      935,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      936,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      937,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      935,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      936,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      937,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      935,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      936,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      937,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      983,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      984,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      985,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      983,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      984,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      985,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      983,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      984,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      985,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      983,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      984,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      985,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      983,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      984,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      985,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      983,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      984,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      985,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      983,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      984,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      985,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      983,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      984,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      985,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1031,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1032,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1033,
+      90,
+      465
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1031,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1032,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1033,
+      90,
+      466
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1031,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1032,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1033,
+      90,
+      467
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1031,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1032,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1033,
+      90,
+      468
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1031,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1032,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1033,
+      90,
+      476
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1031,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1032,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1033,
+      90,
+      477
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1031,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1032,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1033,
+      90,
+      478
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1031,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1032,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  },
+  {
+    "pos": [
+      1033,
+      90,
+      479
+    ],
+    "state": "projectseele:nerv_machine_edge"
+  }
+]

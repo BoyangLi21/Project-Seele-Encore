@@ -14,7 +14,10 @@ EMPTY=AIR|PLANTS|{'minecraft:light'}
 
 
 def preservation_mask(candidate,spec):
-    boxes=spec.get('protected_volumes',[]);columns=defaultdict(list)
+    boxes=list(spec.get('protected_volumes',[]));columns=defaultdict(list)
+    retained=candidate/'plan/retained-buildings.json'
+    if retained.is_file():
+        boxes.extend([b[0]-2,b[1]-3,b[2]-2,b[3]+2,b[4]+8,b[5]+2] for b in json.loads(retained.read_text('utf8')))
     curves=json.loads((candidate/'plan/native-curves.json').read_text('utf8'))
     with np.load(candidate/'plan/network.npz')as f:x,z,X,Z=map(int,f['bounds'])
     for kind,radius,below,above in [('ropeway',3,10,6)]+([('trains',8,30,7)]if spec.get('preserve_train_corridors',False)else[]):

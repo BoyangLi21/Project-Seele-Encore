@@ -1,0 +1,2843 @@
+{
+  "source": "Current saved parcels and native infrastructure; longitudinally graded regional streets",
+  "togendai_forecourt": false,
+  "core": [
+    380,
+    175,
+    1064,
+    553
+  ],
+  "earthwork_blend_distance": 28,
+  "connectivity_seed": [
+    760,
+    432
+  ],
+  "streets": [
+    {
+      "id": "east-ward-trunk",
+      "points": [
+        [
+          380,
+          81,
+          395
+        ],
+        [
+          440,
+          76,
+          400
+        ],
+        [
+          500,
+          68,
+          410
+        ],
+        [
+          560,
+          63,
+          425
+        ],
+        [
+          640,
+          63,
+          432
+        ],
+        [
+          760,
+          63,
+          432
+        ],
+        [
+          880,
+          63,
+          432
+        ],
+        [
+          1000,
+          63,
+          432
+        ],
+        [
+          1040,
+          64,
+          430
+        ],
+        [
+          1060,
+          65,
+          422
+        ],
+        [
+          1108,
+          67,
+          422
+        ],
+        [
+          1140,
+          69,
+          432
+        ],
+        [
+          1270,
+          69,
+          432
+        ]
+      ],
+      "width": 7,
+      "sidewalk": 2,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true
+    },
+    {
+      "id": "north-neighbourhood-street",
+      "points": [
+        [
+          390,
+          82.5,
+          226
+        ],
+        [
+          440,
+          89,
+          232
+        ],
+        [
+          520,
+          87,
+          262
+        ],
+        [
+          590,
+          93,
+          275
+        ],
+        [
+          650,
+          90,
+          300
+        ],
+        [
+          710,
+          82,
+          330
+        ],
+        [
+          765,
+          78,
+          350
+        ],
+        [
+          810,
+          76,
+          356
+        ],
+        [
+          840,
+          73,
+          300
+        ],
+        [
+          852,
+          74,
+          258
+        ],
+        [
+          884,
+          78,
+          222
+        ],
+        [
+          899,
+          83,
+          190
+        ]
+      ],
+      "width": 7,
+      "sidewalk": 2,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true
+    },
+    {
+      "id": "western-neighbourhood-connection",
+      "points": [
+        [
+          440,
+          89,
+          232
+        ],
+        [
+          454,
+          84,
+          285
+        ],
+        [
+          460,
+          80,
+          335
+        ],
+        [
+          480,
+          74,
+          375
+        ],
+        [
+          500,
+          68,
+          410
+        ]
+      ],
+      "width": 7,
+      "sidewalk": 2,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true
+    },
+    {
+      "id": "eastern-neighbourhood-connection",
+      "points": [
+        [
+          840,
+          73,
+          300
+        ],
+        [
+          890,
+          70,
+          350
+        ],
+        [
+          930,
+          66,
+          400
+        ],
+        [
+          930,
+          63,
+          432
+        ]
+      ],
+      "width": 7,
+      "sidewalk": 2,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true
+    },
+    {
+      "id": "gora-north-approach",
+      "points": [
+        [
+          760,
+          63,
+          432
+        ],
+        [
+          760,
+          66,
+          480
+        ],
+        [
+          772,
+          72,
+          535
+        ],
+        [
+          774,
+          74.5,
+          560
+        ],
+        [
+          774,
+          76,
+          579
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.23,
+      "arc_length_grade": true
+    },
+    {
+      "id": "chokoku-valley-approach",
+      "points": [
+        [
+          1000,
+          63,
+          432
+        ],
+        [
+          1015,
+          58,
+          470
+        ],
+        [
+          1005,
+          52,
+          520
+        ],
+        [
+          995,
+          45,
+          565
+        ],
+        [
+          1000,
+          39,
+          600
+        ],
+        [
+          1040,
+          35,
+          614
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.21,
+      "arc_length_grade": true
+    }
+  ],
+  "retained_ports": [
+    {
+      "street": "east-ward-trunk",
+      "end": 0,
+      "radius": 20
+    },
+    {
+      "street": "east-ward-trunk",
+      "end": -1,
+      "radius": 20
+    },
+    {
+      "street": "gora-north-approach",
+      "end": -1,
+      "radius": 18
+    },
+    {
+      "street": "chokoku-valley-approach",
+      "end": -1,
+      "radius": 20
+    }
+  ],
+  "parcel_floors": {
+    "tokyo_north/11-02": 81,
+    "tokyo_north/12-02": 80,
+    "tokyo_north/12-05": 93,
+    "tokyo_north/14-03": 80,
+    "tokyo_north/16-01": 81,
+    "tokyo_north/03-03": 85,
+    "tokyo_north/05-01": 85,
+    "tokyo_north/06-01": 82,
+    "tokyo_north/06-04": 91,
+    "tokyo_north/08-02": 90,
+    "tokyo_north/13-01": 70,
+    "tokyo_north/14-04": 72,
+    "tokyo_north/16-02": 84,
+    "tokyo_north/16-05": 77
+  },
+  "footways": [
+    {
+      "parcel": "tokyo_north/11-02",
+      "points": [
+        [
+          389,
+          82,
+          187
+        ],
+        [
+          383,
+          82,
+          201
+        ],
+        [
+          390,
+          82.0,
+          226
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/12-02",
+      "points": [
+        [
+          416,
+          81,
+          196
+        ],
+        [
+          416,
+          82,
+          215
+        ],
+        [
+          416,
+          85.5,
+          228
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/12-05",
+      "points": [
+        [
+          466,
+          94,
+          176
+        ],
+        [
+          470,
+          94,
+          185
+        ],
+        [
+          470,
+          92,
+          210
+        ],
+        [
+          474,
+          89,
+          226
+        ],
+        [
+          473,
+          87.0,
+          243
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/14-03",
+      "points": [
+        [
+          499,
+          81,
+          189
+        ],
+        [
+          488,
+          81,
+          189
+        ],
+        [
+          488,
+          83,
+          220
+        ],
+        [
+          488,
+          87.0,
+          250
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/16-01",
+      "points": [
+        [
+          398,
+          82,
+          241
+        ],
+        [
+          398,
+          83.0,
+          226
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/03-03",
+      "points": [
+        [
+          425,
+          86,
+          245
+        ],
+        [
+          425,
+          86.5,
+          230
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/05-01",
+      "points": [
+        [
+          503,
+          86,
+          240
+        ],
+        [
+          503,
+          87.0,
+          256
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/06-01",
+      "points": [
+        [
+          532,
+          83,
+          243
+        ],
+        [
+          532,
+          87.5,
+          265
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/06-04",
+      "points": [
+        [
+          576,
+          92,
+          249
+        ],
+        [
+          576,
+          92,
+          268
+        ],
+        [
+          576,
+          92.5,
+          272
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/08-02",
+      "points": [
+        [
+          590,
+          91,
+          255
+        ],
+        [
+          604,
+          91,
+          258
+        ],
+        [
+          605,
+          92.5,
+          280
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/13-01",
+      "points": [
+        [
+          799,
+          71,
+          250
+        ],
+        [
+          810,
+          71,
+          265
+        ],
+        [
+          835,
+          73,
+          275
+        ],
+        [
+          848,
+          73.5,
+          269
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/14-04",
+      "points": [
+        [
+          846,
+          73,
+          207
+        ],
+        [
+          858,
+          73,
+          208
+        ],
+        [
+          868,
+          75.5,
+          239
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/16-02",
+      "points": [
+        [
+          877,
+          85,
+          163
+        ],
+        [
+          884,
+          85,
+          173
+        ],
+        [
+          889,
+          84,
+          188
+        ],
+        [
+          899,
+          83.0,
+          190
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "tokyo_north/16-05",
+      "points": [
+        [
+          765,
+          78,
+          338
+        ],
+        [
+          765,
+          78.0,
+          350
+        ]
+      ],
+      "linear_grade": true
+    }
+  ],
+  "retained_soil_areas": [
+    [
+      1080,
+      190,
+      1250,
+      510
+    ],
+    [
+      465,
+      448,
+      558,
+      495
+    ]
+  ],
+  "protected_volumes": [
+    [
+      -2828,
+      70,
+      -980,
+      -2676,
+      110,
+      -940
+    ],
+    [
+      -1556,
+      104,
+      616,
+      -1404,
+      151,
+      656
+    ],
+    [
+      -1156,
+      104,
+      540,
+      -1004,
+      134,
+      580
+    ],
+    [
+      -700,
+      96,
+      164,
+      -660,
+      126,
+      316
+    ],
+    [
+      -196,
+      80,
+      -192,
+      -44,
+      110,
+      -152
+    ],
+    [
+      340,
+      80,
+      224,
+      380,
+      110,
+      376
+    ],
+    [
+      160,
+      80,
+      684,
+      200,
+      110,
+      836
+    ],
+    [
+      664,
+      80,
+      1170,
+      816,
+      110,
+      1210
+    ],
+    [
+      -1730,
+      80,
+      -285,
+      -1610,
+      110,
+      -245
+    ],
+    [
+      -1740,
+      104,
+      300,
+      -1700,
+      134,
+      420
+    ],
+    [
+      -1540,
+      104,
+      656,
+      -1420,
+      151,
+      696
+    ],
+    [
+      -420,
+      80,
+      664,
+      -300,
+      110,
+      704
+    ],
+    [
+      296,
+      80,
+      240,
+      336,
+      122,
+      360
+    ],
+    [
+      1124,
+      70,
+      452,
+      1244,
+      110,
+      492
+    ],
+    [
+      900,
+      51,
+      618,
+      944,
+      71,
+      685
+    ],
+    [
+      964,
+      51,
+      744,
+      1014,
+      71,
+      781
+    ],
+    [
+      1022,
+      48,
+      917,
+      1072,
+      68,
+      954
+    ],
+    [
+      1243,
+      23,
+      864,
+      1288,
+      43,
+      909
+    ],
+    [
+      1498,
+      -2,
+      967,
+      1548,
+      18,
+      1004
+    ],
+    [
+      1949,
+      -44,
+      1080,
+      1999,
+      -24,
+      1117
+    ],
+    [
+      2189,
+      -60,
+      1097,
+      2245,
+      -40,
+      1137
+    ],
+    [
+      -310,
+      96,
+      994,
+      -260,
+      130,
+      1038
+    ],
+    [
+      -38,
+      135,
+      813,
+      -5,
+      160,
+      835
+    ],
+    [
+      252,
+      175,
+      813,
+      299,
+      200,
+      851
+    ],
+    [
+      628,
+      99,
+      744,
+      681,
+      130,
+      800
+    ],
+    [
+      465,
+      20,
+      448,
+      558,
+      95,
+      495
+    ]
+  ],
+  "preserve_train_corridors": true,
+  "retire_road_areas": [
+    [
+      380,
+      280,
+      1070,
+      554
+    ],
+    [
+      430,
+      230,
+      620,
+      380
+    ],
+    [
+      810,
+      180,
+      1070,
+      540
+    ],
+    [
+      970,
+      540,
+      1070,
+      607
+    ],
+    [
+      1040,
+      410,
+      1120,
+      450
+    ],
+    [
+      880,
+      530,
+      1195,
+      607
+    ],
+    [
+      1110,
+      410,
+      1150,
+      444
+    ]
+  ],
+  "public_paths": [],
+  "new_frontages": [],
+  "retire_street_remnants": [
+    {
+      "pos": [
+        502,
+        76,
+        316
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        502,
+        77,
+        316
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        502,
+        78,
+        316
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        502,
+        79,
+        316
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        502,
+        80,
+        316
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        502,
+        81,
+        316
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        502,
+        82,
+        314
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        502,
+        82,
+        315
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        502,
+        82,
+        316
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        502,
+        73,
+        316
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        502,
+        74,
+        316
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        502,
+        75,
+        316
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        617,
+        65,
+        428
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        617,
+        66,
+        428
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        617,
+        67,
+        428
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        617,
+        68,
+        428
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        617,
+        69,
+        428
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        617,
+        70,
+        428
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        617,
+        71,
+        426
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        617,
+        71,
+        427
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        617,
+        71,
+        428
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        617,
+        62,
+        428
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        617,
+        63,
+        428
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        617,
+        64,
+        428
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        671,
+        63,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        671,
+        64,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        671,
+        65,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        671,
+        66,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        671,
+        67,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        671,
+        68,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        671,
+        69,
+        436
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        671,
+        69,
+        437
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        671,
+        69,
+        438
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        671,
+        60,
+        438
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        671,
+        61,
+        438
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        671,
+        62,
+        438
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        724,
+        47,
+        447
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        724,
+        48,
+        447
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        724,
+        49,
+        447
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        724,
+        50,
+        447
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        724,
+        51,
+        447
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        724,
+        52,
+        447
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        724,
+        53,
+        445
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        724,
+        53,
+        446
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        724,
+        53,
+        447
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        724,
+        44,
+        447
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        724,
+        45,
+        447
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        724,
+        46,
+        447
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        785,
+        55,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        785,
+        56,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        785,
+        57,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        785,
+        58,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        785,
+        59,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        785,
+        60,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        785,
+        61,
+        438
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        785,
+        61,
+        439
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        785,
+        61,
+        440
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        785,
+        52,
+        440
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        785,
+        53,
+        440
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        785,
+        54,
+        440
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        841,
+        69,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        841,
+        70,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        841,
+        71,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        841,
+        72,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        841,
+        73,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        841,
+        74,
+        440
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        841,
+        75,
+        438
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        841,
+        75,
+        439
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        841,
+        75,
+        440
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        841,
+        66,
+        440
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        841,
+        67,
+        440
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        841,
+        68,
+        440
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        896,
+        66,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        896,
+        67,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        896,
+        68,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        896,
+        69,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        896,
+        70,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        896,
+        71,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        896,
+        72,
+        437
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        896,
+        72,
+        438
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        896,
+        72,
+        439
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        896,
+        63,
+        439
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        896,
+        64,
+        439
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        896,
+        65,
+        439
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        958,
+        59,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        958,
+        60,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        958,
+        61,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        958,
+        62,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        958,
+        63,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        958,
+        64,
+        439
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        958,
+        65,
+        437
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        958,
+        65,
+        438
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        958,
+        65,
+        439
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        958,
+        56,
+        439
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        958,
+        57,
+        439
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        958,
+        58,
+        439
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        1018,
+        55,
+        441
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1018,
+        56,
+        441
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1018,
+        57,
+        441
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1018,
+        58,
+        441
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1018,
+        59,
+        441
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1018,
+        60,
+        441
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1016,
+        61,
+        441
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        1017,
+        61,
+        441
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        1018,
+        61,
+        441
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        1018,
+        52,
+        441
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        1018,
+        53,
+        441
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        1018,
+        54,
+        441
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        1065,
+        68,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1065,
+        69,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1065,
+        70,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1065,
+        71,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1065,
+        72,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1065,
+        73,
+        438
+      ],
+      "state": "minecraft:gray_concrete"
+    },
+    {
+      "pos": [
+        1065,
+        74,
+        436
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        1065,
+        74,
+        437
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        1065,
+        74,
+        438
+      ],
+      "state": "projectseele:nerv_strip_light[lit=true]"
+    },
+    {
+      "pos": [
+        1065,
+        65,
+        438
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        1065,
+        66,
+        438
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:dirt"
+    },
+    {
+      "pos": [
+        1065,
+        67,
+        438
+      ],
+      "state": "minecraft:polished_andesite",
+      "after": "minecraft:grass_block[snowy=false]"
+    },
+    {
+      "pos": [
+        771,
+        74,
+        576
+      ],
+      "state": "minecraft:light_gray_concrete",
+      "after": "minecraft:stone"
+    },
+    {
+      "pos": [
+        772,
+        74,
+        576
+      ],
+      "state": "minecraft:light_gray_concrete",
+      "after": "minecraft:stone"
+    }
+  ],
+  "retained_public_surfaces": [],
+  "retained_pavement_materials": [
+    "projectseele:period_station_floor",
+    "projectseele:nerv_floor_panel"
+  ],
+  "train_underpasses": [
+    [
+      1064,
+      32,
+      410,
+      1110,
+      84,
+      444
+    ],
+    [
+      1124,
+      71,
+      424,
+      1124,
+      71,
+      424
+    ]
+  ],
+  "train_underpass_prior_plan": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\feedback-old-civil-installed-authority-v1",
+  "retire_civil_volumes": [
+    [
+      380,
+      32,
+      280,
+      1070,
+      140,
+      554
+    ],
+    [
+      430,
+      32,
+      230,
+      620,
+      140,
+      380
+    ],
+    [
+      810,
+      32,
+      180,
+      1070,
+      140,
+      540
+    ],
+    [
+      970,
+      32,
+      540,
+      1070,
+      140,
+      607
+    ],
+    [
+      1040,
+      32,
+      410,
+      1120,
+      140,
+      450
+    ],
+    [
+      880,
+      32,
+      530,
+      1195,
+      140,
+      607
+    ],
+    [
+      1110,
+      32,
+      410,
+      1150,
+      140,
+      444
+    ]
+  ],
+  "retire_civil_materials": [
+    "minecraft:black_concrete",
+    "minecraft:gray_concrete",
+    "minecraft:iron_bars",
+    "minecraft:light_gray_concrete",
+    "minecraft:polished_andesite",
+    "minecraft:polished_deepslate",
+    "minecraft:sea_lantern",
+    "minecraft:smooth_stone",
+    "minecraft:smooth_stone_slab",
+    "minecraft:stone_brick_slab",
+    "minecraft:stone_brick_stairs",
+    "minecraft:stone_brick_wall",
+    "minecraft:stone_bricks",
+    "minecraft:white_concrete",
+    "projectseele:road_asphalt_slab",
+    "projectseele:road_marking_slab"
+  ],
+  "retained_road_lamp_payloads": [
+    {
+      "base": [
+        502,
+        75,
+        316
+      ],
+      "members": [
+        {
+          "pos": [
+            502,
+            76,
+            316
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            502,
+            77,
+            316
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            502,
+            78,
+            316
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            502,
+            79,
+            316
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            502,
+            80,
+            316
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            502,
+            81,
+            316
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            502,
+            82,
+            314
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            502,
+            82,
+            315
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            502,
+            82,
+            316
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        617,
+        64,
+        428
+      ],
+      "members": [
+        {
+          "pos": [
+            617,
+            65,
+            428
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            617,
+            66,
+            428
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            617,
+            67,
+            428
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            617,
+            68,
+            428
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            617,
+            69,
+            428
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            617,
+            70,
+            428
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            617,
+            71,
+            426
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            617,
+            71,
+            427
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            617,
+            71,
+            428
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        671,
+        62,
+        438
+      ],
+      "members": [
+        {
+          "pos": [
+            671,
+            63,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            671,
+            64,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            671,
+            65,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            671,
+            66,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            671,
+            67,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            671,
+            68,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            671,
+            69,
+            436
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            671,
+            69,
+            437
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            671,
+            69,
+            438
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        724,
+        46,
+        447
+      ],
+      "members": [
+        {
+          "pos": [
+            724,
+            47,
+            447
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            724,
+            48,
+            447
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            724,
+            49,
+            447
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            724,
+            50,
+            447
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            724,
+            51,
+            447
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            724,
+            52,
+            447
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            724,
+            53,
+            445
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            724,
+            53,
+            446
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            724,
+            53,
+            447
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        785,
+        54,
+        440
+      ],
+      "members": [
+        {
+          "pos": [
+            785,
+            55,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            785,
+            56,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            785,
+            57,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            785,
+            58,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            785,
+            59,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            785,
+            60,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            785,
+            61,
+            438
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            785,
+            61,
+            439
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            785,
+            61,
+            440
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        841,
+        68,
+        440
+      ],
+      "members": [
+        {
+          "pos": [
+            841,
+            69,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            841,
+            70,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            841,
+            71,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            841,
+            72,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            841,
+            73,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            841,
+            74,
+            440
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            841,
+            75,
+            438
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            841,
+            75,
+            439
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            841,
+            75,
+            440
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        896,
+        65,
+        439
+      ],
+      "members": [
+        {
+          "pos": [
+            896,
+            66,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            896,
+            67,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            896,
+            68,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            896,
+            69,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            896,
+            70,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            896,
+            71,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            896,
+            72,
+            437
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            896,
+            72,
+            438
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            896,
+            72,
+            439
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        958,
+        58,
+        439
+      ],
+      "members": [
+        {
+          "pos": [
+            958,
+            59,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            958,
+            60,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            958,
+            61,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            958,
+            62,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            958,
+            63,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            958,
+            64,
+            439
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            958,
+            65,
+            437
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            958,
+            65,
+            438
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            958,
+            65,
+            439
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        1018,
+        54,
+        441
+      ],
+      "members": [
+        {
+          "pos": [
+            1018,
+            55,
+            441
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1018,
+            56,
+            441
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1018,
+            57,
+            441
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1018,
+            58,
+            441
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1018,
+            59,
+            441
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1018,
+            60,
+            441
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1016,
+            61,
+            441
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            1017,
+            61,
+            441
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            1018,
+            61,
+            441
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    },
+    {
+      "base": [
+        1065,
+        67,
+        438
+      ],
+      "members": [
+        {
+          "pos": [
+            1065,
+            68,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1065,
+            69,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1065,
+            70,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1065,
+            71,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1065,
+            72,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1065,
+            73,
+            438
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "pos": [
+            1065,
+            74,
+            436
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            1065,
+            74,
+            437
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        },
+        {
+          "pos": [
+            1065,
+            74,
+            438
+          ],
+          "state": "projectseele:nerv_strip_light[lit=true]"
+        }
+      ]
+    }
+  ],
+  "additional_core_areas": [
+    [
+      880,
+      530,
+      1195,
+      607
+    ]
+  ],
+  "retained_water_bearing_pockets": [
+    [
+      445,
+      86,
+      230
+    ],
+    [
+      445,
+      86,
+      231
+    ]
+  ]
+}
