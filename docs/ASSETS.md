@@ -483,10 +483,11 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 空手站立右键已直接改用原 B 键侧踹逻辑（代码改动，不涉及动作资源）；此前为右键准备的双臂砸地、ACCAD 上勾拳、Mesh2Motion 前蹬候选均已废弃。
 
 跳跃与空中攻击：`eva_gameplay_r44_{0,1,2}.json` 中替换四段动作，全部来自 Mesh2Motion（CC0），沿用同一重定向管线，生成脚本为本机 `motion-work/toolroot/air_attacks_r57.py`：
-- `r32_jump_start`：`human-base-animations.glb` 的 `Jump_Start` 第 0–12 帧（深蹲→蹬伸离地），运行时先从当前姿势沉入深蹲再蹬起，准备 7 tick；
+- `r32_jump_start`：`human-base-animations.glb` 的 `NinjaJump_Start` 第 0–5 帧（深蹲→蹬伸离地），运行时先从当前姿势沉入深蹲再蹬起，准备 7 tick；
+- `r32_jump_flight`：`NinjaJump_Start` 第 5–30 帧（离地→最高点收腿，收腿幅度取源动作的 60%），再从收腿姿势平滑展开到 `Jump_Land` 第 0 帧的伸腿探地姿势；起跳、腾空、落地三段首尾帧相同，连成一个动作（生成脚本本机 `motion-work/toolroot/jump_set_r57b.py`，空中蹬踢的收腿支撑腿同步改为新最高点姿势）；
 - `r32_jump_land`：`human-base-animations.glb` 的 `Jump_Land` 第 0–60 帧（触地→屈膝缓冲→站起），从触地帧开始播放；
 - `r32_air_strike`：`human-addon-animations.glb` 的 `Attack_Ground_Pound` 第 0–63 帧（举拳→下砸），去掉根骨骼位移，空中下砸时收腿；
 - `r32_air_kick`：`human-mocap-animations.glb` 的 `Kick_Breach` 第 18–81 帧（提膝→蹬出→收回），去掉根骨骼位移，支撑腿换成腾空姿势的屈腿，形成空中蹬踢（参照 TV 第 9 话双机同步飞踢的意象，未使用任何官方素材）。
 原先的 Tuffles `AerialSlapDownwards` / `LegsDivekickFightingGameInspired` 空中动作不再使用。
 
-走/跑防滑：`eva_body_r44.json` 中三台机体原有的走、跑循环（来源不变）用官方步幅变形 `warp_locomotion_r44` 压到运行时步幅（走 25.8、跑 31.4 格/周期），保持用户要求的快步频，支撑脚不再以身体速度的 1.8–2.3 倍后滑。原片段没有着地标记，按“前掌相对身体后移且处于高度下部”推断着地，压缩量按游戏内实测的支撑脚/身体位移比校准；生成脚本为本机 `motion-work/toolroot/walk_run_warp_r57.py`。不涉及新素材来源。
+走/跑：曾用步幅变形把原走、跑循环的步子压短以消除滑步（`walk_run_warp_r57.py`），用户验收认为动作变形（小碎步、膝内扣），已撤回，`eva_body_r44.json` 恢复原走、跑循环。

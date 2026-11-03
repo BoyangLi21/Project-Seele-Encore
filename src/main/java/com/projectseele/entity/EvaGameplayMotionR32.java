@@ -500,14 +500,19 @@ public final class EvaGameplayMotionR32
         {
             float takeoff=clip(e,"jump_start").get("takeoff_phase").getAsFloat();
             boolean single=singleFlight(e);
+            // The knees start drawing up as the toes leave the ground and
+            // slow into the tuck at the apex; an ease-in left the legs
+            // hanging straight for the first quarter second.
+            float rise=Math.min(1,air/12F);
             float flightPhase=descending(e)?.5F+.5F*EvaDorsalMechanism.smooth(1-clearance(e,partial)/28F)
-                    :.5F*EvaDorsalMechanism.smooth(air/12F);
+                    :.5F*(1-(1-rise)*(1-rise));
             var pose=single?EvaBodyPose.gameplayClip(e,"jump_flight",flightPhase)
                     :air<8?EvaBodyPose.gameplayClip(e,"jump_start",Mth.lerp(air/8,takeoff,1)):EvaBodyPose.gameplayClip(e,"jump_loop",(air-8)%40/40);
-            if(single&&air<5)
+            // The flight starts on the take-off pose: only a short blend.
+            if(single&&air<2)
             {
                 var launch=EvaBodyPose.gameplayClip(e,"jump_start",takeoff);
-                pose=EvaBodyPose.blend(launch,pose,EvaDorsalMechanism.smooth(air/5));
+                pose=EvaBodyPose.blend(launch,pose,EvaDorsalMechanism.smooth(air/2));
             }
             var arms=e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS?EvaBodyPose.gameplayClip(e,"guard",(e.level().getGameTime()%120+partial)/120F):base;
             for(String n:pose.rig.keySet())if((!single||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS)&&(n.startsWith("arm_")||n.startsWith("forearm_")||n.startsWith("wrist_")||n.startsWith("hand_")))
@@ -521,14 +526,29 @@ public final class EvaGameplayMotionR32
                 float age=EvaCombatR31.age(e,partial),stroke=EvaCombatR31.strokeAge(e,partial),contact=contactPhase(e,name);
                 var authored=clip(e,name);
                 float chamber=authored.has("r57_chamber_phase")?authored.get("r57_chamber_phase").getAsFloat():Math.max(0,contact-(kick?.14F:.07F));
-                float phase=stroke<0?Mth.lerp(Math.min(1,age/4),0,chamber):stroke<5?Mth.lerp(stroke/5,chamber,contact):Mth.lerp(Math.min(1,(stroke-5)/12),contact,1);
+                // The stroke is carried into the landing: the hammer stays low
+                // and the kick stays out. Easing back to the flight pose and
+                // then landing read as two moves stuck together.
+                float held=kick?contact:Mth.lerp(.4F,contact,1);
+                float phase=stroke<0?Mth.lerp(Math.min(1,age/4),0,chamber):stroke<5?Mth.lerp(stroke/5,chamber,contact)
+                        :Mth.lerp(EvaDorsalMechanism.smooth(Math.min(1,(stroke-5)/10)),contact,held);
                 var attack=EvaBodyPose.gameplayClip(e,name,phase);
                 // The pelvis drives the recorded downward stroke. Replacing its
                 // transform with the idle jump left the fist above the head.
-                // Both strokes follow through and return to the flight pose.
-                // The old heavy branch froze its contact pose until landing.
-                float weight=EvaDorsalMechanism.smooth(age/3)*(1-EvaDorsalMechanism.smooth((stroke-13)/4));
-                pose=EvaBodyPose.blend(pose,attack,weight);
+                var mixed=EvaBodyPose.blend(pose,attack,EvaDorsalMechanism.smooth(age/3));
+                // The hammer was captured standing: in the air its legs hung
+                // straight. They keep the flight's tuck and reach instead.
+                if(!kick)
+                {
+                    for(String n:mixed.rig.keySet())if(n.startsWith("leg_")||n.startsWith("shin_")||n.startsWith("ankle_")||n.startsWith("foot_")||n.startsWith("toe_"))
+                    {
+                        var q=mixed.rotations.get(n);var p=mixed.positions.get(n);
+                        if(q!=null&&pose.rotations.containsKey(n))q.set(pose.rotations.get(n));
+                        if(p!=null&&pose.positions.containsKey(n))p.set(pose.positions.get(n));
+                    }
+                    mixed.dirty();
+                }
+                pose=mixed;
             }
             return pose;
         }
@@ -537,7 +557,26 @@ public final class EvaGameplayMotionR32
             float contact=clip(e,"jump_land").get("ground_contact_phase").getAsFloat();var pose=EvaBodyPose.gameplayClip(e,"jump_land",Mth.lerp(Math.min(1,land/16),contact,1));
             // The flight pose eases onto the touchdown frame: a linear three
             // ticks started and stopped the knees in a single frame.
-            if(land<4){var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(LAND_FROM),from);pose=EvaBodyPose.blend(from,pose,EvaDorsalMechanism.smooth(land/4));}
+            // After an aerial attack the chest and arms stay in the stroke
+            // while the legs take the landing, then join the recovery.
+            boolean struck=EvaCombatR31.action(e)==EvaCombatR31.LAND;
+            if(land<(struck?12:4))
+            {
+                var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(LAND_FROM),from);
+                var lower=EvaBodyPose.blend(from,pose,EvaDorsalMechanism.smooth(Math.min(1,land/4)));
+                if(struck)
+                {
+                    var upper=EvaBodyPose.blend(from,pose,EvaDorsalMechanism.smooth(land/12));
+                    for(String n:lower.rig.keySet())if(n.equals("torso_upper")||n.startsWith("clavicle_")||n.startsWith("arm_")||n.startsWith("forearm_")||n.startsWith("wrist_")||n.startsWith("hand_"))
+                    {
+                        var q=lower.rotations.get(n);var p=lower.positions.get(n);
+                        if(q!=null&&upper.rotations.containsKey(n))q.set(upper.rotations.get(n));
+                        if(p!=null&&upper.positions.containsKey(n))p.set(upper.positions.get(n));
+                    }
+                    lower.dirty();
+                }
+                pose=lower;
+            }
             if(land>10)pose=EvaBodyPose.blend(pose,groundLocomotion(e,base,partial,capturedBase,null),(land-10)/8);
             return pose;
         }

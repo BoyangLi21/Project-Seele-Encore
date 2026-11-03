@@ -237,11 +237,12 @@ public final class EvaConnectedActionReview
         // stays inside the open review ground, then back for the knife.
         // (A tour started part-way has room ahead and does not turn.)
         mc.player.setYRot(TOUR_START==0&&t>=610&&t<1085?180:0);mc.player.setXRot(0);
-        if(tourAt(70))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        // The ledge check walks onto the step, as a pilot usually does.
+        if(tourAt(70)&&!CLIMB)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
         // Optional checks: a full sprint over the run, and kerbs on the walk.
         // The client re-syncs held sprint and dash to the real keys, so hold them.
         if(DASH)com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=70&&t<110);
-        mc.options.keySprint.setDown(t>=70&&t<110);
+        mc.options.keySprint.setDown(!CLIMB&&t>=70&&t<110);
         if(STEPS&&at(1))
         {
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:stone");
@@ -260,11 +261,11 @@ public final class EvaConnectedActionReview
             mc.player.connection.sendCommand("fill -24 -60 -40 24 -16 -30 minecraft:air");
         }
         if(CLIMB)mc.options.keyJump.setDown(t>=100&&t<104);
-        // Jumps with an air strike (left) and an air kick (right).
-        if(JUMP)mc.options.keyJump.setDown(t>=50&&t<53||t>=100&&t<103);
+        // A plain jump, then one with the hammer and one with the kick.
+        if(JUMP)mc.options.keyJump.setDown(t>=50&&t<53||t>=100&&t<103||t>=150&&t<153);
         // The jump leaves the ground after its squat (seven ticks).
-        if(JUMP&&tourAt(64))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(JUMP&&tourAt(114))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        if(JUMP&&tourAt(114))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(JUMP&&tourAt(164))send(ServerboundEvaControlPacket.ACTION_SMASH);
         if(STEPS&&at(TOUR_END-2))
         {
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:air");

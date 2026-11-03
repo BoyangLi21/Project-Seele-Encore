@@ -19,7 +19,7 @@ public final class EvaStepSmoothingR57
     /** Longest the body waits low for a sole to reach over the ledge (seconds). */
     private static final double HOLD=1.2;
     private static final boolean DIAG=Boolean.getBoolean("projectseele.poseDiag");
-    private static final class State {long frame;double y=Double.NaN,offset,speed,held;int diag;}
+    private static final class State {long frame;double y=Double.NaN,x,z,pace,offset,speed,held;int diag;}
     private static final WeakIdentityMap<EvaUnit01Entity,State> STATES=new WeakIdentityMap<>();
 
     /** Blocks to add to the entity's drawn height this frame (zero or negative). */
@@ -31,11 +31,15 @@ public final class EvaStepSmoothingR57
         if(s.frame==now)return (float)s.offset;
         double dt=(now-s.frame)/1e9,y=e.getPosition(partial).y;
         s.frame=now;
-        if(Double.isNaN(s.y)||dt<=0||dt>.25){s.y=y;s.offset=0;s.speed=0;return 0;}
+        if(Double.isNaN(s.y)||dt<=0||dt>.25){s.y=y;var at=e.getPosition(partial);s.x=at.x;s.z=at.z;s.pace=0;s.offset=0;s.speed=0;return 0;}
         double rise=y-s.y;s.y=y;
+        var at=e.getPosition(partial);
+        // Horizontal speed, eased: a running body rises onto the ledge within
+        // the lead foot's stance, a walking one over about half a second.
+        s.pace=s.pace+(Math.hypot(at.x-s.x,at.z-s.z)/dt-s.pace)*(1-Math.exp(-dt/.15));s.x=at.x;s.z=at.z;
         boolean standing=e.onGround()&&!e.isVisuallyAirborneForRender();
         if(standing&&rise>STEP_RISE&&rise<24)s.offset-=rise;
-        double rate=s.offset<-10?RATE_HIGH:RATE;
+        double rate=Math.max(s.offset<-10?RATE_HIGH:RATE,Math.min(30,s.pace/2.5));
         // A tall step rises only once a sole stands over the ledge: lifting
         // the body while both feet were still before the kerb floated it.
         if(standing&&s.offset<-3&&s.held<HOLD

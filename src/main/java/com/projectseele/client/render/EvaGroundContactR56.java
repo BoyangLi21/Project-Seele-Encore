@@ -69,8 +69,16 @@ final class EvaGroundContactR56
         float walking=eva.isPilotProne()?0:Mth.clamp(eva.rifleMoveBlend(partial),0,1);
         settleFoot(eva,model,root,hulls,"l",floor,right,now,walking);
         settleFoot(eva,model,root,hulls,"r",floor,left,now,walking);
-        float lowest=lowest(model,root,hulls);
-        float gap=Mth.clamp(lowest-ground,-MAX_LIFT,MAX_DROP);
+        float lowest=lowest(model,root,hulls),support=lowest-ground;
+        // A sole set on a ledge already stands: measured against the drawn
+        // ground below, a foot off the ground pulled the whole body down and
+        // sank the ledge foot into the kerb.
+        for(String side:new String[]{"l","r"})
+        {
+            double under=EvaFootPlacement.groundUnder(eva,side);
+            if(Double.isFinite(under)&&under>ground+.5)support=Math.min(support,soleHeight(model,root,hulls,side)-(float)under);
+        }
+        float gap=Mth.clamp(support,-MAX_LIFT,MAX_DROP);
         var base=model.getBone("root").orElse(null);
         if(base==null)return;
         // Root offsets are model pixels; the world frame only turns and scales.
