@@ -63,8 +63,26 @@ def publish(a):
                 px,py,pz=fixture['pos'];b=row['occupied_bounds']
                 b[0]=min(b[0],px-1);b[3]=max(b[3],px+1);b[2]=min(b[2],pz-1);b[5]=max(b[5],pz+1)
                 b[1]=min(b[1],py-1);b[4]=max(b[4],py+fixture['upper_cells'])
+    added=0
+    if (a.candidate/'new-frontages.json').exists():
+        existing_ids={r['id']for r in catalog}
+        for built in json.loads((a.candidate/'new-frontages.json').read_text('utf8'))['buildings']:
+            if built['id']in existing_ids:raise ValueError(('New frontage address already published',built['id']))
+            row={k:copy.deepcopy(built[k])for k in ('id','site','door','approach','use','occupied_bounds')};row.update(kind='building',template='graded-hillside-frontage',installed_neighbourhood=a.candidate.name)
+            row['devices']=[dict(source=device['pos'],target=device['pos'])for device in built['devices']]
+            points=footways[row['id']];path=[]
+            for p,q in zip(points,points[1:]):
+                steps=max(1,int(np.ceil(np.linalg.norm(np.asarray(q)[[0,2]]-np.asarray(p)[[0,2]]))))
+                for t in np.linspace(0,1,steps+1):
+                    px,pz=map(int,np.rint(np.asarray(p)[[0,2]]*(1-t)+np.asarray(q)[[0,2]]*t));j,i=pz-z,px-x
+                    py=float(d['grade2'][j,i])/2+1 if d['walk'][j,i]else row['site']['floor']+1
+                    if not path or path[-1]!=[px,py,pz]:path.append([px,py,pz])
+            row['footway']=path;owned=[f for f in fixtures if f['parcel']==row['id']];row['native_frontage_fixtures']=owned
+            for fixture in owned:
+                px,py,pz=fixture['pos'];b=row['occupied_bounds'];b[0]=min(b[0],px-1);b[3]=max(b[3],px+1);b[2]=min(b[2],pz-1);b[5]=max(b[5],pz+1);b[1]=min(b[1],py-1);b[4]=max(b[4],py+fixture['upper_cells'])
+            catalog.append(row);existing_ids.add(row['id']);added+=1
     save_json(a.out/'catalog.json',catalog)
-    save_json(a.out/'neighbourhood-authority.json',dict(installation=str(a.installation),candidate=str(a.candidate),previous=str(a.previous),overlaid_current_plans=[str(p)for p in a.overlay_plan],planning_bounds=g['bounds'].tolist(),outside_frame_keeps_its_separate_installed_authority=True,parcels_updated=len(updated),retired_unwalkable_old_columns=retired,current_neighbourhood_public_columns=int(d['walk'].sum()),parcel_moves_already_installed=True,whole_map_complete=False,global_legacy_connectivity_report_requires_refresh=True))
+    save_json(a.out/'neighbourhood-authority.json',dict(installation=str(a.installation),candidate=str(a.candidate),previous=str(a.previous),overlaid_current_plans=[str(p)for p in a.overlay_plan],planning_bounds=g['bounds'].tolist(),outside_frame_keeps_its_separate_installed_authority=True,parcels_updated=len(updated),new_frontages_added=added,retired_unwalkable_old_columns=retired,current_neighbourhood_public_columns=int(d['walk'].sum()),parcel_moves_already_installed=True,whole_map_complete=False,global_legacy_connectivity_report_requires_refresh=True))
     print('Published current planning authority:',len(updated),'parcel addresses;',retired,'retired old surface columns',flush=True)
 
 if __name__=='__main__':

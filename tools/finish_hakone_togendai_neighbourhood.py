@@ -12,7 +12,7 @@ from query_blocks import AIR
 from prepare_hakone_togendai_neighbourhood import save_json
 from verify_hakone_togendai_neighbourhood import verify
 
-def finish(source,out):
+def finish(source,out,detail_plan=None):
     for name in ('functional-check.json','independent-check.json'):
         if json.loads((source/name).read_text('utf8'))['errors']:raise ValueError('Unverified input '+name)
     out.mkdir(parents=True,exist_ok=False);(out/'source').mkdir()
@@ -23,6 +23,10 @@ def finish(source,out):
         else:shutil.copy2(file,out/file.name)
     with np.load(out/'plan/network.npz')as f:d={k:f[k]for k in f.files}
     x,z,X,Z=map(int,d['bounds']);e=Editor(out);spec=json.loads((out/'plan/authored-design.json').read_text('utf8'));details=dict(crossings=[],bus_bays=[],lights=[],trees=[],awnings=[])
+    if detail_plan is not None:
+        overrides=json.loads(detail_plan.read_text('utf8'))
+        if set(overrides)-{'bridge_details','tree_clusters','woodland_areas','native_frontage_details'}:raise ValueError('Finishing plan may not alter street or parcel geometry')
+        spec.update(overrides);save_json(out/'plan/authored-design.json',spec)
     if spec.get('togendai_forecourt',True):
         for lo,hi in [(-321,-302),(-277,-258)]:
             for px in range(lo,hi+1):
@@ -95,9 +99,12 @@ def finish(source,out):
     if spec.get('nerv_west_details',False):
         from detail_hakone_nerv_streets import decorate
         decorate(e,d,spec,rows,out,details,outdoor,preserved)
-    elif spec.get('native_frontage_details',False):
+    elif spec.get('native_frontage_details',False)or (out/'new-frontages.json').exists():
         from detail_hakone_nerv_streets import decorate_frontages
-        decorate_frontages(e,d,rows,out,details,outdoor,preserved)
+        fixture_rows=list(rows)
+        if (out/'new-frontages.json').exists():
+            fixture_rows.extend(dict(r,new_payload_bounds=r['occupied_bounds'])for r in json.loads((out/'new-frontages.json').read_text('utf8'))['buildings'])
+        decorate_frontages(e,d,fixture_rows,out,details,outdoor,preserved)
     if spec.get('hillside_street_details',False):
         from detail_hakone_hillside_streets import decorate as hillside_details
         hillside_details(e,d,spec,rows,details,preserved)
@@ -106,7 +113,11 @@ def finish(source,out):
     manifest=json.loads((out/'manifest.json').read_text('utf8'));manifest.update(regions=patches,cells=sum(r['cells']for r in patches))
     manifest['neighbourhood_verification']['new_native_fixtures']=len(details.get('native_fixtures',[]));save_json(out/'manifest.json',manifest)
     save_json(out/'launch-protection.json',check_candidate(load(Path(manifest['world'])),out))
-    verify(out);print({k:len(v)for k,v in details.items()},flush=True)
+    if (out/'new-frontages.json').exists():
+        from verify_hakone_hillside_frontages import check
+        check(out)
+    else:verify(out)
+    print({k:len(v)for k,v in details.items()},flush=True)
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(__doc__);p.add_argument('--source',type=Path,required=True);p.add_argument('--out',type=Path,required=True);a=p.parse_args();finish(a.source,a.out)
+    p=argparse.ArgumentParser(__doc__);p.add_argument('--source',type=Path,required=True);p.add_argument('--out',type=Path,required=True);p.add_argument('--detail-plan',type=Path);a=p.parse_args();finish(a.source,a.out,a.detail_plan)

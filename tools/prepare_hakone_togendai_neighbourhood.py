@@ -50,6 +50,13 @@ def design(a):
     rows=json.loads((a.survey/'buildings.json').read_text('utf8'))
     old=Editor(a.source);road=np.zeros(shape,bool);walk=road.copy();grade2=np.zeros(shape,np.int16);mark=road.copy()
     design=json.loads(a.design.read_text('utf8'));streets=[]
+    measured_public=np.zeros(shape,bool)
+    for path in design.get('retained_public_surfaces',[]):
+        with np.load(Path(path))as f:
+            ax,az,aX,aZ=map(int,f['bounds']);l,t,R,B=max(x,ax),max(z,az),min(X,aX),min(Z,aZ)
+            if l>R or t>B:raise ValueError(('Retained public surface outside design',path))
+            dst=np.s_[t-z:B-z+1,l-x:R-x+1];src=np.s_[t-az:B-az+1,l-ax:R-ax+1];keep=f['walk'][src]
+            measured_public[dst]|=keep;walk[dst]|=keep;road[dst]|=f['road'][src]&keep;grade2[dst][keep]=f['grade2'][src][keep]
     for row in design['streets']:
         curve,along=alignment(row);dist,near=cKDTree(curve[:,[0,2]]).query(np.column_stack([xx.ravel(),zz.ravel()]));dist=dist.reshape(shape);near=near.reshape(shape)
         r=dist<=row['width']/2;w=dist<=row['width']/2+row.get('sidewalk',2)
@@ -101,6 +108,12 @@ def design(a):
         for key in ('door','approach'):q[key]=[v+q['translation'][i]for i,v in enumerate(q[key])]
         q['new_payload_bounds']=[v+q['translation'][i%3]for i,v in enumerate(box)]
         newrows.append(q)
+    new_sites=design.get('new_frontages',[])
+    for row in new_sites:
+        px0,_,pz0,px1,_,pz1=row['occupied_bounds'];area=rect(bounds,[px0,pz0,px1,pz1])
+        if px0<x or px1>X or pz0<z or pz1>Z:raise ValueError(('New frontage outside captured design',row['id']))
+        if np.any((walk|plots)[area]):raise ValueError(('New frontage meets a public surface or parcel',row['id']))
+        plots[area]=True;plotfloor[area]=row['site']['floor']
     # Explicit footways have their own grade; complete surfaces are solved
     # before any terrain is composed. They never cross a retained wall.
     np.savez_compressed(a.out/'debug-streets.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,plots=plots,plotfloor=plotfloor)
@@ -112,7 +125,7 @@ def design(a):
         h2=fit_ports(w&~walk,h2,walk,grade2);use=w&~walk;walk|=w;grade2[use]=h2[use]
         footways.append(dict(id=spec['id'],points=spec['points'],length=float(along[-1])))
     for spec in design['footways']:
-        row=next(r for r in newrows if r['id']==spec['parcel']);path=np.asarray(spec['points'],float)
+        row=next(r for r in [*newrows,*new_sites]if r['id']==spec['parcel']);path=np.asarray(spec['points'],float)
         start=np.asarray(row['approach'],float);end=path[-1]
         if np.linalg.norm(start[[0,2]]-path[0,[0,2]])>.1:raise ValueError(('wrong parcel approach',row['id']))
         path[0,1]=row['site']['floor']+1
@@ -165,6 +178,7 @@ def design(a):
     fixed&=~station_soil
     bridge=np.zeros(shape,bool)
     for box in design.get('bridge_spans',[]):bridge[rect(bounds,box)]=True
+    bridge|=measured_public
     innerplots=binary_erosion(plots,iterations=2)
     anchor=(walk&~bridge)|innerplots|fixed;anchor_y=d['old_ground'].copy();anchor_y[walk]=(grade2[walk]+1)//2-1;anchor_y[innerplots]=plotfloor[innerplots]-3
     target,conflict=grade_ground(surveyed,anchor,anchor_y,slope=1)
@@ -174,9 +188,9 @@ def design(a):
     target[wet|fixed|station_soil|bridge|~known]=d['old_ground'][wet|fixed|station_soil|bridge|~known]
     if any(np.any(edge)for edge in((target-d['old_ground'])[0],(target-d['old_ground'])[-1],(target-d['old_ground'])[:,0],(target-d['old_ground'])[:,-1])):raise ValueError('Nonzero earthwork at crop edge')
     np.savez_compressed(a.out/'design.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,marking=mark,plots=plots,plotfloor=plotfloor,ground=target,old_ground=d['old_ground'],wet=wet,core=core,retained_walk=retained_walk,ports=ports,bridge=bridge)
-    save_json(a.out/'buildings.json',newrows);save_json(a.out/'streets.json',streets);save_json(a.out/'footways.json',footways);shutil.copy2(a.design,a.out/'authored-design.json')
+    save_json(a.out/'buildings.json',newrows);save_json(a.out/'new-frontages.json',new_sites);save_json(a.out/'streets.json',streets);save_json(a.out/'footways.json',footways);shutil.copy2(a.design,a.out/'authored-design.json')
     save_json(a.out/'retained-buildings.json',retained)
-    save_json(a.out/'design-report.json',dict(buildings=len(rows),moves=sum(r['dy']!=0 for r in newrows),maximum_lift=max(r['dy']for r in newrows),streets=streets,road_columns=int(road.sum()),public_columns=int(walk.sum()),earthwork_columns=int((target!=d['old_ground']).sum()),world_written=False))
+    save_json(a.out/'design-report.json',dict(buildings=len(rows),moves=sum(r['dy']!=0 for r in newrows),maximum_lift=max((r['dy']for r in newrows),default=0),streets=streets,road_columns=int(road.sum()),public_columns=int(walk.sum()),retained_public_columns=int(measured_public.sum()),earthwork_columns=int((target!=d['old_ground']).sum()),world_written=False))
     print((a.out/'design-report.json').read_text('utf8'),flush=True)
 
 if __name__=='__main__':

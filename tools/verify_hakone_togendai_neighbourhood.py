@@ -171,7 +171,7 @@ def verify(candidate):
         for p,q in zip(points,points[1:]):
             if abs(p[0]-q[0])+abs(p[2]-q[2])!=1 or abs(p[1]-q[1])>.5:errors.append(['noncontinuous retained access',route['id'],p,q])
         for px,py,pz in points:
-            floor=int(py)-1
+            floor=int(np.ceil(py))-1
             if e.state(px,floor,pz).split('[')[0]not in pavement|SOIL:errors.append(['retained access floor',route['id'],px,floor,pz])
             if any(e.state(px,Y,pz).split('[')[0]not in empty for Y in range(floor+1,floor+4)):errors.append(['retained access headroom',route['id'],px,py,pz])
             if any(e.state(px,Y,pz)!=e.state(px,Y,pz,True)for Y in range(floor,floor+4)):errors.append(['retained access changed',route['id'],px,py,pz])
@@ -185,4 +185,5 @@ def verify(candidate):
     return report
 
 if __name__=='__main__':
-    p=argparse.ArgumentParser(__doc__);p.add_argument('--candidate',type=Path,required=True);verify(p.parse_args().candidate)
+    p=argparse.ArgumentParser(__doc__);p.add_argument('--candidate',type=Path,required=True)
+    if verify(p.parse_args().candidate)['errors']:raise SystemExit(1)

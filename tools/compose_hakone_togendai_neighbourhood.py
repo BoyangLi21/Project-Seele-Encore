@@ -61,6 +61,16 @@ def compose(a):
     with stopped_world(world):shutil.copytree(world/'mtr',a.out/'preserved-native')
     shutil.copy2(a.survey/'captured-devices.dat',a.out/'captured-devices.dat')
     design_spec=json.loads((a.design/'authored-design.json').read_text('utf8'))
+    removed_vegetation=[]
+    for box in design_spec.get('retire_vegetation_volumes',[]):
+        for px in range(box[0],box[3]+1):
+            for pz in range(box[2],box[5]+1):
+                for py in range(box[1],box[4]+1):
+                    state=e.state(px,py,pz);mat=state.split('[')[0]
+                    if not(mat.endswith('_leaves')or mat.endswith('_log')):continue
+                    if (px,py,pz)in devices or guard.chunk_mask(px//16,pz//16)[py+128,pz%16,px%16]:raise ValueError(('Retained device or launch cell in vegetation retirement',px,py,pz))
+                    removed_vegetation.append(dict(pos=[px,py,pz],before=state,after='minecraft:air'));e.put(px,py,pz,'minecraft:air')
+    save_json(a.out/'retired-vegetation.json',removed_vegetation)
     for remnant in design_spec.get('retire_street_remnants',[]):
         pos=remnant['pos']
         if tuple(pos)in devices or e.state(*pos,original=True)!=remnant['state']:raise ValueError(('Changed street remnant',pos))
@@ -223,7 +233,9 @@ def compose(a):
     manifest=dict(world=str(world),bounds_xz=bounds.tolist(),regions=patches,cells=sum(r['cells']for r in patches),world_written=False,preserve_native_members=True,neighbourhood_verification=dict(public_columns=int(d['walk'].sum()),parcels=len(rows),devices=len(moved)),parcel_moves=[dict(id=r['id'],dy=r['dy'],translation=r.get('translation',[0,r['dy'],0]))for r in rows])
     save_json(a.out/'manifest.json',manifest);save_json(a.out/'launch-protection.json',check_candidate(guard,a.out))
     print(json.dumps({**manifest,'regions':len(patches),'errors':len(errors),'moved_devices':len(moved)},ensure_ascii=False),flush=True)
-    if errors:print(errors[:20],flush=True)
+    if errors:
+        print(errors[:20],flush=True)
+        raise ValueError('Candidate composition has unresolved obstructions')
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)

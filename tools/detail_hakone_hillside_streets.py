@@ -18,6 +18,39 @@ def decorate(e,d,spec,rows,details,preserved):
     distance,nearest=distance_transform_edt(~d['walk'],return_indices=True)
     plot_distance=distance_transform_edt(~d['plots'])
     details.update(drain_covers=[],retaining_faces=[],slope_handrails=[],engineered_retaining_faces=[])
+    details['bridge_structures']=[]
+    for structure in spec.get('bridge_details',[]):
+        depth=int(structure.get('deck_depth',2))
+        if depth not in (1,2):raise ValueError(('Unsupported solid bridge deck depth',depth))
+        a,b,A,B=structure['bounds'];zone=np.zeros(shape,bool);zone[max(0,b-z):B-z+1,max(0,a-x):A-x+1]=True
+        deck=zone&d['bridge']&d['walk'];deck_cells=0;parapets=0;pier_cells=0
+        for j,i in np.argwhere(deck):
+            floor,_=road_blocks(d['grade2'][j,i]);floor=int(floor);px,pz=int(i+x),int(j+z)
+            for py in range(floor-depth,floor):
+                pos=(px,py,pz)
+                if preserved(pos):continue
+                if e.state(*pos).split('[')[0]not in SOIL|{'minecraft:stone_bricks','minecraft:light_gray_concrete'}:raise ValueError(('Bridge deck is not owned structural fill',structure['id'],pos,e.state(*pos)))
+                e.put(*pos,'minecraft:light_gray_concrete');deck_cells+=1
+        for j,i in np.argwhere(zone&(distance>0)&(distance<=1.05)):
+            J,I=nearest[:,j,i]
+            if not deck[J,I]:continue
+            floor,_=road_blocks(d['grade2'][J,I]);floor=int(floor);px,pz=int(i+x),int(j+z)
+            if any(preserved((px,py,pz))for py in range(floor-depth,floor+2)):continue
+            if any(e.state(px,py,pz).split('[')[0]not in SOIL|EMPTY|PAVE for py in range(floor-depth,floor+2)):continue
+            for py in range(floor-depth,floor+1):e.put(px,py,pz,'minecraft:light_gray_concrete')
+            state='minecraft:iron_bars[east=false,north=true,south=true,waterlogged=false,west=false]'if abs(i-I)>=abs(j-J)else'minecraft:iron_bars[east=true,north=false,south=false,waterlogged=false,west=true]'
+            e.put(px,floor+1,pz,state);parapets+=1
+        for px,pz in structure.get('supports',[]):
+            J,I=nearest[:,pz-z,px-x];floor,_=road_blocks(d['grade2'][J,I]);floor=int(floor)
+            if not deck[J,I]:raise ValueError(('Bridge bearing misses deck',structure['id'],px,pz))
+            for Q in range(px-1,px+2):
+                for R in range(pz-1,pz+2):
+                    bottom=int(d['old_ground'][R-z,Q-x])
+                    for py in range(bottom,floor-1):
+                        pos=(Q,py,R)
+                        if preserved(pos)or e.state(*pos).split('[')[0]not in SOIL|EMPTY|PAVE|{'minecraft:light_gray_concrete'}:raise ValueError(('Bridge bearing intersects unowned construction',structure['id'],pos,e.state(*pos)))
+                        e.put(*pos,'minecraft:light_gray_concrete');pier_cells+=1
+        details['bridge_structures'].append(dict(id=structure['id'],deck_depth=depth,deck_cells=deck_cells,parapet_columns=parapets,pier_cells=pier_cells))
     for face in spec.get('engineered_retaining_faces',[]):
         count=0
         for px in range(face['x'][0],face['x'][1]+1):
