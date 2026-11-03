@@ -1422,8 +1422,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         if(!this.level().isClientSide)return this.entityData.get(key);
         float value=poseSignalClocks[i].sample(FirstBattleSignals.clientFrameTime());
-        return i>=4&&i<=6?EvaCombatSupportR33.renderLocomotionSignalR44(this,p,i,value):value;
+        value=i>=4&&i<=6?EvaCombatSupportR33.renderLocomotionSignalR44(this,p,i,value):value;
+        long frame=FirstBattleSignals.clientFrameTime();
+        return i==4?gaitClockR57.sample(this,p,value,frame):i==5||i==6?blendEaseR57[i-5].sample(value,frame):value;
     }
+    private final EvaGaitClockR57 gaitClockR57=new EvaGaitClockR57();
+    private final EvaSignalEaseR57[] blendEaseR57={new EvaSignalEaseR57(),new EvaSignalEaseR57()};
     public float rifleCrouchBlend(float p){return rifleSignal(0,DATA_RIFLE_CROUCH,p);}
     public float rifleProneBlend(float p){return rifleSignal(1,DATA_RIFLE_PRONE,p);}
     public float rifleReadyBlend(float p){return rifleSignal(2,DATA_RIFLE_READY,p);}

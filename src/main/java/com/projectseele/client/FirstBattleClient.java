@@ -42,7 +42,8 @@ public final class FirstBattleClient
     public static void releaseCamera(){restore();}
     @SubscribeEvent public static void renderClock(TickEvent.RenderTickEvent event)
     {
-        if(event.phase==TickEvent.Phase.START)com.projectseele.entity.FirstBattleSignals.beginClientFrame(System.nanoTime(),Minecraft.getInstance().isPaused());
+        // The frame's own start, not this event's: see AircraftRenderClockR21.stampFrame.
+        if(event.phase==TickEvent.Phase.START)com.projectseele.entity.FirstBattleSignals.beginClientFrame(AircraftRenderClockR21.frameNanos(),Minecraft.getInstance().isPaused());
     }
     private static void capture(EvaUnit01Entity eva,Camera camera)
     {

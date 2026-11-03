@@ -32,11 +32,11 @@ final class EvaGroundContactR56
             "arm_l","arm_r","forearm_l","forearm_r","hand_l","hand_r","head"};
     /** Rest-pose hull samples per part (model units): the extremes along 26 directions. */
     private static final Map<Integer,Map<String,Vector3f[]>> HULLS=new HashMap<>();
-    private record Ankle(float x,float z,long time,float planted) {}
+    private record Ankle(float x,float z,long time,float planted,float rate) {}
     /** Last ankle position per EVA and side (world), its frame time and planted weight. */
     private static final Map<String,Ankle> ANKLES=new HashMap<>();
-    /** Seconds a foot takes to settle onto, or lift off, the ground. */
-    private static final float PLANT_EASE=.09F;
+    /** Stiffness (1/s) of the critically damped spring that settles a foot onto, or lifts it off, the ground. */
+    private static final float PLANT_RATE=18F;
     /** The other foot this high (blocks) means double support; this high, mid-swing. */
     private static final float STANCE_LOW=1.5F,STANCE_HIGH=5F;
     /** A sole this far above the ground still counts as planted (blocks), fading out by the second. */
@@ -129,7 +129,8 @@ final class EvaGroundContactR56
         var target=EvaRigTransforms.point(foot,EvaRigTransforms.pivot(foot),root).add(0,-drop,0);
         var hip=EvaRigTransforms.point(leg,EvaRigTransforms.pivot(leg),root);
         var knee=EvaRigTransforms.point(leg,EvaRigTransforms.knee(shin),root);
-        EvaRigTransforms.solveLeg(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(footWorld),knee.sub(hip),root);
+        // A drop of a hair fades in rather than switching the solver on.
+        EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(footWorld),knee.sub(hip),root,Math.min(1,Math.abs(drop)/.15F));
     }
 
     private static boolean applies(EvaUnit01Entity eva)
@@ -178,11 +179,20 @@ final class EvaGroundContactR56
             // instep rests whatever the other foot does.
             float swing=step((other-STANCE_LOW)/(STANCE_HIGH-STANCE_LOW));
             wanted*=Mth.lerp(lying(model,side),swing,1);
-            // Settle in and out over a few frames: a weight flickering with
-            // the frame-to-frame speed snapped the foot between its poses.
-            planted=dt>0&&dt<.25F?last.planted()+(wanted-last.planted())*(1-(float)Math.exp(-dt/PLANT_EASE)):wanted;
+            // Settle in and out through a spring that starts and stops
+            // gently. A weight flickering with the frame-to-frame speed
+            // snapped the foot between its poses; a plain exponential ease
+            // still turned the foot ten to fifteen degrees in its first frame.
+            float rate=0;
+            if(dt>0&&dt<.25F)
+            {
+                float error=last.planted()-wanted,step=(last.rate()+PLANT_RATE*error)*dt,decay=(float)Math.exp(-PLANT_RATE*dt);
+                planted=Mth.clamp(wanted+(error+step)*decay,0,1);
+                rate=(last.rate()-PLANT_RATE*step)*decay;
+            }
+            else planted=wanted;
             if(ANKLES.size()>64)ANKLES.clear();
-            ANKLES.put(key,new Ankle(ankle.x,ankle.z,now,planted));
+            ANKLES.put(key,new Ankle(ankle.x,ankle.z,now,planted,rate));
         }
         if(planted<=.01F)return;
         var modelRotation=EvaRigTransforms.rotation(EvaRigTransforms.model(foot));

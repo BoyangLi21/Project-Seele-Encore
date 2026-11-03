@@ -20,6 +20,15 @@ public final class AircraftRenderClockR21
     /** One timestamp per rendered frame: the main and shadow passes of the same
      * frame must evaluate time-driven poses identically. */
     public static long frameNanos(){return frameStarted==0?System.nanoTime():frameStarted;}
+    private static long stamped;
+    /**
+     * Called at the head of Minecraft.runTick, where vanilla samples its own
+     * frame timer. RenderTickEvent fires only after that frame's client
+     * ticks, so stamping there added their four to eight milliseconds to every
+     * third frame interval: time-driven poses sped up and slowed down against
+     * the evenly interpolated body, a visible judder in every walk.
+     */
+    public static void stampFrame(){stamped=System.nanoTime();}
     public static double availableSeconds()
     {return presented==0?1D/60:Math.max(0,(System.nanoTime()-presented)/1e9);}
     public static long simulationMillis()
@@ -36,7 +45,7 @@ public final class AircraftRenderClockR21
     public static void begin(TickEvent.RenderTickEvent event)
     {
         if(event.phase!=TickEvent.Phase.START)return;
-        long now=System.nanoTime();
+        long now=stamped>frameStarted?stamped:System.nanoTime();
         seconds=previous==0?1D/60:Math.max(0,(now-previous)/1e9);
         previous=now;frameStarted=now;frame++;
         if(net.minecraft.client.Minecraft.getInstance().isPaused())nativeStarted=now;

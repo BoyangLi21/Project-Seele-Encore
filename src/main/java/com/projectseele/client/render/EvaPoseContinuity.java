@@ -56,6 +56,37 @@ final class EvaPoseContinuity
 
     private EvaPoseContinuity() {}
 
+    /** Development: per drawn frame, the body origin and gait signals (-Dprojectseele.gaitTrace=file). */
+    private static final String GAIT_TRACE = System.getProperty("projectseele.gaitTrace", "");
+    private static java.io.PrintWriter gaitOut;
+    private static int gaitLines;
+
+    private static void gaitTrace(EvaUnit01Entity entity, BakedGeoModel model, float partialTick, long now)
+    {
+        try
+        {
+            if (gaitOut == null)
+            {
+                gaitOut = new java.io.PrintWriter(java.nio.file.Files.newBufferedWriter(java.nio.file.Path.of(GAIT_TRACE)));
+            }
+            var origin = entity.getPosition(partialTick);
+            GeoBone root = model.getBone("root").orElse(null);
+            GeoBone hips = model.getBone("torso_lower").orElse(null);
+            gaitOut.printf(java.util.Locale.ROOT, "%d %d %d %.4f %.5f %.5f %.5f %.5f %.4f %.4f %.4f %.4f %s%n",
+                    entity.getUnitVariant(), now, entity.level().getGameTime(), partialTick, origin.x, origin.y, origin.z,
+                    entity.rifleGaitPhase(partialTick), entity.rifleMoveBlend(partialTick), entity.rifleRunBlend(partialTick),
+                    root == null ? 0 : root.getPosY(), hips == null ? 0 : hips.getRotY(), entity.poseTransitionKey(partialTick));
+            if (++gaitLines % 240 == 0)
+            {
+                gaitOut.flush();
+            }
+        }
+        catch (Exception e)
+        {
+            com.projectseele.ProjectSeele.LOGGER.warn("gait trace failed", e);
+        }
+    }
+
     static void settle(EvaUnit01Entity entity, BakedGeoModel model, String owner)
     {
         settle(entity, model, owner, owner, 0.0F);
@@ -75,6 +106,10 @@ final class EvaPoseContinuity
         // A shader pack draws the body again for its shadow map within the same
         // frame: that pass reuses this frame's blend and must not re-trigger.
         boolean repeat = now == state.lastNanos;
+        if (!GAIT_TRACE.isEmpty() && !repeat)
+        {
+            gaitTrace(entity, model, partialTick, now);
+        }
         if (!repeat && now - state.lastNanos < STALE_NANOS && !state.last.isEmpty())
         {
             long blend = !key.equals(state.key) ? transitionNanos(state.key, key)
@@ -374,7 +409,8 @@ final class EvaPoseContinuity
         state.trace.add(row);
     }
 
-    private static final String[] TRACE_BONES = {"hand_l", "hand_r", "forearm_l", "forearm_r", "arm_l", "arm_r", "cannon", "torso_upper"};
+    private static final String[] TRACE_BONES = {"hand_l", "hand_r", "forearm_l", "forearm_r", "arm_l", "arm_r", "cannon", "torso_upper",
+            "torso_lower", "leg_l", "leg_r", "shin_l", "shin_r", "foot_l", "foot_r"};
 
     /** Per stage, how far the popped bone moved since the same stage last frame. */
     private static String traceDelta(State state, String boneName)

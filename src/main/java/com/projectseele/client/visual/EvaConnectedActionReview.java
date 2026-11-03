@@ -230,7 +230,8 @@ public final class EvaConnectedActionReview
         mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
         // Turn about between the bare-hand and rifle parts so the long walk
         // stays inside the open review ground, then back for the knife.
-        mc.player.setYRot(t>=610&&t<1085?180:0);mc.player.setXRot(0);
+        // (A tour started part-way has room ahead and does not turn.)
+        mc.player.setYRot(TOUR_START==0&&t>=610&&t<1085?180:0);mc.player.setXRot(0);
         if(tourAt(70))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
         if(tourAt(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
         if(tourAt(170)||tourAt(182)||tourAt(194)||tourAt(206))send(ServerboundEvaControlPacket.ACTION_MELEE);

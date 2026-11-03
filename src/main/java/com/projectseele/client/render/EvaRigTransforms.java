@@ -69,6 +69,34 @@ final class EvaRigTransforms
     {
         return solveChain(upper,lower,ankle,foot,knee(lower),target,rotation,pole,root);
     }
+    /**
+     * {@link #solveLeg} faded in by {@code weight}. The solver rebuilds the
+     * thigh twist and the ankle from scratch, so switching it on for a tiny
+     * correction turned the leg several degrees within one frame; below full
+     * weight the chain blends from its incoming pose instead.
+     */
+    static void solveLegFaded(GeoBone upper,GeoBone lower,GeoBone ankle,GeoBone foot,Vector3f target,Quaternionf rotation,Vector3f pole,Matrix4f root,float weight)
+    {
+        if(weight<=0)return;
+        GeoBone[] chain={upper,lower,ankle,foot};
+        Quaternionf[] rotations=new Quaternionf[4];Vector3f[] positions=new Vector3f[4];
+        for(int i=0;i<4;i++)
+        {
+            rotations[i]=new Quaternionf().rotationZYX(chain[i].getRotZ(),chain[i].getRotY(),chain[i].getRotX());
+            positions[i]=new Vector3f(chain[i].getPosX(),chain[i].getPosY(),chain[i].getPosZ());
+        }
+        solveLeg(upper,lower,ankle,foot,target,rotation,pole,root);
+        if(weight>=1)return;
+        for(int i=0;i<4;i++)
+        {
+            var solved=new Quaternionf().rotationZYX(chain[i].getRotZ(),chain[i].getRotY(),chain[i].getRotX());
+            rotate(chain[i],rotations[i].slerp(solved,weight));
+            var p=positions[i];
+            chain[i].setPosX(p.x+(chain[i].getPosX()-p.x)*weight);
+            chain[i].setPosY(p.y+(chain[i].getPosY()-p.y)*weight);
+            chain[i].setPosZ(p.z+(chain[i].getPosZ()-p.z)*weight);
+        }
+    }
     static double solveGenericArm(GeoBone upper,GeoBone lower,GeoBone hand,Vector3f target,Quaternionf rotation,Vector3f pole,Matrix4f root)
     {return solveChain(upper,lower,hand,hand,pivot(lower),target,rotation,pole,root);}
     private static double solveChain(GeoBone upper,GeoBone lower,GeoBone wrist,GeoBone hand,Vector3f centre,Vector3f target,Quaternionf handRotation,Vector3f pole,Matrix4f root)

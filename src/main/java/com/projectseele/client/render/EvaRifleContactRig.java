@@ -20,6 +20,7 @@ public final class EvaRifleContactRig
     public record Witness(Vec3 expectedMuzzle,double rightError,double leftError,double footDrift,Vec3 stock,Vec3 shoulder,
                           ArmTrace left,ArmTrace right,boolean measured) {}
     public static final Map<Integer,Witness> LAST=new HashMap<>();
+    private static final float LEFT_ELBOW_OUT=Float.parseFloat(System.getProperty("projectseele.rifleLeftElbowOutR57",".45"));
     private static void absolute(GeoBone b,Matrix4f desired,Matrix4f root)
     {
         Matrix4f rel=EvaRigTransforms.parent(b,root).invert().mul(desired);Vector3f p=EvaRigTransforms.pivot(b);
@@ -43,6 +44,9 @@ public final class EvaRifleContactRig
         Vec3 sight=eva.getAimDirectionForPoseCapture(partial);float twist=EvaRifleKinematics.twistDegrees(eva,partial,sight);
         boolean airborne=eva.isVisuallyAirborneForRender();
         if(!airborne)EvaRifleKinematics.twist(body,twist);
+        float hips=airborne?0:EvaRifleKinematics.hipDegrees(eva,partial,body);
+        Map<String,Plant> plants=Math.abs(hips)<.01F?Map.of():plants(body,model,root);
+        EvaRifleKinematics.turnHips(body,hips);
         for(String n:body.rig.keySet())
         {
             GeoBone b=model.getBone(n).orElse(null);if(b==null||!bodyBone(n))continue;
@@ -59,6 +63,8 @@ public final class EvaRifleContactRig
                 rotations.add(n);positions.add(n);
             }
         }
+        // Over the first few degrees the soles blend from swinging with the hips to staying put.
+        replant(model,root,plants,Math.min(1,Math.abs(hips)/3F));
         if(airborne&&twist!=0&&model.getBone("torso_upper").isPresent())
         {
             // The airborne limbs stay as accepted; the chest still turns to the sight line.
@@ -122,7 +128,8 @@ public final class EvaRifleContactRig
         float support=EvaBodyPose.hasSupportedStances()&&stance>1&&stance<3
                 ?(float)Math.pow(Math.sin((stance-1)*Math.PI/2),2):0;
         float prone=EvaBodyPose.hasSupportedStances()?net.minecraft.util.Mth.clamp(stance-2,0,1):eva.rifleProneBlend(partial);
-        Vector3f leftPole=new Vector3f(right).negate().add(0,-.7F,0);
+        // The support elbow hangs under the fore-end, only a little outward.
+        Vector3f leftPole=new Vector3f(right).negate().mul(LEFT_ELBOW_OUT).add(0,-1,0);
         if(EvaBodyPose.hasSupportedStances())
         {
             float kneeling=(1-Math.min(1,Math.abs(stance-1)))*(1-eva.rifleMoveBlend(partial));
@@ -180,6 +187,31 @@ public final class EvaRifleContactRig
         rotations.addAll(Set.of("neck","head","arm_r","forearm_r","wrist_r","hand_r","arm_l","forearm_l","wrist_l","hand_l","cannon"));
         positions.addAll(Set.of("forearm_r","wrist_r","hand_r","forearm_l","wrist_l","hand_l","cannon"));
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),Set.copyOf(positions),"MOTION_ENGINE_LIVE_ACTION");
+    }
+    /** Where the clip put each sole and knee (world) before the hips turned. */
+    private record Plant(Matrix4f foot,Vector3f knee) {}
+    private static Map<String,Plant> plants(EvaBodyPose.Sample body,BakedGeoModel model,Matrix4f root)
+    {
+        Map<String,Plant> result=new HashMap<>();
+        for(String s:new String[]{"l","r"})
+        {
+            var shin=model.getBone("shin_"+s).orElse(null);
+            if(shin==null||!body.rig.containsKey("foot_"+s)||!body.rig.containsKey("leg_"+s))continue;
+            result.put(s,new Plant(new Matrix4f(root).mul(body.matrix("foot_"+s)),
+                    new Matrix4f(root).mul(body.matrix("leg_"+s)).transformPosition(EvaRigTransforms.knee(shin))));
+        }
+        return result;
+    }
+    private static void replant(BakedGeoModel model,Matrix4f root,Map<String,Plant> plants,float weight)
+    {
+        plants.forEach((s,plant)->{
+            GeoBone[] chain={model.getBone("leg_"+s).orElse(null),model.getBone("shin_"+s).orElse(null),
+                    model.getBone("ankle_"+s).orElse(null),model.getBone("foot_"+s).orElse(null)};
+            if(Arrays.asList(chain).contains(null))return;
+            var hip=EvaRigTransforms.point(chain[0],EvaRigTransforms.pivot(chain[0]),root);
+            var target=plant.foot().transformPosition(EvaRigTransforms.pivot(chain[3]));
+            EvaRigTransforms.solveLegFaded(chain[0],chain[1],chain[2],chain[3],target,EvaRigTransforms.rotation(plant.foot()),new Vector3f(plant.knee()).sub(hip),root,weight);
+        });
     }
     private static double solve(BakedGeoModel model,String side,Vector3f target,Quaternionf rotation,Vector3f pole,Matrix4f root)
     {

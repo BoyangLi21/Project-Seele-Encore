@@ -26,13 +26,25 @@ public final class EvaRifleKinematics
      */
     private static final double POCKET_LATERAL=property("projectseele.rifleStockLateral",-2.4),
             POCKET_FORWARD=property("projectseele.rifleStockForward",4.4),
-            POCKET_DOWN=property("projectseele.rifleStockDown",-2.0),
+            POCKET_DOWN=property("projectseele.rifleStockDown",-1.2),
             POCKET_FORWARD_PRONE=property("projectseele.rifleStockForwardProne",1.0),
             POCKET_DOWN_PRONE=property("projectseele.rifleStockDownProne",-2.4),
             /** Rise of the stock from low ready to aimed fire. */
             SIGHT_LIFT=property("projectseele.rifleSightLift",0.8);
     /** The chest turns at most this far from the hips toward the sight line; beyond it the barrel pivots on the stock. */
     private static final float TWIST_LIMIT=50;
+    /**
+     * With the rifle up the chest also turns this far right of the sight
+     * line (degrees), bringing the left shoulder forward: square to the
+     * target, the support hand had to reach across the belly with a locked arm.
+     */
+    private static final float BLADE=(float)property("projectseele.rifleBladeR57",18);
+    /**
+     * Share of that turn the hips take while the EVA stands its ground. The
+     * stance already puts the right foot back; square hips under a bladed
+     * chest twisted the narrow waist by forty degrees.
+     */
+    private static final float HIP_SHARE=(float)property("projectseele.rifleHipShareR57",.45);
     /** The drawn barrel converges on the sight line no nearer than this, so a wall or the floor close ahead cannot swing it. */
     private static final double MIN_CONVERGENCE=96;
     // Server and client threads share this JVM in single player.
@@ -77,8 +89,53 @@ public final class EvaRifleKinematics
         if(EvaRifleClearance.usesLegacyGripFit()||direction.x*direction.x+direction.z*direction.z<1e-6)return 0;
         float body=entity.level().isClientSide?Mth.rotLerp(partial,entity.yBodyRotO,entity.yBodyRot):entity.yBodyRot;
         float aim=(float)Math.toDegrees(Math.atan2(-direction.x,direction.z));
-        float weight=(.35F+.65F*entity.rifleReadyBlend(partial))*(1-entity.rifleProneBlend(partial));
-        return Mth.clamp(Mth.wrapDegrees(aim-body),-TWIST_LIMIT,TWIST_LIMIT)*weight;
+        float ready=entity.rifleReadyBlend(partial),upright=1-entity.rifleProneBlend(partial);
+        float weight=(.35F+.65F*ready)*upright;
+        return Mth.clamp(Mth.wrapDegrees(aim-body),-TWIST_LIMIT,TWIST_LIMIT)*weight+BLADE*ready*upright;
+    }
+
+    /**
+     * Yaw (degrees, Minecraft sense) the hips take of the sampled chest's whole
+     * turn from them, the stance's own and the sight line's: none while
+     * walking, where they face the way the legs go, or lying.
+     */
+    public static float hipDegrees(EvaUnit01Entity entity,float partial,EvaBodyPose.Sample body)
+    {
+        if(!body.rig.containsKey("torso_upper")||!body.rig.containsKey("torso_lower"))return 0;
+        Vector3f chest=body.matrix("torso_upper").transformDirection(new Vector3f(0,0,-1)),hips=body.matrix("torso_lower").transformDirection(new Vector3f(0,0,-1));
+        float turn=Mth.wrapDegrees((float)Math.toDegrees(Math.atan2(chest.x,-chest.z)-Math.atan2(hips.x,-hips.z)));
+        return turn*HIP_SHARE*(1-Mth.clamp(entity.rifleMoveBlend(partial),0,1))*(1-entity.rifleProneBlend(partial));
+    }
+
+    /**
+     * Turns the hips of a sampled body about the vertical through the chest
+     * joint, leaving the chest exactly where it was, so the stock, arms and
+     * sight line do not move. The legs swing with the hips; the renderer
+     * plants the feet again.
+     */
+    public static void turnHips(EvaBodyPose.Sample body,float degrees)
+    {
+        if(Math.abs(degrees)<.01F||!body.rig.containsKey("torso_upper")||!body.rig.containsKey("torso_lower"))return;
+        Matrix4f chest=body.matrix("torso_upper");
+        Vector3f centre=chest.transformPosition(new Vector3f(body.rig.get("torso_upper").pivot()));
+        // Minecraft yaw grows clockwise from above; model space turns the other way.
+        Matrix4f turn=new Matrix4f().translation(centre).rotateY(-degrees*Mth.DEG_TO_RAD).translate(-centre.x,-centre.y,-centre.z);
+        String parent=body.rig.get("torso_lower").parent();
+        Matrix4f above=parent==null?new Matrix4f():body.matrix(parent);
+        Matrix4f hips=new Matrix4f(above).invert().mul(turn).mul(body.matrix("torso_lower"));
+        setLocal(body,"torso_lower",hips);
+        body.dirty();
+        String chestParent=body.rig.get("torso_upper").parent();
+        setLocal(body,"torso_upper",(chestParent==null?new Matrix4f():body.matrix(chestParent)).invert().mul(chest));
+        body.dirty();
+    }
+
+    /** Stores a rigid local transform as the bone's rotation about its pivot plus offset. */
+    private static void setLocal(EvaBodyPose.Sample body,String name,Matrix4f local)
+    {
+        Vector3f pivot=body.rig.get(name).pivot();
+        body.rotations.put(name,local.getNormalizedRotation(new Quaternionf()));
+        body.positions.put(name,local.transformPosition(new Vector3f(pivot)).sub(pivot));
     }
 
     /** Turns the chest of a sampled body about the vertical through its waist joint. */

@@ -65,16 +65,38 @@ public final class EvaFootPlacement
             if(selected==null)continue;Vector3f lowest=matrix.transformPosition(new Vector3f(selected));
             double ground=ground(eva,lowest),lift=lowest.y-eva.getY();
             double plant=1-Math.max(0,Math.min(1,(lift-.35)/1.7));
-            double correction=Double.isFinite(ground)?Math.max(-2.6,Math.min(2.6,ground+.05-lowest.y))*plant:0;
+            double correction=ease(eva.getId()*2+(s.equals("l")?0:1),Double.isFinite(ground)?Math.max(-2.6,Math.min(2.6,ground+.05-lowest.y))*plant:0);
             witness[index++]=lowest.y;witness[index++]=ground;witness[index++]=correction;
-            if(Math.abs(correction)<.025)continue;
+            if(Math.abs(correction)<.005)continue;
             Vector3f target=EvaRigTransforms.point(foot,EvaRigTransforms.pivot(foot),root).add(0,(float)correction,0);
             Vector3f hip=EvaRigTransforms.point(leg,EvaRigTransforms.pivot(leg),root);Vector3f knee=EvaRigTransforms.point(leg,EvaRigTransforms.knee(shin),root);
-            EvaRigTransforms.solveLeg(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(matrix),knee.sub(hip),root);
+            // Small corrections fade in: a solver switched on at a fixed threshold snapped the walking leg.
+            EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(matrix),knee.sub(hip),root,(float)Math.min(1,Math.abs(correction)/.2));
             changed.addAll(List.of("leg_"+s,"shin_"+s,"ankle_"+s,"foot_"+s));
         }
         if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),witness);
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(changed),"MOTION_ENGINE_LIVE_ACTION");
+    }
+    private record Eased(double value,long time) {}
+    private static final Map<Integer,Eased> EASED=new HashMap<>();
+    /**
+     * The ground under a sole changes block by block, and a ray that found
+     * nothing read as no ground: the correction jumped by up to a block
+     * between frames and snapped the leg. It now follows over about a tenth of
+     * a second.
+     */
+    private static double ease(int key,double wanted)
+    {
+        long now=com.projectseele.client.AircraftRenderClockR21.frameNanos();var last=EASED.get(key);double value=wanted;
+        if(last!=null)
+        {
+            double dt=(now-last.time())/1e9;
+            if(dt==0)return last.value();
+            if(dt>0&&dt<.25&&Math.abs(wanted-last.value())<3)value=last.value()+(wanted-last.value())*(1-Math.exp(-dt/.06));
+        }
+        if(EASED.size()>64)EASED.clear();
+        EASED.put(key,new Eased(value,now));
+        return value;
     }
     private EvaFootPlacement() {}
 }
