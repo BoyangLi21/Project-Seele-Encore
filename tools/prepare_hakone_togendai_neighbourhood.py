@@ -61,7 +61,7 @@ def design(a):
         h2[walk&w]=grade2[walk&w]
         h2=fit_ports(w&~walk,h2,walk,grade2)
         road|=r;walk|=w;grade2[w]=h2[w]
-        mark|=r&(dist<.6)&((along[near]//4).astype(int)%2==0)
+        if row.get('centre_line',True):mark|=r&(dist<.6)&((along[near]//4).astype(int)%2==0)
         streets.append(dict(id=row['id'],length=float(along[-1]),maximum_continuous_grade=float((abs(np.diff(curve[:,1]))/np.linalg.norm(np.diff(curve[:,[0,2]],axis=0),axis=1)).max())))
     # Preserve existing station entrance and shelters. Rebuild its carriageway
     # at one datum, with a generous continuous passenger pavement in front.
@@ -90,16 +90,20 @@ def design(a):
             if not valid:walk[j,i]=False;road[j,i]=False;mark[j,i]=False
     plots=np.zeros(shape,bool);plotfloor=np.zeros(shape,np.int16);newrows=[]
     for row in rows:
-        box=row['payload_bounds'];px0,_,pz0,px1,_,pz1=box
+        box=row['payload_bounds'];dx,dz=map(int,design.get('parcel_offsets_xz',{}).get(row['id'],[0,0]))
+        px0,_,pz0,px1,_,pz1=box;px0+=dx;px1+=dx;pz0+=dz;pz1+=dz
+        if px0<x or px1>X or pz0<z or pz1>Z:raise ValueError(('Relocated parcel outside captured design',row['id']))
         area=rect(bounds,[px0,pz0,px1,pz1]);target=int(design['parcel_floors'].get(row['id'],row['surveyed_floor']))
         if walk[area].any():raise ValueError(('road meets retained parcel',row['id']))
         plots[area]=True;plotfloor[area]=target
         q=copy.deepcopy(row);q['dy']=target-row['site']['floor'];q['site']['floor']=target
-        for key in ('door','approach'):q[key][1]+=q['dy']
-        q['new_payload_bounds']=[v+(q['dy']if i in (1,4)else 0)for i,v in enumerate(box)]
+        q['translation']=[dx,q['dy'],dz];q['site']['centre']=[q['site']['centre'][0]+dx,q['site']['centre'][1]+dz]
+        for key in ('door','approach'):q[key]=[v+q['translation'][i]for i,v in enumerate(q[key])]
+        q['new_payload_bounds']=[v+q['translation'][i%3]for i,v in enumerate(box)]
         newrows.append(q)
     # Explicit footways have their own grade; complete surfaces are solved
     # before any terrain is composed. They never cross a retained wall.
+    np.savez_compressed(a.out/'debug-streets.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,plots=plots,plotfloor=plotfloor)
     footways=[]
     for spec in design.get('public_paths',[]):
         curve,along=alignment(spec);dist,near=cKDTree(curve[:,[0,2]]).query(np.column_stack([xx.ravel(),zz.ravel()]));dist=dist.reshape(shape);near=near.reshape(shape)
@@ -128,7 +132,9 @@ def design(a):
         use=w&~walk;walk|=w;grade2[use]=h2[use];footways.append(dict(parcel=row['id'],points=path.tolist(),length=float(along[-1])))
     core=np.zeros(shape,bool);core[rect(bounds,design['core'])]=True
     active=binary_dilation(core|walk|plots,iterations=8)
-    distance=distance_transform_edt(~(core|walk|plots));blend=np.clip(1-distance/55,0,1)
+    blend_distance=float(design.get('earthwork_blend_distance',55))
+    if blend_distance<=0:raise ValueError('Earthwork blend distance must be positive')
+    distance=distance_transform_edt(~(core|walk|plots));blend=np.clip(1-distance/blend_distance,0,1)
     surveyed=d['old_ground']*(1-blend)+d['surveyed']*blend
     # Lake and original station lower floors are not soil anchors for fill.
     wet=np.zeros(shape,bool)
@@ -142,7 +148,7 @@ def design(a):
     if np.any(wet&walk):
         j,i=np.argwhere(wet&walk)[0];raise ValueError(('new street over measured lake',int(i+x),int(j+z)))
     known=d['old_ground']>-129
-    fixed=((distance>=55)|wet|retained_walk)&known
+    fixed=((distance>=blend_distance)|wet|retained_walk)&known
     retained=[]
     moved_ids={r['id']for r in rows}
     for r in json.loads(a.catalog.read_text('utf8')):

@@ -65,13 +65,15 @@ def finish(source,out):
         for along in (1,2):
             for side in range(-4,5):
                 Q,R=px+dx*along-dz*side,pz+dz*along+dx*side;Y=h+4;before=e.state(Q,Y,R)
-                if before.split('[')[0]not in AIR:continue
+                if preserved((Q,Y,R))or before.split('[')[0]not in AIR:continue
                 material='minecraft:dark_oak_slab[type=bottom,waterlogged=false]'if '喫茶'in row['use']else'minecraft:smooth_stone_slab[type=bottom,waterlogged=false]'
                 e.put(Q,Y,R,material);added.append([Q,Y,R]);outdoor.append(dict(parcel=row['id'],kind='outside wall canopy',pos=[Q,Y,R],before=before,after=material))
-        details['awnings'].append(dict(parcel=row['id'],cells=len(added)))
+        if added:details['awnings'].append(dict(parcel=row['id'],cells=len(added)))
     # Irregular groups with clear gaps around road sightlines and doorways.
     rng=np.random.default_rng(20261103)
-    clusters=spec.get('tree_clusters',[(-410,854),(-347,904),(-337,928),(-270,891),(-242,922),(-204,903),(-354,956),(-273,973),(-227,1011)])
+    clusters=list(spec.get('tree_clusters',[(-410,854),(-347,904),(-337,928),(-270,891),(-242,922),(-204,903),(-354,956),(-273,973),(-227,1011)]))
+    for a,b,A,B in spec.get('woodland_areas',[]):
+        clusters.extend((cx,cz)for cx in range(a+15,A,40)for cz in range(b+15,B,40))
     for cx,cz in clusters:
         for _ in range(18):
             px,pz=map(int,np.rint(rng.normal([cx,cz],[12,9])));j,i=pz-z,px-x
@@ -93,6 +95,12 @@ def finish(source,out):
     if spec.get('nerv_west_details',False):
         from detail_hakone_nerv_streets import decorate
         decorate(e,d,spec,rows,out,details,outdoor,preserved)
+    elif spec.get('native_frontage_details',False):
+        from detail_hakone_nerv_streets import decorate_frontages
+        decorate_frontages(e,d,rows,out,details,outdoor,preserved)
+    if spec.get('hillside_street_details',False):
+        from detail_hakone_hillside_streets import decorate as hillside_details
+        hillside_details(e,d,spec,rows,details,preserved)
     patches=e.save();save_json(out/'outdoor-apron-corrections.json',outdoor);save_json(out/'street-details.json',details)
     np.savez_compressed(out/'plan/network.npz',**d)
     manifest=json.loads((out/'manifest.json').read_text('utf8'));manifest.update(regions=patches,cells=sum(r['cells']for r in patches))

@@ -11,6 +11,7 @@ from map_pipeline.corridors import alignment
 from prepare_hakone_togendai_neighbourhood import save_json
 from verify_hakone_network_candidate import PAVEMENT
 from query_blocks import AIR
+from plan_ashi_landscape_r54 import SOIL
 
 def verify(candidate):
     with np.load(candidate/'plan/network.npz')as f:d={k:f[k]for k in f.files}
@@ -41,11 +42,12 @@ def verify(candidate):
     outdoor={tuple(r['pos']):r for r in json.loads((candidate/'outdoor-apron-corrections.json').read_text('utf8'))}
     payload_cells=0;payload_exceptions=0;payloads=list(sorted((candidate/'payloads').glob('*.npz'),key=lambda p:int(p.stem)))
     for path in payloads:
-        with np.load(path)as f:box=f['bounds'];dy=int(f['dy']);v=f['blocks'];names=list(map(str,f['palette']))
-        for px in range(int(box[0]),int(box[3])+1):
-            for pz in range(int(box[2]),int(box[5])+1):
+        with np.load(path)as f:box=f['bounds'];dy=int(f['dy']);shift=list(map(int,f['translation']))if 'translation'in f else[0,dy,0];v=f['blocks'];names=list(map(str,f['palette']))
+        for sx in range(int(box[0]),int(box[3])+1):
+            for sz in range(int(box[2]),int(box[5])+1):
+                px,pz=sx+shift[0],sz+shift[2]
                 r=e.region(px,pz);col=r['after'][r['index'][px//16,pz//16],int(box[1])+dy+128:int(box[4])+dy+129,pz%16,px%16]
-                actual=np.asarray(r['names'])[col];expected=np.asarray(names)[v[:,pz-box[2],px-box[0]]]
+                actual=np.asarray(r['names'])[col];expected=np.asarray(names)[v[:,sz-box[2],sx-box[0]]]
                 expected=expected.astype(object)
                 for k in range(len(expected)):
                     correction=outdoor.get((px,int(box[1])+dy+k,pz))
@@ -123,7 +125,8 @@ def verify(candidate):
     checked_tags=0
     for row in rows:
         for pos in row['devices']:
-            pos=tuple(pos);tag=originals[pos];q=(pos[0],pos[1]+row['dy'],pos[2]);new=copy.deepcopy(tag);new['y']=nbtlib.Int(q[1])
+            pos=tuple(pos);tag=originals[pos];shift=row.get('translation',[0,row['dy'],0]);q=tuple(pos[i]+shift[i]for i in range(3));new=copy.deepcopy(tag)
+            for key,value in zip(('x','y','z'),q):new[key]=nbtlib.Int(value)
             if before.get(pos)!=tag or after.get(q)!=new:errors.append(['full device NBT changed',row['id'],pos])
             checked_tags+=1
     added_fixtures=0
@@ -161,7 +164,19 @@ def verify(candidate):
                         contacts+=1;break
         seams.append(dict(street=row['id'],contacts=contacts))
         if contacts==0:errors.append(['retained street disconnected',row['id']])
-    report=dict(errors=errors,full_width_columns=checked,reachable_columns=int(seen.sum()),parcel_payload_cells_checked=payload_cells,parcel_payload_cells_exact=payload_cells-payload_exceptions,approved_outdoor_cells=payload_exceptions,complete_device_tags_exact=checked_tags,retained_device_tags_unchanged=retained_tags,native_room_volume_cells_unchanged=preserved_cells,native_rail_corridor_cells_unchanged=train_cells,native_cable_swept_cells_unchanged=cable_cells,parcel_goals=goals,streets=profiles,retained_interfaces=seams,visual_verified=False,world_written=False)
+    retained_access=[]
+    for route in specs.get('retained_ground_access',[]):
+        points=route['points']
+        if len(points)<2:errors.append(['empty retained access',route['id']])
+        for p,q in zip(points,points[1:]):
+            if abs(p[0]-q[0])+abs(p[2]-q[2])!=1 or abs(p[1]-q[1])>.5:errors.append(['noncontinuous retained access',route['id'],p,q])
+        for px,py,pz in points:
+            floor=int(py)-1
+            if e.state(px,floor,pz).split('[')[0]not in pavement|SOIL:errors.append(['retained access floor',route['id'],px,floor,pz])
+            if any(e.state(px,Y,pz).split('[')[0]not in empty for Y in range(floor+1,floor+4)):errors.append(['retained access headroom',route['id'],px,py,pz])
+            if any(e.state(px,Y,pz)!=e.state(px,Y,pz,True)for Y in range(floor,floor+4)):errors.append(['retained access changed',route['id'],px,py,pz])
+        retained_access.append(dict(id=route['id'],columns=len(points),start=points[0],end=points[-1]))
+    report=dict(errors=errors,full_width_columns=checked,reachable_columns=int(seen.sum()),parcel_payload_cells_checked=payload_cells,parcel_payload_cells_exact=payload_cells-payload_exceptions,approved_outdoor_cells=payload_exceptions,complete_device_tags_exact=checked_tags,retained_device_tags_unchanged=retained_tags,native_room_volume_cells_unchanged=preserved_cells,native_rail_corridor_cells_unchanged=train_cells,native_cable_swept_cells_unchanged=cable_cells,parcel_goals=goals,streets=profiles,retained_interfaces=seams,retained_ground_access=retained_access,visual_verified=False,world_written=False)
     report['new_native_fixtures_checked']=added_fixtures
     save_json(candidate/'independent-check.json',report)
     prior=json.loads((candidate/'functional-check.json').read_text('utf8'));prior.setdefault('composition_errors',prior['errors']);prior['independent_verification_errors']=errors;prior['errors']=prior['composition_errors']+errors;save_json(candidate/'functional-check.json',prior)

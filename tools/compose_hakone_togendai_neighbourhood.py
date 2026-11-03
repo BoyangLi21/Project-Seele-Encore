@@ -32,8 +32,8 @@ def compose(a):
     # Snapshot EVERY parcel before retiring any old volume. This also handles
     # a destination that overlaps an old floor in the same vertical column.
     for number,row in enumerate(rows):
-        box=row['payload_bounds'];dy=row['dy'];lo=np.asarray(box[:3]);hi=np.asarray(box[3:]);sx,sy,sz=map(int,hi-lo+1)
-        if any(all(box[i]<=actor['pos'][i]<=box[i+3]for i in range(3))for actor in capture['actors']):raise ValueError('An occupied parcel requires an explicit actor move')
+        box=row['payload_bounds'];dy=row['dy'];shift=row.get('translation',[0,dy,0]);lo=np.asarray(box[:3]);hi=np.asarray(box[3:]);sx,sy,sz=map(int,hi-lo+1)
+        if any(all(volume[i]<=actor['pos'][i]<=volume[i+3]for i in range(3))for actor in capture['actors']for volume in (box,row['new_payload_bounds'])):raise ValueError('An occupied parcel or destination requires an explicit actor move')
         names=[];codes={};v=np.empty((sy,sz,sx),np.uint16)
         for px in range(box[0],box[3]+1):
             for pz in range(box[2],box[5]+1):
@@ -43,22 +43,23 @@ def compose(a):
                     if state not in codes:codes[state]=len(names);names.append(state)
                     remap.append(codes[state])
                 v[:,pz-box[2],px-box[0]]=np.asarray(remap,np.uint16)[col]
-        np.savez_compressed(a.out/'payloads'/f'{number}.npz',bounds=box,dy=dy,blocks=v,palette=names)
-        payloads.append((box,dy,v,names));stats['parcel_payload_cells']+=int(v.size)
+        np.savez_compressed(a.out/'payloads'/f'{number}.npz',bounds=box,dy=dy,translation=shift,blocks=v,palette=names)
+        payloads.append((box,shift,v,names));stats['parcel_payload_cells']+=int(v.size)
         for pos,tag in devices.items():
             if not all(box[i]<=pos[i]<=box[i+3]for i in range(3)):continue
             if pos in moved:raise ValueError('Overlapping parcel payloads')
-            moved.add(pos);q=(pos[0],pos[1]+dy,pos[2]);new=copy.deepcopy(tag);new['y']=nbtlib.Int(q[1])
+            moved.add(pos);q=tuple(pos[i]+shift[i]for i in range(3));new=copy.deepcopy(tag)
+            for k,value in zip(('x','y','z'),q):new[k]=nbtlib.Int(value)
             changes.setdefault(pos,{})['Before']=copy.deepcopy(tag);changes.setdefault(q,{})['After']=new
         for other in rows[:number]:
-            b=other['payload_bounds']
-            if all(max(box[i],b[i])<=min(box[i+3],b[i+3])for i in (0,2)):raise ValueError(('Overlapping parcels',row['id'],other['id']))
+            for key in ('payload_bounds','new_payload_bounds'):
+                b=other[key];q=row[key]
+                if all(max(q[i],b[i])<=min(q[i+3],b[i+3])for i in (0,2)):raise ValueError(('Overlapping parcels',key,row['id'],other['id']))
     for p,r in changes.items():
         if 'After'in r and p in devices and p not in moved:raise ValueError(('Destination occupied by retained device',p))
     # Original addresses, schedules, vehicle data and identities remain bytes.
     with stopped_world(world):shutil.copytree(world/'mtr',a.out/'preserved-native')
     shutil.copy2(a.survey/'captured-devices.dat',a.out/'captured-devices.dat')
-    for box,dy,v,names in payloads:e.fill(*box[:3],*box[3:],'minecraft:air')
     design_spec=json.loads((a.design/'authored-design.json').read_text('utf8'))
     for remnant in design_spec.get('retire_street_remnants',[]):
         pos=remnant['pos']
@@ -98,7 +99,26 @@ def compose(a):
                     for R in range(pz-8,pz+9):
                         lo,hi=trains[Q//16,R//16].get((Q,R),(320,-129))
                         trains[Q//16,R//16][Q,R]=(min(lo,py-30),max(hi,py+7))
-    yy=np.arange(-128,320)[:,None,None];retired=[]
+    yy=np.arange(-128,320)[:,None,None];retired=[];protected_chunks={}
+    def protected_chunk(cx,cz):
+        if (cx,cz)in protected_chunks:return protected_chunks[cx,cz]
+        zz,xx=np.mgrid[cz*16:cz*16+16,cx*16:cx*16+16];protect=guard.chunk_mask(cx,cz)
+        for q in boxes:
+            if q[0]>cx*16+15 or q[3]<cx*16 or q[2]>cz*16+15 or q[5]<cz*16:continue
+            protect|=(xx>=q[0])&(xx<=q[3])&(zz>=q[2])&(zz<=q[5])&(yy>=q[1])&(yy<=q[4])
+        for Q,Y,R in cable[cx,cz]:protect[max(0,Y-10+128):min(448,Y+7+128),R%16,Q%16]=True
+        for (Q,R),(lo,hi)in trains[cx,cz].items():protect[max(0,lo+128):min(448,hi+129),R%16,Q%16]=True
+        for pos in devices.keys()-moved:
+            if pos[0]//16==cx and pos[2]//16==cz:protect[pos[1]+128,pos[2]%16,pos[0]%16]=True
+        protected_chunks[cx,cz]=protect
+        return protect
+    for box,shift,v,names in payloads:
+        for px in range(box[0],box[3]+1):
+            for pz in range(box[2],box[5]+1):
+                r=e.region(px,pz);idx=r['index'][px//16,pz//16];a0,b0=box[1]+128,box[4]+129
+                if 'minecraft:air'not in r['ids']:r['ids']['minecraft:air']=len(r['names']);r['names'].append('minecraft:air')
+                preserve=protected_chunk(px//16,pz//16)[a0:b0,pz%16,px%16]
+                r['after'][idx,a0:b0,pz%16,px%16][~preserve]=r['ids']['minecraft:air']
     for file in sorted((a.out/'source').glob('*.npz')):
         rx,rz=map(int,file.stem.split('.')[1:])
         if rx*512>X or rx*512+511<x or rz*512>Z or rz*512+511<z:continue
@@ -115,14 +135,7 @@ def compose(a):
             walk=d['walk'][iz,ix]&inside;new=d['ground'][iz,ix];old=d['old_ground'][iz,ix];active=inside&(new!=old)&(old>-129)
             retire=retired_scope[iz,ix]&inside
             if not (active|walk|retire).any():continue
-            protect=guard.chunk_mask(cx,cz)
-            for q in boxes:
-                if q[0]>cx*16+15 or q[3]<cx*16 or q[2]>cz*16+15 or q[5]<cz*16:continue
-                protect|=(xx>=q[0])&(xx<=q[3])&(zz>=q[2])&(zz<=q[5])&(yy>=q[1])&(yy<=q[4])
-            for Q,Y,R in cable[cx,cz]:protect[max(0,Y-10+128):min(448,Y+7+128),R%16,Q%16]=True
-            for (Q,R),(lo,hi)in trains[cx,cz].items():protect[max(0,lo+128):min(448,hi+129),R%16,Q%16]=True
-            for pos in devices.keys()-moved:
-                if pos[0]//16==cx and pos[2]//16==cz:protect[pos[1]+128,pos[2]%16,pos[0]%16]=True
+            protect=protected_chunk(cx,cz)
             own=retire&~protect&(yy>=old-4)&(yy<=np.maximum(old+12,(oldgrade[iz,ix]+1)//2+8))
             retiredmask=own&(pave[v]|decor[v]);stats['retired_pavement_and_details']+=int(retiredmask.sum());v[retiredmask]=air
             # Only the exterior skin is moved. Existing underground voids,
@@ -153,24 +166,27 @@ def compose(a):
         print('Composed terrain',file.name,'obstructions',len(errors),flush=True)
     # Restore complete translated payloads LAST, preserving interiors including
     # empty room cells. Foundation fill is confined below their copied bases.
-    for box,dy,v,names in payloads:
-        for px in range(box[0],box[3]+1):
-            for pz in range(box[2],box[5]+1):
+    for box,shift,v,names in payloads:
+        dx,dy,dz=shift
+        for sx in range(box[0],box[3]+1):
+            for sz in range(box[2],box[5]+1):
+                px,pz=sx+dx,sz+dz
                 r=e.region(px,pz);mapped=[]
                 for state in names:
                     if state not in r['ids']:r['ids'][state]=len(r['names']);r['names'].append(state)
                     mapped.append(r['ids'][state])
-                column=np.asarray(mapped,np.uint16)[v[:,pz-box[2],px-box[0]]];idx=r['index'][px//16,pz//16];lo=box[1]+dy;hi=box[4]+dy
+                column=np.asarray(mapped,np.uint16)[v[:,sz-box[2],sx-box[0]]];idx=r['index'][px//16,pz//16];lo=box[1]+dy;hi=box[4]+dy
                 dest=r['after'][idx,lo+128:hi+129,pz%16,px%16]
                 # Native objects or user content outside the former parcel
                 # may not silently disappear beneath a translated building.
                 for offset,state in enumerate(dest):
                     mat=r['names'][state].split('[')[0]
-                    if mat not in NATURAL|EMPTY|PAVE and not box[1]<=lo+offset<=box[4]:
+                    if mat not in NATURAL|EMPTY|PAVE and not (box[0]<=px<=box[3]and box[1]<=lo+offset<=box[4]and box[2]<=pz<=box[5]):
                         errors.append(['parcel destination obstruction',px,lo+offset,pz,r['names'][state]])
                 dest[:]=column
                 j,i=pz-z,px-x;h=int(d['ground'][j,i]);oldh=int(d['old_ground'][j,i])
                 for Y in range(min(oldh,h),lo):
+                    if protected_chunk(px//16,pz//16)[Y+128,pz%16,px%16]:continue
                     mat=e.state(px,Y,pz).split('[')[0]
                     if mat in SOIL|EMPTY:e.put(px,Y,pz,'minecraft:stone')
     # Correct only the OUTDOOR three-wide door aprons: the previous street
@@ -204,7 +220,7 @@ def compose(a):
     np.savez_compressed(a.out/'plan/network.npz',**{**d,'ground':actualground,'tunnel':np.zeros(shape,bool)})
     report=dict(errors=errors,world_written=False,visual_verified=False,parcels=len(rows),moved_devices=len(moved),**stats)
     save_json(a.out/'functional-check.json',report)
-    manifest=dict(world=str(world),bounds_xz=bounds.tolist(),regions=patches,cells=sum(r['cells']for r in patches),world_written=False,preserve_native_members=True,neighbourhood_verification=dict(public_columns=int(d['walk'].sum()),parcels=len(rows),devices=len(moved)),parcel_moves=[dict(id=r['id'],dy=r['dy'])for r in rows])
+    manifest=dict(world=str(world),bounds_xz=bounds.tolist(),regions=patches,cells=sum(r['cells']for r in patches),world_written=False,preserve_native_members=True,neighbourhood_verification=dict(public_columns=int(d['walk'].sum()),parcels=len(rows),devices=len(moved)),parcel_moves=[dict(id=r['id'],dy=r['dy'],translation=r.get('translation',[0,r['dy'],0]))for r in rows])
     save_json(a.out/'manifest.json',manifest);save_json(a.out/'launch-protection.json',check_candidate(guard,a.out))
     print(json.dumps({**manifest,'regions':len(patches),'errors':len(errors),'moved_devices':len(moved)},ensure_ascii=False),flush=True)
     if errors:print(errors[:20],flush=True)

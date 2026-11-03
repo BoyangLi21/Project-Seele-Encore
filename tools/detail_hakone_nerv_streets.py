@@ -32,7 +32,6 @@ def preservation_mask(candidate,spec):
 
 def decorate(e,d,spec,rows,out,details,outdoor,preserved):
     x,z,X,Z=map(int,d['bounds']);distance,nearest=distance_transform_edt(~d['walk'],return_indices=True)
-    changes=list(nbtlib.load(out/'block-entities.dat')['Changes']);existing={tuple(int(tag[k])for k in('x','y','z'))for row in changes for tag in [row.get('After',row.get('Before'))]}
     details.update(bridges=[],native_fixtures=[],entry_handrails=[],frontage_pads=[])
     def put(p,state,allow=EMPTY|SOIL|PAVE):
         if preserved(p):raise ValueError(('Detail intersects retained native volume',p))
@@ -93,8 +92,23 @@ def decorate(e,d,spec,rows,out,details,outdoor,preserved):
                 floor,slab=road_blocks(d['grade2'][j,i]);p=(px,int(floor),pz)
                 put(p,'projectseele:road_marking_slab[type=bottom,waterlogged=false]'if slab else'minecraft:white_concrete');d['marking'][j,i]=True;n+=1
         details['crossings'].append(dict(centre=[cx,cz],cells=n))
+    decorate_frontages(e,d,rows,out,details,outdoor,preserved)
+
+
+def decorate_frontages(e,d,rows,out,details,outdoor,preserved):
+    x,z,X,Z=map(int,d['bounds'])
+    changes=list(nbtlib.load(out/'block-entities.dat')['Changes']);existing={tuple(int(tag[k])for k in('x','y','z'))for row in changes for tag in [row.get('After',row.get('Before'))]}
+    details.setdefault('native_fixtures',[]);details.setdefault('frontage_pads',[])
+    def put(p,state,allow=EMPTY|SOIL|PAVE):
+        if preserved(p):raise ValueError(('Detail intersects retained native volume',p))
+        before=e.state(*p)
+        if before==state:return
+        if before.split('[')[0]not in allow:raise ValueError(('Unowned detail cell',p,before))
+        if any(all(r['new_payload_bounds'][k]<=p[k]<=r['new_payload_bounds'][k+3]for k in range(3))for r in rows):
+            outdoor.append(dict(kind='outside frontage pad',pos=list(p),before=before,after=state))
+        e.put(*p,state)
     for r in rows:
-        if not any(s in r['use']for s in ('喫茶','商店','诊所')):continue
+        if not any(s in r['use']for s in ('喫茶','商店','书店','诊所')):continue
         px,py,pz=r['door'];ax,_,az=r['approach'];dx=int(np.sign(ax-px));dz=int(np.sign(az-pz));floor=r['site']['floor']
         facing={(1,0):'east',(-1,0):'west',(0,1):'south',(0,-1):'north'}[dx,dz]
         kinds=['cafe_table','vending_machine']if '喫茶'in r['use']else['public_phone','notice_board']if '诊所'in r['use']else['parked_bicycle','letter_box']

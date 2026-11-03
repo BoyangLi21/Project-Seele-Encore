@@ -43,8 +43,10 @@ def publish(a):
     for row in catalog:
         if row.get('id')not in updated:continue
         revised=updated[row['id']];dy=revised['dy'];row['site']=copy.deepcopy(revised['site']);row['door']=revised['door'];row['approach']=revised['approach']
-        for k in (1,4):row['occupied_bounds'][k]+=dy
-        for device in row['devices']:device['target'][1]+=dy
+        shift=revised.get('translation',[0,dy,0])
+        for k in range(6):row['occupied_bounds'][k]+=shift[k%3]
+        for device in row['devices']:
+            for k in range(3):device['target'][k]+=shift[k]
         # Replace stale approach levels with the current installed path frame.
         points=footways[row['id']];path=[]
         for p,q in zip(points,points[1:]):
