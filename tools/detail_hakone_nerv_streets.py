@@ -9,6 +9,7 @@ from prepare_hakone_city_cross import packed
 from query_blocks import AIR
 from plan_ashi_landscape_r54 import SOIL,PLANTS
 from prepare_hakone_togendai_neighbourhood import PAVE
+from map_pipeline.frontage_geometry import entrance_frame
 
 EMPTY=AIR|PLANTS|{'minecraft:light'}
 
@@ -111,8 +112,8 @@ def decorate_frontages(e,d,rows,out,details,outdoor,preserved):
             outdoor.append(dict(kind='outside frontage pad',pos=list(p),before=before,after=state))
         e.put(*p,state)
     for r in rows:
-        if not any(s in r['use']for s in ('喫茶','商店','书店','诊所')):continue
-        px,py,pz=r['door'];ax,_,az=r['approach'];dx=int(np.sign(ax-px));dz=int(np.sign(az-pz));floor=r['site']['floor']
+        if not any(s in r.get('use','')for s in ('喫茶','商店','书店','诊所')):continue
+        px,pz,dx,dz=entrance_frame(r);floor=r['site']['floor']
         facing={(1,0):'east',(-1,0):'west',(0,1):'south',(0,-1):'north'}[dx,dz]
         kinds=['cafe_table','vending_machine']if '喫茶'in r['use']else['public_phone','notice_board']if '诊所'in r['use']else['parked_bicycle','letter_box']
         for side,kind in zip((-5,5),kinds):

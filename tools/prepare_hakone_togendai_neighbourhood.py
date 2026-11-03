@@ -193,7 +193,7 @@ def design(a):
     np.savez_compressed(a.out/'design.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,marking=mark,plots=plots,plotfloor=plotfloor,ground=target,old_ground=d['old_ground'],wet=wet,core=core,retained_walk=retained_walk,ports=ports,bridge=bridge)
     save_json(a.out/'buildings.json',newrows);save_json(a.out/'new-frontages.json',new_sites);save_json(a.out/'streets.json',streets);save_json(a.out/'footways.json',footways);shutil.copy2(a.design,a.out/'authored-design.json')
     save_json(a.out/'retained-buildings.json',retained)
-    save_json(a.out/'design-report.json',dict(buildings=len(rows),moves=sum(r['dy']!=0 for r in newrows),maximum_lift=max((r['dy']for r in newrows),default=0),streets=streets,road_columns=int(road.sum()),public_columns=int(walk.sum()),retained_public_columns=int(measured_public.sum()),earthwork_columns=int((target!=d['old_ground']).sum()),world_written=False))
+    save_json(a.out/'design-report.json',dict(buildings=len(rows),moves=sum(any(r['translation'])for r in newrows),maximum_lift=max((r['dy']for r in newrows),default=0),streets=streets,road_columns=int(road.sum()),public_columns=int(walk.sum()),retained_public_columns=int(measured_public.sum()),earthwork_columns=int((target!=d['old_ground']).sum()),world_written=False))
     print((a.out/'design-report.json').read_text('utf8'),flush=True)
 
 if __name__=='__main__':

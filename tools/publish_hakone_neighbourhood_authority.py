@@ -45,6 +45,7 @@ def publish(a):
         revised=updated[row['id']];dy=revised['dy'];row['site']=copy.deepcopy(revised['site']);row['door']=revised['door'];row['approach']=revised['approach']
         shift=revised.get('translation',[0,dy,0])
         for k in range(6):row['occupied_bounds'][k]+=shift[k%3]
+        if 'devices'not in row:row['devices']=[dict(source=list(p),target=list(p))for p in revised['devices']]
         for device in row['devices']:
             for k in range(3):device['target'][k]+=shift[k]
         # Replace stale approach levels with the current installed path frame.

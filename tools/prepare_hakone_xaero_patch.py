@@ -12,7 +12,9 @@ from author_hakone_lakefront import Editor
 from query_blocks import AIR
 from xaero_cache_codec import Cache,unpack_heights
 
-INVISIBLE=AIR|{'minecraft:barrier','minecraft:structure_void','minecraft:light'}
+# The fixture's upper cells are invisible collision/picking proxies. The
+# visible furniture belongs to its base block entity renderer.
+INVISIBLE=AIR|{'minecraft:barrier','minecraft:structure_void','minecraft:light','projectseele:period_fixture_part'}
 
 def prepare(a):
     a.out.mkdir(parents=True,exist_ok=False)

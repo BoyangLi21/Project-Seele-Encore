@@ -11,6 +11,7 @@ from plan_ashi_landscape_r54 import SOIL,PLANTS
 from query_blocks import AIR
 from prepare_hakone_togendai_neighbourhood import save_json
 from verify_hakone_togendai_neighbourhood import verify
+from map_pipeline.frontage_geometry import entrance_frame
 
 def finish(source,out,detail_plan=None):
     for name in ('functional-check.json','independent-check.json'):
@@ -66,8 +67,8 @@ def finish(source,out,detail_plan=None):
                 e.put(px,h+6,pz,head);details['lights'].append([px,h+1,pz]);break
     rows=json.loads((out/'plan/buildings.json').read_text('utf8'));outdoor=json.loads((out/'outdoor-apron-corrections.json').read_text('utf8'))
     for row in rows:
-        if not any(word in row['use']for word in ('喫茶','商店','书店','诊所')):continue
-        px,py,pz=row['door'];ax,_,az=row['approach'];dx=int(np.sign(ax-px));dz=int(np.sign(az-pz));h=row['site']['floor']
+        if not any(word in row.get('use','')for word in ('喫茶','商店','书店','诊所')):continue
+        px,pz,dx,dz=entrance_frame(row);h=row['site']['floor']
         added=[]
         for along in (1,2):
             for side in range(-4,5):

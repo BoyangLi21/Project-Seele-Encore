@@ -176,7 +176,8 @@ def verify(candidate):
     for row in specs['streets']:
         curve,s=alignment(row);samples=np.arange(0,s[-1]+.1,1.0);cx=np.rint(np.interp(samples,s,curve[:,0])).astype(int);cz=np.rint(np.interp(samples,s,curve[:,2])).astype(int)
         y=g[cz-z,cx-x]/2+1;ten=abs(y[10:]-y[:-10])/10
-        profiles.append(dict(id=row['id'],length=float(s[-1]),maximum_actual_10m_grade=float(ten.max()),maximum_continuous_grade=float((abs(np.diff(curve[:,1]))/np.linalg.norm(np.diff(curve[:,[0,2]],axis=0),axis=1)).max())))
+        span=min(10,len(y)-1)
+        profiles.append(dict(id=row['id'],length=float(s[-1]),maximum_actual_10m_grade=float(ten.max())if len(ten)else None,measured_profile_span_metres=span,maximum_actual_profile_grade=float((abs(y[span:]-y[:-span])/span).max())if span else None,maximum_continuous_grade=float((abs(np.diff(curve[:,1]))/np.linalg.norm(np.diff(curve[:,[0,2]],axis=0),axis=1)).max())))
     # A retained seam must remain in the same standing component, including
     # its full surveyed width. No rounded road cap may erase its continuation.
     seams=[]

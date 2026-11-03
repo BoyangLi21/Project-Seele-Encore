@@ -14,6 +14,7 @@ from prepare_hakone_city_cross import packed
 from query_blocks import AIR
 from plan_ashi_landscape_r54 import SOIL,PLANTS,NATURAL
 from install_r53_carrier_trays import stopped_world
+from map_pipeline.frontage_geometry import entrance_frame
 
 def compose(a):
     a.out.mkdir(parents=True,exist_ok=False)
@@ -190,6 +191,7 @@ def compose(a):
                         v[Y+128,j,i]=(sslab if ismark else aslab if isroad else pslab)if slab[j,i]else(stripe if ismark else asphalt if isroad else paving)
         e.save();e.regions.clear()
         print('Composed terrain',file.name,'obstructions',len(errors),flush=True)
+    save_json(a.out/'composition-obstacles.json',errors)
     # Restore complete translated payloads LAST, preserving interiors including
     # empty room cells. Foundation fill is confined below their copied bases.
     for box,shift,v,names in payloads:
@@ -219,7 +221,7 @@ def compose(a):
     # pass had left several at a different datum from their retained doors.
     outdoor=[]
     for row in rows:
-        px,py,pz=row['door'];ax,_,az=row['approach'];dx=int(np.sign(ax-px));dz=int(np.sign(az-pz));h=row['site']['floor']
+        px,pz,dx,dz=entrance_frame(row);h=row['site']['floor']
         for distance in (1,2,3):
             for side in (-1,0,1):
                 Q,R=px+dx*distance-dz*side,pz+dz*distance+dx*side
