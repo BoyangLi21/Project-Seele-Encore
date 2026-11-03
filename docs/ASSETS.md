@@ -474,6 +474,6 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 `data/projectseele/worldgen/hakone_surface.bin.gz` 出典为国土地理院[地理院瓦片](https://maps.gsi.go.jp/development/ichiran.html)和[最适化矢量数据](https://github.com/gsi-cyberjapan/optimal_bvmap)，由本项目加工为 1:4 游戏坐标高程和水面。复用本地缓存，没有嵌入旅游照片或动画图像。42 个局部陆地 DEM 缺值经过邻域补齐；海床和芦之湖水下深度是游戏适配，不是水下测绘。来源、锚点及加工见 HAKONE_GEOGRAPHY_WORK.md。
 
-## R57 空手右键重击（上勾拳）
+## R57 空手右键重击（前蹬）
 
-候选私有资源（未经用户验收，不入库）：`eva_gameplay_r44_{0,1,2}.json` 的 `r32_heavy` 改用 [ACCAD Open Motion Project](https://accad.osu.edu/research/motion-lab/mocap-system-and-data) 的 `Male2_E8_UppercutRight.bvh`（SHA-256 `c705cb97efc2c41e0a8cc88a0cc73253b030e3ed082081e34f0f3425eee25240`），版权归 ACCAD / The Ohio State University，按 [CC BY 3.0](https://creativecommons.org/licenses/by/3.0/) 署名。修改：裁剪到架势起手与收势、重新计时（下沉蓄力放慢、起拳加快、顶点停顿）、按出拳方向定朝向、EVA 比例重定向，并在蓄力至停顿段把胸部与双臂相对起手架势的转动放大 1.4 倍（腿与骨盆保持原始捕捉）。生成脚本为本机 `motion-work/toolroot/heavy_uppercut_r57.py` 与 `heavy_exaggerate_r57.py`。
+候选私有资源（未经用户验收，不入库）：`eva_gameplay_r44_{0,1,2}.json` 的 `r32_heavy` 改用 Mesh2Motion `human-mocap-animations.glb`（SHA-256 `814593d62522f5be8d6bd32df2a8fa3c7feb90a8e1a1ba43f4aaf0048555280d`）中的 `Kick_Breach`，CC0。修改：截取 60fps 解码帧 10–96（站立→提膝→蹬出→落步），沿用刺拳/直拳同一 Mesh2Motion 管线重定向到 EVA 比例，游戏内按捕捉原速播放，命中点改为右脚（`contact_bone: foot_r`）。生成脚本为本机 `motion-work/toolroot/heavy_kick_r57.py`。此前的双臂砸地版与 ACCAD 上勾拳版均已废弃。
