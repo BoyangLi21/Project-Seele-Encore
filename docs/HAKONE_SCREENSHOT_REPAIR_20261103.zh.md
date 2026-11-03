@@ -124,3 +124,11 @@ Xaero 更新 39,271 个地表像素、31 个基础瓦片、49 个缩放瓦片，
 实际存档修改 156,912 格，165 个区块的生产生成配方回放通过，全部改动段、五份新增或保留设备变更记录和配方元数据读回一致；两个既有 Static 配方区块与新改动兼容。世界、玩家、实体文件以及原生交通成员逐字节保持，实际 JAR 的其他条目保持。18 个远景瓦片及父子层级已安装，缓存服务正常停止。Xaero 更新 19,596 个地表像素、17 个基础瓦片、33 个缩放瓦片，共十个文件，取色均来自现有原生地图样本，没有材质同类色回退。
 
 候选分别为 `chokoku-approach-candidate-v6`、`kowakudani-approach-candidate-v6`；安装回执 `station-approaches-installation-v2`；远景 `station-approaches-lod-installation-v1`；小地图 `station-approaches-xaero-installation-v1`；地形数据 `station-approaches-field-v1`；规划依据 `station-approaches-installed-authority-v1`。发布前检查曾拦下未同步的步道列计数，修正清单后才安装；未通过的候选和准备目录没有写入实际存档。离线三维复查已完成，游戏 UI 验收待进行。站外仍保留的铁路土建与旧路冲突纳入后续逐段整改，此批不等于整条铁路或全图验收完成。
+
+## 宫之下北侧街巷（第十批，已安装）
+
+三栋现存建筑通过约 40 米的短街和端部回车场接到此前完成的谷地道路。385 个公共通行位置全部连通，八个同高接缝接触位置通过检查，十米实测纵坡不超过 5%。三栋楼保留原位和完整室内，21,330 格载荷中 36 格为明确室外接合，其余逐格保持；三份楼内原设备和四份周边设备的完整 NBT 保持。71,686 格周边房间空间、113,317 格铁路保护空间保持。
+
+增加一处路灯、19 株树、两处原生街边设施及基座、两处排水细部、20 格挡土立面和 12 格扶栏。实际修改 24,100 格、42 个生产区块配方，回放与存档读回通过。客户端仅合入五个地形条目，其他模型和代码逐项保持。Xaero 更新 3,592 个地表像素、六个基础瓦片、11 个缩放瓦片，共四个文件，无取色回退；六个远景瓦片及父子层级完成更新，缓存服务正常停止。
+
+候选 `miyanoshita-north-approach-candidate-v2`；安装 `miyanoshita-north-installation-v1`；小地图 `miyanoshita-north-xaero-installation-v1`；远景 `miyanoshita-north-lod-installation-v1`；地形数据 `miyanoshita-north-field-v1`；规划依据 `miyanoshita-north-installed-authority-v1`。实际方块离线三维复查完成，游戏 UI 效果尚未复验。南侧站房接驳及全图铁路土建继续处理，本批不代表整片山谷或全图完成。

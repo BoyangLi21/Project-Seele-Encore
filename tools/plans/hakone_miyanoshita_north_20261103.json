@@ -1,0 +1,341 @@
+{
+  "core": [
+    1216,
+    832,
+    1264,
+    860
+  ],
+  "retire_road_areas": [
+    [
+      1216,
+      830,
+      1270,
+      866
+    ]
+  ],
+  "connectivity_seed": [
+    1218,
+    845
+  ],
+  "streets": [
+    {
+      "id": "miyanoshita-shop-street",
+      "points": [
+        [
+          1218,
+          24,
+          845
+        ],
+        [
+          1237,
+          23,
+          846
+        ],
+        [
+          1258,
+          23,
+          850
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "miyanoshita-local-turning-court",
+      "points": [
+        [
+          1257,
+          23,
+          850
+        ],
+        [
+          1258,
+          23,
+          850
+        ]
+      ],
+      "width": 7,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    }
+  ],
+  "retained_ports": [
+    {
+      "street": "miyanoshita-shop-street",
+      "end": 0,
+      "radius": 8
+    }
+  ],
+  "footways": [
+    {
+      "parcel": "valley/1237/825",
+      "points": [
+        [
+          1237,
+          22,
+          834
+        ],
+        [
+          1237,
+          23,
+          846
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/1255/831",
+      "points": [
+        [
+          1255,
+          20,
+          840
+        ],
+        [
+          1253,
+          23,
+          850
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/1273/848",
+      "points": [
+        [
+          1264,
+          23,
+          848
+        ],
+        [
+          1258,
+          23,
+          848
+        ]
+      ]
+    }
+  ],
+  "source": "Current complete saved station and building payloads; native rail corridors retained",
+  "togendai_forecourt": false,
+  "earthwork_blend_distance": 20,
+  "parcel_floors": {
+    "valley/1237/825": 21,
+    "valley/1255/831": 19,
+    "valley/1273/848": 22
+  },
+  "retained_soil_areas": [],
+  "protected_volumes": [
+    [
+      -2828,
+      70,
+      -980,
+      -2676,
+      110,
+      -940
+    ],
+    [
+      -1556,
+      104,
+      616,
+      -1404,
+      151,
+      656
+    ],
+    [
+      -1156,
+      104,
+      540,
+      -1004,
+      134,
+      580
+    ],
+    [
+      -700,
+      96,
+      164,
+      -660,
+      126,
+      316
+    ],
+    [
+      -196,
+      80,
+      -192,
+      -44,
+      110,
+      -152
+    ],
+    [
+      340,
+      80,
+      224,
+      380,
+      110,
+      376
+    ],
+    [
+      160,
+      80,
+      684,
+      200,
+      110,
+      836
+    ],
+    [
+      664,
+      80,
+      1170,
+      816,
+      110,
+      1210
+    ],
+    [
+      -1730,
+      80,
+      -285,
+      -1610,
+      110,
+      -245
+    ],
+    [
+      -1740,
+      104,
+      300,
+      -1700,
+      134,
+      420
+    ],
+    [
+      -1540,
+      104,
+      656,
+      -1420,
+      151,
+      696
+    ],
+    [
+      -420,
+      80,
+      664,
+      -300,
+      110,
+      704
+    ],
+    [
+      296,
+      80,
+      240,
+      336,
+      122,
+      360
+    ],
+    [
+      1124,
+      70,
+      452,
+      1244,
+      110,
+      492
+    ],
+    [
+      900,
+      51,
+      618,
+      944,
+      71,
+      685
+    ],
+    [
+      964,
+      51,
+      744,
+      1014,
+      71,
+      781
+    ],
+    [
+      1022,
+      48,
+      917,
+      1072,
+      68,
+      954
+    ],
+    [
+      1243,
+      23,
+      864,
+      1288,
+      43,
+      909
+    ],
+    [
+      1498,
+      -2,
+      967,
+      1548,
+      18,
+      1004
+    ],
+    [
+      1949,
+      -44,
+      1080,
+      1999,
+      -24,
+      1117
+    ],
+    [
+      2189,
+      -60,
+      1097,
+      2245,
+      -40,
+      1137
+    ],
+    [
+      -310,
+      96,
+      994,
+      -260,
+      130,
+      1038
+    ],
+    [
+      -38,
+      135,
+      813,
+      -5,
+      160,
+      835
+    ],
+    [
+      252,
+      175,
+      813,
+      299,
+      200,
+      851
+    ],
+    [
+      628,
+      99,
+      744,
+      681,
+      130,
+      800
+    ]
+  ],
+  "preserve_train_corridors": true,
+  "public_paths": [],
+  "new_frontages": [],
+  "retire_street_remnants": [],
+  "retained_public_surfaces": [],
+  "retained_pavement_materials": [
+    "projectseele:period_station_floor",
+    "projectseele:nerv_floor_panel"
+  ]
+}
