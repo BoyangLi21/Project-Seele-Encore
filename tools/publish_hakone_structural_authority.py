@@ -14,7 +14,9 @@ def run(a):
     if not {p.resolve()for p in a.candidate}<=installed:raise ValueError('Wrong candidate receipt')
     shutil.copytree(a.previous,a.out)
     with np.load(a.previous/'network.npz')as f:g={k:f[k]for k in f.files}
-    x,z,X,Z=map(int,g['bounds']);retired=0;spaces=[]
+    x,z,X,Z=map(int,g['bounds']);retired=0
+    prior=a.previous/'structural-feedback-authority.json'
+    spaces=json.loads(prior.read_text('utf8')).get('additional_supported_spaces',[])if prior.exists()else[]
     for C in a.candidate:
         e=Editor(C);cols=set()
         for file in (C/'delta').glob('*.npz'):
@@ -35,6 +37,16 @@ def run(a):
             if l<=r and t<=b:
                 dst=np.s_[t-z:b-z+1,l-x:r-x+1];src=np.s_[t-oz:b-oz+1,l-ox:r-ox+1]
                 for k in ('ground','old_ground'):g[k][dst]=f[k][src]
+                # A verified public stair supplies its own finite elevations.
+                # Do not reserve the rest of its vertical columns as structures.
+                functional=json.loads((C/'functional-check.json').read_text('utf8'))
+                if 'door_and_street_contacts'in functional:
+                    if functional['errors']:raise ValueError('Unverified public stair')
+                    public=f['walk'][src]
+                    for k in ('walk','grade2'):
+                        target=g[k][dst];target[public]=f[k][src][public]
+                    for k in ('road','marking','tunnel'):g[k][dst][public]=False
+                    spaces.append(dict(id='sounzan-connected-outdoor-stair',candidate=str(C),footprint_plan=str(C/'plan/network.npz'),contacts=functional['door_and_street_contacts']))
         if 'sniper'in C.name:spaces.append(dict(id='expanded-yashima-forecourt',candidate=str(C),floor=174,footprint_plan=str(C/'plan/network.npz'),mechanical_well_exclusions=json.loads((C/'design.json').read_text('utf8'))['well_volumes']))
     np.savez_compressed(a.out/'network.npz',**g)
     report=dict(installation=str(a.installation),retired_invalid_old_walk_columns=retired,additional_supported_spaces=spaces,whole_map_acceptance=False)
