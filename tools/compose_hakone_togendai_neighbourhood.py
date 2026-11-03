@@ -15,6 +15,7 @@ from query_blocks import AIR
 from plan_ashi_landscape_r54 import SOIL,PLANTS,NATURAL
 from install_r53_carrier_trays import stopped_world
 from map_pipeline.frontage_geometry import entrance_frame
+from map_pipeline.payload_exceptions import record_exception
 
 def compose(a):
     a.out.mkdir(parents=True,exist_ok=False)
@@ -228,8 +229,40 @@ def compose(a):
                 for Y in range(h-1,h+4):
                     before=e.state(Q,Y,R);mat=before.split('[')[0];new='minecraft:stone'if Y<h else'minecraft:smooth_stone'if Y==h else'minecraft:air'
                     if before==new:continue
+                    if protected_chunk(Q//16,R//16)[Y+128,R%16,Q%16]:
+                        if Y<h and mat in SOIL|PAVE and 'type=bottom'not in before and not mat.endswith('_stairs'):continue
+                        raise ValueError(('Entrance apron would change retained native volume',row['id'],Q,Y,R,before))
                     if (Q,Y,R)in changes or (Q,Y,R)in devices or mat not in SOIL|EMPTY|PAVE:raise ValueError(('Unowned entrance apron object',row['id'],Q,Y,R,before))
                     outdoor.append(dict(parcel=row['id'],pos=[Q,Y,R],before=before,after=new));e.put(Q,Y,R,new)
+    # Small explicitly surveyed outdoor aprons may include an old elevated
+    # path inside a parcel's capture collar. Regrade that collar only after
+    # restoring the complete payload, never the building's occupied volume.
+    for spec in design_spec.get('outdoor_paving_aprons',[]):
+        row=next(r for r in rows if r['id']==spec['parcel'])
+        ax,az,bx,bz=spec['bounds'];h=int(row['site']['floor'])
+        if not(x<=ax<=bx<=X and z<=az<=bz<=Z)or (bx-ax+1)*(bz-az+1)>256:
+            raise ValueError(('Exterior apron exceeds finite scope',spec))
+        occupied=row['occupied_bounds'];payload=row['new_payload_bounds']
+        if row['translation']!=[0,0,0]:raise ValueError('Exterior regrade requires current unmoved parcel')
+        if not(payload[0]-3<=ax<=bx<=payload[3]+3 and payload[2]-3<=az<=bz<=payload[5]+3):
+            raise ValueError('Exterior apron is not beside its parcel')
+        for Q in range(ax,bx+1):
+            for R in range(az,bz+1):
+                if occupied[0]<=Q<=occupied[3]and occupied[2]<=R<=occupied[5]:
+                    raise ValueError(('Exterior apron enters a building',Q,R))
+                j,i=R-z,Q-x
+                if d['walk'][j,i]and int(d['grade2'][j,i])!=h*2:
+                    raise ValueError(('Exterior apron disagrees with designed path',Q,R))
+                for Y in range(h-2,h+4):
+                    pos=(Q,Y,R);before=e.state(*pos)
+                    new='minecraft:stone'if Y<h else'minecraft:smooth_stone'if Y==h else'minecraft:air'
+                    if before==new:continue
+                    if pos in devices or pos in changes or protected_chunk(Q//16,R//16)[Y+128,R%16,Q%16]:
+                        raise ValueError(('Exterior apron meets retained native object',pos))
+                    if before.split('[')[0]not in SOIL|EMPTY|PAVE:
+                        raise ValueError(('Unowned exterior apron cell',pos,before))
+                    record_exception(outdoor,dict(parcel=row['id'],kind='surveyed exterior paving apron',pos=list(pos),before=before,after=new))
+                    e.put(*pos,new)
     # Move the original station lamp out of the new sidewalk. It has no block
     # entity; all five original block states are retained at the new position.
     lamp=[]
