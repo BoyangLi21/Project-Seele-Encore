@@ -4404,6 +4404,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             return false;
         }
+        // Space against a ledge taller than a step climbs it instead.
+        if (EvaFieldActionsR45.requestClimb(this, pilot))
+        {
+            this.jumpBufferTicks = 0;
+            this.jumpCooldown = JUMP_COOLDOWN_TICKS;
+            return true;
+        }
         if ((this.isPilotCrouching() || this.isPilotProne())
                 && !this.hasStandingRoom())
         {

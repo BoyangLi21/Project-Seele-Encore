@@ -67,6 +67,7 @@ def parse():
     ap.add_argument("--start", type=int, default=0)
     ap.add_argument("--end", type=int, default=-1)
     ap.add_argument("--focus", default="", help="JSON list of {from, to, bone, dist, az, el, label} close-up segments in tour ticks")
+    ap.add_argument("--boxes", default="", help="JSON list of world block boxes [x1,y1,z1,x2,y2,z2] (inclusive) to draw as scenery")
     ap.add_argument("--out", required=True)
     return ap.parse_args(argv)
 
@@ -168,6 +169,17 @@ def main():
     for node in floor.data.materials[0].node_tree.nodes:
         if node.type == 'TEX_CHECKER':
             node.inputs["Scale"].default_value *= 10.0
+    # Scenery the tour built (walls, kerbs), in the same world-to-model mapping as the body.
+    for box in (json.loads(a.boxes) if a.boxes else []):
+        lo = mathutils.Vector((min(box[0], box[3]), min(box[1], box[4]), min(box[2], box[5])))
+        hi = mathutils.Vector((max(box[0], box[3]) + 1, max(box[1], box[4]) + 1, max(box[2], box[5]) + 1))
+        centre, size = (lo + hi) / 2 - origin, hi - lo
+        bpy.ops.mesh.primitive_cube_add(size=1)
+        cube = bpy.context.active_object
+        cube.location = lab.model_to_blender(mathutils.Vector((-centre.x, centre.y, -centre.z)) / RENDER_SCALE)
+        cube.scale = (size.x / RENDER_SCALE, size.z / RENDER_SCALE, size.y / RENDER_SCALE)
+        material = bpy.data.materials.new("scenery"); material.diffuse_color = (.55, .55, .58, 1)
+        cube.data.materials.append(material)
     cam = bpy.data.objects.new("cam", bpy.data.cameras.new("cam"))
     bpy.context.scene.collection.objects.link(cam)
     cam.data.lens = 29

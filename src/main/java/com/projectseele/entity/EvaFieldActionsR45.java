@@ -34,13 +34,20 @@ public final class EvaFieldActionsR45
     }
     public static void clear(EvaUnit01Entity e)
     {
+        if(!e.level().isClientSide&&CLIMB.equals(EvaWeaponHandlingR45.fieldActionR45(e).getString("clip")))e.setNoGravity(false);
         if(!e.level().isClientSide&&!EvaWeaponHandlingR45.fieldActionR45(e).isEmpty())
             EvaWeaponHandlingR45.fieldActionR45(e,new CompoundTag());
         var runtime=RUNTIMES.get(e);if(runtime!=null){runtime.previous=null;runtime.lastStep=Long.MIN_VALUE;runtime.pending=null;}
     }
+    /** The ledge climb: Space at a ledge taller than a step. */
+    public static final String CLIMB="climb_up";
+    /** Ledges the EVA climbs (blocks above its feet); lower ones it steps onto. */
+    private static final double CLIMB_LOW=8,CLIMB_HIGH=44;
     private static boolean stableOwner(EvaUnit01Entity e)
+    {return stableOwner(e,false);}
+    private static boolean stableOwner(EvaUnit01Entity e,boolean climbing)
     {
-        return !e.isExperimentalUnit()&&e.isAlive()&&e.isPoweredOn()&&e.onGround()
+        return !e.isExperimentalUnit()&&e.isAlive()&&e.isPoweredOn()&&(climbing||e.onGround())
                 &&!e.isNervLogisticsLocked()&&!e.isLaunchSequenceActive()&&!e.isFirstBattleActive()
                 &&!e.isBerserk()&&!EvaShutdownR30.disabled(e)&&!EvaBayRepairR33.active(e)
                 &&!EvaAirTransportR31.active(e)&&!com.projectseele.physics.CombatBodyDynamics.active(e)
@@ -85,6 +92,52 @@ public final class EvaFieldActionsR45
             return true;
         }
         return start(e,pilot,directions,sprinting,requestedYaw(e,directions,sprinting));
+    }
+    /**
+     * Space against a ledge too tall to step onto: climb it. The clip's own
+     * rise and advance, scaled to this ledge, move the body; the drawn pose
+     * climbs relative to it. Returns false (an ordinary jump follows) when no
+     * ledge of climbable height with room on top stands right ahead.
+     */
+    public static boolean requestClimb(EvaUnit01Entity e,ServerPlayer pilot)
+    {
+        if(e.level().isClientSide||pilot==null||e.getPilotEntity()!=pilot||!stableOwner(e)||active(e)
+                ||EvaCombatR31.active(e)||EvaWeaponHandlingR45.active(e)||e.isPilotProne()||e.isPilotCrouching()
+                ||e.rifleStanceLevel(0)>.01F||e.hasLiveActionForRender(0)||e.hasLegacyStrikeForRender()||e.isPilotControlLocked())return false;
+        var authored=admittedClip(e,CLIMB);
+        if(authored==null||!authored.has("r57_climb_path"))return false;
+        double[] ledge=ledge(e);if(ledge==null)return false;
+        EvaGameplayMotionR32.beginAction(e,EvaBodyPose.sample(e,0));
+        e.interruptCombatR31();
+        var runtime=RUNTIMES.computeIfAbsent(e,k->new Runtime());
+        var state=new CompoundTag();state.putString("clip",CLIMB);
+        state.putLong("sequence",++runtime.sequence);state.putLong("since",e.level().getGameTime());
+        int sourceTicks=Math.max(1,(int)Math.round(authored.get("source_duration_seconds").getAsDouble()*20));
+        state.putInt("source_clock_r51",1);state.putInt("source_ticks",sourceTicks);state.putInt("entry_ticks",6);state.putInt("duration",sourceTicks);
+        state.putUUID("pilot",pilot.getUUID());state.putFloat("facing",e.getYRot());
+        state.putDouble("x0",e.getX());state.putDouble("y0",e.getY());state.putDouble("z0",e.getZ());
+        state.putDouble("rise",ledge[0]);state.putDouble("advance",ledge[1]);
+        runtime.previous=Vec3.ZERO;runtime.lastStep=Long.MIN_VALUE;runtime.elapsed=0;
+        e.setDeltaMovement(Vec3.ZERO);
+        EvaWeaponHandlingR45.fieldActionR45(e,state);e.fieldActionPhaseR45(0);return true;
+    }
+    /** {rise, advance} in blocks onto the ledge right ahead, or null. */
+    private static double[] ledge(EvaUnit01Entity e)
+    {
+        var level=e.level();var box=e.getBoundingBox();
+        Vec3 forward=Vec3.directionFromRotation(0,e.getYRot()).multiply(1,0,1).normalize();
+        // Something taller than a step stands within two blocks ahead.
+        if(level.noCollision(e,box.move(forward.scale(2)).move(0,CLIMB_LOW+.5,0)))return null;
+        double advance=Math.max(box.getXsize(),box.getZsize())*.5+4;
+        for(double rise=CLIMB_LOW+1;rise<=CLIMB_HIGH;rise+=1)
+        {
+            // Room to rise in place, then room on top, standing on something.
+            if(!level.noCollision(e,box.move(0,rise,0)))return null;
+            var top=box.move(forward.scale(advance)).move(0,rise,0);
+            if(level.noCollision(e,top)&&level.noCollision(e,box.move(forward.scale(advance*.5)).move(0,rise,0))
+                    &&!level.noCollision(e,top.move(0,-1.5,0)))return new double[]{rise,advance};
+        }
+        return null;
     }
     private static float requestedYaw(EvaUnit01Entity e,int directions,boolean sprinting)
     {
@@ -153,7 +206,8 @@ public final class EvaFieldActionsR45
         if(!active(e)){if(known!=null)consumePending(e,known);return;}
         var state=EvaWeaponHandlingR45.fieldActionR45(e);var pilot=e.getPilotEntity();
         long now=e.level().getGameTime();
-        if(!stableOwner(e)||pilot==null||!state.hasUUID("pilot")||!state.getUUID("pilot").equals(pilot.getUUID())
+        boolean climbing=CLIMB.equals(state.getString("clip"));
+        if(!stableOwner(e,climbing)||pilot==null||!state.hasUUID("pilot")||!state.getUUID("pilot").equals(pilot.getUUID())
                 ||now<state.getLong("since")){clear(e);return;}
         var authored=admittedClip(e,state.getString("clip"));if(authored==null){clear(e);return;}
         var runtime=RUNTIMES.get(e);if(runtime==null){clear(e);return;}
@@ -162,10 +216,27 @@ public final class EvaFieldActionsR45
         e.setYRot(state.getFloat("facing"));e.yBodyRot=e.getYRot();e.yHeadRot=e.getYRot();
         float at=Mth.clamp(++runtime.elapsed/(float)state.getInt("duration"),0,1);
         e.fieldActionPhaseR45(at);
-        Vec3 next=root(authored,progress(e,0)),delta=next.subtract(runtime.previous);runtime.previous=next;
-        e.moveFieldRootR45(delta);
+        if(climbing)
+        {
+            // Along the clip's own path, scaled to this ledge; no gravity or
+            // collision on the way, both checked before the climb began.
+            var path=authored.getAsJsonArray("r57_climb_path");float at2=Mth.clamp(progress(e,0),0,1)*(path.size()-1);
+            int a=(int)at2,b=Math.min(a+1,path.size()-1);var p=path.get(a).getAsJsonArray();var q=path.get(b).getAsJsonArray();
+            double up=Mth.lerp(at2-a,p.get(0).getAsDouble(),q.get(0).getAsDouble()),on=Mth.lerp(at2-a,p.get(1).getAsDouble(),q.get(1).getAsDouble());
+            Vec3 forward=Vec3.directionFromRotation(0,state.getFloat("facing")).multiply(1,0,1).normalize();
+            e.setNoGravity(true);e.setDeltaMovement(Vec3.ZERO);e.fallDistance=0;
+            e.setPos(state.getDouble("x0")+forward.x*on*state.getDouble("advance"),state.getDouble("y0")+up*state.getDouble("rise"),
+                    state.getDouble("z0")+forward.z*on*state.getDouble("advance"));
+            e.setOnGround(true);
+        }
+        else
+        {
+            Vec3 next=root(authored,progress(e,0)),delta=next.subtract(runtime.previous);runtime.previous=next;
+            e.moveFieldRootR45(delta);
+        }
         if(runtime.elapsed>=state.getInt("duration"))
         {
+            if(climbing)e.setNoGravity(false);
             var pending=runtime.pending;
             EvaGameplayMotionR32.releaseToMovement(e);e.finishCapturedActionEndpointR45();clear(e);
             runtime.pending=pending;consumePending(e,runtime);

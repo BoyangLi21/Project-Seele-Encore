@@ -45,6 +45,8 @@ public final class EvaConnectedActionReview
     private static final boolean COMBO=Boolean.getBoolean("projectseele.tourComboR57");
     private static final boolean DASH=Boolean.getBoolean("projectseele.tourDashR57");
     private static final boolean STEPS=Boolean.getBoolean("projectseele.tourStepsR57");
+    private static final boolean CLIMB=Boolean.getBoolean("projectseele.tourClimbR57");
+    private static final boolean JUMP=Boolean.getBoolean("projectseele.tourJumpR57");
     private static final int TOUR_END=Integer.getInteger("projectseele.tourEnd",1600)-TOUR_START;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     private static int wait;
@@ -244,6 +246,14 @@ public final class EvaConnectedActionReview
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:stone");
             mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:stone");
         }
+        if(CLIMB&&at(1))mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -40 minecraft:stone");
+        if(CLIMB&&at(TOUR_END-2))mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -40 minecraft:air");
+        // Space against the wall.
+        if(CLIMB)mc.options.keyJump.setDown(t>=80&&t<84);
+        // Jumps with an air strike (left) and an air kick (right).
+        if(JUMP)mc.options.keyJump.setDown(t>=50&&t<53||t>=100&&t<103);
+        if(JUMP&&tourAt(58))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(JUMP&&tourAt(108))send(ServerboundEvaControlPacket.ACTION_SMASH);
         if(STEPS&&at(TOUR_END-2))
         {
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:air");
