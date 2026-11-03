@@ -16,6 +16,9 @@ public final class EvaFootPlacement
 {
     private static final Map<Integer,Map<String,Vector3f[]>> GEOMETRY=new HashMap<>();
     public static final Map<Integer,double[]> LAST=new HashMap<>();
+    /** Per EVA, last frame: highest ground found under either sole, above the drawn ground (blocks). */
+    private static final Map<Integer,Double> LEDGE=new HashMap<>();
+    public static double ledgeUnderFoot(EvaUnit01Entity eva){return LEDGE.getOrDefault(eva.getId(),Double.NEGATIVE_INFINITY);}
     public static void clear(){GEOMETRY.clear();LAST.clear();}
     private static Map<String,Vector3f[]> feet(EvaUnit01Entity eva)
     {
@@ -49,12 +52,24 @@ public final class EvaFootPlacement
         }
         return Double.NaN;
     }
+    private static final Map<Integer,Long> RAN=new HashMap<>();
+    /**
+     * Run once this frame if no pose stage already did: every owner's soles
+     * meet kerbs and steps, not only the firearm stage's.
+     */
+    static void ensure(EvaUnit01Entity eva,BakedGeoModel model,float partial,Matrix4f root)
+    {
+        Long ran=RAN.get(eva.getId());
+        if(ran==null||ran!=com.projectseele.client.AircraftRenderClockR21.frameNanos())apply(eva,model,partial,root);
+    }
     public static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva,BakedGeoModel model,float partial,Matrix4f root)
     {
+        if(RAN.size()>32)RAN.clear();
+        RAN.put(eva.getId(),com.projectseele.client.AircraftRenderClockR21.frameNanos());
         LAST.remove(eva.getId());
         if(eva.hasLegacyStrikeForRender())return EvaMotionEngineV2.BoneWrites.empty();
         if(root==null||!eva.isPoweredOn()||eva.isCrucified()||eva.hasActiveCarrierMotion()||eva.isExperimentalUnit()&&!EvaBodyPose.hasOwnUnRig(eva)||eva.isFirstBattleActive()||eva.isVisuallyAirborneForRender()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()||eva.isBerserk()||eva.getActivationTicks()>0||eva.getVisualPose()!=0||eva.hasLiveActionForRender(partial)||eva.rifleStanceLevel(partial)>1.01F)return EvaMotionEngineV2.BoneWrites.empty();
-        var mesh=feet(eva);Set<String> changed=new LinkedHashSet<>();double[] witness=new double[6];int index=0;
+        var mesh=feet(eva);Set<String> changed=new LinkedHashSet<>();double[] witness=new double[6];int index=0;double ledge=Double.NEGATIVE_INFINITY;
         for(String s:List.of("l","r"))
         {
             var foot=model.getBone("foot_"+s).orElse(null);var leg=model.getBone("leg_"+s).orElse(null);var shin=model.getBone("shin_"+s).orElse(null);var ankle=model.getBone("ankle_"+s).orElse(null);
@@ -64,9 +79,17 @@ public final class EvaFootPlacement
             // of temporary vectors per frame. The minimum remains exact.
             for(Vector3f rest:mesh.get(s)){float y=matrix.m01()*rest.x+matrix.m11()*rest.y+matrix.m21()*rest.z+matrix.m31();if(y<minimum){minimum=y;selected=rest;}}
             if(selected==null)continue;Vector3f lowest=matrix.transformPosition(new Vector3f(selected));
-            double ground=ground(eva,lowest),lift=lowest.y-eva.getY();
+            // Height above the drawn ground: while the body rises onto a kerb it is drawn below the entity.
+            double ground=ground(eva,lowest),lift=lowest.y-root.m31();
+            if(Double.isFinite(ground))ledge=Math.max(ledge,ground-root.m31());
             double plant=1-Math.max(0,Math.min(1,(lift-.35)/1.7));
-            double correction=ease(eva.getId()*2+(s.equals("l")?0:1),Double.isFinite(ground)?Math.max(-STEP,Math.min(STEP,ground+.05-lowest.y))*plant:0);
+            // Only the terrain's rise or fall under the sole, measured from the
+            // drawn ground. Pinning the sole itself pulled every lifting foot
+            // down and lagged it behind the clip, so the legs shook each step
+            // on flat ground; resting the body on its feet is ground contact's.
+            // Flat ground reads a hair below the drawn one; no block edge is that small.
+            double rise=Double.isFinite(ground)?Math.max(-STEP,Math.min(STEP,ground-root.m31())):0,flat=Math.max(0,Math.min(1,(Math.abs(rise)-.15)/.3));
+            double correction=ease(eva.getId()*2+(s.equals("l")?0:1),rise*flat*flat*(3-2*flat)*plant);
             witness[index++]=lowest.y;witness[index++]=ground;witness[index++]=correction;
             if(Math.abs(correction)<.005)continue;
             Vector3f target=EvaRigTransforms.point(foot,EvaRigTransforms.pivot(foot),root).add(0,(float)correction,0);
@@ -76,10 +99,11 @@ public final class EvaFootPlacement
             changed.addAll(List.of("leg_"+s,"shin_"+s,"ankle_"+s,"foot_"+s));
         }
         if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),witness);
+        if(LEDGE.size()>32)LEDGE.clear();LEDGE.put(eva.getId(),ledge);
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(changed),"MOTION_ENGINE_LIVE_ACTION");
     }
     /** The EVA's step height (blocks): a sole is set on ground this far above or below it. */
-    private static final double STEP=8;
+    private static final double STEP=20;
     private record Eased(double value,long time) {}
     private static final Map<Integer,Eased> EASED=new HashMap<>();
     /**

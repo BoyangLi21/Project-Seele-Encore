@@ -66,16 +66,16 @@ final class EvaGroundContactR56
         float floor=lowest(model,root,hulls);
         if(!Float.isFinite(floor))return;
         float left=soleHeight(model,root,hulls,"l")-floor,right=soleHeight(model,root,hulls,"r")-floor;
-        settleFoot(eva,model,root,hulls,"l",floor,right,now);
-        settleFoot(eva,model,root,hulls,"r",floor,left,now);
+        float walking=eva.isPilotProne()?0:Mth.clamp(eva.rifleMoveBlend(partial),0,1);
+        settleFoot(eva,model,root,hulls,"l",floor,right,now,walking);
+        settleFoot(eva,model,root,hulls,"r",floor,left,now,walking);
         float lowest=lowest(model,root,hulls);
         float gap=Mth.clamp(lowest-ground,-MAX_LIFT,MAX_DROP);
         var base=model.getBone("root").orElse(null);
         if(base==null)return;
         // Root offsets are model pixels; the world frame only turns and scales.
         float grounded=base.getPosY()-gap*16/EvaScale.RENDER_SCALE;
-        float walking=eva.isPilotProne()?0:Mth.clamp(eva.rifleMoveBlend(partial),0,1);
-        float drawn=easePelvis(eva,grounded,walking,now);
+        float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now);
         base.setPosY(drawn);
         // The eased pelvis sits this far above (+) or below (-) the grounded
         // one: planted legs take up the difference so their soles stay down.
@@ -90,33 +90,34 @@ final class EvaGroundContactR56
             }
     }
 
-    private record Pelvis(float height,float speed,long time) {}
-    private static final Map<Integer,Pelvis> PELVIS=new HashMap<>();
-    /** Stiffness (1/s) of the walking pelvis spring, and its largest lag behind the grounded height (model pixels). */
+    private record Grounding(float offset,float speed,long time) {}
+    private static final Map<Integer,Grounding> PELVIS=new HashMap<>();
+    /** Stiffness (1/s) of the walking grounding spring, and its largest lag behind the grounding offset (model pixels). */
     private static final float PELVIS_RATE=18F,PELVIS_LAG=1.1F;
 
     /**
-     * Walking, the pelvis height follows the grounded one through a critically
-     * damped spring. Pinning the lowest sole every frame dropped the pelvis
-     * about a block within one tick at each footfall and threw it back up:
-     * the body shook all through a walk.
+     * Walking, the grounding offset (not the pelvis height) follows through a
+     * critically damped spring: a jump in which sole is lowest eases, while
+     * the clip's own rise and fall reaches the screen unfiltered. Easing the
+     * height lagged that bob by a third of a block, and the stance legs were
+     * bent every frame to take it up.
      */
-    private static float easePelvis(EvaUnit01Entity eva,float grounded,float walking,long now)
+    private static float easeGrounding(EvaUnit01Entity eva,float offset,float walking,long now)
     {
         var last=PELVIS.get(eva.getId());
-        if(last!=null&&last.time()==now)return Mth.lerp(walking,grounded,Mth.clamp(last.height(),grounded-PELVIS_LAG,grounded+PELVIS_LAG));
+        if(last!=null&&last.time()==now)return Mth.lerp(walking,offset,Mth.clamp(last.offset(),offset-PELVIS_LAG,offset+PELVIS_LAG));
         float dt=last==null?0:(now-last.time())/1e9F;
-        float height=grounded,speed=0;
+        float eased=offset,speed=0;
         if(last!=null&&dt>0&&dt<.25F)
         {
-            float error=last.height()-grounded,step=(last.speed()+PELVIS_RATE*error)*dt,decay=(float)Math.exp(-PELVIS_RATE*dt);
-            height=grounded+(error+step)*decay;
+            float error=last.offset()-offset,step=(last.speed()+PELVIS_RATE*error)*dt,decay=(float)Math.exp(-PELVIS_RATE*dt);
+            eased=offset+(error+step)*decay;
             speed=(last.speed()-PELVIS_RATE*step)*decay;
         }
-        height=Mth.clamp(height,grounded-PELVIS_LAG,grounded+PELVIS_LAG);
+        eased=Mth.clamp(eased,offset-PELVIS_LAG,offset+PELVIS_LAG);
         if(PELVIS.size()>32)PELVIS.clear();
-        PELVIS.put(eva.getId(),new Pelvis(height,speed,now));
-        return Mth.lerp(walking,grounded,height);
+        PELVIS.put(eva.getId(),new Grounding(eased,speed,now));
+        return Mth.lerp(walking,offset,eased);
     }
 
     /** Bend or reach a planted leg so its sole moves down by {@code drop} blocks (up when negative). */
@@ -157,7 +158,7 @@ final class EvaGroundContactR56
     }
 
     private static void settleFoot(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls,
-                                   String side,float ground,float other,long now)
+                                   String side,float ground,float other,long now,float walking)
     {
         var foot=model.getBone("foot_"+side).orElse(null);var shin=model.getBone("shin_"+side).orElse(null);
         var points=hulls.get("foot_"+side);
@@ -194,14 +195,18 @@ final class EvaGroundContactR56
             if(ANKLES.size()>64)ANKLES.clear();
             ANKLES.put(key,new Ankle(ankle.x,ankle.z,now,planted,rate));
         }
-        if(planted<=.01F)return;
+        // A walking foot keeps the clip's heel strike and toe-off. Laid flat
+        // each stance, its rolled edge rose up to a block and a half and the
+        // grounded pelvis sank and sprang back at every footfall.
+        float level=planted*(1-walking);
+        if(level<=.01F)return;
         var modelRotation=EvaRigTransforms.rotation(EvaRigTransforms.model(foot));
         var parent=EvaRigTransforms.rotation(EvaRigTransforms.model(foot.getParent()));
         var up=modelRotation.transform(new Vector3f(0,1,0));
-        var level=new Quaternionf().rotationTo(up,new Vector3f(0,1,0)).mul(modelRotation);
+        var flat=new Quaternionf().rotationTo(up,new Vector3f(0,1,0)).mul(modelRotation);
         float lying=lying(model,side);
         var instep=new Quaternionf(parent).mul(new Quaternionf().rotationX(INSTEP_POINT*Mth.DEG_TO_RAD));
-        var wanted=new Quaternionf(modelRotation).slerp(new Quaternionf(level).slerp(instep,lying),planted);
+        var wanted=new Quaternionf(modelRotation).slerp(new Quaternionf(flat).slerp(instep,lying),level);
         EvaRigTransforms.rotate(foot,parent.invert().mul(wanted));
     }
 

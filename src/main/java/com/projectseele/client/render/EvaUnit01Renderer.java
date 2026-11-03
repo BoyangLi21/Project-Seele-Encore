@@ -493,7 +493,9 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
             this.pendingPoseModel = null;
             this.pendingPoseEntity = null;
             org.joml.Matrix4f world=software.bernie.geckolib.util.RenderUtils.invertAndMultiplyMatrices(poseStack.last().pose(),this.entityRenderTranslations);
-            Vec3 origin=renderedOrigin(animatable,partialTick);
+            // The step rise translates the pose stack before GeckoLib records
+            // its entity frame, so that frame already carries it: add it back.
+            Vec3 origin=renderedOrigin(animatable,partialTick).add(0,com.projectseele.client.EvaStepSmoothingR57.offset(animatable,partialTick),0);
             world.m30(world.m30()+(float)origin.x).m31(world.m31()+(float)origin.y).m32(world.m32()+(float)origin.z);
             EvaPoseGraph.commit(animatable, poseModel,this.pendingPosePartialTick,world);
         }

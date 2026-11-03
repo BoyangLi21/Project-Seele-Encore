@@ -241,19 +241,30 @@ public final class EvaConnectedActionReview
         // Optional checks: a full sprint over the run, and kerbs on the walk.
         // The client re-syncs held sprint and dash to the real keys, so hold them.
         if(DASH)com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=70&&t<110);
+        mc.options.keySprint.setDown(t>=70&&t<110);
         if(STEPS&&at(1))
         {
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:stone");
             mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:stone");
         }
-        if(CLIMB&&at(1))mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -40 minecraft:stone");
-        if(CLIMB&&at(TOUR_END-2))mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -40 minecraft:air");
-        // Space against the wall.
-        if(CLIMB)mc.options.keyJump.setDown(t>=80&&t<84);
+        // A bench-high wall (stepped onto) and, beyond it, a tower 25 above
+        // its top (climbed with Space).
+        if(CLIMB&&at(1))
+        {
+            mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -41 minecraft:stone");
+            mc.player.connection.sendCommand("fill -24 -60 -40 24 -16 -30 minecraft:stone");
+        }
+        if(CLIMB&&at(TOUR_END-2))
+        {
+            mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -41 minecraft:air");
+            mc.player.connection.sendCommand("fill -24 -60 -40 24 -16 -30 minecraft:air");
+        }
+        if(CLIMB)mc.options.keyJump.setDown(t>=100&&t<104);
         // Jumps with an air strike (left) and an air kick (right).
         if(JUMP)mc.options.keyJump.setDown(t>=50&&t<53||t>=100&&t<103);
-        if(JUMP&&tourAt(58))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(JUMP&&tourAt(108))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        // The jump leaves the ground after its squat (seven ticks).
+        if(JUMP&&tourAt(64))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(JUMP&&tourAt(114))send(ServerboundEvaControlPacket.ACTION_SMASH);
         if(STEPS&&at(TOUR_END-2))
         {
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:air");

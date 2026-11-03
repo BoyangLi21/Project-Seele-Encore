@@ -243,6 +243,11 @@ final class EvaPoseContinuity
         }
         forEach(model, bone -> s.last.put(bone.getName(), new float[] {bone.getRotX(), bone.getRotY(), bone.getRotZ(),
                 bone.getPosX(), bone.getPosY(), bone.getPosZ()}));
+        if (!STAGE_TRACE.isEmpty() && DIAG)
+        {
+            trace(entity, model, "settled");
+            stageTrace(entity, state, now, partialTick);
+        }
         state.key = key;
         state.owner = owner;
         state.rawOwner = rawOwner;
@@ -404,13 +409,73 @@ final class EvaPoseContinuity
         for (int i = 0; i < TRACE_BONES.length; i++)
         {
             GeoBone bone = model.getBone(TRACE_BONES[i]).orElse(null);
-            row[i + 1] = bone == null ? null : new float[] {bone.getRotX(), bone.getRotY(), bone.getRotZ()};
+            row[i + 1] = bone == null ? null : new float[] {bone.getRotX(), bone.getRotY(), bone.getRotZ(),
+                    bone.getPosX(), bone.getPosY(), bone.getPosZ()};
         }
         state.trace.add(row);
     }
 
     private static final String[] TRACE_BONES = {"hand_l", "hand_r", "forearm_l", "forearm_r", "arm_l", "arm_r", "cannon", "torso_upper",
-            "torso_lower", "leg_l", "leg_r", "shin_l", "shin_r", "foot_l", "foot_r"};
+            "torso_lower", "leg_l", "leg_r", "shin_l", "shin_r", "foot_l", "foot_r", "root", "neck", "head", "clavicle_l", "clavicle_r"};
+
+    /** Development: every frame, every stage's traced bones (-Dprojectseele.stageTrace=file). */
+    private static final String STAGE_TRACE = System.getProperty("projectseele.stageTrace", "");
+    private static java.io.PrintWriter stageOut;
+
+    private static final StringBuilder EXTRA = new StringBuilder();
+
+    /** Development: a labelled diagnostic row for this frame's stage trace. */
+    static void extra(String row)
+    {
+        if (!STAGE_TRACE.isEmpty() && DIAG)
+        {
+            EXTRA.append("X ").append(row).append(System.lineSeparator());
+        }
+    }
+
+    private static void stageTrace(EvaUnit01Entity entity, State state, long now, float partialTick)
+    {
+        try
+        {
+            if (stageOut == null)
+            {
+                stageOut = new java.io.PrintWriter(java.nio.file.Files.newBufferedWriter(java.nio.file.Path.of(STAGE_TRACE)));
+                stageOut.println("bones " + String.join(" ", TRACE_BONES));
+            }
+            var origin = entity.getPosition(partialTick);
+            StringBuilder b = new StringBuilder();
+            b.append("F ").append(now).append(' ').append(entity.getUnitVariant()).append(' ').append(entity.level().getGameTime())
+                    .append(' ').append(String.format(java.util.Locale.ROOT, "%.4f %.5f %.5f %.5f %.3f", partialTick, origin.x, origin.y, origin.z,
+                            net.minecraft.util.Mth.rotLerp(partialTick, entity.yBodyRotO, entity.yBodyRot)))
+                    .append(' ').append(entity.poseTransitionKey(partialTick).replace(' ', '_')).append(System.lineSeparator());
+            for (Object[] row : state.trace)
+            {
+                b.append("S ").append(row[0]);
+                for (int i = 1; i < row.length; i++)
+                {
+                    float[] v = (float[]) row[i];
+                    if (v == null)
+                    {
+                        b.append(" n n n n n n");
+                        continue;
+                    }
+                    for (float f : v)
+                    {
+                        b.append(' ').append(String.format(java.util.Locale.ROOT, "%.5f", f));
+                    }
+                }
+                b.append(System.lineSeparator());
+            }
+            b.append(EXTRA);
+            EXTRA.setLength(0);
+            stageOut.print(b);
+            stageOut.flush();
+        }
+        catch (Exception e)
+        {
+            com.projectseele.ProjectSeele.LOGGER.warn("stage trace failed", e);
+        }
+    }
 
     /** Per stage, how far the popped bone moved since the same stage last frame. */
     private static String traceDelta(State state, String boneName)

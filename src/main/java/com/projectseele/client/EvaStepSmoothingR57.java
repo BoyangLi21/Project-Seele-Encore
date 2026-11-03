@@ -14,9 +14,12 @@ public final class EvaStepSmoothingR57
 {
     /** A rise this fast while standing (blocks per frame) is a step, not a slope. */
     private static final double STEP_RISE=.6;
-    /** Spring stiffness (1/s): most of the rise within about a third of a second. */
-    private static final double RATE=12;
-    private static final class State {long frame;double y=Double.NaN,offset,speed;}
+    /** Spring stiffness (1/s): a kerb takes about a third of a second, a bench-high ledge about half. */
+    private static final double RATE=12,RATE_HIGH=7;
+    /** Longest the body waits low for a sole to reach over the ledge (seconds). */
+    private static final double HOLD=1.2;
+    private static final boolean DIAG=Boolean.getBoolean("projectseele.poseDiag");
+    private static final class State {long frame;double y=Double.NaN,offset,speed,held;int diag;}
     private static final WeakIdentityMap<EvaUnit01Entity,State> STATES=new WeakIdentityMap<>();
 
     /** Blocks to add to the entity's drawn height this frame (zero or negative). */
@@ -31,10 +34,22 @@ public final class EvaStepSmoothingR57
         if(Double.isNaN(s.y)||dt<=0||dt>.25){s.y=y;s.offset=0;s.speed=0;return 0;}
         double rise=y-s.y;s.y=y;
         boolean standing=e.onGround()&&!e.isVisuallyAirborneForRender();
-        if(standing&&rise>STEP_RISE&&rise<12)s.offset-=rise;
+        if(standing&&rise>STEP_RISE&&rise<24)s.offset-=rise;
+        double rate=s.offset<-10?RATE_HIGH:RATE;
+        // A tall step rises only once a sole stands over the ledge: lifting
+        // the body while both feet were still before the kerb floated it.
+        if(standing&&s.offset<-3&&s.held<HOLD
+                &&com.projectseele.client.render.EvaFootPlacement.ledgeUnderFoot(e)<-s.offset*.5)
+        {
+            s.held+=dt;s.speed=0;
+            if(DIAG&&(s.diag++%10)==0)com.projectseele.ProjectSeele.LOGGER.info("STEP HOLD offset={} ledge={} held={}",
+                    String.format("%.2f",s.offset),String.format("%.2f",com.projectseele.client.render.EvaFootPlacement.ledgeUnderFoot(e)),String.format("%.2f",s.held));
+            return (float)s.offset;
+        }
+        if(s.offset>-.05)s.held=0;
         if(!standing&&s.offset<0&&rise<0)s.offset=Math.min(0,s.offset-rise);
-        double step=(s.speed+RATE*s.offset)*dt,decay=Math.exp(-RATE*dt);
-        s.offset=(s.offset+step)*decay;s.speed=(s.speed-RATE*step)*decay;
+        double step=(s.speed+rate*s.offset)*dt,decay=Math.exp(-rate*dt);
+        s.offset=(s.offset+step)*decay;s.speed=(s.speed-rate*step)*decay;
         if(s.offset>0){s.offset=0;s.speed=0;}
         return (float)s.offset;
     }

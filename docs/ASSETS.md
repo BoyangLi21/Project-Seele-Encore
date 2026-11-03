@@ -481,3 +481,10 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 空格攀爬：`eva_gameplay_r44_{0,1,2}.json` 新增 `r32_climb_up`，来源 Mesh2Motion `human-base-animations.glb` 的 `ClimbUp_1m_RM`（CC0），截去源片段末尾的循环复位帧，把源动作的上升与前移从姿态中移出、存为归一化路径 `r57_climb_path`，由服务端按实际坎高和机体宽度移动机体；生成脚本为本机 `motion-work/toolroot/climb_clip_r57.py`。
 
 空手站立右键已直接改用原 B 键侧踹逻辑（代码改动，不涉及动作资源）；此前为右键准备的双臂砸地、ACCAD 上勾拳、Mesh2Motion 前蹬候选均已废弃。
+
+跳跃与空中攻击：`eva_gameplay_r44_{0,1,2}.json` 中替换四段动作，全部来自 Mesh2Motion（CC0），沿用同一重定向管线，生成脚本为本机 `motion-work/toolroot/air_attacks_r57.py`：
+- `r32_jump_start`：`human-base-animations.glb` 的 `Jump_Start` 第 0–12 帧（深蹲→蹬伸离地），运行时先从当前姿势沉入深蹲再蹬起，准备 7 tick；
+- `r32_jump_land`：`human-base-animations.glb` 的 `Jump_Land` 第 0–60 帧（触地→屈膝缓冲→站起），从触地帧开始播放；
+- `r32_air_strike`：`human-addon-animations.glb` 的 `Attack_Ground_Pound` 第 0–63 帧（举拳→下砸），去掉根骨骼位移，空中下砸时收腿；
+- `r32_air_kick`：`human-mocap-animations.glb` 的 `Kick_Breach` 第 18–81 帧（提膝→蹬出→收回），去掉根骨骼位移，支撑腿换成腾空姿势的屈腿，形成空中蹬踢（参照 TV 第 9 话双机同步飞踢的意象，未使用任何官方素材）。
+原先的 Tuffles `AerialSlapDownwards` / `LegsDivekickFightingGameInspired` 空中动作不再使用。

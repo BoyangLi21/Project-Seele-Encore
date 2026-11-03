@@ -42,7 +42,7 @@ public final class EvaFieldActionsR45
     /** The ledge climb: Space at a ledge taller than a step. */
     public static final String CLIMB="climb_up";
     /** Ledges the EVA climbs (blocks above its feet); lower ones it steps onto. */
-    private static final double CLIMB_LOW=8,CLIMB_HIGH=44;
+    private static final double CLIMB_LOW=20,CLIMB_HIGH=44;
     private static boolean stableOwner(EvaUnit01Entity e)
     {return stableOwner(e,false);}
     private static boolean stableOwner(EvaUnit01Entity e,boolean climbing)

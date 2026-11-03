@@ -93,9 +93,15 @@ final class EvaStanceFinishR56
         var palmDown=new Quaternionf().setFromNormalized(new Matrix3f().setColumn(0,x).setColumn(1,y).setColumn(2,z));
         float near=1-smooth((palm.y-ground-PALM_NEAR)/(PALM_FAR-PALM_NEAR));
         var wanted=new Quaternionf(handWorld).slerp(palmDown,near*prone);
+        var target=new Vector3f(shoulder.x,ground+PALM_REST,shoulder.z).fma(REACH_AHEAD,forward).fma(REACH_OUT,outward);
+        // A hand reaches for ground its arm can reach. From a body still
+        // standing, the solver pulled the straightened arms up and out
+        // toward a ground far below: the shoulders shrugged on the way down.
+        var elbow=EvaRigTransforms.point(forearm,EvaRigTransforms.elbow(forearm,side),root);
+        float span=elbow.distance(shoulder)+palm.distance(elbow);
+        reach*=smooth((span*1.05F-target.distance(shoulder))/(span*.35F));
         if(reach>.01F)
         {
-            var target=new Vector3f(shoulder.x,ground+PALM_REST,shoulder.z).fma(REACH_AHEAD,forward).fma(REACH_OUT,outward);
             var goal=new Vector3f(palm).lerp(target,reach);
             // Elbows bend out and back, as hands do that catch the body.
             var pole=new Vector3f(outward).mul(.7F).fma(-.5F,forward).add(0,-.2F,0);

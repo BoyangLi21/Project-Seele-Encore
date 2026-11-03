@@ -369,12 +369,16 @@ public final class EvaPoseGraph
                     ||com.projectseele.entity.EvaGameplayMotionR32.sharedJumpActive(entity,partialTick)))
             transitions=EvaPoseTransition.applySharedExitR45(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"shared.exit");
+        EvaFootPlacement.ensure(entity,model,partialTick,modelToWorld);
+        EvaPoseContinuity.trace(entity,model,"foot.placement.finish");
         EvaStanceFinishR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"stance.finish");
         EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"ground.contact");
         EvaFollowThroughR56.apply(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"follow.through");
+        EvaJointLimitsR57.apply(model);
+        EvaPoseContinuity.trace(entity,model,"joint.limits");
         String continuityOwner=motionWrites.owner();
         EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);

@@ -57,6 +57,7 @@
     "client.CameraMixin",
     "client.AbstractClientPlayerSkinMixin",
     "client.MinecraftRenderTargetMixin",
+    "client.TimerPrecisionMixin",
     "client.GameRendererFeedProjectionMixin",
     "client.FirstBattleContactDrawWitnessR52Mixin",
     "client.LargeStructureRenderMixin",

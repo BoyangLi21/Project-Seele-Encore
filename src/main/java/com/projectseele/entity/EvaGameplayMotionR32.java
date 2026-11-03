@@ -50,7 +50,9 @@ public final class EvaGameplayMotionR32
     private static int takeoffTicks(EvaUnit01Entity e)
     {
         var c=clip(e,"jump_start");
-        return c.has("preparation_ticks")?Mth.clamp(c.get("preparation_ticks").getAsInt(),3,10):3;
+        // A sixty-metre body needs a visible knee bend before it leaves the
+        // ground: in three ticks the squat was gone before it was drawn.
+        return c.has("preparation_ticks")?Mth.clamp(c.get("preparation_ticks").getAsInt(),3,10):6;
     }
     public static boolean prepareJump(EvaUnit01Entity e)
     {
@@ -485,9 +487,14 @@ public final class EvaGameplayMotionR32
         float air=airAge(e,partial),land=landAge(e,partial);
         if(age(e,TAKEOFF,partial)>=0&&air<0)
         {
-            float progress=Math.min(1,age(e,TAKEOFF,partial)/takeoffTicks(e)),contact=clip(e,"jump_start").get("takeoff_phase").getAsFloat();
+            var start=clip(e,"jump_start");
+            float progress=Math.min(1,age(e,TAKEOFF,partial)/takeoffTicks(e)),contact=start.get("takeoff_phase").getAsFloat();
             var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(ACTION_FROM),from);
-            return EvaBodyPose.blend(from,EvaBodyPose.gameplayClip(e,"jump_start",progress*contact),progress);
+            // A clip that begins in its squat: sink into it first, then drive
+            // up through the extension that leaves the ground.
+            float hold=start.has("r57_squat_hold")?start.get("r57_squat_hold").getAsFloat():0;
+            float phase=hold>0?EvaDorsalMechanism.smooth((progress-hold)/(1-hold))*contact:progress*contact;
+            return EvaBodyPose.blend(from,EvaBodyPose.gameplayClip(e,"jump_start",phase),EvaDorsalMechanism.smooth(progress/Math.max(.35F,hold)));
         }
         if(air>=0)
         {
@@ -512,7 +519,8 @@ public final class EvaGameplayMotionR32
             {
                 boolean kick=action==EvaCombatR31.AIR_SLAM;String name=kick?"air_kick":"air_strike";
                 float age=EvaCombatR31.age(e,partial),stroke=EvaCombatR31.strokeAge(e,partial),contact=contactPhase(e,name);
-                float chamber=Math.max(0,contact-(kick?.14F:.07F));
+                var authored=clip(e,name);
+                float chamber=authored.has("r57_chamber_phase")?authored.get("r57_chamber_phase").getAsFloat():Math.max(0,contact-(kick?.14F:.07F));
                 float phase=stroke<0?Mth.lerp(Math.min(1,age/4),0,chamber):stroke<5?Mth.lerp(stroke/5,chamber,contact):Mth.lerp(Math.min(1,(stroke-5)/12),contact,1);
                 var attack=EvaBodyPose.gameplayClip(e,name,phase);
                 // The pelvis drives the recorded downward stroke. Replacing its
@@ -527,7 +535,9 @@ public final class EvaGameplayMotionR32
         if(land>=0&&land<18&&e.getOrdinaryAttackStage()<0&&!e.isHeavyMotionActive())
         {
             float contact=clip(e,"jump_land").get("ground_contact_phase").getAsFloat();var pose=EvaBodyPose.gameplayClip(e,"jump_land",Mth.lerp(Math.min(1,land/16),contact,1));
-            if(land<3){var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(LAND_FROM),from);pose=EvaBodyPose.blend(from,pose,land/3);}
+            // The flight pose eases onto the touchdown frame: a linear three
+            // ticks started and stopped the knees in a single frame.
+            if(land<4){var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(LAND_FROM),from);pose=EvaBodyPose.blend(from,pose,EvaDorsalMechanism.smooth(land/4));}
             if(land>10)pose=EvaBodyPose.blend(pose,groundLocomotion(e,base,partial,capturedBase,null),(land-10)/8);
             return pose;
         }
