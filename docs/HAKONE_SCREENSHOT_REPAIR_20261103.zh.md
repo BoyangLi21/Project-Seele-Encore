@@ -42,3 +42,10 @@
 生产生成配方回放通过 9 个区块；实际存档全部修改格读回一致。3 个远景瓦片及小地图 609 个地表像素、8 个缩放瓦片已安装，远景服务正常停止。实际游戏内视觉验收仍待进行。
 
 记录：`feedback-stairs-installation-v1/installation.json`、`feedback-stairs-lod-installation-v1/installation.json`、`feedback-stairs-xaero-installation-v1/installation.json`。这批不代表其余旧路和老港口已修复。
+# 强罗废弃道路与空地基补充（已安装）
+
+基于实际三维方块的 26 邻接关系，清理了 23 组未连接现用建筑、车站、原生交通、车辆或已修公共道路的完整旧构件，包含 10,846 个旧铺装与基础方块。与现用设施相连、接触未知构件或越过测量边界的组件继续保留待完整重做，没有按材质横扫。
+
+删除铺装后额外修复了 26,612 列局部坡面；边界取现有山体高度，保留完整树冠与根部，保护既有水方块。最终实际修改 63,688 格，198 个生产区块配方回放通过，实际存档逐格读回一致。31 个远景瓦片及小地图 17,052 个像素、54 个缩放瓦片同步完成。4,971 个失效旧路列从后续规划依据中撤除。
+
+候选：`feedback-gora-orphans-v3`；安装：`feedback-orphans-installation-v1`；远景：`feedback-orphans-lod-installation-v1`；小地图：`feedback-orphans-xaero-installation-v1`。简化三维复查已查看，原生游戏内光影与通行体验尚未复验。北侧仍连接成片的错乱旧路、旧 P1 公共平台接合、老港口及全图线路验收不在本批完成范围。
