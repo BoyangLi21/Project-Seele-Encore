@@ -485,6 +485,7 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 跳跃与空中攻击：`eva_gameplay_r44_{0,1,2}.json` 中替换四段动作，全部来自 Mesh2Motion（CC0），沿用同一重定向管线，生成脚本为本机 `motion-work/toolroot/air_attacks_r57.py`：
 - `r32_jump_start`：`human-base-animations.glb` 的 `NinjaJump_Start` 第 0–5 帧（深蹲→蹬伸离地），运行时先从当前姿势沉入深蹲再蹬起，准备 7 tick；
 - `r32_jump_flight`：`NinjaJump_Start` 第 5–30 帧（离地→最高点收腿，收腿幅度取源动作的 60%），再从收腿姿势平滑展开到 `Jump_Land` 第 0 帧的伸腿探地姿势；起跳、腾空、落地三段首尾帧相同，连成一个动作（生成脚本本机 `motion-work/toolroot/jump_set_r57b.py`，空中蹬踢的收腿支撑腿同步改为新最高点姿势）；
+- R57b 起：起跳、腾空、落地和空中下砸/飞踢的姿势改由代码中手工设定的关键姿势驱动（`EvaJumpChoreographyR57`，项目原创），按下蹲进度、上升时间、离地高度和触地时间连续插值；上述 Mesh2Motion 片段只保留作攻击判定元数据。空格攀爬同样改为手工关键姿势加手脚 IK（`EvaClimbChoreographyR57`，项目原创），`ClimbUp_1m_RM` 只提供服务端移动路径。
 - `r32_jump_land`：`human-base-animations.glb` 的 `Jump_Land` 第 0–60 帧（触地→屈膝缓冲→站起），从触地帧开始播放；
 - `r32_air_strike`：`human-addon-animations.glb` 的 `Attack_Ground_Pound` 第 0–63 帧（举拳→下砸），去掉根骨骼位移，空中下砸时收腿；
 - `r32_air_kick`：`human-mocap-animations.glb` 的 `Kick_Breach` 第 18–81 帧（提膝→蹬出→收回），去掉根骨骼位移，支撑腿换成腾空姿势的屈腿，形成空中蹬踢（参照 TV 第 9 话双机同步飞踢的意象，未使用任何官方素材）。

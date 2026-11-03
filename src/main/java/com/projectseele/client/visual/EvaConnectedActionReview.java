@@ -47,6 +47,11 @@ public final class EvaConnectedActionReview
     private static final boolean STEPS=Boolean.getBoolean("projectseele.tourStepsR57");
     private static final boolean CLIMB=Boolean.getBoolean("projectseele.tourClimbR57");
     private static final boolean JUMP=Boolean.getBoolean("projectseele.tourJumpR57");
+    /** Weapon check (run with tourStart past the script, e.g. 2000): rifle, positron cannon standing and prone, Unit-02's sword. */
+    private static final boolean WEAPONS=Boolean.getBoolean("projectseele.tourWeaponsR57");
+    /** Record every drawn frame, not the first of each tick: offline renders then show the frames the game drew. */
+    private static final boolean EVERY_FRAME=Boolean.getBoolean("projectseele.recordEveryFrame");
+    private static float poseTime = Float.NaN;
     private static final int TOUR_END=Integer.getInteger("projectseele.tourEnd",1600)-TOUR_START;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     private static int wait;
@@ -271,6 +276,7 @@ public final class EvaConnectedActionReview
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:air");
             mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:air");
         }
+        if(WEAPONS)weaponsR57(mc,tick);
         if(tourAt(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
         if(tourAt(170)||tourAt(182)||!COMBO&&(tourAt(194)||tourAt(206)))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(tourAt(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
@@ -286,6 +292,25 @@ public final class EvaConnectedActionReview
         if(tourAt(1150)||tourAt(1165)||tourAt(1180)||tourAt(1370)||tourAt(1385)||tourAt(1400))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(tourAt(1220)||tourAt(1430))send(ServerboundEvaControlPacket.ACTION_SMASH);
         positionCamera(mc,eva);
+    }
+
+    private static void weaponsR57(Minecraft mc,int w)
+    {
+        boolean walk=w>=60&&w<100||w>=490&&w<530;
+        mc.options.keyUp.setDown(walk);mc.player.input.up=walk;mc.player.input.forwardImpulse=walk?1:0;mc.player.zza=walk?1:0;mc.player.xxa=0;
+        if(at(1))mc.player.connection.sendCommand("seele motionlab weapon unit01 rifle");
+        if(w>=20&&w<116&&w%4==0)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
+        if(at(125))mc.player.connection.sendCommand("seele motionlab weapon unit01 cannon");
+        if(at(150)||at(265))send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
+        if(at(215)||at(330))send(ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
+        if(at(235)||at(350))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
+        if(at(380))
+        {
+            mc.player.connection.sendCommand("seele motionlab enter unit02");
+            mc.player.connection.sendCommand("seele motionlab weapon unit02 sword");
+        }
+        if(at(400)||at(414)||at(428)||at(520))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(455))send(ServerboundEvaControlPacket.ACTION_SMASH);
     }
 
     /** A tour event at its script tick, with -Dprojectseele.tourStart skipping the script's beginning. */
@@ -427,8 +452,10 @@ public final class EvaConnectedActionReview
             warmupFrames++;
             return;
         }
-        if (poses == null || poseTick == tick) return;
-        poseTick = tick;
+        if (poses == null || !EVERY_FRAME && poseTick == tick) return;
+        // A frame can draw the body more than once (shadow and main pass).
+        if (EVERY_FRAME && eva.tickCount + partialTick == poseTime) return;
+        poseTick = tick;poseTime = eva.tickCount + partialTick;
         JsonObject row = new JsonObject();
         row.addProperty("tick", tick);
         row.addProperty("variant", eva.getUnitVariant());

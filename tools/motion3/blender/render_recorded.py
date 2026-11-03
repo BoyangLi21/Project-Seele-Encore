@@ -39,7 +39,7 @@ from render_pack_sequence import setup_world  # noqa: E402
 
 UNIT = {0: "eva_unit00", 1: "eva_unit01", 2: "eva_unit02", 4: "eva_un01"}
 RENDER_SCALE = 5.0
-WEAPON_KNIFE, WEAPON_RIFLE = 1, 4
+WEAPON_KNIFE, WEAPON_CANNON, WEAPON_LANCE, WEAPON_RIFLE, WEAPON_SWORD = 1, 2, 3, 4, 6
 # EvaConnectedActionReview.tour(): (first tick, label)
 TOUR = [(0, "空手 · 待机"), (40, "空手 · 起步走"), (70, "空手 · 跑"), (110, "空手 · 跑→走"), (140, "空手 · 停下"),
         (170, "空手 · 普通攻击连击（左键×4）"), (230, "空手 · 重击（右键）"), (290, "空手 · 踢（B 键）"),
@@ -156,11 +156,18 @@ def main():
     if a.hands:
         hands = Hands(a.hands, body[0].data.materials[0])
     rifle = knife = []
+    extra = {}
     if a.weapons:
         rifle = lab.load_mesh_parts(arm, os.path.join(a.weapons, "eva_pallet_smg.mesh.json"),
                                     os.path.join(a.weapons, "eva_pallet_smg.png"), "rifle")
         knife = lab.load_mesh_parts(arm, os.path.join(a.weapons, "progressive_knife_anatomical_r45.mesh.json"),
                                     os.path.join(a.weapons, "progressive_knife.png"), "knife")
+        # The positron cannon and Unit-02's long sword, when the weapons folder has them.
+        for mesh_name, texture_name, label in (("positron_cannon.mesh.json", "positron_cannon.png", "cannon"),
+                                               ("eva02_longsword.mesh.json", "eva02_longsword.png", "sword")):
+            if os.path.isfile(os.path.join(a.weapons, mesh_name)):
+                extra[label] = lab.load_mesh_parts(arm, os.path.join(a.weapons, mesh_name),
+                                                   os.path.join(a.weapons, texture_name), label)
     rw, rh = (int(x) for x in a.res.split("x"))
     setup_world(rw, rh)
     floor = next(o for o in bpy.data.objects if o.type == 'MESH' and o.name.startswith("Plane"))
@@ -235,9 +242,10 @@ def main():
         arm.rotation_mode = 'XYZ'
         arm.rotation_euler = (0.0, 0.0, math.radians(-yaw))
         weapon = weapon_of(near)
-        for objs, held in ((rifle, WEAPON_RIFLE), (knife, WEAPON_KNIFE)):
+        for objs, held in ((rifle, (WEAPON_RIFLE,)), (knife, (WEAPON_KNIFE,)), (extra.get("cannon", []), (WEAPON_CANNON,)),
+                           (extra.get("sword", []), (WEAPON_SWORD, WEAPON_LANCE))):
             for ob in objs:
-                ob.hide_render = weapon != held
+                ob.hide_render = weapon not in held
         bpy.context.view_layer.update()
         if hands and fi >= a.start:
             mats = fk.model_matrices(rig, states)
