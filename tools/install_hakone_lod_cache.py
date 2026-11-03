@@ -33,6 +33,8 @@ def install(a):
         with sqlite3.connect((a.cache/REL).resolve().as_uri()+'?mode=ro',uri=True)as src:
             pending=src.execute('select count(*) from FullData where ApplyToParent=1').fetchone()[0]
             if pending:raise ValueError(f'Distant parent updates are still pending: {pending}')
+            children=src.execute('select count(*) from FullData where ApplyToChildren=1').fetchone()[0]
+            if children:raise ValueError(f'Distant child updates are still pending: {children}')
             if incomplete.exists():
                 for row in exported['unbuilt_tiles']:
                     if src.execute('select 1 from FullData where DetailLevel=0 and PosX=? and PosZ=?',row['tile']).fetchone():
@@ -60,7 +62,7 @@ def install(a):
                 with sqlite3.connect(a.out/'DistantHorizons.before.sqlite')as backup,sqlite3.connect(a.world/REL)as target:backup.backup(target)
                 raise
     receipt=dict(status='installed',world=str(a.world),cache=str(a.cache),tiles=imported['completed'],
-        unbuilt_tiles_kept_unknown=len(exported.get('unbuilt_tiles',[])),pending_parent_updates=0,
+        unbuilt_tiles_kept_unknown=len(exported.get('unbuilt_tiles',[])),pending_parent_updates=0,pending_child_updates=0,
         cache_server_stopped_normally=True,only_distant_cache_copied_back=True,export=str(a.export),backup=str(a.out/'DistantHorizons.before.sqlite'))
     receipt['unfinished_columns_checked_absent']=incomplete.exists()
     (a.out/'installation.json').write_text(json.dumps(receipt,indent=2),'utf8');print(json.dumps(receipt),flush=True)
