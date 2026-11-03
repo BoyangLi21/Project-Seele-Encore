@@ -12,6 +12,7 @@ from query_blocks import AIR
 from prepare_hakone_togendai_neighbourhood import save_json
 from verify_hakone_togendai_neighbourhood import verify
 from map_pipeline.frontage_geometry import entrance_frame
+from map_pipeline.payload_exceptions import record_exception
 
 def finish(source,out,detail_plan=None):
     for name in ('functional-check.json','independent-check.json'):
@@ -26,7 +27,7 @@ def finish(source,out,detail_plan=None):
     x,z,X,Z=map(int,d['bounds']);e=Editor(out);spec=json.loads((out/'plan/authored-design.json').read_text('utf8'));details=dict(crossings=[],bus_bays=[],lights=[],trees=[],awnings=[])
     if detail_plan is not None:
         overrides=json.loads(detail_plan.read_text('utf8'))
-        if set(overrides)-{'bridge_details','tree_clusters','woodland_areas','native_frontage_details'}:raise ValueError('Finishing plan may not alter street or parcel geometry')
+        if set(overrides)-{'bridge_details','tree_clusters','woodland_areas','native_frontage_details','hillside_street_details'}:raise ValueError('Finishing plan may not alter street or parcel geometry')
         spec.update(overrides);save_json(out/'plan/authored-design.json',spec)
     if spec.get('togendai_forecourt',True):
         for lo,hi in [(-321,-302),(-277,-258)]:
@@ -75,7 +76,7 @@ def finish(source,out,detail_plan=None):
                 Q,R=px+dx*along-dz*side,pz+dz*along+dx*side;Y=h+4;before=e.state(Q,Y,R)
                 if preserved((Q,Y,R))or before.split('[')[0]not in AIR:continue
                 material='minecraft:dark_oak_slab[type=bottom,waterlogged=false]'if '喫茶'in row['use']else'minecraft:smooth_stone_slab[type=bottom,waterlogged=false]'
-                e.put(Q,Y,R,material);added.append([Q,Y,R]);outdoor.append(dict(parcel=row['id'],kind='outside wall canopy',pos=[Q,Y,R],before=before,after=material))
+                e.put(Q,Y,R,material);added.append([Q,Y,R]);record_exception(outdoor,dict(parcel=row['id'],kind='outside wall canopy',pos=[Q,Y,R],before=before,after=material))
         if added:details['awnings'].append(dict(parcel=row['id'],cells=len(added)))
     # Irregular groups with clear gaps around road sightlines and doorways.
     rng=np.random.default_rng(20261103)

@@ -10,6 +10,7 @@ from query_blocks import AIR
 from plan_ashi_landscape_r54 import SOIL,PLANTS
 from prepare_hakone_togendai_neighbourhood import PAVE
 from map_pipeline.frontage_geometry import entrance_frame
+from map_pipeline.payload_exceptions import record_exception
 
 EMPTY=AIR|PLANTS|{'minecraft:light'}
 
@@ -43,7 +44,7 @@ def decorate(e,d,spec,rows,out,details,outdoor,preserved):
         if before==state:return
         if before.split('[')[0]not in allow:raise ValueError(('Unowned detail cell',p,before))
         if any(all(r['new_payload_bounds'][k]<=p[k]<=r['new_payload_bounds'][k+3]for k in range(3))for r in rows):
-            outdoor.append(dict(kind='outside frontage pad',pos=list(p),before=before,after=state))
+            record_exception(outdoor,dict(kind='outside frontage pad',pos=list(p),before=before,after=state))
         e.put(*p,state)
     for name,lo,hi in [('west',-507,-455),('east',-290,-250)]:
         count=0;rail=0
