@@ -59,6 +59,19 @@ class Tile:
         return bytes([self.key,0])+struct.pack('>ii',32856,len(pixels))+pixels+bytes([self.light])+pack_heights(heights)+pack_heights(top_heights)+self.biomes
 
 class Cache:
+    @classmethod
+    def empty(cls,leaf=True):
+        # New surface regions use native default metadata and the current
+        # surface layer bounds. Existing opaque region metadata is untouched.
+        prefix=bytes(12)+struct.pack('>2i',2147483647,30)if leaf else b''
+        return cls(struct.pack('>i',65561)+prefix+b'\xff'+struct.pack('>i',0)+b'\xff',leaf)
+    def add_empty_tile(self,key):
+        if key in self.tiles:raise ValueError('Cannot replace an existing native tile')
+        h=pack_heights(np.full((64,64),-32768,np.int16))
+        tail=struct.pack('>i',0)+(struct.pack('>4i',-1,-1,-1,-1)if not self.leaf else b'')
+        pixels=bytes(16384)
+        raw=bytes([key,0])+struct.pack('>ii',32856,len(pixels))+pixels+b'\x00'+h+h+tail
+        self.versions[key]=0;self.tiles[key]=Tile(key,raw,0,32856,pixels,0,h,h,tail)
     def __init__(self,data,leaf=True):
         r=Reader(data);self.original=data;self.version=r.i32()
         if self.version!=65561:raise ValueError(('Unsupported Xaero cache version',self.version))

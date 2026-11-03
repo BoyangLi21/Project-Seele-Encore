@@ -15,6 +15,16 @@ def fixture(leaf=True):
     return data+b'\xff'
 
 class NativeCacheTests(unittest.TestCase):
+    def test_add_missing_leaf_keeps_existing_pixels_and_metadata(self):
+        old=Cache(fixture());original=old.tiles[0].raw;prefix=old.prefix
+        old.add_empty_tile(32);new=Cache(old.encode())
+        self.assertEqual(new.tiles[0].raw,original);self.assertEqual(new.prefix,prefix)
+        self.assertTrue(np.all(unpack_heights(new.tiles[32].heights)==-32768))
+    def test_new_empty_surface_and_overview_records_roundtrip(self):
+        for leaf in (True,False):
+            c=Cache.empty(leaf);c.add_empty_tile(17);read=Cache(c.encode(),leaf)
+            self.assertEqual(read.encode(),c.encode())
+            self.assertEqual(read.versions[17],0)
     def test_leaf_exact_colour_light_height_roundtrip(self):
         raw=fixture();c=Cache(raw)
         self.assertEqual(c.encode(),raw)

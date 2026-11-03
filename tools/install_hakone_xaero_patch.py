@@ -16,17 +16,23 @@ def install(a):
         for name in m['files']:
             rel=Path(name)
             if rel.is_absolute()or'..'in rel.parts:raise ValueError('Unsafe cache path')
-            if (root/rel).read_bytes()!=(a.stage/'before'/rel).read_bytes():raise ValueError('Client has updated map cache since staging: '+name)
+            if name in m.get('new_files',[]):
+                if (root/rel).exists():raise ValueError('New cache region was created by the client: '+name)
+            elif (root/rel).read_bytes()!=(a.stage/'before'/rel).read_bytes():raise ValueError('Client has updated map cache since staging: '+name)
             cache=Cache.open(a.stage/'after'/rel,leaf=rel.parts[0]=='cache_1')
             if cache.encode()!=cache.original:raise ValueError('Unverified Xaero file')
         try:
             for name in m['files']:
-                rel=Path(name);backup=a.out/'original'/rel;backup.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(root/rel,backup)
+                rel=Path(name);backup=a.out/'original'/rel;backup.parent.mkdir(parents=True,exist_ok=True)
+                if name not in m.get('new_files',[]):shutil.copy2(root/rel,backup)
+                (root/rel).parent.mkdir(parents=True,exist_ok=True)
                 atomic_replace(root/rel,(a.stage/'after'/rel).read_bytes());written.append(rel)
             for rel in written:
                 if (root/rel).read_bytes()!=(a.stage/'after'/rel).read_bytes():raise ValueError('Map cache readback mismatch')
         except BaseException:
-            for rel in reversed(written):atomic_replace(root/rel,(a.out/'original'/rel).read_bytes())
+            for rel in reversed(written):
+                if rel.as_posix()in m.get('new_files',[]):(root/rel).unlink()
+                else:atomic_replace(root/rel,(a.out/'original'/rel).read_bytes())
             raise
     result=dict(status='installed',world=str(a.world),stage=str(a.stage),map_installation=str(a.installation),files=len(written),surface_pixels=m['pixels'],leaf_tiles=m['leaf_tiles'],all_zoom_tiles=m['all_zoom_tiles'],readback=True,waypoints_untouched=True,manual_reload_required=False,game_ui_verification=False)
     (a.out/'installation.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),'utf8');print(json.dumps(result),flush=True)

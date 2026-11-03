@@ -242,6 +242,10 @@ def install(a):
         check = json.loads((candidate/'functional-check.json').read_text('utf8'))
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
+        if 'port_verification'in manifest:
+            expected=manifest['port_verification'];verified=json.loads((candidate/'port-independent-check.json').read_text('utf8'))
+            if verified['errors'] or any(verified['counts'].get(k)!=v for k,v in expected['counts'].items()) or not all(r['reachable']for r in verified['destinations']) or len(verified['destinations'])!=expected['destinations']:
+                raise ValueError('Incomplete independent port geometry and payload verification')
         if 'neighbourhood_verification'in manifest:
             expected=manifest['neighbourhood_verification'];verified=json.loads((candidate/'independent-check.json').read_text('utf8'))
             if verified['errors'] or verified['full_width_columns']!=expected['public_columns'] or verified['reachable_columns']!=expected['public_columns'] or len(verified['parcel_goals'])!=expected['parcels'] or verified['complete_device_tags_exact']!=expected['devices']:
@@ -308,6 +312,17 @@ def install(a):
             elif current.exists(): raise ValueError(f'New metadata already exists: {relative}')
             metadata.append((current, after));metadata_targets.add(current)
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
+        for name in manifest.get('json_metadata',[]):
+            relative=Path(name)
+            allowed={'r07_installations.json','r07_commissioned.json','military_readiness_r23.json',
+                     'regional_plan.json','un01_annex_r20.json','un_hangars_r31.json',
+                     'un_air_reception_r40.json','un_commission_r21.json','un_models_r21.json','un_models_r30.json'}
+            if relative.parts!=(name,) or name not in allowed:raise ValueError('Unexpected facility metadata destination')
+            current=a.world/relative;prior=candidate/'before'/relative;after=candidate/'after'/relative
+            if current in metadata_targets:raise ValueError('Overlapping facility metadata')
+            if not prior.is_file()or not current.is_file()or current.read_bytes()!=prior.read_bytes():raise ValueError('Facility metadata changed since capture')
+            json.loads(after.read_text('utf8'))
+            metadata.append((current,after));metadata_targets.add(current)
         for name in manifest.get('native_members',[]):
             relative=Path(name)
             if relative.is_absolute()or'..'in relative.parts or relative.parts[:3]!=('mtr','projectseele','geofront'):
@@ -338,6 +353,15 @@ def install(a):
                 target,prepared,cells,tiles=future.result()
                 plans.append((target,prepared));total+=cells;tile_set.update(tiles)
                 print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s',flush=True)
+        from map_pipeline.install.entity_moves import prepare as prepare_entity_moves
+        actor_reports=[]
+        for candidate,manifest in zip(a.candidate,manifests):
+            actor_pairs,actor_report=prepare_entity_moves(candidate,a.world,stage,manifest)
+            for target,prepared in actor_pairs:
+                if target in metadata_targets:raise ValueError('Overlapping actor migration candidates')
+                metadata.append((target,prepared));metadata_targets.add(target)
+            if actor_report['roots']:actor_reports.append(actor_report)
+        journal['actor_relocations']=actor_reports
     except BaseException as error:
         journal.update(status='staging-failed',actual_files_written=0,error_type=type(error).__name__);save()
         raise
