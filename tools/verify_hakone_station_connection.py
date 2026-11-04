@@ -21,6 +21,9 @@ def verify(candidate):
     floor_materials=PAVEMENT|{'minecraft:gravel','projectseele:period_station_floor','projectseele:nerv_floor_panel','minecraft:stone_bricks','minecraft:polished_andesite'}
     for r in rows:
         a=np.asarray(r['approach'],float);p=np.asarray(r['platform'],float);p[1]+=1
+        max_step=float(r.get('maximum_step_height',1.0))
+        if max_step not in (.5,1.0):raise ValueError('Unsupported pedestrian step limit')
+        vertical_steps=(0,1,-1)if max_step==.5 else(0,1,-1,2,-2)
         # The route may go around waiting-room walls, but cannot leave this
         # station to return via an unrelated crossing elsewhere in the map.
         l,t=max(x,int(min(a[0],p[0]))-24),max(z,int(min(a[2],p[2]))-24)
@@ -47,7 +50,7 @@ def verify(candidate):
         while queue and goal not in previous:
             px,py,pz=queue.popleft()
             for dx,dz in((1,0),(-1,0),(0,1),(0,-1)):
-                for dy in(0,1,-1,2,-2):
+                for dy in vertical_steps:
                     q=px+dx,py+dy,pz+dz
                     if q in standing and q not in previous:previous[q]=(px,py,pz);queue.append(q)
         reached=goal in previous;path=[]
@@ -56,7 +59,7 @@ def verify(candidate):
             while q is not None:path.append([q[0],q[1]/2,q[2]]);q=previous[q]
             path.reverse()
         else:errors.append(['station platform unreachable without crossing track',r['id'],a.tolist(),p.tolist()])
-        results.append(dict(station=r['station_id'],approach=a.tolist(),platform=p.tolist(),connected=reached,visited=len(previous),running_track_positions_excluded=blocked_rail,path=path,wooden_doors_treated_as_operable=True,half_block_floors_supported=True))
+        results.append(dict(station=r['station_id'],approach=a.tolist(),platform=p.tolist(),destination_type=r.get('destination_type','platform'),maximum_step_height=max_step,connected=reached,visited=len(previous),running_track_positions_excluded=blocked_rail,path=path,wooden_doors_treated_as_operable=True,half_block_floors_supported=True))
     report=dict(stations=results,errors=errors,world_written=False,game_ui_verification=False)
     (candidate/'station-access-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
     print(json.dumps(dict(stations=[dict(station=r['station'],connected=r['connected'],path_positions=len(r['path']),visited=r['visited'])for r in results],errors=errors),ensure_ascii=False),flush=True)

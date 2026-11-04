@@ -6,14 +6,14 @@ import verify_hakone_station_connection as connection
 
 
 class StationHalfStepsTest(unittest.TestCase):
-    def check_path(self,blocked):
+    def check_path(self,blocked,max_step=1.0,half_middle=True):
         with tempfile.TemporaryDirectory() as temp:
             root=Path(temp);(root/'plan').mkdir()
-            (root/'plan/buildings.json').write_text(json.dumps([dict(id='test',station_id='test',kind='station',approach=[0,1,0],platform=[2,-1,0])]),'utf8')
+            (root/'plan/buildings.json').write_text(json.dumps([dict(id='test',station_id='test',kind='station',approach=[0,1,0],platform=[2,-1,0],maximum_step_height=max_step)]),'utf8')
             (root/'plan/native-curves.json').write_text(json.dumps(dict(trains=[dict(points=[[100,10,100],[101,10,100]])])),'utf8')
             np.savez_compressed(root/'plan/network.npz',bounds=[0,0,2,0],walk=np.ones((1,3),bool),grade2=np.array([[0,-1,-2]]))
             blocks=np.zeros((1,448,16,16),np.uint16)
-            blocks[0,128,0,0]=1;blocks[0,128,0,1]=2;blocks[0,127,0,2]=1
+            blocks[0,128,0,0]=1;blocks[0,128,0,1]=2 if half_middle else 1;blocks[0,127,0,2]=1
             if blocked:blocks[0,129,0,1]=1
             class Fixture:
                 def region(self,x,z):
@@ -29,6 +29,11 @@ class StationHalfStepsTest(unittest.TestCase):
     def test_obstruction_above_slab_still_blocks_passenger(self):
         report=self.check_path(True)
         self.assertTrue(report['errors'])
+
+    def test_no_jump_route_rejects_whole_block_shortcut(self):
+        self.assertFalse(self.check_path(False,max_step=.5)['errors'])
+        self.assertTrue(self.check_path(False,max_step=.5,half_middle=False)['errors'])
+        self.assertFalse(self.check_path(False,max_step=1.0,half_middle=False)['errors'])
 
 
 if __name__=='__main__':unittest.main()
