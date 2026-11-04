@@ -108,6 +108,11 @@ def author(site,row,folder):
         y=level*5
         c.fill(-hx+2,y+5,-hz+2,-hx+4,y+5,-hz+5,'minecraft:air')
         for step in range(5):
+            if step:
+                # A continuous stringer joins successive risers; diagonal
+                # stair blocks alone leave the middle flight unsupported.
+                c.fill(-hx+2,y+step,-hz+2+step,-hx+4,y+step,-hz+2+step,
+                       'minecraft:stone_bricks')
             c.fill(-hx+2,y+1+step,-hz+2+step,-hx+4,y+1+step,-hz+2+step,
                    'minecraft:stone_brick_stairs[facing=south,half=bottom,shape=straight,waterlogged=false]')
             c.walkpoint(-hx+3,y+2+step,-hz+2+step)
