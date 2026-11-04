@@ -1,0 +1,570 @@
+{
+  "source": "Four current retained southern buildings; measured low railway crossing at X1480",
+  "togendai_forecourt": false,
+  "core": [
+    1440,
+    1002,
+    1540,
+    1122
+  ],
+  "earthwork_blend_distance": 45,
+  "retire_road_areas": [
+    [
+      1434,
+      998,
+      1550,
+      1132
+    ]
+  ],
+  "connectivity_seed": [
+    1439,
+    1005
+  ],
+  "streets": [
+    {
+      "id": "ohiradai-southern-access",
+      "points": [
+        [
+          1439,
+          10,
+          1005
+        ],
+        [
+          1456,
+          7,
+          1008
+        ],
+        [
+          1470,
+          3,
+          1023
+        ],
+        [
+          1480,
+          1,
+          1035
+        ],
+        [
+          1480,
+          1,
+          1056
+        ],
+        [
+          1501,
+          4.5,
+          1058
+        ],
+        [
+          1530,
+          11,
+          1084
+        ],
+        [
+          1530,
+          14,
+          1115
+        ],
+        [
+          1493,
+          13,
+          1117
+        ],
+        [
+          1462,
+          13,
+          1107
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "ohiradai-western-frontages",
+      "points": [
+        [
+          1462,
+          13,
+          1107
+        ],
+        [
+          1462,
+          13,
+          1065
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "ohiradai-western-turning-court",
+      "points": [
+        [
+          1462,
+          13,
+          1066
+        ],
+        [
+          1462,
+          13,
+          1065
+        ]
+      ],
+      "width": 9,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "ohiradai-shop-lane",
+      "points": [
+        [
+          1492,
+          13,
+          1117
+        ],
+        [
+          1492,
+          12,
+          1081
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "ohiradai-shop-turning-court",
+      "points": [
+        [
+          1492,
+          12,
+          1082
+        ],
+        [
+          1492,
+          12,
+          1081
+        ]
+      ],
+      "width": 9,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    }
+  ],
+  "retained_ports": [
+    {
+      "street": "ohiradai-southern-access",
+      "end": 0,
+      "radius": 10
+    }
+  ],
+  "footways": [
+    {
+      "parcel": "valley/1454/1030",
+      "points": [
+        [
+          1454,
+          12,
+          1021
+        ],
+        [
+          1450,
+          10,
+          1013
+        ],
+        [
+          1450,
+          8,
+          1006
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/1477/1074",
+      "points": [
+        [
+          1477,
+          13,
+          1065
+        ],
+        [
+          1462,
+          13,
+          1065
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/1478/1093",
+      "points": [
+        [
+          1478,
+          13,
+          1084
+        ],
+        [
+          1462,
+          13,
+          1084
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/1503/1096",
+      "points": [
+        [
+          1503,
+          12,
+          1087
+        ],
+        [
+          1492,
+          12,
+          1087
+        ]
+      ]
+    }
+  ],
+  "parcel_floors": {
+    "valley/1454/1030": 11,
+    "valley/1477/1074": 12,
+    "valley/1478/1093": 12,
+    "valley/1503/1096": 11
+  },
+  "retained_soil_areas": [
+    [
+      1384,
+      910,
+      1558,
+      990
+    ]
+  ],
+  "protected_volumes": [
+    [
+      -2828,
+      70,
+      -980,
+      -2676,
+      110,
+      -940
+    ],
+    [
+      -1556,
+      104,
+      616,
+      -1404,
+      151,
+      656
+    ],
+    [
+      -1156,
+      104,
+      540,
+      -1004,
+      134,
+      580
+    ],
+    [
+      -700,
+      96,
+      164,
+      -660,
+      126,
+      316
+    ],
+    [
+      -196,
+      80,
+      -192,
+      -44,
+      110,
+      -152
+    ],
+    [
+      340,
+      80,
+      224,
+      380,
+      110,
+      376
+    ],
+    [
+      160,
+      80,
+      684,
+      200,
+      110,
+      836
+    ],
+    [
+      664,
+      80,
+      1170,
+      816,
+      110,
+      1210
+    ],
+    [
+      -1730,
+      80,
+      -285,
+      -1610,
+      110,
+      -245
+    ],
+    [
+      -1740,
+      104,
+      300,
+      -1700,
+      134,
+      420
+    ],
+    [
+      -1540,
+      104,
+      656,
+      -1420,
+      151,
+      696
+    ],
+    [
+      -420,
+      80,
+      664,
+      -300,
+      110,
+      704
+    ],
+    [
+      296,
+      80,
+      240,
+      336,
+      122,
+      360
+    ],
+    [
+      1124,
+      70,
+      452,
+      1244,
+      110,
+      492
+    ],
+    [
+      900,
+      51,
+      618,
+      944,
+      71,
+      685
+    ],
+    [
+      964,
+      51,
+      744,
+      1014,
+      71,
+      781
+    ],
+    [
+      1022,
+      48,
+      917,
+      1072,
+      68,
+      954
+    ],
+    [
+      1243,
+      23,
+      864,
+      1288,
+      43,
+      909
+    ],
+    [
+      1498,
+      -2,
+      967,
+      1548,
+      18,
+      1004
+    ],
+    [
+      1949,
+      -44,
+      1080,
+      1999,
+      -24,
+      1117
+    ],
+    [
+      2189,
+      -60,
+      1097,
+      2245,
+      -40,
+      1137
+    ],
+    [
+      -310,
+      96,
+      994,
+      -260,
+      130,
+      1038
+    ],
+    [
+      -38,
+      135,
+      813,
+      -5,
+      160,
+      835
+    ],
+    [
+      252,
+      175,
+      813,
+      299,
+      200,
+      851
+    ],
+    [
+      628,
+      99,
+      744,
+      681,
+      130,
+      800
+    ],
+    [
+      1384,
+      -128,
+      910,
+      1558,
+      50,
+      990
+    ]
+  ],
+  "preserve_train_corridors": true,
+  "train_underpasses": [
+    [
+      1475,
+      -8,
+      1035,
+      1485,
+      4,
+      1056
+    ],
+    [
+      1486,
+      3,
+      1053,
+      1486,
+      3,
+      1053
+    ],
+    [
+      1487,
+      3,
+      1053,
+      1487,
+      3,
+      1053
+    ],
+    [
+      1488,
+      3,
+      1053,
+      1488,
+      3,
+      1053
+    ],
+    [
+      1489,
+      3,
+      1053,
+      1489,
+      3,
+      1053
+    ],
+    [
+      1490,
+      3,
+      1053,
+      1490,
+      3,
+      1053
+    ],
+    [
+      1491,
+      3,
+      1053,
+      1491,
+      3,
+      1053
+    ]
+  ],
+  "train_underpass_prior_plan": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\ohiradai-north-installed-authority-v1",
+  "public_paths": [],
+  "new_frontages": [],
+  "retire_street_remnants": [],
+  "retained_public_surfaces": [],
+  "retained_pavement_materials": [
+    "projectseele:period_station_floor",
+    "projectseele:nerv_floor_panel"
+  ],
+  "covered_road_spans": [
+    [
+      1475,
+      1034,
+      1490,
+      1061
+    ]
+  ],
+  "train_underpass_roof_infill": [
+    [
+      1476,
+      -3,
+      1033,
+      1491,
+      7,
+      1061
+    ]
+  ],
+  "hillside_street_details": true,
+  "native_frontage_details": true,
+  "tree_clusters": [
+    [
+      1426,
+      1047
+    ],
+    [
+      1518,
+      1024
+    ],
+    [
+      1545,
+      1102
+    ],
+    [
+      1443,
+      1111
+    ]
+  ],
+  "woodland_areas": []
+}

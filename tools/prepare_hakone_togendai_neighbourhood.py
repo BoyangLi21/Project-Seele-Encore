@@ -182,15 +182,21 @@ def design(a):
     bridge=np.zeros(shape,bool)
     for box in design.get('bridge_spans',[]):bridge[rect(bounds,box)]=True
     bridge|=measured_public
+    # Covered roads keep the measured overburden. Their carriageway is a
+    # separate vertical layer, so it must not flatten the hill into an open cut.
+    covered=np.zeros(shape,bool)
+    for box in design.get('covered_road_spans',[]):covered[rect(bounds,box)]=True
+    if covered.any()and not np.any(covered&road):raise ValueError('Covered span contains no carriageway')
+    separate_level=bridge|covered
     innerplots=binary_erosion(plots,iterations=2)
-    anchor=(walk&~bridge)|innerplots|fixed;anchor_y=d['old_ground'].copy();anchor_y[walk]=(grade2[walk]+1)//2-1;anchor_y[innerplots]=plotfloor[innerplots]-3
+    anchor=(walk&~separate_level)|innerplots|fixed;anchor_y=d['old_ground'].copy();anchor_y[walk]=(grade2[walk]+1)//2-1;anchor_y[innerplots]=plotfloor[innerplots]-3
     target,conflict=grade_ground(surveyed,anchor,anchor_y,slope=1)
     np.savez_compressed(a.out/'debug-grades.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,plots=plots,plotfloor=plotfloor,fixed=fixed,anchor_y=anchor_y,wet=wet,conflict=conflict,target=target,old_ground=d['old_ground'])
-    if np.any(conflict & ((walk&~bridge)|innerplots)):
-        j,i=np.argwhere(conflict&((walk&~bridge)|innerplots))[0];raise ValueError(('terrain anchor conflict',int(i+x),int(j+z)))
-    target[wet|fixed|station_soil|bridge|~known]=d['old_ground'][wet|fixed|station_soil|bridge|~known]
+    if np.any(conflict & ((walk&~separate_level)|innerplots)):
+        j,i=np.argwhere(conflict&((walk&~separate_level)|innerplots))[0];raise ValueError(('terrain anchor conflict',int(i+x),int(j+z)))
+    target[wet|fixed|station_soil|separate_level|~known]=d['old_ground'][wet|fixed|station_soil|separate_level|~known]
     if any(np.any(edge)for edge in((target-d['old_ground'])[0],(target-d['old_ground'])[-1],(target-d['old_ground'])[:,0],(target-d['old_ground'])[:,-1])):raise ValueError('Nonzero earthwork at crop edge')
-    np.savez_compressed(a.out/'design.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,marking=mark,plots=plots,plotfloor=plotfloor,ground=target,old_ground=d['old_ground'],wet=wet,core=core,retained_walk=retained_walk,ports=ports,bridge=bridge)
+    np.savez_compressed(a.out/'design.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,marking=mark,plots=plots,plotfloor=plotfloor,ground=target,old_ground=d['old_ground'],wet=wet,core=core,retained_walk=retained_walk,ports=ports,bridge=bridge,covered=covered)
     save_json(a.out/'buildings.json',newrows);save_json(a.out/'new-frontages.json',new_sites);save_json(a.out/'streets.json',streets);save_json(a.out/'footways.json',footways);shutil.copy2(a.design,a.out/'authored-design.json')
     save_json(a.out/'retained-buildings.json',retained)
     save_json(a.out/'design-report.json',dict(buildings=len(rows),moves=sum(any(r['translation'])for r in newrows),maximum_lift=max((r['dy']for r in newrows),default=0),streets=streets,road_columns=int(road.sum()),public_columns=int(walk.sum()),retained_public_columns=int(measured_public.sum()),earthwork_columns=int((target!=d['old_ground']).sum()),world_written=False))

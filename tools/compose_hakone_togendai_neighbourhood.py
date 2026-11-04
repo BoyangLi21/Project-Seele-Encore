@@ -27,6 +27,7 @@ def compose(a):
     with np.load(a.design/'design.npz')as f:d={k:f[k]for k in f.files}
     bounds=d['bounds'];x,z,X,Z=map(int,bounds);shape=d['walk'].shape
     bridge=d.get('bridge',np.zeros(shape,bool))
+    covered=d.get('covered',np.zeros(shape,bool))
     rows=json.loads((a.design/'buildings.json').read_text('utf8'))
     capture=json.loads((a.source/'capture.json').read_text('utf8'));world=Path(capture['world'])
     devices={tuple(int(t[k])for k in('x','y','z')):t for t in nbtlib.load(a.survey/'captured-devices.dat')['Devices']}
@@ -178,8 +179,8 @@ def compose(a):
                 if protect[h+128,j,i]:
                     if not pave[v[h+128,j,i]] and r['names'][v[h+128,j,i]].split('[')[0]not in design_spec.get('retained_pavement_materials',[]):errors.append(['protected road floor',px,h,pz,r['names'][v[h+128,j,i]]])
                     continue
-                deck=bool(bridge[j0,i0])
-                for Y in range(h-2 if deck else min(int(old[j,i])-2,h-2),h+(5 if d['road'][j0,i0]else 4)):
+                deck=bool(bridge[j0,i0]or covered[j0,i0])
+                for Y in range(h-2 if deck else min(int(old[j,i])-2,h-2),h+(5 if d['road'][j0,i0]or covered[j0,i0]else 4)):
                     if protect[Y+128,j,i]:continue
                     state=int(v[Y+128,j,i]);allowed=natural[state]or empty[state]or (pave[state]and retire[j,i])
                     if not allowed:
@@ -278,7 +279,7 @@ def compose(a):
     records=[nbtlib.Compound({'Pos':nbtlib.Long(packed(pos)),**row})for pos,row in sorted(changes.items())]
     nbtlib.File({'Changes':nbtlib.List[nbtlib.Compound](records)}).save(a.out/'block-entities.dat',gzipped=True)
     actualground=ground(Editor(a.out),list(map(int,bounds)))
-    np.savez_compressed(a.out/'plan/network.npz',**{**d,'ground':actualground,'tunnel':np.zeros(shape,bool)})
+    np.savez_compressed(a.out/'plan/network.npz',**{**d,'ground':actualground,'tunnel':covered&d['walk']})
     report=dict(errors=errors,world_written=False,visual_verified=False,parcels=len(rows),moved_devices=len(moved),**stats)
     save_json(a.out/'functional-check.json',report)
     manifest=dict(world=str(world),bounds_xz=bounds.tolist(),regions=patches,cells=sum(r['cells']for r in patches),world_written=False,preserve_native_members=True,neighbourhood_verification=dict(public_columns=int(d['walk'].sum()),parcels=len(rows),devices=len(moved)),parcel_moves=[dict(id=r['id'],dy=r['dy'],translation=r.get('translation',[0,r['dy'],0]))for r in rows])

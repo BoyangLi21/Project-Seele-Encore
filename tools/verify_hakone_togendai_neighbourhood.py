@@ -16,13 +16,14 @@ from plan_ashi_landscape_r54 import SOIL
 def verify(candidate):
     with np.load(candidate/'plan/network.npz')as f:d={k:f[k]for k in f.files}
     x,z,X,Z=map(int,d['bounds']);e=Editor(candidate);errors=[];walk=d['walk'];g=d['grade2'];checked=0
+    covered=d.get('covered',np.zeros(walk.shape,bool))
     specs=json.loads((candidate/'plan/authored-design.json').read_text('utf8'))
     pavement=PAVEMENT|set(specs.get('retained_pavement_materials',[]))
     empty=AIR|{'minecraft:light','minecraft:grass','minecraft:tall_grass','minecraft:fern','minecraft:large_fern'}
     for j,i in np.argwhere(walk):
         px,pz=int(i+x),int(j+z);floor,slab=road_blocks(g[j,i]);floor=int(floor);state=e.state(px,floor,pz)
         if state.split('[')[0]not in pavement or ('type=bottom'in state)!=bool(slab):errors.append(['pavement',px,floor,pz,state,bool(slab)])
-        for Y in range(floor+1,floor+(5 if d['road'][j,i] else 4)):
+        for Y in range(floor+1,floor+(5 if d['road'][j,i]or covered[j,i]else 4)):
             state=e.state(px,Y,pz)
             if state.split('[')[0]not in empty:errors.append(['headroom',px,Y,pz,state])
         # The deck needs a real bearing immediately below it. A passable top
@@ -35,6 +36,15 @@ def verify(candidate):
                 if not(pocket and Y==floor-2 and state==e.state(px,Y,pz,True) and state.startswith('minecraft:water') and bank):
                     errors.append(['pavement bearing',px,Y,pz,state])
         checked+=1
+    covered_roofs=[]
+    for j,i in np.argwhere(covered&walk):
+        px,pz=int(i+x),int(j+z);floor=int(road_blocks(g[j,i])[0]);roof=None
+        for Y in range(floor+5,min(320,floor+13)):
+            state=e.state(px,Y,pz);bare=state.split('[')[0]
+            if bare in SOIL|PAVEMENT or bare.endswith('_concrete')or bare in {'minecraft:stone_bricks','minecraft:deepslate_bricks'}:
+                roof=[px,Y,pz];break
+        if roof is None:errors.append(['covered road has no continuous roof',px,floor,pz])
+        else:covered_roofs.append(dict(pos=roof,clear_blocks=roof[1]-floor-1))
     seed=specs.get('connectivity_seed',[-287,1000]);start=(seed[1]-z,seed[0]-x)
     if not walk[start]:raise ValueError(('Connectivity seed is not public pavement',seed))
     seen=np.zeros(walk.shape,bool);queue=deque([start]);seen[start]=True
@@ -107,6 +117,11 @@ def verify(candidate):
                     for R in range(pz-8,pz+9):
                         if not(x<=Q<=X and z<=R<=Z):continue
                         lo,hi=columns.get((Q,R),(320,-129));columns[Q,R]=(min(lo,py-30),max(hi,py+7))
+        deck_limits={}
+        if specs.get('train_underpass_roof_infill'):
+            from map_pipeline.rail_underpasses import physical_deck_ceilings
+            for box in specs['train_underpass_roof_infill']:
+                deck_limits.update(physical_deck_ceilings(json.loads((candidate/'plan/native-curves.json').read_text('utf8'))['trains'],[box[0],box[2],box[3],box[5]]))
         for (px,pz),(lo,hi)in columns.items():
             r=e.region(px,pz);idx=r['index'][px//16,pz//16];a,b=max(-128,lo)+128,min(319,hi)+129
             original=r['before'][idx,a:b,pz%16,px%16];actual=r['after'][idx,a:b,pz%16,px%16]
@@ -115,6 +130,9 @@ def verify(candidate):
                 from map_pipeline.rail_underpasses import editable_underpass_column
                 ux,uz,_,_=map(int,underpass_prior['bounds'])
                 keep&=~editable_underpass_column(e,px,pz,a-128,b-129,specs['train_underpasses'],underpass_prior['walk'][pz-uz,px-ux],underpass_prior['grade2'][pz-uz,px-ux])
+            if specs.get('train_underpass_roof_infill'):
+                from map_pipeline.rail_underpasses import allowed_roof_infill_column
+                keep&=~allowed_roof_infill_column(e,px,pz,a-128,b-129,specs['train_underpass_roof_infill'],deck_limits.get((px,pz)))
             if not np.array_equal(original[keep],actual[keep]):errors.append(['native rail structure or clearance changed',px,pz,int(((original!=actual)&keep).sum())])
             train_cells+=int(keep.sum())
             train_ground_exemptions+=int((~keep).sum())
@@ -208,10 +226,16 @@ def verify(candidate):
             if any(e.state(px,Y,pz).split('[')[0]not in empty for Y in range(floor+1,floor+4)):errors.append(['retained access headroom',route['id'],px,py,pz])
             if any(e.state(px,Y,pz)!=e.state(px,Y,pz,True)for Y in range(floor,floor+4)):errors.append(['retained access changed',route['id'],px,py,pz])
         retained_access.append(dict(id=route['id'],columns=len(points),start=points[0],end=points[-1]))
+    if (candidate/'underpass-structure.json').exists():
+        from finish_hakone_road_underpass import check_structure
+        errors.extend(check_structure(candidate))
     report=dict(errors=errors,full_width_columns=checked,reachable_columns=int(seen.sum()),parcel_payload_cells_checked=payload_cells,parcel_payload_cells_exact=payload_cells-payload_exceptions,approved_outdoor_cells=payload_exceptions,complete_device_tags_exact=checked_tags,retained_device_tags_unchanged=retained_tags,native_room_volume_cells_unchanged=preserved_cells,native_rail_corridor_cells_unchanged=train_cells,native_cable_swept_cells_unchanged=cable_cells,parcel_goals=goals,streets=profiles,retained_interfaces=seams,retained_ground_access=retained_access,visual_verified=False,world_written=False)
     report['new_native_fixtures_checked']=added_fixtures
     report['finite_rail_ground_exception_cells']=train_ground_exemptions
     report['finite_rail_ground_changed_cells']=train_ground_changes
+    report['covered_road_columns']=len(covered_roofs)
+    report['covered_road_minimum_clearance']=min((r['clear_blocks']for r in covered_roofs),default=None)
+    save_json(candidate/'covered-road-roofs.json',covered_roofs)
     save_json(candidate/'independent-check.json',report)
     prior=json.loads((candidate/'functional-check.json').read_text('utf8'));prior.setdefault('composition_errors',prior['errors']);prior['independent_verification_errors']=errors;prior['errors']=prior['composition_errors']+errors;save_json(candidate/'functional-check.json',prior)
     print(json.dumps({k:v for k,v in report.items()if k not in ('errors','parcel_goals')},ensure_ascii=False),flush=True)
