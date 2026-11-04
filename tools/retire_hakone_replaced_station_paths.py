@@ -23,7 +23,10 @@ def run(a):
     keep=binary_dilation(d['walk'],iterations=2);devices={tuple(int(t[k])for k in('x','y','z'))for t in nbtlib.load(a.out/'captured-devices.dat')['Devices']};owned=set()
     for row in rows:
         if row.get('kind')!='station':continue
-        paths=[p for p in row['original_approach_paths']if p[-1]==row['road']]
+        # Published road levels can be corrected independently of the legacy
+        # path. Its horizontal endpoint still identifies original ownership;
+        # retirement uses the captured legacy elevations, not the new datum.
+        paths=[p for p in row['original_approach_paths']if p[-1][::2]==row['road'][::2]]
         if len(paths)!=1:raise ValueError('Original street approach not unique')
         for px,py,pz in paths[0]:
             owned.update((px+dx,Y,pz+dz)for dx in(-1,0,1)for dz in(-1,0,1)for Y in range(py-2,py+1))
