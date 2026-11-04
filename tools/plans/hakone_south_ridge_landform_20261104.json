@@ -1,0 +1,1263 @@
+{
+  "source": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\south-ridge-landform-current-source-v1",
+  "previous_authority": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\south-station-east-streets-installed-authority-v1",
+  "soil_heights": "hakone_south_ridge_landform_20261104.npz",
+  "constraint": "Fill only; no new adjacent height difference above max(previous difference, 1); retained floor caps, full native and occupied-volume checks",
+  "trees": [
+    {
+      "translation": [
+        0,
+        40,
+        0
+      ],
+      "cells": [
+        {
+          "pos": [
+            306,
+            134,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            306,
+            134,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            306,
+            134,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            306,
+            135,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            306,
+            135,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            306,
+            135,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            306,
+            136,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            306,
+            136,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            306,
+            136,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            134,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            134,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            134,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            134,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            134,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            135,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            135,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            135,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            135,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            135,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            136,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            136,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            136,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            136,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            136,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            137,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            137,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            307,
+            137,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            131,
+            846
+          ],
+          "state": "minecraft:oak_log[axis=y]"
+        },
+        {
+          "pos": [
+            308,
+            132,
+            846
+          ],
+          "state": "minecraft:oak_log[axis=y]"
+        },
+        {
+          "pos": [
+            308,
+            133,
+            846
+          ],
+          "state": "minecraft:oak_log[axis=y]"
+        },
+        {
+          "pos": [
+            308,
+            134,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            134,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            134,
+            846
+          ],
+          "state": "minecraft:oak_log[axis=y]"
+        },
+        {
+          "pos": [
+            308,
+            134,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            134,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            135,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            135,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            135,
+            846
+          ],
+          "state": "minecraft:oak_log[axis=y]"
+        },
+        {
+          "pos": [
+            308,
+            135,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            135,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            136,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            136,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            136,
+            846
+          ],
+          "state": "minecraft:oak_log[axis=y]"
+        },
+        {
+          "pos": [
+            308,
+            136,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            136,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            137,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            137,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            308,
+            137,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            134,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            134,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            134,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            134,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            134,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            135,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            135,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            135,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            135,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            135,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            136,
+            844
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            136,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            136,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            136,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            136,
+            848
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            137,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            137,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            309,
+            137,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            134,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            134,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            134,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            135,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            135,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            135,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            136,
+            845
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            136,
+            846
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            310,
+            136,
+            847
+          ],
+          "state": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]"
+        }
+      ],
+      "footings": [
+        [
+          308,
+          170,
+          846
+        ]
+      ]
+    },
+    {
+      "translation": [
+        0,
+        5,
+        0
+      ],
+      "cells": [
+        {
+          "pos": [
+            330,
+            168,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            330,
+            168,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            330,
+            168,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            330,
+            169,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            330,
+            169,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            330,
+            169,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            330,
+            170,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            330,
+            170,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            330,
+            170,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            168,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            168,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            168,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            168,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            168,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            169,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            169,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            169,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            169,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            169,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            170,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            170,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            170,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            170,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            170,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            171,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            171,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            331,
+            171,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            166,
+            825
+          ],
+          "state": "minecraft:birch_log[axis=y]"
+        },
+        {
+          "pos": [
+            332,
+            167,
+            825
+          ],
+          "state": "minecraft:birch_log[axis=y]"
+        },
+        {
+          "pos": [
+            332,
+            168,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            168,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            168,
+            825
+          ],
+          "state": "minecraft:birch_log[axis=y]"
+        },
+        {
+          "pos": [
+            332,
+            168,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            168,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            169,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            169,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            169,
+            825
+          ],
+          "state": "minecraft:birch_log[axis=y]"
+        },
+        {
+          "pos": [
+            332,
+            169,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            169,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            170,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            170,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            170,
+            825
+          ],
+          "state": "minecraft:birch_log[axis=y]"
+        },
+        {
+          "pos": [
+            332,
+            170,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            170,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            171,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            171,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            332,
+            171,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            168,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            168,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            168,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            168,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            168,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            169,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            169,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            169,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            169,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            169,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            170,
+            823
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            170,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            170,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            170,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            170,
+            827
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            171,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            171,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            333,
+            171,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            168,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            168,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            168,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            169,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            169,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            169,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            170,
+            824
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            170,
+            825
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        },
+        {
+          "pos": [
+            334,
+            170,
+            826
+          ],
+          "state": "minecraft:birch_leaves[distance=1,persistent=true,waterlogged=false]"
+        }
+      ],
+      "footings": [
+        [
+          332,
+          170,
+          825
+        ]
+      ]
+    }
+  ],
+  "report": {
+    "errors": [],
+    "cells": 168475,
+    "terrain_columns": 4839,
+    "raised_soil_columns": 4839,
+    "earth_cells": 168304,
+    "trees_replanted": 2,
+    "tree_cells_moved": 149,
+    "devices_preserved": 568,
+    "retained_public_before": {
+      "floor": 0,
+      "headroom": 105
+    },
+    "retained_public_after": {
+      "floor": 0,
+      "headroom": 105
+    },
+    "retained_civil_cells_in_fill": {
+      "minecraft:light_gray_concrete": 440,
+      "minecraft:stone_bricks": 20538,
+      "minecraft:gray_concrete": 193,
+      "minecraft:smooth_stone": 30,
+      "minecraft:black_concrete": 30,
+      "minecraft:white_concrete": 3
+    },
+    "original_structures_modified": 0,
+    "native_geometry_unchanged": true,
+    "maximum_ground_raise": 93,
+    "new_height_discontinuities": 0,
+    "whole_map_complete": false
+  }
+}
