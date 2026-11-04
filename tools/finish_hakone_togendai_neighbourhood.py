@@ -54,7 +54,10 @@ def finish(source,out,detail_plan=None):
     for row in spec['streets']:
         curve,s=alignment(row)
         for at in np.arange(25,s[-1]-12,36):
-            k=int(np.argmin(abs(s-at)));t=curve[k+1,[0,2]]-curve[k-1,[0,2]];t/=np.linalg.norm(t);n=np.array([-t[1],t[0]])
+            k=int(np.argmin(abs(s-at)))
+            cj,ci=int(round(curve[k,2]))-z,int(round(curve[k,0]))-x
+            if 'covered' in d and 0<=cj<d['walk'].shape[0] and 0<=ci<d['walk'].shape[1] and d['covered'][cj,ci]:continue
+            t=curve[k+1,[0,2]]-curve[k-1,[0,2]];t/=np.linalg.norm(t);n=np.array([-t[1],t[0]])
             for side in ((1,-1)if int(at)//36%2 else(-1,1)):
                 px,pz=map(int,np.rint(curve[k,[0,2]]+n*side*(row['width']/2+4)));j,i=pz-z,px-x
                 if not(0<=j<d['walk'].shape[0]and 0<=i<d['walk'].shape[1])or distance[j,i]<1.5:continue

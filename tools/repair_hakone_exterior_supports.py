@@ -19,6 +19,14 @@ from plan_ashi_landscape_r54 import SOIL
 from query_blocks import AIR
 from verify_hakone_togendai_neighbourhood import verify
 from verify_hakone_station_connection import verify as station_verify
+from hakone_earthworks import road_blocks
+
+def require_outside_occupied(pos,rows):
+    for row in rows:
+        shift=row.get('translation',[0,row.get('dy',0),0])
+        b=[value+shift[i%3] for i,value in enumerate(row['occupied_bounds'])]
+        if all(b[k]<=pos[k]<=b[k+3] for k in range(3)):
+            raise ValueError(('Occupied building',pos,row.get('id')))
 
 def repair(a):
     for name in ('functional-check.json','independent-check.json'):
@@ -48,9 +56,10 @@ def repair(a):
         px,py,pz=pos
         if not(x<=px<=X and z<=pz<=Z and -128<=py<=319):raise ValueError(('Outside capture',pos))
         if pos in tags or protected(pos):raise ValueError(('Protected exterior cell',pos))
-        if any(all(r['occupied_bounds'][k]<=pos[k]<=r['occupied_bounds'][k+3] for k in range(3)) for r in rows):raise ValueError(('Occupied building',pos))
+        require_outside_occupied(pos,rows)
         j,i=pz-z,px-x
-        if d['walk'][j,i]:raise ValueError(('Public walkway obstruction',pos))
+        floor,_=road_blocks(d['grade2'][j,i])
+        if d['walk'][j,i] and int(floor)-2<=py<=int(floor)+4:raise ValueError(('Public walkway obstruction',pos))
         before=e.state(*pos)
         for r in rows:
             if all(r['new_payload_bounds'][k]<=pos[k]<=r['new_payload_bounds'][k+3] for k in range(3)):
@@ -78,6 +87,9 @@ def repair(a):
         elif request['action']=='retire':
             if len(cells)>2 or any(e.state(*p)!='minecraft:smooth_stone' for p in cells):raise ValueError('Removal exceeds reviewed tiny paving remnants')
             for pos in cells:put(pos,'minecraft:air','detached exterior paving remnant')
+        elif request['action']=='retire_paving_component':
+            if any(e.state(*p).split('[')[0] not in PAVE for p in cells):raise ValueError('Detached assembly contains a non-paving object')
+            for pos in cells:put(pos,'minecraft:air','reviewed complete detached former road component')
         else:raise ValueError('Unknown repair action')
         repairs.append(dict(component=row['id'],action=request['action'],original_cells=len(cells),bounds=row['bounds']))
     patches=e.save();e.regions.clear()

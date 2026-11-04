@@ -173,6 +173,9 @@ def design(a):
         if px0>X or px1<x or pz0>Z or pz1<z:continue
         fixed[rect(bounds,[px0-3,pz0-3,px1+3,pz1+3])]=True
         retained.append(box)
+    for box in design.get('fixed_ground_areas',[]):
+        if not(x<=box[0]<=box[2]<=X and z<=box[1]<=box[3]<=Z):raise ValueError('Fixed ground area outside capture')
+        fixed[rect(bounds,box)]=True
     fixed&=known
     station_soil=np.zeros(shape,bool)
     for box in design.get('retained_soil_areas',[[-316,994,-255,1115]]):station_soil[rect(bounds,box)]=True
