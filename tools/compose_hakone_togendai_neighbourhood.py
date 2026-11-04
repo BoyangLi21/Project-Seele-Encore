@@ -97,6 +97,8 @@ def compose(a):
     # volume protects both movement directions, independently of station boxes.
     cable=defaultdict(list)
     curves=json.loads((a.base_plan/'native-curves.json').read_text('utf8'))
+    from map_pipeline.entrance_infill import validated_apron_infill
+    apron_infill=validated_apron_infill(e,design_spec,rows,curves)
     for row in curves.get('ropeway',curves.get('ropeways',[])):
         for px,py,pz in row['points']:
             px,py,pz=map(int,np.floor([px,py,pz]))
@@ -129,6 +131,10 @@ def compose(a):
             protect[lo+128:hi+129,R%16,Q%16]|=keep
         for pos in devices.keys()-moved:
             if pos[0]//16==cx and pos[2]//16==cz:protect[pos[1]+128,pos[2]%16,pos[0]%16]=True
+        for pos in apron_infill:
+            if pos[0]//16!=cx or pos[2]//16!=cz:continue
+            if pos in devices or guard.chunk_mask(cx,cz)[pos[1]+128,pos[2]%16,pos[0]%16]:raise ValueError(('Apron infill touches native device or launch mechanism',pos))
+            protect[pos[1]+128,pos[2]%16,pos[0]%16]=False
         protected_chunks[cx,cz]=protect
         return protect
     for box,shift,v,names in payloads:

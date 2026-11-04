@@ -18,6 +18,11 @@ def verify(candidate):
     x,z,X,Z=map(int,d['bounds']);e=Editor(candidate);errors=[];walk=d['walk'];g=d['grade2'];checked=0
     covered=d.get('covered',np.zeros(walk.shape,bool))
     specs=json.loads((candidate/'plan/authored-design.json').read_text('utf8'))
+    from map_pipeline.entrance_infill import validated_apron_infill
+    apron_infill=validated_apron_infill(e,specs,json.loads((candidate/'plan/buildings.json').read_text('utf8')),
+                                       json.loads((candidate/'plan/native-curves.json').read_text('utf8')))
+    for pos,state in apron_infill.items():
+        if e.state(*pos)!=state:errors.append(['protected exterior apron infill differs',*pos,e.state(*pos)])
     pavement=PAVEMENT|set(specs.get('retained_pavement_materials',[]))
     empty=AIR|{'minecraft:light','minecraft:grass','minecraft:tall_grass','minecraft:fern','minecraft:large_fern'}
     for j,i in np.argwhere(walk):
@@ -157,8 +162,14 @@ def verify(candidate):
                 a,b=max(box[1],-128)+128,min(box[4],319)+129
                 area=np.s_[a:b,max(box[2]-cz*16,0):min(box[5]-cz*16+1,16),max(box[0]-cx*16,0):min(box[3]-cx*16+1,16)]
                 original=r['before'][idx][area];actual=r['after'][idx][area]
-                if not np.array_equal(original,actual):errors.append(['native room or mechanism volume changed',box,cx,cz,int((original!=actual).sum())])
-                preserved_cells+=original.size
+                different=original!=actual;exempt=0
+                for pos,state in apron_infill.items():
+                    px,py,pz=pos
+                    if px//16!=cx or pz//16!=cz or not all(box[k]<=pos[k]<=box[k+3]for k in range(3)):continue
+                    if e.state(*pos)==state:
+                        different[py-(a-128),pz-max(box[2],cz*16),px-max(box[0],cx*16)]=False;exempt+=1
+                if different.any():errors.append(['native room or mechanism volume changed',box,cx,cz,int(different.sum())])
+                preserved_cells+=original.size-exempt
     moved_positions={tuple(pos)for row in rows for pos in row['devices']}
     retained_tags=0
     for pos,tag in originals.items():
@@ -231,6 +242,7 @@ def verify(candidate):
         errors.extend(check_structure(candidate))
     report=dict(errors=errors,full_width_columns=checked,reachable_columns=int(seen.sum()),parcel_payload_cells_checked=payload_cells,parcel_payload_cells_exact=payload_cells-payload_exceptions,approved_outdoor_cells=payload_exceptions,complete_device_tags_exact=checked_tags,retained_device_tags_unchanged=retained_tags,native_room_volume_cells_unchanged=preserved_cells,native_rail_corridor_cells_unchanged=train_cells,native_cable_swept_cells_unchanged=cable_cells,parcel_goals=goals,streets=profiles,retained_interfaces=seams,retained_ground_access=retained_access,visual_verified=False,world_written=False)
     report['new_native_fixtures_checked']=added_fixtures
+    report['protected_exterior_air_infill_cells']=len(apron_infill)
     report['finite_rail_ground_exception_cells']=train_ground_exemptions
     report['finite_rail_ground_changed_cells']=train_ground_changes
     report['covered_road_columns']=len(covered_roofs)
