@@ -13,6 +13,13 @@ def prepare(a):
     for C in a.candidate:
         for name in('functional-check.json','independent-check.json'):
             if json.loads((C/name).read_text('utf8'))['errors']:raise ValueError('Unverified '+str(C/name))
+        check=json.loads((C/'functional-check.json').read_text('utf8'))
+        if check.get('native_geometry_requires_verified_migration'):
+            from map_pipeline.native_geometry_patch import expected
+            final,proof=expected(C)
+            if proof['changed_members']==0:raise ValueError('Native geometry repair lacks its finite member migration')
+            loaded=json.loads((C/'native-load-check.json').read_text('utf8'))
+            if not loaded['service_and_vehicle_records_equal'] or loaded['new_path_gaps']:raise ValueError('Native engine load verification failed')
         stations=[r for r in json.loads((C/'plan/buildings.json').read_text('utf8'))if r.get('kind')=='station']
         if stations:
             r=json.loads((C/'station-access-check.json').read_text('utf8'))

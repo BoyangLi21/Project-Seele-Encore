@@ -296,7 +296,7 @@ def install(a):
             if previous is not None and previous!=r:raise ValueError(f'Conflicting device changes at {(x,y,z)}')
             devices[x//512, z//512][x//16, z//16][x,y,z] = r
             files.setdefault((x//512,z//512), [])
-    metadata = [];native_snapshots=[];native_additions=set()
+    metadata = [];native_snapshots=[];native_additions=set();native_geometry_finals=[];native_geometry_reports=[]
     metadata_targets=set()
     for candidate in a.candidate:
         for after in (candidate/'after').rglob('*.dat'):
@@ -332,7 +332,16 @@ def install(a):
             if current.read_bytes()!=prior.read_bytes():raise ValueError('Native service changed after repair preparation')
             metadata.append((current,after));metadata_targets.add(current)
         additions=manifest.get('native_additions',[])
-        if additions or manifest.get('preserve_native_members',False):
+        if manifest.get('native_geometry_patch'):
+            if len(a.candidate)!=1 or additions or manifest.get('native_members'):
+                raise ValueError('Finite native geometry migration requires one composed candidate and no other native operations')
+            from map_pipeline.native_geometry_patch import prepare as prepare_native_geometry
+            pairs,baseline,final,report=prepare_native_geometry(candidate,a.world)
+            for current,after in pairs:
+                if current in metadata_targets:raise ValueError('Overlapping native geometry operation')
+                metadata.append((current,after));metadata_targets.add(current)
+            native_snapshots.append(baseline);native_geometry_finals.append(final);native_geometry_reports.append(report)
+        elif additions or manifest.get('preserve_native_members',False):
             pairs,baseline,added=prepare_native_additions(candidate,a.world,additions)
             for current,after in pairs:
                 if current in metadata_targets:raise ValueError('Overlapping native service addition')
@@ -382,7 +391,7 @@ def install(a):
     for i, (target, source) in enumerate(plans):
         backup = original/str(i)
         if target.exists(): shutil.copy2(target, backup)
-        journal['files'].append(dict(target=str(target), staged=str(source), backup=str(backup) if backup.exists() else None))
+        journal['files'].append(dict(target=str(target), staged=str(source) if source is not None else None, backup=str(backup) if backup.exists() else None))
     journal.update(status='prepared', cells=total, regions=len(files), metadata_files=len(metadata), jar_classes=jar_classes, tiles=sorted(tile_set)); save()
     written = []
     try:
@@ -391,7 +400,9 @@ def install(a):
         for item in journal['files']:
             target = Path(item['target']); target.parent.mkdir(parents=True, exist_ok=True)
             if a.installed_jar and target==a.installed_jar:unchanged_jar()
-            atomic_replace(target, Path(item['staged']).read_bytes()); written.append(item)
+            if item['staged'] is None:target.unlink()
+            else:atomic_replace(target, Path(item['staged']).read_bytes())
+            written.append(item)
         journal['status'] = 'written'; save()
         # Read back changed sections, not untouched regions or whole-save data.
         for region_key, inputs in sorted(files.items()):
@@ -404,8 +415,10 @@ def install(a):
             if any(pending.values()): raise ValueError(f'Missing written sections {region_key}')
         device_count=0
         for target,source in metadata:
-            if target.read_bytes()!=source.read_bytes():raise ValueError('Installed metadata mismatch: '+str(target))
-        for baseline in native_snapshots:assert_native_preserved(a.world,baseline,native_additions)
+            if source is None:
+                if target.exists():raise ValueError('Retired native endpoint still exists: '+str(target))
+            elif target.read_bytes()!=source.read_bytes():raise ValueError('Installed metadata mismatch: '+str(target))
+        for baseline in native_geometry_finals or native_snapshots:assert_native_preserved(a.world,baseline,native_additions)
         for (rx,rz),chunks in devices.items():
             _,raw=read_region(dimension_dir(a.world,DIM)/'region'/f'r.{rx}.{rz}.mca')
             for (cx,cz),changes in chunks.items():
@@ -416,7 +429,8 @@ def install(a):
                     device_count+=1
         journal.update(status='installed', seconds=round(time.monotonic()-start), changed_section_readback=True,
             changed_device_nbt_readback=device_count,metadata_readback=len(metadata),
-            native_additions=len(native_additions),existing_native_members_exact=bool(native_snapshots),lod='required'); save()
+            native_additions=len(native_additions),existing_native_members_exact=bool(native_snapshots) and not native_geometry_reports,
+            native_geometry_migrations=native_geometry_reports,lod='required'); save()
         print(json.dumps({k:v for k,v in journal.items() if k not in ('files','tiles')}), flush=True)
     except BaseException:
         for item in reversed(written):

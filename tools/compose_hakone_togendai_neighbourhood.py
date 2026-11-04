@@ -89,6 +89,13 @@ def compose(a):
     for box in design_spec.get('retire_road_areas',[]):rebuild[rect(bounds,box)]=True
     rebuild[d['ports']&~d['walk']]=False
     retired_scope=rebuild&oldowned
+    if design_spec.get('retired_public_mask'):
+        with np.load(Path(design_spec['retired_public_mask'])) as finite:
+            if not np.array_equal(finite['bounds'],bounds):raise ValueError('Finite retirement mask uses a different capture')
+            mask=finite['retired'].copy()
+        if mask.shape!=shape or mask.dtype!=bool:raise ValueError('Invalid finite public retirement mask')
+        retired_scope=(mask|binary_dilation(d['walk'],iterations=2))&oldowned
+        retired_scope[d['ports']&~d['walk']]=False
     if design_spec.get('togendai_forecourt',True):retired_scope[rect(bounds,[-326,979,-246,996])]=True
     retained=json.loads((a.design/'retained-buildings.json').read_text('utf8'))
     boxes=[[b[0]-2,b[1]-3,b[2]-2,b[3]+2,b[4]+8,b[5]+2]for b in retained]

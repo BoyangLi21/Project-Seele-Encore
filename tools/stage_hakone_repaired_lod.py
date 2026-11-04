@@ -4,6 +4,7 @@ from pathlib import Path
 from install_r53_carrier_trays import stopped_world
 from install_hakone_array_patch import atomic_replace,prepare_jar
 from native_transit_additions import inventory,assert_preserved
+from map_pipeline.native_geometry_patch import expected as expected_native
 
 def stage(a):
     r=json.loads(a.installation.read_text('utf8'))
@@ -21,8 +22,10 @@ def stage(a):
         kept=json.loads((a.candidate[0]/'identity-before/files.json').read_text('utf8'))
         for name in kept:
             if (a.candidate[0]/'identity-before'/name).read_bytes()!=(a.world/name).read_bytes():raise ValueError('World/player/entity identity changed '+name)
-        for C in a.candidate:assert_preserved(a.world,inventory(C/'preserved-native'))
-        (a.installation.parent/'identity-readback.json').write_text(json.dumps(dict(files_exact=len(kept),native_members_exact=len(inventory(a.candidate[0]/'preserved-native')),actors_players_level_untouched=True),indent=2),'utf8')
+        native_reports=[]
+        for C in a.candidate:
+            final,report=expected_native(C);assert_preserved(a.world,final);native_reports.append(report)
+        (a.installation.parent/'identity-readback.json').write_text(json.dumps(dict(files_exact=len(kept),native_expected_members_exact=len(final),native_geometry=native_reports,actors_players_level_untouched=True),indent=2),'utf8')
         for name in {p.stem+'.mca'for C in a.candidate for p in(C/'delta').glob('*.npz')}:
             rel=Path('dimensions/projectseele/geofront/region')/name;backup=a.out/'cache-before'/rel;backup.parent.mkdir(parents=True,exist_ok=True)
             if (a.cache/rel).exists():shutil.copy2(a.cache/rel,backup)

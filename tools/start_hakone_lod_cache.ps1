@@ -11,6 +11,8 @@ $taskLog = Join-Path $ArtifactRoot "work\$BatchName-stdout.log"
 $taskErr = Join-Path $ArtifactRoot "work\$BatchName-stderr.log"
 $taskReceipt = Join-Path $ArtifactRoot "$BatchName\input-isolation.json"
 if (Test-Path -LiteralPath $taskReceipt) { throw 'Fresh isolation receipt required' }
+[System.IO.Directory]::CreateDirectory((Split-Path -Parent $taskLog)) | Out-Null
+[System.IO.Directory]::CreateDirectory((Split-Path -Parent $taskReceipt)) | Out-Null
 $taskProcess = Start-Process -FilePath $Java -ArgumentList '@user_jvm_args.txt','@libraries/net/minecraftforge/forge/1.20.1-47.4.10/win_args.txt','nogui' -WorkingDirectory $CacheServer -WindowStyle Hidden -RedirectStandardOutput $taskLog -RedirectStandardError $taskErr -PassThru
 $taskProcess.Id | Set-Content -LiteralPath (Join-Path $ArtifactRoot "work\$BatchName-pid.txt")
 Write-Output "Started isolated cache PID $($taskProcess.Id)"

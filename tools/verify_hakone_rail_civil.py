@@ -16,6 +16,18 @@ def verify(candidate):
     spec=json.loads((candidate/'plan/rail-civil-design.json').read_text('utf8'))
     curves=json.loads((candidate/'plan/native-curves.json').read_text('utf8'))['trains']
     env=columns(curves,spec['curve_indices']);e=Editor(candidate);errors=[];bearings={};structure={}
+    base=Editor(Path(spec['base_public_candidate'])) if spec.get('base_public_candidate') else None
+    base_public_columns=0
+    if base is not None:
+        path=Path(spec['base_public_candidate'])
+        if json.loads((path/'independent-check.json').read_text('utf8'))['errors']:raise ValueError('Base public works are not verified')
+        with np.load(path/'plan/network.npz') as f:public={k:f[k] for k in ('bounds','walk','grade2')}
+        bx,bz,_,_=map(int,public['bounds']);by,_=road_blocks(public['grade2'])
+        for j,i in np.argwhere(public['walk']):
+            px,pz=int(i+bx),int(j+bz);h=int(by[j,i])
+            for Y in range(h-2,h+5):
+                if e.state(px,Y,pz)!=base.state(px,Y,pz):errors.append(['verified public works changed by rail civil',px,Y,pz])
+            base_public_columns+=1
     empty=AIR|PLANTS|{'minecraft:light','minecraft:water','minecraft:lava'}
     low_gaps=[];clearance=0
     for (x,z),row in env.items():
@@ -36,12 +48,22 @@ def verify(candidate):
             s=e.state(x,Y,z)
             if s.split('[')[0] not in empty:structure[x,Y,z]=s
     data=json.loads((candidate/'rail-civil-geometry.json').read_text('utf8'))
+    station_access_cells=set()
+    for row in data.get('station_access_columns',[]):
+        px,pz,h,footing=(row[k] for k in ('x','z','floor','footing'))
+        if e.state(px,footing,pz).split('[')[0] not in SOIL:errors.append(['station footway lacks earth bearing',px,footing,pz])
+        for Y in range(footing+1,h+4):
+            state=e.state(px,Y,pz)
+            if (Y<=h and state!='minecraft:stone_bricks') or (Y>h and state.split('[')[0] not in AIR):errors.append(['station footway surface or clearance',px,Y,pz,state])
+            station_access_cells.add((px,Y,pz))
+    exterior_footings=set()
     for row in data['pier_columns']:
         x,y,z=row['top'];bottom=row['footing'][1]
         for Y in range(bottom+1,y+1):
             s=e.state(x,Y,z)
             if s.split('[')[0] in empty:errors.append(['pier gap',x,Y,z])
             else:structure[x,Y,z]=s
+            if row['kind']=='measured exterior fragment footing':exterior_footings.add((x,Y,z))
         if e.state(x,bottom,z).split('[')[0] not in SOIL:errors.append(['pier lacks measured earth bearing',x,bottom,z])
     # Solid contacts must have actual overlapping vertical faces: touching
     # half-slabs at a voxel corner is not a structural connection.
@@ -91,6 +113,9 @@ def verify(candidate):
                 for name,b in room_index.get((int(cx),int(cz)),[]):
                     if b[0]<=px<=b[3] and b[1]<=py<=b[4] and b[2]<=pz<=b[5]:errors.append(['retained occupied room changed',name,int(px),int(py),int(pz)])
                 if d['walk'][j,i] and floor[j,i]-2<=py<=floor[j,i]+4:
+                    if (int(px),int(py),int(pz)) in station_access_cells:continue
+                    if (int(px),int(py),int(pz)) in exterior_footings and py<floor[j,i] and str(palette[old]).split('[')[0] in AIR|PLANTS|{'minecraft:light'}:continue
+                    if base is not None and base.state(int(px),int(py),int(pz))==str(palette[new]):continue
                     if str(palette[new]).split('[')[0] not in AIR or py<=floor[j,i]:errors.append(['retained public passage changed',int(px),int(py),int(pz)])
                     else:passage_changed+=1
     stations=station_verify(candidate)
@@ -98,7 +123,7 @@ def verify(candidate):
     report=dict(errors=errors,track_columns=len(env),bearing_positions_checked=len(bearings),maximum_bearing_gap_below_lowest_native_rail=max(low_gaps,default=0),
         continuous_earth_load_paths=len(bearings)-len(missing),maximum_load_path_blocks=max((distance.get(p,0) for p in bearings),default=0),
         station_access=stations['stations'],devices_unchanged=len(tags),retained_public_headroom_fragments_removed=passage_changed,
-        world_written=False,rendered_train_collision_checked=False)
+        verified_base_public_columns_unchanged=base_public_columns,world_written=False,rendered_train_collision_checked=False)
     (candidate/'independent-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
     print({k:v for k,v in report.items() if k not in ('errors','station_access')},'errors',len(errors),errors[:8],flush=True)
     return report
