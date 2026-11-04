@@ -20,6 +20,7 @@ def prepare(candidate,proposal,samples,old_samples):
     if root.exists():raise ValueError('Use a fresh native geometry candidate')
     before=inventory(candidate/'preserved-native')
     spec=json.loads(proposal.read_text('utf8'))
+    station_lift=spec.get('migration_kind')=='cable_station_vertical'
     measured={r['id']:r for r in json.loads(samples.read_text('utf8'))}
     original={r['id']:r for r in json.loads(old_samples.read_text('utf8'))}
     moves={tuple(r['before']):tuple(r['after']) for r in spec['moves']}
@@ -66,9 +67,17 @@ def prepare(candidate,proposal,samples,old_samples):
             return result
         if 'vehicles' in value:vehicle_arrays+=1
         return {k:(v if k=='vehicles' else update(v)) for k,v in value.items()}
+    identity_members=[]
     for name,raw in before.items():
-        if not any('/'+kind+'/' in name for kind in ('depots','sidings')):continue
+        if not any('/'+kind+'/' in name for kind in (('depots','sidings','platforms')if station_lift else('depots','sidings'))):continue
         node,tail=decode(raw);result=update(node.value)
+        if station_lift and any('/'+kind+'/' in name for kind in ('platforms','sidings')):
+            for key in ('position1','position2'):
+                q=moves.get(point(node.value[key]))
+                if q is not None:
+                    if node.value['transportMode']!='CABLE_CAR':raise ValueError('Station lift touches another transport mode')
+                    result[key]=dict(zip(('x','y','z'),q))
+            if any(result[k]!=node.value[k]for k in ('position1','position2')):identity_members.append(name)
         if result==node.value:continue
         local=[];declared[name]=patch(node,result,local)+tail;path_members.append(name)
         trace.extend(dict(member=name,**t) for t in local)
@@ -83,6 +92,7 @@ def prepare(candidate,proposal,samples,old_samples):
         operations.append(dict(member=name,before=old is not None,after=raw is not None))
     report=dict(operations=operations,rail_geometry=proof,cached_path_entries=path_count,cached_path_members=path_members,
                 vehicle_arrays_untouched=vehicle_arrays,trace=trace,node_moves=spec['moves'],world_written=False)
+    if station_lift:report.update(migration_kind='cable_station_vertical',station_identity_members=identity_members)
     (root/'operations.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
     m=json.loads((candidate/'manifest.json').read_text('utf8'));m['native_geometry_patch']='native-geometry/operations.json'
     (candidate/'manifest.json').write_text(json.dumps(m,ensure_ascii=False,indent=2),'utf8')

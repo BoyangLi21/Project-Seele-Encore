@@ -240,6 +240,8 @@ def install(a):
     launch_checks = [check_candidate(protection, candidate) for candidate in a.candidate]
     for candidate in a.candidate:
         check = json.loads((candidate/'functional-check.json').read_text('utf8'))
+        from verify_hakone_owakudani_release import require_verified
+        require_verified(candidate)
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
         if 'port_verification'in manifest:

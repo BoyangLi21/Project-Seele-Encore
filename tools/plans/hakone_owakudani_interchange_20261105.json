@@ -1,0 +1,1970 @@
+{
+  "source": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\south-ropeway-station-current-source-v1",
+  "authority": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\south-ridge-landform-installed-authority-v1",
+  "candidate": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\owakudani-candidate-v5",
+  "native_proposal": {
+    "migration_kind": "cable_station_vertical",
+    "moves": [
+      {
+        "before": [
+          275,
+          191,
+          823
+        ],
+        "after": [
+          275,
+          198,
+          823
+        ]
+      },
+      {
+        "before": [
+          281,
+          191,
+          823
+        ],
+        "after": [
+          281,
+          198,
+          823
+        ]
+      },
+      {
+        "before": [
+          291,
+          191,
+          823
+        ],
+        "after": [
+          291,
+          198,
+          823
+        ]
+      },
+      {
+        "before": [
+          291,
+          191,
+          831
+        ],
+        "after": [
+          291,
+          198,
+          831
+        ]
+      },
+      {
+        "before": [
+          281,
+          191,
+          831
+        ],
+        "after": [
+          281,
+          198,
+          831
+        ]
+      },
+      {
+        "before": [
+          275,
+          191,
+          831
+        ],
+        "after": [
+          275,
+          198,
+          831
+        ]
+      },
+      {
+        "before": [
+          271,
+          191,
+          827
+        ],
+        "after": [
+          271,
+          198,
+          827
+        ]
+      },
+      {
+        "before": [
+          267,
+          191,
+          823
+        ],
+        "after": [
+          267,
+          198,
+          823
+        ]
+      }
+    ],
+    "rails": [
+      {
+        "id": "HRE-0",
+        "index": 65,
+        "before": {
+          "position1": {
+            "x": 275,
+            "y": 191,
+            "z": 823
+          },
+          "angle1": "E",
+          "position2": {
+            "x": 281,
+            "y": 191,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 275,
+            "y": 198,
+            "z": 823
+          },
+          "angle1": "E",
+          "position2": {
+            "x": 281,
+            "y": 198,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      },
+      {
+        "id": "HRE-1",
+        "index": 66,
+        "before": {
+          "position1": {
+            "x": 281,
+            "y": 191,
+            "z": 823
+          },
+          "angle1": "E",
+          "position2": {
+            "x": 291,
+            "y": 191,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 80,
+          "speedLimit2": 80,
+          "isPlatform": true,
+          "isSiding": false,
+          "canAccelerate": false,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 281,
+            "y": 198,
+            "z": 823
+          },
+          "angle1": "E",
+          "position2": {
+            "x": 291,
+            "y": 198,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 80,
+          "speedLimit2": 80,
+          "isPlatform": true,
+          "isSiding": false,
+          "canAccelerate": false,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      },
+      {
+        "id": "HRE-2s0",
+        "index": 67,
+        "before": {
+          "position1": {
+            "x": 291,
+            "y": 191,
+            "z": 823
+          },
+          "angle1": "E",
+          "position2": {
+            "x": 314,
+            "y": 221,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 291,
+            "y": 198,
+            "z": 823
+          },
+          "angle1": "E",
+          "position2": {
+            "x": 314,
+            "y": 221,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 11.5,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      },
+      {
+        "id": "HRE-11s4",
+        "index": 100,
+        "before": {
+          "position1": {
+            "x": 314,
+            "y": 221,
+            "z": 831
+          },
+          "angle1": "W",
+          "position2": {
+            "x": 291,
+            "y": 191,
+            "z": 831
+          },
+          "angle2": "E",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 314,
+            "y": 221,
+            "z": 831
+          },
+          "angle1": "W",
+          "position2": {
+            "x": 291,
+            "y": 198,
+            "z": 831
+          },
+          "angle2": "E",
+          "shape": "QUADRATIC",
+          "verticalRadius": 11.5,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      },
+      {
+        "id": "HRE-12",
+        "index": 101,
+        "before": {
+          "position1": {
+            "x": 291,
+            "y": 191,
+            "z": 831
+          },
+          "angle1": "W",
+          "position2": {
+            "x": 281,
+            "y": 191,
+            "z": 831
+          },
+          "angle2": "E",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 80,
+          "speedLimit2": 80,
+          "isPlatform": true,
+          "isSiding": false,
+          "canAccelerate": false,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 291,
+            "y": 198,
+            "z": 831
+          },
+          "angle1": "W",
+          "position2": {
+            "x": 281,
+            "y": 198,
+            "z": 831
+          },
+          "angle2": "E",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 80,
+          "speedLimit2": 80,
+          "isPlatform": true,
+          "isSiding": false,
+          "canAccelerate": false,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      },
+      {
+        "id": "HRE-13",
+        "index": 102,
+        "before": {
+          "position1": {
+            "x": 281,
+            "y": 191,
+            "z": 831
+          },
+          "angle1": "W",
+          "position2": {
+            "x": 275,
+            "y": 191,
+            "z": 831
+          },
+          "angle2": "E",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 281,
+            "y": 198,
+            "z": 831
+          },
+          "angle1": "W",
+          "position2": {
+            "x": 275,
+            "y": 198,
+            "z": 831
+          },
+          "angle2": "E",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      },
+      {
+        "id": "HRE-14",
+        "index": 103,
+        "before": {
+          "position1": {
+            "x": 275,
+            "y": 191,
+            "z": 831
+          },
+          "angle1": "W",
+          "position2": {
+            "x": 271,
+            "y": 191,
+            "z": 827
+          },
+          "angle2": "S",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 275,
+            "y": 198,
+            "z": 831
+          },
+          "angle1": "W",
+          "position2": {
+            "x": 271,
+            "y": 198,
+            "z": 827
+          },
+          "angle2": "S",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      },
+      {
+        "id": "HRE-15",
+        "index": 104,
+        "before": {
+          "position1": {
+            "x": 271,
+            "y": 191,
+            "z": 827
+          },
+          "angle1": "N",
+          "position2": {
+            "x": 275,
+            "y": 191,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 271,
+            "y": 198,
+            "z": 827
+          },
+          "angle1": "N",
+          "position2": {
+            "x": 275,
+            "y": 198,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 30.0,
+          "styles": [],
+          "speedLimit1": 12,
+          "speedLimit2": 12,
+          "isPlatform": false,
+          "isSiding": false,
+          "canAccelerate": true,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      },
+      {
+        "id": "HRE-depot",
+        "index": 105,
+        "before": {
+          "position1": {
+            "x": 267,
+            "y": 191,
+            "z": 823
+          },
+          "angle1": "E",
+          "position2": {
+            "x": 275,
+            "y": 191,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 100.0,
+          "styles": [],
+          "speedLimit1": 40,
+          "speedLimit2": 40,
+          "isPlatform": false,
+          "isSiding": true,
+          "canAccelerate": false,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        },
+        "after": {
+          "position1": {
+            "x": 267,
+            "y": 198,
+            "z": 823
+          },
+          "angle1": "E",
+          "position2": {
+            "x": 275,
+            "y": 198,
+            "z": 823
+          },
+          "angle2": "W",
+          "shape": "QUADRATIC",
+          "verticalRadius": 100.0,
+          "styles": [],
+          "speedLimit1": 40,
+          "speedLimit2": 40,
+          "isPlatform": false,
+          "isSiding": true,
+          "canAccelerate": false,
+          "canTurnBack": false,
+          "canConnectRemotely": false,
+          "canHaveSignal": true,
+          "signalColors": [],
+          "transportMode": "CABLE_CAR",
+          "stylesMigratedLegacy": true
+        }
+      }
+    ]
+  },
+  "finite_retired_fragments": [
+    {
+      "pos": [
+        289,
+        178,
+        831
+      ],
+      "state": "minecraft:smooth_stone"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        832
+      ],
+      "state": "minecraft:smooth_stone"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        833
+      ],
+      "state": "minecraft:smooth_stone"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        834
+      ],
+      "state": "minecraft:smooth_stone"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        835
+      ],
+      "state": "minecraft:white_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        836
+      ],
+      "state": "minecraft:white_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        837
+      ],
+      "state": "minecraft:white_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        838
+      ],
+      "state": "minecraft:white_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        839
+      ],
+      "state": "minecraft:white_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        840
+      ],
+      "state": "minecraft:white_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        841
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        842
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        843
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        844
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        845
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        846
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        847
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        848
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        849
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        850
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        289,
+        178,
+        851
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        832
+      ],
+      "state": "minecraft:smooth_stone"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        833
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        834
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        835
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        836
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        837
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        838
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        839
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        840
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        841
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        842
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        843
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        844
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        845
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        846
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        847
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        848
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        849
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        850
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        290,
+        177,
+        851
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        838
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        839
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        840
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        841
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        842
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        843
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        844
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        845
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        846
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        847
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        848
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        849
+      ],
+      "state": "minecraft:smooth_stone"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        850
+      ],
+      "state": "minecraft:smooth_stone"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        851
+      ],
+      "state": "minecraft:smooth_stone"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        832
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        833
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        834
+      ],
+      "state": "minecraft:black_concrete"
+    },
+    {
+      "pos": [
+        291,
+        176,
+        830
+      ],
+      "state": "minecraft:smooth_stone"
+    }
+  ],
+  "station_design": {
+    "goals": {
+      "street": [
+        278,
+        179,
+        853
+      ],
+      "concourse": [
+        272,
+        180,
+        840
+      ],
+      "west north platform": [
+        264,
+        186,
+        821
+      ],
+      "west south platform": [
+        264,
+        186,
+        837
+      ],
+      "east north platform": [
+        282,
+        193,
+        820
+      ],
+      "east south platform": [
+        286,
+        193,
+        835
+      ]
+    },
+    "clearance_box": [
+      256,
+      180,
+      809,
+      296,
+      201,
+      845
+    ],
+    "native_lift": 7,
+    "levels": [
+      179,
+      185,
+      192
+    ],
+    "roof": 200,
+    "stair_treads": [
+      [
+        264,
+        180,
+        810
+      ],
+      [
+        264,
+        180,
+        811
+      ],
+      [
+        264,
+        180,
+        812
+      ],
+      [
+        269,
+        183,
+        814
+      ],
+      [
+        269,
+        183,
+        815
+      ],
+      [
+        269,
+        183,
+        816
+      ],
+      [
+        265,
+        180,
+        810
+      ],
+      [
+        265,
+        180,
+        811
+      ],
+      [
+        265,
+        180,
+        812
+      ],
+      [
+        268,
+        183,
+        814
+      ],
+      [
+        268,
+        183,
+        815
+      ],
+      [
+        268,
+        183,
+        816
+      ],
+      [
+        266,
+        181,
+        810
+      ],
+      [
+        266,
+        181,
+        811
+      ],
+      [
+        266,
+        181,
+        812
+      ],
+      [
+        267,
+        184,
+        814
+      ],
+      [
+        267,
+        184,
+        815
+      ],
+      [
+        267,
+        184,
+        816
+      ],
+      [
+        267,
+        181,
+        810
+      ],
+      [
+        267,
+        181,
+        811
+      ],
+      [
+        267,
+        181,
+        812
+      ],
+      [
+        266,
+        184,
+        814
+      ],
+      [
+        266,
+        184,
+        815
+      ],
+      [
+        266,
+        184,
+        816
+      ],
+      [
+        268,
+        182,
+        810
+      ],
+      [
+        268,
+        182,
+        811
+      ],
+      [
+        268,
+        182,
+        812
+      ],
+      [
+        265,
+        185,
+        814
+      ],
+      [
+        265,
+        185,
+        815
+      ],
+      [
+        265,
+        185,
+        816
+      ],
+      [
+        269,
+        182,
+        810
+      ],
+      [
+        269,
+        182,
+        811
+      ],
+      [
+        269,
+        182,
+        812
+      ],
+      [
+        264,
+        185,
+        814
+      ],
+      [
+        264,
+        185,
+        815
+      ],
+      [
+        264,
+        185,
+        816
+      ],
+      [
+        263,
+        186,
+        810
+      ],
+      [
+        263,
+        186,
+        811
+      ],
+      [
+        263,
+        186,
+        812
+      ],
+      [
+        269,
+        189,
+        814
+      ],
+      [
+        269,
+        189,
+        815
+      ],
+      [
+        269,
+        189,
+        816
+      ],
+      [
+        264,
+        186,
+        810
+      ],
+      [
+        264,
+        186,
+        811
+      ],
+      [
+        264,
+        186,
+        812
+      ],
+      [
+        268,
+        190,
+        814
+      ],
+      [
+        268,
+        190,
+        815
+      ],
+      [
+        268,
+        190,
+        816
+      ],
+      [
+        265,
+        187,
+        810
+      ],
+      [
+        265,
+        187,
+        811
+      ],
+      [
+        265,
+        187,
+        812
+      ],
+      [
+        267,
+        190,
+        814
+      ],
+      [
+        267,
+        190,
+        815
+      ],
+      [
+        267,
+        190,
+        816
+      ],
+      [
+        266,
+        187,
+        810
+      ],
+      [
+        266,
+        187,
+        811
+      ],
+      [
+        266,
+        187,
+        812
+      ],
+      [
+        266,
+        191,
+        814
+      ],
+      [
+        266,
+        191,
+        815
+      ],
+      [
+        266,
+        191,
+        816
+      ],
+      [
+        267,
+        188,
+        810
+      ],
+      [
+        267,
+        188,
+        811
+      ],
+      [
+        267,
+        188,
+        812
+      ],
+      [
+        265,
+        191,
+        814
+      ],
+      [
+        265,
+        191,
+        815
+      ],
+      [
+        265,
+        191,
+        816
+      ],
+      [
+        268,
+        188,
+        810
+      ],
+      [
+        268,
+        188,
+        811
+      ],
+      [
+        268,
+        188,
+        812
+      ],
+      [
+        264,
+        192,
+        814
+      ],
+      [
+        264,
+        192,
+        815
+      ],
+      [
+        264,
+        192,
+        816
+      ],
+      [
+        269,
+        189,
+        810
+      ],
+      [
+        269,
+        189,
+        811
+      ],
+      [
+        269,
+        189,
+        812
+      ],
+      [
+        263,
+        192,
+        814
+      ],
+      [
+        263,
+        192,
+        815
+      ],
+      [
+        263,
+        192,
+        816
+      ]
+    ]
+  },
+  "receipts": [
+    "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\owakudani-install-v5\\installation.json",
+    "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\owakudani-minimap-install-v5\\installation.json",
+    "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\owakudani-lod-install-v5\\installation.json"
+  ],
+  "validation": {
+    "errors": [],
+    "edited_cells_read_back": 6590,
+    "clearance_cells_checked": 33374,
+    "changed_native_curves": [
+      65,
+      66,
+      67,
+      100,
+      101,
+      102,
+      103,
+      104,
+      105
+    ],
+    "native": {
+      "changed_members": 22,
+      "rails": 9,
+      "cached_path_entries": 13,
+      "vehicles_in_changed_owners_exact": 12,
+      "unmodified_native_members_exact": true,
+      "existing_native_members_exact": false,
+      "unmodified_members": 577,
+      "station_identities_retained": 3
+    },
+    "passenger_destinations": 6,
+    "boarding": [
+      {
+        "name": "west north platform",
+        "static_path": [
+          [
+            264,
+            186.0,
+            821
+          ],
+          [
+            264,
+            186.0,
+            822
+          ],
+          [
+            264,
+            185.5,
+            823
+          ],
+          [
+            264,
+            185.5,
+            824
+          ],
+          [
+            264,
+            185.5,
+            825
+          ]
+        ],
+        "car_floor": 186,
+        "step_to_car": 0.5
+      },
+      {
+        "name": "west south platform",
+        "static_path": [
+          [
+            264,
+            186.0,
+            837
+          ],
+          [
+            264,
+            186.0,
+            836
+          ],
+          [
+            264,
+            185.5,
+            835
+          ],
+          [
+            264,
+            185.5,
+            834
+          ],
+          [
+            264,
+            185.5,
+            833
+          ]
+        ],
+        "car_floor": 186,
+        "step_to_car": 0.5
+      },
+      {
+        "name": "east north platform",
+        "static_path": [
+          [
+            282,
+            193.0,
+            820
+          ],
+          [
+            282,
+            192.5,
+            821
+          ],
+          [
+            282,
+            192.5,
+            822
+          ],
+          [
+            282,
+            192.5,
+            823
+          ]
+        ],
+        "car_floor": 193,
+        "step_to_car": 0.5
+      },
+      {
+        "name": "east south platform",
+        "static_path": [
+          [
+            286,
+            193.0,
+            835
+          ],
+          [
+            286,
+            193.0,
+            834
+          ],
+          [
+            286,
+            192.5,
+            833
+          ],
+          [
+            286,
+            192.5,
+            832
+          ],
+          [
+            286,
+            192.5,
+            831
+          ]
+        ],
+        "car_floor": 193,
+        "step_to_car": 0.5
+      }
+    ],
+    "floating_cells_before": 1505,
+    "floating_cells_after": 1435,
+    "new_floating_cells": 0,
+    "unknown_components": 5,
+    "models": [
+      {
+        "model": "ngong_ping_360",
+        "part": "floor",
+        "low": -5.125,
+        "high": -5.0,
+        "radius": 1.5971165423975797
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "lower_wall",
+        "low": -5.125,
+        "high": -3.9662744013346836,
+        "radius": 2.075583641663736
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "roof",
+        "low": -3.0,
+        "high": -2.875,
+        "radius": 1.5971165423975797
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "upper_wall",
+        "low": -4.033725598665317,
+        "high": -2.875,
+        "radius": 2.075583641663736
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "lower_wall",
+        "low": -5.125,
+        "high": -3.966274401334684,
+        "radius": 2.0884655068986233
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "upper_wall",
+        "low": -4.033725598665316,
+        "high": -2.875,
+        "radius": 2.0884655068986233
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "lower_wall_left",
+        "low": -5.125,
+        "high": -3.966274401334684,
+        "radius": 2.0884655068986233
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "upper_wall_left",
+        "low": -4.033725598665316,
+        "high": -2.875,
+        "radius": 2.0884655068986233
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "upper_wall_right",
+        "low": -4.033725598665316,
+        "high": -2.875,
+        "radius": 2.0884655068986233
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "lower_wall_right",
+        "low": -5.125,
+        "high": -3.966274401334684,
+        "radius": 2.0884655068986233
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "lower_wall_left",
+        "low": -5.022069622746272,
+        "high": -3.9835017360732463,
+        "radius": 1.6881682317912432
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "upper_wall_left",
+        "low": -4.033725598665316,
+        "high": -2.935078855996145,
+        "radius": 1.6898899649117423
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "lower_wall_right",
+        "low": -5.022069622746272,
+        "high": -3.9835017360732463,
+        "radius": 1.688168231791243
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "upper_wall_right",
+        "low": -4.033725598665316,
+        "high": -2.935078855996145,
+        "radius": 1.689889964911742
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "door_top",
+        "low": -3.0209987141001333,
+        "high": -2.8491589978921565,
+        "radius": 1.5622438094380482
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "door_bottom_1",
+        "low": -5.0625,
+        "high": -5.0,
+        "radius": 1.688657010763287
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "door_bottom_2",
+        "low": -5.0625,
+        "high": -5.0,
+        "radius": 1.5524677935467777
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "door_bottom_3",
+        "low": -5.065625,
+        "high": -5.003125,
+        "radius": 1.688657010763287
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "door_bottom_4",
+        "low": -5.065625,
+        "high": -5.003125,
+        "radius": 1.688657010763287
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "upper_pole_1",
+        "low": -2.9439865023845715,
+        "high": -2.5272482227916724,
+        "radius": 1.5971165423975797
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "upper_pole_2",
+        "low": -2.9439865023845715,
+        "high": -2.5272482227916724,
+        "radius": 1.5971165423975797
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "pole_1",
+        "low": -2.875,
+        "high": -2.25,
+        "radius": 0.6281172263200556
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "pole_2",
+        "low": -2.4129126073623883,
+        "high": -1.6174174785275222,
+        "radius": 0.9504316453590969
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "pole_3",
+        "low": -1.75,
+        "high": 0.5,
+        "radius": 0.9504316453590969
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "seat",
+        "low": -4.6875,
+        "high": -4.625,
+        "radius": 1.6828640022295325
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "floor",
+        "low": -5.0,
+        "high": -5.0,
+        "radius": 1.5971165423975797
+      },
+      {
+        "model": "ngong_ping_360",
+        "part": "doorway",
+        "low": -5.0,
+        "high": -5.0,
+        "radius": 1.875
+      },
+      {
+        "model": "cable_car_grip",
+        "part": "cable_grip",
+        "low": 0.5125,
+        "high": 0.5125,
+        "radius": 0.5
+      },
+      {
+        "model": "cable_car_grip",
+        "part": "wheel_1",
+        "low": 0.25,
+        "high": 0.5625,
+        "radius": 0.4192627457812106
+      },
+      {
+        "model": "cable_car_grip",
+        "part": "wheel_2",
+        "low": 0.25,
+        "high": 0.5625,
+        "radius": 0.4192627457812106
+      },
+      {
+        "model": "cable_car_grip",
+        "part": "wheel_holder",
+        "low": 0.3125,
+        "high": 0.5,
+        "radius": 0.4419417382415922
+      },
+      {
+        "model": "cable_car_grip",
+        "part": "top",
+        "low": 0.5,
+        "high": 0.625,
+        "radius": 0.31868871959954903
+      },
+      {
+        "model": "cable_car_grip",
+        "part": "wheel_holder_back",
+        "low": 0.3125,
+        "high": 0.5,
+        "radius": 0.5038911092686593
+      },
+      {
+        "model": "cable_car_grip",
+        "part": "grip_top",
+        "low": 0.5,
+        "high": 0.5625,
+        "radius": 0.19764235376052372
+      }
+    ],
+    "owners": [
+      "HRE 車庫",
+      "HRW 車庫"
+    ],
+    "game_ui_verification": false
+  },
+  "whole_map_complete": false
+}

@@ -65,5 +65,42 @@ class NativeGeometryPatchTests(unittest.TestCase):
         (self.c/'native-geometry/after'/self.newname).write_bytes(encode(self.after))
         with self.assertRaisesRegex(ValueError,'opaque'):expected(self.c)
 
+    def station_case(self):
+        p=self.c/'native-geometry/operations.json';r=json.loads(p.read_text())
+        r.update(migration_kind='cable_station_vertical',station_identity_members=['projectseele/geofront/platforms/00/platform'])
+        r['node_moves']=[dict(before=[10,0,0],after=[10,7,0])]
+        self.rail.update(transportMode='CABLE_CAR',isPlatform=True)
+        self.after.update(transportMode='CABLE_CAR',isPlatform=True);self.after['position2']['y']=7
+        self.newowner['path'][0]['endPosition']['y']=7
+        for base in ('preserved-native','native-geometry/before'):
+            self.write(base,self.oldname,self.rail)
+        self.write('native-geometry/after',self.newname,self.after);self.write('native-geometry/after',self.depot,self.newowner)
+        self.platform='projectseele/geofront/platforms/00/platform'
+        self.oldplatform=dict(id=789,transportMode='CABLE_CAR',name='Original platform',position1=dict(x=0,y=0,z=0),position2=dict(x=10,y=0,z=0),dwellTime=14000)
+        self.newplatform=copy.deepcopy(self.oldplatform);self.newplatform['position2']['y']=7
+        for base in ('preserved-native','native-geometry/before'):self.write(base,self.platform,self.oldplatform)
+        self.write('native-geometry/after',self.platform,self.newplatform)
+        r['operations'].append(dict(member=self.platform,before=True,after=True));p.write_text(json.dumps(r))
+
+    def test_explicit_cable_station_lift_retains_identity(self):
+        self.station_case();_,proof=expected(self.c)
+        self.assertEqual(proof['station_identities_retained'],1)
+        self.assertEqual(proof['vehicles_in_changed_owners_exact'],1)
+
+    def test_station_lift_rejects_platform_identity_change(self):
+        self.station_case();self.newplatform['id']=790;self.write('native-geometry/after',self.platform,self.newplatform)
+        with self.assertRaisesRegex(ValueError,'identity'):expected(self.c)
+
+    def test_station_lift_rejects_omitted_platform(self):
+        self.station_case();p=self.c/'native-geometry/operations.json';r=json.loads(p.read_text())
+        r['operations']=[x for x in r['operations']if x['member']!=self.platform];r['station_identity_members']=[];p.write_text(json.dumps(r))
+        with self.assertRaisesRegex(ValueError,'omitted'):expected(self.c)
+
+    def test_station_lift_rejects_train(self):
+        self.station_case();self.rail['transportMode']='TRAIN';self.after['transportMode']='TRAIN'
+        for base in ('preserved-native','native-geometry/before'):self.write(base,self.oldname,self.rail)
+        self.write('native-geometry/after',self.newname,self.after)
+        with self.assertRaisesRegex(ValueError,'another transport mode'):expected(self.c)
+
 
 if __name__=='__main__':unittest.main()

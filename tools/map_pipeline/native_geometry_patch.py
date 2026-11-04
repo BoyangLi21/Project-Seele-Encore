@@ -21,10 +21,13 @@ def expected(candidate):
     if not filename:return baseline,dict(changed_members=0,existing_native_members_exact=True)
     if filename!='native-geometry/operations.json':raise ValueError('Unexpected native geometry manifest location')
     root=candidate/'native-geometry';report=json.loads((root/'operations.json').read_text('utf8'))
+    station_lift=report.get('migration_kind')=='cable_station_vertical'
+    if report.get('migration_kind')not in (None,'cable_station_vertical'):raise ValueError('Unknown geometry migration kind')
     current=dict(baseline);names=set();changed=set()
     for op in report['operations']:
         name=op['member'];rel=Path(name)
-        if rel.is_absolute() or '..' in rel.parts or len(rel.parts)!=5 or rel.parts[:2]!=('projectseele','geofront') or rel.parts[2] not in {'rails','depots','sidings'}:
+        allowed={'rails','depots','sidings'}|({'platforms'}if station_lift else set())
+        if rel.is_absolute() or '..' in rel.parts or len(rel.parts)!=5 or rel.parts[:2]!=('projectseele','geofront') or rel.parts[2] not in allowed:
             raise ValueError('Native geometry operation outside finite rail/path scope')
         if name in names:raise ValueError('Duplicate native geometry member')
         names.add(name)
@@ -35,15 +38,18 @@ def expected(candidate):
         changed.add(name)
     moves={tuple(m['before']):tuple(m['after']) for m in report['node_moves']}
     if len(moves)!=len(report['node_moves']):raise ValueError('Duplicate moved native node')
-    if any(a[0]!=b[0] or a[2]!=b[2] or a[1]==b[1] or abs(a[1]-b[1])>4 for a,b in moves.items()):
+    if any(a[0]!=b[0] or a[2]!=b[2] or a[1]==b[1] or abs(a[1]-b[1])>(8 if station_lift else 4) for a,b in moves.items()):
         raise ValueError('This migration only supports bounded vertical junction corrections')
+    if station_lift and (not moves or len({b[1]-a[1]for a,b in moves.items()})!=1):raise ValueError('Cable station must use a single declared vertical translation')
     rails={};rail_members=set();vehicles=0;paths=0
     for row in report['rail_geometry']:
         oldname,newname=row['before_member'],row['after_member']
         rail_members|={oldname,newname}
         old,tail=decode(baseline[oldname]);new,newtail=decode(current[newname]);a,b=old.value,new.value
         if tail!=newtail or set(a)!=set(b):raise ValueError('Rail opaque data changed')
-        if a['isPlatform'] or a['isSiding']:raise ValueError('Station/siding geometry needs an explicit identity migration')
+        if station_lift:
+            if a.get('transportMode')!='CABLE_CAR':raise ValueError('Cable station migration touches another transport mode')
+        elif a['isPlatform'] or a['isSiding']:raise ValueError('Station/siding geometry needs an explicit identity migration')
         if abs(row['length_after']-row['length_before'])>1e-8:raise ValueError('Native path length changed')
         for key in a:
             if key in {'shape','verticalRadius'}:continue
@@ -60,12 +66,18 @@ def expected(candidate):
         if any(point(row[k]) in moves for k in ('position1','position2')) and name not in rail_members:
             raise ValueError('Moved native junction leaves an incident rail behind')
     allowed_paths={'path','pathSidingToMainRoute','pathMainRouteToSiding'}
+    identities=[]
     for name in names-rail_members:
         if name not in baseline or name not in current:raise ValueError('Do not create/remove depots or sidings')
         old,tail=decode(baseline[name]);new,newtail=decode(current[name])
         if tail!=newtail or set(old.value)!=set(new.value):raise ValueError('Native owner schema changed')
+        identity=station_lift and any('/'+kind+'/' in name for kind in ('platforms','sidings'))
+        if identity and any(old.value[k]!=new.value[k]for k in ('position1','position2')):identities.append(name)
         for key in old.value:
             aa,bb=map_child(old,key),map_child(new,key)
+            if identity and key in {'position1','position2'}:
+                if old.value.get('transportMode')!='CABLE_CAR' or point(bb.value)!=moves.get(point(aa.value),point(aa.value)):raise ValueError('Undeclared station identity endpoint')
+                continue
             if key not in allowed_paths:
                 if aa.raw!=bb.raw:raise ValueError('Native identity, vehicle or timetable token changed '+key)
                 if key=='vehicles':vehicles+=len(aa.value)
@@ -84,9 +96,17 @@ def expected(candidate):
                     elif map_child(a,k).raw!=map_child(b,k).raw:raise ValueError('Cached path distance/angle/service token changed')
                 paths+=1
     if paths!=report['cached_path_entries']:raise ValueError('Cached path coverage mismatch')
+    if station_lift:
+        if set(identities)!=set(report.get('station_identity_members',[])):raise ValueError('Station identity coverage mismatch')
+        # All matching platform/siding objects must follow their native rail,
+        # retaining IDs and every route, dwell, vehicle and timetable token.
+        for name,raw in baseline.items():
+            if not any('/'+kind+'/'in name for kind in ('platforms','sidings')):continue
+            row=decode(raw)[0].value
+            if any(point(row[k])in moves for k in ('position1','position2')) and name not in identities:raise ValueError('Moved station identity was omitted')
     return current,dict(changed_members=len(changed),rails=len(rails),cached_path_entries=paths,
                         vehicles_in_changed_owners_exact=vehicles,unmodified_native_members_exact=True,
-                        existing_native_members_exact=False,unmodified_members=len(set(baseline)-changed))
+                        existing_native_members_exact=False,unmodified_members=len(set(baseline)-changed),station_identities_retained=len(identities))
 
 
 def prepare(candidate,world):
