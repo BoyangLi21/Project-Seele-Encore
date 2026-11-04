@@ -92,7 +92,7 @@ def verify(candidate):
         for py in ys:
             if e.state(px,py,pz)!=e.state(px,py,pz,True):errors.append(['native cable swept volume changed',px,py,pz])
             cable_cells+=1
-    train_cells=0
+    train_cells=0;train_ground_exemptions=0;train_ground_changes=0
     if specs.get('preserve_train_corridors',False):
         underpass_prior=None
         if specs.get('train_underpasses'):
@@ -116,7 +116,9 @@ def verify(candidate):
                 ux,uz,_,_=map(int,underpass_prior['bounds'])
                 keep&=~editable_underpass_column(e,px,pz,a-128,b-129,specs['train_underpasses'],underpass_prior['walk'][pz-uz,px-ux],underpass_prior['grade2'][pz-uz,px-ux])
             if not np.array_equal(original[keep],actual[keep]):errors.append(['native rail structure or clearance changed',px,pz,int(((original!=actual)&keep).sum())])
-            train_cells+=original.size
+            train_cells+=int(keep.sum())
+            train_ground_exemptions+=int((~keep).sum())
+            train_ground_changes+=int(((original!=actual)&~keep).sum())
     changes=nbtlib.load(candidate/'block-entities.dat')['Changes'];before={};after={}
     for r in changes:
         for key,table in [('Before',before),('After',after)]:
@@ -208,6 +210,8 @@ def verify(candidate):
         retained_access.append(dict(id=route['id'],columns=len(points),start=points[0],end=points[-1]))
     report=dict(errors=errors,full_width_columns=checked,reachable_columns=int(seen.sum()),parcel_payload_cells_checked=payload_cells,parcel_payload_cells_exact=payload_cells-payload_exceptions,approved_outdoor_cells=payload_exceptions,complete_device_tags_exact=checked_tags,retained_device_tags_unchanged=retained_tags,native_room_volume_cells_unchanged=preserved_cells,native_rail_corridor_cells_unchanged=train_cells,native_cable_swept_cells_unchanged=cable_cells,parcel_goals=goals,streets=profiles,retained_interfaces=seams,retained_ground_access=retained_access,visual_verified=False,world_written=False)
     report['new_native_fixtures_checked']=added_fixtures
+    report['finite_rail_ground_exception_cells']=train_ground_exemptions
+    report['finite_rail_ground_changed_cells']=train_ground_changes
     save_json(candidate/'independent-check.json',report)
     prior=json.loads((candidate/'functional-check.json').read_text('utf8'));prior.setdefault('composition_errors',prior['errors']);prior['independent_verification_errors']=errors;prior['errors']=prior['composition_errors']+errors;save_json(candidate/'functional-check.json',prior)
     print(json.dumps({k:v for k,v in report.items()if k not in ('errors','parcel_goals')},ensure_ascii=False),flush=True)

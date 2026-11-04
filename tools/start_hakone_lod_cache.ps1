@@ -3,7 +3,8 @@ param(
  [Parameter(Mandatory=$true)][ValidatePattern('^[a-z0-9-]+$')][string]$BatchName,
  [Parameter(Mandatory=$true)][string]$CacheServer,
  [Parameter(Mandatory=$true)][string]$Repository,
- [Parameter(Mandatory=$true)][string]$Java
+ [Parameter(Mandatory=$true)][string]$Java,
+ [switch]$KeepAlive
 )
 $ErrorActionPreference = 'Stop'
 $taskLog = Join-Path $ArtifactRoot "work\$BatchName-stdout.log"
@@ -24,3 +25,8 @@ if (-not $taskReady) { throw 'Cache did not reach initialization gate' }
 & $Java -cp (Join-Path $Repository '.Codex\native1023') R53ReadOnlyAttach1023 $taskProcess.Id (Join-Path $ArtifactRoot 'cache-input-isolated.jar') $taskReceipt
 if ($LASTEXITCODE -ne 0) { throw 'Cache isolation attach failed' }
 Get-Content -LiteralPath $taskReceipt -Raw
+if ($KeepAlive) {
+ Write-Output 'Keeping the launch session alive until the isolated server stops normally'
+ $taskProcess.WaitForExit()
+ Write-Output "Isolated cache exited with $($taskProcess.ExitCode)"
+}
