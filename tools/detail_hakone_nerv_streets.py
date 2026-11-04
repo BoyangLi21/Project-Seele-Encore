@@ -16,6 +16,8 @@ EMPTY=AIR|PLANTS|{'minecraft:light'}
 
 
 def preservation_mask(candidate,spec):
+    from map_pipeline.retained_public import load_guard
+    retained_public=load_guard(candidate)
     boxes=list(spec.get('protected_volumes',[]));columns=defaultdict(list)
     retained=candidate/'plan/retained-buildings.json'
     if retained.is_file():
@@ -31,7 +33,7 @@ def preservation_mask(candidate,spec):
                     for R in range(pz-radius,pz+radius+1):columns[Q,R].append((py-below,py+above))
     def protected(pos):
         px,py,pz=pos
-        return any(all(b[k]<=pos[k]<=b[k+3]for k in range(3))for b in boxes)or any(lo<=py<=hi for lo,hi in columns.get((px,pz),()))
+        return retained_public(pos)or any(all(b[k]<=pos[k]<=b[k+3]for k in range(3))for b in boxes)or any(lo<=py<=hi for lo,hi in columns.get((px,pz),()))
     return protected
 
 

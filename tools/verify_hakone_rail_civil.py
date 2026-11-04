@@ -48,6 +48,10 @@ def verify(candidate):
             s=e.state(x,Y,z)
             if s.split('[')[0] not in empty:structure[x,Y,z]=s
     data=json.loads((candidate/'rail-civil-geometry.json').read_text('utf8'))
+    for p in data.get('bridge_crossheads',[]):
+        state=e.state(*p)
+        if state!='minecraft:light_gray_concrete':errors.append(['bridge crosshead gap',*p])
+        else:structure[tuple(p)]=state
     station_access_cells=set()
     for row in data.get('station_access_columns',[]):
         px,pz,h,footing=(row[k] for k in ('x','z','floor','footing'))
@@ -96,6 +100,16 @@ def verify(candidate):
     x,z,X,Z=map(int,d['bounds']);floor,_=road_blocks(d['grade2']);passage_changed=0
     tags={tuple(int(t[k]) for k in ('x','y','z')):t for t in nbtlib.load(candidate/'captured-devices.dat')['Devices']}
     buildings=json.loads((candidate/'plan/catalog.json').read_text('utf8'));room_index={}
+    roof_supports={tuple(row['pos']):row for row in spec.get('roof_supports',[])}
+    for p,row in roof_supports.items():
+        px,Y,pz=p;old=e.state(*p,original=True);above=e.state(px,Y+1,pz,original=True)
+        if (old.split('[')[0] not in AIR or above!=row['roof_state'] or above.split('[')[0] not in {'minecraft:dark_oak_planks','minecraft:dark_oak_stairs'}
+                or e.state(*p)!='minecraft:dark_oak_planks'
+                or not any(all(b[k]<=p[k]<=b[k+3] for k in range(3)) for b in spec.get('roof_support_scopes',[]))):
+            errors.append(['invalid exterior roof backing',*p])
+        for r in buildings:
+            b=r['occupied_bounds']
+            if b[0]<=px<=b[3] and b[2]<=pz<=b[5] and Y<b[1]+6:errors.append(['roof backing enters occupied room height',*p])
     for row in buildings:
         b=row['occupied_bounds']
         if b[0]>X or b[3]<x or b[2]>Z or b[5]<z:continue
@@ -111,7 +125,7 @@ def verify(candidate):
             for px,py,pz,old,new in zip(xx,yy,zz,before[lo:hi],after[lo:hi]):
                 j,i=pz-z,px-x
                 for name,b in room_index.get((int(cx),int(cz)),[]):
-                    if b[0]<=px<=b[3] and b[1]<=py<=b[4] and b[2]<=pz<=b[5]:errors.append(['retained occupied room changed',name,int(px),int(py),int(pz)])
+                    if b[0]<=px<=b[3] and b[1]<=py<=b[4] and b[2]<=pz<=b[5] and (int(px),int(py),int(pz)) not in roof_supports:errors.append(['retained occupied room changed',name,int(px),int(py),int(pz)])
                 if d['walk'][j,i] and floor[j,i]-2<=py<=floor[j,i]+4:
                     if (int(px),int(py),int(pz)) in station_access_cells:continue
                     if (int(px),int(py),int(pz)) in exterior_footings and py<floor[j,i] and str(palette[old]).split('[')[0] in AIR|PLANTS|{'minecraft:light'}:continue
@@ -122,8 +136,9 @@ def verify(candidate):
     errors.extend(stations['errors'])
     report=dict(errors=errors,track_columns=len(env),bearing_positions_checked=len(bearings),maximum_bearing_gap_below_lowest_native_rail=max(low_gaps,default=0),
         continuous_earth_load_paths=len(bearings)-len(missing),maximum_load_path_blocks=max((distance.get(p,0) for p in bearings),default=0),
+        longest_bearing_load_paths=[dict(pos=list(p),blocks=distance[p]) for p in sorted((p for p in bearings if p in distance),key=lambda p:distance[p],reverse=True)[:8]],
         station_access=stations['stations'],devices_unchanged=len(tags),retained_public_headroom_fragments_removed=passage_changed,
-        verified_base_public_columns_unchanged=base_public_columns,world_written=False,rendered_train_collision_checked=False)
+        verified_base_public_columns_unchanged=base_public_columns,exterior_roof_backing_cells=len(roof_supports),world_written=False,rendered_train_collision_checked=False)
     (candidate/'independent-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
     print({k:v for k,v in report.items() if k not in ('errors','station_access')},'errors',len(errors),errors[:8],flush=True)
     return report

@@ -99,7 +99,23 @@ def repair(a):
         if b[0]>X or b[3]<x or b[2]>Z or b[5]<z:continue
         for cx in range(b[0]//16,b[3]//16+1):
             for cz in range(b[2]//16,b[5]//16+1):box_index.setdefault((cx,cz),[]).append(b)
+    roof_supports={tuple(row['pos']):row for row in spec.get('roof_supports',[])}
+    for pos,row in roof_supports.items():
+        px,Y,pz=pos;above=(px,Y+1,pz)
+        if (e.state(*pos,original=True).split('[')[0] not in AIR or e.state(*above,original=True)!=row['roof_state']
+                or row['roof_state'].split('[')[0] not in {'minecraft:dark_oak_planks','minecraft:dark_oak_stairs'}
+                or not any(all(b[k]<=pos[k]<=b[k+3] for k in range(3)) for b in spec.get('roof_support_scopes',[]))):
+            raise ValueError('Roof backing is not finite original exterior air below a measured timber roof')
+        for b in box_index.get((px//16,pz//16),[]):
+            if b[0]<=px<=b[3] and b[2]<=pz<=b[5] and Y<b[1]+6:raise ValueError('Roof backing enters occupied room height')
     road_y,_=road_blocks(d['grade2'])
+    edge_moves=spec.get('platform_edge_moves',[])
+    clearance_edges={tuple(row['before']):row['state'] for row in edge_moves}
+    for row in edge_moves:
+        p,q=tuple(row['before']),tuple(row['after'])
+        if (e.state(*p,original=True)!=row['state'] or e.state(*q,original=True)!=row['destination_state']
+                or p[1]!=q[1] or abs(p[0]-q[0])+abs(p[2]-q[2])!=1 or (q[0],q[2]) in env):
+            raise ValueError('Platform edge move is stale or enters the native rail envelope')
     access_columns={}
     for path in spec.get('station_access_paths',[]):
         points=dense_points(path['points']);tree=cKDTree(points[:,[0,2]])
@@ -125,6 +141,7 @@ def repair(a):
         old=e.state(*pos)
         if old==state:return
         problem=guarded(pos)
+        if problem=='occupied building' and kind=='measured roof backing' and pos in roof_supports:problem=None
         if (problem in {'public passage','station passenger passage'} and kind.startswith('station footway ')
                 and (pos[0],pos[2]) in access_columns):problem=None
         if problem=='station passenger passage' and kind=='retired obsolete station street':problem=None
@@ -149,7 +166,12 @@ def repair(a):
         put((px,floor,pz),state,'continuous rail bearing')
         for yy in range(floor+1,roof):
             pos=(px,yy,pz)
-            put(pos,'minecraft:air','rail clearance',{'minecraft:dark_oak_planks'} if pos in canopy_cells else ())
+            extra={'minecraft:dark_oak_planks'} if pos in canopy_cells else set()
+            if pos in clearance_edges:extra.add(clearance_edges[pos].split('[')[0])
+            put(pos,'minecraft:air','rail clearance',extra)
+    for row in edge_moves:
+        if e.state(*row['before']).split('[')[0] not in AIR:raise ValueError('Platform edge was not retired by verified clearance')
+        put(tuple(row['after']),row['state'],'set-back platform warning edge')
     # True covered spans derive from current soil, not a projected aerial mask.
     covered=set();spans=[]
     for index in indices:
@@ -181,18 +203,21 @@ def repair(a):
             floor=vertical_bounds(env[px,pz])[0]
             if q in walls:walls[q]=(min(walls[q][0],floor-2),max(walls[q][1],ceiling))
             else:walls[q]=(floor-2,ceiling)
-    def support_column(px,pz,start,kind):
+    def support_column(px,pz,start,kind,material=STONE):
         pending=[]
+        # A restored tree trunk may pass through leaves of its own species.
+        bare=material.split('[')[0]
+        extra={bare[:-4]+'_leaves'} if bare.endswith('_log') else set()
         for yy in range(start,max(-128,start-48)-1,-1):
             old=e.state(px,yy,pz);mat=old.split('[')[0]
             if mat in SOIL and 'type=bottom' not in old:break
             protection=guarded((px,yy,pz))
             if (protection=='public passage' and kind=='measured exterior fragment footing'
                     and yy<int(road_y[pz-z,px-x]) and mat in EMPTY):protection=None
-            if protection or mat not in PASSIVE:return False
+            if protection or mat not in PASSIVE|extra:return False
             pending.append((px,yy,pz))
         else:return False
-        for pos in reversed(pending):put(pos,STONE,kind)
+        for pos in reversed(pending):put(pos,material,kind,extra)
         if pending:pier_columns.append(dict(top=list(pending[0]),footing=[px,yy,pz],kind=kind))
         return True
     for (px,pz),(low,high) in walls.items():
@@ -208,6 +233,16 @@ def repair(a):
             for Q,R in candidates:
                 floor=vertical_bounds(env[Q,R])[0]
                 if support_column(Q,R,floor-2,'measured bridge pier'):break
+    crossheads=[]
+    for frame in spec.get('bridge_crossheads',[]):
+        cells=[tuple(p) for p in frame['cells']]
+        if not cells or len(cells)>10 or any(p[1]!=cells[0][1] for p in cells):raise ValueError('Unbounded bridge crosshead')
+        if any(abs(p[0]-q[0])+abs(p[2]-q[2])!=1 for p,q in zip(cells,cells[1:])):raise ValueError('Disconnected bridge crosshead')
+        Q,Y,R=cells[-1]
+        if d['walk'][R-z,Q-x] or (cells[0][0],cells[0][2]) not in env:raise ValueError('Bridge crosshead lacks rail/roadside anchor')
+        if not support_column(Q,R,Y-1,'roadside bridge pier'):issues.append(['roadside bridge pier blocked',Q,Y,R]);continue
+        for pos in cells:put(pos,'minecraft:light_gray_concrete','roadside bridge crosshead')
+        crossheads.extend([list(p) for p in cells])
     # Explicit complete platform canopies move one block upward when needed,
     # providing 5 m clearance while keeping their measured timber footprint.
     for canopy in spec.get('canopies',[]):
@@ -249,7 +284,9 @@ def repair(a):
     for fragment in spec.get('support_fragments',[]):
         px,py,pz=fragment['base']
         if e.state(px,py,pz,original=True)!=fragment['state']:raise ValueError('Stale measured exterior fragment')
-        if not support_column(px,pz,py-1,'measured exterior fragment footing'):issues.append(['exterior fragment footing blocked',px,py,pz])
+        if fragment.get('cap_state'):put((px,py,pz),fragment['cap_state'],'measured exterior support cap')
+        if not support_column(px,pz,py-1,'measured exterior fragment footing',fragment.get('material',STONE)):issues.append(['exterior fragment footing blocked',px,py,pz])
+    for pos in roof_supports:put(pos,'minecraft:dark_oak_planks','measured roof backing')
     access_records=[]
     access_removable={tuple(r['pos']):r['state'] for r in spec.get('station_access_removable_posts',[])}
     for pos,state in access_removable.items():
@@ -290,7 +327,7 @@ def repair(a):
     patches=e.save();e.regions.clear()
     save(a.out/'manifest.json',dict(world=str(world),bounds_xz=[x,z,X,Z],regions=patches,cells=sum(r['cells'] for r in patches),world_written=False,preserve_native_members=True))
     save(a.out/'civil-edits.json',list(edits.values()));save(a.out/'civil-conflicts.json',issues)
-    save(a.out/'rail-civil-geometry.json',dict(curves=indices,columns=[dict(x=q[0],z=q[1],**{k:(sorted(v) if k=='curves' else v) for k,v in r.items()}) for q,r in env.items()],covered_columns=[list(q) for q in sorted(covered)],tunnels=spans,pier_columns=pier_columns,canopies=canopy_records,station_access_columns=access_records,road_overpass_single_course_deck=thin_deck))
+    save(a.out/'rail-civil-geometry.json',dict(curves=indices,columns=[dict(x=q[0],z=q[1],**{k:(sorted(v) if k=='curves' else v) for k,v in r.items()}) for q,r in env.items()],covered_columns=[list(q) for q in sorted(covered)],tunnels=spans,pier_columns=pier_columns,canopies=canopy_records,station_access_columns=access_records,road_overpass_single_course_deck=thin_deck,bridge_crossheads=crossheads))
     # Current road/city planning stays authoritative; this patch owns rail
     # structures only and does not declare any new pedestrian/cargo routes.
     np.savez_compressed(a.out/'plan/network.npz',**d)

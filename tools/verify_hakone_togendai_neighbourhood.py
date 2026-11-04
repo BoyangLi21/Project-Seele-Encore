@@ -16,6 +16,9 @@ from plan_ashi_landscape_r54 import SOIL
 def verify(candidate):
     with np.load(candidate/'plan/network.npz')as f:d={k:f[k]for k in f.files}
     x,z,X,Z=map(int,d['bounds']);e=Editor(candidate);errors=[];walk=d['walk'];g=d['grade2'];checked=0
+    from map_pipeline.retained_public import verify as verify_retained_public
+    retained_public=verify_retained_public(candidate,e);errors.extend(retained_public['errors'])
+    save_json(candidate/'retained-public-check.json',retained_public)
     covered=d.get('covered',np.zeros(walk.shape,bool))
     specs=json.loads((candidate/'plan/authored-design.json').read_text('utf8'))
     from map_pipeline.entrance_infill import validated_apron_infill

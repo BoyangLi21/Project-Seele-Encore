@@ -79,7 +79,7 @@ def compose(a):
         if tuple(pos)in devices or e.state(*pos,original=True)!=remnant['state']:raise ValueError(('Changed street remnant',pos))
         e.put(*pos,remnant.get('after','minecraft:air'));stats['explicit_old_lamp_remnants']+=1
     oldnet=np.load(a.base_plan/'network.npz');bx,bz,_,_=map(int,oldnet['bounds']);area=np.s_[z-bz:Z-bz+1,x-bx:X-bx+1]
-    oldwalk=oldnet['walk'][area].copy();oldgrade=oldnet['grade2'][area].copy();oldnet.close()
+    oldwalk=oldnet['walk'][area].copy();oldgrade=oldnet['grade2'][area].copy();oldroad=oldnet['road'][area].copy();oldnet.close()
     for row in rows:
         for px,py,pz in row.get('footway',[]):
             l,t,R,B=max(x,px-1),max(z,pz-1),min(X,px+1),min(Z,pz+1)
@@ -97,6 +97,11 @@ def compose(a):
         retired_scope=(mask|binary_dilation(d['walk'],iterations=2))&oldowned
         retired_scope[d['ports']&~d['walk']]=False
     if design_spec.get('togendai_forecourt',True):retired_scope[rect(bounds,[-326,979,-246,996])]=True
+    # A cleanup collar is not authorization to retire the adjacent public
+    # street. Preserve its actual floor, bearing and clearance in 3D.
+    retained_public=oldwalk&~d['walk']&~(mask if design_spec.get('retired_public_mask') else retired_scope)
+    np.savez_compressed(a.out/'plan/retained-public.npz',bounds=bounds,walk=retained_public,grade2=oldgrade,road=oldroad)
+    retained_floor,_=road_blocks(oldgrade)
     retained=json.loads((a.design/'retained-buildings.json').read_text('utf8'))
     boxes=[[b[0]-2,b[1]-3,b[2]-2,b[3]+2,b[4]+8,b[5]+2]for b in retained]
     boxes += design_spec.get('protected_volumes',[[-316,95,997,-255,135,1048],[-316,90,1049,-255,112,1090],[-328,110,989,-244,125,998]])
@@ -125,6 +130,9 @@ def compose(a):
     def protected_chunk(cx,cz):
         if (cx,cz)in protected_chunks:return protected_chunks[cx,cz]
         zz,xx=np.mgrid[cz*16:cz*16+16,cx*16:cx*16+16];protect=guard.chunk_mask(cx,cz)
+        jj=np.clip(zz-z,0,shape[0]-1);ii=np.clip(xx-x,0,shape[1]-1)
+        kept=(xx>=x)&(xx<=X)&(zz>=z)&(zz<=Z)&retained_public[jj,ii]
+        protect|=kept&(yy>=retained_floor[jj,ii]-2)&(yy<=retained_floor[jj,ii]+np.where(oldroad[jj,ii],4,3))
         for q in boxes:
             if q[0]>cx*16+15 or q[3]<cx*16 or q[2]>cz*16+15 or q[5]<cz*16:continue
             protect|=(xx>=q[0])&(xx<=q[3])&(zz>=q[2])&(zz<=q[5])&(yy>=q[1])&(yy<=q[4])
