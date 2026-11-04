@@ -873,11 +873,16 @@ public final class EvaBodyPose
     private static void groundGameplay(EvaUnit01Entity e,Sample pose,float partial)
     {
         if(!EvaGameplayMotionR32.owns(e,partial)||EvaGameplayMotionR32.airAge(e,partial)>=0||e.isVisuallyAirborneForRender()&&!e.onGround())return;
+        // A ledge climb sets its hands and foot against the ledge itself, and
+        // is only kept from going below the ground it started from. Set down
+        // on its lowest part, the climbing body sank six blocks once both feet
+        // were raised: the foot on the top went into it and the hands left the edge.
+        boolean climb=EvaFieldActionsR45.CLIMB.equals(EvaFieldActionsR45.clip(e));
         var reaction=CombatFeelR31.beat(e);if(reaction!=null&&(reaction.kind()==CombatFeelR31.DOWN||reaction.kind()==CombatFeelR31.THROWN))return;
         var mesh=data.rigSupport().getOrDefault(rigKey(e),data.support());float lowest=Float.POSITIVE_INFINITY;
         // Low actions bear on the actual crouched/prone body. Supporting only
         // their feet can push the prone chest below the same terrain surface.
-        java.util.Collection<String> bearing=EvaGameplayMotionR32.lowActionR44(e)||EvaFieldActionsR45.active(e)?mesh.keySet():List.of("foot_l","foot_r");
+        java.util.Collection<String> bearing=!climb&&(EvaGameplayMotionR32.lowActionR44(e)||EvaFieldActionsR45.active(e))?mesh.keySet():List.of("foot_l","foot_r");
         for(String name:bearing)
         {
             var points=mesh.get(name);if(points==null||!pose.rig.containsKey(name))continue;var m=pose.matrix(name);
@@ -885,6 +890,12 @@ public final class EvaBodyPose
         }
         // Quaternion crossfades preserve joints, but do not preserve sole height.
         // Support the rigid assembly after blending instead of stretching its legs.
+        if(climb)
+        {
+            float floor=(float)((EvaWeaponHandlingR45.fieldActionR45(e).getDouble("y0")-e.getPosition(partial).y)/EvaScale.RENDER_SCALE);
+            if(lowest<floor){pose.positions.get("root").y+=.006F+floor-lowest;pose.dirty();}
+            return;
+        }
         if(Float.isFinite(lowest)){pose.positions.get("root").y+=.006F-lowest;pose.dirty();}
     }
 }

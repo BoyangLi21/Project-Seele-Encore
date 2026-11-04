@@ -27,7 +27,7 @@ final class EvaClimbChoreographyR57
     private static final Key STEP=key(0,-12,0,0,-8,0,0,10,0,0,40,0,-6,45,0,6,-90,0,0,-55,0,0,-10,0,0,10,0,0,25,0,-20,25,0,20,25,0,0,25,0,0);
     private static final Key[] KEYS={null,PLANT,PRESS,KNEE,STEP,null};
     /** Clip progress at each key: the climb path rises 10%, 60% and 100% of the ledge at 0.07, 0.37 and 0.54. */
-    private static final float[] AT={0,.07F,.37F,.54F,.85F,1};
+    private static final float[] AT={0,.05F,.37F,.54F,.85F,1};
     /** Half the EVA's width, and the gap to the wall it climbs (blocks). */
     private static final float HALF=EvaScale.NORMAL_WIDTH*.5F,GAP=1;
 
@@ -49,12 +49,25 @@ final class EvaClimbChoreographyR57
             // Elbows point back and out, as when pressing down on a wall top.
             reach(pose,"arm_"+side,"forearm_"+side,"hand_"+side,target,new Vector3f(Math.signum(shoulder.x)*.6F,-.2F,1),hands);
         }
-        float foot=ease((progress-.4F)/.12F)*(1-ease((progress-.9F)/.1F));
+        // Handed back to the ground pose at the end, but only once the body is
+        // up: the drawn body trails the climb path, and a foot let go while it
+        // was still two blocks below the top was set down inside it.
+        float foot=ease((progress-.36F)/.06F)*Math.max(1-ease((progress-.9F)/.1F),Mth.clamp(top/.1F,0,1));
         if(foot>0)
         {
             var hip=pose.matrix("leg_r").transformPosition(new Vector3f(pose.rig.get("leg_r").pivot()));
+            // Once the hips are nearly up, the foot rises in front of the wall
+            // to above its edge, knee up rather than forward, then comes down
+            // just past the edge. Going straight onto the top cut the corner,
+            // and a foothold further in was out of the leg's reach.
             // The ankle stands 1.16 units above the sole.
-            reach(pose,"leg_r","shin_r","foot_r",new Vector3f(hip.x,top+1.16F,face-1.1F),new Vector3f(0,.5F,-1),foot);
+            float over=ease((progress-.55F)/.1F);
+            reach(pose,"leg_r","shin_r","foot_r",new Vector3f(hip.x,top+1.36F+.9F*(1-over),Mth.lerp(over,face+.6F,face-.4F)),
+                    new Vector3f(0,1,-Mth.lerp(over,.3F,1)),foot);
+            // The sole is flat before it crosses the edge, so the toes do not
+            // dip into the top as it comes down; levelled only on the way over,
+            // the pointed toes went a block and a half into it.
+            level(pose,"foot_r",foot*ease((progress-.45F)/.1F));
         }
         return pose;
     }

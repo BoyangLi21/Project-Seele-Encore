@@ -90,6 +90,37 @@ final class EvaKeyPosesR57
         turn(pose,lower,new Vector3f(h2).sub(e2),goal.sub(e2),weight);
         EvaBodyPose.preserveJointCentres(pose);
     }
+    /**
+     * The two wrists brought to gap apart, about the point between where the
+     * keys put them, elbows bent the way the keys bent them: clasped hands
+     * stay clasped while interpolated keys swing the arms. Swinging from
+     * overhead to the front the arms' Euler angles passed through poses that
+     * spread the hands a body's width apart.
+     */
+    static void clasp(EvaBodyPose.Sample pose,float gap,float weight)
+    {
+        if(weight<=0||!pose.rig.containsKey("hand_l")||!pose.rig.containsKey("hand_r"))return;
+        var l=point(pose,"hand_l");var r=point(pose,"hand_r");
+        var middle=new Vector3f(l).add(r).mul(.5F);var across=new Vector3f(r).sub(l);
+        if(across.lengthSquared()<1e-6F)across.set(1,0,0);
+        across.normalize().mul(gap*.5F);
+        for(String side:new String[]{"l","r"})
+        {
+            var bend=point(pose,"forearm_"+side).sub(point(pose,"arm_"+side));
+            var target=side.equals("l")?new Vector3f(middle).sub(across):new Vector3f(middle).add(across);
+            reach(pose,"arm_"+side,"forearm_"+side,"hand_"+side,target,bend,weight);
+        }
+    }
+    /** Turn a bone so it lies level with the root (a foot set flat on a top), by weight. */
+    static void level(EvaBodyPose.Sample pose,String name,float weight)
+    {
+        if(weight<=0||!pose.rig.containsKey(name))return;
+        String parent=pose.rig.get(name).parent();
+        var world=parent==null?new Quaternionf():pose.matrix(parent).getNormalizedRotation(new Quaternionf());
+        var root=pose.matrix("root").getNormalizedRotation(new Quaternionf());
+        pose.rotations.get(name).slerp(world.invert().mul(root),Mth.clamp(weight,0,1));
+        pose.dirty();
+    }
     private static Vector3f point(EvaBodyPose.Sample pose,String name)
     {return pose.matrix(name).transformPosition(new Vector3f(pose.rig.get(name).pivot()));}
     /** Rotate a bone in pose space so from turns onto to, as a local rotation under its parent. */

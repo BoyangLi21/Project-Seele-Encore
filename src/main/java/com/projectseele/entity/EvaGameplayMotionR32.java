@@ -468,9 +468,9 @@ public final class EvaGameplayMotionR32
         {
             String name=EvaFieldActionsR45.clip(e);float phase=EvaFieldActionsR45.progress(e,partial),entry=EvaFieldActionsR45.entryProgress(e,partial);
             var authored=clip(e,name);
-            var pose=EvaFieldActionsR45.CLIMB.equals(name)&&authored.has("r57_climb_path")?climbPose(e,base,authored,phase)
+            var pose=EvaFieldActionsR45.CLIMB.equals(name)&&authored.has("r57_climb_path")?climbPose(e,base,authored,phase,partial)
                     :EvaBodyPose.gameplayClip(e,name,phase);
-            if(entry<1&&!e.getEntityData().get(ACTION_FROM).isEmpty())
+            if(entry<1&&!e.getEntityData().get(ACTION_FROM).isEmpty()&&!EvaFieldActionsR45.CLIMB.equals(name))
             {var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(ACTION_FROM),from);pose=EvaBodyPose.blend(from,pose,entry*entry*(3-2*entry));}
             reviewChoice(e,"owner_branch","field_full_body");reviewChoice(e,"effective_action_clip","r32_"+name);reviewWeight(e,"sample_phase",phase);
             return pose;
@@ -515,16 +515,25 @@ public final class EvaGameplayMotionR32
         if(e.isHeavyMotionActive())return actionPose(e,"heavy",e.heavyMotionProgress(partial),base,partial);
         String active=activeGroundClip(e,partial);
         if(!active.isEmpty())return actionPose(e,active,activeGroundPhase(e,partial),base,partial);
-        return groundLocomotion(e,base,partial,capturedBase,movementOwner);
+        var ground=EvaBodyPose.copy(groundLocomotion(e,base,partial,capturedBase,movementOwner));
+        EvaWallStanceR57.gather(e,ground,partial);
+        return ground;
     }
     /** The ledge climb at clip progress phase, along the server's path for this ledge. */
-    private static EvaBodyPose.Sample climbPose(EvaUnit01Entity e,EvaBodyPose.Sample base,JsonObject authored,float phase)
+    private static EvaBodyPose.Sample climbPose(EvaUnit01Entity e,EvaBodyPose.Sample base,JsonObject authored,float phase,float partial)
     {
-        var path=authored.getAsJsonArray("r57_climb_path");float at=Mth.clamp(phase,0,1)*(path.size()-1);
-        int a=(int)at,b=Math.min(a+1,path.size()-1);var p=path.get(a).getAsJsonArray();var q=path.get(b).getAsJsonArray();
-        float rise=Mth.lerp(at-a,p.get(0).getAsFloat(),q.get(0).getAsFloat()),advance=Mth.lerp(at-a,p.get(1).getAsFloat(),q.get(1).getAsFloat());
+        float[] path=EvaFieldActionsR45.climbPathR57(authored,phase);
         var state=EvaWeaponHandlingR45.fieldActionR45(e);
-        return EvaClimbChoreographyR57.pose(base,phase,rise,advance,(float)state.getDouble("rise"),(float)state.getDouble("advance"));
+        double rise=state.getDouble("rise"),advance=state.getDouble("advance");
+        // Hands and foot are set against where the body is drawn: the path at
+        // the clip's progress ran a tick or two ahead of the drawn position,
+        // and the foot came down five blocks into the top.
+        Vec3 at=e.getPosition(partial),forward=Vec3.directionFromRotation(0,state.getFloat("facing"));
+        float up=rise>.5?(float)Mth.clamp((at.y-state.getDouble("y0"))/rise,0,1):path[0];
+        float on=advance>.5?(float)Mth.clamp(((at.x-state.getDouble("x0"))*forward.x+(at.z-state.getDouble("z0"))*forward.z)/advance,0,1):path[1];
+        // From the stance the walk had gathered into against the wall.
+        var from=EvaBodyPose.copy(base);EvaWallStanceR57.gather(e,from,0);
+        return EvaClimbChoreographyR57.pose(from,phase,up,on,(float)rise,(float)advance);
     }
     private static EvaBodyPose.Sample groundLocomotion(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial,boolean capturedBase,boolean[] movementOwner)
     {

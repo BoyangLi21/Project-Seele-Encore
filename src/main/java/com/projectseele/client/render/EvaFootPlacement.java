@@ -54,6 +54,10 @@ public final class EvaFootPlacement
         for(int i=0;i<5;i++)
         {
             var hit=eva.level().clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,eva));if(hit.getType()!=HitResult.Type.BLOCK)return Double.NaN;
+            // Starting inside a block: a wall taller than a step stands over the
+            // sole, not a kerb to stand on. Read as a 20-block ledge, it lifted
+            // a foot pressed against a wall up into it.
+            if(i==0&&hit.getLocation().y>point.y+STEP+.5)return Double.NaN;
             var pos=hit.getBlockPos();var s=eva.level().getBlockState(pos);var shape=s.getCollisionShape(eva.level(),pos,CollisionContext.of(eva));
             if(!EvaObstacleCollision.ignores(eva,s,pos,shape))return hit.getLocation().y;
             from=new Vec3(point.x,pos.getY()-.001,point.z);
@@ -82,7 +86,8 @@ public final class EvaFootPlacement
         Vector3f forward=new Vector3f(-net.minecraft.util.Mth.sin(yaw),0,net.minecraft.util.Mth.cos(yaw));
         // A swinging foot crosses the ground at about twice the body's speed:
         // read far enough ahead that it is already up when it reaches the edge.
-        float reach=(float)Math.max(REACH,Math.min(20,Math.hypot(eva.getX()-eva.xo,eva.getZ()-eva.zo)*20*.3));
+        float reach=(float)Math.max(REACH,Math.min(20,Math.hypot(eva.getX()-eva.xo,eva.getZ()-eva.zo)*20*.6));
+        boolean stepping=com.projectseele.client.EvaStepSmoothingR57.offset(eva,partial)<-3;
         for(String s:List.of("l","r"))
         {
             var foot=model.getBone("foot_"+s).orElse(null);var leg=model.getBone("leg_"+s).orElse(null);var shin=model.getBone("shin_"+s).orElse(null);var ankle=model.getBone("ankle_"+s).orElse(null);
@@ -90,14 +95,43 @@ public final class EvaFootPlacement
             Matrix4f matrix=new Matrix4f(root).mul(EvaRigTransforms.model(foot));Vector3f selected=null;float minimum=Float.POSITIVE_INFINITY;
             // Dense sole meshes need one scalar reduction, not tens of thousands
             // of temporary vectors per frame. The minimum remains exact.
-            for(Vector3f rest:mesh.get(s)){float y=matrix.m01()*rest.x+matrix.m11()*rest.y+matrix.m21()*rest.z+matrix.m31();if(y<minimum){minimum=y;selected=rest;}}
+            Vector3f toe=null,heel=null;float front=Float.NEGATIVE_INFINITY,rear=Float.POSITIVE_INFINITY;
+            for(Vector3f rest:mesh.get(s))
+            {
+                float y=matrix.m01()*rest.x+matrix.m11()*rest.y+matrix.m21()*rest.z+matrix.m31();if(y<minimum){minimum=y;selected=rest;}
+                float ahead=(matrix.m00()*rest.x+matrix.m10()*rest.y+matrix.m20()*rest.z+matrix.m30())*forward.x+(matrix.m02()*rest.x+matrix.m12()*rest.y+matrix.m22()*rest.z+matrix.m32())*forward.z;
+                if(ahead>front){front=ahead;toe=rest;}
+                if(ahead<rear){rear=ahead;heel=rest;}
+            }
             if(selected==null)continue;Vector3f lowest=matrix.transformPosition(new Vector3f(selected));
             int key=eva.getId()*2+(s.equals("l")?0:1);
             Vector3f pivot=EvaRigTransforms.point(foot,EvaRigTransforms.pivot(foot),root);
             // A sole held on a ledge is read where it is held, not where the clip has slid it.
             Vector3f held=hold(key,pivot);lowest.add(held.x,0,held.z);
+            // A sole stands on one level, never half on each. Read under its
+            // lowest point, toes reaching past a kerb's edge read the kerb's top
+            // and the foot was lifted with its heel still before the face, toes
+            // in it. Across an edge it goes up when the body is stepping up or
+            // the sole is nearer the top, carried on until its heel clears the
+            // edge; otherwise it stays below and its toes are drawn back out.
+            Vector3f toeAt=matrix.transformPosition(new Vector3f(toe)).add(held.x,0,held.z),heelAt=matrix.transformPosition(new Vector3f(heel)).add(held.x,0,held.z);
+            Vector3f middle=new Vector3f(toeAt).add(heelAt).mul(.5F);middle.y=lowest.y;
+            double top=ground(eva,new Vector3f(toeAt.x,lowest.y,toeAt.z)),below=ground(eva,new Vector3f(heelAt.x,lowest.y,heelAt.z));
             // Height above the drawn ground: while the body rises onto a kerb it is drawn below the entity.
-            double ground=ground(eva,lowest),lift=lowest.y-root.m31();
+            double ground,lift=lowest.y-root.m31();
+            float onto=0;
+            if(Double.isFinite(top)&&Double.isFinite(below)&&top>below+.5)
+            {
+                ground=below;
+                if(stepping||top-lowest.y<lowest.y-below)
+                {
+                    float length=(float)((toeAt.x-heelAt.x)*forward.x+(toeAt.z-heelAt.z)*forward.z);
+                    for(float d=0;d<=length;d+=.5F)
+                        if(solid(eva,heelAt.x+forward.x*d,top-.5,heelAt.z+forward.z*d)){onto=d+.5F;ground=top;break;}
+                }
+            }
+            else ground=ground(eva,middle);
+            onto=(float)ease(key^0x20000000,onto);
             double plant=1-Math.max(0,Math.min(1,(lift-.35)/1.7));
             // A sole planted on a ledge stays where it landed while the body
             // passes over it and rises, until it lifts. The clips' stance feet
@@ -127,15 +161,38 @@ public final class EvaFootPlacement
             double correction=ease(eva.getId()*2+(s.equals("l")?0:1),rise*flat*flat*(3-2*flat));
             witness[index++]=lowest.y;witness[index++]=ground;witness[index++]=correction;
             float holding=holdWeight(key);
-            if(Math.abs(correction)<.005&&holding<.005)continue;
-            Vector3f target=new Vector3f(pivot).add(held.x,(float)correction,held.z);
+            // A toe that reaches into or through a wall or a kerb's face is
+            // drawn back to stand in front of it, along the heading: the long
+            // walking stride reached past the body's box into a wall it was
+            // pressed against (through an eleven-block wall to its far side),
+            // and into a ledge's face before the foot had cleared its edge.
+            Vector3f tip=matrix.transformPosition(new Vector3f(toe)).add(held.x,(float)correction,held.z);
+            var centre=eva.getPosition(partial);
+            // Stopped at once as the toe meets the face, released gently: eased
+            // both ways, a swinging foot outran it and its toe went four blocks in.
+            float back=(float)easeUnder(key^0x40000000,blocked(eva,tip,lowest.y+(float)correction,centre,forward));
+            // Carried onto the ledge only as it rises over the edge, not through the face.
+            float up=rise>.5?(float)Math.max(0,Math.min(1,(correction/rise-.6)/.4)):1,shift=onto*up-back;
+            if(Math.abs(correction)<.005&&holding<.005&&back<.005&&onto<.005)continue;
+            Vector3f target=new Vector3f(pivot).add(held.x+forward.x*shift,(float)correction,held.z+forward.z*shift);
             // The knee bends forward, and up when the foot is lifted high in
             // front. The clip's own knee direction lay along the thigh when a
             // foot was raised onto a ledge, and the solver flipped the knee
             // backwards and flung the foot up behind.
             Vector3f pole=new Vector3f(forward).add(0,.5F,0);
             // Small corrections fade in: a solver switched on at a fixed threshold snapped the walking leg.
-            EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(matrix),pole,root,Math.max(holding,(float)Math.min(1,Math.abs(correction)/.2)));
+            EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(matrix),pole,root,Math.max(Math.max(holding,Math.min(1,(back+onto)/.5F)),(float)Math.min(1,Math.abs(correction)/.2)));
+            // The solved leg can fall short of its target, a foot lifted onto a
+            // kerb lower than asked: the toes are checked again where they are drawn.
+            // The solver keeps the foot's turn, so the sole sits where it did under the toe.
+            var drawnToe=new Matrix4f(root).mul(EvaRigTransforms.model(foot)).transformPosition(new Vector3f(toe));
+            float more=blocked(eva,drawnToe,drawnToe.y+lowest.y-matrix.transformPosition(new Vector3f(toe)).y,centre,forward);
+            if(more>0)
+            {
+                back+=more;EASED.put(key^0x40000000,new Eased(back,com.projectseele.client.AircraftRenderClockR21.frameNanos()));
+                target.sub(forward.x*more,0,forward.z*more);
+                EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(matrix),pole,root,1);
+            }
             changed.addAll(List.of("leg_"+s,"shin_"+s,"ankle_"+s,"foot_"+s));
         }
         if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),witness);
@@ -148,6 +205,11 @@ public final class EvaFootPlacement
     private static Vector3f hold(int key,Vector3f pivot)
     {
         var hold=HOLDS.get(key);if(hold==null)return new Vector3f();
+        // A hold from before an action (no placement while a ledge climb
+        // played) pinned the foot where it had stood: 25 blocks behind the
+        // body on the wall top, and the leg pulled the body down into it.
+        if(com.projectseele.client.AircraftRenderClockR21.frameNanos()-hold.time>250_000_000L||Math.hypot(hold.x-pivot.x,hold.z-pivot.z)>12)
+        {HOLDS.remove(key);return new Vector3f();}
         float w=hold.weight*hold.weight*(3-2*hold.weight);
         return new Vector3f((hold.x-pivot.x)*w,0,(hold.z-pivot.z)*w);
     }
@@ -168,6 +230,42 @@ public final class EvaFootPlacement
         float dt=Math.max(0,Math.min(.25F,(now-hold.time)/1e9F));hold.time=now;
         // Released over 0.15 s as the foot lifts.
         if(!hold.on){hold.weight-=dt/.15F;if(hold.weight<=0)HOLDS.remove(key);}
+    }
+    /**
+     * How far back along the heading a toe at tip, sole at sole, must go to
+     * stand in front of a wall or a kerb's face. The way from the body to the
+     * toe is searched, not the toe alone: a toe through an eleven-block wall
+     * stood in the open. Read at the sole as well as the toe cap, which stands
+     * higher: a sole lifted onto a kerb's top went over it still below it.
+     * A block-high bump is left to the ground correction.
+     */
+    private static float blocked(EvaUnit01Entity eva,Vector3f tip,float sole,Vec3 centre,Vector3f forward)
+    {
+        float reachOut=(float)((tip.x-centre.x)*forward.x+(tip.z-centre.z)*forward.z);
+        double low=Math.min(tip.y+.6,sole+1.2);
+        for(float d=1;d<=reachOut;d+=1)
+        {
+            double x=tip.x-forward.x*(reachOut-d),z=tip.z-forward.z*(reachOut-d);
+            if(solid(eva,x,low,z)||solid(eva,x,tip.y+3,z))return reachOut-d+1;
+        }
+        return 0;
+    }
+    /** Follows a rise at once and eases a fall, as ease() does both. */
+    private static double easeUnder(int key,double wanted)
+    {
+        var last=EASED.get(key);
+        if(last!=null&&wanted<last.value())return ease(key,wanted);
+        if(EASED.size()>64)EASED.clear();
+        EASED.put(key,new Eased(wanted,com.projectseele.client.AircraftRenderClockR21.frameNanos()));
+        return wanted;
+    }
+    private static boolean solid(EvaUnit01Entity eva,double x,double y,double z)
+    {
+        var pos=net.minecraft.core.BlockPos.containing(x,y,z);var state=eva.level().getBlockState(pos);if(state.isAir())return false;
+        var shape=state.getCollisionShape(eva.level(),pos,CollisionContext.of(eva));
+        if(shape.isEmpty()||EvaObstacleCollision.ignores(eva,state,pos,shape))return false;
+        for(var box:shape.toAabbs())if(box.move(pos).contains(x,y,z))return true;
+        return false;
     }
     /** The EVA's step height (blocks): a sole is set on ground this far above or below it. */
     private static final double STEP=20;

@@ -22,6 +22,8 @@ public final class EvaOrdinaryStandingSupportR52
 {
     // Preserve the existing 3cm model support margin (the renderer adds 5cm).
     private static final float CLEARANCE=.006F;
+    /** A floor further than this below the body (blocks) is a drop, not uneven ground. */
+    private static final double DROP=8;
     private static final float KNEE_RESERVE=(float)Math.toRadians(20);
     private static final Map<Integer,Map<String,Vector3f[]>> SOURCES=new HashMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,MotionMemory> MEMORY=new com.projectseele.util.WeakIdentityMap<>();
@@ -93,7 +95,11 @@ public final class EvaOrdinaryStandingSupportR52
                     ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,e));
             if(hit.getType()!=HitResult.Type.BLOCK)
             {restoreFeet(pose,authoredFeet);memory.clearFeet();if(!e.onGround())MEMORY.remove(e);return;}
-            floor[index++]=(float)((hit.getLocation().y-origin.y)/EvaScale.RENDER_SCALE);
+            // A sole over a drop is not set down to the ground below it: standing
+            // on a wall top narrower than the stance, the foot past its edge
+            // reached for the ground 45 blocks down and sank the body into the wall.
+            double below=hit.getLocation().y-origin.y;
+            floor[index++]=below<-DROP?0:(float)(below/EvaScale.RENDER_SCALE);
         }
         double leftFloor=origin.y+floor[0]*EvaScale.RENDER_SCALE,rightFloor=origin.y+floor[1]*EvaScale.RENDER_SCALE;
         if(!e.onGround()&&!memory.retainsGroundFloorR52(leftFloor,rightFloor))

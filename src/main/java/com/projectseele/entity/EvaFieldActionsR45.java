@@ -218,11 +218,9 @@ public final class EvaFieldActionsR45
         e.fieldActionPhaseR45(at);
         if(climbing)
         {
-            // Along the clip's own path, scaled to this ledge; no gravity or
+            // Along the climb path, scaled to this ledge; no gravity or
             // collision on the way, both checked before the climb began.
-            var path=authored.getAsJsonArray("r57_climb_path");float at2=Mth.clamp(progress(e,0),0,1)*(path.size()-1);
-            int a=(int)at2,b=Math.min(a+1,path.size()-1);var p=path.get(a).getAsJsonArray();var q=path.get(b).getAsJsonArray();
-            double up=Mth.lerp(at2-a,p.get(0).getAsDouble(),q.get(0).getAsDouble()),on=Mth.lerp(at2-a,p.get(1).getAsDouble(),q.get(1).getAsDouble());
+            float[] path=climbPathR57(authored,progress(e,0));double up=path[0],on=path[1];
             Vec3 forward=Vec3.directionFromRotation(0,state.getFloat("facing")).multiply(1,0,1).normalize();
             e.setNoGravity(true);e.setDeltaMovement(Vec3.ZERO);e.fallDistance=0;
             e.setPos(state.getDouble("x0")+forward.x*on*state.getDouble("advance"),state.getDouble("y0")+up*state.getDouble("rise"),
@@ -241,6 +239,25 @@ public final class EvaFieldActionsR45
             EvaGameplayMotionR32.releaseToMovement(e);e.finishCapturedActionEndpointR45();clear(e);
             runtime.pending=pending;consumePending(e,runtime);
         }
+    }
+    /**
+     * {rise, advance} of the ledge climb at clip progress, each 0..1. The rise
+     * is the capture's; the body moves forward only once it is nearly up and
+     * eases to a stop at the end. The capture moved forward while still
+     * rising, which carried the body into the wall below the edge, and was
+     * still moving at the end, so the final position sync jumped it ahead.
+     */
+    static float[] climbPathR57(com.google.gson.JsonObject authored,float progress)
+    {
+        var path=authored.getAsJsonArray("r57_climb_path");int last=path.size()-1;
+        float at=Mth.clamp(progress,0,1)*last;int a=(int)at,b=Math.min(a+1,last);
+        float rise=Mth.lerp(at-a,path.get(a).getAsJsonArray().get(0).getAsFloat(),path.get(b).getAsJsonArray().get(0).getAsFloat());
+        int up=last;
+        for(int i=0;i<=last;i++)if(path.get(i).getAsJsonArray().get(0).getAsFloat()>=.9F){up=i;break;}
+        // Done a few ticks early: the client's position trails the server's,
+        // and the end of the climb syncs it, so it must be standing still by then.
+        float from=up/(float)last,on=Mth.clamp((progress-from)/Math.max(1e-3F,.88F-from),0,1);
+        return new float[]{Math.min(1,rise/.97F),on*on*(3-2*on)};
     }
     private EvaFieldActionsR45() {}
 }

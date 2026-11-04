@@ -72,11 +72,13 @@ final class EvaGroundContactR56
         float lowest=lowest(model,root,hulls),support=lowest-ground;
         // A sole set on a ledge already stands: measured against the drawn
         // ground below, a foot off the ground pulled the whole body down and
-        // sank the ledge foot into the kerb.
+        // sank the ledge foot into the kerb. It only holds the body up: a
+        // swinging sole still below the top, toes in the face, lifted the
+        // whole body three blocks for a frame.
         for(String side:new String[]{"l","r"})
         {
             double under=EvaFootPlacement.groundUnder(eva,side);
-            if(Double.isFinite(under)&&under>ground+.5)support=Math.min(support,soleHeight(model,root,hulls,side)-(float)under);
+            if(Double.isFinite(under)&&under>ground+.5)support=Math.min(support,Math.max(0,soleHeight(model,root,hulls,side)-(float)under));
         }
         float gap=Mth.clamp(support,-MAX_LIFT,MAX_DROP);
         var base=model.getBone("root").orElse(null);
@@ -144,7 +146,11 @@ final class EvaGroundContactR56
 
     private static boolean applies(EvaUnit01Entity eva)
     {
+        // A ledge climb hangs on its hands and the foot set on the top, not on
+        // the ground below: lowered onto its dangling foot, the body sank five
+        // blocks and the foot on the top went into it.
         return eva.isPoweredOn()&&!eva.isCrucified()&&!eva.hasActiveCarrierMotion()&&!eva.isFirstBattleActive()
+                &&!com.projectseele.entity.EvaFieldActionsR45.CLIMB.equals(com.projectseele.entity.EvaFieldActionsR45.clip(eva))
                 &&!eva.isVisuallyAirborneForRender()&&!eva.isNervLogisticsLocked()&&!eva.isLaunchSequenceActive()
                 &&eva.getActivationTicks()<=0&&eva.getVisualPose()==0&&!EvaShutdownR30.displayed(eva)
                 &&!EvaAirTransportR31.active(eva)&&!com.projectseele.physics.CombatBodyDynamics.active(eva)
