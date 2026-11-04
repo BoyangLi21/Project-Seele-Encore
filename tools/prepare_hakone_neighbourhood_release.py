@@ -13,6 +13,8 @@ def prepare(a):
     for C in a.candidate:
         from verify_hakone_owakudani_release import require_verified
         require_verified(C)
+        from verify_hakone_west_tunnel import require_verified as require_tunnel
+        require_tunnel(C)
         for name in('functional-check.json','independent-check.json'):
             if json.loads((C/name).read_text('utf8'))['errors']:raise ValueError('Unverified '+str(C/name))
         check=json.loads((C/'functional-check.json').read_text('utf8'))
