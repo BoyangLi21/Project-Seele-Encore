@@ -1,0 +1,589 @@
+{
+  "curve_indices": [
+    210,
+    211,
+    212,
+    213,
+    214,
+    215,
+    216,
+    217,
+    218
+  ],
+  "previous_native_curves": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\western-road-seams-installed-authority-v1\\native-curves.json",
+  "native_geometry_proposal": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\funicular-native-profile-review-v1\\proposal.json",
+  "canopies": [],
+  "station_sources": [],
+  "retained_volumes": [
+    [
+      634,
+      109,
+      750,
+      670,
+      122,
+      784
+    ]
+  ],
+  "platform_edge_moves": [
+    {
+      "before": [
+        917,
+        56,
+        655
+      ],
+      "after": [
+        917,
+        56,
+        656
+      ],
+      "state": "minecraft:iron_bars[east=false,north=true,south=true,waterlogged=false,west=false]",
+      "destination_state": "minecraft:air"
+    },
+    {
+      "before": [
+        918,
+        56,
+        655
+      ],
+      "after": [
+        918,
+        56,
+        656
+      ],
+      "state": "minecraft:iron_bars[east=false,north=true,south=true,waterlogged=false,west=false]",
+      "destination_state": "minecraft:air"
+    },
+    {
+      "before": [
+        925,
+        55,
+        647
+      ],
+      "after": [
+        924,
+        55,
+        647
+      ],
+      "state": "minecraft:yellow_concrete",
+      "destination_state": "minecraft:smooth_stone"
+    }
+  ],
+  "reviewed_interface_cells": [
+    {
+      "pos": [
+        634,
+        106,
+        772
+      ],
+      "before": "minecraft:light_gray_stained_glass",
+      "after": "minecraft:air",
+      "kind": "rail clearance"
+    },
+    {
+      "pos": [
+        634,
+        107,
+        772
+      ],
+      "before": "minecraft:light_gray_stained_glass",
+      "after": "minecraft:air",
+      "kind": "rail clearance"
+    },
+    {
+      "pos": [
+        634,
+        106,
+        777
+      ],
+      "before": "minecraft:light_gray_stained_glass",
+      "after": "minecraft:stone_bricks",
+      "kind": "continuous tunnel sidewall"
+    },
+    {
+      "pos": [
+        634,
+        107,
+        777
+      ],
+      "before": "minecraft:light_gray_stained_glass",
+      "after": "minecraft:stone_bricks",
+      "kind": "continuous tunnel sidewall"
+    },
+    {
+      "pos": [
+        599,
+        149,
+        759
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "continuous ropeway crossbeam"
+    },
+    {
+      "pos": [
+        601,
+        149,
+        760
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "continuous ropeway crossbeam"
+    },
+    {
+      "pos": [
+        602,
+        149,
+        761
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "continuous ropeway crossbeam"
+    },
+    {
+      "pos": [
+        604,
+        149,
+        762
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "continuous ropeway crossbeam"
+    },
+    {
+      "pos": [
+        606,
+        149,
+        763
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "continuous ropeway crossbeam"
+    },
+    {
+      "pos": [
+        631,
+        123,
+        762
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "ropeway station roof mounting beam"
+    },
+    {
+      "pos": [
+        632,
+        123,
+        762
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "ropeway station roof mounting beam"
+    },
+    {
+      "pos": [
+        633,
+        123,
+        762
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "ropeway station roof mounting beam"
+    },
+    {
+      "pos": [
+        634,
+        123,
+        762
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "ropeway station roof mounting beam"
+    },
+    {
+      "pos": [
+        631,
+        123,
+        770
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "ropeway station roof mounting beam"
+    },
+    {
+      "pos": [
+        632,
+        123,
+        770
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "ropeway station roof mounting beam"
+    },
+    {
+      "pos": [
+        633,
+        123,
+        770
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "ropeway station roof mounting beam"
+    },
+    {
+      "pos": [
+        634,
+        123,
+        770
+      ],
+      "before": "minecraft:air",
+      "after": "minecraft:iron_block",
+      "kind": "ropeway station roof mounting beam"
+    }
+  ],
+  "station_checks": [
+    {
+      "id": "sounzan-funicular",
+      "station_id": "sounzan-funicular",
+      "kind": "station",
+      "approach": [
+        704,
+        97,
+        789
+      ],
+      "platform": [
+        667,
+        104,
+        765
+      ]
+    },
+    {
+      "id": "gora-funicular",
+      "station_id": "gora-funicular",
+      "kind": "station",
+      "approach": [
+        916,
+        56,
+        646
+      ],
+      "platform": [
+        915,
+        55,
+        651
+      ],
+      "platform_side": "north-west boarding edge next to waiting shelter"
+    }
+  ],
+  "remaining_interchange_access": [
+    {
+      "id": "gora-south-platform-access",
+      "platform": [
+        907,
+        55,
+        662
+      ],
+      "reason": "Separate existing south-side paving has no declared public-road contact; requires its own approach avoiding all native tracks"
+    }
+  ],
+  "retire_cells": [
+    {
+      "pos": [
+        897,
+        61,
+        660
+      ],
+      "state": "minecraft:black_concrete",
+      "current_state": "minecraft:black_concrete",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        897,
+        61,
+        661
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        898,
+        61,
+        660
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        898,
+        61,
+        661
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        898,
+        61,
+        662
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        899,
+        61,
+        659
+      ],
+      "state": "minecraft:black_concrete",
+      "current_state": "minecraft:black_concrete",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        899,
+        61,
+        660
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        899,
+        61,
+        661
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        900,
+        61,
+        659
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        900,
+        61,
+        660
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        900,
+        61,
+        661
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        901,
+        61,
+        658
+      ],
+      "state": "minecraft:black_concrete",
+      "current_state": "minecraft:black_concrete",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        901,
+        61,
+        659
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        901,
+        61,
+        660
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        902,
+        61,
+        658
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        902,
+        61,
+        659
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        902,
+        61,
+        660
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        903,
+        61,
+        657
+      ],
+      "state": "minecraft:black_concrete",
+      "current_state": "minecraft:black_concrete",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        903,
+        61,
+        658
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        903,
+        61,
+        659
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        904,
+        61,
+        657
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        904,
+        61,
+        658
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        904,
+        61,
+        659
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        905,
+        61,
+        657
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        905,
+        61,
+        658
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        906,
+        61,
+        656
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        906,
+        61,
+        657
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        906,
+        61,
+        658
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        907,
+        61,
+        656
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    },
+    {
+      "pos": [
+        907,
+        61,
+        657
+      ],
+      "state": "minecraft:smooth_stone",
+      "current_state": "minecraft:smooth_stone",
+      "reason": "detached legacy paving over the native platform; no public-road declaration or contact"
+    }
+  ]
+}

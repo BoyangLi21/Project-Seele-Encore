@@ -76,11 +76,12 @@ def repair(a):
         changed=public['ground']!=public['old_ground'];d['ground'][changed]=public['ground'][changed]
         oldground=public['ground'].copy()
     tags={};station_rows=[];passenger_cells=set()
+    station_rows.extend(spec.get('station_checks',[]))
     for source in spec.get('station_sources',[]):
         station_rows.extend(row for row in json.loads((Path(source)/'plan/buildings.json').read_text('utf8')) if row.get('kind')=='station')
         for station in json.loads((Path(source)/'station-access-check.json').read_text('utf8'))['stations']:
             for px,py,pz in station['path']:
-                passenger_cells.update((px,Y,pz) for Y in range(py-1,py+3))
+                passenger_cells.update((px,Y,pz) for Y in range(math.floor(py)-1,math.ceil(py)+3))
     with stopped_world(world):
         shutil.copytree(world/'mtr',a.out/'preserved-native')
         for pos,tag in iter_block_entities(world,'projectseele:geofront',(x,-128,z),(X,319,Z)):tags[pos]=tag
@@ -109,6 +110,10 @@ def repair(a):
         for b in box_index.get((px//16,pz//16),[]):
             if b[0]<=px<=b[3] and b[2]<=pz<=b[5] and Y<b[1]+6:raise ValueError('Roof backing enters occupied room height')
     road_y,_=road_blocks(d['grade2'])
+    reviewed={tuple(row['pos']):row for row in spec.get('reviewed_interface_cells',[])}
+    if len(reviewed)!=len(spec.get('reviewed_interface_cells',[])) or len(reviewed)>128:raise ValueError('Unbounded or duplicate interface edits')
+    for pos,row in reviewed.items():
+        if e.state(*pos,original=True)!=row['before']:raise ValueError(('Stale reviewed station interface',pos))
     edge_moves=spec.get('platform_edge_moves',[])
     clearance_edges={tuple(row['before']):row['state'] for row in edge_moves}
     for row in edge_moves:
@@ -132,6 +137,7 @@ def repair(a):
         if pos in tags:return 'device'
         if pos in passenger_cells:return 'station passenger passage'
         if launch.chunk_mask(px//16,pz//16)[py+128,pz%16,px%16]:return 'mechanism'
+        if any(all(b[k]<=pos[k]<=b[k+3] for k in range(3)) for b in spec.get('retained_volumes',[])):return 'retained station volume'
         for b in box_index.get((px//16,pz//16),[]):
             if all(b[k]<=pos[k]<=b[k+3] for k in range(3)):return 'occupied building'
         j,i=pz-z,px-x
@@ -149,6 +155,8 @@ def repair(a):
                 and pos[1]<int(road_y[pos[2]-z,pos[0]-x]) and old.split('[')[0] in EMPTY):problem=None
         if problem=='public passage' and state=='minecraft:air' and pos[1]>int(road_y[pos[2]-z,pos[0]-x]):problem=None
         if problem:issues.append([problem,*pos,old,state,kind]);return
+        review=reviewed.get(pos)
+        if review and review['before']==old and review['after']==state and review['kind']==kind:extra=set(extra)|{old.split('[')[0]}
         if old.split('[')[0] not in PASSIVE|set(extra):issues.append(['foreign structure',*pos,old,state,kind]);return
         record=edits.setdefault(pos,dict(pos=list(pos),before=old,after=state,kind=kind))
         record['after']=state;record['kind']=kind;e.put(*pos,state)
@@ -156,6 +164,7 @@ def repair(a):
     # their finite roof band; canopy timber is handled as complete assemblies.
     for (px,pz),row in retired_wide.items():
         for yy in range(math.floor(row['low'])+3,math.ceil(row['high'])+7):
+            if guarded((px,yy,pz))=='retained station volume':continue
             if e.state(px,yy,pz).split('[')[0] in {STONE,'minecraft:sea_lantern'}:
                 put((px,yy,pz),'minecraft:air','retired unlined legacy roof')
     # Continuous half-step bearing: every voxel surface stays below the track.
@@ -287,6 +296,7 @@ def repair(a):
         if fragment.get('cap_state'):put((px,py,pz),fragment['cap_state'],'measured exterior support cap')
         if not support_column(px,pz,py-1,'measured exterior fragment footing',fragment.get('material',STONE)):issues.append(['exterior fragment footing blocked',px,py,pz])
     for pos in roof_supports:put(pos,'minecraft:dark_oak_planks','measured roof backing')
+    for pos,row in reviewed.items():put(pos,row['after'],row['kind'])
     access_records=[]
     access_removable={tuple(r['pos']):r['state'] for r in spec.get('station_access_removable_posts',[])}
     for pos,state in access_removable.items():

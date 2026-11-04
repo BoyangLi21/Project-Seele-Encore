@@ -16,6 +16,9 @@ def verify(candidate):
     spec=json.loads((candidate/'plan/rail-civil-design.json').read_text('utf8'))
     curves=json.loads((candidate/'plan/native-curves.json').read_text('utf8'))['trains']
     env=columns(curves,spec['curve_indices']);e=Editor(candidate);errors=[];bearings={};structure={}
+    for row in spec.get('reviewed_interface_cells',[]):
+        pos=row['pos']
+        if e.state(*pos,original=True)!=row['before'] or e.state(*pos)!=row['after']:errors.append(['reviewed interface mismatch',*pos])
     base=Editor(Path(spec['base_public_candidate'])) if spec.get('base_public_candidate') else None
     base_public_columns=0
     if base is not None:
@@ -124,6 +127,7 @@ def verify(candidate):
             yy,zz,xx=np.unravel_index(at[lo:hi],(448,16,16));yy-=128;xx+=cx*16;zz+=cz*16
             for px,py,pz,old,new in zip(xx,yy,zz,before[lo:hi],after[lo:hi]):
                 j,i=pz-z,px-x
+                if any(b[0]<=px<=b[3] and b[1]<=py<=b[4] and b[2]<=pz<=b[5] for b in spec.get('retained_volumes',[])):errors.append(['retained station volume changed',int(px),int(py),int(pz)])
                 for name,b in room_index.get((int(cx),int(cz)),[]):
                     if b[0]<=px<=b[3] and b[1]<=py<=b[4] and b[2]<=pz<=b[5] and (int(px),int(py),int(pz)) not in roof_supports:errors.append(['retained occupied room changed',name,int(px),int(py),int(pz)])
                 if d['walk'][j,i] and floor[j,i]-2<=py<=floor[j,i]+4:
