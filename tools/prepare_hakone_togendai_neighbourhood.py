@@ -159,10 +159,29 @@ def design(a):
         for (cx,cz),v in zip(r['coords'],r['before']):
             px,pz=int(cx)*16,int(cz)*16;l,t,R,B=max(x,px),max(z,pz),min(X,px+15),min(Z,pz+15)
             if l>R or t>B:continue
-            wet[t-z:B-z+1,l-x:R-x+1]=water[v[227,t-pz:B-pz+1,l-px:R-px+1]]
+            if design.get('surface_water_guard',False):
+                # Coastal and river towns do not share Lake Ashi's Y=99 datum.
+                # Reserve measured water above the soil surface, including
+                # rivers at different levels, before fitting any new road.
+                topwater=np.where(water[v],np.arange(-128,320)[:,None,None],-129).max(0)
+                measured=d['old_ground'][t-z:B-z+1,l-x:R-x+1]
+                sample=topwater[t-pz:B-pz+1,l-px:R-px+1]
+                wet[t-z:B-z+1,l-x:R-x+1]=(sample>-129)&(sample>=measured)
+            else:
+                wet[t-z:B-z+1,l-x:R-x+1]=water[v[227,t-pz:B-pz+1,l-px:R-px+1]]
         old.regions.clear()
+    if design.get('geographic_water_mask'):
+        with np.load(design['geographic_water_mask'])as f:
+            if not np.array_equal(f['bounds'],bounds):raise ValueError('Geographic water mask has a different frame')
+            wet|=f['wet']
     if np.any(wet&walk):
         j,i=np.argwhere(wet&walk)[0];raise ValueError(('new street over measured lake',int(i+x),int(j+z)))
+    if design.get('geographic_rail_mask'):
+        with np.load(design['geographic_rail_mask'])as f:
+            if not np.array_equal(f['bounds'],bounds):raise ValueError('Geographic railway mask has a different frame')
+            conflict=walk&f['blocked']
+            if conflict.any():
+                j,i=np.argwhere(conflict)[0];raise ValueError(('new street enters reserved railway',int(i+x),int(j+z)))
     known=d['old_ground']>-129
     fixed=((distance>=blend_distance)|wet|retained_walk)&known
     retained=[]

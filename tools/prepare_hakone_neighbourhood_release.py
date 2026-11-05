@@ -15,6 +15,8 @@ def prepare(a):
         require_verified(C)
         from verify_hakone_west_tunnel import require_verified as require_tunnel
         require_tunnel(C)
+        from verify_odawara_downtown_release import require_verified as require_odawara
+        require_odawara(C)
         for name in('functional-check.json','independent-check.json'):
             if json.loads((C/name).read_text('utf8'))['errors']:raise ValueError('Unverified '+str(C/name))
         check=json.loads((C/'functional-check.json').read_text('utf8'))

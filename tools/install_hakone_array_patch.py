@@ -244,6 +244,8 @@ def install(a):
         require_verified(candidate)
         from verify_hakone_west_tunnel import require_verified as require_tunnel
         require_tunnel(candidate)
+        from verify_odawara_downtown_release import require_verified as require_odawara
+        require_odawara(candidate)
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
         if 'port_verification'in manifest:

@@ -81,12 +81,19 @@ def build(row):
         goals.extend([dict(kind='stair lower landing',feet=c.point(-hx+2,y+1,hz-2)),dict(kind='stair upper landing',feet=c.point(-hx+2,y+6,hz-8))])
     # A lower-pitch tile roof has closed gables and thin overhanging eaves.
     roof=levels*5;c.fill(-hx,roof,-hz,hx,roof,hz,frame)
-    for pz in range(-hz-1,hz+2):
-        rise=hz+1-abs(pz);py=roof+1+rise//2
-        for px in (-hx,hx):
-            if abs(pz)<=hz:c.fill(px,roof+1,pz,px,py,pz,wall)
-        material='minecraft:deepslate_tile_slab[type=bottom,waterlogged=false]'if rise%2==0 else'minecraft:deepslate_tiles'
-        c.fill(-hx-1,py,pz,hx+1,py,pz,material)
+    if row.get('roof_style','gable')=='flat':
+        c.fill(-hx,roof,-hz,hx,roof,hz,'minecraft:smooth_stone')
+        for pz in (-hz,hz):c.fill(-hx,roof+1,pz,hx,roof+1,pz,'minecraft:smooth_stone_slab[type=bottom,waterlogged=false]')
+        for px in (-hx,hx):c.fill(px,roof+1,-hz,px,roof+1,hz,'minecraft:smooth_stone_slab[type=bottom,waterlogged=false]')
+        c.fill(hx-3,roof+1,-hz+2,hx-2,roof+1,-hz+3,'minecraft:polished_andesite')
+        c.fill(hx-3,roof+2,-hz+2,hx-2,roof+2,-hz+3,'minecraft:iron_trapdoor[facing=north,half=bottom,open=false,powered=false,waterlogged=false]')
+    else:
+        for pz in range(-hz-1,hz+2):
+            rise=hz+1-abs(pz);py=roof+1+rise//2
+            for px in (-hx,hx):
+                if abs(pz)<=hz:c.fill(px,roof+1,pz,px,py,pz,wall)
+            material='minecraft:deepslate_tile_slab[type=bottom,waterlogged=false]'if rise%2==0 else'minecraft:deepslate_tiles'
+            c.fill(-hx-1,py,pz,hx+1,py,pz,material)
     for px,hinge in [(-1,'left'),(0,'right')]:
         for py,half in [(1,'lower'),(2,'upper')]:c.put(px,py,hz,f'minecraft:dark_oak_door[facing=south,half={half},hinge={hinge},open=false,powered=false]')
     c.fill(-1,3,hz,0,3,hz,'minecraft:glass')

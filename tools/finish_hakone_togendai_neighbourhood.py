@@ -27,7 +27,7 @@ def finish(source,out,detail_plan=None):
     x,z,X,Z=map(int,d['bounds']);e=Editor(out);spec=json.loads((out/'plan/authored-design.json').read_text('utf8'));details=dict(crossings=[],bus_bays=[],lights=[],trees=[],awnings=[])
     if detail_plan is not None:
         overrides=json.loads(detail_plan.read_text('utf8'))
-        if set(overrides)-{'bridge_details','tree_clusters','woodland_areas','native_frontage_details','hillside_street_details'}:raise ValueError('Finishing plan may not alter street or parcel geometry')
+        if set(overrides)-{'bridge_details','tree_clusters','woodland_areas','native_frontage_details','hillside_street_details','tree_species','tree_probabilities','tree_attempts_per_cluster'}:raise ValueError('Finishing plan may not alter street or parcel geometry')
         spec.update(overrides);save_json(out/'plan/authored-design.json',spec)
     if spec.get('togendai_forecourt',True):
         for lo,hi in [(-321,-302),(-277,-258)]:
@@ -86,12 +86,16 @@ def finish(source,out,detail_plan=None):
     clusters=list(spec.get('tree_clusters',[(-410,854),(-347,904),(-337,928),(-270,891),(-242,922),(-204,903),(-354,956),(-273,973),(-227,1011)]))
     for a,b,A,B in spec.get('woodland_areas',[]):
         clusters.extend((cx,cz)for cx in range(a+15,A,40)for cz in range(b+15,B,40))
+    species_choices=spec.get('tree_species',['spruce','birch','oak']);probabilities=spec.get('tree_probabilities',[.55,.2,.25])
+    if not species_choices or set(species_choices)-{'spruce','birch','oak'}or len(species_choices)!=len(probabilities)or any(p<0 for p in probabilities)or abs(sum(probabilities)-1)>1e-8:raise ValueError('Invalid district planting mix')
+    attempts=int(spec.get('tree_attempts_per_cluster',18))
+    if not 1<=attempts<=30:raise ValueError('Expected bounded planting attempts')
     for cx,cz in clusters:
-        for _ in range(18):
+        for _ in range(attempts):
             px,pz=map(int,np.rint(rng.normal([cx,cz],[12,9])));j,i=pz-z,px-x
             if not(3<=j<d['walk'].shape[0]-3 and 3<=i<d['walk'].shape[1]-3)or distance[j,i]<5 or d['wet'][j,i]:continue
             if any(np.hypot(px-q['base'][0],pz-q['base'][2])<6 for q in details['trees']):continue
-            h=int(d['ground'][j,i]);height=int(rng.integers(5,9));species=str(rng.choice(['spruce','birch','oak'],p=[.55,.2,.25]));cells={}
+            h=int(d['ground'][j,i]);height=int(rng.integers(5,9));species=str(rng.choice(species_choices,p=probabilities));cells={}
             if e.state(px,h,pz).split('[')[0]not in SOIL:continue
             for Y in range(h+1,h+height):cells[px,Y,pz]=f'minecraft:{species}_log[axis=y]'
             for layer in range(4):
