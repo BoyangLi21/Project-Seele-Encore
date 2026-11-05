@@ -216,34 +216,88 @@ def _sample(tex, uv):
 
 
 class RigidMesh:
-    """Unit-01 style: each part follows one bone rigidly."""
+    """Unit-01 style: each part follows one bone, plus the runtime's seam welding.
 
-    def __init__(self, mesh_path, texture_path, rig, skip=('finger_',), extra_parts=None):
+    Mirrors LocalTriangleMeshLayer.jointSkins: vertices shared by the two parts
+    meeting at an elbow/ankle/wrist/hip/waist get half weight on each bone
+    (snapped to the shared rest point), fading to 0 within 6 px of the seam,
+    and the head's neck sleeve blends toward torso_upper.  LBS here, DQS in game.
+    """
+
+    JOINTS = [('torso_lower', 'torso_upper')] + [(u.replace('%s', s), l.replace('%s', s)) for s in 'lr' for u, l in
+                                                 (('torso_lower', 'leg_%s'), ('arm_%s', 'forearm_%s'),
+                                                  ('shin_%s', 'foot_%s'), ('forearm_%s', 'hand_%s'))]
+
+    def __init__(self, mesh_path, texture_path, rig, skip=('finger_',), weld=True):
         m = json.load(open(mesh_path, encoding='utf8'))
         stride = m['stride']
         tex = _texture(texture_path)
         self.parts = []
+        raw = {}
         for name, part in m['parts'].items():
-            if name.startswith(skip):
-                continue
-            bone = name if name in rig.pivot else None
-            if bone is None:
+            if name.startswith(skip) or name not in rig.pivot:
                 continue
             v = np.array(part['vertices'], float).reshape(-1, stride)
-            xyz = v[:, :3] + np.array(part['pivot'], float)
+            file_px = v[:, :3] + np.array(part['pivot'], float)
+            xyz = file_px.copy()
             xyz[:, 0] *= -1
             xyz /= 16
-            tris = xyz.reshape(-1, 3, 3)
             col = _sample(tex, v[:, 3:5].reshape(-1, 3, 2).mean(1))
             if 'tint' in part:
                 col = col * np.array(part['tint'], float)[None, :]
-            self.parts.append((bone, tris, col))
+            raw[name] = (xyz, file_px, col, np.array(part['pivot'], float))
+        self.skin = {}
+        if weld:
+            for upper, lower in self.JOINTS:
+                if upper not in raw or lower not in raw:
+                    continue
+                a, b = raw[upper][1], raw[lower][1]
+                d = np.linalg.norm(a[:, None, :] - b[None, :, :], axis=2)
+                close = d < 0.002
+                ia, ib = np.nonzero(close)
+                if len(ia) < 3:
+                    continue
+                seam = (a[ia] + b[ib]) / 2
+                for name, other in ((upper, lower), (lower, upper)):
+                    pts = raw[name][1]
+                    dd = np.linalg.norm(pts[:, None, :] - seam[None, :, :], axis=2)
+                    k = dd.argmin(1)
+                    dist = dd[np.arange(len(pts)), k]
+                    t = np.clip(1 - dist / 6.0, 0, 1)
+                    w = 0.5 * t * t * (3 - 2 * t)
+                    rest = raw[name][0].copy()
+                    on = dist < 0.002
+                    w[on] = 0.5
+                    snap = seam[k[on]].copy()
+                    snap[:, 0] *= -1
+                    rest[on] = snap / 16
+                    self.skin.setdefault(name, []).append((other, w, rest))
+            if 'head' in raw and 'torso_upper' in raw:
+                fp, pv = raw['head'][1], raw['head'][3]
+                blend = np.clip((pv[1] + 1.5 - fp[:, 1]) / 7.0, 0, 1)
+                blend[(fp[:, 1] > pv[1] - 3) & (fp[:, 2] < -6)] = 0
+                self.skin.setdefault('head', []).append(('torso_upper', blend * blend * (3 - 2 * blend), raw['head'][0].copy()))
+        for name, (xyz, _, col, _) in raw.items():
+            self.parts.append((name, xyz.reshape(-1, 3, 3), col))
+        self.rest = {name: raw[name][0] for name in raw}
 
     def triangles(self, mats, world):
         out_t, out_c = [], []
         for bone, tris, col in self.parts:
             m = world @ mats[bone]
-            t = tris @ m[:3, :3].T + m[:3, 3]
+            if bone in self.skin:
+                own = np.ones(len(self.rest[bone]))
+                acc = np.zeros((len(own), 3))
+                for other, w, rest in self.skin[bone]:
+                    take = np.minimum(own, w)
+                    own -= take
+                    mo = world @ mats[other]
+                    acc += take[:, None] * (rest @ mo[:3, :3].T + mo[:3, 3])
+                base = self.skin[bone][0][2]
+                acc += own[:, None] * (base @ m[:3, :3].T + m[:3, 3])
+                t = acc.reshape(-1, 3, 3)
+            else:
+                t = tris @ m[:3, :3].T + m[:3, 3]
             out_t.append(t)
             out_c.append(col)
         return np.concatenate(out_t), np.concatenate(out_c)
