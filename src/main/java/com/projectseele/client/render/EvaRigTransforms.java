@@ -125,7 +125,20 @@ final class EvaRigTransforms
             if(restAxis.lengthSquared()<1e-8F)restAxis.set(u).cross(new Vector3f(0,0,1));
             restAxis.normalize();
         }
-        var localSide=rotation(new Matrix4f(root).mul(model(upper))).transform(new Vector3f(restAxis));if(axis.dot(localSide)<0)axis.negate();
+        if(anatomical)
+        {
+            var localSide=rotation(new Matrix4f(root).mul(model(upper))).transform(new Vector3f(restAxis));if(axis.dot(localSide)<0)axis.negate();
+        }
+        else
+        {
+            // Roll the limb by anatomy, never by the incoming pose: the rest frame's x-cross-limb side is
+            // the front of the thigh/upper arm. A kneecap faces the way the knee bends out; an elbow's
+            // front faces away from it (the point is behind). Keeping the incoming axis sign instead let
+            // an already-twisted limb stay turned back to front.
+            boolean leg=upper.getName().startsWith("leg_");
+            boolean frontToBend=new Vector3f(axis).cross(du).dot(bend)>0;
+            if(leg!=frontToBend)axis.negate();
+        }
         for(var bone:new GeoBone[]{lower,wrist,hand}){bone.setPosX(0);bone.setPosY(0);bone.setPosZ(0);}
         wrist.setRotX(0);wrist.setRotY(0);wrist.setRotZ(0);
         orient(upper,u,du,axis,restAxis,root);var actual=parent(lower,root).transformPosition(new Vector3f(centre));
