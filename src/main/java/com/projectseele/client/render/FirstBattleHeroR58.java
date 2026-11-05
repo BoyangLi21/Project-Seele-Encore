@@ -31,7 +31,8 @@ final class FirstBattleHeroR58
     private FirstBattleHeroR58() {}
 
     static final float GROUNDED_IN = 5.6F, GROUNDED_OUT = 12.2F;
-    private static float standingRootY, standingAnkle = 3;
+    private static float standingRootY, standingAnkle = 6;
+    private static final Quaternionf[] standingAnkleTurn = {new Quaternionf(), new Quaternionf()};
 
     /** Unit-01's forearms (left, right), published for Sachiel's claws (one frame behind at most). */
     private static final Vec3[] forearms = new Vec3[2];
@@ -153,6 +154,7 @@ final class FirstBattleHeroR58
             GeoBone ankle = model.getBone("ankle_" + side).orElse(null), foot = model.getBone("foot_" + side).orElse(null);
             if (upper == null || lower == null || ankle == null || foot == null) continue;
             Vector3f target = EvaRigTransforms.point(foot, EvaRigTransforms.pivot(foot), root);
+            if (time < 1) standingAnkleTurn[s] = relation(lower, foot, root);
             Quaternionf rotation = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(foot)));
             // A foot within reach of the ground stands on it, flat and level with the heading.
             if (time < 1) standingAnkle = (float) Math.max(.5, target.y - ground);
@@ -162,7 +164,8 @@ final class FirstBattleHeroR58
             float plant = 1 - Mth.clamp((above - 1.5F) / 4F, 0, 1);
             if (plant > 0)
             {
-                target.y = (float) Math.max(target.y, ground + 1.1F);
+                boolean kneeling = time > POUND_IN - .3F && time < POUND_OUT + .3F;
+                target.y = (float) Math.max(target.y, ground + standingAnkle * (kneeling ? .55F : 1));
                 // A foot well behind the hip stands on its toes, heel raised, as in a lunge.
                 Vector3f hip = EvaRigTransforms.point(upper, EvaRigTransforms.pivot(upper), root);
                 float behind = -new Vector3f(target).sub(hip).dot(toF(front));
@@ -173,7 +176,7 @@ final class FirstBattleHeroR58
             }
             Vector3f pole = toF(front).fma(s == 0 ? .15F : -.15F, lateral).add(0, .1F, 0);
             EvaRigTransforms.solveLeg(upper, lower, ankle, foot, target, rotation, pole, root);
-            limitAnkle(lower, foot, root);
+            limitAnkle(lower, foot, root, standingAnkleTurn[s]);
         }
         if (JOINT_LOG && (int) (time * 20) != lastLogged)
         {
@@ -188,7 +191,19 @@ final class FirstBattleHeroR58
                 Vector3f e = new Vector3f(el).sub(new Vector3f(sh).lerp(wr, .5F));
                 Vector3f out = new Vector3f(lateral).mul(side.equals("l") ? 1 : -1);
                 row.append(String.format(java.util.Locale.ROOT, " knee_%s=%.1f elbowOut_%s=%.1f elbowDown_%s=%.1f ankle_%s=%.0f footY_%s=%.1f",
-                        side, k.dot(toF(front)), side, e.dot(out), side, -e.y, side, ankleBend(model, side, root), side, ankle.y - ground));
+                        side, k.dot(toF(front)), side, e.dot(out), side, -e.y, side, ankleBend(model, side, root), side, ankle.y - ground - standingAnkle));
+            }
+            Vec3[] other = FirstBattleAngelR58.body(time);
+            if (other != null)
+            {
+                // Trunk to trunk: Unit-01's waist, chest and head against Sachiel's.
+                float closest = Float.MAX_VALUE;
+                for (String bone : new String[] {"torso_lower", "torso_upper", "head"})
+                {
+                    Vector3f p = at(model, bone, root);
+                    for (Vec3 q : other) closest = Math.min(closest, (float) q.distanceTo(new Vec3(p.x, p.y, p.z)));
+                }
+                row.append(String.format(java.util.Locale.ROOT, " trunks=%.1f", closest));
             }
             com.projectseele.ProjectSeele.LOGGER.info(row.toString());
         }
@@ -197,25 +212,30 @@ final class FirstBattleHeroR58
     /** Largest turn of the foot away from square to the shin; the rigid ankle armour parts beyond it. */
     private static final float ANKLE_LIMIT = (float) Math.toRadians(35);
 
-    private static void limitAnkle(GeoBone shin, GeoBone foot, Matrix4f root)
+    private static Quaternionf relation(GeoBone shin, GeoBone foot, Matrix4f root)
     {
         Quaternionf shinWorld = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(shin)));
         Quaternionf footWorld = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(foot)));
-        Quaternionf delta = new Quaternionf(shinWorld).invert().mul(footWorld).normalize();
-        float angle = 2 * (float) Math.acos(Math.min(1, Math.abs(delta.w)));
+        return shinWorld.invert().mul(footWorld).normalize();
+    }
+
+    /** Keeps the foot within ANKLE_LIMIT of how it sits on the shin when standing. */
+    private static void limitAnkle(GeoBone shin, GeoBone foot, Matrix4f root, Quaternionf standing)
+    {
+        Quaternionf shinWorld = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(shin)));
+        Quaternionf away = new Quaternionf(standing).invert().mul(relation(shin, foot, root)).normalize();
+        float angle = 2 * (float) Math.acos(Math.min(1, Math.abs(away.w)));
         if (angle <= ANKLE_LIMIT) return;
-        Quaternionf limited = new Quaternionf().slerp(delta, ANKLE_LIMIT / angle);
-        Quaternionf wanted = new Quaternionf(shinWorld).mul(limited);
+        Quaternionf wanted = new Quaternionf(shinWorld).mul(standing).mul(new Quaternionf().slerp(away, ANKLE_LIMIT / angle));
         EvaRigTransforms.rotate(foot, EvaRigTransforms.rotation(EvaRigTransforms.parent(foot, root)).invert().mul(wanted));
     }
 
+    /** Degrees the foot sits away from its standing relation to the shin. */
     static float ankleBend(BakedGeoModel model, String side, Matrix4f root)
     {
         GeoBone shin = model.getBone("shin_" + side).orElse(null), foot = model.getBone("foot_" + side).orElse(null);
         if (shin == null || foot == null) return 0;
-        Quaternionf a = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(shin)));
-        Quaternionf b = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(foot)));
-        Quaternionf d = a.invert().mul(b).normalize();
+        Quaternionf d = new Quaternionf(standingAnkleTurn[side.equals("l") ? 0 : 1]).invert().mul(relation(shin, foot, root)).normalize();
         return (float) Math.toDegrees(2 * Math.acos(Math.min(1, Math.abs(d.w))));
     }
 

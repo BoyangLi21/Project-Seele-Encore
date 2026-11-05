@@ -52,6 +52,15 @@ final class FirstBattleAngelR58
 
     private static Vec3 vec(Vector3f v) { return new Vec3(v.x, v.y, v.z); }
 
+    /** Sachiel's waist, neck and head this frame, for the review checks. */
+    private static Vec3[] body;
+    private static float bodyAt = -1;
+
+    static Vec3[] body(float time) { return body != null && Math.abs(time - bodyAt) < .25F ? body : null; }
+
+    /** Sachiel's waist as the grapple began. */
+    private static Vec3 grabAnchor;
+
     /** Sachiel's waist when Unit-01 let go: the throw starts there. */
     private static Vec3 released;
     private static float releasedAt = -1;
@@ -71,10 +80,13 @@ final class FirstBattleAngelR58
         Vec3 origin = new Vec3(at.x, at.y, at.z);
         float yaw = FirstBattleClip.yaw(spec, false, time);
         Frame f = new Frame(bones, root, origin, yaw, spec.origin().y);
+        if (time < 1) grabAnchor = null;
         if (time <= STAND_END) blend(f, ramp(time, 0, .4F, STAND_END - .01F, STAND_END), () -> standoff(f, spec, time));
         if (time >= GRAB_IN && time <= GRAB_END) blend(f, ramp(time, GRAB_IN, GRAB_FULL, GRAB_OUT, GRAB_END), () -> grab(f, spec, time));
         if (time >= PIN_IN && time <= PIN_END) blend(f, ramp(time, PIN_IN, PIN_IN + .15F, PIN_END - .01F, PIN_END), () -> pinned(f, spec, time));
         if (time >= RISE && time <= END) blend(f, ramp(time, RISE, HOLD, END, END + 1), () -> embrace(f, spec, time));
+        body = new Vec3[] {vec(point(f, TORSO_UPPER)), vec(point(f, TORSO_UPPER + 1)), vec(point(f, HEAD))};
+        bodyAt = time;
     }
 
     // ------------------------------------------------------------------ phases
@@ -108,6 +120,9 @@ final class FirstBattleAngelR58
         // Seized by the shoulders and driven back: the trunk arches away,
         // then is wrenched toward Unit-01 as it twists into the throw.
         lean(f, toward, -.18F + .5F * yank);
+        if (time < GRAB_IN + .06F || grabAnchor == null) grabAnchor = vec(point(f, TORSO_UPPER));
+        float drive = smooth((time - GRAB_IN) / (YANK - GRAB_IN));
+        place(f, TORSO_UPPER, grabAnchor.subtract(toward.scale(4 * drive - 6 * yank)));
         shoulders = new Vec3[] {vec(point(f, ARM_L)), vec(point(f, ARM_R))};
         shouldersAt = time;
         released = vec(point(f, TORSO_UPPER));
