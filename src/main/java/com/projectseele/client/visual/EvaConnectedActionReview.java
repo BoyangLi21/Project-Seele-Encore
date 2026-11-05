@@ -368,7 +368,11 @@ public final class EvaConnectedActionReview
         if(fxOrigin!=null)
         {
             Vec3 r=new Vec3(-fxFront.z,0,fxFront.x);
-            camPos=fxOrigin.add(r.scale(95)).add(fxFront.scale(10)).add(0,40,0);camAim=fxOrigin.add(fxFront.scale(17)).add(0,24,0);
+            // Follow the two fighters in profile, from the side away from Unit-00.
+            Vec3 mid=fxOrigin.add(fxFront.scale(32));
+            for(var e:mc.level.entitiesForRendering())
+                if(e instanceof com.projectseele.entity.SachielEntity angel&&angel.isAlive()){mid=eva.position().lerp(angel.position(),.5);break;}
+            camPos=mid.add(r.scale(-72)).add(0,26,0);camAim=mid.add(0,22,0);
         }
     }
 

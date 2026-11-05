@@ -27,6 +27,8 @@ import java.util.UUID;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID,value=Dist.CLIENT)
 public final class FirstBattleClient
 {
+    /** Review only: keep the review's fixed camera instead of the authored shots. */
+    private static final boolean FIXED_REVIEW_CAMERA_R58=Boolean.getBoolean("projectseele.finaleFixedCameraR58");
     private static final boolean REVIEW_CAMERA_R52="r10-firstbattle".equals(System.getProperty("projectseele.regionalBuild",""))&&Boolean.getBoolean("projectseele.firstBattleAuthoredCameraR52");
     private static final boolean REVIEW_CLOSE_R52=REVIEW_CAMERA_R52&&Boolean.getBoolean("projectseele.firstBattleCloseViewsR52");
     private static CameraType savedCamera;
@@ -63,11 +65,13 @@ public final class FirstBattleClient
         if(event.phase!=TickEvent.Phase.END)return;var eva=actor();if(eva==null){restore();return;}
         var mc=Minecraft.getInstance();capture(eva,mc.gameRenderer.getMainCamera());
         float time=eva.firstBattleSignals().time(eva,1);
+        if(FIXED_REVIEW_CAMERA_R58)return;
         if(time<FirstBattleClip.RETURN_TICK/20F)mc.options.setCameraType(CameraType.THIRD_PERSON_BACK);
         else mc.options.setCameraType(savedCamera);
     }
     public static FirstBattleClip.CameraPose camera(Camera camera,float partial)
     {
+        if(FIXED_REVIEW_CAMERA_R58)return null;
         var eva=actor();var mc=Minecraft.getInstance();
         if(eva==null&&REVIEW_CLOSE_R52&&com.projectseele.visual.FirstBattleR10Review.capturePostStopR52&&mc.level!=null
                 &&mc.level.getEntity(com.projectseele.visual.FirstBattleR10Review.heroId) instanceof EvaUnit01Entity stopped)

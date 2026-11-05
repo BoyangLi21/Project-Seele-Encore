@@ -40,7 +40,7 @@ final class FirstBattleAngelR58
     static final float STAND_END = 6.1F;
     static final float GRAB_IN = 5.6F, GRAB_FULL = 6.1F, YANK = 8.4F, GRAB_OUT = 9.1F, GRAB_END = 9.5F;
     static final float PIN_IN = 9.5F, PIN_FULL = 10.9F, PIN_END = 17.7F;
-    static final float RISE = 17.0F, HOLD = 17.7F, END = 18.7F;
+    static final float RISE = 17.0F, HOLD = 17.4F, END = 18.7F;
 
     private FirstBattleAngelR58() {}
 
@@ -63,6 +63,7 @@ final class FirstBattleAngelR58
 
     /** Sachiel's waist when Unit-01 let go: the throw starts there. */
     private static Vec3 released;
+    private static float[] releasedRoot;
     private static float releasedAt = -1;
 
     private record Frame(GeoBone[] bones, Matrix4f root, Vec3 origin, float yaw, double ground) {}
@@ -127,6 +128,7 @@ final class FirstBattleAngelR58
         shouldersAt = time;
         released = vec(point(f, TORSO_UPPER));
         releasedAt = time;
+        releasedRoot = new float[] {f.bones[ROOT].getPosX(), f.bones[ROOT].getPosY(), f.bones[ROOT].getPosZ()};
         Vec3[] grips = FirstBattleHeroR58.forearms(time);
         for (int arm : new int[] {ARM_L, ARM_R})
         {
@@ -154,7 +156,12 @@ final class FirstBattleAngelR58
         float flight = Mth.clamp((time - PIN_IN) / (PIN_FULL - PIN_IN), 0, 1);
         boolean thrown = flight < 1 && released != null && Math.abs(releasedAt - PIN_IN) < 1.5F;
         Quaternionf supine = new Quaternionf().rotationTo(new Vector3f(0, 1, 0), toF(front));
-        Quaternionf turn = thrown ? new Quaternionf().slerp(supine, smooth(flight)) : supine;
+        Quaternionf turn = thrown ? new Quaternionf().slerp(supine, smooth(Math.min(1, flight * 1.4F))) : supine;
+        if (thrown && releasedRoot != null)
+        {
+            // Felled like a tree: the feet stay where Unit-01 let go while the body goes over.
+            f.bones[ROOT].setPosX(releasedRoot[0]); f.bones[ROOT].setPosY(releasedRoot[1]); f.bones[ROOT].setPosZ(releasedRoot[2]);
+        }
         Quaternionf world = turn.mul(EvaRigTransforms.rotation(f.root));
         EvaRigTransforms.rotate(f.bones[ROOT], EvaRigTransforms.rotation(f.root).invert().mul(world));
         f.bones[HEAD].setRotX(-.25F - .35F * jerk);
@@ -162,8 +169,9 @@ final class FirstBattleAngelR58
         Vec3 waist = core.subtract(front.scale(5.4)).add(0, -5.1 - 1.2 * jerk, 0);
         if (thrown)
         {
-            float u = smooth(flight);
-            waist = released.lerp(waist, u).add(0, 9 * 4 * flight * (1 - flight), 0);
+            // Where the toppling body has got to, eased onto the pin as it lands.
+            Vector3f toppled = point(f, TORSO_UPPER);
+            waist = vec(toppled).lerp(waist, smooth((flight - .45F) / .55F));
         }
         place(f, TORSO_UPPER, waist);
         Vec3 side = new Vec3(-front.z, 0, front.x);
@@ -179,7 +187,7 @@ final class FirstBattleAngelR58
             int leg = s == 0 ? ARM_L + 3 : ARM_R + 3;
             Vector3f hip = point(f, leg);
             double sign = sideOf(f, leg, side);
-            Vec3 foot = new Vec3(hip.x, f.ground + ANKLE + 4 * jerk, hip.z).add(front.scale(-16)).add(side.scale(sign * 6));
+            Vec3 foot = new Vec3(hip.x, f.ground + ANKLE + 4 * jerk, hip.z).add(front.scale(-7)).add(side.scale(sign * 14));
             limb(f, leg, foot, new Vec3(0, 1, 0).add(side.scale(sign * .4)), -.3F);
         }
     }
@@ -244,8 +252,12 @@ final class FirstBattleAngelR58
     /** Two-bone chain from {@code first} (arm or leg) to a world target; end bone curled by {@code curl}. */
     private static void limb(Frame f, int first, Vec3 target, Vec3 pole, float curl)
     {
-        EvaRigTransforms.solveGenericArm(f.bones[first], f.bones[first + 1], f.bones[first + 2], toF(target),
-                EvaRigTransforms.rotation(f.root), toF(pole), f.root);
+        // Arms: the point of the elbow faces the bend; legs: the kneecap does.
+        boolean leg = first == ARM_L + 3 || first == ARM_R + 3;
+        Vector3f facing = AnatomicalLimbR58.modelForward(f.root, toF(Vec3.directionFromRotation(0, f.yaw)));
+        if (!leg) facing.negate();
+        AnatomicalLimbR58.solve(f.bones[first], f.bones[first + 1], f.bones[first + 2], f.bones[first + 2],
+                EvaRigTransforms.pivot(f.bones[first + 1]), toF(target), toF(pole), f.root, facing);
         GeoBone end = f.bones[first + 2];
         end.setRotX(curl); end.setRotY(0); end.setRotZ(0);
     }
