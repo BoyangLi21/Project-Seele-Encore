@@ -38,10 +38,10 @@ LANDING_TICK = 234
 
 # finger preset timeline per hand (EvaAnatomicalHandsR45 preset names)
 HAND_PRESETS = {
-    'l': [(0.0, 'relaxed'), (0.55, 'fist'), (1.62, 'spread'), (2.0, 'grab'), (4.9, 'spread'), (5.3, 'fist'),
+    'l': [(0.0, 'relaxed'), (0.3, 'fist'), (0.66, 'spread'), (1.4, 'fist'), (1.62, 'spread'), (2.0, 'grab'), (4.9, 'spread'), (5.3, 'fist'),
           (6.6, 'spread'), (7.95, 'grab'), (9.15, 'spread'), (10.5, 'fist'), (16.35, 'spread'),
           (18.6, 'grab'), (19.4, 'spread'), (20.6, 'relaxed')],
-    'r': [(0.0, 'relaxed'), (0.55, 'fist'), (1.62, 'spread'), (2.0, 'grab'), (4.9, 'spread'), (5.3, 'fist'),
+    'r': [(0.0, 'relaxed'), (0.3, 'fist'), (0.66, 'spread'), (1.4, 'fist'), (1.62, 'spread'), (2.0, 'grab'), (4.9, 'spread'), (5.3, 'fist'),
           (6.6, 'spread'), (7.95, 'grab'), (9.15, 'spread'), (10.5, 'fist'), (16.35, 'spread'),
           (18.6, 'grab'), (19.4, 'spread'), (20.6, 'relaxed')],
 }

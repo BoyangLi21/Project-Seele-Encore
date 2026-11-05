@@ -113,11 +113,11 @@ def awakening(eva, ang):
     eva.key(0.42, hip=(0, 33.9, 0.0), pelvis_rot=(0, 14, 0), chest=(0, 30, 0), head=(0, 18, 0),
             hand_l=(6.6, 25.6, 6.8), hand_r=(-6.6, 25.6, 6.8), shoulder_l=(6, 12), shoulder_r=(6, 12), jaw=6.0)
     # roar at the sky: chest thrown open, head back, arms hanging back with fists
-    eva.key(0.88, hip=(0, 34.2, -0.8), pelvis_rot=(0, 2, 0), chest=(0, -18, 0), head=(0, -42, 0), jaw=42.0,
-            hand_l=(10.5, 28.5, -3.5), hand_r=(-10.5, 28.5, -3.5), elbow_l=(0.6, 0.2, -1.0), elbow_r=(-0.6, 0.2, -1.0),
-            shoulder_l=(9, -10), shoulder_r=(9, -10), wrist_l=(-20, 0, 0), wrist_r=(-20, 0, 0))
-    eva.key(1.30, hip=(0, 34.0, -0.7), pelvis_rot=(0, 3, 0), chest=(0, -15, 0), head=(0, -36, 3), jaw=36.0,
-            hand_l=(10.8, 28.2, -3.0), hand_r=(-10.6, 28.4, -3.2), shoulder_l=(8, -8), shoulder_r=(8, -8))
+    eva.key(0.88, hip=(0, 33.2, -1.0), pelvis_rot=(0, -2, 0), chest=(0, -24, 0), head=(0, -44, 0), jaw=46.0,
+            hand_l=(18.5, 32.5, -3.0), hand_r=(-18.5, 32.5, -3.0), elbow_l=(0.5, -1.0, -0.6), elbow_r=(-0.5, -1.0, -0.6),
+            shoulder_l=(10, -14), shoulder_r=(10, -14), wrist_l=(-34, 0, 0), wrist_r=(-34, 0, 0))
+    eva.key(1.30, hip=(0, 33.0, -0.9), pelvis_rot=(0, -1, 0), chest=(0, -21, 0), head=(0, -40, 3), jaw=42.0,
+            hand_l=(18.8, 32.0, -2.6), hand_r=(-18.6, 32.3, -2.8), shoulder_l=(9, -12), shoulder_r=(9, -12))
     # it finds the angel: head snaps level, hands come up, weight drops
     eva.key(1.62, hip=(0, 33.2, 0.4), pelvis_rot=(0, 14, 0), chest=(0, 8, 0), head=(0, -6, 0), jaw=12.0,
             hand_l=(8.0, 34.5, 9.0), hand_r=(-8.0, 34.5, 9.0), elbow_l=(0.8, -0.6, -0.3), elbow_r=(-0.8, -0.6, -0.3),
@@ -399,21 +399,30 @@ def pound(eva, ang):
 
 # --------------------------------------------------------------- 16.3 - 18.6 the self-destruct embrace
 def embrace(eva, ang):
+    """Sachiel curls up off the ground and locks its arms round Unit-01's back; Unit-01, still
+    bent over it, braces both hands on the ground and heaves to break free, and is dragged back."""
     eva.key(16.42, pound_w=1.0)
     eva.key(16.62, pound_w=0.0)
-    # Unit-01 rears back and shoves at the angel's mask (hands follow its torso, see contacts)
-    eva.key(16.75, hip=(0, 17.6, KNEEL_Z - 1.2), pelvis_rot=(0, -10, 0), chest=(0, -16, 0), head=(0, -12, 0), jaw=34.0,
-            elbow_l=(0.9, -0.6, -0.4), elbow_r=(-0.9, -0.6, -0.4))
-    eva.key(17.4, hip=(0, 18.0, KNEEL_Z - 1.6), pelvis_rot=(0, -14, 2), chest=(4, -18, 0), head=(-6, -18, 0), jaw=40.0)
-    eva.key(18.1, hip=(0, 19.4, KNEEL_Z - 1.8), pelvis_rot=(0, -12, -2), chest=(-4, -20, 0), head=(6, -24, 0), jaw=42.0)
-    eva.key(18.55, hip=(0, 20.2, KNEEL_Z - 2.0), pelvis_rot=(0, -14, 0), chest=(0, -22, 0), head=(0, -26, 0))
-    # Sachiel sits up hard into Unit-01's belly and locks its arms around the back
+    ground_l, ground_r = (12.5, 2.4, 80.5), (-12.5, 2.4, 80.0)
+    eva.key(16.62, hand_l=ground_l, hand_r=ground_r, elbow_l=(1.0, 0.4, -0.2), elbow_r=(-1.0, 0.4, -0.2))
+    # pulled down onto the angel's chest
+    eva.key(16.75, hip=(0, 16.4, KNEEL_Z + 1.2), pelvis_rot=(0, 24, 0), chest=(0, 26, 0), head=(0, 6, 0), jaw=30.0)
+    # heave up, dragged back, heave again
+    eva.key(17.15, hip=(0, 18.6, KNEEL_Z - 0.4), pelvis_rot=(0, 16, 0), chest=(0, 4, 0), head=(0, -18, 0), jaw=42.0,
+            shoulder_l=(6, -6), shoulder_r=(6, -6))
+    eva.key(17.45, hip=(0, 16.8, KNEEL_Z + 0.8), pelvis_rot=(0, 24, 0), chest=(0, 22, 0), head=(0, 4, 0), jaw=26.0,
+            shoulder_l=(0, 8), shoulder_r=(0, 8))
+    eva.key(17.95, hip=(0, 19.4, KNEEL_Z - 0.8), pelvis_rot=(0, 14, -3), chest=(4, 0, 0), head=(-6, -24, 0), jaw=44.0,
+            shoulder_l=(8, -8), shoulder_r=(8, -8))
+    eva.key(18.25, hip=(0, 17.4, KNEEL_Z + 0.6), pelvis_rot=(0, 22, 2), chest=(-4, 18, 0), head=(4, -2, 0), jaw=30.0)
+    eva.key(18.55, hip=(0, 19.0, KNEEL_Z - 0.4), pelvis_rot=(0, 16, 0), chest=(0, 6, 0), head=(0, -20, 0), jaw=44.0)
+    # Sachiel: the trunk stays on the ground, the chest curls up into Unit-01 and holds
     ang.key(16.35, hip=(0, 4.6, LIE_Z + 0.8), pelvis_rot=(180, -90, 0), chest=(0, 2, 0), head=(0, 0, 0))
-    ang.key(16.8, hip=(0, 5.2, LIE_Z + 0.4), pelvis_rot=((180, -38, 0), 'fast'), chest=(0, 10, 0), head=(0, 18, 0))
-    ang.key(17.4, hip=(0, 5.4, LIE_Z + 0.2), pelvis_rot=(180, -34, 0), chest=(0, 14, 0), head=(0, 20, 0))
-    ang.key(18.55, hip=(0, 6.0, LIE_Z), pelvis_rot=(180, -30, 0), chest=(0, 16, 0), head=(0, 22, 0))
+    ang.key(16.75, chest=((0, 42, 0), 'fast'), head=(0, 26, 0))
+    for t, c in ((17.15, 30), (17.45, 44), (17.95, 28), (18.25, 42), (18.55, 32)):
+        ang.key(t, hip=(0, 4.6, LIE_Z + 0.8), pelvis_rot=(180, -90, 0), chest=(0, c, 0), head=(0, 20, 0))
     ang.key(16.4, hug_w=0.0)
-    ang.key(16.85, hug_w=1.0)
+    ang.key(16.8, hug_w=1.0)
 
 
 # --------------------------------------------------------------- 18.6 - 23.0 aftermath
@@ -480,7 +489,8 @@ SACH_R_ELBOW = np.array([54.410686, 108.749362, 6.75443]) / 16
 SACH_R_HAND = np.array([54.410686, 108.749362, -34.572077]) / 16
 
 
-EVA_BACK = {'l': np.array([-9.0, 136.0, 11.0]) / 16, 'r': np.array([9.0, 136.0, 11.0]) / 16}
+# Unit-01's shoulder tops (baked model px): Sachiel's claws clamp them from below and drag down
+EVA_SHOULDER = {'l': np.array([-21.0, 153.0, -1.0]) / 16, 'r': np.array([21.0, 153.0, -1.0]) / 16}
 SACH_PUSH = {'l': np.array([-13.0, 170.0, -10.0]) / 16, 'r': np.array([13.0, 170.0, -10.0]) / 16}
 
 
@@ -504,14 +514,6 @@ def eva_contacts(t, ce, am, core):
     if w > 0:
         for side in 'lr':
             ce['hand_' + side] = ce['hand_' + side] * (1 - w) + (core + ce['pound_' + side]) * w
-    # embrace: hands shove at the angel's shoulders
-    w = window(t, 16.45, 16.8, 18.7, 18.9)
-    if w > 0:
-        tu = am['torso_upper']
-        for side, s2 in (('l', 'r'), ('r', 'l')):
-            grip = B.point(tu, SACH_PUSH[s2])
-            shoulder = hip + np.array([6.0 if side == 'l' else -6.0, 12.6, 0.0])
-            ce['hand_' + side] = ce['hand_' + side] * (1 - w) + _toward(grip, shoulder, 2.4) * w
     return ce
 
 
@@ -520,8 +522,8 @@ def angel_contacts(t, ca, em):
     if w > 0:
         tu = em['torso_upper']
         for side, s2 in (('l', 'r'), ('r', 'l')):
-            ca['hand_' + side] = ca['hand_' + side] * (1 - w) + B.point(tu, EVA_BACK[s2]) * w
-            ca['elbow_' + side] = np.array([-1.0 if side == 'l' else 1.0, 0.6, -0.3])
+            ca['hand_' + side] = ca['hand_' + side] * (1 - w) + B.point(tu, EVA_SHOULDER[s2]) * w
+            ca['elbow_' + side] = np.array([-1.0 if side == 'l' else 1.0, -0.6, 0.1])
     return ca
 
 
@@ -543,4 +545,16 @@ class Scene:
         if float(np.ravel(ca['hug_w'])[0]) > 0:
             ca = angel_contacts(t, ca, em)
             ar, ap, am, ai = self.ang_body.solve(ca)
+            # Unit-01 wrenches at the wrists clamped on its shoulders (its trunk does not depend on its hands)
+            w = window(t, 16.8, 17.0, 18.62, 18.8)
+            if w > 0:
+                hip = np.asarray(ce['hip'], float)
+                for side, s2 in (('l', 'r'), ('r', 'l')):
+                    fa = am['forearm_' + s2]
+                    el = np.array([54.410686 if s2 == 'r' else -54.410686, 108.749362, 6.75443]) / 16
+                    hd = np.array([el[0], 108.749362 / 16, -34.572077 / 16])
+                    grip = B.point(fa, el + 0.7 * (hd - el))
+                    shoulder = hip + np.array([6.0 if side == 'l' else -6.0, 12.6, 0.0])
+                    ce['hand_' + side] = ce['hand_' + side] * (1 - w) + _toward(grip, shoulder, 2.4) * w
+                er, ep, em, ei = self.eva_body.solve(ce)
         return {'eva': (er, ep, em, ei, ce), 'angel': (ar, ap, am, ai, ca), 'core': core}
