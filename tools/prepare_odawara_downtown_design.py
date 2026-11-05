@@ -37,6 +37,10 @@ def prepare(a):
     bounds=capture['bounds_xz'];x,z,X,Z=bounds
     with np.load(a.source/'measured.npz') as f: old=f['top'];full=f['full']
     if not full.all(): raise ValueError('Unknown current block terrain')
+    layout=json.loads((a.layout/'district-plan.json').read_text('utf8'))
+    preserve=layout.get('district_config',{}).get('preserve_existing_district',False)
+    authority=Path(layout['retained_authority'])if preserve and layout.get('retained_authority')else None
+    if preserve and authority is None:raise ValueError('Retained district lacks its installed authority')
     # This new-district compiler has no ownership of any retained construction.
     # Reject it before grading, including construction below the old Y=32 gate.
     yy=np.arange(-128,320)[:,None,None]
@@ -45,16 +49,16 @@ def prepare(a):
         foreign=np.asarray([s.split('[')[0]not in NATURAL|{'minecraft:bedrock'}for s in names])
         for (cx,cz),v in zip(coords,blocks):
             ground=old[cz*16-z:cz*16-z+16,cx*16-x:cx*16-x+16]
-            if np.any(foreign[v]&(yy>=ground-8)): raise ValueError(('Retained construction needs an explicit preservation plan',int(cx),int(cz)))
+            if not preserve and np.any(foreign[v]&(yy>=ground-8)): raise ValueError(('Retained construction needs an explicit preservation plan',int(cx),int(cz)))
     world=Path(capture['world'])
     with stopped_world(world): tags=list(iter_block_entities(world,'projectseele:geofront',(x,-128,z),(X,319,Z)))
-    if tags: raise ValueError('Native devices require a separate retention plan')
-    nbtlib.File({'Devices':nbtlib.List[nbtlib.Compound]([])}).save(survey/'captured-devices.dat',gzipped=True)
+    if tags and not preserve: raise ValueError('Native devices require a separate retention plan')
+    nbtlib.File({'Devices':nbtlib.List[nbtlib.Compound]([tag for _,tag in tags])}).save(survey/'captured-devices.dat',gzipped=True)
     with np.load(a.gis/'runtime-surface-field.npz')as f: grid={k:f[k]for k in ('x','z','height_y')}
     zz,xx=np.mgrid[z:Z+1,x:X+1];surveyed=sample_grid(grid,'height_y',xx,zz)
+    if preserve:surveyed=old.astype(float)
     np.savez_compressed(survey/'surface.npz',bounds=bounds,old_ground=old,surveyed=surveyed)
     save(survey/'buildings.json',[])
-    layout=json.loads((a.layout/'district-plan.json').read_text('utf8'))
     graph=defaultdict(set)
     for route in layout['routes']:
         if route['destination']=='hayakawa-bank':continue
@@ -165,8 +169,10 @@ def prepare(a):
               connectivity_seed=list(map(round,layout['terminals'][0]['road_node'])),
               old_public_retirement_areas=[],un_relocation_allowed=False,station_structures_deferred_to_stage=2,
               hayakawa_civil_interface_deferred_to_stage=3)
+    if preserve:
+        spec.update(preserve_all_existing_public=True,retained_public_surfaces=[str(authority/'network.npz')])
     save(a.out/'authored-design.json',spec)
-    save(a.out/'compilation.json',dict(streets=len(streets),buildings=len(rows),current_full_chunks=capture['chunk_statuses']['full'],existing_constructions=0,devices=0,
+    save(a.out/'compilation.json',dict(streets=len(streets),buildings=len(rows),current_full_chunks=capture['chunk_statuses']['full'],preserve_existing_district=preserve,retained_devices=len(tags),
                                      max_road_height_adjustment=max(abs(heights[p]-wanted[p])for p in graph),
                                      measured_save_captured=True,game_world_written=False))
     print('Downtown design ready:',len(streets),'street chains;',len(rows),'building lots',flush=True)

@@ -1,0 +1,20 @@
+{
+  "id": "odawara-ogicho",
+  "name": "Odawara Ogicho western neighbourhood",
+  "label": "小田原荻窪",
+  "core": [3248, -224, 3648, 256],
+  "terminals": [
+    ["south-interface", "荻窪南侧城区接口", [3325, 257]],
+    ["west-residential", "荻窪西侧住宅街", [3250, 230]],
+    ["north-residential", "荻窪北侧住宅街", [3270, 180]],
+    ["central-residential", "荻窪中心生活街", [3300, 210]],
+    ["east-interface", "荻窪东侧街道接口", [3334, 210]]
+  ],
+  "maximum_buildings": 64,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

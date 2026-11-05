@@ -69,6 +69,11 @@ def prepare(a):
     fixed=np.rint((old*(1-weight)+geographic*weight)*16).astype(np.int16)
     proposed_water=np.where(sea,-82,-32768).astype(np.int16)
     chosen=weight>=.5;newwater=np.where(chosen,proposed_water,oldwater)
+    # Keep the low sea's potential datum under reclaimed dry land. Switching
+    # it to NO_WATER while native blending is nonzero activates the runtime
+    # water-mode divide and makes a false crest beside the same low ocean.
+    # Ground at/above -81 remains dry even with the potential datum at -82.
+    newwater[weight>0]=-82
     # Contain the retained low sea on both sides of a mode boundary.
     dry=chosen&~sea;fixed[dry]=np.maximum(fixed[dry],-81*16)
     newblend=np.rint(oldblend*(1-weight)).astype(np.uint8)

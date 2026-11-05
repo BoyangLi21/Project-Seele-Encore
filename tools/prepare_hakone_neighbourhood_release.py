@@ -34,6 +34,8 @@ def prepare(a):
             if r['errors']or len(r['stations'])!=len(stations):raise ValueError('Unverified station passenger connection')
     with stopped_world(a.world):
         for C in a.candidate:
+            from capture_staged_hakone_native import require_installed
+            require_installed(C,a.world)
             assert_preserved(a.world,inventory(C/'preserved-native'));parallel_recipes(Namespace(candidate=C,world=a.world,regions=None,workers=2))
         identity=a.candidate[0]/'identity-before';identity.mkdir();files=[a.world/'level.dat',a.world/'level.dat_old']+list((a.world/'playerdata').glob('*'))+list((a.world/'dimensions/projectseele/geofront/entities').glob('*.mca'));kept=[]
         for file in files:

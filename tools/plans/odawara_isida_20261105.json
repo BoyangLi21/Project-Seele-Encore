@@ -1,0 +1,20 @@
+{
+  "id": "odawara-isida-east",
+  "name": "Odawara Isida eastern neighbourhood",
+  "label": "井细田东街区",
+  "core": [3424, 32, 3544, 224],
+  "terminals": [
+    ["south-interface", "井细田南侧城区接口", [3490, 186]],
+    ["north-residential", "井细田东北住宅街", [3450, 68]],
+    ["station-east-interface", "井细田站东侧街道接口", [3448, 115]],
+    ["east-residential", "井细田东侧住宅街", [3512, 160]],
+    ["central-residential", "井细田中心生活街", [3480, 125]]
+  ],
+  "maximum_buildings": 32,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

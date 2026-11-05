@@ -8,6 +8,42 @@ from verify_hakone_network_candidate import PAVEMENT
 from query_blocks import AIR
 from prepare_hakone_togendai_neighbourhood import save_json
 
+def changed_columns(candidate,bounds):
+    x,z,X,Z=map(int,bounds);changed=np.zeros((Z-z+1,X-x+1),bool)
+    for file in(candidate/'delta').glob('*.npz'):
+        with np.load(file)as f:
+            coords=f['coordinates'];ranges=f['ranges'];indices=f['indices']
+        for n,(cx,cz)in enumerate(coords):
+            columns=np.unique(indices[ranges[n]:ranges[n+1]]%256).astype(np.int64)
+            xx=int(cx)*16+columns%16;zz=int(cz)*16+columns//16
+            if np.any((xx<x)|(xx>X)|(zz<z)|(zz>Z)):raise ValueError('Candidate delta exceeds its planning frame')
+            changed[zz-z,xx-x]=True
+    return changed
+
+
+def merge_network(g,d,candidate):
+    x,z,X,Z=map(int,d['bounds']);bx,bz,bX,bZ=map(int,g['bounds'])
+    if not(bx<=x<=X<=bX and bz<=z<=Z<=bZ):raise ValueError('Candidate exceeds current planning authority')
+    area=np.s_[z-bz:Z-bz+1,x-bx:X-bx+1];changed=changed_columns(candidate,d['bounds'])
+    oldwalk=g['walk'][area].copy();e=Editor(candidate);retired=0
+    for j,i in np.argwhere(oldwalk&~d['walk']&changed):
+        px,pz=int(i+x),int(j+z);h,_=road_blocks(g['grade2'][area][j,i]);h=int(h)
+        # Another independently staged district can have already published a
+        # path absent from this candidate's older source. A roof/tree edit
+        # alone also cannot retire an unchanged ground path.
+        if all(e.state(px,Y,pz)==e.state(px,Y,pz,original=True)for Y in(h,h+1,h+2)):continue
+        if e.state(px,h,pz).split('[')[0]in PAVEMENT and all(e.state(px,Y,pz).split('[')[0]in AIR|{'minecraft:light','minecraft:grass','minecraft:tall_grass','minecraft:fern'}for Y in(h+1,h+2)):continue
+        for key in('road','walk','marking','tunnel'):g[key][area][j,i]=False
+        retired+=1
+    for key in('road','walk','marking','tunnel'):g[key][area][d['walk']]=d[key][d['walk']]
+    g['grade2'][area][d['walk']]=d['grade2'][d['walk']]
+    # Whole captures can overlap. Replace only edited ground/public/parcel
+    # columns; a tree crown cannot replace an unrelated ground measurement.
+    ground_changes=changed&((d['ground']!=d['old_ground'])|d['walk']|d.get('plots',np.zeros_like(changed)))
+    for key in('ground','old_ground'):g[key][area][ground_changes]=d[key][ground_changes]
+    return retired,int(ground_changes.sum())
+
+
 def publish(a):
     receipt=json.loads(a.installation.read_text('utf8'))
     if receipt['status']!='installed'or not receipt['changed_section_readback']:raise ValueError('Current-save installation required')
@@ -22,17 +58,9 @@ def publish(a):
             for key in g:
                 if key!='bounds'and key in f.files:g[key][t-gz:B-gz+1,l-gx:R-gx+1]=f[key][t-oz:B-oz+1,l-ox:R-ox+1]
     with np.load(a.candidate/'plan/network.npz')as f:d={k:f[k]for k in f.files}
-    x,z,X,Z=map(int,d['bounds']);bx,bz,_,_=map(int,g['bounds']);area=np.s_[z-bz:Z-bz+1,x-bx:X-bx+1]
-    oldwalk=g['walk'][area].copy();e=Editor(a.candidate);retired=0
-    for j,i in np.argwhere(oldwalk&~d['walk']):
-        px,pz=int(i+x),int(j+z);h,_=road_blocks(g['grade2'][area][j,i]);h=int(h)
-        if e.state(px,h,pz).split('[')[0]in PAVEMENT and all(e.state(px,Y,pz).split('[')[0]in AIR|{'minecraft:light','minecraft:grass','minecraft:tall_grass','minecraft:fern'}for Y in (h+1,h+2)):continue
-        for key in ('road','walk','marking','tunnel'):g[key][area][j,i]=False
-        retired+=1
-    for key in ('road','walk','marking','tunnel'):g[key][area][d['walk']]=d[key][d['walk']]
-    g['grade2'][area][d['walk']]=d['grade2'][d['walk']]
-    for key in ('ground','old_ground'):g[key][area]=d[key]
+    x,z,X,Z=map(int,d['bounds']);retired,changed_ground_columns=merge_network(g,d,a.candidate)
     np.savez_compressed(a.out/'network.npz',**g)
+    save_json(a.out/'ground-overlay.json',dict(candidate=str(a.candidate),changed_ground_columns=changed_ground_columns,unchanged_capture_columns_preserved=True))
     updated={r['id']:r for r in json.loads((a.candidate/'plan/buildings.json').read_text('utf8'))}
     footways={r['parcel']:r['points']for r in json.loads((a.candidate/'plan/footways.json').read_text('utf8'))if 'parcel'in r}
     catalog={r['id']:r for r in json.loads((a.previous/'catalog.json').read_text('utf8'))}

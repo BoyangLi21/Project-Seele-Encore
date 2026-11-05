@@ -246,6 +246,8 @@ def install(a):
         require_tunnel(candidate)
         from verify_odawara_downtown_release import require_verified as require_odawara
         require_odawara(candidate)
+        from capture_staged_hakone_native import require_installed as require_staged_native
+        require_staged_native(candidate,a.world)
         from verify_odawara_coast_release import require_verified as require_coast
         require_coast(candidate)
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
