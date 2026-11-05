@@ -16,11 +16,14 @@ def verify(C):
         rx,rz=map(int,path.stem.split('.')[1:]);r=e.region(rx*512,rz*512);base=[s.split('[')[0]for s in r['names']]
         natural=np.asarray([s in NATURAL for s in base]);soil=np.asarray([s in SOIL for s in base]);wet=np.asarray([s=='minecraft:water'for s in base])
         authored=np.asarray([s in {'minecraft:air','minecraft:stone','minecraft:gravel','minecraft:sand','minecraft:water'}for s in base])
+        trees=np.asarray([s in NATURAL and s.endswith(('_log','_leaves'))for s in base])
         for(cx,cz),before,after in zip(r['coords'],r['before'],r['after']):
             q=np.s_[cz*16-z:cz*16-z+16,cx*16-x:cx*16-x+16];chunks+=1;delta=before!=after;cells+=int(delta.sum())
             bottom=np.minimum(d['old_ground'][q],d['ground'][q])-3
             if np.any(delta&(~d['active'][q]|~natural[before]|(yy<bottom))):errors.append(['unauthorized-cell',int(cx),int(cz)])
             if np.any(delta&~authored[after]):errors.append(['unexpected-authored-material',int(cx),int(cz)])
+            if spec.get('retained_tree_vegetation')and np.any(delta&trees[before]&(yy>d['ground'][q])):
+                errors.append(['retained-tree-changed',int(cx),int(cz)])
             ground=np.where(soil[after],yy,-129).max(0);water=np.where(wet[after]&(yy>ground),yy,-32768).max(0)
             if np.any(ground!=d['ground'][q]):errors.append(['saved-ground-differs',int(cx),int(cz)])
             if np.any(water!=d['water'][q]):errors.append(['retained-water-level-changed',int(cx),int(cz)])
