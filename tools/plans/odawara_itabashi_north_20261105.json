@@ -1,0 +1,21 @@
+{
+  "id": "odawara-itabashi-north",
+  "name": "Hakone Itabashi northern neighbourhood",
+  "label": "箱根板桥站北侧生活街区",
+  "preserve_existing_district": true,
+  "include_existing_public_in_connectivity": false,
+  "core": [3080, 672, 3224, 776],
+  "terminals": [
+    ["station-north-interface", "板桥站北侧街道接口", [3155, 730]],
+    ["north-interface", "城址方向街道接口", [3140, 690]],
+    ["eastern-services", "东侧生活服务街口", [3180, 710]],
+    ["west-neighbourhood", "西侧住宅街口", [3127, 705]]
+  ],
+  "maximum_buildings": 50,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}
