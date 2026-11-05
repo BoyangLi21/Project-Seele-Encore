@@ -113,12 +113,6 @@ public final class SeeleNetwork
                 .decoder(ClientboundEvaArrivalSyncPacket::new)
                 .consumerMainThread(ClientboundEvaArrivalSyncPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(ClientboundEvaPoseRecorderPacket.class, id++,
-                        NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(ClientboundEvaPoseRecorderPacket::encode)
-                .decoder(ClientboundEvaPoseRecorderPacket::new)
-                .consumerMainThread(ClientboundEvaPoseRecorderPacket::handle)
-                .add();
         CHANNEL.messageBuilder(ServerboundEvaControlPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ServerboundEvaControlPacket::encode)
                 .decoder(ServerboundEvaControlPacket::new)

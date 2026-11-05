@@ -3830,12 +3830,6 @@ public final class VisualCaptureManager
                 int frameNumber = this.videoFrame + 1;
                 String frameName = String.format("frame_%04d.png",
                         frameNumber);
-                if (!EvaFoundationReviewAudit.record(
-                        minecraft, entity.getId(), CAPTURE_BATCH,
-                        this.poseName, viewName, frameNumber))
-                {
-                    return false;
-                }
                 Screenshot.grab(minecraft.gameDirectory,
                         "projectseele_foundation/" + CAPTURE_BATCH + "/"
                                 + this.poseName + "/" + viewName + "/"

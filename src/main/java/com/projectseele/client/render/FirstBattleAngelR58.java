@@ -39,16 +39,22 @@ final class FirstBattleAngelR58
 
     static final float STAND_END = 6.1F;
     static final float GRAB_IN = 5.6F, GRAB_FULL = 6.1F, YANK = 8.4F, GRAB_OUT = 9.1F, GRAB_END = 9.5F;
-    static final float PIN_IN = 11.6F, PIN_FULL = 12.1F, PIN_END = 17.7F;
+    static final float PIN_IN = 9.5F, PIN_FULL = 10.9F, PIN_END = 17.7F;
     static final float RISE = 17.0F, HOLD = 17.7F, END = 18.7F;
 
     private FirstBattleAngelR58() {}
 
-    /** Sachiel's seized forearm, published for Unit-01's gripping hand (one frame behind at most). */
-    private static Vec3 grabPoint;
-    private static float grabAt = -1;
+    /** Sachiel's shoulders during the grab, published for Unit-01's hands (one frame behind at most). */
+    private static Vec3[] shoulders;
+    private static float shouldersAt = -1;
 
-    static Vec3 grabPoint(float time) { return grabPoint != null && Math.abs(time - grabAt) < .25F ? grabPoint : null; }
+    static Vec3[] shoulders(float time) { return shoulders != null && Math.abs(time - shouldersAt) < .25F ? shoulders : null; }
+
+    private static Vec3 vec(Vector3f v) { return new Vec3(v.x, v.y, v.z); }
+
+    /** Sachiel's waist when Unit-01 let go: the throw starts there. */
+    private static Vec3 released;
+    private static float releasedAt = -1;
 
     private record Frame(GeoBone[] bones, Matrix4f root, Vec3 origin, float yaw, double ground) {}
 
@@ -67,7 +73,7 @@ final class FirstBattleAngelR58
         Frame f = new Frame(bones, root, origin, yaw, spec.origin().y);
         if (time <= STAND_END) blend(f, ramp(time, 0, .4F, STAND_END - .01F, STAND_END), () -> standoff(f, spec, time));
         if (time >= GRAB_IN && time <= GRAB_END) blend(f, ramp(time, GRAB_IN, GRAB_FULL, GRAB_OUT, GRAB_END), () -> grab(f, spec, time));
-        if (time >= PIN_IN && time <= PIN_END) blend(f, ramp(time, PIN_IN, PIN_FULL, PIN_END - .01F, PIN_END), () -> pinned(f, spec, time));
+        if (time >= PIN_IN && time <= PIN_END) blend(f, ramp(time, PIN_IN, PIN_IN + .15F, PIN_END - .01F, PIN_END), () -> pinned(f, spec, time));
         if (time >= RISE && time <= END) blend(f, ramp(time, RISE, HOLD, END, END + 1), () -> embrace(f, spec, time));
     }
 
@@ -86,8 +92,8 @@ final class FirstBattleAngelR58
             double sign = sideOf(f, arm, side);
             Vector3f shoulder = point(f, arm);
             // Claws held before the chest toward Unit-01, swaying with the breath.
-            Vec3 hand = new Vec3(shoulder.x, shoulder.y, shoulder.z).add(toward.scale(8)).add(side.scale(sign * 3))
-                    .add(0, -12 + 1.5 * Mth.sin(time * 1.7F + (float) sign), 0);
+            Vec3 hand = new Vec3(shoulder.x, shoulder.y, shoulder.z).add(toward.scale(2.5)).add(side.scale(sign * -2))
+                    .add(0, -13 + 1.5 * Mth.sin(time * 1.7F + (float) sign), 0);
             limb(f, arm, hand, side.scale(sign).add(0, -.5, 0).add(toward.scale(-.5)), 0);
         }
         legs(f, toward, side, null);
@@ -99,37 +105,24 @@ final class FirstBattleAngelR58
         Vec3 toward = horizontal(eva.subtract(f.origin), f.yaw);
         Vec3 side = new Vec3(-toward.z, 0, toward.x);
         float yank = smooth((time - YANK) / (GRAB_OUT - YANK));
-        lean(f, toward, -.22F + .62F * yank);
-        int held = -1;
-        double nearest = Double.MAX_VALUE;
-        for (int arm : new int[] {ARM_L, ARM_R})
-        {
-            Vector3f s = point(f, arm);
-            Vec3 grip = FirstBattleClip.point(spec, true, "hand_r_blocks", time);
-            double d = grip.distanceToSqr(s.x, s.y, s.z);
-            if (d < nearest) { nearest = d; held = arm; }
-        }
+        // Seized by the shoulders and driven back: the trunk arches away,
+        // then is wrenched toward Unit-01 as it twists into the throw.
+        lean(f, toward, -.18F + .5F * yank);
+        shoulders = new Vec3[] {vec(point(f, ARM_L)), vec(point(f, ARM_R))};
+        shouldersAt = time;
+        released = vec(point(f, TORSO_UPPER));
+        releasedAt = time;
+        Vec3[] grips = FirstBattleHeroR58.forearms(time);
         for (int arm : new int[] {ARM_L, ARM_R})
         {
             double sign = sideOf(f, arm, side);
-            Vector3f s = point(f, arm);
-            if (arm == held)
-            {
-                // Struck at Unit-01's chest and caught there, drawn tight by the yank.
-                Vec3 chest = FirstBattleClip.point(spec, true, "socket_blocks", time).subtract(toward.scale(9)).add(0, -8, 0);
-                Vec3 reach = chest.subtract(s.x, s.y, s.z).normalize();
-                limb(f, arm, chest.subtract(reach.scale(3 - 4 * yank)), side.scale(sign).add(0, -.6, 0), .2F);
-                Vector3f elbow = point(f, arm + 1), wrist = point(f, arm + 2);
-                Vector3f mid = new Vector3f(elbow).lerp(wrist, .6F);
-                grabPoint = new Vec3(mid.x, mid.y, mid.z);
-                grabAt = time;
-            }
-            else
-            {
-                // The free arm thrown out low for balance against the pull.
-                Vec3 brace = new Vec3(s.x, s.y, s.z).add(0, -24, 0).add(side.scale(sign * 11)).add(toward.scale(-4 + 8 * yank));
-                limb(f, arm, brace, side.scale(sign).add(0, .3, 0).add(toward.scale(-.5)), .4F);
-            }
+            Vec3 s = vec(point(f, arm));
+            Vec3 hold = null;
+            if (grips != null)
+                hold = grips[0].distanceToSqr(s) < grips[1].distanceToSqr(s) ? grips[0] : grips[1];
+            // Claws clamped on the forearm that holds this shoulder; without it, guarding.
+            Vec3 target = hold != null ? hold : s.add(toward.scale(8)).add(0, -12, 0).add(side.scale(sign * 3));
+            limb(f, arm, target, side.scale(sign).add(0, -.5, 0).add(toward.scale(-.3)), .5F);
         }
         legs(f, toward, side, null);
     }
@@ -140,13 +133,23 @@ final class FirstBattleAngelR58
         Vec3 core = FirstBattleHeroR58.core(spec, time);
         float jerk = jerk(time);
         for (int i = 1; i < f.bones.length; i++) zero(f.bones[i]);
-        // On its back: the body's long axis runs away from Unit-01, its chest to the sky.
-        Quaternionf world = new Quaternionf().rotationTo(new Vector3f(0, 1, 0), toF(front))
-                .mul(EvaRigTransforms.rotation(f.root));
+        // On its back: the body's long axis runs away from Unit-01, its chest to
+        // the sky. Before that it is thrown there: a short arc from where
+        // Unit-01 let go, turning from upright onto its back as it falls.
+        float flight = Mth.clamp((time - PIN_IN) / (PIN_FULL - PIN_IN), 0, 1);
+        boolean thrown = flight < 1 && released != null && Math.abs(releasedAt - PIN_IN) < 1.5F;
+        Quaternionf supine = new Quaternionf().rotationTo(new Vector3f(0, 1, 0), toF(front));
+        Quaternionf turn = thrown ? new Quaternionf().slerp(supine, smooth(flight)) : supine;
+        Quaternionf world = turn.mul(EvaRigTransforms.rotation(f.root));
         EvaRigTransforms.rotate(f.bones[ROOT], EvaRigTransforms.rotation(f.root).invert().mul(world));
         f.bones[HEAD].setRotX(-.25F - .35F * jerk);
         // The core, a little above the waist on the chest's face, lies under the fists.
         Vec3 waist = core.subtract(front.scale(5.4)).add(0, -5.1 - 1.2 * jerk, 0);
+        if (thrown)
+        {
+            float u = smooth(flight);
+            waist = released.lerp(waist, u).add(0, 9 * 4 * flight * (1 - flight), 0);
+        }
         place(f, TORSO_UPPER, waist);
         Vec3 side = new Vec3(-front.z, 0, front.x);
         for (int arm : new int[] {ARM_L, ARM_R})

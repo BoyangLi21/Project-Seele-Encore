@@ -30,6 +30,18 @@ final class FirstBattleHeroR58
 
     private FirstBattleHeroR58() {}
 
+    static final float GROUNDED_IN = 5.6F, GROUNDED_OUT = 12.2F;
+    private static float standingRootY, standingAnkle = 3;
+
+    /** Unit-01's forearms (left, right), published for Sachiel's claws (one frame behind at most). */
+    private static final Vec3[] forearms = new Vec3[2];
+    private static float forearmsAt = -1;
+
+    static Vec3[] forearms(float time)
+    {
+        return forearms[0] != null && forearms[1] != null && Math.abs(time - forearmsAt) < .25F ? forearms.clone() : null;
+    }
+
     /** Where the fists land: the chest of the pinned Sachiel, in front of the kneeling unit. */
     static Vec3 core(FirstBattleSignals.Spec spec, float time)
     {
@@ -45,6 +57,17 @@ final class FirstBattleHeroR58
         Vec3 front = Vec3.directionFromRotation(0, yaw).multiply(1, 0, 1).normalize();
         double ground = spec.origin().y;
 
+        // From the grab to the pin the clip's body leaps up and over Sachiel
+        // and flings a leg back: hold the body at standing height and keep
+        // both feet on the ground through it.
+        GeoBone rootBone = model.getBone("root").orElse(null);
+        float grounded = Math.min(smooth((time - GROUNDED_IN) / .4F), smooth((GROUNDED_OUT - time) / .5F));
+        if (rootBone != null)
+        {
+            if (time < 1) standingRootY = rootBone.getPosY();
+            else if (grounded > 0 && rootBone.getPosY() > standingRootY)
+                rootBone.setPosY(Mth.lerp(grounded, rootBone.getPosY(), standingRootY));
+        }
         GeoBone torso = model.getBone("torso_upper").orElse(null);
         GeoBone armL = model.getBone("arm_l").orElse(null), armR = model.getBone("arm_r").orElse(null);
         if (torso == null || armL == null || armR == null) return;
@@ -62,16 +85,30 @@ final class FirstBattleHeroR58
             GeoBone hand = model.getBone("hand_" + (s == 0 ? "l" : "r")).orElse(null);
             hands[s] = hand == null ? null : EvaRigTransforms.point(hand, EvaRigTransforms.pivot(hand), root);
         }
-        // The grab: the right hand closes on Sachiel's forearm and the trunk hauls back on it.
-        Vec3 seized = FirstBattleAngelR58.grabPoint(time);
+        // The grab: both hands on Sachiel's shoulders, the trunk driving into
+        // it, then twisting to hurl it down.
+        Vec3[] held = FirstBattleAngelR58.shoulders(time);
         float grab = Math.min(smooth((time - FirstBattleAngelR58.GRAB_IN) / .5F), smooth((FirstBattleAngelR58.GRAB_END - time) / .4F));
-        if (seized != null && grab > 0 && hands[1] != null)
+        if (held != null && grab > 0)
         {
-            hands[1] = new Vector3f(hands[1]).lerp(toF(seized), grab);
-            float haul = smooth((time - FirstBattleAngelR58.YANK) / (FirstBattleAngelR58.GRAB_OUT - FirstBattleAngelR58.YANK)) * grab;
-            var turn = new Quaternionf().fromAxisAngleRad(lateral.x, lateral.y, lateral.z, -.3F * haul);
+            float twist = smooth((time - FirstBattleAngelR58.YANK) / (FirstBattleAngelR58.GRAB_OUT - FirstBattleAngelR58.YANK)) * grab;
+            var drive = new Quaternionf().fromAxisAngleRad(lateral.x, lateral.y, lateral.z, .22F * grab)
+                    .premul(new Quaternionf().rotationY(-.55F * twist));
             var current = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(torso)));
-            EvaRigTransforms.rotate(torso, EvaRigTransforms.rotation(EvaRigTransforms.parent(torso, root)).invert().mul(turn.mul(current)));
+            EvaRigTransforms.rotate(torso, EvaRigTransforms.rotation(EvaRigTransforms.parent(torso, root)).invert().mul(drive.mul(current)));
+            shoulderL = EvaRigTransforms.point(armL, EvaRigTransforms.pivot(armL), root);
+            shoulderR = EvaRigTransforms.point(armR, EvaRigTransforms.pivot(armR), root);
+            Vector3f[] own = {shoulderL, shoulderR};
+            Vector3f middle = toF(held[0]).add(toF(held[1])).mul(.5F);
+            for (int s = 0; s < 2; s++)
+                if (hands[s] != null)
+                {
+                    // Each hand takes the shoulder across from it, a little in toward the neck.
+                    Vector3f a = toF(held[0]), b = toF(held[1]);
+                    Vector3f mine = a.distanceSquared(own[s]) < b.distanceSquared(own[s]) ? a : b;
+                    Vector3f grip = new Vector3f(mine).lerp(middle, .25F).add(0, -2, 0);
+                    hands[s] = new Vector3f(hands[s]).lerp(grip, grab);
+                }
         }
         if (pound > 0)
         {
@@ -102,7 +139,12 @@ final class FirstBattleHeroR58
             EvaRigTransforms.solveArm(upper, lower, wrist, hand, side, hands[s],
                     EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(hand))), pole, root);
             straighten(wrist, hand, lower, root);
+            Vector3f elbow = EvaRigTransforms.point(lower, EvaRigTransforms.pivot(lower), root);
+            Vector3f palm = EvaRigTransforms.point(hand, EvaRigTransforms.pivot(hand), root);
+            Vector3f mid = elbow.lerp(palm, .55F);
+            forearms[s] = new Vec3(mid.x, mid.y, mid.z);
         }
+        forearmsAt = time;
 
         for (int s = 0; s < 2; s++)
         {
@@ -113,15 +155,25 @@ final class FirstBattleHeroR58
             Vector3f target = EvaRigTransforms.point(foot, EvaRigTransforms.pivot(foot), root);
             Quaternionf rotation = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(foot)));
             // A foot within reach of the ground stands on it, flat and level with the heading.
+            if (time < 1) standingAnkle = (float) Math.max(.5, target.y - ground);
+            else if (grounded > 0 && target.y - ground > standingAnkle)
+                target.y = (float) Mth.lerp(grounded, target.y, ground + standingAnkle);
             float above = (float) (target.y - ground);
             float plant = 1 - Mth.clamp((above - 1.5F) / 4F, 0, 1);
             if (plant > 0)
             {
                 target.y = (float) Math.max(target.y, ground + 1.1F);
-                rotation = new Quaternionf(rotation).slerp(EvaRigTransforms.rotation(root), plant);
+                // A foot well behind the hip stands on its toes, heel raised, as in a lunge.
+                Vector3f hip = EvaRigTransforms.point(upper, EvaRigTransforms.pivot(upper), root);
+                float behind = -new Vector3f(target).sub(hip).dot(toF(front));
+                float lift = (float) Math.toRadians(40) * Mth.clamp((behind - 4) / 14F, 0, 1);
+                Vector3f toes = toF(front).mul(Mth.cos(lift)).add(0, -Mth.sin(lift), 0);
+                Quaternionf flat = new Quaternionf().rotationTo(toF(front), toes).mul(EvaRigTransforms.rotation(root));
+                rotation = new Quaternionf(rotation).slerp(flat, plant);
             }
             Vector3f pole = toF(front).fma(s == 0 ? .15F : -.15F, lateral).add(0, .1F, 0);
             EvaRigTransforms.solveLeg(upper, lower, ankle, foot, target, rotation, pole, root);
+            limitAnkle(lower, foot, root);
         }
         if (JOINT_LOG && (int) (time * 20) != lastLogged)
         {
@@ -135,11 +187,36 @@ final class FirstBattleHeroR58
                 Vector3f k = new Vector3f(knee).sub(new Vector3f(hip).lerp(ankle, .5F));
                 Vector3f e = new Vector3f(el).sub(new Vector3f(sh).lerp(wr, .5F));
                 Vector3f out = new Vector3f(lateral).mul(side.equals("l") ? 1 : -1);
-                row.append(String.format(java.util.Locale.ROOT, " knee_%s=%.1f elbowOut_%s=%.1f elbowDown_%s=%.1f",
-                        side, k.dot(toF(front)), side, e.dot(out), side, -e.y));
+                row.append(String.format(java.util.Locale.ROOT, " knee_%s=%.1f elbowOut_%s=%.1f elbowDown_%s=%.1f ankle_%s=%.0f footY_%s=%.1f",
+                        side, k.dot(toF(front)), side, e.dot(out), side, -e.y, side, ankleBend(model, side, root), side, ankle.y - ground));
             }
             com.projectseele.ProjectSeele.LOGGER.info(row.toString());
         }
+    }
+
+    /** Largest turn of the foot away from square to the shin; the rigid ankle armour parts beyond it. */
+    private static final float ANKLE_LIMIT = (float) Math.toRadians(35);
+
+    private static void limitAnkle(GeoBone shin, GeoBone foot, Matrix4f root)
+    {
+        Quaternionf shinWorld = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(shin)));
+        Quaternionf footWorld = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(foot)));
+        Quaternionf delta = new Quaternionf(shinWorld).invert().mul(footWorld).normalize();
+        float angle = 2 * (float) Math.acos(Math.min(1, Math.abs(delta.w)));
+        if (angle <= ANKLE_LIMIT) return;
+        Quaternionf limited = new Quaternionf().slerp(delta, ANKLE_LIMIT / angle);
+        Quaternionf wanted = new Quaternionf(shinWorld).mul(limited);
+        EvaRigTransforms.rotate(foot, EvaRigTransforms.rotation(EvaRigTransforms.parent(foot, root)).invert().mul(wanted));
+    }
+
+    static float ankleBend(BakedGeoModel model, String side, Matrix4f root)
+    {
+        GeoBone shin = model.getBone("shin_" + side).orElse(null), foot = model.getBone("foot_" + side).orElse(null);
+        if (shin == null || foot == null) return 0;
+        Quaternionf a = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(shin)));
+        Quaternionf b = EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(foot)));
+        Quaternionf d = a.invert().mul(b).normalize();
+        return (float) Math.toDegrees(2 * Math.acos(Math.min(1, Math.abs(d.w))));
     }
 
     private static final boolean JOINT_LOG = Boolean.getBoolean("projectseele.finaleJointLogR58");

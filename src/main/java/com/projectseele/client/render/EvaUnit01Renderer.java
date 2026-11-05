@@ -256,7 +256,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         boolean localPilotView=isLocalPilotView(minecraft, entity),shadowPass=ShaderShadowPassR44.active();
         this.pilotView = localPilotView && !shadowPass;
         if(this.pilotView)com.projectseele.client.EvaPilotBodyRenderBridge.mark(entity);
-        EvaPoseRuntimeRecorder.maybeStartSmoke(entity);
         // Wet cages and launch shafts use dedicated NERV floodlights.  Keeping
         // the airframe full-bright only while logistics-locked prevents a
         // 24-block model from sampling one dark centre voxel and becoming a
@@ -285,11 +284,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         if(com.projectseele.entity.EvaGroundReceiverR50.active(entity))
             EvaGroundReceiverRendererR50.render(poseStack,bufferSource,packedLight,entity,partialTick);
         TvFacilityMeshes.withBuffers(bufferSource,()->EvaBayMachineryR33.render(poseStack,entity,partialTick));
-        boolean recording = EvaPoseRuntimeRecorder.wants(entity);
-        if (recording)
-        {
-            EvaPoseRuntimeRecorder.beginFrame(entity, partialTick);
-        }
         try
         {
             // A kerb climbed this tick is risen onto over a third of a second.
@@ -310,10 +304,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         finally
         {
             this.pilotView=false;
-            if (recording)
-            {
-                EvaPoseRuntimeRecorder.endFrame(entity);
-            }
         }
     }
 
@@ -370,10 +360,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         {
             return frustum.isVisible(entity.getBoundingBoxForCulling());
         }
-        if (EvaPoseRuntimeRecorder.requestsSmokeRender())
-        {
-            return true;
-        }
         Minecraft minecraft = Minecraft.getInstance();
         // The crouch/prone head socket can sit just beyond the entity's coarse
         // gameplay AABB while hands and weapon remain in front of the camera.
@@ -417,13 +403,7 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         {
             bone.setHidden(false);
             bone.setChildrenHidden(false);
-            if (EvaPoseRuntimeRecorder.wants(animatable))
-            {
-                EvaPoseRuntimeRecorder.trackMatrices(bone);
-            }
         });
-        EvaWeightedInnerProxy.prepare(model);
-        EvaManifoldInnerBody.prepare(model);
         if (this.pilotView)
         {
             forEachBone(model, bone ->
@@ -502,19 +482,12 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         super.renderRecursively(poseStack, animatable, bone, renderType,
                 bufferSource, buffer, isReRender, partialTick, packedLight,
                 packedOverlay, red, green, blue, alpha);
-        EvaPoseRuntimeRecorder.captureBone(animatable, bone, isReRender);
         if (!isReRender && bone.getParent() == null)
         {
             FirstBattleRuntimeWitnessR52.finish(animatable,bone);
             if (com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)
                 com.projectseele.client.visual.EvaConnectedActionReview.recordPose(animatable,
                     this.getGeoModel().getBakedModel(this.getGeoModel().getModelResource(animatable)), partialTick);
-            if(!this.pilotView)EvaWeightedInnerProxy.renderAfterRoot(
-                    poseStack, animatable, bone, bufferSource,
-                    packedLight, packedOverlay);
-            if(!this.pilotView)EvaManifoldInnerBody.renderAfterRoot(
-                    poseStack, animatable, bone, bufferSource,
-                    packedLight, packedOverlay);
         }
     }
 

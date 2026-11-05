@@ -229,7 +229,7 @@ public final class FirstBattleClip
     public static Vec3 point(FirstBattleSignals.Spec spec,boolean eva,String curve,float seconds){return world(spec,localPoint(spec,eva,curve,seconds));}
     /** Where Unit-01's fists land in the ground and pound: the pinned Sachiel's core, in front of the kneeling unit. */
     public static Vec3 poundCore(FirstBattleSignals.Spec spec,float seconds)
-    {Vec3 front=Vec3.directionFromRotation(0,yaw(spec,true,seconds)).multiply(1,0,1).normalize();return point(spec,true,"root_blocks",seconds).add(front.scale(15)).add(0,8,0);}
+    {float pin=12.5F;Vec3 front=Vec3.directionFromRotation(0,yaw(spec,true,pin)).multiply(1,0,1).normalize();return point(spec,true,"root_blocks",pin).add(front.scale(15)).add(0,8,0);}
     public static float yaw(FirstBattleSignals.Spec spec,boolean eva,float seconds)
     {
         return Mth.rotLerp(smooth(seconds/1.2F),eva?spec.evaYaw():spec.angelYaw(),spec.yaw()+(eva?0:180));

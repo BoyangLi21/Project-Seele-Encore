@@ -23,10 +23,7 @@ public final class BodyPoseLayersR40
         CURRENT.remove();
         if (!ENABLED || !actor.level().isClientSide || ROWS.size() >= 1200) return;
         boolean network=com.projectseele.client.visual.RuntimeR44ClientProbe.poseLayerActor(actor);
-        boolean manual=com.projectseele.client.render.EvaPoseRuntimeRecorder.wants(actor);
-        // A manual final-pose capture can inspect the same source/constraint
-        // layers without enabling the scripted combat review scenario.
-        if (!(manual||network||CombatR31Review.ENABLED&&actor.getId()==CombatR31Review.evaId)) return;
+        if (!(network||CombatR31Review.ENABLED&&actor.getId()==CombatR31Review.evaId)) return;
         long tick = actor.level().getGameTime();
         if(network)
         {

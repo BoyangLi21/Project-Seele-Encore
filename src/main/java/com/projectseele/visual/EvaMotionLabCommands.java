@@ -5,7 +5,6 @@ import com.mojang.brigadier.arguments.StringArgumentType;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
-import com.projectseele.network.ClientboundEvaPoseRecorderPacket;
 import com.projectseele.network.SeeleNetwork;
 import com.projectseele.world.EvaMotionLabDirector;
 import com.projectseele.world.EvaPilotResolver;
@@ -72,25 +71,7 @@ public final class EvaMotionLabCommands
                                                                 context, "mode"))))))
                         .then(Commands.literal("camera")
                                 .executes(context -> camera(
-                                        context.getSource())))
-                        .then(Commands.literal("record")
-                                .then(Commands.literal("start")
-                                        .executes(context -> recordStart(
-                                                context.getSource(), "manual"))
-                                        .then(Commands.argument("label",
-                                                        StringArgumentType.word())
-                                                .executes(context -> recordStart(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(
-                                                                context, "label")))))
-                                .then(Commands.literal("stop")
-                                        .executes(context -> recordControl(
-                                                context.getSource(),
-                                                ClientboundEvaPoseRecorderPacket.STOP)))
-                                .then(Commands.literal("status")
-                                        .executes(context -> recordControl(
-                                                context.getSource(),
-                                                ClientboundEvaPoseRecorderPacket.STATUS))))));
+                                        context.getSource())))));
     }
 
     private static int setup(CommandSourceStack source, boolean force)
@@ -224,54 +205,6 @@ public final class EvaMotionLabCommands
                                 + String.format("%02d", variant) + " " + mode)
                 : "Motion-lab autonomous gait: EVA-"
                         + String.format("%02d", variant) + " " + mode), false);
-        return 1;
-    }
-
-    private static int recordStart(CommandSourceStack source, String label)
-            throws CommandSyntaxException
-    {
-        ServerPlayer player = source.getPlayerOrException();
-        if (!EvaMotionLabDirector.isMotionLab(player.serverLevel()))
-        {
-            source.sendFailure(Component.literal(
-                    "This command is restricted to SEELE_EVA_MOTION_LAB."));
-            return 0;
-        }
-        EvaUnit01Entity eva = EvaPilotResolver.controlTarget(player);
-        if (eva == null || EvaPilotResolver.pilot(eva) != player)
-        {
-            source.sendFailure(Component.literal(
-                    "Board a Motion Lab EVA through the normal enter command before recording."));
-            return 0;
-        }
-        if (eva.getMotionLabPhysicsPreview() != 0
-                || eva.getVisualPose() != EvaUnit01Entity.VISUAL_NORMAL)
-        {
-            source.sendFailure(Component.literal(
-                    "Official pose recording rejects demo/preview authority; use normal pilot input."));
-            return 0;
-        }
-        SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
-                new ClientboundEvaPoseRecorderPacket(
-                        ClientboundEvaPoseRecorderPacket.START,
-                        eva.getId(), label));
-        source.sendSuccess(() -> Component.literal(
-                "Final-matrix recording requested for the normally controlled EVA."), false);
-        return 1;
-    }
-
-    private static int recordControl(CommandSourceStack source, int operation)
-            throws CommandSyntaxException
-    {
-        ServerPlayer player = source.getPlayerOrException();
-        if (!EvaMotionLabDirector.isMotionLab(player.serverLevel()))
-        {
-            source.sendFailure(Component.literal(
-                    "This command is restricted to SEELE_EVA_MOTION_LAB."));
-            return 0;
-        }
-        SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player),
-                new ClientboundEvaPoseRecorderPacket(operation, -1, "manual"));
         return 1;
     }
 
