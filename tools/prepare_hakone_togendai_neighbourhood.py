@@ -57,6 +57,12 @@ def design(a):
             if l>R or t>B:raise ValueError(('Retained public surface outside design',path))
             dst=np.s_[t-z:B-z+1,l-x:R-x+1];src=np.s_[t-az:B-az+1,l-ax:R-ax+1];keep=f['walk'][src]
             measured_public[dst]|=keep;walk[dst]|=keep;road[dst]|=f['road'][src]&keep;grade2[dst][keep]=f['grade2'][src][keep]
+    fixed_public=np.zeros(shape,bool)
+    for path in design.get('fixed_public_surfaces',[]):
+        with np.load(Path(path))as f:
+            ax,az,aX,aZ=map(int,f['bounds']);l,t,R,B=max(x,ax),max(z,az),min(X,aX),min(Z,aZ)
+            if l>R or t>B:raise ValueError(('Fixed public surface outside design',path))
+            fixed_public[t-z:B-z+1,l-x:R-x+1]|=f['walk'][t-az:B-az+1,l-ax:R-ax+1]
     for row in design['streets']:
         curve,along=alignment(row);dist,near=cKDTree(curve[:,[0,2]]).query(np.column_stack([xx.ravel(),zz.ravel()]));dist=dist.reshape(shape);near=near.reshape(shape)
         r=dist<=row['width']/2;w=dist<=row['width']/2+row.get('sidewalk',2)
@@ -143,6 +149,7 @@ def design(a):
         try:h2=fit_ports(w&~walk,h2,walk|plots,np.where(plots,plotfloor*2,grade2))
         except ValueError as exc:raise ValueError((row['id'],str(exc)))from exc
         use=w&~walk;walk|=w;grade2[use]=h2[use];footways.append(dict(parcel=row['id'],points=path.tolist(),length=float(along[-1])))
+    if np.any(fixed_public&walk):raise ValueError('New pavement reaches a retained road without an explicit connected interface')
     core=np.zeros(shape,bool);core[rect(bounds,design['core'])]=True
     for area in design.get('additional_core_areas',[]):
         if not(x<=area[0]<=area[2]<=X and z<=area[1]<=area[3]<=Z):raise ValueError('Additional reconstruction area outside capture')
@@ -183,7 +190,7 @@ def design(a):
             if conflict.any():
                 j,i=np.argwhere(conflict)[0];raise ValueError(('new street enters reserved railway',int(i+x),int(j+z)))
     known=d['old_ground']>-129
-    fixed=((distance>=blend_distance)|wet|retained_walk)&known
+    fixed=((distance>=blend_distance)|wet|retained_walk|fixed_public)&known
     retained=[]
     moved_ids={r['id']for r in rows}
     for r in json.loads(a.catalog.read_text('utf8')):
@@ -203,7 +210,7 @@ def design(a):
     fixed&=~station_soil
     bridge=np.zeros(shape,bool)
     for box in design.get('bridge_spans',[]):bridge[rect(bounds,box)]=True
-    bridge|=measured_public
+    bridge|=measured_public|fixed_public
     # Covered roads keep the measured overburden. Their carriageway is a
     # separate vertical layer, so it must not flatten the hill into an open cut.
     covered=np.zeros(shape,bool)

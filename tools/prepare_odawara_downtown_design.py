@@ -171,6 +171,10 @@ def prepare(a):
               hayakawa_civil_interface_deferred_to_stage=3)
     if preserve:
         spec.update(preserve_all_existing_public=True,retained_public_surfaces=[str(authority/'network.npz')])
+        if not cfg.get('include_existing_public_in_connectivity',True):
+            # A disconnected older road remains protected in three dimensions,
+            # but is not a new district's destination or connectivity claim.
+            spec['fixed_public_surfaces']=spec.pop('retained_public_surfaces')
     save(a.out/'authored-design.json',spec)
     save(a.out/'compilation.json',dict(streets=len(streets),buildings=len(rows),current_full_chunks=capture['chunk_statuses']['full'],preserve_existing_district=preserve,retained_devices=len(tags),
                                      max_road_height_adjustment=max(abs(heights[p]-wanted[p])for p in graph),

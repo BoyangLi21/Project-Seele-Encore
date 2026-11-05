@@ -1,0 +1,20 @@
+{
+  "id": "odawara-iriuda",
+  "name": "Odawara Iriuda southern valley neighbourhood",
+  "label": "入生田南岸街区",
+  "preserve_existing_district": true,
+  "include_existing_public_in_connectivity": false,
+  "core": [2464, 928, 2660, 1039],
+  "terminals": [
+    ["station-bank-interface", "入生田站方向跨河接口的南岸街道", [2595, 980]],
+    ["west-interface", "西侧住宅街道接口", [2515, 1022]],
+    ["south-interface", "南侧河谷街道接口", [2550, 1028]]
+  ],
+  "maximum_buildings": 40,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}
