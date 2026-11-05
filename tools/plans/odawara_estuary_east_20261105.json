@@ -1,0 +1,20 @@
+{
+  "id": "odawara-estuary-east",
+  "name": "Odawara Sakawa estuary eastern coastal neighbourhood",
+  "label": "酒匂川河口东岸街区",
+  "preserve_existing_district": true,
+  "include_existing_public_in_connectivity": false,
+  "core": [4088, 216, 4178, 280],
+  "terminals": [
+    ["west-bank-interface", "河口东岸街道接口", [4110, 250]],
+    ["central-services", "东岸生活服务街口", [4130, 230]],
+    ["east-coast-interface", "东侧海岸街道接口", [4150, 250]]
+  ],
+  "maximum_buildings": 50,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

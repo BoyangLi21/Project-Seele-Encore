@@ -149,15 +149,24 @@ def parallel_recipes(a):
     print('Prepared parallel recipes',summary['recipes'],'devices',summary['devices_checked'],'errors',len(errors),flush=True)
 
 
+def dry_field_changes(old,water,old_ground,new_ground,inside):
+    # The eastern extension retains the sea datum even above dry land. Such
+    # samples may follow verified dry earthworks; actual wet beds stay exact.
+    dry=(water==-32768)|((old.astype(np.int64)>=water.astype(np.int64)*16)&(old_ground>=water)&(new_ground>=water))
+    use=inside&(new_ground!=old_ground)&dry
+    revised=old.copy();revised[use]=(new_ground[use]*16).astype(old.dtype)
+    return revised,use
+
+
 def field(a):
     d=load_grid(a.plan/'network.npz')
     with gzip.open(a.resource,'rb')as f:
         header=f.read(24);magic,x,z,step,w,h=struct.unpack('>6i',header)
         old=np.frombuffer(f.read(w*h*2),'>i2').reshape(h,w).copy();water=np.frombuffer(f.read(w*h*2),'>i2').reshape(h,w).copy()
     zz,xx=np.meshgrid(np.arange(h)*step+z,np.arange(w)*step+x,indexing='ij');inside=(xx>=d['bounds'][0])&(xx<=d['bounds'][2])&(zz>=d['bounds'][1])&(zz<=d['bounds'][3])
-    difference=sampled(d,'ground',xx,zz)-sampled(d,'old_ground',xx,zz)
+    new_ground=sampled(d,'ground',xx,zz);old_ground=sampled(d,'old_ground',xx,zz);difference=new_ground-old_ground
     # Preserve surveyed lakes/rivers and the already baked external transition.
-    use=inside&(difference!=0)&(water==-32768);new=old.copy();new[use]=sampled(d,'ground',xx,zz)[use]*16
+    new,use=dry_field_changes(old,water,old_ground,new_ground,inside)
     for edge in (difference[0],difference[-1],difference[:,0],difference[:,-1]):
         if np.any(edge):raise ValueError('Network earthworks reach the outer saved-world seam')
     a.out.mkdir(parents=True,exist_ok=True)
