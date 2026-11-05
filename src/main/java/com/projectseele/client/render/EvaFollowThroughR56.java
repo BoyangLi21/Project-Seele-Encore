@@ -76,6 +76,10 @@ final class EvaFollowThroughR56
             }
             EvaRigTransforms.rotate(bone,drawn);
         }
+        // The lagged forearm keeps turning about the elbow centre: its position field was solved for the
+        // un-lagged rotation, so without this the elbow slid off the upper arm while the arm trailed.
+        if(!armed)for(String side:new String[]{"l","r"})
+            model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
         state.time=now;
     }
 

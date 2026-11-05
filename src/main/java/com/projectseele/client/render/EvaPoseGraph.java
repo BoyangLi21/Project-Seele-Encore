@@ -381,6 +381,13 @@ public final class EvaPoseGraph
         EvaPoseContinuity.trace(entity,model,"joint.limits");
         String continuityOwner=motionWrites.owner();
         EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
+        // Last word on the joints: every layer above may have turned a forearm or shin (lag, limits,
+        // continuity residuals decayed apart from rotation); seat each back on its real elbow/knee centre.
+        for(String side:new String[]{"l","r"})
+        {
+            model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
+            model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
+        }
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         com.projectseele.client.visual.RuntimeR44ClientProbe.capture(entity,model,partialTick,modelToWorld);

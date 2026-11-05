@@ -72,6 +72,13 @@ def main():
                 st['slide'] = max(st['slide'], np.linalg.norm((ball - prev_ball[side][:3])[[0, 2]]) / dt)
             prev_ball[side] = np.r_[ball, r['tick']]
         world = {b: R.matq(m[:3, :3] / np.linalg.norm(m[:3, 0])) for b, m in mats.items() if not b.startswith(SKIP)}
+        # dislocation: the hinge centre seen from the upper and from the lower bone must coincide
+        for side in 'lr':
+            for up, lo, c in (('arm_', 'forearm_', S.elbow_centre(side)),
+                              ('leg_', 'shin_', actors.eva_rig.pivot['shin_' + side] + np.array([0, S.KNEE_LIFT, 0]))):
+                gap = np.linalg.norm(mats[up + side][:3, :3] @ c + mats[up + side][:3, 3] - mats[lo + side][:3, :3] @ c - mats[lo + side][:3, 3])
+                if gap > st.get('gap', (0.0, ''))[0]:
+                    st['gap'] = (gap, '%s%s@%d' % (lo, side, r['tick']))
         if prev_rot is not None:
             dt = max(1, r['tick'] - prev_rot[1])
             for b, q in world.items():
@@ -86,9 +93,10 @@ def main():
             cam = R.Camera(c + np.array([-110, 30 + 0 * c[1], 20]) - np.array([0, 0, 0]), c + np.array([0, 26, 0]), 42, (300, 260))
             img = R.render(cam, groups, label='%d %s' % (r['tick'], key[:22]), ground=(c[0] - 60, c[0] + 60, c[2] - 60, c[2] + 60))
             sheet.append(img)
-    print('%-28s %5s %8s %10s  %s' % ('segment', 'n', 'pen', 'slide/s', 'max joint speed (deg/tick)'))
+    print('%-22s %4s %6s %8s  %-26s %s' % ('segment', 'n', 'pen', 'slide/s', 'max joint speed (deg/tick)', 'max hinge gap (blocks)'))
     for key, st in stats.items():
-        print('%-28s %5d %8.2f %10.2f  %.0f %s' % (key[:28], st['n'], st['pen'], st['slide'], st['pop'][0], st['pop'][1]))
+        g = st.get('gap', (0.0, ''))
+        print('%-22s %4d %6.2f %8.2f  %4.0f %-21s %5.2f %s' % (key[:22], st['n'], st['pen'], st['slide'], st['pop'][0], st['pop'][1], g[0], g[1]))
     if sheet:
         R.sheet(sheet, 6).save(sys.argv[2])
 
