@@ -64,6 +64,10 @@ public final class FirstBattlePoseRenderer
             model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
             model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
         }
+        if(!actor.isFirstBattleEva()&&FirstBattleClingR58.active(time))
+            FirstBattleClingR58.apply(entity,model,actor.firstBattleSignals().spec(entity),time,partial);
+        if(!actor.isFirstBattleEva()&&FirstBattleClingR58.grabbing(time))
+            FirstBattleClingR58.grab(entity,model,actor.firstBattleSignals().spec(entity),time,partial);
         FirstBattleRuntimeWitnessR52.writer(entity,model,partial,pose);
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),Set.copyOf(positions),EvaMotionEngineV2.OWNER_LIVE_ACTION);
     }

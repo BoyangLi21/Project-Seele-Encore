@@ -318,8 +318,12 @@ public final class EvaConnectedActionReview
         if(at(462))send(ServerboundEvaControlPacket.ACTION_SMASH);
     }
 
+    /** -Dprojectseele.fxFinaleOnly: start the effects script at its finale. */
+    private static final int FX_OFFSET=Boolean.getBoolean("projectseele.fxFinaleOnly")?600:0;
+    private static boolean fxAt(int scriptTick){return scriptTick>=FX_OFFSET&&at(scriptTick-FX_OFFSET);}
     private static boolean fxCapture(int t)
     {
+        t+=FX_OFFSET;
         if(t>=90&&t<150)return true;
         if(t>=200&&t<620)return t%2==0;
         return t>=640&&t%2==0;
@@ -327,41 +331,42 @@ public final class EvaConnectedActionReview
 
     private static void fxR58(Minecraft mc,EvaUnit01Entity eva)
     {
-        int t=tick;
+        int t=tick+FX_OFFSET;
         mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
         mc.player.setYRot(0);mc.player.setXRot(0);
         Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),right=new Vec3(-fwd.z,0,fwd.x);
-        if(at(1))
+        if(fxAt(1))
         {
             // The review save keeps entities between runs.
             mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
             mc.player.connection.sendCommand("kill @e[type=projectseele:sachiel]");
             mc.player.connection.sendCommand("seele motionlab weapon unit01 cannon");
         }
-        if(at(30))send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
-        if(at(100))send(ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
-        if(at(180))mc.player.connection.sendCommand("seele motionlab weapon unit00 shield");
+        if(fxAt(30))send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
+        if(fxAt(100))send(ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
+        if(fxAt(180))mc.player.connection.sendCommand("seele motionlab weapon unit00 shield");
         if(t<200){camPos=eva.position().add(right.scale(-45)).add(fwd.scale(-75)).add(0,72,0);camAim=eva.position().add(fwd.scale(140)).add(0,22,0);return;}
         if(fxUnit00==null||!fxUnit00.isAlive())
             for(var e:mc.level.entitiesForRendering())if(e instanceof EvaUnit01Entity u&&u!=eva&&u.getUnitVariant()==0){fxUnit00=u;break;}
         if(fxUnit00==null)return;
         Vec3 f0=Vec3.directionFromRotation(0,fxUnit00.getYRot()).multiply(1,0,1).normalize(),r0=new Vec3(-f0.z,0,f0.x);
-        if(at(200))
+        if(fxAt(200))
         {
             fxRamiel=fxUnit00.position().add(f0.scale(170)).add(0,50,0);
             mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:ramiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,PersistenceRequired:1b}",fxRamiel.x,fxRamiel.y,fxRamiel.z));
         }
-        if(fxRamiel==null)return;
+        if(fxRamiel==null&&FX_OFFSET==0)return;
         if(t<400){camPos=fxRamiel.add(r0.scale(85)).add(f0.scale(-30)).add(0,4,0);camAim=fxRamiel.add(0,10,0);return;}
         if(t<520){camPos=fxUnit00.position().add(r0.scale(48)).add(f0.scale(30)).add(0,38,0);camAim=fxUnit00.position().add(f0.scale(6)).add(0,32,0);return;}
-        if(t<620){Vec3 mid=fxUnit00.position().lerp(fxRamiel,.5);camPos=mid.add(r0.scale(190)).add(0,10,0);camAim=mid;return;}
-        if(at(620))
+        if(t<620&&fxRamiel!=null){Vec3 mid=fxUnit00.position().lerp(fxRamiel,.5);camPos=mid.add(r0.scale(190)).add(0,10,0);camAim=mid;return;}
+        if(fxAt(620))
         {
             mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
+            mc.player.connection.sendCommand("kill @e[type=projectseele:sachiel]");
             mc.player.connection.sendCommand("seele motionlab weapon unit00 fists");
             mc.player.connection.sendCommand("seele motionlab weapon unit01 fists");
         }
-        if(at(645))
+        if(fxAt(645))
         {
             var server=mc.getSingleplayerServer();var id=eva.getUUID();
             server.execute(()->{
