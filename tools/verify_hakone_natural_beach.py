@@ -2,9 +2,37 @@
 import argparse,json
 from pathlib import Path
 import numpy as np
-from scipy.ndimage import label
+from scipy.ndimage import label,distance_transform_edt
 from author_hakone_lakefront import Editor
 from plan_ashi_landscape_r54 import NATURAL,SOIL
+from query_blocks import AIR
+
+def inspect_water_sides(editor,bounds,ground,water,original=False):
+    """Resolve soil-height suspects against actual water and full side blocks.
+
+    A retained structural column is not missing ground. Unknown non-cubic
+    materials remain unresolved rather than being treated as a sealed bank.
+    """
+    x,z,X,Z=map(int,bounds);h,width=ground.shape;opened=set();unknown=set();contained=0;rows=[]
+    full_blocks=SOIL|{'projectseele:nerv_structural_panel','projectseele:nerv_floor_panel'}
+    for dz,dx in ((0,1),(0,-1),(1,0),(-1,0)):
+        l=(slice(max(0,-dz),h-max(0,dz)),slice(max(0,-dx),width-max(0,dx)))
+        r=(slice(max(0,dz),h-max(0,-dz)),slice(max(0,dx),width-max(0,-dx)))
+        suspect=(water[l]>ground[l])&(water[l]>np.maximum(ground[r],water[r]))
+        for J,I in np.argwhere(suspect):
+            j=int(J+l[0].start);i=int(I+l[1].start);jj,ii=j+dz,i+dx;bad=[];unresolved=[];materials=set()
+            low=max(int(ground[j,i]),int(ground[jj,ii]),int(water[jj,ii]))
+            for y in range(low+1,int(water[j,i])+1):
+                if editor.state(x+i,y,z+j,original=original).split('[')[0]!='minecraft:water':continue
+                state=editor.state(x+ii,y,z+jj,original=original).split('[')[0];key=(x+i,y,z+j,dx,dz)
+                materials.add(state)
+                if state in AIR|{'minecraft:light','minecraft:structure_void'}:opened.add(key);bad.append(y)
+                elif state not in full_blocks|{'minecraft:water'}:unknown.add(key);unresolved.append(y)
+            sealed=not bad and not unresolved;contained+=int(sealed)
+            rows.append(dict(water_xz=[x+i,z+j],side_xz=[x+ii,z+jj],open_heights=bad,
+                unresolved_heights=unresolved,side_materials=sorted(materials),contained=sealed))
+    editor.regions.clear()
+    return opened,unknown,contained,rows
 
 def verify(C):
     m=json.loads((C/'manifest.json').read_text('utf8'));spec=m['natural_beach']
@@ -23,6 +51,22 @@ def verify(C):
         if not np.array_equal(reference_sea,d['sea_reference']):errors.append(['marine-reference-differs'])
     if np.any((d['water']!=old_water)&~marine_voids):errors.append(['undeclared-water-change'])
     if np.any(d['active']&(d['blocked']|d['public'])):errors.append(['protected-column-in-authoring-scope'])
+    # Independently reconstruct the geographical and physical exclusions;
+    # the candidate's blocked bitmap alone is not evidence of ownership.
+    zz,xx=np.mgrid[z:Z+1,x:X+1];port_buffer=int(spec.get('retained_port_buffer_blocks',32))
+    if not 0<=port_buffer<=32:errors.append(['invalid-port-buffer'])
+    port=(xx>=3040-port_buffer)&(xx<=3360+port_buffer)&(zz>=960-port_buffer)&(zz<=1216+port_buffer)
+    if np.any(d['active']&port):errors.append(['retained-port-intersection'])
+    cap=json.loads((Path(spec['source'])/'capture.json').read_text('utf8'))
+    for actor in cap['actors']:
+        px,_,pz=actor['pos']
+        if np.any(d['active']&(abs(xx-px)<=64)&(abs(zz-pz)<=64)):errors.append(['retained-actor-intersection'])
+    with np.load(Path(spec['programme'])/'watercourse-reference.npz')as f:
+        ox,oz,oX,oZ=map(int,f['bounds']);river=f['river'][z-oz:Z-oz+1,x-ox:X-ox+1]
+    if np.any(d['active']&(distance_transform_edt(~river)<=spec['river_mouth_buffer_blocks'])):
+        errors.append(['retained-river-intersection'])
+    edge=np.minimum.reduce([xx-x,X-xx,zz-z,Z-zz])
+    if np.any(d['active']&(edge<spec['source_edge_guard_blocks'])):errors.append(['retained-source-edge-intersection'])
     if int(d['active'].sum())!=spec['active_columns']:errors.append(['active-column-count'])
     for path in sorted((C/'source').glob('*.npz')):
         rx,rz=map(int,path.stem.split('.')[1:]);r=e.region(rx*512,rz*512);base=[s.split('[')[0]for s in r['names']]
@@ -61,9 +105,15 @@ def verify(C):
         new_exposed+=int((new>old).sum());old_exposed+=int((old>0).sum());after_exposed+=int((new>0).sum())
         for edge in (0,-1):
             q=[slice(None),slice(None)];q[axis]=edge;q=tuple(q)
-            if not np.array_equal(actual[q],d['old_ground'][q]):errors.append(['changed-outer-seam',axis,edge])
+            if not np.array_equal(actual[q],d['old_ground'][q])or not np.array_equal(actual_water[q],old_water[q]):
+                errors.append(['changed-outer-seam',axis,edge])
     if new_steps:errors.append(['new-increased-cliffs-above-two',new_steps])
     if new_exposed:errors.append(['new-exposed-water-faces',new_exposed])
+    old_open,old_unknown,old_contained,old_sides=inspect_water_sides(e,d['bounds'],d['old_ground'],old_water,original=True)
+    new_open,new_unknown,contained,side_rows=inspect_water_sides(e,d['bounds'],actual,actual_water)
+    if new_open-old_open:errors.append(['new-actual-water-side-gap',len(new_open-old_open)])
+    if new_unknown-old_unknown:errors.append(['new-unresolved-water-side',len(new_unknown-old_unknown)])
+    (C/'actual-water-side-review.json').write_text(json.dumps(dict(before=old_sides,after=side_rows),indent=2),'utf8')
     checked_void_sides=0
     if marine_voids.any():
         ids,_=label((actual_water==sea)&(actual<sea))
@@ -82,6 +132,9 @@ def verify(C):
         new_increased_cliffs_above_two=new_steps,maximum_adjacent_ground_steps=maximum,new_exposed_water_edges=new_exposed,
         slope_comparison='soil within wet/dry zones; visible surfaces at wet/dry boundaries',
         previous_exposed_water_edges=old_exposed,resulting_exposed_water_edges=after_exposed,
+        actual_open_water_side_cells=len(new_open),previous_actual_open_water_side_cells=len(old_open),
+        actual_open_water_edges=sum(bool(r['open_heights'])for r in side_rows),
+        actual_unresolved_water_side_cells=len(new_unknown),structurally_contained_candidate_edges=contained,
         all_original_surface_water_levels_equal=bool(np.array_equal(actual_water[old_water>d['old_ground']],old_water[old_water>d['old_ground']])),
         original_dry_columns_changed_to_sea=int(marine_voids.sum()),declared_water_map_exact=bool(np.array_equal(actual_water,d['water'])),marine_void_side_cells_checked=checked_void_sides,
         declared_public_column_intersections=int((d['active']&d['public']).sum()),natural_ownership_only=not any(r[0]=='unauthorized-cell'for r in errors),

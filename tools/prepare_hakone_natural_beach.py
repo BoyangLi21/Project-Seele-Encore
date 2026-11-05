@@ -40,8 +40,12 @@ def prepare(a):
     zz,xx=np.mgrid[z:Z+1,x:X+1];edge=np.minimum.reduce([xx-x,X-xx,zz-z,Z-zz])
     if not(0<=a.river_buffer<=24 and 1<=a.edge_guard<=16):raise ValueError('Invalid finite coastal exclusion distances')
     blocked=(distance_transform_edt(~river)<=a.river_buffer)|(edge<a.edge_guard)
-    # The retained port box includes complete ship hulls and their apron.
-    blocked|=(xx>=3008)&(xx<=3392)&(zz>=928)&(zz<=1248)
+    # Keep the complete retained port and an explicit construction collar.
+    # A smaller collar requires current ownership/actor checks; the port
+    # itself is never an editable coastal surface.
+    port_buffer=getattr(a,'port_buffer',32)
+    if not 0<=port_buffer<=32:raise ValueError('Invalid retained port collar')
+    blocked|=(xx>=3040-port_buffer)&(xx<=3360+port_buffer)&(zz>=960-port_buffer)&(zz<=1216+port_buffer)
     for actor in cap['actors']:
         px,_,pz=actor['pos'];blocked|=(abs(xx-px)<=64)&(abs(zz-pz)<=64)
     with np.load(a.authority/'network.npz')as f:
@@ -170,7 +174,8 @@ def prepare(a):
         natural_beach=dict(source=str(a.source),authority=str(a.authority),programme=str(a.programme),full_chunks=cap['chunk_statuses']['full'],
         active_columns=int(active.sum()),wet_columns=int((active&wet_zone).sum()),dry_columns=int((active&dry_zone).sum()),slope_refinements=refinements,
         measured_dry_sea_slivers=int((slivers&active).sum()),measured_shore_bank_columns=int(actual_bank.sum()),retained_tree_vegetation=True,marine_void_columns=int(marine_voids.sum()),
-        original_sea_level_retained=SEA,river_mouth_buffer_blocks=a.river_buffer,source_edge_guard_blocks=a.edge_guard,regional_field_unchanged=True,exact_future_recipes_required=True),world_written=False))
+        original_sea_level_retained=SEA,river_mouth_buffer_blocks=a.river_buffer,source_edge_guard_blocks=a.edge_guard,
+        retained_port_buffer_blocks=port_buffer,regional_field_unchanged=True,exact_future_recipes_required=True),world_written=False))
     save(a.out/'functional-check.json',dict(errors=['Independent beach verification pending'],visual_verified=False,world_written=False))
     save(a.out/'launch-protection.json',check_candidate(guard,a.out))
     print('Prepared natural coast:',int(active.sum()),'columns;',sum(r['cells']for r in records),'cells; no world writes.',flush=True)
@@ -180,5 +185,6 @@ if __name__=='__main__':
     for n in('source','programme','authority','out'):p.add_argument('--'+n,type=Path,required=True)
     p.add_argument('--river-buffer',type=int,default=24,help='Retained future river/bank collar; narrow only with current mouth and exact ownership checks')
     p.add_argument('--edge-guard',type=int,default=16,help='Keep this measured outer collar exact; never remove the final measured edge')
+    p.add_argument('--port-buffer',type=int,default=32,help='Additional retained port collar; complete port, actors and exact foreign blocks always remain protected')
     p.add_argument('--fill-marine-voids',action='store_true',help='Fill natural dry holes below existing sea level only inside surveyed sea and connected to existing marine water')
     prepare(p.parse_args())
