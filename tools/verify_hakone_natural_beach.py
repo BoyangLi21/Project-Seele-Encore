@@ -14,7 +14,10 @@ def inspect_water_sides(editor,bounds,ground,water,original=False):
     materials remain unresolved rather than being treated as a sealed bank.
     """
     x,z,X,Z=map(int,bounds);h,width=ground.shape;opened=set();unknown=set();contained=0;rows=[]
-    full_blocks=SOIL|{'projectseele:nerv_structural_panel','projectseele:nerv_floor_panel'}
+    # The concrete and polished-deepslate quay walls are vanilla full cubes;
+    # slabs, stairs, walls and other partial shapes remain unresolved here.
+    full_blocks=SOIL|{'projectseele:nerv_structural_panel','projectseele:nerv_floor_panel',
+        'minecraft:polished_deepslate','minecraft:black_concrete','minecraft:red_concrete','minecraft:gray_concrete'}
     for dz,dx in ((0,1),(0,-1),(1,0),(-1,0)):
         l=(slice(max(0,-dz),h-max(0,dz)),slice(max(0,-dx),width-max(0,dx)))
         r=(slice(max(0,dz),h-max(0,-dz)),slice(max(0,dx),width-max(0,-dx)))
