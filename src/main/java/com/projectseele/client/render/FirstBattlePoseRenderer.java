@@ -37,6 +37,9 @@ public final class FirstBattlePoseRenderer
         for(var child:bone.getChildBones())record(child,snapshot);
     }
     public static EvaMotionEngineV2.BoneWrites apply(Entity entity,BakedGeoModel model,float partial)
+    {return apply(entity,model,partial,null);}
+    /** {@code world}: the renderer's model-to-world matrix; Unit-01's limbs are re-solved only when it is known. */
+    public static EvaMotionEngineV2.BoneWrites apply(Entity entity,BakedGeoModel model,float partial,org.joml.Matrix4f world)
     {
         if(!(entity instanceof FirstBattleSignals.Actor actor)||!actor.firstBattleSignals().active(entity)||!FirstBattleClip.ready())return EvaMotionEngineV2.BoneWrites.empty();
         float time=actor.firstBattleSignals().time(entity,partial);
@@ -64,10 +67,15 @@ public final class FirstBattlePoseRenderer
             model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
             model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
         }
-        if(actor.isFirstBattleEva())FirstBattleHeroR58.apply(entity,model,actor.firstBattleSignals().spec(entity),time,partial);
-        else FirstBattleAngelR58.apply(entity,model,actor.firstBattleSignals().spec(entity),time,partial);
+        if(actor.isFirstBattleEva()&&world!=null)FirstBattleHeroR58.apply(entity,model,actor.firstBattleSignals().spec(entity),time,partial,world);
         FirstBattleRuntimeWitnessR52.writer(entity,model,partial,pose);
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(rotations),Set.copyOf(positions),EvaMotionEngineV2.OWNER_LIVE_ACTION);
+    }
+    /** Sachiel's limbs, solved in its renderer's root pass where the true model-to-world matrix is known. */
+    public static void solveAngel(Entity entity,BakedGeoModel model,float partial,org.joml.Matrix4f world)
+    {
+        if(!(entity instanceof FirstBattleSignals.Actor actor)||actor.isFirstBattleEva()||!actor.firstBattleSignals().active(entity)||!FirstBattleClip.ready())return;
+        FirstBattleAngelR58.apply(entity,model,actor.firstBattleSignals().spec(entity),actor.firstBattleSignals().time(entity,partial),partial,world);
     }
     private FirstBattlePoseRenderer() {}
 }

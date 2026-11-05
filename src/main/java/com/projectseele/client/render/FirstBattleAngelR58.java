@@ -52,7 +52,8 @@ final class FirstBattleAngelR58
 
     private record Frame(GeoBone[] bones, Matrix4f root, Vec3 origin, float yaw, double ground) {}
 
-    static void apply(Entity angel, BakedGeoModel model, FirstBattleSignals.Spec spec, float time, float partial)
+    /** {@code root}: the renderer's own model-to-world matrix for this frame. */
+    static void apply(Entity angel, BakedGeoModel model, FirstBattleSignals.Spec spec, float time, float partial, Matrix4f root)
     {
         GeoBone[] bones = new GeoBone[NAMES.length];
         for (int i = 0; i < NAMES.length; i++)
@@ -60,11 +61,9 @@ final class FirstBattleAngelR58
             bones[i] = model.getBone(NAMES[i]).orElse(null);
             if (bones[i] == null) return;
         }
-        Vec3 origin = new Vec3(Mth.lerp(partial, angel.xOld, angel.getX()), Mth.lerp(partial, angel.yOld, angel.getY()),
-                Mth.lerp(partial, angel.zOld, angel.getZ())).add(FirstBattleClip.renderOffset(angel, partial));
+        Vector3f at = root.getTranslation(new Vector3f());
+        Vec3 origin = new Vec3(at.x, at.y, at.z);
         float yaw = FirstBattleClip.yaw(spec, false, time);
-        Matrix4f root = new Matrix4f().translate((float) origin.x, (float) origin.y, (float) origin.z)
-                .rotateY((float) Math.toRadians(180 - yaw)).scale(5);
         Frame f = new Frame(bones, root, origin, yaw, spec.origin().y);
         if (time <= STAND_END) blend(f, ramp(time, 0, .4F, STAND_END - .01F, STAND_END), () -> standoff(f, spec, time));
         if (time >= GRAB_IN && time <= GRAB_END) blend(f, ramp(time, GRAB_IN, GRAB_FULL, GRAB_OUT, GRAB_END), () -> grab(f, spec, time));

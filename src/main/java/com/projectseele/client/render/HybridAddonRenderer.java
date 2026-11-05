@@ -182,6 +182,8 @@ public class HybridAddonRenderer<T extends LivingEntity & GeoEntity> extends Ent
                 MultiBufferSource buffers,VertexConsumer vertex,boolean rerender,float partial,int light,int overlay,
                 float red,float green,float blue,float alpha)
         {
+            if(!rerender&&bone.getParent()==null&&entity instanceof com.projectseele.entity.SachielEntity)
+                FirstBattlePoseRenderer.solveAngel(entity,this.getGeoModel().getBakedModel(this.getGeoModel().getModelResource(entity)),partial,renderedMeshTransform(pose.last().pose(),entity,partial));
             super.renderRecursively(pose,entity,bone,type,buffers,vertex,rerender,partial,light,overlay,red,green,blue,alpha);
             if(!rerender&&bone.getParent()==null)FirstBattleRuntimeWitnessR52.finish(entity,bone);
         }

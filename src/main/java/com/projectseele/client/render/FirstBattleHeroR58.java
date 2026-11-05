@@ -36,13 +36,12 @@ final class FirstBattleHeroR58
         return FirstBattleClip.poundCore(spec, time);
     }
 
-    static void apply(Entity eva, BakedGeoModel model, FirstBattleSignals.Spec spec, float time, float partial)
+    /** {@code root}: the renderer's own model-to-world matrix for this frame. */
+    static void apply(Entity eva, BakedGeoModel model, FirstBattleSignals.Spec spec, float time, float partial, Matrix4f root)
     {
-        Vec3 origin = new Vec3(Mth.lerp(partial, eva.xOld, eva.getX()), Mth.lerp(partial, eva.yOld, eva.getY()),
-                Mth.lerp(partial, eva.zOld, eva.getZ())).add(FirstBattleClip.renderOffset(eva, partial));
+        Vector3f at = root.getTranslation(new Vector3f());
+        Vec3 origin = new Vec3(at.x, at.y, at.z);
         float yaw = FirstBattleClip.yaw(spec, true, time);
-        Matrix4f root = new Matrix4f().translate((float) origin.x, (float) origin.y, (float) origin.z)
-                .rotateY((float) Math.toRadians(180 - yaw)).scale(EvaScale.RENDER_SCALE);
         Vec3 front = Vec3.directionFromRotation(0, yaw).multiply(1, 0, 1).normalize();
         double ground = spec.origin().y;
 
@@ -124,6 +123,32 @@ final class FirstBattleHeroR58
             Vector3f pole = toF(front).fma(s == 0 ? .15F : -.15F, lateral).add(0, .1F, 0);
             EvaRigTransforms.solveLeg(upper, lower, ankle, foot, target, rotation, pole, root);
         }
+        if (JOINT_LOG && (int) (time * 20) != lastLogged)
+        {
+            lastLogged = (int) (time * 20);
+            StringBuilder row = new StringBuilder(String.format(java.util.Locale.ROOT, "R58 FINALE JOINTS t=%.2f", time));
+            for (String side : new String[] {"l", "r"})
+            {
+                // Knee ahead of the hip-ankle line (+ = forward), elbow off the shoulder-wrist line (out, down).
+                var hip = at(model, "leg_" + side, root); var knee = at(model, "shin_" + side, root); var ankle = at(model, "foot_" + side, root);
+                var sh = at(model, "arm_" + side, root); var el = at(model, "forearm_" + side, root); var wr = at(model, "hand_" + side, root);
+                Vector3f k = new Vector3f(knee).sub(new Vector3f(hip).lerp(ankle, .5F));
+                Vector3f e = new Vector3f(el).sub(new Vector3f(sh).lerp(wr, .5F));
+                Vector3f out = new Vector3f(lateral).mul(side.equals("l") ? 1 : -1);
+                row.append(String.format(java.util.Locale.ROOT, " knee_%s=%.1f elbowOut_%s=%.1f elbowDown_%s=%.1f",
+                        side, k.dot(toF(front)), side, e.dot(out), side, -e.y));
+            }
+            com.projectseele.ProjectSeele.LOGGER.info(row.toString());
+        }
+    }
+
+    private static final boolean JOINT_LOG = Boolean.getBoolean("projectseele.finaleJointLogR58");
+    private static int lastLogged = -1;
+
+    private static Vector3f at(BakedGeoModel model, String bone, Matrix4f root)
+    {
+        GeoBone b = model.getBone(bone).orElse(null);
+        return b == null ? new Vector3f() : EvaRigTransforms.point(b, EvaRigTransforms.pivot(b), root);
     }
 
     /** 0 outside the ground and pound, eased in and out of the clip's own pose. */

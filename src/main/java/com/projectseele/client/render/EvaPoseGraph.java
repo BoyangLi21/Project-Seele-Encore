@@ -182,7 +182,7 @@ public final class EvaPoseGraph
         {
             // The paired performance owns the complete skeleton. In the old
             // path, the late gameplay hand writer replaced its finger bases.
-            var scene=FirstBattlePoseRenderer.apply(entity,model,partialTick);
+            var scene=FirstBattlePoseRenderer.apply(entity,model,partialTick,modelToWorld);
             return finish(entity,model,partialTick,modelToWorld,scene,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         }
         if(com.projectseele.physics.CombatBodyDynamics.active(entity))
