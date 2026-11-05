@@ -277,6 +277,9 @@ public final class EvaGameplayMotionR32
         float lead=name.equals("heavy")?.29F:.21F,tail=name.equals("heavy")?.10F:.14F;
         return phase>=Math.max(0,contact-lead)&&phase<=Math.min(.98F,contact+tail);
     }
+    /** Clip phase at which the contact window closes. */
+    public static float contactEndR57(EvaUnit01Entity e,String name)
+    {return Math.min(.98F,contactPhase(e,name)+(name.equals("heavy")?.10F:.14F));}
     public static float swingSoundPhaseR45(EvaUnit01Entity e,String name)
     {return Math.max(0,contactPhase(e,name)-(name.equals("heavy")?.15F:.19F));}
     public static float releasePhase(EvaUnit01Entity e)
@@ -519,12 +522,12 @@ public final class EvaGameplayMotionR32
         EvaWallStanceR57.gather(e,ground,partial);
         return ground;
     }
-    /** The ledge climb at clip progress phase, along the server's path for this ledge. */
+    /** The ledge step-up or climb at progress phase, along the server's path for this ledge. */
     private static EvaBodyPose.Sample climbPose(EvaUnit01Entity e,EvaBodyPose.Sample base,JsonObject authored,float phase,float partial)
     {
-        float[] path=EvaFieldActionsR45.climbPathR57(authored,phase);
         var state=EvaWeaponHandlingR45.fieldActionR45(e);
         double rise=state.getDouble("rise"),advance=state.getDouble("advance");
+        float[] path=EvaClimbChoreographyR57.path(rise,phase);
         // Hands and foot are set against where the body is drawn: the path at
         // the clip's progress ran a tick or two ahead of the drawn position,
         // and the foot came down five blocks into the top.
@@ -533,7 +536,7 @@ public final class EvaGameplayMotionR32
         float on=advance>.5?(float)Mth.clamp(((at.x-state.getDouble("x0"))*forward.x+(at.z-state.getDouble("z0"))*forward.z)/advance,0,1):path[1];
         // From the stance the walk had gathered into against the wall.
         var from=EvaBodyPose.copy(base);EvaWallStanceR57.gather(e,from,0);
-        return EvaClimbChoreographyR57.pose(from,phase,up,on,(float)rise,(float)advance);
+        return EvaClimbChoreographyR57.pose(e,from,phase,up,on,(float)rise,(float)advance);
     }
     private static EvaBodyPose.Sample groundLocomotion(EvaUnit01Entity e,EvaBodyPose.Sample base,float partial,boolean capturedBase,boolean[] movementOwner)
     {

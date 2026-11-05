@@ -42,6 +42,15 @@ final class EvaWallStanceR57
             if(pose.rotations.containsKey("ankle_"+side))above.mul(pose.rotations.get("ankle_"+side));
             foot.slerp(new Quaternionf(above).invert().mul(root),weight);
         }
+        // The arms hang at the sides, elbows nearly straight: the idle's
+        // forearms, held forward, went five blocks into the wall.
+        for(String side:new String[]{"l","r"})
+        {
+            var arm=pose.rotations.get("arm_"+side);var forearm=pose.rotations.get("forearm_"+side);
+            if(arm==null||forearm==null)continue;
+            arm.slerp(new Quaternionf().rotationZ((side.equals("l")?-8:8)*Mth.DEG_TO_RAD),weight);
+            forearm.slerp(new Quaternionf().rotationX(15*Mth.DEG_TO_RAD),weight);
+        }
         EvaBodyPose.preserveJointCentres(pose);
     }
 

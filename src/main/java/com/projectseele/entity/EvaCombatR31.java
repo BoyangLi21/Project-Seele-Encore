@@ -162,7 +162,9 @@ public final class EvaCombatR31
             }
             if(e.onGround()&&s.airborne&&age>0)
             {
-                if(a==AIR_SLAM){if(motion)landingDust(e);else slam(e);}start(e,LAND,null);return;
+                if(a==AIR_SLAM){if(motion)landingDust(e);else slam(e);}
+                else if(motion)hammerImpact(e);
+                start(e,LAND,null);return;
             }
             if(age>150)clear(e);return;
         }
@@ -220,6 +222,19 @@ public final class EvaCombatR31
         l.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,floor),p.x,p.y+.3,p.z,50,5,.25,5,.12);
         l.playSound(null,e.blockPosition(),ModSounds.EVA_IMPACT.get(),SoundSource.PLAYERS,5,.62F);
         CombatFeelR31.send(e,CombatFeelR31.CONTACT,forward(e),.9F,6,1);
+    }
+    /**
+     * The air hammer's fists meet the ground in front of the feet as the body
+     * lands: dust and a blow there, and the jolt. Without it the strike ended
+     * on a plain landing. Feedback only; the blow's damage is its swing's.
+     */
+    private static void hammerImpact(EvaUnit01Entity e)
+    {
+        var l=(ServerLevel)e.level();Vec3 centre=e.position().add(forward(e).scale(7));var floor=l.getBlockState(e.blockPosition().below());
+        l.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,floor),centre.x,centre.y+.3,centre.z,60,5,.3,5,.16);
+        l.sendParticles(ParticleTypes.POOF,centre.x,centre.y+1,centre.z,16,4,.4,4,.15);
+        l.playSound(null,net.minecraft.core.BlockPos.containing(centre),ModSounds.EVA_IMPACT.get(),SoundSource.PLAYERS,6,.55F);
+        CombatFeelR31.send(e,CombatFeelR31.CONTACT,forward(e),1.1F,8,2);
     }
     private EvaCombatR31() {}
 }

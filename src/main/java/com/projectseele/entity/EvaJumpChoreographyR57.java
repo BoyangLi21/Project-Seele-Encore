@@ -28,21 +28,32 @@ final class EvaJumpChoreographyR57
     // clasped fists swing down in front through the fall and strike the
     // ground in front of the knees at touchdown.
     private static final Key H_RAISE=key(0,6,0,0,10,0,0,-8,0,0,60,0,-8,72,0,8,-105,0,0,-112,0,0,-20,0,0,-20,0,0,170,0,-17,170,0,17,24,0,0,24,0,0);
-    private static final Key H_RAISE2=key(0,8,0,0,12,0,0,-10,0,0,52,0,-8,66,0,8,-110,0,0,-118,0,0,-25,0,0,-25,0,0,160,0,-16,160,0,16,8,0,0,8,0,0);
+    // Cocked: the back arched further, the clasped fists drawn behind the head.
+    private static final Key H_RAISE2=key(0,12,0,0,18,0,0,-16,0,0,50,0,-8,64,0,8,-112,0,0,-120,0,0,-25,0,0,-25,0,0,178,0,-18,178,0,18,50,0,0,50,0,0);
     // The elbows straighten through the swing, as a whip.
     private static final Key H_SWING=key(0,-12,0,0,-16,0,0,12,0,0,45,0,-8,52,0,8,-80,0,0,-88,0,0,-10,0,0,-10,0,0,100,-16,0,100,16,0,20,0,0,20,0,0);
     private static final Key H_SLAM=key(-34.51F,-34,0,0,-30,0,0,34,0,0,92,0,-16,86,0,16,-122,0,0,-116,0,0,32,0,0,32,0,0,58,-10,0,58,10,0,0,0,0,0,0,0);
-    private static final Key H_SLAM_DEEP=key(-37.05F,-40,0,0,-34,0,0,38,0,0,96,0,-18,90,0,18,-124,0,0,-120,0,0,34,0,0,34,0,0,68,-10,0,68,10,0,0,0,0,0,0,0);
-    // Air kick: right knee drawn to the chest, then the leg driven out, chest back.
-    private static final Key K_CHAMBER=key(0,8,0,0,6,0,0,-6,0,0,55,0,-10,110,0,4,-110,0,0,-130,0,0,-20,0,0,10,0,0,60,0,-55,30,0,60,50,0,0,40,0,0);
-    private static final Key K_STRIKE=key(0,0,0,0,22,0,0,-12,0,0,40,0,-10,88,0,4,-115,0,0,-4,0,0,-20,0,0,20,0,0,-30,0,-60,-30,0,60,30,0,0,30,0,0);
-    private static final Key K_LAND=key(-7.72F,-14,0,0,-10,0,0,12,0,0,-25,0,-6,60,0,6,-30,0,0,-60,0,0,-10,0,0,10,0,0,50,0,-40,20,0,55,35,0,0,25,0,0);
+    // Struck: knees wide, the fists driven into the ground in front of the feet.
+    private static final Key H_SLAM_DEEP=key(-39.21F,-32,0,0,-26,0,0,34,0,0,96,0,-20,90,0,20,-124,0,0,-120,0,0,34,0,0,34,0,0,88,-12,0,88,12,0,0,0,0,0,0,0);
+    // Air kick: coiled behind a guard, right knee to the chest; the leg snaps
+    // out heel first with the body laid back and the arms flung behind it;
+    // the landing drops onto the kicking foot, rear knee to the ground, the
+    // right fist planted in front. Held before arms out in front and a lunge
+    // landing, it read as a hop.
+    private static final Key K_CHAMBER=key(0,10,0,0,-6,0,0,4,0,0,45,0,-8,118,0,4,-125,0,0,-140,0,0,-30,0,0,25,0,0,55,0,-18,45,0,18,115,0,0,105,0,0);
+    private static final Key K_STRIKE=key(0,26,0,0,4,0,0,-14,0,0,5,0,-8,52,0,4,-105,0,0,-3,0,0,-35,0,0,28,0,0,-45,0,-30,-40,0,30,25,0,0,30,0,0);
+    private static final Key K_LAND=key(-26.61F,-32,0,0,-22,0,0,30,0,0,37,0,-10,112,0,8,-90,0,0,-90,0,0,-10,0,0,10,0,0,-25,0,-45,62,0,10,30,0,0,8,0,0);
 
     /** Ticks from take-off to the apex at the EVA's jump speed and gravity. */
     private static final float APEX_TICKS=12;
-    /** Landing: touchdown to the deepest bend, then back to the ground pose. */
-    private static final float IMPACT_TICKS=3,RECOVER_TICKS=14;
-    static final float LANDING_TICKS=IMPACT_TICKS+1+RECOVER_TICKS;
+    /**
+     * Landing: touchdown to the deepest bend, held, then back to the ground
+     * pose. An aerial attack drives into its strike faster and holds it
+     * longer, in the same total.
+     */
+    private static final float IMPACT_TICKS=3,HOLD_TICKS=1,RECOVER_TICKS=14;
+    private static final float STRIKE_IMPACT_TICKS=2,STRIKE_HOLD_TICKS=4;
+    static final float LANDING_TICKS=IMPACT_TICKS+HOLD_TICKS+RECOVER_TICKS;
 
     private static final class State {long air=-1,takeoff=-1;float top=-1,highest,swingFrom=-1,fallAt=-1;int attack;}
     private static final WeakIdentityMap<EvaUnit01Entity,State> STATES=new WeakIdentityMap<>();
@@ -86,28 +97,29 @@ final class EvaJumpChoreographyR57
         if(action!=EvaCombatR31.AIR_STRIKE&&action!=EvaCombatR31.AIR_SLAM)return pose;
         boolean kick=action==EvaCombatR31.AIR_SLAM;st.attack=kick?2:1;
         float fall=st.highest>1?Mth.clamp(1-clearance/st.highest,0,1):1;
-        // Chamber over four ticks and hold it; the stroke snaps out in three
-        // and then eases on towards the landing as the ground comes up.
+        // Coil over four ticks and hold it; the leg snaps out in two, fastest
+        // at the start, and stays out through the fall, coming down to plant
+        // only as the ground comes up. Eased in and out over three, then
+        // drifting halfway to the landing, the kick had no snap.
         if(kick)
         {
-            float a=stroke<0?ease(Math.min(1,age/4)):1+ease(Math.min(1,stroke/3))+(stroke>=3?.45F*fall:0);
+            float a=stroke<0?ease(Math.min(1,age/4)):1+out(Math.min(1,stroke/2))+(stroke>=2?.3F*fall*fall*fall:0);
             return play(pose,new Key[]{null,K_CHAMBER,K_STRIKE,K_LAND},a);
         }
         // Raise the clasped hands over four ticks, keep arching back until the
-        // drop, then swing through the whole fall, gathering speed, so the
-        // fists strike the ground at touchdown. Driven by the fall alone the
-        // arms hung overhead for most of it and whipped down in the last
-        // fifth of a second.
-        // The swing starts as the body tips over the apex, not when the
+        // drop, then swing through the whole fall so the fists strike the
+        // ground at touchdown. The swing starts as the body tips over the apex, not when the
         // server's stroke is confirmed a tick or two later.
         boolean dropping=stroke>=0||st.fallAt>=0;
         float since=st.fallAt>=0?Math.min(age,air-st.fallAt):0;
         if(dropping&&st.swingFrom<0)st.swingFrom=fall;
         float raised=raise(dropping?age-since:age);
-        // From the drop the arms come straight down, steadily and a little
-        // faster at first: an eased start left them overhead for half a second.
-        float swing=!dropping?0:Math.max((float)Math.pow(Math.min(1,since/(APEX_TICKS-1)),.85),
-                Mth.clamp((fall-st.swingFrom)/Math.max(.05F,1-st.swingFrom),0,1));
+        // From the drop the arms come down gathering speed, as a blow does,
+        // and are fastest as the fists reach the ground. Swung at an even rate
+        // the blow had no weight; held overhead until the last fifth of a
+        // second, it read as a hold and a jerk.
+        float swing=!dropping?0:(float)Math.pow(Math.max(Math.min(1,since/(APEX_TICKS-1)),
+                Mth.clamp((fall-st.swingFrom)/Math.max(.05F,1-st.swingFrom),0,1)),1.6);
         float from=dropping?raised+Math.max(0,1.9F-raised)*Math.min(1,since/2):raised;
         var hammer=play(pose,new Key[]{null,H_RAISE,H_RAISE2,H_SWING,H_SLAM},from+(4-from)*swing);
         clasp(hammer,CLASP,ease(Math.min(1,age/3)));
@@ -123,7 +135,8 @@ final class EvaJumpChoreographyR57
     {
         int attack=state(e).attack;
         Key impact=attack==1?H_SLAM_DEEP:attack==2?K_LAND:IMPACT;
-        float s=land<IMPACT_TICKS?out(land/IMPACT_TICKS):land<IMPACT_TICKS+1?1:1+ease(Math.min(1,(land-IMPACT_TICKS-1)/RECOVER_TICKS));
+        float in=attack==0?IMPACT_TICKS:STRIKE_IMPACT_TICKS,hold=attack==0?HOLD_TICKS:STRIKE_HOLD_TICKS;
+        float s=land<in?out(land/in):land<in+hold?1:1+ease(Math.min(1,(land-in-hold)/(LANDING_TICKS-in-hold)));
         // Both ends are live poses: interpolate the touchdown key between them.
         var into=play(from,new Key[]{null,impact},Math.min(1,s));
         // The hammer's fists stay clasped into the strike, and part as the body rises.

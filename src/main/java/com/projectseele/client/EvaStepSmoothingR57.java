@@ -37,6 +37,11 @@ public final class EvaStepSmoothingR57
         // Horizontal speed, eased: a running body rises onto the ledge within
         // the lead foot's stance, a walking one over about half a second.
         s.pace=s.pace+(Math.hypot(at.x-s.x,at.z-s.z)/dt-s.pace)*(1-Math.exp(-dt/.15));s.x=at.x;s.z=at.z;
+        // A ledge step-up or climb carries the body along its own path, hands
+        // and feet set against the ledge: held low here as a step, the body
+        // hung up to a second below where they reached.
+        if(com.projectseele.entity.EvaFieldActionsR45.CLIMB.equals(com.projectseele.entity.EvaFieldActionsR45.clip(e)))
+        {s.offset=0;s.speed=0;s.held=0;return 0;}
         boolean standing=e.onGround()&&!e.isVisuallyAirborneForRender();
         if(standing&&rise>STEP_RISE&&rise<24)s.offset-=rise;
         double rate=Math.max(s.offset<-10?RATE_HIGH:RATE,Math.min(30,s.pace/2.5));

@@ -870,6 +870,26 @@ public final class EvaBodyPose
         for(var point:points){var actual=matrix.transformPosition(new Vector3f(point));if(actual.y<lowest){lowest=actual.y;result=actual;}}
         return result;
     }
+    /**
+     * The furthest forward (least z, model units) any support hull point of
+     * the named parts reaches below a ledge's top, +infinity if none. Within
+     * fade of the top a point counts as up to fade further back, so a part
+     * rising over the edge lets go of the face gradually, not all at once.
+     */
+    static float frontBelow(EvaUnit01Entity e,Sample pose,Collection<String> parts,float top,float fade)
+    {
+        if(data==null)reload();var mesh=data.rigSupport().getOrDefault(rigKey(e),data.support());float front=Float.POSITIVE_INFINITY;
+        for(String name:parts)
+        {
+            var points=mesh.get(name);if(points==null||!pose.rig.containsKey(name))continue;var m=pose.matrix(name);
+            for(Vector3f p:points)
+            {
+                float y=m.m01()*p.x+m.m11()*p.y+m.m21()*p.z+m.m31();if(y>=top)continue;
+                front=Math.min(front,m.m02()*p.x+m.m12()*p.y+m.m22()*p.z+m.m32()+fade*(1-Math.min(1,(top-y)/fade)));
+            }
+        }
+        return front;
+    }
     private static void groundGameplay(EvaUnit01Entity e,Sample pose,float partial)
     {
         if(!EvaGameplayMotionR32.owns(e,partial)||EvaGameplayMotionR32.airAge(e,partial)>=0||e.isVisuallyAirborneForRender()&&!e.onGround())return;

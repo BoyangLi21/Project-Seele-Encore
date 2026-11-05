@@ -235,7 +235,8 @@ public final class EvaConnectedActionReview
     private static void tour(Minecraft mc,EvaUnit01Entity eva)
     {
         int t=tick+TOUR_START;
-        boolean move=t>=40&&t<140||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
+        boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
+                :t>=40&&t<140||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
                 ||t>=840&&t<900||t>=1000&&t<1060||t>=1270&&t<1330||t>=1470&&t<1530;
         mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
         // Turn about between the bare-hand and rifle parts so the long walk
@@ -253,19 +254,17 @@ public final class EvaConnectedActionReview
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:stone");
             mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:stone");
         }
-        // A bench-high wall (stepped onto) and, beyond it, a tower 25 above
-        // its top (climbed with Space).
-        if(CLIMB&&at(1))
+        // A kerb 20 high (walked up), on it a ledge 30 high, hip height (Space:
+        // stepped up), and on that a wall 54 high, above the shoulders (Space: climbed).
+        // A fill takes at most 32768 blocks: the ledge and the wall go in slices.
+        if(CLIMB&&(at(1)||at(TOUR_END-2)))
         {
-            mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -41 minecraft:stone");
-            mc.player.connection.sendCommand("fill -24 -60 -40 24 -16 -30 minecraft:stone");
+            String block=at(1)?" minecraft:stone":" minecraft:air";
+            mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -41"+block);
+            for(int z=-40;z<=-14;z+=10)mc.player.connection.sendCommand("fill -24 -40 "+z+" 24 -11 "+Math.min(-14,z+9)+block);
+            for(int z=-13;z<=14;z+=10)mc.player.connection.sendCommand("fill -24 -10 "+z+" 24 43 "+Math.min(14,z+9)+block);
         }
-        if(CLIMB&&at(TOUR_END-2))
-        {
-            mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -41 minecraft:air");
-            mc.player.connection.sendCommand("fill -24 -60 -40 24 -16 -30 minecraft:air");
-        }
-        if(CLIMB)mc.options.keyJump.setDown(t>=100&&t<104);
+        if(CLIMB)mc.options.keyJump.setDown(t>=100&&t<104||t>=166&&t<170);
         // A plain jump, then one with the hammer and one with the kick.
         if(JUMP)mc.options.keyJump.setDown(t>=50&&t<53||t>=100&&t<103||t>=150&&t<153);
         // The jump leaves the ground after its squat (seven ticks).
@@ -278,11 +277,11 @@ public final class EvaConnectedActionReview
         }
         if(WEAPONS)weaponsR57(mc,tick);
         if(tourAt(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
-        if(tourAt(170)||tourAt(182)||!COMBO&&(tourAt(194)||tourAt(206)))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(tourAt(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        if(!CLIMB&&(tourAt(170)||tourAt(182)||!COMBO&&(tourAt(194)||tourAt(206))))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(!CLIMB&&tourAt(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
         // Optional chain check: the heavy pressed during the punch string.
         if(COMBO&&tourAt(193))send(ServerboundEvaControlPacket.ACTION_SMASH);
-        if(tourAt(290))send(ServerboundEvaControlPacket.ACTION_STOMP);
+        if(!CLIMB&&tourAt(290))send(ServerboundEvaControlPacket.ACTION_STOMP);
         if(tourAt(340)||tourAt(820))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
         if(tourAt(440)||tourAt(920))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
         if(tourAt(470)||tourAt(600)||tourAt(940)||tourAt(1080)||tourAt(1340)||tourAt(1550))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
@@ -309,8 +308,9 @@ public final class EvaConnectedActionReview
             mc.player.connection.sendCommand("seele motionlab enter unit02");
             mc.player.connection.sendCommand("seele motionlab weapon unit02 sword");
         }
-        if(at(400)||at(414)||at(428)||at(520))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(at(455))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        // Pressed every half second through the string, as a pilot mashing it would.
+        if(at(400)||at(410)||at(420)||at(430)||at(440)||at(450)||at(520))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(462))send(ServerboundEvaControlPacket.ACTION_SMASH);
     }
 
     /** A tour event at its script tick, with -Dprojectseele.tourStart skipping the script's beginning. */

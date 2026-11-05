@@ -16,6 +16,8 @@ import net.minecraft.world.phys.Vec3;
 public final class EvaSwordActionsR45
 {
     private static final WeakIdentityMap<EvaUnit01Entity,Runtime> STATES=new WeakIdentityMap<>();
+    private static final int CUT_AFTER_CONTACT=1;
+    private static final boolean DIAG=Boolean.getBoolean("projectseele.poseDiag");
     private static final class Runtime
     {
         final EvaContactHitsR45 hits=new EvaContactHitsR45();
@@ -75,6 +77,7 @@ public final class EvaSwordActionsR45
         runtime.elapsed=0;runtime.lastStep=Long.MIN_VALUE;runtime.previous=null;runtime.queued=-1;
         runtime.soundPlayed=false;runtime.swingPlayed=false;runtime.root=sourceRoot(authored,0);runtime.hits.begin(sequence,state.getLong("since"));
         if(!heavy)runtime.nextStage=(runtime.nextStage+1)%3;else {runtime.nextStage=0;e.swordBeginHeavyCooldownR45();}
+        if(DIAG)ProjectSeele.LOGGER.info("R57 SWORD STROKE clip={} tick={}",name,e.level().getGameTime());
         EvaWeaponHandlingR45.swordActionR45(e,state);e.swordActionPhaseR45(0);return true;
     }
     public static boolean cancelByPilotR45(EvaUnit01Entity e,LivingEntity pilot)
@@ -118,9 +121,18 @@ public final class EvaSwordActionsR45
             runtime.previous=blade;
         }
         else runtime.previous=null;
-        if(runtime.elapsed>=state.getInt("duration"))
+        boolean fresh=now-runtime.inputAt<=e.swordInputBufferTicksR45();
+        // A stroke pressed for during b, c or the heavy cuts in a tick after the
+        // blade has passed through its contact window: playing out every
+        // recovery made the combo stop and start (in source ticks, before the
+        // pilot's attack-speed scaling: b 31 to the next stroke, now 17; c 34,
+        // now 19; heavy 39, now 17). a, whose contact comes at 90%, plays out.
+        String clip=state.getString("clip");
+        boolean cut=runtime.queued>=0&&fresh&&!clip.equals("sword_a")
+                &&runtime.elapsed>=EvaGameplayMotionR32.contactEndR57(e,clip)*state.getInt("duration")+CUT_AFTER_CONTACT;
+        if(runtime.elapsed>=state.getInt("duration")||cut)
         {
-            int queued=runtime.queued,nextStage=runtime.nextStage;boolean fresh=now-runtime.inputAt<=e.swordInputBufferTicksR45();
+            int queued=runtime.queued,nextStage=runtime.nextStage;
             EvaGameplayMotionR32.releaseToMovement(e);e.finishCapturedActionEndpointR45();clear(e);
             if(queued>=0&&fresh){runtime.nextStage=nextStage;request(e,pilot,queued==1);}
         }
