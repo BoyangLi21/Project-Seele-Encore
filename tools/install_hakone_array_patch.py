@@ -256,6 +256,8 @@ def install(a):
         require_water(candidate)
         from verify_hakone_natural_beach import require_verified as require_beach
         require_beach(candidate)
+        from verify_hakone_sea_connected_mouths import require_verified as require_mouths
+        require_mouths(candidate)
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
         if 'port_verification'in manifest:
