@@ -258,6 +258,8 @@ def install(a):
         require_beach(candidate)
         from refine_hakone_coastal_materials import require_verified as require_coastal_materials
         require_coastal_materials(candidate)
+        from verify_regional_station import require_verified as require_station
+        require_station(candidate)
         from verify_hakone_sea_connected_mouths import require_verified as require_mouths
         require_mouths(candidate)
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))

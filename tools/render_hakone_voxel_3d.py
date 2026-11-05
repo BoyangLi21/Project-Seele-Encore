@@ -9,6 +9,9 @@ from query_blocks import AIR
 
 def render(e,bounds,out,title):
     x,y,z,X,Y,Z=bounds;shape=(Y-y+1,Z-z+1,X-x+1)
+    if hasattr(e,'box'):
+        blocks,palette=e.box(bounds)
+        return render_arrays(bounds,out,title,blocks,palette,blocks!=0)
     palette=['minecraft:air'];lookup={palette[0]:0};blocks=np.zeros(shape,np.uint16);known=np.zeros(shape,bool)
     for rx in range(x//512,X//512+1):
         for rz in range(z//512,Z//512+1):
@@ -24,6 +27,10 @@ def render(e,bounds,out,title):
                 ar=np.s_[:,t-z:B-z+1,l-x:R-x+1]
                 blocks[ar]=np.asarray(codes,np.uint16)[v[y+128:Y+129,t-cz*16:B-cz*16+1,l-cx*16:R-cx*16+1]]
                 known[ar]=True
+    return render_arrays(bounds,out,title,blocks,palette,known)
+
+def render_arrays(bounds,out,title,blocks,palette,known):
+    x,y,z,X,Y,Z=bounds
     visible=np.array([s.split('[')[0]not in AIR|{'minecraft:light','minecraft:barrier','minecraft:structure_void'}for s in palette])
     solid=visible[blocks]&known;colours=np.asarray([color(s)for s in palette])*255
     half=np.array([.5 if 'slab'in s and 'type=bottom'in s else 1.0 for s in palette])
