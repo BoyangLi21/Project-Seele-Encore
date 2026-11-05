@@ -219,10 +219,10 @@ public final class FirstBattleDirector
                 if(record.age==FirstBattleClip.eventTick(160)){Vec3 p=FirstBattleClip.point(record.spec,false,"hand_r_blocks",seconds);sound(level,p,ModSounds.EVA_ARMOR_IMPACT.get(),1.5F);chips(level,p,true);}
                 if(record.age==FirstBattleClip.eventTick(184)){Vec3 p=FirstBattleClip.point(record.spec,true,"foot_l_blocks",seconds);sound(level,p,ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,false);}
                 if(record.age==FirstBattleClip.landingTick())sound(level,eva.position(),ModSounds.EVA_LAND.get(),2.1F);
-                if(record.age==FirstBattleClip.eventTick(307)){Vec3 p=FirstBattleClip.point(record.spec,true,"hand_r_blocks",seconds);sound(level,p,ModSounds.EVA_ARMOR_IMPACT.get(),1.4F);chips(level,p,true);}
+                if(record.age==FirstBattleClip.eventTick(307)||record.age==FirstBattleClip.eventTick(267)||record.age==FirstBattleClip.eventTick(295)){Vec3 p=FirstBattleClip.poundCore(record.spec,seconds);sound(level,p,record.age==FirstBattleClip.eventTick(307)?ModSounds.EVA_ARMOR_IMPACT.get():ModSounds.EVA_IMPACT.get(),1.6F);chips(level,p,true);}
                 if(record.age==FirstBattleClip.eventTick(255)||record.age==FirstBattleClip.eventTick(283)||record.age==FirstBattleClip.eventTick(321))
                 {
-                    Vec3 p=FirstBattleClip.point(record.spec,true,"hand_r_blocks",seconds);sound(level,p,record.age==FirstBattleClip.eventTick(321)?ModSounds.EVA_CORE_BREAK.get():ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,record.age==FirstBattleClip.eventTick(321));
+                    Vec3 p=FirstBattleClip.poundCore(record.spec,seconds);sound(level,p,record.age==FirstBattleClip.eventTick(321)?ModSounds.EVA_CORE_BREAK.get():ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,record.age==FirstBattleClip.eventTick(321));
                     if(angel!=null)angel.setHealth(Math.max(1,record.originalHealth*(record.age==FirstBattleClip.eventTick(255)?.6F:record.age==FirstBattleClip.eventTick(283)?.25F:.05F)));
                 }
                 if(record.age==FirstBattleClip.eventTick(354))sound(level,FirstBattleClip.point(record.spec,false,"core_blocks",seconds),ModSounds.EVA_AT_PRESSURE.get(),1.6F);
