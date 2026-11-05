@@ -1,0 +1,18 @@
+{
+  "id": "odawara-wadagahara",
+  "name": "Wadagahara northwestern neighbourhood",
+  "label": "和田河原西北街区",
+  "core": [2448, -1280, 2592, -1152],
+  "terminals": [
+    ["station-north-interface", "和田河原站北侧街道接口", [2504, -1200]],
+    ["northwest-interface", "西北住宅街口", [2490, -1240]],
+    ["east-interface", "东侧生活服务街口", [2552, -1202]]
+  ],
+  "maximum_buildings": 40,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}
