@@ -18,9 +18,16 @@ def verify(C):
   rx,rz=map(int,path.stem.split('.')[1:]);r=e.region(rx*512,rz*512);names=np.asarray(r['names']);base=np.asarray([s.split('[')[0]for s in names])
   natural=np.asarray([s in NATURAL for s in base]);soil=np.asarray([s in SOIL for s in base]);iswater=base=='minecraft:water'
   allowed=np.isin(base,['minecraft:air','minecraft:stone','minecraft:gravel','minecraft:water'])
+  trees=np.asarray([s in NATURAL and s.endswith(('_log','_leaves')) for s in base])
   for(cx,cz),before,after in zip(r['coords'],r['before'],r['after']):
    q=np.s_[cz*16-z:cz*16-z+16,cx*16-x:cx*16-x+16];changed=before!=after;cells+=int(changed.sum());chunks+=1
+   baseline_ground=np.where(soil[before],yy,-129).max(0)
+   baseline_water=np.where(iswater[before]&(yy>baseline_ground),yy,-32768).max(0)
+   if np.any(baseline_ground!=d['old_ground'][q])or np.any(baseline_water!=d['original_water'][q]):
+    errors.append(['source-baseline-differs',int(cx),int(cz)])
    bottom=np.minimum(d['old_ground'][q],d['ground'][q])-2
+   if np.any(changed&trees[before]&(yy>d['ground'][q])):
+    errors.append(['retained-tree-changed',int(cx),int(cz)])
    if np.any(changed&(~d['active'][q]|~natural[before]|(yy<bottom))):errors.append(['unauthorized-cell',int(cx),int(cz)])
    if np.any(changed&~allowed[after]):errors.append(['unexpected-material',int(cx),int(cz)])
    g=np.where(soil[after],yy,-129).max(0);water=np.where(iswater[after]&(yy>g),yy,-32768).max(0);actual_ground[q]=g;actual_water[q]=water

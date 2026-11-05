@@ -60,7 +60,29 @@ def prepare(a):
   collar=(distance_to_shore<=20)&~wet&(water==-32768)
   crest=sea+1-np.floor(distance_to_shore/2).astype(np.int16)
   target[collar]=np.maximum(target[collar],crest[collar]);bank|=collar
- bank&=target!=g
+ # Cutting a sea-level channel can leave an abrupt new bank even when the
+ # pre-existing ground was smooth. Lower only nearby dry natural banks;
+ # preserve the original visible height difference if it was already steeper.
+ # Exact structure, public-surface and ownership checks below still apply.
+ bank_domain=bank.copy();original_surface=np.maximum(g,water)
+ expected_water=water.copy();expected_water[wet]=sea;bank_refinements=0
+ for iteration in range(64):
+  changes=0
+  for axis in (0,1):
+   l=[slice(None),slice(None)];r=l.copy();l[axis]=slice(None,-1);r[axis]=slice(1,None);l,r=tuple(l),tuple(r)
+   visible=np.maximum(target,expected_water)
+   allowance=np.maximum(2,np.abs(original_surface[l].astype(int)-original_surface[r]))
+   bad=np.abs(visible[l].astype(int)-visible[r])>allowance
+   for j,i in np.argwhere(bad):
+    P=(int(j),int(i));Q=(int(j+(axis==0)),int(i+(axis==1)))
+    high,low=(P,Q)if visible[P]>visible[Q]else(Q,P)
+    limit=int(visible[low])+int(allowance[j,i])
+    if bank_domain[high] and water[high]==-32768 and limit>=sea and target[high]>limit:
+     target[high]=limit;changes+=1
+  bank_refinements+=changes
+  if not changes:break
+ else:raise ValueError('Lower-river bank grading did not converge')
+ bank=bank_domain&(target!=g)
  active=wet|bank
  with np.load(a.authority/'network.npz')as f:
   ox,oz,oX,oZ=map(int,f['bounds'])
@@ -94,12 +116,17 @@ def prepare(a):
    if name not in r['ids']:r['ids'][name]=len(r['names']);r['names'].append(name)
   air,stone,gravel,waterid=(r['ids'][name]for name in materials);base=[s.split('[')[0]for s in r['names']]
   natural=np.asarray([s in NATURAL for s in base]);empty=np.asarray([s in AIR for s in base])
+  trees=np.asarray([s in NATURAL and s.endswith(('_log','_leaves')) for s in base])
   for(cx,cz),v in zip(r['coords'],r['after']):
    q=np.s_[cz*16-z:cz*16-z+16,cx*16-x:cx*16-x+16]
    if not active[q].any():continue
    highest=np.where(~empty[v],YY,-129).max(0);bottom=np.minimum(g[q],target[q])-2
    band=active[q]&(YY>=bottom)&(YY<=np.maximum(np.maximum(highest,target[q]),sea))
    desired=np.where(YY<=target[q],np.where(YY>=target[q]-1,gravel,stone),np.where(wet[q]&(YY<=sea),waterid,air))
+   vegetation=trees[v]
+   if np.any(active[q]&(target[q]<g[q])&vegetation.any(0)):
+    raise ValueError('Lowering beneath a retained tree needs a complete-tree design')
+   desired=np.where(vegetation&(YY>target[q]),v,desired)
    delta=band&(v!=desired)
    if np.any(delta&(~natural[v]|guard.chunk_mask(int(cx),int(cz)))):raise ValueError('Mouth reaches retained structure or launch volume')
    v[delta]=desired[delta]
@@ -107,7 +134,8 @@ def prepare(a):
  records=e.save();np.savez_compressed(a.out/'mouth-design.npz',bounds=cap['bounds_xz'],wet=wet,bank=bank,active=active,old_ground=g,ground=target,original_water=water,sea=sea,public=public,sea_reference=sea_reference)
  save(a.out/'manifest.json',dict(world=str(world),bounds_xz=cap['bounds_xz'],regions=records,cells=sum(r['cells']for r in records),preserve_native_members=True,
   sea_connected_mouths=dict(source=str(a.source),authority=str(a.authority),programme=str(a.programme),profiles=selected,water_columns=int(wet.sum()),bank_columns=int(bank.sum()),sea=sea,full_chunks=cap['chunk_statuses']['full'],
-  measured_marine_connections=contacts,upper_rivers_complete=False,regional_height_field_unchanged=True,exact_future_recipes_required=True),world_written=False))
+  measured_marine_connections=contacts,bank_slope_refinements=bank_refinements,retained_tree_vegetation=True,
+  upper_rivers_complete=False,regional_height_field_unchanged=True,exact_future_recipes_required=True),world_written=False))
  save(a.out/'functional-check.json',dict(errors=['Independent lower-river verification pending'],visual_verified=False,world_written=False))
  save(a.out/'launch-protection.json',check_candidate(guard,a.out))
  print('Prepared lower river pools:',int(wet.sum()),'water columns;',sum(r['cells']for r in records),'changes; upper rivers remain incomplete.',flush=True)
