@@ -2,6 +2,7 @@
 
 Ports, river mouths, public surfaces, buildings, actors and non-natural blocks
 remain protected. Existing sea levels and high coastal cliffs are retained.
+An explicit option can fill surveyed, sea-connected dry voids below sea level.
 """
 import argparse,json,os,shutil
 from pathlib import Path
@@ -62,6 +63,22 @@ def prepare(a):
             foreign[q]=((~natural[v])&(YY>=np.minimum(g[q],proposal[q])-3)).any(0)
         print('Measured coast ownership',path.name,flush=True)
     blocked|=foreign
+    original_water=water.copy();marine_voids=np.zeros(g.shape,bool)
+    if a.fill_marine_voids:
+        # These are measured dry holes inside the reference sea, not new
+        # inland lakes. Require a route to existing marine water and keep all
+        # construction, actor, river and capture-boundary exclusions intact.
+        existing_marine=(water==SEA)&(g<SEA)
+        # A dry marine hole can sit beside a high coastal cliff. Its measured
+        # submerged bed, not the height of the nearest inland cliff, decides
+        # whether seawater belongs here.
+        potential=sea&(inland<=40)&(water==-32768)&(g<SEA)&(g>=SEA-12)&~blocked
+        connected,_=label(existing_marine|potential)
+        ocean_ids=np.unique(connected[existing_marine&sea])
+        ocean_ids=ocean_ids[ocean_ids>0]
+        marine_voids=potential&np.isin(connected,ocean_ids)
+        water[marine_voids]=SEA
+        wet_zone|=marine_voids
     wet_zone&=(water==SEA)&(g<SEA);dry_zone&=water==-32768
     marine_labels,_=label((water==SEA)&(g<SEA))
     marine_ids=np.unique(marine_labels[sea&(marine_labels>0)])
@@ -69,9 +86,12 @@ def prepare(a):
     # Coarse reference shorelines can leave a tiny measured dry land sliver
     # inside the sea polygon. Keep it dry and support its bank; do not turn it
     # into an unverified new water body or leave its soil below adjacent sea.
-    sliver_labels,_=label(sea&(water==-32768)&(g<SEA)&(g>=SEA-4));sizes=np.bincount(sliver_labels.ravel())
+    sliver_labels,_=label(sea&(water==-32768)&(g<SEA)&(g>=SEA-12));sizes=np.bincount(sliver_labels.ravel())
     dry_land_labels=np.unique(sliver_labels[binary_dilation(~sea&(water==-32768))&(sliver_labels>0)])
-    marine_neighbour_labels=np.unique(sliver_labels[binary_dilation(marine)&(sliver_labels>0)])
+    # Tiny dry reference-sea fragments can also sit one cell inland from the
+    # saved water edge. Keep these attached land fragments in the dry backshore
+    # slope; do not create a disconnected puddle or leave a deep ungraded hole.
+    marine_neighbour_labels=np.unique(sliver_labels[(distance_transform_edt(~marine)<=40)&(sliver_labels>0)])
     sliver_ids=[int(k)for k in np.intersect1d(dry_land_labels,marine_neighbour_labels)if sizes[k]<=4]
     slivers=np.isin(sliver_labels,sliver_ids)&(sliver_labels>0)
     measured_dry=(~sea|slivers)&(water==-32768)&(g>=SEA-12)&(g<=SEA+4)
@@ -132,7 +152,7 @@ def prepare(a):
         for(cx,cz),v in zip(r['coords'],r['after']):
             q=np.s_[cz*16-z:cz*16-z+16,cx*16-x:cx*16-x+16];use=active[q]
             if not use.any():continue
-            high=np.where(~empty[v],YY,-129).max(0);bottom=np.minimum(g[q],target[q])-3;band=use&(YY>=bottom)&(YY<=np.maximum(high,target[q]))
+            high=np.where(~empty[v],YY,-129).max(0);bottom=np.minimum(g[q],target[q])-3;band=use&(YY>=bottom)&(YY<=np.maximum(np.maximum(high,target[q]),water[q]))
             desired=np.where(YY>target[q],np.where(YY<=water[q],wet,air),np.where(YY>=target[q]-2,np.where(sand[q],sandy,gravel),stone))
             # A canopy can extend outside the finite beach mask. Keep the
             # connected tree above raised soil, including its supporting trunk,
@@ -145,11 +165,11 @@ def prepare(a):
             if np.any(delta&(~natural[v]|guard.chunk_mask(int(cx),int(cz)))):raise ValueError('Beach grading reaches retained construction or launch volume')
             v[delta]=desired[delta]
         e.save();e.regions.clear();print('Prepared coast',path.name,flush=True)
-    records=e.save();np.savez_compressed(a.out/'beach-design.npz',bounds=cap['bounds_xz'],active=active,wet=wet_zone&active,dry=dry_zone&active,ground=target,old_ground=g,water=water,blocked=blocked,public=public)
+    records=e.save();np.savez_compressed(a.out/'beach-design.npz',bounds=cap['bounds_xz'],active=active,wet=wet_zone&active,dry=dry_zone&active,ground=target,old_ground=g,water=water,original_water=original_water,marine_voids=marine_voids,sea_reference=sea,blocked=blocked,public=public)
     save(a.out/'manifest.json',dict(world=str(world),bounds_xz=cap['bounds_xz'],regions=records,cells=sum(r['cells']for r in records),preserve_native_members=True,
         natural_beach=dict(source=str(a.source),authority=str(a.authority),programme=str(a.programme),full_chunks=cap['chunk_statuses']['full'],
         active_columns=int(active.sum()),wet_columns=int((active&wet_zone).sum()),dry_columns=int((active&dry_zone).sum()),slope_refinements=refinements,
-        measured_dry_sea_slivers=int((slivers&active).sum()),measured_shore_bank_columns=int(actual_bank.sum()),retained_tree_vegetation=True,
+        measured_dry_sea_slivers=int((slivers&active).sum()),measured_shore_bank_columns=int(actual_bank.sum()),retained_tree_vegetation=True,marine_void_columns=int(marine_voids.sum()),
         original_sea_level_retained=SEA,river_mouth_buffer_blocks=a.river_buffer,source_edge_guard_blocks=a.edge_guard,regional_field_unchanged=True,exact_future_recipes_required=True),world_written=False))
     save(a.out/'functional-check.json',dict(errors=['Independent beach verification pending'],visual_verified=False,world_written=False))
     save(a.out/'launch-protection.json',check_candidate(guard,a.out))
@@ -160,4 +180,5 @@ if __name__=='__main__':
     for n in('source','programme','authority','out'):p.add_argument('--'+n,type=Path,required=True)
     p.add_argument('--river-buffer',type=int,default=24,help='Retained future river/bank collar; narrow only with current mouth and exact ownership checks')
     p.add_argument('--edge-guard',type=int,default=16,help='Keep this measured outer collar exact; never remove the final measured edge')
+    p.add_argument('--fill-marine-voids',action='store_true',help='Fill natural dry holes below existing sea level only inside surveyed sea and connected to existing marine water')
     prepare(p.parse_args())
