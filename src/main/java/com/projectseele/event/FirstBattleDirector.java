@@ -219,6 +219,7 @@ public final class FirstBattleDirector
                 if(record.age==FirstBattleClip.eventTick(160)){Vec3 p=FirstBattleClip.point(record.spec,false,"hand_r_blocks",seconds);sound(level,p,ModSounds.EVA_ARMOR_IMPACT.get(),1.5F);chips(level,p,true);}
                 if(record.age==FirstBattleClip.eventTick(184)){Vec3 p=FirstBattleClip.point(record.spec,true,"foot_l_blocks",seconds);sound(level,p,ModSounds.EVA_IMPACT.get(),1.8F);chips(level,p,false);}
                 if(record.age==FirstBattleClip.landingTick())sound(level,eva.position(),ModSounds.EVA_LAND.get(),2.1F);
+                if(record.age==FirstBattleClip.eventTick(208)&&FirstBattleClip.hasCurve(false,"waist_blocks")){Vec3 p=FirstBattleClip.point(record.spec,false,"waist_blocks",seconds);sound(level,p,ModSounds.EVA_IMPACT.get(),2.0F);chips(level,p,false);}
                 if(record.age==FirstBattleClip.eventTick(307)||record.age==FirstBattleClip.eventTick(267)||record.age==FirstBattleClip.eventTick(295)){Vec3 p=FirstBattleClip.poundCore(record.spec,seconds);sound(level,p,record.age==FirstBattleClip.eventTick(307)?ModSounds.EVA_ARMOR_IMPACT.get():ModSounds.EVA_IMPACT.get(),1.6F);chips(level,p,true);}
                 if(record.age==FirstBattleClip.eventTick(255)||record.age==FirstBattleClip.eventTick(283)||record.age==FirstBattleClip.eventTick(321))
                 {

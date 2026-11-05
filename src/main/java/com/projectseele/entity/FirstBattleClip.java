@@ -23,7 +23,8 @@ public final class FirstBattleClip
     public record BonePose(String[] names,Quaternionf[] rotations,Vector3f[] positions) {}
     public record CameraPose(Vec3 position,Vec3 target,float fov) {}
     private record Role(String[] bones,Quaternionf[][] rotations,Vector3f[][] positions,Map<String,Vec3[]> curves) {}
-    private record Data(float fps,Map<String,Role> roles,Vec3[] cameras,Vec3[] targets,float[] fov,Set<Integer> cuts,String surfaceHash,int landingTick,Map<Integer,Integer> eventTicks,float[] referenceSeconds) {}
+    private record HandTrack(float[] times,String[] presets) {}
+    private record Data(float fps,Map<String,Role> roles,Vec3[] cameras,Vec3[] targets,float[] fov,Set<Integer> cuts,String surfaceHash,int landingTick,Map<Integer,Integer> eventTicks,float[] referenceSeconds,Map<String,HandTrack> hands) {}
     private static String loadedFingerprint="";
     private static final Data DATA=load();
     private static final Map<Integer,Boolean> HAND_OWNERS_R52=new HashMap<>();
@@ -40,21 +41,9 @@ public final class FirstBattleClip
             try{return readLocal(CombatMotionResourcesR44.instancePath(review),"isolated candidate review");}
             catch(Exception e){throw new IllegalStateException("Requested battle candidate could not load",e);}
         }
-        String bundle=System.getProperty("projectseele.combatBundleDirectory","");
-        if(!bundle.isEmpty())
-        {
-            try{return readLocal(CombatMotionResourcesR44.instancePath(bundle).resolve("first_battle_r44.json"),"R44 matched combat bundle");}
-            catch(Exception e){throw new IllegalStateException("Requested battle bundle could not load",e);}
-        }
-        for(String revision:List.of("r44","r43","r42","r24","r18","r15","r14","r12"))
-        {
-            Path local=CombatMotionResourcesR44.instancePath("projectseele-local-maps/first_battle_"+revision+".json");
-            if(!Files.isRegularFile(local))continue;
-            try{return readLocal(local,revision+" private capture adaptation");}
-            catch(Exception e){ProjectSeele.LOGGER.warn("Private first-battle clip rejected; using bundled sequence",e);}
-        }
-        try(var stream=FirstBattleClip.class.getResourceAsStream("/assets/projectseele/motion/first_battle_r10.json"))
-        {return read(stream,"R10 bundled");}
+        // The bundled clip is original hand-keyed work (tools/finale); the old private capture adaptations are retired.
+        try(var stream=FirstBattleClip.class.getResourceAsStream("/assets/projectseele/motion/first_battle_r59.json"))
+        {return read(stream,"R59 bundled");}
         catch(Exception e){ProjectSeele.LOGGER.error("First-battle clip rejected",e);return null;}
     }
     private static Data readLocal(Path path,String source)throws Exception
@@ -128,7 +117,14 @@ public final class FirstBattleClip
             Map<Integer,Integer> cues=new HashMap<>();
             if(root.has("event_tick_remap_r42"))root.getAsJsonObject("event_tick_remap_r42").entrySet().forEach(e->cues.put(Integer.parseInt(e.getKey()),e.getValue().getAsInt()));
             float[] reference=new float[count];for(int i=0;i<count;i++)reference[i]=root.has("reference_seconds_r42")?root.getAsJsonArray("reference_seconds_r42").get(i).getAsFloat():i/fps;
-            return new Data(fps,Map.copyOf(roles),positions,targets,fov,Set.copyOf(cuts),surfaceHash,landing,Map.copyOf(cues),reference);
+            Map<String,HandTrack> hands=new HashMap<>();
+            if(root.has("hand_presets_r59"))for(var entry:root.getAsJsonObject("hand_presets_r59").entrySet())
+            {
+                var rows=entry.getValue().getAsJsonArray();float[] times=new float[rows.size()];String[] presets=new String[rows.size()];
+                for(int i=0;i<rows.size();i++){var row=rows.get(i).getAsJsonArray();times[i]=row.get(0).getAsFloat();presets[i]=row.get(1).getAsString();}
+                hands.put(entry.getKey(),new HandTrack(times,presets));
+            }
+            return new Data(fps,Map.copyOf(roles),positions,targets,fov,Set.copyOf(cuts),surfaceHash,landing,Map.copyOf(cues),reference,Map.copyOf(hands));
     }
     private static void validateCurve(Vec3[] curve,int count)
     {
@@ -227,9 +223,18 @@ public final class FirstBattleClip
         return p;
     }
     public static Vec3 point(FirstBattleSignals.Spec spec,boolean eva,String curve,float seconds){return world(spec,localPoint(spec,eva,curve,seconds));}
-    /** Where Unit-01's fists land in the ground and pound: the pinned Sachiel's core, in front of the kneeling unit. */
+    /** Where Unit-01's fists land in the ground and pound: the pinned Sachiel's core as the clip moves it. */
     public static Vec3 poundCore(FirstBattleSignals.Spec spec,float seconds)
-    {float pin=12.5F;Vec3 front=Vec3.directionFromRotation(0,yaw(spec,true,pin)).multiply(1,0,1).normalize();return point(spec,true,"root_blocks",pin).add(front.scale(15)).add(0,8,0);}
+    {
+        if(hasCurve(false,"core_blocks"))return point(spec,false,"core_blocks",seconds);
+        float pin=12.5F;Vec3 front=Vec3.directionFromRotation(0,yaw(spec,true,pin)).multiply(1,0,1).normalize();return point(spec,true,"root_blocks",pin).add(front.scale(15)).add(0,8,0);
+    }
+    /** Finger preset the clip asks for on one hand ("l"/"r"), from its hand_presets_r59 timeline. */
+    public static String handPreset(String side,float seconds)
+    {
+        HandTrack track=DATA==null?null:DATA.hands.get(side);if(track==null||track.times.length==0)return "relaxed";
+        String preset=track.presets[0];for(int i=0;i<track.times.length&&track.times[i]<=seconds;i++)preset=track.presets[i];return preset;
+    }
     public static float yaw(FirstBattleSignals.Spec spec,boolean eva,float seconds)
     {
         return Mth.rotLerp(smooth(seconds/1.2F),eva?spec.evaYaw():spec.angelYaw(),spec.yaw()+(eva?0:180));

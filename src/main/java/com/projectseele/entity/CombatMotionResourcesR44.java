@@ -82,7 +82,7 @@ public final class CombatMotionResourcesR44
             Path angel=resolve("projectseele.gameplayReviewDirectory","sachiel_gameplay_r44.json","sachiel_gameplay_r32.json");
             values.put("sachiel-profile",Files.isRegularFile(angel)?digest(read(angel,"login-sachiel")):"ABSENT");
             FirstBattleClip.ready();String finisher=FirstBattleClip.fingerprint();
-            values.put("first-battle",finisher.isEmpty()?bundled("motion/first_battle_r10.json"):finisher);
+            values.put("first-battle",finisher.isEmpty()?bundled("motion/first_battle_r59.json"):finisher);
             values.put("physical-body-profiles",com.projectseele.physics.CombatBodyProfiles.fingerprint());
             var hands=new StringBuilder();
             for(int key=0;key<3;key++)hands.append(key).append(':').append(EvaAnatomicalHandsR45.contractFingerprintR45(key)).append(';');

@@ -441,11 +441,7 @@ public final class EvaAnatomicalHandsR45
         if(!forced.isBlank())return forced;
         if(e.isFirstBattleActive())
         {
-            float time=e.firstBattleSignals().time(e,0);
-            if(time>=FirstBattleClip.DEATH_TICK/20F)return "relaxed";
-            if(time>=16.3F)return "grab";
-            if(time>=11.05F)return side.equals("r")?"fist":"support";
-            return time>=5.1F?"grab":"spread";
+            return FirstBattleClip.handPreset(side,e.firstBattleSignals().time(e,0));
         }
         if(EvaWeaponHandlingR45.active(e))return side.equals("r")?"knife":"relaxed";
         if(side.equals("r")&&e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&EvaWeaponHandlingR45.available(e))return "knife";
