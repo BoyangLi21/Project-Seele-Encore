@@ -50,7 +50,7 @@ def require_verified(candidate):
     spec_path=candidate/'plan/authored-design.json'
     if not spec_path.exists():return
     spec=json.loads(spec_path.read_text('utf8'))
-    if spec.get('name')!='Odawara first downtown district':return
+    if spec.get('name')!='Odawara first downtown district'and not spec.get('odawara_new_district',False):return
     report=json.loads((candidate/'odawara-release-check.json').read_text('utf8'))
     if Path(report['candidate']).resolve()!=candidate.resolve():raise ValueError('Odawara proof belongs to a different candidate')
     if not report['all_public_columns_reachable']or report['room_and_landing_goals']!=report['reachable_room_and_landing_goals']:raise ValueError('Incomplete Odawara access proof')

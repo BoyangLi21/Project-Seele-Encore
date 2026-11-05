@@ -93,7 +93,7 @@ def prepare(a):
     streets=[];public_paths=[];adaptations=[]
     for chain in chains:
         # Preserve junctions, simplify only the internal geographic samples.
-        line=LineString(chain).simplify(.4,preserve_topology=True)
+        line=LineString(chain).simplify(layout.get('district_config',{}).get('horizontal_simplification',.4),preserve_topology=True)
         coords=list(line.coords);points=[[p[0],heights[tuple(p)],p[1]]for p in coords]
         if any(math.dist(p,(3421.2,625.2))<.2 for p in coords):
             before=[p.copy()for p in points]
@@ -111,7 +111,9 @@ def prepare(a):
                 if math.dist((p[0],p[2]),(3409.4,485.0))<.2:p[0]+=8
                 if math.dist((p[0],p[2]),(3423.0,452.8))<.2:p[0]+=10;p[2]+=4
             adaptations.append(dict(reason='keep the full paved width east of the mapped Daiyuzan railway corridor',source_points=before,points=points))
-        spec=dict(id=f'odawara-downtown-street-{len(streets)+1:02}',points=points,width=7,sidewalk=2,centre_line=False,
+        prefix=layout.get('district_config',{}).get('id','odawara-downtown')
+        district_cfg=layout.get('district_config',{})
+        spec=dict(id=f'{prefix}-street-{len(streets)+1:02}',points=points,width=district_cfg.get('carriageway_width',7),sidewalk=district_cfg.get('sidewalk_width',2),centre_line=False,
                   maximum_grade=.09,arc_length_grade=True,linear_grade=True)
         curve,along=alignment(spec)
         if len(points)<2 or along[-1]<.1:raise ValueError('Collapsed street chain')
@@ -137,7 +139,8 @@ def prepare(a):
         approach=c.point(0,1,hz+4);door=c.point(0,1,hz)
         if LineString([[approach[0],approach[2]],[goal.x,goal.y]]).intersects(shape(lot['lot_geometry']).buffer(-.05)):
             raise ValueError(('Frontage approach enters its own building',lot['id']))
-        row=dict(id=lot['id'],programme=lot['programme'],label='小田原 '+programme_names[lot['programme']],use=programme_names[lot['programme']],
+        district_label=layout.get('district_config',{}).get('label','小田原')
+        row=dict(id=lot['id'],programme=lot['programme'],label=district_label+' '+programme_names[lot['programme']],use=programme_names[lot['programme']],
                  site=site,occupied_bounds=occupied,approach=approach,door=door,roof_style=lot['roof_style'])
         rows.append(row)
         footways.append(dict(parcel=lot['id'],points=[approach,[round(float(goal.x)),float(curve[k,1]),round(float(goal.y))]]))
@@ -152,8 +155,9 @@ def prepare(a):
     np.savez_compressed(a.out/'geographic-water.npz',bounds=bounds,wet=np.asarray(water,bool))
     rail=unary_union([shape(f['geometry'])for f in geographic if f['properties']['source_layer']=='RailCL']).buffer(3)
     np.savez_compressed(a.out/'geographic-rail.npz',bounds=bounds,blocked=contains_xy(rail,xx,zz))
-    spec=dict(name='Odawara first downtown district',togendai_forecourt=False,surface_water_guard=True,
-              geographic_water_mask=str(a.out/'geographic-water.npz'),core=[3344,448,3680,768],earthwork_blend_distance=32,
+    cfg=layout.get('district_config',{})
+    spec=dict(name=cfg.get('name','Odawara first downtown district'),odawara_new_district=True,togendai_forecourt=False,surface_water_guard=True,
+              geographic_water_mask=str(a.out/'geographic-water.npz'),core=cfg.get('core',[3344,448,3680,768]),earthwork_blend_distance=32,
               geographic_rail_mask=str(a.out/'geographic-rail.npz'),
               streets=streets,new_frontages=rows,footways=footways,public_paths=public_paths,retained_ports=[],parcel_floors={},
               geographic_street_adaptations=adaptations,deferred_geographic_lots=deferred,
@@ -162,7 +166,7 @@ def prepare(a):
               old_public_retirement_areas=[],un_relocation_allowed=False,station_structures_deferred_to_stage=2,
               hayakawa_civil_interface_deferred_to_stage=3)
     save(a.out/'authored-design.json',spec)
-    save(a.out/'compilation.json',dict(streets=len(streets),buildings=len(rows),current_full_chunks=784,existing_constructions=0,devices=0,
+    save(a.out/'compilation.json',dict(streets=len(streets),buildings=len(rows),current_full_chunks=capture['chunk_statuses']['full'],existing_constructions=0,devices=0,
                                      max_road_height_adjustment=max(abs(heights[p]-wanted[p])for p in graph),
                                      measured_save_captured=True,game_world_written=False))
     print('Downtown design ready:',len(streets),'street chains;',len(rows),'building lots',flush=True)
