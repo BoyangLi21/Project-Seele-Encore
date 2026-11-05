@@ -1,0 +1,21 @@
+{
+  "id": "odawara-hayakawa-south",
+  "name": "Hayakawa southern hillside neighbourhood",
+  "label": "早川南侧山麓街区",
+  "preserve_existing_district": true,
+  "include_existing_public_in_connectivity": false,
+  "core": [2928, 1264, 3151, 1567],
+  "terminals": [
+    ["north-interface", "北侧铁路西侧街道接口", [3025, 1480]],
+    ["central-services", "南部生活服务街口", [3035, 1505]],
+    ["south-interface", "南部海岸方向街道接口", [3025, 1545]],
+    ["hillside-services", "山麓住宅街口", [3003, 1515]]
+  ],
+  "maximum_buildings": 50,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}
