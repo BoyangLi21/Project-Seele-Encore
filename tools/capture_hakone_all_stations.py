@@ -44,7 +44,14 @@ def sites(programme):
 
 
 def capture(args):
-    programme=json.loads(args.programme.read_text('utf8'));rows=sites(programme)
+    explicit=getattr(args,'sites',None)
+    if explicit:
+        rows=json.loads(explicit.read_text('utf8'))
+        for row in rows:
+            b=row['bounds']
+            if len(b)!=6 or any(not isinstance(v,int)for v in b)or any(b[i]>b[i+3]for i in range(3))or b[1]<-1344 or b[4]>319:raise ValueError('Invalid bounded station capture')
+    else:
+        programme=json.loads(args.programme.read_text('utf8'));rows=sites(programme)
     args.out.mkdir(parents=True,exist_ok=False);(args.out/'sections').mkdir()
     selected=defaultdict(set)
     for row in rows:
@@ -111,7 +118,7 @@ def capture(args):
         row['all_requested_chunks_full']=not row['unavailable_chunks']
     nbtlib.File({'Devices':nbtlib.List[nbtlib.Compound](devices)}).save(args.out/'devices.dat',gzipped=True)
     nbtlib.File({'Actors':nbtlib.List[nbtlib.Compound](actors)}).save(args.out/'actors.dat',gzipped=True)
-    report=dict(world=str(args.world),programme=str(args.programme),native_reference=str(args.native),
+    report=dict(world=str(args.world),programme=str(explicit or args.programme),native_reference=str(args.native),
         sites=rows,regions=regions,chunk_statuses=dict(Counter(statuses.values())),
         captured_sections=sum(r['sections']for r in regions),devices=len(devices),actors=len(actors),
         diagnostics=diagnostics,world_written=False,station_access_verified=False,
@@ -123,5 +130,6 @@ def capture(args):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
-    for name in('world','native','programme','out'):p.add_argument('--'+name,type=Path,required=True)
+    for name in('world','native','out'):p.add_argument('--'+name,type=Path,required=True)
+    scope=p.add_mutually_exclusive_group(required=True);scope.add_argument('--programme',type=Path);scope.add_argument('--sites',type=Path,help='Explicit measured [x,y,z,X,Y,Z] boxes; no automatic expansion.')
     capture(p.parse_args())

@@ -66,15 +66,38 @@ def verify(candidate,authority,write=True):
             while q is not None:path.append([q[0]+.5,q[1]/2,q[2]+.5]);q=parents[q]
             path.reverse()
         routes.append(dict(name=name,reachable=bool(path),path=path))
-    # Reserved native train body: three blocks wide, five blocks above rail.
+    plan=json.loads((candidate/'native-station-plan.json').read_text('utf8'))
+    rail=plan['rails'][0]
+    if len(plan['rails'])!=1 or len(plan['stations'])!=1 or plan['lines']:errors.append(['compact-station-native-scope'])
+    pa,pb=rail['from'],rail['to']
+    if pa[1]!=pb[1]or sum(pa[i]!=pb[i]for i in(0,2))!=1 or sum(abs(pa[i]-pb[i])for i in(0,2))!=48:errors.append(['compact-station-track-geometry'])
+    # Independently derive the reserved train body from its native endpoints.
+    authoring=candidate/'authoring-plan.json'
+    rot=json.loads(authoring.read_text('utf8'))['rotation']if authoring.exists()else 0
+    if pa[2]==pb[2]:clearance=[min(pa[0],pb[0]),pa[1],pa[2]-(2 if rot%4==2 else 1),max(pa[0],pb[0]),pa[1]+4,pa[2]+(1 if rot%4==2 else 2)]
+    else:
+        # Rotation one puts the side platform east, rotation three west.
+        clearance=[pa[0]-(2 if rot%4==1 else 1),pa[1],min(pa[2],pb[2]),pa[0]+(1 if rot%4==1 else 2),pa[1]+4,max(pa[2],pb[2])]
+    if authoring.exists():
+        cached=Path('F:/eva/artifacts/hakone_geography_20261029/stations.json')
+        refs=[r for r in json.loads(cached.read_text('utf8'))if r['name']==d['station']]
+        if len(refs)!=1:errors.append(['unique-cached-station-reference'])
+        else:
+            ref=refs[0];centre=[(pa[i]+pb[i])/2 for i in(0,2)];track=ref['station_track']
+            ref_axis=math.degrees(math.atan2(track[-1][1]-track[0][1],track[-1][0]-track[0][0]))%180
+            native_axis=math.degrees(math.atan2(pb[2]-pa[2],pb[0]-pa[0]))%180
+            axis_error=abs((native_axis-ref_axis+90)%180-90)
+            if math.dist(centre,ref['track_centre_xz'])>2 or axis_error>15 or abs(pa[1]-ref['terrain_world_y'])>4:errors.append(['station-geographic-adaptation-out-of-bounds'])
+    if 'rail_clearance_bounds'in d and clearance!=d['rail_clearance_bounds']:errors.append(['declared-track-envelope-mismatch'])
     rail_obstacles=[]
-    for x in range(2502,2551):
-        for z in range(-1160,-1156):
-            for y in range(-72,-67):
+    for x in range(clearance[0],clearance[3]+1):
+        for z in range(clearance[2],clearance[5]+1):
+            for y in range(clearance[1],clearance[4]+1):
                 state=e.state(x,y,z)
                 if state.split('[')[0]not in AIR|{'minecraft:light'}:rail_obstacles.append([x,y,z,state])
     if rail_obstacles:errors.append(['station-track-clearance',len(rail_obstacles)])
-    expected_signs={(2526,-68,-1181):'和田河原駅',(2519,-69,-1174):'きっぷ',(2540,-69,-1163):'和田河原'}
+    expected_signs={tuple(r['pos']):r['title']for r in d['expected_signs']}if 'expected_signs'in d else{(2526,-68,-1181):'和田河原駅',(2519,-69,-1174):'きっぷ',(2540,-69,-1163):'和田河原'}
+    if len(expected_signs)!=3 or d['station']not in expected_signs.values():errors.append(['station-sign-design'])
     actual_signs={}
     for row in nbtlib.load(candidate/'block-entities.dat')['Changes']:
         tag=row.get('After');pos=tuple(int(tag[k])for k in('x','y','z'))if tag else None
@@ -91,11 +114,11 @@ def verify(candidate,authority,write=True):
     native=candidate/'native-station/native-station-proof.json';native_ok=False
     if native.exists():
         proof=json.loads(native.read_text('utf8'))
-        native_ok=proof['existing_loaded_objects_exact']and proof['platform_length']==48 and len(proof['members'])==3
+        native_ok=proof['existing_loaded_objects_exact']and abs(proof['platform_length']-48)<1e-7 and len(proof['members'])==3
         if set(proof['members'])!=set(m.get('native_additions',[])):native_ok=False
         decoded={Path(name).parts[3]:Reader((candidate/'after'/name).read_bytes()).read()for name in proof['members']}
-        if decoded['stations']['name']!='和田河原駅'or decoded['platforms']['name']!='1':native_ok=False
-        if decoded['rails']['position1']!={'x':2502,'y':-72,'z':-1159}or decoded['rails']['position2']!={'x':2550,'y':-72,'z':-1159}:native_ok=False
+        if decoded['stations']['name']!=d['station']or decoded['platforms']['name']!='1':native_ok=False
+        if decoded['rails']['position1']!=dict(zip(('x','y','z'),pa))or decoded['rails']['position2']!=dict(zip(('x','y','z'),pb)):native_ok=False
         if any(decoded['platforms'][k]!=decoded['rails'][k]for k in('position1','position2')):native_ok=False
     if not native_ok:errors.append(['native-station-registration-unverified'])
     report=dict(errors=errors,changed_cells=cells,public_columns=len(nodes),reachable_public_columns=len(parents),
@@ -106,7 +129,7 @@ def verify(candidate,authority,write=True):
         through_service_complete=False,world_written=False,game_ui_verified=False)
     if write:
         (candidate/'station-independent-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
-        (candidate/'functional-check.json').write_text(json.dumps(dict(errors=errors,station='和田河原駅',world_written=False),ensure_ascii=False,indent=2),'utf8')
+        (candidate/'functional-check.json').write_text(json.dumps(dict(errors=errors,station=d['station'],world_written=False),ensure_ascii=False,indent=2),'utf8')
     print('Independent station:',cells,'changes;',len(nodes),'public columns;',len(parents),'reachable; errors',errors,flush=True)
     return report
 
