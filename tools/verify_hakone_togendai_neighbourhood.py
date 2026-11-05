@@ -92,8 +92,30 @@ def verify(candidate):
         for dz,dx in ((1,0),(-1,0),(0,1),(0,-1),(0,0)):
             j,i=pz+dz-z,px+dx-x
             if seen[j,i] and abs(int(g[j,i])-2*floor)<=1:reached=True
+        apron=[]
+        if not reached and row['id']in specs.get('preserve_entrance_aprons',[]):
+            # A complete parcel can include fixtures beyond its central
+            # landing. Prove the short actual flat porch walk out of that
+            # payload, rather than accepting a larger geometric proximity.
+            todo=deque([(px,pz)]);parents={(px,pz):None};goal=None
+            while todo and goal is None:
+                Q,R=todo.popleft()
+                if abs(Q-px)+abs(R-pz)>8:continue
+                state=e.state(Q,floor,R)
+                if state.split('[')[0]not in pavement or 'type=bottom'in state or state.split('[')[0].endswith('_stairs'):continue
+                if any(e.state(Q,Y,R).split('[')[0]not in empty for Y in (floor+1,floor+2)):continue
+                for di,dj in ((1,0),(-1,0),(0,1),(0,-1)):
+                    q,r=Q+di,R+dj
+                    if not(x<=q<=X and z<=r<=Z):continue
+                    if seen[r-z,q-x]and abs(int(g[r-z,q-x])-2*floor)<=1:
+                        goal=(Q,R);break
+                    if (q,r)not in parents:parents[q,r]=(Q,R);todo.append((q,r))
+            if goal is not None:
+                reached=True
+                while goal is not None:apron.append([goal[0],py,goal[1]]);goal=parents[goal]
+                apron.reverse()
         if not reached:errors.append(['parcel approach disconnected',row['id'],px,py,pz])
-        goals.append(dict(id=row['id'],approach=row['approach'],connected=reached))
+        goals.append(dict(id=row['id'],approach=row['approach'],connected=reached,measured_flat_apron=apron))
         door=e.state(*row['door'])
         if 'door'not in door:errors.append(['retained entrance changed',row['id'],door])
     originals={tuple(int(t[k])for k in ('x','y','z')):t for t in nbtlib.load(candidate/'captured-devices.dat')['Devices']}

@@ -48,6 +48,8 @@ def publish(a):
         if 'devices'not in row:row['devices']=[dict(source=list(p),target=list(p))for p in revised['devices']]
         for device in row['devices']:
             for k in range(3):device['target'][k]+=shift[k]
+        for fixture in row.get('native_frontage_fixtures',[]):
+            fixture['pos']=[value+shift[k]for k,value in enumerate(fixture['pos'])]
         # Replace stale approach levels with the current installed path frame.
         points=footways[row['id']];path=[]
         for p,q in zip(points,points[1:]):

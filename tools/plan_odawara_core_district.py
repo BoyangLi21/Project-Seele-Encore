@@ -158,7 +158,9 @@ def make_plan(a):
                         dict(id='hayakawa', bounds_xz=[3112, 948, 3159, 1004])]
     castle = Polygon([(3260, 610), (3320, 576), (3406, 596), (3422, 641), (3419, 697), (3370, 713), (3288, 685)])
     port = box(3040, 960, 3360, 1216)
-    excluded = unary_union([public_reserve.buffer(2), rail_geometry.buffer(17), water_geometry.buffer(4), castle, port,
+    coastal_bypass=unary_union([shape(f['geometry'])for f in features if f['properties']['source_layer']=='RdCL'and f['properties'].get('vt_tollsect')=='有料'])
+    sea_reserve=unary_union([shape(f['geometry'])for f in features if f['properties']['source_layer']=='WA'and f['properties']['vt_code']==5100])
+    excluded = unary_union([public_reserve.buffer(2), rail_geometry.buffer(17), water_geometry.buffer(4), coastal_bypass.buffer(9),sea_reserve.buffer(17),castle, port,
                             *[box(*r['bounds_xz']) for r in station_reserves]])
     with np.load(a.gis / 'runtime-surface-field.npz') as f:
         terrain = {k: f[k] for k in ('x', 'z', 'height_y')}

@@ -88,6 +88,11 @@ def compose(a):
     rebuild=d['core']|binary_dilation(d['walk'],iterations=6)
     for box in design_spec.get('retire_road_areas',[]):rebuild[rect(bounds,box)]=True
     rebuild[d['ports']&~d['walk']]=False
+    vacated=np.zeros(shape,bool)
+    if design_spec.get('restore_vacated_parcels',False):
+        for row in rows:
+            if row.get('translation',[0,0,0])==[0,0,0]:continue
+            q=row['payload_bounds'];vacated[rect(bounds,[q[0],q[2],q[3],q[5]])]=True
     retired_scope=rebuild&oldowned
     if design_spec.get('retired_public_mask'):
         with np.load(Path(design_spec['retired_public_mask'])) as finite:
@@ -100,6 +105,14 @@ def compose(a):
     # A cleanup collar is not authorization to retire the adjacent public
     # street. Preserve its actual floor, bearing and clearance in 3D.
     retained_public=oldwalk&~d['walk']&~(mask if design_spec.get('retired_public_mask') else retired_scope)
+    if design_spec.get('preserve_all_existing_public',False):
+        # A district extension may include a complete adjacent installed road
+        # in its connectivity proof without owning any of its physical cells.
+        retained_public=oldwalk.copy()
+        # The old street's cleanup collar also owns its lamp posts. Including
+        # that street for connectivity must not retire those neighbouring
+        # details; only an explicit finite retirement mask may do so.
+        retired_scope=(mask&oldowned&~oldwalk)if design_spec.get('retired_public_mask')else np.zeros(shape,bool)
     np.savez_compressed(a.out/'plan/retained-public.npz',bounds=bounds,walk=retained_public,grade2=oldgrade,road=oldroad)
     retained_floor,_=road_blocks(oldgrade)
     retained=json.loads((a.design/'retained-buildings.json').read_text('utf8'))
@@ -173,7 +186,7 @@ def compose(a):
         for (cx,cz),before,v in zip(r['coords'],r['before'],r['after']):
             cx,cz=int(cx),int(cz);zz,xx=np.mgrid[cz*16:cz*16+16,cx*16:cx*16+16];inside=(xx>=x)&(xx<=X)&(zz>=z)&(zz<=Z)
             iz=np.clip(zz-z,0,shape[0]-1);ix=np.clip(xx-x,0,shape[1]-1)
-            walk=d['walk'][iz,ix]&inside;new=d['ground'][iz,ix];old=d['old_ground'][iz,ix];active=inside&(new!=old)&(old>-129)
+            walk=d['walk'][iz,ix]&inside;new=d['ground'][iz,ix];old=d['old_ground'][iz,ix];active=inside&((new!=old)|vacated[iz,ix])&(old>-129)
             retire=retired_scope[iz,ix]&inside
             explicit=np.zeros((448,16,16),bool)
             for ax,ay,az,bX,bY,bZ in design_spec.get('retire_civil_volumes',[]):
@@ -244,6 +257,11 @@ def compose(a):
     # pass had left several at a different datum from their retained doors.
     outdoor=[]
     for row in rows:
+        if row['id']in design_spec.get('preserve_entrance_aprons',[]):
+            # Recently authored parcels already have functional entrance
+            # landings and canopies. Their complete translated payload is
+            # checked byte-for-block below by the independent verifier.
+            continue
         px,pz,dx,dz=entrance_frame(row);h=row['site']['floor']
         for distance in (1,2,3):
             for side in (-1,0,1):

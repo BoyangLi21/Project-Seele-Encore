@@ -212,6 +212,15 @@ def design(a):
     separate_level=bridge|covered
     innerplots=binary_erosion(plots,iterations=2)
     anchor=(walk&~separate_level)|innerplots|fixed;anchor_y=d['old_ground'].copy();anchor_y[walk]=(grade2[walk]+1)//2-1;anchor_y[innerplots]=plotfloor[innerplots]-3
+    if design.get('water_surface_levels'):
+        with np.load(design['water_surface_levels'])as f:
+            if not np.array_equal(f['bounds'],bounds):raise ValueError('Water datum frame differs from measured terrain')
+            levels=f['levels']
+        if levels.shape!=shape or np.any(wet&(levels<d['old_ground'])):raise ValueError('Water datum lies below the measured bed')
+        # A deep seabed is not the adjacent dry-bank slope datum. Use the
+        # measured water surface only for the land envelope, then restore all
+        # wet soil targets below so neither water nor bathymetry is rewritten.
+        anchor_y[wet]=levels[wet]
     target,conflict=grade_ground(surveyed,anchor,anchor_y,slope=1)
     np.savez_compressed(a.out/'debug-grades.npz',bounds=bounds,road=road,walk=walk,grade2=grade2,plots=plots,plotfloor=plotfloor,fixed=fixed,anchor_y=anchor_y,wet=wet,conflict=conflict,target=target,old_ground=d['old_ground'])
     if np.any(conflict & ((walk&~separate_level)|innerplots)):
