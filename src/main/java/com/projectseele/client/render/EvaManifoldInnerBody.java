@@ -29,6 +29,9 @@ import software.bernie.geckolib.cache.object.GeoBone;
 /** Phase-E single-component inner body, isolated from the live Tiger body. */
 public final class EvaManifoldInnerBody
 {
+    private static final boolean MANIFOLD_PREVIEW_R58=Boolean.getBoolean("projectseele.manifoldInnerPreview");
+    private static final boolean MANIFOLD_AUDIT_R58=Boolean.getBoolean("projectseele.manifoldInnerAuditOnly");
+
     private static final int ORIENTATION_CORRECTION_SWEEPS = 48;
     private static final float ORIENTATION_TARGET_DOT = 1.0E-5F;
     private static final float ORIENTATION_MAX_VERTEX_DELTA = 0.10F;
@@ -235,12 +238,12 @@ public final class EvaManifoldInnerBody
 
     public static boolean previewEnabled()
     {
-        return Boolean.getBoolean("projectseele.manifoldInnerPreview");
+        return MANIFOLD_PREVIEW_R58;
     }
 
     public static boolean auditOnly()
     {
-        return Boolean.getBoolean("projectseele.manifoldInnerAuditOnly");
+        return MANIFOLD_AUDIT_R58;
     }
 
     public static Status status()

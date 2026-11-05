@@ -12,11 +12,13 @@ import java.util.*;
 /** Check the final rendered hierarchy, including the head's actual mutable pivot. */
 final class JointAuditR38
 {
+    private static final boolean JOINT_AUDIT_R58=Boolean.getBoolean("projectseele.r38JointAudit");
+
     private static long lastTick=-1;private static int count,physicalSamples;private static double maximum,anchorMaximum;private static String worst="";
     static void capture(EvaUnit01Entity eva,BakedGeoModel model,float partial)
     {
         long tick=eva.level().getGameTime();
-        if(!Boolean.getBoolean("projectseele.r38JointAudit")||eva.getId()!=CombatR31Review.evaId||tick==lastTick||tick%3!=0||eva.isFirstBattleActive())return;
+        if(!JOINT_AUDIT_R58||eva.getId()!=CombatR31Review.evaId||tick==lastTick||tick%3!=0||eva.isFirstBattleActive())return;
         lastTick=tick;var pose=EvaBodyPose.sample(eva,partial);var profile=CombatBodyProfiles.get(eva);if(profile==null)return;
         boolean physical=CombatBodyDynamics.active(eva)||EvaShutdownR30.wreck(eva);
         if(physical)physicalSamples++;

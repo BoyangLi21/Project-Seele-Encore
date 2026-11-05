@@ -17,6 +17,8 @@ import java.util.Set;
 /** A restrained airframe has one structural bind pose; the dorsal hinge remains mechanical. */
 final class EvaLockedCagePoseR44
 {
+    private static final boolean HANGAR_WITNESS_R58=Boolean.getBoolean("projectseele.r44HangarMeshWitness");
+
     private static final Map<Integer, Integer> LAST_TICK = new HashMap<>();
     private static final Map<Integer, Integer> SAMPLES = new HashMap<>();
 
@@ -50,7 +52,7 @@ final class EvaLockedCagePoseR44
 
     static void witness(EvaUnit01Entity entity, BakedGeoModel model, String stage)
     {
-        if (!Boolean.getBoolean("projectseele.r44HangarMeshWitness") || entity.isExperimentalUnit()) return;
+        if (!HANGAR_WITNESS_R58 || entity.isExperimentalUnit()) return;
         var mc = Minecraft.getInstance();
         if (mc.getSingleplayerServer() == null || ShaderShadowPassR44.active()) return;
         var world = mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();

@@ -28,6 +28,8 @@ import software.bernie.geckolib.cache.object.GeoBone;
 /** Isolated after-recursion renderer for the Phase-D weighted inner proxy. */
 public final class EvaWeightedInnerProxy
 {
+    private static final boolean PROXY_PREVIEW_R58=Boolean.getBoolean("projectseele.skinnedProxyPreview");
+
     private static final ResourceLocation CONTRACT = new ResourceLocation(
             ProjectSeele.MODID, "eva/eva_weighted_proxy_contract.json");
     private static final ResourceLocation PROXY = new ResourceLocation(
@@ -182,7 +184,7 @@ public final class EvaWeightedInnerProxy
 
     public static boolean previewEnabled()
     {
-        return Boolean.getBoolean("projectseele.skinnedProxyPreview");
+        return PROXY_PREVIEW_R58;
     }
 
     public static Status status()

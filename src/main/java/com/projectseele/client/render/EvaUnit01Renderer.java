@@ -507,7 +507,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         if (!isReRender && bone.getParent() == null)
         {
             FirstBattleRuntimeWitnessR52.finish(animatable,bone);
-            com.projectseele.client.visual.EvaConnectedActionReview.recordPose(animatable,
+            if (com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)
+                com.projectseele.client.visual.EvaConnectedActionReview.recordPose(animatable,
                     this.getGeoModel().getBakedModel(this.getGeoModel().getModelResource(animatable)), partialTick);
             if(!this.pilotView)EvaWeightedInnerProxy.renderAfterRoot(
                     poseStack, animatable, bone, bufferSource,

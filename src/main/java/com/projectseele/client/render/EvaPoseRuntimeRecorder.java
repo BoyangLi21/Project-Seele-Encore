@@ -28,6 +28,8 @@ import software.bernie.geckolib.cache.object.GeoBone;
 /** Records the final matrices emitted by the real Gecko render path. */
 public final class EvaPoseRuntimeRecorder
 {
+    private static final boolean SMOKE_R58=Boolean.getBoolean("projectseele.poseCaptureSmoke");
+
     private static final int MAX_FRAMES = 900;
     private static final int SMOKE_FRAMES = 1;
     private static final DateTimeFormatter FILE_TIME =
@@ -46,14 +48,14 @@ public final class EvaPoseRuntimeRecorder
     /** Makes the one-frame userdev smoke deterministic across camera angles. */
     public static boolean requestsSmokeRender()
     {
-        return Boolean.getBoolean("projectseele.poseCaptureSmoke")
+        return SMOKE_R58
                 && !smokeStarted && session == null;
     }
 
     /** Development-only smoke hook; it never changes entity or animation state. */
     public static void maybeStartSmoke(EvaUnit01Entity entity)
     {
-        if (!Boolean.getBoolean("projectseele.poseCaptureSmoke")
+        if (!SMOKE_R58
                 || smokeStarted || session != null || !EvaPoseGraph.ready()
                 || entity.getMotionLabPhysicsPreview() != 0
                 || entity.getVisualPose() != EvaUnit01Entity.VISUAL_NORMAL)

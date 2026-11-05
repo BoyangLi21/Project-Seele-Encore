@@ -100,7 +100,7 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
                     p.sub((float)origin.x,(float)origin.y,(float)origin.z).div(5);
                     inverseRoot.transformPosition(p);inverseRoot.transformDirection(n).normalize();
                     if(skinWitness!=null)skinWitness.vertex(p);
-                    if(entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,p,sharedContactWorld,"actual-wrap-cache");
+                    if(sharedContactWorld!=null&&entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,p,sharedContactWorld,"actual-wrap-cache");
                     if(authored!=null&&auditWorld!=null)com.projectseele.client.visual.SachielWrapR14Audit.sample(worldEntity,actor,auditWorld,p,authored);
                     emit(target,stack,p,n,surface.u(vertex),surface.v(vertex),light,overlay);
                     if(vertex%3==2)emit(target,stack,p,n,surface.u(vertex),surface.v(vertex),light,overlay);
@@ -174,7 +174,7 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             {
                 if(contactAudit!=null)worldFloor=Math.min(worldFloor,contactAudit.m01()*point.x+contactAudit.m11()*point.y+contactAudit.m21()*point.z+contactAudit.m31());
                 if(skinWitness!=null)skinWitness.vertex(point);
-                if(entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,point,sharedContactWorld,"actual-weighted-final-emit");
+                if(sharedContactWorld!=null&&entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,point,sharedContactWorld,"actual-weighted-final-emit");
                 emit(target,stack,point,normal,v[i+3],v[i+4],light,overlay);
                 if(vertex%3==2)emit(target,stack,point,normal,v[i+3],v[i+4],light,overlay);
             }
@@ -192,7 +192,7 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
                 int at=vertex*6,i=vertex*8;float[] output=model.groundedVertices;
                 point.set(output[at],output[at+1],output[at+2]).add(lift);normal.set(output[at+3],output[at+4],output[at+5]);
                 if(skinWitness!=null)skinWitness.vertex(point);
-                if(entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,point,sharedContactWorld,"actual-weighted-ground-lift-final-emit");
+                if(sharedContactWorld!=null&&entity instanceof net.minecraft.world.entity.LivingEntity living)SharedHandContactWitnessR44.targetVertex(living,point,sharedContactWorld,"actual-weighted-ground-lift-final-emit");
                 if(contactAudit!=null)worldFloor=Math.min(worldFloor,contactAudit.m01()*point.x+contactAudit.m11()*point.y+contactAudit.m21()*point.z+contactAudit.m31());
                 emit(target,stack,point,normal,model.vertices[i+3],model.vertices[i+4],light,overlay);
                 if(vertex%3==2)emit(target,stack,point,normal,model.vertices[i+3],model.vertices[i+4],light,overlay);

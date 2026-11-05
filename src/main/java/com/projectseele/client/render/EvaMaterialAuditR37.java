@@ -11,10 +11,12 @@ import java.util.*;
 /** Read-only witness of the real shader samplers, enabled only in a review. */
 final class EvaMaterialAuditR37
 {
+    private static final boolean ENABLED_R37=Boolean.getBoolean("projectseele.r37MaterialAudit");
+
     private static final JsonObject DATA=new JsonObject();
     static void capture(ResourceLocation texture,ShaderInstance shader)
     {
-        if(!Boolean.getBoolean("projectseele.r37MaterialAudit")||CombatR31Review.mediaFolder.isEmpty()
+        if(!ENABLED_R37||CombatR31Review.mediaFolder.isEmpty()
                 ||!texture.getPath().contains("eva_")||texture.getPath().endsWith("_eyes.png")||DATA.has(texture.toString()))return;
         if(GL20.glGetUniformLocation(shader.getId(),"normals")<0||GL20.glGetUniformLocation(shader.getId(),"specular")<0)return;
         int active=GL11.glGetInteger(GL13.GL_ACTIVE_TEXTURE);var row=new JsonObject();

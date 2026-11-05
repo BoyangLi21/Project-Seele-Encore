@@ -40,6 +40,12 @@ import software.bernie.geckolib.renderer.layer.GeoRenderLayer;
  */
 public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRenderLayer<T>
 {
+    // Review switches read once: they were looked up per bone, per frame.
+    private static final boolean HANGAR_WITNESS=Boolean.getBoolean("projectseele.r44HangarMeshWitness");
+    private static final boolean FOOT_WITNESS=Boolean.getBoolean("projectseele.r44NetworkClient");
+    private static final boolean JOINT_AUDIT=Boolean.getBoolean("projectseele.r38JointAudit");
+    private static final boolean MESH_AUDIT_R05=Boolean.getBoolean("projectseele.motionReviewR05");
+
     private static final Map<ResourceLocation, MeshData> CACHE = new HashMap<>();
     private static final Set<ResourceLocation> LOAD_ATTEMPTED = new HashSet<>();
     private static final Set<Class<?>> GPU_DIAGNOSTICS = new HashSet<>();
@@ -177,13 +183,13 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             EvaHandWitnessR44.submitted(eva,bone,meshLocation,part.vertices(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
                     renderer.renderedMeshTransform(pose,eva,partialTick));
-        if(Boolean.getBoolean("projectseele.r44HangarMeshWitness")&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
+        if(HANGAR_WITNESS&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             com.projectseele.client.visual.HangarMeshWitnessR44.capture(eva,bone.getName(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),renderer.renderedMeshTransform(pose,eva,partialTick));
-        if(Boolean.getBoolean("projectseele.r44NetworkClient")&&animatable instanceof EvaUnit01Entity eva
+        if(FOOT_WITNESS&&animatable instanceof EvaUnit01Entity eva
                 &&bone.getName().startsWith("foot_")&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             EvaFootWitnessR44.submitted(eva,bone,meshLocation,part.vertices(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
                     renderer.renderedMeshTransform(pose,eva,partialTick));
-        if(Boolean.getBoolean("projectseele.r38JointAudit")&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
+        if(JOINT_AUDIT&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
                 &&eva.getId()==com.projectseele.visual.CombatR31Review.evaId&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             witnessAttachmentsR38(mesh,part,bone,values,renderer.renderedMeshTransform(pose,eva,partialTick));
         if(!this.fullBright&&animatable instanceof EvaUnit01Entity eva&&eva.isFirstBattleActive()
@@ -196,7 +202,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 &&com.projectseele.visual.EvaTerrainR11Review.R21&&com.projectseele.visual.EvaTerrainR11Review.runningCase
                 &&com.projectseele.visual.EvaTerrainR11Review.caseTick%20==0)
             witnessWelds(mesh,part,bone,values,renderer.renderedMeshTransform(pose,eva,partialTick),eva.getUNSerial());
-        if(Boolean.getBoolean("projectseele.motionReviewR05")&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
+        if(MESH_AUDIT_R05&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
                 &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             com.projectseele.client.visual.EvaMeshAuditR05.capture(eva.getId(),meshLocation.getPath().contains("pallet_smg")?"rifle":bone.getName(),
                     values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),renderer.renderedMeshTransform(pose,eva,partialTick));

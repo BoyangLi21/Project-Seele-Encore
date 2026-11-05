@@ -34,7 +34,7 @@ import software.bernie.geckolib.cache.object.BakedGeoModel;
 @Mod.EventBusSubscriber(modid = ProjectSeele.MODID, value = Dist.CLIENT)
 public final class EvaConnectedActionReview
 {
-    private static final boolean ENABLED = Boolean.getBoolean("projectseele.connectedActionReview");
+    public static final boolean ENABLED = Boolean.getBoolean("projectseele.connectedActionReview");
     private static final boolean RIFLE = Boolean.getBoolean("projectseele.rifleActionReview");
     private static final boolean R05 = Boolean.getBoolean("projectseele.motionReviewR05");
     private static final boolean R06 = Boolean.getBoolean("projectseele.motionReviewR06");

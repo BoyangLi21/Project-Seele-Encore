@@ -19,6 +19,9 @@ import java.util.Map;
 @Mod.EventBusSubscriber(modid=ProjectSeele.MODID,value=Dist.CLIENT,bus=Mod.EventBusSubscriber.Bus.MOD)
 public final class RigidCapsuleGpu
 {
+    private static final boolean GPU_DISABLED=Boolean.getBoolean("projectseele.disableRigidCapsuleGpu");
+    private static final boolean POSED_GPU_DISABLED=Boolean.getBoolean("projectseele.disablePosedMeshGpuR52");
+
     private static ShaderInstance shader;
     private static boolean shaderApiResolved,externalShader;
     private static Object shaderApi;
@@ -75,8 +78,8 @@ public final class RigidCapsuleGpu
     static boolean drawPosed(Object key,long revision,float[] vertices,int stride,float px,float py,float pz,
                              ResourceLocation texture,PoseStack poses,int light,int overlay,float r,float g,float b)
     {
-        if(shader==null||Boolean.getBoolean("projectseele.disableRigidCapsuleGpu")
-                ||revision>0&&Boolean.getBoolean("projectseele.disablePosedMeshGpuR52"))return false;
+        if(shader==null||GPU_DISABLED
+                ||revision>0&&POSED_GPU_DISABLED)return false;
         if(externalShaderActive())return drawExternal(key,revision,vertices,stride,px,py,pz,texture,poses,light,overlay,r,g,b);
         Mesh mesh=PARTS.get(key);
         boolean uploaded=false;
@@ -115,7 +118,7 @@ public final class RigidCapsuleGpu
     static boolean drawOptics(Object key,long revision,float[] vertices,int stride,float px,float py,float pz,
                               ResourceLocation texture,PoseStack poses,int light,int overlay,float r,float g,float b,boolean emissive)
     {
-        if(shader==null||Boolean.getBoolean("projectseele.disableRigidCapsuleGpu")
+        if(shader==null||GPU_DISABLED
                 ||!externalShaderActive())return false;
         // Keep the original eye shader, depth bias and blend state. Reusing
         // the body pass here would darken the eyes or overwrite the decal.
