@@ -2,7 +2,7 @@
   "id": "odawara-ogicho",
   "name": "Odawara Ogicho western neighbourhood",
   "label": "小田原荻窪",
-  "core": [3248, -224, 3648, 256],
+  "core": [3248, 168, 3360, 264],
   "terminals": [
     ["south-interface", "荻窪南侧城区接口", [3325, 257]],
     ["west-residential", "荻窪西侧住宅街", [3250, 230]],

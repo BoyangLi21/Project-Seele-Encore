@@ -63,7 +63,9 @@ class Sampler:
         fixed=bilinear(self.height);weight=bilinear(self.blend)/255
         water=self.water[np.floor(qz+.5).astype(int),np.floor(qx+.5).astype(int)]
         distance=np.maximum.reduce([fx-x,x-(fx+(w-1)*step),fz-z,z-(fz+(d-1)*step)])
-        weight=1-(1-weight)*(1-smooth(distance/256))
+        # The runtime leaves in-bounds weights untouched. Recomputing 1-(1-w)
+        # changes a few last bits and can move half-integer heights by a block.
+        weight=np.where(distance>0,1-(1-weight)*(1-smooth(distance/256)),weight)
         return combine(x,z,fixed,water,weight,native)
 
 

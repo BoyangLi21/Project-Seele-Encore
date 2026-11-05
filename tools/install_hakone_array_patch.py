@@ -250,6 +250,8 @@ def install(a):
         require_staged_native(candidate,a.world)
         from verify_odawara_coast_release import require_verified as require_coast
         require_coast(candidate)
+        from verify_hakone_geographic_boundary import require_verified as require_geographic
+        require_geographic(candidate)
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
         if 'port_verification'in manifest:

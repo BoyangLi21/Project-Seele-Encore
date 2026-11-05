@@ -7,7 +7,9 @@ public final class HakoneFieldVectorCheck
     public static void main(String[] args)throws Exception
     {
         int checked=0;
-        for(String row:Files.readAllLines(Path.of(args[0])))
+        try(var input=Files.newBufferedReader(Path.of(args[0])))
+        {
+        for(String row;(row=input.readLine())!=null;)
         {
             if(row.isBlank()||row.startsWith("x,"))continue;
             String[] parts=row.split(",");int[] n=new int[5];
@@ -16,6 +18,7 @@ public final class HakoneFieldVectorCheck
             if(surface==null||surface.ground()!=n[3]||surface.water()!=n[4])
                 throw new AssertionError("Offline/runtime disagreement: "+row+" / "+surface);
             checked++;
+        }
         }
         System.out.println("Offline/runtime surface vectors PASS: "+checked);
     }
