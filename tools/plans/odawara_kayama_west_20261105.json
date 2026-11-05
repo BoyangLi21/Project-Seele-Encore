@@ -1,0 +1,22 @@
+{
+  "id": "odawara-kayama-west",
+  "name": "Kayama western neighbourhood",
+  "label": "栢山西侧生活街区",
+  "preserve_existing_district": true,
+  "include_existing_public_in_connectivity": false,
+  "core": [2880, -1180, 3056, -992],
+  "terminals": [
+    ["station-west-interface", "栢山站西侧街道接口", [3010, -1020]],
+    ["north-neighbourhood", "北侧住宅街口", [2910, -1160]],
+    ["western-services", "西侧生活服务街口", [2910, -1100]],
+    ["central-services", "中央生活服务街口", [2970, -1065]],
+    ["east-neighbourhood", "东侧住宅街口", [3005, -1090]]
+  ],
+  "maximum_buildings": 70,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

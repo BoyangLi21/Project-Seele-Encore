@@ -1,0 +1,21 @@
+{
+  "id": "odawara-hotaruda-east",
+  "name": "Hotaruda eastern neighbourhood",
+  "label": "萤田东侧生活街区",
+  "preserve_existing_district": true,
+  "include_existing_public_in_connectivity": false,
+  "core": [3312, -448, 3472, -224],
+  "terminals": [
+    ["station-east-interface", "萤田站东侧街道接口", [3365, -305]],
+    ["north-neighbourhood", "北侧住宅街口", [3365, -408]],
+    ["eastern-services", "东侧生活服务街口", [3415, -370]],
+    ["south-interface", "南侧街道接口", [3395, -267]]
+  ],
+  "maximum_buildings": 60,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}
