@@ -383,9 +383,6 @@ public final class EvaPoseGraph
         EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
         com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
-        JointAuditR38.capture(entity,model,partialTick);
-        EvaHandWitnessR44.capture(entity,model,partialTick,modelToWorld);
-        PilotOpticsWitnessR45.capture(entity,model,partialTick,modelToWorld);
         com.projectseele.client.visual.RuntimeR44ClientProbe.capture(entity,model,partialTick,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
         EvaShutdownPoseR30.rememberFinalLiveR45(entity,model);

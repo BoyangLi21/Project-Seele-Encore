@@ -255,7 +255,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         // the whole body, even though Minecraft's camera mode is first person.
         boolean localPilotView=isLocalPilotView(minecraft, entity),shadowPass=ShaderShadowPassR44.active();
         this.pilotView = localPilotView && !shadowPass;
-        EvaShadowProbeR44.renderMode(entity,localPilotView,shadowPass);
         if(this.pilotView)com.projectseele.client.EvaPilotBodyRenderBridge.mark(entity);
         EvaPoseRuntimeRecorder.maybeStartSmoke(entity);
         // Wet cages and launch shafts use dedicated NERV floodlights.  Keeping
@@ -677,12 +676,10 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         if(EvaHandSurfaceR45.applies(entity)&&EvaHandSurfaceR45.oldSurface(bone.getName()))return false;
         if (!this.pilotView)
         {
-            EvaShadowProbeR44.admission(entity,bone.getName(),true);
             return true;
         }
         if (CAMERA_COVER_BONES.contains(bone.getName()))
         {
-            EvaShadowProbeR44.admission(entity,bone.getName(),false);
             return false;
         }
         // The rider socket is fixed to the entity while attack animations can
@@ -698,7 +695,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         boolean visible=!entity.fixedCannonOperatingR52()&&!PILOT_CAMERA_MESH_COVER.contains(surface);
         if(visible&&(entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||entity.getWeapon()==EvaUnit01Entity.WEAPON_CANNON))
             visible=surface.startsWith("forearm_")||surface.startsWith("wrist_")||surface.startsWith("hand_")||surface.startsWith("r45_hand_");
-        EvaShadowProbeR44.admission(entity,bone.getName(),visible);
         return visible;
     }
 

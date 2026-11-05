@@ -245,7 +245,6 @@ public final class CombatR31Client
                 output.add("normal_bones",normalBones);output.add("support_contacts_r33",supportContacts);output.add("render_performance",performance());Files.writeString(folder.resolve("render_performance.json"),new GsonBuilder().setPrettyPrinting().create().toJson(performance()));
                 Files.writeString(folder.resolve("client_evidence.json"),new GsonBuilder().setPrettyPrinting().create().toJson(output));
                 com.projectseele.visual.BodyPoseLayersR40.write(folder);
-                com.projectseele.client.render.SharedHandContactWitnessR44.write(folder);
                 OpticsR43Review.write(folder);
             }
             catch(Exception e){throw new IllegalStateException("R31 client evidence",e);}
@@ -379,7 +378,6 @@ public final class CombatR31Client
 
     @SubscribeEvent public static void render(TickEvent.RenderTickEvent event)
     {
-        if(event.phase==TickEvent.Phase.END)com.projectseele.client.render.SharedHandContactWitnessR44.finishFrame();
         if(!CombatR31Review.ENABLED||!started||event.phase!=TickEvent.Phase.END||CombatR31Review.done)return;
         var mc=Minecraft.getInstance();if(mc.level==null||mc.player==null)return;
         shutdownWitnessR45(mc);

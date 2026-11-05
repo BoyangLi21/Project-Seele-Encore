@@ -147,7 +147,6 @@ public class HybridAddonRenderer<T extends LivingEntity & GeoEntity> extends Ent
             this.addRenderLayer(new LocalTriangleMeshLayer<>(this, entity -> this.mesh,null,
                     (entity,bone)->{
                         boolean available=!weightedCandidate||RiggedAngelLayer.available(this.mesh);
-                        if(weightedCandidate&&!available)RiggedAngelSkinWitnessR44.fallback(entity,this.mesh,bone.getName());
                         return !weightedCandidate||!available;
                     }));
             if(weightedCandidate)this.addRenderLayer(new RiggedAngelLayer<>(this,this.mesh));

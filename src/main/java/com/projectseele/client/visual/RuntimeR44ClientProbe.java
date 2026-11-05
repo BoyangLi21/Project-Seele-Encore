@@ -83,8 +83,7 @@ public final class RuntimeR44ClientProbe
                 try{Files.writeString(mc.gameDirectory.toPath().resolve("r44_network_client.json"),new Gson().toJson(SAMPLES));com.projectseele.visual.BodyPoseLayersR40.write(mc.gameDirectory.toPath());}
                 catch(Exception failure){throw new IllegalStateException(failure);}
             }
-            if(doneTicks>35&&WRITER.getActiveCount()==0&&WRITER.getQueue().isEmpty()
-                    &&!com.projectseele.client.render.EvaHandWitnessR44.awaitingWrites())
+            if(doneTicks>35&&WRITER.getActiveCount()==0&&WRITER.getQueue().isEmpty())
             {
                 if(!mediaError.isEmpty())throw new IllegalStateException(mediaError);
                 try{if(media!=null)Files.writeString(media.resolve("frames.json"),new Gson().toJson(FRAMES));}catch(Exception failure){throw new IllegalStateException(failure);}
@@ -121,7 +120,7 @@ public final class RuntimeR44ClientProbe
         row.addProperty("x",e.getX());row.addProperty("y",e.getY());row.addProperty("z",e.getZ());JsonObject bones=new JsonObject();
         for(String name:new String[]{"torso_lower","torso_upper","arm_l","arm_r","forearm_l","forearm_r","hand_l","hand_r","leg_l","leg_r","shin_l","shin_r","foot_l","foot_r"})
             model.getBone(name).ifPresent(b->{JsonArray v=new JsonArray();v.add(b.getRotX());v.add(b.getRotY());v.add(b.getRotZ());bones.add(name,v);});
-        row.add("rendered",bones);row.add("foot_witness",com.projectseele.client.render.EvaFootWitnessR44.capture(e,model,partial,modelToWorld));SAMPLES.add(row);
+        row.add("rendered",bones);SAMPLES.add(row);
     }
     @SubscribeEvent public static void media(TickEvent.RenderTickEvent event)
     {

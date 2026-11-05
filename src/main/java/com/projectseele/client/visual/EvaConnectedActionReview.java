@@ -36,9 +36,6 @@ public final class EvaConnectedActionReview
 {
     public static final boolean ENABLED = Boolean.getBoolean("projectseele.connectedActionReview");
     private static final boolean RIFLE = Boolean.getBoolean("projectseele.rifleActionReview");
-    private static final boolean R05 = Boolean.getBoolean("projectseele.motionReviewR05");
-    private static final boolean R06 = Boolean.getBoolean("projectseele.motionReviewR06");
-    private static final boolean R10="r10-motion".equals(System.getProperty("projectseele.regionalBuild",""));
     /** Transition tour: every stance/weapon change the pilot can make, back to back (pose continuity review). */
     private static final boolean TOUR=Boolean.getBoolean("projectseele.transitionTour");
     private static final int TOUR_START=Integer.getInteger("projectseele.tourStart",0);
@@ -71,9 +68,6 @@ public final class EvaConnectedActionReview
     private static boolean finished;
     private static Entity camera;
     private static BufferedWriter poses;
-    private static net.minecraft.world.entity.animal.IronGolem heavyProbe;
-    private static float heavyProbeHealth;
-    private static volatile int heavyProbeFailures;
     private static boolean preferencesSaved,oldPause,oldGui;
     private static CameraType oldCamera;
 
@@ -141,16 +135,6 @@ public final class EvaConnectedActionReview
         }
         if (RIFLE)
         {
-            if(R05)
-            {
-                if(R06)
-                {
-                    if(R10&&tick>=1000)controlsR10(mc,eva);else controlsR06(mc,eva);previousTick=tick;
-                    if(tick>=(R10?1400:Boolean.getBoolean("projectseele.motionReviewR05All")?3000:1000))finish(mc,"complete");
-                    return;
-                }
-                controlsR05(mc,eva);previousTick=tick;if(tick>=(Boolean.getBoolean("projectseele.motionReviewR05All")?1950:650))finish(mc,"complete");return;
-            }
             rifleControls(mc, eva);
             previousTick = tick;
             if (tick >= 1845) finish(mc, "complete");
@@ -394,95 +378,6 @@ public final class EvaConnectedActionReview
         return scriptTick>=TOUR_START&&at(scriptTick-TOUR_START);
     }
 
-    private static void controlsR05(Minecraft mc,EvaUnit01Entity eva)
-    {
-        int local=tick%650,offset=tick-local;String unit=tick>=1300?"unit02":tick>=650?"unit00":"unit01";
-        if(at(650)||at(1300))
-        {
-            mc.player.connection.sendCommand("seele motionlab enter "+unit);
-            mc.player.connection.sendCommand("seele motionlab weapon "+unit+" rifle");
-        }
-        boolean moving=local>=50&&local<200;
-        mc.options.keyUp.setDown(moving);mc.player.input.up=moving;mc.player.input.forwardImpulse=moving?1:0;mc.player.zza=moving?1:0;mc.player.xxa=0;
-        mc.player.setYRot(0);mc.player.setXRot(local>=290&&local<310?15:local>=310&&local<330?-20:local>=600&&local<612?-30:local>=612&&local<622?-45:local>=622&&local<632?-60:local>=632&&local<644?60:0);
-        if(at(offset+65))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
-        if(at(offset+80))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
-        if(at(offset+85))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
-        if(at(offset+205))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
-        if(at(offset+230)||at(offset+330))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
-        if((local>=25&&local<350||local>=600&&local<646)&&tick/4!=previousTick/4)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
-        if(at(offset+365))mc.player.connection.sendCommand("seele motionlab weapon "+unit+" fists");
-        if(at(offset+380))heavyProbe(mc,eva,false);
-        if(at(offset+385))send(ServerboundEvaControlPacket.ACTION_SMASH);
-        if(at(offset+400))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(at(offset+402))heavyProbe(mc,eva,true);
-        if(at(offset+430))send(ServerboundEvaControlPacket.ACTION_STOMP);
-        if(at(offset+460))mc.player.connection.sendCommand("seele motionlab weapon "+unit+" knife");
-        if(at(offset+480))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(at(offset+495))send(ServerboundEvaControlPacket.ACTION_SMASH);
-        if(at(offset+585))mc.player.connection.sendCommand("seele motionlab weapon "+unit+" rifle");
-        positionCamera(mc,eva);
-    }
-
-    private static void heavyProbe(Minecraft mc,EvaUnit01Entity eva,boolean check)
-    {
-        int id=eva.getId();
-        mc.getSingleplayerServer().execute(()->{
-            if(check)
-            {
-                float damage=heavyProbe==null?0:heavyProbeHealth-heavyProbe.getHealth();
-                if(damage<=0)heavyProbeFailures++;
-                ProjectSeele.LOGGER.info("R05 forward heavy target: damage={} passed={}",damage,damage>0);
-                if(heavyProbe!=null)heavyProbe.discard();heavyProbe=null;return;
-            }
-            var level=mc.getSingleplayerServer().overworld();
-            if(!(level.getEntity(id) instanceof EvaUnit01Entity serverEva))return;
-            heavyProbe=EntityType.IRON_GOLEM.create(level);if(heavyProbe==null)return;
-            Vec3 point=serverEva.position().add(serverEva.getForward().multiply(1,0,1).normalize().scale(30)).add(0,46,0);
-            heavyProbe.setPos(point.x,point.y,point.z);heavyProbe.setNoAi(true);heavyProbe.setNoGravity(true);heavyProbe.setSilent(true);
-            heavyProbeHealth=heavyProbe.getHealth();level.addFreshEntity(heavyProbe);
-        });
-    }
-
-    private static void controlsR06(Minecraft mc,EvaUnit01Entity eva)
-    {
-        int local=tick%1000,offset=tick-local;String unit=tick>=2000?"unit02":tick>=1000?"unit00":"unit01";
-        if(at(1000)||at(2000))
-        {
-            mc.player.connection.sendCommand("seele motionlab enter "+unit);
-            mc.player.connection.sendCommand("seele motionlab weapon "+unit+" rifle");
-        }
-        boolean moving=local>=35&&local<70||local>=155&&local<250;
-        mc.options.keyUp.setDown(moving);mc.player.input.up=moving;mc.player.input.forwardImpulse=moving?1:0;mc.player.zza=moving?1:0;mc.player.xxa=0;
-        mc.player.setYRot(0);mc.player.setXRot(local>=365&&local<380?12:local>=380&&local<400?-15:0);
-        if(at(offset+45))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
-        if(at(offset+70))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
-        if(at(offset+85)||at(offset+430))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
-        if(at(offset+510))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
-        if(at(offset+275)||at(offset+590)||at(offset+730))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
-        if(local>=25&&local<805&&tick/4!=previousTick/4)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
-        if(at(offset+805))mc.player.connection.sendCommand("seele motionlab weapon "+unit+" fists");
-        if(at(offset+830))heavyProbe(mc,eva,false);
-        if(at(offset+835))send(ServerboundEvaControlPacket.ACTION_SMASH);
-        if(at(offset+845))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(at(offset+852))heavyProbe(mc,eva,true);
-        if(at(offset+890))mc.player.connection.sendCommand("seele motionlab weapon "+unit+" knife");
-        if(at(offset+910))send(ServerboundEvaControlPacket.ACTION_MELEE);
-        if(at(offset+935))send(ServerboundEvaControlPacket.ACTION_SMASH);
-        positionCamera(mc,eva);
-    }
-
-    private static void controlsR10(Minecraft mc,EvaUnit01Entity eva)
-    {
-        int local=tick-1000;
-        if(at(1000))mc.player.connection.sendCommand("seele motionlab weapon unit01 fists");
-        boolean walking=local>=10&&local<120||local>=145&&local<240||local>=340&&local<390,back=local>=200&&local<240;
-        mc.options.keyUp.setDown(walking&&!back);mc.options.keyDown.setDown(walking&&back);mc.options.keyJump.setDown(local>=125&&local<128||local>=345&&local<348);
-        mc.player.input.up=walking&&!back;mc.player.input.down=walking&&back;mc.player.input.forwardImpulse=walking?(back?-1:1):0;mc.player.zza=mc.player.input.forwardImpulse;mc.player.xxa=0;mc.player.setYRot(0);mc.player.setXRot(0);
-        if(at(1050))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);if(at(1100))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
-        if(at(1260))send(ServerboundEvaControlPacket.ACTION_MELEE);if(at(1300))send(ServerboundEvaControlPacket.ACTION_SMASH);
-        positionCamera(mc,eva);
-    }
     private static void send(int action)
     {
         SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(action));
@@ -500,12 +395,6 @@ public final class EvaConnectedActionReview
         Vec3 target = eva.position().add(0, 28, 0);
         Vec3 position = eva.position().add(RIFLE && eva.getUnitVariant() == 0 ? -60 : 60, 32, 48);
         if (FX && camPos != null) { position = camPos; target = camAim; }
-        if(R06)
-        {
-            double lower=Mth.clamp(eva.rifleStanceLevel(1)/3,0,1);
-            target=eva.position().add(0,28-21*lower,8*lower);
-            position=eva.position().add(eva.getUnitVariant()==0?-64:64,32-19*lower,48);
-        }
         Vec3 delta = target.subtract(position);
         camera.setPos(position.x, position.y - camera.getEyeHeight(), position.z);
         camera.setYRot((float)(Mth.atan2(delta.z, delta.x) * Mth.RAD_TO_DEG) - 90.0F);
@@ -535,14 +424,6 @@ public final class EvaConnectedActionReview
         JsonObject row = new JsonObject();
         row.addProperty("tick", tick);
         row.addProperty("variant", eva.getUnitVariant());
-        if(R06)row.addProperty("stanceLevel",eva.rifleStanceLevel(partialTick));
-        if(R05)
-        {
-            row.addProperty("gaitPhase",eva.rifleGaitPhase(partialTick));
-            row.addProperty("crouchBlend",eva.rifleCrouchBlend(partialTick));
-            row.addProperty("proneBlend",eva.rifleProneBlend(partialTick));
-            JsonArray position=new JsonArray();var v=eva.getPosition(partialTick);position.add(v.x);position.add(v.y);position.add(v.z);row.add("renderPosition",position);
-        }
         row.addProperty("yaw", eva.getYRot());
         row.addProperty("image", frame + 1);
         row.addProperty("entityTick", eva.tickCount + partialTick);
@@ -585,7 +466,6 @@ public final class EvaConnectedActionReview
             {
                 row.addProperty("rightHandError", witness.rightError());
                 row.addProperty("leftHandError", witness.leftError());
-                if(R05){row.addProperty("stock",witness.stock().toString());row.addProperty("shoulder",witness.shoulder().toString());}
                 if(witness.footDrift()>=0)row.addProperty("rifleFootDrift",witness.footDrift());
                 Vec3 actual = com.projectseele.client.render.EvaUnit01Renderer.rifleMuzzleOrFallback(eva.getId(), witness.expectedMuzzle());
                 row.addProperty("muzzleError", actual.distanceTo(witness.expectedMuzzle()));
@@ -605,11 +485,6 @@ public final class EvaConnectedActionReview
     @SubscribeEvent
     public static void render(TickEvent.RenderTickEvent event)
     {
-        if(R05&&poses!=null&&!finished)
-        {
-            if(event.phase==TickEvent.Phase.START)EvaMeshAuditR05.begin(tick,entityId,Minecraft.getInstance().gameDirectory.toPath().resolve("screenshots/projectseele_connected/"+BATCH+"/geometry"));
-            else EvaMeshAuditR05.end();
-        }
         if (!ENABLED || finished || poses == null || event.phase != TickEvent.Phase.END
                 || tick == capturedTick) return;
         // The tour measures per-frame continuity: a screenshot per tick would
@@ -625,7 +500,6 @@ public final class EvaConnectedActionReview
 
     private static void finish(Minecraft mc, String reason)
     {
-        if(R05&&reason.equals("complete")&&heavyProbeFailures>0)reason="forward_heavy_target_failed";
         finished = true;
         mc.options.keyUp.setDown(false);
         mc.options.keyDown.setDown(false);

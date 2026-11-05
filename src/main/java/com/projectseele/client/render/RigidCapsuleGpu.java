@@ -192,7 +192,7 @@ public final class RigidCapsuleGpu
             if(states.variants.put(state,cached))externalStateEvictions++;
             if(revision>0)posedUploads++;
         }
-        var combined=new Matrix4f(RenderSystem.getModelViewMatrix()).mul(poses.last().pose());cached.buffer().bind();cached.buffer().drawWithShader(combined,RenderSystem.getProjectionMatrix(),active);EvaMaterialAuditR37.capture(texture,active);VertexBuffer.unbind();type.clearRenderState();drawCalls++;posedDraw(revision);
+        var combined=new Matrix4f(RenderSystem.getModelViewMatrix()).mul(poses.last().pose());cached.buffer().bind();cached.buffer().drawWithShader(combined,RenderSystem.getProjectionMatrix(),active);VertexBuffer.unbind();type.clearRenderState();drawCalls++;posedDraw(revision);
         if(captureWitnessSubmission)lastWitnessSubmission=new WitnessSubmission(cached.revision(),uploaded,active.getClass().getSimpleName(),new Matrix4f(combined));
         if(!externalReadyLogged){externalReadyLogged=true;ProjectSeele.LOGGER.info("R30 rigid GPU buffers active inside the Oculus entity pipeline");}
         return true;
