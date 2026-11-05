@@ -9,8 +9,8 @@ public final class TvCampaignCatalog
     public static final List<Chapter> CHAPTERS = List.of(
             new Chapter("sachiel", "01–02", "首次出击", "萨基尔", 3, true,
                     "前往东北迎击大道迎击萨基尔。观察目标动作，避开正面攻击，用近战削弱A.T.力场后攻击核心。注意机体损伤与供电。"),
-            new Chapter("shamshel", "03", "第二次迎击", "夏姆榭尔", 4, true,
-                    "前往东北迎击大道迎击夏姆榭尔。看到光鞭蓄势时横向闪避，趁攻击间隙用渐进刀近身。留意电量，必要时撤回补给。"),
+            new Chapter("shamshel", "03", "第二次迎击", "夏姆榭尔", 4, false,
+                    "暂停开放：等可再分发的夏姆榭尔模型到位后重做本战。"),
             new Chapter("rain", "04", "雨中的间奏", "", 0, false, "城际列车与山间步行叙事尚在制作。"),
             new Chapter("ramiel", "05–06", "屋岛作战", "拉米尔", 5, true, "前往箱根阵地。初号机负责阳电子炮，零号机持盾掩护。接通阵地三路电网，初号机停在炮位、看向炮身并右键接入。充能后瞄准核心，在拉米尔发射光束时开火；打中外壳无效。"),
             new Chapter("jet_alone", "07", "反应堆事故", "J.A.", 0, false, "非使徒章节；待制作事故处置流程。"),

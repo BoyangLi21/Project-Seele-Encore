@@ -23,8 +23,9 @@ final class RamielSourceModelR53
     private static List<Part> parts;
     private static String sourceHash = "";
     private record Material(ResourceLocation texture, boolean emissive) { }
+    /** axis: the arm direction (0 x, 1 y, 2 z) of an open-form spike group, -1 otherwise. */
     private record Part(String name, boolean open, int shift, boolean core,
-                        Material material, float[] vertices) { }
+                        Material material, float[] vertices, int axis) { }
 
     private static synchronized boolean selected()
     {
@@ -71,9 +72,16 @@ final class RamielSourceModelR53
                     require(Float.isFinite(vertices[i]), "Finite Ramiel source vertices required");
                 }
                 faces += vertices.length / 24;
-                loaded.add(new Part(part.get("name").getAsString(), part.get("phase").getAsString().equals("open"),
-                        part.get("shell_shift").getAsInt(), part.get("core").getAsBoolean(),
-                        materials.get(part.get("material").getAsInt()), vertices));
+                boolean open = part.get("phase").getAsString().equals("open"), core = part.get("core").getAsBoolean();
+                float[] extent = new float[3];
+                for (int i = 0; i < vertices.length; i += 8)
+                    for (int k = 0; k < 3; k++) extent[k] = Math.max(extent[k], Math.abs(vertices[i + k]));
+                int axis = extent[0] >= extent[1] && extent[0] >= extent[2] ? 0 : extent[1] >= extent[2] ? 1 : 2;
+                float second = Math.max(Math.min(extent[0], extent[1]), Math.min(Math.max(extent[0], extent[1]), extent[2]));
+                if (!open || core || extent[axis] < 1.6F * second) axis = -1;
+                loaded.add(new Part(part.get("name").getAsString(), open,
+                        part.get("shell_shift").getAsInt(), core,
+                        materials.get(part.get("material").getAsInt()), vertices, axis));
             }
             require(faces == 8816 && loaded.size() == 9, "All Ramiel source primitives required");
             parts = List.copyOf(loaded);
@@ -102,15 +110,38 @@ final class RamielSourceModelR53
         blend = blend * blend * (3 - 2 * blend);
         for (var part : parts)
         {
-            float alpha = part.open() ? blend : 1 - blend;
-            if (alpha <= .001F) continue;
+            // The octahedron opens: its halves part and shrink back while the
+            // spike arms are driven out of the core one axis after another,
+            // overshooting a little and settling; they do not fade in.
+            float alpha;
             poses.pushPose();
             poses.translate(0, part.shift() * 3.75F * expose, 0);
             if (part.core())
             {
+                alpha = part.open() ? blend : 1 - blend;
                 float pulse = charging ? 1.1F + .3F * Mth.sin(time * .5F) : .95F;
                 poses.scale(pulse, pulse, pulse);
             }
+            else if (!part.open())
+            {
+                float shrink = 1 - .22F * blend;
+                poses.scale(shrink, shrink, shrink);
+                alpha = 1 - smooth((blend - .3F) / .55F);
+            }
+            else if (part.axis() >= 0)
+            {
+                float delay = part.name().startsWith("Ramiel2.2") ? 0 : part.name().startsWith("Ramiel2.3") ? .12F : .24F;
+                float u = Mth.clamp((blend - delay) / .76F, 0, 1);
+                float along = Math.max(.02F, overshoot(u));
+                if (charging && u >= 1) along *= 1 + .035F * Mth.sin(time * .9F + part.axis() * 2.1F);
+                float across = .35F + .65F * smooth(u * 1.6F);
+                var turn = part.axis() == 0 ? com.mojang.math.Axis.XP : part.axis() == 1 ? com.mojang.math.Axis.YP : com.mojang.math.Axis.ZP;
+                poses.mulPose(turn.rotationDegrees((1 - u) * 90F));
+                poses.scale(part.axis() == 0 ? along : across, part.axis() == 1 ? along : across, part.axis() == 2 ? along : across);
+                alpha = Math.min(1, u * 5);
+            }
+            else alpha = blend;
+            if (alpha <= .001F) { poses.popPose(); continue; }
             var consumer = buffers.getBuffer(RenderType.entityTranslucent(part.material().texture()));
             var pose = poses.last();
             var v = part.vertices();
@@ -126,6 +157,19 @@ final class RamielSourceModelR53
             poses.popPose();
         }
         return true;
+    }
+
+    private static float smooth(float t)
+    {
+        t = Mth.clamp(t, 0, 1);
+        return t * t * (3 - 2 * t);
+    }
+
+    /** Ease out with a small overshoot (about 6%) before settling at 1. */
+    private static float overshoot(float t)
+    {
+        float c = 1.1F, x = t - 1;
+        return 1 + (c + 1) * x * x * x + c * x * x;
     }
 
     private static void require(boolean accepted, String reason)

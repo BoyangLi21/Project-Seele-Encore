@@ -160,7 +160,20 @@ public final class FirstBattleDirector
     }
     private static void chips(ServerLevel level,Vec3 p,boolean bone)
     {
-        level.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,(bone?Blocks.QUARTZ_BLOCK:Blocks.REDSTONE_BLOCK).defaultBlockState()),p.x,p.y,p.z,30,1.4,.6,1.4,.25);
+        // A blow between sixty-metre bodies: a burst at the contact and the
+        // ground thrown up under it. Sent forced: the pilot's camera sits in
+        // the head, beyond the 32-block reach of an ordinary particle packet.
+        var ground=level.getBlockState(net.minecraft.core.BlockPos.containing(p.x,p.y-1,p.z));
+        for(ServerPlayer viewer:level.players())
+        {
+            if(viewer.distanceToSqr(p)>200*200)continue;
+            level.sendParticles(viewer,new BlockParticleOption(ParticleTypes.BLOCK,(bone?Blocks.QUARTZ_BLOCK:Blocks.REDSTONE_BLOCK).defaultBlockState()),true,p.x,p.y,p.z,30,1.4,.6,1.4,.25);
+            level.sendParticles(viewer,ParticleTypes.EXPLOSION,true,p.x,p.y,p.z,3,1.6,1.2,1.6,0);
+            level.sendParticles(viewer,ParticleTypes.CLOUD,true,p.x,p.y,p.z,36,2.2,1.4,2.2,.32);
+            level.sendParticles(viewer,new BlockParticleOption(ParticleTypes.BLOCK,(bone?Blocks.BONE_BLOCK:Blocks.REDSTONE_BLOCK).defaultBlockState()),true,p.x,p.y,p.z,60,2.6,1.6,2.6,.6);
+            if(!ground.isAir())level.sendParticles(viewer,new BlockParticleOption(ParticleTypes.BLOCK,ground),true,p.x,p.y,p.z,80,4.5,.5,4.5,.45);
+            level.sendParticles(viewer,ParticleTypes.CAMPFIRE_COSY_SMOKE,true,p.x,p.y+1,p.z,8,3,1,3,.02);
+        }
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {

@@ -178,7 +178,7 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         {
             Vec3 delta=state.beamEnd().subtract(state.position());var start=new Vector3f(0,center,0);var end=delta.toVector3f();
             renderSustainedBeam(poses.last().pose(),glow,start,end,state.beamTicks()-age-partial,
-                    RamielEntity.YASHIMA_BEAM_TICKS_R54,time);
+                    RamielEntity.YASHIMA_BEAM_TICKS_R54,time,null);
         }
         if(charging)
         { poses.pushPose();poses.translate(0,center,0);drawChargeRays(time,poses,glow);poses.popPose(); }
@@ -204,12 +204,29 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         VertexConsumer consumer = buffer.getBuffer(RenderType.lightning());
         poseStack.pushPose();
         renderSustainedBeam(poseStack.last().pose(),consumer,start,end,beamTicks,
-                entity.getBeamDurationR54(),entity.tickCount+partialTick);
+                entity.getBeamDurationR54(),entity.tickCount+partialTick,shieldFacing(entity,endWorld));
         poseStack.popPose();
     }
 
+    /** The face of a raised shield the beam ends on, turned toward Ramiel; null if it ends elsewhere. */
+    private static Vector3f shieldFacing(RamielEntity ramiel, Vec3 end)
+    {
+        Vector3f facing = null; double nearest = 16 * 16;
+        for (var eva : ramiel.level().getEntitiesOfClass(com.projectseele.entity.EvaUnit01Entity.class, new AABB(end, end).inflate(40)))
+        {
+            var plate = com.projectseele.entity.EvaShieldRigR47.guardPlaneR54(eva);
+            if (plate == null) continue;
+            double d = plate.centre().distanceToSqr(end);
+            if (d >= nearest) continue;
+            nearest = d;
+            facing = plate.normal().toVector3f();
+            if (plate.normal().dot(ramiel.position().subtract(end)) < 0) facing.negate();
+        }
+        return facing;
+    }
+
     private static void renderSustainedBeam(Matrix4f pose,VertexConsumer out,Vector3f start,Vector3f end,
-            float remaining,int duration,float time)
+            float remaining,int duration,float time,Vector3f shield)
     {
         float alpha=Mth.clamp(remaining/4F,0,1);
         float pulse=1F+.06F*Mth.sin(time*1.8F);
@@ -234,6 +251,10 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
             Vector3f tail=new Vector3f(center).fma(Math.min(12F,length-along),axis);
             drawStarRibbon(pose,out,center,tail,4.6F,4.6F,.9F,.55F,1F,alpha*.4F);
         }
+        // The contact lies in the struck surface: the shield's face, or across the beam.
+        Vector3f facing=shield!=null?new Vector3f(shield).normalize():new Vector3f(axis).negate();
+        Vector3f[] plane=RibbonRenderer.planeBasis(facing);
+        across=plane[0];up=plane[1];
         float radius=5F+2F*(.5F+.5F*Mth.sin(time*.7F));
         for(int i=0;i<16;i++)
         {
@@ -242,6 +263,49 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
             Vector3f q=new Vector3f(end).fma(radius*Mth.cos(b),across).fma(radius*Mth.sin(b),up);
             drawStarRibbon(pose,out,p,q,.3F,.3F,1F,.7F,1F,alpha*.7F);
         }
+        splash(pose,out,start,end,axis,facing,across,up,time,alpha,shield!=null);
+    }
+
+    /**
+     * Where the beam meets a surface it does not pierce, the stream is thrown
+     * out along that surface: a white-hot disc at the contact, the beam
+     * swelling into it, and two layers of streaks sprayed across the face and
+     * curling back toward the source, re-drawn every two ticks so the spray
+     * flickers like a jet on a plate. A shield takes the full spray.
+     */
+    private static void splash(Matrix4f pose,VertexConsumer out,Vector3f start,Vector3f end,Vector3f axis,Vector3f facing,
+            Vector3f across,Vector3f up,float time,float alpha,boolean shield)
+    {
+        float strength=alpha*(shield?1F:.6F);
+        if(strength<=.01F)return;
+        float length=start.distance(end);
+        Vector3f swell=new Vector3f(end).fma(-Math.min(18F,length*.5F),axis);
+        RibbonRenderer.drawSoftStarRibbon(pose,out,swell,end,9F,17F,1F,.62F,1F,.45F*strength);
+        for(float[] disc:new float[][]{{2.2F,2.2F,1F,.97F,1F,.9F},{6F,2.6F,1F,.75F,1F,.5F},{10.5F,2.2F,.95F,.5F,.95F,.28F}})
+            RibbonRenderer.drawPolyRing(new Matrix4f(pose).translate(new Vector3f(end).fma(.4F,facing)),out,across,up,20,
+                    disc[0],disc[1],disc[2],disc[3],disc[4],disc[5]*strength);
+        int beat=(int)(time/2F);
+        for(int layer=0;layer<2;layer++)
+        {
+            int count=layer==0?30:16;
+            for(int i=0;i<count;i++)
+            {
+                float h=hash(beat*31+i*7+layer*131),k=hash(beat*17+i*13+layer*71);
+                float angle=(i+.6F*(h-.5F))*Mth.TWO_PI/count;
+                float reach=(layer==0?9F+26F*h:5F+10F*k)*(shield?1F:.65F);
+                Vector3f d=new Vector3f(across).mul(Mth.cos(angle)).add(new Vector3f(up).mul(Mth.sin(angle)));
+                Vector3f from=new Vector3f(end).fma(.6F,facing).fma(1.8F,d);
+                Vector3f to=new Vector3f(end).fma(reach,d).fma((layer==0?.38F:.2F)*reach,facing);
+                if(layer==0)drawStarRibbon(pose,out,from,to,1.3F,.12F,1F,.72F,1F,.75F*strength);
+                else drawStarRibbon(pose,out,from,to,.8F,.1F,1F,.98F,1F,.95F*strength);
+            }
+        }
+    }
+
+    private static float hash(int n)
+    {
+        n=(n<<13)^n;n=n*(n*n*15731+789221)+1376312589;
+        return (n&0x7fffffff)/(float)0x7fffffff;
     }
 
     private static void drawStarRibbon(Matrix4f pose, VertexConsumer consumer, Vector3f start, Vector3f end,

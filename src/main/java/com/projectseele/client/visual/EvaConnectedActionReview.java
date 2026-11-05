@@ -49,6 +49,10 @@ public final class EvaConnectedActionReview
     private static final boolean JUMP=Boolean.getBoolean("projectseele.tourJumpR57");
     /** Weapon check (run with tourStart past the script, e.g. 2000): rifle, positron cannon standing and prone, Unit-02's sword. */
     private static final boolean WEAPONS=Boolean.getBoolean("projectseele.tourWeaponsR57");
+    /** Effects check: a positron shot, a scripted Ramiel (-Dprojectseele.ramielReviewR58) firing on Unit-00's shield, then the Sachiel finale. */
+    private static final boolean FX=Boolean.getBoolean("projectseele.tourFxR58");
+    private static Vec3 camPos, camAim, fxRamiel, fxFront, fxOrigin;
+    private static EvaUnit01Entity fxUnit00;
     /** Record every drawn frame, not the first of each tick: offline renders then show the frames the game drew. */
     private static final boolean EVERY_FRAME=Boolean.getBoolean("projectseele.recordEveryFrame");
     private static float poseTime = Float.NaN;
@@ -234,6 +238,7 @@ public final class EvaConnectedActionReview
 
     private static void tour(Minecraft mc,EvaUnit01Entity eva)
     {
+        if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<140||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -311,6 +316,71 @@ public final class EvaConnectedActionReview
         // Pressed every half second through the string, as a pilot mashing it would.
         if(at(400)||at(410)||at(420)||at(430)||at(440)||at(450)||at(520))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(at(462))send(ServerboundEvaControlPacket.ACTION_SMASH);
+    }
+
+    private static boolean fxCapture(int t)
+    {
+        if(t>=90&&t<150)return true;
+        if(t>=200&&t<620)return t%2==0;
+        return t>=640&&t%2==0;
+    }
+
+    private static void fxR58(Minecraft mc,EvaUnit01Entity eva)
+    {
+        int t=tick;
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),right=new Vec3(-fwd.z,0,fwd.x);
+        if(at(1))
+        {
+            // The review save keeps entities between runs.
+            mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
+            mc.player.connection.sendCommand("kill @e[type=projectseele:sachiel]");
+            mc.player.connection.sendCommand("seele motionlab weapon unit01 cannon");
+        }
+        if(at(30))send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
+        if(at(100))send(ServerboundEvaControlPacket.ACTION_CHARGE_STOP);
+        if(at(180))mc.player.connection.sendCommand("seele motionlab weapon unit00 shield");
+        if(t<200){camPos=eva.position().add(right.scale(-45)).add(fwd.scale(-75)).add(0,72,0);camAim=eva.position().add(fwd.scale(140)).add(0,22,0);return;}
+        if(fxUnit00==null||!fxUnit00.isAlive())
+            for(var e:mc.level.entitiesForRendering())if(e instanceof EvaUnit01Entity u&&u!=eva&&u.getUnitVariant()==0){fxUnit00=u;break;}
+        if(fxUnit00==null)return;
+        Vec3 f0=Vec3.directionFromRotation(0,fxUnit00.getYRot()).multiply(1,0,1).normalize(),r0=new Vec3(-f0.z,0,f0.x);
+        if(at(200))
+        {
+            fxRamiel=fxUnit00.position().add(f0.scale(170)).add(0,50,0);
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:ramiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,PersistenceRequired:1b}",fxRamiel.x,fxRamiel.y,fxRamiel.z));
+        }
+        if(fxRamiel==null)return;
+        if(t<400){camPos=fxRamiel.add(r0.scale(85)).add(f0.scale(-30)).add(0,4,0);camAim=fxRamiel.add(0,10,0);return;}
+        if(t<520){camPos=fxUnit00.position().add(r0.scale(48)).add(f0.scale(30)).add(0,38,0);camAim=fxUnit00.position().add(f0.scale(6)).add(0,32,0);return;}
+        if(t<620){Vec3 mid=fxUnit00.position().lerp(fxRamiel,.5);camPos=mid.add(r0.scale(190)).add(0,10,0);camAim=mid;return;}
+        if(at(620))
+        {
+            mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
+            mc.player.connection.sendCommand("seele motionlab weapon unit00 fists");
+            mc.player.connection.sendCommand("seele motionlab weapon unit01 fists");
+        }
+        if(at(645))
+        {
+            var server=mc.getSingleplayerServer();var id=eva.getUUID();
+            server.execute(()->{
+                var level=server.overworld();
+                if(!(level.getEntity(id) instanceof EvaUnit01Entity hero))return;
+                var angel=com.projectseele.registry.ModEntities.SACHIEL.get().create(level);if(angel==null)return;
+                Vec3 at=hero.position().add(Vec3.directionFromRotation(0,hero.getYRot()).multiply(1,0,1).normalize().scale(34));
+                angel.moveTo(at.x,at.y,at.z,hero.getYRot()+180,0);angel.setNoAi(true);angel.setSilent(true);angel.setPersistenceRequired();
+                level.addFreshEntity(angel);
+                boolean started=com.projectseele.event.FirstBattleDirector.tryStart(angel,hero,true);
+                ProjectSeele.LOGGER.info("R58 FX REVIEW FINALE started={} hero={} angel={}",started,hero.position(),angel.position());
+            });
+            fxOrigin=eva.position();fxFront=fwd;
+        }
+        if(fxOrigin!=null)
+        {
+            Vec3 r=new Vec3(-fxFront.z,0,fxFront.x);
+            camPos=fxOrigin.add(r.scale(95)).add(fxFront.scale(10)).add(0,40,0);camAim=fxOrigin.add(fxFront.scale(17)).add(0,24,0);
+        }
     }
 
     /** A tour event at its script tick, with -Dprojectseele.tourStart skipping the script's beginning. */
@@ -424,6 +494,7 @@ public final class EvaConnectedActionReview
         }
         Vec3 target = eva.position().add(0, 28, 0);
         Vec3 position = eva.position().add(RIFLE && eva.getUnitVariant() == 0 ? -60 : 60, 32, 48);
+        if (FX && camPos != null) { position = camPos; target = camAim; }
         if(R06)
         {
             double lower=Mth.clamp(eva.rifleStanceLevel(1)/3,0,1);
@@ -538,7 +609,8 @@ public final class EvaConnectedActionReview
                 || tick == capturedTick) return;
         // The tour measures per-frame continuity: a screenshot per tick would
         // halve the frame rate, so it keeps one still every two seconds.
-        if (TOUR && !Boolean.getBoolean("projectseele.tourCapture") && tick % 40 != 0) return;
+        if (TOUR && FX) { if (!fxCapture(tick)) return; }
+        else if (TOUR && !Boolean.getBoolean("projectseele.tourCapture") && tick % 40 != 0) return;
         Minecraft mc = Minecraft.getInstance();
         capturedTick = tick;
         frame++;

@@ -439,7 +439,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     /** Eased 0..1 shell separation for the renderer. */
     public float getExposeProgress(float partialTick)
     {
-        return this.isExposed() ? Mth.lerp(partialTick, this.exposeProgressO, this.exposeProgress) : 0;
+        return Mth.lerp(partialTick, this.exposeProgressO, this.exposeProgress);
     }
 
     public boolean isDrilling()
@@ -460,18 +460,25 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
 
     public int getBeamTicks()
     {
+        if (ReviewR58.EXPOSE_CYCLE && this.level().isClientSide) return this.isAlive() ? ReviewR58.beamTicks(this.tickCount) : 0;
         return this.entityData.get(DATA_BEAM_TICKS);
     }
-    public int getBeamDurationR54(){return this.entityData.get(DATA_BEAM_DURATION_R54);}
+    public int getBeamDurationR54()
+    {
+        if (ReviewR58.EXPOSE_CYCLE && this.level().isClientSide) return ReviewR58.BEAM;
+        return this.entityData.get(DATA_BEAM_DURATION_R54);
+    }
 
     public Vec3 getBeamEnd()
     {
+        if (ReviewR58.EXPOSE_CYCLE && this.level().isClientSide) return ReviewR58.target(this);
         Vector3f end = this.entityData.get(DATA_BEAM_END);
         return new Vec3(end.x(), end.y(), end.z());
     }
 
     public boolean isCharging()
     {
+        if (ReviewR58.EXPOSE_CYCLE && this.level().isClientSide) return ReviewR58.charging(this.tickCount);
         return this.entityData.get(DATA_CHARGING);
     }
 
@@ -521,8 +528,11 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             this.spin += this.isCharging() || this.isDrilling() ? 6.0F : 0.75F;
             this.exposeProgressO = this.exposeProgress;
             float target = this.isExposed() ? 1.0F : 0.0F;
-            this.exposeProgress += (target - this.exposeProgress) * 0.16F;
-            if (!this.isExposed()) this.exposeProgressO = this.exposeProgress = 0;
+            if (ReviewR58.EXPOSE_CYCLE) target = ReviewR58.expose(this.tickCount);
+            // Opens over ~15 ticks and folds back over ~20: the shell closing
+            // used to snap shut in a single frame.
+            this.exposeProgress += (target - this.exposeProgress) * (target > this.exposeProgress ? 0.16F : 0.12F);
+            if (target == 0 && this.exposeProgress < .002F) this.exposeProgress = 0;
         }
     }
 
@@ -1204,6 +1214,32 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                     broken++;
                 }
             }
+        }
+    }
+
+    /**
+     * Development review only (-Dprojectseele.ramielReviewR58, client side):
+     * a 200-tick cycle of charge, opening, a 50-tick beam onto the nearest
+     * raised shield (or the ground ahead) and closing, with no AI or damage.
+     */
+    static final class ReviewR58
+    {
+        static final boolean EXPOSE_CYCLE = Boolean.getBoolean("projectseele.ramielReviewR58");
+        static final int CYCLE = 200, OPEN = 30, FIRE = 80, BEAM = 50, CLOSE = 150;
+        static float expose(int tick) { int c = tick % CYCLE; return c >= OPEN && c < CLOSE ? 1 : 0; }
+        static boolean charging(int tick) { int c = tick % CYCLE; return c >= 10 && c < FIRE; }
+        static int beamTicks(int tick) { int c = tick % CYCLE; return c >= FIRE && c < FIRE + BEAM ? FIRE + BEAM - c : 0; }
+        static Vec3 target(RamielEntity ramiel)
+        {
+            Vec3 best = null; double distance = Double.MAX_VALUE;
+            for (var eva : ramiel.level().getEntitiesOfClass(EvaUnit01Entity.class, ramiel.getBoundingBox().inflate(400)))
+            {
+                var plate = EvaShieldRigR47.guardPlaneR54(eva);
+                if (plate == null) continue;
+                double d = plate.centre().distanceToSqr(ramiel.position());
+                if (d < distance) { distance = d; best = plate.centre(); }
+            }
+            return best != null ? best : ramiel.position().add(ramiel.getForward().scale(120)).add(0, -40, 0);
         }
     }
 }

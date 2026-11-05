@@ -7733,15 +7733,32 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     @Override
     protected Vec3 getRiddenInput(Player player, Vec3 input)
     {
-        if(this.fixedCannonOperatingR52()){this.pilotMovementRequested=false;return Vec3.ZERO;}
-        if(this.isBerserk()){this.pilotMovementRequested=false;return Vec3.ZERO;}
-        if(com.projectseele.physics.CombatBodyDynamics.active(this)){this.pilotMovementRequested=false;return Vec3.ZERO;}
-        if(CombatFeelR31.restrained(this)||EvaCombatR31.locksInput(this))return Vec3.ZERO;
-        if(EvaShutdownR30.disabled(this)){this.pilotMovementRequested=false;return Vec3.ZERO;}
+        Vec3 wanted = this.pilotInputR58(player);
+        if (wanted == null) { this.riddenInputR58 = Vec3.ZERO; return Vec3.ZERO; }
+        // A sixty-metre body gathers into its stride and runs out of it: the
+        // pilot's input reaches full speed over ~8 ticks and lets go over ~6,
+        // where vanilla friction alone gave 3. The gait blend (6 ticks) now
+        // keeps up with the body instead of trailing a sliding start.
+        Vec3 held = this.riddenInputR58;
+        boolean gathering = wanted.lengthSqr() >= held.lengthSqr();
+        double step = gathering ? RIDDEN_GATHER_R58 : RIDDEN_RELEASE_R58;
+        held = new Vec3(Mth.approach((float) held.x, (float) wanted.x, (float) step), 0,
+                Mth.approach((float) held.z, (float) wanted.z, (float) step));
+        this.riddenInputR58 = held;
+        return held;
+    }
+
+    private Vec3 pilotInputR58(Player player)
+    {
+        if(this.fixedCannonOperatingR52()){this.pilotMovementRequested=false;return null;}
+        if(this.isBerserk()){this.pilotMovementRequested=false;return null;}
+        if(com.projectseele.physics.CombatBodyDynamics.active(this)){this.pilotMovementRequested=false;return null;}
+        if(CombatFeelR31.restrained(this)||EvaCombatR31.locksInput(this))return null;
+        if(EvaShutdownR30.disabled(this)){this.pilotMovementRequested=false;return null;}
         if (this.getActivationTicks() > 20 || this.isLaunchSequenceActive())
         {
             this.pilotMovementRequested = false;
-            return Vec3.ZERO;
+            return null;
         }
         this.pilotMovementRequested = Math.abs(player.xxa) > 0.01F
                 || Math.abs(player.zza) > 0.01F;
@@ -7750,13 +7767,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // Captured planted feet travel with the authoritative action root.
             // Held movement resumes when the action finishes; it is not added
             // on top of the capture as a second, sliding trajectory.
-            return Vec3.ZERO;
+            return null;
         }
         double strafe = this.isPilotProne() ? 0.28D
                 : this.isPilotCrouching() ? 0.45D : 0.7D;
         return new Vec3(player.xxa * strafe, 0.0D,
                 player.zza >= 0.0F ? player.zza : player.zza * 0.6D);
     }
+
+    private static final double RIDDEN_GATHER_R58 = 0.125D, RIDDEN_RELEASE_R58 = 0.17D;
+    private Vec3 riddenInputR58 = Vec3.ZERO;
 
     @Override
     protected float getRiddenSpeed(Player player)

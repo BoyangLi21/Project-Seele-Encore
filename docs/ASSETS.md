@@ -105,6 +105,7 @@ source licence and is outside the repository's MIT code licence.
 | Positron rifle | [Kantrophe Positron Rifle](https://sketchfab.com/3d-models/positron-rifle-neon-genesis-evangelion-523e4d5b344543aa97b21e885f9dc064), CC Attribution | Download contains Blender 3.04 source and 4K PBR textures only. Portable Blender 3.6 exported and decimated 56,614 source triangles to 20,381; the 5,990-triangle ground cradles are excluded, leaving a 14,391-triangle local cannon. The axis/pivot correction passed an in-game Tigerar1 attachment capture; the two-hand support pose remains under Visual Lab review. |
 | Pallet Rifle | [Oni Anniversary Edition community conversion](https://wiki.oni2.net/AE_talk%3ANew_weapons), provenance/redistribution permission not yet confirmed | Exact TV-style 167-vertex / 292-triangle OBJ and 1024x512 BMP are installed only under ignored external-assets/. tools/make_downloaded_pallet_rifle_pack.py is fingerprint-locked to that pair and emits a local-only runtime derivative. It must not ship until explicit author/licensor approval is recorded; the original 240-triangle MIT procedural rifle remains the distributable fallback. |
 | Ramiel (R53) | [doster114 `RAMIEL`](https://sketchfab.com/3d-models/ramiel-e77106d6ecb34d5bac49582ab969671d), CC Attribution 4.0 (published 2026-08-17; the page describes it as a scrapped game-jam model). Identified 2026-11-05: the user-supplied `ramiel.zip` / `RAMIEL.glb` (SHA-256 `5ad81b03501888165456d25afc7a09e30f180a92dfefc87f002ae74e74c6df1d`) is this download, confirmed by the user and by the page's 8,816-face count | `tools/import_ramiel_source_r53.py` keeps all 8,816 triangles (closed form 1,100, expanded form 7,716, core) in the private optional pack drawn by `RamielSourceModelR53`; the procedural octahedron remains the fallback when the pack is absent. CC BY permits public redistribution, so it may ship once the release credits name doster114 with the link and licence. |
+| Sachiel (R58) | [allanromanreyes `Sachiel`](https://sketchfab.com/3d-models/b2b9e4844351447bb267f705de8e3c27), CC Attribution-ShareAlike (page licence). The user supplied it 2026-11-05 as part of the Tigerar1 set (`sachiel.zip`, OBJ SHA-256 `de7f9ba74819f6c73bb852023d9c5323fc703acbba69b96568063467c5302531`, Blender 2.78 export, one 512x512 texture `m01_001.png`); the Sketchfab search shows the same 4,306-face mesh published by allanromanreyes, so credit goes to that page. Its texture/part naming (`m01_001`, `Untitled.NNN`) matches the other files of that set, which may themselves be game extracts; the user accepted that risk for now | `tools/import_sachiel_tigerar1_r58.py` keeps all 87 source pieces and their own proportions, fits the 17-bone Sachiel skeleton to them, swings the forearms forward into the rig's rest pose and binds pieces rigidly (joint-crossing pieces blend; 568 triangles split once at the joints, 6,010 in all). It replaces the Battle Orchestra extract in the private pack, and `angel_grip_r31.json` was re-measured on it. The first-battle wrap cache was built on the old mesh and is now refused by its fingerprint, so the self-destruct cling plays on ordinary skinning. ShareAlike: adapted mesh/texture must be shared under CC BY-SA with credit. |
 | Ultraman private avatar | User-supplied `ultraman-rig-updated.zip`; no licence or author metadata included | Local/private testing only. FBX contains a 54-bone Character Creator rig and 20,565 exported triangles. `tools/make_ultraman_avatar_pack.py` emits an ignored rigid-bone runtime derivative. Never publish or redistribute the source or derivative without provenance and permission. |
 
 
@@ -112,9 +113,10 @@ source licence and is outside the repository's MIT code licence.
 
 - Source: [Kiki260100 `Lilith - Evangelion`](https://sketchfab.com/3d-models/lilith-evangelion-8203459ac3dc48e18bad7b2a6b46995f), downloaded manually by the user.
 - Local archive: `external-assets/incoming/lilith-kiki260100.zip.zip`; GLB SHA-256 `6693b5ca325d6fa5c355152962e75cf50162266320a4519aab3130c2ecfef06c`.
-- The downloaded archive contains only the GLB and two textures. No licence
-  document is bundled, so this project treats the model as local evaluation
-  material and will obtain explicit author approval before any release.
+- The downloaded archive contains only the GLB and two textures. The
+  Sketchfab page (checked 2026-11-05 via the public API: 19,754 faces,
+  published 2023-10-18) licenses it CC Attribution 4.0, so it may be
+  redistributed and adapted with credit to kiki260100, the link and the licence.
 - `tools/make_lilith_model_pack.py` converts the GLB into six material layers
   inside the Git-ignored `run/resourcepacks/eva_real_model/` pack: body 11,814,
   eyes 1,540, face 322, mask 1,082, nails 448 and sealing spear 4,524
@@ -124,8 +126,10 @@ source licence and is outside the repository's MIT code licence.
   source body's front/side visual audit confirms the cross remains behind the
   body and the sealing spear extends toward the observation gallery.
 - Converter, entity integration and clean-room fallback geometry may ship as
-  code. The generated Kiki mesh/textures and source archive must never be
-  committed or redistributed without permission.
+  code. The generated Kiki mesh/textures may be redistributed under CC BY
+  with the credit above; they still stay out of Git (size), like the other
+  model packs.
+
 `tools/make_tiger_eva_variants_pack.py` writes each EVA target incrementally
 and never clears the active resource pack. During development its `--output`
 must point at an ignored staging pack until the matching renderer and Visual
@@ -451,7 +455,8 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 ## R53 用户提供的托盘步枪
 
 - 2026-10-21 用户提供 `evangelion-pellet-rifle.zip`，SHA-256 `0743aaf30582bce9730b5a4508277bd18712e11ca28e1bb7fe047e0bff9c40c6`。完整9136三角面、2048×2048原底色及AO／法线／粗糙度／金属度来源均为该压缩包。导入、私有交付和实际握持证据见 [本批记录](R53_PELLET_RIFLE_20261021.zh.md)。
-- 尚未证明公开再分发授权；源模型和贴图不进入公开仓库。工具仅做坐标转换、原多边形三角化及材质通道转换，不加入官方声音、截图或影像素材。
+- 2026-11-05 来源确认：该压缩包即 [Joshua Burrows `Evangelion - Pellet Rifle`](https://sketchfab.com/3d-models/evangelion-pellet-rifle-d007aecd79824a688c3fc362f6da3936)（Sketchfab 页面许可 CC Attribution 4.0，2021-05-18 发布，作者自述为个人重建作品；页面面数 9,136 与本包一致，用户确认）。CC BY 允许公开再分发和改作，发布时须署名 Joshua Burrows 并附链接与许可。
+- 工具仅做坐标转换、原多边形三角化及材质通道转换，不加入官方声音、截图或影像素材。上表 Oni AE 托盘步枪是另一份旧候选，与此无关，仍不可分发。
 
 ## R53 用户提供的新转移架
 

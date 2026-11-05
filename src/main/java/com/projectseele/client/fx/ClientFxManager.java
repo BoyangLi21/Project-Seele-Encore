@@ -85,10 +85,21 @@ public final class ClientFxManager
     {
         ACTIVE.add(new CannonBeam(new Vec3(packet.x1, packet.y1, packet.z1),
                 new Vec3(packet.x2, packet.y2, packet.z2)));
+        // The shooter feels the shot: view thrown up and back, field of view punched out.
+        var mc = Minecraft.getInstance();
+        var eva = mc.player == null ? null : com.projectseele.world.EvaPilotResolver.controlTarget(mc.player);
+        if (eva != null && eva.position().distanceToSqr(packet.x1, packet.y1, packet.z1) < 70 * 70)
+            com.projectseele.client.CameraKickR58.kick(-1.6F, .7F, .08F, 7F);
     }
 
     public static void addNukeFx(com.projectseele.network.ClientboundNukeFxPacket packet)
     { addNukeFx(packet, true); }
+
+    /** A blow landing between giants, sized in blocks so it reads from the pilot's height. */
+    public static void addImpactBurst(Vec3 pos, float scale)
+    {
+        if (fxIntensity() > 0) ACTIVE.add(new ImpactBurst(pos, scale));
+    }
 
     public static void addNukeFx(com.projectseele.network.ClientboundNukeFxPacket packet, boolean withSound)
     {
@@ -255,7 +266,7 @@ public final class ClientFxManager
             poseStack.pushPose();
             poseStack.translate(fx.pos.x - cam.x, fx.pos.y - cam.y, fx.pos.z - cam.z);
             VertexConsumer target = fx instanceof KabbalahTree
-                    ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof CrossExplosion || fx instanceof NukeExplosion || fx instanceof RifleTracer
+                    ? buffer.getBuffer(TREE_GEOMETRY) : fx instanceof CrossExplosion || fx instanceof NukeExplosion || fx instanceof RifleTracer || fx instanceof ImpactBurst
                     // Vanilla lightning writes depth even for translucent
                     // rings, cutting a hard empty band through the smoke.
                     ? buffer.getBuffer(com.projectseele.client.render.EnergyGlowR24.CROSS) : buffer.getBuffer(RenderType.lightning());
@@ -487,10 +498,17 @@ public final class ClientFxManager
         }
     }
 
-    /** One positron sniper shot: brilliant flash, quick fade. */
+    /**
+     * One positron shot at the scale of the sixty-metre unit that fires it:
+     * the bolt crosses the range in two and a half ticks, a white-gold core in
+     * an orange sheath with two charged strands winding round it, a ring of
+     * displaced air at the muzzle and a flash where it lands; the ionised
+     * channel then thins and fades over a second and a half.
+     */
     private static final class CannonBeam extends WorldFx
     {
-        static final int LIFETIME = 14;
+        static final int LIFETIME = 32;
+        private static final float TRAVEL = 2.5F, HOT = 4F;
 
         private final Vector3f end;
 
@@ -506,18 +524,127 @@ public final class ClientFxManager
             return LIFETIME;
         }
 
+        private static void ring(Matrix4f pose, VertexConsumer out, Vector3f centre, Vector3f u, Vector3f v,
+                                 float radius, float half, float r, float g, float b, float a)
+        {
+            if (a <= .003F || radius <= 0) return;
+            RibbonRenderer.drawPolyRing(new Matrix4f(pose).translate(centre), out, u, v, 24, radius, half, r, g, b, a);
+        }
+
+        private static void spokes(Matrix4f pose, VertexConsumer out, Vector3f centre, Vector3f axis, Vector3f u, Vector3f v,
+                                   int count, float inner, float outer, float lean, float width, float seed,
+                                   float r, float g, float b, float a)
+        {
+            if (a <= .003F) return;
+            for (int i = 0; i < count; i++)
+            {
+                float angle = (i + .37F * Mth.sin(seed + i * 2.1F)) * Mth.TWO_PI / count;
+                float length = outer * (.65F + .35F * Mth.sin(seed * 1.7F + i * 1.3F) * Mth.sin(seed * 1.7F + i * 1.3F));
+                Vector3f d = new Vector3f(u).mul(Mth.cos(angle)).add(new Vector3f(v).mul(Mth.sin(angle)));
+                Vector3f p = new Vector3f(centre).fma(inner, d);
+                Vector3f q = new Vector3f(centre).fma(length, d).fma(lean * length, axis);
+                RibbonRenderer.drawStarRibbon(pose, out, p, q, width, width * .15F, r, g, b, a);
+            }
+        }
+
         @Override
         void render(PoseStack poseStack, VertexConsumer consumer, float partialTick)
         {
             float t = this.age + partialTick;
-            float alpha = Mth.clamp(1.0F - t / LIFETIME, 0.0F, 1.0F);
-            float flash = t < 2.0F ? 1.5F : 1.0F;
+            float length = this.end.length();
+            if (length < .01F) return;
             Matrix4f pose = poseStack.last().pose();
-            Vector3f start = new Vector3f(0.0F, 0.0F, 0.0F);
-            RibbonRenderer.drawStarRibbon(pose, consumer, start, this.end,
-                    0.65F * flash, 0.40F * flash, 0.55F, 0.80F, 1.0F, alpha * 0.5F);
-            RibbonRenderer.drawStarRibbon(pose, consumer, start, this.end,
-                    0.28F * flash, 0.16F * flash, 1.0F, 0.99F, 0.95F, alpha * 0.95F);
+            Vector3f axis = new Vector3f(this.end).div(length);
+            Vector3f[] basis = RibbonRenderer.planeBasis(axis);
+            Vector3f u = basis[0], v = basis[1];
+            Vector3f start = new Vector3f();
+            float reach = Mth.clamp(t / TRAVEL, 0, 1);
+            Vector3f tip = new Vector3f(axis).mul(length * reach);
+            // Full strength until the bolt has landed, then the channel cools.
+            float alpha = t < HOT ? 1 : Mth.clamp(1 - (t - HOT) / (LIFETIME - HOT), 0, 1);
+            alpha *= alpha;
+            float width = t < HOT ? 1.25F : Mth.lerp(Mth.clamp((t - HOT) / 10, 0, 1), 1.25F, .45F);
+
+            RibbonRenderer.drawSoftStarRibbon(pose, consumer, start, tip, 15F * width, 11F * width, 1F, .42F, .1F, .32F * alpha);
+            RibbonRenderer.drawStarRibbon(pose, consumer, start, tip, 5.5F * width, 4.2F * width, 1F, .58F, .18F, .7F * alpha);
+            RibbonRenderer.drawStarRibbon(pose, consumer, start, tip, 2.3F * width, 1.8F * width, 1F, .97F, .84F, alpha);
+
+            // Two strands winding round the bolt, loosening as it cools.
+            float radius = 3.2F + 2.4F * (1 - alpha);
+            int steps = Math.max(2, (int) (length * reach / 7F));
+            for (int strand = 0; strand < 2; strand++)
+            {
+                Vector3f previous = null;
+                for (int k = 0; k <= steps; k++)
+                {
+                    float s = length * reach * k / steps;
+                    float angle = s / 16F + t * .8F + strand * Mth.PI;
+                    Vector3f p = new Vector3f(axis).mul(s)
+                            .fma(radius * Mth.cos(angle), u).fma(radius * Mth.sin(angle), v);
+                    if (previous != null)
+                        RibbonRenderer.drawStarRibbon(pose, consumer, previous, p, .55F * width, .55F * width, 1F, .82F, .45F, .75F * alpha);
+                    previous = p;
+                }
+            }
+
+            // Muzzle: the flash and the ring of displaced air running outward.
+            float muzzle = Mth.clamp(1 - t / 9F, 0, 1);
+            spokes(pose, consumer, new Vector3f(axis).mul(3), axis, u, v, 12, 2F, 9F + 16F * (1 - muzzle), -.15F, 1.1F,
+                    this.age * 3.1F, 1F, .9F, .6F, .9F * muzzle * muzzle);
+            ring(pose, consumer, new Vector3f(axis).mul(4), u, v, 4F + t * 4.2F, .9F + t * .25F, 1F, .78F, .5F, .55F * muzzle);
+            ring(pose, consumer, new Vector3f(axis).mul(10), u, v, 2F + t * 2.6F, .6F, 1F, .7F, .35F, .35F * muzzle);
+
+            // Landing flash, once the front arrives.
+            if (reach >= 1)
+            {
+                float since = t - TRAVEL, impact = Mth.clamp(1 - since / 14F, 0, 1);
+                Vector3f hit = new Vector3f(this.end);
+                spokes(pose, consumer, hit, new Vector3f(axis).negate(), u, v, 16, 1.5F, 10F + since * 3F, .45F, 1.6F,
+                        this.age * 2.3F, 1F, .93F, .7F, impact);
+                ring(pose, consumer, hit, u, v, 5F + since * 5.5F, 1.4F, 1F, .66F, .3F, .6F * impact);
+                RibbonRenderer.drawSoftStarRibbon(pose, consumer, new Vector3f(hit).fma(-14F, axis), new Vector3f(hit).fma(3F, axis),
+                        22F * impact, 22F * impact, 1F, .8F, .5F, .5F * impact);
+            }
+        }
+    }
+
+    /** Shock ring over the ground, streaks thrown out and a brief flash where a giant's blow lands. */
+    private static final class ImpactBurst extends WorldFx
+    {
+        static final int LIFETIME = 14;
+        private final float scale;
+
+        ImpactBurst(Vec3 pos, float scale)
+        {
+            super(pos);
+            this.scale = scale;
+        }
+
+        @Override
+        int lifetime()
+        {
+            return LIFETIME;
+        }
+
+        @Override
+        void render(PoseStack poseStack, VertexConsumer consumer, float partialTick)
+        {
+            float t = this.age + partialTick, f = Mth.clamp(t / LIFETIME, 0, 1), a = (1 - f) * (1 - f);
+            Matrix4f pose = poseStack.last().pose();
+            float s = this.scale;
+            RibbonRenderer.drawGroundRing(pose, consumer, (3F + t * 2.4F) * s, (.9F + t * .18F) * s, 1F, .86F, .62F, .55F * a);
+            RibbonRenderer.drawGroundRing(pose, consumer, (2F + t * 1.3F) * s, .7F * s, 1F, .72F, .45F, .35F * a);
+            float flash = Mth.clamp(1 - t / 5F, 0, 1);
+            RibbonRenderer.drawSoftStarRibbon(pose, consumer, new Vector3f(0, -1, 0), new Vector3f(0, (2F + 6F * flash) * s, 0),
+                    6F * s * flash, 2F * s * flash, 1F, .95F, .8F, .7F * flash);
+            for (int i = 0; i < 12; i++)
+            {
+                float angle = (i + .4F * Mth.sin(i * 2.7F)) * Mth.TWO_PI / 12;
+                float reach = (4F + t * 2.8F) * s * (.7F + .3F * Mth.sin(i * 1.9F) * Mth.sin(i * 1.9F));
+                Vector3f d = new Vector3f(Mth.cos(angle), 0, Mth.sin(angle));
+                RibbonRenderer.drawStarRibbon(pose, consumer, new Vector3f(d).mul(1.5F * s), new Vector3f(d).mul(reach).add(0, .35F * reach, 0),
+                        .7F * s, .08F * s, 1F, .9F, .7F, .8F * a);
+            }
         }
     }
 

@@ -28,7 +28,10 @@ public final class SurfaceAngelRoutingR52Test
         var owner=java.util.UUID.fromString("00000000-0000-0000-0000-000000000001");
         var target=java.util.UUID.fromString("00000000-0000-0000-0000-000000000002");
         var foreign=java.util.UUID.fromString("00000000-0000-0000-0000-000000000003");
-        for(String chapter:new String[]{"sachiel","shamshel"})for(double distance:new double[]{48,80,160})
+        // Shamshel is closed until a redistributable model exists: its kill never finishes a chapter.
+        {var closed=new TvCampaignSavedData();closed.active="shamshel";closed.owner=owner;closed.angel=target;closed.phase="combat";
+         check(!closed.canFinish("shamshel",owner,target),"A closed chapter cannot be finished");}
+        for(String chapter:new String[]{"sachiel"})for(double distance:new double[]{48,80,160})
         {
             var data=new TvCampaignSavedData();data.active=chapter;data.owner=owner;data.angel=target;data.phase="approach";data.generationR43=6;
             check(!data.canFinish(chapter,owner,target),"Merely approaching does not satisfy combat completion");
