@@ -1,0 +1,1277 @@
+{
+  "source_design": {
+    "sources": [
+      "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\road-floor-north-current-source-v2",
+      "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\road-floor-gora-current-source-v2",
+      "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\road-floor-valley-current-source-v2",
+      "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\road-floor-gora-south-current-source-v2",
+      "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\road-floor-yumoto-south-current-source-v2",
+      "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\road-floor-coast-current-source-v2"
+    ],
+    "restore": [
+      {
+        "pos": [
+          1588,
+          -11,
+          1010
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1588,
+          -11,
+          1011
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1587,
+          -11,
+          1012
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1588,
+          -11,
+          1012
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1587,
+          -11,
+          1013
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1588,
+          -11,
+          1013
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1586,
+          -11,
+          1014
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1587,
+          -11,
+          1014
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1586,
+          -11,
+          1015
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1587,
+          -11,
+          1015
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1585,
+          -10,
+          1016
+        ],
+        "grade2": -21,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1586,
+          -11,
+          1016
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1585,
+          -11,
+          1017
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1586,
+          -11,
+          1017
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1585,
+          -11,
+          1018
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1586,
+          -11,
+          1018
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1584,
+          -11,
+          1019
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1585,
+          -11,
+          1019
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1584,
+          -11,
+          1020
+        ],
+        "grade2": -22,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1585,
+          -11,
+          1020
+        ],
+        "grade2": -23,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1584,
+          -11,
+          1021
+        ],
+        "grade2": -23,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          291,
+          80,
+          196
+        ],
+        "grade2": 160,
+        "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          292,
+          80,
+          196
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          293,
+          80,
+          196
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          294,
+          80,
+          196
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          295,
+          80,
+          196
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          296,
+          80,
+          196
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          297,
+          80,
+          196
+        ],
+        "grade2": 160,
+        "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          292,
+          80,
+          197
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          293,
+          80,
+          197
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          294,
+          80,
+          197
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          295,
+          80,
+          197
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          296,
+          80,
+          197
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          297,
+          80,
+          197
+        ],
+        "grade2": 160,
+        "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          293,
+          80,
+          198
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          294,
+          80,
+          198
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          295,
+          80,
+          198
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          296,
+          80,
+          198
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          297,
+          80,
+          198
+        ],
+        "grade2": 160,
+        "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          294,
+          80,
+          199
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          294,
+          80,
+          200
+        ],
+        "grade2": 160,
+        "state": "projectseele:road_marking_slab[type=bottom,waterlogged=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1501,
+          -1,
+          947
+        ],
+        "grade2": -3,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1500,
+          -1,
+          948
+        ],
+        "grade2": -3,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1501,
+          -1,
+          948
+        ],
+        "grade2": -3,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1500,
+          -1,
+          949
+        ],
+        "grade2": -3,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1501,
+          -1,
+          949
+        ],
+        "grade2": -3,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1500,
+          -1,
+          950
+        ],
+        "grade2": -3,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1501,
+          -1,
+          950
+        ],
+        "grade2": -3,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1509,
+          0,
+          948
+        ],
+        "grade2": -1,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1510,
+          0,
+          948
+        ],
+        "grade2": 0,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1509,
+          0,
+          949
+        ],
+        "grade2": -1,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1510,
+          0,
+          949
+        ],
+        "grade2": 0,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1509,
+          0,
+          950
+        ],
+        "grade2": -1,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1510,
+          0,
+          950
+        ],
+        "grade2": 0,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1585,
+          -14,
+          1034
+        ],
+        "grade2": -28,
+        "state": "minecraft:grass_block[snowy=false]",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1586,
+          -14,
+          1034
+        ],
+        "grade2": -28,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1585,
+          -14,
+          1035
+        ],
+        "grade2": -28,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1586,
+          -14,
+          1035
+        ],
+        "grade2": -29,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1584,
+          -14,
+          1036
+        ],
+        "grade2": -28,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          1585,
+          -14,
+          1036
+        ],
+        "grade2": -29,
+        "state": "minecraft:air",
+        "was_failed": true
+      },
+      {
+        "pos": [
+          254,
+          79,
+          16
+        ],
+        "grade2": 157,
+        "state": "minecraft:deepslate_bricks",
+        "was_failed": true
+      }
+    ],
+    "retired": [
+      {
+        "pos": [
+          1048,
+          25,
+          683
+        ],
+        "grade2": 49,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1048,
+          25,
+          684
+        ],
+        "grade2": 49,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1048,
+          25,
+          685
+        ],
+        "grade2": 49,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1048,
+          25,
+          686
+        ],
+        "grade2": 49,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1048,
+          25,
+          687
+        ],
+        "grade2": 49,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          2283,
+          -56,
+          1192
+        ],
+        "grade2": -113,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          2284,
+          -56,
+          1192
+        ],
+        "grade2": -113,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          2285,
+          -56,
+          1192
+        ],
+        "grade2": -113,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1493,
+          -4,
+          946
+        ],
+        "grade2": -9,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1494,
+          -4,
+          946
+        ],
+        "grade2": -9,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          785,
+          73,
+          640
+        ],
+        "grade2": 145,
+        "state": "minecraft:smooth_stone",
+        "was_failed": true,
+        "reason": "retained house corner outside entrances"
+      },
+      {
+        "pos": [
+          763,
+          77,
+          647
+        ],
+        "grade2": 153,
+        "state": "minecraft:smooth_stone",
+        "was_failed": true,
+        "reason": "retained house corner outside entrances"
+      },
+      {
+        "pos": [
+          789,
+          73,
+          647
+        ],
+        "grade2": 145,
+        "state": "minecraft:smooth_stone",
+        "was_failed": true,
+        "reason": "retained house corner outside entrances"
+      },
+      {
+        "pos": [
+          686,
+          87,
+          657
+        ],
+        "grade2": 173,
+        "state": "minecraft:smooth_stone",
+        "was_failed": true,
+        "reason": "retained house corner outside entrances"
+      },
+      {
+        "pos": [
+          1055,
+          21,
+          723
+        ],
+        "grade2": 41,
+        "state": "minecraft:stone_bricks",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          964,
+          66,
+          1024
+        ],
+        "grade2": 131,
+        "state": "minecraft:stone_bricks",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1484,
+          5,
+          1033
+        ],
+        "grade2": 9,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1994,
+          -51,
+          1147
+        ],
+        "grade2": -103,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          2231,
+          -51,
+          1230
+        ],
+        "grade2": -103,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": true,
+        "reason": "retaining-wall or lamp-bearing edge outside the continuous street"
+      },
+      {
+        "pos": [
+          1492,
+          -4,
+          946
+        ],
+        "grade2": -8,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": false,
+        "reason": "adjacent isolated retaining-wall top, below the actual pavement edge"
+      },
+      {
+        "pos": [
+          2287,
+          -56,
+          1193
+        ],
+        "grade2": -112,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": false,
+        "reason": "adjacent isolated retaining-wall top, below the actual pavement edge"
+      },
+      {
+        "pos": [
+          2288,
+          -56,
+          1193
+        ],
+        "grade2": -112,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": false,
+        "reason": "adjacent isolated retaining-wall top, below the actual pavement edge"
+      },
+      {
+        "pos": [
+          962,
+          66,
+          1025
+        ],
+        "grade2": 132,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": false,
+        "reason": "adjacent isolated retaining-wall top, below the actual pavement edge"
+      },
+      {
+        "pos": [
+          966,
+          66,
+          1023
+        ],
+        "grade2": 132,
+        "state": "minecraft:light_gray_concrete",
+        "was_failed": false,
+        "reason": "adjacent isolated retaining-wall top, below the actual pavement edge"
+      },
+      {
+        "pos": [
+          1573,
+          -11,
+          1029
+        ],
+        "grade2": -22,
+        "state": "minecraft:smooth_stone",
+        "was_failed": false,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1577,
+          -12,
+          1029
+        ],
+        "grade2": -24,
+        "state": "minecraft:black_concrete",
+        "was_failed": false,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1575,
+          -11,
+          1030
+        ],
+        "grade2": -23,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": false,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1576,
+          -12,
+          1030
+        ],
+        "grade2": -24,
+        "state": "minecraft:black_concrete",
+        "was_failed": false,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1577,
+          -12,
+          1030
+        ],
+        "grade2": -24,
+        "state": "minecraft:black_concrete",
+        "was_failed": false,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1578,
+          -12,
+          1030
+        ],
+        "grade2": -24,
+        "state": "minecraft:air",
+        "was_failed": true,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1579,
+          -12,
+          1030
+        ],
+        "grade2": -25,
+        "state": "minecraft:air",
+        "was_failed": true,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1578,
+          -12,
+          1031
+        ],
+        "grade2": -24,
+        "state": "minecraft:air",
+        "was_failed": true,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1575,
+          -11,
+          1032
+        ],
+        "grade2": -23,
+        "state": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "was_failed": false,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1576,
+          -12,
+          1032
+        ],
+        "grade2": -24,
+        "state": "minecraft:air",
+        "was_failed": true,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1577,
+          -12,
+          1032
+        ],
+        "grade2": -24,
+        "state": "minecraft:air",
+        "was_failed": true,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1574,
+          -11,
+          1033
+        ],
+        "grade2": -23,
+        "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+        "was_failed": false,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1575,
+          -12,
+          1033
+        ],
+        "grade2": -24,
+        "state": "minecraft:smooth_stone",
+        "was_failed": false,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1576,
+          -12,
+          1033
+        ],
+        "grade2": -24,
+        "state": "minecraft:air",
+        "was_failed": true,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      },
+      {
+        "pos": [
+          1577,
+          -12,
+          1033
+        ],
+        "grade2": -24,
+        "state": "minecraft:air",
+        "was_failed": true,
+        "landscaped": true,
+        "reason": "isolated obsolete road spur outside the continuous carriageway, with no entrance or destination"
+      }
+    ],
+    "junction_box": [
+      289,
+      189,
+      298,
+      200
+    ],
+    "whole_map_complete": false,
+    "landscape": [
+      {
+        "pos": [
+          1573,
+          -11,
+          1029
+        ],
+        "before": "minecraft:smooth_stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1577,
+          -12,
+          1029
+        ],
+        "before": "minecraft:black_concrete",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1575,
+          -11,
+          1030
+        ],
+        "before": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "after": "minecraft:air"
+      },
+      {
+        "pos": [
+          1575,
+          -12,
+          1030
+        ],
+        "before": "minecraft:stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1576,
+          -12,
+          1030
+        ],
+        "before": "minecraft:black_concrete",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1577,
+          -12,
+          1030
+        ],
+        "before": "minecraft:black_concrete",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1578,
+          -13,
+          1030
+        ],
+        "before": "minecraft:stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1579,
+          -13,
+          1030
+        ],
+        "before": "minecraft:stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1578,
+          -13,
+          1031
+        ],
+        "before": "minecraft:stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1575,
+          -11,
+          1032
+        ],
+        "before": "projectseele:road_asphalt_slab[type=bottom,waterlogged=false]",
+        "after": "minecraft:air"
+      },
+      {
+        "pos": [
+          1575,
+          -12,
+          1032
+        ],
+        "before": "minecraft:stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1576,
+          -13,
+          1032
+        ],
+        "before": "minecraft:stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1577,
+          -13,
+          1032
+        ],
+        "before": "minecraft:stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1574,
+          -11,
+          1033
+        ],
+        "before": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+        "after": "minecraft:air"
+      },
+      {
+        "pos": [
+          1574,
+          -12,
+          1033
+        ],
+        "before": "minecraft:dirt",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1575,
+          -12,
+          1033
+        ],
+        "before": "minecraft:smooth_stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1576,
+          -13,
+          1033
+        ],
+        "before": "minecraft:dirt",
+        "after": "minecraft:grass_block[snowy=false]"
+      },
+      {
+        "pos": [
+          1577,
+          -13,
+          1033
+        ],
+        "before": "minecraft:stone",
+        "after": "minecraft:grass_block[snowy=false]"
+      }
+    ],
+    "rejected_previous_candidate": "floor-seams-candidate-v1: two disconnected car fragments; never installed"
+  },
+  "authority": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\west-tunnel-installed-authority-v10",
+  "candidate": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\floor-seams-candidate-v2",
+  "receipts": [
+    "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\floor-seams-install-v2\\installation.json",
+    "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\floor-seams-minimap-install-v2\\installation.json",
+    "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\floor-seams-lod-install-v2\\installation.json"
+  ],
+  "validation": {
+    "errors": [],
+    "cells": 102,
+    "surveyed_floor_failures": 87,
+    "restored_surveyed_columns": 61,
+    "paved_columns": 84,
+    "retired_false_public_columns": 39,
+    "captured_public_columns": 20224,
+    "road_defects_before": {
+      "floor": 87,
+      "headroom": 42
+    },
+    "road_defects_after": {
+      "floor": 0,
+      "headroom": 42
+    },
+    "devices_unchanged": 108,
+    "new_surface_columns_with_direct_bearing": 84,
+    "vehicle_journeys": 6,
+    "native_geometry_unchanged": true,
+    "world_written": false,
+    "whole_map_complete": false,
+    "floating_cells_before": 86,
+    "floating_cells_after": 86,
+    "new_floating_cells": 0,
+    "unknown_components": 13
+  },
+  "whole_map_complete": false
+}
