@@ -108,7 +108,7 @@ Linux/macOS 使用 `python3` 和 `./gradlew`。首次构建会下载依赖并准
 | [src/test](src/test/) | 数学、几何、状态持久化、编解码等回归检查 |
 | [tools](tools/) | 依赖准备、资产生成、地图审计和交付工具 |
 | `assets-source/`、`art_sources/` | 已入库的可编辑美术来源 |
-| `docs/` | 设计、来源登记、阶段记录和验证边界 |
+| `docs/` | 设计、来源登记和当前工作记录；已结束的阶段记录在 git 历史里 |
 
 贡献前请读 [CONTRIBUTING](CONTRIBUTING.md)。修改存档先读 [地图编辑协议](docs/MAP_EDITING_PROTOCOL.md)；动作与画面检查见 [视觉工作流](docs/VISUAL_RECOVERY.md)。构建通过不等于玩法、手感或美术验收通过。
 

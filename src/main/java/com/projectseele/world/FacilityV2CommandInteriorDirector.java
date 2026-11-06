@@ -90,7 +90,7 @@ public final class FacilityV2CommandInteriorDirector
             /*
              * These are the two authored dummy planes, not a new video wall.
              * Their centres and complementary X rotations come from the
-             * measured 1:1 NBT masks in S19_LOCAL_COMMAND_ASSET_AUDIT.md.
+             * measured 1:1 NBT masks.
              */
             new PanelSpec("authored_amber_upper",
                     1.0D, -319.5D, -36.0D,

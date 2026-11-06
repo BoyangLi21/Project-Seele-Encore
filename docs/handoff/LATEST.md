@@ -1,8 +1,0 @@
-# Project SEELE 当前接力
-
-读取：[`CODEX_CURRENT_20260820.md`](CODEX_CURRENT_20260820.md)。
-
-Pro 已有资料索引：
-[`GPT56PRO_KNOWLEDGE_INDEX_20260820.md`](GPT56PRO_KNOWLEDGE_INDEX_20260820.md)。
-
-本文件永远只做指针；新任务不要扫描本目录中的旧交接文件。

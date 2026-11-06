@@ -4,7 +4,7 @@
 
 正式安装已完成并回读核验：原三机和插入栓身份保留，原 229 个工作人员岗位保留并增加 7 个新舱岗位，指挥室保护范围的 283,504 格完全相同，2,344 格金字塔单向窗保留。九处既有用户文件改动及私有机体资源包均未改变。
 
-UN-00／UN-01 模型制作已按负责人最新要求暂停；当前模型不替换。给 ChatGPT Pro 的完整提示词在 [MODEL_HANDOFF_R20.md](MODEL_HANDOFF_R20.md)，参考包位于 `artifacts/world_rebuild_r20/model_handoff`。新 UN-01 空机库及独立排液、舱门、注液设施属于本轮建筑工程。
+UN-00／UN-01 模型制作已按负责人最新要求暂停；当前模型不替换。给 ChatGPT Pro 的完整提示词在 MODEL_HANDOFF_R20（已归档），参考包位于 `artifacts/world_rebuild_r20/model_handoff`。新 UN-01 空机库及独立排液、舱门、注液设施属于本轮建筑工程。
 
 ## 道路与交通
 
@@ -51,7 +51,7 @@ UN-00／UN-01 模型制作已按负责人最新要求暂停；当前模型不替
 
 实录视频、原生截图和各自来源清单在 `artifacts/world_rebuild_r20/media`。视频仅作剪辑，不生成或插入运动帧；便携文件保留真实片段时间。更新后的地上／地下标注图在 `artifacts/world_rebuild_r20/maps`。
 
-使用 [R20 测试手册](MANUAL_ACCEPTANCE_R20.md) 和根目录 `start_eva_test_20260917_r20.bat`。默认真实 24 区块渲染；Distant Horizons、Farsight 不随默认启动加载。美术观感与实际驾驶手感由负责人最后验收。
+使用 R20 测试手册 和根目录 `start_eva_test_20260917_r20.bat`。默认真实 24 区块渲染；Distant Horizons、Farsight 不随默认启动加载。美术观感与实际驾驶手感由负责人最后验收。
 
 ## 参考与来源
 

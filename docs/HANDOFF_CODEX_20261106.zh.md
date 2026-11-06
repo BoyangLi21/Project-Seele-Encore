@@ -315,14 +315,9 @@ $StationArgs = @(
 
 - `src/main/java/com/projectseele/client/render/NervHangarDoorRenderer.java`
 - `src/main/java/com/projectseele/entity/EvaFieldActionsR45.java`
-- `docs/R53_KNIFE_HINGE_20261020.zh.md`
-- `docs/R53_LIFT_DOORS_20261020.zh.md`
-- `docs/R53_PAIRED_CONTACTS_20261020.zh.md`
-- `docs/R53_PARKED_SERVICE_20261019.zh.md`
 - `docs/R53_PAUSED_20261019_2222.zh.md`
 - `docs/R53_PAUSED_20261020.zh.md`
 - `docs/R53_RESUMED_20261020.zh.md`
-- `docs/R53_STATION_ROOF_20261020.zh.md`
 
 “可以删除”确定项：**本次没有确认任何F:/eva未提交文件可安全删除**。可重建不等于现在允许删；唯一失败证据、未登记素材、本机安装包均保留。
 
