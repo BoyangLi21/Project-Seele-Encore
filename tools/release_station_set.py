@@ -13,11 +13,15 @@ from map_pipeline.launch_earthworks import ground
 from map_pipeline.delivery_check import read,write,capture_identity,verify_delivery
 from map_pipeline.station_release_checks import verify as check_package
 from map_pipeline.station_layout import verify as check_layout
+from map_pipeline.station_consist import verified_platform_consists
 from release_regional_station import install
 
 
 def native_check(a,layout):
     proof=read(a.candidate/'native-station/native-station-proof.json')
+    if proof['input_plan'] != read(a.candidate/'station-set-plan.json'):
+        raise ValueError('Native consist plan changed after registration')
+    verified_platform_consists(proof, layout)
     m=read(a.candidate/'manifest.json')
     if not proof['existing_loaded_objects_exact'] or set(proof['members'])!=set(m['native_additions']):
         raise ValueError('Native registration preservation proof differs')
@@ -99,7 +103,8 @@ def require_verified(candidate):
 
 
 def record(a):
-    layout=read(a.layout);native_check(a,layout)
+    layout=read(a.layout);proof=native_check(a,layout)
+    platform_consists=verified_platform_consists(proof,layout)
     with stopped_world(a.world):
         delivery_check=verify_delivery(a.world,a.candidate,a.installation,a.production_log)
     write(a.candidate/'delivery-check.json',delivery_check)
@@ -131,6 +136,8 @@ def record(a):
     write(a.next_authority/(a.station_id+'-multilevel-overlay.json'),dict(previous=str(a.authority),candidate=str(a.candidate),installation=str(a.installation),ground_access_columns=layout['ground_access_columns'],station_multi_level_nodes=layout['station_multi_level_nodes'],stations=layout['stations'],existing_public_columns_exact=True,existing_catalog_entries_exact=True,world_written=True,through_service_complete=False))
     installed=sum(r.get('kind')=='station_access'and r.get('id','').startswith('regional-station/')for r in catalog)
     delivery=dict(batch=a.batch,status='Station set structure and native registration installed; live operation pending stage 3',stations=[s['name']for s in layout['stations']],candidate=str(a.candidate),installation=str(a.installation),authority=str(a.next_authority),terrain_field=str(a.terrain),changed_cells=receipt['cells'],recipe_chunks=receipt['metadata_files']-len(read(a.candidate/'manifest.json')['native_additions']),new_native_members=delivery_check['new_native_members_exact'],old_native_members_exact=delivery_check['old_native_members_exact'],identity_files_exact=delivery_check['identity_files_exact'],whole_client_jar_exact=True,production_replay_passed=True,visible_model_clearance_passed=True,public_surfaces=len(layout['station_multi_level_nodes']),ground_public_columns=len(layout['ground_access_columns']),new_ground_public_columns=added,all_public_surfaces_reachable=True,native_platform_lengths=[p for s in layout['stations']for p in s['platform_lengths']],planned_consist_lengths=[s['planned_consist_length']for s in layout['stations']],world_written=True,through_service_complete=False,live_boarding_and_rendered_validation_pending=True,new_geographic_stations_installed=installed,new_geographic_stations_remaining=20-installed)
+    delivery['planned_consist_lengths']=[p['required_train_length'] for p in platform_consists]
+    delivery['platform_consists']=platform_consists
     write(a.delivery,delivery)
     p=a.delivery.parent/'continuation.json';state=read(p)
     state.update(latest_installed_batch=a.batch,planning_authority=str(a.next_authority),active_order_stage=2,current_work=f'All stations: {installed}/20 geographic stations installed; retained-station review and further sites pending.',user_paused=False,un_relocation_allowed=False)

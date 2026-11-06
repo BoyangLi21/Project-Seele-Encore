@@ -16,6 +16,7 @@ from pathlib import Path
 import tempfile
 
 from audit_hq_mtr_protection_r52 import Reader
+from map_pipeline.station_consist import verified_platform_consists
 
 
 def read(path):
@@ -98,6 +99,7 @@ def station_set_mapping(names, design, layout, proof, decoded):
     require(len(set(expected_rails)) == len(expected_rails)
             and set(expected_rails) == {endpoints(r) for r in decoded['rails']},
             'Saved rail endpoints differ from the station set proof')
+    verified_platform_consists(proof, layout)
     mappings = []
     for name in names:
         station, declared = stations[name], layout_by_name[name]

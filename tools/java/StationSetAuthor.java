@@ -44,7 +44,7 @@ public final class StationSetAuthor {
     static JsonObject geometry(JsonObject r,Rail rail){
         String id=str(r,"id");double length=rail.railMath.getLength(),tol=num(r,"length_tolerance");
         need(rail.isValid()&&Double.isFinite(length)&&length>0,"Invalid native rail "+id);
-        need(tol>0&&tol<=.01&&Math.abs(length-num(r,"expected_length"))<=tol,"Unexpected native length "+id);
+        need(tol>0&&tol<=.01&&Math.abs(length-num(r,"expected_length"))<=tol,"Unexpected native length "+id+" actual="+length+" expected="+num(r,"expected_length"));
         Position a=pos(r.getAsJsonArray("from")),b=pos(r.getAsJsonArray("to"));
         need(endpoints(rail,r)&&rail.getStartAngle(a)==Angle.valueOf(str(r,"from_angle"))&&rail.getStartAngle(b)==Angle.valueOf(str(r,"to_angle")),"Native endpoints or angles differ "+id);
         // Rail factories canonicalise endpoint ordering. Read native samples

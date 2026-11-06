@@ -79,6 +79,32 @@ def collision(state):
     return [[0, 0, 0, 1, 1, 1]]
 
 
+def source_contract(spec, cap, measured, old_public, old_road, oldgrade, origin):
+    """Explicit three-dimensional exceptions; legacy defaults stay fail-closed."""
+    l,t,_,_=cap['bounds_xz']; ax,az=origin
+    actors=cap.get('actors',[]); contract=spec.get('actor_preservation')
+    if actors or measured['actors'].any():
+        if not contract or contract.get('source_actors')!=actors:
+            raise ValueError('Unhandled actors or changed actor records')
+        envelopes=contract.get('protected_envelopes',[])
+        if len(envelopes)!=len(actors):raise ValueError('Every source actor needs a conservative envelope')
+        for actor,b in zip(actors,envelopes):
+            x,y,z=actor['pos']
+            if not (b[0]<=x-8 and b[1]<=y-2 and b[2]<=z-8 and b[3]>=x+8 and b[4]>=y+12 and b[5]>=z+8):
+                raise ValueError('Actor envelope must preserve body, foot support and headroom')
+    else:envelopes=[]
+    def actor_protected(p):
+        x,y,z=p
+        return bool(measured['actors'][z-t,x-l]) or any(inside(p,b)for b in envelopes)
+    def overhead(p,before):
+        x,y,z=p
+        if not old_public[z-az,x-ax]:return False
+        feet=float(oldgrade[z-az,x-ax])/2+1
+        minimum=feet+(4.25 if old_road[z-az,x-ax] else 2.25)
+        return before.split('[')[0]in OPEN and y>=minimum and any(inside(p,b)for b in spec.get('retained_public_overpasses',[]))
+    return actor_protected,overhead
+
+
 def author(a):
     spec = read(a.plan)
     if spec['schema'] != 'station-layout-author-v1':
@@ -87,19 +113,20 @@ def author(a):
     if any(p.lower() == 'saves' for p in source.parts + a.out.parts):
         raise ValueError('Only offline captures and candidates are accepted')
     cap = read(source / 'capture.json'); l, t, r, b = cap['bounds_xz']
-    if cap.get('unavailable_chunks') or cap.get('actors'):
+    if cap.get('unavailable_chunks'):
         raise ValueError('Source has missing chunks or unhandled actors')
     if set(cap['chunk_statuses']) != {'full'}:
         raise ValueError('Every captured chunk must have FULL status')
     with np.load(source / 'measured.npz') as f:
-        if list(map(int, f['bounds'])) != [l, t, r, b] or not f['full'].all() or f['actors'].any():
+        if list(map(int, f['bounds'])) != [l, t, r, b] or not f['full'].all():
             raise ValueError('Measured bounds or complete capture mask differs')
-        ground = f['top'].copy(); highest = f['highest'].copy()
+        ground = f['top'].copy(); highest = f['highest'].copy(); measured = {k:f[k].copy()for k in f.files}
     with np.load(authority / 'network.npz') as f:
         ax, az, aX, aZ = map(int, f['bounds'])
-        old_public = f['walk'] | f['road']; oldgrade = f['grade2'].copy()
+        old_public = f['walk'] | f['road']; oldgrade = f['grade2'].copy(); old_road=f['road'].copy()
     if not (ax <= l <= r <= aX and az <= t <= b <= aZ):
         raise ValueError('Capture is outside authoritative network')
+    actor_protected,overhead=source_contract(spec,cap,measured,old_public,old_road,oldgrade,(ax,az))
     captured = nbtlib.load(source / 'captured-devices.dat')
     devices = {tuple(int(d[k]) for k in ('x', 'y', 'z')) for d in captured['Devices']}
     water = unary_union([shape(q['geometry']) for q in spec['water_features']]).buffer(spec['water_buffer'])
@@ -129,7 +156,7 @@ def author(a):
         if e.state(*p) == state:
             return
         before = e.state(*p, original=True)
-        if before.split('[')[0] not in ALLOWED or p in devices or old_public[z - az, x - ax]:
+        if before.split('[')[0] not in ALLOWED or p in devices or actor_protected(p) or (old_public[z - az, x - ax] and not overhead(p,before)):
             raise ValueError(('Protected source', p, before))
         if (x, z) in wet and (not any(inside(p, q) for q in spec['airborne_water_spans']) or before.split('[')[0] not in OPEN):
             raise ValueError(('Water terrain/buffer is protected', p, before))
@@ -145,16 +172,26 @@ def author(a):
     def surface(x, z, grade, policy, declare):
         if policy not in ('ground', 'deck'):
             raise ValueError('Unknown surface support policy')
-        if old_public[z - az, x - ax]:
+        if old_public[z - az, x - ax] and not overhead((x,(grade+1)//2-1,z),e.state(x,(grade+1)//2-1,z,original=True)):
             if int(oldgrade[z - az, x - ax]) != grade:
                 raise ValueError(('Retained street grade differs', x, z, grade))
             if declare: public.add((x, z, grade))
             return
         top = (grade + 1) // 2; terrain = int(ground[z - t, x - l])
+        original_floor=e.state(x,top,z,original=True)
+        if spec.get('preserve_existing_surface_material') and original_floor.split('[')[0]not in ALLOWED:
+            boxes=collision(original_floor)
+            if not boxes or max(q[4]for q in boxes)+top!=grade/2+1 or any(not open_state(e.state(x,h,z))for h in range(top+1,top+4)):
+                raise ValueError(('Retained surface is not a clear declared walking floor',x,top,z))
+            if declare:public.add((x,z,grade))
+            return
         base = terrain - 1 if policy == 'ground' else top - 1
         if policy == 'ground' and (abs(top - terrain) > spec['maximum_ground_earthwork'] or (x, z) in wet):
             raise ValueError(('Unbounded earthwork or water fill', x, z, terrain, top))
-        for y in range(base, top): put(x, y, z, 'minecraft:stone_bricks')
+        for y in range(base, top):
+            retained=e.state(x,y,z,original=True)
+            if spec.get('preserve_existing_surface_material') and retained.split('[')[0]not in ALLOWED and collision(retained)==[[0,0,0,1,1,1]]:continue
+            put(x, y, z, 'minecraft:stone_bricks')
         put(x, top, z, 'minecraft:smooth_stone' if grade % 2 == 0 else 'minecraft:smooth_stone_slab[type=bottom,waterlogged=false]')
         clear_top = max(top + 3, int(highest[z - t, x - l]) + 1) if policy == 'ground' else top + 3
         for y in range(top + 1, clear_top + 1):
@@ -182,12 +219,29 @@ def author(a):
             if op['support'] not in ('ground', 'deck'):
                 raise ValueError('Unknown guard support policy')
             for x, z, grade in op['columns']:
-                if old_public[z - az, x - ax]: continue
+                if old_public[z - az, x - ax] and not overhead((x,(grade+1)//2-1,z),e.state(x,(grade+1)//2-1,z,original=True)): continue
                 top = (grade + 1) // 2; terrain = int(ground[z - t, x - l])
                 base = min(terrain - 1, top - 1) if op['support'] == 'ground' else top - 1
                 if op['support'] == 'ground' and (x, z) in wet: raise ValueError('Guard foundation in water buffer')
                 end = max(top, terrain) if op['support'] == 'ground' else top
-                fill([x, base, z, x, end, z], 'minecraft:stone_bricks')
+                if spec.get('preserve_existing_surface_material'):
+                    # A new station boundary must not fence off existing level
+                    # yard paving or retained container/building entrances.
+                    safe_neighbour=False
+                    for h in (top,top-1):
+                        original=e.state(x,h,z,original=True)
+                        for q in collision(original):
+                            feet=h+q[4]
+                            if q[:3]==[0,0,0] and q[3]==q[5]==1 and abs(feet-(grade/2+1))<=.500001 and all(open_state(e.state(x,k,z,original=True))for k in range(math.ceil(feet),math.ceil(feet+1.8))):safe_neighbour=True
+                    if safe_neighbour:continue
+                if spec.get('preserve_existing_surface_material') and e.state(x,end+1,z,original=True).split('[')[0]not in ALLOWED:
+                    if collision(e.state(x,end+1,z,original=True))==[[0,0,0,1,1,1]]:continue
+                    raise ValueError('Existing adjacent object is not a full protective wall')
+                if not (spec.get('preserve_existing_surface_material') and e.state(x,end,z,original=True).split('[')[0]not in ALLOWED):
+                    for h in range(base,end+1):
+                        retained=e.state(x,h,z,original=True)
+                        if spec.get('preserve_existing_surface_material') and retained.split('[')[0]not in ALLOWED and collision(retained)==[[0,0,0,1,1,1]]:continue
+                        put(x,h,z,'minecraft:stone_bricks')
                 put(x, end + 1, z, 'minecraft:light_gray_stained_glass')
                 guards.append([x, end + 1, z])
         elif kind == 'sign':
@@ -218,7 +272,7 @@ def author(a):
     rows = [list(p) for p in sorted(public)]
     design = copy.deepcopy(spec['design'])
     ground_set = {tuple(v) for v in spec['ground_access_columns']}
-    ground_rows = [q for q in rows if old_public[q[1] - az, q[0] - ax] or tuple(q) in ground_set]
+    ground_rows = [q for q in rows if (old_public[q[1] - az, q[0] - ax] and q[2]==int(oldgrade[q[1]-az,q[0]-ax])) or tuple(q) in ground_set]
     design.update(public_columns=rows, station_multi_level_nodes=[[x, g, z] for x, z, g in rows], ground_access_columns=ground_rows,
                   ground_access_format=['x', 'z', 'grade2'], station_multi_level_node_format=['x', 'grade2', 'z'],
                   source_authority=str(authority), world_written=False, through_service_complete=False,
@@ -246,12 +300,15 @@ def verify(a):
     changes = read(a.out / 'exact-edits.json'); errors = []
     proof = verify_layout(a.out, Path(spec['authority']), read(a.out / 'release-layout.json'))
     with np.load(Path(spec['authority']) / 'network.npz') as f:
-        ax, az, _, _ = map(int, f['bounds']); old_public = f['walk'] | f['road']
+        ax, az, _, _ = map(int, f['bounds']); old_public = f['walk'] | f['road'];old_road=f['road'].copy();oldgrade=f['grade2'].copy()
+    cap=read(a.out/'capture.json')
+    with np.load(a.out/'measured.npz')as f:measured={k:f[k].copy()for k in f.files}
+    actor_protected,overhead=source_contract(spec,cap,measured,old_public,old_road,oldgrade,(ax,az))
     devices = {tuple(int(q[k]) for k in ('x', 'y', 'z')) for q in nbtlib.load(a.out / 'captured-devices.dat')['Devices']}
     water = unary_union([shape(q['geometry']) for q in spec['water_features']]).buffer(spec['water_buffer'])
     def protected(p, before):
         x, y, z = p
-        return before.split('[')[0] not in ALLOWED or tuple(p) in devices or bool(old_public[z - az, x - ax])
+        return before.split('[')[0] not in ALLOWED or tuple(p) in devices or actor_protected(p) or (bool(old_public[z - az, x - ax]) and not overhead(p,before))
     def reserved(p, before):
         x, y, z = p
         return water.intersects(box(x, z, x + 1, z + 1)) and (not any(inside(p, q) for q in spec['airborne_water_spans']) or before.split('[')[0] not in OPEN)
