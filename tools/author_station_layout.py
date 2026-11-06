@@ -74,6 +74,11 @@ def collision(state):
         return [[0, .5, 0, 1, 1, 1]]
     if '_stairs[' in state:
         raise ValueError('Exact stair collision must be supplied by native export')
+    if '_glass_pane[' in state:
+        low, high = 7 / 16, 9 / 16
+        arms = dict(east=[high, 0, low, 1, 1, high], west=[0, 0, low, low, 1, high],
+                    north=[low, 0, 0, high, 1, low], south=[low, 0, high, high, 1, 1])
+        return [[low, 0, low, high, 1, high]] + [box for side, box in arms.items() if side + '=true' in state]
     # The JSON author uses full blocks and slabs for all public surfaces and
     # guards. Decorative non-full blocks cannot silently become walking floors.
     return [[0, 0, 0, 1, 1, 1]]

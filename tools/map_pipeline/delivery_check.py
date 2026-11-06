@@ -36,6 +36,7 @@ def archive_exact(before, after):
 
 
 def capture_identity(world, candidate, prior_client=None):
+    """prior_client=False leaves the client out: other work may publish it."""
     world, candidate = Path(world), Path(candidate)
     target = candidate / 'identity-before'
     target.mkdir(exist_ok=False)
@@ -54,6 +55,8 @@ def capture_identity(world, candidate, prior_client=None):
         raise ValueError('Actual world identity is missing')
     write(target/'files.json', files)
     client = world.parent.parent/'mods/projectseele-0.1.0-all.jar'
+    if prior_client is False:
+        return files
     if prior_client is None:
         shutil.copy2(client, candidate/'client-before.jar')
     else:
@@ -109,9 +112,11 @@ def verify_preservation(world, candidate):
             raise ValueError('Identity inventory escapes actual world')
         if (candidate/'identity-before'/rel).read_bytes() != (world/rel).read_bytes():
             raise ValueError('World/player/entity identity changed: ' + name)
-    archive_exact(candidate/'client-before.jar', world.parent.parent/'mods/projectseele-0.1.0-all.jar')
+    jar = (candidate/'client-before.jar').exists()
+    if jar:
+        archive_exact(candidate/'client-before.jar', world.parent.parent/'mods/projectseele-0.1.0-all.jar')
     return dict(identity_files_exact=len(files), old_native_members_exact=len(baseline),
-                new_native_members_exact=len(additions), whole_client_jar_exact=True)
+                new_native_members_exact=len(additions), whole_client_jar_exact=jar)
 
 
 def verify_delivery(world, candidate, installation, production_log):
