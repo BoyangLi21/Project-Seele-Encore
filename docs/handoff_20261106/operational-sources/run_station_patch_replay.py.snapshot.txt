@@ -1,0 +1,16 @@
+import os,subprocess,sys
+from pathlib import Path
+T=Path(r'C:/Users/liboy/Documents/Codex/2026-11-02/gpt-claude-gemini-2/work');B=Path(r'F:/eva/artifacts/hakone_geography_20261029/network-repair-20261102');R=Path(r'C:/Users/liboy/.codex/worktrees/repo-cleanup-20261019/eva')
+name,candidate,task=sys.argv[1:]
+assert all(c.isalnum()or c=='-'for c in name)and task.isidentifier()
+assert all(c.isalnum()or c in '-_/'for c in candidate)and (B/candidate).resolve().is_relative_to(B.resolve())
+assert (B/candidate).is_dir()
+s=(T/'yumoto_landing_test.init.gradle').read_text('utf8').replace('verifyYumotoLandingReplay',task).replace('yumoto-stair-landing-candidate-v1',candidate).replace('yumoto-landing-replay-test',name+'-replay-test')
+init=T/(name+'.init.gradle');init.write_text(s,'utf8')
+env=os.environ.copy();env['JAVA_HOME']=r'E:/Users/liboy/jdks/microsoft17-diagnostic/jdk-17.0.20.1+1';env['PATH']=env['JAVA_HOME']+'/bin;'+env['PATH']
+log=B/'work'/(name+'-production-v1.log')
+with log.open('w',encoding='utf8')as f:result=subprocess.run([str(R/'gradlew.bat'),'--offline','--no-daemon','--console=plain','-I',str(init),task],cwd=R,env=env,stdout=f,stderr=subprocess.STDOUT)
+print(name,'production replay exit',result.returncode,flush=True)
+for line in log.read_text('utf8',errors='replace').splitlines():
+    if 'Production surface replay:'in line or 'BUILD SUCCESSFUL'in line or 'FAILED'in line:print(line[:400])
+raise SystemExit(result.returncode)

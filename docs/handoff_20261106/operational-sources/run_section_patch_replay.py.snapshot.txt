@@ -1,0 +1,27 @@
+import json, os, subprocess, sys
+from pathlib import Path
+from install_r53_carrier_trays import stopped_world
+
+R=Path('C:/Users/liboy/.codex/worktrees/repo-cleanup-20261019/eva')
+B=Path('F:/eva/artifacts/hakone_geography_20261029/network-repair-20261102')
+T=Path(__file__).parent
+candidate=Path(sys.argv[1]).resolve(); log=Path(sys.argv[2]).resolve()
+assert candidate.is_relative_to(B.resolve()) and log.is_relative_to(B.resolve())
+assert not log.exists()
+prepared=json.loads((candidate/'section-release-check.json').read_text('utf8'))
+scope=prepared['replay_scope']; assert Path(scope['candidate']).resolve()==candidate
+name=candidate.relative_to(B).as_posix(); task='verifySectionPatchReplay'
+init=T/'section-patch-replay.init.gradle'
+template=(T/'yumoto_landing_test.init.gradle').read_text('utf8')
+template=template.replace('verifyYumotoLandingReplay',task).replace('yumoto-stair-landing-candidate-v1',name).replace('yumoto-landing-replay-test','section-patch-replay-test')
+assert scope['world'].replace('\\','/') in template
+init.write_text(template,'utf8')
+env=os.environ.copy(); env['JAVA_HOME']='E:/Users/liboy/jdks/microsoft17-diagnostic/jdk-17.0.20.1+1'; env['PATH']=env['JAVA_HOME']+'/bin;'+env['PATH']
+with stopped_world(Path(scope['world'])):
+    with log.open('x',encoding='utf8') as f:
+        f.write('SECTION_PATCH_REPLAY_SCOPE '+json.dumps(scope,ensure_ascii=False,separators=(',',':'))+'\n'); f.flush()
+        result=subprocess.run([str(R/'gradlew.bat'),'--offline','--no-daemon','--console=plain','-I',str(init),task],cwd=R,env=env,stdout=f,stderr=subprocess.STDOUT)
+print('Section production replay exit',result.returncode,flush=True)
+for line in log.read_text('utf8',errors='replace').splitlines():
+    if 'Production surface replay:' in line or 'BUILD SUCCESSFUL' in line or 'FAILED' in line: print(line[:400])
+raise SystemExit(result.returncode)

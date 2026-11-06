@@ -1,0 +1,68 @@
+{
+  "installed_batch": 81,
+  "authority": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\odawara-interchange-installed-authority-v1",
+  "native_snapshot": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\station-installed81-native-v1",
+  "worklist": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\all-stations-construction-worklist-v26\\worklist.json",
+  "new_station_structures_installed": 18,
+  "new_station_structures_remaining": 2,
+  "existing_station_final_reviews_remaining": 34,
+  "latest_installed_deliveries": [
+    {
+      "batch": 80,
+      "stations": [
+        "早川駅"
+      ],
+      "changed_cells": 41637,
+      "recipe_chunks": 34,
+      "new_native_members": 5,
+      "old_native_members_exact": 647,
+      "identity_files_exact": 144,
+      "whole_client_jar_exact": true,
+      "production_replay_passed": true,
+      "authority": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\hayakawa-station-installed-authority-v1",
+      "candidate": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\hayakawa-candidate-v19",
+      "installation": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\hayakawa-station-install-v1\\installation.json"
+    },
+    {
+      "batch": 81,
+      "stations": [
+        "小田原駅"
+      ],
+      "changed_cells": 49377,
+      "recipe_chunks": 95,
+      "new_native_members": 15,
+      "old_native_members_exact": 652,
+      "identity_files_exact": 144,
+      "whole_client_jar_exact": true,
+      "production_replay_passed": true,
+      "authority": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\odawara-interchange-installed-authority-v1",
+      "candidate": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\odawara-interchange-candidate-v13",
+      "installation": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\odawara-interchange-install-v1\\installation.json"
+    }
+  ],
+  "latest_retained_station_capture": {
+    "chunk_statuses": {
+      "full": 4997
+    },
+    "captured_sections": 30926,
+    "devices": 7077,
+    "actors": 12,
+    "diagnostics": []
+  },
+  "actual_route_audit": {
+    "declared_columns": 537334,
+    "known_full_columns": 535396,
+    "unknown_columns": 1938,
+    "floor_or_half_level_failures": 0,
+    "headroom_failures": 678,
+    "goals_without_nearby_valid_approach": 8
+  },
+  "latest_full_build": "work/map-through81-build.log",
+  "latest_full_build_passed": true,
+  "map_cache_refresh_pending": true,
+  "whole_map_complete": false,
+  "un_migration_authorized": false,
+  "source_status": "Installed through81 previously committed; final handoff stages the 11 outstanding source items plus inert historical snapshots. No map batch after81.",
+  "codex_stopped_by_user": true,
+  "continuation_pause_flags_not_changed_due_to_main_readonly": true
+}

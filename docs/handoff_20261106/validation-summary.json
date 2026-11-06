@@ -1,0 +1,27 @@
+{
+  "checked_at": "2026-11-06T16:07:28.524571+08:00",
+  "offline_build": "passed",
+  "build_duration": "2m56s",
+  "build_tasks_executed": 53,
+  "log": "C:\\Users\\liboy\\Documents\\Codex\\2026-11-02\\gpt-claude-gemini-2\\work\\handoff-final\\final-build.log",
+  "corridor_unit_tests_passed": 6,
+  "current_python_drafts_syntax_passed": 8,
+  "saved_historical_texts_exact": 407,
+  "historical_snapshots_runtime_tested": false,
+  "new_world_batch_started": false,
+  "world_files_written_during_handoff": false,
+  "large_assets_added": false,
+  "owned_source_paths": [
+    "tools/java/RegionalTransitAuthor.java",
+    "tools/audit_station_port_extensions.py",
+    "tools/author_hakone_lakeshore.py",
+    "tools/java/NativeLoopTangents.java",
+    "tools/plan_hakone_lake_service.py",
+    "tools/plan_kamioi_access_selection.py",
+    "tools/plan_station_access_corridor.py",
+    "tools/plans/odawara_northcity_20261105.json",
+    "tools/release_station_access_corridor.py",
+    "tools/replay_station_access_corridor.py",
+    "tools/tests/test_station_access_corridor_release.py"
+  ]
+}

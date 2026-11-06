@@ -1,0 +1,13 @@
+allprojects {
+    afterEvaluate {
+        tasks.register('verifyYumotoLandingReplay', JavaExec) {
+            dependsOn testClasses
+            classpath = files('F:/eva/artifacts/hakone_geography_20261029/network-repair-20261102/odawara-itabashi-combined-field-v1/terrain-delivery.jar') + sourceSets.test.runtimeClasspath
+            mainClass = 'com.projectseele.world.SurfaceRepairReplayTest'
+            args 'F:/eva/artifacts/hakone_geography_20261029/network-repair-20261102/yumoto-stair-landing-candidate-v1', 'F:/eva/artifacts/r53_repair_20261015/client/saves/HOTFIX_20261025'
+            maxHeapSize = '512m'
+            workingDir = file('.Codex/yumoto-landing-replay-test')
+            doFirst { workingDir.mkdirs() }
+        }
+    }
+}

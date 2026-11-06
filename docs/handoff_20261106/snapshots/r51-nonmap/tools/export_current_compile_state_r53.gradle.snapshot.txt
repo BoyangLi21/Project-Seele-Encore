@@ -1,0 +1,17 @@
+import groovy.json.JsonOutput
+
+gradle.projectsEvaluated {
+    rootProject.tasks.register('exportCurrentCompileStateR53') {
+        doLast {
+            def compilation = rootProject.tasks.named('compileJava').get()
+            def target = new File(rootProject.property('r53CompileState').toString())
+            target.parentFile.mkdirs()
+            target.setText(JsonOutput.prettyPrint(JsonOutput.toJson([
+                destination: compilation.destinationDirectory.get().asFile.absolutePath,
+                classpath: compilation.classpath.files.collect { it.absolutePath },
+                encoding: compilation.options.encoding,
+                java_version: '17', native_verified: false
+            ])) + '\n', 'UTF-8')
+        }
+    }
+}

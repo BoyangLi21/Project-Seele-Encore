@@ -1,0 +1,305 @@
+{
+  "status": "design",
+  "gates": [
+    {
+      "resource": "bay_0_service_pit",
+      "variant": 0,
+      "frame": {
+        "quaternion_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "translation": [
+          72.5,
+          -678.98,
+          328.5
+        ]
+      },
+      "visual": "3523c542-e321-5fe7-b5de-54616efce631",
+      "collision_steps": null,
+      "supports": [
+        {
+          "position": [
+            55.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            51.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            55.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            51.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            89.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            93.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            89.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            93.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        }
+      ],
+      "height": 33,
+      "kind": "SILO",
+      "stage": -1,
+      "width": 33,
+      "silo_hatch": {
+        "opening_x": 33,
+        "opening_z": 33,
+        "open_ticks": 120,
+        "close_ticks": 180,
+        "separation_sign": -1,
+        "beam_bottom": -2.02,
+        "service_column_ports": true
+      }
+    },
+    {
+      "resource": "bay_1_service_pit",
+      "variant": 1,
+      "frame": {
+        "quaternion_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "translation": [
+          30.5,
+          -678.98,
+          328.5
+        ]
+      },
+      "visual": "7351176c-d4ed-5bcf-84be-eeeb1b5bff9e",
+      "collision_steps": null,
+      "supports": [
+        {
+          "position": [
+            13.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            9.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            13.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            9.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            47.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            51.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            47.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            51.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        }
+      ],
+      "height": 33,
+      "kind": "SILO",
+      "stage": -1,
+      "width": 33,
+      "silo_hatch": {
+        "opening_x": 33,
+        "opening_z": 33,
+        "open_ticks": 120,
+        "close_ticks": 180,
+        "separation_sign": -1,
+        "beam_bottom": -2.02,
+        "service_column_ports": true
+      }
+    },
+    {
+      "resource": "bay_2_service_pit",
+      "variant": 2,
+      "frame": {
+        "quaternion_xyzw": [
+          0,
+          0,
+          0,
+          1
+        ],
+        "translation": [
+          -11.5,
+          -678.98,
+          328.5
+        ]
+      },
+      "visual": "7abb8f42-7531-5251-a2f8-fa157cb55ee7",
+      "collision_steps": null,
+      "supports": [
+        {
+          "position": [
+            -29.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            -33.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            -29.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            -33.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            5.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            9.0,
+            -682,
+            309.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            5.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        },
+        {
+          "position": [
+            9.0,
+            -682,
+            347.0
+          ],
+          "state": "projectseele:nerv_structural_panel"
+        }
+      ],
+      "height": 33,
+      "kind": "SILO",
+      "stage": -1,
+      "width": 33,
+      "silo_hatch": {
+        "opening_x": 33,
+        "opening_z": 33,
+        "open_ticks": 120,
+        "close_ticks": 180,
+        "separation_sign": -1,
+        "beam_bottom": -2.02,
+        "service_column_ports": true
+      }
+    }
+  ],
+  "ground_owner_binding": "Each actual unit.service_pit must reference its same directory DOOR resource; copy these gate objects into the one mechanical-owner.gates array after Root completes the fields.",
+  "scope": "Root receipt gives actual gate UUID/frame/clock. The support cells below are the measured minimal outward-two-cell revision, pending Root civil move/readback. This fragment is design and cannot be installed.",
+  "door_collision_contract": "One finite closed/open collision step covering the entire actual net 33 by 33 floor rectangle. Root supplies exact closed original floor BlockState and open minecraft:air only after actual pit construction and readback. No separate resource namespace.",
+  "schema": "projectseele.r52.root-service-pit-parameters.v1",
+  "map_author": "root",
+  "root_final_parameter_calibration": "Frame floor+.02 and beam_bottom -2.02. Original R16 leaf/source/civil seats remain unchanged; original gantry relative Y+.02. Prior civil receipts keep old uncommissioned proposal values."
+}

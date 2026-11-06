@@ -1,0 +1,2014 @@
+{
+  "schema": "projectseele.r52.air-transport.v1",
+  "map_author": "root",
+  "status": "design",
+  "epoch": null,
+  "directory_fingerprint": null,
+  "dimension": "projectseele:geofront",
+  "mesh_sources": {
+    "mesh/tv_facilities_r16.json": "f78e9c72ba6c3901ee55ab9f377832a0a8a3421c190dc5cbda96f9789d4f2cfe",
+    "mesh/air_cradle_r31.json": "20ca048a0e0cb5a5a4caaed5d8984cd6bef16d769a7a70db5055fa727b6eaa1b"
+  },
+  "aircraft": [
+    {
+      "id": "nerv_surface_0",
+      "entity_uuid": "3e518e40-da24-43b9-86a8-d34b24f74cd0",
+      "expected_type": "projectseele:un_transport",
+      "serial": 0,
+      "airport": "root_surface_region",
+      "stand_node": "nerv_surface_0/actual_stand",
+      "support_cells": [
+        {
+          "position": [
+            1185,
+            72,
+            9
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1185,
+            72,
+            10
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1185,
+            72,
+            11
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1185,
+            72,
+            29
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1185,
+            72,
+            30
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1185,
+            72,
+            31
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1186,
+            72,
+            9
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1186,
+            72,
+            10
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1186,
+            72,
+            11
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1186,
+            72,
+            29
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1186,
+            72,
+            30
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1186,
+            72,
+            31
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1187,
+            72,
+            9
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1187,
+            72,
+            10
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1187,
+            72,
+            11
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1187,
+            72,
+            29
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1187,
+            72,
+            30
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1187,
+            72,
+            31
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1213,
+            72,
+            9
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1213,
+            72,
+            10
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1213,
+            72,
+            11
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1213,
+            72,
+            29
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1213,
+            72,
+            30
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1213,
+            72,
+            31
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1214,
+            72,
+            9
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1214,
+            72,
+            10
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1214,
+            72,
+            11
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1214,
+            72,
+            29
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1214,
+            72,
+            30
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1214,
+            72,
+            31
+          ],
+          "state": "minecraft:white_concrete"
+        },
+        {
+          "position": [
+            1215,
+            72,
+            9
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1215,
+            72,
+            10
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1215,
+            72,
+            11
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1215,
+            72,
+            29
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1215,
+            72,
+            30
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            1215,
+            72,
+            31
+          ],
+          "state": "minecraft:gray_concrete"
+        }
+      ]
+    },
+    {
+      "id": "nerv_underground_50",
+      "entity_uuid": "2c408ff4-6978-45db-8ffa-dfa2743d17b5",
+      "expected_type": "projectseele:un_transport",
+      "serial": 50,
+      "airport": "root_geofront_region",
+      "stand_node": "nerv_underground_50/actual_stand",
+      "support_cells": [
+        {
+          "position": [
+            -456,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -456,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -456,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -456,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -456,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -456,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -456,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -456,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -455,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -455,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -455,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -455,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -455,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -455,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -455,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -455,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -454,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -454,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -454,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -454,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -454,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -454,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -454,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -454,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -453,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -453,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -453,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -453,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -453,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -453,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -453,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -453,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -428,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -428,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -428,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -428,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -428,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -428,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -428,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -428,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -427,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -427,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -427,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -427,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -427,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -427,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -427,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -427,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -426,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -426,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -426,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -426,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -426,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -426,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -426,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -426,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -425,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -425,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -425,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -425,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -425,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -425,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -425,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -425,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        }
+      ]
+    },
+    {
+      "id": "nerv_underground_52",
+      "entity_uuid": "640434aa-bf30-523c-84d1-28fd23befb61",
+      "expected_type": "projectseele:un_transport",
+      "serial": 52,
+      "airport": "root_geofront_region",
+      "stand_node": "nerv_underground_52/actual_stand",
+      "support_cells": [
+        {
+          "position": [
+            -656,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -656,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -656,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -656,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -656,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -656,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -656,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -656,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -655,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -655,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -655,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -655,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -655,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -655,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -655,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -655,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -654,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -654,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -654,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -654,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -654,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -654,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -654,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -654,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -653,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -653,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -653,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -653,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -653,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -653,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -653,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -653,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -628,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -628,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -628,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -628,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -628,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -628,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -628,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -628,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -627,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -627,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -627,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -627,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -627,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -627,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -627,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -627,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -626,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -626,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -626,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -626,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -626,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -626,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -626,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -626,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -625,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -625,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -625,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -625,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -625,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -625,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -625,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -625,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        }
+      ]
+    },
+    {
+      "id": "nerv_underground_53",
+      "entity_uuid": "227a4702-8378-56bf-9515-cde9979d832c",
+      "expected_type": "projectseele:un_transport",
+      "serial": 53,
+      "airport": "root_geofront_region",
+      "stand_node": "nerv_underground_53/actual_stand",
+      "support_cells": [
+        {
+          "position": [
+            -856,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -856,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -856,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -856,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -856,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -856,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -856,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -856,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -855,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -855,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -855,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -855,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -855,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -855,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -855,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -855,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -854,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -854,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -854,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -854,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -854,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -854,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -854,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -854,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -853,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -853,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -853,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -853,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -853,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -853,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -853,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -853,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -828,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -828,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -828,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -828,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -828,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -828,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -828,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -828,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -827,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -827,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -827,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -827,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -827,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -827,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -827,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -827,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -826,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -826,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -826,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -826,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -826,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -826,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -826,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -826,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -825,
+            -476,
+            -282
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -825,
+            -476,
+            -281
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -825,
+            -476,
+            -280
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -825,
+            -476,
+            -279
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -825,
+            -476,
+            -262
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -825,
+            -476,
+            -261
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -825,
+            -476,
+            -260
+          ],
+          "state": "minecraft:gray_concrete"
+        },
+        {
+          "position": [
+            -825,
+            -476,
+            -259
+          ],
+          "state": "minecraft:gray_concrete"
+        }
+      ]
+    }
+  ],
+  "airports": [
+    {
+      "id": "root_surface_region",
+      "region": "SURFACE",
+      "domain": null,
+      "takeoff_node": null,
+      "occupancy": []
+    },
+    {
+      "id": "root_geofront_region",
+      "region": "GEOFRONT",
+      "domain": null,
+      "takeoff_node": null,
+      "occupancy": []
+    }
+  ],
+  "nodes": [
+    {
+      "id": "nerv_surface_0/actual_stand",
+      "region": "SURFACE",
+      "frame": {
+        "plane": {
+          "translation": [
+            1200.5,
+            84,
+            20.5
+          ],
+          "quaternion_xyzw": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        "rig": {
+          "hoist": null,
+          "deployment": 0,
+          "jaws": 1
+        }
+      },
+      "occupancy": [],
+      "actual_cells": []
+    },
+    {
+      "id": "nerv_underground_50/actual_stand",
+      "region": "GEOFRONT",
+      "frame": {
+        "plane": {
+          "translation": [
+            -440,
+            -464,
+            -270
+          ],
+          "quaternion_xyzw": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        "rig": {
+          "hoist": null,
+          "deployment": 0,
+          "jaws": 1
+        }
+      },
+      "occupancy": [],
+      "actual_cells": []
+    },
+    {
+      "id": "nerv_underground_52/actual_stand",
+      "region": "GEOFRONT",
+      "frame": {
+        "plane": {
+          "translation": [
+            -640,
+            -464,
+            -270
+          ],
+          "quaternion_xyzw": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        "rig": {
+          "hoist": 112,
+          "deployment": 0,
+          "jaws": 1
+        }
+      },
+      "occupancy": [],
+      "actual_cells": []
+    },
+    {
+      "id": "nerv_underground_53/actual_stand",
+      "region": "GEOFRONT",
+      "frame": {
+        "plane": {
+          "translation": [
+            -840,
+            -464,
+            -270
+          ],
+          "quaternion_xyzw": [
+            0,
+            0,
+            0,
+            1
+          ]
+        },
+        "rig": {
+          "hoist": 112,
+          "deployment": 0,
+          "jaws": 1
+        }
+      },
+      "occupancy": [],
+      "actual_cells": []
+    }
+  ],
+  "corridors": [],
+  "receivers": [],
+  "missions": [],
+  "shafts": [],
+  "root_fill_required": [
+    "Template is intentionally not a parseable installation manifest until all null/empty fields are measured and filled.",
+    "Exact existing ground directory epoch/fingerprint and resource IDs.",
+    "Original aircraft serial 0/50 HoistDistance readback; no default assumption.",
+    "Each support cell full actual blockstate; no inferred airport bearing.",
+    "Disjoint actual foot-centre region domains and all allowed pickup domains.",
+    "Actual takeoff/corridor endpoints, positive ticks, exact reciprocal cancellation chains, doors and SPACE union coverage.",
+    "Independent actual mechanical receiver stopped frames/support/gates/reverse routes; do not reuse old R30/R50 receiver coordinates.",
+    "Actual shaft lower/upper nodes and shared resources; proposed shaft is not commissioned by this template."
+  ]
+}

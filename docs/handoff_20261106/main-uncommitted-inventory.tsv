@@ -1,0 +1,523 @@
+status	path	bytes	classification
+ M	build.gradle	34760	需保留：源代码或文档；是否过时未验证
+ M	docs/ASSETS.md	69554	需保留：源代码或文档；是否过时未验证
+ M	docs/MANUAL_ACCEPTANCE_20260917.md	17089	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/ProjectSeele.java	5436	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/ClientForgeEvents.java	41183	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/CommandShaderLightR39.java	4190	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/EncounterObserverCacheR45.java	11037	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/EvaCommandFeedClient.java	61924	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/EvaCannonContactRigR45.java	4413	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/EvaContactShadowsR24.java	5041	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/EvaFootPlacement.java	5905	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/EvaFootWitnessR44.java	9710	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/EvaMotionEngineV2.java	74494	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/EvaPoseGraph.java	34774	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/EvaPoseTransition.java	15982	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/EvaUnit01Renderer.java	37508	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/LocalTriangleMeshLayer.java	53865	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/LocalVisualAssetFingerprint.java	20033	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/ModelRenderTypesR49.java	7404	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/NervArmamentStationRenderer.java	12694	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/NervCarrierPlatformRenderer.java	21928	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/NervChestFinishR24.java	2384	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/NervDoorFinish.java	4056	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/NervHangarDoorRenderer.java	10629	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+ M	src/main/java/com/projectseele/client/render/OneWayGlassRenderer.java	2679	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/PlugGantryRenderer.java	21048	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/RamielRenderer.java	14954	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/RigidCapsuleGpu.java	15699	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/RigidMachineryGpuR44.java	8965	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/RigidMachineryPartR44.java	10225	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/TransferGuidewayR20Renderer.java	3570	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/TripoMachineryR48.java	9035	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/TvCageEnclosureR44.java	8202	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/render/UNTransportRenderer.java	17210	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/screen/StaffConversationScreen.java	28801	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/visual/NativeCommandInboxR47.java	15593	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/client/visual/TravelCommandsR43Review.java	5855	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EntryPlugCarrierEntity.java	86028	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaAirTransportR31.java	16439	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaAnatomicalHandsR45.java	37363	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaBayRepairR33.java	5829	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaBerserkMotionR34.java	7926	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaBodyPose.java	57289	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaCapturedLocomotionR44.java	32448	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaCervicalKinematicsR25.java	2092	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaCombatSupportR33.java	35954	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaFieldActionsR45.java	11270	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+ M	src/main/java/com/projectseele/entity/EvaGameplayMotionR32.java	51734	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaMovementSounds.java	8230	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaPoseSignalClock.java	2043	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaRifleKinematics.java	9937	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaShieldRigR47.java	12385	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaShutdownR30.java	14512	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaStanceFoleyR41.java	2820	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaTerrainSupport.java	3385	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaUnit01Entity.java	425015	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/EvaWeaponHandlingR45.java	9418	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/NervArmamentStationEntity.java	32345	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/NervCarrierPlatformEntity.java	68344	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/NervCommandSeatEntity.java	5479	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/NervHangarDoorEntity.java	9291	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/NervLiftDoorEntity.java	7782	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/NervSiloDoorEntity.java	16954	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/NervSlidingDoorEntity.java	8604	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/NervStaffEntity.java	7779	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/RamielEntity.java	40987	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/SachielBodyPoseR35.java	2988	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/SachielEntity.java	25935	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/SachielGameplayMotionR32.java	13463	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/SachielStrike.java	6206	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/ShamshelEntity.java	16588	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/entity/ShamshelWhipMotion.java	6324	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/event/FirstBattleMission.java	12950	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/event/TvCampaignDirector.java	35625	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/mixin/PhysicalBodyVehiclePackets.java	3195	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/mixin/SeeleCompatibilityPlugin.java	8566	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/mixin/TvCageCollisionR44Mixin.java	1190	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/network/ClientboundEncounterObserverPacket.java	7247	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/network/SeeleNetwork.java	16561	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/network/ServerboundEvaControlPacket.java	8062	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/physics/AuthoredTerrainContactR45.java	5728	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/physics/CombatBodyDynamics.java	32406	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/physics/ShamshelPosedContactsR48.java	24320	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/registry/ModEntities.java	15277	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/registry/ModSounds.java	7229	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/util/BiomeCornerCache.java	2889	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/visual/EvaLogisticsCommands.java	20630	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/visual/RegionalWayfindingAuthor.java	6841	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/visual/SeeleTravelCommandsR43.java	10813	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/AirCradleClearanceR31.java	18585	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/AutoSortieR32.java	22098	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/CityCreateDistrictR45.java	101966	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/CommandLightingR30.java	3263	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/CommandRoomSlidingDoorDirector.java	24038	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/DeadSeaChamberR45.java	5681	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/DeadSeaChamberSavedDataR45.java	9604	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EncounterObserverR45.java	14507	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EntryPlugBridgeDeckR48.java	2166	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EntryPlugBridgeLayoutR48.java	10884	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EntryPlugBridgeTopologyR49.java	14297	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EntryPlugDirector.java	99143	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EntryPlugEjectionR48.java	10439	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EntryPlugKinematics.java	20785	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EquipmentVaultsR47.java	15821	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EvaHangarBuilder.java	122984	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/EvaLogisticsDirector.java	133672	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/ExperimentalLiftStopsR47.java	3577	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/FacilityAudioR21.java	7436	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/FacilityDoorControlsR49.java	16091	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/FacilityLiftsR25.java	3185	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/FacilityPaR31.java	7533	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/FacilityReadinessService.java	9612	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/FacilitySchemaV2.java	32697	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervAirLiftR30.java	54638	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervArmorColumnR50.java	17871	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervLiftArrivalSyncR44.java	5081	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervLiftPassengerSync.java	11206	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervOperationsConsole.java	57067	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervPilotCombatR30.java	23954	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervRuntimeMaintenance.java	13179	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervStaffDialogue.java	25221	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervStaffDirector.java	7129	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervUndergroundAirLiftR50.java	64863	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervUndergroundTransportSiteR50.java	26108	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/NervWayfindingR24.java	20538	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/PilotRestroomServicesR47.java	11560	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/PilotRestroomsR47.java	31986	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/PilotReturnR39.java	13207	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/RegionalFacilityLayout.java	3397	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/RegionalGatewayDirector.java	17774	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/S20CommandPresentationDirector.java	30587	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/S20CommandRoomRepairs.java	14885	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/S20MovingElevatorsAdapter.java	93745	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/S20PhysicalElevatorDirector.java	123518	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/SeeleConferenceAccessR47.java	15260	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/SeeleLightingR48.java	7328	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/StaffCommandBookR24.java	17264	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/StaffConversationR24.java	24159	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/StaffIntentR24.java	7972	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/StaffOperationsR48.java	32530	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TerminalDogmaBuilder.java	48050	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TrainingPilotDirector.java	94299	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TransportClearanceR30.java	5995	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvCageCollisionR44.java	17876	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvCampaignCatalog.java	4340	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvDetailR04Layout.java	1500	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvEncounterEquipmentControlR45.java	5447	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvEncounterRulesR45.java	22881	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvMarineArrivalR50.java	4904	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvMarineDirectorR50.java	52789	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvMarineSavedDataR50.java	6494	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvMarineSiteR50.java	6985	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvMissionEquipmentR45.java	53862	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvPersonnelPlatformInterlockR44.java	29779	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvSortiesR32.java	13060	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvWorldPreviewTerrain.java	10592	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvYashimaArrivalR50.java	15732	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/TvYashimaDirectorR50.java	22129	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/UndergroundSortieR48.java	50203	需保留：源代码或文档；是否过时未验证
+ M	src/main/java/com/projectseele/world/VerticalCarrierSweepR40.java	26458	需保留：源代码或文档；是否过时未验证
+ M	src/main/resources/assets/projectseele/animations/eva_unit01.animation.json	7144809	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+ M	src/main/resources/assets/projectseele/geo/eva_unit00.geo.json	25606	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+ M	src/main/resources/assets/projectseele/geo/eva_unit02.geo.json	26968	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+ M	src/main/resources/assets/projectseele/models/block/entry_plug_bridge_fascia.json	8937	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+ M	src/main/resources/assets/projectseele/sounds.json	23966	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+ M	src/main/resources/data/projectseele/dimension_type/geofront.json	601	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+ M	src/main/resources/data/projectseele/worldgen/noise_settings/geofront_surface.json	5308	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+ M	src/main/resources/projectseele.mixins.json	2350	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+ M	src/test/java/com/projectseele/client/render/EvaPoseTransitionTest.java	5528	需保留：源代码或文档；是否过时未验证
+ M	tools/inspect_lux_un00_r19.py	5576	需保留：源代码或文档；是否过时未验证
+ M	tools/preview_motion_r49.py	12376	需保留：源代码或文档；是否过时未验证
+ M	tools/preview_profile_r49.py	7823	需保留：源代码或文档；是否过时未验证
+ M	tools/render_un00_body_r19.py	5392	需保留：源代码或文档；是否过时未验证
+ M	tools/warp_locomotion_r44.py	14732	需保留：源代码或文档；是否过时未验证
+??	LOCAL_REVIEW_20261026.zh.md	3621	需保留：源代码或文档；是否过时未验证
+??	Start-Local-Review.cmd	121	需保留：源代码或文档；是否过时未验证
+??	Start-Local-Review.ps1	2478	需保留：源代码或文档；是否过时未验证
+??	docs/MANUAL_REVIEW_R45_20261003.md	3145	需保留：源代码或文档；是否过时未验证
+??	docs/MOTION_FEEDBACK_R45_20261004.md	12316	需保留：源代码或文档；是否过时未验证
+??	docs/PAUSE_R51_20261007.md	4830	需保留：源代码或文档；是否过时未验证
+??	docs/PERFORMANCE_R52.md	6375	需保留：源代码或文档；是否过时未验证
+??	docs/R53_ACTIVE_BACKLOG_20261020.zh.md	4733	需保留：源代码或文档；是否过时未验证
+??	docs/R53_KNIFE_HINGE_20261020.zh.md	3001	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+??	docs/R53_LIFT_DOORS_20261020.zh.md	2654	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+??	docs/R53_LOCAL_REVIEW.zh.md	23198	需保留：源代码或文档；是否过时未验证
+??	docs/R53_PAIRED_CONTACTS_20261020.zh.md	3874	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+??	docs/R53_PARKED_SERVICE_20261019.zh.md	3319	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+??	docs/R53_PAUSED_20261018.zh.md	15596	需保留：源代码或文档；是否过时未验证
+??	docs/R53_PAUSED_20261019.zh.md	6830	需保留：源代码或文档；是否过时未验证
+??	docs/R53_PAUSED_20261019_1745.zh.md	9416	需保留：源代码或文档；是否过时未验证
+??	docs/R53_PAUSED_20261019_2222.zh.md	4550	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+??	docs/R53_PAUSED_20261020.zh.md	7964	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+??	docs/R53_PAUSED_20261020_2307.zh.md	987	需保留：源代码或文档；是否过时未验证
+??	docs/R53_PAUSED_20261021.zh.md	919	需保留：源代码或文档；是否过时未验证
+??	docs/R53_RESUMED_20261019.zh.md	6275	需保留：源代码或文档；是否过时未验证
+??	docs/R53_RESUMED_20261019_EVENING.zh.md	14557	需保留：源代码或文档；是否过时未验证
+??	docs/R53_RESUMED_20261019_MORNING.zh.md	13476	需保留：源代码或文档；是否过时未验证
+??	docs/R53_RESUMED_20261020.zh.md	22485	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+??	docs/R53_RUNTIME_FOLLOWUP_20261019.zh.md	10395	需保留：源代码或文档；是否过时未验证
+??	docs/R53_STATION_ROOF_20261020.zh.md	1943	已被取代的重复副本：与交接工作树同路径逐字节相同；原件保留
+??	docs/R53_USER_FEEDBACK_20261019_NIGHT.zh.md	2521	需保留：源代码或文档；是否过时未验证
+??	docs/WORK_R51.md	9405	需保留：源代码或文档；是否过时未验证
+??	local-review-updates/backup/installed_20261102/projectseele-0.1.0-all.jar	413873126	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	local-review-updates/backup/motion_pack_20261102/seele_motion_pack.json	2137453	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	local-review-updates/backup/projectseele-0.1.0-all.pre-anim3-20261101.jar	412701994	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	local-review-updates/projectseele-0.1.0-all.jar.ready	414699705	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	src/main/java/com/projectseele/client/EntryPlugBridgeColourR51.java	1013	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/FacilityFrameCacheR51.java	2283	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/render/BoundedRenderStatesR52.java	1528	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/render/CapsuleGripRendererR51.java	1073	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/render/EncounterRamielRendererR51.java	5025	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/render/LaunchChamberFinishR53.java	5548	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/render/PosedMeshCacheR52.java	3100	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/render/YashimaCannonMountRendererR51.java	2594	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/screen/EncounterMonitorScreenR51.java	4501	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/client/visual/NativeEvaKeyInputR52.java	16356	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/compat/MtrRailMathCacheR51.java	4154	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/compat/MtrRailMathCompatibilityR51.java	10075	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/entity/EvaPoseBlendR51.java	718	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/entity/RamielGeometryR51.java	1914	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/entity/YashimaCannonFrameR51.java	4017	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/mixin/client/MtrRailMathCacheR51Mixin.java	396	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/network/ClientboundFacilityFrameR51.java	4159	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/network/ServerboundEncounterAimR51.java	2677	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/physics/SachielTravelSurfaceR51.java	6373	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/AirLiftAssemblyR51.java	15222	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/AirLiftPayloadR51.java	2301	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/AngelTravelSweepR51.java	3082	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/CapsuleCradleGeometryR51.java	21897	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/CapsuleParkingGeometryR51.java	3497	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/CarrierCollisionBatchR51.java	2944	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/CityEndpointFinalizerR51.java	1654	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/EvaFacilityCarrierPoseR51.java	6345	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/EvaFacilityReceiverR51.java	17424	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/FacilityCarrierGeometryR51.java	22248	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/FacilityDoorGeometryR52.java	13572	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/FacilityRouteClockR51.java	1836	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/GroundSurfaceRayR51.java	2655	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/HoistCarrierGeometryR51.java	6910	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/LilithSurfaceContactR51.java	2422	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/MarineCannonPairR51.java	759	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervAirDeliveryReceiptsR51.java	6331	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervArmorAssaultR51.java	8920	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervArmorInvasionR51.java	32055	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervCapsuleAirLiftR51.java	33905	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervCapsuleFacilitiesR51.java	21990	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervEmptyCarrierReturnR51.java	15593	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervFacilityLayoutR51.java	55609	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervFacilityMotionR51.java	40651	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervFacilityPlantR51.java	67399	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervFacilityPresentationR51.java	2522	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervLaunchRoutesR51.java	19023	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/NervTransportTrafficR51.java	13054	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/ReceiverRelativeContactR51.java	10902	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/SeatRetractionR52.java	3449	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/TriangleAssemblySweepR51.java	25139	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/TvMarineCrewR51.java	6958	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/TvYashimaTransitR51.java	15006	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/UndergroundDeploymentR51.java	10204	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/YashimaCannonGeometryR51.java	1311	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/YashimaCannonMechanicsR51.java	22495	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/YashimaCannonMountR51.java	6271	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/YashimaCannonR51.java	24624	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/YashimaFieldReturnR51.java	2301	需保留：源代码或文档；是否过时未验证
+??	src/main/java/com/projectseele/world/YashimaGroundCrewR51.java	6105	需保留：源代码或文档；是否过时未验证
+??	src/main/resources/META-INF/licenses/audio-recordings-r51.txt	662	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+??	src/main/resources/assets/projectseele/sounds/r51_catapult_acceleration_recorded.ogg	33872	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	src/main/resources/assets/projectseele/sounds/r51_catapult_release_recorded.ogg	29826	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	src/main/resources/assets/projectseele/sounds/r51_hydraulic_charge_recorded.ogg	36079	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	src/main/resources/data/projectseele/worldgen/authored/angel_armor_approach_r51.json	340	需保留：资产/生成物/运行数据/权限需核实；不入交接提交
+??	src/test/java/com/projectseele/client/render/RigidMachineryStreamR51Test.java	4254	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/client/render/TransferGuideBoundsR52Test.java	1690	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/client/screen/StaffConversationScaleR52Test.java	1493	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/compat/MtrRailMathCacheR51Test.java	9891	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/network/EncounterObserverPacketR51Test.java	2410	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/util/BiomeCornerMainThreadR51Test.java	2003	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/AirLiftAssemblyR51Test.java	1980	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/CapsuleTicketBatchR52Test.java	1832	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/CarrierCollisionBatchR51Test.java	3663	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/CarrierHullReuseR52Test.java	6664	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/CityEndpointFinalizerR51Test.java	9308	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/FacilityRouteClockR51Test.java	2627	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/HakoneRouteSelectionR51Test.java	5644	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/HoistCarrierGeometryR51Test.java	4879	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/NervTransportSiteR51Test.java	10288	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/NervTransportTrafficR51Test.java	6877	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/OriginalTransferGuideR52Test.java	3480	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/TriangleAssemblySweepR51Test.java	4172	需保留：源代码或文档；是否过时未验证
+??	src/test/java/com/projectseele/world/YashimaShieldRoutesR52Test.java	2779	需保留：源代码或文档；是否过时未验证
+??	system.tmp	36	需保留：源代码或文档；是否过时未验证
+??	tiny.dat	32	需保留：源代码或文档；是否过时未验证
+??	tools/ExportPlugHoistSurfacesR51.java	1334	需保留：源代码或文档；是否过时未验证
+??	tools/activate_facility_directory_r51.py	8702	需保留：源代码或文档；是否过时未验证
+??	tools/align_facility_candidate_offsets_r51.py	2145	需保留：源代码或文档；是否过时未验证
+??	tools/apply_restart_gate_metadata_r52.py	3850	需保留：源代码或文档；是否过时未验证
+??	tools/apply_startup_metadata_links_r51.py	3931	需保留：源代码或文档；是否过时未验证
+??	tools/assemble_final_facility_directory_r51.py	4906	需保留：源代码或文档；是否过时未验证
+??	tools/audit_active_facility_interfaces_r51.py	13769	需保留：源代码或文档；是否过时未验证
+??	tools/audit_cannon_return_sweep_r51.py	4822	需保留：源代码或文档；是否过时未验证
+??	tools/audit_final_civil_composition_r51.py	4822	需保留：源代码或文档；是否过时未验证
+??	tools/audit_installed_bay_command_fields_r51.py	5550	需保留：源代码或文档；是否过时未验证
+??	tools/audit_installed_restroom_fields_r51.py	3825	需保留：源代码或文档；是否过时未验证
+??	tools/audit_navigation_activation_r51.py	4894	需保留：源代码或文档；是否过时未验证
+??	tools/audit_pair_v2_selected_r51.py	2534	需保留：源代码或文档；是否过时未验证
+??	tools/audit_pair_v3_wrap_r51.py	1320	需保留：源代码或文档；是否过时未验证
+??	tools/audit_paired_floor_contact_r51.py	13653	需保留：源代码或文档；是否过时未验证
+??	tools/audit_paired_surfaces_r51.py	4440	需保留：源代码或文档；是否过时未验证
+??	tools/author_eva_airborne_pounce_pitch.py	5479	需保留：源代码或文档；是否过时未验证
+??	tools/author_grounded_pair_r51.py	17958	需保留：源代码或文档；是否过时未验证
+??	tools/author_restart_battle_bindings_r52.py	9091	需保留：源代码或文档；是否过时未验证
+??	tools/author_restart_flight_graph_r51.py	7700	需保留：源代码或文档；是否过时未验证
+??	tools/author_restart_launch_routes_r51.py	9107	需保留：源代码或文档；是否过时未验证
+??	tools/author_restart_masterplan_r51.py	7506	需保留：源代码或文档；是否过时未验证
+??	tools/author_restart_runtime_directory_r51.py	9854	需保留：源代码或文档；是否过时未验证
+??	tools/bake_facility_carrier_anchors_r51.py	2580	需保留：源代码或文档；是否过时未验证
+??	tools/build_capsule_gripper_geometry_r51.py	3505	需保留：源代码或文档；是否过时未验证
+??	tools/build_launch_audio_r51.py	10348	需保留：源代码或文档；是否过时未验证
+??	tools/build_un_models_r20.py	10991	需保留：源代码或文档；是否过时未验证
+??	tools/check_capsule_top_native_foreign_r51.py	5550	需保留：源代码或文档；是否过时未验证
+??	tools/check_facility_directory_links_r51.py	4657	需保留：源代码或文档；是否过时未验证
+??	tools/check_gait_ankle_seams_r51.py	1785	需保留：源代码或文档；是否过时未验证
+??	tools/check_render_stream_samples_r51.py	2978	需保留：源代码或文档；是否过时未验证
+??	tools/commission_restart_runtime_r52.py	6449	需保留：源代码或文档；是否过时未验证
+??	tools/complete_pyramid_owned_mask_r51.py	3056	需保留：源代码或文档；是否过时未验证
+??	tools/complete_restart_native_chunks_r51.py	5792	需保留：源代码或文档；是否过时未验证
+??	tools/compose_caps_personnel_supplement_r51.py	5571	需保留：源代码或文档；是否过时未验证
+??	tools/compose_civil_r51.py	31092	需保留：源代码或文档；是否过时未验证
+??	tools/compose_field_facilities_r51.py	4815	需保留：源代码或文档；是否过时未验证
+??	tools/compose_hakone_branch_r51.py	5323	需保留：源代码或文档；是否过时未验证
+??	tools/drain_r53_interrupted_empty_bay.py	6240	需保留：源代码或文档；是否过时未验证
+??	tools/export_complete_candidate_volume_r51.py	5976	需保留：源代码或文档；是否过时未验证
+??	tools/export_facility_carrier_envelope_r51.py	2865	需保留：源代码或文档；是否过时未验证
+??	tools/extend_construction_height_r51.py	5778	需保留：源代码或文档；是否过时未验证
+??	tools/extract_lux_mesh_r20.py	1727	需保留：源代码或文档；是否过时未验证
+??	tools/fill_new_facility_components_r51.py	8236	需保留：源代码或文档；是否过时未验证
+??	tools/fill_new_facility_routes_r51.py	10398	需保留：源代码或文档；是否过时未验证
+??	tools/fill_personnel_lifts_final_r51.py	7018	需保留：源代码或文档；是否过时未验证
+??	tools/fill_restart_deep_geology_r51.py	6605	需保留：源代码或文档；是否过时未验证
+??	tools/finalize_capsule_top_clearance_r51.py	4814	需保留：源代码或文档；是否过时未验证
+??	tools/finish_civil_staged_r51.py	5169	需保留：源代码或文档；是否过时未验证
+??	tools/finish_r53_dome_rim.py	3606	需保留：源代码或文档；是否过时未验证
+??	tools/fit_cervical_clearance_r51.py	1318	需保留：源代码或文档；是否过时未验证
+??	tools/fit_finger_surface_r47.py	4146	需保留：源代码或文档；是否过时未验证
+??	tools/fit_rigid_grip_surface_r47.py	3296	需保留：源代码或文档；是否过时未验证
+??	tools/fit_unit02_guard_r51.py	2970	需保留：源代码或文档；是否过时未验证
+??	tools/fixtures/EvaPoseSignalClockR51Timeline.java	2420	需保留：源代码或文档；是否过时未验证
+??	tools/inspect_fixed_mechanics_jfr_r51.py	2521	需保留：源代码或文档；是否过时未验证
+??	tools/inspect_navigation_residuals_r51.py	2742	需保留：源代码或文档；是否过时未验证
+??	tools/install_civil_aux_poi_r51.py	7430	需保留：源代码或文档；是否过时未验证
+??	tools/install_facility_supplement_r51.py	23213	需保留：源代码或文档；是否过时未验证
+??	tools/install_marine_inventory_r51.py	5038	需保留：源代码或文档；是否过时未验证
+??	tools/install_mtr_cold_r51.py	19351	需保留：源代码或文档；是否过时未验证
+??	tools/install_restart_aux_r52.py	9649	需保留：源代码或文档；是否过时未验证
+??	tools/install_restart_lift_manager_r51.py	5332	需保留：源代码或文档；是否过时未验证
+??	tools/install_restart_mtr_r51.py	3757	需保留：源代码或文档；是否过时未验证
+??	tools/java/AnalyzeNativeJfrR51.java	5210	需保留：源代码或文档；是否过时未验证
+??	tools/java/MarineCannonPairR51Check.java	1216	需保留：源代码或文档；是否过时未验证
+??	tools/java/MtrColdReadR51.java	1644	需保留：源代码或文档；是否过时未验证
+??	tools/java/MtrGradientProbeR51.java	2568	需保留：源代码或文档；是否过时未验证
+??	tools/java/MtrMigrationShadowR51.java	17263	需保留：源代码或文档；是否过时未验证
+??	tools/java/MtrMigrationVerifyR51.java	2168	需保留：源代码或文档；是否过时未验证
+??	tools/java/MtrNativeRailSamplesR51.java	2381	需保留：源代码或文档；是否过时未验证
+??	tools/java/MtrRestartGeometryR51.java	2403	需保留：源代码或文档；是否过时未验证
+??	tools/java/MtrRestartRuntimePathsR51.java	3427	需保留：源代码或文档；是否过时未验证
+??	tools/java/RegionalTransitAuthor.class	17433	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	tools/java/SummarizeJfrR51.java	4404	需保留：源代码或文档；是否过时未验证
+??	tools/java/TransitSnapshotR20.class	5503	需保留：本机包/备份/素材/生成物；授权或可重建性未验证；不提交
+??	tools/measure_airlift_altitude_r51.py	7519	需保留：源代码或文档；是否过时未验证
+??	tools/measure_angel_travel_envelopes_r51.py	6940	需保留：源代码或文档；是否过时未验证
+??	tools/measure_cannon_dock_reach_r51.py	8488	需保留：源代码或文档；是否过时未验证
+??	tools/measure_capsule_parking_eva_r51.py	4393	需保留：源代码或文档；是否过时未验证
+??	tools/measure_cervical_clearance_r51.py	863	需保留：源代码或文档；是否过时未验证
+??	tools/measure_lilith_drill_projection_r51.py	1914	需保留：源代码或文档；是否过时未验证
+??	tools/measure_pyramid_minimum_displacements_r51.py	4764	需保留：源代码或文档；是否过时未验证
+??	tools/measure_yashima_cover_r51.py	10256	需保留：源代码或文档；是否过时未验证
+??	tools/merge_capsule_directory_r51.py	1958	需保留：源代码或文档；是否过时未验证
+??	tools/move_r53_aoba_console_post.py	6805	需保留：源代码或文档；是否过时未验证
+??	tools/move_restart_station_staff_r51.py	4503	需保留：源代码或文档；是否过时未验证
+??	tools/native/JsonDocumentFingerprintR53.java	655	需保留：源代码或文档；是否过时未验证
+??	tools/native/ReconcileR53InterruptedBridge.java	5084	需保留：源代码或文档；是否过时未验证
+??	tools/native_joint_skin_r51.py	3805	需保留：源代码或文档；是否过时未验证
+??	tools/native_lift_call_contract_r51.py	894	需保留：源代码或文档；是否过时未验证
+??	tools/optimize_eva_paired_grab_contact.py	14649	需保留：源代码或文档；是否过时未验证
+??	tools/polish_r51_player_copy.py	5858	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_HQ_connected_lake_r51.py	9088	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_actor_runtime_shadow_r51.py	45721	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_armor_owner_link_fix_r51.py	3963	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_bay_personnel_handoffs_r51.py	6529	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_capsule_intersection_caps_r51.py	6048	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_capsule_parked_clearance_r51.py	3152	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_capsule_parking_bearings_r51.py	6649	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_capsule_routes_r51.py	22523	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_capsule_top_clearance_r51.py	5440	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_carrier_floor_bearings_r52.py	2554	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_civil_aux_migration_r51.py	8218	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_compact_access_hall_connection_r51.py	7656	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_connected_flight_graph_r51.py	16774	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_construction_r51.py	2168	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_east_station_research_stairs_r51.py	6704	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_facilities_r51.py	21660	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_facility_actor_shadow_r51.py	9821	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_facility_supplement_metadata_r51.py	6379	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_final_airshaft_r51.py	3764	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_final_yashima_r51.py	9214	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_gateway_personnel_connection_r51.py	5543	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_hakone_branch_r51.py	17815	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_marine_ports_r51.py	7636	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_native_MTR_tunnels_r51.py	7054	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_native_fixed_call_buttons_r51.py	7307	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_native_lift_civil_r51.py	8813	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_navigation_r51.py	58048	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_new_hangar_static_r51.py	9160	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_new_main_routes_r51.py	15469	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_old_bay_trial_r51.py	5519	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_original_silo_seals_r51.py	4574	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_path_debug_r47.py	2539	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_personnel_crossings_r51.py	2544	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_pyramid_terminal_move_r51.py	10109	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_r51_delivery_audit.py	28304	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_r51_facility_reference.py	2743	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_r51_native_client.py	33949	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_r51_resource_identity.py	3487	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_r51_shader_recipe.py	5239	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_r51_two_pack.py	28043	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_ramiel_invasion_plan_r51.py	4673	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_real_staff_commission_r51.py	8080	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_remote_natural_lake_r51.py	4872	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_actor_state_r51.py	4122	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_airshaft_r51.py	6314	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_aux_r52.py	17730	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_bay_finishes_r51.py	2217	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_bridge_gate_separation_r52.py	4332	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_cage_door_pockets_r51.py	3363	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_core_r51.py	9881	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_final_fixtures_r52.py	4632	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_floor_interfaces_r52.py	2179	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_geofront_ports_r51.py	6560	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_hq_station_link_r51.py	4766	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_lab_access_r51.py	3111	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_lab_metro_link_r51.py	7288	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_lakeside_r51.py	6551	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_launch_civil_r51.py	12780	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_launch_finish_r52.py	3800	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_local_navigation_r52.py	3216	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_marine_inventory_r52.py	14376	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_marine_supports_r52.py	5455	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_mtr_state_r51.py	9577	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_navigation_r51.py	13566	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_old_lift_retirement_r51.py	2645	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_open_port_priority_r52.py	2816	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_primary_lifts_r51.py	6769	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_public_approaches_r52.py	3880	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_pyramid_loops_r51.py	8497	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_rail_civil_r51.py	10850	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_rail_design_r51.py	4867	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_remote_lake_r51.py	4993	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_retirement_r51.py	4440	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_roof_beacon_r52.py	2221	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_shared_lift_r51.py	8631	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_station_lift_r51.py	6413	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_stations_r51.py	4786	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_surface_annex_r51.py	2827	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_transit_metadata_r52.py	9421	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_restart_yashima_r52.py	6882	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_retained_research_pyramid_bridge_r51.py	9536	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_retracting_shoulder_seats_r52.py	6633	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_science_side_interfaces_r51.py	6775	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_scientific_foyer_restore_r51.py	10862	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_transport_shaft_r51.py	10414	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_underground_station_migration_r51.py	4944	需保留：源代码或文档；是否过时未验证
+??	tools/prepare_unit02_selected_sword_review_r51.py	9156	需保留：源代码或文档；是否过时未验证
+??	tools/prove_capsule_intersection_support_r51.py	5283	需保留：源代码或文档；是否过时未验证
+??	tools/r51_facility_candidate.py	7023	需保留：源代码或文档；是否过时未验证
+??	tools/r51_installed_projection.py	1752	需保留：源代码或文档；是否过时未验证
+??	tools/r51_preparation_sources.py	4864	需保留：源代码或文档；是否过时未验证
+??	tools/r51_release_labels.py	478	需保留：源代码或文档；是否过时未验证
+??	tools/r51_selected_payload.py	4479	需保留：源代码或文档；是否过时未验证
+??	tools/r52_fresh_delivery_evidence.py	13742	需保留：源代码或文档；是否过时未验证
+??	tools/read_marine_native_inputs_r51.py	5662	需保留：源代码或文档；是否过时未验证
+??	tools/rebase_facility_layout_final_r51.py	6732	需保留：源代码或文档；是否过时未验证
+??	tools/refine_r53_launch_chamber_interfaces.py	4118	需保留：源代码或文档；是否过时未验证
+??	tools/refine_r53_natural_lake.py	7288	需保留：源代码或文档；是否过时未验证
+??	tools/refine_wrap_distance_r51.py	6359	需保留：源代码或文档；是否过时未验证
+??	tools/render_final_facility_sections_r51.py	4217	需保留：源代码或文档；是否过时未验证
+??	tools/repair_restart_corridor_junctions_r51.py	2250	需保留：源代码或文档；是否过时未验证
+??	tools/repair_restart_hq_interfaces_r51.py	3862	需保留：源代码或文档；是否过时未验证
+??	tools/repair_restart_rail_junctions_r51.py	2949	需保留：源代码或文档；是否过时未验证
+??	tools/restart_r51_from_delivery.py	2649	需保留：源代码或文档；是否过时未验证
+??	tools/retarget_lux_un01_r20.py	12689	需保留：源代码或文档；是否过时未验证
+??	tools/retarget_user_gaits_r51.py	9905	需保留：源代码或文档；是否过时未验证
+??	tools/retire_r53_launch_divider_posts.py	22721	需保留：源代码或文档；是否过时未验证
+??	tools/retire_restart_close_yashima_r52.py	2000	需保留：源代码或文档；是否过时未验证
+??	tools/retire_restart_old_station_gallery_r52.py	4781	需保留：源代码或文档；是否过时未验证
+??	tools/shield_pose_clearance_r47.py	1903	需保留：源代码或文档；是否过时未验证
+??	tools/simulate_eva_compliant_grip_pair.py	22715	需保留：源代码或文档；是否过时未验证
+??	tools/start_manual_motion_r45.py	4688	需保留：源代码或文档；是否过时未验证
+??	tools/start_same_native_r52.py	1839	需保留：源代码或文档；是否过时未验证
+??	tools/summarize_mtr_cold_r51.py	2182	需保留：源代码或文档；是否过时未验证
+??	tools/survey_armor_invasion_column_r51.py	3616	需保留：源代码或文档；是否过时未验证
+??	tools/survey_facilities_r51.py	3457	需保留：源代码或文档；是否过时未验证
+??	tools/survey_final_rail_corridors_r51.py	3702	需保留：源代码或文档；是否过时未验证
+??	tools/survey_hakone_mechanical_port_r51.py	3630	需保留：源代码或文档；是否过时未验证
+??	tools/survey_hakone_surface_candidates_r51.py	4914	需保留：源代码或文档；是否过时未验证
+??	tools/survey_new_geofront_ports_r51.py	3844	需保留：源代码或文档；是否过时未验证
+??	tools/survey_new_hangar_masterplan_r51.py	5385	需保留：源代码或文档；是否过时未验证
+??	tools/survey_new_hangar_routes_r51.py	6494	需保留：源代码或文档；是否过时未验证
+??	tools/survey_north_slope_r51.py	6744	需保留：源代码或文档；是否过时未验证
+??	tools/survey_pyramid_lake_replan_r51.py	8682	需保留：源代码或文档；是否过时未验证
+??	tools/survey_remote_natural_lake_r51.py	3954	需保留：源代码或文档；是否过时未验证
+??	tools/survey_restart_r51.py	3523	需保留：源代码或文档；是否过时未验证
+??	tools/survey_transport_shaft_r51.py	5495	需保留：源代码或文档；是否过时未验证
+??	tools/survey_yashima_shoulder_r51.py	2458	需保留：源代码或文档；是否过时未验证
+??	tools/templates/r51/DELIVERY_CONTENT_AUDIT_R51.json.template	1383	需保留：源代码或文档；是否过时未验证
+??	tools/templates/r51/FINAL_STATUS_R51.md	1346	需保留：源代码或文档；是否过时未验证
+??	tools/templates/r51/Initialize-R51-Visuals.ps1	3440	需保留：源代码或文档；是否过时未验证
+??	tools/templates/r51/KNOWN_LIMITS_R51.zh.md	647	需保留：源代码或文档；是否过时未验证
+??	tools/templates/r51/MANUAL_R51.zh.md	1310	需保留：源代码或文档；是否过时未验证
+??	tools/templates/r51/PCL/Setup.ini	268	需保留：源代码或文档；是否过时未验证
+??	tools/templates/r51/README_R51.zh.md	1687	需保留：源代码或文档；是否过时未验证
+??	tools/templates/r51/WORLD_AUTHORITY_R51.json.template	419	需保留：源代码或文档；是否过时未验证
+??	tools/wrap_leg_egress_r51.py	2997	需保留：源代码或文档；是否过时未验证
+??	tools/wrap_right_foot_sensitivity_r51.py	1933	需保留：源代码或文档；是否过时未验证

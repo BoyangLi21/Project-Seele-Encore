@@ -1,0 +1,13 @@
+package com.projectseele.world;
+import com.google.gson.*;
+import java.nio.file.*;
+import java.util.*;
+/** Actual facet-focused time samples; map and clock remain untouched. */
+public final class LegacyRideAdaptiveR52 {
+ private record Key(double t,RigidTransform root,NervLegacyCarrierRideR52.RidePose pose){}
+ private static Key key(NervRouteDirectoryR52 d,NervRouteDirectoryR52.Leg l,FootSupportFrameR52.Binding b,double from,double to,double t)throws Exception{var r=d.sample(l,from+(to-from)*t,b).evaRoot();return new Key(t,r,NervLegacyCarrierRideR52.targetFromActualHeadsR52(r));}
+ private static double error(Key a,Key b)throws Exception{if(a.pose()==null||b.pose()==null)return Double.POSITIVE_INFINITY;double worst=0;for(int k=1;k<8;k++){var root=a.root().interpolate(b.root(),k/8D);var pose=NervLegacyCarrierRideR52.interpolate(a.pose(),b.pose(),k/8D);for(var c:NervLegacyCarrierRideR52.finitePadBearingsR52(root,pose))worst=Math.max(worst,c.maximumFit());}return worst;}
+ public static void main(String[] args)throws Exception{var d=NervRouteDirectoryR52.parse(JsonParser.parseString(Files.readString(Path.of(args[0]))).getAsJsonObject());var rows=new ArrayList<Object>();var b=NervOriginalCarrierR52.nominalBinding(0);var leg=d.leg("unit0/original_incline");int failed=0,maxCount=0;double worst=0;var detail=new ArrayList<Object>();
+  for(int age=0;age<240;age++){double from=NervMechanicalTravelR52.fraction(age,240),to=NervMechanicalTravelR52.fraction(age+1,240);var sampled=NervLegacyCarrierRideR52.readOnlySamplesR52(t->d.sample(leg,from+(to-from)*t,b).evaRoot());if(sampled==null){failed++;detail.add(Map.of("age",age,"production_geometry_refused",true));continue;}var keys=new ArrayList<Key>();for(int i=0;i<sampled.times().size();i++)keys.add(new Key(sampled.times().get(i),sampled.roots().get(i),sampled.poses().get(i)));double e=0;for(int i=0;i<keys.size()-1;i++)e=Math.max(e,error(keys.get(i),keys.get(i+1)));worst=Math.max(worst,e);maxCount=Math.max(maxCount,keys.size());if(e>.0002){failed++;detail.add(Map.of("age",age,"count",keys.size(),"fit",e,"times",keys.stream().map(Key::t).toList()));}}
+  System.out.println("failedticks="+failed+" maxkeys="+maxCount+" worst="+worst);Files.writeString(Path.of(args[1]),new GsonBuilder().setPrettyPrinting().create().toJson(Map.of("world_written",false,"clock",240,"failed_ticks",failed,"maximum_keys",maxCount,"worst",worst,"failures",detail)));}
+}

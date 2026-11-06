@@ -1,0 +1,33 @@
+# R52 迁移设施的旧生成入口保护
+
+> 后续新址功能已接入 Root 显式总部文件：见 [HEADQUARTERS_DEVICE_BINDING.md](HEADQUARTERS_DEVICE_BINDING.md)。旧生成仍退休；command 滑门、按钮、三座位和五屏幕的新址维护不再停留在禁用状态。
+
+2026-10-11，本批继续 Air 的 EVA 保护，覆盖完整迁移的总部、办公室、SEELE 与 Terminal。工作目录为 `C:/Users/liboy/.codex/worktrees/r51-nonmap/eva`；地图和 B/W 均未写入。
+
+唯一退休条件是 `NervRouteRuntimeR52.claimed`，不依赖 `ready`、世界名字或残存旧修订标记。`NervLegacyGenerationGuardR52.retired(MinecraftServer)` 只查询 GeoFront 的同一 claim。未 claimed 世界保留旧功能。这个保护仅用于继承的坐标生成器；Root 的 R52 独立设备清单及真实玩家放置行为继续运行。
+
+| 真实入口 → callee → 写入 | 本批保护 |
+| --- | --- |
+| `GameEvents.onServerTick` → clean-rebuild `FacilityV2ArchitectureDirector.tick` → command spine/suite、MAGI descent、Dogma descent → `set` → `level.setBlock` | 入口整体退休；最终 `set` 同时禁止写入。此前仅 EVA branch 的保护不能覆盖迁移的总部。 |
+| clean tick / 已存 zone cursor → `FacilityV2BuildDirector.advance` → `plan.blockAt` → `level.setBlock` | `start`、`tick`、`advance` 对 claimed 都退出；已存总部、MAGI、Lilith、人员连接 zone 也不再执行。 |
+| staged tick → Bootstrap/Programme → BuildDirector；fabric cursor → `GeoFrontFabricDirector.advance`/`advanceReconciliation` | 旧 Bootstrap、全部 Programme 和 staged/fabric 都停止；旧计画不能以缺失 revision 为由再排队。 |
+| zone complete / old button / clean tick → `FacilityV2ElevatorDirector` → cabin `addFreshEntity`、shaft migration/landing `setBlock` | 完成入口、tick、旧按钮、独立 cabin install 和各 door 写入入口退休。Root `S20LiftDirectoryR52` 原生人员电梯不走这些 callee。 |
+| zone completion → `FacilityV2SpecimenDirector.onZoneCompleted` → `LilithChamberV2Plan.specimenAnchor` → `addFreshEntity` | zone 完成入口退休，旧 Lilith plan 无法补生。 |
+| `FacilityV2RouteGateDirector.refresh`/west seam → `setAperture` → `setBlock` | 全部旧 V2 port/seam 退休；不再只跳过 EVA ports。 |
+| old ensure/setup → `IntegratedNervMapBuilder.build/ensure` → `GeoFrontBuilder.ensurePyramidRevision/build` → pyramid/LCL/room/logos shell `setBlock` | build/ensure 仅只读审查或退出；`GeoFrontBuilder`、landscape 与 Integrated 的 `set` 落点保护。旧世界 policy 也拒绝 claimed 的 legacy/S20 civil generation。 |
+| old `/geofront operations` / Integrated repair → `NervOperationsCentreBuilder.repairRuntimeAccess` → command annex/video wall/hangar route/linkFacilities → `setBlock` | 公开生成、连廊、运行修复及最终 `set` 保护；旧门厅、办公室/安全室不再重画。 |
+| `GameEvents` legacy path / old setup → `MagiDeepLabBuilder.tick/repairRuntimeLabels/build` → labels `addFreshEntity`、`set` | 入口、labels、block落点退休；旧固定按钮也不能在旧 statusPosition 造一个孤立状态块。 |
+| **`S22FleetMigration.tick`（100 ticks，GameEvents 的 S20 claimed gate 之外）** / `RegionalWayfindingAuthor` / runtime ensure → `TerminalDogmaBuilder.repairRuntimeSpecimen` → `spawnLilith/moveSpecimens` → `addFreshEntity`/旧锚点 move | `repairRuntimeSpecimen`、spawn 和 move 均退休；`build/ensureRevision/repairRuntimeAccess/set` 同时禁止旧 Terminal 方块修复。 |
+| old topology ensure / button / active ride tick → `NervFacilityTopologyBuilder` → command/MAGI/Dogma/central/lift connections → `setBlock`、`spawnCabin` → `addFreshEntity` | 整体旧 topology entry 与最终 set/cabin 退休；此前只保护 CAGE 不足以保护迁移总部。 |
+| S20 tick/seat click → `S20CommandPresentationDirector.install/installSeat` / runtime presentation removal → `setBlock`、seat `addFreshEntity` | 独立入口保护，不能绕过 GameEvents 的条件。`S20CommandRoomRepairs.tick` 也保护。 |
+| telemetry/setup → `NervCommandTelemetry.install` 与 `NervOperationsConsole.install/installImportedV2Controls` → display/label `addFreshEntity`、control platform `setBlock` | 旧安装入口退休；已存在 R52 console 的手动 operation 路径保留。 |
+| `GameEvents.onRightClickBlock` / old door entity `tick` → `CommandRoomSlidingDoorDirector.handleUse/maintainCollision` → fixed `DOORS` planes `setBlock`；direct `NervSlidingDoorEntity.reconcile` → `addFreshEntity` | `enabled` 对 claimed 返回 false；direct entity reconcile 也保护。该旧类仍只认固定旧坐标，Root `r52/headquarters.json` 与完整 door artifact 已接入新址维护，单改旧 r01 JSON 仍不能启用。 |
+| `LiftSlidingDoorDirector.setLandingDoor` → visual door `addFreshEntity` | claimed 仅拒绝 `lift.r52()==null` 的旧 specs；Root 已声明的 lift 继续工作。 |
+| `SeeleConferencePropsR47.tick` → metadata room prop positions → desk/monolith `addFreshEntity` | claimed 必须有 ready 的 Root office，而且所有道具点落在 Root meeting bounds，才允许新址维护；旧元数据不可造旧会议室。 |
+| `RegionalWayfindingAuthor.tick` → old labels `addFreshEntity` | 已 claimed 时旧一次性 author 退出，避免其旧 HQ 标签及 Terminal repair 重入。 |
+
+保留的实际已安装维护：`NervOfficeChairBlock.sit` 按点击的真实椅子位置创建座位；`PeriodFixtureBlock.setPlacedBy` 按真实放置位置创建上部部件；`FacilityDoorControlsR49` 和 `SeeleConferenceAccessR47` 在 claimed 时已经读取 Root office 的清单而不回退旧 gate/readers；`CommandLightingR30`、`SeeleLightingR48` 只更改已经存在的指定灯具状态；`PublicStationGatesR44` 只更改实际 MTR barrier 的 open 状态。它们不按缺失方块重建设施，因此未做 blanket disable。外部 NERV 图案与墙上画作由迁移的 mounted block entities 渲染；`TreeOfLifeWallClient.onRenderLevel` 的固定旧 plates 仅在显式 `legacyWallArtReview` 开关下渲染，不写地图。
+
+验证：30 个本批源码以实际 Forge/Minecraft 依赖 targeted javac 编译通过；现有 `NervRouteRuntimeStateR52Test` 18 项真实 CompoundTag/lifecycle 检查通过，包括 pending claim 保存回读与故障 claimed 不回退。第一轮整仓 `compileJava` 因其他代理同时编辑的 `NervMappedPlugMechanicsR52.java:54` 的变量 scope 错误失败，本批文件没有编译错误。回执：`.Codex/r52_moved_facility_guard/VALIDATION.json`、`targeted_compile.log`、`saved_claim_test.log`。这不是原生世界运行验收。
+
+仍需 Root 集中迁移的运行元数据见 `MOVED_FACILITY_RUNTIME_METADATA_READONLY.md`。
