@@ -196,10 +196,10 @@ def record(a):
     metrics=validate_plan(a.candidate,a.authority,spec.get('road_promotions',()))
     write(a.next_authority/(spec['id']+'-installed-access.json'),dict(candidate=str(a.candidate),
         installation=str(a.installation),previous=str(a.authority),**metrics,world_written=True))
-    delivery=dict(batch=a.batch,station=spec['label'],candidate=str(a.candidate),installation=str(a.installation),
-        authority=str(a.next_authority),terrain_field=str(a.terrain),**check,**metrics,
-        world_written=True,client_jar_written=False,station_structure_count_unchanged=True,
-        station_complete=False,through_service_complete=False,minimap_refreshed=False,distant_cache_refreshed=False)
+    delivery={**check,**metrics,'batch':a.batch,'station':spec['label'],'candidate':str(a.candidate),
+        'installation':str(a.installation),'authority':str(a.next_authority),'terrain_field':str(a.terrain),
+        'world_written':True,'client_jar_written':False,'station_structure_count_unchanged':True,
+        'station_complete':False,'through_service_complete':False,'minimap_refreshed':False,'distant_cache_refreshed':False}
     write(a.delivery,delivery)
     work.update(latest_installed_batch=a.batch,planning_authority=str(a.next_authority),previous_worklist=str(prior_worklist))
     work.setdefault('station_access_corridor_deliveries',[]).append(str(a.delivery))
