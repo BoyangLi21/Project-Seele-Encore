@@ -11,9 +11,11 @@ import net.minecraft.nbt.Tag;
 /** Execute the production span consumer against the exact candidate delta. */
 public final class SurfaceRepairReplayTest
 {
+    private static final java.util.Map<String, java.util.Map<Long, int[]>> CARGO_COLUMNS = new HashMap<>();
     public static void main(String[] args) throws Exception
     {
         if (args.length != 2) throw new IllegalArgumentException("candidate actual_world required");
+        verifyCargoSweepRegression();
         Path candidate = Path.of(args[0]), world = Path.of(args[1]);
         Path relative = Path.of("dimensions/projectseele/geofront/data/city_rigid_generation_r45");
         java.util.List<Path> sources;
@@ -116,7 +118,94 @@ public final class SurfaceRepairReplayTest
                     && tower.centre().getX() + tower.minX() <= x * 16 + 15
                     && tower.centre().getZ() + tower.maxZ() >= z * 16
                     && tower.centre().getZ() + tower.minZ() <= z * 16 + 15)
-                throw new IllegalStateException("Later Cargo ownership requires a full replay: " + rigidFile);
+            {
+                // Surface work below a tower's full movement volume is disjoint,
+                // even when it occupies the same XZ chunk. Include the original
+                // cargo and every retained matching journey inventory, including
+                // AIR cells; checking just the current endpoint is insufficient.
+                var columns = cargoColumns(root, rigidFile.getParent().getParent(),
+                        recipe.getString("WorldUUID"), tower.index());
+                for (BlockPos pos : wanted.keySet())
+                {
+                    long column = BlockPos.asLong(pos.getX()-tower.centre().getX(), 0,
+                            pos.getZ()-tower.centre().getZ());
+                    int[] local = columns.get(column);
+                    if (local != null && intersectsSweep(pos.getY(), local[0], local[1],
+                            tower.centre().getY(), tower.retractedY()))
+                        throw new IllegalStateException("Later Cargo swept ownership requires a full replay at " + pos);
+                }
+            }
+        }
+    }
+
+    static boolean intersectsSweep(int y, int localMin, int localMax, int raised, int retracted)
+    {
+        return y >= Math.min(raised, retracted) + localMin
+                && y <= Math.max(raised, retracted) + localMax;
+    }
+
+    private static void verifyCargoSweepRegression()
+    {
+        // A basement below both endpoints is safe; an intermediate travel
+        // position remains owned even if neither endpoint currently touches it.
+        if (intersectsSweep(-559, -3, 40, 80, -120)
+                || !intersectsSweep(-123, -3, 40, 80, -120)
+                || !intersectsSweep(-60, -3, 40, 80, -120)
+                || !intersectsSweep(120, -3, 40, 80, -120)
+                || intersectsSweep(121, -3, 40, 80, -120))
+            throw new AssertionError("Cargo three-dimensional sweep regression");
+        var columns=new HashMap<Long,int[]>();
+        for (int y : new int[]{4,-7,2})
+        {
+            var cell=new CompoundTag();cell.putLong("Pos",new BlockPos(2,y,-3).asLong());
+            var cells=new net.minecraft.nbt.ListTag();cells.add(cell);addCargoColumns(columns,cells);
+        }
+        int[] merged=columns.get(BlockPos.asLong(2,0,-3));
+        if (columns.size()!=1 || merged[0]!=-7 || merged[1]!=4)
+            throw new AssertionError("Retained journey cargo did not expand ownership");
+    }
+
+    private static java.util.Map<Long, int[]> cargoColumns(Path root, Path generation, String world,
+                                                          int index) throws Exception
+    {
+        String key = root.toAbsolutePath().normalize() + "/" + index;
+        var cached = CARGO_COLUMNS.get(key);
+        if (cached != null) return cached;
+        var columns = new HashMap<Long, int[]>();
+        CompoundTag cargo = NbtIo.readCompressed(generation.resolve("cargo").resolve(index+".dat").toFile())
+                .getCompound("data");
+        if (!world.equals(cargo.getString("WorldUUID")) || cargo.getList("Buildings",Tag.TAG_COMPOUND).size()!=1)
+            throw new IllegalStateException("Missing/foreign full cargo inventory");
+        addCargoColumns(columns,cargo.getList("Buildings",Tag.TAG_COMPOUND).getCompound(0)
+                .getList("Cargo",Tag.TAG_COMPOUND));
+        Path journals = root.resolve("city_rigid_journal_r45");
+        if (Files.isDirectory(journals)) try (var directories = Files.list(journals))
+        {
+            for (Path directory : directories.filter(Files::isDirectory).toList())
+            {
+                Path file = directory.resolve(index+".dat");
+                if (!Files.isRegularFile(file)) continue;
+                CompoundTag plan = NbtIo.readCompressed(file.toFile());
+                if (!world.equals(plan.getString("WorldUUID")))
+                    throw new IllegalStateException("Foreign retained journey inventory");
+                addCargoColumns(columns,plan.getList("Cells",Tag.TAG_COMPOUND));
+            }
+        }
+        CARGO_COLUMNS.put(key,columns);
+        return columns;
+    }
+
+    private static void addCargoColumns(java.util.Map<Long,int[]> columns, net.minecraft.nbt.ListTag cells)
+    {
+        if (cells.isEmpty()) throw new IllegalStateException("Unmeasured empty cargo inventory");
+        for (Tag raw : cells)
+        {
+            CompoundTag cell=(CompoundTag)raw;
+            if (!cell.contains("Pos",Tag.TAG_LONG)) throw new IllegalStateException("Cargo cell lacks position");
+            BlockPos local=BlockPos.of(cell.getLong("Pos"));
+            long key=BlockPos.asLong(local.getX(),0,local.getZ());
+            int[] bound=columns.computeIfAbsent(key,k->new int[]{local.getY(),local.getY()});
+            bound[0]=Math.min(bound[0],local.getY()); bound[1]=Math.max(bound[1],local.getY());
         }
     }
 }

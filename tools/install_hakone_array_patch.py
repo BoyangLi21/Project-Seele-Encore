@@ -18,6 +18,7 @@ from install_r53_carrier_trays import stopped_world
 from map_pipeline.install.invariants import assert_chunk_preserved
 from map_pipeline.launch_protection import load as launch_protection, check_candidate
 from native_transit_additions import prepare as prepare_native_additions, assert_preserved as assert_native_preserved
+from map_pipeline.delta_geometry import checked_indices
 
 DIM = 'projectseele:geofront'
 DATA = Path('dimensions/projectseele/geofront/data')
@@ -42,8 +43,11 @@ def compose(files, palette):
     chunks = {}
     for file in files:
         with np.load(file) as a:
+            bottom, _, normalized = checked_indices(a)
+            normalized = normalized + (bottom-Y0)*256
             remap = palette.codes(a['palette'])
-            coordinates, ranges, indices, old, new = (a[k] for k in ('coordinates','ranges','indices','before','after'))
+            coordinates, ranges, old, new = (a[k] for k in ('coordinates','ranges','before','after'))
+            indices = normalized
             for i, coordinate in enumerate(coordinates):
                 key = tuple(map(int, coordinate)); left, right = ranges[i:i+2]
                 at = indices[left:right].astype(np.int32); before = remap[old[left:right]]; after = remap[new[left:right]]

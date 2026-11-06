@@ -3,6 +3,7 @@ import argparse,shutil
 from pathlib import Path
 import numpy as np
 from map_pipeline.delivery_check import read,write
+from map_pipeline.delta_geometry import checked_indices
 
 
 def rebase(a):
@@ -20,10 +21,11 @@ def rebase(a):
     checked=0;overlaps=[]
     for delta in(a.candidate/'delta').glob('*.npz'):
         with np.load(delta)as f:
+            bottom,_,indices=checked_indices(f)
             for k,(cx,cz)in enumerate(f['coordinates']):
                 lo,hi=f['ranges'][k:k+2]
-                for q in f['indices'][lo:hi]:
-                    q=int(q);x,y,z=int(cx)*16+q%16,q//256-128,int(cz)*16+(q%256)//16
+                for q in indices[lo:hi]:
+                    q=int(q);x,y,z=int(cx)*16+q%16,q//256+bottom,int(cz)*16+(q%256)//16
                     checked+=1
                     if(x,z)in layers:
                         floor,depth=layers[x,z]

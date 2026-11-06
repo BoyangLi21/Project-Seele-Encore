@@ -30,7 +30,7 @@ def native_check(a,layout):
     for rail in planned['rails']:
         if any(rail[k]!=actual[rail['id']][k]for k in('from','to','from_angle','to_angle','shape','vertical_radius')):
             raise ValueError('Registered rail geometry differs from physical plan')
-    if sorted(p['station']for p in proof['platforms'])!=sorted(s['name']for s in layout['stations']):
+    if {p['station']for p in proof['platforms']}!={s['name']for s in layout['stations']}:
         raise ValueError('Registered station names differ')
     for station in layout['stations']:
         platforms=[p for p in proof['platforms']if p['station']==station['name']]

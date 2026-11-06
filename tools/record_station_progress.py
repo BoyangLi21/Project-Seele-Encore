@@ -104,8 +104,16 @@ def station_set_mapping(names, design, layout, proof, decoded):
                     'Platform proof endpoints differ from saved platform or rail')
             # Current set designs provide the station's platform rail directly.
             # This binds ownership independently of the proof's name labels.
-            designed = designs[name]['native_rail']
-            require(p['input_rail_id'] == designs[name]['rail_id']
+            station_design=designs[name]
+            declared_rails=station_design.get('platform_rails')
+            if declared_rails is None:
+                declared_rails=[dict(rail_id=station_design['rail_id'],native_rail=station_design['native_rail'])]
+            rail_designs={r['rail_id']:r['native_rail']for r in declared_rails}
+            require(len(rail_designs)==len(declared_rails)
+                    and set(rail_designs)=={q['rail_id']for q in planned['platforms']},
+                    'Physical platform rail declarations differ from native platform assignment')
+            designed=rail_designs[p['input_rail_id']]
+            require(p['input_rail_id'] in rail_designs
                     and expected == frozenset((tuple(designed['from']), tuple(designed['to']))),
                     'Platform identity is assigned to another station design rail')
             midpoint = [(actual['position1'][k] + actual['position2'][k])/2 for k in ('x', 'y', 'z')]
@@ -144,10 +152,13 @@ def installed_station(delivery_path, snapshot, world):
         if 'stations' not in design:
             plan=read_offline(candidate/'native-station-plan.json',world)
             station_name=design.get('station',design.get('name'))
-            require(len(names)==1 and station_name==names[0] and len(plan['rails'])==1,
-                    'A single-station design must bind exactly one declared platform')
-            rail=plan['rails'][0]
-            design=dict(design,stations=[dict(name=station_name,rail_id=rail['id'],native_rail=rail)])
+            require(len(names)==1 and station_name==names[0], 'A single-station design must bind one declared station')
+            if design.get('platform_rails'):
+                design=dict(design,stations=[dict(name=station_name,platform_rails=design['platform_rails'])])
+            else:
+                require(len(plan['rails'])==1,'Several platforms require explicit physical rail assignments')
+                rail=plan['rails'][0]
+                design=dict(design,stations=[dict(name=station_name,rail_id=rail['id'],native_rail=rail)])
         require(len(design['stations']) == len(layout['stations']) == len(names)
                 and {s['name'] for s in design['stations']} == {s['name'] for s in layout['stations']} == set(names),
                 'Delivery, station design and release layout names disagree')

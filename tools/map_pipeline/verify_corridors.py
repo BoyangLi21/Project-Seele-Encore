@@ -17,13 +17,25 @@ def write_replay_expected(candidate):
     for path in sorted((candidate/'delta').glob('*.npz')):
         with np.load(path)as f:
             coordinates,ranges,indices,values,names=(f[k]for k in ('coordinates','ranges','indices','after','palette'))
+            explicit_height='y_origin'in f.files
+            from map_pipeline.delta_geometry import checked_indices
+            bottom,_,indices=checked_indices(f)
         chunks=[]
         for i,(cx,cz)in enumerate(coordinates):
             lo,hi=ranges[i:i+2]
+            if explicit_height:
+                from prepare_hakone_city_cross import packed
+                cells=[]
+                for offset,value in zip(indices[lo:hi],values[lo:hi]):
+                    pos=(int(cx)*16+int(offset)%16,bottom+int(offset)//256,int(cz)*16+(int(offset)//16)%16)
+                    cells.append(nbtlib.Compound({'Pos':nbtlib.Long(packed(pos)),'State':parse_state(str(names[value]))}))
+                chunks.append(nbtlib.Compound({'X':nbtlib.Int(int(cx)),'Z':nbtlib.Int(int(cz)),
+                    'Cells':nbtlib.List[nbtlib.Compound](cells)}))
+                continue
             chunks.append(nbtlib.Compound({'X':nbtlib.Int(int(cx)),'Z':nbtlib.Int(int(cz)),
                 'Offsets':nbtlib.IntArray(indices[lo:hi].astype(np.int32)),
                 'StateIds':nbtlib.IntArray(values[lo:hi].astype(np.int32))}))
-        nbtlib.File({'Version':nbtlib.Int(2),'Palette':nbtlib.List[nbtlib.Compound]([parse_state(str(n))for n in names]),
+        nbtlib.File({'Version':nbtlib.Int(1 if explicit_height else 2),'Palette':nbtlib.List[nbtlib.Compound]([parse_state(str(n))for n in names]),
             'Chunks':nbtlib.List[nbtlib.Compound](chunks)}).save(destination/(path.stem+'.dat'),gzipped=True)
 
 

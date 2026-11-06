@@ -58,6 +58,43 @@ def metadata_scope(candidate):
     return files
 
 
+def ground_replacements(candidate, authority, spec, editor, nodes):
+    """Validate exact old/new column declarations against current saved voxels."""
+    if spec['ground_network']['mode']!='explicit_replacements':return None
+    patch=read(package_file(candidate,spec['ground_network']['replacements_file']))
+    require(patch.get('schema')=='access-ground-replacements-v1'
+            and Path(patch['source_authority']).resolve()==authority.resolve()
+            and patch['expected_previous_batch']==spec['previous_batch']
+            and patch.get('preserve_all_other_fields')is True,'Ground replacement authority differs')
+    rows=patch['columns'];require(len(rows)==patch['unique_columns']>0,'Ground replacement scope differs')
+    with np.load(authority/'network.npz')as f:network={k:f[k]for k in f.files}
+    x0,z0,x1,z1=map(int,network['bounds']);seen=set();changed=0
+    for row in rows:
+        x,z=row['column'];require(type(x)is int and type(z)is int,'Ground replacement coordinates must be integers')
+        require((x,z)not in seen and x0<=x<=x1 and z0<=z<=z1,'Repeated or outside ground replacement');seen.add((x,z))
+        before,after=row['before'],row['after']
+        for state in(before,after):
+            require(set(state)=={'walk','road','grade2'}and type(state['walk'])is bool
+                    and type(state['road'])is bool and type(state['grade2'])is int,'Invalid ground replacement state')
+        actual={k:bool(network[k][z-z0,x-x0])if k!='grade2'else int(network[k][z-z0,x-x0])for k in before}
+        require(actual==before,'Ground replacement precondition changed')
+        require(after['road']==before['road']and(not before['road']or after==before),'Access replacement may not change existing roads')
+        require(row['changed']==(before!=after),'Ground replacement change count is inconsistent')
+        changed+=before!=after
+        if after['walk']:
+            require((x,after['grade2'],z)in nodes and {g for px,g,pz in nodes if(px,pz)==(x,z)}=={after['grade2']},
+                    'Ground replacement lacks a unique measured public surface')
+        elif before['walk']:
+            require((x,before['grade2'],z)not in nodes,'Ground retirement would hide a retained public route')
+        require(row.get('source_witnesses'),'Ground replacement has no measured voxel evidence')
+        for witness in row['source_witnesses']:
+            pos=witness['pos'];require(pos[0]==x and pos[2]==z,'Ground witness belongs to another column')
+            require(editor.state(*pos,True)==witness['source_state']and editor.state(*pos)==witness['candidate_state'],
+                    'Ground replacement witness differs from exact source/candidate')
+    require(changed==patch['changed_columns'],'Ground replacement count differs')
+    return patch
+
+
 def validate_offline(args):
     """Read saved candidate files and evidence only; return exact route overlay."""
     candidate = Path(args.candidate)
@@ -147,7 +184,7 @@ def validate_offline(args):
             nodes.add((math.floor(point[0]), round((point[1]-1)*2), math.floor(point[2])))
         routes.append(route)
     ground = spec['ground_network']
-    require(ground['mode'] in ('preserve', 'explicit_additions'), 'Unknown scalar ground update mode')
+    require(ground['mode'] in ('preserve', 'explicit_additions','explicit_replacements'), 'Unknown scalar ground update mode')
     columns = ground.get('columns', [])
     require(all(len(row) == 3 and all(isinstance(v, int) and not isinstance(v, bool) for v in row) for row in columns),
             'Explicit ground columns require integer x,z,grade2 values')
@@ -156,14 +193,17 @@ def validate_offline(args):
     for x, z, grade in columns:
         require((x, grade, z) in nodes and {g for px, g, pz in nodes if (px, pz) == (x, z)} == {grade},
                 'Ground update is absent from routes or would flatten a layered route')
+    require(ground['mode']!='explicit_replacements'or not columns,'Replacement and addition modes cannot be mixed')
+    replacements=ground_replacements(candidate,Path(args.authority),spec,editor,nodes)if ground['mode']=='explicit_replacements'else None
     for view in spec['candidate_views']:
         package_file(candidate, view)
     metadata_scope(candidate)
     return dict(spec=spec, manifest=manifest, report=report, device_count=len(payloads),
-                routes=routes, nodes=sorted(nodes), ground_columns=columns,
+                routes=routes, nodes=sorted(nodes), ground_columns=columns, ground_replacements=replacements,
                 changed_cells=len(expected), original_blocks_modified=len(old),
                 support_columns=len(supports), guard_probes=len(guards), negative_cases=len(negatives),
-                frozen_scope=dict(configuration=spec, changes=changes, functional_report=report))
+                frozen_scope=dict(configuration=spec, changes=changes, functional_report=report,
+                                  **({'ground_replacements':replacements}if replacements is not None else{})))
 
 
 def current_state(args, spec):
@@ -250,6 +290,13 @@ def publish_overlay(args, checked):
     """Publish metadata only; caller has already verified the installed receipt."""
     columns = checked['ground_columns']
     network = None
+    replacement=checked.get('ground_replacements')
+    if replacement is not None:
+        with np.load(args.authority/'network.npz')as data:network={k:data[k]for k in data.files}
+        ax,az,_,_=map(int,network['bounds'])
+        for row in replacement['columns']:
+            x,z=row['column']
+            for field in('walk','grade2'):network[field][z-az,x-ax]=row['after'][field]
     if columns:
         with np.load(args.authority / 'network.npz') as data:
             network = {k: data[k] for k in data.files}
@@ -277,7 +324,8 @@ def publish_overlay(args, checked):
         verified_routes=checked['routes'], path_format=['x_world', 'feet_y', 'z_world'],
         station_multi_level_nodes=checked['nodes'], station_multi_level_node_format=['x', 'grade2', 'z'],
         ground_access_columns=columns, ground_access_format=['x', 'z', 'grade2'],
-        scalar_network_preserved=not columns, maximum_verified_step=checked['spec']['maximum_step'],
+        scalar_network_preserved=not columns and replacement is None,
+        ground_replacement_evidence=replacement,maximum_verified_step=checked['spec']['maximum_step'],
         static_access_geometry_only=True, live_acceptance_complete=False, through_service_complete=False,
         existing_station_final_review_complete=False, world_written=True))
     return overlay
@@ -311,7 +359,8 @@ def record(args):
         negative_cases_passed=checked['negative_cases'], original_blocks_modified=checked['original_blocks_modified'],
         new_native_members=0, old_native_members_exact=installed['old_native_members_exact'],
         device_payloads=installed['device_payloads'], identity_files_exact=installed['identity_files_exact'],
-        whole_client_jar_exact=installed['whole_client_jar_exact'], old_road_network_exact=not checked['ground_columns'],
+        whole_client_jar_exact=installed['whole_client_jar_exact'],
+        old_road_network_exact=not checked['ground_columns']and checked.get('ground_replacements')is None,
         production_replay_passed=True, world_written=True, client_jar_written=False,
         current_collision_and_open_door_runtime_pending=True, through_service_complete=False,
         existing_station_final_review_complete=False, stage_two_complete=False)

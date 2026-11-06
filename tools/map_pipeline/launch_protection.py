@@ -55,10 +55,13 @@ class LaunchProtection:
                      max(0, x-cx*16):min(16, X-cx*16+1)] = True
         return mask
 
-    def assert_delta(self, path, y0=-128, height=448):
+    def assert_delta(self, path):
+        from map_pipeline.delta_geometry import checked_indices
         checked = 0
         with np.load(path) as d:
-            coordinates,ranges,indices,before,after=(d[k]for k in('coordinates','ranges','indices','before','after'))
+            y0, height, checked_at = checked_indices(d)
+            coordinates,ranges,before,after=(d[k]for k in('coordinates','ranges','before','after'))
+            indices = checked_at
             for i, (cx, cz) in enumerate(coordinates):
                 a, b = ranges[i:i + 2]
                 at = indices[a:b].astype(np.int64)
