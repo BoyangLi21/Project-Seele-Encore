@@ -6,6 +6,9 @@
   "refmap": "projectseele.refmap.json",
   "minVersion": "0.8",
   "mixins": [
+    "SynchedEntityDataReadMixin",
+    "EntityFluidScanMixin",
+    "WalkNodeEvaluatorBlockCacheMixin",
     "LclPlayerSwimmingR54Mixin",
     "DhColumnExtentR53Mixin",
     "DhServerLogoutR53Mixin",
