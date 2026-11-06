@@ -72,11 +72,6 @@ public final class SachielStrikePose
             b.setRotX(r.x);b.setRotY(r.y);b.setRotZ(r.z);
             b.setPosX(a[3]+(b.getPosX()-a[3])*blend);b.setPosY(a[4]+(b.getPosY()-a[4])*blend);b.setPosZ(a[5]+(b.getPosZ()-a[5])*blend);
         }
-        if(com.projectseele.visual.CombatR29Review.ENABLED&&age>=SachielStrike.contactStart(actor.strikeMode())&&age<=SachielStrike.contactEnd(actor.strikeMode()))
-        {
-            double error=EvaRigTransforms.point(hand,EvaRigTransforms.pivot(hand),SachielStrike.root(actor,partial)).distance(frame.hand().toVector3f());
-            com.projectseele.visual.CombatR29Review.maxHandError=Math.max(com.projectseele.visual.CombatR29Review.maxHandError,error);com.projectseele.visual.CombatR29Review.handSamples++;
-        }
     }
     private SachielStrikePose() {}
 }

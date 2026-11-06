@@ -177,13 +177,6 @@ public class HybridAddonRenderer<T extends LivingEntity & GeoEntity> extends Ent
             super.preRender(pose,entity,model,buffers,vertex,rerender,partial,light,overlay,red,green,blue,alpha);
         }
 
-        @Override public void renderRecursively(PoseStack pose,T entity,GeoBone bone,RenderType type,
-                MultiBufferSource buffers,VertexConsumer vertex,boolean rerender,float partial,int light,int overlay,
-                float red,float green,float blue,float alpha)
-        {
-            super.renderRecursively(pose,entity,bone,type,buffers,vertex,rerender,partial,light,overlay,red,green,blue,alpha);
-            if(!rerender&&bone.getParent()==null)FirstBattleRuntimeWitnessR52.finish(entity,bone);
-        }
 
         @Override
         public void renderCubesOfBone(PoseStack poseStack, GeoBone bone, VertexConsumer buffer,

@@ -22,13 +22,14 @@ public final class AirLiftR40Client
     private static boolean wroteEvidence;
     private static String photoPhase="";private static int stablePhase;
     private static final java.util.Set<String> photos=new java.util.HashSet<>();
-    private static CombatR31Client.View lastView;
+    public record View(net.minecraft.world.phys.Vec3 position,net.minecraft.world.phys.Vec3 target) {}
+    private static View lastView;
     private static boolean clearView;
     private static net.minecraft.world.phys.AABB framedBounds;
     private static int testedRays, clearRays;
     private static double maximumProjection;
     private static final com.google.gson.JsonArray cameraEvidence=new com.google.gson.JsonArray();
-    public static CombatR31Client.View cameraView(float partial)
+    public static View cameraView(float partial)
     {
         var mc=Minecraft.getInstance();if(!ENABLED||mc.level==null||mc.player==null)return null;
         if(!(mc.level.getEntity(AirLiftR30Review.observedEntity) instanceof com.projectseele.entity.EvaUnit01Entity eva))return null;
@@ -86,7 +87,7 @@ public final class AirLiftR40Client
             double projection=projection(framedBounds,at,target,vertical,horizontal);
             if(visible<Math.ceil(samples.size()*.8D)||projection>1D)continue;
             testedRays=samples.size();clearRays=visible;maximumProjection=projection;
-            clearView=true;lastView=new CombatR31Client.View(at,target);return lastView;
+            clearView=true;lastView=new View(at,target);return lastView;
         }
         return null;
     }

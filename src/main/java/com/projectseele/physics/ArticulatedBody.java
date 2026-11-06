@@ -26,8 +26,6 @@ public final class ArticulatedBody implements AutoCloseable
     private final Map<String,RigidBody> actors=new HashMap<>();
     private final Set<String> actorFrame=new HashSet<>();
     private boolean closed;
-    private final ArticulatedInputTraceR45 trace=new ArticulatedInputTraceR45();
-    private final Set<String> tracedActors=new HashSet<>();
 
     private static Transform transform(JsonArray values)
     {float[] a=new float[16];for(int i=0;i<16;i++)a[i]=values.get(i).getAsFloat();return new Transform(new Matrix4f(a));}
@@ -45,7 +43,6 @@ public final class ArticulatedBody implements AutoCloseable
     }
     public ArticulatedBody(JsonObject definition,Map<String,org.joml.Matrix4f> initialDeformation)
     {
-        trace.event("create","definition",definition,"pose",initialDeformation);
         var configuration=new DefaultCollisionConfiguration();dispatcher=new CollisionDispatcher(configuration);
         world=new DiscreteDynamicsWorld(dispatcher,new DbvtBroadphase(),new SequentialImpulseConstraintSolver(),configuration);
         world.setGravity(new Vector3f(0,-9.81F,0));world.getSolverInfo().numIterations=30;
@@ -102,18 +99,15 @@ public final class ArticulatedBody implements AutoCloseable
     }
     public void addStaticBox(org.joml.Vector3f centre,org.joml.Vector3f halfSize,org.joml.Quaternionf orientation)
     {
-        trace.event("terrain","centre",centre,"half",halfSize,"orientation",orientation);
         Transform pose=new Transform();pose.setIdentity();pose.origin.set(centre.x,centre.y,centre.z);pose.setRotation(new Quat4f(orientation.x,orientation.y,orientation.z,orientation.w));
         var body=makeBody(0,new BoxShape(new Vector3f(halfSize.x,halfSize.y,halfSize.z)),pose);body.setUserPointer("terrain");scenery.add(body);
         if(Math.abs(orientation.x)<1e-5F&&Math.abs(orientation.z)<1e-5F){Transform inverse=new Transform(pose);inverse.inverse();Vector3f low=new Vector3f(),high=new Vector3f();body.getAabb(low,high);surfaces.add(new TerrainSurface(inverse,new Vector3f(halfSize.x,halfSize.y,halfSize.z),low,high));}
     }
     public void clearTerrain()
-    {trace.event("clearTerrain");for(var body:scenery)world.removeRigidBody(body);scenery.clear();surfaces.clear();}
-    public void beginActorFrame(){trace.event("beginActors");actorFrame.clear();}
+    {for(var body:scenery)world.removeRigidBody(body);scenery.clear();surfaces.clear();}
+    public void beginActorFrame(){actorFrame.clear();}
     public void actor(String id,JsonObject definition,Map<String,org.joml.Matrix4f> deformation,org.joml.Matrix4f frame)
     {
-        if(tracedActors.add(id))trace.event("actorDefinition","id",id,"definition",definition);
-        trace.event("actor","id",id,"pose",deformation,"frame",frame);
         for(var element:definition.getAsJsonArray("bodies"))
         {
             var row=element.getAsJsonObject();String name=row.get("name").getAsString();
@@ -138,18 +132,16 @@ public final class ArticulatedBody implements AutoCloseable
         }
     }
     public void endActorFrame()
-    {trace.event("endActors");var it=actors.entrySet().iterator();while(it.hasNext()){var e=it.next();if(!actorFrame.contains(e.getKey())){world.removeRigidBody(e.getValue());it.remove();}}world.updateAabbs();}
+    {var it=actors.entrySet().iterator();while(it.hasNext()){var e=it.next();if(!actorFrame.contains(e.getKey())){world.removeRigidBody(e.getValue());it.remove();}}world.updateAabbs();}
     public void impulse(String bone,org.joml.Vector3f point,org.joml.Vector3f impulse)
     {
-        trace.event("impulse","bone",bone,"point",point,"impulse",impulse);
         var body=bodies.getOrDefault(bone,bodies.get("torso_upper"));var origin=body.getCenterOfMassPosition(new Vector3f());
         body.applyImpulse(new Vector3f(impulse.x,impulse.y,impulse.z),new Vector3f(point.x-origin.x,point.y-origin.y,point.z-origin.z));body.activate(true);
     }
     public void velocity(org.joml.Vector3f velocity)
-    {trace.event("velocity","value",velocity);for(var body:bodies.values())body.setLinearVelocity(new Vector3f(velocity.x,velocity.y,velocity.z));}
+    {for(var body:bodies.values())body.setLinearVelocity(new Vector3f(velocity.x,velocity.y,velocity.z));}
     public void motionFromPose(Map<String,org.joml.Matrix4f> previous,float seconds)
     {
-        trace.event("motion","previous",previous,"seconds",seconds);
         if(seconds<=0)return;
         for(var entry:bodies.entrySet())
         {
@@ -163,7 +155,6 @@ public final class ArticulatedBody implements AutoCloseable
     }
     public void step(float seconds)
     {
-        trace.event("step","seconds",seconds);
         if(closed)throw new IllegalStateException("Closed body");
         int count=Math.max(1,(int)Math.ceil(Math.min(seconds,.10F)*240));float dt=Math.min(seconds,.10F)/count;
         for(int i=0;i<count;i++)
@@ -228,7 +219,6 @@ public final class ArticulatedBody implements AutoCloseable
     }
     public void controlledPose(Map<String,org.joml.Matrix4f> deformations)
     {
-        trace.event("controlledPose","pose",deformations);
         for(var entry:bodies.entrySet())
         {
             var body=entry.getValue();Transform target=transform(deformations.get(entry.getKey()));target.mul(binds.get(entry.getKey()));
@@ -264,7 +254,6 @@ public final class ArticulatedBody implements AutoCloseable
                 {impulse=point.appliedImpulse;var p="terrain".equals(a.getUserPointer())?point.positionWorldOnA:point.positionWorldOnB;impactPoint.set(p.x,p.y,p.z);}
             }
         }
-        trace.event("frame","min",min,"max",max,"speed",speed,"contacts",contacts,"groundImpulse",impulse);
         return new Frame(Map.copyOf(result),min,max,speed,contacts,impulse,impactPoint);
     }
     @Override public void close()

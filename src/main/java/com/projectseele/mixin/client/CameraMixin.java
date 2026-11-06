@@ -68,28 +68,10 @@ public abstract class CameraMixin
             Entity subject, boolean detached, boolean mirrored,
             float partialTick, CallbackInfo callback)
     {
-        var networkReview=com.projectseele.client.visual.RuntimeR44ClientProbe.cameraView(partialTick);
-        if(networkReview!=null)
-        {
-            Vec3 p=networkReview.position(),d=networkReview.target().subtract(p);this.setPosition(p.x,p.y,p.z);
-            this.setRotation((float)Math.toDegrees(Math.atan2(-d.x,d.z)),(float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));return;
-        }
         var airReview=com.projectseele.client.visual.AirLiftR40Client.cameraView(partialTick);
         if(airReview!=null)
         {
             Vec3 p=airReview.position(),d=airReview.target().subtract(p);this.setPosition(p.x,p.y,p.z);
-            this.setRotation((float)Math.toDegrees(Math.atan2(-d.x,d.z)),(float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));return;
-        }
-        var combatReview=com.projectseele.client.visual.CombatR31Client.cameraView(partialTick);
-        if(combatReview!=null)
-        {
-            Vec3 p=combatReview.position(),d=combatReview.target().subtract(p);this.setPosition(p.x,p.y,p.z);
-            this.setRotation((float)Math.toDegrees(Math.atan2(-d.x,d.z)),(float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));return;
-        }
-        var factory=com.projectseele.client.visual.FactoryR20Client.cameraView();
-        if(factory!=null)
-        {
-            Vec3 p=factory.position(),d=factory.target().subtract(p);this.setPosition(p.x,p.y,p.z);
             this.setRotation((float)Math.toDegrees(Math.atan2(-d.x,d.z)),(float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));return;
         }
         var exterior=com.projectseele.client.visual.TransitExteriorR16Client.cameraView();
@@ -118,7 +100,6 @@ public abstract class CameraMixin
             // The modelled pressure leaves project beyond their thin block
             // interlock. Keep the orbit off the visible leaf as well.
             double rawZoom=projectseele$looseOrbitZoom(pivot);
-            double originalEyeZoom=rawZoom;
             double available=Math.max(.25,rawZoom-2.0);
             boolean primaryClear=projectseele$outsideCapsule(loose,partialTick,pivot.add(back.scale(available)))
                     &&projectseele$cameraPointClear(level,subject,pivot.add(back.scale(available)));
@@ -154,14 +135,6 @@ public abstract class CameraMixin
                 projectseele$carrierZoom=available;
             projectseele$carrierCameraId=key;projectseele$carrierFrame=now;projectseele$loosePlugCamera=true;
             Vec3 p=pivot.add(back.scale(projectseele$carrierZoom));
-            if(com.projectseele.visual.FactoryR20Review.ENABLED&&Boolean.getBoolean("projectseele.factoryNativePilotCamera"))
-            {
-                Vec3 far=pivot.add(Vec3.directionFromRotation(camera.getXRot(),camera.getYRot()).scale(-32));
-                var hit=level.clip(new net.minecraft.world.level.ClipContext(pivot,far,
-                        net.minecraft.world.level.ClipContext.Block.VISUAL,net.minecraft.world.level.ClipContext.Fluid.NONE,subject));
-                com.projectseele.client.visual.FactoryR20Client.looseCameraProbe(loose,partialTick,pivot,p,rawZoom,projectseele$carrierZoom,hit);
-                com.projectseele.client.visual.FactoryR20Client.looseCameraResolution(originalEyeZoom,offset,resolved);
-            }
             this.setPosition(p.x,p.y,p.z);
             if(offset.lengthSqr()>.0001)
             {

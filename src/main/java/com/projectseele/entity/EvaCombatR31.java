@@ -145,7 +145,6 @@ public final class EvaCombatR31
             if(window&&!s.contact)
             {
                 Vec3 hand=aerialHand(e,1),previous=s.previousContact==null?hand:s.previousContact;
-                com.projectseele.visual.CombatR31Review.aerialContact(e,previous,hand);
                 // Vanilla's section index stores a giant at its feet. A small
                 // hand-height query omits it even when the hand crosses its body.
                 // Broaden only the candidate search; keep the swept contact below.

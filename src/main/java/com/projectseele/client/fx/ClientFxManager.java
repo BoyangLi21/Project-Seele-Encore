@@ -175,7 +175,6 @@ public final class ClientFxManager
 
     public static void addRifleTracer(ClientboundRifleTracerPacket packet)
     {
-        if(com.projectseele.visual.FactoryR20Review.R28_VISUAL)com.projectseele.visual.FieldR28Review.receivedRifleTracers++;
         ensureActiveLevel();
         Vec3 fallback = new Vec3(packet.x1, packet.y1, packet.z1);
         com.projectseele.client.RifleShotAudioR53.confirmedShot(packet.entityId, fallback);

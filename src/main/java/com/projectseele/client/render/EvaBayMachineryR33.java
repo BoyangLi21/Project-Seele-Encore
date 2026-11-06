@@ -10,8 +10,6 @@ import org.joml.Quaternionf;
 /** Twelve rail-mounted service arms; all links are opaque rigid geometry. */
 public final class EvaBayMachineryR33
 {
-    public static final long[] REVIEW_DRAWS=new long[5];
-    public static final float[] REVIEW_PHASES=new float[5];
     private static final java.util.Map<Integer,Vector3f[]> TARGETS=new java.util.HashMap<>();
     public static void clearCache(){TARGETS.clear();}
     private static Vector3f[] targets(int variant)
@@ -34,7 +32,6 @@ public final class EvaBayMachineryR33
     }
     public static void render(PoseStack p,float phase,float time,float width,boolean wide,int variant)
     {
-        if(com.projectseele.visual.BayRepairR33Review.ENABLED){REVIEW_DRAWS[variant]++;REVIEW_PHASES[variant]=phase;}
         float engagement=phase<0?0:EvaDorsalMechanism.smooth(Math.min(phase/.05F,(1-phase)/.05F));
         Vector3f[] contacts=targets(variant);
         p.pushPose();

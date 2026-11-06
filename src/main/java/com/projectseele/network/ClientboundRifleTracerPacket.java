@@ -51,7 +51,6 @@ public class ClientboundRifleTracerPacket
 
     public void handle(Supplier<NetworkEvent.Context> context)
     {
-        if(com.projectseele.visual.NpcCombatR30Review.ENABLED&&entityId==com.projectseele.visual.NpcCombatR30Review.evaId)com.projectseele.visual.NpcCombatR30Review.tracerPackets++;
         var networkContext=context.get();
         // Effects and sound share client state with rendering, never Netty.
         networkContext.enqueueWork(() -> DistExecutor.unsafeRunWhenOn(Dist.CLIENT,

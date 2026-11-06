@@ -540,18 +540,6 @@ public final class EvaBodyPose
     }
     public static boolean hasSupportedStances(){if(data==null)reload();return data.clips().containsKey("rifle_stance");}
     public static boolean hasTerrainStances(){if(data==null)reload();return data.clips().containsKey("unarmed_stance");}
-    public static JsonObject clipDiagnosticR44(EvaUnit01Entity e)
-    {
-        if(data==null)reload();int variant=rigKey(e);JsonObject row=new JsonObject();row.addProperty("rig",variant);
-        for(String name:List.of("idle","walk","run","unarmed_stance","rifle_stance","crouch_idle","crouch_walk","prone_crawl","stand_to_crouch"))
-        {
-            Clip owned=data.combatClips().getOrDefault(variant,Map.of()).get(name);Clip clip=owned==null?data.clips().get(name):owned;JsonObject c=new JsonObject();
-            c.addProperty("source",owned!=null?"per-rig-profile":clip!=null?"shared-motion":"ABSENT");
-            if(clip!=null){c.addProperty("duration",clip.duration());c.addProperty("frames",clip.rotations().length);c.addProperty("channels",clip.names().length);}
-            row.add(name,c);
-        }
-        return row;
-    }
     public static Vector3f eyePoint(int variant){if(data==null)reload();return new Vector3f(data.eyes().get(variant));}
     public static int rigKey(EvaUnit01Entity eva)
     {if(data==null)reload();int candidate=eva instanceof EvaPrototypeEntity un?3+un.getUNSerial():eva.getUnitVariant();return data.rigs().containsKey(candidate)?candidate:eva.getUnitVariant();}
@@ -708,7 +696,6 @@ public final class EvaBodyPose
         var capturedLocomotion=EvaCapturedLocomotionR44.sample(entity,variant,d.rigs().get(variant),partial);
         boolean capturedLocomotionOwns=capturedLocomotion!=null;
         if(capturedLocomotionOwns)body=capturedLocomotion;
-        com.projectseele.visual.BodyPoseLayersR40.capture("source_clip",body);
         if(!capturedLocomotionOwns)
         {
         var bareChest=new Quaternionf(body.rotations.get("torso_lower")).mul(body.rotations.get("torso_upper"));
@@ -731,7 +718,6 @@ public final class EvaBodyPose
         }
         EvaHandsR41.apply(entity,body,partial);
         // Ground the actual body hull during stance blending, including chest support in prone.
-        com.projectseele.visual.BodyPoseLayersR40.capture("hands_before_initial_ground",body);
         float floor=Float.POSITIVE_INFINITY;
         for(var e:d.rigSupport().getOrDefault(variant,d.support()).entrySet())
         {
@@ -750,7 +736,6 @@ public final class EvaBodyPose
             body.positions.get("root").y-=Mth.lerp(flight,floor,-RUN_CLEARANCE*(1-dash))*groundWeight;body.dirty();
         }
         }
-        com.projectseele.visual.BodyPoseLayersR40.capture("initial_ground",body);
         if(!capturedLocomotionOwns)for(var b:body.rig.values())if(b.name().contains("_axis_"))body.rotations.put(b.name(),new Quaternionf(b.bindRotation()));
         for(var e:d.grip().entrySet())if(entity.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE&&e.getKey().startsWith("finger_")&&body.rig.containsKey(e.getKey()))
         {
@@ -785,23 +770,9 @@ public final class EvaBodyPose
                 &&EvaCombatR31.action(entity)==EvaCombatR31.NONE&&!CombatReactionsR36.active(entity);
         if(EvaCapturedLocomotionR44.SUPPORT_OWNERSHIP_CANDIDATE)capturedSupport&=gameplayApplied.capturedMovementSupport();
         if(!capturedSupport)EvaCapturedLocomotionR44.invalidateSupportOwnerR44(entity);
-        if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
-        {
-            var review=new com.google.gson.JsonObject();review.addProperty("captured_base_sampled",capturedLocomotionOwns);
-            review.addProperty("ownership_candidate",EvaCapturedLocomotionR44.SUPPORT_OWNERSHIP_CANDIDATE);
-            review.addProperty("actual_gameplay_movement_owner",gameplayApplied.capturedMovementSupport());
-            review.addProperty("captured_adapt_allowed",capturedSupport);
-            review.addProperty("foreign_joint_preservation_allowed",!capturedSupport);
-            var plane=EvaTerrainSupport.sample(entity);var values=new com.google.gson.JsonArray();values.add(plane.x);values.add(plane.y);values.add(plane.z);review.add("actual_terrain_plane",values);
-            var choice=EvaGameplayMotionR32.actualPoseChoiceReviewR44(entity,partial);if(choice!=null)review.add("actual_same_apply_choice",choice);
-            var signals=EvaCombatSupportR33.signalReviewR45(entity);if(signals!=null)review.add("actual_signal_samples_r45",signals);
-            com.projectseele.visual.BodyPoseLayersR40.metadata("actual_support_ownership",review);
-        }
         if(!capturedSupport)preserveJointCentres(body);
-        com.projectseele.visual.BodyPoseLayersR40.capture("authored",body);
         EvaTerrainSupport.apply(entity,body);body.dirty();
         if(capturedSupport)EvaCapturedLocomotionR44.adapt(entity,body,partial);
-        com.projectseele.visual.BodyPoseLayersR40.capture("terrain",body);
         var beat=CombatFeelR31.beat(entity);
         if(beat!=null&&beat.kind()==CombatFeelR31.STAGGER&&!CombatReactionsR36.enabled(entity)&&!entity.isPilotProne()&&!entity.isPilotCrouching()&&entity.onGround())
         {
@@ -833,15 +804,11 @@ public final class EvaBodyPose
                 body=mix(body,inactivePoseR30(entity,true),w);
             }
         }
-        com.projectseele.visual.BodyPoseLayersR40.capture("reaction",body);
         if(!capturedSupport)groundGameplay(entity,body,partial);
-        com.projectseele.visual.BodyPoseLayersR40.capture("ground",body);
         boolean capturedRootAction=EvaFieldActionsR45.active(entity)||EvaSwordActionsR45.active(entity);
         if(!capturedSupport&&!capturedRootAction)EvaCombatSupportR33.apply(entity,body,partial);
-        com.projectseele.visual.BodyPoseLayersR40.capture("feet",body);
         if(!capturedSupport&&!entity.isNervLogisticsLocked()&&!entity.isFirstBattleActive()&&!EvaAirTransportR31.active(entity))
         {EvaAerialContactR35.apply(entity,body,partial);com.projectseele.physics.CombatBodyDynamics.normalize(entity,body);}
-        com.projectseele.visual.BodyPoseLayersR40.capture("normalized",body);
         if(!capturedSupport&&!capturedRootAction)
         {
             applyLocomotionContactGoalsR44(entity,body,partial);
@@ -865,7 +832,6 @@ public final class EvaBodyPose
         EvaProneLegSupportR52.apply(entity,body,partial);
         EvaProneArmSupportR53.apply(entity,body,partial);
         EvaCombatSupportR33.rememberFinalFeetR44(entity,body,partial);
-        com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;
     }
     private static final float PRONE_FIREARM_CHEST=Float.parseFloat(System.getProperty("projectseele.proneFirearmChestR56","25"));

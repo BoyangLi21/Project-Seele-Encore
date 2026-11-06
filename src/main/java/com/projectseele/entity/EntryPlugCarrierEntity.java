@@ -1051,11 +1051,10 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
     @Override
     protected void removePassenger(Entity passenger)
     {
-        passengerAuthorityTraceR44(passenger,"plug_before_remove_passenger");
         super.removePassenger(passenger);
         // A client passenger-list refresh must not abort insertion, open the
         // cabin or change synchronized progress. The server owns those edges.
-        if(this.level().isClientSide){passengerAuthorityTraceR44(passenger,"plug_after_client_graph_only");return;}
+        if(this.level().isClientSide){return;}
         if(com.projectseele.world.NervOriginalActorsR52.retainSeatStateOnLogoutR54(passenger,this))return;
         if(com.projectseele.world.NervOriginalActorsR52.managed(this))
         {
@@ -1105,16 +1104,6 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
                         MobEffects.SLOW_FALLING, 20 * 12, 0));
             }
         }
-        passengerAuthorityTraceR44(passenger,"plug_after_authoritative_remove_cleanup");
-    }
-    private void passengerAuthorityTraceR44(Entity passenger,String stage)
-    {
-        if(!com.projectseele.visual.PassengerAuthorityWitnessR44.enabled())return;
-        var fields=new com.google.gson.JsonObject();fields.addProperty("insertion_stage",this.getInsertionStage());fields.addProperty("insertion_epoch",this.getInsertionEpoch());
-        fields.addProperty("abort_requested",this.isInsertionAbortRequested());fields.addProperty("host_uuid",this.hostEvaUuid==null?"":this.hostEvaUuid.toString());
-        fields.addProperty("host_id",this.entityData.get(DATA_HOST_EVA_ID));fields.addProperty("shell_visible",this.entityData.get(DATA_SHELL_VISIBLE));
-        fields.addProperty("cabin_stage",this.getCabinStage());fields.addProperty("cabin_progress",this.getCabinProgress());
-        com.projectseele.visual.PassengerAuthorityWitnessR44.capture(this,passenger,stage,fields);
     }
 
     /** Mechanical transport keeps the original person in the capsule. The

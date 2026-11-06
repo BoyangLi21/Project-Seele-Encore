@@ -54,14 +54,7 @@ public final class EvaAnatomicalHandsR45
     public static int contractKeyR53(EvaUnit01Entity eva)
     {
         if(!eva.isExperimentalUnit())return eva.getUnitVariant();
-        if(Unit03SourceRigR53.uses(eva))return 4;
-        // Source-proportioned rig4 is admitted only for the fixed review actor.
-        // A shared-rig marker alone cannot select rig1 hands or unlock gameplay.
-        return eva instanceof EvaPrototypeEntity un&&un.getUNSerial()==1
-                &&Unit03ReviewContractR53.actor(eva.getUUID())
-                &&EvaShutdownR30.mode(eva)==EvaShutdownR30.EMPTY
-                &&EvaShutdownR30.valid(EvaShutdownR30.pose(eva))
-                &&EvaBodyPose.usesUnit01SkeletonR53(eva)?4:-1;
+        return Unit03SourceRigR53.uses(eva)?4:-1;
     }
     public static Rig forEntityR53(EvaUnit01Entity eva)
     {int key=contractKeyR53(eva);return key<0?null:rig(key);}
@@ -80,7 +73,7 @@ public final class EvaAnatomicalHandsR45
     }
     public static synchronized Rig rig(int variant)
     {
-        if(variant==4&&Unit03ReviewContractR53.current()==null&&!Unit03SourceRigR53.loaded())return null;
+        if(variant==4&&!Unit03SourceRigR53.loaded())return null;
         return RIGS.computeIfAbsent(variant,key->{
             String source="unresolved unit0"+key;
             try

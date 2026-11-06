@@ -116,21 +116,6 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
 
         Matrix4f pose = poseStack.last().pose();
         Matrix3f normal = poseStack.last().normal();
-        if(com.projectseele.visual.MechanicsR31Review.ENABLED&&!this.fullBright)
-        {
-            if(animatable instanceof EvaUnit01Entity eva&&"torso_upper".equals(bone.getName())&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
-                com.projectseele.client.visual.MechanicsR31Client.captureSocket(eva,renderer.renderedMeshTransform(pose,eva,partialTick),partialTick);
-            if(animatable instanceof EvaUnit01Entity eva&&"head".equals(bone.getName())&&this.getRenderer() instanceof EvaUnit01Renderer renderer)
-                com.projectseele.client.visual.MechanicsR31Client.captureHeadFacing(eva,renderer.renderedMeshTransform(pose,eva,partialTick),partialTick);
-            if(animatable instanceof com.projectseele.entity.EntryPlugCarrierEntity plug&&"entry_plug".equals(bone.getName())&&this.getRenderer() instanceof EntryPlugCarrierRenderer renderer)
-                com.projectseele.client.visual.MechanicsR31Client.capturePlug(plug,renderer.renderedMeshTransform(pose,plug,partialTick),partialTick);
-        }
-        if((com.projectseele.client.visual.EvaDorsalR13Audit.ENABLED||EvaHeadArmorR25Audit.ENABLED)&&!this.fullBright&&animatable instanceof EvaUnit01Entity eva
-                &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
-        {
-            com.projectseele.client.visual.EvaDorsalR13Audit.capture(eva,bone.getName(),renderer.renderedMeshTransform(pose,eva,partialTick));
-            EvaHeadArmorR25Audit.capture(eva,bone.getName(),renderer.renderedMeshTransform(pose,eva,partialTick));
-        }
         if (animatable instanceof EvaUnit01Entity eva
                 && eva.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE
                 && "cannon".equals(bone.getName())
@@ -140,7 +125,6 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
             {
                 var muzzle=renderer.renderedMeshPoint(pose,new Vector3f(part.muzzleX(),part.muzzleY(),part.muzzleZ()),eva,partialTick);
                 EvaUnit01Renderer.rememberRifleMuzzle(eva.getId(),muzzle);
-                com.projectseele.client.visual.UNR29Client.captureRifle(eva,muzzle);
             }
         }
         ResourceLocation selectedTexture=this.textureSelector==null?null:this.textureSelector.apply(animatable);
@@ -177,31 +161,13 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         if(!this.fullBright&&animatable instanceof EvaUnit01Entity eva&&eva.isFirstBattleActive()
                 &&this.getRenderer() instanceof EvaUnit01Renderer renderer)
             EvaContactShadowsR24.capture(eva,bone.getName(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),renderer.renderedMeshTransform(pose,eva,partialTick));
-        if(!this.fullBright&&animatable instanceof com.projectseele.entity.EvaPrototypeEntity eva&&this.getRenderer() instanceof EvaUnit01Renderer renderer
-                &&com.projectseele.visual.EvaTerrainR11Review.R21&&com.projectseele.visual.EvaTerrainR11Review.runningCase
-                &&com.projectseele.visual.EvaTerrainR11Review.caseTick%20==0)
-            witnessWelds(mesh,part,bone,values,renderer.renderedMeshTransform(pose,eva,partialTick),eva.getUNSerial());
         boolean dormantEye = animatable instanceof EvaUnit01Entity eva && "head".equals(bone.getName())
                 && !com.projectseele.entity.EvaDorsalMechanism.eyesEnabled(eva);
         int vertexLight = this.fullBright && !dormantEye
                 ? LightTexture.FULL_BRIGHT : packedLight;
-        if("head".equals(bone.getName())&&animatable instanceof EvaUnit01Entity eva&&this.textureSelector!=null
-                &&com.projectseele.client.visual.OpticsR43Review.ENABLED)
-        {
-            var material=this.textureSelector.apply(animatable);
-            if(material.getPath().equals("textures/entity/eva_unit01_eyes.png")
-                    ||material.getPath().startsWith("dynamic/unit01_eyes_"))
-                com.projectseele.client.visual.OpticsR43Review.draw(eva,material,vertexLight);
-        }
         if(GPU_DIAGNOSTICS.add(animatable.getClass()))com.projectseele.ProjectSeele.LOGGER.info(
                 "Rigid mesh dispatch: entity={} rigid={} buffer={} texture={}",animatable.getClass().getSimpleName(),values==part.vertices(),targetBuffer.getClass().getName(),this.textureSelector!=null);
-        boolean runtimeWitness=!this.fullBright&&animatable instanceof net.minecraft.world.entity.Entity actor
-                &&FirstBattleRuntimeWitnessR52.wants(actor,bone.getName());
-        boolean gpu;
-        RigidCapsuleGpu.captureWitnessSubmission=runtimeWitness;
-        try
-        {
-            gpu=triangles
+        boolean gpu=triangles
                 &&(targetBuffer instanceof com.mojang.blaze3d.vertex.BufferBuilder
                     ||targetBuffer.getClass().getName().equals("me.jellysquid.mods.sodium.client.render.vertex.buffer.SodiumBufferBuilder"))
                 &&(optics?RigidCapsuleGpu.drawOptics(values==part.vertices()?part:skin,
@@ -210,18 +176,6 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 :RigidCapsuleGpu.drawPosed(values==part.vertices()?part:skin,
                 values==part.vertices()?0:skinPose.revision(),values,stride,part.pivotX(),part.pivotY(),part.pivotZ(),
                 selectedTexture,poseStack,vertexLight,packedOverlay,part.red(),part.green(),part.blue()));
-        }
-        finally { RigidCapsuleGpu.captureWitnessSubmission=false; }
-        if(runtimeWitness&&animatable instanceof net.minecraft.world.entity.Entity actor)
-        {
-            Matrix4f world=this.getRenderer() instanceof EvaUnit01Renderer renderer&&actor instanceof EvaUnit01Entity eva
-                    ?renderer.renderedMeshTransform(pose,eva,partialTick)
-                    :this.getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer
-                    ?renderer.renderedMeshTransform(pose,actor,partialTick):null;
-            if(world!=null)FirstBattleRuntimeWitnessR52.localSubmission(actor,bone,pose,world,
-                    values==part.vertices()?0:skinPose.revision(),skinReused,gpu,values,stride,
-                    part.pivotX(),part.pivotY(),part.pivotZ());
-        }
         if(gpu)return;
         for (int index = 0; index + stride * 3 <= values.length; index += stride * 3)
         {
@@ -571,83 +525,6 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         JointSkin(String other,float[] weights,float[] rest,float[] scratch){this(other,weights,rest,scratch,Map.of(),Map.of(),null);}
         JointSkin(String other,float[] weights,float[] rest,float[] scratch,Map<String,float[]> influences)
         {this(other,weights,rest,scratch,influences,Map.of(),null);}
-    }
-
-    private static final Map<String,WeldWitness> WELD_WITNESSES=new HashMap<>();
-    private static final class WeldWitness
-    {
-        final Map<String,Map<String,Integer>> points=new HashMap<>();
-        final Map<String,Vector3f> framePoints=new HashMap<>();final Map<String,String> frameOwners=new HashMap<>();long frame=-1;int samples;double maximum;String worst="";
-        WeldWitness(MeshData mesh)
-        {this(mesh,false);}
-        WeldWitness(MeshData mesh,boolean attachments)
-        {
-            for(var entry:mesh.parts().entrySet())
-            {
-                String name=entry.getKey();if(name.startsWith("dorsal_")||name.startsWith("finger_")||!attachments&&(name.startsWith("hand_")||name.startsWith("wrist_")))continue;
-                var part=entry.getValue();var v=part.vertices();
-                for(int i=0;i<v.length;i+=8)
-                {
-                    String key=Math.round((v[i]+part.pivotX())*1000)+","+Math.round((v[i+1]+part.pivotY())*1000)+","+Math.round((v[i+2]+part.pivotZ())*1000);
-                    points.computeIfAbsent(key,k->new HashMap<>()).putIfAbsent(name,i);
-                }
-            }
-            points.entrySet().removeIf(e->e.getValue().size()<2||!(e.getValue().keySet().stream().anyMatch(n->n.startsWith("r21_join_"))
-                    ||attachments&&(pairedR38(e.getValue().keySet(),"forearm_","hand_")||pairedR38(e.getValue().keySet(),"shin_","foot_"))));
-        }
-    }
-    private static boolean pairedR38(java.util.Set<String> names,String a,String b)
-    {return names.contains(a+"l")&&names.contains(b+"l")||names.contains(a+"r")&&names.contains(b+"r");}
-    private static void witnessAttachmentsR38(MeshData mesh,MeshPart part,GeoBone bone,float[] values,Matrix4f world)
-    {
-        var witness=WELD_WITNESSES.computeIfAbsent(mesh.captureTag()+"-r38",k->new WeldWitness(mesh,true));long frame=com.projectseele.client.AircraftRenderClockR21.frame;
-        if(frame!=witness.frame)
-        {
-            witness.frame=frame;witness.framePoints.clear();witness.frameOwners.clear();
-            if(witness.samples>0&&frame%15==0)try
-            {
-                var report=new JsonObject();report.addProperty("passed",witness.maximum<.02);report.addProperty("maximum_world_gap",witness.maximum);report.addProperty("compared_pairs",witness.samples);report.addProperty("neutral_shared_points",witness.points.size());report.addProperty("worst",witness.worst);
-                java.nio.file.Files.writeString(java.nio.file.Path.of(com.projectseele.visual.CombatR31Review.mediaFolder).resolve("surface_seams_r38.json"),report.toString());
-            }
-            catch(IOException error){throw new IllegalStateException(error);}
-        }
-        for(var entry:witness.points.entrySet())
-        {
-            Integer i=entry.getValue().get(bone.getName());if(i==null)continue;
-            var point=world.transformPosition(new Vector3f(-(values[i]+part.pivotX())/16,(values[i+1]+part.pivotY())/16,(values[i+2]+part.pivotZ())/16));
-            var previous=witness.framePoints.putIfAbsent(entry.getKey(),point);
-            if(previous!=null)
-            {
-                double gap=point.distance(previous);if(gap>witness.maximum){witness.maximum=gap;witness.worst=entry.getKey()+" "+witness.frameOwners.get(entry.getKey())+" / "+bone.getName()+" stage="+com.projectseele.visual.CombatR31Review.stageName;}
-                witness.samples++;
-            }
-            else witness.frameOwners.put(entry.getKey(),bone.getName());
-        }
-    }
-    private static void witnessWelds(MeshData mesh,MeshPart part,GeoBone bone,float[] values,Matrix4f world,int serial)
-    {
-        var witness=WELD_WITNESSES.computeIfAbsent(mesh.captureTag(),k->new WeldWitness(mesh));long frame=com.projectseele.client.AircraftRenderClockR21.frame;
-        if(frame!=witness.frame)
-        {
-            witness.frame=frame;witness.framePoints.clear();witness.frameOwners.clear();
-            if(witness.samples>0)try
-            {
-                var report=new JsonObject();report.addProperty("passed",witness.maximum<.02);report.addProperty("maximum_world_gap",witness.maximum);report.addProperty("compared_pairs",witness.samples);report.addProperty("neutral_shared_points",witness.points.size());report.addProperty("worst",witness.worst);
-                var path=Minecraft.getInstance().gameDirectory.toPath().resolve("../artifacts/un_models_r21/seam_witness_un0"+serial+".json").normalize();java.nio.file.Files.writeString(path,report.toString());
-            }catch(IOException e){throw new IllegalStateException(e);}
-        }
-        for(var entry:witness.points.entrySet())
-        {
-            Integer i=entry.getValue().get(bone.getName());if(i==null)continue;
-            var point=world.transformPosition(new Vector3f(-(values[i]+part.pivotX())/16,(values[i+1]+part.pivotY())/16,(values[i+2]+part.pivotZ())/16));
-            var previous=witness.framePoints.putIfAbsent(entry.getKey(),point);
-            if(previous!=null)
-            {
-                double gap=point.distance(previous);if(gap>witness.maximum){witness.maximum=gap;witness.worst=entry.getKey()+" "+witness.frameOwners.get(entry.getKey())+" / "+bone.getName()+" case="+com.projectseele.visual.EvaTerrainR11Review.caseIndex+" tick="+com.projectseele.visual.EvaTerrainR11Review.caseTick;}
-                witness.samples++;
-            }
-            else witness.frameOwners.put(entry.getKey(),bone.getName());
-        }
     }
 
     private static Map<String,JointSkin> resolvedJointSkins(LocalMeshJsonR53.Document document,Map<String,MeshPart> parts,int stride) throws IOException

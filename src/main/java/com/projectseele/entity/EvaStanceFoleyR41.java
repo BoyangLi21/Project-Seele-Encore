@@ -30,7 +30,6 @@ public final class EvaStanceFoleyR41
         if(Math.abs(velocity)>.002F&&(Math.abs(state.velocity)<=.002F||state.velocity*velocity<0)&&now-state.loadAt>=8)
         {
             CombatFoleyR36.load(eva);state.loadAt=now;
-            com.projectseele.visual.StanceContactR41Review.sound(eva,"joint_load",eva.position());
         }
         state.velocity=velocity;
         if(stance<.35F){state.knees=0;return;}
@@ -49,7 +48,6 @@ public final class EvaStanceFoleyR41
             if((state.knees&(1<<i))==0&&velocity>0)
             {
                 EvaMovementSounds.play(eva,floor.getLocation(),ModSounds.EVA_LAND.get(),1.9F,.95F);
-                com.projectseele.visual.StanceContactR41Review.sound(eva,"knee_bearing_"+side,floor.getLocation());
             }
         }
         state.knees=bearing;

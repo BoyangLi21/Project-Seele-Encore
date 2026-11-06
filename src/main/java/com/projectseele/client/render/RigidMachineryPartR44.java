@@ -178,7 +178,6 @@ final class RigidMachineryPartR44
     /** True means the real cached GPU mesh was submitted in this shader pass. */
     boolean drawWithProofR52(PoseStack poses, MultiBufferSource buffers, int light)
     {
-        TvCraneMeshWitnessR44.part(vertices,poses);
         // Keep the source arrays unchanged. Only imported smooth triangles
         // omit their duplicated fourth point; vanilla outlines remain quads.
         boolean triangles=importedTriangles&&!(buffers instanceof OutlineBufferSource);

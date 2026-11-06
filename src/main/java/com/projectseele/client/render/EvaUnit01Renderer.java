@@ -249,7 +249,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
     public void render(EvaUnit01Entity entity, float entityYaw, float partialTick, PoseStack poseStack,
                        MultiBufferSource bufferSource, int packedLight)
     {
-        com.projectseele.client.visual.FactoryR20Client.bodyDraw(entity);
         Minecraft minecraft = Minecraft.getInstance();
         // The physical feed trims enclosing armour. The sun's view must keep
         // the whole body, even though Minecraft's camera mode is first person.
@@ -354,7 +353,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
     public boolean shouldRender(EvaUnit01Entity entity, Frustum frustum,
                                 double cameraX, double cameraY, double cameraZ)
     {
-        com.projectseele.client.visual.FactoryR20Client.bodyCandidate(entity);
         if(com.projectseele.entity.EvaAirTransportR31.active(entity)||com.projectseele.entity.EvaMechanicalFrameR52.active(entity)
                 ||entity.hasActiveCarrierMotion())
         {
@@ -484,7 +482,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
                 packedOverlay, red, green, blue, alpha);
         if (!isReRender && bone.getParent() == null)
         {
-            FirstBattleRuntimeWitnessR52.finish(animatable,bone);
             if (com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)
                 com.projectseele.client.visual.EvaConnectedActionReview.recordPose(animatable,
                     this.getGeoModel().getBakedModel(this.getGeoModel().getModelResource(animatable)), partialTick);

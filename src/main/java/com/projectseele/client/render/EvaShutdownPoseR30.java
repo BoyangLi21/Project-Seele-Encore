@@ -13,7 +13,7 @@ final class EvaShutdownPoseR30
 {
     private static final Map<EvaUnit01Entity,View> VIEWS=new WeakHashMap<>();
     static void resetEntityR31(EvaUnit01Entity eva){VIEWS.remove(eva);EvaCombatPoseR31.resetEntityR31(eva);CombatFeelR31.clear(eva);}
-    private static final class View {CompoundTag live=new CompoundTag(),held=new CompoundTag(),entry=new CompoundTag();int mode,sentMode=-1;boolean localPilot;UUID localOwner;long sent=-1,released,traceTick=Long.MIN_VALUE,episodeStamp=Long.MIN_VALUE;}
+    private static final class View {CompoundTag live=new CompoundTag(),held=new CompoundTag(),entry=new CompoundTag();int mode,sentMode=-1;boolean localPilot;UUID localOwner;long sent=-1,released,episodeStamp=Long.MIN_VALUE;}
     private static void invalidateForeignOwnerR45(EvaUnit01Entity eva,View view)
     {
         if(!view.localPilot)return;
@@ -61,8 +61,6 @@ final class EvaShutdownPoseR30
         // that owned frame with a still-ACTIVE but already unpiloted frame.
         if(view.localPilot&&!ownsNow&&eva.getPilotEntity()==null)
         {
-            if(com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckEnabledR45(eva))
-            {var trace=new com.google.gson.JsonObject();trace.addProperty("cached_owner_retained",true);trace.addProperty("previous_live_bones",view.live.size());com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckTraceR45(eva,"client_owned_cut_preserved_before_mode",trace);}
             return;
         }
         view.live=capture(model);
@@ -89,14 +87,8 @@ final class EvaShutdownPoseR30
             boolean localSnapshot=ownedCut&&mc.player!=null
                     &&(mode==EvaShutdownR30.EMPTY&&age>=0&&age<=20||mode==EvaShutdownR30.POWER_LOCK
                     &&com.projectseele.world.EvaPilotResolver.controlTarget(mc.player)==eva&&eva.getPilotEntity()==mc.player);
-            if(com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckEnabledR45(eva)&&view.traceTick!=eva.level().getGameTime())
-            {
-                view.traceTick=eva.level().getGameTime();var trace=new com.google.gson.JsonObject();trace.addProperty("local_pilot_cached",view.localPilot);trace.addProperty("local_snapshot_allowed",localSnapshot);trace.addProperty("client_player_uuid",mc.player==null?"none":mc.player.getStringUUID());trace.addProperty("controls_now",mc.player!=null&&com.projectseele.world.EvaPilotResolver.controlTarget(mc.player)==eva&&eva.getPilotEntity()==mc.player);trace.addProperty("live_bones",view.live.size());trace.addProperty("held_bones",view.held.size());trace.addProperty("entry_bones",view.entry.size());trace.addProperty("held_valid",EvaShutdownR30.valid(view.held));trace.addProperty("sent_stamp",view.sent);trace.addProperty("sent_mode",view.sentMode);
-                com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckTraceR45(eva,"client_before_snapshot_decision",trace);
-            }
             if(localSnapshot&&(view.sent!=stamp||view.sentMode!=mode)&&!view.held.isEmpty())
             {
-                if(com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckEnabledR45(eva)){var trace=new com.google.gson.JsonObject();trace.addProperty("packet_entity_id",eva.getId());trace.addProperty("payload_bones",view.held.size());trace.addProperty("payload_valid",EvaShutdownR30.valid(view.held));trace.addProperty("payload_snbt",view.held.toString());com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckTraceR45(eva,"client_actual_send_frozen_packet",trace);}
                 SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaFrozenPoseR30(eva.getId(),view.held.copy()));view.sent=stamp;view.sentMode=mode;
             }
             // Drawing the owned cut and permission to transmit it are separate.

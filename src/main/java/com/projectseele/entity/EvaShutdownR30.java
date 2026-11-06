@@ -134,16 +134,6 @@ public final class EvaShutdownR30
     }
     public static void acceptPilotPose(ServerPlayer player,int entityId,CompoundTag tag)
     {
-        if(player.serverLevel().getEntity(entityId) instanceof EvaUnit01Entity observed
-                &&com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckEnabledR45(observed))
-        {
-            long observedAge=observed.level().getGameTime()-since(observed);var remembered=MEMORY.get(observed);var trace=new com.google.gson.JsonObject();
-            boolean observedCurrent=mode(observed)==POWER_LOCK&&observed.getPilotEntity()==player&&observedAge>=0&&observedAge<=200;
-            boolean observedExited=mode(observed)==EMPTY&&observed.getPilotEntity()==null&&remembered!=null&&player.getUUID().equals(remembered.lastPilot)&&observedAge>=0&&observedAge<=20;
-            String reason=!retainsPoseR45(observed)?"mode_not_retained":com.projectseele.physics.CombatBodyDynamics.active(observed)?"real_physics_owner":observed.getPersistentData().getBoolean("R30FrozenPoseConfirmed")?"already_confirmed_once":!valid(tag)?"payload_invalid":!observedCurrent&&!observedExited?"actor_or_mode_time_window_rejected":"accepted";
-            trace.addProperty("sender_uuid",player.getStringUUID());trace.addProperty("packet_entity_id",entityId);trace.addProperty("last_pilot_uuid",remembered==null||remembered.lastPilot==null?"none":remembered.lastPilot.toString());trace.addProperty("current_pilot_permission",observedCurrent);trace.addProperty("just_exited_permission",observedExited);trace.addProperty("payload_bones",tag.size());trace.addProperty("payload_valid",valid(tag));trace.addProperty("decision",reason);trace.addProperty("payload_snbt",tag.toString());
-            com.projectseele.visual.StanceContactR41Review.shutdownFrozenAckTraceR45(observed,"server_actual_receive_and_admission",trace);
-        }
         if(!(player.serverLevel().getEntity(entityId) instanceof EvaUnit01Entity e)||!retainsPoseR45(e)
                 ||com.projectseele.physics.CombatBodyDynamics.active(e)||e.getPersistentData().getBoolean("R30FrozenPoseConfirmed")||!valid(tag))return;
         long age=e.level().getGameTime()-since(e);var memory=MEMORY.get(e);

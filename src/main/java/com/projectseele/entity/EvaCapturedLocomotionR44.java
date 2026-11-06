@@ -255,22 +255,6 @@ public final class EvaCapturedLocomotionR44
         var physical=com.projectseele.physics.CombatBodyProfiles.get(e);
         com.projectseele.physics.AnatomicalLimbConstraints.restoreAuthoredJointCentres(pose,physical);
         CompoundTag origin=e.getEntityData().get(ORIGIN);
-        if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
-        {
-            JsonObject review=new JsonObject();review.addProperty("clip",clipName);review.addProperty("phase",phase);
-            review.addProperty("elapsed_seconds",elapsed);review.addProperty("since_world_tick",e.getEntityData().get(SINCE));
-            review.addProperty("origin_blend_weight",!origin.isEmpty()&&elapsed<.3F?ease(elapsed/.3F):1F);
-            float frame=Mth.clamp(phase,0,1)*(clip.patches().length-1);int first=(int)frame,last=Math.min(first+1,clip.patches().length-1);
-            JsonObject plants=new JsonObject();
-            for(int side=0;side<2;side++)
-            {
-                JsonObject plant=new JsonObject();Vector3f patch=new Vector3f(clip.patches()[first][side]).lerp(clip.patches()[last][side],frame-first);
-                JsonArray point=new JsonArray();point.add(patch.x);point.add(patch.y);point.add(patch.z);plant.add("patch_body",point);
-                plant.addProperty("authored_plant_weight",Mth.lerp(frame-first,clip.support()[first][side],clip.support()[last][side]));
-                plants.add(side==0?"l":"r",plant);
-            }
-            review.add("plants",plants);com.projectseele.visual.BodyPoseLayersR40.metadata("actual_captured_sample",review);
-        }
         if(!origin.isEmpty()&&elapsed<.3F)
         {
             var from=new EvaBodyPose.Sample(rig);EvaShutdownR30.decode(origin,from);
@@ -345,13 +329,6 @@ public final class EvaCapturedLocomotionR44
         if(multiContact(name))
         {
             invalidateSupportOwnerR44(e);
-            if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
-            {
-                JsonObject mode=new JsonObject();mode.addProperty("clip",name);
-                mode.addProperty("mode","authored_multi_contact_with_measured_body_plane");
-                mode.addProperty("standing_foot_lock_applied",false);
-                com.projectseele.visual.BodyPoseLayersR40.metadata("actual_captured_contact_owner",mode);
-            }
             return;
         }
         Clip clip=profile.clips().get(name);float elapsed=(e.level().getGameTime()-e.getEntityData().get(SINCE)+partial)/20F;
@@ -361,13 +338,6 @@ public final class EvaCapturedLocomotionR44
         {State created=new State();stateLifecycleWitness("state_create",key.level(),key,created,levelState.actors.size(),levelState.actors.size()+1);return created;});
         synchronized(state)
         {
-        if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
-        {
-            JsonObject scope=new JsonObject();scope.addProperty("level_identity",System.identityHashCode(e.level()));
-            scope.addProperty("logical_client",levelState.client);scope.addProperty("actor_identity",System.identityHashCode(e));
-            scope.addProperty("state_identity",System.identityHashCode(state));
-            com.projectseele.visual.BodyPoseLayersR40.metadata("actual_captured_state_scope",scope);
-        }
         if(!name.equals(state.clip)||time<state.last||time-state.last>20)state.plants.clear();state.clip=name;state.last=time;
         Matrix4f world=EvaRifleKinematics.world(e,partial),inverse=new Matrix4f(world).invert();
         Vector3f displacement=new Vector3f(e.getEntityData().get(DISPLACEMENT));Vector3f localVelocity=inverse.transformDirection(new Vector3f(displacement));
@@ -415,17 +385,6 @@ public final class EvaCapturedLocomotionR44
                 com.projectseele.physics.AnatomicalLimbConstraints.reachAuthoredFoot(pose,physics,suffix,target,orientation);
             }
             plant.bearing=bearing;plant.patch=patch;plant.footWorld=new Matrix4f(world).mul(pose.matrix(bone));
-            if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
-            {
-                JsonObject row=new JsonObject();row.addProperty("side",suffix);row.addProperty("clip",name);row.addProperty("phase",phase);
-                row.addProperty("authored_plant_weight",weight);row.addProperty("bearing",bearing);row.addProperty("world_speed",worldSpeed);
-                row.addProperty("stride_warp_factor",factor);row.addProperty("actual_floor_world_y",floor);
-                row.addProperty("actual_whole_boot_minimum_before_floor_correction",minimum);
-                row.add("source_patch_body",reviewVector(patch));row.add("before_anchor_patch_world",reviewVector(beforeWorldGoal));
-                row.add("constrained_patch_world",reviewVector(worldGoal));row.add("actual_final_patch_world",reviewVector(plant.footWorld.transformPosition(new Vector3f(patch))));
-                if(plant.anchor!=null)row.add("actual_anchor_world",reviewVector(plant.anchor));
-                com.projectseele.visual.BodyPoseLayersR40.appendMetadata("actual_captured_adapt",row);
-            }
         }
         }
     }
@@ -438,19 +397,11 @@ public final class EvaCapturedLocomotionR44
             synchronized(state){state.plants.clear();state.clip="";state.last=Double.NEGATIVE_INFINITY;}
         }
     }
-    private static JsonArray reviewVector(Vector3f value)
-    {JsonArray out=new JsonArray();out.add(value.x);out.add(value.y);out.add(value.z);return out;}
     private static float ground(EvaUnit01Entity e,Vector3f point,float fallback)
     {
         Vec3 start=new Vec3(point.x,point.y+3,point.z),end=start.add(0,-6,0);
         var hit=e.level().clip(new ClipContext(start,end,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,e));
         float result=hit.getType()==HitResult.Type.MISS?fallback:(float)hit.getLocation().y+.015F;
-        if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
-        {
-            JsonObject row=new JsonObject();row.add("query_patch_world",reviewVector(point));row.addProperty("fallback_y",fallback);
-            row.addProperty("actual_hit_type",hit.getType().name());row.addProperty("actual_result_y",result);
-            com.projectseele.visual.BodyPoseLayersR40.appendMetadata("actual_captured_ground_queries",row);
-        }
         return result;
     }
     private EvaCapturedLocomotionR44() {}

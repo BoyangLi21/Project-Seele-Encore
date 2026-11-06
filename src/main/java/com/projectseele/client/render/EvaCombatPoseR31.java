@@ -32,11 +32,6 @@ public final class EvaCombatPoseR31
             for(String name:body.rig.keySet())if(completeHands||!name.startsWith("finger_"))m.getBone(name).ifPresent(b->{EvaRigTransforms.rotate(b,body.rotations.get(name));var p=body.positions.get(name);b.setPosX(-p.x*16);b.setPosY(p.y*16);b.setPosZ(p.z*16);changed.add(name);position.add(name);});
             if(!e.isBerserk()&&e.getWeapon()!=EvaUnit01Entity.WEAPON_RIFLE&&!(e instanceof EvaPrototypeEntity un&&un.isEyeLaserActive()))
                 m.getBone("head").ifPresent(b->EvaRigTransforms.rotate(b,new Quaternionf(body.rotations.get("head")).rotateY(-e.pilotHeadYawForRender(partial)*Mth.DEG_TO_RAD).rotateX(-e.pilotHeadPitchForRender(partial)*Mth.DEG_TO_RAD)));
-            if(com.projectseele.visual.CombatR31Review.ENABLED&&EvaCombatSupportR33.ready(e)&&EvaCombatSupportR33.strike(e))
-                for(String side:new String[]{"l","r"})m.getBone("foot_"+side).ifPresent(b->{
-                    var expected=EvaCombatSupportR33.anchor(e,side,partial);
-                    if(expected!=null)com.projectseele.client.visual.CombatR31Client.toeSupport(e,side,new Vec3(EvaRigTransforms.point(b,EvaRigTransforms.pivot(b).add(EvaCombatSupportR33.toe(e,side)),root)),expected);
-                });
             // Weapon and eye optics solve against the final airborne skeleton.
             // A full-body attack layer must not leave the gun on the prior arm pose.
             var rifle=EvaRifleContactRig.apply(e,m,partial,root);changed.addAll(rifle.rotationBones());position.addAll(rifle.positionBones());
@@ -156,8 +151,6 @@ public final class EvaCombatPoseR31
         var bones=new GeoBone[]{upper,lower,wrist,hand};Map<GeoBone,BonePose> before=new HashMap<>();for(var b:bones)before.put(b,new BonePose(new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX()),new Vector3f(b.getPosX(),b.getPosY(),b.getPosZ())));
         EvaRigTransforms.solveArm(upper,lower,wrist,hand,side,target,q,new Vector3f(side.equals("l")?1:-1,-1,0),root);
         for(var b:bones){var old=before.get(b);EvaRigTransforms.rotate(b,new Quaternionf(old.rotation).slerp(new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX()),weight));b.setPosX(Mth.lerp(weight,old.position.x,b.getPosX()));b.setPosY(Mth.lerp(weight,old.position.y,b.getPosY()));b.setPosZ(Mth.lerp(weight,old.position.z,b.getPosZ()));changed.add(b.getName());position.add(b.getName());}
-        var palm=EvaRigTransforms.pivot(hand).fma(.62F,along);var actual=EvaRigTransforms.point(hand,palm,root);
-        com.projectseele.client.visual.CombatR31Client.handWitness(e,side,new Vec3(actual),contact,weight);
     }
     private EvaCombatPoseR31() {}
 }

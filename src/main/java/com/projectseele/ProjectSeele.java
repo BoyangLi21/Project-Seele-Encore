@@ -51,8 +51,6 @@ public class ProjectSeele
 
         if(Boolean.getBoolean("projectseele.r45BeValidityReview"))
         {
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(com.projectseele.visual.BlockEntityValidityReviewR45::register);
-            net.minecraftforge.common.MinecraftForge.EVENT_BUS.addListener(com.projectseele.visual.BlockEntityValidityReviewR45::exportOnStart);
         }
 
         modEventBus.addListener(this::commonSetup);

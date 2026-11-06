@@ -27,26 +27,6 @@ public final class EvaCombatSupportR33
         final EvaGaitPacketTailR53.Cursor gait=new EvaGaitPacketTailR53.Cursor();
     }
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,RenderClockR45> RENDER_CLOCKS_R45=new com.projectseele.util.WeakIdentityMap<>();
-    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,com.google.gson.JsonObject> SIGNAL_REVIEW_R45=new com.projectseele.util.WeakIdentityMap<>();
-    public static com.google.gson.JsonObject signalReviewR45(EvaUnit01Entity e)
-    {
-        var review=SIGNAL_REVIEW_R45.get(e);return review==null?null:review.deepCopy();
-    }
-    private static float witnessSignalR45(EvaUnit01Entity e,float partial,int channel,float fallback,float value,String source,
-                                          CompoundTag first,CompoundTag last,float amount,boolean stationary)
-    {
-        if(com.projectseele.visual.BodyPoseLayersR40.ENABLED&&e.level().isClientSide)
-        {
-            var review=SIGNAL_REVIEW_R45.get(e);
-            if(review==null){review=new com.google.gson.JsonObject();SIGNAL_REVIEW_R45.put(e,review);}
-            var row=new com.google.gson.JsonObject();row.addProperty("source",source);row.addProperty("partial",partial);
-            row.addProperty("fallback",fallback);row.addProperty("value",value);row.addProperty("stationary",stationary);
-            if(first!=null){row.addProperty("first_tick",first.getLong("tick"));row.addProperty("last_tick",last.getLong("tick"));row.addProperty("amount",amount);}
-            var clock=RENDER_CLOCKS_R45.get(e);if(clock!=null){row.addProperty("server_time",clock.serverTime);row.addProperty("client_time",clock.clientTime);}
-            review.add(channel==4?"gait":channel==5?"move":"run",row);
-        }
-        return value;
-    }
     private static final EntityDataAccessor<CompoundTag> CONTACTS=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.COMPOUND_TAG);
     private static final EntityDataAccessor<CompoundTag> PHASE_HISTORY_R45=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.COMPOUND_TAG);
     private static final EntityDataAccessor<Vector3f> DIRECTION=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.VECTOR3);
@@ -68,13 +48,13 @@ public final class EvaCombatSupportR33
         if(!e.level().isClientSide
                 ||e.hasLiveActionForRender(partial)&&!EvaGameplayMotionR32.movementMayComposeR45(e)
                 ||e.isFirstBattleActive()||e.isPilotCrouching()||e.isPilotProne())
-            return witnessSignalR45(e,partial,channel,fallback,fallback,"ineligible",null,null,0,false);
+            return fallback;
         // Releasing a planted foot must not also discard the gait clock.
         // Attacks and turning previously cleared CONTACTS, switching the
         // same moving legs between two differently delayed sample streams.
         var tag=!Unit03SourceRigR53.sharesGroundActions(e)?e.getEntityData().get(CONTACTS):e.getEntityData().get(PHASE_HISTORY_R45);
-        if(!tag.contains("position_phase_r44",Tag.TAG_LIST))return witnessSignalR45(e,partial,channel,fallback,fallback,"no_history",null,null,0,false);
-        var samples=tag.getList("position_phase_r44",Tag.TAG_COMPOUND);if(samples.isEmpty())return witnessSignalR45(e,partial,channel,fallback,fallback,"empty_history",null,null,0,false);
+        if(!tag.contains("position_phase_r44",Tag.TAG_LIST))return fallback;
+        var samples=tag.getList("position_phase_r44",Tag.TAG_COMPOUND);if(samples.isEmpty())return fallback;
         var origin=e.getPosition(partial);CompoundTag first=samples.getCompound(samples.size()-1),last=first;float amount=1;double best=Double.POSITIVE_INFINITY;
         for(int i=0;i+1<samples.size();i++)
         {
@@ -90,9 +70,8 @@ public final class EvaCombatSupportR33
         // same tick. Sample that pair at the actual renderer origin instead
         // of advancing phase ahead of vanilla's three-tick position lerp.
         if(best>64&&Double.isFinite(best))
-            return witnessSignalR45(e,partial,channel,fallback,channel==4?stableGaitR53(e,samples,fallback):fallback,
-                    "far_from_history",first,last,amount,false);
-        boolean stationaryReview=false,timedStopReview=false;
+            return channel==4?stableGaitR53(e,samples,fallback):fallback;
+        boolean timedStopReview=false;
         if(Unit03SourceRigR53.sharesGroundActions(e))
         {
             var newest=samples.getCompound(samples.size()-1);
@@ -100,7 +79,6 @@ public final class EvaCombatSupportR33
             double dx=newest.getDouble("x")-prior.getDouble("x"),dz=newest.getDouble("z")-prior.getDouble("z");
             double ox=origin.x-newest.getDouble("x"),oz=origin.z-newest.getDouble("z");
             boolean stationary=dx*dx+dz*dz<1e-8&&ox*ox+oz*oz<.0025;
-            stationaryReview=stationary;
             double spatialTime=Mth.lerp((double)amount,(double)first.getLong("tick"),(double)last.getLong("tick"));
             long frame=FirstBattleSignals.clientFrameTime();double clientTime=(double)e.level().getGameTime()+partial;
             var clock=RENDER_CLOCKS_R45.get(e);
@@ -173,7 +151,7 @@ public final class EvaCombatSupportR33
             value=stableGaitR53(e,samples,value);
         }
         else value=Mth.lerp(amount,a,b);
-        return witnessSignalR45(e,partial,channel,fallback,value,timedStopReview?"stop_timeline":"position_history",first,last,amount,stationaryReview);
+        return value;
     }
     private static float stableGaitR53(EvaUnit01Entity e,ListTag samples,float value)
     {

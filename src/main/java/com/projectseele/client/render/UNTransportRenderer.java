@@ -86,19 +86,18 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
         }
         return true;
     }
-    private static void cradle(UNTransportEntity plane,float partial,PoseStack poses,MultiBufferSource buffers,int light,Matrix4f submittedEntityFrame,Vec3 dispatcher)
+    private static void cradle(UNTransportEntity plane,float partial,PoseStack poses,MultiBufferSource buffers,int light)
     {
         if(plane.rig(partial)<.001F)return;
         var cargo=plane.level().getEntity(plane.cargoEntityId());
         EvaUnit01Entity eva=cargo instanceof EvaUnit01Entity e?e:null;
         if(plane.carrying()&&eva==null)return;
         if(eva!=null&&EvaAirTransportR31.active(eva)&&EvaAirTransportR31.adaptive(eva))
-        {adaptiveCradle(plane,eva,partial,poses,buffers,light,submittedEntityFrame,dispatcher);return;}
+        {adaptiveCradle(plane,eva,partial,poses,buffers,light);return;}
         boolean attached=plane.carrying()&&eva!=null&&EvaAirTransportR31.active(eva);
         float pitch=attached?EvaAirTransportR31.pitch(eva,partial):(1-plane.rig(partial))*90;
         float width=eva instanceof EvaPrototypeEntity un?(un.getUNSerial()==1?1.05F:.95F):.86F;
         float offset=plane.hoistDistance();
-        int rods=0;
         // The two telescopic pairs carry the rotating saddle. They end at real
         // trunnions on its spine, not at imaginary points above the payload.
         for(int side:new int[]{-1,1})for(int end:new int[]{-1,1})
@@ -106,8 +105,8 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
             var a=new Vector3f(-side*14,-11,-end*10);
             var b=latch(side*14,end<0?18:50,pitch,width,offset);
             var mid=new Vector3f(a).lerp(b,.58F);
-            if(rod(poses,buffers,light,a,mid,.48F,70))rods++;
-            if(rod(poses,buffers,light,mid,b,.27F,170))rods++;
+            rod(poses,buffers,light,a,mid,.48F,70);
+            rod(poses,buffers,light,mid,b,.27F,170);
         }
         poses.pushPose();
         poses.mulPose(Axis.YP.rotationDegrees(180));
@@ -115,21 +114,15 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
         poses.mulPose(Axis.XP.rotationDegrees(-pitch));
         poses.translate(0,-EvaAirTransportR31.HIP_HEIGHT,0);
         poses.scale(width,1,1);
-        int triangles=draw("air_cradle_frame_r31",poses,buffers,light);
+        draw("air_cradle_frame_r31",poses,buffers,light);
         for(int side:new int[]{-1,1})
         {
             poses.pushPose();poses.translate(side*4*plane.jaws(partial),0,0);
-            triangles+=draw("air_cradle_jaw_r31_"+side,poses,buffers,light);poses.popPose();
-        }
-        if(com.projectseele.visual.MechanicsR31Review.ENABLED)
-        {
-            var actual=software.bernie.geckolib.util.RenderUtils.invertAndMultiplyMatrices(poses.last().pose(),submittedEntityFrame);
-            actual.m30(actual.m30()+(float)dispatcher.x).m31(actual.m31()+(float)dispatcher.y).m32(actual.m32()+(float)dispatcher.z);
-            com.projectseele.client.visual.MechanicsR31Client.captureCradle(plane,actual,partial,triangles,rods);
+            draw("air_cradle_jaw_r31_"+side,poses,buffers,light);poses.popPose();
         }
         poses.popPose();
     }
-    private static void adaptiveCradle(UNTransportEntity plane,EvaUnit01Entity eva,float partial,PoseStack poses,MultiBufferSource buffers,int light,Matrix4f submittedEntityFrame,Vec3 dispatcher)
+    private static void adaptiveCradle(UNTransportEntity plane,EvaUnit01Entity eva,float partial,PoseStack poses,MultiBufferSource buffers,int light)
     {
         Vec3 aircraft=plane.carrying()?EvaAirTransportR31.framePosition(eva,partial).add(0,plane.hoistDistance(),0):plane.renderFlightPosition(partial);
         float yaw=plane.carrying()?EvaAirTransportR31.frameYaw(eva,partial):plane.renderFlightYaw(partial);
@@ -144,7 +137,6 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
             var end=new Vector3f((float)world.x,(float)world.y,(float)world.z).rotateY(yaw*Mth.DEG_TO_RAD);
             anchors.add(end);
         }
-        int segments=0;
         for(int pair=0;pair<3;pair++)
         {
             Vector3f left=anchors.get(pair*2),right=anchors.get(pair*2+1);
@@ -153,27 +145,19 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
             float extension=plane.rig(partial);
             left.lerp(new Vector3f(14,-13,(pair-1)*11),1-extension);
             right.lerp(new Vector3f(-14,-13,(pair-1)*11),1-extension);
-            if(rod(poses,buffers,light,left,right,.48F,66))segments++;
+            rod(poses,buffers,light,left,right,.48F,66);
             for(int side=0;side<2;side++)
             {
                 var end=anchors.get(pair*2+side);var top=new Vector3f(side==0?14:-14,-11,(pair-1)*11);
                 var mid=new Vector3f(top).lerp(end,.62F);
-                if(rod(poses,buffers,light,top,mid,.48F,65))segments++;
-                if(rod(poses,buffers,light,mid,end,.24F,182))segments++;
+                rod(poses,buffers,light,top,mid,.48F,65);
+                rod(poses,buffers,light,mid,end,.24F,182);
                 var collar=new Vector3f(mid).lerp(end,.07F);
-                if(rod(poses,buffers,light,mid,collar,.60F,48))segments++;
+                rod(poses,buffers,light,mid,collar,.60F,48);
                 var tangent=new Vector3f(right).sub(left).normalize().mul(1.6F);
-                if(rod(poses,buffers,light,new Vector3f(end).sub(tangent),new Vector3f(end).add(tangent),.85F,86))segments++;
+                rod(poses,buffers,light,new Vector3f(end).sub(tangent),new Vector3f(end).add(tangent),.85F,86);
             }
-            if(pair>0)for(int side=0;side<2;side++)if(rod(poses,buffers,light,anchors.get((pair-1)*2+side),anchors.get(pair*2+side),.35F,58))segments++;
-        }
-        if(com.projectseele.visual.MechanicsR31Review.ENABLED)
-        {
-            var centre=new Vector3f(anchors.get(2)).add(anchors.get(3)).mul(.5F);
-            var submitted=new Matrix4f(poses.last().pose()).translate(centre.x,centre.y-EvaAirTransportR31.HIP_HEIGHT,centre.z);
-            var actual=software.bernie.geckolib.util.RenderUtils.invertAndMultiplyMatrices(submitted,submittedEntityFrame);
-            actual.m30(actual.m30()+(float)dispatcher.x).m31(actual.m31()+(float)dispatcher.y).m32(actual.m32()+(float)dispatcher.z);
-            com.projectseele.client.visual.MechanicsR31Client.captureCradle(plane,actual,partial,segments*24,segments);
+            if(pair>0)for(int side=0;side<2;side++)rod(poses,buffers,light,anchors.get((pair-1)*2+side),anchors.get(pair*2+side),.35F,58);
         }
     }
     private void identity(UNTransportEntity entity,PoseStack poses,MultiBufferSource buffers,int light)
@@ -195,7 +179,6 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
     @Override public ResourceLocation getTextureLocation(UNTransportEntity entity){return entity.isNerv()?com.projectseele.client.TreeOfLifeWallClient.nervLogoTexture(net.minecraft.client.Minecraft.getInstance()):com.projectseele.client.UNIdentityClient.logoTexture();}
     @Override public void render(UNTransportEntity entity,float yaw,float partial,PoseStack poses,MultiBufferSource buffers,int light)
     {
-        Matrix4f submittedEntityFrame=new Matrix4f(poses.last().pose());
         Vec3 dispatcher=new Vec3(Mth.lerp((double)partial,entity.xOld,entity.getX()),Mth.lerp((double)partial,entity.yOld,entity.getY()),Mth.lerp((double)partial,entity.zOld,entity.getZ()));
         poses.pushPose();
         if(com.projectseele.world.NervAircraftFrameR52.active(entity))
@@ -221,7 +204,6 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
                 }
             }
             identity(entity,poses,buffers,light);
-            if(com.projectseele.visual.MechanicsR31Review.ENABLED){var actual=software.bernie.geckolib.util.RenderUtils.invertAndMultiplyMatrices(poses.last().pose(),submittedEntityFrame);actual.m30(actual.m30()+(float)dispatcher.x).m31(actual.m31()+(float)dispatcher.y).m32(actual.m32()+(float)dispatcher.z);com.projectseele.client.visual.MechanicsR31Client.captureAircraft(entity,actual,partial);}
             poses.popPose();super.render(entity,yaw,partial,poses,buffers,light);return;
         }
         if(entity.carrying()&&entity.level().getEntity(entity.cargoEntityId()) instanceof com.projectseele.entity.EvaUnit01Entity eva)
@@ -256,13 +238,7 @@ public final class UNTransportRenderer extends EntityRenderer<UNTransportEntity>
             poses.popPose();return;
         }
         draw("un_transport_body",poses,buffers,light);
-        if(com.projectseele.visual.MechanicsR31Review.ENABLED)
-        {
-            var actual=software.bernie.geckolib.util.RenderUtils.invertAndMultiplyMatrices(poses.last().pose(),submittedEntityFrame);
-            actual.m30(actual.m30()+(float)dispatcher.x).m31(actual.m31()+(float)dispatcher.y).m32(actual.m32()+(float)dispatcher.z);
-            com.projectseele.client.visual.MechanicsR31Client.captureAircraft(entity,actual,partial);
-        }
-        cradle(entity,partial,poses,buffers,light,submittedEntityFrame,dispatcher);
+        cradle(entity,partial,poses,buffers,light);
         int i=0;
         for(int[] rotor:new int[][]{{-29,-11},{29,-11},{-49,9},{49,9}})
         {

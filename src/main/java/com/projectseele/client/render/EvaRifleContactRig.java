@@ -174,8 +174,6 @@ public final class EvaRifleContactRig
         leftPole=groundedPole(eva.getId(),model,"l",leftTarget,leftPole,root,(float)eva.getY()+3.5F,Math.max(prone,support));
         double re=solve(model,"r",rightTarget,qR,rightPole,root);
         double le=solve(model,"l",leftTarget,qL,leftPole,root);
-        if(com.projectseele.visual.UNR29Review.R30&&le>.5&&eva.tickCount%20==0)
-            com.projectseele.ProjectSeele.LOGGER.info("R30 left contact diagnostic stance={} support={} reach={} shoulder={} target={} error={}",stance,support,reach,leftShoulder,leftTarget,le);
         absolute(cannon,gun,root);
         // Lean the gaze toward the existing sight line. This never moves the weapon.
         var head=model.getBone("head").orElseThrow();var headWorld=new Quaternionf(f.headRotation());

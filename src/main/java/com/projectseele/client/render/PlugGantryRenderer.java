@@ -34,7 +34,7 @@ public final class PlugGantryRenderer
     {this.poses=poses;this.buffers=buffers;this.buffer=buffers.getBuffer(RenderType.entitySolid(PAINT));this.light=light;this.baking=null;}
     private PlugGantryRenderer(RigidMachineryPartR44.Builder builder){this.poses=new PoseStack();this.buffers=null;this.buffer=null;this.light=15728880;this.baking=builder;}
     public static void render(NervCarrierPlatformEntity entity,float partial,PoseStack poses,MultiBufferSource buffers,int light)
-    {TvCraneMeshWitnessR44.begin(entity,partial,poses);try{new PlugGantryRenderer(poses,buffers,light).draw(entity,partial);}finally{TvCraneMeshWitnessR44.end();}}
+    {new PlugGantryRenderer(poses,buffers,light).draw(entity,partial);}
     private void draw(NervCarrierPlatformEntity entity,float partial)
     {
         declaredRigR52=entity.hasDeclaredMachineFrameR52();

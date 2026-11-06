@@ -84,7 +84,6 @@ public final class EvaMovementSounds
             var state=eva.level().getBlockState(BlockPos.containing(foot.x,foot.y-.2,foot.z));
             boolean soil=state.is(BlockTags.DIRT)||state.is(BlockTags.SAND)||state.is(BlockTags.LEAVES);
             CombatFoleyR36.step(eva,foot,soil,Mth.lerp(low,1+.28F*run,.5F));
-            com.projectseele.visual.StanceContactR41Review.sound(eva,"legacy_foot_"+side,foot);
             if(eva.getTags().contains("seele_motion_lab"))ProjectSeele.LOGGER.info("EVA FOOT CONTACT side={} phase={} position={} material={}",side,phase,foot,state);
         }
     }
@@ -122,7 +121,6 @@ public final class EvaMovementSounds
                         contact.x,contact.y+.3,contact.z,42,2.6,.2,2.6,.16);
                 server.sendParticles(net.minecraft.core.particles.ParticleTypes.POOF,contact.x,contact.y+.6,contact.z,9,2.2,.3,2.2,.05);
             }
-            com.projectseele.visual.StanceContactR41Review.sound(eva,"geometric_foot_"+side,contact);
             if(eva.getTags().contains("seele_motion_lab"))
                 ProjectSeele.LOGGER.info("EVA SOLE CONTACT side={} phase={} gap={} position={}",side,phase,gap,contact);
         }

@@ -232,18 +232,11 @@ public final class EvaPoseGraph
             // This owner produces the complete body. Do not evaluate the old
             // locomotion/impact/transition/foot-placement stack and overwrite it
             // afterwards: that also leaves those controllers' histories stale.
-            com.projectseele.client.visual.CombatR31Client.normalWitness(entity,model,"before");
-            com.projectseele.visual.BodyPoseLayersR40.begin(entity,partialTick);
             var body=EvaCombatPoseR31.apply(entity,model,partialTick,modelToWorld);
             EvaPoseContinuity.trace(entity,model,"combat.body");
             var hands=EvaHandPoseR28.apply(entity,model,partialTick);
             EvaPoseContinuity.trace(entity,model,"combat.hands");
             var exit=EvaMotionEngineV2.BoneWrites.empty();
-            if(com.projectseele.visual.BodyPoseLayersR40.ENABLED)
-                for(String name:com.projectseele.visual.BodyPoseLayersR40.BONES)
-                    model.getBone(name).ifPresent(b->com.projectseele.visual.BodyPoseLayersR40.rendered(name,EvaRigTransforms.model(b)));
-            com.projectseele.visual.BodyPoseLayersR40.end();
-            com.projectseele.client.visual.CombatR31Client.normalWitness(entity,model,"after");
             return finish(entity,model,partialTick,modelToWorld,body,exit,hands);
         }
         if(entity.isNervLogisticsLocked())
@@ -326,10 +319,8 @@ public final class EvaPoseGraph
             Set<String> p=new LinkedHashSet<>(motionWrites.positionBones());p.addAll(firearm.positionBones());
             motionWrites=new EvaMotionEngineV2.BoneWrites(Set.copyOf(r),Set.copyOf(p),"MOTION_ENGINE_LIVE_ACTION");
         }
-        com.projectseele.client.visual.CombatR31Client.normalWitness(entity,model,"before");
         var combat=EvaCombatPoseR31.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"combat.pose");
-        com.projectseele.client.visual.CombatR31Client.normalWitness(entity,model,"after");
         if(!combat.rotationBones().isEmpty())motionWrites=combat;
         var shutdown=EvaShutdownPoseR30.apply(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"shutdown");
@@ -391,9 +382,7 @@ public final class EvaPoseGraph
             model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
             model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
         }
-        com.projectseele.client.visual.MechanicsR31Client.captureBones(entity,model,partialTick,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
-        com.projectseele.client.visual.RuntimeR44ClientProbe.capture(entity,model,partialTick,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
         EvaShutdownPoseR30.rememberFinalLiveR45(entity,model);
         Snapshot committed = snapshot(
@@ -403,7 +392,6 @@ public final class EvaPoseGraph
             LAST_COMMITS.clear();
         }
         LAST_COMMITS.put(entity.getId(), committed);
-        FirstBattleRuntimeWitnessR52.finalWriter(entity,model,"EvaPoseGraph.finish");
         if (!firstCommitLogged)
         {
             firstCommitLogged = true;

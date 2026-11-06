@@ -35,7 +35,6 @@ public final class BattleFinaleClientR29
         var mc=Minecraft.getInstance();if(mc.level==null)return;
         if(world!=mc.level){BLASTS.clear();world=mc.level;}
         Vec3 point=new Vec3(p.x(),p.y(),p.z());received++;
-        if(com.projectseele.visual.TvCampaignR24Review.R29)com.projectseele.visual.TvCampaignR24Review.finalePackets++;
         if(BLASTS.size()>=4)BLASTS.remove(0);
         BLASTS.add(new Blast(point,mc.level.getGameTime()));
         ClientFxManager.addNukeFx(new ClientboundNukeFxPacket(p.x(),p.y()+12,p.z(),4.8F,false),false);

@@ -72,9 +72,6 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
     {
         if(!root.getName().equals("root")||root.isHidden())return;
         Model model=load(resource);if(model==null)return;
-        Matrix4f runtimeWorld=entity instanceof net.minecraft.world.entity.Entity actor
-                &&FirstBattleRuntimeWitnessR52.wants(actor,"root")&&getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer
-                ?renderer.renderedMeshTransform(stack.last().pose(),actor,partial):null;
         Map<String,GeoBone> bones=new HashMap<>();collect(root,bones);
         Matrix4f inverseRoot=EvaRigTransforms.model(root).invert();
         Quaternionf[] real=new Quaternionf[model.bones.length],dual=new Quaternionf[model.bones.length];
@@ -88,14 +85,10 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             Vector3f translation=matrix.getTranslation(new Vector3f());
             dual[i]=new Quaternionf(translation.x,translation.y,translation.z,0).mul(real[i]).mul(.5F);
         }
-        if(runtimeWorld!=null&&entity instanceof net.minecraft.world.entity.Entity actor)
-            FirstBattleRuntimeWitnessR52.angelSubmission(actor,"actual-weighted-palette",stack.last().pose(),runtimeWorld,model.bones,matrices,-1,-1,0);
         Quaternionf q=new Quaternionf(),d=new Quaternionf(),translation=new Quaternionf(),conjugate=new Quaternionf();
         Vector3f point=new Vector3f(),normal=new Vector3f(),work=new Vector3f();
         boolean grounded=entity instanceof net.minecraft.world.entity.LivingEntity living&&AngelCombatPoseR31.needsGroundSupport(living);
         Matrix4f rootModel=grounded?EvaRigTransforms.model(root):null;float floor=Float.POSITIVE_INFINITY;
-        Matrix4f contactAudit=com.projectseele.visual.CombatR31Review.ENABLED&&entity instanceof net.minecraft.world.entity.Entity actor&&getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer?renderer.renderedMeshTransform(stack.last().pose(),actor,partial):null;
-        float worldFloor=Float.POSITIVE_INFINITY;
         float[] v=model.vertices,skinned=model.skinned;int[] sources=model.corners.sources();
         for(int input=0;input<sources.length;input++)
         {
@@ -141,11 +134,9 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             for(int at=0;at<skinned.length;at+=6)
             {
                 if(grounded){skinned[at]+=lift.x;skinned[at+1]+=lift.y;skinned[at+2]+=lift.z;}
-                if(contactAudit!=null)worldFloor=Math.min(worldFloor,contactAudit.m01()*skinned[at]+contactAudit.m11()*skinned[at+1]+contactAudit.m21()*skinned[at+2]+contactAudit.m31());
                 MeshVertexWriter.transform(skinned,at,pose,normalPose);
             }
             DirectMeshWriter.write(target,skinned,model.corners.inputs(),v,1,overlay,light);
         }
-        if(contactAudit!=null&&entity instanceof net.minecraft.world.entity.LivingEntity living)com.projectseele.client.visual.CombatR31Client.angelSupport(living,worldFloor);
     }
 }
