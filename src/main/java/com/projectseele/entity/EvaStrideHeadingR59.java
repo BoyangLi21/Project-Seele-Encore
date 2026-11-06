@@ -70,7 +70,7 @@ final class EvaStrideHeadingR59
     }
 
     /** Turns a bone about the vertical (degrees, Minecraft sense), carrying everything above it. */
-    private static void turn(EvaBodyPose.Sample body,String name,float degrees)
+    static void turn(EvaBodyPose.Sample body,String name,float degrees)
     {
         var bone=body.rig.get(name);
         if(bone==null||bone.parent()==null)return;

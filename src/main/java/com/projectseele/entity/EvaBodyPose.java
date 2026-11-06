@@ -848,6 +848,7 @@ public final class EvaBodyPose
             EvaCombatSupportR33.preventFreeFootPenetrationR44(entity,body,partial);
         }
         EvaStrideHeadingR59.apply(entity,body,partial);
+        EvaPunchAimR59.apply(entity,body,partial);
         supportProneFirearmChestR45(entity,body,partial);
         EvaCervicalKinematicsR25.apply(entity,body,partial);
         EvaOriginalHandsR45.apply(entity,body);
