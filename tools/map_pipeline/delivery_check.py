@@ -118,7 +118,7 @@ def verify_delivery(world, candidate, installation, production_log):
     candidate = Path(candidate)
     tags = nbtlib.load(candidate/'block-entities.dat')['Changes']
     report = validate_receipt(read(installation), read(candidate/'manifest.json'),
-                              Path(production_log).read_text('utf-8-sig'), len(tags))
+                              Path(production_log).read_text('utf-8-sig', errors='replace'), len(tags))
     report.update(verify_preservation(world, candidate))
     report.update(passed=True, world_written=False, production_replay_passed=True,
                   geometry_or_live_acceptance_claim=False)

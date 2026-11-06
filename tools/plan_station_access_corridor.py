@@ -523,6 +523,9 @@ def author(config, design, out):
     distance=distance.reshape(xx.shape);nearest=nearest.reshape(xx.shape);chainage=along[nearest]
     feet=np.ceil((height[nearest]-1e-9)*2)/2
     terminal=raster(geometry['terminal_apron'].buffer(spec['sidewalk_width']))
+    centre=np.zeros(walk.shape,bool);stroke=np.floor(points).astype(int)
+    inside=(stroke[:,0]>=bx)&(stroke[:,0]<=bX)&(stroke[:,1]>=bz)&(stroke[:,1]<=bZ)
+    centre[stroke[inside,1]-bz,stroke[inside,0]-bx]=True
     feet[terminal|link]=spec['station_feet'][1]
     grade2=np.rint(2*(feet-1)).astype(np.int16);floor,slab=road_blocks(grade2)
     original=source.measured['top'][bz-sz:bZ-sz+1,bx-sx:bX-sx+1].copy()
@@ -576,7 +579,7 @@ def author(config, design, out):
         elif slab[iz,ix]:put(x,y-1,z,'minecraft:stone','half-slab deck attachment')
         for yy in range(y+1,max(y+6,int(original[iz,ix])+2)):
             put(x,yy,z,'minecraft:air','full vehicle and pedestrian headroom')
-        marking=road[iz,ix] and distance[iz,ix]<.4 and int(chainage[iz,ix]//6)%2==0 and not terminal[iz,ix]
+        marking=road[iz,ix] and centre[iz,ix] and int(chainage[iz,ix]//6)%2==0 and not terminal[iz,ix]
         if slab[iz,ix]:
             state=('projectseele:road_marking_slab' if marking else 'projectseele:road_asphalt_slab' if road[iz,ix] else 'minecraft:smooth_stone_slab')+'[type=bottom,waterlogged=false]'
         else:state='minecraft:white_concrete' if marking else 'minecraft:black_concrete' if road[iz,ix] else 'minecraft:smooth_stone'
@@ -620,21 +623,26 @@ def author(config, design, out):
     # Every elevated sidewalk edge has a separate beam/parapet outside the
     # clear pedestrian cells. No fence consumes the two-metre footway.
     guard=binary_dilation(span,structure=np.array([[0,1,0],[1,1,1],[0,1,0]]))&~walk
+    trusses=spec['truss_crossings'];plate=np.zeros(walk.shape,bool)
+    for crossing in civil['hydraulic_crossings']:
+        stations=crossing['accepted_support_stations']
+        if max(stations)-min(stations)>=18:
+            plate|=(chainage>=min(stations))&(chainage<=max(stations))
+    for a,b in trusses.values():plate&=~((chainage>=a)&(chainage<=b))
     for iz,ix in np.argwhere(guard):
         x,z=int(xx[iz,ix]),int(zz[iz,ix]);h=math.ceil(sampled_feet(x,z))
         put(x,h-1,z,'minecraft:stone_bricks','outer deck edge beam')
         state='minecraft:iron_bars[east=true,north=true,south=true,waterlogged=false,west=true]'
         put(x,h,z,state,'outside-footway parapet')
-        if chainage[iz,ix]<33:
-            put(x,h-1,z,'minecraft:iron_block','west irrigation side plate girder')
-            put(x,h,z,'minecraft:iron_block','west irrigation side plate girder')
+        if plate[iz,ix]:
+            put(x,h-1,z,'minecraft:iron_block','side plate girder')
+            put(x,h,z,'minecraft:iron_block','side plate girder')
     actual_walk=unary_union(cells[walk]);shapely.prepare(actual_walk)
     for crossing in civil['hydraulic_crossings']:
-        start,end=min(crossing['accepted_support_stations']),max(crossing['accepted_support_stations'])
-        # The street-side opening uses two-metre side plate girders, within
-        # its already measured parapet footprint, to retain the neighbouring
-        # building. Taller trusses would enter that retained building.
-        if end-start<18 or start<4:continue
+        # Declared chainage keeps the truss on the straight; a truss bay
+        # on a bend voxelizes into a tangle of diagonals.
+        if crossing['id'] not in trusses:continue
+        start,end=trusses[crossing['id']]
         truss_rows=[]
         for s in np.linspace(start,end,math.ceil((end-start)/6)+1):
             j=int(np.argmin(abs(along-s)));p=points[j];t=points[min(j+1,len(points)-1)]-points[max(0,j-1)];t/=np.linalg.norm(t)
@@ -679,6 +687,7 @@ def author(config, design, out):
     write(out/'manifest.json',dict(schema='bounded-station-access-corridor-v1',world=source.capture['world'],
         source=str(source.source),section_source=spec['section_source'],cells=len(rows),regions=regions,
         vertical_extent=[-128,319],device_changes=0,native_changes=[],native_additions=[],actor_changes=[],
+        streets=[dict(id=spec['id'],status='prepared',walk_columns=int(walk.sum()))],
         preserve_native_members=True,world_written=False))
     np.savez_compressed(out/'earthworks'/ (spec['id']+'.npz'),bounds=[bx,bz,bX,bZ],old=original,target=target,active=active,
         walk=walk,road=road,grade2=grade2,bridge_span=span,deck_depth=0,clearance=5,guard=guard,
@@ -708,6 +717,7 @@ def verify(config,out):
     from hakone_earthworks import road_blocks
     from map_pipeline.delta_geometry import checked_indices
     from map_pipeline.corridors import publish_plan
+    from map_pipeline.native_rails import load_rails,near_points
     from map_pipeline.verify_corridors import main as common_verify
     from types import SimpleNamespace
     spec=read(config);out=Path(out);source=CapturedSurface(spec['source']);e=Editor(out)
@@ -764,8 +774,16 @@ def verify(config,out):
         actual_floor[iz,ix]=state.split('[')[0] in PAVEMENT and observed==feet[iz,ix]
         headroom[iz,ix]=all(not solid(e.state(px,y,pz))for y in range(py+1,py+6))
     actual_road=road&actual_floor&headroom
+    with np.load(Path(spec['authority'])/'network.npz')as base:
+        ax,az,_,_=map(int,base['bounds']);area=np.s_[z-az:Z-az+1,x-ax:X-ax+1]
+        retained=base['road'][area]&~walk;retained_grade=base['grade2'][area]
+    feet=feet.copy();oldfloor,oldslab=road_blocks(retained_grade)
+    for iz,ix in np.argwhere(retained):
+        px,pz,py=x+int(ix),z+int(iz),int(oldfloor[iz,ix]);state=e.state(px,py,pz)
+        feet[iz,ix]=py+(.5 if oldslab[iz,ix] else 1)
+        actual_road[iz,ix]=state.split('[')[0] in PAVEMENT and all(not solid(e.state(px,y,pz))for y in range(py+1,py+6))
     poses=read(out/'bus-poses.json');bus=poses['reference'];vehicle_fail=[];pose_rows=[]
-    geometries=[];motion=[];body_height=float(bus['height']);point_poses=poses['mainline']+poses['terminal']
+    geometries=[];motion=[];body_height=float(bus['height']);point_poses=poses['mainline']+poses['terminal']+poses.get('junction',[])
     for i,p in enumerate(point_poses):
         g=bus_rectangle(np.asarray(p['center']),np.asarray(p['tangent']),bus['length'],bus['width'])
         geometries.append(g);a,b,A,B=g.bounds
@@ -785,7 +803,10 @@ def verify(config,out):
         pose_rows.append(dict(pose=i,road_cells=len(q),floor_range=[float(tops.min()),bottom],body_y=[bottom,top],passed=not missing and not occupied))
     # For each ordered lane, bound between-pose translation and rotation by
     # maximum corner displacement, checked against the explicit design pad.
-    for sequence in (geometries[:len(poses['mainline']):2],geometries[1:len(poses['mainline']):2],geometries[len(poses['mainline']):]):
+    main_end=len(poses['mainline']);terminal_end=main_end+len(poses['terminal'])
+    junction=poses.get('junction',[])
+    half=len(junction)//2
+    for sequence in (geometries[:main_end:2],geometries[1:main_end:2],geometries[main_end:terminal_end],geometries[terminal_end:terminal_end+half],geometries[terminal_end+half:]):
         for a,b in zip(sequence,sequence[1:]):motion.append(float(np.linalg.norm(np.asarray(a.exterior.coords)[:4]-np.asarray(b.exterior.coords)[:4],axis=1).max()))
     if max(motion)>civil['interval_motion_padding']:errors.append('Vehicle interval motion exceeds plan pad')
     if vehicle_fail:errors.append(['Actual bus body/road sweep failed',vehicle_fail[:10]])
@@ -853,6 +874,9 @@ def verify(config,out):
                 q=edits[at[j]]
                 if p[j,1]-2<=q[1]<=p[j,1]+6:native_hits.append(dict(kind=kind,id=r['id'],native_point=p[j].tolist(),edit=q.tolist()))
     if native_hits:errors.append(['Candidate intersects retained native running envelope',native_hits[:10]])
+    # native-curves.json predates the station batches; the snapshot is the installed rail set.
+    near_rails=near_points(load_rails(spec['native_snapshot']),edits[:,[0,2]],6)
+    if near_rails:errors.append(['Candidate within 6m of an installed rail chord',near_rails[:10]])
     # Negative controls call the same source, footing, floor, occupancy and
     # hydraulic predicates with one changed fact each. No world is modified.
     def expect_rejected(name,baseline,mutation,evidence):

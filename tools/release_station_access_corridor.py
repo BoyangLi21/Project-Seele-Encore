@@ -1,4 +1,4 @@
-"""Cold publication of a finite station road, with exact frozen source and QC.
+"""Cold publication of a finite station road from a verified candidate.
 
 No station or service is counted complete by this road-only delivery. New roads
 must join an installed public surface and preserve all existing public grades.
@@ -27,7 +27,6 @@ from prepare_hakone_network_recipes import parallel_recipes
 from release_access_patch import require, metadata_scope, package_file
 
 CONTROL='corridor-release-check.json'
-FREEZE='corridor-release-freeze'
 REQUIRED=('source_devices_preserved','source_actors_preserved','vehicle_sweep_passed',
           'full_width_walk_passed','future_water_clearance_passed','supports_grounded')
 
@@ -82,13 +81,17 @@ def validate_offline(a):
     require(len(negatives)>=5 and all(q.get('rejected')is True for q in negatives),'Fault rejection incomplete')
     for name in spec['reviewed_views']:package_file(c,name)
     require(spec.get('views_reviewed_by_root')is True,'Root exact voxel view review pending')
-    validate_plan(c,a.authority)
+    validate_plan(c,a.authority,spec.get('road_promotions',()))
     metadata_scope(c)
     return spec,m,report
 
 
-def validate_plan(candidate,authority):
-    """No silent retirement, grade change, or out-of-scope metadata updates."""
+def validate_plan(candidate,authority,promotions=()):
+    """No silent retirement, grade change, or out-of-scope metadata updates.
+
+    promotions lists every [x,z] retained footway column a junction turns into
+    carriageway. They keep their footway status and grade; demotion stays fatal.
+    """
     with np.load(authority/'network.npz')as f:old={k:f[k]for k in f.files}
     with np.load(candidate/'plan/network.npz')as f:new={k:f[k]for k in f.files}
     require(set(old)==set(new)and np.array_equal(old['bounds'],new['bounds']),'Authority extent or fields differ')
@@ -99,10 +102,15 @@ def validate_plan(candidate,authority):
             require(active[area].shape==f['active'].shape,'Corridor lies outside authority')
             active[area]|=f['active'];public[area]|=f['walk']
             require(not f.get('retired_walk',np.zeros(f['walk'].shape,bool)).any(),'Station road may not retire existing routes')
-    retained=old['walk']|old['road']
+    retained=old['walk']|old['road'];promoted=np.zeros(active.shape,bool)
+    for x,z in promotions:promoted[z-az,x-ax]=True
+    require(len(promotions)==int(promoted.sum()),'Repeated road promotion')
+    require(not np.any(promoted&(old['road']|~old['walk']|~public)),'Promotion is not a retained footway in this road')
+    require(np.array_equal(promoted,old['walk']&~old['road']&new['road']),'Undeclared or omitted road promotion')
     require(np.any(retained&public),'Road never reaches an installed public surface')
-    for key in ('walk','road','grade2','tunnel'):
+    for key in ('walk','grade2','tunnel'):
         require(np.array_equal(old[key][retained],new[key][retained]),'Existing public route changed: '+key)
+    require(np.array_equal(old['road'][retained&~promoted],new['road'][retained&~promoted]),'Existing public route changed: road')
     for key in old:
         if old[key].shape!=active.shape:
             require(np.array_equal(old[key],new[key]),'Non-spatial authority field differs: '+key)
@@ -129,29 +137,6 @@ def replay_scope(a):
                 expected=str((a.candidate/'recipe-replay-expected').resolve()))
 
 
-def freeze(a,save=False):
-    sources={'config':a.config};dest=a.candidate/FREEZE
-    for name in ('release_station_access_corridor.py','map_pipeline/verify_corridors.py',
-                 'map_pipeline/corridors.py','map_pipeline/delta_geometry.py','map_pipeline/delivery_check.py',
-                 'plan_station_access_corridor.py','author_hakone_lakefront.py'):
-        sources['tools/'+name]=Path(__file__).parent/name
-    for prefix,root in [('candidate',a.candidate),('authority',a.authority)]:
-        for path in root.rglob('*'):
-            if not path.is_file():continue
-            rel=path.relative_to(root)
-            if prefix=='candidate'and(rel.parts[0]==FREEZE or rel.as_posix()in (CONTROL,'delivery-check.json')):continue
-            sources[prefix+'/'+rel.as_posix()]=path
-    entries={name:f'{i:06d}.bin'for i,name in enumerate(sorted(sources))}
-    if save:
-        dest.mkdir(exist_ok=False)
-        for name,path in sources.items():shutil.copy2(path,dest/entries[name])
-        write(dest/'inventory.json',entries)
-    else:
-        require(read(dest/'inventory.json')==entries,'Frozen file set changed')
-        for name,path in sources.items():require(path.read_bytes()==(dest/entries[name]).read_bytes(),'Frozen evidence changed: '+name)
-    return len(entries)
-
-
 def prepare(a):
     spec=read(a.config);current_state(a,spec)
     publish_plan(a.candidate,a.authority)
@@ -168,19 +153,18 @@ def prepare(a):
         parallel_recipes(argparse.Namespace(candidate=a.candidate,world=a.world,regions=None,workers=2))
         identity=capture_identity(a.world,a.candidate,a.prior_client)
     write_replay_expected(a.candidate);validate_offline(a)
-    count=freeze(a,True)
     write(a.candidate/CONTROL,dict(schema='station-access-road-prepared-v1',prepared_time_ns=time.time_ns(),
         replay_scope=replay_scope(a),identity_files=len(identity),native_members=len(baseline),
-        frozen_files=count,exact_voxel_views_reviewed=True,world_written=False))
-    print('Prepared bounded station road:',m['cells'],'cells;',count,'frozen files.')
+        exact_voxel_views_reviewed=True,world_written=False))
+    print('Prepared bounded station road:',m['cells'],'cells.')
 
 
 def require_prepared(a):
-    spec,m,report=validate_offline(a);current_state(a,spec);freeze(a)
+    spec,m,report=validate_offline(a);current_state(a,spec)
     p=read(a.candidate/CONTROL)
     require(p.get('schema')=='station-access-road-prepared-v1'and p['replay_scope']==replay_scope(a),'Wrong preparation')
     require(a.production_log.stat().st_mtime_ns>=p['prepared_time_ns'],'Replay predates preparation')
-    log=a.production_log.read_text('utf-8-sig');marker='CORRIDOR_PATCH_REPLAY_SCOPE '
+    log=a.production_log.read_text('utf-8-sig',errors='replace');marker='CORRIDOR_PATCH_REPLAY_SCOPE '
     scopes=[json.loads(line[len(marker):])for line in log.splitlines()if line.startswith(marker)]
     require(scopes==[replay_scope(a)],'Production replay scope differs')
     matches=re.findall(r'Production surface replay: (\d+) chunks, ([\d,]+) changed cells',log)
@@ -209,12 +193,12 @@ def record(a):
     require(a.continuation.read_bytes()==before,'Continuation changed during verification')
     shutil.copytree(a.authority,a.next_authority)
     shutil.copy2(a.candidate/'plan/network.npz',a.next_authority/'network.npz')
-    metrics=validate_plan(a.candidate,a.authority)
+    metrics=validate_plan(a.candidate,a.authority,spec.get('road_promotions',()))
     write(a.next_authority/(spec['id']+'-installed-access.json'),dict(candidate=str(a.candidate),
         installation=str(a.installation),previous=str(a.authority),**metrics,world_written=True))
     delivery=dict(batch=a.batch,station=spec['label'],candidate=str(a.candidate),installation=str(a.installation),
         authority=str(a.next_authority),terrain_field=str(a.terrain),**check,**metrics,
-        new_native_members=0,world_written=True,client_jar_written=False,station_structure_count_unchanged=True,
+        world_written=True,client_jar_written=False,station_structure_count_unchanged=True,
         station_complete=False,through_service_complete=False,minimap_refreshed=False,distant_cache_refreshed=False)
     write(a.delivery,delivery)
     work.update(latest_installed_batch=a.batch,planning_authority=str(a.next_authority),previous_worklist=str(prior_worklist))

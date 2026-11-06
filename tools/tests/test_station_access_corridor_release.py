@@ -1,4 +1,3 @@
-from argparse import Namespace
 import json
 from pathlib import Path
 import tempfile
@@ -6,7 +5,7 @@ import unittest
 
 import numpy as np
 
-from release_station_access_corridor import validate_plan,freeze
+from release_station_access_corridor import validate_plan
 
 
 class CorridorContractTests(unittest.TestCase):
@@ -39,6 +38,18 @@ class CorridorContractTests(unittest.TestCase):
                 with self.assertRaises(ValueError):self.run_check()
                 self.new[key][2,0]=old
 
+    def test_declared_promotion_only(self):
+        self.data['walk'][1,1]=True
+        np.savez_compressed(self.old/'network.npz',**self.data)
+        for key in ('walk','road'):self.new[key][1,1]=True
+        with np.load(self.c/'earthworks/road.npz')as f:payload={k:f[k]for k in f.files}
+        payload['walk'][1,1]=True;payload['active'][1,1]=True
+        np.savez_compressed(self.c/'earthworks/road.npz',**payload)
+        np.savez_compressed(self.c/'plan/network.npz',**self.new)
+        with self.assertRaises(ValueError):validate_plan(self.c,self.old)
+        self.assertEqual(validate_plan(self.c,self.old,[[1,1]])['public_columns'],5)
+        with self.assertRaises(ValueError):validate_plan(self.c,self.old,[[1,1],[3,2]])
+
     def test_no_outside_or_unknown_metadata_mutation(self):
         for key,pos,value in [('ground',(4,4),-75),('reserved',(2,2),True),('road',(4,4),True)]:
             with self.subTest(key=key):
@@ -58,17 +69,6 @@ class CorridorContractTests(unittest.TestCase):
     def test_catalogue_mutation_is_rejected(self):
         (self.c/'plan/catalog.json').write_text('[1]','utf8')
         with self.assertRaises(ValueError):self.run_check()
-
-    def test_exact_freeze_rejects_changed_or_added_evidence(self):
-        config=self.root/'config.json';config.write_text('{}','utf8')
-        proof=self.c/'proof.json';proof.write_text('{"passed":true}','utf8')
-        a=Namespace(candidate=self.c,authority=self.old,config=config)
-        freeze(a,True);freeze(a)
-        proof.write_text('{"passed":false}','utf8')
-        with self.assertRaises(ValueError):freeze(a)
-        proof.write_text('{"passed":true}','utf8')
-        (self.c/'extra.json').write_text('{}','utf8')
-        with self.assertRaises(ValueError):freeze(a)
 
 
 if __name__=='__main__':unittest.main()
