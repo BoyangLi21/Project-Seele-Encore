@@ -88,7 +88,7 @@ public final class NervEmptyCarrierTransferR52
             String node=actualNode(directory,original.variant(),current,binding);if(node==null)return false;var legs=existingPath(directory,original.variant(),node,port.node());if(legs==null)return false;
             state.putUUID("Task",UUID.randomUUID());state.putUUID("Controller",controller.getUUID());state.putString("Directory",directory.fingerprint());state.putString("Port",targetPort);state.putString("Stage","RAISE");state.putInt("Index",0);state.putInt("Age",0);list(state,"Legs",legs);flightData.put(KEY,state.copy());
         }
-        if(!state.getUUID("Controller").equals(controller.getUUID())||!state.getString("Directory").equals(directory.fingerprint())||!state.getString("Port").equals(targetPort))return false;
+        if(!state.getUUID("Controller").equals(controller.getUUID())||!state.getString("Port").equals(targetPort))return false;
         var legs=readList(state,"Legs");int index=state.getInt("Index"),age=state.getInt("Age");if(index<0||index>legs.size())return false;
         var own=new HashSet<UUID>();own.add(controller.getUUID());
         var flight=context.pool().queryFlight(companionFlight);

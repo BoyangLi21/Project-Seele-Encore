@@ -14,7 +14,7 @@ public final class CarrierFootBearingR53
     public static final String SOURCE = "mesh/carrier_sole_bearings_r53.json";
     public record Pad(int variant, String bone, String name, NervRigidMeshSweepR52 mesh, double[] rgb,
                       List<List<Vec3>> contacts, double bottom) { }
-    public record Source(List<Pad> pads, String fingerprint, String carrierSource)
+    public record Source(List<Pad> pads, String fingerprint)
     {
         public List<Pad> variant(int variant) { return pads.stream().filter(p -> p.variant() == variant).toList(); }
     }
@@ -37,14 +37,7 @@ public final class CarrierFootBearingR53
         if (checked) return installed;
         try (var stream = CarrierFootBearingR53.class.getResourceAsStream("/assets/projectseele/" + SELECTION))
         {
-            if (stream != null)
-            {
-                var manifest = JsonParser.parseString(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
-                byte[] bytes = EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);
-                if (!sha(bytes).equals(manifest.getAsJsonObject("resources").get(SOURCE).getAsString())) throw new IllegalStateException("Selected sole pad changed");
-                installed = read(bytes);
-                if (!CarrierAssemblyR53.retainsSourceSurface(installed.carrierSource())) throw new IllegalStateException("Sole bearing requires its exact supplied deck");
-            }
+            if (stream != null) installed = read(EvaOriginalMeshGeometryR52.classpathBytes(SOURCE));
             checked = true;return installed;
         }
         catch (IOException failure) { throw new IllegalStateException("Selected finite sole support unavailable", failure); }
@@ -73,7 +66,7 @@ public final class CarrierFootBearingR53
             pads.add(new Pad(variant, bone, row.get("name").getAsString(), new NervRigidMeshSweepR52(xyz), rgb, List.copyOf(contacts), row.get("bottom").getAsDouble()));
         }
         if (pads.size() != 6) throw new IllegalArgumentException("All original soles required");
-        return new Source(List.copyOf(pads), sha(bytes), root.get("carrier_source_sha256").getAsString());
+        return new Source(List.copyOf(pads), sha(bytes));
     }
 
     public static List<NervOriginalCarrierR52.Part> partsAt(Source source, int variant, RigidTransform controller, CarrierMountProfileR53.State mounting)

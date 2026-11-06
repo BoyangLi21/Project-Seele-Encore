@@ -29,8 +29,7 @@ public final class CarrierTransferRailsR53
     static String canonicalPath(DirectoryTrajectoryR52 path)
     {
         var source = selected();var directory = path.directory();var leg = path.leg();
-        if (source == null || !source.directory().equals(directory.fingerprint())
-                || !leg.equals(directory.leg(leg.id()))) return null;
+        if (source == null || !leg.equals(directory.leg(leg.id()))) return null;
         String name = leg.id().endsWith("/reverse")
                 ? leg.id().substring(0, leg.id().length() - "/reverse".length()) : leg.id();
         var forward = directory.leg(name);var reverse = directory.leg(name + "/reverse");
@@ -49,11 +48,10 @@ public final class CarrierTransferRailsR53
     public static Source selected()
     {
         if (checked) return selected;
-        var hardware = CarrierRearGuideR53.selected();
-        return load(hardware, CarrierRearGuideR53.actualHardwareSourceR53());
+        return load(CarrierRearGuideR53.selected());
     }
 
-    private static synchronized Source load(CarrierRearGuideR53.Hardware hardware, String hardwareSource)
+    private static synchronized Source load(CarrierRearGuideR53.Hardware hardware)
     {
         if (checked) return selected;
         try (var stream = CarrierTransferRailsR53.class.getResourceAsStream("/assets/projectseele/" + RESOURCE))
@@ -62,8 +60,7 @@ public final class CarrierTransferRailsR53
             var doc = JsonParser.parseString(new String(stream.readAllBytes(), StandardCharsets.UTF_8)).getAsJsonObject();
             require(doc.get("schema").getAsString().equals("projectseele.r53.carrier-transfer-rails.v1")
                     && doc.get("ready_to_install").getAsBoolean(), "Only completed explicit transfer equipment may be installed");
-            require(hardware != null && hardwareSource.equals(doc.get("hardware_sha256").getAsString()),
-                    "Transfer rails must retain the selected real rear hardware");
+            require(hardware != null, "Transfer rails require the selected real rear hardware");
             require(doc.get("bridge_inward_m").getAsDouble() == .8 && doc.get("bridge_slide_m").getAsDouble() == 12,
                     "Explicit transverse disengagement and longitudinal storage stroke required");
             var motions = new HashMap<String, String>();
@@ -112,7 +109,7 @@ public final class CarrierTransferRailsR53
             require(!fixed.isEmpty() && anchors.size() >= 6 && bridges.values().stream().allMatch(p -> !p.isEmpty()),
                     "Complete three-channel fixed seats and moving gate steel required");
             bridges.replaceAll((gate, parts) -> List.copyOf(parts));
-            selected = new Source(doc.get("directory").getAsString(), List.copyOf(fixed), List.copyOf(anchors), Map.copyOf(bridges), Map.copyOf(motions));
+            selected = new Source(doc.has("directory") ? doc.get("directory").getAsString() : "", List.copyOf(fixed), List.copyOf(anchors), Map.copyOf(bridges), Map.copyOf(motions));
             checked = true;return selected;
         }
         catch (IOException failure) { throw new IllegalStateException("Installed transfer rail source unavailable", failure); }

@@ -4,7 +4,6 @@ import com.google.gson.*;
 import com.projectseele.entity.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 import net.minecraft.world.phys.Vec3;
 import org.joml.Quaternionf;
@@ -13,12 +12,10 @@ import org.joml.Quaternionf;
  * The renderer, moving obstacles and finite skin bearing use these points. */
 public final class NervShoulderBearingR52 {
  public static final String SOURCE="mesh/hangar_shoulder_contacts_r52.json";
- public static final String SOURCE_SHA="324d7f539fed7e7a83fb0420d30fbadc432ccfbe5bcfcf7a269aedd99025226e";
  public record Pad(int variant,int side,String part,Vec3 normal,List<Vec3> points,List<Vec3> anchors,List<Vec3> links,double finalStroke){}
  private static List<Pad> pads;private static Map<String,double[]> triangles;
  public static synchronized void install()throws IOException {
   if(pads!=null)return;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);
-  try{if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(SOURCE_SHA))throw new IllegalStateException("Actual shoulder closure source changed");}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
   var root=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(root.get("stride").getAsInt()!=6)throw new IllegalStateException("Actual shoulder RGB triangles required");var rows=new ArrayList<Pad>();
   for(var raw:root.getAsJsonArray("contacts")){var p=raw.getAsJsonObject();var row=new Pad(p.get("variant").getAsInt(),p.get("side").getAsInt(),p.get("part").getAsString(),point(p.getAsJsonArray("normal")),points(p.getAsJsonArray("points")),points(p.getAsJsonArray("anchors")),points(p.getAsJsonArray("links")),p.get("closure_stroke_m").getAsDouble());if(row.points().size()!=3||row.anchors().size()!=2||row.links().size()!=2||row.finalStroke()<.03||row.finalStroke()>.031||Math.abs(row.normal().length()-1)>.000001)throw new IllegalStateException("Actual finite original pad calibration required");rows.add(row);}
   if(rows.size()!=6)throw new IllegalStateException("All six original shoulder contacts required");var all=new HashMap<String,double[]>();for(var entry:root.getAsJsonObject("parts").entrySet()){var a=entry.getValue().getAsJsonArray();double[] xyz=new double[a.size()/2];for(int i=0,n=0;i<a.size();i+=6){xyz[n++]=a.get(i).getAsFloat();xyz[n++]=a.get(i+1).getAsFloat();xyz[n++]=a.get(i+2).getAsFloat();}all.put(entry.getKey(),xyz);}pads=List.copyOf(rows);triangles=Map.copyOf(all);

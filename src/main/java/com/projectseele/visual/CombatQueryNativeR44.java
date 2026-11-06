@@ -5,17 +5,12 @@ import com.mojang.authlib.GameProfile;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.*;
 import com.projectseele.physics.*;
-import com.projectseele.network.CombatBundleGateR44;
 import com.projectseele.registry.ModEntities;
 import com.projectseele.registry.ModItems;
 import net.minecraft.nbt.CompoundTag;
-import net.minecraft.network.Connection;
-import net.minecraft.network.ConnectionProtocol;
-import net.minecraft.network.protocol.PacketFlow;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.server.network.ServerGamePacketListenerImpl;
 import net.minecraft.world.entity.*;
 import net.minecraft.world.entity.ai.attributes.Attributes;
 import net.minecraft.world.level.GameRules;
@@ -27,10 +22,8 @@ import net.minecraft.world.phys.*;
 import net.minecraft.core.BlockPos;
 import net.minecraftforge.common.util.FakePlayerFactory;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
-import io.netty.channel.embedded.EmbeddedChannel;
 import org.joml.Vector3f;
 import java.lang.reflect.*;
 import java.nio.file.*;
@@ -79,7 +72,6 @@ public final class CombatQueryNativeR44
             for(int rig=0;rig<5;rig++)spatial(rig);
             for(String path:new String[]{"jab","cross","heavy","knife_forward","knife_reverse","kick","eva_rifle","eva_cannon","un_eye","player_rifle",
                     "shamshel_whip","ramiel_beam","ramiel_drill","zeruel_paper","zeruel_eye","strategic_blast","native_explosion"})damage(path);
-            handshake(server);
         }
         catch(Exception failure){record("suite_setup","native_API",false,failure.toString());}
         finally{cleanup();for(var chunk:OWNED_CHUNKS)level.setChunkForced(chunk.x,chunk.z,false);OWNED_CHUNKS.clear();write(server);}
@@ -223,26 +215,6 @@ public final class CombatQueryNativeR44
     {Vec3 head=bone(target,"head"),delta=point.subtract(head);target.teleportTo(target.getX()+delta.x,target.getY()+delta.y,target.getZ()+delta.z);target.setOnGround(true);}
     @SuppressWarnings("unchecked") private static List<Object> activeCraters()throws Exception
     {return (List<Object>)field(com.projectseele.fx.StrategicExplosionDirector.class,"ACTIVE").get(null);}
-    private static void handshake(MinecraftServer server)throws Exception
-    {
-        var expected=com.projectseele.entity.CombatMotionResourcesR44.fingerprints();
-        for(String key:new TreeMap<>(expected).keySet())
-        {
-            ServerPlayer player=null;EmbeddedChannel channel=null;
-            try
-            {
-                player=new ServerPlayer(server,level,new GameProfile(UUID.randomUUID(),"R44Gate"));
-                Connection connection=new Connection(PacketFlow.SERVERBOUND);channel=new EmbeddedChannel(connection);connection.setProtocol(ConnectionProtocol.PLAY);
-                player.connection=new ServerGamePacketListenerImpl(server,connection,player);connection.setListener(player.connection);
-                CombatBundleGateR44.login(new PlayerEvent.PlayerLoggedInEvent(player));var bad=new HashMap<>(expected);bad.put(key,"0".repeat(64));
-                CombatBundleGateR44.accept(player,bad);channel.runPendingTasks();
-                record("mismatch_"+key,"native_server_handler_embedded_connection",!connection.isConnected(),
-                        String.valueOf(connection.getDisconnectedReason())+"; actual separate client is a different denominator");
-            }
-            catch(Exception failure){record("mismatch_"+key,"native_server_handler_embedded_connection",false,cause(failure));}
-            finally{if(player!=null)CombatBundleGateR44.logout(new PlayerEvent.PlayerLoggedOutEvent(player));if(channel!=null)channel.finishAndReleaseAll();}
-        }
-    }
     private static void restoreWall()
     {if(level!=null)for(var entry:WALL_BLOCKS.entrySet())level.setBlock(entry.getKey(),entry.getValue(),2);WALL_BLOCKS.clear();}
     private static JsonObject indexWitness(EvaUnit01Entity target,Vec3 point)

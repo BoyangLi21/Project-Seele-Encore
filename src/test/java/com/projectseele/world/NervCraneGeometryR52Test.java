@@ -14,7 +14,7 @@ public final class NervCraneGeometryR52Test
 {
     public static void main(String[] args)throws Exception
     {
-        byte[] raw=EvaOriginalMeshGeometryR52.classpathBytes("mesh/tripo_gripper_r48.json");var root=JsonParser.parseString(new String(raw,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();String gripSha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(raw));byte[] procedural=Files.readAllBytes(Path.of(args[0]));String procSha=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(procedural));var geometry=NervCraneGeometryR52.load(name->name.startsWith("eva/")?procedural:raw,procSha,gripSha);
+        byte[] raw=EvaOriginalMeshGeometryR52.classpathBytes("mesh/tripo_gripper_r48.json");var root=JsonParser.parseString(new String(raw,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();byte[] procedural=Files.readAllBytes(Path.of(args[0]));var geometry=NervCraneGeometryR52.load(name->name.startsWith("eva/")?procedural:raw);
         long compared=0;double maximum=0;int poses=0;
         for(var outer:new Quaternionf[]{new Quaternionf(),new Quaternionf().rotationY((float)Math.PI),new Quaternionf().rotationY(.73F)})for(int age:new int[]{0,10,40,70,100})
         {

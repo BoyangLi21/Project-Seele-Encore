@@ -12,7 +12,6 @@ import org.joml.Vector3f;
 import java.io.InputStreamReader;
 import java.io.InputStream;
 import java.nio.charset.StandardCharsets;
-import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.*;
 
@@ -24,7 +23,7 @@ public final class FirstBattleClip
     public record CameraPose(Vec3 position,Vec3 target,float fov) {}
     private record Role(String[] bones,Quaternionf[][] rotations,Vector3f[][] positions,Map<String,Vec3[]> curves) {}
     private record HandTrack(float[] times,String[] presets) {}
-    private record Data(float fps,Map<String,Role> roles,Vec3[] cameras,Vec3[] targets,float[] fov,Set<Integer> cuts,String surfaceHash,int landingTick,Map<Integer,Integer> eventTicks,float[] referenceSeconds,Map<String,HandTrack> hands) {}
+    private record Data(float fps,Map<String,Role> roles,Vec3[] cameras,Vec3[] targets,float[] fov,Set<Integer> cuts,int landingTick,Map<Integer,Integer> eventTicks,float[] referenceSeconds,Map<String,HandTrack> hands) {}
     private static String loadedFingerprint="";
     private static final Data DATA=load();
     private static final Map<Integer,Boolean> HAND_OWNERS_R52=new HashMap<>();
@@ -103,15 +102,6 @@ public final class FirstBattleClip
                 int index=cut.getAsInt();if(index<=0||index>=count)throw new IllegalArgumentException("Invalid first-battle camera cut");cuts.add(index);
             }
             ProjectSeele.LOGGER.info("{} first battle loaded: fps={} frames={} durationTicks={}",source,fps,fov.length,DURATION_TICKS);
-            String surfaceHash=root.has("surface_deformation_r14")?root.get("surface_deformation_r14").getAsString():"";
-            if(!surfaceHash.isEmpty()&&!surfaceHash.matches("[0-9a-f]{64}"))throw new IllegalArgumentException("Invalid surface cache fingerprint");
-            if(!surfaceHash.isEmpty())
-            {
-                Path cache=CombatMotionResourcesR44.instancePath("projectseele-local-maps/sachiel_wrap_r14.bin");
-                if(!Files.isRegularFile(cache)||Files.size(cache)>96*1024*1024L)throw new IllegalArgumentException("Missing private surface performance");
-                String digest=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(cache)));
-                if(!digest.equals(surfaceHash))throw new IllegalArgumentException("Private movie / surface mismatch");
-            }
             int landing=root.has("landing_tick")?root.get("landing_tick").getAsInt():234;
             if(landing<0||landing>=DURATION_TICKS)throw new IllegalArgumentException("Invalid landing cue");
             Map<Integer,Integer> cues=new HashMap<>();
@@ -124,7 +114,7 @@ public final class FirstBattleClip
                 for(int i=0;i<rows.size();i++){var row=rows.get(i).getAsJsonArray();times[i]=row.get(0).getAsFloat();presets[i]=row.get(1).getAsString();}
                 hands.put(entry.getKey(),new HandTrack(times,presets));
             }
-            return new Data(fps,Map.copyOf(roles),positions,targets,fov,Set.copyOf(cuts),surfaceHash,landing,Map.copyOf(cues),reference,Map.copyOf(hands));
+            return new Data(fps,Map.copyOf(roles),positions,targets,fov,Set.copyOf(cuts),landing,Map.copyOf(cues),reference,Map.copyOf(hands));
     }
     private static void validateCurve(Vec3[] curve,int count)
     {
@@ -166,7 +156,6 @@ public final class FirstBattleClip
         Set<String> required=new HashSet<>(handBones);
         return required.size()==34&&handBones.size()==34&&new HashSet<>(Arrays.asList(authored)).containsAll(required);
     }
-    public static String surfaceHash(){return DATA==null?"":DATA.surfaceHash;}
     public static int landingTick(){return DATA==null?234:DATA.landingTick;}
     public static String fingerprint(){return loadedFingerprint;}
     public static boolean hasCurve(boolean eva,String curve){return DATA!=null&&DATA.roles.get(eva?"eva":"angel").curves.containsKey(curve);}

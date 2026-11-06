@@ -29,8 +29,8 @@ public final class NervTurnStationRuntimeR52 {
   var proof=NervFootGuideDockR52.proposeStation(l,station,NervFootGuideStationR52.view(station),p,next,Set.of(station.getUUID()));if(proof==null||!covered(admission,proof.envelopes())||!NervFootGuideStationR52.acceptStationStepR52(l,proof))return false;return next.equals(target);
  }
  private static CompoundTag state(CompoundTag data,Spec spec){var t=data.getCompound(KEY);if(!t.getString("Leg").equals(spec.leg().id()))return new CompoundTag();return t.copy();}
- private static void save(CompoundTag data,Spec spec,Sample p,long at){var tag=new CompoundTag();tag.putString("Leg",spec.leg().id());tag.putString("Source",NervFootGuideDockR52.SOURCE_SHA);tag.putString("Stage",p.stage().name());tag.putDouble("Fraction",p.fraction());tag.putLong("At",at);data.put(KEY,tag);}
- private static Sample sample(CompoundTag state){if(!state.getString("Source").equals(NervFootGuideDockR52.SOURCE_SHA))throw new IllegalStateException("Actual station source clock changed");return new Sample(Stage.valueOf(state.getString("Stage")),state.getDouble("Fraction"));}
+ private static void save(CompoundTag data,Spec spec,Sample p,long at){var tag=new CompoundTag();tag.putString("Leg",spec.leg().id());tag.putString("Stage",p.stage().name());tag.putDouble("Fraction",p.fraction());tag.putLong("At",at);data.put(KEY,tag);}
+ private static Sample sample(CompoundTag state){return new Sample(Stage.valueOf(state.getString("Stage")),state.getDouble("Fraction"));}
  private static boolean advance(ServerLevel l,NervCarrierPlatformEntity carrier,Spec spec,Admission a,Set<UUID> own,CompoundTag data,Sample from,Sample to)throws IOException {
   var proof=NervFootGuideDockR52.propose(l,carrier,spec,from,to,own);if(proof==null||!covered(a,proof.envelopes())||!NervOriginalCarrierR52.acceptDockStepR52(l,proof))return false;save(data,spec,to,l.getGameTime());return true;
  }

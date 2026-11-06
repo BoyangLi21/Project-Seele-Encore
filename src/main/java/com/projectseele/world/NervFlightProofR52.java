@@ -108,7 +108,7 @@ public final class NervFlightProofR52
                     ||eva.getUnitVariant()!=variant||!frozenActorR53(eva)||!frame.equals(NervOwnerPlacementR52.actualRoot(eva))
                     ||!frame.equals(mesh.frame())||!frame.equals(mesh.endFrame())
                     ||!source.equals(EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52().sourceFingerprint())
-                    ||!body.equals(EvaShutdownR30.encode(EvaBodyPose.sample(eva,1)))||!hands.equals(EvaFrozenHandsR52.capture(eva,1)))
+                    ||!body.equals(EvaShutdownR30.encode(EvaBodyPose.sample(eva,1)))||!EvaFrozenHandsR52.sameFrozen(hands,EvaFrozenHandsR52.capture(eva,1)))
             {hold="captured actor identity/pose/root/source changed";return false;}
             if(matchedMeshes.contains(mesh.mesh()))return true;
             // Geometry cache eviction may rebuild the same immutable source.
@@ -187,7 +187,7 @@ public final class NervFlightProofR52
                 var entry=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
                 if(entry==null||entry.canonicalId().equals(original.eva())||!(level.getEntity(entry.canonicalId()) instanceof EvaUnit01Entity actor)||!frozenActorR53(actor))continue;
                 var otherRoot=NervOwnerPlacementR52.actualRoot(actor);var pose=EvaBodyPose.sample(actor,1);var hands=EvaFrozenHandsR52.capture(actor,1);
-                var other=EvaMechanicalFrameR52.serviceSourceHeldR52(actor)?EvaMechanicalFrameR52.serviceGeometryR52(actor):provider.evaluate(variant,pose,EvaFrozenHandsR52.decode(variant,provider.handContractFingerprint(variant),provider.handJoints(variant),hands));
+                var other=EvaMechanicalFrameR52.serviceSourceHeldR52(actor)?EvaMechanicalFrameR52.serviceGeometryR52(actor):provider.evaluate(variant,pose,EvaFrozenHandsR52.decode(variant,provider.handJoints(variant),hands));
                 if(!NervObstacleMeshesR53.body(other).stream().anyMatch(mesh->sweep.intersects(mesh,otherRoot)))continue;
                 var capture=new CompoundTag();capture.putUUID("Actor",actor.getUUID());capture.putInt("Variant",variant);
                 capture.put("Body",EvaShutdownR30.encode(pose));capture.put("Hands",hands.copy());capture.putString("Source",other.sourceFingerprint());
@@ -204,9 +204,9 @@ public final class NervFlightProofR52
             var savedRoot=NervAircraftFrameR52.decodeRigid(tag.getCompound("Root"));
             // NBT canonicalizes signed zero. Compare the same numeric rotation,
             // without broadening position or angle tolerances.
-            if(actor.getUnitVariant()!=tag.getInt("Variant")||!tag.getString("Source").equals(provider.sourceFingerprint())||!tag.getCompound("Body").equals(EvaShutdownR30.encode(pose))||!tag.getCompound("Hands").equals(hands)
+            if(actor.getUnitVariant()!=tag.getInt("Variant")||!tag.getCompound("Body").equals(EvaShutdownR30.encode(pose))||!tag.getCompound("Hands").equals(hands)
                     ||!savedRoot.translation().equals(frame.translation())||savedRoot.qx()!=frame.qx()||savedRoot.qy()!=frame.qy()||savedRoot.qz()!=frame.qz()||savedRoot.qw()!=frame.qw())return false;
-            var other=EvaMechanicalFrameR52.serviceSourceHeldR52(actor)?EvaMechanicalFrameR52.serviceGeometryR52(actor):provider.evaluate(actor.getUnitVariant(),pose,EvaFrozenHandsR52.decode(actor.getUnitVariant(),provider.handContractFingerprint(actor.getUnitVariant()),provider.handJoints(actor.getUnitVariant()),hands));
+            var other=EvaMechanicalFrameR52.serviceSourceHeldR52(actor)?EvaMechanicalFrameR52.serviceGeometryR52(actor):provider.evaluate(actor.getUnitVariant(),pose,EvaFrozenHandsR52.decode(actor.getUnitVariant(),provider.handJoints(actor.getUnitVariant()),hands));
             if(retractActorR53!=null&&retractPairsR53.size()==retractActorR53.meshes.size()&&retractActorR53.meshes.equals(NervObstacleMeshesR53.body(other)))return true;
             var start=NervAircraftFrameR52.decode(tag.getCompound("Start"));var zero=new Frame(start.plane(),start.cargo(),new Rig(start.rig().hoist(),0,1));
             var initial=source.cradleParts(start,anchors,jawAxes(),true);var stowed=source.cradleParts(zero,anchors,jawAxes(),true);var pairs=new HashMap<NervRigidMeshSweepR52,Set<String>>();
@@ -278,7 +278,7 @@ public final class NervFlightProofR52
         {
             if(!(level.getEntity(original.eva()) instanceof EvaUnit01Entity e)||!EvaMechanicalFrameR52.active(e))return current(level);
             boolean visible=NervMappedPlugMechanicsR52.actualCarrierVisibleR52(e);float release=e.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR?EvaDorsalMechanism.smooth(1-(e.getLaunchTicks()-1)/18F):0;
-            return EvaMechanicalFrameR52.kind(e)==kind&&EvaMechanicalFrameR52.capturedGeometry(e).sourceFingerprint().equals(sourceFingerprint())&&EvaShutdownR30.encode(EvaMechanicalFrameR52.frozenLocalPose(e)).equals(frozenBody)&&EvaFrozenHandsR52.capture(e,1).equals(frozenHands)&&visible==carrierVisible&&EvaMechanicalFrameR52.detachedCarrierR52(e)==detachedCarrier&&(!visible||e.carrierRiseProgress(1)==carrierRise&&release==carrierRelease&&e.recoveryRackR39()==recoveryRack&&EvaMechanicalFrameR52.carrierDeckTravelR52(e)==carrierDeckTravel&&(!detachedCarrier||NervAirTransportManifestR52.same(EvaMechanicalFrameR52.carrierFrameR52(e,1),carrierFrame)));
+            return EvaMechanicalFrameR52.kind(e)==kind&&EvaMechanicalFrameR52.capturedGeometry(e).sourceFingerprint().equals(sourceFingerprint())&&EvaShutdownR30.encode(EvaMechanicalFrameR52.frozenLocalPose(e)).equals(frozenBody)&&EvaFrozenHandsR52.sameFrozen(EvaFrozenHandsR52.capture(e,1),frozenHands)&&visible==carrierVisible&&EvaMechanicalFrameR52.detachedCarrierR52(e)==detachedCarrier&&(!visible||e.carrierRiseProgress(1)==carrierRise&&release==carrierRelease&&e.recoveryRackR39()==recoveryRack&&EvaMechanicalFrameR52.carrierDeckTravelR52(e)==carrierDeckTravel&&(!detachedCarrier||NervAirTransportManifestR52.same(EvaMechanicalFrameR52.carrierFrameR52(e,1),carrierFrame)));
         }
         public FootSupportFrameR52.Sample sample(RigidTransform frame){return new FootSupportFrameR52.Sample(frame,frame.transformPoint(binding.leftFoot()),frame.transformPoint(binding.rightFoot()),frame.compose(binding.plugInEva()));}
         boolean cargoIntersects(RigidTransform from,RigidTransform to,AABB obstacle)
@@ -302,7 +302,7 @@ public final class NervFlightProofR52
                 var otherRoot=NervOwnerPlacementR52.actualRoot(actor);
                 if(!ownBounds.inflate(200).contains(otherRoot.translation()))continue;
                 var body=EvaBodyPose.sample(actor,1);var hands=EvaFrozenHandsR52.capture(actor,1);
-                var other=EvaMechanicalFrameR52.serviceSourceHeldR52(actor)?EvaMechanicalFrameR52.serviceGeometryR52(actor):provider.evaluate(variant,body,EvaFrozenHandsR52.decode(variant,provider.handContractFingerprint(variant),provider.handJoints(variant),hands));
+                var other=EvaMechanicalFrameR52.serviceSourceHeldR52(actor)?EvaMechanicalFrameR52.serviceGeometryR52(actor):provider.evaluate(variant,body,EvaFrozenHandsR52.decode(variant,provider.handJoints(variant),hands));
                 if(!ownBounds.intersects(NervRigidMeshSweepR52.transformed(other.bounds(),otherRoot)))continue;
                 captured.put(actor.getUUID(),new FrozenActorContactR53(actor,otherRoot,EvaShutdownR30.encode(body),hands,completeAssemblyR54(),root,other));
             }
@@ -399,7 +399,7 @@ public final class NervFlightProofR52
     {
         var preview=inspect(level,original,kind);if(preview==null||!data.contains("RescueSkinContactsR53"))return preview;
         var tag=data.getCompound("RescueSkinContactsR53");
-        if(!tag.getString("Source").equals(preview.sourceFingerprint())||!tag.getCompound("Body").equals(preview.frozenBody)||!tag.getCompound("Hands").equals(preview.frozenHands))
+        if(!tag.getCompound("Body").equals(preview.frozenBody)||!EvaFrozenHandsR52.sameFrozen(tag.getCompound("Hands"),preview.frozenHands))
             return Set.of("CLAMP","RESELECT_RETRACT","RESELECT_CONTACT").contains(data.getString("FlightStage"))?null:preview;
         var list=tag.getList("Contacts",10);var selected=new ArrayList<NervAirCradleContactsR52.Contact>();
         for(int i=0;i<list.size();i++){var c=list.getCompound(i);selected.add(new NervAirCradleContactsR52.Contact(c.getString("Bone"),readContactVectorR53(c,"Skin"),readContactVectorR53(c,"Centre"),readContactVectorR53(c,"Axis")));}
@@ -416,7 +416,7 @@ public final class NervFlightProofR52
         else{occupied=EvaMechanicalFrameR52.prepareOccupiedRecovery(e,o);if(occupied==null)return null;binding=EvaMechanicalFrameR52.occupiedPreviewBinding(occupied);frame=EvaMechanicalFrameR52.occupiedPreviewFrame(occupied);}
         var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var body=EvaMechanicalFrameR52.active(e)?EvaMechanicalFrameR52.frozenLocalPose(e):EvaBodyPose.sample(e,1);var hands=EvaFrozenHandsR52.capture(e,1);
         var geometry=EvaMechanicalFrameR52.active(e)?EvaMechanicalFrameR52.capturedGeometry(e)
-                :provider.evaluate(e.getUnitVariant(),body,EvaFrozenHandsR52.decode(e.getUnitVariant(),provider.handContractFingerprint(e.getUnitVariant()),provider.handJoints(e.getUnitVariant()),hands));
+                :provider.evaluate(e.getUnitVariant(),body,EvaFrozenHandsR52.decode(e.getUnitVariant(),provider.handJoints(e.getUnitVariant()),hands));
         var surfaces=new ArrayList<>(NervObstacleMeshesR53.body(geometry));
         var anchors=new ArrayList<Vec3>();for(String bone:new String[]{"arm_l","arm_r","leg_l","leg_r","shin_l","shin_r"}){var p=body.matrix(bone).transformPosition(new Vector3f(body.rig.get(bone).pivot()).add(0,0,2.5F/EvaScale.RENDER_SCALE)).mul(EvaScale.RENDER_SCALE);anchors.add(new Vec3(p.x,p.y,p.z));}
         boolean carrierVisible=NervMappedPlugMechanicsR52.actualCarrierVisibleR52(e);
@@ -761,7 +761,7 @@ public final class NervFlightProofR52
     }
     private static synchronized NervAirframeGeometryR52 actualAircraftSource()throws IOException
     {
-        if(actualAircraftSource==null)actualAircraftSource=NervAirframeGeometryR52.loadClasspath(Map.of("mesh/tv_facilities_r16.json",NervSiloHatchGeometryR52.SOURCE_SHA,"mesh/air_cradle_r31.json","20ca048a0e0cb5a5a4caaed5d8984cd6bef16d769a7a70db5055fa727b6eaa1b"));
+        if(actualAircraftSource==null)actualAircraftSource=NervAirframeGeometryR52.loadClasspath(Map.of());
         return actualAircraftSource;
     }
     private static List<ObstacleMesh> obstacleMeshes(Entity actor,NervAirframeGeometryR52 source)
@@ -774,7 +774,7 @@ public final class NervFlightProofR52
     private static List<ObstacleMesh> resolveObstacleMeshes(Entity actor,NervAirframeGeometryR52 source)throws IOException
     {
         if(actor instanceof YashimaCannonEntityR52 gun)return YashimaCannonMeshR52.actualObstacleMeshesR52(gun);
-        if(actor instanceof NervCarrierPlatformEntity gantry){try{if(NervFootGuideStationR52.declared(gantry))return NervFootGuideStationR52.actualMeshesR52(gantry);if(NervOriginalCarrierR52.declared(gantry))return NervOriginalCarrierR52.actualMeshesR52(gantry);if(gantry.isPlugCrane())return NervCraneGeometryR52.actualObstacleMeshesR52(gantry);if(!gantry.isRestraintGantry()||!gantry.hasDeclaredMachineFrameR52()||!gantry.declaredCollisionSourceR52().equals(selectedCageSourceR52()))return null;return NervPlantMotionR52.actualRenderedMeshesR52(gantry);}catch(IOException|IllegalStateException missing){return null;}}
+        if(actor instanceof NervCarrierPlatformEntity gantry){try{if(NervFootGuideStationR52.declared(gantry))return NervFootGuideStationR52.actualMeshesR52(gantry);if(NervOriginalCarrierR52.declared(gantry))return NervOriginalCarrierR52.actualMeshesR52(gantry);if(gantry.isPlugCrane())return NervCraneGeometryR52.actualObstacleMeshesR52(gantry);if(!gantry.isRestraintGantry()||!gantry.hasDeclaredMachineFrameR52()||gantry.declaredCollisionSourceR52().isEmpty())return null;return NervPlantMotionR52.actualRenderedMeshesR52(gantry);}catch(IOException|IllegalStateException missing){return null;}}
         if(actor instanceof EvaUnit01Entity eva)
         {
             EvaOriginalMeshGeometryR52.Geometry geometry;
@@ -783,7 +783,7 @@ public final class NervFlightProofR52
             else
             {
                 var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();var body=EvaBodyPose.sample(eva,1);var hands=EvaFrozenHandsR52.capture(eva,1);
-                geometry=provider.evaluate(eva.getUnitVariant(),body,EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),hands));
+                geometry=provider.evaluate(eva.getUnitVariant(),body,EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handJoints(eva.getUnitVariant()),hands));
             }
             var root=NervOwnerPlacementR52.actualRoot(eva);var out=new ArrayList<ObstacleMesh>();
             for(var mesh:NervObstacleMeshesR53.body(geometry))out.add(new ObstacleMesh(mesh,root));

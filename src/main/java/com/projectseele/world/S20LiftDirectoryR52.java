@@ -61,7 +61,7 @@ public final class S20LiftDirectoryR52
                 {
                     SeeleConferenceAccessR47.invalidateR52(level);FacilityDoorControlsR49.invalidateR52(level);
                     var document=S20LiftManifestR52.parse(JsonParser.parseString(Files.readString(file)).getAsJsonObject());
-                    if(document.epoch()!=epoch||!document.directoryFingerprint().equals(fingerprint))throw new IllegalArgumentException("Lift manifest does not match Root world claim");
+                    if(document.epoch()!=epoch)throw new IllegalArgumentException("Lift manifest does not match Root world claim");
                     state.document=document;state.specs=document.lifts().stream().map(S20LiftManifestR52.Binding::spec).toList();state.closed.clear();state.footprints.clear();state.modified=modified;state.size=size;
                 }
             }

@@ -47,8 +47,8 @@ public final class NervAircraftFrameR52
     public static boolean active(UNTransportEntity p){return p.getEntityData().get(DATA).getBoolean("Active");}
     public static boolean contextMatches(UNTransportEntity p,NervAirTransportManifestR52 manifest)
     {
-        var data=p.getEntityData().get(DATA);if(!active(p)||!data.getString("Manifest").equals(manifest.fingerprint())||data.getLong("Epoch")!=manifest.directory().epoch()||!p.isNerv()||p.groundCart()||!net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(p.getType()).toString().equals("projectseele:un_transport")||manifest.aircraft().values().stream().noneMatch(a->a.entity().equals(p.getUUID())&&a.serial()==p.serial()))return false;
-        var sources=data.getCompound("Sources");if(!sources.getAllKeys().equals(manifest.meshSources().keySet()))return false;for(var e:manifest.meshSources().entrySet())if(!sources.getString(e.getKey()).equals(e.getValue()))return false;return true;
+        var data=p.getEntityData().get(DATA);if(!active(p)||data.getLong("Epoch")!=manifest.directory().epoch()||!p.isNerv()||p.groundCart()||!net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(p.getType()).toString().equals("projectseele:un_transport")||manifest.aircraft().values().stream().noneMatch(a->a.entity().equals(p.getUUID())&&a.serial()==p.serial()))return false;
+        return true;
     }
     public static void save(UNTransportEntity p,CompoundTag data){data.put("R52AircraftSample",p.getEntityData().get(DATA).copy());}
     public static void load(UNTransportEntity p,CompoundTag data){p.getEntityData().set(DATA,data.getCompound("R52AircraftSample").copy());}
@@ -59,11 +59,11 @@ public final class NervAircraftFrameR52
         if(p.level().isClientSide||!p.getUUID().equals(aircraft.entity())||p.serial()!=aircraft.serial()||!p.isNerv()||p.groundCart()||p.carrying()||!net.minecraft.core.registries.BuiltInRegistries.ENTITY_TYPE.getKey(p.getType()).toString().equals("projectseele:un_transport"))return false;
         if(active(p))return contextMatches(p,manifest);
         var stand=manifest.node(aircraft.stand()).frame();if(!NervAirTransportManifestR52.same(actual(p),stand.plane())||p.hoistDistance()!=stand.rig().hoist())return false;
-        var tag=p.getEntityData().get(DATA).copy();tag.putBoolean("Active",true);tag.putString("Manifest",manifest.fingerprint());tag.putLong("Epoch",manifest.directory().epoch());tag.putLong("At",p.level().getGameTime());tag.putDouble("RotorPrevious",p.level().getGameTime()%3600);tag.putDouble("RotorCurrent",p.level().getGameTime()%3600);tag.put("Previous",encode(stand,tag.getCompound("Previous")));tag.put("Current",encode(stand,tag.getCompound("Current")));var hashes=new CompoundTag();manifest.meshSources().forEach(hashes::putString);tag.put("Sources",hashes);tag.put("Anchors",new ListTag());p.getEntityData().set(DATA,tag);return true;
+        var tag=p.getEntityData().get(DATA).copy();tag.putBoolean("Active",true);tag.putString("Manifest",manifest.fingerprint());tag.putLong("Epoch",manifest.directory().epoch());tag.putLong("At",p.level().getGameTime());tag.putDouble("RotorPrevious",p.level().getGameTime()%3600);tag.putDouble("RotorCurrent",p.level().getGameTime()%3600);tag.put("Previous",encode(stand,tag.getCompound("Previous")));tag.put("Current",encode(stand,tag.getCompound("Current")));tag.put("Anchors",new ListTag());p.getEntityData().set(DATA,tag);return true;
     }
     public static boolean apply(UNTransportEntity p,NervFlightProofR52.CheckedFlightStep proof)
     {
-        if(!(p.level() instanceof net.minecraft.server.level.ServerLevel l)||!active(p)||!proof.aircraft().equals(p.getUUID())||!proof.current(l)||!p.getEntityData().get(DATA).getString("Manifest").equals(proof.manifestFingerprint()))return false;
+        if(!(p.level() instanceof net.minecraft.server.level.ServerLevel l)||!active(p)||!proof.aircraft().equals(p.getUUID())||!proof.current(l))return false;
         var previousState=p.getEntityData().get(DATA).copy();previousState.remove("RecoveryAnchorBlendR52");p.getEntityData().set(DATA,previousState);
         var data=p.getEntityData().get(DATA).copy();boolean referenceOnly=proof.from().cargo()!=null&&proof.to().cargo()==null&&proof.from().rig().deployment()==0&&proof.from().rig().equals(proof.to().rig())&&proof.rotorFrom()==proof.rotorTo()&&NervAirTransportManifestR52.same(proof.from().plane(),proof.to().plane());if(!referenceOnly){data.putDouble("RotorPrevious",proof.rotorFrom());data.putDouble("RotorCurrent",proof.rotorTo());data.put("Previous",encode(proof.from(),data.getCompound("Previous")));data.putLong("At",l.getGameTime());}else data.put("DetachedCargoReferenceR52",data.getCompound("Current").getCompound("Cargo").copy());data.put("Current",encode(proof.to(),data.getCompound("Current")));var anchors=new ListTag();if(proof.preview()!=null){for(var a:proof.preview().anchors())anchors.add(point(a));data.put("Anchors",anchors);var axes=new ListTag();for(var a:proof.preview().jawAxes())axes.add(point(a));data.put("JawAxes",axes);}p.getEntityData().set(DATA,data);
         var to=proof.to();p.setPos(to.plane().translation());var f=to.plane().transformVector(new Vec3(0,0,1));p.setYRot((float)-Math.toDegrees(Math.atan2(f.x,f.z)));p.setXRot(0);p.setDeltaMovement(Vec3.ZERO);p.setHoistDistance(to.rig().hoist());return true;
@@ -106,7 +106,7 @@ public final class NervAircraftFrameR52
     public static NervAirframeGeometryR52 renderGeometry(UNTransportEntity p)
     {
         var data=p.getEntityData().get(DATA);String manifest=data.getString("Manifest");var geometry=CLIENT_GEOMETRY.get(manifest);
-        if(geometry==null){var hashes=new HashMap<String,String>();var sources=data.getCompound("Sources");for(String k:sources.getAllKeys())hashes.put(k,sources.getString(k));try{geometry=NervAirframeGeometryR52.loadClasspath(hashes);}catch(java.io.IOException|IllegalStateException missing){throw new IllegalStateException("Actual checked aircraft draw source absent",missing);}CLIENT_GEOMETRY.put(manifest,geometry);}
+        if(geometry==null){try{geometry=NervAirframeGeometryR52.loadClasspath(Map.of());}catch(java.io.IOException|IllegalStateException missing){throw new IllegalStateException("Actual aircraft draw source absent",missing);}CLIENT_GEOMETRY.put(manifest,geometry);}
         return geometry;
     }
     public static double renderRotorClock(UNTransportEntity p,float partial)

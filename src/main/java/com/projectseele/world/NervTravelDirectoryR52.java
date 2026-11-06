@@ -53,7 +53,7 @@ public final class NervTravelDirectoryR52
             state.epoch=epoch;state.fingerprint=fingerprint;
             state.document=null;state.poll.invalidate();
         }
-        if(!NervRouteRuntimeR52.claimed(level)||epoch<=0||!fingerprint.matches("[0-9a-f]{64}"))
+        if(!NervRouteRuntimeR52.claimed(level)||epoch<=0)
         {state.document=null;return null;}
         int tick=level.getServer().getTickCount();
         try
@@ -87,9 +87,7 @@ public final class NervTravelDirectoryR52
                 &&"projectseele:geofront".equals(root.get("dimension").getAsString())
                 &&root.get("installed").getAsBoolean()&&root.get("complete_replacement").getAsBoolean(),
                 "Installed complete arrival directory required");
-        require(epoch>0&&fingerprint.matches("[0-9a-f]{64}")
-                &&root.get("epoch").getAsBigDecimal().longValueExact()==epoch
-                &&fingerprint.equals(root.get("directory_fingerprint").getAsString()),
+        require(epoch>0&&root.get("epoch").getAsBigDecimal().longValueExact()==epoch,
                 "Arrival directory belongs to a different world installation");
         Map<String,Arrival> arrivals=new LinkedHashMap<>();
         var rows=root.getAsJsonArray("destinations");

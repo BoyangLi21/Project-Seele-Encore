@@ -101,8 +101,7 @@ public final class FacilityV2SavedData extends SavedData
                 && this.epoch == FacilitySchemaV2.EPOCH
                 && FacilitySchemaV2.REGION_ID.equals(this.regionId)
                 && FacilitySchemaV2.GENERATOR_VERSION.equals(
-                        this.generatorVersion)
-                && !this.regionCoreHash.isBlank();
+                        this.generatorVersion);
     }
 
     public void commission(FacilitySchemaV2.ResolvedManifest manifest,

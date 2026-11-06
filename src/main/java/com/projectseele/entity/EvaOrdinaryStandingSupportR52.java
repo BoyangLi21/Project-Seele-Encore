@@ -8,7 +8,6 @@ import com.projectseele.physics.CombatBodyProfiles;
 import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
-import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
 import net.minecraft.world.level.ClipContext;
@@ -320,10 +319,6 @@ public final class EvaOrdinaryStandingSupportR52
                 if(!"projectseele.ordinary-standing-hulls.r52.v1".equals(data.get("schema").getAsString()))throw new IllegalStateException("Standing shoe support schema differs");
             }
             var row=data.getAsJsonObject("rigs").getAsJsonObject(""+variant);
-            try(var stream=EvaOrdinaryStandingSupportR52.class.getResourceAsStream("/assets/projectseele/"+row.get("source_resource").getAsString()))
-            {
-                if(stream==null||!row.get("source_sha256").getAsString().equals(HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(stream.readAllBytes()))))throw new IllegalStateException("Original standing shoe source hash differs");
-            }
             var result=new HashMap<String,Vector3f[]>();
             for(String side:List.of("l","r"))
             {

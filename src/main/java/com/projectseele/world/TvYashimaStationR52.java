@@ -66,7 +66,7 @@ public final class TvYashimaStationR52
             }
             catch(Exception error){com.projectseele.ProjectSeele.LOGGER.error("Installed fixed Yashima cannon rejected",error);return Optional.empty();}});
     }
-    /** Called only by the explicit, hash-checked Root installation bundle. */
+    /** Called only by the explicit Root installation bundle. */
     public static void installRootControllerR52(ServerLevel level,Plan p)
     {
         for(Vec3 at:List.of(p.closed(),p.raised(),p.sourcePosition(),Vec3.atCenterOf(p.control())))retain(level,at);
@@ -77,7 +77,7 @@ public final class TvYashimaStationR52
         var existing=level.getEntity(p.cannon());
         if(existing!=null)
         {
-            if(!(existing instanceof YashimaCannonEntityR52 gun)||!gun.getPersistentData().getString("StationLayoutR52").equals(p.fingerprint())
+            if(!(existing instanceof YashimaCannonEntityR52 gun)
                     ||gun.geometryR52()==null||!YashimaCannonGeometryR52.encode(gun.geometryR52()).equals(YashimaCannonGeometryR52.encode(p.geometry()))
                     ||!p.cradle().equals(gun.cradleR52()))
                 throw new IllegalStateException("Existing fixed cannon identity/source differs; not replaced: "+p.cannon());
@@ -256,7 +256,6 @@ public final class TvYashimaStationR52
         var gun=gun(level);if(gun==null||!(level.getEntity(p.hatch()) instanceof NervSiloDoorEntity hatch)||!(level.getEntity(p.source()) instanceof NervArmamentStationEntity source))return;
         if(source.position().distanceTo(p.sourcePosition())>2)return;
         var tag=gun.getPersistentData();String recorded=tag.getString("StationLayoutR52");
-        if(!recorded.isEmpty()&&!recorded.equals(p.fingerprint())){gun.readyR52(false);return;}
         if(recorded.isEmpty()){if(gun.position().distanceTo(p.closed())>.01)return;tag.putString("StationLayoutR52",p.fingerprint());gun.configureR52(p.geometry());gun.configureCradleR52(p.cradle());}
         var data=TvCampaignSavedData.get(level);var eva=TvSortiesR32.assignedUnit(level,data,1);
         boolean active=data.active.equals("ramiel")&&!data.targetDeathConfirmedR45&&!Set.of("cancel","failure","combat_victory","episode_archived").contains(data.phase);

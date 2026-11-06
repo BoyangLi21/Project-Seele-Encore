@@ -15,13 +15,13 @@ public final class EvaFrozenHandsR52
     {
         if(!EvaAnatomicalHandsR45.enabled(eva))throw new IllegalStateException("Actual anatomical hand rig unavailable");
         var pose=EvaAnatomicalHandsR45.sample(eva,partial);
-        return encode(eva.getUnitVariant(),EvaAnatomicalHandsR45.contractFingerprintR45(eva.getUnitVariant()),pose);
+        return encode(eva.getUnitVariant(),pose);
     }
-    public static CompoundTag encode(int variant,String contract,EvaAnatomicalHandsR45.Pose pose)
+    public static CompoundTag encode(int variant,EvaAnatomicalHandsR45.Pose pose)
     {
-        if(variant<0||variant>2||!contract.matches("[0-9a-f]{64}")||pose.rotations().size()!=34)
-            throw new IllegalArgumentException("Original variant, actual contract and all 34 joints required");
-        var tag=new CompoundTag();tag.putString("Schema",SCHEMA);tag.putInt("Variant",variant);tag.putString("ContractSHA256",contract);
+        if(variant<0||variant>2||pose.rotations().size()!=34)
+            throw new IllegalArgumentException("Original variant and all 34 joints required");
+        var tag=new CompoundTag();tag.putString("Schema",SCHEMA);tag.putInt("Variant",variant);
         tag.putString("Left",pose.left());tag.putString("Right",pose.right());var bones=new CompoundTag();
         for(var entry:new TreeMap<>(pose.rotations()).entrySet())
         {
@@ -31,11 +31,11 @@ public final class EvaFrozenHandsR52
         }
         tag.put("Bones",bones);return tag;
     }
-    public static EvaAnatomicalHandsR45.Pose decode(int variant,String contract,Set<String> actualJoints,CompoundTag tag)
+    public static EvaAnatomicalHandsR45.Pose decode(int variant,Set<String> actualJoints,CompoundTag tag)
     {
-        if(!SCHEMA.equals(tag.getString("Schema"))||tag.getInt("Variant")!=variant||!tag.getString("ContractSHA256").equals(contract)
+        if(!SCHEMA.equals(tag.getString("Schema"))||tag.getInt("Variant")!=variant
                 ||actualJoints.size()!=34||!tag.getCompound("Bones").getAllKeys().equals(actualJoints))
-            throw new IllegalStateException("Frozen anatomical pose/source/34-joint identity mismatch");
+            throw new IllegalStateException("Frozen anatomical pose/34-joint identity mismatch");
         var result=new LinkedHashMap<String,Quaternionf>();var bones=tag.getCompound("Bones");
         for(String name:new TreeSet<>(actualJoints))
         {
@@ -44,10 +44,13 @@ public final class EvaFrozenHandsR52
         }
         return new EvaAnatomicalHandsR45.Pose(tag.getString("Left"),tag.getString("Right"),Collections.unmodifiableMap(result));
     }
+    /** Same pose; snapshots saved by older builds also carry an inert contract digest. */
+    public static boolean sameFrozen(CompoundTag a,CompoundTag b)
+    {var x=a.copy();var y=b.copy();x.remove("ContractSHA256");y.remove("ContractSHA256");return x.equals(y);}
     public static EvaAnatomicalHandsR45.Pose frozen(EvaUnit01Entity eva)
     {
         var rig=EvaAnatomicalHandsR45.rig(eva.getUnitVariant());if(rig==null)throw new IllegalStateException("Original anatomical rig unavailable");
-        return decode(eva.getUnitVariant(),EvaAnatomicalHandsR45.contractFingerprintR45(eva.getUnitVariant()),rig.named().keySet(),
+        return decode(eva.getUnitVariant(),rig.named().keySet(),
                 EvaAirTransportR31.cradleStateR50(eva).getCompound(KEY));
     }
     private static void validate(Quaternionf q)

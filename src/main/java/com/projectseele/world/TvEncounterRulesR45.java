@@ -117,7 +117,7 @@ public final class TvEncounterRulesR45
                     ||d.sorties.values().stream().anyMatch(s->commander.getUUID().equals(s.commander)
                         ||!s.npc&&commander.getUUID().equals(s.pilotR45));
             return participant&&site.geometryValidated()&&site.modelReady()
-                    &&site.id().equals(d.encounterSiteR45)&&site.fingerprint().equals(d.encounterLayoutR45)
+                    &&site.id().equals(d.encounterSiteR45)
                     &&target instanceof net.minecraft.world.entity.Mob mob&&mob.isAlive()
                     &&com.projectseele.event.TvEncounterDirectorR45.owned(mob,d)
                     &&TvEncounterTrackingR50.tracks(l,commander,mob);
@@ -234,7 +234,7 @@ public final class TvEncounterRulesR45
                 ||d.phase.equals("cancel")||d.phase.equals("failure"))return configured;
         var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
         return site==null||!site.geometryValidated()||!site.modelReady()
-                ||!site.id().equals(d.encounterSiteR45)||!site.fingerprint().equals(d.encounterLayoutR45)?configured:site.attackRange();
+                ||!site.id().equals(d.encounterSiteR45)?configured:site.attackRange();
     }
     /** Accepted TV06 target stays at its measured battlefield rather than chasing the shooter. */
     public static Vec3 missionRamielAnchor(net.minecraft.world.entity.Mob boss)
@@ -244,7 +244,7 @@ public final class TvEncounterRulesR45
         if(!d.active.equals("ramiel")||!boss.getUUID().equals(d.angel)
                 ||!com.projectseele.event.TvEncounterDirectorR45.owned(boss,d))return null;
         var site=TvEncounterSitesR45.site(l,d.active).orElse(null);
-        return site!=null&&site.id().equals(d.encounterSiteR45)&&site.fingerprint().equals(d.encounterLayoutR45)?site.angel():null;
+        return site!=null&&site.id().equals(d.encounterSiteR45)?site.angel():null;
     }
     /** The release consumer rechecks the live mission, including actual first-frame visibility. */
     public static boolean missionBeamAllowed(net.minecraft.world.entity.Mob boss)
@@ -262,7 +262,7 @@ public final class TvEncounterRulesR45
         // Once exposed, putting the cannon down or leaving its crown does not
         // remove the threat. Actual beam range and world LOS still own reach.
         boolean allowed=owner!=null&&owner.level()==l&&site!=null&&site.geometryValidated()&&site.modelReady()
-                &&site.id().equals(d.encounterSiteR45)&&site.fingerprint().equals(d.encounterLayoutR45)
+                &&site.id().equals(d.encounterSiteR45)
                 &&exposure.matches(d)&&exposure.fireControlLocked&&target!=null&&target.isAlive()
                 &&target.getHealth()>0&&!EvaShutdownR30.wreck(target);
         if(allowed)

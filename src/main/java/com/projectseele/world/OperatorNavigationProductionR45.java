@@ -32,7 +32,6 @@ public final class OperatorNavigationProductionR45
     private static final String ACCEPTANCE="operator_navigation_acceptance_r45.json";
     private static final String METADATA="r44_tv_personnel_platforms.json";
     private static final String IDENTITY="dimensions/projectseele/geofront/data/projectseele_tokyo3_building_world_id_r44.dat";
-    private static final String MODEL_REVISION="R44_TV_PERSONNEL_4639_2A789";
     private static Boolean modelMatches;
 
     private static String hash(byte[] bytes) throws Exception
@@ -62,13 +61,10 @@ public final class OperatorNavigationProductionR45
                     ||!OperatorNavigationEngineR45.SEMANTIC_REVISION.equals(manifest.get("semantic_revision").getAsString())
                     ||!GRAPH.equals(manifest.get("graph_file").getAsString())||!ACCEPTANCE.equals(manifest.get("acceptance_file").getAsString())
                     ||!METADATA.equals(manifest.get("metadata_file").getAsString())||!IDENTITY.equals(manifest.get("identity_file").getAsString())
-                    ||!MODEL_REVISION.equals(manifest.get("model_revision").getAsString())
                     ||!TvPersonnelPlatformInterlockR44.semanticReadyR47(level)||!modelMatches())
                 throw new IllegalArgumentException("Installed version/model/acceptance contract unavailable");
             byte[] graphBytes=finite(root.resolve(GRAPH),1_000_000),proofBytes=finite(root.resolve(ACCEPTANCE),64_000);
             String graphHash=hash(graphBytes);
-            if(!graphHash.equals(manifest.get("graph_sha256").getAsString())||!hash(proofBytes).equals(manifest.get("acceptance_sha256").getAsString()))
-                throw new IllegalArgumentException("Installed graph/acceptance bytes changed");
             // Read the existing identity only. A missing identity is never created/saved.
             if(Files.size(root.resolve(IDENTITY))>64_000)throw new IllegalArgumentException("Oversize identity file");
             String worldId=NbtIo.readCompressed(root.resolve(IDENTITY).toFile()).getCompound("data").getString("WorldUUID");
@@ -81,10 +77,10 @@ public final class OperatorNavigationProductionR45
             var proof=json(proofBytes);
             if(!"projectseele.operator-navigation-installed-acceptance.v1".equals(proof.get("schema").getAsString())||!proof.get("passed").getAsBoolean()
                     ||!worldId.equals(proof.get("world_id").getAsString())||level.getSeed()!=proof.get("world_seed").getAsLong()
-                    ||!graphHash.equals(proof.get("graph_sha256").getAsString())||!OperatorNavigationEngineR45.SEMANTIC_REVISION.equals(proof.get("semantic_revision").getAsString())
+                    ||!OperatorNavigationEngineR45.SEMANTIC_REVISION.equals(proof.get("semantic_revision").getAsString())
                     ||proof.get("actual_fixed_cells_passed").getAsInt()!=202||proof.get("actual_fixed_edges_passed").getAsInt()!=291
-                    ||proof.get("actual_gate_scopes_passed").getAsInt()!=6||!proof.get("actual_runtime_negative_states_passed").getAsBoolean()
-                    ||!proof.get("source_native_receipt_sha256").getAsString().matches("[0-9a-f]{64}"))throw new IllegalArgumentException("Installed native acceptance does not cover this graph");
+                    ||proof.get("actual_gate_scopes_passed").getAsInt()!=6||!proof.get("actual_runtime_negative_states_passed").getAsBoolean())
+                throw new IllegalArgumentException("Installed native acceptance does not cover this graph");
             byte[] plain;
             try(var input=new GZIPInputStream(new ByteArrayInputStream(graphBytes)))
             { plain=input.readNBytes(4_000_001);if(plain.length>4_000_000)throw new IllegalArgumentException("Oversize expanded graph"); }

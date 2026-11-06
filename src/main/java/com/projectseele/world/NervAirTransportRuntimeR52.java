@@ -43,7 +43,7 @@ public final class NervAirTransportRuntimeR52
     public static boolean compatibleGroundInstall(ServerLevel level,NervRouteDirectoryR52 directory)
     {
         var saved=level.getDataStorage().get(NervAirTransportStateR52::load,NervAirTransportStateR52.NAME);if(saved==null)return true;if(!saved.fault().isEmpty())return false;
-        boolean active=saved.jobs().stream().anyMatch(Job::active);return !active||!LIVE.containsKey(level)&&saved.epoch()==directory.epoch()&&saved.directoryFingerprint().equals(directory.fingerprint());
+        boolean active=saved.jobs().stream().anyMatch(Job::active);return !active||!LIVE.containsKey(level)&&saved.epoch()==directory.epoch();
     }
     public static boolean quarantineSavedLeases(ServerLevel level,NervRouteDirectoryR52 directory,NervRouteReservationsR52 pool)
     {
@@ -116,7 +116,7 @@ public final class NervAirTransportRuntimeR52
         // automatic retry can recreate the flight that was just cancelled.
         for(int variant=0;variant<3;variant++)if(variant!=e.getUnitVariant()&&StaffRecoveryR47.pending(l,variant)
                 &&EvaLogisticsDirector.status(l,variant).phase().equals("DEPLOYED"))return false;
-        request(l,e.getUnitVariant(),commander,Intent.RECOVER,0,0);var c=LIVE.get(l);var job=state(l).payload(e.getUUID());return c!=null&&state(l).fault().isEmpty()&&job!=null&&job.active()&&job.manifestFingerprint().equals(c.manifest.fingerprint())&&job.original().owner().equals(commander)&&job.ownerData().getBoolean("Returning");}
+        request(l,e.getUnitVariant(),commander,Intent.RECOVER,0,0);var c=LIVE.get(l);var job=state(l).payload(e.getUUID());return c!=null&&state(l).fault().isEmpty()&&job!=null&&job.active()&&job.original().owner().equals(commander)&&job.ownerData().getBoolean("Returning");}
     public static String request(ServerLevel l,int variant,UUID commander,Intent intent,int x,int z)
     {var c=LIVE.get(l);if(c==null)return status(l);try{return c.request(variant,commander,intent,x,z);}catch(IllegalArgumentException|IllegalStateException denied){com.projectseele.ProjectSeele.LOGGER.debug("R52 flight request rejected variant={} intent={}: {}",variant,intent,denied.toString());return "当前位置或接载路径尚未满足运输条件，机体保持原位。";}}
     /** Named actual far receiver; no shoe/body-root conversion or integer coordinate guess. */
@@ -152,7 +152,6 @@ public final class NervAirTransportRuntimeR52
         var accepted=controller.saved.payload(original.eva());
         boolean queued=controller.saved.fault().isEmpty()&&accepted!=null&&accepted.active()
                 &&accepted.original().equals(original)&&accepted.receiver().equals(receiverId)
-                &&accepted.manifestFingerprint().equals(controller.manifest.fingerprint())
                 &&accepted.ownerData().getBoolean("Returning")
                 &&accepted.ownerData().getString("Intent").equals(Intent.RECOVER.name());
         return new EvaLogisticsDirector.ActionResult(queued,queued
@@ -500,7 +499,7 @@ public final class NervAirTransportRuntimeR52
         }
         void tick(Job job)
         {
-            var m=manifest.missions().get(job.itinerary());if(m==null||!job.manifestFingerprint().equals(manifest.fingerprint())){hold(job,"保存目录/任务版本已改变");return;}
+            var m=manifest.missions().get(job.itinerary());if(m==null){hold(job,"保存目录/任务版本已改变");return;}
             var hint=job.ownerData();var savedFrame=NervAircraftFrameR52.decode(hint.getCompound("Frame"));ticketAt(savedFrame.plane().translation());if(savedFrame.cargo()!=null)ticketAt(savedFrame.cargo().translation());if(hint.contains("PickupRoot"))ticketAt(NervAircraftFrameR52.decodeRigid(hint.getCompound("PickupRoot")).translation());
             if(!(level.getEntity(job.aircraft()) instanceof UNTransportEntity plane)||!NervAircraftFrameR52.active(plane)){hold(job,"等待同 UUID 原飞机加载；不重造、不复制备份");return;}
             var actualFrame=NervAircraftFrameR52.frame(plane,1);ticketAt(actualFrame.plane().translation());if(actualFrame.cargo()!=null)ticketAt(actualFrame.cargo().translation());
@@ -530,7 +529,7 @@ public final class NervAirTransportRuntimeR52
             var held=new HashSet<>(job.spaces());held.addAll(job.mechanisms());
             boolean restore=lease==null||ground().pool().flightQuarantined(job.task())
                     ||!lease.original().equals(job.original())||!lease.aircraft().equals(job.aircraft())||lease.kind()!=job.kind()
-                    ||lease.payloadTransferred()!=job.payloadTransferred()||!lease.directoryFingerprint().equals(manifest.directory().fingerprint())
+                    ||lease.payloadTransferred()!=job.payloadTransferred()
                     ||!lease.spaces().equals(job.spaces())||!lease.mechanisms().equals(job.mechanisms())||!ground().pool().resourcesHeldR52(job.task(),held);
             if(data.getString("FlightStage").equals("RESELECT_RETRACT")&&!p.prepareClampRetractionR53(level,geometry,data))
             {hold(job,"等待原接触夹爪及同一停机体的有限退爪路径");return;}
@@ -764,7 +763,7 @@ public final class NervAirTransportRuntimeR52
                     ||job.leg()>=mission.loaded().size()||!NervAircraftFrameR52.contextMatches(plane,manifest)||!plane.carrying()
                     ||!(level.getEntity(job.original().eva()) instanceof EvaUnit01Entity eva)||!EvaMechanicalFrameR52.flightCustody(eva)
                     ||EvaMechanicalFrameR52.epoch(eva)!=job.original().epoch()||!job.aircraft().equals(data.getUUID("FlightAircraftR52"))
-                    ||!preview.sourceFingerprint().equals(data.getString("FlightSourceR52"))||!(ground().owner() instanceof NervRouteNativeR52.AssemblyOwner assemblyOwner))return false;
+                    ||!(ground().owner() instanceof NervRouteNativeR52.AssemblyOwner assemblyOwner))return false;
             var corridor=manifest.corridor(mission.loaded().get(job.leg()));var from=startFrame(mission,corridor,preview,data,true);var to=endFrame(mission,corridor,preview,data,true);
             int ticks=corridor.ticks();if(corridor.id().endsWith("/actual_loaded_bridge_r53"))ticks=Math.max(1,(int)Math.ceil(from.plane().translation().distanceTo(to.plane().translation())*1.875/2.8));
             int planned=data.getCompound("AirCorridorTicksR53").getInt(corridor.id());if(planned>0)ticks=planned;if(job.age()+1>=ticks)return false;

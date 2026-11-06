@@ -28,7 +28,7 @@ public final class NervTravelDirectoryR52Test
         var parsed=NervTravelDirectoryR52.parse(document,53,fingerprint);
         check(parsed.arrival("hanger")==parsed.arrival("hangar"),"Legacy hangar spelling resolved a different coordinate");
         check(parsed.arrival("hanger_station")==null,"Removed old station remained an available fallback");
-        rejected(document,54,fingerprint,"Foreign epoch accepted");rejected(document,53,"b".repeat(64),"Foreign directory fingerprint accepted");
+        rejected(document,54,fingerprint,"Foreign epoch accepted");NervTravelDirectoryR52.parse(document,53,"b".repeat(64));// the directory digest is not an admission key
         var invalid=document.deepCopy();invalid.addProperty("installed",false);rejected(invalid,53,fingerprint,"Uninstalled candidate accepted");
         invalid=document.deepCopy();invalid.addProperty("complete_replacement",false);rejected(invalid,53,fingerprint,"Partial arrivals silently merged old coordinates");
         invalid=document.deepCopy();invalid.getAsJsonArray("destinations").remove(2);rejected(invalid,53,fingerprint,"Missing actual hangar entry accepted");

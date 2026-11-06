@@ -209,31 +209,41 @@ public final class GeoFrontFabricSavedData extends SavedData
                 == GeoFrontFabricPlan.FABRIC_REVISION
                 && this.facilityEpoch == FacilitySchemaV2.EPOCH
                 && FacilitySchemaV2.REGION_ID.equals(this.regionId)
-                && facility.regionCoreHash().equals(this.regionCoreHash)
-                && this.planHash.equals(FacilityV2Hashing.fabricPlanHash(
-                facility.regionCoreHash(),
-                java.util.List.of(GeoFrontFabricPlan.Feature.values())))
-                && this.ownerUnionHash.equals(
-                FacilityV2Hashing.fabricOwnerMaskHash(
-                        facility.manifest(), 0))
-                && this.ownerGuardHash.equals(
-                FacilityV2Hashing.fabricOwnerMaskHash(
-                        facility.manifest(), 1))
-                && this.committedContracts.equals(currentContractMap());
+                && sameContractsIgnoringHash(this.committedContracts,
+                currentContractMap());
     }
 
     private boolean sameFacilityIdentity(FacilityV2SavedData facility)
     {
         return facility.commissioned()
                 && this.facilityEpoch == FacilitySchemaV2.EPOCH
-                && FacilitySchemaV2.REGION_ID.equals(this.regionId)
-                && facility.regionCoreHash().equals(this.regionCoreHash)
-                && this.ownerUnionHash.equals(
-                FacilityV2Hashing.fabricOwnerMaskHash(
-                        facility.manifest(), 0))
-                && this.ownerGuardHash.equals(
-                FacilityV2Hashing.fabricOwnerMaskHash(
-                        facility.manifest(), 1));
+                && FacilitySchemaV2.REGION_ID.equals(this.regionId);
+    }
+
+    /** Stored plan/owner digests are receipts only; never a reason to refuse saved work. */
+    private static boolean sameContractsIgnoringHash(
+            Map<String, GeoFrontFabricPlan.FeatureContract> stored,
+            Map<String, GeoFrontFabricPlan.FeatureContract> current)
+    {
+        if (!stored.keySet().equals(current.keySet()))
+        {
+            return false;
+        }
+        for (GeoFrontFabricPlan.FeatureContract contract : current.values())
+        {
+            GeoFrontFabricPlan.FeatureContract saved =
+                    stored.get(contract.id());
+            if (saved == null
+                    || !saved.revision().equals(contract.revision())
+                    || saved.priority() != contract.priority()
+                    || saved.authoredWork() != contract.authoredWork()
+                    || saved.geometryVersion()
+                    != contract.geometryVersion())
+            {
+                return false;
+            }
+        }
+        return true;
     }
 
     private void stageReconciliation(
@@ -331,8 +341,7 @@ public final class GeoFrontFabricSavedData extends SavedData
                     + record.state() + ", expected PENDING");
         }
         if (!record.revision().equals(feature.revision())
-                || record.priority() != feature.priority()
-                || !record.contractHash().equals(feature.contractHash()))
+                || record.priority() != feature.priority())
         {
             throw new IllegalStateException(
                     feature.id() + " persisted contract mismatch");
@@ -370,8 +379,7 @@ public final class GeoFrontFabricSavedData extends SavedData
                     + record.state() + ", expected PENDING");
         }
         if (!record.revision().equals(feature.revision())
-                || record.priority() != feature.priority()
-                || !record.contractHash().equals(feature.contractHash()))
+                || record.priority() != feature.priority())
         {
             throw new IllegalStateException(
                     feature.id() + " persisted contract mismatch");

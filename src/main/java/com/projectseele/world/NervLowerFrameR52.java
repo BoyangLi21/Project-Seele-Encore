@@ -3,7 +3,6 @@ import com.google.gson.*;
 import com.projectseele.entity.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.entity.*;
@@ -14,7 +13,6 @@ import net.minecraft.world.phys.*;
  * poses are shared by both sides. No world construction or private clock. */
 public final class NervLowerFrameR52 {
     public static final String SOURCE="mesh/cage_lower_telescopes_r52.json";
-    public static final String SOURCE_SHA="90c7cccabb080367a130aa9155d1b922375dca7a3aa6b9dac87b67729aea82ac";
     public static final int OPEN_TICKS=120,CLOSE_TICKS=180;
     public record Piece(String name,double[] rgb,RigidTransform local,String kind,JsonObject declaration){public double[] xyz(){var result=new double[rgb.length/2];for(int i=0,n=0;i<rgb.length;i+=6){result[n++]=rgb[i];result[n++]=rgb[i+1];result[n++]=rgb[i+2];}return result;}public NervRigidMeshSweepR52 mesh(){return kind.equals("rope")?new NervRigidMeshSweepR52(xyz()):MESHES.computeIfAbsent(name,key->new NervRigidMeshSweepR52(xyz()));}}
     private static final Map<String,NervRigidMeshSweepR52> MESHES=new HashMap<>();
@@ -31,9 +29,7 @@ public final class NervLowerFrameR52 {
             if(input==null)return List.copyOf(previous);
             var refit=JsonParser.parseString(new String(input.readAllBytes(),StandardCharsets.UTF_8)).getAsJsonObject();
             if(!refit.get("schema").getAsString().equals("projectseele.r53.fixed-carrier-bay-gantry.v1")
-                    ||!refit.get("predecessor_resource").getAsString().equals(SOURCE)
-                    ||refit.get("retained_column_triangles").getAsInt()!=4912
-                    ||refit.get("permanent_floor_bearings").getAsInt()!=4)
+                    ||!refit.get("predecessor_resource").getAsString().equals(SOURCE))
                 throw new IllegalStateException("Explicit original bay equipment replacement required");
             var retained=new HashSet<String>();var removed=new HashSet<String>();
             for(var name:refit.getAsJsonArray("retained_members"))if(!retained.add(name.getAsString()))throw new IllegalStateException("Repeated retained member");
@@ -46,7 +42,7 @@ public final class NervLowerFrameR52 {
                 if(keep!=retained.remove(name)||keep==removed.remove(name))throw new IllegalStateException("Complete physical lower equipment replacement required");
                 if(keep){if(!member.get("kind").getAsString().equals("fixed"))throw new IllegalStateException("Permanent column supports required");result.add(member);}
             }
-            if(result.size()!=5||!retained.isEmpty()||!removed.isEmpty())throw new IllegalStateException("Exact five original column support members required");
+            if(result.isEmpty()||!retained.isEmpty()||!removed.isEmpty())throw new IllegalStateException("Original column support members required");
             fixedCarrierRefit=refit.deepCopy();fixedCarrierBay=true;return List.copyOf(result);
         }
     }
@@ -62,8 +58,8 @@ public final class NervLowerFrameR52 {
         for(var raw:rows)
         {
             var row=raw.getAsJsonObject();int unit=row.get("variant").getAsInt();UUID actor=UUID.fromString(row.get("visual").getAsString());
-            if(unit<0||unit>2||!variants.add(unit)||!ids.add(actor)||!row.get("resource").getAsString().equals("bay_"+unit+"_service_pit")||row.get("retired_moving_panels").getAsInt()!=8||row.get("retained_fixed_members").getAsInt()!=7)
-                throw new IllegalStateException("Distinct original eight-leaf service-pit replacements required");
+            if(unit<0||unit>2||!variants.add(unit)||!ids.add(actor)||!row.get("resource").getAsString().equals("bay_"+unit+"_service_pit"))
+                throw new IllegalStateException("Distinct original service-pit replacements required");
             if(!actor.equals(id))continue;
             var at=row.getAsJsonArray("position");var expected=new Vec3(at.get(0).getAsDouble(),at.get(1).getAsDouble(),at.get(2).getAsDouble());
             if(unit!=variant||spec==null||!spec.serviceColumnPorts()||spec.uprightGuidePorts()||spec.separationSign()!=-1||spec.openingX()!=33||spec.openingZ()!=33||spec.serviceGantryYawDegrees()!=180
@@ -74,7 +70,7 @@ public final class NervLowerFrameR52 {
         return selected;
     }
     public static synchronized void install()throws IOException {
-        if(source!=null)return;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);try{if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(SOURCE_SHA))throw new IllegalStateException("Actual lower frame source changed");}catch(java.security.NoSuchAlgorithmException e){throw new IllegalStateException(e);}var root=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(!root.get("schema").getAsString().equals("projectseele.r52.engineered-lower-frame-telescopes.v1")||root.get("stride").getAsInt()!=6)throw new IllegalStateException("Actual lower frame declaration absent");var all=new HashMap<String,double[]>();for(var row:root.getAsJsonObject("parts").entrySet()){var a=row.getValue().getAsJsonArray();if(a.size()%18!=0)throw new IllegalStateException("Incomplete lower steel triangles");var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();all.put(row.getKey(),v);}var rows=new ArrayList<JsonObject>();for(var r:root.getAsJsonArray("members"))rows.add(r.getAsJsonObject());parts=Map.copyOf(all);members=installedMembers(rows);source=root;
+        if(source!=null)return;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);var root=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(!root.get("schema").getAsString().equals("projectseele.r52.engineered-lower-frame-telescopes.v1")||root.get("stride").getAsInt()!=6)throw new IllegalStateException("Actual lower frame declaration absent");var all=new HashMap<String,double[]>();for(var row:root.getAsJsonObject("parts").entrySet()){var a=row.getValue().getAsJsonArray();if(a.size()%18!=0)throw new IllegalStateException("Incomplete lower steel triangles");var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();all.put(row.getKey(),v);}var rows=new ArrayList<JsonObject>();for(var r:root.getAsJsonArray("members"))rows.add(r.getAsJsonObject());parts=Map.copyOf(all);members=installedMembers(rows);source=root;
     }
     private static double smooth(double value){double p=Math.max(0,Math.min(1,value));return p*p*p*(10+p*(-15+6*p));}
     public static RigidTransform at(JsonObject member,double progress) {

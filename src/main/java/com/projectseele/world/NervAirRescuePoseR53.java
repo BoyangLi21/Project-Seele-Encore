@@ -79,7 +79,7 @@ final class NervAirRescuePoseR53
                 ||!(level.getEntity(original.pilot()) instanceof LivingEntity pilot)
                 ||NervMappedPlugMechanicsR52.actualCarrierVisibleR52(eva)&&!EvaMechanicalFrameR52.detachedCarrierR52(eva))return null;
         var initial=EvaMechanicalFrameR52.frozenLocalPose(eva);var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
-        var initialHands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),
+        var initialHands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),
                 provider.handJoints(eva.getUnitVariant()),EvaFrozenHandsR52.capture(eva,1));
         var frame=NervAircraftFrameR52.frame(plane,1);var root=frame.cargo();double clock=NervAircraftFrameR52.rotorClock(plane);
         var own=new HashSet<>(TransportMembershipR52.members(original,TransportMembershipR52.Kind.OCCUPIED));own.add(plane.getUUID());

@@ -61,7 +61,6 @@ public final class EvaBodyPose
         try
         {
             EvaGameplayMotionR32.reload();
-            CombatMotionResourcesR44.resetFingerprints();
             String explicit=System.getProperty("projectseele.bodyPoseReview","");
             Path path=explicit.isEmpty()?CombatMotionResourcesR44.resolve("projectseele.bodyPoseReviewDirectory",
                     "eva_body_r44.json","eva_body_r43.json","eva_body_r42.json","eva_body_r41.json","eva_body_r25.json"):Path.of(explicit);

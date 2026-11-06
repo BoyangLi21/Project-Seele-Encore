@@ -38,7 +38,7 @@ public final class TvYashimaTransitR52
         return state.jobs().stream().anyMatch(j->j.payloadTransferred()&&!j.carrying()&&!j.cancelRequested()
                 &&j.receiver().equals(landing.receiver())&&j.original().eva().equals(eva.getUUID())&&j.original().variant()==eva.getUnitVariant()
                 &&j.original().owner().equals(assignment.commander)&&j.original().pilot().equals(assignment.pilotR45)
-                &&j.original().mission().equals(mission)&&j.manifestFingerprint().equals(state.manifestFingerprint()));
+                &&j.original().mission().equals(mission));
     }
     public static boolean automatic(ServerLevel level,int unit)
     {

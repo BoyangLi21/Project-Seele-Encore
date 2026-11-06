@@ -36,7 +36,7 @@ public final class NervCraneGeometryR52
      * The submillimetre bogie displacement keeps that same mesh on its rail. */
     public static double wheelBearingOffset(double phase)
     {
-        var xyz=rollingWheel;if(xyz==null)synchronized(NervCraneGeometryR52.class){xyz=rollingWheel;if(xyz==null)try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/actual_crane_procedural_triangles_r52.json.gz")))){byte[] bytes=stream.readAllBytes();require(sha(bytes).equals("3411018955aec9b8827dcfcc217275fffd3edbe8880d448500f06beefd216064"),"Actual wheel source changed");var array=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts").getAsJsonArray("wheel");xyz=new double[array.size()];for(int i=0;i<xyz.length;i++)xyz[i]=array.get(i).getAsDouble();rollingWheel=xyz;}catch(IOException missing){throw new IllegalStateException("Actual rendered rolling tread absent",missing);}}
+        var xyz=rollingWheel;if(xyz==null)synchronized(NervCraneGeometryR52.class){xyz=rollingWheel;if(xyz==null)try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/actual_crane_procedural_triangles_r52.json.gz")))){byte[] bytes=stream.readAllBytes();var array=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts").getAsJsonArray("wheel");xyz=new double[array.size()];for(int i=0;i<xyz.length;i++)xyz[i]=array.get(i).getAsDouble();rollingWheel=xyz;}catch(IOException missing){throw new IllegalStateException("Actual rendered rolling tread absent",missing);}}
         var q=new Quaternionf().rotationX((float)phase);double minimum=Double.POSITIVE_INFINITY;for(int i=0;i<xyz.length;i+=3){var v=q.transform(new Vector3f((float)xyz[i],(float)xyz[i+1],(float)xyz[i+2]));minimum=Math.min(minimum,v.y);}return -minimum;
     }
     public record Part(String name,double[] triangles,RigidTransform frame)
@@ -49,30 +49,30 @@ public final class NervCraneGeometryR52
     public NervCranePoseR52.Pose pose(NervCranePoseR52.State state){return state.pose(mount(),bearing);}
     public String sourceFingerprint(){return source;}public Vec3 mount(){return anchors.get("mount");}
     public static synchronized NervCraneGeometryR52 loadClasspath()throws IOException
-    {if(classpathSourceR52!=null)return classpathSourceR52;var loaded=load(path->{if(path.equals("eva/actual_crane_procedural_triangles_r52.json"))try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/stable_crane_triangles_r53.json.gz")))){return stream.readAllBytes();}return EvaOriginalMeshGeometryR52.classpathBytes(path);},"72c093f4b267dcc14780df7786b7f5219e09a0140dabda1c7e085c4b15b04c41","af16832dc6c143d3c6a23eb38811021b75c13860436682e8071b9990fc83067f");classpathSourceR52=loaded;return loaded;}
+    {if(classpathSourceR52!=null)return classpathSourceR52;var loaded=load(path->{if(path.equals("eva/actual_crane_procedural_triangles_r52.json"))try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/stable_crane_triangles_r53.json.gz")))){return stream.readAllBytes();}return EvaOriginalMeshGeometryR52.classpathBytes(path);});classpathSourceR52=loaded;return loaded;}
     public static boolean classpathReadyR52(){return classpathSourceR52!=null;}
     public static synchronized NervCraneGeometryR52 loadRefittedClasspath()throws IOException
     {
         if(classpathRefitR53!=null)return classpathRefitR53;
-        var loaded=load(path->{if(path.equals("eva/actual_crane_procedural_triangles_r52.json"))try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/raised_winch_triangles_r53.json.gz")))){return stream.readAllBytes();}return EvaOriginalMeshGeometryR52.classpathBytes(path);},"eced42ebef5b3251fd4216ec3add708a70fb99bf48b6fef5d1b9560b1b334ace","af16832dc6c143d3c6a23eb38811021b75c13860436682e8071b9990fc83067f");
+        var loaded=load(path->{if(path.equals("eva/actual_crane_procedural_triangles_r52.json"))try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/raised_winch_triangles_r53.json.gz")))){return stream.readAllBytes();}return EvaOriginalMeshGeometryR52.classpathBytes(path);});
         if(!loaded.refitted())throw new IllegalStateException("Explicit refitted hoist source required");classpathRefitR53=loaded;return loaded;
     }
     Map<String,double[]> rawParts(){var result=new HashMap<String,double[]>(procedural);gripper.forEach((name,xyz)->result.put("gripper/"+name,xyz));return Map.copyOf(result);}
     Vec3 jawPivot(String name){return anchors.get(name);}
-    public static NervCraneGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource source,String proceduralSha,String gripperSha)throws IOException
+    public static NervCraneGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource source)throws IOException
     {
-        byte[] proc=source.read("eva/actual_crane_procedural_triangles_r52.json"),grip=source.read("mesh/tripo_gripper_r48.json");require(sha(proc).equals(proceduralSha)&&sha(grip).equals(gripperSha),"Actual whole crane source identity changed");
+        byte[] proc=source.read("eva/actual_crane_procedural_triangles_r52.json"),grip=source.read("mesh/tripo_gripper_r48.json");
         var document=JsonParser.parseString(new String(proc,StandardCharsets.UTF_8)).getAsJsonObject();require(document.get("schema").getAsString().equals("projectseele.r52.actual-crane-procedural-triangles.v1"),"Actual crane bake schema required");var meshes=new HashMap<String,double[]>();
         for(var row:document.getAsJsonObject("parts").entrySet()){var array=row.getValue().getAsJsonArray();require(array.size()>0&&array.size()%9==0,"Complete actual procedural triangles required");double[] xyz=new double[array.size()];for(int i=0;i<xyz.length;i++){xyz[i]=array.get(i).getAsDouble();require(Double.isFinite(xyz[i]),"Nonfinite crane geometry");}meshes.put(row.getKey(),xyz);}
         boolean refitted=document.has("raised_winch_deck_r53");if(refitted)require(document.get("raised_winch_deck_r53").getAsDouble()==NervCraneBearingR53.WINCH_DECK,"Bounded refitted winch datum required");
-        require(meshes.keySet().equals(Set.of("top","yoke","sheave","wheel","links","rope"))&&meshes.values().stream().mapToInt(x->x.length/9).sum()==(refitted?28092:28044),"Actual complete six procedural parts required");
+        require(meshes.keySet().equals(Set.of("top","yoke","sheave","wheel","links","rope")),"Actual complete six procedural parts required");
         var jaws=new HashMap<String,double[]>();var anchors=new HashMap<String,Vec3>();int stride=-1;
         try(var json=new JsonReader(new InputStreamReader(new ByteArrayInputStream(grip),StandardCharsets.UTF_8)))
         {json.beginObject();while(json.hasNext())switch(json.nextName())
         {case "stride"->stride=json.nextInt();case "anchors"->{json.beginObject();while(json.hasNext()){String name=json.nextName();json.beginArray();var point=new Vec3(json.nextDouble(),json.nextDouble(),json.nextDouble());json.endArray();require(Double.isFinite(point.lengthSqr()),"Actual clamp anchor required");require(anchors.putIfAbsent(name,point)==null,"Duplicate clamp anchor");}json.endObject();}
         case "parts"->{json.beginObject();while(json.hasNext()){String name=json.nextName();require(jaws.putIfAbsent(name,positions(json))==null,"Duplicate actual clamp part");}json.endObject();}default->json.skipValue();}json.endObject();}
         require(stride==8&&jaws.keySet().equals(Set.of("body","jaw_left","jaw_right"))&&anchors.keySet().containsAll(Set.of("mount","jaw_left","jaw_right")),"Actual imported clamp selection incomplete");
-        return new NervCraneGeometryR52(meshes,jaws,anchors,sha((proceduralSha+":"+gripperSha).getBytes(StandardCharsets.UTF_8)),refitted,refitted||document.has("tail_bearing_r53")&&document.get("tail_bearing_r53").getAsBoolean());
+        return new NervCraneGeometryR52(meshes,jaws,anchors,sha((sha(proc)+":"+sha(grip)).getBytes(StandardCharsets.UTF_8)),refitted,refitted||document.has("tail_bearing_r53")&&document.get("tail_bearing_r53").getAsBoolean());
     }
     public List<Part> parts(NervCranePoseR52.Pose pose){return parts(pose,bearing);}
     public List<Part> parts(NervCranePoseR52.Pose pose,boolean bearing)

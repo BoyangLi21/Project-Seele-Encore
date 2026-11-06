@@ -45,8 +45,8 @@ public final class CarrierMountProfileR53
 
     private static void validateTag(CompoundTag tag)
     {
-        if (!SCHEMA.equals(tag.getString("Schema")) || !tag.getString("Source").matches("[0-9a-f]{64}")
-                || tag.getLong("Epoch") <= 0 || !tag.contains("At", 4)) throw new IllegalStateException("Source-bound carrier mounting required");
+        if (!SCHEMA.equals(tag.getString("Schema")) || tag.getLong("Epoch") <= 0 || !tag.contains("At", 4))
+            throw new IllegalStateException("Explicit carrier mounting required");
         decode(tag.getCompound("Previous"));decode(tag.getCompound("Current"));
     }
 
@@ -62,7 +62,7 @@ public final class CarrierMountProfileR53
         PreparedUpdate(NervCarrierPlatformEntity machine, String source, long epoch, State from, State to,
                        BooleanSupplier geometryCurrent, boolean parkedInstallation)
         {
-            if (machine.level().isClientSide || !source.matches("[0-9a-f]{64}") || epoch <= 0
+            if (machine.level().isClientSide || source == null || epoch <= 0
                     || !read(machine, 1).equals(from) || geometryCurrent == null || !geometryCurrent.getAsBoolean())
                 throw new IllegalArgumentException("Current owner geometry proof required");
             var binding = machine.carrierMountProfileR53();
@@ -75,8 +75,8 @@ public final class CarrierMountProfileR53
                         && !(parkedInstallation && CarrierBayTrayR53.parkedInstallationCurrent(machine))))
                 throw new IllegalArgumentException("Shallow bay commissioning requires the unchanged raised source pose");
             actor = machine.getUUID();at = machine.level().getGameTime();before = machine.carrierMountProfileR53();
-            if (!before.isEmpty() && (!before.getString("Source").equals(source) || before.getLong("Epoch") != epoch))
-                throw new IllegalArgumentException("Existing mounting source cannot be silently replaced");
+            if (!before.isEmpty() && before.getLong("Epoch") != epoch)
+                throw new IllegalArgumentException("Existing mounting epoch cannot be silently replaced");
             after = new CompoundTag();after.putString("Schema", SCHEMA);after.putString("Source", source);after.putLong("Epoch", epoch);
             after.putLong("At", at);after.put("Previous", encode(before.isEmpty() || from.shallowBay() != to.shallowBay() || from.supportOnly() != to.supportOnly() ? to : from));after.put("Current", encode(to));
             this.geometryCurrent = geometryCurrent;

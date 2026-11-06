@@ -55,8 +55,6 @@ public final class RegionalBuildingQualityR44
                     String format="r45_current_named_buildings_v1";
                     if(!input.get("catalogue_contract").getAsString().equals(format)||!catalogue.get("format").getAsString().equals(format))
                         throw new IllegalStateException("Different current named-building catalogue contract");
-                    String digest=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(cataloguePath)));
-                    if(!digest.equals(input.get("catalogue_sha256").getAsString()))throw new IllegalStateException("Current241 catalogue changed after scheduling");
                     int originals=0,installed=0;Set<String> ids=new HashSet<>();
                     for(JsonElement item:buildings)
                     {

@@ -272,7 +272,7 @@ public final class TvYashimaDirectorR50
     {
         var site=TvEncounterSitesR45.site(level,"ramiel").orElse(null);
         return data.active.equals("ramiel")&&data.angel!=null&&site!=null&&site.geometryValidated()&&site.modelReady()
-                &&site.id().equals(data.encounterSiteR45)&&site.fingerprint().equals(data.encounterLayoutR45)
+                &&site.id().equals(data.encounterSiteR45)
                 &&level.getEntity(data.angel) instanceof RamielEntity boss&&TvEncounterDirectorR45.owned(boss,data);
     }
     public static void fail(ServerLevel level,TvCampaignSavedData data,String reason)
@@ -308,7 +308,7 @@ public final class TvYashimaDirectorR50
                 &&++data.missingTicksR45>=40)fail(level,data,"原拉米尔信号中断，请确认原目标状态。");return;}
         data.missingTicksR45=0;
         retainBody(level,boss,false);
-        boolean valid=site.geometryValidated()&&site.modelReady()&&site.id().equals(data.encounterSiteR45)&&site.fingerprint().equals(data.encounterLayoutR45);
+        boolean valid=site.geometryValidated()&&site.modelReady()&&site.id().equals(data.encounterSiteR45);
         if(owner==null||owner.level()!=level||!valid)
         {
             boss.setNoAi(true);boss.setTarget(null);boss.missionDrillR50(false,0);TvEncounterRulesR45.pauseFire(level,data);

@@ -13,7 +13,6 @@ import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.block.state.properties.DoorHingeSide;
 import java.util.*;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 
 /** Finite declared three-bed recipe; construction and operation have distinct preflights. */
 public final class TvPersonnelPlatformRecipeR44

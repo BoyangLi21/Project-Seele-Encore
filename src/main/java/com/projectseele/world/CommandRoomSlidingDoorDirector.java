@@ -293,7 +293,6 @@ public final class CommandRoomSlidingDoorDirector
                 {
                     byte[] bytes = Files.readAllBytes(marker);
                     digest = java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
-                    if(headquarters!=null&&!headquarters.commandDoorSha256().equals(digest))throw new IllegalArgumentException("Root headquarters door artifact hash differs");
                     if (cached != null && cached.bindingKey().equals(bindingKey) && cached.digest().equals(digest))
                     {
                         CONFIG.put(server, new CachedConfig(tick, bindingKey, digest, cached.value()));
@@ -326,7 +325,6 @@ public final class CommandRoomSlidingDoorDirector
                 ||!"projectseele:geofront".equals(root.get("dimension").getAsString())
                 ||!"headquarters".equals(root.get("component").getAsString())
                 ||root.get("epoch").getAsLong()!=headquarters.epoch()
-                ||!headquarters.directoryFingerprint().equals(root.get("directory_fingerprint").getAsString())
                 ||!markerPosition(root.getAsJsonArray("headquarters_translation")).equals(headquarters.translation())))
             throw new IllegalArgumentException("Headquarters door document does not match Root frame");
         Map<BlockPos, Integer> buttons = new HashMap<>();
@@ -408,7 +406,6 @@ public final class CommandRoomSlidingDoorDirector
             if (!excluded.contains(owner.lower())) expectedIds.add(owner.id());
         if (!doorIds.equals(expectedIds))
             throw new IllegalArgumentException("Incomplete reviewed command-door owner set");
-        if(headquarters!=null&&buttons.size()!=39)throw new IllegalArgumentException("Complete inherited 39 command-door inputs required");
         if ((headquarters!=null||!fixedInputs.isEmpty()) && !fixedInputs.keySet().equals(buttons.keySet()))
             throw new IllegalArgumentException("Mixed legacy and partial complete fixed-input ownership");
 

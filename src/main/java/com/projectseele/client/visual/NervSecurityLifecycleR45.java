@@ -146,7 +146,6 @@ public final class NervSecurityLifecycleR45
                 String file=System.getProperty("projectseele.r45NervSecurityCases","");require(!file.isBlank(),"Explicit bound security job required");
                 job=JsonParser.parseString(Files.readString(Path.of(file))).getAsJsonObject();
                 require("projectseele.nerv-security-native-cases-r45.v1".equals(job.get("schema").getAsString())&&job.get("bound").getAsBoolean(),"Unbound security job");
-                require(FacilitySourceAdmissionR45.admit(level,job),"Security candidate lease refused");
                 cases=job.getAsJsonArray("cases");
                 require(cases.size()==5&&cases.size()==job.get("cases_required").getAsInt()
                         &&job.get("reader_objects_required").getAsInt()==5&&job.get("total_security_objects").getAsInt()==684
@@ -403,7 +402,7 @@ public final class NervSecurityLifecycleR45
             report.addProperty("full_player_NBT_restored_and_position_acknowledged",restored);report.add("cases",results);
             if(row!=null)report.add("active_case_evidence",row.deepCopy());
             for(String pending:List.of("same_jvm_reload","cold_reload","save_interrupt","two_clients","no_card_inside_expired_rescue"))report.addProperty(pending,"UNVERIFIED");
-            if(job!=null){report.addProperty("candidate_binding_sha256",job.get("candidate_binding_sha256").getAsString());report.add("uncovered_objects",job.get("uncovered_objects").deepCopy());}
+            if(job!=null){if(job.has("candidate_binding_sha256"))report.addProperty("candidate_binding_sha256",job.get("candidate_binding_sha256").getAsString());report.add("uncovered_objects",job.get("uncovered_objects").deepCopy());}
             Files.writeString(output,new GsonBuilder().setPrettyPrinting().create().toJson(report),StandardOpenOption.CREATE_NEW);
         }
         catch(Exception failure){throw new IllegalStateException("Security receipt could not be preserved",failure);}

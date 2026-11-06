@@ -24,8 +24,7 @@ public final class CarrierBayMotionR53
     public static CarrierRearGuideMotionR53.Result translation(ServerLevel level, NervCarrierPlatformEntity carrier,
             DirectoryTrajectoryR52 path, Set<UUID> own) throws IOException
     {
-        if (!path.pureTranslation() || CarrierTransferRailsR53.selected() == null
-                || !CarrierTransferRailsR53.selected().directory().equals(path.directory().fingerprint()))
+        if (!path.pureTranslation() || CarrierTransferRailsR53.selected() == null)
             return no("shallow_tray_actual_route_equipment_source_missing");
         var mounting = CarrierMountProfileR53.read(carrier, 1);var boxes = new ArrayList<AABB>();
         if (!NervTraversalPolicyR53.strict(level))

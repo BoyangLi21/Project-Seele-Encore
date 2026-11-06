@@ -385,13 +385,12 @@ public final class NervRouteDirectoryR52
 
     public static NervRouteDirectoryR52 parse(JsonObject root)
     {
-        require(!root.has("air_transport")&&!root.has("directory_fingerprint")&&!root.has("fingerprint"),
-                "Directory identity cannot contain its own fingerprint or dependent air manifest");
+        require(!root.has("air_transport"),"Directory cannot embed its dependent air manifest");
         String schema=text(root,"schema");int schemaVersion=EXPLICIT_BANK_SCHEMA.equals(schema)?2:SCHEMA.equals(schema)?1:0;
         require(schemaVersion!=0&&"root".equals(text(root,"map_author")),"Root runtime-directory schema required; spatial draft is not a runtime installation");
         var bankRoles=parseBankRolesR52(root,schemaVersion);
         String status=text(root,"status");require(status.equals("design")||status.equals("installed"),"Explicit design/installed status required");
-        boolean installed=status.equals("installed");if(installed)require(text(root,"installation_receipt_sha256").matches("[0-9a-f]{64}"),"Explicit Root installation receipt required");
+        boolean installed=status.equals("installed");
         long epoch=whole(root,"epoch");var units=new LinkedHashMap<Integer,Unit>();var nodes=new LinkedHashMap<String,Node>();var resources=new LinkedHashMap<String,Resource>();var legs=new LinkedHashMap<String,Leg>();var routes=new LinkedHashMap<String,Route>();var ports=new LinkedHashMap<String,Port>();
         for(var value:root.getAsJsonArray("units")){var o=value.getAsJsonObject();var u=new Unit(integer(o,"variant"),integer(o,"lane"),UUID.fromString(text(o,"eva")),UUID.fromString(text(o,"plug")));unique(units,u.variant(),u);}
         for(var value:root.getAsJsonArray("nodes"))

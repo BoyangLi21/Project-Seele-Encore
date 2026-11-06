@@ -40,9 +40,8 @@ public final class FullAssemblyGeometryR52
     }
     public static void installClasspath(Map<String,String> expected)throws IOException
     {installed=selectedClasspathProviderR52(expected);}
-    /** One immutable packaged selection. Publish only after every actual
-     * resource checksum, skeleton and component assertion succeeds. Failed
-     * or differently requested selections cannot replace/reuse this proof. */
+    /** One immutable packaged selection, cached per requested resource set.
+     * Only the keys select optional resources; the loaded bytes are used as found. */
     public static synchronized Provider selectedClasspathProviderR52(Map<String,String> expected)throws IOException
     {
         var selection=Map.copyOf(expected);var known=checkedClasspath;
@@ -54,22 +53,21 @@ public final class FullAssemblyGeometryR52
     {return loadStreams(path->new ByteArrayInputStream(bytes.read(path)),Map.copyOf(expected));}
     private static Provider loadStreams(StreamSource bytes,Map<String,String> expected)throws IOException
     {
-        var receipt=new TreeMap<String,String>();var carrier=read(bytes,"mesh/tripo_carrier_r48.json",expected,receipt);var plugs=new HashMap<Integer,Map<String,double[]>>();
-        String geoPath="geo/entry_plug_carrier.geo.json";byte[] geoBytes;try(var input=bytes.open(geoPath)){geoBytes=input.readAllBytes();}require(expected.containsKey(geoPath)&&expected.get(geoPath).equals(sha(geoBytes)),"Actual capsule GEO selection changed");receipt.put(geoPath,expected.get(geoPath));
+        var receipt=new TreeMap<String,String>();var carrier=read(bytes,"mesh/tripo_carrier_r48.json",receipt);var plugs=new HashMap<Integer,Map<String,double[]>>();
+        String geoPath="geo/entry_plug_carrier.geo.json";byte[] geoBytes;try(var input=bytes.open(geoPath)){geoBytes=input.readAllBytes();}receipt.put(geoPath,sha(geoBytes));
         var geo=JsonParser.parseString(new String(geoBytes,StandardCharsets.UTF_8)).getAsJsonObject();var bones=geo.getAsJsonArray("minecraft:geometry").get(0).getAsJsonObject().getAsJsonArray("bones");var named=new HashSet<String>();var plugPivots=new HashMap<String,Vec3>();
         for(var value:bones){var b=value.getAsJsonObject();String name=b.get("name").getAsString();require(named.add(name),"Duplicate capsule bone");if(b.has("rotation"))for(var component:b.getAsJsonArray("rotation"))require(component.getAsDouble()==0,"Actual closed capsule has unsupported bind transform");if(!name.equals("entry_plug"))require(b.get("parent").getAsString().equals("entry_plug"),"Actual closed capsule parent changed");var pivot=b.getAsJsonArray("pivot");require(pivot!=null&&pivot.size()==3,"Actual capsule hinge pivot required");var p=new Vec3(-pivot.get(0).getAsDouble(),pivot.get(1).getAsDouble(),pivot.get(2).getAsDouble()).scale(EntryPlugKinematics.MODEL_TO_BLOCK);finite(p);plugPivots.put(name,p);}
         require(named.equals(Set.of("entry_plug","plug_hatch_l","plug_hatch_r","plug_crane_collar")),"Actual capsule skeleton incomplete");
-        for(int v=0;v<3;v++)plugs.put(v,read(bytes,"mesh/entry_plug_unit0"+v+".mesh.json",expected,receipt).parts);
+        for(int v=0;v<3;v++)plugs.put(v,read(bytes,"mesh/entry_plug_unit0"+v+".mesh.json",receipt).parts);
         require(carrier.parts.keySet().equals(Set.of("body","deck","contact_pads","service_platform"))&&carrier.anchors.containsKey("service_platform"),"Actual four-part Tripo carrier and hinge required");
         for(var entry:plugs.values())require(entry.keySet().equals(Set.of("entry_plug","plug_hatch_l","plug_hatch_r","plug_crane_collar")),"Actual complete original capsule required");
-        var bearings=read(bytes,"mesh/carrier_sole_bearings_r52.json",expected,receipt).parts;require(bearings.keySet().equals(Set.of("sole_bearing_0_l","sole_bearing_0_r","sole_bearing_1_l","sole_bearing_1_r","sole_bearing_2_l","sole_bearing_2_r")),"Explicit six engineered sole-bearing parts required");
-        var trim=read(bytes,"mesh/carrier_body_trimmed_r52.json",expected,receipt).parts;require(trim.keySet().equals(Set.of("body_trimmed_r52","upper_frame_cap_r52","interior_cut_caps_r52")),"Actual authorised cropped upper body and engineering steel cap required");
-        var stow=read(bytes,"mesh/carrier_service_stow_r52.json",expected,receipt).parts;require(stow.containsKey("service_platform_stowed_r52")&&stow.keySet().stream().filter(n->n.startsWith("contact_pad_stowed_")).count()==6,"All original physical folded pads/platform required");var runningDeck=expected.containsKey(NervLegacyCarrierRideR52.DECK_SOURCE)?read(bytes,NervLegacyCarrierRideR52.DECK_SOURCE,expected,receipt).parts:Map.<String,double[]>of();if(!runningDeck.isEmpty())require(runningDeck.keySet().equals(Set.of("deck")),"Actual four-housing textured deck source required");if(expected.containsKey(NervLegacyCarrierRideR52.SOURCE)){String hash=digestResourceR52(bytes,NervLegacyCarrierRideR52.SOURCE);require(hash.equals(expected.get(NervLegacyCarrierRideR52.SOURCE)),"Selected four-slide/fixed-head source changed");receipt.put(NervLegacyCarrierRideR52.SOURCE,hash);}return new Provider(carrier.parts,carrier.anchors,Map.copyOf(plugs),bearings,trim,stow,runningDeck,plugPivots,sha(receipt.toString().getBytes(StandardCharsets.UTF_8)));
+        var bearings=read(bytes,"mesh/carrier_sole_bearings_r52.json",receipt).parts;require(bearings.keySet().equals(Set.of("sole_bearing_0_l","sole_bearing_0_r","sole_bearing_1_l","sole_bearing_1_r","sole_bearing_2_l","sole_bearing_2_r")),"Explicit six engineered sole-bearing parts required");
+        var trim=read(bytes,"mesh/carrier_body_trimmed_r52.json",receipt).parts;require(trim.keySet().equals(Set.of("body_trimmed_r52","upper_frame_cap_r52","interior_cut_caps_r52")),"Actual authorised cropped upper body and engineering steel cap required");
+        var stow=read(bytes,"mesh/carrier_service_stow_r52.json",receipt).parts;require(stow.containsKey("service_platform_stowed_r52")&&stow.keySet().stream().filter(n->n.startsWith("contact_pad_stowed_")).count()==6,"All original physical folded pads/platform required");var runningDeck=expected.containsKey(NervLegacyCarrierRideR52.DECK_SOURCE)?read(bytes,NervLegacyCarrierRideR52.DECK_SOURCE,receipt).parts:Map.<String,double[]>of();if(!runningDeck.isEmpty())require(runningDeck.keySet().equals(Set.of("deck")),"Actual four-housing textured deck source required");if(expected.containsKey(NervLegacyCarrierRideR52.SOURCE))receipt.put(NervLegacyCarrierRideR52.SOURCE,digestResourceR52(bytes,NervLegacyCarrierRideR52.SOURCE));return new Provider(carrier.parts,carrier.anchors,Map.copyOf(plugs),bearings,trim,stow,runningDeck,plugPivots,sha(receipt.toString().getBytes(StandardCharsets.UTF_8)));
     }
     private record Imported(Map<String,double[]> parts,Map<String,Vec3> anchors){}
-    private static Imported read(StreamSource source,String path,Map<String,String> expected,Map<String,String> receipt)throws IOException
+    private static Imported read(StreamSource source,String path,Map<String,String> receipt)throws IOException
     {
-        String hash=expected.get(path);require(hash!=null&&hash.matches("[0-9a-f]{64}"),"Actual assembly resource SHA required: "+path);
         var parts=new LinkedHashMap<String,double[]>();var anchors=new HashMap<String,Vec3>();boolean carrier=path.contains("tripo_carrier")||path.equals("mesh/carrier_sole_bearings_r52.json")||path.equals("mesh/carrier_body_trimmed_r52.json")||path.equals("mesh/carrier_service_stow_r52.json")||path.equals(NervLegacyCarrierRideR52.DECK_SOURCE);int stride=-1;
         var digest=newDigestR52();
         try(var input=new java.security.DigestInputStream(source.open(path),digest);var json=new JsonReader(new InputStreamReader(input,StandardCharsets.UTF_8)))
@@ -94,11 +92,10 @@ public final class FullAssemblyGeometryR52
             }
             json.endObject();require(stride==8&&!parts.isEmpty(),"Actual triangle stride8 required");
             // Reader buffering already contributes to this digest. Drain any
-            // remaining bytes so trailing bytes are checked as in ByteSource.
+            // remaining bytes so the source identity covers the whole resource.
             input.transferTo(OutputStream.nullOutputStream());
-            require(hash.equals(HexFormat.of().formatHex(digest.digest())),"Actual assembly resource changed: "+path);
         }
-        receipt.put(path,hash);
+        receipt.put(path,HexFormat.of().formatHex(digest.digest()));
         return new Imported(Map.copyOf(parts),Map.copyOf(anchors));
     }
     private static MessageDigest newDigestR52(){try{return MessageDigest.getInstance("SHA-256");}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
@@ -285,8 +282,7 @@ public final class FullAssemblyGeometryR52
         public boolean clear(ServerLevel level,Entity eva)
         {
             railCoverage=null;
-            if(!(eva instanceof EvaUnit01Entity unit)||unit.carrierRiseProgress(1)!=1||unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR
-                    ||!assembly.source.startsWith(EvaAirTransportR31.cradleStateR50(unit).getString("GeometrySourceR52")+":"))return false;
+            if(!(eva instanceof EvaUnit01Entity unit)||unit.carrierRiseProgress(1)!=1||unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_CLEAR)return false;
             if(!EvaMechanicalFrameR52.active(unit)||!same(EvaMechanicalFrameR52.frame(unit,1),trajectory.sample(0).evaRoot()))return false;
             if(assembly.kind==Kind.HULL_ONLY_RECOVERY)
             {if(!unit.getPassengers().isEmpty()||unit.isEntryPlugInserted()||!EntryPlugEjectionR48.originalFieldEjection(level,assembly.original.variant(),unit,assembly.original.pilot()))return false;}
@@ -355,9 +351,6 @@ public final class FullAssemblyGeometryR52
                     ||!same(NervOriginalCarrierR52.actualRoot(carrier,1),trajectory.sample(0).evaRoot()))
                 return collisionHeldR53("carrier_rail_actual_frame");
             var rails=CarrierRearGuideR53.fixed();var transfer=CarrierTransferRailsR53.selected();
-            if(!rails.directory().equals(trajectory.directory().fingerprint())
-                    ||transfer!=null&&!transfer.directory().equals(trajectory.directory().fingerprint()))
-                return collisionHeldR53("carrier_rail_directory");
             var bridges=new ArrayList<BridgeFrame>();var candidates=new LinkedHashMap<String,CarrierRearGuideR53.Fixed>();
             for(var box:envelopes)for(var rail:rails.index().query(box))candidates.putIfAbsent(rail.name(),rail);
             if(transfer!=null)for(var gate:transfer.bridges().keySet())

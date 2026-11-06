@@ -37,7 +37,7 @@ public final class EvaOriginalMeshGeometryR52
     private record Corrective(Map<String,Quaternionf> targets,float activation,float positionLimit,float[] sparse){}
     private record Skin(String other,float[] weights,float[] rest,Map<String,float[]> influences,Map<String,Matrix4f> inverseBind,Corrective corrective){}
     private record Mesh(String resource,String hash,Map<String,RawPart> parts,Map<String,Skin> skins){}
-    private record Rig(Mesh body,Mesh hands,Map<String,Bone> geo,Set<String> handJoints,String contractHash){}
+    private record Rig(Mesh body,Mesh hands,Map<String,Bone> geo,Set<String> handJoints){}
 
     /** Only the four original arm surfaces, using the same seam/DQS evaluator
      * as the complete collision mesh. Coincident vertices with identical skin
@@ -102,40 +102,14 @@ public final class EvaOriginalMeshGeometryR52
         return new ProneArmSurfacesR53(new Mesh(resource,original.hash(),Map.copyOf(parts),Map.copyOf(skins)));
     }
     private static final Set<String> HIDDEN_FACTORY=Set.of("dorsal_liner","r37_red_upper","r37_red_lower","r37_lining");
-    public static final String CLASSPATH_SELECTION="/assets/projectseele/eva/eva_original_mesh_geometry_r52_sources.json";
     private static volatile Provider installed;
     @FunctionalInterface public interface ByteSource{byte[] read(String relativeResource)throws IOException;}
 
-    /** Root supplies the same resolved assets and exact per-resource hashes as
-     * the graphical client. Never guesses a private override or resource pack. */
-    public static void install(Path assets,Map<String,String> expectedSHA256)throws IOException
-    {installed=load(assets,expectedSHA256);}
-    public static void install(ByteSource actualRenderedAssets,Map<String,String> expectedSHA256)throws IOException
-    {installed=load(actualRenderedAssets,expectedSHA256);}
-    public static void installClasspath(Map<String,String> expectedSHA256)throws IOException
-    {install(EvaOriginalMeshGeometryR52::classpathBytes,expectedSHA256);}
-    /** Only the small checked-in source receipt is read; private meshes stay
-     * in their existing JAR resources, with no extraction or asset copies. */
+    /** Reads the renderer's own meshes, GEO skeletons and hand contracts for
+     * the three original rigs. Private meshes stay in their existing JAR
+     * resources, with no extraction or asset copies. */
     public static void installClasspath()throws IOException
-    {
-        var manifest=json(classpathBytes("eva/eva_original_mesh_geometry_r52_sources.json"));require("projectseele.r52.actual-rendered-mesh-selection.v1".equals(manifest.get("schema").getAsString()),"Actual classpath source receipt required");
-        var hashes=new HashMap<String,String>();for(var entry:manifest.getAsJsonObject("resources").entrySet())hashes.put(entry.getKey(),entry.getValue().getAsString());installClasspath(hashes);
-        var predecessors=new HashSet<String>();
-        if(manifest.has("held_hand_surface_predecessors"))for(var value:manifest.getAsJsonArray("held_hand_surface_predecessors"))
-        {
-            var previous=new TreeMap<String,String>();
-            for(var entry:value.getAsJsonObject().entrySet())previous.put(entry.getKey(),entry.getValue().getAsString());
-            require(previous.keySet().equals(hashes.keySet()),"Hand update must retain the complete original source membership");
-            for(var entry:previous.entrySet())
-            {
-                require(entry.getValue().matches("[0-9a-f]{64}"),"Hand predecessor binding is invalid");
-                if(!entry.getKey().matches("mesh/eva_unit0[012]_anatomical_hands_r45\\.mesh\\.json"))
-                    require(entry.getValue().equals(hashes.get(entry.getKey())),"Held hand update cannot replace body, rig or hand contract");
-            }
-            predecessors.add(sha(previous.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
-        }
-        installed.heldHandPredecessors=Set.copyOf(predecessors);
-    }
+    {installed=load(EvaOriginalMeshGeometryR52::classpathBytes);}
     public static byte[] classpathBytes(String relativeResource)throws IOException
     {
         try(var input=openClasspathResourceR52(relativeResource)){return input.readAllBytes();}
@@ -187,17 +161,17 @@ public final class EvaOriginalMeshGeometryR52
     public static Provider readOnlySelectedProviderR52()
     {var result=installed;if(result==null)throw new IllegalStateException("Actual selected mesh source not installed");return result;}
 
-    public static Provider load(Path assets,Map<String,String> expectedSHA256)throws IOException
+    public static Provider load(Path assets)throws IOException
     {
-        var root=assets.toAbsolutePath().normalize();return load(relative->{var path=root.resolve(relative).normalize();require(path.startsWith(root)&&Files.isRegularFile(path),"Actual selected resource absent: "+relative);return Files.readAllBytes(path);},expectedSHA256);
+        var root=assets.toAbsolutePath().normalize();return load(relative->{var path=root.resolve(relative).normalize();require(path.startsWith(root)&&Files.isRegularFile(path),"Actual selected resource absent: "+relative);return Files.readAllBytes(path);});
     }
-    public static Provider load(ByteSource actualRenderedAssets,Map<String,String> expectedSHA256)throws IOException
+    public static Provider load(ByteSource actualRenderedAssets)throws IOException
     {
         var rigs=new HashMap<Integer,Rig>();var selection=new TreeMap<String,String>();
         for(int variant=0;variant<3;variant++)
         {
             String stem="eva_unit0"+variant;String body="mesh/"+stem+".mesh.json",hands="mesh/"+stem+"_anatomical_hands_r45.mesh.json",geo="geo/"+stem+".geo.json",contract="hand_rigs/unit0"+variant+"/hand_rig_contract.json";
-            byte[] bodyBytes=read(actualRenderedAssets,body,expectedSHA256,selection),handBytes=read(actualRenderedAssets,hands,expectedSHA256,selection),geoBytes=read(actualRenderedAssets,geo,expectedSHA256,selection),contractBytes=read(actualRenderedAssets,contract,expectedSHA256,selection);
+            byte[] bodyBytes=read(actualRenderedAssets,body,selection),handBytes=read(actualRenderedAssets,hands,selection),geoBytes=read(actualRenderedAssets,geo,selection),contractBytes=read(actualRenderedAssets,contract,selection);
             var skeleton=skeleton(json(geoBytes));var c=json(contractBytes);
             require(c.get("rig").getAsInt()==variant&&c.get("schema").getAsString().equals("projectseele.anatomical-hands.r45.v2"),"Actual 34-joint contract required");
             require(!c.has("knife_mechanism_r45"),"Renderer selects a different body mesh; this selection is incomplete");
@@ -214,14 +188,15 @@ public final class EvaOriginalMeshGeometryR52
                 if(skin.influences().containsKey("forearm_"+side))expected.add("forearm_"+side);
                 require(skin.influences().keySet().equals(expected),"Hand source joint palette identity differs");
             }
-            rigs.put(variant,new Rig(b,h,skeleton,Set.copyOf(joints),selection.get(contract)));
+            rigs.put(variant,new Rig(b,h,skeleton,Set.copyOf(joints)));
         }
         return new Provider(Map.copyOf(rigs),sha(selection.toString().getBytes(java.nio.charset.StandardCharsets.UTF_8)));
     }
-    private static byte[] read(ByteSource source,String relative,Map<String,String> expected,Map<String,String> receipt)throws IOException
+    /** The digest only names the bytes actually loaded (part and provider
+     * identity); any edited asset is accepted. */
+    private static byte[] read(ByteSource source,String relative,Map<String,String> loaded)throws IOException
     {
-        String hash=expected.get(relative);require(hash!=null&&hash.matches("[0-9a-f]{64}"),"Exact actual rendered resource SHA256 required: "+relative);
-        byte[] bytes=source.read(relative);require(bytes!=null&&hash.equals(sha(bytes)),"Actual rendered resource changed: "+relative);receipt.put(relative,hash);return bytes;
+        byte[] bytes=source.read(relative);require(bytes!=null,"Actual rendered resource absent: "+relative);loaded.put(relative,sha(bytes));return bytes;
     }
     private static JsonObject json(byte[] data){return JsonParser.parseString(new String(data,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();}
     private static String sha(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception impossible){throw new IllegalStateException(impossible);}}
@@ -239,7 +214,7 @@ public final class EvaOriginalMeshGeometryR52
             // A field recovery can retain a bent or damaged dorsal joint;
             // reloading it must not require a factory rest pose.
             var provider=readOnlySelectedProviderR52();
-            var hands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),cradle.getCompound(EvaFrozenHandsR52.KEY));
+            var hands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handJoints(eva.getUnitVariant()),cradle.getCompound(EvaFrozenHandsR52.KEY));
             geometry=provider.evaluate(eva.getUnitVariant(),frozenLocalPose,hands);
         }
         else geometry=cradle.getBoolean("FrozenRecoveryR52")?partsForFrozenRecovery(eva,frozenLocalPose,cradle.getCompound(EvaFrozenHandsR52.KEY)):partsForCapture(eva,frozenLocalPose,cradle.getCompound(EvaFrozenHandsR52.KEY));
@@ -264,7 +239,7 @@ public final class EvaOriginalMeshGeometryR52
     {
         require(EvaShutdownR30.disabled(eva)&&eva.getPilotEntity()==null,"Actual stopped unpiloted hull required");
         var provider=readOnlySelectedProviderR52();
-        var hands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),handSnapshot);
+        var hands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handJoints(eva.getUnitVariant()),handSnapshot);
         return provider.evaluate(eva.getUnitVariant(),frozenLocalPose,hands);
     }
     private static Geometry partsForFrozen(EvaUnit01Entity eva,EvaBodyPose.Sample frozenLocalPose,CompoundTag handSnapshot,boolean factory)
@@ -273,10 +248,10 @@ public final class EvaOriginalMeshGeometryR52
         require(!eva.isExperimentalUnit()&&eva.getUnitVariant()>=0&&eva.getUnitVariant()<3,"Only original three actual rigs are admitted");
         require(eva.isNervLogisticsLocked()&&!eva.isFirstBattleActive()&&!eva.isBerserk()&&eva.getWeapon()==EvaUnit01Entity.WEAPON_FISTS&&!EvaShieldRigR47.equipped(eva),"Factory frozen equipment/pose admission only");
         require(EvaDorsalMechanism.open(eva)<.0001F&&EvaDorsalMechanism.bow(eva)<.0001F&&EvaBerserkMotionR34.mouth(eva,1)==0,"Actual dorsal and late mouth mechanism must be closed before capture");
-        var rig=provider.rigs.get(eva.getUnitVariant());require(EvaAnatomicalHandsR45.contractFingerprintR45(eva.getUnitVariant()).equals(rig.contractHash()),"Actual live hand override differs from geometry selection");
+        var rig=provider.rigs.get(eva.getUnitVariant());
         require(frozenLocalPose.rotations.containsKey("dorsal_cover")&&sameRotation(frozenLocalPose.rotations.get("dorsal_cover"),new Quaternionf())
                 &&frozenLocalPose.positions.get("dorsal_cover").lengthSquared()<1e-12F,"Captured late dorsal cover does not match the actual closed renderer state");
-        var hands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),rig.contractHash(),rig.handJoints(),handSnapshot);
+        var hands=EvaFrozenHandsR52.decode(eva.getUnitVariant(),rig.handJoints(),handSnapshot);
         provider.validateBody(eva.getUnitVariant(),frozenLocalPose,factory);
         return provider.evaluate(eva.getUnitVariant(),frozenLocalPose,hands);
     }
@@ -284,7 +259,6 @@ public final class EvaOriginalMeshGeometryR52
     public static final class Provider
     {
         private final Map<Integer,Rig> rigs;private final String fingerprint;
-        private Set<String> heldHandPredecessors=Set.of();
         private record Rotation(float x,float y,float z,float w)
         {static Rotation of(Quaternionf q){return new Rotation(q.x,q.y,q.z,q.w);}}
         private record BodyChannels(String parent,float px,float py,float pz,Rotation rotation,float x,float y,float z){}
@@ -304,8 +278,6 @@ public final class EvaOriginalMeshGeometryR52
         }
         private Provider(Map<Integer,Rig> rigs,String fingerprint){this.rigs=rigs;this.fingerprint=fingerprint;}
         public String sourceFingerprint(){return fingerprint;}
-        public boolean replacesHeldHandSurface(String previous){return heldHandPredecessors.contains(previous);}
-        public String handContractFingerprint(int variant){return rig(variant).contractHash();}
         public Set<String> handJoints(int variant){return rig(variant).handJoints();}
         private Rig rig(int variant){var r=rigs.get(variant);require(r!=null,"Original rig selection absent");return r;}
         private void validateBody(int variant,EvaBodyPose.Sample body,boolean factory)

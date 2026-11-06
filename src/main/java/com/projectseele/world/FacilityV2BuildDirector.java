@@ -79,8 +79,7 @@ public final class FacilityV2BuildDirector
                     data.manifest(), zoneId);
             if (!record.stage().equals(plan.stage())
                     || !record.generatorVersion().equals(
-                    FacilitySchemaV2.GENERATOR_VERSION)
-                    || !record.buildPlanHash().equals(plan.buildPlanHash()))
+                    FacilitySchemaV2.GENERATOR_VERSION))
             {
                 data.failZone(zoneId,
                         "persisted generation receipt does not match plan");

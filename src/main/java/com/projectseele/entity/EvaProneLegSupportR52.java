@@ -137,7 +137,7 @@ public final class EvaProneLegSupportR52
     }
 
     /** Exact original rest convex-hull vertices suffice for every directional
-     * support query. Source hashes are checked once; runtime never loads a
+     * support query; runtime never loads a
      * complete posed mesh. The renderer retains its automatic ankle seam. */
     public static synchronized Map<String,Vector3f[]> sourceVerticesR52(int variant)
     {
@@ -151,10 +151,6 @@ public final class EvaProneLegSupportR52
                 if(!sourceData.get("schema").getAsString().equals("projectseele.prone-support-hulls.r52.v1"))throw new IllegalStateException("Original prone support schema differs");
             }
             var row=sourceData.getAsJsonObject("rigs").getAsJsonObject(""+variant);
-            try(var stream=EvaProneLegSupportR52.class.getResourceAsStream("/assets/projectseele/"+row.get("source_resource").getAsString()))
-            {
-                if(stream==null||!row.get("source_sha256").getAsString().equals(java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(stream.readAllBytes()))))throw new IllegalStateException("Original prone source/hull hash differs");
-            }
             var result=new HashMap<String,Vector3f[]>();
             for(String side:List.of("l","r"))for(String family:List.of("leg_","shin_"))
             {

@@ -37,13 +37,13 @@ public final class S20LiftManifestR52
     public record MainLift(String liftId,List<Integer> headquartersFloors,int hangarFloor,Integer terminalFloor,
                            Integer observationFloor,Integer launchFloor) {}
     public record MainLifts(MainLift commandRear,MainLift eastGallery) {}
-    public record Document(long epoch,String directoryFingerprint,boolean ready,List<Binding> lifts,Office office,MainLifts mainLifts) {}
+    public record Document(long epoch,boolean ready,List<Binding> lifts,Office office,MainLifts mainLifts) {}
     private S20LiftManifestR52() {}
     public static Document parse(JsonObject root)
     {
         require(SCHEMA.equals(root.get("schema").getAsString())&&root.get("complete_replacement").getAsBoolean(),"Complete Root lift replacement required");
-        long epoch=root.get("epoch").getAsBigDecimal().longValueExact();String fingerprint=root.get("directory_fingerprint").getAsString();
-        require(epoch>0&&fingerprint.matches("[0-9a-f]{64}"),"Root claim epoch/fingerprint required");
+        long epoch=root.get("epoch").getAsBigDecimal().longValueExact();
+        require(epoch>0,"Root claim epoch required");
         require("s20_personnel_only".equals(root.get("scope").getAsString()),"S20-only scope required; independent gateway excluded");
         List<Binding> lifts=new ArrayList<>();Set<String> ids=new HashSet<>();Set<BlockPos> allControllers=new HashSet<>();
         Set<BlockPos> allCalls=new HashSet<>();
@@ -136,7 +136,7 @@ public final class S20LiftManifestR52
         }
         for(var binding:lifts)for(var floor:binding.floors())for(var call:floor.calls())if(call.kind()==CallKind.SEELE_READER)
             require(office!=null&&office.liftId().equals(binding.id())&&office.readers().contains(call.position()),"Highest-card reader must belong to this actual office lift");
-        return new Document(epoch,fingerprint,ready,List.copyOf(lifts),office,mainLifts);
+        return new Document(epoch,ready,List.copyOf(lifts),office,mainLifts);
     }
     private static Binding lift(List<Binding> lifts,String id)
     {return lifts.stream().filter(lift->lift.id().equals(id)).findFirst().orElseThrow(()->new IllegalArgumentException("Declared main lift identity is missing: "+id));}

@@ -16,8 +16,11 @@ public final class PortableRuntimeOwnersR45
     public static final String RELATIVE_FILE="config/projectseele-runtime-r45.properties";
     private static final Set<String> KEYS=Set.of("schema","weapon_handling","cannon_contact",
             "captured_support","captured_locomotion_directory",
-            "city.union.client.enabled","city.union.client.required","city.union.client.create_class_sha256","city.union.client.proof_sha256",
-            "city.union.server.enabled","city.union.server.required","city.union.server.create_class_sha256","city.union.server.proof_sha256");
+            "city.union.client.enabled","city.union.client.required",
+            "city.union.server.enabled","city.union.server.required");
+    // Retired class/proof digest pins: still accepted in existing files, never required or read.
+    private static final Set<String> RETIRED_KEYS=Set.of("city.union.client.create_class_sha256","city.union.client.proof_sha256",
+            "city.union.server.create_class_sha256","city.union.server.proof_sha256");
     private static final Set<String> FACILITY_KEYS=Set.of("tv_cage","personnel_platforms");
     private static final Set<String> ACTIVATION_KEYS=Set.of("city.union.activation",
             "city.union.client.activation","city.union.server.activation");
@@ -42,7 +45,7 @@ public final class PortableRuntimeOwnersR45
                 parsed.load(new StringReader(text));
                 if(!"projectseele.runtime-owners.r45.v1".equals(parsed.getProperty("schema")))
                     throw new IllegalStateException("Unknown portable runtime owner schema");
-                var allowed=new java.util.HashSet<>(KEYS);allowed.addAll(FACILITY_KEYS);allowed.addAll(ACTIVATION_KEYS);
+                var allowed=new java.util.HashSet<>(KEYS);allowed.addAll(FACILITY_KEYS);allowed.addAll(ACTIVATION_KEYS);allowed.addAll(RETIRED_KEYS);
                 var missing=new java.util.TreeSet<>(KEYS);missing.removeAll(parsed.stringPropertyNames());
                 var unknown=new java.util.TreeSet<>(parsed.stringPropertyNames());unknown.removeAll(allowed);
                 if(!missing.isEmpty()||!unknown.isEmpty())
@@ -102,12 +105,6 @@ public final class PortableRuntimeOwnersR45
         if(explicit!=null)return explicit;
         String relative=portableDirectory(values().getProperty("captured_locomotion_directory",""));
         return relative.isEmpty()?"":FMLPaths.GAMEDIR.get().resolve(relative).normalize().toString();
-    }
-    public static synchronized String fingerprint()
-    {
-        values();String effective=hash+":"+weaponHandling()+":"+cannonContact()+":"+capturedSupport()+":"+!capturedDirectory().isEmpty()+":"+tvCage()+":"+personnelPlatforms();
-        try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(effective.getBytes(StandardCharsets.UTF_8)));}
-        catch(Exception error){throw new IllegalStateException("Cannot fingerprint actual runtime owners",error);}
     }
     private PortableRuntimeOwnersR45() {}
 }

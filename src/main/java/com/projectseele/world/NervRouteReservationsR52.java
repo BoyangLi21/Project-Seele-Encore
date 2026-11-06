@@ -79,8 +79,8 @@ public final class NervRouteReservationsR52
     public synchronized boolean resourcesHeldR52(UUID task,Set<String> ids)
     {
         if(task==null||ids.isEmpty())return false;for(String id:ids){if(directory.resource(id)==null)return false;if(isSpace(id))continue;UUID ground=resources.get(id),steel=hardwareResources.get(id);if(!task.equals(ground)&&!task.equals(steel))return false;
-            if(ground!=null&&!ground.equals(task)){var h=hardware.get(task);var f=flights.get(ground);if(h==null||f==null||!ground.equals(h.companionFlight())||f.payloadTransferred()||f.original().variant()!=h.variant()||h.epoch()!=directory.epoch()||!h.directoryFingerprint().equals(directory.fingerprint()))return false;}
-            if(steel!=null&&!steel.equals(task)){var h=hardware.get(steel);var f=flights.get(task);if(h==null||f==null||!task.equals(h.companionFlight())||f.payloadTransferred()||f.original().variant()!=h.variant()||h.epoch()!=directory.epoch()||!h.directoryFingerprint().equals(directory.fingerprint()))return false;}
+            if(ground!=null&&!ground.equals(task)){var h=hardware.get(task);var f=flights.get(ground);if(h==null||f==null||!ground.equals(h.companionFlight())||f.payloadTransferred()||f.original().variant()!=h.variant()||h.epoch()!=directory.epoch())return false;}
+            if(steel!=null&&!steel.equals(task)){var h=hardware.get(steel);var f=flights.get(task);if(h==null||f==null||!task.equals(h.companionFlight())||f.payloadTransferred()||f.original().variant()!=h.variant()||h.epoch()!=directory.epoch())return false;}
         }return true;
     }
     private boolean isSpace(String id)
@@ -98,7 +98,7 @@ public final class NervRouteReservationsR52
     public synchronized boolean quarantineGround(Snapshot saved)
     {
         Objects.requireNonNull(saved);var route=directory.route(saved.route());var previous=quarantinedGround.get(saved.task());if(previous!=null)return previous.equals(saved);
-        if(tasks.containsKey(saved.task())||flights.containsKey(saved.task())||hardware.containsKey(saved.task())||route==null||!context(saved.original(),route).isEmpty()||!saved.directoryFingerprint().equals(directory.fingerprint())||saved.stage()==Stage.CANCELLED||saved.leg()<0||saved.leg()>=route.legs().size()||!Double.isFinite(saved.fraction())||saved.fraction()<0||saved.fraction()>1||!free(saved.original(),route,saved.kind()))return false;
+        if(tasks.containsKey(saved.task())||flights.containsKey(saved.task())||hardware.containsKey(saved.task())||route==null||!context(saved.original(),route).isEmpty()||saved.stage()==Stage.CANCELLED||saved.leg()<0||saved.leg()>=route.legs().size()||!Double.isFinite(saved.fraction())||saved.fraction()<0||saved.fraction()>1||!free(saved.original(),route,saved.kind()))return false;
         claimResources(saved.task(),directory.resources(route));for(UUID id:TransportMembershipR52.members(saved.original(),saved.kind()))actors.put(id,saved.task());quarantinedGround.put(saved.task(),saved);return true;
     }
     public synchronized Set<UUID> leasedMembers(UUID task){var result=new HashSet<UUID>();actors.forEach((actor,owner)->{if(owner.equals(task))result.add(actor);});return Set.copyOf(result);}
@@ -108,7 +108,7 @@ public final class NervRouteReservationsR52
      * in its declaration for loading/display; mechanisms retain their owners. */
     public synchronized boolean reserveHardware(HardwareLease lease,HardwareAccess actual,boolean restoring)
     {
-        if(!directory.installed()||lease.epoch()!=directory.epoch()||!lease.directoryFingerprint().equals(directory.fingerprint())||lease.variant()<0||lease.variant()>2||lease.resources().isEmpty()||tasks.containsKey(lease.task())||flights.containsKey(lease.task())||quarantinedGround.containsKey(lease.task()))return false;
+        if(!directory.installed()||lease.epoch()!=directory.epoch()||lease.variant()<0||lease.variant()>2||lease.resources().isEmpty()||tasks.containsKey(lease.task())||flights.containsKey(lease.task())||quarantinedGround.containsKey(lease.task()))return false;
         for(int variant=0;variant<3;variant++){var unit=directory.unit(variant);if(unit!=null&&(lease.controller().equals(unit.eva())||lease.controller().equals(unit.plug())))return false;}
         var old=hardware.get(lease.task());if(old!=null&&!old.controller().equals(lease.controller()))return false;
         UUID actor=actors.get(lease.controller());if(actor!=null&&!actor.equals(lease.task()))return false;
@@ -147,7 +147,7 @@ public final class NervRouteReservationsR52
     synchronized Result reclaimCheckedCancelledContinuousR52(Snapshot cancelled,UUID task,Original original,NativeAccess actual)
     {
         Objects.requireNonNull(task);Objects.requireNonNull(original);Objects.requireNonNull(actual);
-        if(cancelled==null||cancelled.stage()!=Stage.CANCELLED||!cancelled.directoryFingerprint().equals(directory.fingerprint())||!sameOriginalActorsR52(cancelled.original(),original))return new Result(false,null,"Stopped cancelled original provenance mismatch");var old=directory.route(cancelled.route());if(old==null||!old.continuousUpright()||cancelled.leg()<0||cancelled.leg()>=old.legs().size()||!Double.isFinite(cancelled.fraction())||cancelled.fraction()<0||cancelled.fraction()>1)return new Result(false,null,"Cancelled task has no exact continuous reverse");
+        if(cancelled==null||cancelled.stage()!=Stage.CANCELLED||!sameOriginalActorsR52(cancelled.original(),original))return new Result(false,null,"Stopped cancelled original provenance mismatch");var old=directory.route(cancelled.route());if(old==null||!old.continuousUpright()||cancelled.leg()<0||cancelled.leg()>=old.legs().size()||!Double.isFinite(cancelled.fraction())||cancelled.fraction()<0||cancelled.fraction()>1)return new Result(false,null,"Cancelled task has no exact continuous reverse");
         var reverse=old.recovery()?old:directory.route(directory.ports().get(old.port()).reverseRoutes().get(original.variant()));if(reverse==null||!reverse.continuousUpright()||!reverse.recovery()||!old.recovery()&&!reverse.reverseOf().equals(old.id()))return new Result(false,null,"Actual selected route has no bound reverse");
         int index=old.recovery()?cancelled.leg():old.legs().size()-1-cancelled.leg();double fraction=old.recovery()?cancelled.fraction():1-cancelled.fraction();
         if(!old.recovery()&&cancelled.fraction()>0&&cancelled.fraction()<1&&(fraction==0||fraction==1))return new Result(false,null,"Cancelled interior point cannot be rounded to a reverse endpoint");
@@ -196,7 +196,7 @@ public final class NervRouteReservationsR52
     }
     public synchronized boolean canCommitContinuousR52(UUID task,NervRouteNativeR52.CheckedContinuousTraversalR52 proof)
     {
-        Snapshot state=tasks.get(task);if(state==null||proof==null||state.stage()==Stage.COMPLETE||state.stage()==Stage.CANCELLED||!state.original().equals(proof.original())||state.kind()!=proof.kind()||!state.route().equals(proof.route().id())||!state.directoryFingerprint().equals(directory.fingerprint())||!resourcesHeldR52(task,directory.resources(proof.route())))return false;
+        Snapshot state=tasks.get(task);if(state==null||proof==null||state.stage()==Stage.COMPLETE||state.stage()==Stage.CANCELLED||!state.original().equals(proof.original())||state.kind()!=proof.kind()||!state.route().equals(proof.route().id())||!resourcesHeldR52(task,directory.resources(proof.route())))return false;
         var paths=proof.paths();int previous=state.leg();double fraction=state.fraction();
         for(var path:paths){int index=proof.route().legs().indexOf(path.leg().id());if(index==previous){if(Math.abs(path.fromFraction()-fraction)>1e-12)return false;}else if(index==previous+1&&fraction==1&&path.fromFraction()==0){}else return false;if(path.toFraction()<path.fromFraction())return false;previous=index;fraction=path.toFraction();}
         return true;
@@ -215,7 +215,6 @@ public final class NervRouteReservationsR52
         var from=proof.from;var to=proof.to;var route=directory.route(from.route());
         var existing=tasks.get(from.task());var quarantine=quarantinedGround.get(from.task());
         if(route==null||!route.continuousUpright()||!context(from.original(),route).isEmpty()
-                ||!from.directoryFingerprint().equals(directory.fingerprint())
                 ||!(from.equals(existing)&&quarantine==null||existing==null&&from.equals(quarantine))
                 ||flights.containsKey(from.task())||hardware.containsKey(from.task())
                 ||!resourcesHeldR52(from.task(),directory.resources(route))
@@ -248,7 +247,7 @@ public final class NervRouteReservationsR52
         var state=tasks.get(task);var route=state==null?null:directory.route(state.route());
         if(state==null||route==null||route.recovery()||state.stage()!=Stage.COMPLETE||state.kind()!=Kind.OCCUPIED
                 ||state.leg()!=route.legs().size()-1||state.fraction()!=1||proof==null
-                ||!state.original().equals(proof.original())||!state.directoryFingerprint().equals(directory.fingerprint())
+                ||!state.original().equals(proof.original())
                 ||!proof.current(eva)||!proof.placement(level,eva)
                 ||!com.projectseele.entity.EvaMechanicalFrameR52.controlledBallisticR53(eva)
                 ||!state.original().dimension().equals(level.dimension().location().toString())
@@ -316,12 +315,12 @@ public final class NervRouteReservationsR52
         Objects.requireNonNull(saved);Objects.requireNonNull(nativeAccess);Objects.requireNonNull(saved.task());Objects.requireNonNull(saved.original());
         Route route=directory.route(saved.route());String blocker=context(saved.original(),route);
         if(!blocker.isEmpty())return new Result(false,null,blocker);
-        if(!directory.fingerprint().equals(saved.directoryFingerprint())||saved.leg()<0||saved.leg()>=route.legs().size()
+        if(saved.leg()<0||saved.leg()>=route.legs().size()
                 ||!Double.isFinite(saved.fraction())||saved.fraction()<0||saved.fraction()>1||saved.stage()==null||saved.stage()==Stage.COMPLETE||saved.stage()==Stage.CANCELLED)
             return new Result(false,null,"Saved task/directory/progress is incompatible");
         if(saved.kind()==Kind.HULL_ONLY_RECOVERY&&!route.recovery())return new Result(false,null,"Hull-only save cannot restore a departure");
         var provisional=quarantinedGround.get(saved.task());
-        if(provisional!=null&&(!provisional.original().equals(saved.original())||!provisional.route().equals(saved.route())||provisional.kind()!=saved.kind()||provisional.leg()!=saved.leg()||provisional.fraction()!=saved.fraction()||!provisional.directoryFingerprint().equals(saved.directoryFingerprint())))return new Result(false,null,"Saved provisional physical progress changed");
+        if(provisional!=null&&(!provisional.original().equals(saved.original())||!provisional.route().equals(saved.route())||provisional.kind()!=saved.kind()||provisional.leg()!=saved.leg()||provisional.fraction()!=saved.fraction()))return new Result(false,null,"Saved provisional physical progress changed");
         boolean free=resourcesAvailable(saved.task(),directory.resources(route))&&TransportMembershipR52.members(saved.original(),saved.kind()).stream().allMatch(id->actors.get(id)==null||saved.task().equals(actors.get(id)));
         if(tasks.containsKey(saved.task())||flights.containsKey(saved.task())||hardware.containsKey(saved.task())||!free)return new Result(false,null,"Restore would collide with an existing reservation");
         if(!nativeAccess.sameAssembly(saved.original(),saved.kind())||!nativeAccess.canRestoreAssembly(saved.original(),saved.kind(),route,saved.leg(),saved.fraction()))return new Result(false,null,"Native restore membership/geometry was not confirmed");
@@ -359,14 +358,14 @@ public final class NervRouteReservationsR52
     public synchronized boolean quarantineFlight(FlightLease saved)
     {
         Objects.requireNonNull(saved);var original=saved.original();var unit=directory.unit(original.variant());var previous=flights.get(saved.task());if(previous!=null)return previous.equals(saved);
-        if(!directory.installed()||original.epoch()!=directory.epoch()||unit==null||!unit.eva().equals(original.eva())||!unit.plug().equals(original.plug())||!directory.knowsDimension(original.dimension())||!saved.directoryFingerprint().equals(directory.fingerprint())||saved.aircraft()==null||List.of(original.eva(),original.plug(),original.pilot()).contains(saved.aircraft())||tasks.containsKey(saved.task())||hardware.containsKey(saved.task())||quarantinedGround.containsKey(saved.task())||flightMembers(saved).stream().anyMatch(actors::containsKey)||flightResources(saved,null)==null)return false;
+        if(!directory.installed()||original.epoch()!=directory.epoch()||unit==null||!unit.eva().equals(original.eva())||!unit.plug().equals(original.plug())||!directory.knowsDimension(original.dimension())||saved.aircraft()==null||List.of(original.eva(),original.plug(),original.pilot()).contains(saved.aircraft())||tasks.containsKey(saved.task())||hardware.containsKey(saved.task())||quarantinedGround.containsKey(saved.task())||flightMembers(saved).stream().anyMatch(actors::containsKey)||flightResources(saved,null)==null)return false;
         claimResources(saved.task(),flightResourceIds(saved));for(UUID actor:flightMembers(saved))actors.put(actor,saved.task());flights.put(saved.task(),saved);quarantinedFlights.add(saved.task());return true;
     }
     private boolean claimFlight(FlightLease lease,FlightAccess actual,boolean restoring)
     {
         Objects.requireNonNull(lease);Objects.requireNonNull(actual);if(!spaceArgumentsValidR52(lease.spaces()))return false;var proved=actual.checkedSourceSpacesR52();if(proved!=null){if(restoring&&!lease.spaces().equals(proved))return false;lease=new FlightLease(lease.task(),lease.original(),lease.directoryFingerprint(),proved,lease.aircraft(),lease.kind(),lease.payloadTransferred(),lease.mechanisms());}Original original=lease.original();Unit unit=directory.unit(original.variant());
         if(!directory.installed()||original.epoch()!=directory.epoch()||unit==null||!unit.eva().equals(original.eva())||!unit.plug().equals(original.plug())
-                ||!directory.knowsDimension(original.dimension())||!lease.directoryFingerprint().equals(directory.fingerprint())||lease.spaces().isEmpty()||tasks.containsKey(lease.task())||quarantinedGround.containsKey(lease.task())||flights.containsKey(lease.task())||hardware.containsKey(lease.task())
+                ||!directory.knowsDimension(original.dimension())||lease.spaces().isEmpty()||tasks.containsKey(lease.task())||quarantinedGround.containsKey(lease.task())||flights.containsKey(lease.task())||hardware.containsKey(lease.task())
                 ||lease.aircraft()!=null&&List.of(original.eva(),original.plug(),original.pilot()).contains(lease.aircraft())
                 ||flightMembers(lease).stream().anyMatch(actors::containsKey))return false;
         var declared=flightResources(lease,null);if(declared==null||!checkedFlight(lease,declared,actual,restoring))return false;

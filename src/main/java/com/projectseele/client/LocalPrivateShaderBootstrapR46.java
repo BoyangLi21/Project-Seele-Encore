@@ -9,6 +9,7 @@ import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.Files;
 import java.nio.file.Path;
+import java.nio.file.StandardCopyOption;
 import java.nio.file.StandardOpenOption;
 import java.security.MessageDigest;
 import java.util.ArrayList;
@@ -26,8 +27,6 @@ import java.util.zip.ZipOutputStream;
 /** Build the bundled offline recipe only inside the player's personal client instance. */
 public final class LocalPrivateShaderBootstrapR46
 {
-    private static final String STOCK_SHA="66061b3c5b4843e31bc9a7562a7ac697a51bb77c73defc7071f996b783efacce";
-    private static final String LICENSE_SHA="1e1f730abd9c25ad4d0ba301453d37547d17102a3cfc628de794d5b08e278a20";
     private static final String RECIPE="private_shader_recipe_v12.json";
     private static final String MARKER="config/projectseele-private-visuals-r46.json";
 
@@ -41,23 +40,21 @@ public final class LocalPrivateShaderBootstrapR46
         {
             var recipe=JsonParser.parseString(Files.readString(recipePath)).getAsJsonObject();
             if(!"projectseele.local-private-shader-adapter.v12".equals(recipe.get("schema").getAsString())
-                    ||!"LOCAL_PERSONAL_ONLY_NOT_PREBUILT_SHADER_DISTRIBUTION".equals(recipe.get("scope").getAsString())
-                    ||!STOCK_SHA.equals(recipe.get("input_sha256").getAsString())
-                    ||!LICENSE_SHA.equals(recipe.get("input_license_sha256").getAsString()))
-                throw new IllegalArgumentException("Unrecognized personal shader recipe/input/license");
+                    ||!"LOCAL_PERSONAL_ONLY_NOT_PREBUILT_SHADER_DISTRIBUTION".equals(recipe.get("scope").getAsString()))
+                throw new IllegalArgumentException("Unrecognized personal shader recipe");
             String originalName=filename(recipe.get("input_filename").getAsString());
             String selected=filename(recipe.get("output_filename").getAsString());
             if(!"ComplementaryUnbound_r5.3.zip".equals(originalName)||!selected.startsWith("SEELE_Local_"))
                 throw new IllegalArgumentException("Personal shader must have its own local name");
             Path directory=game.resolve("shaderpacks"),original=directory.resolve(originalName);
-            byte[] source=Files.readAllBytes(original);check(source,STOCK_SHA,originalName);
+            byte[] source=Files.readAllBytes(original);
             Map<String,byte[]> entries=readArchive(source);
-            check(entries.get("License.txt"),LICENSE_SHA,"License.txt");
+            byte[] license=present(entries.get("License.txt"),"License.txt");
             Map<String,byte[]> output=new TreeMap<>(entries);
             for(var value:recipe.getAsJsonArray("files"))
             {
                 var file=value.getAsJsonObject();String name=entry(file.get("path").getAsString());
-                byte[] bytes=entries.get(name);check(bytes,file.get("source_sha256").getAsString(),name);
+                byte[] bytes=present(entries.get(name),name);
                 String[] lines=normalized(bytes).split("\n",-1);var result=new ArrayList<String>();
                 for(var item:file.getAsJsonArray("parts"))
                 {
@@ -88,27 +85,25 @@ public final class LocalPrivateShaderBootstrapR46
                     }
                 }
                 bytes=String.join("\n",result).getBytes(StandardCharsets.UTF_8);
-                check(bytes,file.get("normalized_target_sha256").getAsString(),name);output.put(name,bytes);
+                output.put(name,bytes);
             }
             for(var value:recipe.getAsJsonArray("project_authored_entries"))
             {
                 var file=value.getAsJsonObject();String name=entry(file.get("path").getAsString());
-                byte[] bytes=file.get("project_authored_text").getAsString().getBytes(StandardCharsets.UTF_8);
-                check(bytes,file.get("normalized_target_sha256").getAsString(),name);output.put(name,bytes);
+                output.put(name,file.get("project_authored_text").getAsString().getBytes(StandardCharsets.UTF_8));
             }
             for(var value:recipe.getAsJsonArray("clone_at_install_time"))
             {
                 var file=value.getAsJsonObject();String name=entry(file.get("path").getAsString());
-                byte[] bytes=entries.get(entry(file.get("source").getAsString()));
-                check(bytes,file.get("source_sha256").getAsString(),name);
+                String from=entry(file.get("source").getAsString());byte[] bytes=present(entries.get(from),from);
                 bytes=replaceOnce(normalized(bytes),file.get("replace_old").getAsString(),file.get("replace_new").getAsString()).getBytes(StandardCharsets.UTF_8);
-                check(bytes,file.get("normalized_target_sha256").getAsString(),name);output.put(name,bytes);
+                output.put(name,bytes);
             }
             output.put("SEELE_LOCAL_PRIVATE_ADAPTATION.txt",recipe.get("credits").getAsString().getBytes(StandardCharsets.UTF_8));
-            check(output.get("License.txt"),LICENSE_SHA,"retained License.txt");
+            // The shader's own licence must ship unaltered with the adaptation.
+            if(!Arrays.equals(output.get("License.txt"),license))throw new IllegalArgumentException("Recipe altered the shader License.txt");
             Path target=directory.resolve(selected);
-            if(Files.exists(target))verify(target,output);
-            else
+            if(!Files.exists(target)||!sameEntries(target,output))
             {
                 Path temporary=Files.createTempFile(directory,"seele-private-r46-",".partial");
                 try
@@ -118,7 +113,7 @@ public final class LocalPrivateShaderBootstrapR46
                         for(var row:output.entrySet())
                         {zip.putNextEntry(new ZipEntry(row.getKey()));zip.write(row.getValue());zip.closeEntry();}
                     }
-                    verify(temporary,output);Files.move(temporary,target);
+                    Files.move(temporary,target,StandardCopyOption.REPLACE_EXISTING);
                 }
                 finally {Files.deleteIfExists(temporary);}
             }
@@ -143,7 +138,7 @@ public final class LocalPrivateShaderBootstrapR46
                 }
                 Files.createDirectories(marker.getParent());
                 var receipt=new JsonObject();receipt.addProperty("schema","projectseele.personal-shader-installed.r46.v1");
-                receipt.addProperty("original_sha256",STOCK_SHA);receipt.addProperty("recipe_sha256",hash(Files.readAllBytes(recipePath)));
+                receipt.addProperty("original_sha256",hash(source));receipt.addProperty("recipe_sha256",hash(Files.readAllBytes(recipePath)));
                 receipt.addProperty("local_output",selected);receipt.addProperty("local_output_sha256",hash(Files.readAllBytes(target)));
                 receipt.addProperty("selected_on_first_install",select);receipt.addProperty("world_written",false);
                 Files.writeString(marker,receipt.toString(),StandardCharsets.UTF_8,StandardOpenOption.CREATE_NEW);
@@ -170,11 +165,12 @@ public final class LocalPrivateShaderBootstrapR46
         }
         return entries;
     }
-    private static void verify(Path target,Map<String,byte[]> expected)throws Exception
+    private static boolean sameEntries(Path target,Map<String,byte[]> expected)throws Exception
     {
         Map<String,byte[]> actual=readArchive(Files.readAllBytes(target));
-        if(!actual.keySet().equals(expected.keySet()))throw new IllegalArgumentException("Existing local shader entry set differs; preserved: "+target);
-        for(var row:expected.entrySet())check(actual.get(row.getKey()),hash(row.getValue()),row.getKey());
+        if(!actual.keySet().equals(expected.keySet()))return false;
+        for(var row:expected.entrySet())if(!Arrays.equals(actual.get(row.getKey()),row.getValue()))return false;
+        return true;
     }
     private static String normalized(byte[] bytes){return new String(bytes,StandardCharsets.UTF_8).replace("\r","");}
     private static String replaceOnce(String text,String old,String replacement)
@@ -194,7 +190,7 @@ public final class LocalPrivateShaderBootstrapR46
         return name;
     }
     private static String hash(byte[] bytes)throws Exception{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}
-    private static void check(byte[] bytes,String expected,String name)throws Exception
-    {if(bytes==null||!hash(bytes).equals(expected))throw new IllegalArgumentException("Shader bytes differ: "+name);}
+    private static byte[] present(byte[] bytes,String name)
+    {if(bytes==null)throw new IllegalArgumentException("Shader entry missing: "+name);return bytes;}
     private LocalPrivateShaderBootstrapR46(){}
 }

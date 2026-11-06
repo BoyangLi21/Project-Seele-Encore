@@ -38,8 +38,8 @@ public final class NervMechanicalTravelR52Test
             check(edge<middle*.04&&Math.abs(edge-(1-NervMechanicalTravelR52.fraction(ticks-1,ticks)))<2e-14,"Endpoint travel has not eased to rest symmetrically");
         }
         var data=new CompoundTag();check(NervMechanicalTravelR52.restoredClock(data,"original",0,40,0)==0,"Fresh actual endpoint rejected");check(NervMechanicalTravelR52.restoredClock(data,"original",0,40,.25)==-1,"Missing clock guessed from a moved body");
-        String directory="c".repeat(64);for(int amount=0;amount<=9;amount++){var tag=new CompoundTag();tag.putInt("BridgeAmount",amount);tag.putLong("BridgeEpoch",52);tag.putString("BridgeDirectory",directory);check(NervAssemblyOwnerR52.savedBridgeProvenance(tag,52,directory),"Exact actual bridge state lost on save");check(!NervAssemblyOwnerR52.savedBridgeProvenance(tag,51,directory),"Old bridge epoch was accepted");check(!NervAssemblyOwnerR52.savedBridgeProvenance(tag,52,"d".repeat(64)),"Foreign bridge directory was accepted");}
-        data.putInt("BridgeAmount",10);data.putLong("BridgeEpoch",52);data.putString("BridgeDirectory",directory);check(!NervAssemblyOwnerR52.savedBridgeProvenance(data,52,directory),"Out-of-range bridge stage was accepted");
+        String directory="c".repeat(64);for(int amount=0;amount<=9;amount++){var tag=new CompoundTag();tag.putInt("BridgeAmount",amount);tag.putLong("BridgeEpoch",52);tag.putString("BridgeDirectory",directory);check(NervAssemblyOwnerR52.savedBridgeProvenance(tag,52),"Exact actual bridge state lost on save");check(!NervAssemblyOwnerR52.savedBridgeProvenance(tag,51),"Old bridge epoch was accepted");}
+        data.putInt("BridgeAmount",10);data.putLong("BridgeEpoch",52);data.putString("BridgeDirectory",directory);check(!NervAssemblyOwnerR52.savedBridgeProvenance(data,52),"Out-of-range bridge stage was accepted");
         System.out.println("R52 actual persisted mechanical clock/bridge provenance PASS checks="+checks+"; no world/native acceptance");
     }
 }

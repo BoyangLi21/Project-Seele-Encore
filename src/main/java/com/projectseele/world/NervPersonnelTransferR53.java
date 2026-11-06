@@ -70,7 +70,7 @@ public final class NervPersonnelTransferR53
             var file=server.getServer().getWorldPath(LevelResource.ROOT).resolve(reference);long modified=Files.getLastModifiedTime(file).toMillis();
             if(reference.equals(cache.reference)&&modified==cache.modified)return cache.paths;
             var root=JsonParser.parseString(Files.readString(file)).getAsJsonObject();
-            if(root.get("epoch").getAsLong()!=NervRouteRuntimeR52.commissioningEpoch(server)||!root.get("directory_fingerprint").getAsString().equals(NervRouteRuntimeR52.directoryFingerprint(server)))return List.of();
+            if(root.get("epoch").getAsLong()!=NervRouteRuntimeR52.commissioningEpoch(server))return List.of();
             var paths=new ArrayList<PathSpec>();for(var raw:root.getAsJsonArray("lifts")){var lift=raw.getAsJsonObject();var path=parse(lift.get("id").getAsString(),lift);if(path!=null)paths.add(path);}
             cache.reference=reference;cache.modified=modified;cache.paths=List.copyOf(paths);return cache.paths;
         }

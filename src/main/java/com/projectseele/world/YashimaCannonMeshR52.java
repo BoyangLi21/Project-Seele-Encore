@@ -12,7 +12,7 @@ import org.joml.Vector3f;
 /** Complete original gun and current selected EVA skin. Empty space in a long barrel's broadphase is not a solid. */
 public final class YashimaCannonMeshR52
 {
-    private record Source(String sha,double[] triangles,List<Vec3> normals,AABB bounds){}
+    private record Source(double[] triangles,List<Vec3> normals,AABB bounds){}
     private record Body(long tick,String source,List<NervRigidMeshSweepR52> parts,List<NervRigidMeshSweepR52> complete){}
     private static volatile Source source;
     private static final Map<Float,NervRigidMeshSweepR52> GUNS=new HashMap<>();
@@ -24,7 +24,6 @@ public final class YashimaCannonMeshR52
         try
         {
             byte[] bytes=EvaOriginalMeshGeometryR52.classpathBytes("mesh/positron_cannon_payload_r50.mesh.json");
-            String sha=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
             var root=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();int stride=root.get("stride").getAsInt();
             var points=new ArrayList<Vec3>();var normals=new ArrayList<Vec3>();AABB raw=null;
             for(var entry:root.getAsJsonObject("parts").entrySet())
@@ -39,14 +38,14 @@ public final class YashimaCannonMeshR52
             var centre=raw.getCenter();double[] triangles=new double[points.size()*3];AABB bounds=null;int n=0;
             for(var p:points)
             {p=new Vec3(-(p.x-centre.x)/16,(p.y-raw.minY)/16,(p.z-centre.z)/16);triangles[n++]=p.x;triangles[n++]=p.y;triangles[n++]=p.z;bounds=bounds==null?new AABB(p,p):bounds.minmax(new AABB(p,p));}
-            source=new Source(sha,triangles,List.copyOf(normals),bounds);return source;
+            source=new Source(triangles,List.copyOf(normals),bounds);return source;
         }
         catch(Exception error){throw new IllegalStateException("Original fixed cannon source unavailable",error);}
     }
     public static void requireOriginal(JsonObject manifest,YashimaCannonGeometryR52.Geometry geometry)
     {
-        var original=source();String declared=manifest.get("source_mesh_sha256").getAsString();var b=geometry.bounds();var a=original.bounds();
-        if(!original.sha().equals(declared)||new Vec3(a.minX,a.minY,a.minZ).distanceTo(new Vec3(b.minX,b.minY,b.minZ))>.00001
+        var original=source();var b=geometry.bounds();var a=original.bounds();
+        if(new Vec3(a.minX,a.minY,a.minZ).distanceTo(new Vec3(b.minX,b.minY,b.minZ))>.00001
                 ||new Vec3(a.maxX,a.maxY,a.maxZ).distanceTo(new Vec3(b.maxX,b.maxY,b.maxZ))>.00001
                 ||geometry.bore().distanceTo(new Vec3(0,-1,0))>.00001)throw new IllegalArgumentException("Fixed gun must use complete unchanged original source and barrel axis");
         // Muzzle is the area centroid of the twelve coplanar original barrel
@@ -113,7 +112,6 @@ public final class YashimaCannonMeshR52
         if(!eva.isPoweredOn()||eva.isBerserk()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)||EvaDorsalMechanism.open(eva)>.0001F
                 ||EvaDorsalMechanism.bow(eva)>.0001F||EvaBerserkMotionR34.mouth(eva,1)!=0)throw new IllegalStateException("Original closed powered fixed-gun operator required");
         var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
-        if(!provider.handContractFingerprint(eva.getUnitVariant()).equals(EvaAnatomicalHandsR45.contractFingerprintR45(eva.getUnitVariant())))throw new IllegalStateException("Fixed gun actual hand source differs from rendered source");
         var cached=BODIES.get(eva);long tick=eva.level().getGameTime();if(cached!=null&&cached.tick()==tick&&cached.source().equals(provider.sourceFingerprint()))return cached;
         var pose=EvaBodyPose.sample(eva,0);var actual=provider.evaluate(eva.getUnitVariant(),pose,EvaAnatomicalHandsR45.sample(eva,0));var meshes=new ArrayList<NervRigidMeshSweepR52>();var complete=new ArrayList<NervRigidMeshSweepR52>();
         for(var part:actual.parts()){var mesh=new NervRigidMeshSweepR52(part.triangles());complete.add(mesh);if(!Set.of("hand_l","hand_r","wrist_l","wrist_r").contains(part.bone()))meshes.add(mesh);}

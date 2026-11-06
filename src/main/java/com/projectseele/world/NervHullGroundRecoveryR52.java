@@ -26,7 +26,7 @@ public final class NervHullGroundRecoveryR52
     {var body=new EvaBodyPose.Sample(from.rig);for(String name:from.rig.keySet()){var a=from.rotations.get(name);var b=to.rotations.get(name);body.rotations.put(name,fraction<=0||a.equals(b)?new Quaternionf(a):fraction>=1?new Quaternionf(b):new Quaternionf(a).slerp(b,fraction).normalize());var x=from.positions.get(name);var y=to.positions.get(name);body.positions.put(name,fraction<=0||x.equals(y)?new Vector3f(x):fraction>=1?new Vector3f(y):new Vector3f(x).lerp(y,fraction));}body.dirty();return body;}
     private static float ease(double value){return EvaDorsalMechanism.smooth((float)Math.max(0,Math.min(1,value)));}
     private static EvaOriginalMeshGeometryR52.Geometry evaluate(EvaUnit01Entity e,EvaBodyPose.Sample body,CompoundTag hands)
-    {var p=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();return p.evaluate(e.getUnitVariant(),body,EvaFrozenHandsR52.decode(e.getUnitVariant(),p.handContractFingerprint(e.getUnitVariant()),p.handJoints(e.getUnitVariant()),hands));}
+    {var p=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();return p.evaluate(e.getUnitVariant(),body,EvaFrozenHandsR52.decode(e.getUnitVariant(),p.handJoints(e.getUnitVariant()),hands));}
     private static FootSupportFrameR52.Binding binding(EvaUnit01Entity e,EvaBodyPose.Sample body,EvaOriginalMeshGeometryR52.Geometry geometry)
     {var socket=EvaMechanicalFrameR52.emptySocketReferenceR52(body,EvaRifleKinematics.frameWorldR52(Vec3.ZERO,180),EvaDorsalProfile.of(e));return EvaMechanicalFrameR52.sourceSoleBindingR52(geometry,socket);}
     private static List<Vec3> desiredAnchors(EvaBodyPose.Sample body)
@@ -63,7 +63,7 @@ public final class NervHullGroundRecoveryR52
         if(preview==null||preview.kind()!=Kind.HULL_ONLY_RECOVERY||receiver.delivery()||!(level.getEntity(preview.original().eva()) instanceof EvaUnit01Entity e))return null;
         var saved=data.getCompound(KEY);if(!saved.isEmpty())
         {
-            if(!saved.getString("Source").equals(preview.sourceFingerprint())||!saved.getString("Port").equals(receiver.port()))return null;
+            if(!saved.getString("Port").equals(receiver.port()))return null;
             return new Plan(preview.original(),saved.getCompound("Start"),saved.getCompound("Goal"),saved.getCompound("Hands"),NervAircraftFrameR52.decodeRigid(saved.getCompound("Waiting")),NervAircraftFrameR52.decodeRigid(saved.getCompound("Stopped")),saved.getString("Source"),receiver.port());
         }
         var initial=decode(e,preview.bodySnapshotR52());var target=decode(e,EvaShutdownR30.encode(destinationPose(e,initial)));var hands=preview.handSnapshotR52();
@@ -88,9 +88,9 @@ public final class NervHullGroundRecoveryR52
         public boolean aircraftCurrent(ServerLevel level)
         {return level.getGameTime()==at&&level.getEntity(aircraft) instanceof UNTransportEntity p&&NervAircraftFrameR52.active(p)&&NervAirTransportManifestR52.same(NervAircraftFrameR52.actual(p),from.plane())&&NervAircraftFrameR52.frame(p,1).rig().equals(from.rig())&&NervAirTransportManifestR52.same(NervAircraftFrameR52.frame(p,1).cargo(),from.cargo())&&NervAircraftFrameR52.rotorClock(p)==rotorFrom;}
         public boolean current(ServerLevel level)
-        {return aircraftCurrent(level)&&level.getEntity(original.eva()) instanceof EvaUnit01Entity e&&originalHull(e,original)&&NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),fromRoot())&&EvaAirTransportR31.cradleStateR50(e).getCompound("Origin").equals(before)&&EvaFrozenHandsR52.capture(e,1).equals(hands)&&EvaMechanicalFrameR52.capturedGeometry(e).sourceFingerprint().equals(sourceFingerprint());}
+        {return aircraftCurrent(level)&&level.getEntity(original.eva()) instanceof EvaUnit01Entity e&&originalHull(e,original)&&NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),fromRoot())&&EvaAirTransportR31.cradleStateR50(e).getCompound("Origin").equals(before)&&EvaFrozenHandsR52.sameFrozen(EvaFrozenHandsR52.capture(e,1),hands)&&EvaMechanicalFrameR52.capturedGeometry(e).sourceFingerprint().equals(sourceFingerprint());}
         public boolean cargoCommitted(ServerLevel level)
-        {return aircraftCurrent(level)&&level.getEntity(original.eva()) instanceof EvaUnit01Entity e&&originalHull(e,original)&&NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),toRoot())&&EvaAirTransportR31.cradleStateR50(e).getCompound("Origin").equals(after)&&EvaFrozenHandsR52.capture(e,1).equals(hands);}
+        {return aircraftCurrent(level)&&level.getEntity(original.eva()) instanceof EvaUnit01Entity e&&originalHull(e,original)&&NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),toRoot())&&EvaAirTransportR31.cradleStateR50(e).getCompound("Origin").equals(after)&&EvaFrozenHandsR52.sameFrozen(EvaFrozenHandsR52.capture(e,1),hands);}
     }
     record Chord(String bone,Vec3[] vertices,double error,AABB box){}
     static List<Chord> chords(EvaOriginalMeshGeometryR52.Geometry from,EvaOriginalMeshGeometryR52.Geometry to,RigidTransform a,RigidTransform b,double error)
@@ -145,7 +145,7 @@ public final class NervHullGroundRecoveryR52
     {
         if(plan==null||age<0||age>=TICKS||!(level.getEntity(plan.original.eva()) instanceof EvaUnit01Entity e)||!originalHull(e,plan.original)||!(level.getEntity(aircraft) instanceof UNTransportEntity p)||!p.carrying()||current.cargo()==null||current.rig().deployment()!=1||current.rig().jaws()!=0)return null;
         var context=NervRouteRuntimeR52.flightContext(level);if(context==null)return null;var lease=context.pool().queryFlight(task);if(lease==null||!lease.original().equals(plan.original)||!lease.aircraft().equals(aircraft)||lease.kind()!=Kind.HULL_ONLY_RECOVERY||!lease.spaces().containsAll(spaces))return null;
-        if(!NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),plan.root(age))||!NervAirTransportManifestR52.same(current.cargo(),plan.root(age))||!sameBody(EvaMechanicalFrameR52.frozenLocalPose(e),plan.body(e,age))||!EvaFrozenHandsR52.capture(e,1).equals(plan.hands))return null;
+        if(!NervAirTransportManifestR52.same(EvaMechanicalFrameR52.frame(e,1),plan.root(age))||!NervAirTransportManifestR52.same(current.cargo(),plan.root(age))||!sameBody(EvaMechanicalFrameR52.frozenLocalPose(e),plan.body(e,age))||!EvaFrozenHandsR52.sameFrozen(EvaFrozenHandsR52.capture(e,1),plan.hands))return null;
         double rotor=NervAircraftFrameR52.rotorClock(p);if(!Double.isFinite(rotor))return null;
         var bodyFrom=EvaMechanicalFrameR52.frozenLocalPose(e);var geometryFrom=EvaMechanicalFrameR52.capturedGeometry(e);var contactsFrom=NervAirCradleContactsR52.evaluate(geometryFrom,desiredAnchors(bodyFrom));var after=EvaShutdownR30.encode(plan.body(e,age+1));
         var next=new Frame(current.plane(),plan.root(age+1),current.rig());var bodyTo=decode(e,after);boolean unchanged=sameBody(bodyFrom,bodyTo);var geometryTo=unchanged?geometryFrom:evaluate(e,bodyTo,plan.hands);var contactsTo=unchanged?contactsFrom:NervAirCradleContactsR52.evaluate(geometryTo,desiredAnchors(bodyTo));

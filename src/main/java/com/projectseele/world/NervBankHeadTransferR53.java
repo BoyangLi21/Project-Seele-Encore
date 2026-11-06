@@ -3,7 +3,6 @@ package com.projectseele.world;
 import com.google.gson.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.*;
 import java.util.*;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.world.phys.*;
@@ -12,7 +11,7 @@ import org.joml.Quaternionf;
 /** The original ball joint turns only its retractable captured head. The deck never turns. */
 public final class NervBankHeadTransferR53
 {
-    public static final String SOURCE="mesh/outer_head_transfer_r53.json",SOURCE_SHA="235eaec91ea7e269305a73e819fc3f9a94335d281444cdc819b98d96f48f182b",KEY="BankHeadTransferR53";
+    public static final String SOURCE="mesh/outer_head_transfer_r53.json",KEY="BankHeadTransferR53";
     public static final int TICKS=120;
     public static final double RETRACT=.65;
     public record Pose(Vec3 direction,double slide){}
@@ -20,8 +19,7 @@ public final class NervBankHeadTransferR53
     public static synchronized List<NervOuterCarrierGuideR52.Template> templates()throws IOException
     {
         if(parts!=null)return parts;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);
-        try{if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(SOURCE_SHA))throw new IllegalStateException("Selected actual head slide source changed");}catch(NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
-        var j=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(!j.get("schema").getAsString().equals("projectseele.r53.actual-outer-head-slide.v1")||!j.get("outer_source_sha256").getAsString().equals(NervOuterCarrierGuideR52.SOURCE_SHA)||j.get("retraction_metres").getAsDouble()!=RETRACT)throw new IllegalStateException("Exact original capture and bounded slide required");
+        var j=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(!j.get("schema").getAsString().equals("projectseele.r53.actual-outer-head-slide.v1")||j.get("retraction_metres").getAsDouble()!=RETRACT)throw new IllegalStateException("Exact original capture and bounded slide required");
         var all=j.getAsJsonArray("parts").deepCopy();all.addAll(j.getAsJsonArray("socket_overrides"));var out=new ArrayList<NervOuterCarrierGuideR52.Template>();for(var raw:all){var p=raw.getAsJsonObject();var values=p.getAsJsonArray("triangles_rgb");double[] rgb=new double[values.size()],xyz=new double[values.size()/2];if(rgb.length==0||rgb.length%18!=0)throw new IllegalStateException("Actual complete slide triangles required");for(int i=0,k=0;i<rgb.length;i+=6){for(int c=0;c<6;c++)rgb[i+c]=values.get(i+c).getAsDouble();xyz[k++]=rgb[i];xyz[k++]=rgb[i+1];xyz[k++]=rgb[i+2];}out.add(new NervOuterCarrierGuideR52.Template(p.get("name").getAsString(),p.get("frame").getAsString(),p.get("role").getAsString(),new NervRigidMeshSweepR52(xyz),rgb));}parts=List.copyOf(out);return parts;
     }
     public static boolean slides(String role){return Set.of("capture_structure","upper_bearing","lower_bearing","side_bearing","transfer_slider").contains(role);}
@@ -35,10 +33,10 @@ public final class NervBankHeadTransferR53
     }
     public static CompoundTag begin(UUID task,String directory,String route,Vec3 from,Vec3 to)
     {
-        sample(from,to,0);var t=new CompoundTag();t.putString("Source",SOURCE_SHA);t.putUUID("Task",task);t.putString("Directory",directory);t.putString("Route",route);t.putInt("Clock",0);t.put("From",point(from));t.put("To",point(to));return t;
+        sample(from,to,0);var t=new CompoundTag();t.putUUID("Task",task);t.putString("Directory",directory);t.putString("Route",route);t.putInt("Clock",0);t.put("From",point(from));t.put("To",point(to));return t;
     }
     public static Pose pose(CompoundTag state,double clock)
-    {if(!state.getString("Source").equals(SOURCE_SHA))throw new IllegalStateException("Actual local head source changed");return sample(point(state.getCompound("From")),point(state.getCompound("To")),clock);}
+    {return sample(point(state.getCompound("From")),point(state.getCompound("To")),clock);}
     public static boolean unfinished(CompoundTag state){return !state.isEmpty()&&state.getInt("Clock")<TICKS&&!state.getBoolean("AbortedToStart");}
     public static CompoundTag advance(CompoundTag state,int direction,long at)
     {

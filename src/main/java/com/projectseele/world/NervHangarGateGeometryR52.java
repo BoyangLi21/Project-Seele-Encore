@@ -2,7 +2,6 @@ package com.projectseele.world;
 import com.google.gson.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 import net.minecraft.world.phys.*;
 
@@ -73,7 +72,7 @@ public final class NervHangarGateGeometryR52
     private static NervAirframeGeometryR52.Part reflectClosedDepth(NervAirframeGeometryR52.Part p){var a=p.vertices();for(int i=0;i<a.length;i+=6)a[i+2]=.98-a[i+2];for(int i=0;i<a.length;i+=18)for(int n=0;n<6;n++){double old=a[i+6+n];a[i+6+n]=a[i+12+n];a[i+12+n]=old;}return new NervAirframeGeometryR52.Part(p.name(),a);}
     public static NervHangarGateGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource bytes,Spec spec)throws IOException
     {
-        byte[] data=bytes.read(NervSiloHatchGeometryR52.SOURCE);try{if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(data)).equals(NervSiloHatchGeometryR52.SOURCE_SHA))throw new IllegalStateException("Side-stack door source changed");}catch(java.security.NoSuchAlgorithmException bad){throw new IllegalStateException(bad);}var array=JsonParser.parseString(new String(data,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts").getAsJsonArray("hatch_panel");var v=new double[array.size()];for(int i=0;i<v.length;i++)v[i]=array.get(i).getAsFloat();return new NervHangarGateGeometryR52(spec,new NervAirframeGeometryR52.Part("source_panel",v));
+        byte[] data=bytes.read(NervSiloHatchGeometryR52.SOURCE);var array=JsonParser.parseString(new String(data,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts").getAsJsonArray("hatch_panel");var v=new double[array.size()];for(int i=0;i<v.length;i++)v[i]=array.get(i).getAsFloat();return new NervHangarGateGeometryR52(spec,new NervAirframeGeometryR52.Part("source_panel",v));
     }
     public static synchronized NervHangarGateGeometryR52 loadClasspath(Spec spec)throws IOException{var g=CACHE.get(spec);if(g==null){g=load(EvaOriginalMeshGeometryR52::classpathBytes,spec);CACHE.put(spec,g);}return g;}
     private static NervAirframeGeometryR52.Part box(String name,double x0,double y0,double z0,double x1,double y1,double z1,int color)

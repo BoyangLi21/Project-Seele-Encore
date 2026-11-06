@@ -27,16 +27,11 @@ public final class EvaRifleClearance
         try(var in=EvaRifleClearance.class.getResourceAsStream("/assets/projectseele/motion/rifle_clearance_r10.json"))
         {
             var root=JsonParser.parseReader(new InputStreamReader(in,StandardCharsets.UTF_8)).getAsJsonObject();
-            if(!root.has("schema")||root.get("schema").getAsString().equals("1"))return parse(root,null);
-            try(var mesh=EvaRifleClearance.class.getResourceAsStream("/assets/projectseele/mesh/eva_pallet_smg.mesh.json"))
-            {
-                String hash=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(mesh.readAllBytes()));
-                return parse(root,hash);
-            }
+            return parse(root);
         }
-        catch(Exception failure){throw new IllegalStateException("Rifle geometry unavailable or mismatched",failure);}
+        catch(Exception failure){throw new IllegalStateException("Rifle geometry unavailable",failure);}
     }
-    static Hull parse(com.google.gson.JsonObject root,String meshHash)
+    static Hull parse(com.google.gson.JsonObject root)
     {
         var a=root.getAsJsonArray("points");Vec3[] result=new Vec3[a.size()];
         if(result.length==0)throw new IllegalArgumentException("Empty rifle support surface");
@@ -44,8 +39,6 @@ public final class EvaRifleClearance
         if(!root.has("schema")||root.get("schema").getAsString().equals("1"))return legacy(result);
         if(!root.get("schema").getAsString().equals("projectseele.rifle-geometry.r53.v1"))
             throw new IllegalArgumentException("Unknown rifle geometry schema");
-        if(meshHash==null||!meshHash.equals(root.get("mesh_sha256").getAsString()))
-            throw new IllegalArgumentException("Rifle contact geometry and mesh differ");
         return new Hull(result,vector(root.getAsJsonArray("muzzle")),vector(root.getAsJsonArray("stock")),
                 vector(root.getAsJsonArray("dominant_pad")),vector(root.getAsJsonArray("supporting_pad")),false);
     }

@@ -27,7 +27,7 @@ public final class NervAirframeGeometryR52
         var parts=new LinkedHashMap<String,Part>();var receipts=new TreeMap<String,String>();
         for(String path:List.of("mesh/tv_facilities_r16.json","mesh/air_cradle_r31.json"))
         {
-            byte[] b=bytes.read(path);String hash=sha(b);if(!hash.equals(expected.get(path)))throw new IllegalStateException("Actual aircraft rendered source changed: "+path);receipts.put(path,hash);
+            byte[] b=bytes.read(path);receipts.put(path,sha(b));
             var root=JsonParser.parseString(new String(b,StandardCharsets.UTF_8)).getAsJsonObject();
             for(var e:root.getAsJsonObject("parts").entrySet())if(e.getKey().equals("un_ground_carrier")||e.getKey().equals("un_transport_body")||e.getKey().startsWith("un_transport_rotor_")||e.getKey().startsWith("air_cradle_"))
             {var row=e.getValue().getAsJsonArray();var v=new double[row.size()];for(int i=0;i<v.length;i++){v[i]=row.get(i).getAsFloat();if(!Double.isFinite(v[i]))throw new IllegalStateException("Nonfinite original aircraft triangle");}if(parts.putIfAbsent(e.getKey(),new Part(e.getKey(),v))!=null)throw new IllegalStateException("Duplicate actual aircraft part");}

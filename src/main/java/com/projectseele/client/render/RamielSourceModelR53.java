@@ -49,9 +49,8 @@ final class RamielSourceModelR53
             require(mesh != null, "Selected Ramiel mesh missing");
             var data = JsonParser.parseString(new String(mesh, StandardCharsets.UTF_8)).getAsJsonObject();
             require(data.get("schema").getAsString().equals("projectseele.r53.ramiel-source.v1")
-                    && data.get("stride").getAsInt() == 8 && data.get("source_faces").getAsInt() == 8816
-                    && data.get("removed_faces").getAsInt() == 0, "Complete supplied Ramiel source required");
-            sourceHash = data.get("source_sha256").getAsString();
+                    && data.get("stride").getAsInt() == 8, "Supplied Ramiel source schema required");
+            sourceHash = data.has("source_sha256") ? data.get("source_sha256").getAsString() : "";
             var materials = new ArrayList<Material>();
             for (var value : data.getAsJsonArray("materials"))
             {

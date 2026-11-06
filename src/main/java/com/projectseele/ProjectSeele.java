@@ -63,8 +63,6 @@ public class ProjectSeele
         event.enqueueWork(() ->
         {
             SeeleNetwork.register();
-            if(!System.getProperty("projectseele.r45CampaignAcceptancePlan", "").isBlank())
-                net.minecraftforge.common.MinecraftForge.EVENT_BUS.register(com.projectseele.visual.TvCampaignNativeAcceptanceR45.class);
             EvaLiveCombatMotion.preload();
             ForgeChunkManager.setForcedChunkLoadingCallback(MODID,
                     NervRuntimeMaintenance::validateForcedChunkTickets);

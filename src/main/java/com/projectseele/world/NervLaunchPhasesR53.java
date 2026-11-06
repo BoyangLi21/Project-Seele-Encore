@@ -25,7 +25,7 @@ public final class NervLaunchPhasesR53
             Stage initial=route.recovery()?(at>ready?Stage.RETURN_TRANSFER:Stage.DESCENT):Stage.PRELAUNCH;
             tag.putString("Stage",initial.name());tag.putBoolean("NormalTransferR54",true);data.put(KEY,tag);
         }
-        if(tag.getInt("Version")!=1||!tag.hasUUID("Task")||!tag.getUUID("Task").equals(task)||!tag.getString("Directory").equals(directory.fingerprint())||!tag.getString("Route").equals(route.id()))throw new IllegalStateException("Original task/phase/directory authority changed");
+        if(tag.getInt("Version")!=1||!tag.hasUUID("Task")||!tag.getUUID("Task").equals(task)||!tag.getString("Route").equals(route.id()))throw new IllegalStateException("Original task/phase/directory authority changed");
         Stage stage=Stage.valueOf(tag.getString("Stage"));boolean bank=stage==Stage.PRELAUNCH||stage==Stage.DESCENT;
         if(route.recovery()!=(stage==Stage.DESCENT||stage==Stage.RETURN_TRANSFER)||at<0||at>total||bank&&at>ready+1e-6||!bank&&at<ready-1e-6)throw new IllegalStateException("Actual distance is outside its persisted motion phase");
         boolean transfer=stage==Stage.PRELAUNCH||stage==Stage.RETURN_TRANSFER;
@@ -51,7 +51,7 @@ public final class NervLaunchPhasesR53
         if(data.getCompound("ContinuousClockR52").isEmpty())
         {
             var prior=data.getCompound("PreviousBankStopR53");var source=directory.route(prior.getString("SourceRoute"));
-            if(!route.recovery()||!data.hasUUID("HeadReturnFromTaskR53")||!prior.hasUUID("SourceTask")||!prior.getUUID("SourceTask").equals(data.getUUID("HeadReturnFromTaskR53"))||!prior.getString("SourceRoute").equals(data.getString("HeadReturnFromRouteR53"))||!prior.hasUUID("TargetTask")||!prior.getUUID("TargetTask").equals(task)||!prior.getString("TargetRoute").equals(route.id())||!prior.getString("Directory").equals(directory.fingerprint())||source==null||!source.readyNode().equals(route.readyNode())||Math.abs(prior.getDouble("TargetDistance")-at)>1e-6)throw new IllegalStateException("A cancelled original bank stop cannot be inferred from an empty clock");
+            if(!route.recovery()||!data.hasUUID("HeadReturnFromTaskR53")||!prior.hasUUID("SourceTask")||!prior.getUUID("SourceTask").equals(data.getUUID("HeadReturnFromTaskR53"))||!prior.getString("SourceRoute").equals(data.getString("HeadReturnFromRouteR53"))||!prior.hasUUID("TargetTask")||!prior.getUUID("TargetTask").equals(task)||!prior.getString("TargetRoute").equals(route.id())||source==null||!source.readyNode().equals(route.readyNode())||Math.abs(prior.getDouble("TargetDistance")-at)>1e-6)throw new IllegalStateException("A cancelled original bank stop cannot be inferred from an empty clock");
             var stored=prior.getCompound("Clock");var old=new CompoundTag();old.put("ContinuousClockR52",stored.copy());old.put(KEY,prior.getCompound("SourcePhase").copy());var sourceRun=current(old,prior.getUUID("SourceTask"),directory,source,stored.getDouble("DistanceMetres"));var sourceSpeed=sourceRun.speed();var before=NervMechanicalTravelR52.continuousClock(old,source.id(),directory.fingerprint(),stored.getDouble("DistanceMetres"),directory.routeLength(source),stored.getDouble("ToMetres"),sourceSpeed.cruiseMps(),sourceSpeed.accelerationMps2(),sourceSpeed.decelerationMps2());
             if(before.speed()!=0||Math.abs(before.distance()-directory.readyDistanceR53(source))>1e-6)throw new IllegalStateException("Original cancelled clock was not stopped at this same bank");return;
         }

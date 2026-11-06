@@ -119,8 +119,7 @@ public final class FacilityV2RouteGateDirector
         FacilityV2SavedData.ZoneRecord receipt =
                 data.requireZone(zoneId);
         return receipt.state() == FacilityV2SavedData.ZoneState.COMPLETE
-                && !receipt.generatorVersion().isBlank()
-                && !receipt.buildPlanHash().isBlank();
+                && !receipt.generatorVersion().isBlank();
     }
 
     /**

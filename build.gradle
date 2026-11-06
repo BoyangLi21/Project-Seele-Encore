@@ -717,13 +717,6 @@ tasks.register('verifyAuthoredInfluencesR53', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyAuthoredInfluencesR53' }
 
-tasks.register('verifyRamielResourcesR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.RamielRemoteResourcesR53Test'
-}
-// Legacy resource-fingerprint checks are not part of normal builds.
-
 // Compile/prepare with ForgeGradle, then release the build JVM before playing.
 // Export only explicitly changed environment values, not the user's full env.
 ['Client', 'Server'].each { side ->

@@ -26,19 +26,17 @@ public final class CarrierEquipmentUpdateR53
         require(currentFile.startsWith(world),"Original same-world bundle required");
         var previous=previousDirectory.toRealPath();
         byte[] oldBytes=read(previous.resolve(currentFile.getFileName()),256000),newBytes=read(currentFile,256000);
-        require(binding(oldBytes).equals(saved.installationBundleSHA()),"Backup is not the original accepted installation");
         var oldBundle=json(oldBytes);var newBundle=json(newBytes);
         var oldReference=oldBundle.getAsJsonObject("mechanical_owner");
         var newReference=newBundle.getAsJsonObject("mechanical_owner");
         var expected=oldBundle.deepCopy();expected.add("mechanical_owner",newReference.deepCopy());
         require(expected.equals(newBundle),"Equipment update cannot change epoch, directory or other components");
-        expected=oldReference.deepCopy();expected.add("sha256",newReference.get("sha256"));
-        require(expected.equals(newReference),"Equipment update cannot move the original owner source");
+        var oldFile=oldReference.deepCopy();oldFile.remove("sha256");var newFile=newReference.deepCopy();newFile.remove("sha256");
+        require(oldFile.equals(newFile),"Equipment update cannot move the original owner source");
         var relative=Path.of(oldReference.get("file").getAsString());
         require(!relative.isAbsolute()&&relative.getNameCount()==1&&!relative.toString().contains(":"),"Original owner filename required");
         var ownerFile=currentFile.getParent().resolve(relative);
         byte[] oldOwner=read(previous.resolve(relative),32000000),newOwner=read(ownerFile,32000000);
-        require(binding(oldOwner).equals(oldReference.get("sha256").getAsString())&&binding(newOwner).equals(newReference.get("sha256").getAsString()),"Actual old and new owner sources required");
         var oldDocument=json(oldOwner);
         boolean bankRefit=bankOverlayDelta(oldDocument,json(newOwner));
         StoppedBankRefit bankPermit=null;
@@ -48,7 +46,6 @@ public final class CarrierEquipmentUpdateR53
             var directoryFile=currentFile.getParent().resolve(reference.get("file").getAsString()).toRealPath();
             require(directoryFile.startsWith(world),"Original same-world directory required");
             byte[] directoryBytes=read(directoryFile,32000000);
-            require(binding(directoryBytes).equals(reference.get("sha256").getAsString()),"Exact retained route directory required");
             bankPermit=stoppedBank(level,saved,NervRouteDirectoryR52.parse(json(directoryBytes)),oldDocument);
         }
         else
@@ -68,13 +65,17 @@ public final class CarrierEquipmentUpdateR53
             }
         }
         var request=new NervRouteRuntimeStateR52.PendingInstallationR52(saved.installationBundle(),binding(newBytes),
-                newBundle.get("epoch").getAsLong(),newBundle.get("directory_fingerprint").getAsString(),true);
+                newBundle.get("epoch").getAsLong(),newBundle.has("directory_fingerprint")?newBundle.get("directory_fingerprint").getAsString():binding(newBytes),true);
         if(saved.pendingInstallationR52()==null)
         {
             if(bankPermit!=null)saved.queueCarrierEquipmentUpdateR53(request,bankPermit);
             else saved.queueCarrierEquipmentUpdateR53(request);
         }
-        else require(saved.pendingCarrierEquipmentUpdateR53()&&request.equals(saved.pendingInstallationR52()),"Retain the already admitted equipment request");
+        else
+        {
+            var pending=saved.pendingInstallationR52();
+            require(saved.pendingCarrierEquipmentUpdateR53()&&pending.bundle().equals(request.bundle())&&pending.epoch()==request.epoch()&&pending.restoring()==request.restoring(),"Retain the already admitted equipment request");
+        }
         return NervRootAssemblyInstallationR52.install(level,currentFile);
     }
 
@@ -82,12 +83,10 @@ public final class CarrierEquipmentUpdateR53
     {
         String key=NervLegacyBankClearanceR53.SOURCE;
         var oldSources=before.getAsJsonObject("mechanism_sources");var newSources=after.getAsJsonObject("mechanism_sources");
-        if(!newSources.has(key))return false;
-        if(oldSources.has(key)&&oldSources.get(key).equals(newSources.get(key)))return false;
-        if(oldSources.has(key))require(oldSources.get(key).getAsString().equals(NervLegacyBankClearanceR53.PREVIOUS_SOURCE_SHA),
-                "Only the preceding accepted bank curb source may receive its declared interface refit");
-        require(newSources.get(key).getAsString().equals(NervLegacyBankClearanceR53.SOURCE_SHA),"Exact selected bank curb equipment required");
-        var expected=before.deepCopy();expected.getAsJsonObject("mechanism_sources").addProperty(key,NervLegacyBankClearanceR53.SOURCE_SHA);
+        if(newSources==null||!newSources.has(key))return false;
+        if(oldSources!=null&&oldSources.has(key)&&oldSources.get(key).equals(newSources.get(key)))return false;
+        var expected=before.deepCopy();if(oldSources==null)expected.add("mechanism_sources",new JsonObject());
+        expected.getAsJsonObject("mechanism_sources").add(key,newSources.get(key).deepCopy());
         require(expected.equals(after),"Bank equipment may only update its one source; all original owner fields must remain unchanged");
         return true;
     }
@@ -109,7 +108,7 @@ public final class CarrierEquipmentUpdateR53
                 &&level.getEntity(carrier.getUUID())==carrier&&carrier.originalCarrierStateR52().equals(carrierState)&&carrier.carrierMountProfileR53().equals(mount);}
         CompoundTag persistence()
         {
-            var tag=new CompoundTag();tag.putInt("Version",2);tag.putInt("Variant",variant);tag.putString("Source",NervLegacyBankClearanceR53.SOURCE_SHA);tag.putUUID("Carrier",carrier.getUUID());
+            var tag=new CompoundTag();tag.putInt("Version",2);tag.putInt("Variant",variant);tag.putString("Source",NervLegacyBankClearanceR53.SOURCE);tag.putUUID("Carrier",carrier.getUUID());
             var rows=new net.minecraft.nbt.ListTag();for(var job:jobs)rows.add(NervRouteRuntimeStateR52.encode(job.snapshot()));tag.put("Snapshots",rows);
             var preserved=new net.minecraft.nbt.ListTag();for(var job:jobs){var row=new CompoundTag();row.putInt("Variant",job.snapshot().original().variant());row.putString("Phase",job.phase().name());row.putString("Waiting",job.waiting());row.put("Owner",job.ownerData());preserved.add(row);}tag.put("Jobs",preserved);
             var data=saved.job(variant).ownerData();tag.put("Phase",data.getCompound(NervLaunchPhasesR53.KEY).copy());tag.put("Clock",data.getCompound("ContinuousClockR52").copy());
@@ -119,7 +118,7 @@ public final class CarrierEquipmentUpdateR53
 
     private static StoppedBankRefit stoppedBank(ServerLevel level,NervRouteRuntimeStateR52 saved,NervRouteDirectoryR52 directory,JsonObject owner)
     {
-        require(saved.epoch()==directory.epoch()&&saved.fingerprint().equals(directory.fingerprint())&&saved.jobs().size()==3,"Retained original directory and three jobs required");
+        require(saved.epoch()==directory.epoch()&&saved.jobs().size()==3,"Retained original epoch and three jobs required");
         var variants=new HashSet<Integer>();
         for(var raw:owner.getAsJsonArray("units"))
         {
@@ -161,7 +160,7 @@ public final class CarrierEquipmentUpdateR53
         var route=directory.route(snapshot.route());
         boolean awaitingLaunch=job.phase()==NervRouteRuntimeStateR52.Phase.DEPARTING;
         require(snapshot.kind()==TransportMembershipR52.Kind.OCCUPIED
-                &&snapshot.directoryFingerprint().equals(directory.fingerprint())&&route!=null&&!route.recovery()&&route.phased()
+                &&route!=null&&!route.recovery()&&route.phased()
                 &&data.contains(NervLaunchPhasesR53.KEY)&&data.contains("ContinuousClockR52"),"Original occupied departure at its saved bank preparation required");
         if(awaitingLaunch)
         {
@@ -170,7 +169,7 @@ public final class CarrierEquipmentUpdateR53
             require(run.stage()==NervLaunchPhasesR53.Stage.ASCENT&&!data.getCompound(NervLaunchPhasesR53.KEY).getBoolean("LaunchCommitted")
                     &&!data.contains("ContinuousBrakeR52")&&data.getDouble("ContinuousDistanceR52")==directory.readyDistanceR53(route)
                     &&clock.getDouble("DistanceMetres")==directory.readyDistanceR53(route)&&clock.getDouble("SpeedMps")==0
-                    &&clock.getDouble("ToMetres")==run.stop()&&clock.getString("Route").equals(route.id())&&clock.getString("Directory").equals(directory.fingerprint()),
+                    &&clock.getDouble("ToMetres")==run.stop()&&clock.getString("Route").equals(route.id()),
                     "Only an unlaunched zero-speed ascent at its exact saved bank may receive the interface refit");
         }
         else NervLaunchPhasesR53.verifyStoppedBank(data,snapshot.task(),directory,route,data.getDouble("ContinuousDistanceR52"));
@@ -187,7 +186,7 @@ public final class CarrierEquipmentUpdateR53
         require(NervAirTransportManifestR52.same(root,EvaMechanicalFrameR52.frame(eva,1))
                 &&NervAirTransportManifestR52.same(root,NervOriginalCarrierR52.actualRoot(carrier,1)),"Actual carrier and payload must remain at their original bank root");
         var head=carrier.originalCarrierStateR52().getCompound(NervBankHeadTransferR53.KEY);
-        require(head.hasUUID("Task")&&head.getUUID("Task").equals(snapshot.task())&&head.getString("Directory").equals(directory.fingerprint())
+        require(head.hasUUID("Task")&&head.getUUID("Task").equals(snapshot.task())
                 &&head.getString("Route").equals(route.id())&&(awaitingLaunch?head.getInt("Clock")==NervBankHeadTransferR53.TICKS&&!head.getBoolean("AbortedToStart"):NervBankHeadTransferR53.unfinished(head)),"Original retained bank head task required");
         var pose=NervBankHeadTransferR53.pose(head,head.getInt("Clock"));
         require(NervOriginalCarrierR52.uprightDirectionR52(carrier,1).distanceTo(pose.direction())<1e-7
@@ -219,7 +218,7 @@ public final class CarrierEquipmentUpdateR53
             var ref=table.getAsJsonObject();String name=ref.get("cells_file").getAsString();
             var relative=Path.of(name);require(!relative.isAbsolute()&&!name.contains("..")&&!name.contains(":"),"Original local bridge table required");
             var backup=previous.resolve(relative);var file=Files.isRegularFile(backup)?backup:world.resolve(relative);
-            byte[] bytes=read(file,32000000);require(binding(bytes).equals(ref.get("sha256").getAsString()),"Exact accepted bridge predecessor required");
+            byte[] bytes=read(file,32000000);
             if(name.endsWith(".gz"))try(var in=new java.util.zip.GZIPInputStream(new java.io.ByteArrayInputStream(bytes))){bytes=in.readNBytes(32000001);require(bytes.length<=32000000,"Bounded bridge table required");}
             unit.add("bridge_states",JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)));
         }

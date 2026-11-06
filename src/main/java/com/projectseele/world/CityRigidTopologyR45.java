@@ -55,8 +55,7 @@ public final class CityRigidTopologyR45
         if (tag != null && "CANDIDATE_DISABLED".equals(tag.getString("Stage"))
                 && !tag.getBoolean("RuntimeEnabled") && tag.getBoolean("ExactStaticMigrationPassed")
                 && tag.getBoolean("ExactCargoMigrationPassed")
-                && !System.getProperty("projectseele.r45CityCreateDistrict", "").isEmpty()
-                && CityAtomicCandidateBindingR45.candidateLeaseReady(level.getServer().getWorldPath(LevelResource.ROOT)))
+                && !System.getProperty("projectseele.r45CityCreateDistrict", "").isEmpty())
             return tag;
         if (tag == null || !"INSTALLED".equals(tag.getString("Stage"))
                 || !tag.getBoolean("NativeStructurePassed") || !tag.getBoolean("ExactCargoMigrationPassed"))

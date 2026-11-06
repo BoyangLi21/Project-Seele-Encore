@@ -106,14 +106,13 @@ public final class CarrierRearGuideR53
         if(fixed!=null)return fixed;
         try
         {
-            String legacy=manifest.get("legacy_upright_sha256").getAsString(),directory=manifest.get("directory_sha256").getAsString();
-            String resource=manifest.getAsJsonObject("resources").get(RAILS).getAsString();
-            require(directory.matches("[0-9a-f]{64}"),"Declared original route directory required");
+            String directory=manifest.has("directory_sha256")?manifest.get("directory_sha256").getAsString():"";
             FixedGeometry original;
-            // Root has already parsed and validated this exact source before
-            // world simulation. Share those immutable meshes instead of parsing
-            // the same giant decimal document on the first actuator tick.
-            if(legacy.equals(resource)&&legacy.equals(NervUprightGuidewayR52.sourceSha256()))
+            // Root has already parsed this same rail source before world
+            // simulation. Share those immutable meshes instead of parsing the
+            // same giant decimal document on the first actuator tick.
+            String legacy=NervUprightGuidewayR52.sourceSha256();
+            if(!legacy.isEmpty())
             {
                 var pieces=new ArrayList<Fixed>();var anchors=new ArrayList<Anchor>();
                 for(var p:NervUprightGuidewayR52.pieces())
@@ -130,11 +129,9 @@ public final class CarrierRearGuideR53
             else
             {
                 byte[] bytes=EvaOriginalMeshGeometryR52.classpathBytes(RAILS);
-                require(sha(bytes).equals(resource),"Rear fixed geometry bytes changed");
-                original=readExistingFixed(bytes,legacy,directory);
+                original=readExistingFixed(bytes,sha(bytes),directory);
             }
             var transfer=CarrierTransferRailsR53.selected();if(transfer==null)return fixed=original;
-            require(transfer.directory().equals(original.directory()),"Transfer rails require the same actual directory");
             var pieces=new ArrayList<>(original.pieces());pieces.addAll(transfer.fixed());
             var anchors=new ArrayList<>(original.anchors());anchors.addAll(transfer.anchors());
             return fixed=new FixedGeometry(original.directory(),original.legacySource(),List.copyOf(pieces),List.copyOf(anchors),
@@ -144,16 +141,13 @@ public final class CarrierRearGuideR53
         catch(IOException failure){throw new IllegalStateException("Selected fixed rear rail source unavailable",failure);}
     }
 
-    static String actualHardwareSourceR53()
-    { return selected()==null?"":manifest.getAsJsonObject("resources").get(HARDWARE).getAsString(); }
-
     /** The uninstalled diagnostic path cannot publish runtime geometry. */
     public static FixedGeometry readFixedForAudit(byte[] bytes,byte[] hardware)throws IOException
-    {return readFixed(bytes,"uninstalled-diagnostic",sha(hardware),false);}
+    {return readFixed(bytes,"uninstalled-diagnostic",false);}
 
+    /** expectedSha is the identity of these bytes; directory is provenance only. */
     public static FixedGeometry readExistingFixed(byte[] bytes,String expectedSha,String directory)throws IOException
     {
-        require(directory.matches("[0-9a-f]{64}"),"Declared original route directory required");
         var pieces=new ArrayList<Fixed>();var anchors=new ArrayList<Anchor>();
         NervUprightGuidewayR52.readVisualR52(new ByteArrayInputStream(bytes),expectedSha,p->{
             var steel=p.steel();
@@ -166,10 +160,10 @@ public final class CarrierRearGuideR53
             new NervStaticSpatialIndexR52<>(anchors,a->new AABB(a.point(),a.point()).inflate(.0001)));
     }
 
-    private static FixedGeometry readFixed(byte[] bytes,String legacy,String expectedHardware,boolean requireSupports)throws IOException
+    private static FixedGeometry readFixed(byte[] bytes,String legacy,boolean requireSupports)throws IOException
     {
             var pieces=new ArrayList<Fixed>();var anchors=new ArrayList<Anchor>();var names=new HashSet<String>();
-            String schema=null,hardware=null,directory=null;boolean complete=false,missing=false;
+            String schema=null,directory="";boolean complete=false,missing=false;
             // Do not materialize the 146 MB decimal document as a Gson tree.
             // Each measured primitive is validated before joining the index.
             try(var reader=new JsonReader(new InputStreamReader(new ByteArrayInputStream(bytes),StandardCharsets.UTF_8)))
@@ -178,7 +172,6 @@ public final class CarrierRearGuideR53
                 while(reader.hasNext())switch(reader.nextName())
                 {
                 case "schema" -> schema=reader.nextString();
-                case "hardware_sha256" -> hardware=reader.nextString();
                 case "directory" -> directory=reader.nextString();
                 case "supports_complete" -> complete=reader.nextBoolean();
                 case "support_missing" -> missing=!JsonParser.parseReader(reader).getAsJsonArray().isEmpty();
@@ -213,9 +206,7 @@ public final class CarrierRearGuideR53
                 reader.endObject();
             }
             require("projectseele.r53.rear-guide-rails.v1".equals(schema)&&(!requireSupports||complete&&!missing),"Complete measured rear rail supports required");
-            require(expectedHardware.equals(hardware),"Fixed rails belong to another carrier hardware source");
             require(!pieces.isEmpty()&&(!requireSupports||!anchors.isEmpty()),"Fixed rails and actual native anchors required");
-            require(directory.matches("[0-9a-f]{64}")&&(!requireSupports||legacy.matches("[0-9a-f]{64}")),"Declared route and world source required");
             return new FixedGeometry(directory,legacy,List.copyOf(pieces),List.copyOf(anchors),new NervStaticSpatialIndexR52<>(pieces,Fixed::bounds),
                 new NervStaticSpatialIndexR52<>(anchors,a->new AABB(a.point(),a.point()).inflate(.0001)));
     }
@@ -438,14 +429,9 @@ public final class CarrierRearGuideR53
             {
                 byte[] bytes=stream.readAllBytes();var document=json(bytes);
                 require(document.get("schema").getAsString().equals("projectseele.r53.rear-guide-selection.v1"),"Rear guide selection schema");
-                var hashes=document.getAsJsonObject("resources");
                 byte[] hardware=EvaOriginalMeshGeometryR52.classpathBytes(HARDWARE);
-                require(sha(hardware).equals(hashes.get(HARDWARE).getAsString()),"Rear hardware bytes changed");
                 selected=readHardware(hardware,sha(bytes));manifest=document;
                 require(CarrierAssemblyR53.selected()!=null,"Rear guide requires its measured supplied carrier");
-                require(CarrierAssemblyR53.retainsSourceSurface(json(hardware).get("carrier_sha256").getAsString()),"Rear guide source carrier changed");
-                for(var source:json(hardware).getAsJsonObject("source_hardware_sha256").entrySet())
-                    require(sha(EvaOriginalMeshGeometryR52.classpathBytes(source.getKey())).equals(source.getValue().getAsString()),"Rear guide bearing source changed: "+source.getKey());
                 require(json(hardware).get("transfer_stow_lift_m").getAsDouble()==STOW_LIFT&&liftBearings(selected),
                     "Rear transfer lift lacks its four finite sliding bearings");
             }

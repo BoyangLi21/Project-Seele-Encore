@@ -71,15 +71,14 @@ public final class NervAirTransportStateR52 extends SavedData
     public void bind(long newEpoch,String directory,String manifest)
     {
         if(!fault.isEmpty())throw new IllegalStateException(fault);
-        if(newEpoch<=0||!directory.matches("[0-9a-f]{64}")||!manifest.matches("[0-9a-f]{64}"))throw new IllegalArgumentException("Explicit matching Root flight receipt required");
-        if(jobs.values().stream().anyMatch(Job::active)&&(epoch!=newEpoch||!directoryFingerprint.equals(directory)||!manifestFingerprint.equals(manifest)))throw new IllegalStateException("Active original flights cannot change directory/epoch/manifest");
+        if(newEpoch<=0||directory==null||manifest==null)throw new IllegalArgumentException("Explicit Root flight epoch required");
+        if(jobs.values().stream().anyMatch(Job::active)&&epoch!=newEpoch)throw new IllegalStateException("Active original flights cannot change epoch");
         epoch=newEpoch;directoryFingerprint=directory;manifestFingerprint=manifest;setDirty();
     }
     private void validate(Job job)
     {
         if(!job.active())return;
-        if(job.original().epoch()!=epoch||job.original().epoch()<=0||job.original().variant()<0||job.original().variant()>2
-                ||!job.manifestFingerprint().equals(manifestFingerprint))throw new IllegalArgumentException("Saved original flight context changed");
+        if(job.original().epoch()!=epoch||job.original().epoch()<=0||job.original().variant()<0||job.original().variant()>2)throw new IllegalArgumentException("Saved original flight context changed");
         for(var existing:jobs.values())if(existing.active()&&!existing.task().equals(job.task()))
         {
             if(existing.aircraft().equals(job.aircraft()))throw new IllegalArgumentException("Original aircraft has two tasks");

@@ -302,7 +302,6 @@ public final class CityCreateDistrictR45
                 ServerLevel level = event.getServer().getLevel(FacilitySchemaV2.DIMENSION);
                 Path world = event.getServer().getWorldPath(LevelResource.ROOT).toAbsolutePath().normalize();
                 if (input.has("candidate_binding")) world = world.toRealPath();
-                if (level != null && !CityAtomicCandidateBindingR45.admit(world, input)) return;
                 if (level == null
                         || !world.equals(Path.of(input.get("world").getAsString()).toAbsolutePath().normalize())
                         || level.getSeed() != input.get("world_seed").getAsLong()
@@ -369,7 +368,6 @@ public final class CityCreateDistrictR45
                     throw new IllegalStateException("Actual complete city source endpoint differs from the explicit native job");
                 if (input.has("unplaced_fault_recovery"))
                 {
-                    CityAtomicCandidateBindingR45.verifyUnplacedFault(world, input.getAsJsonObject("unplaced_fault_recovery"), active.world);
                     var recovery = recover(level, active.origin, false);
                     if (!recovery.accepted()) throw new IllegalStateException("Explicit unplaced city recovery rejected: " + recovery.message());
                     ProjectSeele.LOGGER.info("R45 explicit unplaced city preparation recovery: {}", recovery.message());

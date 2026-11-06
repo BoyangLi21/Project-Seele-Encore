@@ -3,7 +3,6 @@ package com.projectseele.world;
 import com.google.gson.*;
 import java.io.*;
 import java.nio.charset.StandardCharsets;
-import java.security.*;
 import java.util.*;
 import net.minecraft.world.phys.*;
 import org.joml.*;
@@ -13,15 +12,14 @@ import java.lang.Math;
  * frame; only the captured rail head takes the independently transported
  * track frame. The source contains measured original deck weld facets. */
 public final class NervOuterCarrierGuideR52 {
- public static final String SOURCE="mesh/upright_outer_captured_r52.json",SOURCE_SHA="18768bb49713daf08a8f3b9d186fff5ac123e21b471e8fcc21c7251e17a66fb7";
+ public static final String SOURCE="mesh/upright_outer_captured_r52.json";
  public record Template(String name,String frame,String role,NervRigidMeshSweepR52 mesh,double[] rgb){}
  private static List<Template> parts;
  public static boolean selected(){return parts!=null;}
  public static synchronized void install()throws IOException {
   if(parts!=null)return;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);
-  try{if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(SOURCE_SHA))throw new IllegalStateException("Actual selected outer-capture source differs");}catch(NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
   var source=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();
-  if(!source.get("schema").getAsString().equals("projectseele.r52.upright-outer-captured-model.v1")||!source.get("original_full_source_sha256").getAsString().equals(NervOriginalCarrierR52.SOURCE_SHA)||!source.get("original_running_source_sha256").getAsString().equals(NervLegacyCarrierRideR52.SOURCE_SHA))throw new IllegalStateException("Original full carrier/deck dependency differs");
+  if(!source.get("schema").getAsString().equals("projectseele.r52.upright-outer-captured-model.v1"))throw new IllegalStateException("Explicit outer-capture schema required");
   var out=new ArrayList<Template>();for(var value:source.getAsJsonArray("parts")){var p=value.getAsJsonObject();String frame=p.get("frame").getAsString();if(!Set.of("ROOT","RUNNER_NEG","RUNNER_POS").contains(frame))throw new IllegalStateException("Unknown real outer capture frame");var a=p.getAsJsonArray("triangles_rgb");if(a.size()%18!=0||a.isEmpty())throw new IllegalStateException("Complete actual outer steel triangles required");double[] rgb=new double[a.size()],xyz=new double[a.size()/2];for(int i=0,k=0;i<rgb.length;i+=6){for(int c=0;c<6;c++)rgb[i+c]=a.get(i+c).getAsDouble();xyz[k++]=rgb[i];xyz[k++]=rgb[i+1];xyz[k++]=rgb[i+2];}out.add(new Template(p.get("name").getAsString(),frame,p.get("role").getAsString(),new NervRigidMeshSweepR52(xyz),rgb));}var overlays=NervBankHeadTransferR53.templates();out.removeIf(p->overlays.stream().anyMatch(q->q.name().equals(p.name())));out.addAll(overlays);parts=List.copyOf(out);
  }
  public static List<Template> templates()throws IOException{install();return parts;}

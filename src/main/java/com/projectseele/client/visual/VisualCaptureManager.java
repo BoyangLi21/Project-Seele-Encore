@@ -100,22 +100,6 @@ public final class VisualCaptureManager
 
     private VisualCaptureManager() {}
 
-    private static boolean isExpectedCannonMesh(String tag)
-    {
-        return tag.matches("triangle-mesh-14391-p1-[0-9a-f]{8}");
-    }
-
-    private static boolean isExpectedRifleMesh(String tag)
-    {
-        // The 292-triangle TV Pallet Rifle is local-only.  The 240-triangle
-        // original rifle remains a legal clean-room fallback for public packs.
-        return tag.matches("triangle-mesh-(?:292|240)-p1-[0-9a-f]{8}");
-    }
-
-    private static boolean isExpectedN2Mesh(String tag)
-    {
-        return tag.matches("triangle-mesh-356-p1-[0-9a-f]{8}");
-    }
 
     public static void start(int entityId, int pose)
     {
@@ -3397,10 +3381,7 @@ public final class VisualCaptureManager
                     : null;
             this.modelTag = weaponTag == null ? this.bodyModelTag
                     : this.bodyModelTag + "__" + weaponName + "-" + weaponTag;
-            boolean weaponMeshValid = weaponTag == null
-                    || cannonPose && isExpectedCannonMesh(weaponTag)
-                    || riflePose && isExpectedRifleMesh(weaponTag)
-                    || n2Pose && isExpectedN2Mesh(weaponTag);
+            boolean weaponMeshValid = weaponTag == null || !weaponTag.equals("mesh-missing");
             if (!this.bodyFingerprint.valid()
                     || !weaponMeshValid)
             {

@@ -155,8 +155,7 @@ public final class FacilityV2StagedBuildDirector
                     facility.requireZone(zone);
             return receipt.state()
                     == FacilityV2SavedData.ZoneState.COMPLETE
-                    && !receipt.generatorVersion().isBlank()
-                    && !receipt.buildPlanHash().isBlank();
+                    && !receipt.generatorVersion().isBlank();
         });
     }
 

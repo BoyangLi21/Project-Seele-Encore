@@ -44,8 +44,7 @@ public final class CarrierOutletMotionR53
             return new CarrierRearGuideMotionR53.Result(List.of(bounds), null);
         }
         var hardware = CarrierRearGuideR53.selected();var fixed = CarrierRearGuideR53.fixed();
-        if (hardware == null || fixed == null || !fixed.directory().equals(guide.directory().fingerprint())
-                || !fixed.legacySource().equals(NervRouteRuntimeR52.uprightGuideSourceR52(level)))
+        if (hardware == null || fixed == null)
             return no("actual_guide_binding_changed");
         // The helper accepts only a LINE tail. Both physical endpoints must be
         // exactly those of its bounded segment; no alternative return path.

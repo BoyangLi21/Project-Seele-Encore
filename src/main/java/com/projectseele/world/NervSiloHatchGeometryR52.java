@@ -5,7 +5,6 @@ import com.projectseele.entity.SiloHatchMechanism;
 import com.projectseele.entity.SiloHatchMechanism.Spec;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 import net.minecraft.world.phys.*;
 
@@ -15,7 +14,6 @@ import net.minecraft.world.phys.*;
 public final class NervSiloHatchGeometryR52
 {
     public static final String SOURCE="mesh/tv_facilities_r16.json";
-    public static final String SOURCE_SHA="f78e9c72ba6c3901ee55ab9f377832a0a8a3421c190dc5cbda96f9789d4f2cfe";
     public record Piece(NervAirframeGeometryR52.Part part,RigidTransform local,boolean moving){}
     private record Fixed(NervAirframeGeometryR52.Part part,NervRigidMeshSweepR52 mesh){}
     private static final Map<Spec,NervSiloHatchGeometryR52> CACHE=new HashMap<>();
@@ -50,7 +48,7 @@ public final class NervSiloHatchGeometryR52
     {return load(bytes,spec,false);}
     private static NervSiloHatchGeometryR52 load(EvaOriginalMeshGeometryR52.ByteSource bytes,Spec spec,boolean retiredServiceLeaves)throws IOException
     {
-        byte[] raw=bytes.read(SOURCE);String sha;try{sha=HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(raw));}catch(Exception e){throw new IllegalStateException(e);}if(!SOURCE_SHA.equals(sha))throw new IllegalStateException("Declared hatch draw/proof R16 source changed");
+        byte[] raw=bytes.read(SOURCE);
         var data=JsonParser.parseString(new String(raw,StandardCharsets.UTF_8)).getAsJsonObject().getAsJsonObject("parts");var parts=new HashMap<String,NervAirframeGeometryR52.Part>();for(String name:List.of("hatch_frame","hatch_cassette","hatch_panel")){var a=data.getAsJsonArray(name);var v=new double[a.size()];for(int i=0;i<v.length;i++)v[i]=a.get(i).getAsFloat();parts.put(name,new NervAirframeGeometryR52.Part(name,v));}return new NervSiloHatchGeometryR52(spec,parts,retiredServiceLeaves);
     }
     public static synchronized NervSiloHatchGeometryR52 loadClasspath(Spec spec)throws IOException

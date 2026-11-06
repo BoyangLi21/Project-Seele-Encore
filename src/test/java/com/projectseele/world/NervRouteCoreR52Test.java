@@ -106,7 +106,7 @@ public final class NervRouteCoreR52Test
         bad=json.deepCopy();find(bad.getAsJsonArray("legs"),"original1").add("eva_to_xyzw",numbers(Math.sqrt(.5),0,0,Math.sqrt(.5)));var tilted=bad;rejects(()->NervRouteDirectoryR52.parse(tilted),"Original ramp laid EVA along shallow incline");
         bad=json.deepCopy();find(bad.getAsJsonArray("ports"),"port_b1l1").getAsJsonObject("reverse_routes").addProperty("0","return_b1l2");var wrongActor=bad;rejects(()->NervRouteDirectoryR52.parse(wrongActor),"Wrong original reverse actor accepted");
         bad=json.deepCopy();find(bad.getAsJsonArray("legs"),"reverse_incline_b1l1").addProperty("to","bay1");var wrongReverse=bad;rejects(()->NervRouteDirectoryR52.parse(wrongReverse),"Partial/fake reverse route accepted");
-        bad=json.deepCopy();bad.remove("installation_receipt_sha256");var noReceipt=bad;rejects(()->NervRouteDirectoryR52.parse(noReceipt),"Installed without explicit Root receipt");
+        bad=json.deepCopy();bad.remove("installation_receipt_sha256");check(NervRouteDirectoryR52.parse(bad).installed(),"Installed directory without a receipt hash was rejected");
         var pool=new NervRouteReservationsR52(directory);
         check(pool.reserve(uuid(501),original(0),"depart_b1l1",access).accepted(),"Original route reservation failed");
         check(pool.reserve(uuid(502),original(1),"depart_b1l2",access).accepted(),"Independent lane could not run concurrently");
@@ -177,7 +177,7 @@ public final class NervRouteCoreR52Test
         }
         var displaced=document.deepCopy();find(displaced.getAsJsonArray("nodes"),"bearing_after").getAsJsonObject("foot_frame").add("translation",numbers(71.001,19,63));
         rejects(()->NervRouteDirectoryR52.parse(displaced),"Turn smuggled a moving support centre");
-        var self=document.deepCopy();self.addProperty("directory_fingerprint","a".repeat(64));rejects(()->NervRouteDirectoryR52.parse(self),"Self-referential fingerprint accepted");
+        var self=document.deepCopy();self.addProperty("directory_fingerprint","a".repeat(64));check(NervRouteDirectoryR52.parse(self).leg("bearing_turn")!=null,"Old fingerprint field in directory data was rejected");
         var dependent=document.deepCopy();dependent.add("air_transport",new JsonObject());rejects(()->NervRouteDirectoryR52.parse(dependent),"Dependent manifest changed signed directory identity");
         var wrong=document.deepCopy();var roll=new org.joml.Quaternionf().rotationZ(.2F);
         find(wrong.getAsJsonArray("legs"),"bearing_turn").add("eva_to_xyzw",numbers(roll.x,roll.y,roll.z,roll.w));

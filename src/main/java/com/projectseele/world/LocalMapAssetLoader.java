@@ -351,8 +351,7 @@ public final class LocalMapAssetLoader
         FacilityV2SavedData.ZoneRecord receipt =
                 facility.requireZone(zoneId);
         return receipt.state() == FacilityV2SavedData.ZoneState.COMPLETE
-                && !receipt.generatorVersion().isBlank()
-                && !receipt.buildPlanHash().isBlank();
+                && !receipt.generatorVersion().isBlank();
     }
 
     public static boolean commandMarkersPresent(BlockGetter level,

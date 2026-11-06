@@ -27,15 +27,14 @@ public final class EvaAnatomicalHandsR45
     public record KnifeAttachment(Quaternionf rotation,Vector3f sourceCentre,Vector3f targetCentre,String mesh) {}
     public record KnifePose(Quaternionf rotation,Vector3f position) {}
     public record KnifeMechanism(String bodyMesh,String cover,float openDegrees,String carriage,String actuator,Vector3f presented,float actuatorLength,Vector3f actuatorPin,Vector3f hingeAxis,float storedPitchDegrees,float liftModel) {}
-    public record SwordAttachment(KnifeAttachment grip,String meshSha256,Vector3f bladeBase,Vector3f bladeTip,float radius) {}
+    public record SwordAttachment(KnifeAttachment grip,Vector3f bladeBase,Vector3f bladeTip,float radius) {}
     public record SwordBladeR45(net.minecraft.world.phys.Vec3 base,net.minecraft.world.phys.Vec3 tip,double radius) {}
     public record CarryFrame(Vector3f along,Vector3f normal) {}
     public record Rig(List<Joint> joints,Map<String,Joint> named,JsonObject poses,Map<String,Grip> grips,KnifeAttachment knife,KnifeMechanism mechanism,SwordAttachment sword,Map<String,CarryFrame> carry) {}
     public record Pose(String left,String right,Map<String,Quaternionf> rotations) {}
     private static final Map<Integer,Optional<Rig>> RIGS=new HashMap<>();
     private static final Map<Integer,Map<String,Vector3f>> PUNCH_SOCKETS_R53=new HashMap<>();
-    private static final Map<Integer,String> RIG_FINGERPRINTS_R45=new HashMap<>();
-    private static final Map<String,String> SWORD_RESOURCE_HASHES_R45=new HashMap<>();
+    private static final Map<String,Boolean> SWORD_RESOURCE_PRESENT_R45=new HashMap<>();
     private record ContractBytesR45(byte[] bytes,String source) {}
     private static final WeakIdentityMap<EvaUnit01Entity,Memory> STATES=new WeakIdentityMap<>();
     private static final class Memory
@@ -79,9 +78,6 @@ public final class EvaAnatomicalHandsR45
         try(var stream=EvaAnatomicalHandsR45.class.getResourceAsStream(name))
         {return stream==null?null:new ContractBytesR45(stream.readAllBytes(),"classpath:"+name);}
     }
-    /** The fingerprint describes the same once-loaded contract used by server contact and client hands. */
-    public static synchronized String contractFingerprintR45(int variant)
-    {rig(variant);return RIG_FINGERPRINTS_R45.getOrDefault(variant,"ABSENT");}
     public static synchronized Rig rig(int variant)
     {
         if(variant==4&&Unit03ReviewContractR53.current()==null&&!Unit03SourceRigR53.loaded())return null;
@@ -173,9 +169,8 @@ public final class EvaAnatomicalHandsR45
                 {
                     var k=root.getAsJsonObject("sword_attachment_r45");var q=k.getAsJsonArray("rotation_xyzw");
                     String mesh=k.get("source_mesh").getAsString().replace('\\','/');mesh=mesh.substring(mesh.lastIndexOf('/')+1);
-                    String expectedHash=k.get("source_mesh_sha256").getAsString();
                     if(key!=2||!"lance".equals(k.get("mesh_part").getAsString())||!"r".equals(k.get("grip_side").getAsString())
-                            ||!"eva02_longsword.mesh.json".equals(mesh)||!expectedHash.matches("[a-f0-9]{64}"))
+                            ||!"eva02_longsword.mesh.json".equals(mesh))
                         throw new IllegalArgumentException("Invalid independent Unit02 sword binding");
                     var rotation=new Quaternionf(q.get(0).getAsFloat(),q.get(1).getAsFloat(),q.get(2).getAsFloat(),q.get(3).getAsFloat());
                     var sourceCentre=vector(k.getAsJsonArray("source_handle_centre"));var targetCentre=vector(k.getAsJsonArray("target_handle_centre"));
@@ -187,9 +182,8 @@ public final class EvaAnatomicalHandsR45
                     if(!Float.isFinite(bladeBase.lengthSquared())||!Float.isFinite(bladeTip.lengthSquared())
                             ||bladeBase.distance(bladeTip)<1||bladeBase.distance(bladeTip)>20||!Float.isFinite(radius)||radius<=0||radius>1)
                         throw new IllegalArgumentException("Invalid measured sword blade segment");
-                    sword=new SwordAttachment(new KnifeAttachment(rotation.normalize(),sourceCentre,targetCentre,mesh),expectedHash,bladeBase,bladeTip,radius);
+                    sword=new SwordAttachment(new KnifeAttachment(rotation.normalize(),sourceCentre,targetCentre,mesh),bladeBase,bladeTip,radius);
                 }
-                RIG_FINGERPRINTS_R45.put(key,hash);
                 ProjectSeele.LOGGER.info("R45 anatomical hand contract resolved: variant={} source={} sha256={}",key,source,hash);
                 Map<String,CarryFrame> carry=new HashMap<>();
                 for(String side:List.of("l","r"))
@@ -275,12 +269,8 @@ public final class EvaAnatomicalHandsR45
     {
         if(e.isExperimentalUnit()||e.getUnitVariant()!=2||!enabled(e))return false;
         var sword=rig(2).sword();if(sword==null||!rig(2).poses().has("sword_right"))return false;
-        String actual=SWORD_RESOURCE_HASHES_R45.computeIfAbsent(sword.grip().mesh(),name->{
-            try(var stream=EvaAnatomicalHandsR45.class.getResourceAsStream("/assets/projectseele/mesh/"+name))
-            {return stream==null?"ABSENT":HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(stream.readAllBytes()));}
-            catch(Exception error){throw new IllegalStateException("Cannot verify common sword geometry",error);}
-        });
-        return actual.equals(sword.meshSha256());
+        return SWORD_RESOURCE_PRESENT_R45.computeIfAbsent(sword.grip().mesh(),
+                name->EvaAnatomicalHandsR45.class.getResource("/assets/projectseele/mesh/"+name)!=null);
     }
 
     public static boolean shieldAttachmentReadyR45(EvaUnit01Entity e)

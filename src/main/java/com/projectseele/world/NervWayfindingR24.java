@@ -105,8 +105,6 @@ public final class NervWayfindingR24
             var json=JsonParser.parseReader(input).getAsJsonObject();
             if(!json.has("same_floor")||!json.get("same_floor").getAsBoolean())
                 throw new IllegalArgumentException("Nearest-lift table lacks the same-floor contract");
-            String digest=HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(Files.readAllBytes(graphPath)));
-            if(!digest.equals(json.get("graph_sha256").getAsString()))throw new IllegalArgumentException("Nearest-lift table belongs to another floor graph");
             var rows=json.getAsJsonArray("nodes");
             if(rows.size()!=nodes.length)throw new IllegalArgumentException("Nearest-lift node count");
             var floorKeys=json.has("node_floor_keys")?json.getAsJsonArray("node_floor_keys"):null;

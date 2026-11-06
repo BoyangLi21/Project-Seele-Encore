@@ -33,17 +33,16 @@ public final class NervRouteRuntimeR52
         var s=level.getDataStorage().computeIfAbsent(NervRouteRuntimeStateR52::load,NervRouteRuntimeStateR52::new,NervRouteRuntimeStateR52.NAME);SAVES.put(level,Optional.of(s));return s;
     }
     public static boolean claimed(ServerLevel level){var state=state(level,false);return LIVE.containsKey(level)||state!=null&&state.claimed();}
-    public static boolean ready(ServerLevel level){var c=LIVE.get(level);return c!=null&&(c.saved.pendingInstallationR52()==null||INSTALLING.contains(level))&&c.saved.fault().isEmpty()&&c.saved.epoch()==c.directory.epoch()&&c.saved.fingerprint().equals(c.directory.fingerprint())&&c.owner.fullRigidFramesReady(level,c.directory);}
+    public static boolean ready(ServerLevel level){var c=LIVE.get(level);return c!=null&&(c.saved.pendingInstallationR52()==null||INSTALLING.contains(level))&&c.saved.fault().isEmpty()&&c.saved.epoch()==c.directory.epoch()&&c.owner.fullRigidFramesReady(level,c.directory);}
     /** Only the current ordinary phone boarding receipt may delegate an idle original NPC. */
-    static boolean manualNpcReceiptR60(Original original,Unit unit,long epoch,String dimension,String directory,
+    static boolean manualNpcReceiptR60(Original original,Unit unit,long epoch,String dimension,
             String pilotDirectory,String pilotOperation,UUID declaredPilot,UUID stampedCommander,boolean currentOwner)
     {
         return original!=null&&original.mission().isEmpty()&&unit!=null&&currentOwner
                 &&original.epoch()==epoch&&original.dimension().equals(dimension)&&original.variant()==unit.variant()
                 &&original.eva().equals(unit.eva())&&original.plug().equals(unit.plug())
                 &&original.pilot().equals(declaredPilot)&&original.owner().equals(stampedCommander)
-                &&directory!=null&&!directory.isEmpty()
-                &&directory.equals(pilotDirectory)&&"board".equals(pilotOperation);
+                &&pilotDirectory!=null&&!pilotDirectory.isEmpty()&&"board".equals(pilotOperation);
     }
     static boolean manualNpcCommanderR60(UUID owner,UUID online,boolean alive,boolean sameLevel,boolean spectator,boolean authorized)
     {return owner!=null&&owner.equals(online)&&alive&&sameLevel&&!spectator&&authorized;}
@@ -53,11 +52,11 @@ public final class NervRouteRuntimeR52
         var c=LIVE.get(level);if(c==null||!(owner instanceof NervOriginalActorsR52.Access access))return false;
         var tag=eva.getPersistentData();var receipt=pilot.getPersistentData();
         UUID stamped=tag.hasUUID("R32SortieCommander")?tag.getUUID("R32SortieCommander"):null;
-        return manualNpcReceiptR60(original,directory.unit(original.variant()),directory.epoch(),level.dimension().location().toString(),directory.fingerprint(),
+        return manualNpcReceiptR60(original,directory.unit(original.variant()),directory.epoch(),level.dimension().location().toString(),
                 receipt.getString("R52OriginalPilotDirectory"),receipt.getString("R52OriginalPilotOperation"),
                 access.originalPilot(level,original.variant())==pilot?pilot.getUUID():null,stamped,
                 c.directory==directory&&c.owner==owner&&c.saved.claimed()&&c.saved.epoch()==directory.epoch()
-                        &&c.saved.fingerprint().equals(directory.fingerprint())&&pilot.getAssignedVariant()==original.variant());
+                        &&pilot.getAssignedVariant()==original.variant());
     }
     static boolean controllerLoadedR52(ServerLevel level){return LIVE.containsKey(level);}
     static NervRouteRuntimeStateR52 installationStateR52(ServerLevel level){return state(level,false);}
@@ -69,30 +68,30 @@ public final class NervRouteRuntimeR52
     public static FlightContext flightContext(ServerLevel level)
     {var c=LIVE.get(level);return c!=null&&ready(level)?c.flightContext:null;}
     public static Original originalForFlight(ServerLevel level,int variant,UUID commander)
-    {var c=LIVE.get(level);if(c==null||!ready(level))return null;var job=c.saved.job(variant);if(job==null||job.phase()!=Phase.DEPLOYED)return null;var original=job.snapshot().original();return original.owner().equals(commander)&&original.epoch()==c.directory.epoch()&&job.snapshot().directoryFingerprint().equals(c.directory.fingerprint())&&original.dimension().equals(level.dimension().location().toString())?original:null;}
+    {var c=LIVE.get(level);if(c==null||!ready(level))return null;var job=c.saved.job(variant);if(job==null||job.phase()!=Phase.DEPLOYED)return null;var original=job.snapshot().original();return original.owner().equals(commander)&&original.epoch()==c.directory.epoch()&&original.dimension().equals(level.dimension().location().toString())?original:null;}
     /** Read before the atomic broker transfer; no leases or saved job change. */
     public static boolean canAcceptFlightGround(ServerLevel level,Original original,Kind kind,String routeId)
-    {var c=LIVE.get(level);if(c==null||!ready(level))return false;var route=c.directory.route(routeId);var old=c.saved.job(original.variant());return route!=null&&route.recovery()&&route.variant()==original.variant()&&original.epoch()==c.directory.epoch()&&old!=null&&old.phase()==Phase.DEPLOYED&&sameOriginalProvenance(old.snapshot().original(),original)&&old.snapshot().directoryFingerprint().equals(c.directory.fingerprint());}
+    {var c=LIVE.get(level);if(c==null||!ready(level))return false;var route=c.directory.route(routeId);var old=c.saved.job(original.variant());return route!=null&&route.recovery()&&route.variant()==original.variant()&&original.epoch()==c.directory.epoch()&&old!=null&&old.phase()==Phase.DEPLOYED&&sameOriginalProvenance(old.snapshot().original(),original);}
     private static boolean sameOriginalProvenance(Original a,Original b)
     {return a.epoch()==b.epoch()&&a.variant()==b.variant()&&a.eva().equals(b.eva())&&a.plug().equals(b.plug())&&a.pilot().equals(b.pilot())&&a.owner().equals(b.owner())&&a.dimension().equals(b.dimension());}
     /** Records exactly the already transferred lease; never reserves again. */
     public static boolean acceptFlightGround(ServerLevel level,Snapshot snapshot,CompoundTag ownerData)
     {
-        var c=LIVE.get(level);if(c==null||!canAcceptFlightGround(level,snapshot.original(),snapshot.kind(),snapshot.route())||snapshot.stage()!=Stage.RESERVED||snapshot.leg()!=0||snapshot.fraction()!=0||!snapshot.equals(c.pool.query(snapshot.task()))||!snapshot.directoryFingerprint().equals(c.directory.fingerprint()))return false;
-        var route=c.directory.route(snapshot.route());if(!ownerData.getString("AirReceiverPortR52").equals(route.port())||!ownerData.getString("AirReceiverDirectoryR52").equals(c.directory.fingerprint()))return false;
+        var c=LIVE.get(level);if(c==null||!canAcceptFlightGround(level,snapshot.original(),snapshot.kind(),snapshot.route())||snapshot.stage()!=Stage.RESERVED||snapshot.leg()!=0||snapshot.fraction()!=0||!snapshot.equals(c.pool.query(snapshot.task())))return false;
+        var route=c.directory.route(snapshot.route());if(!ownerData.getString("AirReceiverPortR52").equals(route.port()))return false;
         var data=ownerData.copy();data.putString("AssemblyKindR52",snapshot.kind().name());data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("Returning",true);data.putString("RouteR52",snapshot.route());for(String field:List.of("Finish","FinishTicks","FinishRoot","FinishFeet","FinishPlugLocal","LastFinishTick","FlightAircraftR52","FlightEpochR52","FlightDirectoryR52","FlightSourceR52","ContinuousClockR52","ContinuousDistanceR52","ContinuousRotationR52","ContinuousAutoLaunchR52","ContinuousCheckedStartR52"))data.remove(field);
         c.nativeAccess.ownerData(data);if(!c.nativeAccess.sameAssembly(snapshot.original(),snapshot.kind())||!c.nativeAccess.canRestoreAssembly(snapshot.original(),snapshot.kind(),route,0,0))return false;
         if(level.getEntity(snapshot.original().eva()) instanceof EvaUnit01Entity eva)EvaMechanicalFrameR52.setFlightCustody(eva,false,true);c.saved.put(new Job(snapshot,Phase.RETURNING,data,""));c.mirror(c.saved.job(snapshot.original().variant()));return true;
     }
     public static String personnelLiftManifest(ServerLevel level){var s=state(level,false);return s==null?"":s.personnelLiftManifest();}
     static void personnelLiftManifest(ServerLevel level,String actualVerifiedFile)
-    {var c=LIVE.get(level);if(c==null||!c.owner.fullRigidFramesReady(level,c.directory)||!c.saved.fingerprint().equals(c.directory.fingerprint()))throw new IllegalStateException("Installed Root directory required before personnel lift binding");c.saved.personnelLiftManifest(actualVerifiedFile);S20PhysicalElevatorDirector.invalidateLiftSpecs(level.getServer());}
+    {var c=LIVE.get(level);if(c==null||!c.owner.fullRigidFramesReady(level,c.directory))throw new IllegalStateException("Installed Root directory required before personnel lift binding");c.saved.personnelLiftManifest(actualVerifiedFile);S20PhysicalElevatorDirector.invalidateLiftSpecs(level.getServer());}
     public static long commissioningEpoch(ServerLevel level){var s=state(level,false);return s==null?0:s.epoch();}
     public static String directoryFingerprint(ServerLevel level){var s=state(level,false);return s==null?"":s.fingerprint();}
     public static NervOriginalActorsR52.Access originalActorAccess(ServerLevel level)
     {
         var c=LIVE.get(level);var saved=state(level,false);
-        return c!=null&&saved!=null&&saved.claimed()&&saved.epoch()==c.directory.epoch()&&saved.fingerprint().equals(c.directory.fingerprint())
+        return c!=null&&saved!=null&&saved.claimed()&&saved.epoch()==c.directory.epoch()
                 &&c.owner instanceof NervOriginalActorsR52.Access access?access:null;
     }
     /** Root may stamp its migrated world pending before any native tick; no
@@ -104,11 +103,11 @@ public final class NervRouteRuntimeR52
     {
         return installParsed(level,root,NervRouteDirectoryR52.parse(root),owner,null);
     }
-    /** The signed directory is unchanged. Air is a separate verified manifest
-     * referencing its hash and reuses this exact directory object/pool. */
+    /** The directory is unchanged. Air is a separate manifest that reuses
+     * this exact directory object/pool. */
     static boolean installParsed(ServerLevel level,JsonObject root,NervRouteDirectoryR52 directory,NervRouteNativeR52.AssemblyOwner owner,JsonObject airDocument)
     {
-        if(root.has("air_transport")||root.has("directory_fingerprint")||root.has("fingerprint"))throw new IllegalArgumentException("Directory cannot embed a manifest that refers to its own hash or contain a self-fingerprint");
+        if(root.has("air_transport"))throw new IllegalArgumentException("Directory cannot embed its dependent air manifest");
         var running=LIVE.get(level);if(running!=null&&running.saved.jobs().stream().anyMatch(j->!Set.of(Phase.PARKED,Phase.DEPLOYED,Phase.CANCELLED).contains(j.phase())))throw new IllegalStateException("Active original ground leases cannot be discarded by hot reinstallation");
         if(!NervAirTransportRuntimeR52.compatibleGroundInstall(level,directory))throw new IllegalStateException("Active or foreign original flight leases cannot be discarded by ground installation");
         if(!directory.installed()||owner==null||!owner.fullRigidFramesReady(level,directory))return false;
@@ -696,6 +695,9 @@ public final class NervRouteRuntimeR52
                 com.projectseele.ProjectSeele.LOGGER.warn("R53 continuous commit recovery held: {}",reason);
             return false;
         }
+        /** A saved window's directory digest is provenance only; its path geometry is compared. */
+        private static CompoundTag portableGeometryR55(CompoundTag window)
+        {var copy=window.copy();for(var row:copy.getList("Parts",net.minecraft.nbt.Tag.TAG_COMPOUND))((CompoundTag)row).remove("Directory");return copy;}
         private boolean recoverContinuousCommitR53()
         {
             var job=saved.interruptedContinuousCommitR53();if(job==null)return false;
@@ -703,8 +705,8 @@ public final class NervRouteRuntimeR52
             String prefix="task="+snapshot.task()+" ";
             try
             {
-                if(LIVE.get(level)!=this||saved.epoch()!=directory.epoch()||!saved.fingerprint().equals(directory.fingerprint())
-                        ||original.epoch()!=directory.epoch()||!snapshot.directoryFingerprint().equals(directory.fingerprint())
+                if(LIVE.get(level)!=this||saved.epoch()!=directory.epoch()
+                        ||original.epoch()!=directory.epoch()
                         ||!owner.fullRigidFramesReady(level,directory))return recoveryHeldR53(prefix+"owner/epoch/directory not restored");
                 var route=directory.route(snapshot.route());
                 if(route==null||!route.continuousUpright()||Set.of(Stage.COMPLETE,Stage.CANCELLED).contains(snapshot.stage()))
@@ -720,7 +722,7 @@ public final class NervRouteRuntimeR52
                 if(window.isEmpty()||stored.isEmpty()||!window.getCompound("Clock").equals(stored)
                         ||window.getLong("Sequence")<=0||window.getLong("Sequence")!=sample.getLong("ContinuousSequenceR52"))
                     return recoveryHeldR53(prefix+"physical window sequence/old clock differs from saved job");
-                if(!stored.getString("Route").equals(route.id())||!stored.getString("Directory").equals(directory.fingerprint())
+                if(!stored.getString("Route").equals(route.id())
                         ||stored.getDouble("TotalMetres")!=directory.routeLength(route))
                     return recoveryHeldR53(prefix+"old clock route/profile provenance differs");
                 var clock=new NervMechanicalTravelR52.ContinuousClock(new NervMechanicalTravelR52.ContinuousProfile(
@@ -734,7 +736,7 @@ public final class NervRouteRuntimeR52
                 var binding=EvaMechanicalFrameR52.measuredBinding(eva,original);
                 if(binding==null)return recoveryHeldR53(prefix+"original frozen bearing binding unavailable");
                 var paths=directory.routeSlices(route,at,next.distance(),binding);
-                if(paths.isEmpty()||!DirectoryTrajectoryR52.encodePortableR52(paths).equals(window.getCompound("Path")))
+                if(paths.isEmpty()||!portableGeometryR55(DirectoryTrajectoryR52.encodePortableR52(paths)).equals(portableGeometryR55(window.getCompound("Path"))))
                     return recoveryHeldR53(prefix+"portable window differs from the unique next route slice");
                 var portable=DirectoryTrajectoryR52.decodePortableR52(window.getCompound("Path"));
                 var from=paths.get(0).sample(0);var last=paths.get(paths.size()-1);var to=last.sample(1);
@@ -749,7 +751,7 @@ public final class NervRouteRuntimeR52
                 if(carrier==null||carrier!=NervOriginalCarrierR52.controller(level,original)||!NervOriginalCarrierR52.attachedTo(carrier,eva)||carrier.getUnitVariant()!=original.variant())
                     return recoveryHeldR53(prefix+"original attached carrier unavailable");
                 var steel=carrier.originalCarrierStateR52();var steelRoot=NervAircraftFrameR52.decodeRigid(steel.getCompound("Current"));
-                if(steel.getLong("Epoch")!=original.epoch()||!steel.getString("Directory").equals(directory.fingerprint())
+                if(steel.getLong("Epoch")!=original.epoch()
                         ||NervOriginalCarrierR52.progress(carrier,1)!=1||carrier.position().distanceToSqr(steelRoot.translation())>1e-10
                         ||!NervAirTransportManifestR52.same(CarrierMountProfileR53.read(carrier,1).payloadFrame(steelRoot),to.evaRoot()))
                     return recoveryHeldR53(prefix+"original carrier has not committed the same endpoint");

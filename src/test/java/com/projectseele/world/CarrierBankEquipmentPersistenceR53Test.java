@@ -14,7 +14,7 @@ public final class CarrierBankEquipmentPersistenceR53Test
         var saved=NervRouteRuntimeStateR52.load(source);check(saved.fault().isEmpty(),"Actual source state already faulty");
         int variant=args.length>2?Integer.parseInt(args[2]):1;
         var bank=saved.job(variant);var head=TagParser.parseTag(JsonParser.parseString(Files.readString(Path.of(args[1]))).getAsJsonObject().get("head").getAsString());
-        var marker=new CompoundTag();marker.putInt("Version",2);marker.putInt("Variant",variant);marker.putString("Source",NervLegacyBankClearanceR53.SOURCE_SHA);
+        var marker=new CompoundTag();marker.putInt("Version",2);marker.putInt("Variant",variant);marker.putString("Source",NervLegacyBankClearanceR53.SOURCE);
         marker.putUUID("Carrier",NervOriginalCarrierR52.proposedIdentityR52(bank.snapshot().original().epoch(),bank.snapshot().original().eva()));
         var rows=new ListTag();for(var job:saved.jobs())rows.add(NervRouteRuntimeStateR52.encode(job.snapshot()));marker.put("Snapshots",rows);
         var preserved=new ListTag();for(var job:saved.jobs()){var row=new CompoundTag();row.putInt("Variant",job.snapshot().original().variant());row.putString("Phase",job.phase().name());row.putString("Waiting",job.waiting());row.put("Owner",job.ownerData());preserved.add(row);}marker.put("Jobs",preserved);

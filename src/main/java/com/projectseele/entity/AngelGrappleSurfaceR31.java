@@ -13,11 +13,11 @@ import java.util.*;
 /** Six measured material vertices per Angel, evaluated by the same four-weight DQS as the visible skin. */
 public final class AngelGrappleSurfaceR31
 {
-    public record Contact(Vec3 position,Vec3 outwardNormal,int triangle,String meshSha256) {}
+    public record Contact(Vec3 position,Vec3 outwardNormal,int triangle) {}
     private record Bone(String parent,Vector3f pivot,Vector3f idle) {}
     private record Vertex(Vector3f point,int[] indices,float[] weights) {}
     private record Anchor(Vertex[] triangle,float[] bary,float sign,int index) {}
-    private record Profile(Map<String,Bone> bones,String[] palette,Anchor left,Anchor right,String hash) {}
+    private record Profile(Map<String,Bone> bones,String[] palette,Anchor left,Anchor right) {}
     private record PoseState(float partial,float held,EvaImpactResponse.Pose impact,CombatFeelR31.Beat beat) {}
     private static volatile Map<String,Profile> profiles;
     private static Vector3f vector(JsonArray a){return new Vector3f(a.get(0).getAsFloat(),a.get(1).getAsFloat(),a.get(2).getAsFloat());}
@@ -45,7 +45,7 @@ public final class AngelGrappleSurfaceR31
                 var p=entry.getValue().getAsJsonObject();Map<String,Bone> bones=new HashMap<>();
                 for(var item:p.getAsJsonArray("bones")){var b=item.getAsJsonObject();bones.put(b.get("name").getAsString(),new Bone(b.get("parent").isJsonNull()?null:b.get("parent").getAsString(),vector(b.getAsJsonArray("pivot")),vector(b.getAsJsonArray("idle"))));}
                 var names=p.getAsJsonArray("skin_bones");String[] palette=new String[names.size()];for(int i=0;i<palette.length;i++)palette[i]=names.get(i).getAsString();
-                loaded.put(entry.getKey(),new Profile(Map.copyOf(bones),palette,anchor(p.getAsJsonObject("anchors").getAsJsonObject("left")),anchor(p.getAsJsonObject("anchors").getAsJsonObject("right")),p.get("mesh_sha256").getAsString()));
+                loaded.put(entry.getKey(),new Profile(Map.copyOf(bones),palette,anchor(p.getAsJsonObject("anchors").getAsJsonObject("left")),anchor(p.getAsJsonObject("anchors").getAsJsonObject("right"))));
             }
         }
         catch(Exception error){ProjectSeele.LOGGER.warn("Measured Angel grip profile unavailable: {}",path,error);}
@@ -72,7 +72,7 @@ public final class AngelGrappleSurfaceR31
         Vector3f normal=new Vector3f(points[1]).sub(points[0]).cross(new Vector3f(points[2]).sub(points[0])).normalize().mul(anchor.sign);
         Vec3 at=victim.level().isClientSide?victim.getPosition(partial):victim.position();float yaw=victim.level().isClientSide?net.minecraft.util.Mth.rotLerp(partial,victim.yBodyRotO,victim.yBodyRot):victim.yBodyRot;
         Matrix4f world=new Matrix4f().translation(at.toVector3f()).rotateY((float)Math.toRadians(180-yaw)).scale(5);
-        return new Contact(new Vec3(world.transformPosition(surface)),new Vec3(world.transformDirection(normal).normalize()),anchor.index,p.hash);
+        return new Contact(new Vec3(world.transformPosition(surface)),new Vec3(world.transformDirection(normal).normalize()),anchor.index);
     }
     private static Matrix4f matrix(LivingEntity victim,Profile p,String name,PoseState pose,Map<String,Matrix4f> cache)
     {

@@ -42,7 +42,7 @@ public final class TvEncounterDirectorR45
                 || data.angel == null || !(level.getEntity(data.angel) instanceof RamielEntity boss) || !owned(boss, data))
             return "原作战目标或授权凭证尚未确认，行动暂停。";
         if (site == null || !site.geometryValidated() || !site.modelReady()
-                || !site.id().equals(data.encounterSiteR45) || !site.fingerprint().equals(data.encounterLayoutR45))
+                || !site.id().equals(data.encounterSiteR45))
             return "原作战阵地正在重新确认，行动暂停。";
         if (data.sorties.containsKey(2) && !site.supportReady())
             return "二号机支援阵地仍在整备中。";

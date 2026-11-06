@@ -52,8 +52,8 @@ public final class NervUprightGuideRendererR52 {
                 for(int i=0;i<rgb.length;i+=18)cell.mesh.triangleNormalizedR52(rgb,i,steel.frame(),k.origin());count[0]++;if(token==generation)parsedParts=count[0];
             },anchors::add);
         }
-        // Pure parser returned normally: the complete original bytes, schema,
-        // model and support declarations have now passed before publication.
+        // Pure parser returned normally: the complete schema and support
+        // declarations have now passed before publication.
         var anchorIndex=new NervStaticSpatialIndexR52<>(anchors,a->new AABB(a.bearing(),a.bearing()).inflate(.000001));var cells=new ArrayList<Cell>();
         for(var row:building.values()){
             var mesh=row.mesh.finish();var b=mesh.bounds();var o=row.key.origin();var centre=new Vec3((b[0]+b[3])/2+o.x,(b[1]+b[4])/2+o.y,(b[2]+b[5])/2+o.z);var selected=new ArrayList<NervUprightGuidewayR52.Anchor>();
@@ -72,7 +72,7 @@ public final class NervUprightGuideRendererR52 {
         if(com.projectseele.world.NervR50CarrierModeR53.enabled())return;
         String selected=FacilityFrameClientR52.uprightGuideSourceR52(level);if(selected.isEmpty()){if(!expected.isEmpty())clear();return;}
         if(!selected.equals(expected)){clear();expected=selected;status="LOADING";long token=generation;loading=CompletableFuture.supplyAsync(()->{try{return read(selected,token);}catch(IOException e){throw new CompletionException(e);}},READER);}
-        if(loaded==null&&loading!=null&&loading.isDone()){try{loaded=loading.join();parsedParts=loaded.pieceCount();status="LOADED";}catch(RuntimeException failure){status="FAILED";ProjectSeele.LOGGER.error("Actual declared upright visual source rejected sha={}",expected,failure);}loading=null;}
+        if(loaded==null&&loading!=null&&loading.isDone()){try{loaded=loading.join();parsedParts=loaded.pieceCount();status="LOADED";}catch(RuntimeException failure){status="FAILED";ProjectSeele.LOGGER.error("Actual declared upright visual source unreadable sha={}",expected,failure);}loading=null;}
         frame++;long now=System.nanoTime();var camera=event.getCamera().getPosition();int distance=Math.max(16,Math.min(512,Minecraft.getInstance().options.getEffectiveRenderDistance()*16));var visible=new ArrayList<Map<String,Object>>();
         if(loaded!=null){var at=key(camera);if(!at.equals(cameraCell)||distance!=cameraDistance){nearby=loaded.index().query(new AABB(at.origin(),at.origin().add(32,32,32)).inflate(distance));cameraCell=at;cameraDistance=distance;}
             var view=new AABB(camera,camera).inflate(distance);int coldBudget=4;
@@ -83,7 +83,7 @@ public final class NervUprightGuideRendererR52 {
                 var row=new LinkedHashMap<String,Object>();row.put("key",cell.key.id());row.put("bounds",List.of(cell.bounds.minX,cell.bounds.minY,cell.bounds.minZ,cell.bounds.maxX,cell.bounds.maxY,cell.bounds.maxZ));row.put("native_loaded",ready);row.put("gpu_uploaded",cell.gpuUploaded);row.put("last_draw_frame",cell.lastDrawFrame);row.put("last_draw_nanos",cell.lastDrawNanos);visible.add(Map.copyOf(row));
             }
         }
-        var report=new LinkedHashMap<String,Object>();report.put("expected_source_sha256",expected);report.put("loaded_source_sha256",loaded==null?"":loaded.sha());report.put("model_source_sha256",NervOuterCarrierGuideR52.SOURCE_SHA);report.put("parse_status",status);report.put("parsed_parts",parsedParts);report.put("render_frame",frame);report.put("render_nanos",now);report.put("camera",List.of(camera.x,camera.y,camera.z));report.put("distance_m",distance);report.put("target_visible_cells",List.copyOf(visible));report.put("ready",loaded!=null&&!visible.isEmpty()&&visible.stream().allMatch(r->Boolean.TRUE.equals(r.get("native_loaded"))&&Boolean.TRUE.equals(r.get("gpu_uploaded"))&&Objects.equals(r.get("last_draw_frame"),frame)));diagnostic=Map.copyOf(report);
+        var report=new LinkedHashMap<String,Object>();report.put("expected_source_sha256",expected);report.put("loaded_source_sha256",loaded==null?"":loaded.sha());report.put("parse_status",status);report.put("parsed_parts",parsedParts);report.put("render_frame",frame);report.put("render_nanos",now);report.put("camera",List.of(camera.x,camera.y,camera.z));report.put("distance_m",distance);report.put("target_visible_cells",List.copyOf(visible));report.put("ready",loaded!=null&&!visible.isEmpty()&&visible.stream().allMatch(r->Boolean.TRUE.equals(r.get("native_loaded"))&&Boolean.TRUE.equals(r.get("gpu_uploaded"))&&Objects.equals(r.get("last_draw_frame"),frame)));diagnostic=Map.copyOf(report);
     }
     /** Immutable actual render-thread snapshot for native observers; no GPU,
      * World, pose, loading, ticket, or render mutation is performed here. */

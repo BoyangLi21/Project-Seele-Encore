@@ -14,7 +14,7 @@ public final class SeeleNetwork
 {
     // R52 includes the independent original carrier, cannon cradle and armor-beam
     // state. Older clients must reject the changed synchronized accessor layout.
-    private static final String PROTOCOL_VERSION = "76";
+    private static final String PROTOCOL_VERSION = "77";
 
     public static final SimpleChannel CHANNEL = NetworkRegistry.newSimpleChannel(
             new ResourceLocation(ProjectSeele.MODID, "main"),
@@ -186,12 +186,6 @@ public final class SeeleNetwork
         CHANNEL.messageBuilder(ServerboundEvaFrozenPoseR30.class,id++,NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ServerboundEvaFrozenPoseR30::encode).decoder(ServerboundEvaFrozenPoseR30::new)
                 .consumerMainThread(ServerboundEvaFrozenPoseR30::handle).add();
-        CHANNEL.messageBuilder(ClientboundCombatContractR44.class,id++,NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(ClientboundCombatContractR44::encode).decoder(ClientboundCombatContractR44::new)
-                .consumerMainThread(ClientboundCombatContractR44::handle).add();
-        CHANNEL.messageBuilder(ServerboundCombatContractR44.class,id++,NetworkDirection.PLAY_TO_SERVER)
-                .encoder(ServerboundCombatContractR44::encode).decoder(ServerboundCombatContractR44::new)
-                .consumerMainThread(ServerboundCombatContractR44::handle).add();
         CHANNEL.messageBuilder(ServerboundLiftArrivalR44.class,id++,NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ServerboundLiftArrivalR44::encode).decoder(ServerboundLiftArrivalR44::new)
                 .consumerMainThread(ServerboundLiftArrivalR44::handle).add();

@@ -62,8 +62,6 @@ public final class LiftPassengerR20Review
         ProjectSeele.LOGGER.warn("R21 LIFT DAMAGE {}",r);
     }
     private static double minimumFloorError=100,maximumWallOverflow;
-    private static JsonObject candidateTripsR45;
-    private static final JsonArray actualInputsR45=new JsonArray();
     private static final String[] IDS=R40?tripsR40().stream().map(Trip::id).toArray(String[]::new):R26?new String[]{FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION,FacilityLiftsR25.OBSERVATION}:R25?new String[]{FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.EAST,FacilityLiftsR25.OBSERVATION,FacilityLiftsR25.OBSERVATION}:new String[]{S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,NervLiftPassengerSync.GATEWAY,NervLiftPassengerSync.GATEWAY,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,S20PhysicalElevatorDirector.COMPACT_CAGE_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID,S20PhysicalElevatorDirector.COMMANDER_OFFICE_LIFT_ID};
     private static final int[] FROM=R40?tripsR40().stream().mapToInt(Trip::from).toArray():R26?new int[]{-461,-364,-448,-434,-420,-406,-392,-378,-394,-367}:R25?new int[]{-448,-392,-434,-420,-406,-448,-394,-367}:new int[]{-566,-448,-442,81,-466,81,-442,-370,-388,-340};
     private static final int[] TO=R40?tripsR40().stream().mapToInt(Trip::to).toArray():R26?new int[]{-364,-448,-434,-420,-406,-392,-378,-461,-367,-394}:R25?new int[]{-392,-434,-420,-406,-448,-434,-367,-394}:new int[]{-448,-566,81,-442,81,-466,-370,-394,-340,-388};
@@ -71,23 +69,6 @@ public final class LiftPassengerR20Review
     private static List<Trip> tripsR40()
     {
         var trips=new ArrayList<Trip>();
-        String file=System.getProperty("projectseele.r45LiftTripCases", "");
-        if(R44&&!file.isBlank())
-        {
-            try
-            {
-                candidateTripsR45=CandidateLiftTripCasesR45.load();
-                for(var raw:candidateTripsR45.getAsJsonArray("cases"))
-                {
-                    var row=raw.getAsJsonObject();
-                    trips.add(new Trip(row.get("runtime_alias").getAsString(),
-                            row.getAsJsonArray("from_cabin").get(1).getAsInt(),
-                            row.getAsJsonArray("to_cabin").get(1).getAsInt()));
-                }
-                return trips;
-            }
-            catch(Exception failure){throw new IllegalStateException("Strict candidate lift trip file rejected",failure);}
-        }
         append(trips,S20PhysicalElevatorDirector.COMMAND_REAR_LIFT_ID,-566,-448,-423,-419,-409,-448,-566);
         append(trips,S20PhysicalElevatorDirector.SURFACE_TRANSIT_LIFT_ID,-442,75,-442);
         append(trips,NervLiftPassengerSync.GATEWAY,-466,81,-466);
@@ -143,14 +124,6 @@ public final class LiftPassengerR20Review
         var player=e.getServer().getPlayerList().getPlayers().get(0);var level=e.getServer().getLevel(FacilitySchemaV2.DIMENSION);
         try
         {
-            if(candidateTripsR45!=null)
-            {
-                if(!FacilitySourceAdmissionR45.admit(level,candidateTripsR45))return;
-                String requested=System.getProperty("projectseele.r45LiftOutput", "");
-                require(!requested.isBlank(),"Candidate lift receipt must use a unique artifact path before movement");
-                Path output=Path.of(requested).toAbsolutePath().normalize();
-                require(!output.startsWith(world.toRealPath())&&!Files.exists(output),"Candidate lift receipt cannot overwrite a world or earlier run");
-            }
             if(R44&&!clickFailureR44.isEmpty())throw new IllegalStateException(clickFailureR44);
             if(R44&&clickReceiptR44!=null){diagnosticStates.add(clickReceiptR44);clickReceiptR44=null;}
             if(R44&&blockedClientR44!=null){diagnosticStates.add(blockedClientR44);blockedClientR44=null;}
@@ -165,7 +138,7 @@ public final class LiftPassengerR20Review
                     var control=S20MovingElevatorsAdapter.controllerPosition(resolved,stop);var call=gateway?new net.minecraft.core.BlockPos(-355,stop.walkY()+1,740):S20PhysicalElevatorDirector.exteriorCallPosition(stop);
                     row.addProperty("controller",control.toShortString());row.addProperty("call_button",call.toShortString());interfaceSpecsR43.add(row);
                 }
-            if(++age>(candidateTripsR45==null?15000:180000))throw new IllegalStateException("R20 lift suite timeout");
+            if(++age>15000)throw new IllegalStateException("R20 lift suite timeout");
             if(DESCENT&&index==4){write(world,"");finished=true;return;}
             if((R21||R22)&&!R25&&!R40){FROM[3]=75;TO[2]=75;if(index==4&&!ALL)index=6;}
             if(index==IDS.length||R41&&index==Integer.getInteger("projectseele.r41LiftEnd",IDS.length)||R21&&index==8){write(world,"");finished=true;return;}
@@ -179,8 +152,6 @@ public final class LiftPassengerR20Review
             var group=c.getGroup();timer++;
             if(stage==0)
             {
-                if(candidateTripsR45!=null)CandidateLiftTripCasesR45.verifyNative(level,spec,group,index);
-                while(actualInputsR45.size()>0)actualInputsR45.remove(actualInputsR45.size()-1);
                 walkingTargetR43=null;phaseR43=index+"_outside_call";
                 doorArrivalTicks=0;
                 ProjectSeele.LOGGER.info("R20 lift setup {} {} -> {}",spec.id(),FROM[index],TO[index]);
@@ -356,26 +327,6 @@ public final class LiftPassengerR20Review
                     pendingTripR43.addProperty("actual_client_call_click",true);pendingTripR43.addProperty("actual_client_car_selection",true);
                     pendingTripR43.addProperty("grounded_exit",true);completedSourcesR44.add(spec.id()+"/"+FROM[index]);
                 }
-                if(candidateTripsR45!=null)
-                {
-                    var caseProof=CandidateLiftTripCasesR45.evidence(index);
-                    caseProof.addProperty("actual_player_uuid",player.getUUID().toString());
-                    caseProof.addProperty("native_verified",true);
-                    caseProof.add("actual_server_inputs",actualInputsR45.deepCopy());
-                    boolean call=false,selection=false;
-                    for(var raw:actualInputsR45)
-                    {
-                        var input=raw.getAsJsonObject();
-                        call|=input.get("stage").getAsInt()==10;
-                        selection|=input.get("stage").getAsInt()==2;
-                    }
-                    require(call&&selection,"Completed ride lacks real server exterior-call or car-selection input");
-                    caseProof.addProperty("same_jvm_reload","UNVERIFIED");
-                    caseProof.addProperty("cold_reload","UNVERIFIED");
-                    caseProof.addProperty("save_interrupt","UNVERIFIED");
-                    caseProof.addProperty("two_clients","UNVERIFIED");
-                    pendingTripR43.add("candidate_case",caseProof);
-                }
                 results.add(pendingTripR43);pendingTripR43=null;
                 ProjectSeele.LOGGER.info("R43 complete lift passage {} {} -> {}",IDS[index],FROM[index],TO[index]);index++;stage=0;timer=0;
             }
@@ -539,7 +490,6 @@ public final class LiftPassengerR20Review
         }
         proof.addProperty("case_index",index);proof.addProperty("stage",stage);proof.addProperty("phase",phaseR43);
         proof.addProperty("cancellation_result",event.getCancellationResult().name());
-        if(candidateTripsR45!=null)actualInputsR45.add(proof.deepCopy());
         if(stage==10)exteriorCallObservedR44=true;
         diagnosticStates.add(proof);ProjectSeele.LOGGER.info("R44 observed real input {}",proof);
     }
@@ -571,17 +521,8 @@ public final class LiftPassengerR20Review
     private static void write(Path world,String error)
     {
         try{JsonObject r=new JsonObject();r.addProperty("error",error);r.add("trips",results);r.add("damage",damageEvents);r.add("diagnostics",diagnosticStates);if(R43)r.add("resolved_interfaces",interfaceSpecsR43);
-            if(R44){r.addProperty("required_source_stops",24);r.addProperty("completed_source_stops",completedSourcesR44.size());r.addProperty("full_current_run_pass",error.isEmpty()&&completedSourcesR44.size()==24&&(candidateTripsR45==null||results.size()==90));r.addProperty("required_directed_pairs",candidateTripsR45==null?IDS.length:90);r.addProperty("completed_directed_pairs",results.size());r.addProperty("full_lifecycle_pass",false);r.addProperty("save_interrupt","UNVERIFIED");r.addProperty("two_clients","UNVERIFIED");if(candidateTripsR45!=null){r.addProperty("candidate_binding_sha256",candidateTripsR45.get("candidate_binding_sha256").getAsString());r.addProperty("declared_session_phase",System.getProperty("projectseele.r45LiftLifecyclePhase","current_native_function"));}r.addProperty("same_jvm_reload","UNVERIFIED");r.addProperty("cold_reload","UNVERIFIED");r.addProperty("inherited","NOT_USED");r.add("completed_sources",new Gson().toJsonTree(completedSourcesR44));}
-            String requested=System.getProperty("projectseele.r45LiftOutput", "");
-            if(candidateTripsR45!=null)
-            {
-                require(!requested.isBlank(),"Candidate lift receipt must use a unique artifact path");
-                Path output=Path.of(requested).toAbsolutePath().normalize();
-                require(!output.startsWith(world.toRealPath())&&!Files.exists(output),"Candidate lift receipt cannot overwrite a world or earlier run");
-                Files.createDirectories(output.getParent());
-                Files.writeString(output,new GsonBuilder().setPrettyPrinting().create().toJson(r),StandardOpenOption.CREATE_NEW);
-            }
-            else Files.writeString(world.resolve(R44?"r44_lift_review.json":"r20_lift_review.json"),r.toString());}catch(Exception x){throw new IllegalStateException(x);}
+            if(R44){r.addProperty("required_source_stops",24);r.addProperty("completed_source_stops",completedSourcesR44.size());r.addProperty("full_current_run_pass",error.isEmpty()&&completedSourcesR44.size()==24);r.addProperty("required_directed_pairs",IDS.length);r.addProperty("completed_directed_pairs",results.size());r.addProperty("full_lifecycle_pass",false);r.addProperty("save_interrupt","UNVERIFIED");r.addProperty("two_clients","UNVERIFIED");r.addProperty("same_jvm_reload","UNVERIFIED");r.addProperty("cold_reload","UNVERIFIED");r.addProperty("inherited","NOT_USED");r.add("completed_sources",new Gson().toJsonTree(completedSourcesR44));}
+            Files.writeString(world.resolve(R44?"r44_lift_review.json":"r20_lift_review.json"),r.toString());}catch(Exception x){throw new IllegalStateException(x);}
     }
     private static void diagnose(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec,com.supermartijn642.movingelevators.elevator.ElevatorGroup group,ServerPlayer player,String point)
     {

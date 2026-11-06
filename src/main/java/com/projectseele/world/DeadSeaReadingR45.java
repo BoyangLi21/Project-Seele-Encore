@@ -104,17 +104,18 @@ public final class DeadSeaReadingR45
         var session=SESSIONS.getOrDefault(level,Map.of()).get(player.getUUID());long now=level.getGameTime();
         if(session==null||!nonce.equals(session.challenge.nonce)||now<session.next||now>session.expires
                 ||!session.dimension.equals(level.dimension().location().toString())||!physical(player,session.challenge.book)
-                ||page<0||page>=session.challenge.pages||!session.challenge.revision.equals(displayedRevision)
-                ||!displayedRevision.equals(currentRevision()))return false;
+                ||page<0||page>=session.challenge.pages)return false;
         var data=CityCoordinationSavedDataR44.get(level);
         if(session.challenge.dossier!=null&&(!data.active||!session.challenge.dossier.equals(data.instance)))return false;
+        // The client's edition digest is informational only; the server's own opened edition is recorded.
+        String revision=session.challenge.revision;
         session.next=now+20;String document="r45/archive/"+page;var row=new CompoundTag();
-        row.putUUID("Reader",player.getUUID());row.putUUID("Nonce",nonce);row.putString("Document",document);row.putString("Revision",displayedRevision);
+        row.putUUID("Reader",player.getUUID());row.putUUID("Nonce",nonce);row.putString("Document",document);row.putString("Revision",revision);
         row.putString("World",Tokyo3BuildingWorldIdentityR44.get(level));row.putString("Dimension",session.dimension);row.putLong("Book",session.challenge.book.asLong());row.putLong("At",now);
         if(session.challenge.dossier!=null)row.putUUID("Dossier",session.challenge.dossier);
-        var state=state(level);String key=player.getUUID()+"|"+row.getString("World")+"|"+document+"|"+displayedRevision;
+        var state=state(level);String key=player.getUUID()+"|"+row.getString("World")+"|"+document+"|"+revision;
         if(state.receipts.putIfAbsent(key,row)==null)state.setDirty();
-        if(session.challenge.dossier!=null)data.recordReading(session.challenge.dossier,player.getUUID(),document,displayedRevision,"physical_archive",now);
+        if(session.challenge.dossier!=null)data.recordReading(session.challenge.dossier,player.getUUID(),document,revision,"physical_archive",now);
         return true;
     }
     private DeadSeaReadingR45(){}

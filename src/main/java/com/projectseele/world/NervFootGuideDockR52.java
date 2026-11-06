@@ -32,7 +32,7 @@ public final class NervFootGuideDockR52 {
 
     public static final double CONTACT_COMPRESSION=.0002;
 
-    public static final String SOURCE="mesh/foot_guide_dock_r52.json",SOURCE_SHA="45cf09ba27dd4fecd375270ebeadf36b5d519aa398f0a7fc726d869b479890f9";
+    public static final String SOURCE="mesh/foot_guide_dock_r52.json";
 
     public enum Stage { COUPLE,OPEN_INCOMING,TURN,CLOSE_OUTGOING,RELEASE }
 
@@ -78,9 +78,9 @@ public final class NervFootGuideDockR52 {
 
     public static net.minecraft.nbt.CompoundTag snapshot(Spec spec){return snapshot(view(spec));}
 
-    public static net.minecraft.nbt.CompoundTag snapshot(ViewSpec s){var t=new net.minecraft.nbt.CompoundTag();t.putString("Source",SOURCE_SHA);t.putString("GuideSource",NervFootGuideRigR52.SOURCE_SHA);t.putInt("Variant",s.variant());t.putString("Leg",s.legId());t.put("Left",pointTag(s.binding().leftFoot()));t.put("Right",pointTag(s.binding().rightFoot()));t.put("Plug",NervAircraftFrameR52.encodeRigid(s.binding().plugInEva()));t.put("FootFrom",NervAircraftFrameR52.encodeRigid(s.footFrom()));t.put("FootTo",NervAircraftFrameR52.encodeRigid(s.footTo()));t.put("BodyFrom",NervAircraftFrameR52.encodeRigid(RigidTransform.of(Vec3.ZERO,s.bodyFrom())));t.put("BodyTo",NervAircraftFrameR52.encodeRigid(RigidTransform.of(Vec3.ZERO,s.bodyTo())));t.put("UpFrom",pointTag(s.fromUp()));t.put("UpTo",pointTag(s.toUp()));t.putDouble("FoundationTop",s.foundationTop());return t;}
+    public static net.minecraft.nbt.CompoundTag snapshot(ViewSpec s){var t=new net.minecraft.nbt.CompoundTag();t.putInt("Variant",s.variant());t.putString("Leg",s.legId());t.put("Left",pointTag(s.binding().leftFoot()));t.put("Right",pointTag(s.binding().rightFoot()));t.put("Plug",NervAircraftFrameR52.encodeRigid(s.binding().plugInEva()));t.put("FootFrom",NervAircraftFrameR52.encodeRigid(s.footFrom()));t.put("FootTo",NervAircraftFrameR52.encodeRigid(s.footTo()));t.put("BodyFrom",NervAircraftFrameR52.encodeRigid(RigidTransform.of(Vec3.ZERO,s.bodyFrom())));t.put("BodyTo",NervAircraftFrameR52.encodeRigid(RigidTransform.of(Vec3.ZERO,s.bodyTo())));t.put("UpFrom",pointTag(s.fromUp()));t.put("UpTo",pointTag(s.toUp()));t.putDouble("FoundationTop",s.foundationTop());return t;}
 
-    public static ViewSpec viewSpec(net.minecraft.nbt.CompoundTag t){if(!t.getString("Source").equals(SOURCE_SHA)||!t.getString("GuideSource").equals(NervFootGuideRigR52.SOURCE_SHA))throw new IllegalStateException("Actual canonical station source snapshot changed");return new ViewSpec(t.getInt("Variant"),t.getString("Leg"),new FootSupportFrameR52.Binding(tagPoint(t.getCompound("Left")),tagPoint(t.getCompound("Right")),NervAircraftFrameR52.decodeRigid(t.getCompound("Plug"))),NervAircraftFrameR52.decodeRigid(t.getCompound("FootFrom")),NervAircraftFrameR52.decodeRigid(t.getCompound("FootTo")),NervAircraftFrameR52.decodeRigid(t.getCompound("BodyFrom")).rotation(),NervAircraftFrameR52.decodeRigid(t.getCompound("BodyTo")).rotation(),tagPoint(t.getCompound("UpFrom")),tagPoint(t.getCompound("UpTo")),t.getDouble("FoundationTop"));}
+    public static ViewSpec viewSpec(net.minecraft.nbt.CompoundTag t){return new ViewSpec(t.getInt("Variant"),t.getString("Leg"),new FootSupportFrameR52.Binding(tagPoint(t.getCompound("Left")),tagPoint(t.getCompound("Right")),NervAircraftFrameR52.decodeRigid(t.getCompound("Plug"))),NervAircraftFrameR52.decodeRigid(t.getCompound("FootFrom")),NervAircraftFrameR52.decodeRigid(t.getCompound("FootTo")),NervAircraftFrameR52.decodeRigid(t.getCompound("BodyFrom")).rotation(),NervAircraftFrameR52.decodeRigid(t.getCompound("BodyTo")).rotation(),tagPoint(t.getCompound("UpFrom")),tagPoint(t.getCompound("UpTo")),t.getDouble("FoundationTop"));}
 
     public static net.minecraft.nbt.CompoundTag encodePose(StationPose p){var t=new net.minecraft.nbt.CompoundTag();t.putDouble("Turn",p.turn());t.putDouble("Incoming",p.incoming());t.putDouble("Outgoing",p.outgoing());t.putDouble("Coupling",p.coupling());t.putDouble("Raised",p.raised());return t;}
 
@@ -156,7 +156,7 @@ public final class NervFootGuideDockR52 {
 
         public UUID actor(){return actor;}public UUID station(){return station;}public long checkedAt(){return at;}public Spec spec(){return spec;}public Sample from(){return from;}public Sample to(){return to;}public RigidTransform fromRoot(){return root(spec,from);}public RigidTransform toRoot(){return root(spec,to);}public Vec3 fromUp(){return guideUp(spec,from);}public Vec3 toUp(){return guideUp(spec,to);}public List<AABB> envelopes(){return envelopes;}
 
-        public net.minecraft.nbt.CompoundTag stationState(){var t=new net.minecraft.nbt.CompoundTag();t.putString("Source",SOURCE_SHA);t.putString("Leg",spec.leg().id());t.putString("Stage",to.stage().name());t.putDouble("Fraction",to.fraction());t.putDouble("FoundationTop",spec.foundationTop());t.put("View",snapshot(spec));t.put("Pose",encodePose(stationPose(spec,to)));return t;}
+        public net.minecraft.nbt.CompoundTag stationState(){var t=new net.minecraft.nbt.CompoundTag();t.putString("Leg",spec.leg().id());t.putString("Stage",to.stage().name());t.putDouble("Fraction",to.fraction());t.putDouble("FoundationTop",spec.foundationTop());t.put("View",snapshot(spec));t.put("Pose",encodePose(stationPose(spec,to)));return t;}
 
         public boolean current(ServerLevel l){try{return at==l.getGameTime()&&l.getEntity(actor) instanceof NervCarrierPlatformEntity e&&NervOriginalCarrierR52.declared(e)&&e.originalCarrierStateR52().equals(state)&&l.getEntity(station) instanceof NervCarrierPlatformEntity fixed&&NervFootGuideStationR52.declared(fixed)&&NervFootGuideStationR52.rawState(fixed).equals(stationBefore)&&NervFootGuideStationR52.currentPose(fixed).equals(stationPose(spec,from))&&foundationsBear(l,spec);}catch(IOException missing){return false;}}
 
@@ -214,9 +214,9 @@ public final class NervFootGuideDockR52 {
 
     private static synchronized Map<String,Template> templates()throws IOException {
 
-        if(templates!=null)return templates;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);try{if(!java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)).equals(SOURCE_SHA))throw new IllegalStateException("Actual docking source changed");}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+        if(templates!=null)return templates;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);
 
-        var j=com.google.gson.JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();if(!j.get("schema").getAsString().equals("projectseele.r52.actual-foot-guide-dock.v1")||j.get("stride").getAsInt()!=6||!j.get("original_guide_sha256").getAsString().equals(NervFootGuideRigR52.SOURCE_SHA))throw new IllegalStateException("Actual original axle/source pair required");
+        var j=com.google.gson.JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();if(!j.get("schema").getAsString().equals("projectseele.r52.actual-foot-guide-dock.v1")||j.get("stride").getAsInt()!=6)throw new IllegalStateException("Actual original axle/source pair required");
 
         var out=new LinkedHashMap<String,Template>();for(var entry:j.getAsJsonObject("parts").entrySet()){var a=entry.getValue().getAsJsonArray();double[] rgb=new double[a.size()],xyz=new double[a.size()/2];for(int n=0,k=0;n<rgb.length;n+=6){for(int c=0;c<6;c++)rgb[n+c]=a.get(n+c).getAsDouble();xyz[k++]=rgb[n];xyz[k++]=rgb[n+1];xyz[k++]=rgb[n+2];}out.put(entry.getKey(),new Template(rgb,new NervRigidMeshSweepR52(xyz)));}templates=Map.copyOf(out);return templates;
 
@@ -509,7 +509,7 @@ public final class NervFootGuideDockR52 {
 
         if(!s.directory().installed()||e.getUnitVariant()!=variant(s)||!NervOriginalCarrierR52.declared(e)||NervOriginalCarrierR52.progress(e,1)!=1||!own.contains(e.getUUID())||!monotone(from,to)||!NervAirTransportManifestR52.same(NervOriginalCarrierR52.actualRoot(e,1),root(s,from))||NervOriginalCarrierR52.guideUp(e).distanceTo(guideUp(s,from))>1e-6||!foundationsBear(l,s))return null;
 
-        var station=NervFootGuideStationR52.controller(l,s);if(station==null||!NervFootGuideStationR52.currentPose(station).equals(stationPose(s,from))||!snapshot(NervFootGuideStationR52.view(station)).equals(snapshot(view(s))))return null;var owned=new HashSet<>(own);owned.add(station.getUUID());var saved=e.originalCarrierStateR52().getCompound("DockR52");if(saved.isEmpty()){if(from.stage()!=Stage.COUPLE||from.fraction()!=0)return null;}else if(!saved.getString("Source").equals(SOURCE_SHA)||!saved.getString("Leg").equals(s.leg().id())||!saved.getString("Stage").equals(from.stage().name())||saved.getDouble("Fraction")!=from.fraction()||saved.getDouble("FoundationTop")!=s.foundationTop())return null;
+        var station=NervFootGuideStationR52.controller(l,s);if(station==null||!NervFootGuideStationR52.currentPose(station).equals(stationPose(s,from))||!snapshot(NervFootGuideStationR52.view(station)).equals(snapshot(view(s))))return null;var owned=new HashSet<>(own);owned.add(station.getUUID());var saved=e.originalCarrierStateR52().getCompound("DockR52");if(saved.isEmpty()){if(from.stage()!=Stage.COUPLE||from.fraction()!=0)return null;}else if(!saved.getString("Leg").equals(s.leg().id())||!saved.getString("Stage").equals(from.stage().name())||saved.getDouble("Fraction")!=from.fraction()||saved.getDouble("FoundationTop")!=s.foundationTop())return null;
 
         if(coupled(from)==1&&!finiteAxleContacts(s,from)||coupled(to)==1&&!finiteAxleContacts(s,to)||bearingFaces(s.binding(),root(s,from),guideUp(s,from)).stream().anyMatch(f->!f.bears())||bearingFaces(s.binding(),root(s,to),guideUp(s,to)).stream().anyMatch(f->!f.bears())||saddleSupportsR52(view(s),stationPose(s,from)).stream().anyMatch(f->!f.bears())||saddleSupportsR52(view(s),stationPose(s,to)).stream().anyMatch(f->!f.bears()))return null;var boxes=new ArrayList<AABB>();
 

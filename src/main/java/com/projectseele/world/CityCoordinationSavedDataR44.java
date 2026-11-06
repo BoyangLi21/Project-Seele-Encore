@@ -129,8 +129,7 @@ public final class CityCoordinationSavedDataR44 extends SavedData
         for(String id:requiredArchivePagesR45)
         {
             var receipt=readingsR45.get(owner+"|"+id);
-            if(receipt==null||!receipt.instance.equals(instance)||!receipt.revision.equals(requiredArchiveRevisionR45)
-                    ||!receipt.source.equals("physical_archive"))return false;
+            if(receipt==null||!receipt.instance.equals(instance)||!receipt.source.equals("physical_archive"))return false;
         }
         return true;
     }

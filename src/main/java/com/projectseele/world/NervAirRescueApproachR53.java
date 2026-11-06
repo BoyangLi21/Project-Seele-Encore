@@ -184,7 +184,7 @@ public final class NervAirRescueApproachR53
         float t=(float)NervAirTransportRuntimeR52.ease((age+1D)/60);
         var body=EvaBodyPose.blend(start,EvaBodyPose.neutralForTransportR32(eva),t);
         var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
-        var from=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),data.getCompound("RescueHandsR53"));
+        var from=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handJoints(eva.getUnitVariant()),data.getCompound("RescueHandsR53"));
         var goal=EvaAnatomicalHandsR45.ordinaryReleaseTargetR52(eva.getUnitVariant(),false);
         var joints=new LinkedHashMap<String,org.joml.Quaternionf>();
         for(String name:from.rotations().keySet())joints.put(name,new org.joml.Quaternionf(from.rotations().get(name)).slerp(goal.rotations().get(name),t));
@@ -228,12 +228,12 @@ public final class NervAirRescueApproachR53
             var start=EvaBodyPose.neutralForTransportR32(eva);EvaShutdownR30.decode(tag.getCompound("RescueServiceStartR53"),start);
             var body=EvaBodyPose.blend(start,EvaBodyPose.neutralForTransportR32(eva),t);
             var provider=EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
-            var from=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handContractFingerprint(eva.getUnitVariant()),provider.handJoints(eva.getUnitVariant()),tag.getCompound("RescueServiceHandsR53"));
+            var from=EvaFrozenHandsR52.decode(eva.getUnitVariant(),provider.handJoints(eva.getUnitVariant()),tag.getCompound("RescueServiceHandsR53"));
             var goal=EvaAnatomicalHandsR45.ordinaryReleaseTargetR52(eva.getUnitVariant(),false);
             var joints=new LinkedHashMap<String,org.joml.Quaternionf>();
             for(String name:from.rotations().keySet())joints.put(name,new org.joml.Quaternionf(from.rotations().get(name)).slerp(goal.rotations().get(name),t));
             var hands=new EvaAnatomicalHandsR45.Pose(goal.left(),goal.right(),Map.copyOf(joints));
-            tag.put("HeldBody",EvaShutdownR30.encode(body));tag.put("HeldHands",EvaFrozenHandsR52.encode(eva.getUnitVariant(),EvaAnatomicalHandsR45.contractFingerprintR45(eva.getUnitVariant()),hands));
+            tag.put("HeldBody",EvaShutdownR30.encode(body));tag.put("HeldHands",EvaFrozenHandsR52.encode(eva.getUnitVariant(),hands));
             tag.putLong("HeldAt",level.getGameTime());tag.putInt("RescueServiceAgeR53",age);
             if(age>=60){tag.putBoolean("RescueServiceSettledR53",true);tag.remove("RescueServiceStartR53");tag.remove("RescueServiceHandsR53");eva.stowHandsForShutdownR30();}
             EvaMechanicalFrameR52.load(eva,live);eva.setBoundingBox(EvaMechanicalFrameR52.serviceBoundsR52(eva));

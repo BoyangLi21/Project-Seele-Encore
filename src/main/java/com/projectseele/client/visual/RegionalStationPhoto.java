@@ -90,7 +90,6 @@ public final class RegionalStationPhoto
                 if(DETAIL)
                 {
                     Path itinerary=world.resolve(R30?"r30_photo_views.json":R07?"r07_photo_views.json":"regional_photo_views.json");
-                    if(!System.getProperty("projectseele.nativeFacilityBindingR45","").isEmpty())itinerary=com.projectseele.world.FacilitySourceAdmissionR45.photoViews(world);
                     var data=com.google.gson.JsonParser.parseString(Files.readString(itinerary)).getAsJsonArray();
                     java.util.List<View> views=new java.util.ArrayList<>();
                     for(var item:data)

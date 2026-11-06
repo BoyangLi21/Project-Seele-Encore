@@ -37,8 +37,7 @@ public final class YashimaCannonHatchR54
     public static boolean advance(ServerLevel level,TvYashimaStationR52.Plan plan,
             YashimaCannonEntityR52 gun,NervSiloDoorEntity hatch,boolean open)
     {
-        if(!plan.cannon().equals(gun.getUUID())||!plan.hatch().equals(hatch.getUUID())
-                ||!plan.fingerprint().equals(gun.getPersistentData().getString("StationLayoutR52")))
+        if(!plan.cannon().equals(gun.getUUID())||!plan.hatch().equals(hatch.getUUID()))
             return held(gun,"original_station_identity_changed");
         var cells=proxyCells(hatch);if(cells.isEmpty())return held(gun,"declared_cannon_aperture_missing");
         boolean strict=NervTraversalPolicyR53.strict(level);

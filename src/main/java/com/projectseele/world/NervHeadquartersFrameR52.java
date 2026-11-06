@@ -19,13 +19,13 @@ public final class NervHeadquartersFrameR52
 {
     public static final String FILE = "r52/headquarters.json";
     public record Frame(long epoch, String directoryFingerprint, BlockPos translation,
-                        String commandDoorManifest, String commandDoorSha256)
+                        String commandDoorManifest)
     {
         public BlockPos apply(BlockPos original) { return original.offset(translation); }
         public BlockPos inverse(BlockPos actual) { return actual.subtract(translation); }
         public Vec3 apply(Vec3 original) { return original.add(translation.getX(), translation.getY(), translation.getZ()); }
         public AABB apply(AABB original) { return original.move(translation.getX(), translation.getY(), translation.getZ()); }
-        String identity() { return epoch + "/" + directoryFingerprint + "/" + translation + "/" + commandDoorManifest + "/" + commandDoorSha256; }
+        String identity() { return epoch + "/" + directoryFingerprint + "/" + translation + "/" + commandDoorManifest; }
     }
     private static final class State
     {
@@ -87,9 +87,7 @@ public final class NervHeadquartersFrameR52
                 || !"projectseele:geofront".equals(root.get("dimension").getAsString())
                 || !"headquarters".equals(root.get("component").getAsString())
                 || !root.get("installed").getAsBoolean()
-                || root.get("epoch").getAsLong() != epoch || epoch <= 0
-                || !fingerprint.matches("[0-9a-f]{64}")
-                || !fingerprint.equals(root.get("directory_fingerprint").getAsString()))
+                || root.get("epoch").getAsLong() != epoch || epoch <= 0)
             throw new IllegalArgumentException("Root headquarters declaration does not match the current claim");
         var row = root.getAsJsonArray("translation");
         if (row == null || row.size() != 3) throw new IllegalArgumentException("Three-axis headquarters translation required");
@@ -111,9 +109,7 @@ public final class NervHeadquartersFrameR52
         if (relative.isAbsolute() || manifest.contains(":") || manifest.contains("\\")
                 || !manifest.startsWith("r52/") || manifest.contains("..") || !manifest.endsWith(".json"))
             throw new IllegalArgumentException("Root world-relative headquarters door declaration required");
-        String sha = root.get("command_door_sha256").getAsString();
-        if (!sha.matches("[0-9a-f]{64}")) throw new IllegalArgumentException("Actual headquarters door artifact hash required");
-        return new Frame(epoch, fingerprint, translation, manifest, sha);
+        return new Frame(epoch, fingerprint, translation, manifest);
     }
     private NervHeadquartersFrameR52() {}
 }

@@ -298,8 +298,6 @@ public final class CombatBodyDynamics
                         // The stitched render skin extends beyond Bullet's bodies. Evaluate
                         // it once at rest, without sampling the Dynamics-owned body again.
                         var provider=com.projectseele.world.EvaOriginalMeshGeometryR52.readOnlySelectedProviderR52();
-                        if(!provider.handContractFingerprint(eva.getUnitVariant()).equals(EvaAnatomicalHandsR45.contractFingerprintR45(eva.getUnitVariant())))
-                            throw new IllegalStateException("Rest hand source differs from selected actual mesh");
                         var geometry=provider.evaluate(eva.getUnitVariant(),s.pose,EvaAnatomicalHandsR45.sample(eva,0));
                         var root=com.projectseele.world.RigidTransform.of(s.position,new Quaternionf().rotationY((180-s.yaw)*Mth.DEG_TO_RAD));
                         var actual=com.projectseele.world.NervRigidMeshSweepR52.transformed(geometry.bounds(),root);

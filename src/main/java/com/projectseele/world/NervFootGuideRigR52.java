@@ -4,7 +4,6 @@ import com.google.gson.*;
 import com.projectseele.entity.*;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
-import java.security.MessageDigest;
 import java.util.*;
 import net.minecraft.world.phys.*;
 import org.joml.Matrix3f;
@@ -16,13 +15,12 @@ import org.joml.Vector3f;
  * and world up during the Root's foot-axis turn. Both use this same source. */
 public final class NervFootGuideRigR52 {
  public static final String SOURCE="mesh/foot_guide_rig_r52.json";
- public static final String SOURCE_SHA="cdb42ec6d3856675c26ab5c037927e1821de5bffcb563e7918a9d00ad51391e3";
  public static final double HALF_WIDTH=14.95,AXIS_EXTENSION=14.75,ROW=2.9,REAR=.8,WEB_HALF=.03,PAD_HALF=.15;
  public record Part(String name,String role,double[] rgb,NervRigidMeshSweepR52 mesh){}
  public record Draw(Part part,RigidTransform frame){}
  private static List<Part> parts,bearingParts;private static Map<Integer,FootSupportFrameR52.Binding> nominal;
  public static synchronized void install()throws IOException {
-  if(parts!=null)return;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);try{if(!HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes)).equals(SOURCE_SHA))throw new IllegalStateException("Actual foot-guide rig source changed");}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}
+  if(parts!=null)return;var bytes=EvaOriginalMeshGeometryR52.classpathBytes(SOURCE);
   var data=JsonParser.parseString(new String(bytes,StandardCharsets.UTF_8)).getAsJsonObject();if(!data.get("schema").getAsString().equals("projectseele.r52.engineered-foot-guide-rig.v1")||data.get("stride").getAsInt()!=6)throw new IllegalStateException("Explicit actual foot-guide source required");var out=new ArrayList<Part>();for(var value:data.getAsJsonArray("members")){var row=value.getAsJsonObject();String name=row.get("part").getAsString(),role=row.get("role").getAsString();if(!Set.of("rotor","stator").contains(role))throw new IllegalStateException("Unknown actual foot-guide attachment");var a=data.getAsJsonObject("parts").getAsJsonArray(name);double[] rgb=new double[a.size()],xyz=new double[a.size()/2];for(int i=0,n=0;i<rgb.length;i+=6){for(int c=0;c<6;c++)rgb[i+c]=a.get(i+c).getAsFloat();xyz[n++]=rgb[i];xyz[n++]=rgb[i+1];xyz[n++]=rgb[i+2];}out.add(new Part(name,role,rgb,new NervRigidMeshSweepR52(xyz)));}
   var bindings=new HashMap<Integer,FootSupportFrameR52.Binding>();for(int v=0;v<3;v++){var b=data.getAsJsonObject("nominal_sole_bindings").getAsJsonObject(Integer.toString(v));bindings.put(v,new FootSupportFrameR52.Binding(point(b.getAsJsonArray("l")),point(b.getAsJsonArray("r")),RigidTransform.identity()));}parts=List.copyOf(out);nominal=Map.copyOf(bindings);var centred=new ArrayList<Part>();for(var p:parts){int side=p.name().split("_")[3].equals("-1")?-1:1;double[] rgb=p.rgb().clone(),xyz=new double[rgb.length/2];for(int i=0,n=0;i<rgb.length;i+=6){rgb[i]=(float)(rgb[i]-side*AXIS_EXTENSION);xyz[n++]=rgb[i];xyz[n++]=rgb[i+1];xyz[n++]=rgb[i+2];}centred.add(new Part(p.name(),p.role(),rgb,new NervRigidMeshSweepR52(xyz)));}bearingParts=List.copyOf(centred);
  }

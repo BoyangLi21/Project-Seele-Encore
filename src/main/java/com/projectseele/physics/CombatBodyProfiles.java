@@ -16,7 +16,6 @@ public final class CombatBodyProfiles
     public record Profile(String key,JsonObject definition,Map<String,EvaBodyPose.Bone> rig,Recovery recovery) {}
     private static Map<String,Profile> profiles;
     private static String loadedFingerprint="ABSENT";
-    public static synchronized String fingerprint(){get(null);return loadedFingerprint;}
     public static String key(net.minecraft.world.entity.LivingEntity entity)
     {return entity instanceof EvaPrototypeEntity un?Integer.toString(3+un.getUNSerial()):entity instanceof EvaUnit01Entity eva?Integer.toString(eva.getUnitVariant()):entity instanceof SachielEntity?"sachiel":"";}
     public static synchronized Profile get(net.minecraft.world.entity.LivingEntity entity)

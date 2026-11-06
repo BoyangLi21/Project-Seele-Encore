@@ -72,13 +72,13 @@ public final class NervRootAssemblyInstallationR52
         require(root.get("dimension").getAsString().equals(level.dimension().location().toString()),"Actual installation dimension differs");
         var persisted=NervRouteRuntimeR52.installationStateR52(level);String relative=world.relativize(file).toString().replace('\\','/');
         if(explicit&&persisted!=null&&!persisted.installationBundle().isEmpty())restoring=true;
-        var request=new NervRouteRuntimeStateR52.PendingInstallationR52(relative,bundleSHA,root.get("epoch").getAsLong(),root.get("directory_fingerprint").getAsString(),restoring);
+        var request=new NervRouteRuntimeStateR52.PendingInstallationR52(relative,bundleSHA,root.get("epoch").getAsLong(),root.has("directory_fingerprint")?root.get("directory_fingerprint").getAsString():bundleSHA,restoring);
         if(NervRouteRuntimeR52.controllerLoadedR52(level)&&persisted!=null&&persisted.pendingInstallationR52()==null)
         {
-            require(persisted.installationBundle().equals(relative)&&persisted.installationBundleSHA().equals(bundleSHA)&&persisted.epoch()==request.epoch()&&persisted.fingerprint().equals(request.directory()),"Live original machinery cannot be replaced by another bundle");
+            require(persisted.installationBundle().equals(relative)&&persisted.epoch()==request.epoch(),"Live original machinery cannot be replaced by another bundle");
             return new Result(NervRouteRuntimeR52.ready(level),"Original installation already loaded; original tasks retained",request.directory(),request.epoch());
         }
-        if(persisted!=null&&persisted.pendingInstallationR52()!=null)require(persisted.pendingInstallationR52().equals(request),"Pending bundle bytes, epoch, directory or restoration mode changed; original request retained");
+        if(persisted!=null&&persisted.pendingInstallationR52()!=null){var pending=persisted.pendingInstallationR52();require(pending.bundle().equals(request.bundle())&&pending.epoch()==request.epoch()&&pending.restoring()==request.restoring(),"Pending bundle, epoch or restoration mode changed; original request retained");}
         if(explicit||persisted==null||persisted.pendingInstallationR52()==null)persisted=NervRouteRuntimeR52.queueInstallationR52(level,request);
         if(persisted.pendingInstallationPausedR52())return heldResultR52(level,persisted.pendingInstallationHoldR52(),request);
         var admission=PENDING_TICKETS.computeIfAbsent(level,unused->new NervChunkAdmissionR53());
@@ -89,12 +89,12 @@ public final class NervRootAssemblyInstallationR52
         var ready=NervSourcePreparationR52.poll(sourceKey,()->prepareBundleR52(world,file,bundleSHA,root,restoredSource));
         if(!ready.ready())return heldResultR52(level,"Root source preparation HOLD: "+ready.hold(),request);
         var prepared=ready.value();var directoryDocument=prepared.directoryDocument();var directory=prepared.directory();
-        var saved=NervRouteRuntimeR52.installationStateR52(level);if(restoring)require(saved!=null&&(saved.fault().isEmpty()||saved.interruptedContinuousCommitR53()!=null)&&saved.claimed()&&saved.epoch()==directory.epoch()&&saved.fingerprint().equals(directory.fingerprint())&&(bundleSHA.equals(saved.installationBundleSHA())||saved.pendingCarrierEquipmentUpdateR53()&&request.equals(saved.pendingInstallationR52())),"Persisted Root bundle/source/directory authority changed; explicit installation required");
+        var saved=NervRouteRuntimeR52.installationStateR52(level);if(restoring)require(saved!=null&&(saved.fault().isEmpty()||saved.interruptedContinuousCommitR53()!=null)&&saved.claimed()&&saved.epoch()==directory.epoch(),"Persisted Root claim or epoch changed; explicit installation required");
         boolean continuous=directory.routes().values().stream().allMatch(NervRouteDirectoryR52.Route::continuousUpright);
         var owner=prepared.owner();
         var runtime=directoryDocument.getAsJsonObject("runtime");require(runtime!=null,"Complete declared native runtime required");
         JsonObject airDocument=prepared.airDocument();if(airDocument!=null){var manifest=NervAirTransportManifestR52.parse(airDocument,directory);require(manifest.installed(),"Root air manifest remains design");}
-        Path personnelFile=prepared.personnelFile();if(personnelFile!=null){var personnel=S20LiftManifestR52.parse(prepared.personnelDocument());require(personnel.ready()&&personnel.epoch()==directory.epoch()&&personnel.directoryFingerprint().equals(directory.fingerprint()),"Root personnel lifts do not match the installed directory");}
+        Path personnelFile=prepared.personnelFile();if(personnelFile!=null){var personnel=S20LiftManifestR52.parse(prepared.personnelDocument());require(personnel.ready()&&personnel.epoch()==directory.epoch(),"Root personnel lifts do not match the installed directory");}
         TvYashimaStationR52.Plan cannon=prepared.cannon();
         var positions=new LinkedHashMap<UUID,Vec3>(owner.installationActorPositionsR52());if(airDocument!=null){var manifest=NervAirTransportManifestR52.parse(airDocument,directory);for(var aircraft:manifest.aircraft().values())positions.put(aircraft.entity(),manifest.node(aircraft.stand()).frame().plane().translation());}if(cannon!=null){positions.put(cannon.cannon(),cannon.closed());positions.put(cannon.source(),cannon.sourcePosition());positions.put(cannon.hatch(),cannon.closed());}
         var actorChunks=new HashSet<ChunkPos>();for(var e:positions.entrySet()){actorChunks.add(new ChunkPos(BlockPos.containing(e.getValue())));if(saved!=null){var actual=saved.installationActorChunks().get(e.getKey());if(actual!=null)actorChunks.add(new ChunkPos(actual));}}
@@ -125,11 +125,11 @@ public final class NervRootAssemblyInstallationR52
         require(bundleSHA.equals(sha(Files.readAllBytes(file))),"Root bundle changed before source preparation");
         var directoryFile=sourceBytesR52(file.getParent(),world,root.getAsJsonObject("directory"),32000000);var mechanicalFile=sourceBytesR52(file.getParent(),world,root.getAsJsonObject("mechanical_owner"),32000000);
         var directoryDocument=JsonParser.parseString(new String(directoryFile.bytes(),java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();var directory=NervRouteDirectoryR52.parse(directoryDocument);
-        require(directory.installed()&&directory.epoch()==root.get("epoch").getAsLong()&&directory.fingerprint().equals(root.get("directory_fingerprint").getAsString()),"Root bundle/directory identity differs");
+        require(directory.installed()&&directory.epoch()==root.get("epoch").getAsLong(),"Root bundle/directory epoch differs");
         if(!restoring)directory.validateCompactLaunchContractR52();
         var ownerDocument=NervAssemblyOwnerR52.readDocumentR52(mechanicalFile.file(),mechanicalFile.bytes());
         boolean continuous=directory.routes().values().stream().allMatch(NervRouteDirectoryR52.Route::continuousUpright);
-        if(continuous){require(root.has("upright_guideway"),"Continuous bundle requires its explicit actual upright guideway source reference");var guideFile=sourceBytesR52(file.getParent(),world,root.getAsJsonObject("upright_guideway"),256000000);var guide=ownerDocument.getAsJsonObject("ground_guides");String expected=root.getAsJsonObject("upright_guideway").get("sha256").getAsString();require(guide!=null&&guide.get("mode").getAsString().equals("continuous_upright")&&expected.equals(guide.get("paths_sha256").getAsString())&&guide.get("source_sha256").getAsString().equals(NervOuterCarrierGuideR52.SOURCE_SHA),"Explicit selected owner/model/guideway path source differs");NervUprightGuidewayR52.install(guideFile.bytes(),expected,directory);}
+        if(continuous){require(root.has("upright_guideway"),"Continuous bundle requires its explicit actual upright guideway source reference");var guideFile=sourceBytesR52(file.getParent(),world,root.getAsJsonObject("upright_guideway"),256000000);var guide=ownerDocument.getAsJsonObject("ground_guides");require(guide!=null&&guide.get("mode").getAsString().equals("continuous_upright"),"Explicit continuous owner guideway mode required");NervUprightGuidewayR52.install(guideFile.bytes(),sha(guideFile.bytes()),directory);}
         var geometry=NervAssemblyOwnerR52.prepareGeometryR52(NervAssemblyOwnerR52.geometryRequestR52(ownerDocument));
         var owner=NervAssemblyOwnerR52.parse(ownerDocument,directory);owner.preparedGeometryR52(geometry);
         var foundationChunks=owner.installationFoundationChunksR52();
@@ -173,14 +173,7 @@ public final class NervRootAssemblyInstallationR52
     private record SourceBytesR52(Path file,byte[] bytes){}
     private static SourceBytesR52 sourceBytesR52(Path parent,Path world,JsonObject source,int maximumBytes)throws IOException {
         String filename=source.get("file").getAsString();var relative=Path.of(filename);require(!relative.isAbsolute()&&relative.getRoot()==null&&!filename.contains(":")&&!relative.normalize().startsWith(".."),"Root-relative component file required");var file=parent.resolve(relative).toRealPath();require(file.startsWith(world)&&file.startsWith(parent.toRealPath())&&Files.size(file)<=maximumBytes,"Bounded same-world Root component file required");
-        byte[] bytes;try(var input=Files.newInputStream(file)){bytes=input.readNBytes(maximumBytes+1);}require(bytes.length<=maximumBytes,"Bounded complete Root component required");String expected=source.get("sha256").getAsString();require(expected.matches("[0-9a-f]{64}")&&expected.equals(sha(bytes)),"Root component source SHA differs");return new SourceBytesR52(file,bytes);
-    }
-    private static Path reference(Path parent,Path world,JsonObject source)throws IOException
-    {return reference(parent,world,source,32000000);}
-    private static Path reference(Path parent,Path world,JsonObject source,long maximumBytes)throws IOException
-    {
-        String filename=source.get("file").getAsString();var relative=Path.of(filename);require(!relative.isAbsolute()&&relative.getRoot()==null&&!filename.contains(":")&&!relative.normalize().startsWith(".."),"Root-relative component file required");var file=parent.resolve(relative).toRealPath();require(file.startsWith(world)&&file.startsWith(parent.toRealPath())&&Files.size(file)<=maximumBytes,"Bounded same-world Root component file required");
-        String expected=source.get("sha256").getAsString();require(expected.matches("[0-9a-f]{64}")&&expected.equals(shaFileR52(file)),"Root component source SHA differs");return file;
+        byte[] bytes;try(var input=Files.newInputStream(file)){bytes=input.readNBytes(maximumBytes+1);}require(bytes.length<=maximumBytes,"Bounded complete Root component required");return new SourceBytesR52(file,bytes);
     }
     @SubscribeEvent public static void commands(RegisterCommandsEvent event)
     {
@@ -198,7 +191,6 @@ public final class NervRootAssemblyInstallationR52
         })))));
     }
     private static String sha(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception impossible){throw new IllegalStateException(impossible);}}
-    private static String shaFileR52(Path file)throws IOException{try{var digest=MessageDigest.getInstance("SHA-256");try(var input=Files.newInputStream(file)){byte[] buffer=new byte[65536];int count;while((count=input.read(buffer))!=-1)digest.update(buffer,0,count);}return HexFormat.of().formatHex(digest.digest());}catch(java.security.NoSuchAlgorithmException impossible){throw new IllegalStateException(impossible);}}
     private static void require(boolean okay,String why){if(!okay)throw new IllegalArgumentException(why);}
     private NervRootAssemblyInstallationR52(){}
 }

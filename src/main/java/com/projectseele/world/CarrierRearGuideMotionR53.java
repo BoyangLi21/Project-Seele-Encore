@@ -113,10 +113,9 @@ public final class CarrierRearGuideMotionR53
         boolean allowPending=geometry.coverage.allowsPendingSourceR53();
         var transfer=CarrierTransferRailsR53.selected();
         var context=NervRouteRuntimeR52.flightContext(level);
-        if(context==null||!rails.directory().equals(context.directory().fingerprint())
-            ||!rails.legacySource().equals(NervRouteRuntimeR52.uprightGuideSourceR52(level)))return "rear_actual_world_binding_changed";
+        if(context==null)return "rear_actual_world_binding_changed";
         for(var path:paths)
-            if(!path.pureTranslation()||!rails.directory().equals(path.directory().fingerprint())
+            if(!path.pureTranslation()
                 ||!NervUprightGuidewayR52.enabledForDirectoryR52(level,path.directory()))return "rear_route_source_or_root_changed";
         var bridges=bridgeState(level,transfer);
         // Legacy floor templates are installed once per class loader; their
@@ -140,7 +139,7 @@ public final class CarrierRearGuideMotionR53
         if(FIXED_WORK.stream().filter(w->!w.result.isDone()).count()>=2)return "rear_fixed_source_pending";
         var keys=new HashSet<FixedMeshKey>();var pairs=new ArrayList<FixedPair>();int[] interval={0};
         var failure=visitContinuousIntervals(paths,hardware,lift,mounting,(path,from,to,rootFrom,rootTo,error)->{
-            if(!path.pureTranslation()||!rails.directory().equals(path.directory().fingerprint())
+            if(!path.pureTranslation()
                 ||!NervUprightGuidewayR52.enabledForDirectoryR52(level,path.directory()))return rejected("rear_route_source_or_root_changed");
             int index=interval[0]++;double expanded=sweptError(from,to,error,false);
             String leg=CarrierRearGuideR53.canonicalPath(path);
@@ -281,7 +280,7 @@ public final class CarrierRearGuideMotionR53
             var actual=NervOriginalCarrierR52.actualRoot(carrier,1).translation();
             for(var path:paths)
             {
-                if(!path.pureTranslation()||!fixed.directory().equals(path.directory().fingerprint())
+                if(!path.pureTranslation()
                         ||!NervUprightGuidewayR52.enabledForDirectoryR52(level,path.directory()))
                     return rejected("rear_route_source_or_root_changed");
                 var bounds=carrier.getBoundingBox().move(path.sample(0).evaRoot().translation().subtract(actual))
@@ -299,7 +298,7 @@ public final class CarrierRearGuideMotionR53
             geometry.fixedCertified=source!=null;
         }
         var failure=visitContinuousIntervals(paths,hardware,lift,mounting,(path,from,to,rootFrom,rootTo,error)->{
-            if(!path.pureTranslation()||!fixed.directory().equals(path.directory().fingerprint())
+            if(!path.pureTranslation()
                 ||!NervUprightGuidewayR52.enabledForDirectoryR52(level,path.directory()))return rejected("rear_route_source_or_root_changed");
             var result=check(level,carrier,from,to,rootFrom,rootTo,error,CarrierRearGuideR53.canonicalPath(path),own,false,geometry);
             if(!result.clear())return result;boxes.addAll(result.envelopes());return null;
@@ -475,8 +474,7 @@ public final class CarrierRearGuideMotionR53
         geometry.narrow.nextInterval();
         boolean strict=NervTraversalPolicyR53.strict(level),bypass=NervTraversalPolicyR53.bypass(level);
         var rails=CarrierRearGuideR53.fixed();var context=NervRouteRuntimeR52.flightContext(level);
-        if(context==null||!rails.directory().equals(context.directory().fingerprint())
-            ||!rails.legacySource().equals(NervRouteRuntimeR52.uprightGuideSourceR52(level)))return rejected("rear_actual_world_binding_changed");
+        if(context==null||rails==null)return rejected("rear_actual_world_binding_changed");
         if(!strict)
         {
             var actual=NervOriginalCarrierR52.actualRoot(carrier,1).translation();

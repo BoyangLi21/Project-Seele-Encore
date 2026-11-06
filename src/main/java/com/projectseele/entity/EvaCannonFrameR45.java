@@ -9,7 +9,6 @@ import org.joml.Vector3f;
 /** Private pose candidate: the visible barrel and gameplay ray share one frame. */
 public final class EvaCannonFrameR45
 {
-    public static final String MESH_SHA256 = "6e61de763863b313e5d9b9b933e21b41903bb2899c482018bb60e2fe30932c3d";
     private static final Vector3f PART_PIVOT = new Vector3f(-24.25F,88.34F,.875F);
     // The twelve triangles of the barrel end are coplanar at Y=-90.93669.
     // The support hook projects farther forward and is not the muzzle.

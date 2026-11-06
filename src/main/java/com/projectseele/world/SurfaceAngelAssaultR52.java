@@ -60,7 +60,7 @@ public final class SurfaceAngelAssaultR52
         var plan=SurfaceAngelPlanR52.plan(level).orElse(null);var site=SurfaceAngelPlanR52.site(level,data.active).orElse(null);
         Mob boss=data.angel!=null&&level.getEntity(data.angel) instanceof Mob m?m:null;
         String blocker=SurfaceAngelPlanR52.startBlocker(level,data.active);
-        if(site==null||plan==null||!data.encounterSiteR45.equals(plan.id())||!data.encounterLayoutR45.equals(plan.fingerprint())
+        if(site==null||plan==null||!data.encounterSiteR45.equals(plan.id())
                 ||!blocker.isEmpty())
         {if(boss!=null&&TvEncounterDirectorR45.owned(boss,data))hold(boss);String notice=blocker.isEmpty()?"原远端路线或地表装甲井安装状态改变，行动暂停。":blocker;if(!data.notice.equals(notice)){data.notice=notice;data.setDirty();}return boss;}
         if(data.angel!=null)

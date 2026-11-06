@@ -105,7 +105,7 @@ final class CarrierRearGuideRendererR53
             try{loaded=pending.join();}catch(RuntimeException failure){ProjectSeele.LOGGER.error("Selected rear rails rejected",failure);diagnostic=Map.of("status","FAILED");}
             pending=null;
         }
-        if(loaded==null||!loaded.legacy().equals(FacilityFrameClientR52.uprightGuideSourceR52(level)))return;
+        if(loaded==null||FacilityFrameClientR52.uprightGuideSourceR52(level).isEmpty())return;
         var camera=event.getCamera().getPosition();int distance=Math.min(512,Math.max(FacilityVisibilityR54.DISTANCE,Minecraft.getInstance().options.getEffectiveRenderDistance()*16));
         int budget=4,visible=0,drawn=0;long now=System.nanoTime();
         for(var cell:loaded.index().query(new AABB(camera,camera).inflate(distance)))
