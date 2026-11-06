@@ -47,6 +47,7 @@
     "CitySavedOwnerUnionMixinR45"
   ],
   "client": [
+    "client.BufferBuilderDirectMixin",
     "client.LclBubbleR54Mixin",
     "client.GeoFrontMissionDayTimeR54Mixin",
     "client.GeoFrontMissionSunR54Mixin",

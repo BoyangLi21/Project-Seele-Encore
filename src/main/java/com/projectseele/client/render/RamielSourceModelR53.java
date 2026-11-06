@@ -33,7 +33,7 @@ final class RamielSourceModelR53
     private record Material(ResourceLocation texture, boolean emissive) { }
     /** axis: the arm direction (0 x, 1 y, 2 z) of an open-form spike group, -1 otherwise. */
     private record Part(String name, boolean open, int shift, boolean core,
-                        Material material, float[] vertices, int axis) { }
+                        Material material, float[] vertices, int axis, MeshCorners corners, float[] posed) { }
 
     /**
      * Parses the source on a background worker so the first frame that shows
@@ -102,9 +102,11 @@ final class RamielSourceModelR53
                 int axis = extent[0] >= extent[1] && extent[0] >= extent[2] ? 0 : extent[1] >= extent[2] ? 1 : 2;
                 float second = Math.max(Math.min(extent[0], extent[1]), Math.min(Math.max(extent[0], extent[1]), extent[2]));
                 if (!open || core || extent[axis] < 1.6F * second) axis = -1;
+                MeshCorners corners = MeshCorners.of(vertices);
                 loaded.add(new Part(part.get("name").getAsString(), open,
                         part.get("shell_shift").getAsInt(), core,
-                        materials.get(part.get("material").getAsInt()), vertices, axis));
+                        materials.get(part.get("material").getAsInt()), vertices, axis, corners,
+                        new float[corners.sources().length * 6]));
             }
             require(faces == 8816 && loaded.size() == 9, "All Ramiel source primitives required");
             parts = List.copyOf(loaded);
@@ -172,22 +174,18 @@ final class RamielSourceModelR53
             var normal = poses.last().normal();
             int light = part.material().emissive() ? LightTexture.FULL_BRIGHT : packedLight;
             var v = part.vertices();
-            // Triangles go out as quads whose last corner repeats the third.
-            // The whole-vertex call writes the same bytes as the chained
-            // vertex/color/uv/overlay/uv2/normal calls, with the same JOML
-            // transforms, but without six element-by-element dispatches.
-            for (int triangle = 0; triangle < v.length; triangle += 24)
-                for (int corner = 0; corner < 3; corner++)
-                {
-                    int i = triangle + corner * 8;
-                    matrix.transform(POSITION.set(v[i], v[i + 1], v[i + 2], 1F));
-                    normal.transform(NORMAL.set(v[i + 5], v[i + 6], v[i + 7]));
-                    consumer.vertex(POSITION.x, POSITION.y, POSITION.z, 1F, 1F, 1F, alpha, v[i + 3], v[i + 4],
-                            OverlayTexture.NO_OVERLAY, light, NORMAL.x, NORMAL.y, NORMAL.z);
-                    if (corner == 2)
-                        consumer.vertex(POSITION.x, POSITION.y, POSITION.z, 1F, 1F, 1F, alpha, v[i + 3], v[i + 4],
-                                OverlayTexture.NO_OVERLAY, light, NORMAL.x, NORMAL.y, NORMAL.z);
-                }
+            // The same JOML transforms as before, once per distinct corner.
+            float[] posed = part.posed();
+            int[] sources = part.corners().sources();
+            for (int input = 0; input < sources.length; input++)
+            {
+                int i = sources[input] * 8, at = input * 6;
+                matrix.transform(POSITION.set(v[i], v[i + 1], v[i + 2], 1F));
+                normal.transform(NORMAL.set(v[i + 5], v[i + 6], v[i + 7]));
+                posed[at] = POSITION.x; posed[at + 1] = POSITION.y; posed[at + 2] = POSITION.z;
+                posed[at + 3] = NORMAL.x; posed[at + 4] = NORMAL.y; posed[at + 5] = NORMAL.z;
+            }
+            DirectMeshWriter.write(consumer, posed, part.corners().inputs(), v, alpha, OverlayTexture.NO_OVERLAY, light);
             poses.popPose();
         }
         return true;

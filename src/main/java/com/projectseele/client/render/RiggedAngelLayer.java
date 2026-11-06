@@ -24,13 +24,7 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
     private static final Map<ResourceLocation,Model> CACHE=new HashMap<>();
     private static final Set<ResourceLocation> ATTEMPTED=new HashSet<>();
     private final ResourceLocation resource;
-    /** {@code sources} holds one corner per distinct skinning input and {@code inputs} maps every corner to it. */
-    private record Model(String[] bones,float[] vertices,int[] indices,float[] weights,int[] sources,int[] inputs,float[] skinned) {}
-    private record SkinInput(int[] bits)
-    {
-        @Override public boolean equals(Object other){return other instanceof SkinInput input&&Arrays.equals(bits,input.bits);}
-        @Override public int hashCode(){return Arrays.hashCode(bits);}
-    }
+    private record Model(String[] bones,float[] vertices,int[] indices,float[] weights,MeshCorners corners,float[] skinned) {}
 
     public RiggedAngelLayer(GeoRenderer<T> renderer,ResourceLocation resource)
     {
@@ -63,30 +57,11 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
             }
             for(int i=0;i<weights.length;i+=4)if(Math.abs(weights[i]+weights[i+1]+weights[i+2]+weights[i+3]-1)>1e-4)throw new IllegalArgumentException("Unnormalized skin weights");
             for(float v:vertices)if(!Float.isFinite(v))throw new IllegalArgumentException("Non-finite skin vertex");
-            Model model=indexed(bones,vertices,indices,weights);CACHE.put(resource,model);
-            ProjectSeele.LOGGER.info("R10 weighted Angel loaded: {} triangles={} bones={} skinInputs={}",resource,vertices.length/24,bones.length,model.sources.length);return model;
+            MeshCorners corners=MeshCorners.of(vertices,indices,weights);
+            Model model=new Model(bones,vertices,indices,weights,corners,new float[corners.sources().length*6]);CACHE.put(resource,model);
+            ProjectSeele.LOGGER.info("R10 weighted Angel loaded: {} triangles={} bones={} skinInputs={}",resource,vertices.length/24,bones.length,corners.sources().length);return model;
         }
         catch(Exception e){ProjectSeele.LOGGER.error("R10 weighted Angel rejected: {}",resource,e);return null;}
-    }
-    /**
-     * The mesh is a triangle soup, so a surface point appears once per touching
-     * triangle. Corners with equal position, normal and influences skin to the
-     * same result, which leaves only their UVs to write per corner.
-     */
-    private static Model indexed(String[] bones,float[] vertices,int[] indices,float[] weights)
-    {
-        int corners=vertices.length/8;int[] inputs=new int[corners],sources=new int[corners];
-        Map<SkinInput,Integer> seen=new HashMap<>();
-        for(int corner=0;corner<corners;corner++)
-        {
-            int i=corner*8,j=corner*4;int[] bits=new int[14];
-            for(int k=0;k<3;k++){bits[k]=Float.floatToRawIntBits(vertices[i+k]);bits[3+k]=Float.floatToRawIntBits(vertices[i+5+k]);}
-            for(int k=0;k<4;k++){bits[6+k]=indices[j+k];bits[10+k]=Float.floatToRawIntBits(weights[j+k]);}
-            SkinInput input=new SkinInput(bits);Integer known=seen.get(input);
-            if(known==null){known=seen.size();seen.put(input,known);sources[known]=corner;}
-            inputs[corner]=known;
-        }
-        return new Model(bones,vertices,indices,weights,Arrays.copyOf(sources,seen.size()),inputs,new float[seen.size()*6]);
     }
     private static void collect(GeoBone bone,Map<String,GeoBone> bones)
     {
@@ -121,10 +96,10 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
         Matrix4f rootModel=grounded?EvaRigTransforms.model(root):null;float floor=Float.POSITIVE_INFINITY;
         Matrix4f contactAudit=com.projectseele.visual.CombatR31Review.ENABLED&&entity instanceof net.minecraft.world.entity.Entity actor&&getRenderer() instanceof HybridAddonRenderer.MeshBackedRenderer<?> renderer?renderer.renderedMeshTransform(stack.last().pose(),actor,partial):null;
         float worldFloor=Float.POSITIVE_INFINITY;
-        float[] v=model.vertices,skinned=model.skinned;
-        for(int input=0;input<model.sources.length;input++)
+        float[] v=model.vertices,skinned=model.skinned;int[] sources=model.corners.sources();
+        for(int input=0;input<sources.length;input++)
         {
-            int i=model.sources[input]*8,j=model.sources[input]*4;
+            int i=sources[input]*8,j=sources[input]*4;
             point.set(-v[i]/16,v[i+1]/16,v[i+2]/16);normal.set(-v[i+5],v[i+6],v[i+7]);
             boolean hasScale=false;for(int k=0;k<4;k++)hasScale|=model.weights[j+k]>0&&scaled[model.indices[j+k]];
             if(hasScale)
@@ -169,12 +144,7 @@ public final class RiggedAngelLayer<T extends GeoAnimatable> extends GeoRenderLa
                 if(contactAudit!=null)worldFloor=Math.min(worldFloor,contactAudit.m01()*skinned[at]+contactAudit.m11()*skinned[at+1]+contactAudit.m21()*skinned[at+2]+contactAudit.m31());
                 MeshVertexWriter.transform(skinned,at,pose,normalPose);
             }
-            for(int corner=0;corner<model.inputs.length;corner++)
-            {
-                int at=model.inputs[corner]*6,i=corner*8;
-                target.vertex(skinned[at],skinned[at+1],skinned[at+2],1,1,1,1,v[i+3],v[i+4],overlay,light,skinned[at+3],skinned[at+4],skinned[at+5]);
-                if(corner%3==2)target.vertex(skinned[at],skinned[at+1],skinned[at+2],1,1,1,1,v[i+3],v[i+4],overlay,light,skinned[at+3],skinned[at+4],skinned[at+5]);
-            }
+            DirectMeshWriter.write(target,skinned,model.corners.inputs(),v,1,overlay,light);
         }
         if(contactAudit!=null&&entity instanceof net.minecraft.world.entity.LivingEntity living)com.projectseele.client.visual.CombatR31Client.angelSupport(living,worldFloor);
     }
