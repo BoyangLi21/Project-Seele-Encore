@@ -20,19 +20,39 @@ def jar_exact(a,b):
         assert set(old.namelist())==set(actual.namelist())
         for name in old.namelist():assert old.read(name)==actual.read(name),name
 
+def platform_proof(c):
+    proof=read(c/'native-station/native-station-proof.json')
+    return proof,proof['platforms']if 'platforms'in proof else[proof]
+
 def prepare(a):
-    c=a.candidate;verify(c,a.authority);assert not visible_check(c,a.models)['errors']
-    manifest=read(c/'manifest.json');proof=read(c/'native-station/native-station-proof.json');design=read(c/'station-design.json')
-    assert proof['existing_loaded_objects_exact']and len(proof['platforms'])==2 and len(proof['members'])==5
-    assert all(abs(p['platform_length']-128)<1e-7 for p in proof['platforms'])
-    components=read(a.review/'components.json');assert all(components[k]['unrooted_components']==0 for k in('before','after'))
+    c=a.candidate;design=read(c/'station-design.json')
+    if a.profile=='itabashi':
+        from author_itabashi_station import verify as verify_compact
+        from check_itabashi_vehicle import verify as verify_vehicle
+        from verify_regional_station import verify as verify_registered_compact
+        verify_compact(c,a.authority);assert not verify_vehicle(c)['errors']
+        assert not verify_registered_compact(c,a.authority)['errors']
+        with np.load(c/'vehicle-model/e44_mini_cab_3-visible-cubes.npz')as actual,np.load(a.models/'e44_mini_cab_3-visible-cubes.npz')as independent:
+            for key in('cubes','names','door_slides'):assert np.array_equal(actual[key],independent[key]),key
+        assert not read(c/'water-buffer-review.json')['errors']
+    else:
+        verify(c,a.authority);assert not visible_check(c,a.models)['errors']
+    manifest=read(c/'manifest.json');proof,platforms=platform_proof(c)
+    lengths=design['rail_lengths']if 'rail_lengths'in design else[design['platform_length']]
+    assert proof['existing_loaded_objects_exact']and len(platforms)==len(lengths)and len(proof['members'])==len(lengths)*2+1
+    assert all(abs(p['platform_length']-n)<1e-7 for p,n in zip(platforms,lengths))
+    assert all(n>=design['planned_maximum_consist_length']for n in lengths)
+    components=read(a.review/'components.json')
+    assert components['before']['unrooted']==components['after']['unrooted']
+    assert not components['after'].get('fully_enclosed_unrooted_components',components['after']['unrooted_components'])
     faults=read(a.review/'negative-cases.json')['cases'];assert len(faults)>=5 and all(r['detected']for r in faults)
     assert not read(c/'visible-model-sweep.json')['errors']
-    model_fault=read(a.review/'visible-model-negative.json');assert model_fault['detected']and model_fault['failed_vehicle_count']==2
-    for name in('overview','ramp-cut'):assert(a.review/(name+'.png')).exists()
+    if a.profile=='mainline':
+        model_fault=read(a.review/'visible-model-negative.json');assert model_fault['detected']and model_fault['failed_vehicle_count']==2
+    for name in(('overview','ramp-cut')if a.profile=='mainline'else('overview','bridge-section','platform-cut','measured-sections')):assert(a.review/(name+'.png')).exists()
     check=read(c/'offline-verification.json');assert not check['errors']and check['nodes']==check['reachable_nodes']==len(design['station_multi_level_nodes'])
     assert len(design['ground_access_columns'])<len(design['station_multi_level_nodes'])
-    write(c/'functional-check.json',dict(errors=[],station=design['station'],offline_proof='offline-verification.json',visible_model_proof='visible-model-clearance.json',world_written=False))
+    write(c/'functional-check.json',dict(errors=[],station=design['station'],offline_proof='offline-verification.json',visible_model_proof='visible-model-clearance.json'if a.profile=='mainline'else'visible-model-sweep.json',world_written=False))
     with stopped_world(a.world):
         assert_preserved(a.world,inventory(c/'preserved-native'))
         parallel_recipes(Namespace(candidate=c,world=a.world,regions=None,workers=2))
@@ -45,12 +65,12 @@ def prepare(a):
         (c/'client-before.jar').hardlink_to(a.prior_client)
     write_replay_expected(c)
     write(c/'station-release-check.json',dict(production_recipe_replay_passed=False,identity_snapshot_ready=True,native_station_registration_verified=True,exact_voxel_views_reviewed=True,negative_fault_checks_passed=True,no_new_floating_components=True,current_native_source_exact=True,visible_models_checked=True,ground_only_scalar_network_update=True,world_written=False,through_service_complete=False))
-    print('Prepared mainline station:',manifest['cells'],'cells;',check['nodes'],'reachable surfaces; two native platforms; retained identity files',len(files),flush=True)
+    print('Prepared layered station:',manifest['cells'],'cells;',check['nodes'],'reachable surfaces;',len(platforms),'native platforms; retained identity files',len(files),flush=True)
 
 def record(a):
-    c=a.candidate;receipt=read(a.installation);m=read(c/'manifest.json');proof=read(c/'native-station/native-station-proof.json')
+    c=a.candidate;receipt=read(a.installation);m=read(c/'manifest.json');proof,platforms=platform_proof(c)
     assert receipt['status']=='installed'and receipt['changed_section_readback']and receipt['existing_native_members_exact']
-    assert receipt['native_additions']==5 and receipt['changed_device_nbt_readback']==3 and receipt['cells']==m['cells']
+    assert receipt['native_additions']==2*len(platforms)+1 and receipt['changed_device_nbt_readback']==3 and receipt['cells']==m['cells']
     baseline=inventory(c/'preserved-native');additions=[Path(n).relative_to('mtr').as_posix()for n in m['native_additions']];kept=read(c/'identity-before/files.json')
     with stopped_world(a.world):
         for name in kept:assert(c/'identity-before'/name).read_bytes()==(a.world/name).read_bytes(),name
@@ -75,15 +95,18 @@ def record(a):
     np.savez_compressed(a.next_authority/'network.npz',**d)
     catalog=read(a.authority/'catalog.json');stationid='regional-station/'+a.station_id;assert not any(r['id']==stationid for r in catalog)
     native=read(c/'native-station-plan.json')['stations'][0];occupied=native['min']+native['max'];goals=design['goals']
-    catalog.append(dict(id=stationid,kind='station_access',use=design['station'],occupied_bounds=occupied,door=goals['hall'],approach=goals['forecourt'],destination=goals['platform_1_centre'],destinations=[goals['platform_1_centre'],goals['platform_2_centre']],destination_type='platform',installed_station_access=str(c),through_service_complete=False));write(a.next_authority/'catalog.json',catalog)
+    destinations=[v for k,v in goals.items()if k.startswith('platform')and k.endswith('centre')]
+    assert len(destinations)==len(platforms)
+    catalog.append(dict(id=stationid,kind='station_access',use=design['station'],occupied_bounds=occupied,door=goals['hall'],approach=goals['forecourt'],destination=destinations[0],destinations=destinations,destination_type='platform',installed_station_access=str(c),through_service_complete=False));write(a.next_authority/'catalog.json',catalog)
     volumes=read(a.authority/'station-volumes.json');volumes.append(occupied);write(a.next_authority/'station-volumes.json',volumes)
     write(a.next_authority/(a.station_id+'-multilevel-overlay.json'),dict(previous=str(a.authority),candidate=str(c),installation=str(a.installation),new_ground_public_columns=added,ground_access_columns=design['ground_access_columns'],station_multi_level_nodes=design['station_multi_level_nodes'],goals=goals,existing_public_columns_exact=True,existing_catalog_entries_exact=True,world_written=True,through_service_complete=False))
     installed=sum(r.get('kind')=='station_access'and r.get('id','').startswith('regional-station/')for r in catalog)
-    write(a.delivery,dict(batch=a.batch,status='Physical station and native registration installed; through service pending stage 3',station=design['station'],candidate=str(c),installation=str(a.installation),authority=str(a.next_authority),terrain_field=str(a.terrain),changed_cells=receipt['cells'],recipe_chunks=receipt['metadata_files']-len(additions),new_native_members=5,old_native_members_exact=len(baseline),native_platform_lengths=[p['platform_length']for p in proof['platforms']],public_surfaces=len(design['station_multi_level_nodes']),ground_public_columns=len(design['ground_access_columns']),new_ground_public_columns=added,all_public_surfaces_reachable=True,identity_files_exact=len(kept),whole_client_jar_exact=True,visible_model_clearance_passed=True,production_replay_passed=True,world_written=True,through_service_complete=False,new_geographic_stations_installed=installed,new_geographic_stations_remaining=20-installed,live_boarding_and_rendered_validation_pending=True))
+    write(a.delivery,dict(batch=a.batch,status='Physical station and native registration installed; through service pending stage 3',station=design['station'],candidate=str(c),installation=str(a.installation),authority=str(a.next_authority),terrain_field=str(a.terrain),changed_cells=receipt['cells'],recipe_chunks=receipt['metadata_files']-len(additions),new_native_members=len(additions),old_native_members_exact=len(baseline),native_platform_lengths=[p['platform_length']for p in platforms],planned_consist_length=design['planned_maximum_consist_length'],public_surfaces=len(design['station_multi_level_nodes']),ground_public_columns=len(design['ground_access_columns']),new_ground_public_columns=added,all_public_surfaces_reachable=True,identity_files_exact=len(kept),whole_client_jar_exact=True,visible_model_clearance_passed=True,production_replay_passed=True,world_written=True,through_service_complete=False,new_geographic_stations_installed=installed,new_geographic_stations_remaining=20-installed,live_boarding_and_rendered_validation_pending=True))
     p=a.delivery.parent/'continuation.json';state=read(p);state.update(latest_installed_batch=a.batch,planning_authority=str(a.next_authority),active_order_stage=2,current_work=f'All stations: {installed}/20 new stations installed; retained-station access and further sites continue in parallel.',user_paused=False,un_relocation_allowed=False);state.setdefault('pending_map_cache_releases',[]).append(str(a.installation.parent));write(p,state)
     print('Recorded batch',a.batch,design['station'],receipt['cells'],'cells;',installed,'of 20 new stations installed; existing native and identity exact.',flush=True)
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__);p.add_argument('mode',choices=['prepare','install','record']);p.add_argument('--batch',type=int,required=True);p.add_argument('--station-id',required=True)
+    p.add_argument('--profile',choices=['mainline','itabashi'],default='mainline')
     for n in('world','candidate','authority','next-authority','terrain','installation','review','models','prior-client','production-log','delivery'):p.add_argument('--'+n,type=Path,required=True)
     a=p.parse_args();globals()[a.mode](a)

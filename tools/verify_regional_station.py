@@ -125,7 +125,7 @@ def verify(candidate,authority,write=True):
         floor_errors=floor_errors,head_errors=head_errors,destinations=routes,changed_original_public_cells=changed_public,
         original_device_cells_changed=changed_devices,unowned_material_examples=foreign[:20],
         changed_water_cells=changed_water,rail_obstacles=rail_obstacles,native_station_registration_verified=native_ok,
-        planned_maximum_consist_length=40,native_platform_length=48,maximum_pedestrian_step=.5,
+        planned_maximum_consist_length=d.get('planned_maximum_consist_length',40),native_platform_length=48,maximum_pedestrian_step=.5,
         through_service_complete=False,world_written=False,game_ui_verified=False)
     if write:
         (candidate/'station-independent-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')

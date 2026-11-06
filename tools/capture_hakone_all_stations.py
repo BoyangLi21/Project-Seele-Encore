@@ -122,7 +122,7 @@ def capture(args):
         sites=rows,regions=regions,chunk_statuses=dict(Counter(statuses.values())),
         captured_sections=sum(r['sections']for r in regions),devices=len(devices),actors=len(actors),
         diagnostics=diagnostics,world_written=False,station_access_verified=False,
-        native_members_exact=True,deep_native_stations=sum(r['kind']=='existing'and r['bounds'][1]<-128 for r in rows))
+        native_members_exact=True,deep_native_stations=sum(r.get('kind')=='existing'and r['bounds'][1]<-128 for r in rows))
     (args.out/'capture.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
     print('Station snapshot:',len(rows),'sites;',report['chunk_statuses'],';',report['captured_sections'],'sections;',len(diagnostics),'decode issues.',flush=True)
     if diagnostics:raise ValueError('Snapshot contains decode diagnostics; review before using')
