@@ -50,6 +50,27 @@ def endpoints(record):
                      for key in ('position1', 'position2'))
 
 
+def physical_platform_assignments(design, plan):
+    """Resolve a single side platform's explicit reference to its physical rail."""
+    bindings = copy.deepcopy(design['platform_rails'])
+    planned = {r['id']: r for r in plan['rails']}
+    require(len(planned) == len(plan['rails']), 'Duplicate physical plan rail')
+    for binding in bindings:
+        if 'native_rail' not in binding:
+            rail = design.get('rail')
+            require(len(bindings) == len(planned) == 1 and isinstance(rail, dict)
+                    and rail.get('id') == binding['rail_id'],
+                    'A platform reference needs one independently declared physical rail')
+            binding['native_rail'] = copy.deepcopy(rail)
+        rail = binding['native_rail']
+        require(binding['rail_id'] in planned and rail.get('id') == binding['rail_id'],
+                'Physical platform rail identity disagrees')
+        require(all(rail.get(k) == planned[binding['rail_id']].get(k)
+                    for k in ('from', 'to', 'from_angle', 'to_angle', 'shape', 'vertical_radius')),
+                'Physical platform rail geometry differs from frozen plan')
+    return bindings
+
+
 def station_set_mapping(names, design, layout, proof, decoded):
     """Bind each declared station to its saved station and platform identities."""
     stations = {s['name']: s for s in decoded['stations']}
@@ -154,7 +175,7 @@ def installed_station(delivery_path, snapshot, world):
             station_name=design.get('station',design.get('name'))
             require(len(names)==1 and station_name==names[0], 'A single-station design must bind one declared station')
             if design.get('platform_rails'):
-                design=dict(design,stations=[dict(name=station_name,platform_rails=design['platform_rails'])])
+                design=dict(design,stations=[dict(name=station_name,platform_rails=physical_platform_assignments(design,plan))])
             else:
                 require(len(plan['rails'])==1,'Several platforms require explicit physical rail assignments')
                 rail=plan['rails'][0]

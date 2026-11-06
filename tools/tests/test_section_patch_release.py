@@ -15,7 +15,8 @@ from map_pipeline.delivery_check import read, write
 from map_pipeline.install.invariants import require_nbt_equal
 from plan_hakone_relocations import unpack
 from prepare_station_section_recipes import DATA, REGIONS, validate_delta, actual_cells, prepare
-from release_section_access_patch import freeze_files, validate_replay, replay_scope
+from release_section_access_patch import (freeze_files, validate_replay, replay_scope, validate_offline,
+    installed_dependencies, declaration_transition, validate_retained_failure)
 from transplant_s22_authority import build_region, read_region, parse_chunk
 
 
@@ -110,6 +111,85 @@ class SectionPatchTest(unittest.TestCase):
             with np.load(path) as f:data={k:f[k] for k in f.files}
             data['coordinates']=data['coordinates'][1:];data['blocks']=data['blocks'][1:];np.savez(path,**data)
             with self.assertRaisesRegex(ValueError,'Unknown source'):validate_delta(candidate)
+            with self.assertRaisesRegex(ValueError,'Unknown source'):
+                validate_delta(candidate,source_overlay={(-17,-560,-1):'minecraft:air'})
+
+    def test_dependency_state_cannot_hide_delta_precondition(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            candidate,*_=self.fixture(Path(tmp))
+            with self.assertRaisesRegex(ValueError,'source precondition'):
+                validate_delta(candidate,source_overlay={(-17,-560,-1):'minecraft:stone'})
+
+    def test_unknown_scope_kind_is_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);candidate,*_=self.fixture(root)
+            write(candidate/'functional.json',{})
+            config=root/'config.json'
+            write(config,dict(schema='section-access-patch-release-v1',id='test',maximum_step=.5,
+                changes_file='exact-edits.json',functional_report='functional.json',scope_kind='floor_as_guard'))
+            with self.assertRaisesRegex(ValueError,'scope_kind'):
+                validate_offline(argparse.Namespace(candidate=candidate,config=config))
+
+    def test_uninstalled_or_unreplayed_dependency_rejected(self):
+        with tempfile.TemporaryDirectory() as tmp:
+            root=Path(tmp);candidate,*_=self.fixture(root);checked=validate_delta(candidate)
+            item=dict(candidate=str(candidate),installation=str(root/'installation.json'))
+            with self.assertRaisesRegex(ValueError,'not installed'):installed_dependencies([(item,checked)])
+            write(root/'installation.json',dict(status='installed',changed_section_readback=True,cells=3,
+                candidates=[str(candidate)],world=checked['manifest']['world']))
+            write(candidate/'delivery-check.json',dict(passed=True,production_replay_passed=False,changed_cells=3))
+            write(candidate/'section-release-check.json',dict(installed_delivery_check_passed=True,production_recipe_replay_passed=True))
+            with self.assertRaisesRegex(ValueError,'replay/delivery'):installed_dependencies([(item,checked)])
+
+    def declaration_fixture(self):
+        cell=dict(floor=[0,-450,0],role='public',source={'generator':'fixture'},allowed_occupants=[])
+        before=dict(stations=[dict(site='a',cells=[cell],native_platforms=[dict(extent=[-32,32])])])
+        after=copy.deepcopy(before);changed=after['stations'][0]['cells'][0]
+        changed.update(role='guarded_nonboarding_trackside_margin',public_walkable=False,
+                       ownership_change={'component':['a','line',1,1]})
+        exact=[dict(site='a',floor=cell['floor'],before=cell,after=changed)]
+        expected=dict(complete_floor_denominator=1,finite_margin_cells=1,new_barrier_occupied_cells=0,declaration_changed_cells=1)
+        return before,after,exact,expected
+
+    def test_complete_declaration_denominator_and_exact_delta(self):
+        before,after,exact,expected=self.declaration_fixture()
+        actual,margins=declaration_transition(before,after,exact,{},expected)
+        self.assertEqual(expected,actual);self.assertEqual({('a',(0,-450,0))},margins)
+        with self.assertRaisesRegex(ValueError,'delta differs'):
+            declaration_transition(before,after,[],{},expected)
+        after['stations'][0]['cells']=[]
+        with self.assertRaisesRegex(ValueError,'denominator'):
+            declaration_transition(before,after,exact,{},expected)
+
+    def test_original_boarding_metadata_cannot_be_reclassified(self):
+        before,after,exact,expected=self.declaration_fixture()
+        after['stations'][0]['native_platforms'][0]['extent']=[-31,31]
+        with self.assertRaisesRegex(ValueError,'boarding'):
+            declaration_transition(before,after,exact,{},expected)
+
+    def test_structural_underlay_cannot_bypass_margin_proof(self):
+        before,after,exact,expected=self.declaration_fixture()
+        after['stations'][0]['cells'][0]['role']='structural_underlay'
+        with self.assertRaisesRegex(ValueError,'occupant'):
+            declaration_transition(before,after,exact,{},expected)
+
+    def test_legacy_failure_exception_is_exact_and_disjoint(self):
+        hit=dict(kind='body_obstruction',pos=[0,0,0],state='fixture:board')
+        result=dict(kind='strict_step_or_body_failure',unknown=[])
+        row=dict(key='a/original/0',path=[[0,1,0],[2,1,0]],before=dict(forward=result,reverse=result),after=dict(forward=result,reverse=result))
+        exception=dict(path=row['path'],results=row['before'],obstruction=hit,witness_feet=[1,1,0])
+        class Walker:
+            minimum=[0,0,0];maximum=[1,1,1]
+            def __init__(self):self.reader=self
+            def body(self,*p):return hit
+            def state(self,*p):return 'fixture:board'
+        w=Walker()
+        self.assertFalse(validate_retained_failure(row,exception,w,w,{(50,0,50):{}})['resolved'])
+        with self.assertRaisesRegex(ValueError,'query domain'):
+            validate_retained_failure(row,exception,w,w,{(2,0,1):{}})
+        changed=copy.deepcopy(row);changed['after']['forward']['unknown']=[{'pos':[1,2,3]}]
+        with self.assertRaisesRegex(ValueError,'changed original route failure'):
+            validate_retained_failure(changed,exception,w,w,{})
 
     def test_extent_outside_dimension_rejected(self):
         with tempfile.TemporaryDirectory() as tmp:

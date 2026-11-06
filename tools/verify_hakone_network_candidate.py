@@ -9,6 +9,7 @@ from query_blocks import AIR
 from hakone_earthworks import road_blocks
 
 PAVEMENT={'minecraft:black_concrete','minecraft:white_concrete','minecraft:gray_concrete','minecraft:light_gray_concrete','minecraft:smooth_stone','minecraft:smooth_stone_slab','minecraft:stone_bricks','minecraft:stone_brick_slab','minecraft:stone_brick_stairs','minecraft:deepslate_bricks','minecraft:polished_deepslate','minecraft:blackstone_slab','minecraft:yellow_concrete','minecraft:yellow_terracotta','minecraft:polished_blackstone_slab','projectseele:nerv_floor_panel','projectseele:road_asphalt_slab','projectseele:road_marking_slab'}
+PAVEMENT.add('minecraft:cut_sandstone_slab')  # Declared station boarding lips; slab type/height is checked separately.
 
 def run(a):
     e=Editor(a.candidate);d=load_grid(a.plan/'network.npz');errors=[];checked=0;full=np.zeros(d['walk'].shape,bool)

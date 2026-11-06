@@ -24,7 +24,7 @@ def require(ok, reason):
         raise ValueError(reason)
 
 
-def validate_delta(candidate, changes_file='exact-edits.json', section_source=None):
+def validate_delta(candidate, changes_file='exact-edits.json', section_source=None, source_overlay=None):
     """Validate package/source only. Unknown captured sections never mean air."""
     candidate = Path(candidate)
     manifest = read(candidate/'manifest.json')
@@ -75,8 +75,9 @@ def validate_delta(candidate, changes_file='exact-edits.json', section_source=No
                 require(pos not in seen, 'Repeated section patch cell')
                 require(row is not None and row['before'] == before and row['after'] == after,
                         'Sparse delta differs from exact declared cells')
-                actual = source.state(*pos)
-                require(actual is not None, 'Unknown source section at '+str(pos))
+                captured = source.state(*pos)
+                require(captured is not None, 'Unknown source section at '+str(pos))
+                actual = (source_overlay or {}).get(pos, captured)
                 require(actual == before, 'Sparse delta source precondition differs at '+str(pos))
                 seen.add(pos); chunks[cx, cz].append(row)
     require(seen == set(changes), 'Some declared section cells have no delta')
@@ -116,9 +117,9 @@ def actual_cells(world, checked, *, after=False):
     return nbtlib.File({'Devices': nbtlib.List[nbtlib.Compound](devices)}), count
 
 
-def prepare(world, candidate, changes_file='exact-edits.json'):
+def prepare(world, candidate, changes_file='exact-edits.json', source_overlay=None):
     world, candidate = Path(world), Path(candidate)
-    checked = validate_delta(candidate, changes_file)
+    checked = validate_delta(candidate, changes_file, source_overlay=source_overlay)
     require(checked['manifest'].get('device_changes', 0) == 0, 'Device changes are forbidden')
     require(not (candidate/'before').exists() and not (candidate/'after').exists(), 'Recipes already prepared')
     devices, count = actual_cells(world, checked)
