@@ -39,11 +39,10 @@ def run(a):
             if not q.get('points'):continue
             v=np.asarray(q['points']);line=LineString(v[:,[0,2]])
             if line.buffer(4).intersects(footprint) and float(v[:,1].max())>=-85 and float(v[:,1].min())<=-55:retained_native.append(dict(id=q['id'],mode=mode))
-    transition=[]
-    for side,endpoint,targetx in(('west',[3840.5,-38.5],3660.5),('east',[3968.5,-38.5],4148.5)):
-        predicted=centre+axis*((targetx-centre[0])/axis[0]);jr=[(i,f,g)for i,f,g in rails if f['properties'].get('vt_rtcode')=='JR']
-        i,f,g=min(jr,key=lambda r:r[2].distance(Point(predicted)));p=np.asarray(nearest_points(g,Point(predicted))[0].coords[0]);line=LineString([endpoint,p]);reserved=line.buffer(14,cap_style=2)
-        transition.append(dict(side=side,station_centreline_port_xz=endpoint,station_rail_y=-78,station_outward_tangent='W'if side=='west'else'E',reference_target_xz=p.tolist(),reference_target_feature_index=i,reference_target_properties=f['properties'],horizontal_distance=float(np.linalg.norm(p-endpoint)),minimum_design_transition_length=180,reserved_horizontal_corridor=mapping(reserved),world_terrain_capture_complete=False,vertical_profile_verified=False,exact_native_transition_curve_verified=False,track_pair_spacing_at_station=14,stage=3,construction_allowed=False,note='Retain both east/west native tangents; taper onto the measured reference corridor only after three-dimensional road, river and vehicle checks. This reservation is not an excavation instruction.'))
+    interface=json.loads((a.candidate/'stage-three-interfaces.json').read_text('utf8'))
+    transition=interface['transition_interfaces']
+    if len(transition)!=2 or any(q['horizontal_distance']<180 or q['longitudinal_distance']<180 for q in transition):raise ValueError('Insufficient reserved connected-reference transition distance')
+    if not interface['water_buffer_preserved']or interface['three_block_water_buffer_intersections']:raise ValueError('Water buffer is not preserved')
     sources=[]
     for i,f,g in rails:
         if g.intersects(footprint.buffer(4)):sources.append(dict(feature_index=i,properties=f['properties'],geometry=mapping(g.intersection(footprint.buffer(4)))))
@@ -52,7 +51,7 @@ def run(a):
         if f['properties'].get('source_layer')not in('WA','RvrCL','WStrL'):continue
         q=shape(f['geometry'])
         if q.intersects(footprint):water.append(dict(feature_index=i,properties=f['properties'],geometry=mapping(q.intersection(footprint))))
-    adaptation=dict(reference_centre=centre.tolist(),native_centre=[3904.5,-38.5],centre_offset=float(np.linalg.norm(centre-[3904.5,-38.5])),reference_axis_degrees=float(math.degrees(math.atan2(axis[1],axis[0]))%180),native_axis_degrees=0,local_axis_adaptation_degrees=abs(float(math.degrees(math.atan2(axis[1],axis[0])))),platform_lengths=[128,128],capacity=120,gap_each_side=.5,reason='Local straight-platform geographic adaptation for a continuous safe boarding edge; not a 1:1 restoration.',reference_rail_features_in_station_area=sources,retained_native_curves_in_station_volume=retained_native,cached_water_features_in_station_area=water,transition_interfaces=transition,through_service_complete=False,world_written=False)
+    adaptation=dict(reference_centre=centre.tolist(),native_centre=[3904.5,-38.5],centre_offset=float(np.linalg.norm(centre-[3904.5,-38.5])),reference_axis_degrees=float(math.degrees(math.atan2(axis[1],axis[0]))%180),native_axis_degrees=0,local_axis_adaptation_degrees=abs(float(math.degrees(math.atan2(axis[1],axis[0])))),platform_lengths=[128,128],capacity=120,native_two_metre_calibration_gap_each_side=.5,actual_visible_model_gap_requires_separate_model_sweep=True,reason='Local straight-platform geographic adaptation for a continuous boarding edge; not a 1:1 restoration.',reference_rail_features_in_station_area=sources,retained_native_curves_in_station_volume=retained_native,cached_water_features_in_station_area=water,transition_interfaces=transition,retained_siding_interfaces=interface['retained_siding_interfaces'],water_buffer_preserved=True,through_service_complete=False,world_written=False)
     dump(a.out/'geographic-adaptation-and-interfaces.json',adaptation)
     if retained_native:raise ValueError('Candidate intersects retained native curves')
     # Failures are injected in independent offline copies; live world untouched.
@@ -64,7 +63,7 @@ def run(a):
             px,feet,pz=d['goals']['hall'];e.put(px,int(feet)-1,pz,'minecraft:air')
         elif name=='train':e.put(3904,-77,-46,'minecraft:glass')
         elif name=='protected':e.put(3908,-80,1,'minecraft:air')
-        elif name=='support':e.put(3972,-68,-10,'minecraft:gray_concrete')
+        elif name=='support':e.put(3958,-68,-10,'minecraft:gray_concrete')
         else:
             tags=nbtlib.load(folder/'block-entities.dat');del tags['Changes'][0]['After'];tags.save(folder/'block-entities.dat',gzipped=True)
         if name!='sign':
@@ -77,7 +76,7 @@ def run(a):
         tests.append(dict(case=name,expected=expected,detected=True))
     dump(a.out/'negative-cases.json',dict(cases=tests,world_written=False))
     e=Editor(a.candidate)
-    render(e,[3826,-83,-54,3982,-62,34],a.out/'overview.png','鴨宮站：128格双线、0.5格连续登车间隙、跨线桥与南侧接入')
+    render(e,[3826,-83,-54,3982,-62,34],a.out/'overview.png','鴨宮站：双线128格、全长候车通道与跨线换乘')
     render(e,[3836,-81,-49,3924,-66,6],a.out/'ramp-cut.png','剖切：站台双侧通道、半砖缓坡、楼梯和跨线桥净空')
     positions=[r['pos']for r in d['expected_signs']]
     dump(a.out/'review.json',dict(candidate=str(a.candidate),cells=m['cells'],changed_chunks=len(changed),sign_positions=positions,ground_access_columns=len(d['ground_access_columns']),multi_level_nodes=len(d['station_multi_level_nodes']),negative_cases_passed=len(tests),component_report='components.json',adaptation_report='geographic-adaptation-and-interfaces.json',views=['overview.png','ramp-cut.png'],source=str(a.source),authority=str(a.authority),world_written=False,native_registry_pending=True,production_replay_pending=True,through_service_complete=False))

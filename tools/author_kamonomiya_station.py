@@ -7,7 +7,7 @@ import argparse,collections,copy,json,math,shutil
 from pathlib import Path
 import numpy as np
 import nbtlib
-from shapely.geometry import Point,LineString,Polygon,box,mapping
+from shapely.geometry import Point,LineString,Polygon,box,mapping,shape
 from shapely.ops import unary_union
 from author_hakone_lakefront import Editor
 from author_hakone_togendai import Station
@@ -58,11 +58,14 @@ def author(a):
         ax,az,aX,aZ=map(int,f['bounds']);oldwalk=f['walk'];oldgrade=f['grade2']
     with np.load(a.source/'measured.npz')as f:ground=f['top'].copy()
     devices={tuple(int(d[k])for k in('x','y','z')) for d in nbtlib.load(a.source/'captured-devices.dat')['Devices']}
+    site_plan=json.loads(a.site.read_text('utf8'))
+    cached_water=unary_union([shape(q['geometry'])for q in site_plan['nearby_water_interfaces']]).buffer(3)
     e=Editor(a.out);s=Station(e);public=set();owned=set();parts=[]
     def put(px,py,pz,name):
         if not(x<=px<=X and z<=pz<=Z):raise ValueError(('Outside captured source',px,py,pz))
         before=e.state(px,py,pz,True)
         if e.state(px,py,pz)==name:return
+        if box(px,pz,px+1,pz+1).intersects(cached_water):raise ValueError(('Reserved three-block water buffer',px,py,pz))
         if before.split('[')[0]not in ALLOWED:raise ValueError(('Protected original cell',px,py,pz,before,name))
         if(px,py,pz)in devices:raise ValueError(('Existing device',px,py,pz))
         if oldwalk[pz-az,px-ax]:raise ValueError(('Existing public column',px,py,pz))
@@ -99,11 +102,15 @@ def author(a):
     envelopes=[rigid_envelope(q)for q in lines];sweep=unary_union(envelopes)
     rail_masks=[]
     for line,envelope in zip(lines,envelopes):
-        railcols=[]
+        railcols=[];bed=line.buffer(2.5,cap_style=2)
         for px,pz in points(envelope.buffer(.8)):
             cube=box(px,pz,px+1,pz+1)
             if not cube.intersects(envelope):continue
-            railcols.append((px,pz));put(px,BASE-2,pz,'minecraft:stone');put(px,BASE-1,pz,'minecraft:gravel')
+            railcols.append((px,pz))
+            # A carriage can overhang the end of a platform, but that does not
+            # authorize extending its physical bed into an unbuilt river link.
+            if bed.covers(Point(px+.5,pz+.5)):
+                put(px,BASE-2,pz,'minecraft:stone');put(px,BASE-1,pz,'minecraft:gravel')
             for py in range(BASE,BASE+6):put(px,py,pz,'minecraft:air')
         rail_masks.append(railcols)
     platform=[]
@@ -147,7 +154,7 @@ def author(a):
     lowlink=offset_line(end+19,middle.length/2-8,24)
     floor(lowlink.buffer(1.65,cap_style=2),BASE*2)
     # Station hall uses the reviewed south-side location, retaining the road.
-    plan=json.loads(a.site.read_text('utf8'));hc=np.asarray(plan['hall_centre_xz']);hall=rect(hc,u,n,9,7)
+    plan=site_plan;hc=np.asarray(plan['hall_centre_xz']);hall=rect(hc,u,n,9,7)
     floor(hall,BASE*2)
     for px,pz in points(hall):
         v=np.asarray([px+.5,pz+.5])-hc;du,dn=float(v@u),float(v@n)
