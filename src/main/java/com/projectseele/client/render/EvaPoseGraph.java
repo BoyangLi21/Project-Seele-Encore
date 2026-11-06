@@ -375,6 +375,7 @@ public final class EvaPoseGraph
         EvaPoseContinuity.trace(entity,model,"stance.finish");
         EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"ground.contact");
+        EvaBodyWeightR59.apply(entity,model,partialTick);
         EvaFollowThroughR56.apply(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"follow.through");
         EvaJointLimitsR57.apply(model);

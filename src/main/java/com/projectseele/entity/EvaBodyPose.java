@@ -625,7 +625,10 @@ public final class EvaBodyPose
         {
             float groundWeight=variant>=3||!supported?1
                     :EvaPoseBlendR51.smooth(move/.12F)*(1-EvaPoseBlendR51.smooth((stance-1)/.5F));
-            body.positions.get("root").y-=floor*groundWeight;body.dirty();
+            // A run keeps its own rise and fall: set on its lowest sole every frame, the body stayed down
+            // through the flight of the stride and came up at each footfall, the wrong way round.
+            float flight=gaitFlight(entity,partial);
+            body.positions.get("root").y-=Mth.lerp(flight,floor,-RUN_CLEARANCE*(1-dash))*groundWeight;body.dirty();
         }
         }
         com.projectseele.visual.BodyPoseLayersR40.capture("initial_ground",body);
@@ -915,6 +918,16 @@ public final class EvaBodyPose
             if(lowest<floor){pose.positions.get("root").y+=.006F+floor-lowest;pose.dirty();}
             return;
         }
-        if(Float.isFinite(lowest)){pose.positions.get("root").y+=.006F-lowest;pose.dirty();}
+        if(Float.isFinite(lowest)){pose.positions.get("root").y+=(.006F-lowest)*(1-gaitFlight(e,partial));pose.dirty();}
+    }
+    /** The run clip's stance soles sit this far below its zero (model units); the dash clip's are on it. */
+    private static final float RUN_CLEARANCE=.18F;
+    /** How much of the stride's own height stands: 0 walking or acting, 1 running on the flat. */
+    public static float gaitFlight(EvaUnit01Entity e,float partial)
+    {
+        if(e.isPilotProne()||e.isPilotCrouching()||e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()||e.isKickMotionActive(partial)
+                ||e.hasLiveActionForRender(partial)||e.isVisuallyAirborneForRender()||EvaFieldActionsR45.active(e)||EvaSwordActionsR45.active(e)
+                ||EvaGameplayMotionR32.airAge(e,partial)>=0)return 0;
+        return Mth.clamp(e.rifleMoveBlend(partial),0,1)*Mth.clamp(e.rifleRunBlend(partial),0,1);
     }
 }

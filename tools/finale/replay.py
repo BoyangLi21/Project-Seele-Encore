@@ -31,6 +31,27 @@ def load(path):
     return rows
 
 
+def strip(actors, rows, ticks, out, ground, size=(320, 300), yaw_cam=-1):
+    """Fixed side view of chosen ticks, the ground plane at the real floor."""
+    images = []
+    by_tick = {r['tick']: r for r in rows}
+    for t in ticks:
+        r = by_tick.get(t) or by_tick[min(by_tick, key=lambda k: abs(k - t))]
+        r = dict(r)
+        p = list(r['drawnPosition'])
+        p[1] -= ground
+        r['drawnPosition'] = p
+        mats = pose(actors, r)
+        c = np.array([p[0], 0, p[2]])
+        y = math.radians(r['bodyYaw'])
+        f = np.array([-math.sin(y), 0, math.cos(y)])
+        side = np.array([f[2], 0, -f[0]])
+        cam = R.Camera(c + side * (yaw_cam * 95) + f * 20 + np.array([0, 30, 0]), c + np.array([0, 22, 0]), 42, size)
+        images.append(R.render(cam, [actors.eva_mesh.triangles(mats, np.eye(4))], label='%d %s' % (r['tick'], r.get('key', '')[:18]),
+                               ground=(c[0] - 64, c[0] + 64, c[2] - 64, c[2] + 64)))
+    R.sheet(images, 6).save(out)
+
+
 def pose(actors, r):
     rot, pos = {}, {}
     for name, v in r['bones'].items():

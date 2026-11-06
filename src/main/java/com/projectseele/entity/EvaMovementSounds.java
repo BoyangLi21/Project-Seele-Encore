@@ -107,7 +107,9 @@ public final class EvaMovementSounds
             if(state.tick!=now-1)state.raised=false;
             state.tick=now;
             if(!bearing||gap>.35){state.raised=true;continue;}
-            if(!state.raised||gap<-.12||gap>.12)continue;
+            // A running stride comes down on the clip's own height, a little either side of the surface.
+            float flight=EvaBodyPose.gaitFlight(eva,1);
+            if(!state.raised||gap<-.12-flight*1.2||gap>.12+flight*.2)continue;
             state.raised=false;
             Vec3 contact=hit.getLocation();
             var bearingState=eva.level().getBlockState(hit.getBlockPos());

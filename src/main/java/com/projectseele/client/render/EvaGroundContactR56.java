@@ -80,12 +80,14 @@ final class EvaGroundContactR56
             double under=EvaFootPlacement.groundUnder(eva,side);
             if(Double.isFinite(under)&&under>ground+.5)support=Math.min(support,Math.max(0,soleHeight(model,root,hulls,side)-(float)under));
         }
-        float gap=Mth.clamp(support,-MAX_LIFT,MAX_DROP);
+        // A run stands on its stance feet alone, by the clip's support mask: its body leaves the ground.
+        float flight=EvaBodyPose.gaitFlight(eva,partial);
+        float gap=Mth.clamp(support,-MAX_LIFT,MAX_DROP)*(1-flight);
         var base=model.getBone("root").orElse(null);
         if(base==null)return;
         // Root offsets are model pixels; the world frame only turns and scales.
         float grounded=base.getPosY()-gap*16/EvaScale.RENDER_SCALE;
-        float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now);
+        float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now)+EvaBodyWeightR59.pelvis(eva,partial,now,walking);
         base.setPosY(drawn);
         // The eased pelvis sits this far above (+) or below (-) the grounded
         // one: planted legs take up the difference so their soles stay down.
@@ -98,6 +100,14 @@ final class EvaGroundContactR56
                 // left the sole floating while the foot eased onto the ground.
                 if(last!=null&&last.planted()>.1F)reachGround(model,root,side,lift*step((last.planted()-.1F)/.3F));
             }
+        if(flight>.01F)for(String side:new String[]{"l","r"})
+        {
+            float contact=EvaBodyWeightR59.contact(eva,side);
+            if(contact<=.01F)continue;
+            double under=EvaFootPlacement.groundUnder(eva,side);
+            float floorHere=Double.isFinite(under)&&under>ground+.5?(float)under:ground;
+            reachGround(model,root,side,(soleHeight(model,root,hulls,side)-floorHere)*contact);
+        }
     }
 
     private record Grounding(float offset,float speed,long time) {}
