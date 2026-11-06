@@ -1,0 +1,82 @@
+{
+  "recorded_at": "2026-11-06T16:13:55.020175+08:00",
+  "preservation_commit": "e483b94b0539eb4fb9ebc3e536c1b05e4ab30c8b",
+  "preservation_push": "SUCCESS; ordinary git push origin codex/repo-cleanup-20261019",
+  "remote_branch_verified_commit": "e483b94b0539eb4fb9ebc3e536c1b05e4ab30c8b",
+  "main_not_merged_or_pushed": true,
+  "source_texts_saved": 407,
+  "original_worktrees_preserved": true,
+  "remaining_worktree_changes": {
+    "cleanup": {
+      "path": "E:\\Users\\liboy\\.codex\\worktrees\\repo-cleanup-20261019\\eva",
+      "head": "e483b94b0539eb4fb9ebc3e536c1b05e4ab30c8b",
+      "tracked": 0,
+      "untracked_files": 0,
+      "total_files": 0,
+      "grouped_status_items": 0,
+      "unchanged_original_dirty_count": false
+    },
+    "r51-nonmap": {
+      "path": "E:/Users/liboy/.codex/worktrees/r51-nonmap/eva",
+      "head": "289dfed3f567b527e4f5d514d8d3cc73eb382ba4",
+      "tracked": 18,
+      "untracked_files": 379,
+      "total_files": 397,
+      "grouped_status_items": 397,
+      "unchanged_original_dirty_count": true
+    },
+    "6a9a": {
+      "path": "C:/Users/liboy/.codex/worktrees/6a9a/eva",
+      "head": "c8ece284258205418872b9027dace058fdee5d4f",
+      "tracked": 8,
+      "untracked_files": 4,
+      "total_files": 12,
+      "grouped_status_items": 12,
+      "unchanged_original_dirty_count": true
+    },
+    "28ac": {
+      "path": "C:/Users/liboy/.codex/worktrees/28ac/eva",
+      "head": "ef7320900d4690ba86a7347bab8c15cca88aee85",
+      "tracked": 0,
+      "untracked_files": 0,
+      "total_files": 0,
+      "grouped_status_items": 0,
+      "unchanged_original_dirty_count": true
+    },
+    "main": {
+      "path": "F:/eva",
+      "head": "de1dc4824c28de90f216205f5b596478839de7cf",
+      "tracked": 174,
+      "untracked_files": 348,
+      "total_files": 522,
+      "grouped_status_items": 511,
+      "unchanged_original_dirty_count": true
+    }
+  },
+  "processes_still_running_not_owned_by_codex": [
+    {
+      "pid": 30560,
+      "name": "java.exe",
+      "owner": "Existing shared/Claude Gradle daemon; not owned by this task",
+      "purpose": "Gradle daemon"
+    },
+    {
+      "pid": 28800,
+      "name": "javaw.exe",
+      "owner": "Claude; not stopped",
+      "purpose": "Claude Java/game process"
+    },
+    {
+      "pid": 24384,
+      "name": "javaw.exe",
+      "owner": "Claude; not stopped",
+      "purpose": "Claude Java/game process"
+    }
+  ],
+  "owned_background_processes_remaining": 0,
+  "codex_subagents_running": 0,
+  "r55_automation": "PAUSED",
+  "last_map_batch": 81,
+  "whole_map_complete": false,
+  "final_receipt_commit": "This receipt is recorded by a following documentation-only commit; obtain its ID with git log -1 --format=%H -- docs/HANDOFF_CODEX_20261106.zh.md. Final push outcome is reported in the final chat."
+}

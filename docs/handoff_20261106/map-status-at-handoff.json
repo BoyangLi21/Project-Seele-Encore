@@ -62,7 +62,7 @@
   "map_cache_refresh_pending": true,
   "whole_map_complete": false,
   "un_migration_authorized": false,
-  "source_status": "Installed through81 previously committed; final handoff stages the 11 outstanding source items plus inert historical snapshots. No map batch after81.",
+  "source_status": "All 11 formerly outstanding source items and 407 inert historical source/document snapshots are saved and ordinarily pushed in preservation commit e483b94b0539eb4fb9ebc3e536c1b05e4ab30c8b. No world changes after batch81 by this handoff.",
   "codex_stopped_by_user": true,
   "continuation_pause_flags_not_changed_due_to_main_readonly": true
 }

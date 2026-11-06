@@ -409,4 +409,16 @@ AGENTS.md被忽略，不能依赖clone得到。以下按实读F:/eva/AGENTS.md�
 
 **未人工看过/走过的范围：** 当前游戏内全部新站真实登乘/换乘、全线列车运行、上下坡完整车型、全图道路驾驶、所有隧道两端、最终街景真实性、地图/LOD新旧一致性。第1节部分静态双视角由Codex看过，不等于用户验收。
 
-本轮保存/验证记录见 `H/validation-summary.json`。当前为提交前文档，提交和普通推送的实际结果在完成后补入本节；未发生的动作不提前宣称成功。
+交付回执时间：2026-11-06T16:13:55.020175+08:00。
+
+- 保存提交：`e483b94b0539eb4fb9ebc3e536c1b05e4ab30c8b`。
+- 已执行普通`git push origin codex/repo-cleanup-20261019`成功，远端同名分支已再次读取确认为该提交。原47个未推送提交也已包含；没有推main或强推。
+- 当前文档回执将以单独文档提交保存并普通推送；包含本文最新版本的commit用前述git log命令读取，最后推送结果在最终聊天汇报，避免自引用提交ID。
+- 当前cleanup未提交0，r51-nonmap为397，6a9a为12，28ac为0；F:/eva为174已追踪＋348未追踪文件（折叠目录共511项）。原件均保留，旧代码文本副本已提交。
+- 本任务后台python/java/Forge服务器剩余0，子代理运行0，r55自动化PAUSED。
+- 未停止的非本任务进程：
+  - PID 30560，java.exe，Gradle daemon；Existing shared/Claude Gradle daemon; not owned by this task。
+  - PID 28800，javaw.exe，Claude Java/game process；Claude; not stopped。
+  - PID 24384，javaw.exe，Claude Java/game process；Claude; not stopped。
+
+完整机器回执见`H/final-receipt.json`，远端跟踪分支清单见`H/remote-ref-inventory.json`（仅origin/main与同名交接分支本轮刷新，legacy信息未联网刷新）。全部分支建议保留。构建53任务、6测试通过；没有新地图批次或人工验收结论。
