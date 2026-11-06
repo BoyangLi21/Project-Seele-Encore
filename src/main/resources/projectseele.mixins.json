@@ -9,6 +9,7 @@
     "SynchedEntityDataReadMixin",
     "EntityFluidScanMixin",
     "WalkNodeEvaluatorBlockCacheMixin",
+    "ChunkAccessMinHeightMixin",
     "LclPlayerSwimmingR54Mixin",
     "DhColumnExtentR53Mixin",
     "DhServerLogoutR53Mixin",
