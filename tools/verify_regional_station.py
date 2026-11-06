@@ -98,7 +98,8 @@ def verify(candidate,authority,write=True,mode='registered'):
     if native.exists()and len(plan.get('rails',[]))==1:
         pa,pb=plan['rails'][0]['from'],plan['rails'][0]['to']
         proof=json.loads(native.read_text('utf8'))
-        native_ok=proof['existing_loaded_objects_exact']and abs(proof['platform_length']-48)<1e-7 and len(proof['members'])==3
+        native_platforms=proof.get('platforms',[proof])
+        native_ok=proof['existing_loaded_objects_exact']and len(native_platforms)==1 and abs(native_platforms[0]['platform_length']-48)<1e-7 and len(proof['members'])==3
         if set(proof['members'])!=set(m.get('native_additions',[])):native_ok=False
         decoded={Path(name).parts[3]:Reader((candidate/'after'/name).read_bytes()).read()for name in proof['members']}
         if decoded['stations']['name']!=d['station']or decoded['platforms']['name']!='1':native_ok=False
@@ -124,6 +125,10 @@ def verify(candidate,authority,write=True,mode='registered'):
     return report
 
 def require_verified(candidate):
+    if (candidate/'station-set-release.json').is_file():
+        from release_station_set import require_verified as require_station_set
+        require_station_set(candidate)
+        return
     m=json.loads((candidate/'manifest.json').read_text('utf8'))
     if m.get('kind')!='measured-regional-station':return
     check=json.loads((candidate/'station-independent-check.json').read_text('utf8'))

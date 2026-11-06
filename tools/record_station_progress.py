@@ -141,6 +141,13 @@ def installed_station(delivery_path, snapshot, world):
                 and len(names) == len(set(names)), 'Delivery station set names must be unique')
         layout = read_offline(candidate / 'release-layout.json', world)
         require(layout.get('schema') == 'station-release-layout-v1', 'Unknown station release layout')
+        if 'stations' not in design:
+            plan=read_offline(candidate/'native-station-plan.json',world)
+            station_name=design.get('station',design.get('name'))
+            require(len(names)==1 and station_name==names[0] and len(plan['rails'])==1,
+                    'A single-station design must bind exactly one declared platform')
+            rail=plan['rails'][0]
+            design=dict(design,stations=[dict(name=station_name,rail_id=rail['id'],native_rail=rail)])
         require(len(design['stations']) == len(layout['stations']) == len(names)
                 and {s['name'] for s in design['stations']} == {s['name'] for s in layout['stations']} == set(names),
                 'Delivery, station design and release layout names disagree')
@@ -186,14 +193,29 @@ def installed_station(delivery_path, snapshot, world):
                 and functional.get('overlay_proof') == 'release-layout-check.json', 'Station set functional evidence is incomplete')
         structural_path = offline_path(functional['evidence'], world)
         structural = read(structural_path)
-        require(structural.get('errors') == [] and structural.get('offline_candidate_verified') is True
-                and structural.get('exact_saved_delta_matches') is True and structural.get('cells') == receipt['cells']
-                and not structural.get('new_floating_solids', True)
-                and not structural.get('newly_detached_retained_cells', True), 'Station set structural evidence failed')
-        reached = structural.get('reachable_platforms', [])
-        require(len(reached) == len(names) and {p['station'] for p in reached} == set(names)
-                and all(p.get('unreachable') == [] and p.get('reachable_platform_cells', 0) > 0 for p in reached),
-                'Station set lacks per-station passenger evidence')
+        if structural.get('schema')=='strict-station-layout-v1':
+            underlying_path=offline_path(structural['underlying_structural_evidence'],world)
+            require(same_path(underlying_path,candidate/'offline-verification.json'), 'Strict sweep refers to another candidate')
+            underlying=read(underlying_path)
+            require(structural.get('errors')==[] and structural.get('public_nodes')==structural.get('reachable_nodes')==total
+                    and structural.get('strict_sweep_directions',0)>0 and structural.get('maximum_measured_step',1)<=.50001,
+                    'Strict all-surface passenger sweep failed')
+            require(underlying.get('errors')==[] and underlying.get('cells')==receipt['cells']
+                    and underlying.get('public_nodes')==underlying.get('reachable_public_nodes')==total
+                    and not underlying.get('new_floating_solids',True)and not underlying.get('newly_detached_retained_cells',True)
+                    and not underlying.get('unguarded_public_drop_edges',True)
+                    and all(p.get('rejected')is True for p in underlying['negative_cases']),
+                    'Generic station structure evidence failed')
+            evidence.append(str(underlying_path))
+        else:
+            require(structural.get('errors') == [] and structural.get('offline_candidate_verified') is True
+                    and structural.get('exact_saved_delta_matches') is True and structural.get('cells') == receipt['cells']
+                    and not structural.get('new_floating_solids', True)
+                    and not structural.get('newly_detached_retained_cells', True), 'Station set structural evidence failed')
+            reached = structural.get('reachable_platforms', [])
+            require(len(reached) == len(names) and {p['station'] for p in reached} == set(names)
+                    and all(p.get('unreachable') == [] and p.get('reachable_platform_cells', 0) > 0 for p in reached),
+                    'Station set lacks per-station passenger evidence')
         require(receipt.get('changed_device_nbt_readback') == layout['device_changes']
                 and receipt['native_additions'] == layout['native_additions'], 'Station set installation scope disagrees')
         evidence.extend((str(candidate / 'release-layout.json'), str(functional_path), str(structural_path)))

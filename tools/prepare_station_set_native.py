@@ -130,12 +130,37 @@ def collect(a,spec,counts):
     for name in('native-station-proof.json','native-station-set-proof.json'):dump(a.work/'output'/name,proof)
     print('Collected',len(members),'new members;',len(baseline),'original files preserved; no service authored')
 
+def attach(a,spec,counts):
+    require(a.candidate is not None,'--candidate required for attach')
+    require(not any(p.lower()=='saves'for p in a.candidate.resolve().parts),'Candidate cannot be an actual save')
+    output=a.work/'output';proof=json.loads((output/'native-station-proof.json').read_text('utf8'))
+    require(proof['input_plan']==spec and proof['existing_loaded_objects_exact'],'Native proof belongs to a different plan')
+    source=files(a.candidate/'preserved-native');baseline=files(a.work/'baseline')
+    require(source.keys()==baseline.keys()and len(source)==spec['expected_native_members']and all(equal_files(p,baseline[k])for k,p in source.items()),'Candidate baseline differs from prepared native baseline')
+    members=proof['members'];require(len(members)==len(set(members))==counts['new_native_members'],'Native addition scope differs')
+    manifest=json.loads((a.candidate/'manifest.json').read_text('utf8'))
+    require(not manifest.get('native_additions')and not(a.candidate/'native-station').exists(),'Candidate native additions already attached')
+    for name in members:
+        rel=Path(name)
+        require(not rel.is_absolute()and '..'not in rel.parts and rel.parts[0]=='mtr','Unsafe native member path')
+        require(rel.relative_to('mtr').as_posix()not in source and not(a.candidate/'after'/rel).exists(),'Native attachment would overwrite a member')
+        require((output/'additions'/rel).is_file(),'Collected native addition is missing')
+    for name in members:
+        target=a.candidate/'after'/name;target.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(output/'additions'/name,target)
+    proof_target=a.candidate/'native-station';proof_target.mkdir()
+    for name in('native-station-proof.json','native-station-set-proof.json','collection.json','baseline-preservation.json'):
+        shutil.copy2(output/name,proof_target/name)
+    manifest.update(native_additions=members,native_station_pending=False);dump(a.candidate/'manifest.json',manifest)
+    print('Attached',len(members),'new native members to offline candidate; no actual world opened')
+
+
 def main(a):
     spec=json.loads(a.plan.read_text('utf8'));counts=validate(spec)
     if a.mode=='validate':print('JSON valid:',counts);return
     require(a.work is not None,'--work required');a.work=a.work.resolve()
     require(any(p.lower()=='.codex'for p in a.work.parts)and not any(p.lower()=='saves'for p in a.work.parts),'Isolated .Codex work directory required')
     a.work.mkdir(parents=True,exist_ok=True)
+    if a.mode=='attach':attach(a,spec,counts);return
     if a.mode in('compile','geometry','prepare'):compile_author(a)
     if a.mode=='compile':print('Compiled StationSetAuthor; Simulator not started');return
     if a.mode=='geometry':
@@ -155,7 +180,7 @@ def main(a):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__,formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('--plan',type=Path,required=True);p.add_argument('--mode',choices=('validate','compile','geometry','prepare','collect'),default='validate')
+    p.add_argument('--plan',type=Path,required=True);p.add_argument('--mode',choices=('validate','compile','geometry','prepare','collect','attach'),default='validate')
     for name in('work','candidate','native-source','java','mtr'):p.add_argument('--'+name,type=Path)
     p.add_argument('--expected-members',type=int)
     main(p.parse_args())

@@ -63,7 +63,39 @@ def prepare(a):
         files=capture_identity(a.world,a.candidate,a.prior_client)
     write_replay_expected(a.candidate)
     write(a.candidate/'station-release-check.json',dict(production_recipe_replay_passed=False,identity_snapshot_ready=True,native_station_registration_verified=True,exact_voxel_views_reviewed=True,negative_fault_checks_passed=True,no_new_floating_components=True,current_native_source_exact=True,ground_only_scalar_network_update=True,world_written=False))
+    write(a.candidate/'station-set-release.json',dict(schema='station-set-release-v1',
+        candidate=str(a.candidate.resolve()),authority=str(a.authority.resolve()),
+        review=str(a.review.resolve()),models=str(a.models.resolve()),
+        checks=str(a.checks.resolve()),layout=str(a.layout.resolve()),
+        cells=read(a.candidate/'manifest.json')['cells']))
     print('Prepared station set:',len(layout['stations']),'stations;',measured['nodes'],'measured public surfaces;',len(files),'identity files.')
+
+
+def require_verified(candidate):
+    """The installer gate for explicit layouts, including diagonal platforms."""
+    saved=read(candidate/'station-set-release.json')
+    if saved.get('schema')!='station-set-release-v1' or Path(saved['candidate']).resolve()!=candidate.resolve():
+        raise ValueError('Station set release belongs to a different candidate')
+    a=Namespace(**{key:Path(saved[key])for key in('candidate','authority','review','models','checks','layout')})
+    for key in('checks','layout'):
+        if not getattr(a,key).resolve().is_relative_to(candidate.resolve()):
+            raise ValueError('Station set declaration is outside its candidate')
+    manifest=read(candidate/'manifest.json');release=read(candidate/'station-release-check.json')
+    required=('production_recipe_replay_passed','identity_snapshot_ready','native_station_registration_verified',
+              'exact_voxel_views_reviewed','negative_fault_checks_passed','no_new_floating_components','current_native_source_exact')
+    if saved['cells']!=manifest['cells'] or not all(release.get(k)is True for k in required):
+        raise ValueError('Station set release requirements incomplete')
+    spec=check_package(a);layout=read(a.layout);native_check(a,layout)
+    measured=check_layout(candidate,a.authority,layout)
+    if measured!=read(candidate/'release-layout-check.json'):
+        raise ValueError('Station layout changed after preparation')
+    structural=read(a.review/spec['structural_report'])
+    if len(structural['negative_cases'])<5 or not all(c['rejected']for c in structural['negative_cases']):
+        raise ValueError('Station set rejection evidence incomplete')
+    if structural['new_floating_solids']or structural['newly_detached_retained_cells']:
+        raise ValueError('Station set has floating components')
+    if len(nbtlib.load(candidate/'block-entities.dat')['Changes'])!=layout['device_changes']:
+        raise ValueError('Station set device scope changed')
 
 
 def record(a):
