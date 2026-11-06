@@ -23,7 +23,7 @@ final class EvaBodyWeightR59
     /** Pelvis spring (1/s) and damping; the peak drop after an impulse J is PEAK_PER_IMPULSE*J. */
     private static final float DROP_RATE=16F,DROP_DAMP=.75F,PEAK_PER_IMPULSE=.0274F;
     /** Peak pelvis drop at a footfall (blocks) walking, running and dashing. */
-    private static final float WALK_DROP=.7F,RUN_DROP=.6F,DASH_DROP=.8F;
+    private static final float WALK_DROP=.7F,RUN_DROP=.6F,DASH_DROP=1.2F;
     /** Chest nod per model pixel of pelvis drop (degrees), and how much the neck gives back to keep the head level. */
     private static final float NOD=.75F,NECK_BACK=.45F;
     /** Speed filters (seconds): their difference measures a change of speed. */
@@ -52,7 +52,7 @@ final class EvaBodyWeightR59
         if(now==s.time)return s.drop;
         float dt=(now-s.time)/1e9F;
         s.time=now;s.dt=dt;
-        boolean left=EvaBodyPose.locomotionPlantedR44(eva,"l",partial),right=EvaBodyPose.locomotionPlantedR44(eva,"r",partial);
+        boolean left=EvaBodyPose.gaitFootDownR59(eva,"l",partial),right=EvaBodyPose.gaitFootDownR59(eva,"r",partial);
         if(dt<=0||dt>.2F)
         {
             s.drop=s.dropRate=s.lean=s.leanRate=s.bank=s.bankRate=0;s.left=left;s.right=right;

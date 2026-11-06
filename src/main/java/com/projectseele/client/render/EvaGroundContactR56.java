@@ -110,7 +110,10 @@ final class EvaGroundContactR56
             if(contact<=.01F)continue;
             double under=EvaFootPlacement.groundUnder(eva,side);
             float floorHere=Double.isFinite(under)&&under>ground+.5?(float)under:ground;
-            reachGround(model,root,side,(soleHeight(model,root,hulls,side)-floorHere)*contact);
+            float gapHere=soleHeight(model,root,hulls,side)-floorHere;
+            // It lets go as the clip lifts the foot: held down to the end of the window,
+            // the leg straightened and the knee snapped back in the frame it was released.
+            reachGround(model,root,side,gapHere*contact*(1-step((Math.abs(gapHere)-PIN_NEAR)/(PIN_FAR-PIN_NEAR))));
         }
     }
 
@@ -135,6 +138,8 @@ final class EvaGroundContactR56
         }
     }
 
+    /** A running sole this far off the ground (blocks) is held to it, fading out by the second. */
+    private static final float PIN_NEAR=.5F,PIN_FAR=2.2F;
     private record Grounding(float offset,float speed,long time) {}
     private static final Map<Integer,Grounding> PELVIS=new HashMap<>();
     /** Stiffness (1/s) of the walking grounding spring, and its largest lag behind the grounding offset (model pixels). */

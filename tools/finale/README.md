@@ -17,7 +17,8 @@
 | `review.py` / `video.py` | 多视角接触表 / MP4 预览（需 `imageio-ffmpeg`） |
 | `idle.py` | 原创站立待机（`eva_idle_r59.json`） |
 | `rifle_stance.py` | 持枪跪姿到趴下的骨盆和双腿（`eva_rifle_legs_r59.json`，运行时覆盖到捕捉片段上） |
-| `dash_stride.py` | 冲刺的上身和双腿（`eva_dash_r59.json`，运行时覆盖到捕捉片段上） |
+| `dash_stride.py` | 冲刺（`eva_dash_r59.json`，运行时覆盖到捕捉片段上）。步幅 64 格一圈，改动要同步 `EvaSprintR50.STRIDE_BLOCKS` |
+| `crawl.py` | 匍匐爬行（`eva_crawl_r59.json`，运行时覆盖到捕捉片段上） |
 | `replay.py` | 把复审客户端的 `poses.jsonl` 重放进离线骨架，分段统计穿地、滑步、关节速度、铰链缝隙、脚踝和手腕弯折 |
 | `gait_clip.py` / `hipcurve.py` | 量步态片段本身 / 实机骨盆曲线 |
 | `skin_compare.py` / `bend_test.py` / `fix_eva_plates.py` | 蒙皮对比、弯折测试、肘部装甲板归属修正 |

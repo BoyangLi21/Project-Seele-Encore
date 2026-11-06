@@ -167,6 +167,8 @@ public final class EvaBodyPose
                 {
                     overlayClipR59(combatClips,variant,"rifle_stance","eva_rifle_legs_r59.json");
                     overlayClipR59(combatClips,variant,"dash_run","eva_dash_r59.json");
+                    overlayClipR59(combatClips,variant,"prone_crawl","eva_crawl_r59.json");
+                    smoothGaitsR59(combatClips,variant);
                 }
             }
             data=new Data(names,index,Map.copyOf(clips),Map.copyOf(rigs),Map.copyOf(support),object(all,"prone"),object(all,"grip"),object(all,"rifle_mocap"),Map.copyOf(eyes),Map.copyOf(rigSupport),Map.copyOf(carrierHulls),Map.copyOf(combatClips),object(all,"locomotion_contract_r43"));
@@ -178,8 +180,9 @@ public final class EvaBodyPose
      * Channels authored in tools/finale replace the capture's, frame by frame.
      * The armed kneel-to-prone keeps its captured upper body and takes pelvis
      * and legs from rifle_stance.py: the captured front foot folded up through
-     * the far thigh. The dash takes everything but its pelvis height from
-     * dash_stride.py: captured, it scuttled along with the chest fifty degrees over.
+     * the far thigh. The dash and the crawl are replaced whole, from dash_stride.py
+     * and crawl.py: the captured dash scuttled with the chest fifty degrees over,
+     * the captured crawl held the trunk still and shivered its feet.
      */
     private static void overlayClipR59(Map<Integer,Map<String,Clip>> combatClips,int variant,String name,String file) throws java.io.IOException
     {
@@ -209,6 +212,50 @@ public final class EvaBodyPose
             clips.put(name,new Clip(clip.duration(),clip.names(),rotations,positions));
             combatClips.put(variant,Map.copyOf(clips));
         }
+    }
+    /** Width of the gait low-pass (Gaussian sigma, clip frames). */
+    private static final float GAIT_SMOOTHING_FRAMES=2F;
+    /**
+     * The walk and run captures shiver: the run has 23 source frames a cycle
+     * joined by straight lines, and the walk's pelvis lurches .7 blocks in one
+     * frame at each footfall and jumps at the loop seam. Played at a stride a
+     * second that is nearly all of the tremor measured on the drawn body. A low-pass
+     * round the loop takes out about nine tenths of it and leaves the poses,
+     * pelvis travel included, where they were.
+     */
+    private static void smoothGaitsR59(Map<Integer,Map<String,Clip>> combatClips,int variant)
+    {
+        var clips=new HashMap<>(combatClips.getOrDefault(variant,Map.of()));
+        for(String name:List.of("walk","run","crouch_walk"))
+        {
+            var clip=clips.get(name);
+            if(clip!=null)clips.put(name,smoothLoopR59(clip,GAIT_SMOOTHING_FRAMES));
+        }
+        combatClips.put(variant,Map.copyOf(clips));
+    }
+    private static Clip smoothLoopR59(Clip clip,float sigma)
+    {
+        // The last frame repeats the first.
+        int period=clip.rotations().length-1,reach=Mth.ceil(3*sigma),bones=clip.names().length;
+        if(period<=2*reach)return clip;
+        float[] kernel=new float[2*reach+1];float total=0;
+        for(int k=-reach;k<=reach;k++){kernel[k+reach]=(float)Math.exp(-.5F*k*k/(sigma*sigma));total+=kernel[k+reach];}
+        for(int k=0;k<kernel.length;k++)kernel[k]/=total;
+        var rotations=new Quaternionf[period+1][bones];var positions=new Vector3f[period+1][bones];
+        for(int f=0;f<period;f++)for(int b=0;b<bones;b++)
+        {
+            var centre=clip.rotations()[f][b];float x=0,y=0,z=0,w=0;var p=new Vector3f();
+            for(int k=-reach;k<=reach;k++)
+            {
+                int at=Math.floorMod(f+k,period);float weight=kernel[k+reach];
+                var q=clip.rotations()[at][b];if(q.dot(centre)<0)weight=-weight;
+                x+=weight*q.x;y+=weight*q.y;z+=weight*q.z;w+=weight*q.w;
+                p.fma(kernel[k+reach],clip.positions()[at][b]);
+            }
+            rotations[f][b]=new Quaternionf(x,y,z,w).normalize();positions[f][b]=p;
+        }
+        rotations[period]=rotations[0];positions[period]=positions[0];
+        return new Clip(clip.duration(),clip.names(),rotations,positions);
     }
     private static JsonObject object(JsonObject p,String n){return p.has(n)?p.getAsJsonObject(n):new JsonObject();}
     private static JsonObject locomotionContractR43(EvaUnit01Entity e,String clip)
@@ -245,6 +292,22 @@ public final class EvaBodyPose
         }
         return weight>.5F;
     }
+    /**
+     * Whether a foot is down by its gait clip alone. The fleet's contract has no
+     * masks for walk and run, so {@link #locomotionPlantedR44} is never true on
+     * those rigs. These windows (where the foot lands, the share of the cycle it
+     * stays) are read off the clips' soles, and off tools/finale/dash_stride.py.
+     */
+    public static boolean gaitFootDownR59(EvaUnit01Entity e,String side,float partial)
+    {
+        float phase=e.rifleGaitPhase(partial),run=e.rifleRunBlend(partial),dash=EvaSprintR50.blend(e,partial);
+        phase-=Mth.floor(phase);
+        boolean left=side.equals("l");
+        float weight=(1-run)*down(phase,left?.69F:.20F,.5F)+run*(1-dash)*down(phase,left?.84F:.31F,.23F)
+                +run*dash*down(phase,left?.04F:.54F,.2F);
+        return weight>.5F;
+    }
+    private static float down(float phase,float from,float share){return Mth.positiveModulo(phase-from,1F)<share?1:0;}
     public static float locomotionContactR43(EvaUnit01Entity e,String clip,String side,boolean backwards,float fallback)
     {
         if(clip.equals("run")&&EvaSprintR50.blend(e,1)>.5F&&locomotionContractR43(e,"dash_run")!=null)clip="dash_run";

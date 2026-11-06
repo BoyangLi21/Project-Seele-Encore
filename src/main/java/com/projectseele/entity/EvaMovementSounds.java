@@ -115,6 +115,13 @@ public final class EvaMovementSounds
             var bearingState=eva.level().getBlockState(hit.getBlockPos());
             boolean soil=bearingState.is(BlockTags.DIRT)||bearingState.is(BlockTags.SAND)||bearingState.is(BlockTags.LEAVES);
             CombatFoleyR36.step(eva,contact,soil,Mth.lerp(low,1+.28F*run,.5F));
+            if(EvaSprintR50.blend(eva,1)>.5F&&eva.level() instanceof net.minecraft.server.level.ServerLevel server)
+            {
+                // A sprinting footfall throws the ground up behind it.
+                server.sendParticles(new net.minecraft.core.particles.BlockParticleOption(net.minecraft.core.particles.ParticleTypes.BLOCK,bearingState),
+                        contact.x,contact.y+.3,contact.z,42,2.6,.2,2.6,.16);
+                server.sendParticles(net.minecraft.core.particles.ParticleTypes.POOF,contact.x,contact.y+.6,contact.z,9,2.2,.3,2.2,.05);
+            }
             com.projectseele.visual.StanceContactR41Review.sound(eva,"geometric_foot_"+side,contact);
             if(eva.getTags().contains("seele_motion_lab"))
                 ProjectSeele.LOGGER.info("EVA SOLE CONTACT side={} phase={} gap={} position={}",side,phase,gap,contact);

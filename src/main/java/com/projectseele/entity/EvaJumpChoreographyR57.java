@@ -104,22 +104,18 @@ final class EvaJumpChoreographyR57
         // drifting halfway to the landing, the kick had no snap.
         if(kick)
         {
-            float a=stroke<0?ease(Math.min(1,age/4)):1+out(Math.min(1,stroke/2))+(stroke>=2?.3F*fall*fall*fall:0);
+            float a=stroke<0?ease(Math.min(1,age/3)):1+out(Math.min(1,stroke/2))+(stroke>=2?.3F*fall*fall*fall:0);
             return play(pose,new Key[]{null,K_CHAMBER,K_STRIKE,K_LAND},a);
         }
-        // Raise the clasped hands over four ticks, keep arching back until the
-        // drop, then swing through the whole fall so the fists strike the
-        // ground at touchdown. The swing starts as the body tips over the apex, not when the
-        // server's stroke is confirmed a tick or two later.
-        boolean dropping=stroke>=0||st.fallAt>=0;
-        float since=st.fallAt>=0?Math.min(age,air-st.fallAt):0;
+        // Raise the clasped hands in three ticks, arch back in three more, then
+        // swing through the drop so the fists strike the ground at touchdown.
+        boolean dropping=stroke>=0;
+        float since=Math.max(0,stroke);
         if(dropping&&st.swingFrom<0)st.swingFrom=fall;
         float raised=raise(dropping?age-since:age);
         // From the drop the arms come down gathering speed, as a blow does,
-        // and are fastest as the fists reach the ground. Swung at an even rate
-        // the blow had no weight; held overhead until the last fifth of a
-        // second, it read as a hold and a jerk.
-        float swing=!dropping?0:(float)Math.pow(Math.max(Math.min(1,since/(APEX_TICKS-1)),
+        // and are fastest as the fists reach the ground.
+        float swing=!dropping?0:(float)Math.pow(Math.max(Math.min(1,since/SWING_TICKS),
                 Mth.clamp((fall-st.swingFrom)/Math.max(.05F,1-st.swingFrom),0,1)),1.6);
         float from=dropping?raised+Math.max(0,1.9F-raised)*Math.min(1,since/2):raised;
         var hammer=play(pose,new Key[]{null,H_RAISE,H_RAISE2,H_SWING,H_SLAM},from+(4-from)*swing);
@@ -128,8 +124,10 @@ final class EvaJumpChoreographyR57
     }
     /** Wrist to wrist, model units, of the fists clasped for the hammer. */
     private static final float CLASP=.55F;
+    /** Ticks of the swing if the ground is further off than that. */
+    private static final float SWING_TICKS=6;
 
-    private static float raise(float age){return age<4?ease(age/4):1+out(Math.min(1,(age-4)/14));}
+    private static float raise(float age){return age<3?ease(age/3):1+out(Math.min(1,(age-3)/3));}
 
     /** How far the hammer's wrists are straightened into closed fists in line with the forearms. */
     static float hammerFists(EvaUnit01Entity e,float partial)

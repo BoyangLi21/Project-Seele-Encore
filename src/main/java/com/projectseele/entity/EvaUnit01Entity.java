@@ -245,7 +245,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private static final float PRONE_SPEED = 0.10F;
     private static final float SPRINT_SPEED = 0.78F;
     private static final double JUMP_VELOCITY = 4.05D;
-    private static final float MELEE_RATE_R43 = 1.5F;
+    private static final float MELEE_RATE_R43 = 1.15F;
     private static final double AIRFRAME_GRAVITY = 0.42D;
     /** The airframe climbs slowly and comes down hard: the same height as a uniform pull, half as long again going up. */
     private static final double AIR_RISE_GRAVITY = 0.20D, AIR_FALL_GRAVITY = 0.36D;
@@ -1517,7 +1517,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                         EvaBodyPose.locomotionRuntimeStrideR44(this,"walk",EvaBodyPose.locomotionStrideR43(this,"walk",25.8334D*WALK_CADENCE_GAIN)/WALK_CADENCE_GAIN),
                         EvaBodyPose.locomotionRuntimeStrideR44(this,"run",EvaBodyPose.locomotionStrideR43(this,"run",31.3944D*RUN_CADENCE_GAIN)/RUN_CADENCE_GAIN));
                 standingStride=Mth.lerp(EvaSprintR50.blend(this,1),standingStride,
-                        EvaBodyPose.locomotionRuntimeStrideR44(this,"dash_run",standingStride));
+                        EvaBodyPose.rigKey(this)<=2?EvaSprintR50.STRIDE_BLOCKS:EvaBodyPose.locomotionRuntimeStrideR44(this,"dash_run",standingStride));
                 double stride=stance<=1?Mth.lerp(stance,standingStride,15D):Mth.lerp((stance-1)/2,15D,12D);
                 stride=EvaCombatSupportR33.stride(this,dx,dz,(float)stride);
                 double sign=EvaCombatSupportR33.gaitWeight(this,1)>.5F?1:EvaStrideHeadingR59.backward(this,dx,dz)?-1:1;

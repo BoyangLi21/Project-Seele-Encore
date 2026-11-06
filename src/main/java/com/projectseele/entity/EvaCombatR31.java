@@ -138,9 +138,7 @@ public final class EvaCombatR31
         {
             if(!e.onGround())s.airborne=true;
             boolean motion=EvaGameplayMotionR32.ready(e);
-            boolean falling=EvaGameplayMotionR32.descending(e);
-            boolean strikeHeight=victim==null?EvaGameplayMotionR32.clearance(e,0)<=38:e.getY()<=victim.getBoundingBox().maxY-e.getBbHeight()*.40;
-            if(motion&&strokeAge(e,0)<0&&age>=4&&(a==AIR_STRIKE?falling&&strikeHeight:falling||age>=16))
+            if(motion&&strokeAge(e,0)<0&&age>=EvaAirDriveR59.gather(a))
             {e.getEntityData().set(STROKE,e.level().getGameTime());e.playSound(ModSounds.EVA_SWING.get(),2.6F,a==AIR_SLAM?.58F:.75F);}
             float stroke=strokeAge(e,0);
             boolean window=motion?stroke>=0&&stroke<=9:a==AIR_STRIKE&&age>=6&&age<=18;
@@ -219,9 +217,10 @@ public final class EvaCombatR31
     private static void landingDust(EvaUnit01Entity e)
     {
         var l=(ServerLevel)e.level();var p=e.position();var floor=l.getBlockState(e.blockPosition().below());
-        l.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,floor),p.x,p.y+.3,p.z,50,5,.25,5,.12);
-        l.playSound(null,e.blockPosition(),ModSounds.EVA_IMPACT.get(),SoundSource.PLAYERS,5,.62F);
-        CombatFeelR31.send(e,CombatFeelR31.CONTACT,forward(e),.9F,6,1);
+        l.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,floor),p.x,p.y+.3,p.z,90,6,.25,6,.2);
+        l.sendParticles(ParticleTypes.POOF,p.x,p.y+1,p.z,18,5,.4,5,.16);
+        l.playSound(null,e.blockPosition(),ModSounds.EVA_IMPACT.get(),SoundSource.PLAYERS,6,.58F);
+        CombatFeelR31.send(e,CombatFeelR31.CONTACT,forward(e),1.2F,8,2);
     }
     /**
      * The air hammer's fists meet the ground in front of the feet as the body
@@ -231,10 +230,10 @@ public final class EvaCombatR31
     private static void hammerImpact(EvaUnit01Entity e)
     {
         var l=(ServerLevel)e.level();Vec3 centre=e.position().add(forward(e).scale(7));var floor=l.getBlockState(e.blockPosition().below());
-        l.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,floor),centre.x,centre.y+.3,centre.z,60,5,.3,5,.16);
-        l.sendParticles(ParticleTypes.POOF,centre.x,centre.y+1,centre.z,16,4,.4,4,.15);
+        l.sendParticles(new BlockParticleOption(ParticleTypes.BLOCK,floor),centre.x,centre.y+.3,centre.z,110,7,.3,7,.24);
+        l.sendParticles(ParticleTypes.POOF,centre.x,centre.y+1,centre.z,24,6,.4,6,.2);
         l.playSound(null,net.minecraft.core.BlockPos.containing(centre),ModSounds.EVA_IMPACT.get(),SoundSource.PLAYERS,6,.55F);
-        CombatFeelR31.send(e,CombatFeelR31.CONTACT,forward(e),1.1F,8,2);
+        CombatFeelR31.send(e,CombatFeelR31.CONTACT,forward(e),1.35F,9,2);
     }
     private EvaCombatR31() {}
 }
