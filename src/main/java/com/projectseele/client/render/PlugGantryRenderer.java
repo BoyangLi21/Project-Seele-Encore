@@ -1,12 +1,6 @@
 package com.projectseele.client.render;
 
 import com.mojang.blaze3d.vertex.PoseStack;
-import com.mojang.blaze3d.vertex.BufferBuilder;
-import com.mojang.blaze3d.vertex.DefaultVertexFormat;
-import com.mojang.blaze3d.vertex.VertexFormat;
-import com.mojang.blaze3d.vertex.VertexBuffer;
-import com.mojang.blaze3d.systems.RenderSystem;
-import net.minecraft.client.renderer.GameRenderer;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.projectseele.entity.EntryPlugCarrierEntity;
 import com.projectseele.entity.NervCarrierPlatformEntity;

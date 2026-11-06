@@ -206,14 +206,8 @@ public final class NervOriginalCarrierR52 {
   return new CheckedStep(level,carrier,moved(carrier,root,to,guideUp(carrier)),proof.envelopes(),null);
  }
  public static CheckedStep propose(ServerLevel l,NervCarrierPlatformEntity e,DirectoryTrajectoryR52 curve,float from,float to,Set<UUID> own)throws IOException {if(curve==null||from!=1||to!=1||progress(e,1)!=1||!declared(e)||!NervAirTransportManifestR52.same(actualRoot(e,1),curve.sample(0).evaRoot()))return null;var up=NervFixedFootGuidesR52.up(curve.directory(),curve.leg());if(up==null)up=guideUp(e);if(up.distanceTo(guideUp(e))>1e-6)return null;return check(l,e,curve,curve.sample(0).evaRoot(),curve.sample(1).evaRoot(),from,to,up,own);}
- private static final boolean COLLISION_TRACE_R53=Boolean.getBoolean("projectseele.r53CarrierCollisionTrace");
- private record ActivePairR53(String part,int triangles,int peerTriangles,RigidTransform from,RigidTransform to,RigidTransform peer){}
- private static volatile ActivePairR53 activePairR53;
  private static boolean hits(Part p,Part q,NervFlightProofR52.ObstacleMesh m,double error){
-  long start=COLLISION_TRACE_R53?System.nanoTime():0;
-  if(COLLISION_TRACE_R53)activePairR53=new ActivePairR53(p.name(),p.mesh().triangleCount(),m.mesh().triangleCount(),p.frame(),q.frame(),m.frame());
-  try{return p.mesh().intersects(p.frame(),q.frame(),m.mesh(),m.frame(),m.endFrame(),.003,new Vec3(error,error,error));}
-  finally{if(COLLISION_TRACE_R53){long elapsed=(System.nanoTime()-start)/1_000_000;if(elapsed>=1000)com.projectseele.ProjectSeele.LOGGER.info("Carrier collision query took {} ms: {}",elapsed,activePairR53);activePairR53=null;}}
+  return p.mesh().intersects(p.frame(),q.frame(),m.mesh(),m.frame(),m.endFrame(),.003,new Vec3(error,error,error));
  }
  private record ActualObstaclesR53(boolean known,boolean ordinary,NervStaticSpatialIndexR52<NervFlightProofR52.ObstacleMesh> index){}
  private record LeadPairR53(NervLegacyCarrierRideR52.Piece from,NervLegacyCarrierRideR52.Piece to){}

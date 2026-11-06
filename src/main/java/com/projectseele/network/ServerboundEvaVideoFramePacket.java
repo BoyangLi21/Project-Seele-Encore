@@ -29,11 +29,6 @@ import net.minecraftforge.network.PacketDistributor;
  */
 public final class ServerboundEvaVideoFramePacket
 {
-    private static boolean reviewLoopback(MinecraftServer server)
-    {
-        return Boolean.getBoolean("projectseele.feedReviewR06")&&server.getWorldPath(
-                net.minecraft.world.level.storage.LevelResource.ROOT).normalize().getFileName().toString().startsWith("SEELE_EVA_FEED_REVIEW");
-    }
     public static final int FRAME_WIDTH = 1280;
     public static final int FRAME_HEIGHT = 720;
     public static final int MAX_FRAME_BYTES =
@@ -145,7 +140,7 @@ public final class ServerboundEvaVideoFramePacket
                 || this.variant < EvaUnit01Entity.UNIT_00
                 || this.variant > EvaUnit01Entity.UNIT_02
                 || !sender.serverLevel().dimension().equals(
-                GeoFrontCommands.GEOFRONT)&&!reviewLoopback(sender.server))
+                GeoFrontCommands.GEOFRONT))
         {
             return false;
         }
@@ -171,7 +166,7 @@ public final class ServerboundEvaVideoFramePacket
         }
 
         ServerLevel level = sender.serverLevel();
-        if (!level.dimension().equals(GeoFrontCommands.GEOFRONT)&&!reviewLoopback(sender.server))
+        if (!level.dimension().equals(GeoFrontCommands.GEOFRONT))
         {
             return;
         }
@@ -190,7 +185,7 @@ public final class ServerboundEvaVideoFramePacket
         int viewers = 0;
         for (ServerPlayer viewer : level.players())
         {
-            if (isCommandViewer(level, viewer.position())||viewer==sender&&reviewLoopback(sender.server))
+            if (isCommandViewer(level, viewer.position()))
             {
                 ClientboundEvaVideoFramePacket.send(viewer, this.variant,
                         frame);

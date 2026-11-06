@@ -215,8 +215,6 @@ public final class CityCoordinationR44
     public static void operatorTick(NervStaffEntity npc,UUID requester,String operation,BlockPos control,BlockPos approach,int ticks)
     {
         var level=(ServerLevel)npc.level();var data=CityCoordinationSavedDataR44.get(level);var player=level.getServer().getPlayerList().getPlayer(requester);var site=site(level);
-        if(Boolean.getBoolean("projectseele.r44CoordinationReview")&&ticks%40==1)
-            ProjectSeele.LOGGER.info("Grid operator trace: task={} ticks={} pos={} approach={} navDone={} noAi={} active={} stage={} generation={}",operation,ticks,npc.position(),approach,npc.getNavigation().isDone(),npc.isNoAi(),data.active,data.stage,npc.getPersistentData().get("SeeleCoordTaskR44"));
         if(!data.active||!requester.equals(data.owner)||player==null||!NervStaffDialogue.authorized(player)||site==null||!npc.memberId().equals("grid_liaison_r44")
                 ||!npc.getPersistentData().hasUUID("SeeleCoordTaskR44")||!npc.getPersistentData().getUUID("SeeleCoordTaskR44").equals(data.instance)
                 ||operation.equals("coord_test")&&data.stage!=3||operation.equals("coord_charge")&&data.stage!=4

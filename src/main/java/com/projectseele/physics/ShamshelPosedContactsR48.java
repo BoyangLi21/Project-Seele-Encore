@@ -43,8 +43,6 @@ public final class ShamshelPosedContactsR48
     private static volatile boolean loadAttempted;
     private static volatile String resourceStatus = "NOT_LOADED";
     private static final WeakIdentityMap<ShamshelEntity, State> STATES = new WeakIdentityMap<>();
-    private static final boolean DOMINANT = Boolean.getBoolean("projectseele.r44DominantSkinReview");
-    private static final boolean RUNNING = Boolean.getBoolean("projectseele.r44RunningSkinReview");
     private ShamshelPosedContactsR48() {}
 
     public static boolean supports(LivingEntity entity)
@@ -78,7 +76,6 @@ public final class ShamshelPosedContactsR48
             }
         try
         {
-            if (DOMINANT && RUNNING) throw new IllegalStateException("Select one actual DQS hemisphere owner");
             JsonObject mesh = resource("mesh/shamshel.mesh.json"), geo = resource("geo/shamshel.geo.json");
             var animations = resource("animations/shamshel.animation.json").getAsJsonObject("animations");
             for (var clip : animations.entrySet()) for (var bone : clip.getValue().getAsJsonObject().getAsJsonObject("bones").entrySet())
@@ -208,17 +205,11 @@ public final class ShamshelPosedContactsR48
     private static Vector3f skin(Vertex vertex, Quaternionf[] real, Quaternionf[] dual)
     {
         int reference = vertex.joints()[0];
-        if (DOMINANT)
-        {
-            float largest = 0; reference = -1;
-            for (int k = 0; k < 4; k++) if (vertex.weights()[k] > largest || vertex.weights()[k] == largest && largest > 0
-                    && (reference < 0 || vertex.joints()[k] < reference)) { largest = vertex.weights()[k]; reference = vertex.joints()[k]; }
-        }
         Quaternionf q = new Quaternionf(0, 0, 0, 0), d = new Quaternionf(0, 0, 0, 0);
         for (int k = 0; k < 4; k++)
         {
             int bone = vertex.joints()[k]; float weight = vertex.weights()[k]; if (weight == 0) continue;
-            if ((RUNNING ? q : real[reference]).dot(real[bone]) < 0) weight = -weight;
+            if (real[reference].dot(real[bone]) < 0) weight = -weight;
             q.x += real[bone].x * weight; q.y += real[bone].y * weight; q.z += real[bone].z * weight; q.w += real[bone].w * weight;
             d.x += dual[bone].x * weight; d.y += dual[bone].y * weight; d.z += dual[bone].z * weight; d.w += dual[bone].w * weight;
         }

@@ -203,10 +203,6 @@ public final class EvaCommandFeedClient
 
     private static long nextCaptureNanos;
     private static volatile float compressionHint=.86F;
-    private static final java.util.concurrent.atomic.AtomicLong REVIEW_CAPTURED=new java.util.concurrent.atomic.AtomicLong();
-    private static final java.util.concurrent.atomic.AtomicLong REVIEW_ENCODED=new java.util.concurrent.atomic.AtomicLong();
-    private static final java.util.concurrent.atomic.AtomicLong REVIEW_UPLOADED=new java.util.concurrent.atomic.AtomicLong();
-    private static final java.util.concurrent.atomic.AtomicLong REVIEW_MAX_BYTES=new java.util.concurrent.atomic.AtomicLong();
     private static ClientLevel captureLevel;
     private static int captureEvaId = Integer.MIN_VALUE;
     private static ClientLevel activeLevel;
@@ -253,7 +249,6 @@ public final class EvaCommandFeedClient
         try
         {
             full = captureFirstPersonFrame(minecraft, partialTick);
-            if(Boolean.getBoolean("projectseele.feedReviewR06"))REVIEW_CAPTURED.incrementAndGet();
         }
         catch (RuntimeException exception)
         {
@@ -401,7 +396,6 @@ public final class EvaCommandFeedClient
         {
             EvaFrameCodec.Encoded encoded = encodeJpeg(full);
             byte[] png = encoded.bytes();
-            if(Boolean.getBoolean("projectseele.feedReviewR06")) { REVIEW_ENCODED.incrementAndGet();REVIEW_MAX_BYTES.accumulateAndGet(png.length,Math::max); }
             compressionHint=encoded.quality();
             if (png.length <= ServerboundEvaVideoFramePacket.MAX_FRAME_BYTES)
             {
@@ -596,7 +590,6 @@ public final class EvaCommandFeedClient
             texture.upload();
             texture.setFilter(true, false);
             LAST_FRAME_NANOS[variant] = System.nanoTime();
-            if(Boolean.getBoolean("projectseele.feedReviewR06"))REVIEW_UPLOADED.incrementAndGet();
         }
         catch (RuntimeException exception)
         {
@@ -609,22 +602,7 @@ public final class EvaCommandFeedClient
         }
     }
 
-    /** True only while this client owns a recently decoded command-room frame. */
-    public static long[] reviewCounts()
-    {
-        return new long[]{REVIEW_CAPTURED.get(),REVIEW_ENCODED.get(),REVIEW_UPLOADED.get(),REVIEW_MAX_BYTES.get()};
-    }
 
-    public static void saveReviewFeed(int variant,java.nio.file.Path file)
-    {
-        if(!Boolean.getBoolean("projectseele.feedReviewR06")||TEXTURES[variant]==null)return;
-        var pixels=TEXTURES[variant].getPixels();if(pixels==null)return;
-        var copy=new NativeImage(pixels.getWidth(),pixels.getHeight(),false);copy.copyFrom(pixels);
-        Util.ioPool().execute(()->{
-            try(copy){java.nio.file.Files.createDirectories(file.getParent());copy.writeToFile(file);}
-            catch(IOException failure){ProjectSeele.LOGGER.warn("Saving feed review",failure);}
-        });
-    }
 
     public static boolean hasFreshFrame(int variant)
     {

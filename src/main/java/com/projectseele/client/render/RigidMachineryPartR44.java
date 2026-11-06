@@ -7,7 +7,6 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.blaze3d.systems.RenderSystem;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.OutlineBufferSource;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.world.phys.Vec3;
@@ -147,11 +146,10 @@ final class RigidMachineryPartR44
         return bounds.clone();
     }
 
-    private static final boolean CRANE_MESH_WITNESS=Boolean.getBoolean("projectseele.r44NativeCraneMeshWitness");
     void draw(PoseStack poses, MultiBufferSource buffers, int light)
     {
         if(RigidMachineryGpuR44.enabled()&&!(buffers instanceof OutlineBufferSource)
-                &&!ShaderShadowPassR44.active()&&!CRANE_MESH_WITNESS
+                &&!ShaderShadowPassR44.active()
                 &&outsideClipR60(bounds,RenderSystem.getProjectionMatrix(),RenderSystem.getModelViewMatrix(),poses.last().pose()))return;
         drawWithProofR52(poses,buffers,light);
     }

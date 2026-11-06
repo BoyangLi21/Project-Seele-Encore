@@ -33,11 +33,6 @@ public final class EvaCapturedLocomotionR44
     private static final EntityDataAccessor<Vector3f> DISPLACEMENT=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.VECTOR3);
     private static volatile boolean loaded;
     private static boolean lifecycleRegistered;
-    private static final boolean STATE_WITNESS=Boolean.getBoolean("projectseele.r44CapturedStateWitness");
-    private static final String STATE_WITNESS_PATH=System.getProperty("projectseele.r44CapturedStateWitnessPath","");
-    private static final Object STATE_WITNESS_LOCK=new Object();
-    private static int stateWitnessRows;
-    private static boolean stateWitnessFailed;
     private static final class LevelStates
     {
         final boolean client;
@@ -64,43 +59,15 @@ public final class EvaCapturedLocomotionR44
     {
         if(event.getLevel() instanceof Level level)
         {
-            RETIRED_LEVELS.put(level,true);var state=STATES.remove(level);int before=state==null?0:state.actors.size();
-            if(state!=null)state.actors.clear();stateLifecycleWitness("level_unload",level,null,null,before,0);
+            RETIRED_LEVELS.put(level,true);var state=STATES.remove(level);
+            if(state!=null)state.actors.clear();
         }
     }
     private static void onEntityLeave(net.minecraftforge.event.entity.EntityLeaveLevelEvent event)
     {
         if(event.getEntity() instanceof EvaUnit01Entity actor)
         {
-            var state=STATES.get(actor.level());if(state==null)return;var removed=state.actors.remove(actor);
-            if(removed!=null)synchronized(removed){stateLifecycleWitness("actor_leave",actor.level(),actor,removed,-1,state.actors.size());}
-        }
-    }
-    private static void stateLifecycleWitness(String kind,Level level,EvaUnit01Entity actor,State state,int before,int after)
-    {
-        if(!STATE_WITNESS||STATE_WITNESS_PATH.isEmpty())return;
-        synchronized(STATE_WITNESS_LOCK)
-        {
-            if(stateWitnessFailed||stateWitnessRows>=256)return;
-            try
-            {
-                Path path=Path.of(STATE_WITNESS_PATH);if(!path.isAbsolute())throw new IllegalArgumentException("Captured state witness path must be absolute");
-                if(stateWitnessRows==0){Files.createDirectories(path.getParent());Files.createFile(path);}
-                JsonObject row=new JsonObject();row.addProperty("kind",kind);row.addProperty("logical_client",level.isClientSide);
-                row.addProperty("level_identity",System.identityHashCode(level));row.addProperty("dimension",level.dimension().location().toString());
-                row.addProperty("world_tick",level.getGameTime());row.addProperty("thread",Thread.currentThread().getName());
-                row.addProperty("tracked_actors_before",before);row.addProperty("tracked_actors_after",after);
-                if(actor!=null){row.addProperty("actor_uuid",actor.getUUID().toString());row.addProperty("network_id",actor.getId());row.addProperty("actor_identity",System.identityHashCode(actor));}
-                if(state!=null)
-                {
-                    row.addProperty("state_identity",System.identityHashCode(state));row.addProperty("clip",state.clip);
-                    if(Double.isFinite(state.last))row.addProperty("last_sample_time",state.last);
-                    else row.addProperty("last_sample_available",false);
-                    row.addProperty("anchors",state.plants.size());
-                }
-                Files.writeString(path,row.toString()+"\n",java.nio.charset.StandardCharsets.UTF_8,StandardOpenOption.APPEND);stateWitnessRows++;
-            }
-            catch(Exception failure){stateWitnessFailed=true;ProjectSeele.LOGGER.error("Explicit captured state witness failed",failure);}
+            var state=STATES.get(actor.level());if(state==null)return;state.actors.remove(actor);
         }
     }
     public static void define(SynchedEntityData data)
@@ -335,7 +302,7 @@ public final class EvaCapturedLocomotionR44
         float phase=phase(e,name,clip,elapsed,partial),frame=phase*(clip.patches().length-1);int first=(int)frame,last=Math.min(first+1,clip.patches().length-1);
         double time=e.level().getGameTime()+partial;LevelStates levelState=STATES.computeIfAbsent(e.level(),level->new LevelStates(level.isClientSide));
         State state=levelState.actors.computeIfAbsent(e,key->
-        {State created=new State();stateLifecycleWitness("state_create",key.level(),key,created,levelState.actors.size(),levelState.actors.size()+1);return created;});
+        new State());
         synchronized(state)
         {
         if(!name.equals(state.clip)||time<state.last||time-state.last>20)state.plants.clear();state.clip=name;state.last=time;

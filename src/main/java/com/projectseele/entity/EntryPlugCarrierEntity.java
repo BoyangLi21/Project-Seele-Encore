@@ -6,7 +6,6 @@ import com.projectseele.world.EntryPlugDirector;
 import com.projectseele.world.EntryPlugKinematics;
 import com.projectseele.world.EvaHangarBuilder;
 import com.projectseele.world.FacilityV2EvaRuntime;
-import com.projectseele.world.IntegratedNervMapBuilder;
 import com.projectseele.world.RigidTransform;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.Direction;

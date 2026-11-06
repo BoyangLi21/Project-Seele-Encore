@@ -2,7 +2,6 @@ package com.projectseele.event;
 
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.*;
-import com.projectseele.fx.CrossExplosionFX;
 import com.projectseele.registry.ModSounds;
 import com.projectseele.world.EvaPilotResolver;
 import com.projectseele.world.FirstBattleSavedData;

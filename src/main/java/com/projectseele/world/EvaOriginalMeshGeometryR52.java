@@ -262,7 +262,7 @@ public final class EvaOriginalMeshGeometryR52
         private record Rotation(float x,float y,float z,float w)
         {static Rotation of(Quaternionf q){return new Rotation(q.x,q.y,q.z,q.w);}}
         private record BodyChannels(String parent,float px,float py,float pz,Rotation rotation,float x,float y,float z){}
-        private record EvaluatedPose(Map<String,BodyChannels> body,Map<String,Rotation> hands,boolean liner,boolean dominantReview){}
+        private record EvaluatedPose(Map<String,BodyChannels> body,Map<String,Rotation> hands,boolean liner){}
         private record Evaluated(EvaluatedPose pose,Geometry geometry){}
         private final Map<Integer,Evaluated> evaluated=new HashMap<>();
         private static EvaluatedPose evaluationPose(EvaBodyPose.Sample body,EvaAnatomicalHandsR45.Pose hands,boolean liner)
@@ -274,7 +274,7 @@ public final class EvaOriginalMeshGeometryR52
                 bones.put(entry.getKey(),new BodyChannels(bone.parent(),p.x,p.y,p.z,Rotation.of(body.rotations.get(entry.getKey())),offset.x,offset.y,offset.z));
             }
             var fingers=new HashMap<String,Rotation>();hands.rotations().forEach((name,q)->fingers.put(name,Rotation.of(q)));
-            return new EvaluatedPose(Map.copyOf(bones),Map.copyOf(fingers),liner,Boolean.getBoolean("projectseele.r44DominantSkinReview"));
+            return new EvaluatedPose(Map.copyOf(bones),Map.copyOf(fingers),liner);
         }
         private Provider(Map<Integer,Rig> rigs,String fingerprint){this.rigs=rigs;this.fingerprint=fingerprint;}
         public String sourceFingerprint(){return fingerprint;}
@@ -447,10 +447,9 @@ public final class EvaOriginalMeshGeometryR52
         {
             require(models.containsKey(entry.getKey()),"Actual authored palette bone absent");var model=new Matrix4f(models.get(entry.getKey()));var bind=skin.inverseBind().get(entry.getKey());if(bind!=null)model.mul(bind);var global=model.getUnnormalizedRotation(new Quaternionf()).normalize();if(global.w<0)global.mul(-1);var relative=new Matrix4f(inverse).mul(model);var q=relative.getUnnormalizedRotation(new Quaternionf()).normalize();if(q.dot(new Quaternionf(inverseRotation).mul(global))<0)q.mul(-1);var d=new Quaternionf(relative.m30(),relative.m31(),relative.m32(),0).mul(q).mul(.5F);stable[slot]=names.indexOf(entry.getKey());transforms[slot]=new float[]{q.x,q.y,q.z,q.w,d.x,d.y,d.z,d.w};weights[slot++]=entry.getValue();
         }
-        boolean dominantReview=Boolean.getBoolean("projectseele.r44DominantSkinReview");
         var out=skin.rest().clone();for(int n=0;n<skin.rest().length/8;n++)
         {
-            int dominant=0;for(int j=1;j<count;j++)if(weights[j][n]>weights[dominant][n]||dominantReview&&weights[j][n]==weights[dominant][n]&&weights[j][n]>0&&stable[j]<stable[dominant])dominant=j;
+            int dominant=0;for(int j=1;j<count;j++)if(weights[j][n]>weights[dominant][n])dominant=j;
             var reference=transforms[dominant];var blend=new float[8];for(int j=0;j<count;j++){float w=weights[j][n];if(w==0)continue;var t=transforms[j];if(t[0]*reference[0]+t[1]*reference[1]+t[2]*reference[2]+t[3]*reference[3]<0)w=-w;for(int k=0;k<8;k++)blend[k]+=t[k]*w;}deform(p,skin.rest(),out,n,blend);
         }
         if(skin.corrective()!=null)

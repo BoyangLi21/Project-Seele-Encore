@@ -21,7 +21,7 @@ public final class EvaSwordActionsR45
     private static final class Runtime
     {
         final EvaContactHitsR45 hits=new EvaContactHitsR45();
-        int sequence,elapsed,nextStage,queued=-1,traceRows;boolean soundPlayed,swingPlayed;long lastStep=Long.MIN_VALUE,inputAt;
+        int sequence,elapsed,nextStage,queued=-1;boolean soundPlayed,swingPlayed;long lastStep=Long.MIN_VALUE,inputAt;
         EvaAnatomicalHandsR45.SwordBladeR45 previous;Vec3 root;
     }
     public static boolean active(EvaUnit01Entity e){return !EvaWeaponHandlingR45.swordActionR45(e).isEmpty();}
@@ -161,7 +161,6 @@ public final class EvaSwordActionsR45
             int sequence=state.getInt("sequence");var admission=runtime.hits.admit(sequence,target.getUUID());
             if(!admission.allowsDamage())continue;
             boolean accepted=false,absorbed=false;float beforeField=field(target);long started=runtime.hits.startedAt();
-            int invulnerableBefore=target.invulnerableTime;float healthBefore=target instanceof LivingEntity living?living.getHealth():Float.NaN;
             Vec3 direction=target.position().subtract(e.position()).multiply(1,0,1).normalize();
             try
             {
@@ -174,10 +173,6 @@ public final class EvaSwordActionsR45
                 try{absorbed=EvaContactHitsR45.settledContactR46(false,beforeField,field(target));}
                 finally{runtime.hits.finishAttempt(sequence,started,target.getUUID(),accepted||absorbed);}
             }
-            if(Boolean.getBoolean("projectseele.r45ContactTrace")&&runtime.traceRows++<4096)
-                ProjectSeele.LOGGER.info("R45 SWORD CONTACT eva={} pilot={} clip={} sequence={} target={} damage={} accepted={} field_consumed={} blade_before={} blade_after={} contact={} invulnerable_before={} invulnerable_after={} health_before={} health_after={} field_before={} field_after={}",
-                        e.getUUID(),pilot.getUUID(),state.getString("clip"),sequence,target.getUUID(),damage,accepted,absorbed,before,after,p,
-                        invulnerableBefore,target.invulnerableTime,healthBefore,target instanceof LivingEntity living?living.getHealth():Float.NaN,beforeField,field(target));
             if((accepted||absorbed)&&!runtime.soundPlayed){runtime.soundPlayed=true;e.swordContactSoundR45(p);}
             if(accepted&&target instanceof LivingEntity living)
                 living.knockback(state.getBoolean("heavy")?2:1.1,e.getX()-target.getX(),e.getZ()-target.getZ());
