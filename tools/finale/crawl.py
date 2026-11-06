@@ -28,6 +28,7 @@ BONES = ['torso_lower', 'torso_upper', 'neck', 'head', 'clavicle_l', 'clavicle_r
          'leg_r', 'shin_r', 'ankle_r', 'foot_r']
 PELVIS_PITCH, CHEST_PITCH, HEAD_LEAN = 86.0, 76.0, 6.0
 PELVIS_SWING, CHEST_SWING = 9.0, 14.0     # yaw, against each other
+CHEST_LEAD = 0.0                          # degrees the left shoulder is held forward
 PELVIS_ROLL, CHEST_ROLL = 8.0, 15.0       # about the spine
 HIP_Y, HIP_Z = 6.8, 7.4
 SURGE, HEAVE = 1.8, .8                    # two lunges a cycle: blocks forward, blocks up
@@ -38,7 +39,11 @@ TOE_PITCH = -128.0
 
 ARMED = len(sys.argv) > 3 and sys.argv[3] == 'armed'
 if ARMED:
-    PELVIS_SWING, CHEST_SWING, PELVIS_ROLL, CHEST_ROLL = 6.0, 9.0, 6.0, 9.0
+    # The left hand is on the fore-end, far ahead: the arm is nearly straight, and with
+    # a straight arm the elbow cannot come down.  A rifleman lies turned onto the gun,
+    # left shoulder forward, and the chest stays near that as the body crawls.
+    PELVIS_SWING, CHEST_SWING, PELVIS_ROLL, CHEST_ROLL = 6.0, 5.0, 6.0, 6.0
+    CHEST_LEAD = 8.0
     SURGE, HEAVE, HIP_Y, CHEST_PITCH = 1.2, .4, 7.2, 78.0
 
 
@@ -88,7 +93,7 @@ def main():
         cycle = math.cos(2 * math.pi * u)          # +1: right arm reaching, left knee drawn
         lunge = math.sin(4 * math.pi * u + .6)
         pelvis = spine(-PELVIS_SWING * cycle, PELVIS_PITCH, PELVIS_ROLL * cycle)
-        chest = spine(CHEST_SWING * cycle, CHEST_PITCH - 3 * lunge, -CHEST_ROLL * cycle)
+        chest = spine(CHEST_SWING * cycle - CHEST_LEAD, CHEST_PITCH - 3 * lunge, -CHEST_ROLL * cycle)
         head = B.body_q(0, HEAD_LEAN, 0, 2 * cycle)
         neck = R.qslerp(chest, head, .5)
         root_q = B.mat_rot(raw['root'])
