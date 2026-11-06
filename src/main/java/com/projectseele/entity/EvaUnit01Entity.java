@@ -1458,6 +1458,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
     private void updateRiflePoseSignals()
     {
+        EvaStrideHeadingR59.tick(this);
         rifleCrouchPrevious=this.entityData.get(DATA_RIFLE_CROUCH);riflePronePrevious=this.entityData.get(DATA_RIFLE_PRONE);
         rifleReadyPrevious=this.entityData.get(DATA_RIFLE_READY);rifleRecoilPrevious=this.entityData.get(DATA_RIFLE_RECOIL);
         if(!this.level().isClientSide)
@@ -1500,7 +1501,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 // Distance-driven phase over the pack's measured stride keeps
                 // planted feet fixed to the ground at every speed.
                 double stride=com.projectseele.anim.EvaAnimator.strideWorld(this,run,EvaSprintR50.blend(this,1));
-                double sign=dx*this.getForward().x+dz*this.getForward().z<0?-1:1;
+                double sign=EvaStrideHeadingR59.backward(this,dx,dz)?-1:1;
                 float phase=this.entityData.get(DATA_RIFLE_GAIT)+(float)(sign*distance/stride);phase-=Mth.floor(phase);this.entityData.set(DATA_RIFLE_GAIT,phase);
             }
             else if(moving)
@@ -1519,7 +1520,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                         EvaBodyPose.locomotionRuntimeStrideR44(this,"dash_run",standingStride));
                 double stride=stance<=1?Mth.lerp(stance,standingStride,15D):Mth.lerp((stance-1)/2,15D,12D);
                 stride=EvaCombatSupportR33.stride(this,dx,dz,(float)stride);
-                double sign=EvaCombatSupportR33.gaitWeight(this,1)>.5F?1:dx*this.getForward().x+dz*this.getForward().z<0?-1:1;
+                double sign=EvaCombatSupportR33.gaitWeight(this,1)>.5F?1:EvaStrideHeadingR59.backward(this,dx,dz)?-1:1;
                 float phase=this.entityData.get(DATA_RIFLE_GAIT)+(float)(sign*distance/stride);phase-=Mth.floor(phase);this.entityData.set(DATA_RIFLE_GAIT,phase);
                 }
             }

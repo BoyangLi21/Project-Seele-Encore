@@ -18,7 +18,9 @@ public final class EvaProneLegSupportR52
     public static void apply(EvaUnit01Entity e,EvaBodyPose.Sample pose,float partial)
     {
         if(!eligible(e,partial))return;
-        apply(e.getUnitVariant(),pose,e.rifleStanceLevel(partial),EvaTerrainSupport.sample(e));
+        // The armed stance is authored clear of the ground: nothing to turn away from it.
+        boolean authored=e.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||e.fixedCannonOperatingR52();
+        apply(e.getUnitVariant(),pose,e.rifleStanceLevel(partial),EvaTerrainSupport.sample(e),!authored);
     }
 
     static boolean eligible(EvaUnit01Entity e,float partial)
@@ -33,6 +35,11 @@ public final class EvaProneLegSupportR52
      * target while the live actor remains held by its mechanical owner. */
     public static void apply(int variant,EvaBodyPose.Sample pose,float stance,Vector3f terrain)
     {
+        apply(variant,pose,stance,terrain,true);
+    }
+
+    private static void apply(int variant,EvaBodyPose.Sample pose,float stance,Vector3f terrain,boolean anticipate)
+    {
         // Standing/crouching are 0/1. Every value above 1 belongs to the
         // existing continuous transition to or from the prone endpoint at 3.
         if(variant<0||variant>2||stance<=1)return;
@@ -42,7 +49,7 @@ public final class EvaProneLegSupportR52
         // clock, instead of jumping to that interval on its first frame. The
         // anticipation disappears before the final prone pose, which retains
         // its smallest exact full-surface support angle.
-        float anticipation=(float)Math.toRadians(50)*EvaPoseBlendR51.smooth((stance-1)/.8F)
+        float anticipation=!anticipate?0:(float)Math.toRadians(50)*EvaPoseBlendR51.smooth((stance-1)/.8F)
                 *(1-EvaPoseBlendR51.smooth((stance-2)/.6F));
         var normal=new Quaternionf().rotationX(terrain.x).rotateZ(terrain.y).transform(new Vector3f(0,1,0));
         float plane=normal.y*terrain.z/EvaScale.RENDER_SCALE;

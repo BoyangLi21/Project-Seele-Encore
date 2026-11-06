@@ -13,8 +13,9 @@ public final class EvaStanceTimingR53
         float remaining=target-phase;
         if(Math.abs(remaining)<.00001F&&Math.abs(velocity)<=ACCELERATION)return new Step(target,0);
         // The standing/crouching capture concentrates its knee bend in less
-        // than half a phase. Limit its playback rate before the bend starts.
-        float limit=.035F+.045F*smooth((phase-1.15F)/.6F);
+        // than half a phase, and from kneeling the front leg sweeps back as
+        // far as phase 1.9. Only the lowering of the hips after it may hurry.
+        float limit=.035F+.035F*smooth((phase-1.9F)/.5F);
         if(remaining<0&&phase>1.15F)
             limit=Math.min(limit,(float)Math.sqrt(.035F*.035F+2*ACCELERATION*(phase-1.15F)));
         // The phase advances in server ticks. A continuous v^2/(2a) stop

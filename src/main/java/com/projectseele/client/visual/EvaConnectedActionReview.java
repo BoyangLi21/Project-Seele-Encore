@@ -48,6 +48,8 @@ public final class EvaConnectedActionReview
     private static final boolean WEAPONS=Boolean.getBoolean("projectseele.tourWeaponsR57");
     /** Effects check: a positron shot, a scripted Ramiel (-Dprojectseele.ramielReviewR58) firing on Unit-00's shield, then the Sachiel finale. */
     private static final boolean FX=Boolean.getBoolean("projectseele.tourFxR58");
+    /** Movement check: turning on the spot, walking backward and sideways, curving, and hard turns at a run. */
+    private static final boolean MOVES=Boolean.getBoolean("projectseele.tourMovesR59");
     private static Vec3 camPos, camAim, fxRamiel, fxFront, fxOrigin;
     private static EvaUnit01Entity fxUnit00;
     /** Record every drawn frame, not the first of each tick: offline renders then show the frames the game drew. */
@@ -223,6 +225,7 @@ public final class EvaConnectedActionReview
     private static void tour(Minecraft mc,EvaUnit01Entity eva)
     {
         if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
+        if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<140||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -280,6 +283,23 @@ public final class EvaConnectedActionReview
         if(tourAt(1150)||tourAt(1165)||tourAt(1180)||tourAt(1370)||tourAt(1385)||tourAt(1400))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(tourAt(1220)||tourAt(1430))send(ServerboundEvaControlPacket.ACTION_SMASH);
         positionCamera(mc,eva);
+    }
+
+    private static void movesR59(Minecraft mc)
+    {
+        int t=tick;
+        boolean sprint=t>=400&&t<500;
+        boolean up=t>=320&&t<380||sprint,down=t>=130&&t<175,left=t>=195&&t<240,right=t>=255&&t<300;
+        float forward=(up?1:0)-(down?1:0),side=(left?1:0)-(right?1:0);
+        mc.options.keyUp.setDown(up);mc.options.keyDown.setDown(down);mc.options.keyLeft.setDown(left);mc.options.keyRight.setDown(right);
+        mc.player.input.up=up;mc.player.input.down=down;mc.player.input.left=left;mc.player.input.right=right;
+        mc.player.input.forwardImpulse=forward;mc.player.input.leftImpulse=side;mc.player.zza=forward;mc.player.xxa=side;
+        mc.options.keySprint.setDown(sprint);
+        if(at(400))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(500))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        // A slow quarter turn on the spot and a fast one back; a steady curve; a right angle and a reversal at a run.
+        float yaw=t<30?0:t<70?(t-30)*2.25F:t<90?90:t<100?90-(t-90)*9:t<320?0:t<380?(t-320)*3:t<430?180:t<460?270:90;
+        mc.player.setYRot(yaw);mc.player.setXRot(0);
     }
 
     private static void weaponsR57(Minecraft mc,int w)

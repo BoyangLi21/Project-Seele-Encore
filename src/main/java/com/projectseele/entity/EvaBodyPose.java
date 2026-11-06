@@ -163,11 +163,46 @@ public final class EvaBodyPose
                         combatClips.put(variant,Map.copyOf(merged));
                     }
                 }
+                if(variant<=2)overlayArmedLegsR59(combatClips,variant);
             }
             data=new Data(names,index,Map.copyOf(clips),Map.copyOf(rigs),Map.copyOf(support),object(all,"prone"),object(all,"grip"),object(all,"rifle_mocap"),Map.copyOf(eyes),Map.copyOf(rigSupport),Map.copyOf(carrierHulls),Map.copyOf(combatClips),object(all,"locomotion_contract_r43"));
             ProjectSeele.LOGGER.info("EVA shared body/socket pose loaded: private={} clips={} bones={} gameplayProfiles={}",Files.isRegularFile(path),clips.size(),names.length,combatClips.values().stream().filter(c->c.containsKey("r32_jab")).count());
         }
         catch(Exception failure){throw new IllegalStateException("Shared EVA body pose could not load",failure);}
+    }
+    /**
+     * The armed kneel-to-prone keeps its captured upper body and takes its pelvis
+     * height and legs from tools/finale/rifle_stance.py: the captured front foot
+     * folded up through the far thigh and the rear leg hung in the air.
+     */
+    private static void overlayArmedLegsR59(Map<Integer,Map<String,Clip>> combatClips,int variant) throws java.io.IOException
+    {
+        var clips=new HashMap<>(combatClips.getOrDefault(variant,Map.of()));
+        var clip=clips.get("rifle_stance");
+        if(clip==null)return;
+        try(var stream=EvaBodyPose.class.getResourceAsStream("/assets/projectseele/motion/eva_rifle_legs_r59.json"))
+        {
+            if(stream==null)return;
+            var overlay=JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+            var names=Arrays.asList(clip.names());var bones=overlay.getAsJsonArray("bones");
+            int first=overlay.get("first_frame").getAsInt(),root=names.indexOf("root");
+            var rotations=clip.rotations().clone();var positions=clip.positions().clone();var frames=overlay.getAsJsonArray("frames");
+            for(int f=0;f<frames.size();f++)
+            {
+                var frame=frames.get(f).getAsJsonObject();var quaternions=frame.getAsJsonArray("rotation_wxyz");var offsets=frame.getAsJsonObject("bone_position_xyz");
+                var q=rotations[first+f].clone();var p=positions[first+f].clone();
+                p[root]=vector(frame.get("root_m")).mul(112).mul(-1,1,1).div(16);
+                for(int b=0;b<bones.size();b++)
+                {
+                    String bone=bones.get(b).getAsString();int at=names.indexOf(bone);var value=quaternions.get(b).getAsJsonArray();
+                    q[at]=new Quaternionf(-value.get(1).getAsFloat(),-value.get(2).getAsFloat(),value.get(3).getAsFloat(),value.get(0).getAsFloat()).normalize();
+                    p[at]=offsets.has(bone)?vector(offsets.get(bone)).mul(-1,1,1).div(16):new Vector3f();
+                }
+                rotations[first+f]=q;positions[first+f]=p;
+            }
+            clips.put("rifle_stance",new Clip(clip.duration(),clip.names(),rotations,positions));
+            combatClips.put(variant,Map.copyOf(clips));
+        }
     }
     private static JsonObject object(JsonObject p,String n){return p.has(n)?p.getAsJsonObject(n):new JsonObject();}
     private static JsonObject locomotionContractR43(EvaUnit01Entity e,String clip)
@@ -738,6 +773,7 @@ public final class EvaBodyPose
             applyLocomotionContactGoalsR44(entity,body,partial);
             EvaCombatSupportR33.preventFreeFootPenetrationR44(entity,body,partial);
         }
+        EvaStrideHeadingR59.apply(entity,body,partial);
         supportProneFirearmChestR45(entity,body,partial);
         EvaCervicalKinematicsR25.apply(entity,body,partial);
         EvaOriginalHandsR45.apply(entity,body);

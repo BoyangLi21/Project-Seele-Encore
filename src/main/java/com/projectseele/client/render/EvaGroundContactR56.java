@@ -110,6 +110,27 @@ final class EvaGroundContactR56
         }
     }
 
+    /**
+     * The last word on the floor, after every layer that may turn a leg: a sole
+     * under the ground is raised by bending its own leg. Blends, follow-through
+     * and joint limits each moved a foot after it had been set down, and a
+     * kneeling foot sat two blocks under the road for half a second.
+     */
+    static void keepSolesUp(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root)
+    {
+        if(root==null||!applies(eva))return;
+        var hulls=hulls(eva);
+        if(hulls.isEmpty())return;
+        float ground=root.m31();
+        for(String side:new String[]{"l","r"})
+        {
+            double under=EvaFootPlacement.groundUnder(eva,side);
+            float floor=Double.isFinite(under)?(float)under:ground;
+            float depth=soleHeight(model,root,hulls,side)-floor;
+            if(depth<0)reachGround(model,root,side,depth);
+        }
+    }
+
     private record Grounding(float offset,float speed,long time) {}
     private static final Map<Integer,Grounding> PELVIS=new HashMap<>();
     /** Stiffness (1/s) of the walking grounding spring, and its largest lag behind the grounding offset (model pixels). */
@@ -154,7 +175,7 @@ final class EvaGroundContactR56
         EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(footWorld),knee.sub(hip),root,Math.min(1,Math.abs(drop)/.15F));
     }
 
-    private static boolean applies(EvaUnit01Entity eva)
+    static boolean applies(EvaUnit01Entity eva)
     {
         // A ledge climb hangs on its hands and the foot set on the top, not on
         // the ground below: lowered onto its dangling foot, the body sank five
