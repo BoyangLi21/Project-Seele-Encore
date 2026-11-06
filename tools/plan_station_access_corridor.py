@@ -98,10 +98,18 @@ def nearby_features(path,bounds):
     opener=gzip.open if str(path).endswith('.gz') else open
     with opener(path,'rt',encoding='utf8') as stream:data=json.load(stream)
     clip=box(*bounds);result=[]
-    for index,feature in enumerate(data['features']):
+    rows=data['features'] if isinstance(data,dict) else data
+    for index,feature in enumerate(rows):
         geometry=shape(feature['geometry'])
-        if geometry.intersects(clip):result.append(dict(index=index,**feature))
+        if geometry.intersects(clip):result.append({**feature,'index':index})
     return result
+
+
+def water_geometry(features,spec):
+    """Polygons as drawn; mapped centrelines and streams widened to a channel."""
+    layers=spec.get('water_layers',['WA','RvrCL'])
+    return unary_union([shape(f['geometry']) if f['properties']['source_layer']=='WA' else shape(f['geometry']).buffer(1)
+        for f in features if f['properties']['source_layer'] in layers])
 
 
 def finite_intervals(line,geometry):
@@ -124,7 +132,7 @@ def survey(config, out):
     future=nearby_features(spec['features'],scope.buffer(35).bounds)
     write(out/'route-context.geojson',dict(type='FeatureCollection',features=future))
     water=unary_union([shape(f['geometry']) for f in future if f['properties']['source_layer']=='WA'])
-    waterways=unary_union([shape(f['geometry']).buffer(1) for f in future if f['properties']['source_layer']=='RvrCL'])
+    waterways=water_geometry([f for f in future if f['properties']['source_layer']!='WA'],spec)
     existing_devices=[dict(pos=[int(t[k]) for k in ('x','y','z')],id=str(t['id'])) for t in source.devices]
     natural=SOIL|PLANTS|AIR
     cross_sections=[];foreign={};wet={};profile=[]
@@ -196,7 +204,7 @@ def render_design(spec,report,features,out):
         px,pz=pixel((row['pos'][0],row['pos'][2]));draw.rectangle((px-1,pz-1,px+1,pz+1),fill='#b22428')
     for i,p in enumerate([spec['street_anchor'][::2],spec['station_feet'][::2]]):
         a,b=pixel(p);draw.ellipse((a-6,b-6,a+6,b+6),fill='#243f2f');draw.text((a+8,b+3),('既有街口','站前入口')[i],font=small,fill='#20352a')
-    draw.text((25,15),'下曽我接街：真实源 + 拟建走廊（尚未施工）',font=font,fill='#20352a')
+    draw.text((25,15),spec['label']+'接街：真实源 + 拟建走廊（尚未施工）',font=font,fill='#20352a')
     draw.text((25,48),'金色=拟建道路；蓝色=GIS未来水系；浅灰=GIS参考建筑；红色=实测非自然构筑物冲突',font=small,fill='#303a38')
     draw.text((25,height-50),f"实测无水块 / 原街口脚 -77 → 站入口脚 -75 / 路线 {line.length:.1f} m / 不迁设备或建筑",font=small,fill='#303a38')
     im.save(out/'route-plan.png')
@@ -210,8 +218,7 @@ def longitudinal_design(config,out):
     points=np.asarray(survey['smoothed_points']);line=LineString(points)
     along=np.asarray([r['along'] for r in survey['profile']]);ground=np.asarray([r['ground_y'] for r in survey['profile']],float)
     features=read(out/'route-context.geojson')['features']
-    wet=unary_union([shape(f['geometry']) if f['properties']['source_layer']=='WA' else shape(f['geometry']).buffer(1)
-        for f in features if f['properties']['source_layer'] in ('WA','RvrCL')])
+    wet=water_geometry(features,spec)
     intervals=finite_intervals(line,wet.buffer(spec['clear_width']/2+1))
     raw=[]
     for row in intervals:
@@ -243,7 +250,7 @@ def longitudinal_design(config,out):
         depth=major.get('deck_depth',2) if main else 1
         required_feet=high_water+clearance+depth
         lower[use]=np.maximum(lower[use],required_feet);target[use]=np.maximum(target[use],required_feet)
-        crossings.append(dict(id='sakawa-fujimi-bridge' if main else 'future-water-crossing-'+str(i),along=[a,b],
+        crossings.append(dict(id=major['id'] if main else 'future-water-crossing-'+str(i),along=[a,b],
             role='main_river_clear_span' if main else 'future_drainage_opening',length=b-a,
             design_high_water_surface=high_water,design_bed_y=high_water-(3 if main else 2),
             minimum_clearance=clearance,deck_depth=depth,minimum_feet_y=required_feet,
@@ -285,17 +292,18 @@ def longitudinal_design(config,out):
             foundations.append(dict(along=station,xz=[x,z],ground_y=g,
                 bearing_checks=[dict(pos=[x,y,z],state=source.state(x,y,z)) for y in range(g-5,g-2)]))
         crossing['measured_bank_foundation_columns']=foundations
-    prior_profile=Path(spec['prior_water_profile'])
-    with np.load(prior_profile) as data:
-        bx,bz,bX,bZ=map(int,data['bounds']);mask=data['wet']
-        matches=[i for i,p in enumerate(points) if bx<=p[0]<=bX and bz<=p[1]<=bZ and mask[int(p[1])-bz,int(p[0])-bx]]
-    proof=dict(status='PROPOSED_SOURCE_MEASURED_PROFILE',errors=[],alignment_length=float(line.length),
+    prior_profile=spec.get('prior_water_profile');matches=[]
+    if prior_profile:
+        with np.load(prior_profile) as data:
+            bx,bz,bX,bZ=map(int,data['bounds']);mask=data['wet']
+            matches=[i for i,p in enumerate(points) if bx<=p[0]<=bX and bz<=p[1]<=bZ and mask[int(p[1])-bz,int(p[0])-bx]]
+    proof=dict(label=spec['label'],status='PROPOSED_SOURCE_MEASURED_PROFILE',errors=[],alignment_length=float(line.length),
         continuous_grade_max=float((abs(np.diff(feet))/np.diff(along)).max()),
         maximum_grade_change_per_m=float((abs(np.diff(np.diff(feet)/np.diff(along)))/(.5*(np.diff(along)[1:]+np.diff(along)[:-1]))).max()),
         endpoint_grades=[float((feet[1]-feet[0])/(along[1]-along[0])),float((feet[-1]-feet[-2])/(along[-1]-along[-2]))],
         feet_range=[float(feet.min()),float(feet.max())],
         source_ground_range=[float(ground.min()),float(ground.max())],horizontal_points=points.tolist(),along=along.tolist(),
-        feet=feet.tolist(),ground=ground.tolist(),crossings=crossings,prior_water_profile=str(prior_profile),
+        feet=feet.tolist(),ground=ground.tolist(),crossings=crossings,prior_water_profile=prior_profile,
         prior_water_profile_route_columns=len(matches),existing_water_level_reused=False,
         future_channel_levels_are_explicit_design_constraints=True,water_system_flow_acceptance_pending=True,
         fixed_street_feet=spec['street_anchor'],fixed_station_feet=spec['station_feet'],
@@ -319,12 +327,17 @@ def render_profile(proof,out):
         draw.line((*pt(a,level),*pt(a,level+crossing['minimum_clearance'])),fill='#3a8cba',width=2)
     draw.line([pt(s,y+1) for s,y in zip(proof['along'],proof['ground'])],fill='#8c987c',width=3)
     draw.line([pt(s,y) for s,y in zip(proof['along'],proof['feet'])],fill='#b27125',width=4)
-    draw.text((35,18),'下曽我接街纵断面：拟建脚位与真实地面（垂向放大）',font=font,fill='#243d32')
+    draw.text((35,18),proof.get('label','')+'接街纵断面：拟建脚位与真实地面（垂向放大）',font=font,fill='#243d32')
     draw.text((35,52),'橙=拟建路面脚位；绿=实测地面顶；蓝=未来水系设计高水面，当前没有实水',font=small,fill='#3b4c42')
     for s in range(0,math.ceil(proof['alignment_length']),100):
         x,_=pt(s,lo);draw.text((x-8,475),str(s)+' m',font=small,fill='#33483e')
     draw.text((35,515),f"连续坡度 ≤ {proof['continuous_grade_max']*100:.1f}% / 7m车道 + 2×2m人行 / {len(proof['crossings'])}处有限跨水接口 / 无河内墩",font=small,fill='#243d32')
     im.save(Path(out)/'longitudinal-profile.png')
+
+
+def level_crossing_band(spec,xx):
+    band=spec.get('level_crossing',{}).get('road_x')
+    return (xx>=band[0])&(xx<=band[1]) if band else np.zeros(xx.shape,bool)
 
 
 def bus_rectangle(center,tangent,length,width):
@@ -393,14 +406,15 @@ def civil_constraints(config,out):
             terminal_bodies.append(bus_rectangle(pos,tangent,bus['length'],bus['width']))
     terminal_road=unary_union([pad,unary_union(terminal_bodies).buffer(.5)])
     road=road.union(terminal_road)
-    pedestrian_left=fore['pedestrian_entry_x']-fore['pedestrian_width']//2
-    pedestrian=box(pedestrian_left,fore['pedestrian_z'][0],
-                   pedestrian_left+fore['pedestrian_width'],fore['pedestrian_z'][1]+1)
+    if 'pedestrian_route_xz' in spec:
+        pedestrian=LineString(spec['pedestrian_route_xz']).buffer(fore['pedestrian_width']/2,cap_style=2,join_style=2)
+    else:
+        pedestrian_left=fore['pedestrian_entry_x']-fore['pedestrian_width']//2
+        pedestrian=box(pedestrian_left,fore['pedestrian_z'][0],
+                       pedestrian_left+fore['pedestrian_width'],fore['pedestrian_z'][1]+1)
     walk=road.buffer(spec['sidewalk_width']).union(pedestrian)
     features=read(out/'route-context.geojson')['features']
-    water=unary_union([shape(f['geometry']) if f['properties']['source_layer']=='WA' else shape(f['geometry']).buffer(1)
-        for f in features if f['properties']['source_layer'] in ('WA','RvrCL')])
-    future_no_pier=water.buffer(2)
+    future_no_pier=water_geometry(features,spec).buffer(2)
     foundations=[];unresolved=[]
     def try_support(station):
         j=int(np.argmin(abs(along-station)));p=points[j]
@@ -623,6 +637,9 @@ def author(config, design, out):
     # Every elevated sidewalk edge has a separate beam/parapet outside the
     # clear pedestrian cells. No fence consumes the two-metre footway.
     guard=binary_dilation(span,structure=np.array([[0,1,0],[1,1,1],[0,1,0]]))&~walk
+    # A level crossing keeps its whole width open for the future train body.
+    crossing_band=level_crossing_band(spec,xx)
+    guard&=~crossing_band
     trusses=spec['truss_crossings'];plate=np.zeros(walk.shape,bool)
     for crossing in civil['hydraulic_crossings']:
         stations=crossing['accepted_support_stations']
@@ -664,7 +681,7 @@ def author(config, design, out):
     # A pair of bollards separates the fixed station pedestrian link from
     # the bus apron; the whole three-column portal remains open.
     portal=spec['station_pedestrian_interface'];link_mid=(portal['x'][0]+portal['x'][1])//2
-    for x in (link_mid-2,link_mid+2):
+    for x in (link_mid-2,link_mid+2) if 'pedestrian_z' in spec['forecourt'] else ():
         z=spec['forecourt']['pedestrian_z'][1];y=math.floor(spec['station_feet'][1])
         if not walk[index(x,z)]:
             put(x,y-1,z,'minecraft:stone_bricks','pedestrian portal footing')
@@ -822,6 +839,11 @@ def verify(config,out):
     pedestrian_reach=(foot_labels==entry_label)&footway if entry_label else np.zeros(walk.shape,bool)
     nearstreet=(xx-spec['street_anchor'][0])**2+(zz-spec['street_anchor'][2])**2<=100
     if not np.any(pedestrian_reach&nearstreet):errors.append('Station pedestrian link has no continuous footway to original street')
+    band=level_crossing_band(spec,xx);train_body=[]
+    for iz,ix in np.argwhere(band&walk):
+        px,pz,py=x+int(ix),z+int(iz),int(floor[iz,ix])
+        train_body+=[[px,y,pz]for y in range(py+1,py+6)if solid(e.state(px,y,pz))]
+    if train_body:errors.append(['Solid above a level crossing surface',train_body[:10]])
     # Exact future open-water envelope: existing soil awaits Stage3 excavation;
     # no newly introduced solid may occupy the reserved water/air cross-section.
     points=np.asarray(profile['horizontal_points']);along=np.asarray(profile['along']);tree=cKDTree(points)
