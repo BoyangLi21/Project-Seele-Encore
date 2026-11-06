@@ -954,9 +954,9 @@ public final class EvaMotionEngineV2
     private static double liveActionHalfLife(boolean kick,
                                              RuntimeState runtime)
     {
-        if (runtime.liveTransitionAge < 0.14D)
+        if (runtime.liveTransitionAge < (kick ? 0.22D : 0.14D))
         {
-            return 0.060D;
+            return kick ? 0.085D : 0.060D;
         }
         return kick ? 0.030D : 0.025D;
     }
