@@ -54,6 +54,8 @@ public final class EvaConnectedActionReview
     /** Starts the sprint this many ticks sooner: the review ground ends in a wall. */
     private static final int DASH_LEAD=Integer.getInteger("projectseele.tourDashLead",0);
     private static final String DASH_WEAPON=System.getProperty("projectseele.tourDashWeapon");
+    /** The unit the tour pilots: unit00, unit01 or unit02. */
+    private static final String UNIT=System.getProperty("projectseele.tourUnit","unit01");
     private static Vec3 camPos, camAim, fxRamiel, fxFront, fxOrigin;
     private static EvaUnit01Entity fxUnit00;
     /** Record every drawn frame, not the first of each tick: offline renders then show the frames the game drew. */
@@ -98,9 +100,9 @@ public final class EvaConnectedActionReview
         if (wait == 100)
         {
             mc.player.connection.sendCommand("seele motionlab reset");
-            mc.player.connection.sendCommand("seele motionlab demo unit01 stop");
-            mc.player.connection.sendCommand("seele motionlab enter unit01");
-            mc.player.connection.sendCommand("seele motionlab weapon unit01 " + (RIFLE ? "rifle" : "fists"));
+            mc.player.connection.sendCommand("seele motionlab demo " + UNIT + " stop");
+            mc.player.connection.sendCommand("seele motionlab enter " + UNIT);
+            mc.player.connection.sendCommand("seele motionlab weapon " + UNIT + " " + (RIFLE ? "rifle" : "fists"));
             return;
         }
         EvaUnit01Entity eva = EvaPilotResolver.controlTarget(mc.player);
@@ -241,7 +243,7 @@ public final class EvaConnectedActionReview
         mc.player.setYRot(TOUR_START==0&&t>=610&&t<1085?180:0);mc.player.setXRot(0);
         // The ledge check walks onto the step, as a pilot usually does.
         if(tourAt(70-DASH_LEAD)&&!CLIMB)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
-        if(tourAt(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand("seele motionlab weapon unit01 "+DASH_WEAPON);
+        if(tourAt(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand("seele motionlab weapon "+UNIT+" "+DASH_WEAPON);
         // Optional checks: a full sprint over the run, and kerbs on the walk.
         // The client re-syncs held sprint and dash to the real keys, so hold them.
         int sprintEnd=DASH?DASH_END:110;
@@ -294,6 +296,7 @@ public final class EvaConnectedActionReview
     private static void movesR59(Minecraft mc)
     {
         int t=tick;
+        if(at(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand("seele motionlab weapon "+UNIT+" "+DASH_WEAPON);
         boolean sprint=t>=400&&t<500;
         boolean up=t>=320&&t<380||sprint,down=t>=130&&t<175,left=t>=195&&t<240,right=t>=255&&t<300;
         float forward=(up?1:0)-(down?1:0),side=(left?1:0)-(right?1:0);
