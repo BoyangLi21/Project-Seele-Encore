@@ -41,7 +41,11 @@ public final class EvaSprintR50
     }
     /** Full sprint speed over the ordinary sprint (Left Alt): the TV 12 dash covers ground at three times the run. */
     private static final float GAIN=3F;
-    /** Travel per gait cycle at full sprint (blocks), the stride tools/finale/dash_stride.py authors. */
+    /**
+     * Travel per gait cycle at full sprint (blocks). This keeps the captured
+     * sprint at about its own cadence; its full stride is far longer, and the
+     * feet slide rather than the stride being warped.
+     */
     static final double STRIDE_BLOCKS=64D;
     public static float speed(EvaUnit01Entity e){return 1+(GAIN-1)*blend(e,1);}
     private EvaSprintR50(){}

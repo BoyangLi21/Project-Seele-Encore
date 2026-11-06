@@ -4,7 +4,7 @@ package com.projectseele.entity;
 public final class EvaStanceTimingR53
 {
     public record Step(float phase,float velocity) {}
-    private static final float ACCELERATION=.006F;
+    private static final float ACCELERATION=.006F,LOW_RATE=.05F;
 
     public static Step advance(float phase,float target,float velocity)
     {
@@ -15,9 +15,7 @@ public final class EvaStanceTimingR53
         // The standing/crouching capture concentrates its knee bend in less
         // than half a phase, and from kneeling the front leg sweeps back as
         // far as phase 1.9. Only the lowering of the hips after it may hurry.
-        float limit=.035F+.035F*smooth((phase-1.9F)/.5F);
-        if(remaining<0&&phase>1.15F)
-            limit=Math.min(limit,(float)Math.sqrt(.035F*.035F+2*ACCELERATION*(phase-1.15F)));
+        float limit=LOW_RATE+.03F*smooth((phase-1.9F)/.5F);
         // The phase advances in server ticks. A continuous v^2/(2a) stop
         // distance omits the next discrete step and then snaps the final
         // velocity to zero. Account for every remaining braking step instead.
@@ -28,6 +26,8 @@ public final class EvaStanceTimingR53
         if(next*remaining>0&&Math.abs(next)>=Math.abs(remaining)&&Math.abs(velocity)<=ACCELERATION)
             return new Step(target,0);
         float result=Math.max(0,Math.min(3,phase+next));
+        // The last braking step lands on the target to within rounding: it must not cross it.
+        if(next*remaining>0&&Math.abs(next)>=Math.abs(remaining)&&Math.abs(next)<=ACCELERATION)result=target;
         return new Step(result,result==phase?0:next);
     }
     private static float brakingSpeed(float distance)

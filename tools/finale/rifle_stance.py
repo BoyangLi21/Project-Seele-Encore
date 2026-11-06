@@ -24,7 +24,7 @@ import scene as S
 
 FIRST, LAST = 60, 180       # clip frames of stance 1 and stance 3
 FRAMES_PER_STANCE = 60
-KNEE_REST, ANKLE_REST = 5.8, 3.6   # heights of a knee and ankle lying on the ground
+KNEE_REST, ANKLE_REST = 4.4, 3.4   # heights of a knee and ankle lying on the ground
 BONES = ['leg_l', 'shin_l', 'ankle_l', 'foot_l', 'leg_r', 'shin_r', 'ankle_r', 'foot_r']
 
 
@@ -55,8 +55,8 @@ def curve(keys, s):
 class Path:
     def __init__(self, raw):
         # Pelvis height above the ground.
-        self.hip_y = [(1.0, raw['hip'][0]), (1.3, raw['hip'][0] - .9), (1.7, 16.6), (2.0, 15.0),
-                      (2.4, 11.8), (2.75, 10.0), (3.0, 9.2)]
+        self.hip_y = [(1.0, raw['hip'][0]), (1.3, raw['hip'][0] - .9), (1.7, 16.6), (2.0, 14.6),
+                      (2.4, 10.6), (2.75, 8.2), (3.0, 7.2)]
         # Front foot: stays down, heel lifts, then drags back on its toes beside the rear leg.
         a, b = raw['ankle_l']
         self.ankle_l = [(1.0, a), (1.14, a + [0, .1, -.2]), (1.3, (6.0, 6.6, 7.6)), (1.5, (6.4, 7.2, 1.0)),
@@ -68,8 +68,9 @@ class Path:
         self.pitch_l = [(1.0, 0), (1.14, -6), (1.3, -38), (1.5, -72), (1.7, -108), (1.9, -122), (2.2, -132), (3.0, -132)]
         self.pitch_r = [(1.0, raw['pitch'][0]), (2.2, -132), (3.0, -132)]
         # Knee aim: forward over a raised thigh, swinging down under a thigh lying back.
-        self.pole_l = [(1.0, (.05, .25, 1)), (1.5, (.2, -.1, 1)), (1.9, (.3, -.9, .7)), (2.4, (.25, -1, .25)), (3.0, (.2, -1, .1))]
-        self.pole_r = [(1.0, (-.2, -.7, .7)), (2.0, (-.25, -1, .3)), (3.0, (-.2, -1, .1))]
+        # Lying, the knees turn out: on their armour they would hold the belly off the ground.
+        self.pole_l = [(1.0, (.05, .25, 1)), (1.5, (.2, -.1, 1)), (1.9, (.4, -.9, .7)), (2.4, (.9, -.8, .2)), (3.0, (1.0, -.55, .05))]
+        self.pole_r = [(1.0, (-.2, -.7, .7)), (1.9, (-.4, -.9, .6)), (2.4, (-.9, -.8, .2)), (3.0, (-1.0, -.55, .05))]
 
 
 def measure(actors, solver, clip, bones, world, f):
@@ -134,7 +135,7 @@ def main():
         limb = solver.limbs['leg_' + side]
         thigh, shin = np.linalg.norm(limb.a) * S.SCALE, np.linalg.norm(limb.b) * S.SCALE
         sign = 1 if side == 'l' else -1
-        kx, ax = sign * 7.0, sign * 7.4
+        kx, ax = sign * 9.5, sign * 10.5
         kz = hip[2] - math.sqrt(max(0.0, thigh**2 - (hip[1] - KNEE_REST)**2 - (hip[0] - kx)**2))
         return np.array([ax, ANKLE_REST, kz - math.sqrt(max(0.0, shin**2 - (KNEE_REST - ANKLE_REST)**2 - (ax - kx)**2))])
 

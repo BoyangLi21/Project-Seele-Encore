@@ -15,7 +15,7 @@ public final class EvaStanceTimingR53Test
                     throw new AssertionError("Overshot stance endpoint");
                 if(Math.abs(step.phase()-phase)>.08001F)throw new AssertionError("Unbounded phase step");
                 if(Math.abs(step.velocity()-velocity)>.00601F)throw new AssertionError("Velocity snapped at normal endpoint");
-                if(phase<=1&&Math.abs(step.phase()-phase)>.03501F)
+                if(phase<=1&&Math.abs(step.phase()-phase)>.05001F)
                     throw new AssertionError("Fast knee-bend playback");
                 phase=step.phase();velocity=step.velocity();
             }

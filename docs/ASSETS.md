@@ -482,6 +482,8 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 ## R57 狂奔（左 Alt）
 
+R59：`assets/projectseele/motion/eva_dash_r59.json` 是 Mesh2Motion `human-base-animations.glb` 的 `Sprint`（CC0）按原步幅重定向到初号机的循环，不再压缩步幅；生成：本机 `motion-work/toolroot/gait_candidates_r59.py` + `tools/finale/sprint_overlay.py`。下面的压缩步幅做法已废弃。
+
 候选私有资源（未经用户验收，不入库）：`eva_body_r44.json` 中三台机体的 `dash_run` 循环改用 Mesh2Motion `human-base-animations.glb` 的 `Sprint`（CC0）。修改：沿用刺拳/直拳同一 Mesh2Motion 管线重定向到 EVA 比例，整段循环统一落地以保留腾空期，再用 `warp_locomotion_r44` 把实测步幅（约 214 格/周期）压到实际移动距离 100 格/周期，运行步幅与动画步幅一致，支撑脚不打滑。生成脚本为本机 `motion-work/toolroot/sprint_dash_r57.py`。
 
 空格攀爬：`eva_gameplay_r44_{0,1,2}.json` 新增 `r32_climb_up`，来源 Mesh2Motion `human-base-animations.glb` 的 `ClimbUp_1m_RM`（CC0），截去源片段末尾的循环复位帧，把源动作的上升与前移从姿态中移出、存为归一化路径 `r57_climb_path`，由服务端按实际坎高和机体宽度移动机体；生成脚本为本机 `motion-work/toolroot/climb_clip_r57.py`。

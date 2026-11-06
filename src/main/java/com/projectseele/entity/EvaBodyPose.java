@@ -165,9 +165,10 @@ public final class EvaBodyPose
                 }
                 if(variant<=2)
                 {
-                    overlayClipR59(combatClips,variant,"rifle_stance","eva_rifle_legs_r59.json");
-                    overlayClipR59(combatClips,variant,"dash_run","eva_dash_r59.json");
-                    overlayClipR59(combatClips,variant,"prone_crawl","eva_crawl_r59.json");
+                    overlayClipR59(combatClips,variant,"rifle_stance","rifle_stance","eva_rifle_legs_r59.json");
+                    overlayClipR59(combatClips,variant,"dash_run","dash_run","eva_dash_r59.json");
+                    overlayClipR59(combatClips,variant,"prone_crawl","prone_crawl","eva_crawl_r59.json");
+                    overlayClipR59(combatClips,variant,"prone_crawl","prone_crawl_armed_r59","eva_crawl_armed_r59.json");
                     smoothGaitsR59(combatClips,variant);
                 }
             }
@@ -180,14 +181,15 @@ public final class EvaBodyPose
      * Channels authored in tools/finale replace the capture's, frame by frame.
      * The armed kneel-to-prone keeps its captured upper body and takes pelvis
      * and legs from rifle_stance.py: the captured front foot folded up through
-     * the far thigh. The dash and the crawl are replaced whole, from dash_stride.py
-     * and crawl.py: the captured dash scuttled with the chest fifty degrees over,
-     * the captured crawl held the trunk still and shivered its feet.
+     * the far thigh. The dash is the Mesh2Motion Sprint at its own full stride,
+     * from sprint_overlay.py: the stride had been warped down to the distance
+     * travelled, which made a crouched shuffle of it. The crawl comes from
+     * crawl.py: the captured one held the trunk still and shivered its feet.
      */
-    private static void overlayClipR59(Map<Integer,Map<String,Clip>> combatClips,int variant,String name,String file) throws java.io.IOException
+    private static void overlayClipR59(Map<Integer,Map<String,Clip>> combatClips,int variant,String from,String name,String file) throws java.io.IOException
     {
         var clips=new HashMap<>(combatClips.getOrDefault(variant,Map.of()));
-        var clip=clips.get(name);
+        var clip=clips.get(from);
         if(clip==null)return;
         try(var stream=EvaBodyPose.class.getResourceAsStream("/assets/projectseele/motion/"+file))
         {
@@ -226,7 +228,7 @@ public final class EvaBodyPose
     private static void smoothGaitsR59(Map<Integer,Map<String,Clip>> combatClips,int variant)
     {
         var clips=new HashMap<>(combatClips.getOrDefault(variant,Map.of()));
-        for(String name:List.of("walk","run","crouch_walk"))
+        for(String name:List.of("walk","run","crouch_walk","dash_run"))
         {
             var clip=clips.get(name);
             if(clip!=null)clips.put(name,smoothLoopR59(clip,GAIT_SMOOTHING_FRAMES));
@@ -296,7 +298,7 @@ public final class EvaBodyPose
      * Whether a foot is down by its gait clip alone. The fleet's contract has no
      * masks for walk and run, so {@link #locomotionPlantedR44} is never true on
      * those rigs. These windows (where the foot lands, the share of the cycle it
-     * stays) are read off the clips' soles, and off tools/finale/dash_stride.py.
+     * stays) are read off the clips' soles.
      */
     public static boolean gaitFootDownR59(EvaUnit01Entity e,String side,float partial)
     {
@@ -304,7 +306,7 @@ public final class EvaBodyPose
         phase-=Mth.floor(phase);
         boolean left=side.equals("l");
         float weight=(1-run)*down(phase,left?.69F:.20F,.5F)+run*(1-dash)*down(phase,left?.84F:.31F,.23F)
-                +run*dash*down(phase,left?.04F:.54F,.2F);
+                +run*dash*down(phase,left?.94F:.5F,left?.26F:.24F);
         return weight>.5F;
     }
     private static float down(float phase,float from,float share){return Mth.positiveModulo(phase-from,1F)<share?1:0;}
@@ -609,7 +611,9 @@ public final class EvaBodyPose
             if(stance>2.5F&&move>0&&d.clips().containsKey("prone_crawl"))
             {
                 float t=Mth.clamp((stance-2.5F)*2,0,1);t=t*t*(3-2*t);
-                body=mix(body,clip(d,variant,"prone_crawl",phase),move*t);
+                // On the gun the arms cannot prop the chest up: the body stays down on its belly.
+                boolean belly=armed&&d.combatClips().getOrDefault(variant,Map.of()).containsKey("prone_crawl_armed_r59");
+                body=mix(body,clip(d,variant,belly?"prone_crawl_armed_r59":"prone_crawl",phase),move*t);
             }
         }
         else
@@ -862,7 +866,7 @@ public final class EvaBodyPose
         com.projectseele.visual.BodyPoseLayersR40.capture("final",body);
         return body;
     }
-    private static final float PRONE_FIREARM_CHEST=Float.parseFloat(System.getProperty("projectseele.proneFirearmChestR56","34"));
+    private static final float PRONE_FIREARM_CHEST=Float.parseFloat(System.getProperty("projectseele.proneFirearmChestR56","25"));
     private static void supportProneFirearmChestR45(EvaUnit01Entity entity,Sample body,float partial)
     {
         if(entity.getWeapon()!=EvaUnit01Entity.WEAPON_RIFLE&&entity.getWeapon()!=EvaUnit01Entity.WEAPON_CANNON)return;
@@ -875,9 +879,9 @@ public final class EvaBodyPose
         // A twelve-degree chest left almost the entire prone look-up angle to
         // the neck, swinging the helmet through its dorsal collar. Support the
         // upper trunk first; the same chest drives both arm IK and gun optics.
-        // Fifty-two degrees lifted the shoulders so high the elbows could not
-        // reach the ground and the gun hung in the air; with the pylons and
-        // dorsal cover folded back a lower chest keeps the helmet clear.
+        // More lifts the shoulders so high the elbows cannot reach the ground
+        // and the arms and gun hang in the air; with the pylons and dorsal
+        // cover folded back a lower chest keeps the helmet clear.
         float minimum=PRONE_FIREARM_CHEST*Mth.DEG_TO_RAD;if(elevation>=minimum)return;
         var headWorld=body.matrix("head").getUnnormalizedRotation(new Quaternionf()).normalize();
         float horizontal=(float)Math.hypot(up.x,up.z);if(horizontal<1e-6F)return;

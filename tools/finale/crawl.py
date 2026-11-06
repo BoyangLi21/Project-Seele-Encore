@@ -1,4 +1,4 @@
-"""Author the crawl: python crawl.py out.json [sheet.png]
+"""Author the crawl: python crawl.py out.json [sheet.png|-] [armed]
 
 The captured crawl holds the trunk still and shivers the feet: a worm.  This is
 a commando crawl: the right hand reaches and plants as the left knee draws up
@@ -6,6 +6,8 @@ and out, the body hauls itself over them, then the other side.  The chest
 swings and rolls towards the reaching shoulder, the pelvis swings against it,
 the spine snakes between them, and the head stays up looking ahead.  Hands and
 feet in contact hold still on the ground: the entity travels 12 blocks a cycle.
+Armed, the hands are on the gun and the elbows on the ground, so the body stays
+down on its belly and the arms do not hold it up.
 Written as an overlay in the {bones, frames} form EvaBodyPose reads.
 """
 import json
@@ -27,11 +29,17 @@ BONES = ['torso_lower', 'torso_upper', 'neck', 'head', 'clavicle_l', 'clavicle_r
 PELVIS_PITCH, CHEST_PITCH, HEAD_LEAN = 86.0, 76.0, 6.0
 PELVIS_SWING, CHEST_SWING = 9.0, 14.0     # yaw, against each other
 PELVIS_ROLL, CHEST_ROLL = 8.0, 15.0       # about the spine
-HIP_Y, HIP_Z = 7.4, 7.4
+HIP_Y, HIP_Z = 6.8, 7.4
 SURGE, HEAVE = 1.8, .8                    # two lunges a cycle: blocks forward, blocks up
 HAND_FAR, HAND_OUT, HAND_Y, HAND_LIFT = 32.0, 8.2, 2.6, 4.6
-FOOT_DRAWN, FOOT_OUT, FOOT_Y, FOOT_LIFT = -15.0, 8.4, 3.9, 2.4
+FOOT_DRAWN, FOOT_OUT, FOOT_Y, FOOT_LIFT = -15.0, 10.0, 3.6, 2.4
 TOE_PITCH = -128.0
+
+
+ARMED = len(sys.argv) > 3 and sys.argv[3] == 'armed'
+if ARMED:
+    PELVIS_SWING, CHEST_SWING, PELVIS_ROLL, CHEST_ROLL = 6.0, 9.0, 6.0, 9.0
+    SURGE, HEAVE, HIP_Y, CHEST_PITCH = 1.2, .4, 7.2, 78.0
 
 
 def smooth(t):
@@ -54,7 +62,9 @@ def spine(yaw, pitch, twist):
 
 
 def lowest(actors, m):
-    return min(float((t.reshape(-1, 3) @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()) for b, t, _ in actors.eva_mesh.parts)
+    # Armed, the rifle rig poses the arms afterwards: only the body and legs lie on the ground.
+    return min(float((t.reshape(-1, 3) @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()) for b, t, _ in actors.eva_mesh.parts
+               if not ARMED or b.startswith(('leg_', 'shin_', 'foot_', 'torso_lower')))
 
 
 def main():
@@ -100,9 +110,9 @@ def main():
             v = u + phase
             along, lift = stroke(v, FOOT_DRAWN, FOOT_LIFT)
             drawn = (math.cos(2 * math.pi * v) + 1) / 2
-            ankle = np.array([side * (FOOT_OUT + 2.6 * drawn), FOOT_Y + lift - drop * 0, along])
+            ankle = np.array([side * (FOOT_OUT + 3.6 * drawn), FOOT_Y + lift - drop * 0, along])
             q_foot = B.foot_q(side * 12, TOE_PITCH)
-            pole = R.qmat(B.heading_q(side * (28 + 52 * drawn))) @ np.array([0, 0, -1.0]) + np.array([0, -.75, 0])
+            pole = R.qmat(B.heading_q(side * (62 + 24 * drawn))) @ np.array([0, 0, -1.0]) + np.array([0, -.55, 0])
             limb = solver.limbs['leg_' + s]
             qu, ql, qw, ang, err = limb.solve(B.point(m['torso_lower'], pv['leg_' + s]), ankle, pole, B.mat_rot(m['torso_lower']))
             rot['leg_' + s], rot['shin_' + s] = qu, ql
@@ -158,11 +168,11 @@ def main():
         m = posed[f][2]
         low = {b: min(float((t.reshape(-1, 3) @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()) for bb, t, _ in actors.eva_mesh.parts if bb == b) for b in names}
         print('  frame', f, sorted(((round(v, 1), k) for k, v in low.items()))[:7])
-    doc = {'source': 'Project SEELE original crawl (tools/finale/crawl.py), MIT', 'clip': 'prone_crawl',
+    doc = {'source': 'Project SEELE original crawl (tools/finale/crawl.py), MIT', 'clip': 'prone_crawl_armed' if ARMED else 'prone_crawl',
            'first_frame': 0, 'bones': BONES, 'frames': frames}
     json.dump(doc, open(out, 'w', encoding='utf8'), separators=(',', ':'))
     print('wrote', out, FRAMES, 'frames')
-    if len(sys.argv) > 2:
+    if len(sys.argv) > 2 and sys.argv[2] != '-':
         images = []
         size = (320, 240)
         for f in range(0, FRAMES - 1, 10):
