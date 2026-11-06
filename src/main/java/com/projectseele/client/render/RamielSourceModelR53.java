@@ -2,17 +2,22 @@ package com.projectseele.client.render;
 
 import com.google.gson.JsonParser;
 import com.mojang.blaze3d.vertex.PoseStack;
+import com.projectseele.ProjectSeele;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CompletableFuture;
+import net.minecraft.Util;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.OverlayTexture;
 import net.minecraft.resources.ResourceLocation;
 import net.minecraft.util.Mth;
+import org.joml.Vector3f;
+import org.joml.Vector4f;
 
 /** Optional private source geometry, shared by near and distant encounter draws. */
 final class RamielSourceModelR53
@@ -21,15 +26,34 @@ final class RamielSourceModelR53
     private static final String SELECTION = "eva/ramiel_source_r53_sources.json";
     private static boolean checked;
     private static List<Part> parts;
+    /** Render-thread scratch for the per-vertex transforms. */
+    private static final Vector4f POSITION = new Vector4f();
+    private static final Vector3f NORMAL = new Vector3f();
     private static String sourceHash = "";
     private record Material(ResourceLocation texture, boolean emissive) { }
     /** axis: the arm direction (0 x, 1 y, 2 z) of an open-form spike group, -1 otherwise. */
     private record Part(String name, boolean open, int shift, boolean core,
                         Material material, float[] vertices, int axis) { }
 
+    /**
+     * Parses the source on a background worker so the first frame that shows
+     * Ramiel does not parse it on the render thread; that frame waits on the
+     * monitor instead if the parse is still running. A failure is left for the
+     * render thread's own call to report.
+     */
+    static void prewarm()
+    {
+        CompletableFuture.runAsync(() ->
+        {
+            try { selected(); }
+            catch (RuntimeException reportedByFirstDraw) { }
+        }, Util.backgroundExecutor());
+    }
+
     private static synchronized boolean selected()
     {
         if (checked) return parts != null;
+        long started = System.nanoTime();
         try (var selection = RamielSourceModelR53.class.getResourceAsStream(ROOT + SELECTION))
         {
             if (selection == null) { checked = true; return false; }
@@ -85,6 +109,8 @@ final class RamielSourceModelR53
             require(faces == 8816 && loaded.size() == 9, "All Ramiel source primitives required");
             parts = List.copyOf(loaded);
             checked = true;
+            ProjectSeele.LOGGER.info("Loaded Ramiel source model: faces={} elapsedMs={}",
+                    faces, (System.nanoTime() - started) / 1_000_000L);
             return true;
         }
         catch (IOException failure)
@@ -142,16 +168,25 @@ final class RamielSourceModelR53
             else alpha = blend;
             if (alpha <= .001F) { poses.popPose(); continue; }
             var consumer = buffers.getBuffer(RenderType.entityTranslucent(part.material().texture()));
-            var pose = poses.last();
+            var matrix = poses.last().pose();
+            var normal = poses.last().normal();
+            int light = part.material().emissive() ? LightTexture.FULL_BRIGHT : packedLight;
             var v = part.vertices();
+            // Triangles go out as quads whose last corner repeats the third.
+            // The whole-vertex call writes the same bytes as the chained
+            // vertex/color/uv/overlay/uv2/normal calls, with the same JOML
+            // transforms, but without six element-by-element dispatches.
             for (int triangle = 0; triangle < v.length; triangle += 24)
-                for (int corner = 0; corner < 4; corner++)
+                for (int corner = 0; corner < 3; corner++)
                 {
-                    int i = triangle + Math.min(corner, 2) * 8;
-                    consumer.vertex(pose.pose(), v[i], v[i+1], v[i+2]).color(1F, 1F, 1F, alpha)
-                            .uv(v[i+3], v[i+4]).overlayCoords(OverlayTexture.NO_OVERLAY)
-                            .uv2(part.material().emissive() ? LightTexture.FULL_BRIGHT : packedLight)
-                            .normal(pose.normal(), v[i+5], v[i+6], v[i+7]).endVertex();
+                    int i = triangle + corner * 8;
+                    matrix.transform(POSITION.set(v[i], v[i + 1], v[i + 2], 1F));
+                    normal.transform(NORMAL.set(v[i + 5], v[i + 6], v[i + 7]));
+                    consumer.vertex(POSITION.x, POSITION.y, POSITION.z, 1F, 1F, 1F, alpha, v[i + 3], v[i + 4],
+                            OverlayTexture.NO_OVERLAY, light, NORMAL.x, NORMAL.y, NORMAL.z);
+                    if (corner == 2)
+                        consumer.vertex(POSITION.x, POSITION.y, POSITION.z, 1F, 1F, 1F, alpha, v[i + 3], v[i + 4],
+                                OverlayTexture.NO_OVERLAY, light, NORMAL.x, NORMAL.y, NORMAL.z);
                 }
             poses.popPose();
         }

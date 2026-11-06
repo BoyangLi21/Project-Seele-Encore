@@ -180,6 +180,7 @@ public class ClientEvents
             EvaPoseGraph.reload(resourceManager);
             EvaMotionEngineV2.reload(resourceManager);
             EvaUnit01Renderer.prewarmLocalBodyMeshes(resourceManager);
+            com.projectseele.client.render.RamielRenderer.prewarmSourceModel();
         });
     }
 }

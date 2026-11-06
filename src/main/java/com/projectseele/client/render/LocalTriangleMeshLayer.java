@@ -7,6 +7,7 @@ import java.util.Map;
 import java.util.ArrayList;
 import java.util.Optional;
 import java.util.Set;
+import java.util.concurrent.CompletableFuture;
 import java.util.function.Function;
 import java.util.function.BiPredicate;
 
@@ -17,6 +18,7 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
+import net.minecraft.Util;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
@@ -43,6 +45,8 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
 
     private static final Map<ResourceLocation, MeshData> CACHE = new HashMap<>();
     private static final Set<ResourceLocation> LOAD_ATTEMPTED = new HashSet<>();
+    /** Parses started by prewarm; like CACHE, only the render thread touches the map. */
+    private static final Map<ResourceLocation, CompletableFuture<MeshData>> PENDING = new HashMap<>();
     private static final Set<Class<?>> GPU_DIAGNOSTICS = new HashSet<>();
     private static final Map<JointSkin, PosedMeshCacheR52> SKIN_POSES = new java.util.IdentityHashMap<>();
     private static final Map<MeshPart, Object> STANDALONE_GPU_KEYS = new java.util.IdentityHashMap<>();
@@ -253,6 +257,7 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         STANDALONE_GPU_KEYS.clear();
         ModelRenderTypesR49.clear();
         CACHE.clear();
+        PENDING.clear();
         SKIN_POSES.clear();
         LOAD_ATTEMPTED.clear();
         EvaHeadClearance.clear();
@@ -273,26 +278,23 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     }
 
     /**
-     * Parses the large local EVA shells while the resource reload screen still
-     * owns the render thread. Lazy parsing after an EVA first enters view can
-     * otherwise create multi-second frame stalls in an ordinary route walk.
+     * Starts parsing the large local EVA shells on background workers during
+     * the resource reload; the first draw joins its parse. Lazy parsing when an
+     * EVA first enters view stalls frames for up to seconds, and parsing them
+     * one by one here held the loading screen for ~12 s (eva_prototype alone
+     * is 860 MB of JSON).
      */
     public static void prewarm(ResourceManager resourceManager,
                                ResourceLocation... meshResources)
     {
-        long startedAt = System.nanoTime();
-        int loaded = 0;
         for (ResourceLocation meshResource : meshResources)
         {
-            if (getMesh(resourceManager, meshResource) != null)
+            if (!LOAD_ATTEMPTED.contains(meshResource) && !PENDING.containsKey(meshResource))
             {
-                loaded++;
+                PENDING.put(meshResource, CompletableFuture.supplyAsync(
+                        () -> read(resourceManager, meshResource), Util.backgroundExecutor()));
             }
         }
-        ProjectSeele.LOGGER.info(
-                "Prewarmed local triangle meshes: loaded={}/{} elapsedMs={}",
-                loaded, meshResources.length,
-                (System.nanoTime() - startedAt) / 1_000_000L);
     }
 
     public static boolean hasPart(ResourceLocation meshResource, String boneName)
@@ -423,7 +425,20 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         {
             return CACHE.get(meshLocation);
         }
+        CompletableFuture<MeshData> pending = PENDING.remove(meshLocation);
+        MeshData mesh = pending != null ? pending.join() : read(resourceManager, meshLocation);
         LOAD_ATTEMPTED.add(meshLocation);
+        if (mesh != null)
+        {
+            CACHE.put(meshLocation, mesh);
+        }
+        return mesh;
+    }
+
+    /** Parses one mesh resource; touches no shared state, so it may run off-thread. */
+    private static MeshData read(ResourceManager resourceManager,
+                                 ResourceLocation meshLocation)
+    {
         Optional<Resource> resource = resourceManager.getResource(meshLocation);
         if (resource.isEmpty())
         {
@@ -497,7 +512,6 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                     new net.minecraft.world.phys.AABB((minimumX - maximumX) / 32F, 0,
                         (minimumZ - maximumZ) / 32F, (maximumX - minimumX) / 32F,
                         (maximumY - minimumY) / 16F, (maximumZ - minimumZ) / 32F));
-            CACHE.put(meshLocation, mesh);
             ProjectSeele.LOGGER.info("Loaded local triangle mesh {}: {}",
                     meshLocation, captureTag);
             return mesh;

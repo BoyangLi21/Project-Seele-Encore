@@ -12,11 +12,13 @@ import java.util.*;
 public final class AuthoredTerrainContactR45
 {
     private record Point(String bone,Vector3f position) {}
-    private static final Map<CombatBodyProfiles.Profile,List<Point>> POINTS=new IdentityHashMap<>();
-    private static synchronized List<Point> points(CombatBodyProfiles.Profile profile)
+    /** The hull points one end can touch the ground with: its foot, or its hand, forearm and upper arm, in profile order. */
+    private record Limb(String side,boolean arm,String end,List<Point> points) {}
+    private static final Map<CombatBodyProfiles.Profile,List<Limb>> LIMBS=new IdentityHashMap<>();
+    private static synchronized List<Limb> limbs(CombatBodyProfiles.Profile profile)
     {
-        return POINTS.computeIfAbsent(profile,p->{
-            List<Point> result=new ArrayList<>();
+        return LIMBS.computeIfAbsent(profile,p->{
+            List<Point> surface=new ArrayList<>();
             for(var value:p.definition().getAsJsonArray("bodies"))
             {
                 var row=value.getAsJsonObject();String name=row.get("name").getAsString();
@@ -24,7 +26,16 @@ public final class AuthoredTerrainContactR45
                 float[] matrix=new float[16];for(int i=0;i<16;i++)matrix[i]=row.getAsJsonArray("bind").get(i).getAsFloat();
                 var bind=new Matrix4f().set(matrix).transpose();
                 for(var hull:row.getAsJsonArray("hulls"))for(var vertex:hull.getAsJsonArray())
-                    result.add(new Point(name,bind.transformPosition(CombatBodyProfiles.vector(vertex.getAsJsonArray())).div(CombatBodyProfiles.MODEL_TO_PHYSICS)));
+                    surface.add(new Point(name,bind.transformPosition(CombatBodyProfiles.vector(vertex.getAsJsonArray())).div(CombatBodyProfiles.MODEL_TO_PHYSICS)));
+            }
+            List<Limb> result=new ArrayList<>();
+            for(String side:List.of("l","r"))for(boolean arm:new boolean[]{false,true})
+            {
+                String end=(arm?"hand_":"foot_")+side,upper="arm_"+side,fore="forearm_"+side;
+                List<Point> points=new ArrayList<>();
+                for(var point:surface)
+                    if(point.bone().equals(end)||arm&&(point.bone().equals(upper)||point.bone().equals(fore)))points.add(point);
+                result.add(new Limb(side,arm,end,List.copyOf(points)));
             }
             return List.copyOf(result);
         });
@@ -41,18 +52,16 @@ public final class AuthoredTerrainContactR45
             if(!actor.level().getBlockCollisions(actor,bearing).iterator().hasNext())return;
         }
         var profile=CombatBodyProfiles.get(actor);if(profile==null)return;
-        var surface=points(profile);
         var origin=actor.level().isClientSide?actor.getPosition(partial):actor.position();
         float yaw=(180-actor.getYRot())*(float)Math.PI/180;
-        for(String side:List.of("l","r"))for(boolean arm:new boolean[]{false,true})
+        for(var limb:limbs(profile))
         {
-            String end=(arm?"hand_":"foot_")+side;
+            String side=limb.side(),end=limb.end();boolean arm=limb.arm();
             for(int iteration=0;iteration<3;iteration++)
             {
                 Vector3f lowest=null;
-                for(var point:surface)
+                for(var point:limb.points())
                 {
-                    if(!point.bone().equals(end)&&!(arm&&(point.bone().equals("arm_"+side)||point.bone().equals("forearm_"+side))))continue;
                     var v=pose.matrix(point.bone()).transformPosition(new Vector3f(point.position()));
                     if(lowest==null||v.y<lowest.y)lowest=v;
                 }

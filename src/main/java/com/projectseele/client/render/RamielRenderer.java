@@ -152,6 +152,12 @@ public class RamielRenderer extends EntityRenderer<RamielEntity>
         com.projectseele.client.EncounterObserverCacheR45.markNormalDrawn(entity);
     }
 
+    /** Starts parsing the optional private source model off the render thread. */
+    public static void prewarmSourceModel()
+    {
+        RamielSourceModelR53.prewarm();
+    }
+
     /** The same selected model, drawn from the real server UUID snapshot. No client entity is spawned. */
     public static void renderObservedR52(com.projectseele.network.ClientboundEncounterObserverPacket.Snapshot state,
             float partial,long age,PoseStack poses,MultiBufferSource buffers)
