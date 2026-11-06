@@ -15,5 +15,5 @@ public abstract class MtrSpokenAnnouncementR25Mixin
     @ModifyArg(method = "*", at = @At(value = "INVOKE",
             target = "Lorg/mtr/mod/client/IDrawing;narrateOrAnnounce(Ljava/lang/String;Lorg/mtr/libraries/it/unimi/dsi/fastutil/objects/ObjectArrayList;)V"), index = 0, remap = false)
     private String projectSeele$pronounceNerv(String text)
-    { return FacilityPronunciationR22.spokenFromMtr(text); }
+    { return FacilityPronunciationR22.spoken(text); }
 }

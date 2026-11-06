@@ -20,7 +20,6 @@ public final class NervStaffDialogue
     {
         // Named characters use chat only. Facility PA is a separate sound circuit.
         player.sendSystemMessage(Component.literal("「"+name+"」 ").withStyle(ChatFormatting.AQUA).append(Component.literal(line).withStyle(ChatFormatting.WHITE)));
-        if("r15-staff".equals(System.getProperty("projectseele.regionalBuild","")))ProjectSeele.LOGGER.info("STAFF REVIEW DIALOGUE {} {}",name,line);
     }
     public static void reply(ServerPlayer player,NervStaffEntity npc,String line)
     {
@@ -276,7 +275,6 @@ public final class NervStaffDialogue
             if(hit.getType()!=HitResult.Type.MISS&&!hit.getBlockPos().equals(button))continue;options.add(p.immutable());
         }
         options.sort(Comparator.<BlockPos>comparingDouble(p->Vec3.atBottomCenterOf(p).distanceToSqr(Vec3.atCenterOf(button))).thenComparingDouble(p->npc.distanceToSqr(Vec3.atBottomCenterOf(p))));
-        if("r15-staff".equals(System.getProperty("projectseele.regionalBuild","")))ProjectSeele.LOGGER.info("STAFF PATH REVIEW actor={} pos={} onGround={} candidates={}",npc.memberId(),npc.position(),npc.onGround(),options);
         for(var p:options){var path=npc.getNavigation().createPath(p,0);if(path!=null&&path.canReach())return p;}return null;
     }
     public static void tickTask(NervStaffEntity npc,UUID owner,String operation,int variant,BlockPos control,BlockPos approach,int ticks)
@@ -285,7 +283,6 @@ public final class NervStaffDialogue
         {CityCoordinationR44.operatorTick(npc,owner,operation,control,approach,ticks);return;}
         var level=(ServerLevel)npc.level();var player=level.getServer().getPlayerList().getPlayer(owner);
         boolean city=operation.equals("city_rise")||operation.equals("city_lower");
-        if(ticks%40==0&&"r15-staff-controls".equals(System.getProperty("projectseele.regionalBuild","")))ProjectSeele.LOGGER.info("STAFF CONTROL TRACE actor={} pos={} target={} navDone={} onGround={} loaded={}",npc.memberId(),npc.position(),approach,npc.getNavigation().isDone(),npc.onGround(),EvaLogisticsDirector.status(level,variant).loaded());
         if(player==null||player.level()!=level||(StaffCommandBookR24.order(npc)==null&&player.distanceToSqr(npc)>48*48&&!(city&&StaffConversationR24.radioAllowed(player)))||!authorized(player)||!StaffAuthorityR25.allows(npc,operation)||ticks>300)
         {
             String reason=player==null||player.level()!=level?"通信断了，操作已经停下。":!authorized(player)||!StaffAuthorityR25.allows(npc,operation)?"通行权限已变更，操作停止。":ticks>300?"没能及时到达控制台，这次操作已取消。":"通信距离太远，操作已取消。";

@@ -240,7 +240,6 @@ public final class FirstBattleClip
         if(!(entity instanceof FirstBattleSignals.Actor actor)||!actor.firstBattleSignals().active(entity)||DATA==null)return;
         var signals=actor.firstBattleSignals();var spec=signals.spec(entity);boolean eva=actor.isFirstBattleEva();
         float time=signals.time(entity,1);Vec3 current=point(spec,eva,"root_blocks",time),previous=point(spec,eva,"root_blocks",Math.max(0,time-.05F));
-        if("r10-choreography".equals(System.getProperty("projectseele.regionalBuild","")))previous=current;
         entity.setPos(current);entity.xOld=entity.xo=previous.x;entity.yOld=entity.yo=previous.y;entity.zOld=entity.zo=previous.z;
         float heading=yaw(spec,eva,time),oldHeading=yaw(spec,eva,Math.max(0,time-.05F));entity.setYRot(heading);entity.yBodyRot=entity.yHeadRot=heading;entity.yRotO=entity.yBodyRotO=entity.yHeadRotO=oldHeading;
         entity.setDeltaMovement(Vec3.ZERO);entity.fallDistance=0;entity.noPhysics=true;entity.setNoGravity(true);

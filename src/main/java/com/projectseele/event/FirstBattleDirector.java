@@ -38,8 +38,6 @@ public final class FirstBattleDirector
         if(!review&&(EvaBerserkMotionR34.introduction(eva)||EvaBerserkMotionR34.striking(eva)&&EvaBerserkMotionR34.phase(eva,0)<.72F))return false;
         if(!review&&(com.projectseele.entity.EvaCombatR31.active(eva)||com.projectseele.entity.EvaCombatR31.holds(angel)
                 ||com.projectseele.entity.CombatFeelR31.restrained(eva)||com.projectseele.entity.CombatFeelR31.restrained(angel)))return false;
-        if("r10-firstbattle".equals(System.getProperty("projectseele.regionalBuild","")))
-            ProjectSeele.LOGGER.info("R10 START CHECK health={} ready={} pilot={} variant={} experimental={} locked={} launch={} crucified={} powered={} prone={} crouch={} weapon={} used={} ground={} position={}",angel.getHealth(),FirstBattleClip.ready(),eva.getPilotEntity(),eva.getUnitVariant(),eva.isExperimentalUnit(),eva.isNervLogisticsLocked(),eva.isLaunchSequenceActive(),eva.isCrucified(),eva.isPoweredOn(),eva.isPilotProne(),eva.isPilotCrouching(),eva.getWeapon(),angel.hasUsedFirstBattle(),eva.onGround(),eva.position());
         if(!(angel.level() instanceof ServerLevel level)||eva.level()!=level||!angel.isAlive()||!eva.isAlive()||!FirstBattleClip.ready())return false;
         if(level.getEntity(eva.getUUID())!=eva||level.getEntity(angel.getUUID())!=angel)return false;
         if(com.projectseele.physics.CombatBodyDynamics.active(eva)||com.projectseele.physics.CombatBodyDynamics.active(angel))return false;
@@ -58,15 +56,12 @@ public final class FirstBattleDirector
         Vec3 delta=angel.position().subtract(eva.position());double distance=delta.horizontalDistance();
         if(!review&&(angel.getHealth()>angel.getMaxHealth()*.32F||!stableSupport(eva)||distance<14||distance>46||Math.abs(delta.y)>4))
         {
-            if("r30-npc-combat".equals(System.getProperty("projectseele.regionalBuild",""))&&angel.getHealth()<=angel.getMaxHealth()*.32F&&level.getGameTime()%40==0)
-                ProjectSeele.LOGGER.info("R30 FINALE WAIT health={} distance={} height={} stable={} eva={} angel={}",angel.getHealth(),distance,delta.y,stableSupport(eva),eva.position(),angel.position());
             return false;
         }
         float yaw=(float)Math.toDegrees(Math.atan2(-delta.x,delta.z));
         var spec=new FirstBattleSignals.Spec(eva.position(),yaw,eva.getYRot(),angel.getYRot(),(float)distance,(float)delta.y);
         if(!review&&!spaceReady(level,eva,spec))
         {
-            if("r30-npc-combat".equals(System.getProperty("projectseele.regionalBuild",""))&&level.getGameTime()%40==0)ProjectSeele.LOGGER.info("R30 FINALE WAIT scene clearance eva={} angel={} yaw={}",eva.position(),angel.position(),yaw);
             return false;
         }
         var record=new FirstBattleSavedData.Encounter();record.eva=eva.getUUID();record.angel=angel.getUUID();record.pilot=pilot.getUUID();record.npcPilot=occupant instanceof com.projectseele.entity.TrainingPilotEntity?occupant.getUUID():null;record.spec=spec;record.originalField=angel.getAtField();record.originalHealth=angel.getHealth();data.active=record;data.setDirty();
@@ -178,7 +173,6 @@ public final class FirstBattleDirector
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
         if(event.phase!=TickEvent.Phase.START)return;
-        String mode=System.getProperty("projectseele.regionalBuild","");if(mode.equals("r10-models")||mode.equals("r10-choreography"))return;
         for(ServerLevel level:event.getServer().getAllLevels())
         {
             FirstBattleSavedData data=FirstBattleSavedData.get(level);var record=data.active;if(record==null)continue;
@@ -305,7 +299,6 @@ public final class FirstBattleDirector
     @SubscribeEvent public static void reconcile(net.minecraftforge.event.entity.EntityJoinLevelEvent event)
     {
         if(!(event.getLevel() instanceof ServerLevel level)||!(event.getEntity() instanceof FirstBattleSignals.Actor actor)||!actor.firstBattleSignals().active(event.getEntity()))return;
-        String mode=System.getProperty("projectseele.regionalBuild","");if(mode.equals("r10-choreography")||mode.equals("r10-models"))return;
         Entity entity=event.getEntity();
         level.getServer().execute(()->
         {

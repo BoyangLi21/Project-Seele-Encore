@@ -140,8 +140,6 @@ public final class PilotRadioR28
         }
         if (heard)
         {
-            if (System.getProperty("projectseele.regionalBuild", "").startsWith("r28-"))
-                com.projectseele.ProjectSeele.LOGGER.info("R28 PILOT RADIO variant={} topic={}", pilot.getAssignedVariant(), voice.pending);
             voice.pending = "";
             voice.lastSpoken = now;
             voice.next = now + (topic.equals("field") ? 1400 + 200 * pilot.getAssignedVariant() : 120);

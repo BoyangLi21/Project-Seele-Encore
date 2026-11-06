@@ -3446,8 +3446,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         Vec3 hand=EvaLiveCombatMotion.ordinaryContact(Math.max(0,this.getOrdinaryAttackStage()),this.liveActionProgress(1));
         Vec3 lateral=new Vec3(forward.z,0,-forward.x);
         Vec3 center=this.position().add(lateral.scale(hand.x)).add(0,hand.y,0).add(forward.scale(hand.z));
-        if ("r10-firstbattle".equals(System.getProperty("projectseele.regionalBuild","")))
-            ProjectSeele.LOGGER.info("R10 CONTACT stage={} phase={} center={} forward={}",stage,this.liveActionProgress(1),center,forward);
         Vec3 previous=EvaLiveCombatMotion.ordinaryContact(Math.max(0,stage),Math.max(0,this.liveActionProgress(1)-2F/this.ordinaryAttackDurationTicks(stage)));
         Vec3 from=this.position().add(lateral.scale(previous.x)).add(0,previous.y,0).add(forward.scale(previous.z));
         this.strikeSweepR32(pilot,from,center,3.2,damage,1.1D);

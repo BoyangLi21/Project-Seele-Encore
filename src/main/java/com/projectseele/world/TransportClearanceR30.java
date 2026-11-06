@@ -38,11 +38,6 @@ public final class TransportClearanceR30
                 var collisions=level.getBlockCollisions(eva,new AABB(box.minX,bottom,box.minZ,box.maxX,top,box.maxZ)).iterator();
                 if(collisions.hasNext())
                 {
-                    if("r40-airlift".equals(System.getProperty("projectseele.regionalBuild",""))&&level.getGameTime()%100==0)
-                    {
-                        var obstacle=collisions.next().bounds();var at=BlockPos.containing(obstacle.getCenter());
-                        com.projectseele.ProjectSeele.LOGGER.info("R40 pickup clearance obstruction: root={} bodyPart={} obstacle={} block={} state={}",eva.position(),box,obstacle,at,level.getBlockState(at));
-                    }
                     return "机体或四肢上方有遮挡，等待起吊通道清空";
                 }
             }

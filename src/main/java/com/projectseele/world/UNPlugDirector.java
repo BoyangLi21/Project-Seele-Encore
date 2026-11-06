@@ -69,8 +69,7 @@ public final class UNPlugDirector
         CompoundTag d=eva.getPersistentData();EntryPlugCarrierEntity plug=capsule(eva);
         if(!d.hasUUID("UNPlug"))
         {
-            boolean lab=java.util.Set.of("r11-mechanics","r19-un","r21-un00","r21-un01").contains(System.getProperty("projectseele.regionalBuild",""))&&d.getBoolean("UNMechanicsLab");
-            if(!lab&&(!eva.isInsideTestHangar()||eva.position().distanceTo(eva.homePosition())>4))return;
+            if(!eva.isInsideTestHangar()||eva.position().distanceTo(eva.homePosition())>4)return;
             d.putDouble("UNHomeX",eva.getX());d.putDouble("UNHomeY",eva.getY());d.putDouble("UNHomeZ",eva.getZ());d.putFloat("UNHomeYaw",eva.getYRot());
             plug=ModEntities.ENTRY_PLUG_CARRIER.get().create(level);if(plug==null)return;
             plug.assignIndependentEva(eva);plug.setCanonicalTransform(dock(eva));
@@ -167,26 +166,12 @@ public final class UNPlugDirector
             AABB bounds=EntryPlugKinematics.worldBounds(before.interpolate(after,i/4D),EntryPlugKinematics.BODY_OBB_CENTRE_P,EntryPlugKinematics.BODY_OBB_HALF_EXTENTS).deflate(.06);
             if(level.getBlockCollisions(plug,bounds).iterator().hasNext())
             {
-                diagnoseClearance(level,eva,plug,bounds,"blocks");return false;
+                return false;
             }
             if(!level.getEntities(plug,bounds,e->e!=eva&&e.isPickable()&&!plug.hasPassenger(e)).isEmpty())
-            {diagnoseClearance(level,eva,plug,bounds,"entities");return false;}
+            {return false;}
         }
         return true;
-    }
-    private static void diagnoseClearance(ServerLevel level,EvaPrototypeEntity eva,EntryPlugCarrierEntity plug,AABB bounds,String kind)
-    {
-        String review=System.getProperty("projectseele.regionalBuild","");
-        if(!review.startsWith("r21-un-base")&&!review.equals("r22-un-base")&&!review.startsWith("r29-"))return;
-        if(review.startsWith("r29-")&&level.getGameTime()%20!=0)return;
-        try
-        {
-            var report=new com.google.gson.JsonObject();report.addProperty("unit",eva.getUNSerial());report.addProperty("kind",kind);report.addProperty("bounds",bounds.toString());var cells=new com.google.gson.JsonArray();
-            for(var p:net.minecraft.core.BlockPos.betweenClosed(net.minecraft.core.BlockPos.containing(bounds.minX,bounds.minY,bounds.minZ),net.minecraft.core.BlockPos.containing(bounds.maxX,bounds.maxY,bounds.maxZ)))
-            {var state=level.getBlockState(p);if(state.getCollisionShape(level,p,net.minecraft.world.phys.shapes.CollisionContext.of(plug)).toAabbs().stream().anyMatch(b->b.move(p).intersects(bounds))){var row=new com.google.gson.JsonObject();row.addProperty("pos",p.toShortString());row.addProperty("state",state.toString());cells.add(row);}}
-            report.add("cells",cells);var entities=new com.google.gson.JsonArray();for(var entity:level.getEntities(plug,bounds,e->e!=eva&&e.isPickable()&&!plug.hasPassenger(e)))entities.add(entity.getType()+" "+entity.position());report.add("entities",entities);
-            java.nio.file.Files.writeString(level.getServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT).resolve("un_preflight_obstruction.json"),report.toString());
-        }catch(Exception e){throw new IllegalStateException(e);}
     }
     private static void hoist(ServerLevel level,EvaPrototypeEntity eva,EntryPlugCarrierEntity plug)
     {hoist(level,eva,plug,0);}

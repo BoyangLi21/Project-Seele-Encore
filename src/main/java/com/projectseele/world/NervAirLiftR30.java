@@ -340,7 +340,6 @@ public final class NervAirLiftR30
     private static void advance(ServerLevel l,State s)
     {
         var j=s.job;Vec3 location=s.locations.containsKey(j.variant)?Vec3.atCenterOf(s.locations.get(j.variant)):head(l,j.variant);ready(l,location,2);ready(l,s.aircraftAt,2);
-        if("r32-airlift".equals(System.getProperty("projectseele.regionalBuild"))&&l.getGameTime()%100==0)com.projectseele.ProjectSeele.LOGGER.info("R32 AIR PATH {} age={}/{} plane={} target={}",j.phase,j.age,j.duration,s.aircraftAt,j.to);
         var e=ServiceAircraftR32.payload(l,j.unit);
         if(e==null){EvaLogisticsDirector.loadControlTarget(l,j.variant);note(l,j,"正在加载原机体；不会生成替代机");return;}
         UNTransportEntity plane=ServiceAircraftR32.find(l,s.aircraft);

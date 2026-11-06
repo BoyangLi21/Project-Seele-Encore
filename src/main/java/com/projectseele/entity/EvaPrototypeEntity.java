@@ -138,7 +138,6 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
         entityData.set(LASER_END,end.toVector3f());level.playSound(null,eye.x,eye.y,eye.z,com.projectseele.registry.ModSounds.BEAM_FIRE.get(),net.minecraft.sounds.SoundSource.PLAYERS,1,1.65F);
         level.sendParticles(net.minecraft.core.particles.ParticleTypes.ELECTRIC_SPARK,end.x,end.y,end.z,20,.55,.55,.55,.12);
         com.projectseele.ProjectSeele.LOGGER.debug("EVA-UN eye pulse {} -> {}",eye,end);
-        if("r11-mechanics".equals(System.getProperty("projectseele.regionalBuild","")))com.projectseele.ProjectSeele.LOGGER.info("R11 EYE PULSE origin={} end={} hit={} direction={}",eye,end,hit==null?"none":hit.getEntity().getType(),direction);
     }
     @Override public void onSyncedDataUpdated(net.minecraft.network.syncher.EntityDataAccessor<?> key){super.onSyncedDataUpdated(key);if(key.equals(LASER_AGE)&&eyeClock!=null&&level().isClientSide)eyeClock.accept(entityData.get(LASER_AGE),false,true);}
     @Override public void addAdditionalSaveData(net.minecraft.nbt.CompoundTag t){super.addAdditionalSaveData(t);t.putInt("UNSerial",getUNSerial());t.putInt("UNEyeCooldown",eyeLaserCooldown());t.putBoolean("UNFlight",isUNFlying());t.putBoolean("UNLanding",isUNLanding());}

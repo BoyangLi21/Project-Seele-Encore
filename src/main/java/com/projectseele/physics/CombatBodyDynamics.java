@@ -35,8 +35,7 @@ public final class CombatBodyDynamics
     {
         CombatBodyProfiles.Profile profile;ArticulatedBody simulation;EvaBodyPose.Sample template,pose,resting;
         boolean groundImpact,thrown;
-        double stitchedMax;String stitchedBone="";
-        Vec3 origin,position;float yaw;AABB bounds,terrainCoverage;long started;int age,stable,pendingTerrain,recoveryAge=-1;float recoveryStart,recoveryYaw,groundY;Vector3f recoveryOffset,endShift;
+        Vec3 origin,position;float yaw;AABB bounds,terrainCoverage;long started;int age,stable,recoveryAge=-1;float recoveryStart,recoveryYaw,groundY;Vector3f recoveryOffset,endShift;
     }
     private static final class ClientState
     {EvaBodyPose.Sample previous,current;Vec3 previousPosition,position;AABB bounds;float yaw;int mode;final EvaPoseSignalClock blendClock=new EvaPoseSignalClock(100_000_000L);}
@@ -186,13 +185,9 @@ public final class CombatBodyDynamics
         if(!retainTerrain(level,coverage))
         {
             s.terrainCoverage=null;
-            if(++s.pendingTerrain==1&&"r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
-                ProjectSeele.LOGGER.info("R40 articulated terrain waiting: actor={} coverage={}",entity.getUUID(),coverage);
             return false;
         }
-        if(s.pendingTerrain>0&&"r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
-            ProjectSeele.LOGGER.info("R40 articulated terrain ready: actor={} waitedTicks={}",entity.getUUID(),s.pendingTerrain);
-        s.pendingTerrain=0;s.simulation.clearTerrain();s.terrainCoverage=coverage;
+        s.simulation.clearTerrain();s.terrainCoverage=coverage;
         List<AABB> boxes=new ArrayList<>();for(var shape:level.getBlockCollisions(entity,s.terrainCoverage))boxes.addAll(shape.toAabbs());
         boxes=merge(boxes,true);boxes=merge(boxes,false);Quaternionf orientation=new Quaternionf().rotationY(-(180-s.yaw)*Mth.DEG_TO_RAD);
         for(var b:boxes)s.simulation.addStaticBox(local(s,b.getCenter()),new Vector3f((float)b.getXsize(),(float)b.getYsize(),(float)b.getZsize()).mul(SCALE*.5F),orientation);
@@ -267,19 +262,7 @@ public final class CombatBodyDynamics
                     Vector3f moved=frame.deformation().get("torso_lower").transformPosition(new Vector3f(hip));
                     Vector3f offset=new Vector3f(moved.x-hip.x,frame.min().y,moved.z-hip.z);s.position=world(s,offset);
                     s.pose=CombatBodyProfiles.render(s.template,frame.deformation(),offset);
-                    Map<String,Vector3f> beforeStitch=null;
-                    if("r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
-                    {
-                        beforeStitch=new HashMap<>();
-                        for(var row:s.profile.definition().getAsJsonArray("bodies"))
-                        {String n=row.getAsJsonObject().get("name").getAsString();beforeStitch.put(n,s.pose.matrix(n).transformPosition(new Vector3f(s.pose.rig.get(n).pivot())));}
-                    }
                     stitch(s.pose,s.profile);
-                    if(beforeStitch!=null)for(var before:beforeStitch.entrySet())
-                    {
-                        var n=before.getKey();double change=s.pose.matrix(n).transformPosition(new Vector3f(s.pose.rig.get(n).pivot())).distance(before.getValue())*EvaScale.RENDER_SCALE;
-                        if(change>s.stitchedMax){s.stitchedMax=change;s.stitchedBone=n;}
-                    }
                     s.stable=frame.supportContacts()>1&&frame.speed()<.40F?s.stable+1:0;
                     var beat=CombatFeelR31.beat(entity);
                     if(s.stable>0&&s.age>10&&s.thrown)
@@ -291,8 +274,6 @@ public final class CombatBodyDynamics
                 entity.setPos(s.position.x,s.position.y,s.position.z);entity.setYRot(s.yaw);entity.yBodyRot=entity.yHeadRot=s.yaw;entity.setBoundingBox(s.bounds);entity.setDeltaMovement(Vec3.ZERO);entity.resetFallDistance();entity.setOnGround(s.recoveryAge>=0||s.stable>0);
                 if(s.stable>=12&&entity instanceof EvaUnit01Entity eva&&EvaShutdownR30.disabled(eva))
                 {
-                    if("r40-airlift".equals(System.getProperty("projectseele.regionalBuild","")))
-                        ProjectSeele.LOGGER.info("R40 articulated rest: actor={} ticks={} root={} maxStitchBlocks={} bone={}",entity.getUUID(),s.age,s.position,s.stitchedMax,s.stitchedBone);
                     if(!eva.isExperimentalUnit()&&eva.getUnitVariant()>=0&&eva.getUnitVariant()<3)
                     {
                         // The stitched render skin extends beyond Bullet's bodies. Evaluate

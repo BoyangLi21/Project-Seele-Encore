@@ -70,7 +70,6 @@ public final class FirstBattleSignals
                 if(entity.level().isClientSide)CLIENT_CLOCKS.remove(entity);
                 return Math.max(0,tick/20F);
             }
-            if("r10-choreography".equals(System.getProperty("projectseele.regionalBuild","")))return tick/20F;
             if(entity instanceof Actor actor&&!actor.isFirstBattleEva())
             {
                 Entity hero=entity.level().getEntity(partner(entity));

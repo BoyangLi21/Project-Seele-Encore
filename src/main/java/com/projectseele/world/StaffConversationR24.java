@@ -377,10 +377,6 @@ public final class StaffConversationR24
         if (level.getEntity(id) instanceof NervStaffEntity npc&&npc.isAlive())
         { load(level,npc.blockPosition()); open(player, npc, true); return true; }
         load(level, station.feet());
-        if (System.getProperty("projectseele.regionalBuild", "").startsWith("r24-") && player.server.getTickCount() % 20 == 0)
-            ProjectSeele.LOGGER.info("R24 RADIO LOAD person={} uuid={} post={} entityTicking={} loadedNPCs={}",
-                    station.id(), id, station.feet(), level.isPositionEntityTicking(station.feet()),
-                    level.getEntitiesOfClass(NervStaffEntity.class, new net.minecraft.world.phys.AABB(station.feet()).inflate(32)).stream().map(n -> n.memberId()+":"+n.getUUID()).toList());
         return false;
     }
     private static void load(ServerLevel level, BlockPos at)
