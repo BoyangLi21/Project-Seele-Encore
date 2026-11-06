@@ -51,16 +51,21 @@ def joints_for(piv):
             # does not follow the arm swing
             out.append(("torso_upper", "arm_" + s, piv["arm_" + s],
                         unit(piv["forearm_" + s] - piv["arm_" + s]), 3.5, 7.0))
-            out.append(("arm_" + s, "forearm_" + s, piv["forearm_" + s],
-                        unit(piv["wrist_" + s] - piv["forearm_" + s]), 4.5, 8.0))
+            # the elbow turns about its hinge centre behind the forearm pivot
+            # (EvaRigTransforms.elbow), not the pivot; blending there bent the shell
+            elbow = np.array([23.489652 if s == "l" else -23.489652, 123.435069, 7.737214])
+            out.append(("arm_" + s, "forearm_" + s, elbow,
+                        unit(piv["wrist_" + s] - elbow), 4.5, 9.0))
         if has("forearm_" + s, "hand_" + s, "finger_middle_axis_" + s):
             out.append(("forearm_" + s, "hand_" + s, piv["hand_" + s],
                         unit(piv["finger_middle_axis_" + s] - piv["hand_" + s]), 2.5, 6.0))
         if has("leg_" + s, "shin_" + s, "ankle_" + s):
             out.append(("torso_lower", "leg_" + s, piv["leg_" + s],
                         unit(piv["shin_" + s] - piv["leg_" + s]), 6.0, 12.0))
-            out.append(("leg_" + s, "shin_" + s, piv["shin_" + s],
-                        unit(piv["ankle_" + s] - piv["shin_" + s]), 5.0, 9.0))
+            # likewise the knee turns 11.4 px above the shin pivot (EvaRigTransforms.knee)
+            knee = piv["shin_" + s] + np.array([0, 11.4, 0])
+            out.append(("leg_" + s, "shin_" + s, knee,
+                        unit(piv["ankle_" + s] - knee), 5.0, 9.0))
         if has("shin_" + s, "foot_" + s):
             out.append(("shin_" + s, "foot_" + s, piv["foot_" + s], (0, -1, 0), 2.5, 7.0))
     return out

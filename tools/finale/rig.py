@@ -280,12 +280,25 @@ class RigidMesh:
         for name, (xyz, _, col, _) in raw.items():
             self.parts.append((name, xyz.reshape(-1, 3, 3), col))
         self.rest = {name: raw[name][0] for name in raw}
+        # authored influences replace the seam weld of their part (LocalTriangleMeshLayer.resolvedJointSkins)
+        self.authored = {}
+        for name, skin in m.get('jointSkins', {}).items():
+            if name in raw and 'influences' in skin:
+                self.authored[name] = {b: np.array(w, float) for b, w in skin['influences'].items() if b in rig.pivot}
+                self.skin.pop(name, None)
 
     def triangles(self, mats, world):
         out_t, out_c = [], []
         for bone, tris, col in self.parts:
             m = world @ mats[bone]
-            if bone in self.skin:
+            if bone in self.authored:
+                rest = self.rest[bone]
+                acc = np.zeros_like(rest)
+                for other, w in self.authored[bone].items():
+                    mo = world @ mats[other]
+                    acc += w[:, None] * (rest @ mo[:3, :3].T + mo[:3, 3])
+                t = acc.reshape(-1, 3, 3)
+            elif bone in self.skin:
                 own = np.ones(len(self.rest[bone]))
                 acc = np.zeros((len(own), 3))
                 for other, w, rest in self.skin[bone]:
