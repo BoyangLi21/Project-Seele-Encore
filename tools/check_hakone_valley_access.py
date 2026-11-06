@@ -28,6 +28,7 @@ def check(a):
         goals={'entrance':tuple(row['entrance']),'street':tuple([row['road'][0],row['road'][1]+1,row['road'][2]])}
         if row.get('upper'):goals['upper floor']=tuple(row['upper'])
         if row.get('platform'):p=row['platform'];goals['platform']=(p[0],p[1]+1,p[2])
+        if row.get('waterside_door'):goals['waterside door']=tuple(row['waterside_door'])
         points=list(goals.values());site=row['site'];cx,cz=site['centre'];hx,hz=site['half']
         if site['rotation']%2:hx,hz=hz,hx
         left=max(x0,min([p[0]for p in points]+[cx-hx-4])-5);right=min(x1,max([p[0]for p in points]+[cx+hx+4])+5)

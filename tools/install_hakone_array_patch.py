@@ -6,14 +6,19 @@ The existing query_blocks reader and region writer own the Anvil format.
 """
 from pathlib import Path
 from collections import defaultdict
-import argparse, copy, json, shutil, time, zipfile
+import argparse, copy, io, json, shutil, time, zipfile
 import nbtlib
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor,as_completed
 from query_blocks import iter_selected_sections, dimension_dir
 from regional_voxels import canonical_state
 from transplant_s22_authority import read_region, parse_chunk, build_region
 from apply_s20_approved_semantic_repairs import parse_state, encode_indices, chunk_blob, atomic_replace
 from install_r53_carrier_trays import stopped_world
+from map_pipeline.install.invariants import assert_chunk_preserved
+from map_pipeline.launch_protection import load as launch_protection, check_candidate
+from native_transit_additions import prepare as prepare_native_additions, assert_preserved as assert_native_preserved
+from map_pipeline.delta_geometry import checked_indices
 
 DIM = 'projectseele:geofront'
 DATA = Path('dimensions/projectseele/geofront/data')
@@ -38,8 +43,11 @@ def compose(files, palette):
     chunks = {}
     for file in files:
         with np.load(file) as a:
+            bottom, _, normalized = checked_indices(a)
+            normalized = normalized + (bottom-Y0)*256
             remap = palette.codes(a['palette'])
-            coordinates, ranges, indices, old, new = (a[k] for k in ('coordinates','ranges','indices','before','after'))
+            coordinates, ranges, old, new = (a[k] for k in ('coordinates','ranges','before','after'))
+            indices = normalized
             for i, coordinate in enumerate(coordinates):
                 key = tuple(map(int, coordinate)); left, right = ranges[i:i+2]
                 at = indices[left:right].astype(np.int32); before = remap[old[left:right]]; after = remap[new[left:right]]
@@ -48,6 +56,11 @@ def compose(files, palette):
                     common, ai, bi = np.intersect1d(old_at, at, return_indices=True)
                     if np.any(old_before[ai] != before[bi]):
                         raise ValueError(f'Candidates disagree about original states in {key}')
+                    conflicting = np.flatnonzero(old_after[ai] != after[bi])
+                    if len(conflicting):
+                        offset = int(common[int(conflicting[0])])
+                        pos = (key[0]*16+offset%16, Y0+offset//256, key[1]*16+(offset//16)%16)
+                        raise ValueError(f'Conflicting final states at {pos}; resolve geometry before installation')
                     all_at = np.union1d(old_at, at)
                     all_before = np.empty(len(all_at), np.int32); all_after = all_before.copy()
                     oi = np.searchsorted(all_at, old_at); ni = np.searchsorted(all_at, at)
@@ -72,11 +85,17 @@ def prepare_region(world, region_key, chunks, devices, palette, destination, exp
         slot = (cz % 32)*32 + cx % 32
         if raw[slot] is None: raise ValueError(f'Missing chunk {(cx,cz)}')
         root = parse_chunk(raw[slot])
+        original = copy.deepcopy(root)
         expected='full' if expected_statuses is None else expected_statuses.get((cx,cz),'full')
         if str(root.get('Status', '')).removeprefix('minecraft:') != expected:
             raise ValueError(f'Changed chunk generation status {(cx,cz)}')
         sections = {int(s['Y']): s for s in root['sections']}
         at, before, after = chunks.get((cx, cz), (np.array([], dtype=int),)*3)
+        for tag in root.get('block_entities', []):
+            pos = tuple(int(tag[k]) for k in ('x','y','z'))
+            offset = (pos[1]-Y0)*256+(pos[2]%16)*16+pos[0]%16
+            if np.any(at == offset) and pos not in devices.get((cx, cz), {}):
+                raise ValueError(f'Undeclared device host edit at {pos}')
         for sy in np.unique(at//4096 + Y0//16):
             mask = at//4096 + Y0//16 == sy; offsets = at[mask] % 4096
             remap, ids = decoded.get((cx, cz, int(sy)), (np.array([0]), np.zeros(4096, np.int32)))
@@ -105,22 +124,72 @@ def prepare_region(world, region_key, chunks, devices, palette, destination, exp
         for key in ('Heightmaps', 'isLightOn', 'starlight.light_version'): root.pop(key, None)
         for section in root['sections']:
             for key in ('BlockLight','SkyLight','starlight.blocklight_state','starlight.skylight_state'): section.pop(key, None)
-        raw[slot] = chunk_blob(root)
+        serialized = chunk_blob(root)
+        assert_chunk_preserved(original, parse_chunk(serialized),
+            set(map(int, np.unique(at//4096 + Y0//16))), devices.get((cx, cz), {}))
+        raw[slot] = serialized
     destination.parent.mkdir(parents=True, exist_ok=True)
     atomic_replace(destination, build_region(times, raw))
 
 
-def prepare_jar(installed, compiled, target):
+def prepare_jar(installed, compiled, target, resources_only=False, terrain_consumer_only=False):
     # The live distribution has large authored models absent from the small
     # code build. Keep authored assets, but carry the mixin declarations and
     # mappings with their new classes so newly added compatibility fixes load.
     with zipfile.ZipFile(installed) as old, zipfile.ZipFile(compiled) as new:
+        if resources_only or terrain_consumer_only:
+            resource='data/projectseele/worldgen/hakone_surface.bin.gz'
+            if resource not in new.namelist():raise ValueError('Missing compiled terrain resource')
+            replace={resource}
+            blend='data/projectseele/worldgen/hakone_surface_blend.bin.gz'
+            if blend in new.namelist():replace.add(blend)
+            class_count=0
+            if terrain_consumer_only:
+                if blend not in replace:raise ValueError('Terrain consumer requires its matching blend field')
+                for suffix in ('','\u0024Field','\u0024Surface'):
+                    name='com/projectseele/world/HakoneSurfaceField'+suffix+'.class'
+                    if name not in new.namelist():raise ValueError('Missing selected terrain consumer '+name)
+                    replace.add(name);class_count+=1
+            # Map-only deliveries must not replace a collaborator's entity,
+            # animation or renderer classes from a separate working copy.
+            with zipfile.ZipFile(target,'x',compression=zipfile.ZIP_DEFLATED,compresslevel=1)as out:
+                # Retain the original compressed records verbatim. Large
+                # collaborator models need neither decoding nor recompression
+                # to replace one small map resource. ZipFile writes fresh
+                # central-directory offsets when the archive closes.
+                entries=sorted(old.infolist(),key=lambda entry:entry.header_offset)
+                if len({entry.filename for entry in entries})!=len(entries):
+                    raise ValueError('Installed JAR has ambiguous duplicate entries')
+                for i,entry in enumerate(entries):
+                    if entry.filename in replace:continue
+                    end=entries[i+1].header_offset if i+1<len(entries)else old.start_dir
+                    start=entry.header_offset;updated=copy.copy(entry);updated.header_offset=out.fp.tell()
+                    # Central ZIP64 offsets refer to the old archive. Sizes
+                    # and new offsets are regenerated from ZipInfo below.
+                    extra=bytearray();offset=0
+                    while offset<len(updated.extra):
+                        kind=int.from_bytes(updated.extra[offset:offset+2],'little')
+                        size=int.from_bytes(updated.extra[offset+2:offset+4],'little');limit=offset+4+size
+                        if limit>len(updated.extra):raise ValueError('Malformed installed ZIP extra record')
+                        if kind!=1:extra.extend(updated.extra[offset:limit])
+                        offset=limit
+                    updated.extra=bytes(extra);old.fp.seek(start);remaining=end-start
+                    while remaining:
+                        block=old.fp.read(min(1024*1024,remaining))
+                        if not block:raise ValueError('Truncated installed JAR record')
+                        out.fp.write(block);remaining-=len(block)
+                    out.filelist.append(updated);out.NameToInfo[updated.filename]=updated
+                out.start_dir=out.fp.tell();out.comment=old.comment
+                for name in sorted(replace):out.writestr(name,new.read(name))
+            return class_count
         names = [n for n in new.namelist() if n.startswith('com/projectseele/') and n.endswith('.class')]
         if 'com/projectseele/world/CityRigidGenerationR45.class' not in names: raise ValueError('Missing native city generation class')
         class_count=len(names)
         for name in ('projectseele.mixins.json','projectseele.refmap.json','data/projectseele/worldgen/hakone_surface.bin.gz'):
             if name not in new.namelist():raise ValueError('Missing compiled mixin resource '+name)
             names.append(name)
+        blend='data/projectseele/worldgen/hakone_surface_blend.bin.gz'
+        if blend in new.namelist():names.append(blend)
         new_names = set(names)
         with zipfile.ZipFile(target, 'x', compression=zipfile.ZIP_DEFLATED, compresslevel=1) as out:
             for entry in old.infolist():
@@ -129,6 +198,35 @@ def prepare_jar(installed, compiled, target):
                 out.writestr(entry, old.read(entry.filename))
             for name in names: out.writestr(name, new.read(name))
     return class_count
+
+
+def encode_device_changes(devices):
+    """Carry typed inventory/sign NBT across spawn workers as NBT bytes.
+
+    nbtlib's generated List[String]/List[Compound] classes cannot be pickled
+    reliably. JSON would lose tag types and large integer identity values.
+    """
+    rows=[]
+    for chunk,changes in sorted(devices.items()):
+        for pos,change in sorted(changes.items()):
+            rows.append(nbtlib.Compound({'Chunk':nbtlib.IntArray(chunk),'Pos':nbtlib.IntArray(pos),'Change':copy.deepcopy(change)}))
+    stream=io.BytesIO();nbtlib.File({'Changes':nbtlib.List[nbtlib.Compound](rows)}).write(stream)
+    return stream.getvalue()
+
+
+def decode_device_changes(payload):
+    result=defaultdict(dict)
+    for row in nbtlib.File.parse(io.BytesIO(payload))['Changes']:
+        result[tuple(map(int,row['Chunk']))][tuple(map(int,row['Pos']))]=row['Change']
+    return dict(result)
+
+
+def stage_region_job(world,region_key,inputs,device_payload,stage,expected_statuses):
+    devices=decode_device_changes(device_payload)
+    palette=Palette();chunks=compose(inputs,palette)
+    relative=DATA.parent/'region'/f'r.{region_key[0]}.{region_key[1]}.mca'
+    prepare_region(world,region_key,chunks,devices,palette,stage/relative,expected_statuses)
+    return world/relative,stage/relative,sum(len(v[0])for v in chunks.values()),{(cx//4,cz//4)for cx,cz in chunks}
 
 
 def install(a):
@@ -142,9 +240,69 @@ def install(a):
             if(cx,cz)in expected_statuses and expected_statuses[cx,cz]!=status:raise ValueError('Conflicting generation states')
             expected_statuses[cx,cz]=status
     if any(Path(m['world']).resolve() != a.world.resolve() for m in manifests): raise ValueError('Wrong actual world')
+    protection = launch_protection(a.world)
+    launch_checks = [check_candidate(protection, candidate) for candidate in a.candidate]
     for candidate in a.candidate:
         check = json.loads((candidate/'functional-check.json').read_text('utf8'))
+        from verify_hakone_owakudani_release import require_verified
+        require_verified(candidate)
+        from verify_hakone_west_tunnel import require_verified as require_tunnel
+        require_tunnel(candidate)
+        from verify_odawara_downtown_release import require_verified as require_odawara
+        require_odawara(candidate)
+        from capture_staged_hakone_native import require_installed as require_staged_native
+        require_staged_native(candidate,a.world)
+        from verify_odawara_coast_release import require_verified as require_coast
+        require_coast(candidate)
+        from verify_hakone_geographic_boundary import require_verified as require_geographic
+        require_geographic(candidate)
+        from verify_hakone_enclosed_water import require_verified as require_water
+        require_water(candidate)
+        from verify_hakone_natural_beach import require_verified as require_beach
+        require_beach(candidate)
+        from refine_hakone_coastal_materials import require_verified as require_coastal_materials
+        require_coastal_materials(candidate)
+        from verify_regional_station import require_verified as require_station
+        require_station(candidate)
+        from verify_hakone_sea_connected_mouths import require_verified as require_mouths
+        require_mouths(candidate)
         if check['errors']: raise ValueError('Unresolved authored path errors: '+str(candidate))
+        manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
+        if 'port_verification'in manifest:
+            expected=manifest['port_verification'];verified=json.loads((candidate/'port-independent-check.json').read_text('utf8'))
+            if verified['errors'] or any(verified['counts'].get(k)!=v for k,v in expected['counts'].items()) or not all(r['reachable']for r in verified['destinations']) or len(verified['destinations'])!=expected['destinations']:
+                raise ValueError('Incomplete independent port geometry and payload verification')
+        if 'neighbourhood_verification'in manifest:
+            expected=manifest['neighbourhood_verification'];verified=json.loads((candidate/'independent-check.json').read_text('utf8'))
+            if verified['errors'] or verified['full_width_columns']!=expected['public_columns'] or verified['reachable_columns']!=expected['public_columns'] or len(verified['parcel_goals'])!=expected['parcels'] or verified['complete_device_tags_exact']!=expected['devices']:
+                raise ValueError('Incomplete independent neighbourhood verification: '+str(candidate))
+            if verified.get('new_native_fixtures_checked',0)!=expected.get('new_native_fixtures',0):
+                raise ValueError('Incomplete native fixture mesh/NBT verification: '+str(candidate))
+        if 'legacy_water_banks' in manifest:
+            banks=json.loads((candidate/'water-bank-check.json').read_text('utf8'))
+            if banks['errors'] or banks['exposed_Y62_water_faces']:
+                raise ValueError('Unclosed legacy water bank candidate')
+        if 'terrain_inputs' in manifest:
+            if not a.compiled_jar:raise ValueError('Pending-terrain candidate requires its matching terrain delivery')
+            with zipfile.ZipFile(a.compiled_jar)as bundle:
+                for name,relative in manifest['terrain_inputs'].items():
+                    if name not in ('data/projectseele/worldgen/hakone_surface.bin.gz','data/projectseele/worldgen/hakone_surface_blend.bin.gz'):
+                        raise ValueError('Unrecognized terrain dependency')
+                    path=(candidate/relative).resolve()
+                    if not path.is_relative_to(candidate.resolve()):raise ValueError('Invalid terrain dependency path')
+                    if bundle.read(name)!=path.read_bytes():raise ValueError('Compiled terrain differs from the pending-chunk candidate input')
+        if 'streets' in manifest:
+            verified=json.loads((candidate/'independent-check.json').read_text('utf8'))
+            expected={r['id']:r['walk_columns'] for r in manifest['streets'] if r['status']=='prepared'}
+            observed={r['id']:r['full_width_columns'] for r in verified['streets']}
+            if verified['errors'] or expected!=observed:
+                raise ValueError('Incomplete independent corridor verification: '+str(candidate))
+            design=json.loads((candidate/'authored-design.json').read_text('utf8'))
+            tunnels={r['id']for r in design['streets']if r.get('tunnel')}
+            if tunnels:
+                tunnel_check=json.loads((candidate/'tunnel-check.json').read_text('utf8'))
+                if tunnel_check['errors'] or {r['id']for r in tunnel_check['tunnels']}!=tunnels:
+                    raise ValueError('Incomplete independent tunnel verification: '+str(candidate))
     for candidate in a.candidate:
         for preserved in (candidate/'preserved').glob('*control*.dat'):
             old = nbtlib.load(preserved)['data']; current = nbtlib.load(a.world/DATA/preserved.name)['data']
@@ -164,17 +322,33 @@ def install(a):
             if previous is not None and previous!=r:raise ValueError(f'Conflicting device changes at {(x,y,z)}')
             devices[x//512, z//512][x//16, z//16][x,y,z] = r
             files.setdefault((x//512,z//512), [])
-    metadata = []
+    metadata = [];native_snapshots=[];native_additions=set();native_geometry_finals=[];native_geometry_reports=[]
     metadata_targets=set()
     for candidate in a.candidate:
         for after in (candidate/'after').rglob('*.dat'):
             relative = after.relative_to(candidate/'after'); current = a.world/relative; prior = candidate/'before'/relative
             if current in metadata_targets:raise ValueError(f'Overlapping metadata candidates: {relative}')
             if prior.exists():
-                if not current.exists() or nbtlib.load(prior) != nbtlib.load(current): raise ValueError(f'Changed metadata: {relative}')
+                if not current.exists():raise ValueError(f'Missing current metadata: {relative}')
+                # Captured recipe files are normally byte-identical copies.
+                # Decode potentially large NBT only if their bytes changed;
+                # semantic equality still accepts harmless recompression.
+                if prior.read_bytes()!=current.read_bytes() and nbtlib.load(prior)!=nbtlib.load(current):
+                    raise ValueError(f'Changed metadata: {relative}')
             elif current.exists(): raise ValueError(f'New metadata already exists: {relative}')
             metadata.append((current, after));metadata_targets.add(current)
         manifest=json.loads((candidate/'manifest.json').read_text('utf8'))
+        for name in manifest.get('json_metadata',[]):
+            relative=Path(name)
+            allowed={'r07_installations.json','r07_commissioned.json','military_readiness_r23.json',
+                     'regional_plan.json','un01_annex_r20.json','un_hangars_r31.json',
+                     'un_air_reception_r40.json','un_commission_r21.json','un_models_r21.json','un_models_r30.json'}
+            if relative.parts!=(name,) or name not in allowed:raise ValueError('Unexpected facility metadata destination')
+            current=a.world/relative;prior=candidate/'before'/relative;after=candidate/'after'/relative
+            if current in metadata_targets:raise ValueError('Overlapping facility metadata')
+            if not prior.is_file()or not current.is_file()or current.read_bytes()!=prior.read_bytes():raise ValueError('Facility metadata changed since capture')
+            json.loads(after.read_text('utf8'))
+            metadata.append((current,after));metadata_targets.add(current)
         for name in manifest.get('native_members',[]):
             relative=Path(name)
             if relative.is_absolute()or'..'in relative.parts or relative.parts[:3]!=('mtr','projectseele','geofront'):
@@ -183,35 +357,78 @@ def install(a):
             if current in metadata_targets:raise ValueError('Overlapping native member repair')
             if current.read_bytes()!=prior.read_bytes():raise ValueError('Native service changed after repair preparation')
             metadata.append((current,after));metadata_targets.add(current)
+        additions=manifest.get('native_additions',[])
+        if manifest.get('native_geometry_patch'):
+            if len(a.candidate)!=1 or additions or manifest.get('native_members'):
+                raise ValueError('Finite native geometry migration requires one composed candidate and no other native operations')
+            from map_pipeline.native_geometry_patch import prepare as prepare_native_geometry
+            pairs,baseline,final,report=prepare_native_geometry(candidate,a.world)
+            for current,after in pairs:
+                if current in metadata_targets:raise ValueError('Overlapping native geometry operation')
+                metadata.append((current,after));metadata_targets.add(current)
+            native_snapshots.append(baseline);native_geometry_finals.append(final);native_geometry_reports.append(report)
+        elif additions or manifest.get('preserve_native_members',False):
+            pairs,baseline,added=prepare_native_additions(candidate,a.world,additions)
+            for current,after in pairs:
+                if current in metadata_targets:raise ValueError('Overlapping native service addition')
+                metadata.append((current,after));metadata_targets.add(current)
+            native_snapshots.append(baseline);native_additions.update(added)
     a.backup.mkdir(parents=True)
     stage = a.backup/'prepared'; original = a.backup/'original'; stage.mkdir(); original.mkdir()
-    journal = dict(status='preparing', world=str(a.world), candidates=[str(c) for c in a.candidate], files=[], progress_files_written=[])
+    journal = dict(status='preparing', world=str(a.world), candidates=[str(c) for c in a.candidate], files=[], progress_files_written=[], launch_protection=launch_checks)
     receipt = a.backup/'installation.json'
     def save(): atomic_replace(receipt, json.dumps(journal, indent=2).encode())
     save(); start = time.monotonic(); total = 0; tile_set = set(); plans = []
-    for region_key, inputs in sorted(files.items()):
-        palette = Palette(); chunks = compose(inputs, palette)
-        relative = DATA.parent/'region'/f'r.{region_key[0]}.{region_key[1]}.mca'
-        prepare_region(a.world, region_key, chunks, devices[region_key], palette, stage/relative,expected_statuses)
-        plans.append((a.world/relative, stage/relative)); total += sum(len(v[0]) for v in chunks.values())
-        tile_set.update((cx//4,cz//4) for cx,cz in chunks)
-        print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s', flush=True)
+    # Workers only prepare separate region files. The parent retains the world
+    # lock; backup, publication and rollback stay serialized below.
+    try:
+        with ProcessPoolExecutor(max_workers=getattr(a,'workers',1))as pool:
+            jobs=[pool.submit(stage_region_job,a.world,key,inputs,encode_device_changes(devices[key]),stage,expected_statuses)for key,inputs in sorted(files.items())]
+            for future in as_completed(jobs):
+                target,prepared,cells,tiles=future.result()
+                plans.append((target,prepared));total+=cells;tile_set.update(tiles)
+                print(f'Prepared {len(plans)}/{len(files)} regions; {total:,} changed cells; {round(time.monotonic()-start)} s',flush=True)
+        from map_pipeline.install.entity_moves import prepare as prepare_entity_moves
+        actor_reports=[]
+        for candidate,manifest in zip(a.candidate,manifests):
+            actor_pairs,actor_report=prepare_entity_moves(candidate,a.world,stage,manifest)
+            for target,prepared in actor_pairs:
+                if target in metadata_targets:raise ValueError('Overlapping actor migration candidates')
+                metadata.append((target,prepared));metadata_targets.add(target)
+            if actor_report['roots']:actor_reports.append(actor_report)
+        journal['actor_relocations']=actor_reports
+    except BaseException as error:
+        journal.update(status='staging-failed',actual_files_written=0,error_type=type(error).__name__);save()
+        raise
+    plans.sort(key=lambda row:str(row[0]))
     plans.extend(metadata)
     jar_classes = 0
+    def jar_version():
+        info=a.installed_jar.stat();return info.st_size,info.st_mtime_ns
+    def unchanged_jar():
+        if a.installed_jar and jar_version()!=original_jar_version:
+            raise ValueError('Installed JAR changed during map staging; retain the collaborator update and rebuild the resource-only merge')
     if a.installed_jar:
+        original_jar_version=jar_version()
         prepared_jar = stage/'projectseele-0.1.0-all.jar'
-        jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar)
+        jar_classes = prepare_jar(a.installed_jar, a.compiled_jar, prepared_jar,getattr(a,'terrain_resource_only',False),getattr(a,'terrain_consumer_only',False))
+        unchanged_jar()
         plans.append((a.installed_jar, prepared_jar))
     for i, (target, source) in enumerate(plans):
         backup = original/str(i)
         if target.exists(): shutil.copy2(target, backup)
-        journal['files'].append(dict(target=str(target), staged=str(source), backup=str(backup) if backup.exists() else None))
+        journal['files'].append(dict(target=str(target), staged=str(source) if source is not None else None, backup=str(backup) if backup.exists() else None))
     journal.update(status='prepared', cells=total, regions=len(files), metadata_files=len(metadata), jar_classes=jar_classes, tiles=sorted(tile_set)); save()
     written = []
     try:
+        unchanged_jar()
+        for baseline in native_snapshots:assert_native_preserved(a.world,baseline)
         for item in journal['files']:
             target = Path(item['target']); target.parent.mkdir(parents=True, exist_ok=True)
-            atomic_replace(target, Path(item['staged']).read_bytes()); written.append(item)
+            if a.installed_jar and target==a.installed_jar:unchanged_jar()
+            if item['staged'] is None:target.unlink()
+            else:atomic_replace(target, Path(item['staged']).read_bytes())
+            written.append(item)
         journal['status'] = 'written'; save()
         # Read back changed sections, not untouched regions or whole-save data.
         for region_key, inputs in sorted(files.items()):
@@ -222,7 +439,24 @@ def install(a):
                 if np.any(actual != after[mask]): raise ValueError(f'Installed section mismatch {(cx,cz,sy)}')
                 pending[cx,cz].discard(sy)
             if any(pending.values()): raise ValueError(f'Missing written sections {region_key}')
-        journal.update(status='installed', seconds=round(time.monotonic()-start), changed_section_readback=True, lod='required'); save()
+        device_count=0
+        for target,source in metadata:
+            if source is None:
+                if target.exists():raise ValueError('Retired native endpoint still exists: '+str(target))
+            elif target.read_bytes()!=source.read_bytes():raise ValueError('Installed metadata mismatch: '+str(target))
+        for baseline in native_geometry_finals or native_snapshots:assert_native_preserved(a.world,baseline,native_additions)
+        for (rx,rz),chunks in devices.items():
+            _,raw=read_region(dimension_dir(a.world,DIM)/'region'/f'r.{rx}.{rz}.mca')
+            for (cx,cz),changes in chunks.items():
+                root=parse_chunk(raw[(cz%32)*32+cx%32])
+                actual={tuple(int(tag[k])for k in('x','y','z')):tag for tag in root.get('block_entities',[])}
+                for pos,change in changes.items():
+                    if actual.get(pos)!=change.get('After'):raise ValueError(f'Installed device NBT mismatch {pos}')
+                    device_count+=1
+        journal.update(status='installed', seconds=round(time.monotonic()-start), changed_section_readback=True,
+            changed_device_nbt_readback=device_count,metadata_readback=len(metadata),
+            native_additions=len(native_additions),existing_native_members_exact=bool(native_snapshots) and not native_geometry_reports,
+            native_geometry_migrations=native_geometry_reports,lod='required'); save()
         print(json.dumps({k:v for k,v in journal.items() if k not in ('files','tiles')}), flush=True)
     except BaseException:
         for item in reversed(written):
@@ -236,9 +470,15 @@ def main():
     p = argparse.ArgumentParser(__doc__)
     for name in ('world','backup'): p.add_argument('--'+name, type=Path, required=True)
     for name in ('installed-jar','compiled-jar'): p.add_argument('--'+name, type=Path)
-    p.add_argument('--candidate', type=Path, action='append', required=True, help='Ordered arrays; later candidate takes precedence')
+    p.add_argument('--terrain-resource-only',action='store_true',help='Replace only the compiled terrain resource; retain all installed code and assets')
+    p.add_argument('--terrain-consumer-only',action='store_true',help='Replace only HakoneSurfaceField and its two data records plus both matching terrain resources')
+    p.add_argument('--candidate', type=Path, action='append', required=True, help='Compatible arrays; conflicting final states are rejected')
+    p.add_argument('--workers',type=int,choices=range(1,5),default=1,help='Parallel staging only; publication stays under the parent world lock')
     a = p.parse_args()
     if bool(a.installed_jar)!=bool(a.compiled_jar):p.error('Supply both JAR paths or neither')
+    if a.terrain_resource_only and not a.installed_jar:p.error('Terrain resource mode requires both JAR paths')
+    if a.terrain_consumer_only and not a.installed_jar:p.error('Terrain consumer mode requires both JAR paths')
+    if a.terrain_resource_only and a.terrain_consumer_only:p.error('Choose one terrain delivery mode')
     with stopped_world(a.world): install(a)
 
 

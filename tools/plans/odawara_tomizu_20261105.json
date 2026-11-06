@@ -1,0 +1,19 @@
+{
+  "id": "odawara-tomizu-east",
+  "name": "Odawara Tomizu eastern neighbourhood",
+  "label": "富水东街区",
+  "core": [2976, -688, 3296, -368],
+  "terminals": [
+    ["tomizu-east-interface", "富水站东侧街道接口", [3180, -606]],
+    ["east-residential", "东侧住宅街", [3260, -550]],
+    ["south-bank-interface", "南侧河岸街道接口", [3216, -481]],
+    ["north-interface", "北侧街道接口", [3210, -612]]
+  ],
+  "maximum_buildings": 48,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

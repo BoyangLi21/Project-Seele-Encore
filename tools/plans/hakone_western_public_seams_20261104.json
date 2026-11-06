@@ -1,0 +1,212 @@
+[
+  {
+    "pos": [
+      978,
+      57,
+      818
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      978,
+      57,
+      819
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      979,
+      57,
+      819
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      979,
+      57,
+      820
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      980,
+      57,
+      820
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      980,
+      57,
+      821
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      980,
+      61,
+      827
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      981,
+      61,
+      827
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      979,
+      61,
+      828
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      980,
+      61,
+      828
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      979,
+      61,
+      829
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      980,
+      61,
+      829
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      979,
+      61,
+      830
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      980,
+      61,
+      830
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      980,
+      61,
+      831
+    ],
+    "before": "minecraft:oak_leaves[distance=1,persistent=true,waterlogged=false]",
+    "after": "minecraft:air",
+    "kind": "foliage clearance"
+  },
+  {
+    "pos": [
+      981,
+      57,
+      889
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      980,
+      57,
+      890
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      981,
+      57,
+      890
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:black_concrete",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      990,
+      59,
+      892
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:smooth_stone",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      988,
+      58,
+      893
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:smooth_stone",
+    "kind": "floor"
+  },
+  {
+    "pos": [
+      989,
+      59,
+      893
+    ],
+    "before": "minecraft:air",
+    "after": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+    "kind": "floor"
+  }
+]

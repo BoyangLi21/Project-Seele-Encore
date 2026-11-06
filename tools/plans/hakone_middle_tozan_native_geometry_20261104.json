@@ -1,0 +1,1190 @@
+{
+  "moves": [
+    {
+      "before": [
+        1522,
+        6,
+        1048
+      ],
+      "after": [
+        1522,
+        5,
+        1048
+      ]
+    },
+    {
+      "before": [
+        1531,
+        5,
+        1052
+      ],
+      "after": [
+        1531,
+        4,
+        1052
+      ]
+    },
+    {
+      "before": [
+        1549,
+        3,
+        1013
+      ],
+      "after": [
+        1549,
+        2,
+        1013
+      ]
+    },
+    {
+      "before": [
+        1552,
+        1,
+        1003
+      ],
+      "after": [
+        1552,
+        2,
+        1003
+      ]
+    },
+    {
+      "before": [
+        1770,
+        -23,
+        1160
+      ],
+      "after": [
+        1770,
+        -25,
+        1160
+      ]
+    },
+    {
+      "before": [
+        1785,
+        -25,
+        1157
+      ],
+      "after": [
+        1785,
+        -27,
+        1157
+      ]
+    },
+    {
+      "before": [
+        1802,
+        -28,
+        1156
+      ],
+      "after": [
+        1802,
+        -27,
+        1156
+      ]
+    },
+    {
+      "before": [
+        1774,
+        -29,
+        1148
+      ],
+      "after": [
+        1774,
+        -28,
+        1148
+      ]
+    }
+  ],
+  "rails": [
+    {
+      "id": "HT-3-22",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\15\\00000000000005C1-0000000000000009-0000000000000415-00000000000005E6-0000000000000006-0000000000000415",
+      "before": {
+        "position1": {
+          "x": 1473,
+          "y": 9,
+          "z": 1045
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1510,
+          "y": 6,
+          "z": 1045
+        },
+        "angle2": "W",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1473,
+          "y": 9,
+          "z": 1045
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1510,
+          "y": 6,
+          "z": 1045
+        },
+        "angle2": "W",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-3-23",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\18\\00000000000005E6-0000000000000006-0000000000000415-00000000000005F2-0000000000000006-0000000000000418",
+      "before": {
+        "position1": {
+          "x": 1510,
+          "y": 6,
+          "z": 1045
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1522,
+          "y": 6,
+          "z": 1048
+        },
+        "angle2": "NWW",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1510,
+          "y": 6,
+          "z": 1045
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1522,
+          "y": 5,
+          "z": 1048
+        },
+        "angle2": "NWW",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-3-24",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\1C\\00000000000005F2-0000000000000006-0000000000000418-00000000000005FB-0000000000000005-000000000000041C",
+      "before": {
+        "position1": {
+          "x": 1522,
+          "y": 6,
+          "z": 1048
+        },
+        "angle1": "SEE",
+        "position2": {
+          "x": 1531,
+          "y": 5,
+          "z": 1052
+        },
+        "angle2": "NW",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1522,
+          "y": 5,
+          "z": 1048
+        },
+        "angle1": "SEE",
+        "position2": {
+          "x": 1531,
+          "y": 4,
+          "z": 1052
+        },
+        "angle2": "NW",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-3-25",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\2A\\00000000000005FB-0000000000000005-000000000000041C-0000000000000607-0000000000000004-000000000000042A",
+      "before": {
+        "position1": {
+          "x": 1531,
+          "y": 5,
+          "z": 1052
+        },
+        "angle1": "SE",
+        "position2": {
+          "x": 1543,
+          "y": 4,
+          "z": 1066
+        },
+        "angle2": "NNW",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1531,
+          "y": 4,
+          "z": 1052
+        },
+        "angle1": "SE",
+        "position2": {
+          "x": 1543,
+          "y": 4,
+          "z": 1066
+        },
+        "angle2": "NNW",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "ohiradai-branch",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\E3\\00000000000005FE-0000000000000002-00000000000003DE-0000000000000608-0000000000000002-00000000000003E3",
+      "before": {
+        "position1": {
+          "x": 1544,
+          "y": 2,
+          "z": 995
+        },
+        "angle1": "NWW",
+        "position2": {
+          "x": 1534,
+          "y": 2,
+          "z": 990
+        },
+        "angle2": "SEE",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1544,
+          "y": 2,
+          "z": 995
+        },
+        "angle1": "NWW",
+        "position2": {
+          "x": 1534,
+          "y": 2,
+          "z": 990
+        },
+        "angle2": "SEE",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-4-2",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\F5\\0000000000000603-0000000000000003-0000000000000411-000000000000060D-0000000000000003-00000000000003F5",
+      "before": {
+        "position1": {
+          "x": 1539,
+          "y": 3,
+          "z": 1041
+        },
+        "angle1": "NNE",
+        "position2": {
+          "x": 1549,
+          "y": 3,
+          "z": 1013
+        },
+        "angle2": "S",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1539,
+          "y": 3,
+          "z": 1041
+        },
+        "angle1": "NNE",
+        "position2": {
+          "x": 1549,
+          "y": 2,
+          "z": 1013
+        },
+        "angle2": "S",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-4-3",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\F5\\0000000000000608-0000000000000002-00000000000003E3-000000000000060D-0000000000000003-00000000000003F5",
+      "before": {
+        "position1": {
+          "x": 1549,
+          "y": 3,
+          "z": 1013
+        },
+        "angle1": "N",
+        "position2": {
+          "x": 1544,
+          "y": 2,
+          "z": 995
+        },
+        "angle2": "SEE",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1549,
+          "y": 2,
+          "z": 1013
+        },
+        "angle1": "N",
+        "position2": {
+          "x": 1544,
+          "y": 2,
+          "z": 995
+        },
+        "angle2": "SEE",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-5-0",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\EB\\0000000000000608-0000000000000002-00000000000003E3-0000000000000610-0000000000000001-00000000000003EB",
+      "before": {
+        "position1": {
+          "x": 1544,
+          "y": 2,
+          "z": 995
+        },
+        "angle1": "SEE",
+        "position2": {
+          "x": 1552,
+          "y": 1,
+          "z": 1003
+        },
+        "angle2": "NNW",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1544,
+          "y": 2,
+          "z": 995
+        },
+        "angle1": "SEE",
+        "position2": {
+          "x": 1552,
+          "y": 2,
+          "z": 1003
+        },
+        "angle2": "NNW",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-5-1",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\19\\0000000000000610-0000000000000001-00000000000003EB-0000000000000620-FFFFFFFFFFFFFFFD-0000000000000419",
+      "before": {
+        "position1": {
+          "x": 1552,
+          "y": 1,
+          "z": 1003
+        },
+        "angle1": "SSE",
+        "position2": {
+          "x": 1568,
+          "y": -3,
+          "z": 1049
+        },
+        "angle2": "NNW",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1552,
+          "y": 2,
+          "z": 1003
+        },
+        "angle1": "SSE",
+        "position2": {
+          "x": 1568,
+          "y": -3,
+          "z": 1049
+        },
+        "angle2": "NNW",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-5-14",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\94\\00000000000006BA-FFFFFFFFFFFFFFEC-0000000000000495-00000000000006C9-FFFFFFFFFFFFFFEB-0000000000000494",
+      "before": {
+        "position1": {
+          "x": 1722,
+          "y": -20,
+          "z": 1173
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1737,
+          "y": -21,
+          "z": 1172
+        },
+        "angle2": "SWW",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1722,
+          "y": -20,
+          "z": 1173
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1737,
+          "y": -21,
+          "z": 1172
+        },
+        "angle2": "SWW",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-5-15",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\88\\00000000000006C9-FFFFFFFFFFFFFFEB-0000000000000494-00000000000006EA-FFFFFFFFFFFFFFE9-0000000000000488",
+      "before": {
+        "position1": {
+          "x": 1737,
+          "y": -21,
+          "z": 1172
+        },
+        "angle1": "NEE",
+        "position2": {
+          "x": 1770,
+          "y": -23,
+          "z": 1160
+        },
+        "angle2": "SWW",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1737,
+          "y": -21,
+          "z": 1172
+        },
+        "angle1": "NEE",
+        "position2": {
+          "x": 1770,
+          "y": -25,
+          "z": 1160
+        },
+        "angle2": "SWW",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-5-16",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\85\\00000000000006EA-FFFFFFFFFFFFFFE9-0000000000000488-00000000000006F9-FFFFFFFFFFFFFFE7-0000000000000485",
+      "before": {
+        "position1": {
+          "x": 1770,
+          "y": -23,
+          "z": 1160
+        },
+        "angle1": "NEE",
+        "position2": {
+          "x": 1785,
+          "y": -25,
+          "z": 1157
+        },
+        "angle2": "W",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1770,
+          "y": -25,
+          "z": 1160
+        },
+        "angle1": "NEE",
+        "position2": {
+          "x": 1785,
+          "y": -27,
+          "z": 1157
+        },
+        "angle2": "W",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-5-17",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\87\\00000000000006F9-FFFFFFFFFFFFFFE7-0000000000000485-0000000000000719-FFFFFFFFFFFFFFE5-0000000000000487",
+      "before": {
+        "position1": {
+          "x": 1785,
+          "y": -25,
+          "z": 1157
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1817,
+          "y": -27,
+          "z": 1159
+        },
+        "angle2": "W",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1785,
+          "y": -27,
+          "z": 1157
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1817,
+          "y": -27,
+          "z": 1159
+        },
+        "angle2": "W",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-6-0",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\87\\000000000000070A-FFFFFFFFFFFFFFE4-0000000000000484-0000000000000719-FFFFFFFFFFFFFFE5-0000000000000487",
+      "before": {
+        "position1": {
+          "x": 1817,
+          "y": -27,
+          "z": 1159
+        },
+        "angle1": "W",
+        "position2": {
+          "x": 1802,
+          "y": -28,
+          "z": 1156
+        },
+        "angle2": "SEE",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1817,
+          "y": -27,
+          "z": 1159
+        },
+        "angle1": "W",
+        "position2": {
+          "x": 1802,
+          "y": -27,
+          "z": 1156
+        },
+        "angle2": "SEE",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-6-1",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\84\\00000000000006EE-FFFFFFFFFFFFFFE3-000000000000047C-000000000000070A-FFFFFFFFFFFFFFE4-0000000000000484",
+      "before": {
+        "position1": {
+          "x": 1802,
+          "y": -28,
+          "z": 1156
+        },
+        "angle1": "NWW",
+        "position2": {
+          "x": 1774,
+          "y": -29,
+          "z": 1148
+        },
+        "angle2": "SEE",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1802,
+          "y": -27,
+          "z": 1156
+        },
+        "angle1": "NWW",
+        "position2": {
+          "x": 1774,
+          "y": -28,
+          "z": 1148
+        },
+        "angle2": "SEE",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "HT-6-2",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\7C\\00000000000006E9-FFFFFFFFFFFFFFE3-0000000000000476-00000000000006EE-FFFFFFFFFFFFFFE3-000000000000047C",
+      "before": {
+        "position1": {
+          "x": 1774,
+          "y": -29,
+          "z": 1148
+        },
+        "angle1": "NWW",
+        "position2": {
+          "x": 1769,
+          "y": -29,
+          "z": 1142
+        },
+        "angle2": "SSE",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1774,
+          "y": -28,
+          "z": 1148
+        },
+        "angle1": "NWW",
+        "position2": {
+          "x": 1769,
+          "y": -29,
+          "z": 1142
+        },
+        "angle2": "SSE",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    },
+    {
+      "id": "deyama-branch",
+      "file": "F:\\eva\\artifacts\\r53_repair_20261015\\client\\saves\\HOTFIX_20261025\\mtr\\projectseele\\geofront\\rails\\87\\0000000000000718-FFFFFFFFFFFFFFE5-0000000000000487-0000000000000719-FFFFFFFFFFFFFFE5-0000000000000487",
+      "before": {
+        "position1": {
+          "x": 1817,
+          "y": -27,
+          "z": 1159
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1816,
+          "y": -27,
+          "z": 1159
+        },
+        "angle2": "W",
+        "shape": "QUADRATIC",
+        "verticalRadius": 40.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      },
+      "after": {
+        "position1": {
+          "x": 1817,
+          "y": -27,
+          "z": 1159
+        },
+        "angle1": "E",
+        "position2": {
+          "x": 1816,
+          "y": -27,
+          "z": 1159
+        },
+        "angle2": "W",
+        "shape": "TWO_RADII",
+        "verticalRadius": 5.0,
+        "styles": [
+          "default_3d"
+        ],
+        "speedLimit1": 24,
+        "speedLimit2": 24,
+        "isPlatform": false,
+        "isSiding": false,
+        "canAccelerate": true,
+        "canTurnBack": false,
+        "canConnectRemotely": false,
+        "canHaveSignal": true,
+        "signalColors": [],
+        "transportMode": "TRAIN",
+        "stylesMigratedLegacy": true
+      }
+    }
+  ]
+}

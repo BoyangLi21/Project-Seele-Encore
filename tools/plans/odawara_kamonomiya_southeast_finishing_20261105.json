@@ -1,0 +1,6 @@
+{
+  "tree_clusters": [[4072, 24], [4170, 52], [4094, 166], [4198, 184]],
+  "tree_species": ["oak", "birch"],
+  "tree_probabilities": [0.9, 0.1],
+  "tree_attempts_per_cluster": 4
+}

@@ -247,7 +247,8 @@ public final class RegionalTransitAuthor
                     }
             }
             if(tick%500==0)System.out.println("MTR native validation tick="+tick+" depots="+depots.stream().map(d->d.getName()+":"+d.getLastGeneratedStatus()).toList());
-            if(tick>800 && deployed && progress.values().stream().allMatch(p->p.size()>=5))break;
+            if(tick>800 && deployed && vehicleProgress.values().stream()
+                    .allMatch(vehicles->vehicles.values().stream().anyMatch(positions->positions.size()>=5)))break;
         }
         JsonArray results=new JsonArray();boolean all=true;
         for(int i=0;i<depots.size();i++)

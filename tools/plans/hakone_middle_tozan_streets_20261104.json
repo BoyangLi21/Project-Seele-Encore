@@ -1,0 +1,117 @@
+{
+  "source": "Connect current Ohiradai arrival street to the eastern hillside road, retiring measured disconnected old spurs.",
+  "togendai_forecourt": false,
+  "core": [
+    1501,
+    920,
+    1605,
+    1028
+  ],
+  "earthwork_blend_distance": 24,
+  "connectivity_seed": [
+    1505,
+    950
+  ],
+  "retired_public_mask": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\middle-tozan-street-survey-v1\\retirement-v2.npz",
+  "retire_road_areas": [],
+  "retained_soil_areas": [],
+  "protected_volumes": [],
+  "preserve_train_corridors": false,
+  "retained_pavement_materials": [
+    "projectseele:period_station_floor"
+  ],
+  "streets": [
+    {
+      "id": "ohiradai-east-hillside-connection",
+      "points": [
+        [
+          1505,
+          0,
+          950
+        ],
+        [
+          1505,
+          -1,
+          930
+        ],
+        [
+          1537,
+          -1,
+          923
+        ],
+        [
+          1574,
+          -3,
+          941
+        ],
+        [
+          1600,
+          -6,
+          973
+        ],
+        [
+          1595,
+          -10,
+          1004
+        ],
+        [
+          1580,
+          -12,
+          1035
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    }
+  ],
+  "retained_ports": [
+    {
+      "street": "ohiradai-east-hillside-connection",
+      "end": 0,
+      "radius": 7
+    },
+    {
+      "street": "ohiradai-east-hillside-connection",
+      "end": -1,
+      "radius": 8
+    }
+  ],
+  "footways": [],
+  "public_paths": [],
+  "parcel_floors": {},
+  "tree_clusters": [
+    [
+      1535,
+      911
+    ],
+    [
+      1574,
+      970
+    ]
+  ],
+  "woodland_areas": [],
+  "retire_street_remnants": [
+    {
+      "pos": [
+        1507,
+        -2,
+        946
+      ],
+      "state": "minecraft:light_gray_concrete",
+      "after": "minecraft:stone"
+    },
+    {
+      "pos": [
+        1508,
+        -2,
+        946
+      ],
+      "state": "minecraft:light_gray_concrete",
+      "after": "minecraft:stone"
+    }
+  ],
+  "hillside_street_details": true
+}

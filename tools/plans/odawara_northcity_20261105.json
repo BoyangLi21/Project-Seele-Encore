@@ -1,0 +1,20 @@
+{
+  "id": "odawara-northcity",
+  "name": "Odawara northern city extension",
+  "label": "小田原北街区",
+  "core": [3456, 312, 3680, 400],
+  "terminals": [
+    ["existing-city-interface", "既有绿町街道接入", [3460, 430]],
+    ["north-residential", "绿町东北住宅街", [3528, 328]],
+    ["eastern-residential", "东侧生活街", [3598, 388]],
+    ["central-services", "北街区生活服务路口", [3564, 388]]
+  ],
+  "maximum_buildings": 36,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "preserve_existing_district": true,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

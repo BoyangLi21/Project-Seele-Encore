@@ -1,0 +1,326 @@
+"""Root landscape correction for seven proven artificial R45 mask cliffs.
+
+Original natural cliffs are retained. Current, still-matching authored soil
+is feathered toward its recorded original terrain; adjacent measured dry
+natural ground may form the slope toe. Machinery, water, roads and complete
+trees retain their measured ground and blocks.
+"""
+import os
+os.environ.setdefault('OPENBLAS_NUM_THREADS', '1')
+import argparse
+import json
+import msvcrt
+from pathlib import Path
+import numpy as np
+from scipy.ndimage import distance_transform_edt, label, find_objects
+from scipy.spatial import cKDTree
+import matplotlib
+matplotlib.use('Agg')
+import matplotlib.pyplot as plt
+import regional_voxels as vox
+from extend_world_depth_r52 import acquire_world_lock
+from fit_original_outer_guide_slots_r52 import sha
+from prepare_continuous_upright_civil_r52 import cuboids
+from query_blocks import iter_block_entities, iter_selected_sections, chunk_statuses
+from r52_spatial_plan import BASE
+from survey_r52_original_complex import measure
+
+ROOT = Path(__file__).resolve().parents[1]
+FACTS = ROOT / '.Codex/r52_global_height_ownership_readonly/R45_COMPLETE_CONNECTED_SEAM_BOUNDARIES_CURRENT_FACTS.json'
+FIELDS = Path('D:/eva/artifacts/rebuild_r45/terrain_global_agent')
+OUT = BASE / 'final_map_audit/r45_seam_feather'
+IDS = (6114, 7670, 7849, 8169, 8801, 9222, 10621)
+GROUND = {'minecraft:stone', 'minecraft:dirt', 'minecraft:grass_block', 'minecraft:gravel', 'minecraft:sand', 'minecraft:clay'}
+AIR = {'minecraft:air', 'minecraft:cave_air', 'minecraft:void_air'}
+
+
+def smooth(t):
+    t = np.clip(t, 0, 1)
+    return t*t*(3-2*t)
+
+
+def measured_full_sections(lo,hi):
+    """Unknown perimeter chunks are held, never treated as empty land."""
+    names=['UNREAD'];lookup={'UNREAD':0}
+    values=np.zeros((hi[1]-lo[1]+1,hi[2]-lo[2]+1,hi[0]-lo[0]+1),np.uint16)
+    all_chunks={(cx,cz):set(range(lo[1]//16,hi[1]//16+1)) for cx in range(lo[0]//16,hi[0]//16+1) for cz in range(lo[2]//16,hi[2]//16+1)}
+    statuses=chunk_statuses(BASE/'WORLD_R52','projectseele:geofront',all_chunks)
+    selected={p:ys for p,ys in all_chunks.items() if statuses.get(p)=='full'}
+    for cx,cz,sy,palette,indices in iter_selected_sections(BASE/'WORLD_R52','projectseele:geofront',selected):
+        mapping=[]
+        for state in palette:
+            if state not in lookup:lookup[state]=len(names);names.append(state)
+            mapping.append(lookup[state])
+        data=np.asarray(mapping,np.uint16)[indices].reshape(16,16,16)
+        x,y,z=cx*16,sy*16,cz*16
+        a=(max(lo[0],x),max(lo[1],y),max(lo[2],z));b=(min(hi[0],x+15),min(hi[1],y+15),min(hi[2],z+15))
+        values[a[1]-lo[1]:b[1]-lo[1]+1,a[2]-lo[2]:b[2]-lo[2]+1,a[0]-lo[0]:b[0]-lo[0]+1]=data[a[1]-y:b[1]-y+1,a[2]-z:b[2]-z+1,a[0]-x:b[0]-x+1]
+    return values,names
+
+
+def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument('--apply', action='store_true')
+    ap.add_argument('--component', type=int, choices=IDS)
+    args = ap.parse_args()
+    OUT.mkdir(parents=True, exist_ok=True)
+    facts = json.loads(FACTS.read_text(encoding='utf8'))
+    with np.load(FIELDS / 'hakone_landfield_v4/absolute_field.npz') as f:
+        origin = [int(f['x_origin']), int(f['z_origin'])]
+        original = f['original'].copy()
+        expected = np.where(f['eligible'], f['height'], original)
+        authored = f['eligible'].copy()
+    with np.load(FIELDS / 'new_height_ecology_v2/whole_habitat_field.npz') as f:
+        has = f['height'] != -32768
+        expected = np.where(has, f['height'], expected)
+        authored |= has
+    roads = np.load(BASE / 'final_map_audit/full_road_columns/CURRENT_ROAD_COLUMNS.npz')
+    road_xz = set(map(tuple, roads['coordinates']))
+    components=[c for c in facts['components'] if c['component'] in IDS]
+    # These two 64m neighbourhoods overlap. Author one shared surface, not
+    # two independently generated patches with conflicting exact preconditions.
+    a=next(c for c in components if c['component']==7670)
+    b=next(c for c in components if c['component']==7849)
+    a=dict(a,member_components=[7670,7849],
+           descriptive_bbox_xz=[min(a['descriptive_bbox_xz'][0],b['descriptive_bbox_xz'][0]),min(a['descriptive_bbox_xz'][1],b['descriptive_bbox_xz'][1]),max(a['descriptive_bbox_xz'][2],b['descriptive_bbox_xz'][2]),max(a['descriptive_bbox_xz'][3],b['descriptive_bbox_xz'][3])],
+           column_facts=a['column_facts']+b['column_facts'],exact_connected_boundary_edges=a['exact_connected_boundary_edges']+b['exact_connected_boundary_edges'])
+    components=[a if c['component']==7670 else c for c in components if c['component']!=7849]
+    north_path=ROOT/'.Codex/r52_global_height_ownership_readonly/COMPONENT_10621_NORTH44_CURRENT_RAW_FACTS.json'
+    assert sha(north_path)=='9cd66e81c0b2c6efbf8be9066e4ef5b374c332f3f7032d15829bcbfaf4f17e8e'
+    north=json.loads(north_path.read_text(encoding='utf8'))
+    c=next(c for c in components if c['component']==10621)
+    c['descriptive_bbox_xz']=[214,1635,287,1648]
+    c['column_facts']=c['column_facts']+[dict(xz=p) for e in north['edges'] for p in e['columns']]
+    c['exact_connected_boundary_edges']=c['exact_connected_boundary_edges']+[dict(columns=e['columns'],root_max_gap=2,reason='Measured dry-natural generation seam on exact chunk boundary; historical north height unknown') for e in north['edges']]
+    reports = []
+    for component in components:
+        number = component['component']
+        if number not in IDS or args.component and number != args.component:
+            continue
+        stage = f'component_{number}_natural_transition'
+        assert not list((OUT/stage).glob('applied_*')), 'Do not replay applied terrain'
+        x0, z0, x1, z1 = component['descriptive_bbox_xz']
+        lo = (x0-68, 32, z0-68)
+        hi = (x1+68, 255, z1+68)
+        cache = OUT / ('CURRENT_GROUP_7670_7849.npz' if number==7670 else 'CURRENT_GROUP_10621_NORTH44.npz' if number==10621 else f'CURRENT_COMPONENT_{number}.npz')
+        if cache.exists():
+            with np.load(cache) as f:
+                assert f['origin'].tolist() == list(lo)
+                before, names = f['states'].copy(), list(map(str, f['palette']))
+        else:
+            before, names = measured_full_sections(lo, hi)
+            np.savez_compressed(cache, origin=lo, states=before, palette=names)
+        after = before.copy()
+        for name in ('minecraft:air','minecraft:stone','minecraft:dirt','minecraft:grass_block[snowy=false]'):
+            if name not in names:
+                names.append(name)
+        codes = {s: i for i, s in enumerate(names)}
+        iz, ix = lo[2]-origin[1], lo[0]-origin[0]
+        nz, nx = before.shape[1:]
+        old = original[iz:iz+nz, ix:ix+nx].astype(int)
+        wanted_before = expected[iz:iz+nz, ix:ix+nx].astype(int)
+        owned = authored[iz:iz+nz, ix:ix+nx] & (old != -32768)
+        z, x = np.mgrid[lo[2]:hi[2]+1, lo[0]:hi[0]+1]
+        is_soil = np.asarray([s.split('[')[0] in GROUND for s in names])
+        is_air = np.asarray([s in AIR for s in names])
+        is_plant = np.asarray([s.split('[')[0] in ('minecraft:grass','minecraft:short_grass','minecraft:tall_grass','minecraft:fern','minecraft:large_fern','minecraft:snow','minecraft:dandelion','minecraft:poppy','minecraft:azalea','minecraft:flowering_azalea') for s in names])
+        is_tree = np.asarray([s.split('[')[0].endswith(('_log','_leaves')) for s in names])
+        is_log = np.asarray([s.split('[')[0].endswith('_log') for s in names])
+        is_hardware = np.asarray([not vox.natural(s) for s in names]) & ~is_plant
+        is_water = np.asarray([s.startswith('minecraft:water') for s in names])
+        ground = np.full((nz,nx), -32768, int)
+        keep = np.zeros((nz,nx), bool)
+        tree_columns = np.zeros_like(keep)
+        for n,y in enumerate(range(lo[1],hi[1]+1)):
+            ground = np.where(is_soil[before[n]], y, ground)
+            tree_columns |= is_tree[before[n]]
+            keep |= is_hardware[before[n]] | is_water[before[n]]
+        labels,tree_count=label(is_tree[before],structure=np.ones((3,3,3),int))
+        movable_trees=[];held_trees=[]
+        for tree_id,slices in enumerate(find_objects(labels),1):
+            yy,zz,xx=np.where(labels[slices]==tree_id)
+            yy+=slices[0].start;zz+=slices[1].start;xx+=slices[2].start
+            roots=is_log[before[yy,zz,xx]] & (yy+lo[1]==ground[zz,xx]+1)
+            boundary=any(s.start==0 or s.stop==before.shape[i] for i,s in enumerate(slices))
+            if boundary or int(roots.sum())!=1:
+                keep[zz,xx]=True
+                held_trees.append(dict(id=tree_id,cells=len(yy),touches_survey_edge=boundary,root_count=int(roots.sum())))
+            else:
+                root_index=int(np.flatnonzero(roots)[0])
+                movable_trees.append(dict(id=tree_id,indices=(yy,zz,xx),root=(int(zz[root_index]),int(xx[root_index]))))
+        del labels
+        for xx,zz in road_xz:
+            if lo[0] <= xx <= hi[0] and lo[2] <= zz <= hi[2]:
+                keep[zz-lo[2],xx-lo[0]] = True
+        owned &= (ground == wanted_before) & (ground >= 32)
+        # Historic authoring eligibility is not an ownership or collision
+        # boundary. Current measured natural dry soil can form the slope toe.
+        # Missing historic height falls back to the measured current shape,
+        # never to a placeholder or an invented historical surface.
+        known_dry_surface=ground>=32
+        original_known=old!=-32768
+        old=np.where(old==-32768,ground,old)
+        seeds = np.ones((nz,nx), bool)
+        for row in component['column_facts']:
+            xx,zz = row['xz']
+            seeds[zz-lo[2],xx-lo[0]] = False
+        distance = distance_transform_edt(seeds)
+        weight = 1-smooth(np.maximum(0,distance-1)/64)
+        # Preserve whole tree/hardware columns with a gradual terrain collar.
+        keep |= ~known_dry_surface | (distance >= 64)
+        collar = smooth(distance_transform_edt(~keep)/18)
+        target = np.rint(ground + (old-ground)*weight*collar).astype(int)
+        target[keep] = ground[keep]
+        adjustable = known_dry_surface & ~keep
+        edge_limits=[]
+        for axis in (0,1):
+            aa=(slice(None,-1),slice(None)) if axis==0 else (slice(None),slice(None,-1))
+            bb=(slice(1,None),slice(None)) if axis==0 else (slice(None),slice(1,None))
+            historic=np.where(original_known[aa]&original_known[bb],np.abs(old[aa]-old[bb]),0)
+            edge_limits.append(np.maximum(2,np.maximum(historic,np.abs(ground[aa]-ground[bb]))))
+        for edge in component['exact_connected_boundary_edges']:
+            (X,Z),(XX,ZZ)=edge['columns']
+            axis=0 if X==XX else 1
+            zz,xx=min(Z,ZZ)-lo[2],min(X,XX)-lo[0]
+            edge_limits[axis][zz,xx]=edge.get('root_max_gap',max(2,abs(old[Z-lo[2],X-lo[0]]-old[ZZ-lo[2],XX-lo[0]])))
+        # Fixed measured interfaces determine a feasible upper envelope.
+        # A monotone closure then enforces local relief without oscillating
+        # between adjacent pixel rows or pushing through protected columns.
+        ceiling=np.full(ground.shape,100000,int)
+        ceiling[~adjustable]=ground[~adjustable]
+        for unused in range(512):
+            previous=ceiling.copy()
+            for axis in (0,1):
+                aa=(slice(None,-1),slice(None)) if axis==0 else (slice(None),slice(None,-1))
+                bb=(slice(1,None),slice(None)) if axis==0 else (slice(None),slice(1,None))
+                bound=edge_limits[axis]
+                valid=(ground[aa]>=32)&(ground[bb]>=32)
+                A,B=ceiling[aa].copy(),ceiling[bb].copy()
+                update=ceiling.copy()
+                update[aa]=np.where(valid & adjustable[aa],np.minimum(update[aa],B+bound),update[aa])
+                update[bb]=np.where(valid & adjustable[bb],np.minimum(update[bb],A+bound),update[bb])
+                ceiling=update
+            if np.array_equal(previous,ceiling):break
+        target=np.minimum(target,ceiling)
+        for unused in range(512):
+            previous=target.copy()
+            for axis in (0,1):
+                aa=(slice(None,-1),slice(None)) if axis==0 else (slice(None),slice(None,-1))
+                bb=(slice(1,None),slice(None)) if axis==0 else (slice(None),slice(1,None))
+                bound=edge_limits[axis]
+                valid=(ground[aa]>=32)&(ground[bb]>=32)
+                A,B=target[aa].copy(),target[bb].copy()
+                update=target.copy()
+                update[aa]=np.where(valid & adjustable[aa],np.maximum(update[aa],B-bound),update[aa])
+                update[bb]=np.where(valid & adjustable[bb],np.maximum(update[bb],A-bound),update[bb])
+                target=update
+            if np.array_equal(previous,target):break
+        # Complete tree components keep every original block and its relative
+        # position. Fit the nearby soil below the translated canopy, instead
+        # of preserving old tree-level holes or growing artificial pedestals.
+        for tree_fit_pass in range(32):
+            previous_tree_fit=target.copy()
+            for tree in movable_trees:
+                rz,rx=tree['root'];dy=int(target[rz,rx]-ground[rz,rx])
+                yy,zz,xx=tree['indices']
+                caps=yy+lo[1]+dy-1
+                np.minimum.at(target,(zz,xx),caps)
+            for unused in range(512):
+                previous=target.copy()
+                for axis in (0,1):
+                    aa=(slice(None,-1),slice(None)) if axis==0 else (slice(None),slice(None,-1))
+                    bb=(slice(1,None),slice(None)) if axis==0 else (slice(None),slice(1,None))
+                    A,B=target[aa].copy(),target[bb].copy();bound=edge_limits[axis]
+                    valid=(ground[aa]>=32)&(ground[bb]>=32)
+                    update=target.copy()
+                    update[aa]=np.where(valid & adjustable[aa],np.minimum(update[aa],B+bound),update[aa])
+                    update[bb]=np.where(valid & adjustable[bb],np.minimum(update[bb],A+bound),update[bb])
+                    target=update
+                if np.array_equal(previous,target):break
+            if np.array_equal(previous_tree_fit,target):break
+        assert np.all(target[keep]==ground[keep])
+        new_bad_edges=[]
+        for axis in (0,1):
+            aa=(slice(None,-1),slice(None)) if axis==0 else (slice(None),slice(None,-1))
+            bb=(slice(1,None),slice(None)) if axis==0 else (slice(None),slice(1,None))
+            known=original_known[aa]&original_known[bb]
+            allowed=np.maximum(2,np.abs(ground[aa]-ground[bb]))
+            allowed=np.maximum(allowed,np.where(known,np.abs(old[aa]-old[bb]),0))
+            bad=(ground[aa]>=32)&(ground[bb]>=32)&(np.abs(target[aa]-target[bb])>allowed)
+            for zz,xx in np.argwhere(bad):
+                new_bad_edges.append(dict(axis=axis,x=int(xx+lo[0]),z=int(zz+lo[2]),allowed=int(allowed[zz,xx]),after=int(abs(target[aa][zz,xx]-target[bb][zz,xx]))))
+        active = adjustable & (target != ground)
+        assert not np.any(active & keep)
+        moved_trees=[]
+        for tree in movable_trees:
+            rz,rx=tree['root'];dy=int(target[rz,rx]-ground[rz,rx]);tree['delta_y']=dy
+            if not dy:continue
+            yy,zz,xx=tree['indices'];after[yy,zz,xx]=codes['minecraft:air']
+            moved_trees.append(dict(id=tree['id'],root=[rx+lo[0],int(ground[rz,rx]+1),rz+lo[2]],delta_y=dy,cells=len(yy),complete_rigid_translation=True))
+        for n,y in enumerate(range(lo[1],hi[1]+1)):
+            edit = active & (y>=np.minimum(ground,target)-3) & (y<=np.maximum(ground,target)+2)
+            allowed = (is_soil | is_air | is_plant)[after[n]]
+            if np.any(edit & ~allowed):
+                bad_positions=np.argwhere(edit & ~allowed)
+                raise ValueError(('Non-soil terrain content requires component review',number,y,
+                                  [(int(q[1]+lo[0]),int(q[0]+lo[2]),names[int(before[n][tuple(q)])]) for q in bad_positions[:12]]))
+            values = np.where(y>target,codes['minecraft:air'],np.where(y==target,codes['minecraft:grass_block[snowy=false]'],np.where(y>=target-3,codes['minecraft:dirt'],codes['minecraft:stone'])))
+            after[n][edit] = values[edit]
+        moved_flora=0
+        for yy,zz,xx in np.argwhere(is_plant[before] & active[None,:,:]):
+            world_y=int(yy+lo[1]);step=world_y-int(ground[zz,xx])
+            if step not in (1,2):
+                raise ValueError(('Unusual plant component above terrain',number,xx,world_y,zz))
+            target_y=int(target[zz,xx]+step-lo[1])
+            assert names[int(after[target_y,zz,xx])] in AIR
+            after[target_y,zz,xx]=before[yy,zz,xx]
+            moved_flora+=1
+        for tree in movable_trees:
+            dy=tree['delta_y']
+            if not dy:continue
+            yy,zz,xx=tree['indices'];dest_y=yy+dy
+            assert int(dest_y.min())>=0 and int(dest_y.max())<after.shape[0]
+            allowed=(is_air | is_plant)[after[dest_y,zz,xx]]
+            assert allowed.all(),('Complete translated tree hits actual terrain or equipment',number,tree['id'])
+            after[dest_y,zz,xx]=before[yy,zz,xx]
+        edge_rows = []
+        for e in component['exact_connected_boundary_edges']:
+            (X,Z),(XX,ZZ) = e['columns']
+            a,b = (Z-lo[2],X-lo[0]),(ZZ-lo[2],XX-lo[0])
+            edge_rows.append(dict(columns=e['columns'],original_gap=int(abs(old[a]-old[b])) if original_known[a] and original_known[b] else None,before_gap=int(abs(ground[a]-ground[b])),after_gap=int(abs(target[a]-target[b])),required_max_gap=e.get('root_max_gap',max(2,int(abs(old[a]-old[b])))),protected=[bool(keep[a]),bool(keep[b])]))
+        pending = [e for e in edge_rows if e['after_gap']>e['required_max_gap']]
+        devices = dict(iter_block_entities(BASE/'WORLD_R52','projectseele:geofront',lo,hi))
+        for xx,yy,zz in devices:
+            q=yy-lo[1],zz-lo[2],xx-lo[0]
+            assert before[q] == after[q]
+        fig,axs=plt.subplots(1,2,figsize=(12,5),layout='constrained')
+        for ax,h,title in zip(axs,(ground,target),('Actual saved terrain','Root proposed natural transition')):
+            ax.imshow(np.ma.masked_where(ground<32,h),origin='lower',extent=[lo[0],hi[0],lo[2],hi[2]],cmap='terrain',vmin=min(ground[ground>=32].min(),target[ground>=32].min()),vmax=max(ground.max(),target.max()))
+            ax.contour(x,z,keep,levels=[.5],colors='black',linewidths=.25)
+            ax.set(title=title,xlabel='X',ylabel='Z')
+        fig.savefig(OUT/f'COMPONENT_{number}_BEFORE_AFTER.png',dpi=120);plt.close(fig)
+        np.savez_compressed(OUT/f'COMPONENT_{number}_HEIGHTS.npz',origin=[lo[0],lo[2]],before=ground,after=target,active=active,keep=keep)
+        vox.WORLD,vox.OUT,vox.DIM=BASE/'WORLD_R52',OUT,'projectseele:geofront'
+        painter=vox.Painter(vertical_bounds=(-960,320))
+        changed=cuboids(painter,lo,before,after,names,'R52_finite_natural_seam_feather')
+        painter.meta.update(root_author=True,component=number,known_boundary_edges=edge_rows)
+        folder=painter.save_plan(stage)
+        report=dict(schema='projectseele.r52.root-artificial-seam-feather.v1',world_written=False,component=number,
+                    changed_cells=changed,changed_columns=int(active.sum()),retained_tree_columns=int(tree_columns.sum()),
+                    retained_device_count=len(devices),moved_ground_flora_cells=moved_flora,moved_complete_trees=moved_trees,held_tree_components=held_trees,pending_boundary_edges=pending,new_or_worsened_all_neighbor_edges=new_bad_edges,boundary_edges=edge_rows,unknown_columns_held=int(np.sum(ground==-32768)),member_components=component.get('member_components',[number]),
+                    source_inputs={str(p):sha(p) for p in (FACTS,cache,north_path)},native_art_passed=False)
+        if args.apply:
+            assert not pending and not new_bad_edges, 'Review seed and complete affected-neighbour edges before applying'
+            lock=acquire_world_lock()
+            try:
+                report.update(world_written=True,receipt=painter.apply(stage,session_lock=lock))
+            finally:
+                msvcrt.locking(lock.fileno(),msvcrt.LK_UNLCK,1);lock.close()
+        (folder/'PLAN.json').write_text(json.dumps(report,indent=2),encoding='utf8')
+        reports.append({k:v for k,v in report.items() if k not in ('receipt','source_inputs','boundary_edges','pending_boundary_edges','new_or_worsened_all_neighbor_edges') }|{'pending_boundary_edges':len(pending),'new_or_worsened_all_neighbor_edges':len(new_bad_edges)})
+        print(json.dumps(reports[-1]),flush=True)
+    (OUT/'SUMMARY.json').write_text(json.dumps(reports,indent=2),encoding='utf8')
+
+
+if __name__ == '__main__':
+    main()

@@ -67,7 +67,8 @@ def read_level(world: Path) -> dict:
     }
 
 
-def region_chunks(region_path: Path, bounds: tuple[int, int, int, int], selected_chunks=None
+def region_chunks(region_path: Path, bounds: tuple[int, int, int, int], selected_chunks=None,
+                  *, diagnostics=None
                   ) -> Iterator[tuple[int, int, nbtlib.File]]:
     """Yield chunks inside inclusive chunk-coordinate bounds."""
     parts = region_path.stem.split(".")
@@ -76,6 +77,8 @@ def region_chunks(region_path: Path, bounds: tuple[int, int, int, int], selected
     if region_x*32>max_x or region_x*32+31<min_x or region_z*32>max_z or region_z*32+31<min_z:return
     data = region_path.read_bytes()
     if len(data) < 8192:
+        if diagnostics is not None:
+            diagnostics.append(dict(region=str(region_path), kind='empty_region' if not data else 'truncated_header', size=len(data)))
         return
     min_x, max_x, min_z, max_z = bounds
     for index in range(1024):
@@ -90,9 +93,15 @@ def region_chunks(region_path: Path, bounds: tuple[int, int, int, int], selected
             continue
         position = sector * 4096
         if position + 5 > len(data):
+            if diagnostics is not None:
+                diagnostics.append(dict(chunk=[chunk_x,chunk_z],kind='invalid_sector',region=str(region_path)))
             continue
         length = struct.unpack_from(">I", data, position)[0]
         compression = data[position + 4]
+        if length < 1 or position + 4 + length > len(data):
+            if diagnostics is not None:
+                diagnostics.append(dict(chunk=[chunk_x,chunk_z],kind='truncated_payload',region=str(region_path)))
+            continue
         raw = data[position + 5:position + 4 + length]
         try:
             if compression == 1:
@@ -100,19 +109,24 @@ def region_chunks(region_path: Path, bounds: tuple[int, int, int, int], selected
             elif compression == 2:
                 raw = zlib.decompress(raw)
             elif compression != 3:
+                if diagnostics is not None:
+                    diagnostics.append(dict(chunk=[chunk_x,chunk_z],kind='unsupported_compression',compression=compression,region=str(region_path)))
                 continue
             yield chunk_x, chunk_z, nbtlib.File.parse(BytesIO(raw))
-        except Exception:
+        except Exception as error:
             # Corrupt or unsupported chunks should not invalidate the rest of
             # a local evaluation world.  The report counts successful chunks.
+            if diagnostics is not None:
+                diagnostics.append(dict(chunk=[chunk_x,chunk_z],kind='decode_error',error=str(error),region=str(region_path)))
             continue
 
 
-def iter_chunks(world: Path, bounds: tuple[int, int, int, int], selected_chunks=None
+def iter_chunks(world: Path, bounds: tuple[int, int, int, int], selected_chunks=None,
+                *, diagnostics=None
                 ) -> Iterator[tuple[int, int, nbtlib.File]]:
     region_dir = world / "region"
     for region_path in region_dir.glob("r.*.*.mca"):
-        yield from region_chunks(region_path, bounds, selected_chunks)
+        yield from region_chunks(region_path, bounds, selected_chunks, diagnostics=diagnostics)
 
 
 def palette_name(entry) -> str:

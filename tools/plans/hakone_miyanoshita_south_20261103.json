@@ -1,0 +1,453 @@
+{
+  "core": [
+    1136,
+    884,
+    1240,
+    914
+  ],
+  "retire_road_areas": [
+    [
+      1136,
+      882,
+      1254,
+      939
+    ]
+  ],
+  "connectivity_seed": [
+    1140,
+    884
+  ],
+  "streets": [
+    {
+      "id": "miyanoshita-station-approach",
+      "points": [
+        [
+          1140,
+          43,
+          884
+        ],
+        [
+          1166,
+          40,
+          888
+        ],
+        [
+          1196,
+          34,
+          902
+        ],
+        [
+          1214,
+          31,
+          904
+        ],
+        [
+          1230,
+          28,
+          899
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "miyanoshita-station-turning-court",
+      "points": [
+        [
+          1229,
+          28,
+          899
+        ],
+        [
+          1230,
+          28,
+          899
+        ]
+      ],
+      "width": 9,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    }
+  ],
+  "retained_ports": [
+    {
+      "street": "miyanoshita-station-approach",
+      "end": 0,
+      "radius": 8
+    }
+  ],
+  "footways": [
+    {
+      "parcel": "valley/1148/904",
+      "points": [
+        [
+          1148,
+          40,
+          895
+        ],
+        [
+          1148,
+          42,
+          885
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/1248/904",
+      "points": [
+        [
+          1248,
+          28,
+          895
+        ],
+        [
+          1238,
+          28,
+          895
+        ],
+        [
+          1230,
+          28,
+          899
+        ]
+      ]
+    }
+  ],
+  "source": "Current complete saved station and building payloads; native rail corridors retained",
+  "togendai_forecourt": false,
+  "earthwork_blend_distance": 50,
+  "parcel_floors": {
+    "valley/1248/904": 27,
+    "valley/1148/904": 39
+  },
+  "retained_soil_areas": [
+    [
+      1210,
+      815,
+      1285,
+      865
+    ]
+  ],
+  "protected_volumes": [
+    [
+      -2828,
+      70,
+      -980,
+      -2676,
+      110,
+      -940
+    ],
+    [
+      -1556,
+      104,
+      616,
+      -1404,
+      151,
+      656
+    ],
+    [
+      -1156,
+      104,
+      540,
+      -1004,
+      134,
+      580
+    ],
+    [
+      -700,
+      96,
+      164,
+      -660,
+      126,
+      316
+    ],
+    [
+      -196,
+      80,
+      -192,
+      -44,
+      110,
+      -152
+    ],
+    [
+      340,
+      80,
+      224,
+      380,
+      110,
+      376
+    ],
+    [
+      160,
+      80,
+      684,
+      200,
+      110,
+      836
+    ],
+    [
+      664,
+      80,
+      1170,
+      816,
+      110,
+      1210
+    ],
+    [
+      -1730,
+      80,
+      -285,
+      -1610,
+      110,
+      -245
+    ],
+    [
+      -1740,
+      104,
+      300,
+      -1700,
+      134,
+      420
+    ],
+    [
+      -1540,
+      104,
+      656,
+      -1420,
+      151,
+      696
+    ],
+    [
+      -420,
+      80,
+      664,
+      -300,
+      110,
+      704
+    ],
+    [
+      296,
+      80,
+      240,
+      336,
+      122,
+      360
+    ],
+    [
+      1124,
+      70,
+      452,
+      1244,
+      110,
+      492
+    ],
+    [
+      900,
+      51,
+      618,
+      944,
+      71,
+      685
+    ],
+    [
+      964,
+      51,
+      744,
+      1014,
+      71,
+      781
+    ],
+    [
+      1022,
+      48,
+      917,
+      1072,
+      68,
+      954
+    ],
+    [
+      1247,
+      23,
+      864,
+      1288,
+      43,
+      909
+    ],
+    [
+      1243,
+      23,
+      864,
+      1246,
+      24,
+      909
+    ],
+    [
+      1243,
+      31,
+      864,
+      1246,
+      43,
+      909
+    ],
+    [
+      1243,
+      25,
+      864,
+      1246,
+      30,
+      893
+    ],
+    [
+      1243,
+      25,
+      897,
+      1246,
+      30,
+      909
+    ],
+    [
+      1498,
+      -2,
+      967,
+      1548,
+      18,
+      1004
+    ],
+    [
+      1949,
+      -44,
+      1080,
+      1999,
+      -24,
+      1117
+    ],
+    [
+      2189,
+      -60,
+      1097,
+      2245,
+      -40,
+      1137
+    ],
+    [
+      -310,
+      96,
+      994,
+      -260,
+      130,
+      1038
+    ],
+    [
+      -38,
+      135,
+      813,
+      -5,
+      160,
+      835
+    ],
+    [
+      252,
+      175,
+      813,
+      299,
+      200,
+      851
+    ],
+    [
+      628,
+      99,
+      744,
+      681,
+      130,
+      800
+    ],
+    [
+      1210,
+      -128,
+      815,
+      1285,
+      100,
+      865
+    ]
+  ],
+  "preserve_train_corridors": true,
+  "public_paths": [],
+  "new_frontages": [],
+  "retire_street_remnants": [
+    {
+      "pos": [
+        1150,
+        41,
+        883
+      ],
+      "state": "minecraft:smooth_stone",
+      "after": "minecraft:air"
+    },
+    {
+      "pos": [
+        1149,
+        41,
+        884
+      ],
+      "state": "minecraft:smooth_stone",
+      "after": "minecraft:air"
+    },
+    {
+      "pos": [
+        1148,
+        42,
+        885
+      ],
+      "state": "minecraft:smooth_stone",
+      "after": "minecraft:air"
+    },
+    {
+      "pos": [
+        1147,
+        42,
+        886
+      ],
+      "state": "minecraft:smooth_stone",
+      "after": "minecraft:air"
+    }
+  ],
+  "retained_public_surfaces": [],
+  "retained_pavement_materials": [
+    "projectseele:period_station_floor",
+    "projectseele:nerv_floor_panel"
+  ],
+  "station_exterior_scope_note": "Only old outdoor approach paving X1238..1246 Z894..896 Y25..30 is excluded from the broad station inventory box; occupied station volume starts at Z898 and remains preserved.",
+  "outdoor_paving_aprons": [
+    {
+      "parcel": "valley/1248/904",
+      "bounds": [
+        1238,
+        894,
+        1246,
+        896
+      ]
+    }
+  ],
+  "hillside_street_details": true,
+  "native_frontage_details": true,
+  "tree_clusters": [
+    [
+      1182,
+      916
+    ],
+    [
+      1208,
+      930
+    ],
+    [
+      1272,
+      942
+    ]
+  ],
+  "woodland_areas": []
+}

@@ -1,0 +1,19 @@
+{
+  "id": "odawara-stationwest",
+  "name": "Odawara station west residential district",
+  "label": "小田原站西",
+  "core": [3016, 320, 3296, 548],
+  "terminals": [
+    ["station-west-interface", "小田原站西街道接口", [3290, 489]],
+    ["north-residential", "站西北住宅街", [3214, 348]],
+    ["western-residential", "西坡住宅街", [3076, 410]],
+    ["south-residential", "城山南侧生活街", [3154, 525]],
+    ["hillside-residential", "城山坡地生活街", [3120, 385]]
+  ],
+  "maximum_buildings": 48,
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

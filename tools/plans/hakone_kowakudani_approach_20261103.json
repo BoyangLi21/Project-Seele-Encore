@@ -1,0 +1,424 @@
+{
+  "core": [
+    923,
+    947,
+    1058,
+    1076
+  ],
+  "retire_road_areas": [
+    [
+      922,
+      948,
+      1060,
+      1045
+    ]
+  ],
+  "connectivity_seed": [
+    914,
+    1033
+  ],
+  "streets": [
+    {
+      "id": "kowakudani-station-approach",
+      "points": [
+        [
+          914,
+          73,
+          1033
+        ],
+        [
+          939,
+          70,
+          1031
+        ],
+        [
+          968,
+          68,
+          1017
+        ],
+        [
+          994,
+          61.5,
+          997
+        ],
+        [
+          1018,
+          56.5,
+          982
+        ],
+        [
+          1028,
+          53,
+          963
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "kowakudani-arrival-court",
+      "points": [
+        [
+          1028,
+          53,
+          963
+        ],
+        [
+          1028,
+          53,
+          962
+        ]
+      ],
+      "width": 9,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    }
+  ],
+  "retained_ports": [
+    {
+      "street": "kowakudani-station-approach",
+      "end": 0,
+      "radius": 9
+    }
+  ],
+  "footways": [
+    {
+      "parcel": "valley/1046/970",
+      "points": [
+        [
+          1046,
+          53,
+          961
+        ],
+        [
+          1029,
+          53,
+          961
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/941/1050",
+      "points": [
+        [
+          941,
+          70,
+          1041
+        ],
+        [
+          941,
+          70,
+          1031
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/959/1061",
+      "points": [
+        [
+          959,
+          68,
+          1052
+        ],
+        [
+          959,
+          68,
+          1038
+        ],
+        [
+          969,
+          68,
+          1026
+        ],
+        [
+          969,
+          68,
+          1017
+        ]
+      ]
+    }
+  ],
+  "source": "Current complete saved station and building payloads; native rail corridors retained",
+  "togendai_forecourt": false,
+  "earthwork_blend_distance": 20,
+  "parcel_floors": {
+    "valley/1046/970": 52,
+    "valley/941/1050": 69,
+    "valley/959/1061": 67
+  },
+  "retained_soil_areas": [],
+  "protected_volumes": [
+    [
+      -2828,
+      70,
+      -980,
+      -2676,
+      110,
+      -940
+    ],
+    [
+      -1556,
+      104,
+      616,
+      -1404,
+      151,
+      656
+    ],
+    [
+      -1156,
+      104,
+      540,
+      -1004,
+      134,
+      580
+    ],
+    [
+      -700,
+      96,
+      164,
+      -660,
+      126,
+      316
+    ],
+    [
+      -196,
+      80,
+      -192,
+      -44,
+      110,
+      -152
+    ],
+    [
+      340,
+      80,
+      224,
+      380,
+      110,
+      376
+    ],
+    [
+      160,
+      80,
+      684,
+      200,
+      110,
+      836
+    ],
+    [
+      664,
+      80,
+      1170,
+      816,
+      110,
+      1210
+    ],
+    [
+      -1730,
+      80,
+      -285,
+      -1610,
+      110,
+      -245
+    ],
+    [
+      -1740,
+      104,
+      300,
+      -1700,
+      134,
+      420
+    ],
+    [
+      -1540,
+      104,
+      656,
+      -1420,
+      151,
+      696
+    ],
+    [
+      -420,
+      80,
+      664,
+      -300,
+      110,
+      704
+    ],
+    [
+      296,
+      80,
+      240,
+      336,
+      122,
+      360
+    ],
+    [
+      1124,
+      70,
+      452,
+      1244,
+      110,
+      492
+    ],
+    [
+      900,
+      51,
+      618,
+      944,
+      71,
+      685
+    ],
+    [
+      964,
+      51,
+      744,
+      1014,
+      71,
+      781
+    ],
+    [
+      1022,
+      48,
+      917,
+      1072,
+      68,
+      954
+    ],
+    [
+      1243,
+      23,
+      864,
+      1288,
+      43,
+      909
+    ],
+    [
+      1498,
+      -2,
+      967,
+      1548,
+      18,
+      1004
+    ],
+    [
+      1949,
+      -44,
+      1080,
+      1999,
+      -24,
+      1117
+    ],
+    [
+      2189,
+      -60,
+      1097,
+      2245,
+      -40,
+      1137
+    ],
+    [
+      -310,
+      96,
+      994,
+      -260,
+      130,
+      1038
+    ],
+    [
+      -38,
+      135,
+      813,
+      -5,
+      160,
+      835
+    ],
+    [
+      252,
+      175,
+      813,
+      299,
+      200,
+      851
+    ],
+    [
+      628,
+      99,
+      744,
+      681,
+      130,
+      800
+    ]
+  ],
+  "preserve_train_corridors": true,
+  "public_paths": [],
+  "new_frontages": [],
+  "retire_street_remnants": [
+    {
+      "pos": [
+        1028,
+        55,
+        959
+      ],
+      "state": "minecraft:black_concrete",
+      "after": "minecraft:air",
+      "reason": "Measured old road layer inside reconstructed station forecourt; outside retained station and rail space"
+    },
+    {
+      "pos": [
+        1028,
+        55,
+        960
+      ],
+      "state": "minecraft:smooth_stone",
+      "after": "minecraft:air",
+      "reason": "Measured old road layer inside reconstructed station forecourt; outside retained station and rail space"
+    },
+    {
+      "pos": [
+        1029,
+        55,
+        960
+      ],
+      "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+      "after": "minecraft:air",
+      "reason": "Measured old road layer inside reconstructed station forecourt; outside retained station and rail space"
+    },
+    {
+      "pos": [
+        1028,
+        55,
+        961
+      ],
+      "state": "minecraft:smooth_stone_slab[type=bottom,waterlogged=false]",
+      "after": "minecraft:air",
+      "reason": "Measured old road layer inside reconstructed station forecourt; outside retained station and rail space"
+    }
+  ],
+  "retained_public_surfaces": [],
+  "retained_pavement_materials": [
+    "projectseele:period_station_floor",
+    "projectseele:nerv_floor_panel"
+  ],
+  "hillside_street_details": true,
+  "native_frontage_details": true,
+  "tree_clusters": [
+    [
+      979,
+      1053
+    ],
+    [
+      1000,
+      1029
+    ],
+    [
+      1054,
+      1003
+    ]
+  ],
+  "woodland_areas": []
+}

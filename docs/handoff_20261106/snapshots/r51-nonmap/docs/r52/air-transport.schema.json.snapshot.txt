@@ -1,0 +1,588 @@
+{
+  "type": "object",
+  "properties": {
+    "schema": {
+      "const": "projectseele.r52.air-transport.v1"
+    },
+    "map_author": {
+      "const": "root"
+    },
+    "status": {
+      "enum": [
+        "design",
+        "installed"
+      ]
+    },
+    "epoch": {
+      "type": "integer",
+      "minimum": 1
+    },
+    "directory_fingerprint": {
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "dimension": {
+      "type": "string",
+      "minLength": 1
+    },
+    "pickup_vertical_clearance": {
+      "type": "number",
+      "exclusiveMinimum": 0,
+      "maximum": 256
+    },
+    "mesh_sources": {
+      "type": "object",
+      "required": [
+        "mesh/tv_facilities_r16.json",
+        "mesh/air_cradle_r31.json"
+      ],
+      "additionalProperties": false,
+      "properties": {
+        "mesh/tv_facilities_r16.json": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        },
+        "mesh/air_cradle_r31.json": {
+          "type": "string",
+          "pattern": "^[0-9a-f]{64}$"
+        }
+      }
+    },
+    "aircraft": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "entity_uuid": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "expected_type": {
+            "const": "projectseele:un_transport"
+          },
+          "serial": {
+            "type": "integer"
+          },
+          "airport": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stand_node": {
+            "type": "string",
+            "minLength": 1
+          },
+          "support_cells": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "position",
+                "state"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "entity_uuid",
+          "expected_type",
+          "serial",
+          "airport",
+          "stand_node",
+          "support_cells"
+        ]
+      }
+    },
+    "airports": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "region": {
+            "enum": [
+              "SURFACE",
+              "GEOFRONT"
+            ]
+          },
+          "domain": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 6,
+            "maxItems": 6
+          },
+          "takeoff_node": {
+            "type": "string",
+            "minLength": 1
+          },
+          "occupancy": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "id",
+          "region",
+          "domain",
+          "takeoff_node",
+          "occupancy"
+        ]
+      }
+    },
+    "nodes": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "region": {
+            "enum": [
+              "SURFACE",
+              "GEOFRONT"
+            ]
+          },
+          "frame": {
+            "type": "object",
+            "properties": {
+              "plane": {
+                "type": "object",
+                "properties": {
+                  "translation": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "quaternion_xyzw": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4
+                  }
+                },
+                "required": [
+                  "translation",
+                  "quaternion_xyzw"
+                ]
+              },
+              "cargo": {
+                "type": "object",
+                "properties": {
+                  "translation": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 3,
+                    "maxItems": 3
+                  },
+                  "quaternion_xyzw": {
+                    "type": "array",
+                    "items": {
+                      "type": "number"
+                    },
+                    "minItems": 4,
+                    "maxItems": 4
+                  }
+                },
+                "required": [
+                  "translation",
+                  "quaternion_xyzw"
+                ]
+              },
+              "rig": {
+                "type": "object",
+                "properties": {
+                  "hoist": {
+                    "type": "number",
+                    "minimum": 84,
+                    "maximum": 144
+                  },
+                  "deployment": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  },
+                  "jaws": {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1
+                  }
+                },
+                "required": [
+                  "hoist",
+                  "deployment",
+                  "jaws"
+                ]
+              }
+            },
+            "required": [
+              "plane",
+              "rig"
+            ]
+          },
+          "occupancy": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "actual_cells": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "position",
+                "state"
+              ]
+            }
+          }
+        },
+        "required": [
+          "id",
+          "region",
+          "frame",
+          "occupancy",
+          "actual_cells"
+        ]
+      }
+    },
+    "corridors": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "from": {
+            "type": "string",
+            "minLength": 1
+          },
+          "to": {
+            "type": "string",
+            "minLength": 1
+          },
+          "ticks": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reverse_of": {
+            "type": "string",
+            "minLength": 1
+          },
+          "occupancy": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "id",
+          "from",
+          "to",
+          "ticks",
+          "occupancy",
+          "gates"
+        ]
+      }
+    },
+    "receivers": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "port": {
+            "type": "string",
+            "minLength": 1
+          },
+          "region": {
+            "enum": [
+              "SURFACE",
+              "GEOFRONT"
+            ]
+          },
+          "flight_node": {
+            "type": "string",
+            "minLength": 1
+          },
+          "stopped_cargo_frame": {
+            "type": "object",
+            "properties": {
+              "translation": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 3,
+                "maxItems": 3
+              },
+              "quaternion_xyzw": {
+                "type": "array",
+                "items": {
+                  "type": "number"
+                },
+                "minItems": 4,
+                "maxItems": 4
+              }
+            },
+            "required": [
+              "translation",
+              "quaternion_xyzw"
+            ]
+          },
+          "reverse_routes": {
+            "type": "object",
+            "additionalProperties": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "delivery": {
+            "type": "boolean"
+          },
+          "actual_support_cells": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "position": {
+                  "type": "array",
+                  "items": {
+                    "type": "integer"
+                  },
+                  "minItems": 3,
+                  "maxItems": 3
+                },
+                "state": {
+                  "type": "string",
+                  "minLength": 1
+                }
+              },
+              "required": [
+                "position",
+                "state"
+              ]
+            }
+          },
+          "gates": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "port",
+          "region",
+          "flight_node",
+          "stopped_cargo_frame",
+          "reverse_routes"
+        ]
+      }
+    },
+    "missions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "intent": {
+            "enum": [
+              "RECOVER",
+              "DELIVER",
+              "FAR_MOUNTAIN"
+            ]
+          },
+          "aircraft": {
+            "type": "string",
+            "minLength": 1
+          },
+          "variants": {
+            "type": "array",
+            "items": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 2
+            }
+          },
+          "pickup_region": {
+            "enum": [
+              "SURFACE",
+              "GEOFRONT"
+            ]
+          },
+          "pickup_domain": {
+            "type": "array",
+            "items": {
+              "type": "number"
+            },
+            "minItems": 6,
+            "maxItems": 6
+          },
+          "pickup_node": {
+            "type": "string",
+            "minLength": 1
+          },
+          "receiver": {
+            "type": "string",
+            "minLength": 1
+          },
+          "outbound": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "loaded": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          },
+          "retreat": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "id",
+          "intent",
+          "aircraft",
+          "variants",
+          "pickup_region",
+          "pickup_domain",
+          "pickup_node",
+          "receiver",
+          "outbound",
+          "loaded",
+          "retreat"
+        ]
+      }
+    },
+    "shafts": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "id": {
+            "type": "string",
+            "minLength": 1
+          },
+          "underground_node": {
+            "type": "string",
+            "minLength": 1
+          },
+          "surface_node": {
+            "type": "string",
+            "minLength": 1
+          },
+          "motion": {
+            "enum": [
+              "GROUND_MECHANICAL",
+              "AIRCRAFT"
+            ]
+          },
+          "occupancy": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "minLength": 1
+            }
+          }
+        },
+        "required": [
+          "id",
+          "underground_node",
+          "surface_node",
+          "motion",
+          "occupancy"
+        ]
+      }
+    }
+  },
+  "required": [
+    "schema",
+    "map_author",
+    "status",
+    "epoch",
+    "directory_fingerprint",
+    "dimension",
+    "mesh_sources",
+    "aircraft",
+    "airports",
+    "nodes",
+    "corridors",
+    "receivers",
+    "missions"
+  ],
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "title": "Root explicit R52 aircraft transport schema; design fixture is not installation permission"
+}

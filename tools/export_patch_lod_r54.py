@@ -106,7 +106,10 @@ def main():
         if any(len(p)!=2 or any(type(v)is not int for v in p) for p in installed['tiles']):
             raise ValueError('Invalid installed tile coordinates')
         tiles=sorted(set(tiles)|{tuple(p)for p in installed['tiles']})
-        inputs.append(dict(installation=str(args.installation),changed_cells=installed['cells'],tiles=len(installed['tiles'])))
+        source=dict(installation=str(args.installation),tiles=len(installed['tiles']))
+        if 'cells' in installed:source['changed_cells']=installed['cells']
+        else:source['native_completed_chunks']=installed['chunks']
+        inputs.append(source)
     out.mkdir(parents=True,exist_ok=True)
     report=dict(world=str(world),dimension='projectseele:geofront',tile_size=64,tiles=tiles,
                 total=len(tiles),inputs=inputs,format='SavedColumnLodImporterR53 unchanged',

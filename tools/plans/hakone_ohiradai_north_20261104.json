@@ -1,0 +1,418 @@
+{
+  "source": "Current retained station, inn and dining building; road bends around measured railway without level crossing",
+  "togendai_forecourt": false,
+  "core": [
+    1400,
+    925,
+    1525,
+    968
+  ],
+  "retire_road_areas": [
+    [
+      1398,
+      922,
+      1545,
+      982
+    ]
+  ],
+  "earthwork_blend_distance": 45,
+  "connectivity_seed": [
+    1396,
+    976
+  ],
+  "streets": [
+    {
+      "id": "ohiradai-north-approach",
+      "points": [
+        [
+          1396,
+          12,
+          976
+        ],
+        [
+          1404,
+          12,
+          958
+        ],
+        [
+          1425,
+          9,
+          942
+        ],
+        [
+          1448,
+          4.5,
+          927
+        ],
+        [
+          1470,
+          0,
+          934
+        ],
+        [
+          1482,
+          -3,
+          950
+        ],
+        [
+          1505,
+          0,
+          950
+        ],
+        [
+          1519,
+          3,
+          957
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "ohiradai-station-arrival-court",
+      "points": [
+        [
+          1518,
+          3,
+          957
+        ],
+        [
+          1519,
+          3,
+          957
+        ]
+      ],
+      "width": 9,
+      "sidewalk": 1,
+      "maximum_grade": 0.2,
+      "arc_length_grade": true,
+      "linear_grade": true
+    }
+  ],
+  "retained_ports": [
+    {
+      "street": "ohiradai-north-approach",
+      "end": 0,
+      "radius": 8
+    }
+  ],
+  "trim_retained_pavement": [
+    [
+      1395,
+      978,
+      1395,
+      979
+    ]
+  ],
+  "footways": [
+    {
+      "parcel": "valley/1421/973",
+      "points": [
+        [
+          1412,
+          13,
+          973
+        ],
+        [
+          1405,
+          13,
+          973
+        ],
+        [
+          1400,
+          12,
+          968
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/1469/964",
+      "points": [
+        [
+          1478,
+          -3,
+          964
+        ],
+        [
+          1482,
+          -3,
+          957
+        ],
+        [
+          1482,
+          -3,
+          950
+        ]
+      ]
+    },
+    {
+      "parcel": "valley/1535/956",
+      "points": [
+        [
+          1535,
+          3,
+          965
+        ],
+        [
+          1519,
+          3,
+          965
+        ],
+        [
+          1519,
+          3,
+          957
+        ]
+      ]
+    }
+  ],
+  "parcel_floors": {
+    "valley/1535/956": 2,
+    "valley/1421/973": 12,
+    "valley/1469/964": -4
+  },
+  "retained_soil_areas": [],
+  "protected_volumes": [
+    [
+      -2828,
+      70,
+      -980,
+      -2676,
+      110,
+      -940
+    ],
+    [
+      -1556,
+      104,
+      616,
+      -1404,
+      151,
+      656
+    ],
+    [
+      -1156,
+      104,
+      540,
+      -1004,
+      134,
+      580
+    ],
+    [
+      -700,
+      96,
+      164,
+      -660,
+      126,
+      316
+    ],
+    [
+      -196,
+      80,
+      -192,
+      -44,
+      110,
+      -152
+    ],
+    [
+      340,
+      80,
+      224,
+      380,
+      110,
+      376
+    ],
+    [
+      160,
+      80,
+      684,
+      200,
+      110,
+      836
+    ],
+    [
+      664,
+      80,
+      1170,
+      816,
+      110,
+      1210
+    ],
+    [
+      -1730,
+      80,
+      -285,
+      -1610,
+      110,
+      -245
+    ],
+    [
+      -1740,
+      104,
+      300,
+      -1700,
+      134,
+      420
+    ],
+    [
+      -1540,
+      104,
+      656,
+      -1420,
+      151,
+      696
+    ],
+    [
+      -420,
+      80,
+      664,
+      -300,
+      110,
+      704
+    ],
+    [
+      296,
+      80,
+      240,
+      336,
+      122,
+      360
+    ],
+    [
+      1124,
+      70,
+      452,
+      1244,
+      110,
+      492
+    ],
+    [
+      900,
+      51,
+      618,
+      944,
+      71,
+      685
+    ],
+    [
+      964,
+      51,
+      744,
+      1014,
+      71,
+      781
+    ],
+    [
+      1022,
+      48,
+      917,
+      1072,
+      68,
+      954
+    ],
+    [
+      1243,
+      23,
+      864,
+      1288,
+      43,
+      909
+    ],
+    [
+      1498,
+      -2,
+      967,
+      1548,
+      18,
+      1004
+    ],
+    [
+      1949,
+      -44,
+      1080,
+      1999,
+      -24,
+      1117
+    ],
+    [
+      2189,
+      -60,
+      1097,
+      2245,
+      -40,
+      1137
+    ],
+    [
+      -310,
+      96,
+      994,
+      -260,
+      130,
+      1038
+    ],
+    [
+      -38,
+      135,
+      813,
+      -5,
+      160,
+      835
+    ],
+    [
+      252,
+      175,
+      813,
+      299,
+      200,
+      851
+    ],
+    [
+      628,
+      99,
+      744,
+      681,
+      130,
+      800
+    ]
+  ],
+  "preserve_train_corridors": true,
+  "public_paths": [],
+  "new_frontages": [],
+  "retire_street_remnants": [],
+  "retained_public_surfaces": [],
+  "retained_pavement_materials": [
+    "projectseele:period_station_floor",
+    "projectseele:nerv_floor_panel"
+  ],
+  "train_underpasses": [
+    [
+      1476,
+      -8,
+      961,
+      1483,
+      -2,
+      967
+    ]
+  ],
+  "train_underpass_prior_plan": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\miyanoshita-south-installed-authority-v1",
+  "exterior_rail_guard_note": "Finite low outdoor approach beside the dining building; upper bound stays four blocks below rail. Only measured soil, air or owned former road may change; original bridge members and native objects remain.",
+  "hillside_street_details": true,
+  "native_frontage_details": true,
+  "tree_clusters": [
+    [
+      1443,
+      972
+    ],
+    [
+      1503,
+      925
+    ],
+    [
+      1440,
+      911
+    ]
+  ],
+  "woodland_areas": []
+}

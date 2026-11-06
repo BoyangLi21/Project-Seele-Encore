@@ -1,0 +1,74 @@
+[
+  {
+    "name": "legacy-origin",
+    "commit": "7d8ebcee671aa6421296511b7631ed075cf79120",
+    "symbolic_target": "refs/remotes/legacy-origin/main",
+    "fully_in_origin_main": true,
+    "retain": true,
+    "freshly_fetched": false
+  },
+  {
+    "name": "legacy-origin/feat/mcp-bridge",
+    "commit": "e6d74d266da675145978f93e3d203b3f2a3a3161",
+    "symbolic_target": "",
+    "fully_in_origin_main": false,
+    "retain": true,
+    "freshly_fetched": false
+  },
+  {
+    "name": "legacy-origin/main",
+    "commit": "7d8ebcee671aa6421296511b7631ed075cf79120",
+    "symbolic_target": "",
+    "fully_in_origin_main": true,
+    "retain": true,
+    "freshly_fetched": false
+  },
+  {
+    "name": "origin",
+    "commit": "5deb2fe601a12c2dc71c7d9a0c61f663ad25c400",
+    "symbolic_target": "refs/remotes/origin/main",
+    "fully_in_origin_main": true,
+    "retain": true,
+    "freshly_fetched": false
+  },
+  {
+    "name": "origin/codex/map-complete-20261013",
+    "commit": "289dfed3f567b527e4f5d514d8d3cc73eb382ba4",
+    "symbolic_target": "",
+    "fully_in_origin_main": true,
+    "retain": true,
+    "freshly_fetched": false
+  },
+  {
+    "name": "origin/codex/r51-nonmap-release",
+    "commit": "6f2d35cb819f1e1fbaa0680cab935319b278b311",
+    "symbolic_target": "",
+    "fully_in_origin_main": true,
+    "retain": true,
+    "freshly_fetched": false
+  },
+  {
+    "name": "origin/codex/r52-map-restart",
+    "commit": "269a3c194765c892f6594f6c2eb5048352cc6a52",
+    "symbolic_target": "",
+    "fully_in_origin_main": true,
+    "retain": true,
+    "freshly_fetched": false
+  },
+  {
+    "name": "origin/codex/repo-cleanup-20261019",
+    "commit": "e483b94b0539eb4fb9ebc3e536c1b05e4ab30c8b",
+    "symbolic_target": "",
+    "fully_in_origin_main": false,
+    "retain": true,
+    "freshly_fetched": true
+  },
+  {
+    "name": "origin/main",
+    "commit": "5deb2fe601a12c2dc71c7d9a0c61f663ad25c400",
+    "symbolic_target": "",
+    "fully_in_origin_main": true,
+    "retain": true,
+    "freshly_fetched": true
+  }
+]

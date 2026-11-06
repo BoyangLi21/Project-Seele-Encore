@@ -1,0 +1,35 @@
+{
+  "bounds": [2384, 992, 3255, 1183],
+  "streets": [
+    {
+      "id": "port-yard-service-spine",
+      "bounds": [3088, 992, 3167, 1183],
+      "points": [[3126,-75,1002],[3126,-75,1070],[3126,-75,1167]],
+      "carriage_width": 5,
+      "sidewalk_width": 2,
+      "maximum_grade": 0.05,
+      "linear_grade": true,
+      "arc_length_grade": true,
+      "earth_slope": 0.8,
+      "maximum_earthwork": 8,
+      "clearance": 5,
+      "retire_volumes": [[3121,-80,997,3131,-69,1172]],
+      "retire_auxiliary_materials": ["projectseele:nerv_hazard_paving","projectseele:nerv_edge_rail"]
+    },
+    {
+      "id": "port-yard-to-quay-ramp",
+      "bounds": [3160, 1080, 3255, 1183],
+      "points": [[3204,-75,1120],[3220,-75,1120],[3234,-75,1128],[3234,-79,1160]],
+      "carriage_width": 5,
+      "sidewalk_width": 1,
+      "maximum_grade": 0.15,
+      "linear_grade": true,
+      "arc_length_grade": true,
+      "earth_slope": 1,
+      "maximum_earthwork": 24,
+      "clearance": 5,
+      "retire_volumes": [[3200,-100,1115,3239,-69,1165]],
+      "retire_auxiliary_materials": ["projectseele:nerv_hazard_paving","projectseele:nerv_edge_rail"]
+    }
+  ]
+}

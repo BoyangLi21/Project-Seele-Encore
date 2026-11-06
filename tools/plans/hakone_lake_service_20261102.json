@@ -1,0 +1,781 @@
+{
+  "stations": [
+    {
+      "id": "hakonemachi",
+      "name": "箱根町港",
+      "min": [
+        359,
+        96,
+        2297
+      ],
+      "max": [
+        419,
+        118,
+        2357
+      ],
+      "color": 3177374
+    },
+    {
+      "id": "motohakone",
+      "name": "元箱根港",
+      "min": [
+        480,
+        96,
+        1999
+      ],
+      "max": [
+        540,
+        118,
+        2059
+      ],
+      "color": 3177374
+    },
+    {
+      "id": "togendai_port",
+      "name": "桃源台港",
+      "min": [
+        -316,
+        96,
+        1053
+      ],
+      "max": [
+        -256,
+        118,
+        1113
+      ],
+      "color": 3177374
+    }
+  ],
+  "rails": [
+    {
+      "id": "togendai-boat",
+      "from": [
+        -270,
+        99,
+        1086
+      ],
+      "to": [
+        -306,
+        99,
+        1086
+      ],
+      "from_angle": "W",
+      "to_angle": "E",
+      "mode": "BOAT",
+      "kind": "platform",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-1",
+      "from": [
+        -306,
+        99,
+        1086
+      ],
+      "to": [
+        -405,
+        99,
+        1120
+      ],
+      "from_angle": "W",
+      "to_angle": "NE",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-2",
+      "from": [
+        -405,
+        99,
+        1120
+      ],
+      "to": [
+        -370,
+        99,
+        1190
+      ],
+      "from_angle": "SW",
+      "to_angle": "NW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-3",
+      "from": [
+        -370,
+        99,
+        1190
+      ],
+      "to": [
+        -290,
+        99,
+        1275
+      ],
+      "from_angle": "SE",
+      "to_angle": "NNW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-4",
+      "from": [
+        -290,
+        99,
+        1275
+      ],
+      "to": [
+        -285,
+        99,
+        1370
+      ],
+      "from_angle": "SSE",
+      "to_angle": "N",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-5",
+      "from": [
+        -285,
+        99,
+        1370
+      ],
+      "to": [
+        -210,
+        99,
+        1490
+      ],
+      "from_angle": "S",
+      "to_angle": "NW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-6",
+      "from": [
+        -210,
+        99,
+        1490
+      ],
+      "to": [
+        -160,
+        99,
+        1580
+      ],
+      "from_angle": "SE",
+      "to_angle": "NNW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-7",
+      "from": [
+        -160,
+        99,
+        1580
+      ],
+      "to": [
+        -110,
+        99,
+        1720
+      ],
+      "from_angle": "SSE",
+      "to_angle": "N",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-8",
+      "from": [
+        -110,
+        99,
+        1720
+      ],
+      "to": [
+        -100,
+        99,
+        1880
+      ],
+      "from_angle": "S",
+      "to_angle": "NNW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-9",
+      "from": [
+        -100,
+        99,
+        1880
+      ],
+      "to": [
+        50,
+        99,
+        2050
+      ],
+      "from_angle": "SSE",
+      "to_angle": "NW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-10",
+      "from": [
+        50,
+        99,
+        2050
+      ],
+      "to": [
+        200,
+        99,
+        2200
+      ],
+      "from_angle": "SE",
+      "to_angle": "NW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-11",
+      "from": [
+        200,
+        99,
+        2200
+      ],
+      "to": [
+        335,
+        99,
+        2275
+      ],
+      "from_angle": "SE",
+      "to_angle": "NW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-12",
+      "from": [
+        335,
+        99,
+        2275
+      ],
+      "to": [
+        363,
+        99,
+        2317
+      ],
+      "from_angle": "SE",
+      "to_angle": "SW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "hakonemachi-boat",
+      "from": [
+        363,
+        99,
+        2317
+      ],
+      "to": [
+        391,
+        99,
+        2289
+      ],
+      "from_angle": "NE",
+      "to_angle": "SW",
+      "mode": "BOAT",
+      "kind": "platform",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-14-exit",
+      "from": [
+        391,
+        99,
+        2289
+      ],
+      "to": [
+        399,
+        99,
+        2281
+      ],
+      "from_angle": "NE",
+      "to_angle": "SW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-14",
+      "from": [
+        399,
+        99,
+        2281
+      ],
+      "to": [
+        403,
+        99,
+        2240
+      ],
+      "from_angle": "NE",
+      "to_angle": "S",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-15",
+      "from": [
+        403,
+        99,
+        2240
+      ],
+      "to": [
+        350,
+        99,
+        2180
+      ],
+      "from_angle": "N",
+      "to_angle": "SE",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-16",
+      "from": [
+        350,
+        99,
+        2180
+      ],
+      "to": [
+        330,
+        99,
+        2100
+      ],
+      "from_angle": "NW",
+      "to_angle": "SSW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-17",
+      "from": [
+        330,
+        99,
+        2100
+      ],
+      "to": [
+        400,
+        99,
+        2040
+      ],
+      "from_angle": "NNE",
+      "to_angle": "NWW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-18",
+      "from": [
+        400,
+        99,
+        2040
+      ],
+      "to": [
+        476,
+        99,
+        2058
+      ],
+      "from_angle": "SEE",
+      "to_angle": "SWW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-19",
+      "from": [
+        476,
+        99,
+        2058
+      ],
+      "to": [
+        491,
+        99,
+        2043
+      ],
+      "from_angle": "NEE",
+      "to_angle": "S",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "motohakone-boat",
+      "from": [
+        491,
+        99,
+        2043
+      ],
+      "to": [
+        491,
+        99,
+        2015
+      ],
+      "from_angle": "N",
+      "to_angle": "S",
+      "mode": "BOAT",
+      "kind": "platform",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-21-exit",
+      "from": [
+        491,
+        99,
+        2015
+      ],
+      "to": [
+        491,
+        99,
+        2004
+      ],
+      "from_angle": "N",
+      "to_angle": "S",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-21",
+      "from": [
+        491,
+        99,
+        2004
+      ],
+      "to": [
+        475,
+        99,
+        1995
+      ],
+      "from_angle": "N",
+      "to_angle": "E",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-22",
+      "from": [
+        475,
+        99,
+        1995
+      ],
+      "to": [
+        400,
+        99,
+        2010
+      ],
+      "from_angle": "W",
+      "to_angle": "NE",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-23",
+      "from": [
+        400,
+        99,
+        2010
+      ],
+      "to": [
+        200,
+        99,
+        1950
+      ],
+      "from_angle": "SW",
+      "to_angle": "SEE",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-24",
+      "from": [
+        200,
+        99,
+        1950
+      ],
+      "to": [
+        10,
+        99,
+        1780
+      ],
+      "from_angle": "NWW",
+      "to_angle": "SSE",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-25",
+      "from": [
+        10,
+        99,
+        1780
+      ],
+      "to": [
+        -110,
+        99,
+        1590
+      ],
+      "from_angle": "NNW",
+      "to_angle": "SSE",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-26",
+      "from": [
+        -110,
+        99,
+        1590
+      ],
+      "to": [
+        -185,
+        99,
+        1480
+      ],
+      "from_angle": "NNW",
+      "to_angle": "SE",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-27",
+      "from": [
+        -185,
+        99,
+        1480
+      ],
+      "to": [
+        -255,
+        99,
+        1370
+      ],
+      "from_angle": "NW",
+      "to_angle": "S",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-28",
+      "from": [
+        -255,
+        99,
+        1370
+      ],
+      "to": [
+        -260,
+        99,
+        1280
+      ],
+      "from_angle": "N",
+      "to_angle": "S",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-29",
+      "from": [
+        -260,
+        99,
+        1280
+      ],
+      "to": [
+        -300,
+        99,
+        1180
+      ],
+      "from_angle": "N",
+      "to_angle": "S",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-30",
+      "from": [
+        -300,
+        99,
+        1180
+      ],
+      "to": [
+        -250,
+        99,
+        1130
+      ],
+      "from_angle": "N",
+      "to_angle": "SWW",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-31",
+      "from": [
+        -250,
+        99,
+        1130
+      ],
+      "to": [
+        -250,
+        99,
+        1098
+      ],
+      "from_angle": "NEE",
+      "to_angle": "SE",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-32",
+      "from": [
+        -250,
+        99,
+        1098
+      ],
+      "to": [
+        -270,
+        99,
+        1086
+      ],
+      "from_angle": "NW",
+      "to_angle": "E",
+      "mode": "BOAT",
+      "kind": "rail",
+      "speed": 24,
+      "reverse_speed": 24
+    },
+    {
+      "id": "HA-siding",
+      "from": [
+        -225,
+        99,
+        1124
+      ],
+      "to": [
+        -245,
+        99,
+        1124
+      ],
+      "from_angle": "W",
+      "to_angle": "E",
+      "kind": "siding",
+      "mode": "BOAT"
+    },
+    {
+      "id": "HA-lead",
+      "from": [
+        -245,
+        99,
+        1124
+      ],
+      "to": [
+        -270,
+        99,
+        1086
+      ],
+      "from_angle": "W",
+      "to_angle": "E",
+      "kind": "rail",
+      "mode": "BOAT",
+      "speed": 12
+    }
+  ],
+  "lines": [
+    {
+      "id": "HA",
+      "name": "芦之湖 桃源台—箱根町—元箱根",
+      "mode": "BOAT",
+      "platforms": [
+        "togendai-boat",
+        "hakonemachi-boat",
+        "motohakone-boat",
+        "togendai-boat"
+      ],
+      "siding": "HA-siding",
+      "cars": [
+        {
+          "id": "dark_oak_boat_medium_two_level",
+          "length": 5,
+          "width": 2,
+          "bogie1": -1,
+          "bogie2": 1,
+          "padding1": 0,
+          "padding2": 0
+        }
+      ],
+      "frequency": 8,
+      "repeat": true,
+      "dwell": 20000
+    }
+  ],
+  "warmup_seconds": 1200,
+  "source": "GSI water geometry; official three-port connection; OSM terminal locations cross-checked with GSI piers"
+}

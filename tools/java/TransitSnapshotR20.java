@@ -18,7 +18,7 @@ public final class TransitSnapshotR20
         JsonArray curves=new JsonArray();
         for(Rail r:sim.rails)
         {
-            JsonObject q=new JsonObject();q.addProperty("id",r.getHexId());q.addProperty("mode",r.getTransportMode().name());q.addProperty("kind",r.isPlatform()?"platform":r.isSiding()?"siding":"rail");JsonArray points=new JsonArray();
+            JsonObject q=new JsonObject();q.addProperty("id",r.getHexId());q.addProperty("mode",r.getTransportMode().name());q.addProperty("kind",r.isPlatform()?"platform":r.isSiding()?"siding":"rail");q.addProperty("length",r.railMath.getLength());JsonArray points=new JsonArray();
             for(double d=0;d<=r.railMath.getLength();d+=1){var p=r.railMath.getPosition(d,false);JsonArray a=new JsonArray();a.add(p.x);a.add(p.y);a.add(p.z);points.add(a);}q.add("points",points);curves.add(q);
         }
         out.add("curves",curves);
@@ -36,6 +36,17 @@ public final class TransitSnapshotR20
             resolved.add(p);
         }
         out.add("resolved_platforms",resolved);
+        JsonArray sidings=new JsonArray();
+        for(Siding siding:sim.sidings)
+        {
+            JsonObject s=new JsonObject();s.addProperty("siding_id",Long.toString(siding.getId()));s.addProperty("name",siding.getName());
+            s.addProperty("mode",siding.getTransportMode().name());s.addProperty("vehicle_length",Siding.getTotalVehicleLength(siding.getVehicleCars()));
+            double width=0;for(VehicleCar car:siding.getVehicleCars())width=Math.max(width,car.getWidth());s.addProperty("maximum_car_width",width);
+            if(siding.area!=null){s.addProperty("depot_id",Long.toString(siding.area.getId()));s.addProperty("depot_name",siding.area.getName());
+                JsonArray routeIds=new JsonArray();for(long id:siding.area.getRouteIds())routeIds.add(Long.toString(id));s.add("route_ids",routeIds);}
+            sidings.add(s);
+        }
+        out.add("resolved_sidings",sidings);
         Files.writeString(Path.of(args[1]),new GsonBuilder().setPrettyPrinting().create().toJson(out));sim.stop();System.out.println("Snapshot rails="+sim.rails.size()+" stations="+sim.stations.size()+" platforms="+sim.platforms.size()+" routes="+sim.routes.size());
     }
 }

@@ -1,0 +1,43 @@
+# R52 Root 原飞机安装
+
+生产结构为 [air-transport.schema.json](air-transport.schema.json)。实际关联由 `NervAirTransportManifestR52` 校验；结构 schema 本身不能证明原飞机、门、支撑、几何或航路可达。
+
+[air-transport.root-parameters.template.json](air-transport.root-parameters.template.json) 已填 Root 回读的四架 NERV 飞机 UUID、serial、原 stand 和 yaw0。新增 52/53 的 HoistDistance=112 有实际 NBT 回读；原 0/50 的 HoistDistance 留空等 Root 回读。其他 null/空项也是明确待测字段。模板不是可安装文件，不 commission 机场航路、井或接应口。原军基地两架 UN 运输机、AC130 和其他原 actor 不属于此池。
+
+[air-transport.synthetic-example.json](air-transport.synthetic-example.json) 与对应 `.ground.json` 是最小完整结构示例。它们的 UUID、坐标、receiver 和 hash 都来自纯 synthetic 测试，不能用于 Root 世界或复用成旧 receiver。
+
+安装顺序是完成唯一 ground directory 与 native bindings，计算 parser 的 directory fingerprint，再令独立 mechanical owner 和 air manifest 引用同 epoch/fingerprint。目录不能内嵌引用自己 hash 的 `air_transport`。生产 `NervRootAssemblyInstallationR52` bundle 在完整文件 SHA/结构核对后以同一解析目录与 broker 安装机械、航空；单独代码入口是 `NervAirTransportRuntimeR52.loadAndInstall(level, Root显式Path)`。没有默认文件搜索、旧 STAND/head/roof Y、备份克隆或重造原飞机。
+
+| 字段 | 必须由 Root 提供的实际内容 |
+| --- | --- |
+| `schema/map_author/status` | `projectseele.r52.air-transport.v1` / `root` / `design` 或 `installed`；design 不启动 |
+| `epoch/directory_fingerprint/dimension` | 同一实际地面目录及原维度；没有第二份空域资源表 |
+| `mesh_sources` | 恰好 R16 aircraft 与 R31 cradle 资源 SHA，详见模板 |
+| `aircraft[]` | id、entity_uuid、expected_type=`projectseele:un_transport`、serial、airport、stand_node、support_cells；实际 NERV/非地面车、UUID/serial/stand/HoistDistance 一致 |
+| `airports[]` | id、region、domain、takeoff_node、occupancy；domain 是实际 EVA footCentre 的区域分类域，必须覆盖准许运输的现场，不能只写停机坪；地上/地下域不能重叠 |
+| `nodes[]` | id、region、frame、occupancy、actual_cells；所有 occupancy 都是 ground 原 SPACE ID |
+| `corridors[]` | id、from、to、ticks、occupancy、gates、可选 reverse_of；每条空载出站段必须有精确同 ticks 的互反段，资源/门 ID 相同 |
+| `receivers[]` recovery | 原 ground port ID、region、flight_node、stopped_cargo_frame、reverse_routes；与 typed Owner 实际停止帧、真实 reverse route 起点一致 |
+| `receivers[]` delivery | delivery=true、独立 Root destination ID、region、flight_node、upright stopped_cargo_frame、reverse_routes={}、actual_support_cells、gates；两真实 sole 点接触指定块顶面才释放，HULL 禁用 |
+| `missions[]` | intent=RECOVER/DELIVER/FAR_MOUNTAIN、aircraft、variants、pickup_region/domain/node、receiver、完整连续 outbound/loaded/retreat 航段链；旧 x/z 调用只能匹配已登记目的地 |
+| `shafts[]` | id、underground_node、surface_node、motion、occupancy；所有跨 region 的飞机段必须对应显式 AIRCRAFT shaft 并使用同地面 SPACE，GROUND_MECHANICAL 井不允许飞机飞穿 |
+
+`frame` 形状是 `{plane:{translation:[3],quaternion_xyzw:[4]},cargo:{同格式，可省略},rig:{hoist:84..144,deployment:0..1,jaws:0..1}}`。plane 只 yaw，单位 quaternion 必须是 Root 实测。stand 的 cargo 必须省略、rig deployment=0/jaws=1。cargo 节点值是抓取参考，不代表已携载；pickup 和 loaded endpoints 必须有它。接载节点按原 EVA 实际停稳 root 的完整平移量定位；既定 loaded 拓扑中与 pickup 相邻的巡航节点平移实际 XZ。AIR 可选 `pickup_vertical_clearance:32`，此时飞机巡航 Y 为 `max(Root declared cruise Y, actual pickup plane Y +32)`，cargo 同步增加相同高度；未声明该字段仍保持原 Root 巡航 Y。先在实际接载点垂直上升，再沿原航路飞行。取消互反段使用同一保存的 PickupRoot，不猜测新航点。
+
+地面 Directory 可选 `space_domains:[{id,dimension,bounds:[minX,minY,minZ,maxX,maxY,maxZ],grid_metres:32,max_step_cells:8192}]`。每个域都是 Root 明确批准的有限范围，包含在 Directory fingerprint 中；不展开整个域。实际机身、四旋翼、闭夹具与全部原载荷的本步连续 source envelope 只生成所需 `space/cX_Y_Z` 格及同名 binding。地面静态 SPACE 也必须绑定同一 canonical32m key、component 和完整格边界，重叠域不会生成第二个资源。超过范围、错误维度、非 canonical key 或超过本步格数上限均拒绝。已声明的静态 shaft 格仍可与域联合覆盖真实路径，缝隙不能跨越。
+
+停稳、旋翼推进及冷重载都先验证当前完整 source，再在原 broker 中取得本步精确格集合；不保留上一航段的远端格。冷装先隔离同 epoch、域 fingerprint 和原身份下的保存格，实际重新验证后才能更新或取消。所有世界、原 actor、门与三角碰撞检查继续执行。详细 Source/SHA/sweep 诊断保存在日志与任务记录；电话显示飞机序号、中文阶段及承托或净空等待。
+
+`support_cells/actual_cells` 是 `{position:[整数x,y,z],state:"完整BlockStateParser序列化字符串"}`。SPACE/DOOR 只能引用唯一 ground resources/bindings，同一物理井/通道/接应域不能注册重叠 alias。多个真正相邻 SPACE 可以联合覆盖完整飞机/载荷，实际缝隙不成为可通行空间。
+
+每架原飞机持久保存一个独立 Job：原 UUID、Original provenance、Kind、manifest hash、leg/age、rig、cancel、held phase、SPACE/DOOR、payloadTransferred 与 unknown NBT。冷装先隔离保存的 ground/air SPACE 和 moving members；这不授权运动。只有实际同原帧/乘员图/源网格验证才升级。热重装有活动任务时拒绝丢掉旧 pool。未知/未加载或缺已创建原 plane 时 HOLD，不重定位、不重造。
+
+接载前先取得同 pool 租约，再用 `CheckedPickupHold` 证明真实原位承托和完整皮肤/34 手，保持停稳源姿势；此时 stand 的 plane cargo 仍为空。实际原 12 边 jaw 与六个真实 frozen skin 接触证明后才携载。四旋翼、机身和 cradle 使用与 renderer 同源的实际几何/rig/frame/rotor clock。HULL 只搬原 EVA 和现场真可见架，分离原栓/pilot 只保 provenance。
+
+卸载先等真实 receiver 起架/承托到位，再连续松夹，原载荷与 receiver SPACE 保持。飞机实际退出后，同 broker 原子转 ground reverse lease；ground 不再次 reserve。空机仍持有独立返场身份和 SPACE，已移交 EVA/驾驶员后续活动不阻止它返场。空载取消逆走已走时钟；部分伸展先真实收夹再回程。原位 OCCUPIED 解锁仍须完整 source→gameplay 姿势交接 gate。
+
+当前定向证据是实际选源几何、synthetic 多机/互斥/原子交接/冷装保存检查，不能称为原生完整通过。最终 Root 安装后还须真实并发、shaft/gate、receiver、取消、重载、V 后 HULL 和正常操作画面验证。
+
+原独立停留的载架使用其保存的 `carrierFrameR52`，不因为 EVA 身体被接载而移动。FlightPickupPreview 仍报告实际可见状态，只有没有 detached 的真实随身载架才进入 cargo surfaces；原远端钢架作为独立固定网格检查，不能被 own EVA UUID 排除。对应原 actor 未加载、来源未知或载架位置变化时 HOLD。接收阶段必须先证明真实载架与 body 同一接应 frame、rise1 及实际承托，才可重新 attach；另一 port 没有真实架不能凭 receiver 记录生成。
+
+HULL 的真实足底绑定可能与 upright 的固定 SOLES 不同。航空接近目标由 Owner 只读 `resolveFlightReceiverCargoRootR52` 从同 reverse route 的起点和该原 Binding 解出身体 root，再保留原 plane/hoist 相对关系进行全程检查；固定井口硬件 datum 与 supports 不因此移动。不能把原倒地姿势规范化或把 EVA 直接移到声明 root。当前 Root 航点和共享32m格的具体 design 在 `.Codex/r52_airlift_draft/root_air_design`；它必须通过生产 Directory/Air parser 并等 Root 正式 bindings 安装，不能直接视为 ready。

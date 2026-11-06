@@ -1,0 +1,21 @@
+{
+  "id": "odawara-coast-northeast",
+  "name": "Odawara northeastern coastal neighbourhood",
+  "label": "小田原东北海岸街区",
+  "preserve_existing_district": true,
+  "include_existing_public_in_connectivity": false,
+  "core": [4224, -16, 4479, 159],
+  "terminals": [
+    ["central-services", "海岸生活服务街口", [4290, 40]],
+    ["west-interface", "鸭宫方向街道接口", [4240, 80]],
+    ["east-coast-interface", "东侧海岸街道接口", [4380, 20]],
+    ["shore-interface", "海岸步行接口", [4340, 100]]
+  ],
+  "maximum_buildings": 50,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

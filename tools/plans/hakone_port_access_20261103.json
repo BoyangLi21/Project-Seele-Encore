@@ -1,0 +1,36 @@
+{
+  "bounds": [2384, 992, 3255, 1183],
+  "streets": [
+    {
+      "id": "yumoto-coastal-port-road",
+      "bounds": [2384, 992, 3135, 1183],
+      "points": [[2400,-58.5,1103],[2430,-61.5,1095],[2480,-63,1075],[2530,-60,1065],[2580,-51,1075],[2680,-34,1100],[2770,-29,1100],[2870,-38,1100],[2970,-56,1080],[3064,-75,1070]],
+      "carriage_width": 7,
+      "sidewalk_width": 2,
+      "maximum_grade": 0.21,
+      "linear_grade": true,
+      "arc_length_grade": true,
+      "earth_slope": 0.65,
+      "maximum_earthwork": 24,
+      "clearance": 5,
+      "preserve_exterior_slopes": true,
+      "retire_volumes": [[2384,-80,1040,2431,-45,1130],[3048,-80,1060,3074,-69,1080]],
+      "retire_auxiliary_materials": ["projectseele:nerv_hazard_paving","projectseele:nerv_edge_rail"]
+    },
+    {
+      "id": "port-main-service-road",
+      "bounds": [3040, 1040, 3231, 1100],
+      "points": [[3064,-75,1070],[3126,-75,1070],[3200,-75,1070]],
+      "carriage_width": 7,
+      "sidewalk_width": 2,
+      "maximum_grade": 0.05,
+      "linear_grade": true,
+      "arc_length_grade": true,
+      "earth_slope": 0.8,
+      "maximum_earthwork": 8,
+      "clearance": 5,
+      "retire_volumes": [[3048,-80,1063,3207,-69,1077]],
+      "retire_auxiliary_materials": ["projectseele:nerv_hazard_paving","projectseele:nerv_edge_rail"]
+    }
+  ]
+}

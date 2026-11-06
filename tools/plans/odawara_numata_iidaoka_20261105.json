@@ -1,0 +1,22 @@
+{
+  "id": "odawara-numata-iidaoka",
+  "name": "Numata, Iidaoka and Anabe western neighbourhood",
+  "label": "沼田至饭田冈与穴部西侧街区",
+  "preserve_existing_district": true,
+  "include_existing_public_in_connectivity": false,
+  "core": [2816, -480, 3224, -112],
+  "terminals": [
+    ["anabe-west-interface", "穴部站西侧街道接口", [3188, -135]],
+    ["numata-south-interface", "沼田站南侧街道接口", [2871, -464]],
+    ["iidaoka-west-interface", "饭田冈站西侧街道接口", [2926, -405]],
+    ["central-services", "中央生活服务街口", [3020, -200]],
+    ["west-neighbourhood", "西侧住宅街口", [2820, -200]]
+  ],
+  "maximum_buildings": 120,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

@@ -1,0 +1,383 @@
+{
+  "source": "Two existing western Yumoto frontages north of the native running railway; no new track crossing",
+  "togendai_forecourt": false,
+  "core": [
+    2084,
+    1105,
+    2155,
+    1140
+  ],
+  "earthwork_blend_distance": 35,
+  "retire_road_areas": [
+    [
+      2070,
+      1100,
+      2163,
+      1158
+    ]
+  ],
+  "connectivity_seed": [
+    2078,
+    1127
+  ],
+  "streets": [
+    {
+      "id": "yumoto-west-bank-street",
+      "points": [
+        [
+          2078,
+          -47.5,
+          1127
+        ],
+        [
+          2097,
+          -46,
+          1112
+        ],
+        [
+          2121,
+          -43,
+          1112
+        ],
+        [
+          2149,
+          -46,
+          1113
+        ]
+      ],
+      "width": 5,
+      "sidewalk": 1,
+      "maximum_grade": 0.15,
+      "arc_length_grade": true,
+      "linear_grade": true
+    },
+    {
+      "id": "yumoto-west-bank-turning-court",
+      "points": [
+        [
+          2148,
+          -46,
+          1113
+        ],
+        [
+          2149,
+          -46,
+          1113
+        ]
+      ],
+      "width": 9,
+      "sidewalk": 1,
+      "maximum_grade": 0.15,
+      "arc_length_grade": true,
+      "linear_grade": true,
+      "centre_line": false
+    }
+  ],
+  "retained_ports": [
+    {
+      "street": "yumoto-west-bank-street",
+      "end": 0,
+      "radius": 25
+    }
+  ],
+  "parcel_floors": {},
+  "footways": [
+    {
+      "parcel": "valley/2113/1126",
+      "points": [
+        [
+          2104,
+          -43,
+          1126
+        ],
+        [
+          2101,
+          -44,
+          1126
+        ],
+        [
+          2101,
+          -46.5,
+          1112
+        ]
+      ],
+      "linear_grade": true
+    },
+    {
+      "parcel": "valley/2139/1127",
+      "points": [
+        [
+          2139,
+          -47,
+          1136
+        ],
+        [
+          2149,
+          -47,
+          1138
+        ],
+        [
+          2150,
+          -47,
+          1125
+        ],
+        [
+          2149,
+          -46,
+          1113
+        ]
+      ],
+      "linear_grade": true
+    }
+  ],
+  "protected_volumes": [
+    [
+      -2828,
+      70,
+      -980,
+      -2676,
+      110,
+      -940
+    ],
+    [
+      -1556,
+      104,
+      616,
+      -1404,
+      151,
+      656
+    ],
+    [
+      -1156,
+      104,
+      540,
+      -1004,
+      134,
+      580
+    ],
+    [
+      -700,
+      96,
+      164,
+      -660,
+      126,
+      316
+    ],
+    [
+      -196,
+      80,
+      -192,
+      -44,
+      110,
+      -152
+    ],
+    [
+      340,
+      80,
+      224,
+      380,
+      110,
+      376
+    ],
+    [
+      160,
+      80,
+      684,
+      200,
+      110,
+      836
+    ],
+    [
+      664,
+      80,
+      1170,
+      816,
+      110,
+      1210
+    ],
+    [
+      -1730,
+      80,
+      -285,
+      -1610,
+      110,
+      -245
+    ],
+    [
+      -1740,
+      104,
+      300,
+      -1700,
+      134,
+      420
+    ],
+    [
+      -1540,
+      104,
+      656,
+      -1420,
+      151,
+      696
+    ],
+    [
+      -420,
+      80,
+      664,
+      -300,
+      110,
+      704
+    ],
+    [
+      296,
+      80,
+      240,
+      336,
+      122,
+      360
+    ],
+    [
+      1124,
+      70,
+      452,
+      1244,
+      110,
+      492
+    ],
+    [
+      900,
+      51,
+      618,
+      944,
+      71,
+      685
+    ],
+    [
+      964,
+      51,
+      744,
+      1014,
+      71,
+      781
+    ],
+    [
+      1022,
+      48,
+      917,
+      1072,
+      68,
+      954
+    ],
+    [
+      1243,
+      23,
+      864,
+      1288,
+      43,
+      909
+    ],
+    [
+      1498,
+      -2,
+      967,
+      1548,
+      18,
+      1004
+    ],
+    [
+      1949,
+      -44,
+      1080,
+      1999,
+      -24,
+      1117
+    ],
+    [
+      2189,
+      -60,
+      1097,
+      2245,
+      -40,
+      1137
+    ],
+    [
+      -310,
+      96,
+      994,
+      -260,
+      130,
+      1038
+    ],
+    [
+      -38,
+      135,
+      813,
+      -5,
+      160,
+      835
+    ],
+    [
+      252,
+      175,
+      813,
+      299,
+      200,
+      851
+    ],
+    [
+      628,
+      99,
+      744,
+      681,
+      130,
+      800
+    ],
+    [
+      2016,
+      -128,
+      1140,
+      2095,
+      319,
+      1195
+    ]
+  ],
+  "retained_soil_areas": [
+    [
+      2016,
+      1140,
+      2095,
+      1195
+    ]
+  ],
+  "preserve_train_corridors": true,
+  "public_paths": [],
+  "new_frontages": [],
+  "retire_street_remnants": [],
+  "retained_public_surfaces": [
+    "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\yumoto-west-retained-seam-v1.npz"
+  ],
+  "retained_pavement_materials": [
+    "projectseele:period_station_floor",
+    "projectseele:nerv_floor_panel"
+  ],
+  "trim_retained_pavement": [
+    [
+      2070,
+      1124,
+      2086,
+      1133
+    ]
+  ],
+  "hillside_street_details": true,
+  "native_frontage_details": true,
+  "tree_clusters": [
+    [
+      2095,
+      1087
+    ],
+    [
+      2165,
+      1100
+    ]
+  ],
+  "woodland_areas": []
+}

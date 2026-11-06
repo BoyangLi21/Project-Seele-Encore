@@ -1,0 +1,20 @@
+{
+  "id": "odawara-kamonomiya-south",
+  "name": "Odawara Kamonomiya southern neighbourhood",
+  "label": "鸭宫南街区",
+  "core": [3712, -16, 4018, 208],
+  "terminals": [
+    ["west-interface", "西侧市街接口", [3760, 96]],
+    ["central-services", "南街区生活服务路口", [3920, 96]],
+    ["east-interface", "东侧水路跨越的西岸接口", [4010, 126]],
+    ["station-south-interface", "鸭宫站南侧街道接口", [3905, 18]],
+    ["south-interface", "南侧河岸街道接口", [3984, 192]]
+  ],
+  "maximum_buildings": 60,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

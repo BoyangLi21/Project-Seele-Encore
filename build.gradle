@@ -646,6 +646,18 @@ tasks.register('verifyCityRelocation', JavaExec) {
 }
 tasks.named('check').configure { dependsOn 'verifyCityRelocation' }
 
+tasks.register('verifySurfaceRepairReplay', JavaExec) {
+    dependsOn testClasses
+    classpath = sourceSets.test.runtimeClasspath
+    mainClass = 'com.projectseele.world.SurfaceRepairReplayTest'
+    if (project.hasProperty('surfaceRepairCandidate') && project.hasProperty('surfaceRepairWorld')) {
+        args project.property('surfaceRepairCandidate'), project.property('surfaceRepairWorld')
+    }
+    maxHeapSize = '512m'
+    workingDir = file('.Codex/surface-replay-test')
+    doFirst { workingDir.mkdirs() }
+}
+
 tasks.register('verifyCombatMotionR29', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath

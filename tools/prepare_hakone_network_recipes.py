@@ -4,6 +4,7 @@ from pathlib import Path
 from collections import defaultdict
 import nbtlib
 import numpy as np
+from concurrent.futures import ProcessPoolExecutor,as_completed
 from author_hakone_lakefront import Editor
 from apply_s20_approved_semantic_repairs import parse_state
 from repair_hakone_surface_ownership import load_grid,sampled
@@ -15,6 +16,7 @@ DATA=Path('dimensions/projectseele/geofront/data')
 
 def run(a):
     e=Editor(a.candidate);check=json.loads((a.candidate/'functional-check.json').read_text('utf8'));errors=list(check['errors'])
+    generation={tuple(row[:2]):row[2]for row in json.loads((a.candidate/'manifest.json').read_text('utf8')).get('preserved_generation_statuses',[])}
     migrations={}
     path=a.candidate/'block-entities.dat'
     if path.exists():
@@ -60,7 +62,8 @@ def run(a):
                 if key not in lookup:lookup[key]=len(palette);palette.append(s)
                 codes[name]=lookup[key];return lookup[key]
             l,h=ra[i:i+2];columns=defaultdict(list)
-            if exists:
+            sparse=exists or generation.get(q,'full')!='full'
+            if sparse:
                 for offset,value in zip(at[l:h],vs[l:h]):columns[int(offset)%256].append((int(offset)//256-128,code(names[value])))
             else:
                 # Complete saved surface, not a sparse change set applied to
@@ -88,17 +91,20 @@ def run(a):
                     if int(cell['Pos'])not in {packed(p)for p in migrations}:retained.append(cell)
                 data['BlockEntities']=nbtlib.List[nbtlib.Compound](retained)
                 wanted={p:t for p,t in tags[q].items()if p in migrations}
+            elif sparse:wanted={p:t for p,t in tags[q].items()if p in migrations}
             else:wanted=tags[q]
             for pos,tag in wanted.items():
                 if pos[1]<-128:continue
                 # Only attach inventories covered by the new complete surface.
-                if not exists and pos[1]<bottoms[pos[2]%16*16+pos[0]%16]:continue
+                if not sparse and pos[1]<bottoms[pos[2]%16*16+pos[0]%16]:continue
                 state=e.state(*pos)
                 data['BlockEntities'].append(nbtlib.Compound({'Pos':nbtlib.Long(packed(pos)),'StateId':nbtlib.Int(code(state)),'NBT':copy.deepcopy(tag)}))
             prior=a.candidate/'before'/rel;out=a.candidate/'after'/rel;out.parent.mkdir(parents=True,exist_ok=True)
             if exists:prior.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(original,prior)
             data.save(out,gzipped=True);recipes+=1
         e.regions.clear();print('Prepared current generation recipes',file.name,recipes,flush=True)
+    if getattr(a,'recipe_worker',False):
+        return dict(errors=errors,recipes=recipes,devices=devices,newrecipes=newrecipes)
     preserve=a.candidate/'preserved';preserve.mkdir(exist_ok=True)
     for f in(a.world/DATA).glob('*control*.dat'):shutil.copy2(f,preserve/f.name)
     check.update(errors=errors)
@@ -109,15 +115,58 @@ def run(a):
     (a.candidate/'functional-check.json').write_text(json.dumps(check,indent=2),'utf8')
     print('Prepared',recipes,'recipes; devices',devices,'unresolved',len(errors),flush=True)
 
+def parallel_recipes(a):
+    """Region workers own disjoint chunk recipes; only the parent publishes QA."""
+    files=sorted(f.name for f in (a.candidate/'delta').glob('*.npz'))
+    if a.regions:files=[f for f in files if f in a.regions]
+    if not files:return run(a)
+    check=json.loads((a.candidate/'functional-check.json').read_text('utf8'))
+    reports=[]
+    with ProcessPoolExecutor(max_workers=a.workers)as pool:
+        jobs=[]
+        for group in range(min(a.workers,len(files))):
+            task=copy.copy(a);task.regions=files[group::a.workers];task.recipe_worker=True
+            jobs.append(pool.submit(run,task))
+        for future in as_completed(jobs):reports.append(future.result())
+    if not a.regions:
+        wanted=set()
+        for name in files:
+            with np.load(a.candidate/'delta'/name)as source:wanted.update(f'{int(x)}_{int(z)}.dat'for x,z in source['coordinates'])
+        for side in ('before','after'):
+            for prepared in(a.candidate/side/DATA/'city_rigid_generation_r45/surface').glob('*.dat'):
+                if prepared.name not in wanted:prepared.unlink()
+    errors={json.dumps(row,sort_keys=True):row for report in reports for row in report['errors']}
+    summary=dict(regions=files,recipes=sum(r['recipes']for r in reports),devices_checked=sum(r['devices']for r in reports),workers=a.workers)
+    check.update(errors=list(errors.values()))
+    if a.regions:check['last_recipe_refresh']=summary
+    else:
+        check.pop('last_recipe_refresh',None)
+        check.update(devices_checked=summary['devices_checked'],updated_recipes=summary['recipes'],
+            new_complete_surface_recipes=sum(r['newrecipes']for r in reports),recipe_workers=a.workers)
+    preserve=a.candidate/'preserved';preserve.mkdir(exist_ok=True)
+    for file in(a.world/DATA).glob('*control*.dat'):shutil.copy2(file,preserve/file.name)
+    (a.candidate/'functional-check.json').write_text(json.dumps(check,indent=2),'utf8')
+    print('Prepared parallel recipes',summary['recipes'],'devices',summary['devices_checked'],'errors',len(errors),flush=True)
+
+
+def dry_field_changes(old,water,old_ground,new_ground,inside):
+    # The eastern extension retains the sea datum even above dry land. Such
+    # samples may follow verified dry earthworks; actual wet beds stay exact.
+    dry=(water==-32768)|((old.astype(np.int64)>=water.astype(np.int64)*16)&(old_ground>=water)&(new_ground>=water))
+    use=inside&(new_ground!=old_ground)&dry
+    revised=old.copy();revised[use]=(new_ground[use]*16).astype(old.dtype)
+    return revised,use
+
+
 def field(a):
     d=load_grid(a.plan/'network.npz')
     with gzip.open(a.resource,'rb')as f:
         header=f.read(24);magic,x,z,step,w,h=struct.unpack('>6i',header)
         old=np.frombuffer(f.read(w*h*2),'>i2').reshape(h,w).copy();water=np.frombuffer(f.read(w*h*2),'>i2').reshape(h,w).copy()
     zz,xx=np.meshgrid(np.arange(h)*step+z,np.arange(w)*step+x,indexing='ij');inside=(xx>=d['bounds'][0])&(xx<=d['bounds'][2])&(zz>=d['bounds'][1])&(zz<=d['bounds'][3])
-    difference=sampled(d,'ground',xx,zz)-sampled(d,'old_ground',xx,zz)
+    new_ground=sampled(d,'ground',xx,zz);old_ground=sampled(d,'old_ground',xx,zz);difference=new_ground-old_ground
     # Preserve surveyed lakes/rivers and the already baked external transition.
-    use=inside&(difference!=0)&(water==-32768);new=old.copy();new[use]=sampled(d,'ground',xx,zz)[use]*16
+    new,use=dry_field_changes(old,water,old_ground,new_ground,inside)
     for edge in (difference[0],difference[-1],difference[:,0],difference[:,-1]):
         if np.any(edge):raise ValueError('Network earthworks reach the outer saved-world seam')
     a.out.mkdir(parents=True,exist_ok=True)
@@ -171,4 +220,5 @@ if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__);p.add_argument('--phase',choices=('recipes','field','future'),required=True)
     for n in('candidate','world','plan','resource','out','unfinished'):p.add_argument('--'+n,type=Path)
     p.add_argument('--regions',nargs='*')
-    a=p.parse_args();{'recipes':run,'field':field,'future':future}[a.phase](a)
+    p.add_argument('--workers',type=int,default=1)
+    a=p.parse_args();{'recipes':parallel_recipes if a.workers>1 else run,'field':field,'future':future}[a.phase](a)

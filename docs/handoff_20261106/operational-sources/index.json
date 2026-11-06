@@ -1,0 +1,17 @@
+[
+  {
+    "source": "C:\\Users\\liboy\\Documents\\Codex\\2026-11-02\\gpt-claude-gemini-2\\work\\run_station_patch_replay.py",
+    "snapshot": "docs\\handoff_20261106\\operational-sources\\run_station_patch_replay.py.snapshot.txt",
+    "note": "Frozen text only; no execution and no claim of safe direct replay"
+  },
+  {
+    "source": "C:\\Users\\liboy\\Documents\\Codex\\2026-11-02\\gpt-claude-gemini-2\\work\\yumoto_landing_test.init.gradle",
+    "snapshot": "docs\\handoff_20261106\\operational-sources\\yumoto_landing_test.init.gradle.snapshot.txt",
+    "note": "Frozen text only; no execution and no claim of safe direct replay"
+  },
+  {
+    "source": "C:\\Users\\liboy\\Documents\\Codex\\2026-11-02\\gpt-claude-gemini-2\\work\\run_section_patch_replay.py",
+    "snapshot": "docs\\handoff_20261106\\operational-sources\\run_section_patch_replay.py.snapshot.txt",
+    "note": "Frozen text only; no execution and no claim of safe direct replay"
+  }
+]

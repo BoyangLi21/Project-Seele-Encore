@@ -1,0 +1,317 @@
+[
+  {
+    "path": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\shimosoga-access-candidate-v3",
+    "installed": false,
+    "root_publication_approved": false,
+    "files": [
+      "access-design-input.json",
+      "author-report.json",
+      "authored-design.json",
+      "block-entities.dat",
+      "bus-poses.json",
+      "capture.json",
+      "captured-devices.dat",
+      "civil-constraints.json",
+      "civil-footprints.geojson",
+      "exact-edits.json",
+      "forward-patch.json",
+      "independent-check.json",
+      "inverse-patch.json",
+      "manifest.json",
+      "measured.npz",
+      "profile-design.json",
+      "source-survey.json"
+    ],
+    "reports": {
+      "manifest.json": {
+        "schema": "bounded-station-access-corridor-v1",
+        "cells": 39922,
+        "world_written": false,
+        "preserve_native_members": true
+      },
+      "author-report.json": {
+        "world_written": false,
+        "error_count": 0,
+        "error_examples": [],
+        "world_opened": false,
+        "whole_station_complete": false
+      },
+      "independent-check.json": {
+        "error_count": 16,
+        "error_examples": [
+          [
+            "clearance",
+            3922,
+            -75,
+            -598,
+            "minecraft:stone_bricks"
+          ],
+          [
+            "clearance",
+            3899,
+            -75,
+            -581,
+            "minecraft:stone_bricks"
+          ],
+          [
+            "clearance",
+            3899,
+            -75,
+            -580,
+            "minecraft:stone_bricks"
+          ]
+        ],
+        "whole_map_completion": false,
+        "visual_verified": false
+      }
+    }
+  },
+  {
+    "path": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\shimosoga-access-candidate-v4",
+    "installed": false,
+    "root_publication_approved": false,
+    "files": [
+      "access-design-input.json",
+      "access-independent-check.json",
+      "author-report.json",
+      "authored-design.json",
+      "block-entities.dat",
+      "bus-poses.json",
+      "capture.json",
+      "captured-devices.dat",
+      "civil-constraints.json",
+      "civil-footprints.geojson",
+      "exact-edits.json",
+      "forward-patch.json",
+      "functional-check.json",
+      "independent-check.json",
+      "inverse-patch.json",
+      "junction-probe--1.5.json",
+      "junction-probe-1.5.json",
+      "manifest.json",
+      "measured.npz",
+      "profile-design.json",
+      "source-survey.json",
+      "vehicle-pose-checks.json"
+    ],
+    "reports": {
+      "manifest.json": {
+        "schema": "bounded-station-access-corridor-v1",
+        "cells": 39914,
+        "world_written": false,
+        "preserve_native_members": true
+      },
+      "author-report.json": {
+        "world_written": false,
+        "error_count": 0,
+        "error_examples": [],
+        "world_opened": false,
+        "whole_station_complete": false
+      },
+      "functional-check.json": {
+        "error_count": 0,
+        "error_examples": [],
+        "whole_map_completion": false,
+        "production_replay_pending": true
+      },
+      "independent-check.json": {
+        "error_count": 0,
+        "error_examples": [],
+        "whole_map_completion": false,
+        "visual_verified": false
+      },
+      "access-independent-check.json": {
+        "schema": "bounded-station-access-independent-v1",
+        "world_written": false,
+        "error_count": 0,
+        "error_examples": [],
+        "source_devices_preserved": true,
+        "source_actors_preserved": true,
+        "vehicle_sweep_passed": true,
+        "full_width_walk_passed": true,
+        "future_water_clearance_passed": true,
+        "supports_grounded": true,
+        "manifest_delta_source_exact": true,
+        "production_replay_passed": false,
+        "runtime_driving_passed": false,
+        "world_opened": false,
+        "whole_station_complete": false
+      }
+    }
+  },
+  {
+    "path": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\shimosoga-access-candidate-v5",
+    "installed": false,
+    "root_publication_approved": false,
+    "files": [
+      "access-design-input.json",
+      "bus-poses.json",
+      "capture.json",
+      "captured-devices.dat",
+      "civil-constraints.json",
+      "civil-footprints.geojson",
+      "measured.npz",
+      "profile-design.json",
+      "source-survey.json"
+    ],
+    "reports": {}
+  },
+  {
+    "path": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\shimosoga-access-candidate-v6",
+    "installed": false,
+    "root_publication_approved": false,
+    "files": [
+      "access-design-input.json",
+      "bus-poses.json",
+      "capture.json",
+      "captured-devices.dat",
+      "civil-constraints.json",
+      "civil-footprints.geojson",
+      "measured.npz",
+      "profile-design.json",
+      "source-survey.json"
+    ],
+    "reports": {}
+  },
+  {
+    "path": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\shimosoga-access-candidate-v7",
+    "installed": false,
+    "root_publication_approved": false,
+    "files": [
+      "access-design-input.json",
+      "bus-poses.json",
+      "capture.json",
+      "captured-devices.dat",
+      "civil-constraints.json",
+      "civil-footprints.geojson",
+      "measured.npz",
+      "profile-design.json",
+      "source-survey.json"
+    ],
+    "reports": {}
+  },
+  {
+    "path": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\shimosoga-access-candidate-v8",
+    "installed": false,
+    "root_publication_approved": false,
+    "files": [
+      "access-design-input.json",
+      "author-report.json",
+      "authored-design.json",
+      "block-entities.dat",
+      "bus-poses.json",
+      "capture.json",
+      "captured-devices.dat",
+      "civil-constraints.json",
+      "civil-footprints.geojson",
+      "exact-edits.json",
+      "forward-patch.json",
+      "inverse-patch.json",
+      "manifest.json",
+      "measured.npz",
+      "profile-design.json",
+      "source-survey.json"
+    ],
+    "reports": {
+      "manifest.json": {
+        "schema": "bounded-station-access-corridor-v1",
+        "cells": 39677,
+        "world_written": false,
+        "preserve_native_members": true
+      },
+      "author-report.json": {
+        "world_written": false,
+        "error_count": 0,
+        "error_examples": [],
+        "world_opened": false,
+        "whole_station_complete": false
+      }
+    }
+  },
+  {
+    "path": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\shimosoga-candidate-v5",
+    "installed": false,
+    "root_publication_approved": false,
+    "files": [
+      "authored-collision-shapes.json",
+      "block-entities.dat",
+      "capture.json",
+      "captured-devices.dat",
+      "exact-edits.json",
+      "finite-port-feasibility.json",
+      "finite-port-native-math.json",
+      "internal-pre-access-check.json",
+      "layout-authoring.json",
+      "manifest.json",
+      "measured.npz",
+      "native-math-samples.json",
+      "native-station-plan.json",
+      "pre-access-handoff.json",
+      "release-layout.json",
+      "site-config-next-source.json",
+      "site-geography-evidence.json",
+      "stage-three-interfaces.json",
+      "station-design.json",
+      "station-set-plan.json",
+      "station-verification-config.json",
+      "vehicle-pose-source.json"
+    ],
+    "reports": {
+      "manifest.json": {
+        "cells": 21818,
+        "world_written": false,
+        "native_station_pending": true
+      },
+      "internal-pre-access-check.json": {
+        "world_written": false,
+        "existing_street_connected": false,
+        "offline_candidate_verified": false,
+        "error_count": 0,
+        "error_examples": []
+      }
+    }
+  },
+  {
+    "path": "F:\\eva\\artifacts\\hakone_geography_20261029\\network-repair-20261102\\kamioi-candidate-v2",
+    "installed": false,
+    "root_publication_approved": false,
+    "files": [
+      "authored-collision-shapes.json",
+      "block-entities.dat",
+      "capture.json",
+      "captured-devices.dat",
+      "exact-edits.json",
+      "finite-port-feasibility.json",
+      "finite-port-native-math.json",
+      "internal-pre-access-check.json",
+      "layout-authoring.json",
+      "manifest.json",
+      "measured.npz",
+      "native-math-samples.json",
+      "native-station-plan.json",
+      "pre-access-handoff.json",
+      "release-layout.json",
+      "site-config-next-source.json",
+      "site-geography-evidence.json",
+      "stage-three-interfaces.json",
+      "station-design.json",
+      "station-set-plan.json",
+      "station-verification-config.json",
+      "vehicle-pose-source.json"
+    ],
+    "reports": {
+      "manifest.json": {
+        "cells": 18543,
+        "world_written": false,
+        "native_station_pending": true
+      },
+      "internal-pre-access-check.json": {
+        "world_written": false,
+        "existing_street_connected": false,
+        "offline_candidate_verified": false,
+        "error_count": 0,
+        "error_examples": []
+      }
+    }
+  }
+]

@@ -1,0 +1,19 @@
+{
+  "id": "odawara-iwahara",
+  "name": "Iwahara western neighbourhood",
+  "label": "岩原西街区",
+  "core": [2440, -800, 2760, -672],
+  "terminals": [
+    ["station-west-interface", "岩原站西侧街道接口", [2695, -690]],
+    ["west-interface", "西侧住宅街道接口", [2500, -710]],
+    ["north-interface", "塚原方向街道接口", [2600, -750]],
+    ["northwest-services", "西北生活服务街口", [2470, -745]]
+  ],
+  "maximum_buildings": 60,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

@@ -1,0 +1,62 @@
+"""Read actual named R52 art regions; no world/source/game mutation."""
+from pathlib import Path
+import json,hashlib,sys,time
+import numpy as np
+from query_blocks import iter_selected_sections,iter_block_entities
+from plan_pyramid_ring_links_r52 import LINKS
+BASE=Path('D:/eva/artifacts/r52_fresh_from_r51_20261009')
+WORLD=BASE/'WORLD_R52'
+REPO=Path(__file__).resolve().parents[1]
+OUT=REPO/'.codex/r52_art_readonly_audit'
+AIR={'minecraft:air','minecraft:cave_air','minecraft:void_air'}
+def main():
+    started=time.monotonic();OUT.mkdir(exist_ok=True)
+    source=BASE/'far_yashima/RIDGE_HEIGHTS.npz';ridge=np.load(source);height=ridge['after'];origin=ridge['origin'];grid=[]
+    for iz in range(0,height.shape[0],8):
+        for ix in range(0,height.shape[1],8):grid.append((int(ix+origin[0]),int(height[iz,ix]),int(iz+origin[1])))
+    top=((15,-438,307),(46,-399,345));boxes=[top];ring_boxes=[]
+    for y,nodes in LINKS.items():
+        for (x,z),(X,Z) in zip(nodes,nodes[1:]):
+            lo=(min(x,X)-2,y-1,min(z,Z)-2);hi=(max(x,X)+2,y+3,max(z,Z)+2);boxes.append((lo,hi));ring_boxes.append((y,lo,hi))
+    selected={}
+    for x,y,z in grid:selected.setdefault((x//16,z//16),set()).update((y//16,(y+1)//16))
+    for lo,hi in boxes:
+        for cx in range(lo[0]//16,hi[0]//16+1):
+            for cz in range(lo[2]//16,hi[2]//16+1):selected.setdefault((cx,cz),set()).update(range(lo[1]//16,hi[1]//16+1))
+    cache={}
+    for cx,cz,sy,pal,indices in iter_selected_sections(WORLD,'projectseele:geofront',selected):cache[cx,cz,sy]=(pal,indices)
+    def state(p):
+        x,y,z=p;entry=cache.get((x//16,z//16,y//16))
+        if entry is None:return 'UNREAD_SECTION'
+        pal,idx=entry;return pal[int(idx[(y%16)*256+(z%16)*16+x%16])]
+    samples=[{'position':list(p),'soil_state':state(p),'above_state':state((p[0],p[1]+1,p[2]))} for p in grid]
+    good=[r for r in samples if r['soil_state'].split('[')[0] in {'minecraft:grass_block','minecraft:dirt','minecraft:stone','minecraft:sand','minecraft:gravel'}]
+    flat=height==174
+    from scipy.ndimage import label,find_objects
+    labels,n=label(flat);sizes=[int((labels[s]==i).sum()) for i,s in enumerate(find_objects(labels),1)];largest=int(np.argmax(sizes))+1;q=np.argwhere(labels==largest)
+    plateau=dict(columns=int(len(q)),bbox=[[int(q[:,1].min()+origin[0]),174,int(q[:,0].min()+origin[1])],[int(q[:,1].max()+origin[0]),174,int(q[:,0].max()+origin[1])]])
+    tags={q:t for lo,hi in boxes for q,t in iter_block_entities(WORLD,'projectseele:geofront',lo,hi)}
+    murals=[]
+    for q,t in tags.items():
+        if str(t.get('id',''))=='projectseele:wall_artwork':murals.append({'pos':q,'snbt':t.snbt(),'artwork':str(t['Artwork']),'width':float(t['Width']),'height':float(t['Height']),'facing':int(t['Facing'])})
+    from collections import Counter
+    ring={}
+    for y,lo,hi in ring_boxes:
+        rows=ring.setdefault(str(y),{'states':Counter(),'wood_signs':[],'visible_marker_blocks':[]})
+        for Y in range(lo[1],hi[1]+1):
+            for z in range(lo[2],hi[2]+1):
+                for x in range(lo[0],hi[0]+1):
+                    s=state((x,Y,z));rows['states'][s]+=1
+                    if s.split('[')[0].endswith(('_sign','_wall_sign')):rows['wood_signs'].append([x,Y,z,s])
+                    if s.split('[')[0] in {'minecraft:structure_block','minecraft:jigsaw','minecraft:command_block','minecraft:barrier','minecraft:structure_void'}:rows['visible_marker_blocks'].append([x,Y,z,s])
+    for row in ring.values():row['states']=dict(row['states'])
+    textures={}
+    from PIL import Image
+    for name in ['tree_of_life.png','nerv_logo_r04.png']:
+        p=REPO/'artifacts/r52_runtime_candidate/projectseele-local-maps'/name;a=np.asarray(Image.open(p).convert('RGBA'));textures[name]={'sha256':hashlib.sha256(p.read_bytes()).hexdigest(),'width':a.shape[1],'height':a.shape[0],'pixels':a.shape[0]*a.shape[1],'nonopaque_pixels':int((a[:,:,3]<255).sum()),'opaque_light_pixels':int(((a[:,:,:3]>230).all(axis=2)&(a[:,:,3]==255)).sum())}
+    report={'world':str(WORLD),'world_written':False,'native_art_passed':False,'ridge_height_source_sha256':hashlib.sha256(source.read_bytes()).hexdigest(),'source_design_plot_actually_viewed':True,'current_world_soil_samples':len(samples),'sample_at_expected_height_with_natural_soil':len(good),'largest_flat174':plateau,'samples':samples,'HQ_top_box':top,'actual_murals':murals,'ring_strip_readback':ring,'actual_local_texture_pixels':textures,'top_current_nbt':[{'pos':q,'id':str(t.get('id','')),'snbt':t.snbt()} for q,t in tags.items() if all(lo<=v<=hi for lo,v,hi in zip(top[0],q,top[1]))],'chunks_selected':len(selected),'sections_read':len(cache),'seconds':time.monotonic()-started,'limits':['Grid8 soil sampling checks selected heights only; hardware/tree/nonsoil exceptions are not automatically errors.','Ring source graph is game service layout; unknown TV floorplans do not justify speculative deletion.','Markers are inventoried even when invisible to ordinary clients.','TV frame pixels remain Root browser review; no1:1 claim.']}
+    (OUT/'CURRENT_ART_FOCUS_READBACK.json').write_text(json.dumps(report,ensure_ascii=False,indent=2)+'\n',encoding='utf-8')
+    import matplotlib;matplotlib.use('Agg');import matplotlib.pyplot as plt
+    fig,ax=plt.subplots(figsize=(10,9));ax.imshow(height,origin='lower',extent=[origin[0],origin[0]+height.shape[1],origin[1],origin[1]+height.shape[0]],cmap='terrain');ax.contour(np.arange(height.shape[1])+origin[0],np.arange(height.shape[0])+origin[1],height,levels=[100,125,150,174,180,190],colors='black',linewidths=.4);ax.set_title('R52 saved ridge design; exact current World soil samples at8m grid');bad=[r for r in samples if r not in good];ax.scatter([r['position'][0] for r in bad],[r['position'][2] for r in bad],s=3,c='red',label='non-soil/modified/hardware sample');ax.set_xlabel('world X');ax.set_ylabel('world Z');ax.legend();fig.tight_layout();fig.savefig(OUT/'RIDGE_CURRENT_SAMPLE_DIAGNOSTIC.png',dpi=140);plt.close(fig)
+    print(json.dumps({k:v for k,v in report.items() if k in ['current_world_soil_samples','sample_at_expected_height_with_natural_soil','largest_flat174','actual_murals','chunks_selected','sections_read','seconds']},ensure_ascii=True))
+if __name__=='__main__':main()

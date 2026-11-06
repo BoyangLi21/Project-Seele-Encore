@@ -1,0 +1,19 @@
+{
+  "id": "odawara-northwest",
+  "name": "Odawara northwestern central neighbourhood",
+  "label": "小田原西北生活街区",
+  "core": [2448, -1056, 2704, -832],
+  "terminals": [
+    ["central-services", "西北城区生活服务街口", [2640, -1000]],
+    ["west-interface", "西侧住宅街道接口", [2490, -970]],
+    ["south-interface", "塚原方向街道接口", [2630, -885]],
+    ["neighbourhood-services", "住宅区内部服务街口", [2560, -940]]
+  ],
+  "maximum_buildings": 70,
+  "building_half": [4, 5],
+  "carriageway_width": 5,
+  "sidewalk_width": 1.5,
+  "horizontal_simplification": 1.2,
+  "station_construction_stage": 2,
+  "civil_construction_stage": 3
+}

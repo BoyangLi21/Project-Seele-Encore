@@ -1,0 +1,25 @@
+{
+ "curve_indices":[100,101,102,195,196,197,198,199,200,201,202,203,204,205,206,207],
+ "station_sources":[
+   "F:/eva/artifacts/hakone_geography_20261029/network-repair-20261102/tonosawa-candidate-v4",
+   "F:/eva/artifacts/hakone_geography_20261029/network-repair-20261102/yumoto-central-candidate-v6"
+ ],
+ "retire_cells":[
+   {"pos":[1961,-40,1120],"state":"minecraft:stone_bricks"},
+   {"pos":[1961,-40,1121],"state":"minecraft:stone_bricks"},
+   {"pos":[1961,-40,1122],"state":"minecraft:stone_bricks"},
+   {"pos":[1961,-40,1123],"state":"minecraft:stone_bricks"},
+   {"pos":[1961,-40,1124],"state":"minecraft:stone_bricks"},
+   {"pos":[2257,-51,1099],"state":"minecraft:stone_bricks"},
+   {"pos":[2258,-51,1099],"state":"minecraft:stone_bricks"},
+   {"pos":[2001,-41,1107],"state":"minecraft:smooth_stone"},
+   {"pos":[2001,-40,1106],"state":"minecraft:smooth_stone"},
+   {"pos":[2001,-38,1102],"state":"minecraft:smooth_stone_slab[type=bottom,waterlogged=false]"},
+   {"pos":[2101,-43,1136],"state":"minecraft:smooth_stone"}
+ ],
+ "support_fragments":[{"base":[2104,-43,1130],"state":"minecraft:polished_andesite"}],
+ "canopies":[
+   {"name":"tonosawa-platform","bounds":[1960,-36,1097,1984,-36,1108],"cells":94,"raise":1},
+   {"name":"yumoto-platform","bounds":[2204,-52,1114,2234,-52,1128],"cells":119,"raise":1}
+ ]
+}

@@ -1,0 +1,103 @@
+{
+  "roots": {
+    "cleanup": {
+      "path": "E:\\Users\\liboy\\.codex\\worktrees\\repo-cleanup-20261019\\eva",
+      "head": "764384f290064119904968dfc261bf452a755133",
+      "branch": "codex/repo-cleanup-20261019",
+      "head_fully_in_origin_main": false,
+      "dirty_count": 11,
+      "tracked_dirty": 1,
+      "untracked": 10
+    },
+    "r51-nonmap": {
+      "path": "E:/Users/liboy/.codex/worktrees/r51-nonmap/eva",
+      "head": "289dfed3f567b527e4f5d514d8d3cc73eb382ba4",
+      "branch": "codex/map-complete-20261013",
+      "head_fully_in_origin_main": true,
+      "dirty_count": 397,
+      "tracked_dirty": 18,
+      "untracked": 379
+    },
+    "6a9a": {
+      "path": "C:/Users/liboy/.codex/worktrees/6a9a/eva",
+      "head": "c8ece284258205418872b9027dace058fdee5d4f",
+      "branch": "(detached)",
+      "head_fully_in_origin_main": true,
+      "dirty_count": 12,
+      "tracked_dirty": 8,
+      "untracked": 4
+    },
+    "28ac": {
+      "path": "C:/Users/liboy/.codex/worktrees/28ac/eva",
+      "head": "ef7320900d4690ba86a7347bab8c15cca88aee85",
+      "branch": "(detached)",
+      "head_fully_in_origin_main": true,
+      "dirty_count": 0,
+      "tracked_dirty": 0,
+      "untracked": 0
+    },
+    "main": {
+      "path": "F:/eva",
+      "head": "de1dc4824c28de90f216205f5b596478839de7cf",
+      "branch": "main",
+      "head_fully_in_origin_main": true,
+      "dirty_count": 522,
+      "tracked_dirty": 174,
+      "untracked": 348
+    }
+  },
+  "refs": [
+    {
+      "name": "claude/motion",
+      "commit": "91fcb68bbd6d0cc27f91d217b327c492547aca8d",
+      "upstream": "origin/main",
+      "fully_in_origin_main": true
+    },
+    {
+      "name": "claude/perf-r59",
+      "commit": "5deb2fe601a12c2dc71c7d9a0c61f663ad25c400",
+      "upstream": "origin/main",
+      "fully_in_origin_main": true
+    },
+    {
+      "name": "claude/remove-hash-gates",
+      "commit": "0abd43dfb00d6f77e2c9671e383f8a7c0f0a12af",
+      "upstream": "origin/main",
+      "fully_in_origin_main": true
+    },
+    {
+      "name": "codex/map-complete-20261013",
+      "commit": "289dfed3f567b527e4f5d514d8d3cc73eb382ba4",
+      "upstream": "origin/codex/map-complete-20261013",
+      "fully_in_origin_main": true
+    },
+    {
+      "name": "codex/r51-nonmap-release",
+      "commit": "6f2d35cb819f1e1fbaa0680cab935319b278b311",
+      "upstream": "origin/codex/r51-nonmap-release",
+      "fully_in_origin_main": true
+    },
+    {
+      "name": "codex/r52-map-restart",
+      "commit": "269a3c194765c892f6594f6c2eb5048352cc6a52",
+      "upstream": "origin/codex/r52-map-restart",
+      "fully_in_origin_main": true
+    },
+    {
+      "name": "codex/repo-cleanup-20261019",
+      "commit": "764384f290064119904968dfc261bf452a755133",
+      "upstream": "origin/main",
+      "fully_in_origin_main": false
+    },
+    {
+      "name": "main",
+      "commit": "de1dc4824c28de90f216205f5b596478839de7cf",
+      "upstream": "origin/main",
+      "fully_in_origin_main": true
+    }
+  ],
+  "worktrees_porcelain": "worktree F:/eva\nHEAD de1dc4824c28de90f216205f5b596478839de7cf\nbranch refs/heads/main\n\nworktree C:/Users/liboy/.codex/worktrees/28ac/eva\nHEAD ef7320900d4690ba86a7347bab8c15cca88aee85\ndetached\n\nworktree C:/Users/liboy/.codex/worktrees/6a9a/eva\nHEAD c8ece284258205418872b9027dace058fdee5d4f\ndetached\n\nworktree E:/Users/liboy/.codex/worktrees/r51-nonmap/eva\nHEAD 289dfed3f567b527e4f5d514d8d3cc73eb382ba4\nbranch refs/heads/codex/map-complete-20261013\n\nworktree E:/Users/liboy/.codex/worktrees/repo-cleanup-20261019/eva\nHEAD 764384f290064119904968dfc261bf452a755133\nbranch refs/heads/codex/repo-cleanup-20261019\n\nworktree F:/eva/.claude/worktrees/hashgate\nHEAD 0abd43dfb00d6f77e2c9671e383f8a7c0f0a12af\nbranch refs/heads/claude/remove-hash-gates\n\nworktree F:/eva/.claude/worktrees/motion\nHEAD 91fcb68bbd6d0cc27f91d217b327c492547aca8d\nbranch refs/heads/claude/motion\n\nworktree F:/eva/.claude/worktrees/perf\nHEAD 5deb2fe601a12c2dc71c7d9a0c61f663ad25c400\nbranch refs/heads/claude/perf-r59\n\n",
+  "origin_main": "5deb2fe601a12c2dc71c7d9a0c61f663ad25c400",
+  "stash_count": 0,
+  "alias_C_E_samefile": true
+}

@@ -1,0 +1,9 @@
+{
+  "bridge_details": [
+    {"id": "sounzan-native-funicular-crossing", "bounds": [694,719,747,769], "supports": [[704,724],[739,762]], "deck_depth": 2},
+    {"id": "sounzan-stream-crossing", "bounds": [710,802,740,826], "supports": [], "deck_depth": 1}
+  ],
+  "woodland_areas": [[345,735,535,814],[550,810,655,900],[600,580,690,710],[695,835,805,940],[700,565,840,700]],
+  "tree_clusters": [[680,820],[795,700],[861,718],[728,633],[778,625],[815,676],[831,819]],
+  "native_frontage_details": true
+}
