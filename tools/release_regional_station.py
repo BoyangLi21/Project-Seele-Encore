@@ -40,7 +40,7 @@ def prepare(a):
     print('Prepared release:',len(files),'identity files;',after['full_chunks'],'FULL source chunks;',after['unknown_components'],'unchanged boundary components.',flush=True)
 
 def install(a):
-    log=a.production_log.read_text('utf8');assert 'BUILD SUCCESSFUL'in log and 'Production surface replay:'in log
+    log=a.production_log.read_text('utf8',errors='replace');assert 'BUILD SUCCESSFUL'in log and 'Production surface replay:'in log
     p=a.candidate/'station-release-check.json';d=read(p);d['production_recipe_replay_passed']=True;write(p,d)
     subprocess.run([sys.executable,str(Path(__file__).with_name('install_hakone_array_patch.py')),'--world',str(a.world),'--backup',str(a.installation.parent),'--candidate',str(a.candidate),'--workers','2'],check=True)
 

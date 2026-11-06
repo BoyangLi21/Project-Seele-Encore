@@ -1,4 +1,8 @@
-"""Run one explicitly scoped production road replay under a cold-world lock."""
+"""Run one explicitly scoped production replay of a road or station candidate.
+
+Holds the cold-world lock itself. Road candidates carry their scope from
+prepare; station candidates name the world with --world.
+"""
 import argparse
 import json
 import os
@@ -16,7 +20,9 @@ def groovy_path(path):
 
 
 def run(a):
-    scope=read(a.candidate/'corridor-release-check.json')['replay_scope']
+    control=a.candidate/'corridor-release-check.json'
+    scope=read(control)['replay_scope'] if control.exists() else dict(candidate=str(a.candidate),world=str(a.world),
+        expected=str(a.candidate/'recipe-replay-expected'))
     if Path(scope['candidate']).resolve()!=a.candidate.resolve():raise ValueError('Candidate replay identity differs')
     if Path(scope['expected']).resolve()!=(a.candidate/'recipe-replay-expected').resolve():raise ValueError('Replay expected directory differs')
     if a.log.exists():raise ValueError('Use a fresh production log')
@@ -52,4 +58,5 @@ def run(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
     for key in ('candidate','repository','terrain','java','log'):p.add_argument('--'+key,type=Path,required=True)
+    p.add_argument('--world',type=Path)
     run(p.parse_args())

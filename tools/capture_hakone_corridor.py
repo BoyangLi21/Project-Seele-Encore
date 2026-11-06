@@ -2,11 +2,12 @@
 import argparse,json,math
 from pathlib import Path
 from collections import Counter
+import nbtlib
 import numpy as np
 from prepare_hakone_main_terrain import capture
 from plan_ashi_landscape_r54 import SOIL,NATURAL
 from transplant_s22_authority import read_region,parse_chunk
-from query_blocks import dimension_dir,chunk_statuses,AIR
+from query_blocks import dimension_dir,chunk_statuses,iter_block_entities,AIR
 from install_r53_carrier_trays import stopped_world
 
 
@@ -47,6 +48,8 @@ def main(a):
                         x,z=math.floor(p[0]),math.floor(p[2]);radius=16 if 'aircraft'in str(actor['id'])or str(actor['id'])in('superbwarfare:j_16','superbwarfare:ac_130h')else 4
                         occupied[max(0,z-z0-radius):min(occupied.shape[0],z-z0+radius+1),max(0,x-x0-radius):min(occupied.shape[1],x-x0+radius+1)]=True
         np.savez_compressed(a.out/'measured.npz',bounds=a.bounds,**measured,actors=occupied)
+        devices=[tag for _,tag in iter_block_entities(a.world,'projectseele:geofront',(x0,-128,z0),(x1,319,z1))]
+        nbtlib.File({'Devices':nbtlib.List[nbtlib.Compound](devices)}).save(a.out/'captured-devices.dat',gzipped=True)
     report=dict(world=str(a.world),bounds_xz=a.bounds,source_files=files,actors=actors,chunk_statuses=dict(Counter(status.values())),
                 unavailable_chunks=[[*p,s]for p,s in status.items()if s!='full'],world_written=False)
     (a.out/'capture.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
