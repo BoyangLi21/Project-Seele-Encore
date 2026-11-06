@@ -244,9 +244,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private static final float CROUCH_SPEED = 0.18F;
     private static final float PRONE_SPEED = 0.10F;
     private static final float SPRINT_SPEED = 0.78F;
-    private static final double JUMP_VELOCITY = 5.3D;
+    private static final double JUMP_VELOCITY = 4.05D;
     private static final float MELEE_RATE_R43 = 1.5F;
     private static final double AIRFRAME_GRAVITY = 0.42D;
+    /** The airframe climbs slowly and comes down hard: the same height as a uniform pull, half as long again going up. */
+    private static final double AIR_RISE_GRAVITY = 0.20D, AIR_FALL_GRAVITY = 0.36D;
     private static final double JUMP_SUPPORT_PROBE = 0.75D;
     private static final int JUMP_COOLDOWN_TICKS = 10;
     private static final int JUMP_BUFFER_TICKS = 20;
@@ -7694,6 +7696,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.setDeltaMovement(Vec3.ZERO);
             return;
         }
+        var airframe=this.getAttribute(ForgeMod.ENTITY_GRAVITY.get());
+        if(airframe!=null)
+        {
+            double pull=this.onGround()?AIRFRAME_GRAVITY:this.getDeltaMovement().y>0?AIR_RISE_GRAVITY:AIR_FALL_GRAVITY;
+            if(airframe.getBaseValue()!=pull)airframe.setBaseValue(pull);
+        }
         if(!EvaImmersionR50.travel(this,input))super.travel(input);
         EvaCombatR31.approach(this);
         if (this.level().isClientSide)
@@ -7775,7 +7783,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 player.zza >= 0.0F ? player.zza : player.zza * 0.6D);
     }
 
-    private static final double RIDDEN_GATHER_R58 = 0.125D, RIDDEN_RELEASE_R58 = 0.17D;
+    private static final double RIDDEN_GATHER_R58 = 0.10D, RIDDEN_RELEASE_R58 = 0.12D;
     private Vec3 riddenInputR58 = Vec3.ZERO;
 
     @Override

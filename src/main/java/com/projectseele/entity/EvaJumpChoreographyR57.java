@@ -45,7 +45,7 @@ final class EvaJumpChoreographyR57
     private static final Key K_LAND=key(-26.61F,-32,0,0,-22,0,0,30,0,0,37,0,-10,112,0,8,-90,0,0,-90,0,0,-10,0,0,10,0,0,-25,0,-45,62,0,10,30,0,0,8,0,0);
 
     /** Ticks from take-off to the apex at the EVA's jump speed and gravity. */
-    private static final float APEX_TICKS=12;
+    private static final float APEX_TICKS=14;
     /**
      * Landing: touchdown to the deepest bend, held, then back to the ground
      * pose. An aerial attack drives into its strike faster and holds it

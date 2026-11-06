@@ -21,7 +21,7 @@ POSES = [
 def main():
     out, paths = sys.argv[1], sys.argv[2:]
     a = S.Actors()
-    tex = S.PRIVATE + '/textures/entity/eva_unit01.png'
+    import os; tex = S.PRIVATE + '/textures/entity/' + os.environ.get('SKIN_TEX', 'eva_unit01') + '.png'
     meshes = [R.RigidMesh(p, tex, a.eva_rig) for p in paths]
     imgs = []
     for name, rot, y, eye in POSES:

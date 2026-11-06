@@ -153,6 +153,16 @@ public final class EvaBodyPose
                     merged.putAll(readCombatClipsR31(all.getAsJsonObject("stance_clips_by_rig").getAsJsonObject(Integer.toString(variant)),names));
                     combatClips.put(variant,Map.copyOf(merged));
                 }
+                // The settled stance authored in tools/finale/idle.py replaces the capture's frozen mid-stride.
+                if(variant<=2)try(var stream=EvaBodyPose.class.getResourceAsStream("/assets/projectseele/motion/eva_idle_r59.json"))
+                {
+                    if(stream!=null)
+                    {
+                        var merged=new HashMap<>(combatClips.getOrDefault(variant,Map.of()));
+                        merged.putAll(readCombatClipsR31(JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject(),names));
+                        combatClips.put(variant,Map.copyOf(merged));
+                    }
+                }
             }
             data=new Data(names,index,Map.copyOf(clips),Map.copyOf(rigs),Map.copyOf(support),object(all,"prone"),object(all,"grip"),object(all,"rifle_mocap"),Map.copyOf(eyes),Map.copyOf(rigSupport),Map.copyOf(carrierHulls),Map.copyOf(combatClips),object(all,"locomotion_contract_r43"));
             ProjectSeele.LOGGER.info("EVA shared body/socket pose loaded: private={} clips={} bones={} gameplayProfiles={}",Files.isRegularFile(path),clips.size(),names.length,combatClips.values().stream().filter(c->c.containsKey("r32_jab")).count());
