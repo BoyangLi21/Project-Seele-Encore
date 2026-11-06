@@ -29,7 +29,7 @@ public final class NervRouteNativeBindingR52Test
     {for(var row:rows)if(directory.resource(row.getAsJsonObject().get("resource").getAsString()).kind()==kind)return row.getAsJsonObject();throw new AssertionError("Fixture resource missing");}
     public static void main(String[] args)
     {
-        var directory=NervRouteDirectoryR52.parse(NervRouteCoreR52Test.rootFixtureForNativeBindingTest());var rows=fixture(directory);
+        var directory=NervRouteDirectoryR52.parse(NervRouteFixtureR52.rootFixture());var rows=fixture(directory);
         check(NervRouteNativeR52.parseBindings(rows,directory).size()==directory.declaredResources().size(),"Complete explicit native bindings rejected");
         var changed=rows.deepCopy();changed.remove(0);var missing=changed;rejects(()->NervRouteNativeR52.parseBindings(missing,directory),"Partial provider set accepted");
         changed=rows.deepCopy();first(changed,directory,ResourceKind.SPACE).getAsJsonArray("spaces").set(0,array(1,0,0,0,2,2));var reversed=changed;rejects(()->NervRouteNativeR52.parseBindings(reversed,directory),"Reversed Root bounds silently normalized");

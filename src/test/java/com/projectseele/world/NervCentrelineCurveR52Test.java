@@ -17,7 +17,7 @@ public final class NervCentrelineCurveR52Test
     private static JsonObject profile(String ready){var p=new JsonObject();p.addProperty("type","continuous_upright");p.addProperty("cruise_mps",30);p.addProperty("acceleration_mps2",8);p.addProperty("deceleration_mps2",10);p.addProperty("ready_node",ready);return p;}
     private static JsonObject fixture()
     {
-        var root=NervRouteCoreR52Test.rootFixtureForNativeBindingTest();
+        var root=NervRouteFixtureR52.rootFixture();
         var ramp=new JsonObject();ramp.addProperty("flat_before",1);ramp.addProperty("slope_run",8);ramp.addProperty("blend",1);
         named(root.getAsJsonArray("legs"),"original1").add("ramp_profile",ramp.deepCopy());named(root.getAsJsonArray("legs"),"reverse_original1").add("ramp_profile",ramp.deepCopy());
         var bridge=curve(new Vec3(10,1,10),new Vec3(10,1,12),new Vec3(10,1,14),new Vec3(10,-3,20),new Vec3(10,-1,20),new Vec3(10,1,20));
@@ -50,7 +50,7 @@ public final class NervCentrelineCurveR52Test
         double radius=100;int divisions=path.divisions(radius,.002);double error=path.error(radius,divisions);check(error<=.002,"Curve subdivisions exceed positive query budget");
         for(int i=0;i<divisions;i++){var a=path.sample(i/(double)divisions);var b=path.sample((i+1D)/divisions);for(int k=0;k<=3;k++){double f=k/3D;var value=path.sample((i+f)/divisions);check(value.evaRoot().translation().distanceTo(a.evaRoot().translation().lerp(b.evaRoot().translation(),f))<=error,"Actual curve escaped certified chord+inverse error");check(value.evaRoot().rotationErrorDegrees(RigidTransform.identity())==0,"Prepared rotation changed");check(value.leftContact().distanceTo(value.evaRoot().transformPoint(binding.leftFoot()))<1e-12,"Actual original left contact moved relative to EVA");}}
         rejects(()->path.divisions(radius,path.roundoffBound(radius)/2),"Error budget below inverse numeric floor accepted");
-        var original=directory.leg("original1");var old=NervRouteDirectoryR52.parse(NervRouteCoreR52Test.rootFixtureForNativeBindingTest());
+        var original=directory.leg("original1");var old=NervRouteDirectoryR52.parse(NervRouteFixtureR52.rootFixture());
         for(int i=0;i<=20;i++){double f=i/20D;var expected=new Vec3(10,original.rampProfile().heightFraction(10,f),10D*(float)f);check(directory.centrePoint(original,f).distanceTo(expected)<1e-12,"Original ramp position formula changed");double distance=directory.legDistance(original,f);check(Math.abs(directory.legFractionAtDistance(original,distance)-f)<1e-12,"Original ramp distance/parameter roundtrip failed");}
         check(directory.legLength(original)>=old.legLength(old.leg("original1"))-1e-6,"Original grade arc lost length");
         double join=directory.legLength(original);var located=directory.locateDistance(route,join);check(located.legIndex()==1&&located.fraction()==0,"Exact route join did not preserve outgoing segment progress");

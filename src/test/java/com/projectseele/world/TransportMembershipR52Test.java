@@ -13,7 +13,7 @@ public final class TransportMembershipR52Test
     private static void check(boolean ok,String why){checks++;if(!ok)throw new AssertionError(why);}
     public static void main(String[] args)
     {
-        var directory=NervRouteDirectoryR52.parse(NervRouteCoreR52Test.rootFixtureForNativeBindingTest());var u=directory.unit(0);UUID pilot=new UUID(0,30),owner=new UUID(0,100);var original=new Original(7,0,u.eva(),u.plug(),pilot,owner,"original_mission","test:synthetic_route_graph");
+        var directory=NervRouteDirectoryR52.parse(NervRouteFixtureR52.rootFixture());var u=directory.unit(0);UUID pilot=new UUID(0,30),owner=new UUID(0,100);var original=new Original(7,0,u.eva(),u.plug(),pilot,owner,"original_mission","test:synthetic_route_graph");
         // Test dimension is the actual declared synthetic directory dimension.
         original=new Original(7,0,u.eva(),u.plug(),pilot,owner,"original_mission",directory.node(directory.leg(directory.route("return_b1l1").legs().get(0)).from()).dimension());
         var saved=new NervRouteRuntimeStateR52();saved.claim(7,directory.fingerprint());UUID outbound=new UUID(0,801);var deployed=new Snapshot(outbound,original,directory.fingerprint(),"depart_b1l1",3,1,Stage.COMPLETE,"");

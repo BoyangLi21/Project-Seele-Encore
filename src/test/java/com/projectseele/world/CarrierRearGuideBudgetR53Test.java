@@ -13,7 +13,7 @@ public final class CarrierRearGuideBudgetR53Test
     {boolean rejected=false;try{CarrierRearGuideMotionR53.continuousBudget(curvature,sampling);}catch(IllegalArgumentException expected){rejected=true;}check(rejected,"Invalid or unbounded source accepted: "+curvature+" / "+sampling);}
     private static void analyticRampWindows()
     {
-        var json=NervRouteCoreR52Test.rootFixtureForNativeBindingTest();var ramp=new JsonObject();
+        var json=NervRouteFixtureR52.rootFixture();var ramp=new JsonObject();
         ramp.addProperty("flat_before",1);ramp.addProperty("slope_run",8);ramp.addProperty("blend",1);
         for(var raw:json.getAsJsonArray("legs")){var row=raw.getAsJsonObject();if(Set.of("original1","reverse_original1").contains(row.get("id").getAsString()))row.add("ramp_profile",ramp.deepCopy());}
         var directory=NervRouteDirectoryR52.parse(json);

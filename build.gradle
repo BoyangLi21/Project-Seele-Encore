@@ -484,168 +484,33 @@ tasks.withType(JavaCompile).configureEach {
     options.encoding = 'UTF-8' // Use the UTF-8 charset for Java compilation
 }
 
-tasks.register('verifyEvaPoseTransition', JavaExec) {
+// Every check runs on one JVM; those that boot Forge's locked registries get their own.
+tasks.register('verifyAll', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.client.render.EvaPoseTransitionTest'
-}
-tasks.register('verifyLaunchMotionR29', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.LaunchMotionR29Test'
-}
-tasks.named('check').configure {
-    dependsOn 'verifyEvaPoseTransition'
-    dependsOn 'verifyLaunchMotionR29'
-}
-
-tasks.register('verifyEvaVideoCodec', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.network.EvaVideoCodecTest'
+    mainClass = 'com.projectseele.AllChecks'
     systemProperty 'java.awt.headless', 'true'
+    maxHeapSize = '1G'
 }
-tasks.named('check').configure {
-    dependsOn 'verifyEvaVideoCodec'
-}
-
-tasks.register('verifyBiomeCornerCache', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.util.BiomeCornerCacheTest'
-    workingDir = file('.Codex/biome-cache-test')
-    doFirst { workingDir.mkdirs() }
-}
-tasks.named('check').configure { dependsOn 'verifyBiomeCornerCache' }
-
-tasks.register('verifyMotionPack', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.anim.MotionPackTest'
-    // Optional private inputs: -PseeleMotionPack=<pack.json> -PseeleBodyProfile=<eva_body_r44.json>
-    systemProperty 'seele.motionPack', project.findProperty('seeleMotionPack') ?: ''
-    systemProperty 'seele.bodyProfile', project.findProperty('seeleBodyProfile') ?: ''
-}
-tasks.named('check').configure { dependsOn 'verifyMotionPack' }
-
-tasks.register('verifyLocalMeshJsonR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.client.render.LocalMeshJsonR53Test'
-}
-tasks.named('check').configure { dependsOn 'verifyLocalMeshJsonR53' }
-
-tasks.register('verifyFullCubeBoxesR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.physics.FullCubeBoxesR53Test'
-}
-tasks.named('check').configure { dependsOn 'verifyFullCubeBoxesR53' }
-
-tasks.register('verifyBiomeCornerMainThreadR51', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.util.BiomeCornerMainThreadR51Test'
-    workingDir = file('.Codex/biome-corner-main-thread-r51-test')
-    doFirst { workingDir.mkdirs() }
-}
-tasks.named('check').configure { dependsOn 'verifyBiomeCornerMainThreadR51' }
-
-tasks.register('verifyFootSupportFrameR52', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.FootSupportFrameR52Test'
-    workingDir = file('.Codex/foot-support-frame-r52-test')
-    doFirst { workingDir.mkdirs() }
-}
-tasks.named('check').configure { dependsOn 'verifyFootSupportFrameR52' }
-
-tasks.register('verifyRigidTransformPrecisionR52', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.RigidTransformPrecisionR52Test'
-    workingDir = file('.Codex/rigid-transform-precision-r52-test')
-    doFirst { workingDir.mkdirs() }
-}
-tasks.named('check').configure { dependsOn 'verifyRigidTransformPrecisionR52' }
-
-tasks.register('verifyStaticSpatialIndexR52', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.NervStaticSpatialIndexR52Test'
-}
-tasks.named('check').configure { dependsOn 'verifyStaticSpatialIndexR52' }
-
-tasks.register('verifyNervRouteStateR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.NervRouteRuntimeStateR52Test'
-}
-tasks.named('check').configure { dependsOn 'verifyNervRouteStateR53' }
+tasks.named('check').configure { dependsOn 'verifyAll' }
 
 [
-    verifyCarrierRearGuideBudgetR53: 'CarrierRearGuideBudgetR53Test',
-    verifyNervRigidPairSweepR52: 'NervRigidPairSweepR52Test',
-    verifyNervAirTransportStateR53: 'NervAirTransportStateR52Test',
-    verifyEvaMeshRestSupportR53: 'EvaMeshRestSupportR53Test',
-    verifySurfaceAngelRoutingR53: 'SurfaceAngelRoutingR52Test',
-    verifyNervGeometryWorkR53: 'NervGeometryWorkR53Test',
-    verifyNervRigidPairMemoR53: 'NervRigidPairMemoR53Test',
-    verifyNervRailSourceCoverageR53: 'NervRailSourceCoverageR53Test',
-    verifyRescueActorEgressR53: 'NervRescueActorEgressR53Test',
-    verifyAirCradleContactsR53: 'NervAirCradleContactsR53Test'
+    verifyGeoFrontHeightR52: 'GeoFrontHeightR52Test',
+    verifyHakoneSurface: 'HakoneSurfaceFieldTest',
+    verifyBallisticLandingR53: 'NervBallisticLandingProfileR53Test',
+    verifyWholeAssemblyBlockReadsR53: 'NervCarrierBlockReadsR53Test'
 ].each { taskName, testClass ->
     tasks.register(taskName, JavaExec) {
         dependsOn testClasses
         classpath = sourceSets.test.runtimeClasspath
         mainClass = "com.projectseele.world.${testClass}"
+        maxHeapSize = '1G'
+        if (testClass == 'NervCarrierBlockReadsR53Test') args '--whole-source'
     }
     tasks.named('check').configure { dependsOn taskName }
 }
 
-tasks.register('verifyWholeAssemblyBlockReadsR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.NervCarrierBlockReadsR53Test'
-    args '--whole-source'
-}
-tasks.named('check').configure { dependsOn 'verifyWholeAssemblyBlockReadsR53' }
-
-tasks.register('verifyWayfindingTransitR52', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.NervWayfindingTransitR52Test'
-}
-tasks.named('check').configure { dependsOn 'verifyWayfindingTransitR52' }
-
-tasks.register('verifyGeoFrontHeightR52', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.GeoFrontHeightR52Test'
-    workingDir = file('.Codex/geofront-height-r52-test')
-    maxHeapSize = '384m'
-    doFirst { workingDir.mkdirs() }
-}
-tasks.named('check').configure { dependsOn 'verifyGeoFrontHeightR52' }
-tasks.register('verifyHakoneSurface', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.HakoneSurfaceFieldTest'
-    maxHeapSize = '1G'
-}
-tasks.named('check').configure { dependsOn 'verifyHakoneSurface' }
-
-tasks.register('verifyCityRelocation', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.CityRelocationTest'
-    if (project.hasProperty('cityRelocationCandidate')) args project.property('cityRelocationCandidate')
-    workingDir = file('.Codex/city-relocation-test')
-    maxHeapSize = '384m'
-    doFirst { workingDir.mkdirs() }
-}
-tasks.named('check').configure { dependsOn 'verifyCityRelocation' }
-
+// Replays a map candidate against a stopped world: not part of the build.
 tasks.register('verifySurfaceRepairReplay', JavaExec) {
     dependsOn testClasses
     classpath = sourceSets.test.runtimeClasspath
@@ -657,77 +522,6 @@ tasks.register('verifySurfaceRepairReplay', JavaExec) {
     workingDir = file('.Codex/surface-replay-test')
     doFirst { workingDir.mkdirs() }
 }
-
-tasks.register('verifyCombatMotionR29', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.entity.CombatMotionR29Test'
-}
-tasks.named('check').configure { dependsOn 'verifyCombatMotionR29' }
-
-tasks.register('verifyKneeSupportR40', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.physics.KneeSupportR40Test'
-}
-tasks.named('check').configure { dependsOn 'verifyKneeSupportR40' }
-
-tasks.register('verifyRifleGeometryR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.entity.EvaRifleGeometryR53Test'
-}
-tasks.named('check').configure { dependsOn 'verifyRifleGeometryR53' }
-
-tasks.register('verifyVerticalCarrierSweepR40', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.VerticalCarrierSweepR40Test'
-}
-tasks.named('check').configure { dependsOn 'verifyVerticalCarrierSweepR40' }
-tasks.register('verifyEvaPoseClock', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.entity.EvaPoseSignalClockTest'
-}
-tasks.named('check').configure { dependsOn 'verifyEvaPoseClock' }
-tasks.register('verifyEvaStanceTimingR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.entity.EvaStanceTimingR53Test'
-}
-tasks.named('check').configure { dependsOn 'verifyEvaStanceTimingR53' }
-tasks.register('verifyCarrierBankEquipmentR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.CarrierBankEquipmentUpdateR53Test'
-}
-tasks.named('check').configure { dependsOn 'verifyCarrierBankEquipmentR53' }
-tasks.register('verifyRescueVegetationR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.world.NervRescueVegetationR53Test'
-}
-tasks.named('check').configure { dependsOn 'verifyRescueVegetationR53' }
-tasks.register('verifyEvaGaitPacketTailR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.entity.EvaGaitPacketTailR53Test'
-}
-tasks.named('check').configure { dependsOn 'verifyEvaGaitPacketTailR53' }
-tasks.register('verifyPoseSnapshotCodecR45', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.entity.PoseSnapshotCodecR45Test'
-}
-tasks.named('check').configure { dependsOn 'verifyPoseSnapshotCodecR45' }
-
-tasks.register('verifyAuthoredInfluencesR53', JavaExec) {
-    dependsOn testClasses
-    classpath = sourceSets.test.runtimeClasspath
-    mainClass = 'com.projectseele.client.render.AuthoredInfluencesR53Test'
-}
-tasks.named('check').configure { dependsOn 'verifyAuthoredInfluencesR53' }
 
 // Compile/prepare with ForgeGradle, then release the build JVM before playing.
 // Export only explicitly changed environment values, not the user's full env.

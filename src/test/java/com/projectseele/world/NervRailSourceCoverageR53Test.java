@@ -20,7 +20,7 @@ public final class NervRailSourceCoverageR53Test
     }
     public static void main(String[] args)
     {
-        var json = NervRouteCoreR52Test.rootFixtureForNativeBindingTest();
+        var json = NervRouteFixtureR52.rootFixture();
         var directory = NervRouteDirectoryR52.parse(json);
         var otherDirectory = NervRouteDirectoryR52.parse(json.deepCopy());
         var binding = new FootSupportFrameR52.Binding(new Vec3(-1, 0, 0), new Vec3(1, 0, 0), RigidTransform.identity());

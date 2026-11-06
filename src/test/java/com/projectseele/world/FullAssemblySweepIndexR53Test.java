@@ -26,7 +26,7 @@ public final class FullAssemblySweepIndexR53Test
     }
     public static void main(String[] args)throws Exception
     {
-        var json=NervRouteCoreR52Test.rootFixtureForNativeBindingTest();var directory=NervRouteDirectoryR52.parse(json);
+        var json=NervRouteFixtureR52.rootFixture();var directory=NervRouteDirectoryR52.parse(json);
         var binding=new FootSupportFrameR52.Binding(new Vec3(-1,-2,1),new Vec3(1,-2,1),RigidTransform.identity());
         var paths=new ArrayList<DirectoryTrajectoryR52>();for(int i=0;i<24;i++)paths.add(new DirectoryTrajectoryR52(directory,directory.leg("original1"),binding,i/24D,(i+1)/24D));
         var meshes=new ArrayList<TriangleSweepMeshR52>();var surfaces=new ArrayList<Object>();
