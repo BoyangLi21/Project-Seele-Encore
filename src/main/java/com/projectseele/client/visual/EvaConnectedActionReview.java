@@ -416,8 +416,8 @@ public final class EvaConnectedActionReview
             camera.setInvisible(true);
             camera.setNoGravity(true);
         }
-        Vec3 target = eva.position().add(0, 28, 0);
-        Vec3 position = eva.position().add(RIFLE && eva.getUnitVariant() == 0 ? -60 : Double.parseDouble(System.getProperty("projectseele.reviewCamX","60")), 32, Double.parseDouble(System.getProperty("projectseele.reviewCamZ","48")));
+        Vec3 target = eva.position().add(0, Double.parseDouble(System.getProperty("projectseele.reviewAimY","28")), 0);
+        Vec3 position = eva.position().add(RIFLE && eva.getUnitVariant() == 0 ? -60 : Double.parseDouble(System.getProperty("projectseele.reviewCamX","60")), Double.parseDouble(System.getProperty("projectseele.reviewCamY","32")), Double.parseDouble(System.getProperty("projectseele.reviewCamZ","48")));
         if (FX && camPos != null) { position = camPos; target = camAim; }
         Vec3 delta = target.subtract(position);
         camera.setPos(position.x, position.y - camera.getEyeHeight(), position.z);
