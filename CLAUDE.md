@@ -9,8 +9,8 @@
 使徒 Boss 战 → 可驾驶 EVA → AT 力场体系 → NERV/GeoFront/第三新东京市 → 第三次冲击（生命之树）终局事件。
 完全免费、完全开源、严格遵守 khara 二次创作指引（见下方红线）。
 
-- 仓库：`git@github.com:BoyangLi21/Project-Seele.git`（GitHub 账号 BoyangLi21）
-- 当前进度：Phase 0 完成，Phase 1 MVP 完成（Ramiel 可战斗），Phase 1 收尾进行中 — 详见 ROADMAP §0
+- 仓库：`git@github.com:BoyangLi21/Project-Seele-Encore.git`（GitHub 账号 BoyangLi21）。旧仓库 `Project-Seele`（remote `legacy-origin`）不再推送
+- 当前进度：EVA 动作和战斗在打磨，地图收尾中。地图的现状、工具和规则见 `docs/HANDOFF_CODEX_20261106.zh.md`
 
 ## 技术栈（版本锁定，勿擅自升级）
 
@@ -27,6 +27,7 @@
 
 ```
 ./gradlew build        # 编译 + 产出 build/libs/projectseele-<ver>.jar
+./gradlew check        # 全部检查，一个 JVM 跑完（AllChecks），约 1 分钟
 ./gradlew runClient    # 启动开发客户端（离线账号，无需登录）
 ./gradlew runServer    # 专用服务器（Phase 6 验证用）
 ```
@@ -60,7 +61,7 @@ resources/
 
 1. **中文交流**。
 2. **Commit 署名**：每个提交末尾加 `Co-Authored-By: Ayanami_Rei <liboyang_621@126.com>`（用户的项目分身账号），**不要**加 Claude 署名——这是用户明确要求。多行提交信息用 `git commit -F <文件>` 避免引号问题。
-3. **工作流**：构建通过 + runClient 日志验证无误 → commit + push（用户已授权此流程）。游戏内目视测试由用户负责——你看不到画面，写好日志检查点后把"看什么"列清楚交给用户。
+3. **工作流**：构建通过 + runClient 日志验证无误 → commit + push（用户已授权此流程）。提交用 `git -c user.name=BoyangLi21 -c user.email=liboyang621@gmail.com commit -F <文件>`；推送前 rebase 到 `origin/main`，`./gradlew build` 退出码为 0 才 `git push origin <分支>:main`。游戏内目视测试由用户负责——你看不到画面，写好日志检查点后把"看什么"列清楚交给用户。
 4. `.claude/` 目录已 gitignore，**永不提交**。
 5. 用户负责 GUI 安装类操作（装软件、网页建仓库）；其余全部你来。
 6. 数值平衡（伤害/血量/冷却）改动要在回复里明确列出前后值，用户拍板。
@@ -78,7 +79,7 @@ resources/
 3. 实体行为验证：让用户 `/summon projectseele:ramiel ~ ~5 ~20`，生存模式触发 AI。
 4. 提交前必须 `./gradlew build` 通过。
 
-## 当前数值表（Phase 1 收尾版）
+## 当前数值表（2026-07 的记录，改平衡前先核对 `SeeleConfig`）
 
 数值已全部外置到 `SeeleConfig`（游戏目录 `config/projectseele-common.toml` / `-client.toml`），改平衡不用重新构建。下表为默认值：
 
