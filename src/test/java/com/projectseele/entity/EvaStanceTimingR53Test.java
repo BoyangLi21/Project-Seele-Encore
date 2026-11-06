@@ -27,7 +27,7 @@ public final class EvaStanceTimingR53Test
         var reverse=EvaStanceTimingR53.advance(.01F,0,.035F);
         if(reverse.phase()<=.01F)throw new AssertionError("Reversal discarded existing velocity");
         float p=reverse.phase(),v=reverse.velocity();
-        for(int tick=0;tick<160;tick++)
+        for(int tick=0;tick<240;tick++)
         {
             float target=tick<90?(tick%7<4?3:0):0;
             var next=EvaStanceTimingR53.advance(p,target,v);
