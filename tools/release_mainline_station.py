@@ -1,5 +1,5 @@
 """Release an offline mainline station while preserving layered pedestrian surfaces."""
-import argparse,json,shutil,zipfile
+import argparse,json,shutil
 from pathlib import Path
 from argparse import Namespace
 import numpy as np
@@ -12,21 +12,21 @@ from map_pipeline.verify_corridors import write_replay_expected
 from map_pipeline.launch_earthworks import ground
 from release_regional_station import install
 from verify_mainline_station_model_clearance import check as visible_check
+from map_pipeline.delivery_check import capture_identity, verify_delivery, archive_exact as jar_exact
 
 def read(p):return json.loads(p.read_text('utf8'))
 def write(p,d):p.write_text(json.dumps(d,ensure_ascii=False,indent=2),'utf8')
-def jar_exact(a,b):
-    with zipfile.ZipFile(a)as old,zipfile.ZipFile(b)as actual:
-        assert set(old.namelist())==set(actual.namelist())
-        for name in old.namelist():assert old.read(name)==actual.read(name),name
-
 def platform_proof(c):
     proof=read(c/'native-station/native-station-proof.json')
     return proof,proof['platforms']if 'platforms'in proof else[proof]
 
 def prepare(a):
     c=a.candidate;design=read(c/'station-design.json')
-    if a.profile=='itabashi':
+    configured=None
+    if a.checks:
+        from map_pipeline.station_release_checks import verify as configured_checks
+        configured=configured_checks(a)
+    elif a.profile=='itabashi':
         from author_itabashi_station import verify as verify_compact
         from check_itabashi_vehicle import verify as verify_vehicle
         from verify_regional_station import verify as verify_registered_compact
@@ -47,25 +47,23 @@ def prepare(a):
     assert not components['after'].get('fully_enclosed_unrooted_components',components['after']['unrooted_components'])
     faults=read(a.review/'negative-cases.json')['cases'];assert len(faults)>=5 and all(r['detected']for r in faults)
     assert not read(c/'visible-model-sweep.json')['errors']
-    if a.profile=='mainline':
+    if not configured and a.profile=='mainline':
         model_fault=read(a.review/'visible-model-negative.json');assert model_fault['detected']and model_fault['failed_vehicle_count']==2
-    for name in(('overview','ramp-cut')if a.profile=='mainline'else('overview','bridge-section','platform-cut','measured-sections')):assert(a.review/(name+'.png')).exists()
-    check=read(c/'offline-verification.json');assert not check['errors']and check['nodes']==check['reachable_nodes']==len(design['station_multi_level_nodes'])
+    if not configured:
+        for name in(('overview','ramp-cut')if a.profile=='mainline'else('overview','bridge-section','platform-cut','measured-sections')):assert(a.review/(name+'.png')).exists()
+    check=read(c/'offline-verification.json')
+    node_key=configured.get('public_node_count_field','nodes')if configured else'nodes'
+    assert not check['errors']and check[node_key]==check['reachable_nodes']==len(design['station_multi_level_nodes'])
     assert len(design['ground_access_columns'])<len(design['station_multi_level_nodes'])
-    write(c/'functional-check.json',dict(errors=[],station=design['station'],offline_proof='offline-verification.json',visible_model_proof='visible-model-clearance.json'if a.profile=='mainline'else'visible-model-sweep.json',world_written=False))
+    model_report=configured.get('visible_model_proof','visible-model-sweep.json')if configured else('visible-model-clearance.json'if a.profile=='mainline'else'visible-model-sweep.json')
+    write(c/'functional-check.json',dict(errors=[],station=design['station'],offline_proof='offline-verification.json',visible_model_proof=model_report,world_written=False))
     with stopped_world(a.world):
         assert_preserved(a.world,inventory(c/'preserved-native'))
         parallel_recipes(Namespace(candidate=c,world=a.world,regions=None,workers=2))
-        identity=c/'identity-before';identity.mkdir();files=[]
-        for f in[a.world/'level.dat',a.world/'level.dat_old',*list((a.world/'playerdata').glob('*')),*list((a.world/'dimensions/projectseele/geofront/entities').glob('*.mca'))]:
-            if not f.is_file():continue
-            rel=f.relative_to(a.world);dest=identity/rel;dest.parent.mkdir(parents=True,exist_ok=True);shutil.copy2(f,dest);files.append(rel.as_posix())
-        write(identity/'files.json',files)
-        jar_exact(a.prior_client,a.world.parent.parent/'mods/projectseele-0.1.0-all.jar')
-        (c/'client-before.jar').hardlink_to(a.prior_client)
+        files=capture_identity(a.world,c,a.prior_client)
     write_replay_expected(c)
     write(c/'station-release-check.json',dict(production_recipe_replay_passed=False,identity_snapshot_ready=True,native_station_registration_verified=True,exact_voxel_views_reviewed=True,negative_fault_checks_passed=True,no_new_floating_components=True,current_native_source_exact=True,visible_models_checked=True,ground_only_scalar_network_update=True,world_written=False,through_service_complete=False))
-    print('Prepared layered station:',manifest['cells'],'cells;',check['nodes'],'reachable surfaces;',len(platforms),'native platforms; retained identity files',len(files),flush=True)
+    print('Prepared layered station:',manifest['cells'],'cells;',check[node_key],'reachable surfaces;',len(platforms),'native platforms; retained identity files',len(files),flush=True)
 
 def record(a):
     c=a.candidate;receipt=read(a.installation);m=read(c/'manifest.json');proof,platforms=platform_proof(c)
@@ -73,10 +71,8 @@ def record(a):
     assert receipt['native_additions']==2*len(platforms)+1 and receipt['changed_device_nbt_readback']==3 and receipt['cells']==m['cells']
     baseline=inventory(c/'preserved-native');additions=[Path(n).relative_to('mtr').as_posix()for n in m['native_additions']];kept=read(c/'identity-before/files.json')
     with stopped_world(a.world):
-        for name in kept:assert(c/'identity-before'/name).read_bytes()==(a.world/name).read_bytes(),name
-        assert_preserved(a.world,baseline,additions)
-        for name in additions:assert(c/'after/mtr'/name).read_bytes()==(a.world/'mtr'/name).read_bytes()
-        jar_exact(c/'client-before.jar',a.world.parent.parent/'mods/projectseele-0.1.0-all.jar')
+        delivery_check=verify_delivery(a.world,c,a.installation,a.production_log)
+    write(c/'delivery-check.json',delivery_check)
     shutil.copytree(a.authority,a.next_authority)
     with np.load(a.authority/'network.npz')as f:d={k:f[k]for k in f.files}
     design=read(c/'station-design.json');x,z,X,Z=map(int,d['bounds']);added=0
@@ -108,5 +104,6 @@ def record(a):
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__);p.add_argument('mode',choices=['prepare','install','record']);p.add_argument('--batch',type=int,required=True);p.add_argument('--station-id',required=True)
     p.add_argument('--profile',choices=['mainline','itabashi'],default='mainline')
+    p.add_argument('--checks',type=Path,help='Explicit JSON checks for further station layouts; legacy profiles remain reproducible.')
     for n in('world','candidate','authority','next-authority','terrain','installation','review','models','prior-client','production-log','delivery'):p.add_argument('--'+n,type=Path,required=True)
     a=p.parse_args();globals()[a.mode](a)

@@ -24,7 +24,7 @@ def run(a):
     columns={k:np.asarray(v,np.int32)for k,v in columns.items()};selection={k:set(((h[v,None]+np.arange(5)[None])//16).ravel().tolist())for k,v in columns.items()}
     flags=np.zeros(count,np.uint8);seen=np.zeros(count,np.uint8);full=np.zeros(count,bool);examples=[];chunks=set();failure_materials=collections.Counter()
     # Registry copies SMOOTH_STONE's full block shape for this native floor.
-    floor_materials=PAVEMENT|{'projectseele:period_station_floor'}
+    floor_materials=PAVEMENT|{'projectseele:period_station_floor','projectseele:station_tactile_warning'}
     with stopped_world(a.world):
         statuses=chunk_statuses(a.world,'projectseele:geofront',columns)
         for key,v in columns.items():full[v]=statuses.get(key)=='full'

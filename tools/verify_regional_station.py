@@ -1,5 +1,5 @@
 """Independently check a regional station's saved cells and pedestrian goals."""
-import argparse,json,math
+import argparse,json
 from collections import deque
 from pathlib import Path
 import nbtlib
@@ -9,8 +9,10 @@ from plan_ashi_landscape_r54 import SOIL
 from query_blocks import AIR
 from verify_hakone_network_candidate import PAVEMENT
 from plan_hakone_station_inventory import Reader
+from map_pipeline.station_validation import station_preflight
 
-def verify(candidate,authority,write=True):
+def verify(candidate,authority,write=True,mode='registered'):
+    if mode not in ('offline-preflight','registered'):raise ValueError('Unknown station validation mode')
     m=json.loads((candidate/'manifest.json').read_text('utf8'));d=json.loads((candidate/'station-design.json').read_text('utf8'))
     e=Editor(candidate);errors=[];cells=0;changed_public=0;changed_water=0;outside=0;foreign=[]
     source_allowed=SOIL|AIR|{'minecraft:grass','minecraft:tall_grass','minecraft:fern','minecraft:large_fern','minecraft:light'}
@@ -67,34 +69,15 @@ def verify(candidate,authority,write=True):
             path.reverse()
         routes.append(dict(name=name,reachable=bool(path),path=path))
     plan=json.loads((candidate/'native-station-plan.json').read_text('utf8'))
-    rail=plan['rails'][0]
-    if len(plan['rails'])!=1 or len(plan['stations'])!=1 or plan['lines']:errors.append(['compact-station-native-scope'])
-    pa,pb=rail['from'],rail['to']
-    if pa[1]!=pb[1]or sum(pa[i]!=pb[i]for i in(0,2))!=1 or sum(abs(pa[i]-pb[i])for i in(0,2))!=48:errors.append(['compact-station-track-geometry'])
-    # Independently derive the reserved train body from its native endpoints.
-    authoring=candidate/'authoring-plan.json'
-    rot=json.loads(authoring.read_text('utf8'))['rotation']if authoring.exists()else 0
-    if pa[2]==pb[2]:clearance=[min(pa[0],pb[0]),pa[1],pa[2]-(2 if rot%4==2 else 1),max(pa[0],pb[0]),pa[1]+4,pa[2]+(1 if rot%4==2 else 2)]
-    else:
-        # Rotation one puts the side platform east, rotation three west.
-        clearance=[pa[0]-(2 if rot%4==1 else 1),pa[1],min(pa[2],pb[2]),pa[0]+(1 if rot%4==1 else 2),pa[1]+4,max(pa[2],pb[2])]
-    if authoring.exists():
-        cached=Path('F:/eva/artifacts/hakone_geography_20261029/stations.json')
-        refs=[r for r in json.loads(cached.read_text('utf8'))if r['name']==d['station']]
-        if len(refs)!=1:errors.append(['unique-cached-station-reference'])
-        else:
-            ref=refs[0];centre=[(pa[i]+pb[i])/2 for i in(0,2)];track=ref['station_track']
-            ref_axis=math.degrees(math.atan2(track[-1][1]-track[0][1],track[-1][0]-track[0][0]))%180
-            native_axis=math.degrees(math.atan2(pb[2]-pa[2],pb[0]-pa[0]))%180
-            axis_error=abs((native_axis-ref_axis+90)%180-90)
-            if math.dist(centre,ref['track_centre_xz'])>2 or axis_error>15 or abs(pa[1]-ref['terrain_world_y'])>4:errors.append(['station-geographic-adaptation-out-of-bounds'])
-    if 'rail_clearance_bounds'in d and clearance!=d['rail_clearance_bounds']:errors.append(['declared-track-envelope-mismatch'])
+    preflight=station_preflight(candidate,d,plan);errors.extend(preflight['errors'])
+    clearance=preflight['rail_clearance_bounds']
     rail_obstacles=[]
-    for x in range(clearance[0],clearance[3]+1):
-        for z in range(clearance[2],clearance[5]+1):
-            for y in range(clearance[1],clearance[4]+1):
-                state=e.state(x,y,z)
-                if state.split('[')[0]not in AIR|{'minecraft:light'}:rail_obstacles.append([x,y,z,state])
+    if clearance is not None:
+        for x in range(clearance[0],clearance[3]+1):
+            for z in range(clearance[2],clearance[5]+1):
+                for y in range(clearance[1],clearance[4]+1):
+                    state=e.state(x,y,z)
+                    if state.split('[')[0]not in AIR|{'minecraft:light'}:rail_obstacles.append([x,y,z,state])
     if rail_obstacles:errors.append(['station-track-clearance',len(rail_obstacles)])
     expected_signs={tuple(r['pos']):r['title']for r in d['expected_signs']}if 'expected_signs'in d else{(2526,-68,-1181):'和田河原駅',(2519,-69,-1174):'きっぷ',(2540,-69,-1163):'和田河原'}
     if len(expected_signs)!=3 or d['station']not in expected_signs.values():errors.append(['station-sign-design'])
@@ -112,7 +95,8 @@ def verify(candidate,authority,write=True):
         if str(tag['id'])!='minecraft:sign'or not state.startswith('minecraft:oak_wall_sign[')or text!=title:
             errors.append(['station-sign-payload',list(pos)])
     native=candidate/'native-station/native-station-proof.json';native_ok=False
-    if native.exists():
+    if native.exists()and len(plan.get('rails',[]))==1:
+        pa,pb=plan['rails'][0]['from'],plan['rails'][0]['to']
         proof=json.loads(native.read_text('utf8'))
         native_ok=proof['existing_loaded_objects_exact']and abs(proof['platform_length']-48)<1e-7 and len(proof['members'])==3
         if set(proof['members'])!=set(m.get('native_additions',[])):native_ok=False
@@ -120,16 +104,22 @@ def verify(candidate,authority,write=True):
         if decoded['stations']['name']!=d['station']or decoded['platforms']['name']!='1':native_ok=False
         if decoded['rails']['position1']!=dict(zip(('x','y','z'),pa))or decoded['rails']['position2']!=dict(zip(('x','y','z'),pb)):native_ok=False
         if any(decoded['platforms'][k]!=decoded['rails'][k]for k in('position1','position2')):native_ok=False
-    if not native_ok:errors.append(['native-station-registration-unverified'])
+    pending=[]if native_ok else['native-station-registration']
+    if not native_ok and mode=='registered':errors.append(['native-station-registration-unverified'])
     report=dict(errors=errors,changed_cells=cells,public_columns=len(nodes),reachable_public_columns=len(parents),
         floor_errors=floor_errors,head_errors=head_errors,destinations=routes,changed_original_public_cells=changed_public,
         original_device_cells_changed=changed_devices,unowned_material_examples=foreign[:20],
         changed_water_cells=changed_water,rail_obstacles=rail_obstacles,native_station_registration_verified=native_ok,
-        planned_maximum_consist_length=d.get('planned_maximum_consist_length',40),native_platform_length=48,maximum_pedestrian_step=.5,
+        validation_mode=mode,pending=pending,preflight=preflight,
+        offline_preflight_passed=not any(row[0]!='native-station-registration-unverified'for row in errors),
+        registered_validation_passed=mode=='registered'and not errors and native_ok,
+        planned_maximum_consist_length=d.get('planned_maximum_consist_length',40),native_platform_length=preflight['platform_length'],maximum_pedestrian_step=.5,
         through_service_complete=False,world_written=False,game_ui_verified=False)
     if write:
-        (candidate/'station-independent-check.json').write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
-        (candidate/'functional-check.json').write_text(json.dumps(dict(errors=errors,station=d['station'],world_written=False),ensure_ascii=False,indent=2),'utf8')
+        output='station-preflight-check.json'if mode=='offline-preflight'else'station-independent-check.json'
+        (candidate/output).write_text(json.dumps(report,ensure_ascii=False,indent=2),'utf8')
+        if mode=='registered':
+            (candidate/'functional-check.json').write_text(json.dumps(dict(errors=errors,station=d['station'],world_written=False),ensure_ascii=False,indent=2),'utf8')
     print('Independent station:',cells,'changes;',len(nodes),'public columns;',len(parents),'reachable; errors',errors,flush=True)
     return report
 
@@ -138,7 +128,7 @@ def require_verified(candidate):
     if m.get('kind')!='measured-regional-station':return
     check=json.loads((candidate/'station-independent-check.json').read_text('utf8'))
     release=json.loads((candidate/'station-release-check.json').read_text('utf8'))
-    if check['errors']or check['changed_cells']!=m['cells']or check['reachable_public_columns']!=check['public_columns']:
+    if check.get('validation_mode','registered')!='registered'or check.get('native_station_registration_verified')is not True or check['errors']or check['changed_cells']!=m['cells']or check['reachable_public_columns']!=check['public_columns']:
         raise ValueError('Unverified station geometry')
     required=('production_recipe_replay_passed','identity_snapshot_ready','native_station_registration_verified',
         'exact_voxel_views_reviewed','negative_fault_checks_passed','no_new_floating_components','current_native_source_exact')
@@ -146,5 +136,7 @@ def require_verified(candidate):
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__);p.add_argument('--candidate',type=Path,required=True);p.add_argument('--authority',type=Path,required=True)
+    p.add_argument('--mode',choices=('offline-preflight','registered'),default='registered')
+    p.add_argument('--no-write',action='store_true',help='Inspect offline files without replacing saved reports')
     a=p.parse_args()
-    if verify(a.candidate,a.authority)['errors']:raise SystemExit(1)
+    if verify(a.candidate,a.authority,write=not a.no_write,mode=a.mode)['errors']:raise SystemExit(1)
