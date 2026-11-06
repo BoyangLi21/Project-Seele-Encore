@@ -181,9 +181,10 @@ public final class EvaBodyPose
      * Channels authored in tools/finale replace the capture's, frame by frame.
      * The armed kneel-to-prone keeps its captured upper body and takes pelvis
      * and legs from rifle_stance.py: the captured front foot folded up through
-     * the far thigh. The dash is the Mesh2Motion Sprint at its own full stride,
-     * from sprint_overlay.py: the stride had been warped down to the distance
-     * travelled, which made a crouched shuffle of it. The crawl comes from
+     * the far thigh. The dash is a captured sprint at its own full stride, from
+     * run_retarget.py: warped down to the distance travelled it was a crouched
+     * shuffle. An overlay may carry the root: its rotation is replaced with the
+     * rest, and its position always comes from root_m. The crawl comes from
      * crawl.py: the captured one held the trunk still and shivered its feet.
      */
     private static void overlayClipR59(Map<Integer,Map<String,Clip>> combatClips,int variant,String from,String name,String file) throws java.io.IOException
@@ -207,7 +208,7 @@ public final class EvaBodyPose
                 {
                     String bone=bones.get(b).getAsString();int at=names.indexOf(bone);var value=quaternions.get(b).getAsJsonArray();
                     q[at]=new Quaternionf(-value.get(1).getAsFloat(),-value.get(2).getAsFloat(),value.get(3).getAsFloat(),value.get(0).getAsFloat()).normalize();
-                    p[at]=offsets.has(bone)?vector(offsets.get(bone)).mul(-1,1,1).div(16):new Vector3f();
+                    if(at!=root)p[at]=offsets.has(bone)?vector(offsets.get(bone)).mul(-1,1,1).div(16):new Vector3f();
                 }
                 rotations[first+f]=q;positions[first+f]=p;
             }
@@ -306,7 +307,7 @@ public final class EvaBodyPose
         phase-=Mth.floor(phase);
         boolean left=side.equals("l");
         float weight=(1-run)*down(phase,left?.69F:.20F,.5F)+run*(1-dash)*down(phase,left?.84F:.31F,.23F)
-                +run*dash*down(phase,left?.94F:.5F,left?.26F:.24F);
+                +run*dash*down(phase,left?.84F:.34F,left?.24F:.22F);
         return weight>.5F;
     }
     private static float down(float phase,float from,float share){return Mth.positiveModulo(phase-from,1F)<share?1:0;}

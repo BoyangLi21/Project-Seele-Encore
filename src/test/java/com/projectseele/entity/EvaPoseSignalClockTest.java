@@ -38,8 +38,23 @@ public final class EvaPoseSignalClockTest
         }
         System.out.println("Pose clock: complete metadata snapshots in both field orders, same-tick source change, initial/rejoined sequence and unrelated metadata PASS");
     }
+    /** A stall delivers its packets in one frame: their spacing says nothing about the rate. */
+    private static void heldUpPackets()
+    {
+        var clock=new EvaPoseSignalClock().extrapolating();
+        clock.snapAt(.10F,1_000_000_000L);
+        clock.acceptAt(.12F,true,false,1_050_000_000L);
+        clock.acceptAt(.14F,true,false,1_100_000_000L);
+        clock.acceptAt(.16F,true,false,1_600_000_000L);
+        clock.acceptAt(.18F,true,false,1_600_010_000L);
+        clock.acceptAt(.20F,true,false,1_600_020_000L);
+        float late=clock.sample(1_680_000_000L);
+        if(late<.19F||late>.23F)throw new AssertionError("Packets held up by a stall extrapolated to "+late);
+        System.out.println("Pose clock: packets held up by a stall keep the ordinary rate PASS");
+    }
     public static void main(String[] args)
     {
+        heldUpPackets();
         actionSnapshots();
         for(float prior:new float[]{.02F,1F/(20F*(65F/60F)),.05F})
         {

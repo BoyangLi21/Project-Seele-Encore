@@ -17,7 +17,7 @@
 | `review.py` / `video.py` | 多视角接触表 / MP4 预览（需 `imageio-ffmpeg`） |
 | `idle.py` | 原创站立待机（`eva_idle_r59.json`） |
 | `rifle_stance.py` | 持枪跪姿到趴下的骨盆和双腿（`eva_rifle_legs_r59.json`，运行时覆盖到捕捉片段上） |
-| `sprint_overlay.py` | 把 `motion-work/toolroot/gait_candidates_r59.py` 按原步幅重定向的 Mesh2Motion Sprint（CC0）写成冲刺覆盖片段（`eva_dash_r59.json`）。不要再压缩步幅 |
+| `run_retarget.py` | 把动捕跑步按原步幅重定向到初号机，写成冲刺覆盖片段（`eva_dash_r59.json`）：肢体方向取自演员，长度和铰链用 EVA 自己的，手肘、膝盖和摆臂保持捕捉原样。不要压缩步幅。原始动捕文件不入库 |
 | `crawl.py` | 匍匐爬行（`eva_crawl_r59.json`，运行时覆盖到捕捉片段上） |
 | `replay.py` | 把复审客户端的 `poses.jsonl` 重放进离线骨架，分段统计穿地、滑步、关节速度、铰链缝隙、脚踝和手腕弯折 |
 | `gait_clip.py` / `hipcurve.py` | 量步态片段本身 / 实机骨盆曲线 |

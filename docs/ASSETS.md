@@ -482,7 +482,7 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 ## R57 狂奔（左 Alt）
 
-R59：`assets/projectseele/motion/eva_dash_r59.json` 是 Mesh2Motion `human-base-animations.glb` 的 `Sprint`（CC0）按原步幅重定向到初号机的循环，不再压缩步幅；生成：本机 `motion-work/toolroot/gait_candidates_r59.py` + `tools/finale/sprint_overlay.py`。下面的压缩步幅做法已废弃。
+R59：`assets/projectseele/motion/eva_dash_r59.json` 由 Mixamo 的 `Fast Run`（Adobe Mixamo，用户 2026-11-02 自行下载并同意使用，非 CC0，不属于本项目 MIT 范围；仓库不含原始文件）重定向到初号机的单圈循环。生成：`tools/finale/run_retarget.py`。肢体方向取自动捕，长度和关节用 EVA 自己的，手臂向外张开的分量减半，步幅保持原样不压缩，脚落地滑步。此前的 Mesh2Motion `Sprint` 是手工关键帧，手肘固定在 79～94 度，已弃用，下面的压缩步幅做法也已废弃。若公开发布时不想保留 Mixamo 内容，同一工具可换用 Bandai Namco Research Motiondataset-1 的 `dash_masculinity`（CC BY-NC 4.0，需署名）。
 
 候选私有资源（未经用户验收，不入库）：`eva_body_r44.json` 中三台机体的 `dash_run` 循环改用 Mesh2Motion `human-base-animations.glb` 的 `Sprint`（CC0）。修改：沿用刺拳/直拳同一 Mesh2Motion 管线重定向到 EVA 比例，整段循环统一落地以保留腾空期，再用 `warp_locomotion_r44` 把实测步幅（约 214 格/周期）压到实际移动距离 100 格/周期，运行步幅与动画步幅一致，支撑脚不打滑。生成脚本为本机 `motion-work/toolroot/sprint_dash_r57.py`。
 

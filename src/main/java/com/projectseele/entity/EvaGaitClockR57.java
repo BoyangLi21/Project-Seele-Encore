@@ -20,8 +20,8 @@ final class EvaGaitClockR57
     private static final double PULL=1.0;
     /** A synchronised phase this far away (cycles) is a real jump: take it. */
     private static final double RESYNC=.45;
-    /** Drawn travel beyond this in one frame (blocks) is a teleport, not a step. */
-    private static final double TELEPORT=6;
+    /** Drawn travel beyond this in one frame (blocks) is a teleport: a quarter second of the dash is 29. */
+    private static final double TELEPORT=40;
 
     private double phase=Double.NaN,reference,x,z,cycles,blocks;
     private long frame;
@@ -29,15 +29,23 @@ final class EvaGaitClockR57
 
     float sample(EvaUnit01Entity entity,float partial,float synchronised,long now)
     {
+        // The signal clock counts cycles upward; everything downstream reads 0..1.
+        synchronised-=Math.floor(synchronised);
         if(!ENABLED)return synchronised;
         if(now==frame&&!Double.isNaN(phase))return output;
         var origin=entity.getPosition(partial);
         double dt=(now-frame)/1e9,step=Math.hypot(origin.x-x,origin.z-z);
         double change=synchronised-reference;change-=Math.round(change);
         frame=now;x=origin.x;z=origin.z;reference=synchronised;
-        if(Double.isNaN(phase)||dt<=0||dt>.25||step>TELEPORT)
+        if(Double.isNaN(phase)||dt<=0||step>TELEPORT)
         {
             phase=synchronised;cycles=0;blocks=0;
+            return output=synchronised;
+        }
+        // A stall is not a new gait: the rate it had still holds.
+        if(dt>.25)
+        {
+            phase=synchronised;
             return output=synchronised;
         }
         double keep=Math.exp(-dt/RATE_WINDOW);

@@ -40,7 +40,7 @@ final class EvaStrideHeadingR59
         s.x=e.getX();s.z=e.getZ();s.seen=true;s.previous=s.heading;
         if(first)return;
         float wanted=0;
-        if(distance>MOVING&&distance<8&&e.onGround()&&free(e))
+        if(distance>MOVING&&distance<32&&e.onGround()&&free(e))
         {
             float across=Mth.wrapDegrees((float)Math.toDegrees(Math.atan2(-dx,dz))-e.yBodyRot);
             wanted=Math.abs(across)>REVERSE_FROM?Mth.wrapDegrees(across-180):across;

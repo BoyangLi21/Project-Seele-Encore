@@ -1475,7 +1475,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             double distance=Double.isFinite(dx)?Math.hypot(dx,dz):0;riflePreviousX=this.getX();riflePreviousZ=this.getZ();
             boolean actionDisplacement=!(this instanceof EvaPrototypeEntity)&&!this.isBerserk()
                     &&this.hasLiveActionForRender(0)&&this.isMeleeWeapon();
-            boolean moving=distance>.006&&distance<8&&!this.isPilotControlLocked()
+            // A mounted body's position can arrive two ticks at a time; at a full
+            // dash that is over 11 blocks, which must not read as standing still.
+            boolean moving=distance>.006&&distance<32&&!this.isPilotControlLocked()
                     &&(!actionDisplacement||this.pilotMovementRequested);
             rifleZeroTravelTicksR45=moving?0:Math.min(3,rifleZeroTravelTicksR45+1);
             float oldMove=this.entityData.get(DATA_RIFLE_MOVE),oldRun=this.entityData.get(DATA_RIFLE_RUN);

@@ -25,7 +25,9 @@ final class EvaPoseContinuity
 {
     private static final long OWNER_NANOS = 220_000_000L;
     private static final long POP_NANOS = 120_000_000L;
+    /** A pop at 60 frames a second; longer frames are allowed their extra turn. */
     private static final float POP_DEGREES = 25.0F;
+    private static final long FRAME_NANOS = 16_666_667L;
     private static final long STALE_NANOS = 300_000_000L;
     /** Development diagnostic: log pose pops and tick-held bones (-Dprojectseele.poseDiag=true). */
     private static final boolean DIAG = Boolean.getBoolean("projectseele.poseDiag");
@@ -49,8 +51,11 @@ final class EvaPoseContinuity
         int diagLines;
         final Map<String, int[]> diagCounts = new HashMap<>();
         Map<String, float[]> offsets;
+        /** The undamped pose of the last frame of a running blend. */
+        Map<String, float[]> lastTarget;
         long blendStart;
         long lastNanos;
+        long stepNanos;
         String owner;
     }
 
@@ -113,7 +118,7 @@ final class EvaPoseContinuity
         if (!repeat && now - state.lastNanos < STALE_NANOS && !state.last.isEmpty())
         {
             long blend = !key.equals(state.key) ? transitionNanos(state.key, key)
-                    : state.offsets == null && popped(model, state) ? POP_NANOS : 0L;
+                    : state.offsets == null && popped(model, state, now - state.lastNanos) ? POP_NANOS : 0L;
             if (blend > 0)
             {
                 Map<String, float[]> offsets = new HashMap<>();
@@ -181,7 +186,7 @@ final class EvaPoseContinuity
         // Pops were only caught with no blend running, so a target that jumped
         // mid-blend (a combo strike taking over the previous one) reached the
         // screen in one frame. Restart the blend from the last drawn pose.
-        if (raw != null && state.offsets != null && now != state.blendStart && popped(model, state))
+        if (raw != null && state.offsets != null && now != state.blendStart && targetJumped(raw, state, now - state.lastNanos))
         {
             Map<String, float[]> offsets = new HashMap<>();
             for (var entry : raw.entrySet())
@@ -215,6 +220,10 @@ final class EvaPoseContinuity
                 bone.setPosY(prev[4]);
                 bone.setPosZ(prev[5]);
             });
+        }
+        if (!repeat)
+        {
+            state.lastTarget = state.offsets != null ? raw : null;
         }
         if (DIAG && !state.last.isEmpty())
         {
@@ -251,6 +260,7 @@ final class EvaPoseContinuity
         state.key = key;
         state.owner = owner;
         state.rawOwner = rawOwner;
+        state.stepNanos = now - state.lastNanos;
         state.lastNanos = now;
     }
 
@@ -569,8 +579,10 @@ final class EvaPoseContinuity
     }
 
     /** A body bone turned far more since the last drawn frame than that frame's own motion predicts. */
-    private static boolean popped(BakedGeoModel model, State state)
+    private static boolean popped(BakedGeoModel model, State state, long elapsed)
     {
+        float limit = POP_DEGREES * Math.max(1.0F, elapsed / (float) FRAME_NANOS);
+        float stretch = Math.max(1.0F, elapsed / (float) Math.max(1L, state.stepNanos));
         for (String name : DIAG_BONES)
         {
             float[] prev = state.last.get(name);
@@ -580,8 +592,33 @@ final class EvaPoseContinuity
                 continue;
             }
             float deg = degrees(rotation(bone), prev);
-            float expected = state.drawnStep.getOrDefault(name, 0.0F);
-            if (deg > POP_DEGREES && deg > expected * 3.0F + 8.0F)
+            float expected = state.drawnStep.getOrDefault(name, 0.0F) * stretch;
+            if (deg > limit && deg > expected * 3.0F + 8.0F)
+            {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Mid-blend the drawn pose trails a moving target by design, so only the
+     * target's own step can say it jumped. Measured against the drawn pose a
+     * fast stride restarted the blend every frame, which held the body still
+     * until the dash ended.
+     */
+    private static boolean targetJumped(Map<String, float[]> target, State state, long elapsed)
+    {
+        Map<String, float[]> before = state.lastTarget;
+        if (before == null)
+        {
+            return false;
+        }
+        float limit = POP_DEGREES * Math.max(1.0F, elapsed / (float) FRAME_NANOS);
+        for (String name : DIAG_BONES)
+        {
+            float[] was = before.get(name), is = target.get(name);
+            if (was != null && is != null && degrees(new Quaternionf().rotationZYX(is[2], is[1], is[0]), was) > limit)
             {
                 return true;
             }

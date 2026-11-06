@@ -50,6 +50,10 @@ public final class EvaConnectedActionReview
     private static final boolean FX=Boolean.getBoolean("projectseele.tourFxR58");
     /** Movement check: turning on the spot, walking backward and sideways, curving, and hard turns at a run. */
     private static final boolean MOVES=Boolean.getBoolean("projectseele.tourMovesR59");
+    private static final int DASH_END=Integer.getInteger("projectseele.tourDashEnd",130);
+    /** Starts the sprint this many ticks sooner: the review ground ends in a wall. */
+    private static final int DASH_LEAD=Integer.getInteger("projectseele.tourDashLead",0);
+    private static final String DASH_WEAPON=System.getProperty("projectseele.tourDashWeapon");
     private static Vec3 camPos, camAim, fxRamiel, fxFront, fxOrigin;
     private static EvaUnit01Entity fxUnit00;
     /** Record every drawn frame, not the first of each tick: offline renders then show the frames the game drew. */
@@ -228,7 +232,7 @@ public final class EvaConnectedActionReview
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
-                :t>=40&&t<140||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
+                :t>=40&&t<Math.max(140,DASH_END+10)||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
                 ||t>=840&&t<900||t>=1000&&t<1060||t>=1270&&t<1330||t>=1470&&t<1530;
         mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
         // Turn about between the bare-hand and rifle parts so the long walk
@@ -236,12 +240,13 @@ public final class EvaConnectedActionReview
         // (A tour started part-way has room ahead and does not turn.)
         mc.player.setYRot(TOUR_START==0&&t>=610&&t<1085?180:0);mc.player.setXRot(0);
         // The ledge check walks onto the step, as a pilot usually does.
-        if(tourAt(70)&&!CLIMB)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(tourAt(70-DASH_LEAD)&&!CLIMB)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(tourAt(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand("seele motionlab weapon unit01 "+DASH_WEAPON);
         // Optional checks: a full sprint over the run, and kerbs on the walk.
         // The client re-syncs held sprint and dash to the real keys, so hold them.
-        int sprintEnd=DASH?130:110;
-        if(DASH)com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=98&&t<130);
-        mc.options.keySprint.setDown(!CLIMB&&t>=70&&t<sprintEnd);
+        int sprintEnd=DASH?DASH_END:110;
+        if(DASH)com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=98-DASH_LEAD&&t<sprintEnd);
+        mc.options.keySprint.setDown(!CLIMB&&t>=70-DASH_LEAD&&t<sprintEnd);
         if(STEPS&&at(1))
         {
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:stone");

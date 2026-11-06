@@ -70,7 +70,10 @@ public final class EvaPoseSignalClock
         {
             float step=value-raw;
             if(cyclic)step-=Math.round(step);
-            rate=gap>0&&step>0?step/(float)gap:0;
+            // Packets held up by a stall are handled in one frame. Over the
+            // microseconds between them a tick's step is thousands of cycles
+            // a second, and extrapolating that threw the legs a random distance.
+            rate=step>0?step/(float)Math.max(gap,minimumWindow):0;
         }
         window=Math.max(minimumWindow,Math.min(maximumWindow,gap));
         from=current;to=target;raw=value;start=lastAccepted=now;
