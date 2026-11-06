@@ -65,8 +65,8 @@ class Path:
         a, b = raw['ankle_r']
         self.ankle_r = [(1.0, a), (1.5, (-6.1, 2.5, -18.0)), (2.0, (-6.7, 3.3, -18.6)), (2.6, (-7.2, 3.6, -19.6)), (3.0, (-7.5, 3.6, -20.4))]
         # Toes-up pitch of the sole in the world: flat, onto the toes, over onto the instep.
-        self.pitch_l = [(1.0, 0), (1.14, -6), (1.3, -38), (1.5, -72), (1.7, -112), (1.9, -130), (2.2, -140), (3.0, -140)]
-        self.pitch_r = [(1.0, raw['pitch'][0]), (2.2, -140), (3.0, -140)]
+        self.pitch_l = [(1.0, 0), (1.14, -6), (1.3, -38), (1.5, -72), (1.7, -108), (1.9, -122), (2.2, -132), (3.0, -132)]
+        self.pitch_r = [(1.0, raw['pitch'][0]), (2.2, -132), (3.0, -132)]
         # Knee aim: forward over a raised thigh, swinging down under a thigh lying back.
         self.pole_l = [(1.0, (.05, .25, 1)), (1.5, (.2, -.1, 1)), (1.9, (.3, -.9, .7)), (2.4, (.25, -1, .25)), (3.0, (.2, -1, .1))]
         self.pole_r = [(1.0, (-.2, -.7, .7)), (2.0, (-.25, -1, .3)), (3.0, (-.2, -1, .1))]
@@ -95,8 +95,9 @@ def solve_leg(actors, solver, side, rot, pos, world, ankle, q_foot, pole):
     hip = B.point(m['torso_lower'], actors.eva_rig.pivot['leg_' + side])
     qu, ql, qw, ang, err = limb.solve(hip, ankle, pole, B.mat_rot(m['torso_lower']))
     rot['leg_' + side], rot['shin_' + side] = qu, ql
-    rot['ankle_' + side] = R.qmul(R.qconj(R.qmul(qw, ql)), q_foot)
-    rot['foot_' + side] = np.array([1.0, 0, 0, 0])
+    # The foot bone carries it, as in the capture: the runtime rests a lying foot relative to the ankle bone.
+    rot['ankle_' + side] = np.array([1.0, 0, 0, 0])
+    rot['foot_' + side] = R.qmul(R.qconj(R.qmul(qw, ql)), q_foot)
     pos['shin_' + side] = R.Rig.hinge_offset(ql, actors.eva_rig.pivot['shin_' + side], solver.knee[side])
     return ang, err
 

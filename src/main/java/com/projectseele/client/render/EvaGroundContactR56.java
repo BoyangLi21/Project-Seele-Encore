@@ -47,10 +47,14 @@ final class EvaGroundContactR56
      * lower bar switched planted feet on and off between frames.
      */
     private static final float PLANT_SLOW=30F,PLANT_FAST=60F;
-    /** Shin tilt from vertical (degrees) up to which the sole lies level, and from which the instep rests on the ground. */
+    /** Shin tilt from vertical (degrees) up to which the sole lies level, and from which the foot stands on its toes. */
     private static final float LEVEL_SHIN=40,INSTEP_SHIN=70;
-    /** Ankle extension (foot rotX from the shin, degrees) of a foot resting on its instep. */
-    private static final float INSTEP_POINT=Float.parseFloat(System.getProperty("projectseele.proneFootR56","-70"));
+    /**
+     * Ankle extension (foot rotX from the shin, degrees) of a foot behind a lying
+     * shin: down on its toes. Pointed flat onto its instep, the ankle cuff stood
+     * out under the leg like broken armour and the toes hung off the ground.
+     */
+    private static final float INSTEP_POINT=Float.parseFloat(System.getProperty("projectseele.proneFootR56","-42"));
     /** The body is lowered at most this far onto the ground, and raised at most the second (blocks). */
     private static final float MAX_DROP=8F,MAX_LIFT=3F;
 
@@ -192,7 +196,7 @@ final class EvaGroundContactR56
      * Rest a foot that is on the ground the way its shin allows. Over a steep
      * shin (standing, squatting, the front foot of a kneel) the sole lies
      * level; under a shin lying along the ground (the rear leg of a kneel,
-     * prone) the instep rests on the ground with the toes pointing back.
+     * prone) it stands on its toes, pointing back and down.
      * Blending prone by its progress instead pointed the feet of a body still
      * squatting, which stood on its toe tips.
      */
@@ -255,7 +259,7 @@ final class EvaGroundContactR56
         EvaRigTransforms.rotate(foot,parent.invert().mul(wanted));
     }
 
-    /** How far the shin lies along the ground: 0 steep (sole level), 1 lying (instep down). */
+    /** How far the shin lies along the ground: 0 steep (sole level), 1 lying (on the toes). */
     private static float lying(BakedGeoModel model,String side)
     {
         var shin=model.getBone("shin_"+side).orElse(null);

@@ -93,6 +93,12 @@ def main():
                 st['slide'] = max(st['slide'], np.linalg.norm((ball - prev_ball[side][:3])[[0, 2]]) / dt)
             prev_ball[side] = np.r_[ball, r['tick']]
         world = {b: R.matq(m[:3, :3] / np.linalg.norm(m[:3, 0])) for b, m in mats.items() if not b.startswith(SKIP)}
+        # a foot or hand bent past what its joint allows: the angle between it and the bone above
+        for side in 'lr':
+            for name, up, lo in (('ankle', 'shin_', 'foot_'), ('wrist', 'forearm_', 'hand_')):
+                bend = 2 * math.degrees(math.acos(min(1.0, abs(float(np.dot(world[up + side], world[lo + side]))))))
+                if bend > st.get(name, (0.0, ''))[0]:
+                    st[name] = (bend, '%s%s@%d' % (lo, side, r['tick']))
         # dislocation: the hinge centre seen from the upper and from the lower bone must coincide
         for side in 'lr':
             for up, lo, c in (('arm_', 'forearm_', S.elbow_centre(side)),
@@ -114,10 +120,11 @@ def main():
             cam = R.Camera(c + np.array([-110, 30 + 0 * c[1], 20]) - np.array([0, 0, 0]), c + np.array([0, 26, 0]), 42, (300, 260))
             img = R.render(cam, groups, label='%d %s' % (r['tick'], key[:22]), ground=(c[0] - 60, c[0] + 60, c[2] - 60, c[2] + 60))
             sheet.append(img)
-    print('%-22s %4s %6s %8s  %-26s %s' % ('segment', 'n', 'pen', 'slide/s', 'max joint speed (deg/tick)', 'max hinge gap (blocks)'))
+    print('%-22s %4s %6s %8s  %-26s %-20s %-18s %s' % ('segment', 'n', 'pen', 'slide/s', 'max joint speed (deg/tick)', 'hinge gap', 'ankle bend', 'wrist bend'))
     for key, st in stats.items():
         g = st.get('gap', (0.0, ''))
-        print('%-22s %4d %6.2f %8.2f  %4.0f %-21s %5.2f %s' % (key[:22], st['n'], st['pen'], st['slide'], st['pop'][0], st['pop'][1], g[0], g[1]))
+        an, wr = st.get('ankle', (0.0, '')), st.get('wrist', (0.0, ''))
+        print('%-22s %4d %6.2f %8.2f  %4.0f %-21s %5.2f %-13s %4.0f %-13s %4.0f %s' % (key[:22], st['n'], st['pen'], st['slide'], st['pop'][0], st['pop'][1], g[0], g[1], an[0], an[1], wr[0], wr[1]))
     if sheet:
         R.sheet(sheet, 6).save(sys.argv[2])
 

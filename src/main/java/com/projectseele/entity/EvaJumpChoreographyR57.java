@@ -27,21 +27,22 @@ final class EvaJumpChoreographyR57
     // Air hammer: the hands clasped over the head, the back arched; then the
     // clasped fists swing down in front through the fall and strike the
     // ground in front of the knees at touchdown.
-    private static final Key H_RAISE=key(0,6,0,0,10,0,0,-8,0,0,60,0,-8,72,0,8,-105,0,0,-112,0,0,-20,0,0,-20,0,0,170,0,-17,170,0,17,24,0,0,24,0,0);
-    // Cocked: the back arched further, the clasped fists drawn behind the head.
-    private static final Key H_RAISE2=key(0,12,0,0,18,0,0,-16,0,0,50,0,-8,64,0,8,-112,0,0,-120,0,0,-25,0,0,-25,0,0,178,0,-18,178,0,18,50,0,0,50,0,0);
-    // The elbows straighten through the swing, as a whip.
-    private static final Key H_SWING=key(0,-12,0,0,-16,0,0,12,0,0,45,0,-8,52,0,8,-80,0,0,-88,0,0,-10,0,0,-10,0,0,100,-16,0,100,16,0,20,0,0,20,0,0);
+    private static final Key H_RAISE=key(0,8,0,0,12,0,0,-8,0,0,42,0,-8,52,0,8,-112,0,0,-118,0,0,-20,0,0,-20,0,0,170,0,-17,170,0,17,24,0,0,24,0,0);
+    // Cocked: drawn back like a bow from the heels to the fists behind the head.
+    private static final Key H_RAISE2=key(0,20,0,0,22,0,0,-18,0,0,8,0,-6,20,0,6,-120,0,0,-128,0,0,-25,0,0,-25,0,0,178,0,-18,178,0,18,50,0,0,50,0,0);
+    // The bow lets go: the body jackknifes over the arms and the elbows straighten as a whip.
+    private static final Key H_SWING=key(0,-26,0,0,-24,0,0,18,0,0,62,0,-8,72,0,8,-95,0,0,-102,0,0,-10,0,0,-10,0,0,100,-16,0,100,16,0,20,0,0,20,0,0);
     private static final Key H_SLAM=key(-34.51F,-34,0,0,-30,0,0,34,0,0,92,0,-16,86,0,16,-122,0,0,-116,0,0,32,0,0,32,0,0,58,-10,0,58,10,0,0,0,0,0,0,0);
     // Struck: knees wide, the fists driven into the ground in front of the feet.
     private static final Key H_SLAM_DEEP=key(-39.21F,-32,0,0,-26,0,0,34,0,0,96,0,-20,90,0,20,-124,0,0,-120,0,0,34,0,0,34,0,0,88,-12,0,88,12,0,0,0,0,0,0,0);
-    // Air kick: coiled behind a guard, right knee to the chest; the leg snaps
-    // out heel first with the body laid back and the arms flung behind it;
-    // the landing drops onto the kicking foot, rear knee to the ground, the
-    // right fist planted in front. Held before arms out in front and a lunge
-    // landing, it read as a hop.
-    private static final Key K_CHAMBER=key(0,10,0,0,-6,0,0,4,0,0,45,0,-8,118,0,4,-125,0,0,-140,0,0,-30,0,0,25,0,0,55,0,-18,45,0,18,115,0,0,105,0,0);
-    private static final Key K_STRIKE=key(0,26,0,0,4,0,0,-14,0,0,5,0,-8,52,0,4,-105,0,0,-3,0,0,-35,0,0,28,0,0,-45,0,-30,-40,0,30,25,0,0,30,0,0);
+    // Air kick: coiled tight behind a guard, both knees to the chest; the leg
+    // snaps out heel first and the whole body lies back along it, one line from
+    // the head to the heel diving at the target, the other leg folded and the
+    // arms flung behind. The landing drops onto the kicking foot, rear knee to
+    // the ground, the right fist planted in front. With the body upright and
+    // the leg held out level, it hung in the air with nothing behind it.
+    private static final Key K_CHAMBER=key(0,22,0,0,-16,0,0,8,0,0,72,0,-8,110,0,4,-128,0,0,-140,0,0,-30,0,0,25,0,0,66,0,-16,56,0,16,118,0,0,112,0,0);
+    private static final Key K_STRIKE=key(0,46,0,0,-8,0,0,-28,0,0,80,0,-10,18,0,4,-130,0,0,-3,0,0,-25,0,0,30,0,0,-58,0,-36,-52,0,36,22,0,0,28,0,0);
     private static final Key K_LAND=key(-26.61F,-32,0,0,-22,0,0,30,0,0,37,0,-10,112,0,8,-90,0,0,-90,0,0,-10,0,0,10,0,0,-25,0,-45,62,0,10,30,0,0,8,0,0);
 
     /** Ticks from take-off to the apex at the EVA's jump speed and gravity. */
@@ -129,6 +130,14 @@ final class EvaJumpChoreographyR57
     private static final float CLASP=.55F;
 
     private static float raise(float age){return age<4?ease(age/4):1+out(Math.min(1,(age-4)/14));}
+
+    /** How far the hammer's wrists are straightened into closed fists in line with the forearms. */
+    static float hammerFists(EvaUnit01Entity e,float partial)
+    {
+        int action=EvaCombatR31.action(e);
+        if(action==EvaCombatR31.AIR_STRIKE)return EvaPoseBlendR51.smooth(EvaCombatR31.age(e,partial)/3F);
+        return action==EvaCombatR31.LAND&&state(e).attack==1?1-EvaPoseBlendR51.smooth((EvaCombatR31.age(e,partial)-7)/5F):0;
+    }
 
     /** Touchdown: from the pose the body landed in, into the bend and back up to the ground pose. */
     static EvaBodyPose.Sample landing(EvaUnit01Entity e,EvaBodyPose.Sample from,EvaBodyPose.Sample ground,float land)

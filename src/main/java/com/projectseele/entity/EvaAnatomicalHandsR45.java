@@ -320,6 +320,13 @@ public final class EvaAnatomicalHandsR45
     public static void alignPunchWristR53(EvaUnit01Entity e,EvaBodyPose.Sample body,float partial)
     {
         if(!enabled(e)||e.getWeapon()!=EvaUnit01Entity.WEAPON_FISTS||e.isNervLogisticsLocked())return;
+        float hammer=EvaJumpChoreographyR57.hammerFists(e,partial);
+        if(hammer>0)
+        {
+            alignPunchWristR53(e,body,"l",hammer,false);
+            alignPunchWristR53(e,body,"r",hammer,false);
+            return;
+        }
         String clip=EvaGameplayMotionR32.activeGroundClip(e,partial);
         if(!java.util.Set.of("jab","cross","hook","heavy").contains(clip))return;
         float phase=EvaGameplayMotionR32.activeGroundPhase(e,partial);
@@ -450,7 +457,7 @@ public final class EvaAnatomicalHandsR45
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE&&side.equals("r"))return "knife";
         if(e.getWeapon()==EvaUnit01Entity.WEAPON_LANCE||e.getWeapon()==EvaUnit01Entity.WEAPON_N2)return "grab";
         // Aerial attacks strike with closed fists; the hammer clasps them.
-        if(EvaCombatR31.action(e)==EvaCombatR31.AIR_STRIKE||EvaCombatR31.action(e)==EvaCombatR31.AIR_SLAM)return "fist";
+        if(EvaCombatR31.action(e)==EvaCombatR31.AIR_STRIKE||EvaCombatR31.action(e)==EvaCombatR31.AIR_SLAM||EvaCombatR31.action(e)==EvaCombatR31.LAND)return "fist";
         if(EvaCombatR31.action(e)==EvaCombatR31.REACH)return "spread";
         if(EvaCombatR31.action(e)==EvaCombatR31.HOLD||EvaCombatR31.action(e)==EvaCombatR31.THROW)return "grab";
         // A released crouch/prone key does not mean the palms have left the

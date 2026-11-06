@@ -163,7 +163,11 @@ public final class EvaBodyPose
                         combatClips.put(variant,Map.copyOf(merged));
                     }
                 }
-                if(variant<=2)overlayArmedLegsR59(combatClips,variant);
+                if(variant<=2)
+                {
+                    overlayClipR59(combatClips,variant,"rifle_stance","eva_rifle_legs_r59.json");
+                    overlayClipR59(combatClips,variant,"dash_run","eva_dash_r59.json");
+                }
             }
             data=new Data(names,index,Map.copyOf(clips),Map.copyOf(rigs),Map.copyOf(support),object(all,"prone"),object(all,"grip"),object(all,"rifle_mocap"),Map.copyOf(eyes),Map.copyOf(rigSupport),Map.copyOf(carrierHulls),Map.copyOf(combatClips),object(all,"locomotion_contract_r43"));
             ProjectSeele.LOGGER.info("EVA shared body/socket pose loaded: private={} clips={} bones={} gameplayProfiles={}",Files.isRegularFile(path),clips.size(),names.length,combatClips.values().stream().filter(c->c.containsKey("r32_jab")).count());
@@ -171,16 +175,18 @@ public final class EvaBodyPose
         catch(Exception failure){throw new IllegalStateException("Shared EVA body pose could not load",failure);}
     }
     /**
-     * The armed kneel-to-prone keeps its captured upper body and takes its pelvis
-     * height and legs from tools/finale/rifle_stance.py: the captured front foot
-     * folded up through the far thigh and the rear leg hung in the air.
+     * Channels authored in tools/finale replace the capture's, frame by frame.
+     * The armed kneel-to-prone keeps its captured upper body and takes pelvis
+     * and legs from rifle_stance.py: the captured front foot folded up through
+     * the far thigh. The dash takes everything but its pelvis height from
+     * dash_stride.py: captured, it scuttled along with the chest fifty degrees over.
      */
-    private static void overlayArmedLegsR59(Map<Integer,Map<String,Clip>> combatClips,int variant) throws java.io.IOException
+    private static void overlayClipR59(Map<Integer,Map<String,Clip>> combatClips,int variant,String name,String file) throws java.io.IOException
     {
         var clips=new HashMap<>(combatClips.getOrDefault(variant,Map.of()));
-        var clip=clips.get("rifle_stance");
+        var clip=clips.get(name);
         if(clip==null)return;
-        try(var stream=EvaBodyPose.class.getResourceAsStream("/assets/projectseele/motion/eva_rifle_legs_r59.json"))
+        try(var stream=EvaBodyPose.class.getResourceAsStream("/assets/projectseele/motion/"+file))
         {
             if(stream==null)return;
             var overlay=JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
@@ -200,7 +206,7 @@ public final class EvaBodyPose
                 }
                 rotations[first+f]=q;positions[first+f]=p;
             }
-            clips.put("rifle_stance",new Clip(clip.duration(),clip.names(),rotations,positions));
+            clips.put(name,new Clip(clip.duration(),clip.names(),rotations,positions));
             combatClips.put(variant,Map.copyOf(clips));
         }
     }
@@ -847,7 +853,7 @@ public final class EvaBodyPose
             // end effector after quaternion blending, not its individual bones.
             var target=new Vector3f(actual).lerp(new Vector3f(goal.x,actual.y,goal.z),
                     EvaPoseBlendR51.smooth(e.rifleMoveBlend(partial)/.16F)
-                            *(1-EvaPoseBlendR51.smooth(e.rifleStanceLevel(partial))))
+                            *(1-EvaPoseBlendR51.smooth(e.rifleStanceLevel(partial)))*(1-EvaSprintR50.blend(e,partial)))
                     .sub(orientation.transform(new Vector3f(offset)));
             com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(pose,profile,side,target,orientation);
         }

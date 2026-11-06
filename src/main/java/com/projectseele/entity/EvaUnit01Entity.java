@@ -7703,6 +7703,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             double pull=this.onGround()?AIRFRAME_GRAVITY:this.getDeltaMovement().y>0?AIR_RISE_GRAVITY:AIR_FALL_GRAVITY;
             if(airframe.getBaseValue()!=pull)airframe.setBaseValue(pull);
         }
+        EvaAirDriveR59.apply(this);
         if(!EvaImmersionR50.travel(this,input))super.travel(input);
         EvaCombatR31.approach(this);
         if (this.level().isClientSide)

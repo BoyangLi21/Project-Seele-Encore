@@ -239,8 +239,9 @@ public final class EvaConnectedActionReview
         if(tourAt(70)&&!CLIMB)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
         // Optional checks: a full sprint over the run, and kerbs on the walk.
         // The client re-syncs held sprint and dash to the real keys, so hold them.
-        if(DASH)com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=70&&t<110);
-        mc.options.keySprint.setDown(!CLIMB&&t>=70&&t<110);
+        int sprintEnd=DASH?130:110;
+        if(DASH)com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=98&&t<130);
+        mc.options.keySprint.setDown(!CLIMB&&t>=70&&t<sprintEnd);
         if(STEPS&&at(1))
         {
             mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:stone");
@@ -268,7 +269,7 @@ public final class EvaConnectedActionReview
             mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:air");
         }
         if(WEAPONS)weaponsR57(mc,tick);
-        if(tourAt(110))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(tourAt(sprintEnd))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
         if(!CLIMB&&(tourAt(170)||tourAt(182)||!COMBO&&(tourAt(194)||tourAt(206))))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(!CLIMB&&tourAt(240))send(ServerboundEvaControlPacket.ACTION_SMASH);
         // Optional chain check: the heavy pressed during the punch string.
@@ -419,6 +420,13 @@ public final class EvaConnectedActionReview
         Vec3 target = eva.position().add(0, Double.parseDouble(System.getProperty("projectseele.reviewAimY","28")), 0);
         Vec3 position = eva.position().add(RIFLE && eva.getUnitVariant() == 0 ? -60 : Double.parseDouble(System.getProperty("projectseele.reviewCamX","60")), Double.parseDouble(System.getProperty("projectseele.reviewCamY","32")), Double.parseDouble(System.getProperty("projectseele.reviewCamZ","48")));
         if (FX && camPos != null) { position = camPos; target = camAim; }
+        // Close follow of the fists: -Dprojectseele.reviewTrackHand=<distance>.
+        double track=Double.parseDouble(System.getProperty("projectseele.reviewTrackHand","0"));
+        if(track>0)
+        {
+            var hand=com.projectseele.entity.EvaGameplayMotionR32.hand(eva,"r",1);
+            target=hand;position=hand.add(-track*.7,track*.15,track*.7);
+        }
         Vec3 delta = target.subtract(position);
         camera.setPos(position.x, position.y - camera.getEyeHeight(), position.z);
         camera.setYRot((float)(Mth.atan2(delta.z, delta.x) * Mth.RAD_TO_DEG) - 90.0F);
