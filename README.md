@@ -12,7 +12,7 @@ An open-source, non-commercial Evangelion fan mod for **Minecraft 1.20.1 / Forge
 
 *GeoFront · R53 开发世界，2026-10-18。由实际存档导出，在 Blender Cycles 中离线渲染；连续斜面、水体和摄影灯光经过宣传处理，不代表实时游戏画质或帧率。[图片来源与处理说明](docs/images/README.md)。*
 
-[开发环境](#从源码启动) · [参与贡献](CONTRIBUTING.md) · [当前进展](#当前进展) · [完整路线图](docs/ROADMAP.md) · [素材与许可](docs/ASSETS.md)
+[开发环境](#从源码启动) · [参与贡献](CONTRIBUTING.md) · [当前进展](#当前进展) · [完整路线图](docs/ROADMAP.md) · [素材与许可](docs/ASSETS.md) · [文档索引](docs/README.md)
 
 ## 可以体验什么
 

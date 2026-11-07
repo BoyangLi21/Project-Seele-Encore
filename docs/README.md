@@ -1,0 +1,64 @@
+# 文档索引
+
+只列还在用的文档。历次阶段报告、验收单和交付记录都已移出主分支，需要时到归档 tag 查：
+[`archive/pre-cleanup-20261106`](https://github.com/BoyangLi21/Project-Seele-Encore/tree/archive/pre-cleanup-20261106/docs)。
+
+## 上手
+
+- [环境搭建](SETUP.md)
+- [R55 快速开始](R55_QUICKSTART.zh.md) · [R55 发布说明](R55_RELEASE.zh.md)
+- [R54 联机说明](R54_FRIENDS_QUICKSTART.zh.md)
+- [本地人工试玩](R53_LOCAL_REVIEW.zh.md)
+
+## 方向
+
+- [路线图](ROADMAP.md)
+- [当前实现约定](DECISIONS.md)
+- [各阶段开工提示](PROMPTS.md)
+- [开源发布](OPEN_SOURCE_RELEASE_R24.md) · [B 站与社区](BILIBILI_AND_COMMUNITY_R24.md)
+- [美术方向](ART_DIRECTION_R24.md) · [第三次冲击视觉](THIRD_IMPACT_VISUAL.md)
+- [R54 需求记录](R54_REQUIREMENTS_LOG.zh.md)
+
+## 动作与战斗
+
+- [动作大修](MOTION_OVERHAUL.zh.md)
+- [EVA 连贯动作](EVA_CONNECTED_ACTIONS.md)
+- [动作美学](EVA_MOTION_AESTHETIC_BIBLE_R01.md) · [参考图谱](EVA_REFERENCE_ATLAS_R44.md)
+- [战斗方向 R34](COMBAT_DIRECTION_R34.md)
+- [屋岛作战下一轮](YASHIMA_NEXT_ROUND_R50.zh.md) · [屋岛战场土建依据](BATTLE_CIVIL_REFERENCE_R50.md)
+
+动作工具见 [`tools/finale/README.md`](../tools/finale/README.md)。
+
+## 地图
+
+- [地图现状、工具和规则](HANDOFF_CODEX_20261106.zh.md)，配套数据在 [`handoff_20261106/`](handoff_20261106/README.zh.md)
+- [地图编辑协议](MAP_EDITING_PROTOCOL.md)
+- [箱根完成台账](HAKONE_COMPLETION_LEDGER_20261102.zh.md) · [执行顺序](HAKONE_EXECUTION_ORDER_20261105.zh.md)
+- [箱根地理工作](HAKONE_GEOGRAPHY_WORK.md) · [长程规划](HAKONE_LONG_RANGE_PLAN_R53.zh.md) · [体积管线](HAKONE_VOLUME_PIPELINE.md) · [截图修复](HAKONE_SCREENSHOT_REPAIR_20261103.zh.md)
+- [城市与箱根更新记录](R54_CITY_GEOGRAPHY_20261026.zh.md)
+- R55 地图复核：[已装地图](R55_INSTALLED_MAP_REVIEW_20261030.zh.md) · [发射地形](R55_LAUNCH_TERRAIN_REVIEW_20261101.zh.md) · [后续](R55_MAP_FOLLOWUP_20261029.zh.md) · [修复](R55_MAP_REPAIR_20261102.zh.md) · [路网](R55_NETWORK_REVIEW_20261031.zh.md) · [外部复核采纳](R55_PRO_REVIEW_ADOPTION_20261101.zh.md) · [道路地貌](R55_ROAD_LANDFORM_REVIEW_20261101.zh.md) · [街道细化](R55_STREET_REFINEMENT_REVIEW_20261031.zh.md) · [地表](R55_SURFACE_REVIEW_20261031.zh.md) · [体积修复](R55_VOLUME_REPAIR_REVIEW_20261101.zh.md)
+
+## 工程
+
+- [性能与引擎](PERFORMANCE_ENGINE_20261105.zh.md)
+- [仓库清理记录](REPOSITORY_CLEANUP_R53.md) · [哈希校验移除记录](HASH_GATE_REMOVAL_20261106.zh.md)
+- [模组集成矩阵](MOD_INTEGRATION_MATRIX.md)
+- [私有资源复现](PRIVATE_RESOURCE_REPRODUCIBILITY_R47.md)
+- [质量合同 R43](QUALITY_CONTRACT_R43.md)
+
+## 素材与授权
+
+- [素材登记](ASSETS.md)
+- [第三方动作声明](THIRD_PARTY_MOTION_NOTICES.md)
+- [使徒模型来源](ANGEL_MODEL_ACQUISITION.md)
+- [`licenses/`](licenses/)
+
+## 设定参考
+
+- [NERV 建筑](TV_NERV_ARCHITECTURE_REFERENCE.md) · [TV 布局](TV_LAYOUT_REFERENCE_R08.md) · [驾驶舱](TV_COCKPIT_REFERENCE.md)
+- [死海档案](DEAD_SEA_DOSSIER_R44.md)
+
+## 素材登记引用的旧记录
+
+[`ASSETS.md`](ASSETS.md) 和 [`ROADMAP.md`](ROADMAP.md) 仍引用这些记录，所以留着：
+[EVA_DORSAL_TV_R13](EVA_DORSAL_TV_R13.md) · [DIALOGUE_AUDIO_R31](DIALOGUE_AUDIO_R31.md) · [MESH2MOTION_ACTION_PLAN_R45](MESH2MOTION_ACTION_PLAN_R45.md) · [R53_CARRIER_FIT](R53_CARRIER_FIT_20261021.zh.md) · [R53_PELLET_RIFLE](R53_PELLET_RIFLE_20261021.zh.md) · [STAFF_WORLD_R15](STAFF_WORLD_R15.md) · [UN_MODELS_R21](UN_MODELS_R21.md) · [WORLD_EXPANSION_R07](WORLD_EXPANSION_R07.md) · [WORLD_MOTION_R06](WORLD_MOTION_R06.md) · [R10](WORLD_MOTION_R10.md) · [R11](WORLD_MOTION_R11.md) · [R12](WORLD_MOTION_R12.md) · [WORLD_REBUILD_R20](WORLD_REBUILD_R20.md) · [WORLD_REFINEMENT_R09](WORLD_REFINEMENT_R09.md) · [WORLD_REPAIR_R19](WORLD_REPAIR_R19.md)
