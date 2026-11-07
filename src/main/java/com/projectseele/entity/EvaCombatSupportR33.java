@@ -20,7 +20,6 @@ public final class EvaCombatSupportR33
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,FootFrame> FINAL_FEET=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ReleaseFrame> CLIENT_RELEASES=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ListTag> CLOCKS=new com.projectseele.util.WeakIdentityMap<>();
-    private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,CompoundTag> FLOOR_WITNESS=new com.projectseele.util.WeakIdentityMap<>();
     private static final class RenderClockR45
     {
         long frame; double serverTime,clientTime; float latestMove; boolean timedStop;
@@ -206,18 +205,16 @@ public final class EvaCombatSupportR33
     }
     public static void preventFreeFootPenetrationR44(EvaUnit01Entity e,EvaBodyPose.Sample pose,float partial)
     {
-        FLOOR_WITNESS.remove(e);
         // Terrain non-penetration is independent of the optional locomotion
         // foot-lock asset. Legacy clips and attacks use the same final soles.
         if(!Unit03SourceRigR53.sharesGroundActions(e)||!supported(e)||!EvaGameplayMotionR32.sharedWeapon(e)||e.rifleStanceLevel(partial)>.01F
                 ||e.isFirstBattleActive()||e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e)||CombatReactionsR36.active(e))return;
-        var origin=e.level().isClientSide?e.getPosition(partial):e.position();var diagnostics=new CompoundTag();
+        var origin=e.level().isClientSide?e.getPosition(partial):e.position();
         var profile=com.projectseele.physics.CombatBodyProfiles.get(e);
         for(String side:new String[]{"l","r"})
         {
             var low=EvaBodyPose.lowestRigidFootR44(e,pose,side);if(low==null)continue;
             var world=new Vector3f(low).mul(EvaScale.RENDER_SCALE).rotateY((180-e.getYRot())*Mth.DEG_TO_RAD).add((float)origin.x,(float)origin.y,(float)origin.z);
-            diagnostics.putDouble(side+"before_y",world.y);
             // Normalizing a knee after support IK can move even a planted
             // sole below its actual surface. Preserve its X/Z and orientation;
             // project only the penetrating leg, without lifting the assembly.
@@ -229,10 +226,7 @@ public final class EvaCombatSupportR33
             String name="foot_"+side;var matrix=pose.matrix(name);var orientation=matrix.getUnnormalizedRotation(new Quaternionf()).normalize();
             var target=matrix.transformPosition(new Vector3f(pose.rig.get(name).pivot()));target.y+=(float)((hit.getLocation().y+.02-world.y)/EvaScale.RENDER_SCALE);
             com.projectseele.physics.AnatomicalLimbConstraints.reachFoot(pose,profile,side,target,orientation);
-            var finalLow=EvaBodyPose.lowestRigidFootR44(e,pose,side);diagnostics.putDouble(side+"after_y",origin.y+finalLow.y*EvaScale.RENDER_SCALE);
-            diagnostics.putDouble(side+"ground_y",hit.getLocation().y);
         }
-        FLOOR_WITNESS.put(e,diagnostics);
     }
     public static float gaitWeight(EvaUnit01Entity e,float partial)
     {
