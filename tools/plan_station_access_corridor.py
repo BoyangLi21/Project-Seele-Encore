@@ -33,9 +33,9 @@ def write(path, value):
 
 
 class CapturedSurface:
-    def __init__(self, source):
+    def __init__(self, source, partial=False):
         self.source=Path(source);self.capture=read(self.source/'capture.json')
-        if self.capture['unavailable_chunks'] or set(self.capture['chunk_statuses'])!={'full'}:
+        if not partial and(self.capture['unavailable_chunks'] or set(self.capture['chunk_statuses'])!={'full'}):
             raise ValueError('Corridor needs complete FULL source')
         with np.load(self.source/'measured.npz') as data:
             self.measured={k:data[k] for k in data.files}

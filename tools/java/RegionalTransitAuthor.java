@@ -150,7 +150,15 @@ public final class RegionalTransitAuthor
             int number=1;
             for(JsonElement platformKey:j.getAsJsonArray("platforms"))
             {
-                Platform platform=platforms.get(platformKey.getAsString());if(platform==null)throw new IllegalStateException("Missing platform "+platformKey);
+                String platformId=platformKey.getAsString();
+                if(platformId.startsWith("existing:"))
+                {
+                    // An installed platform joins the route untouched; its native member must stay byte-identical.
+                    long id=Long.parseLong(platformId.substring(9));
+                    if(simulator.platforms.stream().noneMatch(p->p.getId()==id))throw new IllegalStateException("Missing platform "+platformKey);
+                    route.getRoutePlatforms().add(new RoutePlatformData(id));continue;
+                }
+                Platform platform=platforms.get(platformId);if(platform==null)throw new IllegalStateException("Missing platform "+platformKey);
                 platform.setName(Integer.toString(number++));platform.setDwellTime(integer(j,"dwell",8000));metadata.addPlatform(platform);
                 route.getRoutePlatforms().add(new RoutePlatformData(platform.getId()));
             }
@@ -202,7 +210,8 @@ public final class RegionalTransitAuthor
             if(bool(j,"restart_vehicles",false)){siding.clearVehicles();freshDepots.add(depot);}
             depots.add(depot);depotKeys.put(depot,key);lineSidings.put(key,siding);
         }
-        if(!append)simulator.setGameTime(0,1200000,true);Depot.generateDepots(simulator,depots);
+        // Timetabled departures wait for a moving game clock, which staging has only if set.
+        if(!append||bool(plan,"commission_clock",false))simulator.setGameTime(0,1200000,true);Depot.generateDepots(simulator,depots);
         Map<String,Set<Long>> progress=new LinkedHashMap<>();lineSidings.keySet().forEach(k->progress.put(k,new HashSet<>()));
         Map<String,Map<String,Set<Long>>> vehicleProgress=new LinkedHashMap<>();lineSidings.keySet().forEach(k->vehicleProgress.put(k,new LinkedHashMap<>()));
         boolean deployed=false;

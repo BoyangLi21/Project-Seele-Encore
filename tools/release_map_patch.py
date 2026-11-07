@@ -40,7 +40,10 @@ def author(a):
     require(spec.get('schema') == SCHEMA, 'Unknown patch schema')
     source = Path(spec['source'])
     cap = read(source / 'capture.json')
-    require(not cap['unavailable_chunks'] and set(cap['chunk_statuses']) == {'full'}, 'Patch needs a complete FULL capture')
+    with np.load(source / 'measured.npz') as data:
+        x0, z0, _, _ = map(int, data['bounds'])
+        full = data['full'].copy()
+    require(all(full[r['pos'][2] - z0, r['pos'][0] - x0] for r in spec['edits']), 'Every patched column needs a FULL capture')
     a.out.mkdir(exist_ok=False)
     for name in ('source', 'delta'):
         (a.out / name).mkdir()
@@ -75,6 +78,17 @@ def author(a):
     write(a.out / 'manifest.json', dict(schema=SCHEMA, world=cap['world'], source=str(source), cells=len(rows), regions=regions,
                                         vertical_extent=[-128, 319], device_changes=0, native_changes=[], native_additions=[],
                                         actor_changes=[], preserve_native_members=True, world_written=False))
+    if spec.get('native_additions'):
+        # Whole new native members only; the installer refuses to overwrite one.
+        root = Path(spec['native_additions'])
+        members = sorted(path.relative_to(root).as_posix() for path in root.rglob('*') if path.is_file())
+        for name in members:
+            target = a.out / 'after' / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(root / name, target)
+        manifest = read(a.out / 'manifest.json')
+        manifest['native_additions'] = members
+        write(a.out / 'manifest.json', manifest)
     write(a.out / 'functional-check.json', dict(errors=[], purposes=dict(Counter(r['purpose'] for r in rows))))
     print('Authored', len(rows), 'patch cells', dict(Counter(r['purpose'] for r in rows)))
 
