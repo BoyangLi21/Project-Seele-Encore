@@ -387,7 +387,7 @@ AGENTS.md被忽略，不能依赖clone得到。以下按实读F:/eva/AGENTS.md�
 |---|---|---|
 | GSI DEM、优化矢量 | G/sources.json：291下载、17缺失，2023-10-01传统矢量；国土地理院来源及加工署名，docs/HAKONE_GEOGRAPHY_WORK.md | 不代表当前站内/班次/店铺实测；最终发行归属审查未重做 |
 | 箱根官方地图、港口铁路说明、部分OSM参考 | G/town-detail-sources.json等局部来源 | OSM参与范围及派生包署名完整性未逐项核验，不宣称全部MIT |
-| NERV HQ 1:1 / Poodcie | docs/ASSETS.md，PMC本地测试地图 | 公开捆绑须明确授权，本轮未找到新授权凭证 |
+| NERV 总部地图 / Audijon2 | docs/ASSETS.md | 发布时署名，发布前告知作者（负责人 2026-11-07 决定） |
 | Tigerar1 EVA00/01/02/量产机 | docs/ASSETS.md记Sketchfab CC BY-SA，本机转换在忽略目录 | 发行署名/ShareAlike审核待确认，本次不提交 |
 | Udon-San粒子刀、Rainbow_Slakot附件 | 登记CC Attribution，只本机转换；Rainbow身体不采用 | 署名/EVA二创要求待核 |
 | SmOd、Battle Orchestra使徒及用户参考 | docs/ASSETS.md、ANGEL_MODEL_ACQUISITION.md | SmOd无开放许可，Battle Orchestra仅本机，不公开捆绑 |

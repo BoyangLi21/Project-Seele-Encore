@@ -294,7 +294,7 @@
 - khara 二创指引（合规基准）：https://www.khara.co.jp/guideline/ — 非商业✅ 无官方素材✅
 - **待联系授权的现成地图**（Phase 4 前完成，用户出面）：
   - Evangelion Tokyo-3 + NERV HQ（PMC, Babylon98, 2019）
-  - Evangelion: NERV HQ 1:1（PMC, Poodcie）
+  - Evangelion: NERV Headquarters Command Center（PMC, Audijon2）：已用于本项目，发布时署名，发布前告知作者
   - NERV HQ Geofront / TOKYO 3 CITY BUILDINGS（PMC, RobertHidnex, 2025）
   - Geo front schematic（minecraft-schematics.com #1252）
   - エヴァンゲリオン風ワールド（クラフターズコロニー #6749, 作者こんふぃ）

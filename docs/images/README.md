@@ -4,7 +4,7 @@
 
 - **场景**：Project SEELE 本机 R53 单人世界中的 NERV 总部、人工湖、岸边设备与森林。
 - **制作**：Blender Cycles 离线渲染。按实测顶点制作连续金字塔与湖盆斜面；灯位来自实际存档；水体采用美术化直线透射、Fresnel 反射和细波法线。上述摄影处理不代表游戏内实时渲染效果。
-- **建筑来源**：本机世界包含 Poodcie 的 NERV HQ 地图及本项目后续改造；湖盆、森林和此轮设施修订见 [素材登记](../ASSETS.md)。这里仅展示宣传静帧，不包含原始地图、区块、模型或贴图的下载包，也不将第三方建筑改标为 MIT。
+- **建筑来源**：本机世界的 NERV 总部以 Audijon2 的 [Evangelion: NERV Headquarters Command Center](https://www.planetminecraft.com/project/evangelion-nerv-headquarters-command-center/) 为起点，经本项目大幅改造；湖盆、森林和此轮设施修订见 [素材登记](../ASSETS.md)。这里仅展示宣传静帧，不包含原始地图、区块、模型或贴图的下载包，也不将第三方建筑改标为 MIT。
 - **环境照明**：[Kloofendal 48d Partly Cloudy (Pure Sky)](https://polyhaven.com/a/kloofendal_48d_partly_cloudy_puresky)，Greg Zaal / Jarod Guest，Poly Haven，CC0。
 - **原作参考**：只用于造型与灯光关系研究；未把官方参考截图或其中的像素加入宣传图。
 

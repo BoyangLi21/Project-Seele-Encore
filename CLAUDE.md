@@ -111,5 +111,5 @@ resources/
 - 贴图为程序生成 32×32（生成器：`tools/gen_textures.ps1`），欢迎高清重绘（资源包可覆盖）
 - 音效已全部替换为原创合成（`tools/gen_sounds.ps1`，登记于 `docs/ASSETS.md`）；后续可迭代音色质感
 - `ResourceLocation(String,String)` 有过时警告（Forge 迁移提示），1.20.1 内无害，Phase 6 统一清理
-- `run/saves/` 内有本地测试地图（NERV HQ 1:1），**永不提交**；发布捆绑需先拿作者授权（ROADMAP §9）
+- `run/saves/` 内有本地测试地图，**永不提交**。NERV 总部地图源自 Audijon2（见 `docs/ASSETS.md`），发布时署名，发布前告知作者
 - 写 `.ps1` 脚本只用 ASCII 注释：PS 5.1 把无 BOM UTF-8 当 ANSI 读，中文注释会炸解析

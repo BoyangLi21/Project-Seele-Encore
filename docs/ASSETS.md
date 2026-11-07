@@ -55,7 +55,8 @@ R10 负责人授权下载的九份 Battle Orchestra 模型与纹理仅放在 `ex
 
 | 资产 | 来源 | 状态 |
 |---|---|---|
-| NERV HQ 1:1 世界存档（`run/saves/NERV_HQ_1to1_Poodcie`） | PMC 项目 `nerv-hq`，作者 Poodcie，官方镜像下载 | 仅本地测试。**如需随 mod 公开发布，必须先取得作者授权**（ROADMAP §9 行动清单） |
+| NERV 总部地图（本机源 `external-assets/work/maps/source_nerv_command`，世界名 `Nerv Comand Module`，2025-08-15） | [Evangelion: NERV Headquarters Command Center](https://www.planetminecraft.com/project/evangelion-nerv-headquarters-command-center/)，作者 Audijon2，Planet Minecraft | 本项目已大幅改造。负责人 2026-11-07 决定：发布时署名并附原帖链接，发布前告知作者，并在地图合适位置致敬 |
+| 早期测试存档 `run/saves/NERV_HQ_1to1_Poodcie` | 另一个 PMC 项目 `nerv-hq`（`NERV_V_3_-_1.15.zip`，2026-07-06 下载，见存档内 `_SOURCE.txt`） | 仅本地测试，永不提交，不随发布分发 |
 | SmOd EVA/使徒本地参考包 | SmOd `EVANGELION: END ADDON V1.0`（Planet Minecraft / Bedrock addon），作者 SmOd774YT，未列开放许可证 | 旧版 EVA 转换结果已退出当前机体管线；仍作为使徒和造型参考保留。仅本地测试，**公开使用前必须取得作者许可** |
 | 当前 EVA-00/01/02/量产机本机身体资源 | Tigerar1 的四个 Sketchfab 模型（逐项链接见下表），CC BY-SA | `make_tiger_unit01_pack.py` 与 `make_tiger_eva_variants_pack.py` 生成到忽略目录；这是当前测试身体来源，转换美术不属于 MIT 代码许可，正式发行前必须完成完整署名与 ShareAlike 审核 |
 | 初号机/零号机通用高振动粒子刀 | [Udon-San `Progressive Knife`](https://sketchfab.com/3d-models/progressive-knife-e104dbec8c904f9b840c29c4a7d5d770)，CC Attribution | 用户下载的 FBX/贴图；3,766 三角面；由 `make_downloaded_eva_accessories_pack.py` 转换到本机包并以反握插槽使用。源文件与转换 mesh 均不入库 |

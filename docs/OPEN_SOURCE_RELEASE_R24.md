@@ -14,7 +14,7 @@
 | ACCAD、CMU、CMCD 等动作 | 各自的使用条款，见 [第三方动作声明](THIRD_PARTY_MOTION_NOTICES.md) | 保留来源、动作片段、重定向修改和许可证；逐项核对，不能因“免费动捕”而省略 |
 | 混合了非商业许可或演示包的私有动作 | 本机动作包有独立 provenance | 不直接放进通用开放素材包；确认许可或换成允许相应分发的动作 |
 | Battle Orchestra 游戏提取模型 | 目前仅本机研究和测试 | 不进公共源码、美术包或地图下载；优先用社区原创模型替换 |
-| Poodcie NERV HQ 地图及衍生存档 | 本机源地图与大量本项目修改混合；作者公开再分发许可待确认 | 联系原作者明确修改、再分发和署名范围；未确认前不公开完整存档及原始区块 |
+| Audijon2 的 NERV 总部地图及衍生存档 | [原帖](https://www.planetminecraft.com/project/evangelion-nerv-headquarters-command-center/)；本机世界在此基础上大幅改造 | 发布时署名并附原帖链接；发布前告知作者；在地图合适位置致敬 |
 | 下载的人物皮肤、军舰、武器等 | 多个作者和页面，部分缺少明确再分发许可 | 补齐具体来源与证据，无法确认的保持本机使用或重做；一项下载成功不等于获准再分发 |
 | Lux3D 生成与后续修改的 UN 模型 | 生成任务和本机处理记录 | 保留任务、服务条款与人工修改记录；不把生成参考图的第三方角色／标记权利一并视作已取得 |
 
@@ -27,18 +27,18 @@
 1. 代码：Forge 1.20.1／JDK 17 的可构建仓库、运行说明、原生回退资源和明确的已实现功能。
 2. 原创贡献素材：源文件、导出文件、许可、生成脚本、尺寸／轴向／骨骼契约；与 MIT 代码分开登记。
 3. 私有本机包：仅保留本地。公开构建和 CI 不依赖开发者磁盘上的 `run/`、`external-assets/` 或个人账户配置。
-4. 地图：在取得原作者的明确许可前，公开原创建设工具与无第三方区域的独立样板；完整衍生世界暂不列为公开下载。
+4. 地图：完整衍生世界随发布提供时，署名 Audijon2 并附原帖链接，发布前告知作者。其他第三方地图仍按各自来源处理。
 
 建议每个贡献 PR 用同一份素材说明：`作者 → 原网址 → 许可证网址／授权文件 → 原文件 SHA-256 → 修改内容 → 导出文件 → 运行截图`。来源不清的材料不能通过把文件重命名、重拓扑或重新截图来消除来源问题。
 
-## 给地图作者的询问信草稿（尚未发送）
+## 发布前给 Audijon2 的留言草稿（尚未发送）
 
-> Hello Poodcie,
+> Hi Audijon2,
 >
-> We are developing Project SEELE, a free, non-commercial, unofficial Evangelion fan mod for Minecraft Forge 1.20.1. Your NERV HQ map is being used privately as part of our development world. We have added connected city and underground transport, EVA hangars and logistics, NPC controls, and many structural and visual changes.
+> Your NERV Headquarters Command Center map was the starting point for the NERV HQ in Project SEELE, a free, open-source, non-commercial Evangelion mod for Minecraft Forge 1.20.1. You said you would love to see what people build from it, so here is a link: [release link].
 >
-> Before sharing any modified world, we would like to ask whether you permit redistribution of this derivative map, with prominent credit, a link to your original project, and a clear list of our changes. Would you also permit collaborators to modify that distributed version? Please let us know the license or conditions you prefer, and whether showcasing the modified map in a non-monetized development video is acceptable.
+> We have rebuilt and extended it a lot since then. The release credits you by name with a link to your original post, and we would like to add a small tribute to you inside the map.
 >
-> We will not claim authorship of your original work or publish the complete world without your confirmation. Thank you for considering this request.
+> If you would like anything changed about how you are credited, tell us and we will change it. Thank you for sharing the map.
 
-其他模型／皮肤作者使用同样结构，但必须替换具体作品链接和想公开的材料范围。负责人确认后再发送，不能把本草稿当作已经取得的许可。
+由负责人本人在发布前发送。其他模型／皮肤作者的询问要换成具体作品链接和想公开的材料范围，不能把草稿当作已取得的许可。
