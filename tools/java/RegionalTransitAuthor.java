@@ -170,7 +170,8 @@ public final class RegionalTransitAuthor
                     car.get("padding1").getAsDouble(),car.get("padding2").getAsDouble()));
             }
             siding.setVehicleCars(cars);siding.setName(key+" 車庫");siding.setMaxVehicles(integer(j,"trains",1));siding.setIsManual(false);metadata.addSiding(siding);
-            if(mode==TransportMode.AIRPLANE){siding.setDelayedVehicleReduceDwellTimePercentage(0);siding.setEarlyVehicleIncreaseDwellTime(false);}
+            // An early train otherwise holds at a platform for its timetable slot, keeping the block ahead shut.
+            if(mode==TransportMode.AIRPLANE||bool(j,"steady",false)){siding.setDelayedVehicleReduceDwellTimePercentage(0);siding.setEarlyVehicleIncreaseDwellTime(false);}
             JsonObject sidingJson=json(siding);JsonObject p1=sidingJson.getAsJsonObject("position1"),p2=sidingJson.getAsJsonObject("position2");
             Depot depot=new Depot(mode,simulator);depot.setName(j.get("name").getAsString()+" 運転所");depot.setColor(route.getColor());
             depot.setCorners(new Position(Math.min(p1.get("x").getAsLong(),p2.get("x").getAsLong())-8,p1.get("y").getAsLong()-4,Math.min(p1.get("z").getAsLong(),p2.get("z").getAsLong())-8),
@@ -237,6 +238,7 @@ public final class RegionalTransitAuthor
             Siding siding=simulator.sidings.stream().filter(s->s.getId()==j.get("siding_id").getAsLong()).findFirst().orElseThrow();
             if(j.has("cruise"))depot.setCruisingAltitude(j.get("cruise").getAsInt());
             if(j.has("trains"))siding.setMaxVehicles(j.get("trains").getAsInt());
+            if(bool(j,"steady",false)){siding.setDelayedVehicleReduceDwellTimePercentage(0);siding.setEarlyVehicleIncreaseDwellTime(false);}
             if(j.has("repeat"))depot.setRepeatInfinitely(j.get("repeat").getAsBoolean());
             if(j.has("dwell_platform_ids"))
             {

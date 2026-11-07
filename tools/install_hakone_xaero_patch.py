@@ -6,9 +6,13 @@ from apply_s20_approved_semantic_repairs import atomic_replace
 from xaero_cache_codec import Cache
 
 def install(a):
-    m=json.loads((a.stage/'manifest.json').read_text('utf8'));r=json.loads(a.installation.read_text('utf8'))
-    if r.get('status')!='installed'or not r.get('changed_section_readback'):raise ValueError('Read-back map installation required')
-    if m['errors']or not {Path(c).resolve()for c in m['candidates']}<={Path(c).resolve()for c in r['candidates']}:raise ValueError('Xaero input is not the installed map batch')
+    m=json.loads((a.stage/'manifest.json').read_text('utf8'));installed=set()
+    # One staging may cover several installed batches; each must be read back.
+    for path in a.installation:
+        r=json.loads(path.read_text('utf8'))
+        if r.get('status')!='installed'or not r.get('changed_section_readback'):raise ValueError('Read-back map installation required',str(path))
+        installed|={Path(c).resolve()for c in r['candidates']}
+    if m['errors']or not {Path(c).resolve()for c in m['candidates']}<=installed:raise ValueError('Xaero input is not the installed map batch')
     root=Path(m['cache_root']).resolve();client=a.world.resolve().parent.parent
     if not root.is_relative_to(client/'xaero'/'world-map'):raise ValueError('Cache target is outside the actual client')
     a.out.mkdir(parents=True,exist_ok=False);written=[]
@@ -34,10 +38,11 @@ def install(a):
                 if rel.as_posix()in m.get('new_files',[]):(root/rel).unlink()
                 else:atomic_replace(root/rel,(a.out/'original'/rel).read_bytes())
             raise
-    result=dict(status='installed',world=str(a.world),stage=str(a.stage),map_installation=str(a.installation),files=len(written),surface_pixels=m['pixels'],leaf_tiles=m['leaf_tiles'],all_zoom_tiles=m['all_zoom_tiles'],readback=True,waypoints_untouched=True,manual_reload_required=False,game_ui_verification=False)
+    result=dict(status='installed',world=str(a.world),stage=str(a.stage),map_installation=[str(p)for p in a.installation],files=len(written),surface_pixels=m['pixels'],leaf_tiles=m['leaf_tiles'],all_zoom_tiles=m['all_zoom_tiles'],readback=True,waypoints_untouched=True,manual_reload_required=False,game_ui_verification=False)
     (a.out/'installation.json').write_text(json.dumps(result,ensure_ascii=False,indent=2),'utf8');print(json.dumps(result),flush=True)
 
 if __name__=='__main__':
     p=argparse.ArgumentParser(__doc__)
-    for n in ('world','stage','installation','out'):p.add_argument('--'+n,type=Path,required=True)
+    for n in ('world','stage','out'):p.add_argument('--'+n,type=Path,required=True)
+    p.add_argument('--installation',type=Path,action='append',required=True)
     install(p.parse_args())
