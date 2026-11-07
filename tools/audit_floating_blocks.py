@@ -3,6 +3,7 @@
 Reads only. A group is floating when it touches neither the bottom of the world nor
 a region edge or unfinished chunk, so a group cut by a region edge is left out rather
 than guessed at. Groups are reported with their size, bounds and materials for review.
+Soil and plant groups carry their cells: built ones may be meant to hang, these never are.
 """
 import argparse
 from collections import Counter
@@ -14,12 +15,17 @@ import re
 import numpy as np
 from scipy.ndimage import find_objects, label
 
+from plan_ashi_landscape_r54 import PLANTS, SOIL
 from query_blocks import AIR, chunk_statuses, iter_selected_sections
 
 DIM = 'projectseele:geofront'
-Y0, HEIGHT, SECTIONS = -128, 448, range(-8, 20)
+Y0, HEIGHT, SECTIONS, SURFACE = -128, 448, range(-8, 20), -100
 LOOSE = AIR | {'minecraft:water', 'minecraft:lava', 'minecraft:light', 'minecraft:bubble_column', 'minecraft:seagrass', 'minecraft:tall_seagrass',
                'minecraft:kelp', 'minecraft:kelp_plant', 'minecraft:grass', 'minecraft:tall_grass', 'minecraft:fern', 'minecraft:large_fern'}
+
+
+def natural(name):
+    return name in SOIL or name in PLANTS or name.endswith(('_leaves', '_log')) or name == 'minecraft:stone'
 
 
 def scan(job):
@@ -64,13 +70,43 @@ def scan(job):
             continue
         mask = labels[box] == index
         materials = Counter(palette_names[i] for i in names[box][mask].tolist())
-        rows.append(dict(size=int(sizes[index]), bounds=[box[2].start + rx * 512, box[0].start + Y0, box[1].start + rz * 512, box[2].stop - 1 + rx * 512, box[0].stop - 1 + Y0, box[1].stop - 1 + rz * 512],
-                         materials=materials.most_common(4)))
+        row = dict(size=int(sizes[index]), bounds=[box[2].start + rx * 512, box[0].start + Y0, box[1].start + rz * 512, box[2].stop - 1 + rx * 512, box[0].stop - 1 + Y0, box[1].stop - 1 + rz * 512],
+                   materials=materials.most_common(4))
+        if box[0].stop + Y0 >= SURFACE and all(natural(name) for name in materials):
+            cells = np.argwhere(mask) + [box[0].start, box[1].start, box[2].start]
+            row['cells'] = [[int(x) + rx * 512, int(y) + Y0, int(z) + rz * 512] for y, z, x in cells.tolist()]
+        rows.append(row)
     return rows
 
 
+def clear(a):
+    """Cell patch removing the reported soil and plant groups that lie inside one capture."""
+    from plan_station_access_corridor import CapturedSurface
+    spec = json.loads(a.clear.read_text('utf8'))
+    source = CapturedSurface(spec['source'], partial=True)
+    x0, z0, x1, z1 = source.bounds
+    rows, groups = [], 0
+    for group in json.loads(Path(spec['report']).read_text('utf8'))['rows']:
+        cells = group.get('cells', ())
+        if not cells or min(c[0] for c in cells) < x0 or max(c[0] for c in cells) > x1 or min(c[2] for c in cells) < z0 or max(c[2] for c in cells) > z1:
+            continue
+        if group['bounds'][0] in spec.get('keep_x', ()):
+            continue
+        groups += 1
+        rows += [dict(pos=c, before=source.state(*c), after='minecraft:air', purpose='floating natural block') for c in cells if source.state(*c).split('[')[0] not in AIR]
+    a.out.mkdir(parents=True, exist_ok=True)
+    (a.out / 'floating-check.json').write_text(json.dumps(dict(errors=[], groups=groups, cells=len(rows)), ensure_ascii=False), 'utf8')
+    (a.out / 'patch.json').write_text(json.dumps(dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'], edits=rows, native_snapshot=spec['native_snapshot'],
+        error_reports=[str(a.out / 'floating-check.json')], views_reviewed_by_root=False, continuation_work=spec['continuation_work']), ensure_ascii=False, indent=1), 'utf8')
+    print('groups', groups, 'cells', len(rows))
+
+
 def main(a):
+    if a.clear:
+        return clear(a)
     regions = sorted({tuple(map(int, re.match(r'r\.(-?\d+)\.(-?\d+)\.mca', p.name).groups())) for p in (a.world / 'dimensions/projectseele/geofront/region').glob('r.*.mca')})
+    if a.only:
+        regions = sorted({(r['bounds'][0] >> 9, r['bounds'][2] >> 9) for r in json.loads(a.only.read_text('utf8'))['rows'] if a.deep or r['bounds'][4] >= 40 or r['bounds'][0] >= 1200} & set(regions))
     print('regions', len(regions), flush=True)
     rows = []
     with Pool(a.workers) as pool:
@@ -85,7 +121,10 @@ def main(a):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('--world', type=Path, required=True)
+    parser.add_argument('--world', type=Path)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--workers', type=int, default=3)
+    parser.add_argument('--only', type=Path, help='Rescan just the regions of an earlier report')
+    parser.add_argument('--clear', type=Path, help='Config for a cell patch that removes reported natural groups')
+    parser.add_argument('--deep', action='store_true', help='With --only, include underground groups')
     main(parser.parse_args())

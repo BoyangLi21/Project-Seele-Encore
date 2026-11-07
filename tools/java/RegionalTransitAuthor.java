@@ -169,7 +169,7 @@ public final class RegionalTransitAuthor
                     car.get("length").getAsDouble(),car.get("width").getAsDouble(),car.get("bogie1").getAsDouble(),car.get("bogie2").getAsDouble(),
                     car.get("padding1").getAsDouble(),car.get("padding2").getAsDouble()));
             }
-            siding.setVehicleCars(cars);siding.setName(key+" 車庫");siding.setMaxVehicles(1);siding.setIsManual(false);metadata.addSiding(siding);
+            siding.setVehicleCars(cars);siding.setName(key+" 車庫");siding.setMaxVehicles(integer(j,"trains",1));siding.setIsManual(false);metadata.addSiding(siding);
             if(mode==TransportMode.AIRPLANE){siding.setDelayedVehicleReduceDwellTimePercentage(0);siding.setEarlyVehicleIncreaseDwellTime(false);}
             JsonObject sidingJson=json(siding);JsonObject p1=sidingJson.getAsJsonObject("position1"),p2=sidingJson.getAsJsonObject("position2");
             Depot depot=new Depot(mode,simulator);depot.setName(j.get("name").getAsString()+" 運転所");depot.setColor(route.getColor());
@@ -180,13 +180,20 @@ public final class RegionalTransitAuthor
             metadata.addRoute(route).addDepot(depot);depots.add(depot);depotKeys.put(depot,key);lineSidings.put(key,siding);
             JsonObject ids=new JsonObject();ids.addProperty("line",key);ids.addProperty("route_id",route.getId());ids.addProperty("depot_id",depot.getId());ids.addProperty("siding_id",siding.getId());lineIds.add(ids);
         }
-        // Rails carry one train each: MTR has no single-line token, so opposed trains meet and stop for good.
+        // An uncoloured rail carries one train: opposed trains meet head-on and stop for good. Colour single-line sections (signals below).
         if(plan.has("extend_routes"))for(JsonElement e:plan.getAsJsonArray("extend_routes"))
         {
             JsonObject j=e.getAsJsonObject();
             Route route=simulator.routes.stream().filter(r->r.getId()==j.get("route_id").getAsLong()).findFirst().orElseThrow();
             oldRoutes.remove(route.getHexId());route.getRoutePlatforms().clear();
-            for(JsonElement id:j.getAsJsonArray("platforms"))route.getRoutePlatforms().add(new RoutePlatformData(id.getAsLong()));
+            if(j.has("name"))route.setName(j.get("name").getAsString());
+            for(JsonElement id:j.getAsJsonArray("platforms"))
+            {
+                Platform added=platforms.get(id.getAsString());
+                if(added==null){route.getRoutePlatforms().add(new RoutePlatformData(id.getAsLong()));continue;}
+                added.setName(str(j,"platform_name","2"));added.setDwellTime(integer(j,"dwell",12000));metadata.addPlatform(added);
+                route.getRoutePlatforms().add(new RoutePlatformData(added.getId()));
+            }
             metadata.addRoute(route);
         }
         if(plan.has("disable_depots"))for(JsonElement e:plan.getAsJsonArray("disable_depots"))
@@ -199,6 +206,17 @@ public final class RegionalTransitAuthor
             metadata.addDepot(depot);
         }
         metadata.update();simulator.sync();
+        // A colour joins rails into one block: a train holding any of them stops the rest at its edge.
+        if(plan.has("signals"))for(JsonElement e:plan.getAsJsonArray("signals"))
+        {
+            JsonObject j=e.getAsJsonObject();
+            List<Rail> found=simulator.rails.stream().filter(r->endpoints(r,j)).toList();
+            if(found.size()!=1)throw new IllegalStateException("Signal rail is not unique "+j);
+            SignalModification modification=new SignalModification(pos(j.getAsJsonArray("from")),pos(j.getAsJsonArray("to")),false);
+            modification.putColorToAdd(j.get("color").getAsInt());
+            found.get(0).applyModification(modification);
+            oldRails.remove(found.get(0).getHexId());
+        }
         // UpdateDataRequest owns canonical runtime instances. New depot DTOs
         // do not carry the synchronized savedRails association; generating
         // those detached objects creates a route but never dispatches a train.
@@ -218,6 +236,7 @@ public final class RegionalTransitAuthor
             Depot depot=simulator.depots.stream().filter(d->d.getId()==j.get("depot_id").getAsLong()).findFirst().orElseThrow();
             Siding siding=simulator.sidings.stream().filter(s->s.getId()==j.get("siding_id").getAsLong()).findFirst().orElseThrow();
             if(j.has("cruise"))depot.setCruisingAltitude(j.get("cruise").getAsInt());
+            if(j.has("trains"))siding.setMaxVehicles(j.get("trains").getAsInt());
             if(j.has("repeat"))depot.setRepeatInfinitely(j.get("repeat").getAsBoolean());
             if(j.has("dwell_platform_ids"))
             {

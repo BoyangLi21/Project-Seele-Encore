@@ -131,21 +131,30 @@ def swap(a):
     require(state['latest_installed_batch'] == a.batch - 1, 'Stale release batch')
     root = Path(spec['replacements'])
     names = sorted(path.relative_to(root / 'after').as_posix() for path in (root / 'after').rglob('*') if path.is_file())
+    removed = spec.get('remove', [])
     with stopped_world(a.world):
-        for name in names:
-            require((a.world / name).read_bytes() == (root / 'before' / name).read_bytes(), ('Native member changed since staging', name))
+        for name in names + removed:
+            kept = root / 'before' / name
+            if kept.exists():
+                require((a.world / name).read_bytes() == kept.read_bytes(), ('Native member changed since staging', name))
+            else:
+                require(not (a.world / name).exists(), ('New member already exists', name))
         a.installation.parent.mkdir(parents=True, exist_ok=False)
+        for name in names + removed:
+            if (a.world / name).exists():
+                backup = a.installation.parent / 'original' / name
+                backup.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(a.world / name, backup)
         for name in names:
-            backup = a.installation.parent / 'original' / name
-            backup.parent.mkdir(parents=True, exist_ok=True)
-            shutil.copy2(a.world / name, backup)
-        for name in names:
+            (a.world / name).parent.mkdir(parents=True, exist_ok=True)
             temporary = (a.world / name).with_suffix('.swap')
             shutil.copy2(root / 'after' / name, temporary)
             os.replace(temporary, a.world / name)
+        for name in removed:
+            (a.world / name).unlink()
         for name in names:
             require((a.world / name).read_bytes() == (root / 'after' / name).read_bytes(), ('Member readback failed', name))
-    write(a.installation, dict(status='installed', members=names, batch=a.batch))
+    write(a.installation, dict(status='installed', members=names, removed=removed, batch=a.batch))
     state.update(latest_installed_batch=a.batch, current_work=spec['continuation_work'])
     write(a.continuation, state)
     print('Replaced', len(names), 'native members as batch', a.batch)

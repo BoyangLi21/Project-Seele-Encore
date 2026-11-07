@@ -207,7 +207,7 @@ def native(a):
     (work / 'classes').mkdir(parents=True)
     staging, out = work / 'native', work / 'output'
     shutil.copytree(spec['native_snapshot'], staging)
-    plan = {key: spec[key] for key in ('rails', 'stations', 'lines', 'warmup_seconds', 'extend_routes', 'regenerate_depots', 'disable_depots') if key in spec}
+    plan = {key: spec[key] for key in ('rails', 'stations', 'lines', 'warmup_seconds', 'extend_routes', 'regenerate_depots', 'disable_depots', 'signals', 'retire_rails') if key in spec}
     plan['commission_clock'] = True
     write(work / 'plan.json', plan)
     options = argparse.Namespace(work=work, mtr=a.mtr, java=a.java)
@@ -218,9 +218,19 @@ def native(a):
     before, after = inventory(Path(spec['native_snapshot'])), inventory(staging)
     # Staged trains keep moving, so sidings and the clock differ; neither is delivered.
     replaced = set(spec.get('replace_members', ()))
+    if spec.get('signals') or spec.get('retire_rails'):
+        # A block touches many rails; each one travels as a whole member.
+        replaced |= {k for k in before if k in after and after[k] != before[k] and Path(k).parts[2] == 'rails'}
     changed = sorted(k for k in before if k in after and after[k] != before[k] and k not in replaced
                      and Path(k).parts[2] not in ('settings', 'sidings'))
-    gone = sorted(set(before) - set(after))
+    retired = sorted(set(before) - set(after))
+    gone = [k for k in retired if Path(k).parts[2] != 'rails' or not spec.get('retire_rails')]
+    write(a.out / 'retired-members.json', [k for k in retired if k not in gone])
+    # A retired rail keeps its staged copy so the release can prove the world still holds it.
+    for name in (k for k in retired if k not in gone):
+        target = a.out / 'replacements/before' / 'mtr' / name
+        target.parent.mkdir(parents=True, exist_ok=True)
+        shutil.copy2(Path(spec['native_snapshot']) / name, target)
     for name in replaced:
         for folder, root in (('replacements/before', Path(spec['native_snapshot'])), ('replacements/after', staging)):
             target = a.out / folder / 'mtr' / name
@@ -365,6 +375,9 @@ def edits(a):
     sample_block = bed_heights(points[:, 1])[0]
     wet_samples = water_mask(spec['features'], spec, shapely.points(points[:, [0, 2]]), (bx, bz, bX, bZ))
     bridge_samples = mapped_bridges(spec['features'], shapely.points(points[:, [0, 2]]), (bx, bz, bX, bZ))
+    # A road cut under a new track has no survey record; the config names it.
+    for a0, c0, a1, c1 in spec.get('extra_bridges', ()):
+        bridge_samples |= (points[:, 0] >= a0) & (points[:, 0] <= a1) & (points[:, 2] >= c0) & (points[:, 2] <= c1)
     carried, piered = np.zeros(len(points), bool), np.zeros(len(points), bool)
     for start, stop in zip(np.r_[0, rail_ends[:-1]], rail_ends):
         carried[start:stop], piered[start:stop] = spans(points[start:stop], ground[start:stop], sample_block[start:stop], wet_samples[start:stop], bridge_samples[start:stop], spec)
@@ -375,10 +388,16 @@ def edits(a):
     # Deep ground stays in place over a lined tunnel instead of opening a trench.
     in_tunnel = (ground - sample_block >= spec.get('tunnel_depth', 7))[nearest].reshape(xx.shape)
     active = (target != original) & (d <= spec.get('earthwork_reach', 10)) & ~bed & ~spanned & ~public & ~in_tunnel & full
+    if existing is not None:
+        # A track laid beside a line leaves that line's bed and clearance as they are.
+        active &= existing.query(np.c_[xx.ravel() + .5, zz.ravel() + .5])[0].reshape(xx.shape) >= CLEAR_RADIUS
     writes, purposes, skipped, blocked = {}, {}, Counter(), []
+    def razed(x, y, z):
+        # Named walls come down for a widened cut; nothing else built may be touched.
+        return any(b[0] <= x <= b[3] and b[1] <= y <= b[4] and b[2] <= z <= b[5] for b in spec.get('raze', ()))
     def put(x, y, z, state, purpose):
         before = source.state(x, y, z)
-        if before.split('[')[0] not in NATURAL and not before.split('[')[0].endswith(TREE) and before != HALF:
+        if before.split('[')[0] not in NATURAL and not before.split('[')[0].endswith(TREE) and before != HALF and not razed(x, y, z):
             skipped[before.split('[')[0]] += 1
             return
         if before != state:
@@ -416,18 +435,26 @@ def edits(a):
                         continue
                     for y in range(int(original[iz, ix]) - 1, int(sample_block[i]) - 1):
                         put(x, y, z, DECK, 'viaduct pier')
+    def floor_of(iz, ix):
+        # Where the tracks merge, the other line's half-block ballast sits at rail height.
+        base = int(block[iz, ix]) + (2 if half[iz, ix] else 1)
+        if existing is not None:
+            gap, i_ = existing.query([int(xx[iz, ix]) + .5, int(zz[iz, ix]) + .5])
+            if gap < BED_RADIUS:
+                base = max(base, math.ceil(existing_heights[i_]) + 1)
+        return base
     for iz, ix in np.argwhere(clear):
         x, z = int(xx[iz, ix]), int(zz[iz, ix])
         if not full[iz, ix]:
             if body[iz, ix]:
                 blocked.append([x, 0, z])
             continue
-        base = int(block[iz, ix]) + (2 if half[iz, ix] else 1)
+        base = floor_of(iz, ix)
         for y in range(base, base + TUNNEL_HEIGHT):
             before = source.state(x, y, z)
             if before.split('[')[0] in AIR or (x, y, z) in writes:
                 continue
-            if before.split('[')[0] in NATURAL or before.split('[')[0].endswith(TREE) or before == HALF:
+            if before.split('[')[0] in NATURAL or before.split('[')[0].endswith(TREE) or before == HALF or razed(x, y, z):
                 put(x, y, z, 'minecraft:air', 'track clearance')
             elif body[iz, ix] and not public[iz, ix] and not station[iz, ix]:
                 blocked.append([x, y, z])
@@ -448,7 +475,7 @@ def edits(a):
     # Platform edges sit inside this radius by design; the real model sweep owns stations.
     for iz, ix in np.argwhere(body & full & ~public & ~station):
         px, pz = int(xx[iz, ix]), int(zz[iz, ix])
-        base = int(block[iz, ix]) + (2 if half[iz, ix] else 1)
+        base = floor_of(iz, ix)
         for y in range(base, base + math.ceil(BODY_HEIGHT)):
             if state(px, y, pz).split('[')[0] not in AIR and state(px, y, pz).split('[')[0] not in PLANTS:
                 solid_in_body.append([px, y, pz, state(px, y, pz)[:40]])
@@ -654,9 +681,85 @@ def edges(a):
         raise SystemExit(1)
 
 
+def platform(a):
+    """A new platform beside a new track, and any small changes that open a way to it."""
+    spec = read(a.config)
+    source = CapturedSurface(spec['source'], partial=True)
+    patch = read(a.out / 'patch.json')
+    if patch['source'] != spec['source']:
+        raise ValueError('Bed and platform must share one capture')
+    rows = {tuple(r['pos']): r for r in patch['edits']}
+    errors, report = [], []
+    open_ground = {*NATURAL, *AIR, *PLANTS}
+    def put(cell, state, purpose, foreign=False):
+        before = source.state(*cell)
+        if before == state:
+            return
+        if not foreign and before.split('[')[0] not in open_ground and not before.split('[')[0].endswith(TREE):
+            errors.append(['Platform meets a built block', list(cell), before])
+        rows[cell] = dict(pos=list(cell), before=before, after=state, purpose=purpose)
+    for item in spec['new_platforms']:
+        p, q = item['from'], item['to']
+        y = p[1]
+        start = np.array([p[0] + .5, p[2] + .5])
+        delta = np.array([q[0] + .5, q[2] + .5]) - start
+        length = float(np.linalg.norm(delta))
+        along = delta / length
+        out = np.array([-along[1], along[0]]) * item['side']
+        clearance, width = item.get('clearance', spec.get('platform_clearance', 1.35)), item.get('width', 3.5)
+        low = np.minimum(start, start + delta) - width - clearance - 3
+        high = np.maximum(start, start + delta) + width + clearance + 3
+        triggers = set()
+        for x in range(math.floor(low[0]), math.ceil(high[0])):
+            for z in range(math.floor(low[1]), math.ceil(high[1])):
+                corners = np.array([[x + i, z + j] for i in (0, 1) for j in (0, 1)]) - start
+                lateral = corners @ out
+                # A diagonal end crosses cells; each cell belongs to the side its centre is on.
+                run = (np.array([x + .5, z + .5]) - start) @ along
+                if lateral.min() < clearance or lateral.max() > clearance + width:
+                    continue
+                for end, past in (('from', -run), ('to', run - length)):
+                    if end in item.get('steps', ()) and 0 < past <= 1.6:
+                        put((x, y, z), 'minecraft:smooth_stone_slab[type=bottom,waterlogged=false]', 'platform end step')
+                if run < 0 or run > length:
+                    continue
+                edge = lateral.min() < clearance + 1
+                rim = lateral.max() > clearance + width - 1 or any(end not in item.get('steps', ()) and gap < 1 for end, gap in (('from', run), ('to', length - run)))
+                put((x, y, z), 'minecraft:yellow_concrete' if edge else 'minecraft:stone_bricks' if rim else 'minecraft:smooth_stone', 'platform floor')
+                put((x, y - 1, z), DOOR_TRIGGER if edge else DECK, 'platform door trigger' if edge else 'platform body')
+                if edge:
+                    triggers.add((x, y - 1, z))
+                if rim and not edge:
+                    put((x, y + 1, z), 'minecraft:light_gray_stained_glass', 'platform fence')
+                level = y - 2
+                while source.state(x, level, z).split('[')[0] in AIR or source.state(x, level, z).split('[')[0] in PLANTS:
+                    put((x, level, z), DECK, 'platform body')
+                    level -= 1
+                for level in range(y + 2 if rim and not edge else y + 1, y + 4):
+                    if source.state(x, level, z).split('[')[0] not in AIR:
+                        put((x, level, z), 'minecraft:air', 'platform clearance')
+        span = spec.get('door_half_span', DOOR_HALF_SPAN)
+        stops = np.arange(span, length - span, .5)
+        near = sum(any(c in triggers for c in door_scan(start + along * s, along, out, y, span)) for s in stops)
+        far = sum(any(c in triggers for c in door_scan(start + along * s, along, -out, y, span)) for s in stops)
+        if near != len(stops) or far:
+            errors.append(['Door reach', p, near, len(stops), far])
+        report.append(dict(position=p, length=length, triggers=len(triggers), doors_checked=len(stops), doors_in_reach=near, far_side_in_reach=far))
+    for item in spec.get('access_edits', ()):
+        put(tuple(item['pos']), item['after'], 'platform access', foreign=True)
+    check = dict(errors=errors[:20], cells=len(rows) - len(patch['edits']), platforms=report, world_written=False)
+    write(a.out / 'platform-check.json', check)
+    patch['edits'] = [rows[c] for c in sorted(rows)]
+    patch['error_reports'] = sorted({*patch['error_reports'], str(a.out / 'platform-check.json')})
+    write(a.out / 'patch.json', patch)
+    print(json.dumps(dict(cells=check['cells'], platforms=report, errors=errors[:3]), ensure_ascii=False))
+    if errors:
+        raise SystemExit(1)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('fit', 'native', 'edits', 'doors', 'edges'))
+    parser.add_argument('mode', choices=('fit', 'native', 'edits', 'doors', 'edges', 'platform'))
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--java', type=Path)
