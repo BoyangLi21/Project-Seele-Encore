@@ -202,13 +202,6 @@ public final class LocalMapAssetLoader
         set(level, marker.east(), Blocks.LODESTONE.defaultBlockState());
     }
 
-    public static boolean importedTokyo3MarkerPresent(BlockGetter level,
-                                                      BlockPos origin)
-    {
-        BlockPos marker = origin.offset(TOKYO3_IMPORT_MARKER);
-        return level.getBlockState(marker).is(Blocks.NETHERITE_BLOCK)
-                && level.getBlockState(marker.east()).is(Blocks.LODESTONE);
-    }
 
     public static boolean placeCommandModule(ServerLevel level,
                                              BlockPos geoFrontOrigin)

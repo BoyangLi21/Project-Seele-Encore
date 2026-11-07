@@ -15,7 +15,6 @@ import com.mojang.blaze3d.vertex.PoseStack;
 import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.mojang.math.Axis;
 import com.projectseele.ProjectSeele;
-import com.projectseele.client.visual.VisualCaptureManager;
 import com.projectseele.config.SeeleConfig;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.network.ClientboundPilotStatusPacket;
@@ -220,7 +219,6 @@ public final class EvaCommandFeedClient
                 || !captureDemanded
                 || minecraft.player == null || minecraft.level == null
                 || minecraft.screen != null
-                || VisualCaptureManager.isSuppressingGui()
                 || eva == null
                 || eva.isExperimentalUnit()
                 || EvaPilotResolver.pilot(eva) != minecraft.player
@@ -604,14 +602,6 @@ public final class EvaCommandFeedClient
 
 
 
-    public static boolean hasFreshFrame(int variant)
-    {
-        return variant >= EvaUnit01Entity.UNIT_00
-                && variant <= EvaUnit01Entity.UNIT_02
-                && TEXTURES[variant] != null
-                && System.nanoTime() - LAST_FRAME_NANOS[variant]
-                        <= FRAME_STALE_NANOS;
-    }
 
     @SubscribeEvent
     public static void onRenderLevelStage(RenderLevelStageEvent event)

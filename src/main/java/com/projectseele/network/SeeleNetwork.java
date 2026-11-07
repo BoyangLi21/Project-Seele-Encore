@@ -78,36 +78,6 @@ public final class SeeleNetwork
                 .decoder(ClientboundThirdImpactPacket::new)
                 .consumerMainThread(ClientboundThirdImpactPacket::handle)
                 .add();
-        CHANNEL.messageBuilder(ClientboundVisualCapturePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(ClientboundVisualCapturePacket::encode)
-                .decoder(ClientboundVisualCapturePacket::new)
-                .consumerMainThread(ClientboundVisualCapturePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(ClientboundSiloCapturePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(ClientboundSiloCapturePacket::encode)
-                .decoder(ClientboundSiloCapturePacket::new)
-                .consumerMainThread(ClientboundSiloCapturePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(ClientboundTokyo3CapturePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(ClientboundTokyo3CapturePacket::encode)
-                .decoder(ClientboundTokyo3CapturePacket::new)
-                .consumerMainThread(ClientboundTokyo3CapturePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(ClientboundGeoFrontCapturePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(ClientboundGeoFrontCapturePacket::encode)
-                .decoder(ClientboundGeoFrontCapturePacket::new)
-                .consumerMainThread(ClientboundGeoFrontCapturePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(ClientboundS20CapturePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(ClientboundS20CapturePacket::encode)
-                .decoder(ClientboundS20CapturePacket::new)
-                .consumerMainThread(ClientboundS20CapturePacket::handle)
-                .add();
-        CHANNEL.messageBuilder(ClientboundGeoFrontSortieCapturePacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
-                .encoder(ClientboundGeoFrontSortieCapturePacket::encode)
-                .decoder(ClientboundGeoFrontSortieCapturePacket::new)
-                .consumerMainThread(ClientboundGeoFrontSortieCapturePacket::handle)
-                .add();
         CHANNEL.messageBuilder(ClientboundEvaArrivalSyncPacket.class, id++, NetworkDirection.PLAY_TO_CLIENT)
                 .encoder(ClientboundEvaArrivalSyncPacket::encode)
                 .decoder(ClientboundEvaArrivalSyncPacket::new)
@@ -122,11 +92,6 @@ public final class SeeleNetwork
                 .encoder(ServerboundEntryPlugPacket::encode)
                 .decoder(ServerboundEntryPlugPacket::new)
                 .consumerMainThread(ServerboundEntryPlugPacket::handle)
-                .add();
-        CHANNEL.messageBuilder(ServerboundGeoFrontCameraPacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
-                .encoder(ServerboundGeoFrontCameraPacket::encode)
-                .decoder(ServerboundGeoFrontCameraPacket::new)
-                .consumerMainThread(ServerboundGeoFrontCameraPacket::handle)
                 .add();
         CHANNEL.messageBuilder(ServerboundEvaVideoFramePacket.class, id++, NetworkDirection.PLAY_TO_SERVER)
                 .encoder(ServerboundEvaVideoFramePacket::encode)

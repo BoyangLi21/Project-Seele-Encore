@@ -2,7 +2,6 @@ package com.projectseele.client;
 
 import com.projectseele.ProjectSeele;
 import com.mojang.math.Axis;
-import com.projectseele.client.visual.VisualCaptureManager;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.EvaScale;
 import com.projectseele.entity.EntryPlugCarrierEntity;
@@ -648,11 +647,6 @@ public final class ClientForgeEvents
     @SubscribeEvent
     public static void onRenderGuiOverlay(RenderGuiOverlayEvent.Pre event)
     {
-        if (VisualCaptureManager.isSuppressingGui())
-        {
-            event.setCanceled(true);
-            return;
-        }
         Minecraft minecraft = Minecraft.getInstance();
         EvaUnit01Entity eva = ridden(minecraft.player);
         boolean insideExternalPlug = minecraft.player != null

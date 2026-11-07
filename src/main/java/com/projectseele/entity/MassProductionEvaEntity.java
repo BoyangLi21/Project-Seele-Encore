@@ -207,18 +207,6 @@ public class MassProductionEvaEntity extends Monster implements GeoEntity
                 Mth.clamp(pose, VISUAL_NORMAL, VISUAL_RITUAL));
     }
 
-    public static String visualPoseName(int pose)
-    {
-        return switch (pose)
-        {
-            case VISUAL_IDLE -> "idle";
-            case VISUAL_MOVE -> "move";
-            case VISUAL_ATTACK -> "attack";
-            case VISUAL_REVIVE -> "revive";
-            case VISUAL_RITUAL -> "ritual";
-            default -> "normal";
-        };
-    }
 
     private int getReviveTicks()
     {

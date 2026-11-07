@@ -587,20 +587,8 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         };
     }
 
-    public static ResourceLocation positronMeshResource()
-    {
-        return POSITRON_MESH;
-    }
 
-    public static ResourceLocation rifleMeshResource()
-    {
-        return RIFLE_MESH;
-    }
 
-    public static ResourceLocation n2MeshResource()
-    {
-        return N2_MESH;
-    }
 
     public static ResourceLocation knifeMeshResource(EvaUnit01Entity entity)
     {
@@ -630,15 +618,6 @@ public class EvaUnit01Renderer extends GeoEntityRenderer<EvaUnit01Entity>
         return LONGINUS_TEXTURE;
     }
 
-    public static LocalVisualAssetFingerprint.Fingerprint visualFingerprintForVariant(int variant)
-    {
-        return LocalVisualAssetFingerprint.inspect(switch (variant)
-        {
-            case EvaUnit01Entity.UNIT_00 -> "eva_unit00";
-            case EvaUnit01Entity.UNIT_02 -> "eva_unit02";
-            default -> "eva_unit01";
-        });
-    }
 
     private boolean shouldRenderBodyMesh(EvaUnit01Entity entity, GeoBone bone)
     {

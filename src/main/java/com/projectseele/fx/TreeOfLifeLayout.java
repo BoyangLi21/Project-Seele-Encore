@@ -76,9 +76,4 @@ public final class TreeOfLifeLayout
         return -(float) Math.toDegrees(yawRad);
     }
 
-    /** Unit vector from the tree plane toward its intended audience/camera. */
-    public static Vec3 frontNormal(float yawRad)
-    {
-        return new Vec3(Math.sin(yawRad), 0.0D, Math.cos(yawRad));
-    }
 }

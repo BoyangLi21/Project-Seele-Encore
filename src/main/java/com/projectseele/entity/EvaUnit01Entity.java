@@ -3591,7 +3591,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.legacyRecoveryInputsR51.put(queue,new RecoveryStrikeInputR51(pilot.getUUID(),this.getWeapon(),
                 this.isPilotProne()?3:this.isPilotCrouching()?1:0,this.recoveryInputStampR51(),
                 this.level().getGameTime()+windowTicks,System.nanoTime()+windowTicks*50_000_000L));
-        if(windowTicks>RECOVERY_INPUT_BUFFER_TICKS_R51&&(Boolean.getBoolean("projectseele.visualCapture")||this.getTags().contains("seele_ordinary_motion_r52")))
+        if(windowTicks>RECOVERY_INPUT_BUFFER_TICKS_R51&&this.getTags().contains("seele_ordinary_motion_r52"))
             ProjectSeele.LOGGER.info("EVA knife recovery buffered: eva={} tick={} queue={} meleeCooldown={} smashCooldown={} window={} sequence={}",
                     this.getStringUUID(),this.level().getGameTime(),queue,this.meleeCooldown,this.smashCooldown,windowTicks,this.recoveryInputStampR51());
         return true;

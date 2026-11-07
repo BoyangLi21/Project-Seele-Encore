@@ -81,18 +81,6 @@ public final class ThirdImpactDirector
         return true;
     }
 
-    /** Development visual-lab entry: materialise the complete tableau now. */
-    public static void startVisualPreview(ServerLevel level, Vec3 origin, float yaw, boolean hasUnit)
-    {
-        cleanupVisualPreview(level);
-        Impact impact = new Impact(level, origin, yaw, hasUnit, false);
-        impact.ticks = 300;
-        deployVessels(impact);
-        auditTableau(impact, "visual-preview");
-        ACTIVE.add(impact);
-        sendTreeToDimension(impact);
-        broadcast(impact, "message.projectseele.impact_tree");
-    }
 
     @SubscribeEvent
     public static void onServerTick(TickEvent.ServerTickEvent event)
@@ -380,30 +368,6 @@ public final class ThirdImpactDirector
         impact.forcedChunks.clear();
     }
 
-    private static void cleanupVisualPreview(ServerLevel level)
-    {
-        Iterator<Impact> iterator = ACTIVE.iterator();
-        while (iterator.hasNext())
-        {
-            Impact existing = iterator.next();
-            if (!existing.persistent && existing.level == level)
-            {
-                discardOwnedVessels(existing);
-                iterator.remove();
-            }
-        }
-        // One-time migration cleanup for preview vessels written before they
-        // had an event owner in NBT. This runs only inside the dev tableau.
-        for (net.minecraft.world.entity.Entity entity : level.getAllEntities())
-        {
-            if (entity instanceof MassProductionEvaEntity mass
-                    && (mass.isRitualPreview()
-                        || !mass.hasRitualOwner() && mass.isRitualFormation()))
-            {
-                mass.discard();
-            }
-        }
-    }
 
     private static boolean discardOwnedVessels(Impact impact)
     {

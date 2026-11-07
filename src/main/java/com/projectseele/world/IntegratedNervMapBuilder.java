@@ -358,64 +358,6 @@ public final class IntegratedNervMapBuilder
         return audit;
     }
 
-    /**
-     * Audits immutable map topology while an EVA is physically deployed.
-     * The wet cage is intentionally non-parked at this point: its bridge is
-     * retracted, LCL drained, plug absent and carrier parked at the silo.
-     * Final recovery still uses IntegratedAudit.valid() and therefore proves
-     * that every hangar fixture was restored.
-     */
-    public static boolean continuousMapValidDuringSortie(
-            ServerLevel level, IntegratedAudit audit)
-    {
-        GeoFrontBuilder.GeoFrontAudit geo = audit.geoFront();
-        GeoFrontLandscapeBuilder.LandscapeAudit geoLandscape =
-                audit.geoFrontLandscape();
-        ThirdTokyoSurfaceBuilder.DistrictAudit city = audit.tokyo3();
-        Tokyo3LandscapeBuilder.LandscapeAudit cityLandscape =
-                audit.tokyo3Landscape();
-        // A deployed EVA intentionally removes its wet-cage carrier, bridge
-        // and LCL and opens the street-level safety deck. Validate the
-        // immutable world and continuous route here; exact decorative tower,
-        // forest and closed-deck counts are restored/audited after recovery.
-        //
-        // Do not fold the operations annex, MAGI pedestrian access or
-        // Terminal Dogma fit-out into this gate. Those facilities have their
-        // own audits and can be repaired independently; none is part of the
-        // 31x31 moving envelope. Treating an unfinished corridor or display as
-        // a failed sortie hid a physically successful 522-block launch.
-        return geo.floor() && geo.skySphere() && geo.lake()
-                && geo.naturalLake() && geo.pyramid()
-                && geo.legacyInnerPyramidGone() && geo.realSky()
-                && geo.cavernLighting() && geo.lifts() == LIFT_LINKS.size()
-                && geo.bridge() && geo.observation()
-                && geo.vanillaLavaSamples() == 0
-                && geoLandscape.shore() && geoLandscape.docks() == 2
-                && geoLandscape.pumpHouse() && geoLandscape.lclIntake()
-                && geoLandscape.serviceRoad() && geoLandscape.maintenance()
-                && geoLandscape.bunkers() == 2
-                && geoLandscape.lclLakeSamples() == 4
-                && geoLandscape.protectedSites()
-                && city.roads() == 8 && city.substations() == 2
-                && city.pylons() == 6
-                && city.sortieLane() && city.observationDeck()
-                && city.foundation()
-                && cityLandscape.retainingWall()
-                && cityLandscape.underDeck() && cityLandscape.deepGrid()
-                && cityLandscape.ridgePoints() == 4
-                && cityLandscape.highway() && cityLandscape.westPortal()
-                && cityLandscape.eastPortal() && cityLandscape.railway()
-                && cityLandscape.station() && cityLandscape.shaftHeadroom()
-                && cityLandscape.rescueCentre()
-                && audit.deeplyBuried()
-                && audit.controlMarkers()
-                && powerPylonsPresent(level)
-                && audit.recoveryConsole()
-                && audit.lowerBeds() == LIFT_LINKS.size()
-                && audit.surfaceBeds() == LIFT_LINKS.size()
-                && audit.continuousShafts() == LIFT_LINKS.size()
-                && audit.clearExits() == LIFT_LINKS.size();
-    }
 
     public static IntegratedAudit inspect(ServerLevel level)
     {

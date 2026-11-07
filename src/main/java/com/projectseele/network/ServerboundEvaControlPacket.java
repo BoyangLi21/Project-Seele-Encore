@@ -2,7 +2,6 @@ package com.projectseele.network;
 
 import java.util.function.Supplier;
 
-import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.NervArmamentStationEntity;
 import com.projectseele.world.EvaPilotResolver;
@@ -86,13 +85,6 @@ public class ServerboundEvaControlPacket
             if (sender != null && eva != null
                     && EvaPilotResolver.pilot(eva) == sender)
             {
-                if (Boolean.getBoolean("projectseele.visualCapture"))
-                {
-                    ProjectSeele.LOGGER.info(
-                            "Visual live server dispatch action={} pose={} vehicle={} onGround={} velocityY={}",
-                            this.action, eva.getVisualPose(), eva.getStringUUID(),
-                            eva.onGround(), eva.getDeltaMovement().y);
-                }
                 switch (this.action)
                 {
                     case ACTION_CYCLE_WEAPON -> eva.cycleWeapon(sender);
@@ -155,15 +147,6 @@ public class ServerboundEvaControlPacket
                 sender.displayClientMessage(net.minecraft.network.chat.Component.literal(result.message())
                         .withStyle(result.accepted() ? net.minecraft.ChatFormatting.GREEN
                                 : net.minecraft.ChatFormatting.RED), true);
-            }
-            else if (Boolean.getBoolean("projectseele.visualCapture"))
-            {
-                ProjectSeele.LOGGER.warn(
-                        "Visual live server rejected action={} sender={} vehicle={}",
-                        this.action,
-                        sender == null ? "null" : sender.getGameProfile().getName(),
-                        sender == null || sender.getVehicle() == null
-                                ? "null" : sender.getVehicle().getType().toString());
             }
         });
         context.setPacketHandled(true);

@@ -39,7 +39,6 @@ public final class FirstBattleClient
         var eva=EvaPilotResolver.controlTarget(mc.player);return eva!=null&&eva.isFirstBattleActive()&&FirstBattleClip.ready()?eva:null;
     }
     public static boolean active(){return actor()!=null;}
-    public static void releaseCamera(){restore();}
     @SubscribeEvent public static void renderClock(TickEvent.RenderTickEvent event)
     {
         // The frame's own start, not this event's: see AircraftRenderClockR21.stampFrame.

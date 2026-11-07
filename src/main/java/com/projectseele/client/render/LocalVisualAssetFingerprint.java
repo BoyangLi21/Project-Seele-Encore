@@ -29,8 +29,7 @@ public final class LocalVisualAssetFingerprint
 
     public static boolean isStrictMode()
     {
-        return Boolean.getBoolean("projectseele.visualCapture")
-                || Boolean.getBoolean("projectseele.strictHighDetail");
+        return Boolean.getBoolean("projectseele.strictHighDetail");
     }
 
     public static void clearCache()

@@ -50,7 +50,7 @@
 > 状态标记：✅ 完成 · 🔄 进行中 · ⬜ 未开始
 > 每个 Phase 附「验收标准」——全部满足才算关档。数值均为初版，游戏内验证后调平衡。
 
-> **当前恢复边界**：视觉门禁仍优先；用户另行授权本机私有地图拼接与屋岛作战闭环。下载地图/模型只用于本机验证，不进入发布物。构建成功、日志正常或代码存在均不等于视觉完成。详见 `docs/VISUAL_RECOVERY.md`、`GEOFRONT_TEST`（已归档）、`FLEET_LOGISTICS_TEST`（已归档）、`OPERATION_YASHIMA_TEST`（已归档） 与 `LAUNCH_SILO_TEST`（已归档）。
+> **当前恢复边界**：视觉门禁仍优先；用户另行授权本机私有地图拼接与屋岛作战闭环。下载地图/模型只用于本机验证，不进入发布物。构建成功、日志正常或代码存在均不等于视觉完成。详见 `VISUAL_RECOVERY`（已归档）、`GEOFRONT_TEST`（已归档）、`FLEET_LOGISTICS_TEST`（已归档）、`OPERATION_YASHIMA_TEST`（已归档） 与 `LAUNCH_SILO_TEST`（已归档）。
 
 ---
 

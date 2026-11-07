@@ -165,12 +165,6 @@ public final class ClientFxManager
         }
         ACTIVE.add(new KabbalahTree(packet.eventId, position, packet.yaw,
                 packet.hasUnit, packet.initialTreeAge));
-        if (Boolean.getBoolean("projectseele.visualCapture")
-                && "impact".equals(System.getProperty("projectseele.visualCaptureUnit")))
-        {
-            com.projectseele.client.visual.VisualCaptureManager.startImpact(
-                    new Vec3(packet.x, packet.y, packet.z), packet.yaw);
-        }
     }
 
     public static void addRifleTracer(ClientboundRifleTracerPacket packet)

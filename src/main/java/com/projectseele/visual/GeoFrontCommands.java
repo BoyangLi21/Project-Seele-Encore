@@ -1,6 +1,5 @@
 package com.projectseele.visual;
 
-import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Locale;
@@ -11,7 +10,6 @@ import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
-import com.projectseele.registry.ModEntities;
 import com.projectseele.world.EvaHangarBuilder;
 import com.projectseele.world.GeoFrontBuilder;
 import com.projectseele.world.EvaLogisticsDirector;
@@ -19,7 +17,6 @@ import com.projectseele.world.FacilityWorldPolicy;
 import com.projectseele.world.GeoFrontBuilder.GeoFrontAudit;
 import com.projectseele.world.IntegratedNervMapBuilder;
 import com.projectseele.world.IntegratedNervMapBuilder.IntegratedAudit;
-import com.projectseele.world.IntegratedNervMapBuilder.LiftLink;
 import com.projectseele.world.LocalMapAssetLoader;
 import com.projectseele.world.NervOperationsCentreBuilder;
 import com.projectseele.world.S24CoordinateTransform;
@@ -482,78 +479,7 @@ public final class GeoFrontCommands
     {
         return EvaLogisticsDirector.ensureFleet(level);
     }
-    /** Dedicated-world reset before the unattended cross-dimension sortie. */
-    static void preloadVisualSortie(ServerPlayer player)
-    {
-        ServerLevel geoFront = geoFront(player);
-        if (geoFront == null)
-        {
-            throw new IllegalStateException("GeoFront visual sortie dimension is unavailable");
-        }
-        // A linked-sortie capture is a launch-system test, not a city-motion
-        // test. Normalize an interrupted or half-travelled skyline first so
-        // the surface frame cannot inherit a previous retraction session and
-        // report misleading 56/66 tower counts.
-        RequestResult cityReset = Tokyo3RetractionDirector.forceDepth(
-                geoFront, IntegratedNervMapBuilder.tokyo3Origin(geoFront),
-                false);
-        if (cityReset.accepted())
-        {
-            throw new IllegalStateException(
-                    "Tokyo-3 restoration is still running; retry the sortie preload after DEPLOYED");
-        }
-        IntegratedNervMapBuilder.RuntimeAudit audit =
-                IntegratedNervMapBuilder.prepareRuntime(geoFront);
-        if (!audit.launchReady())
-        {
-            throw new IllegalStateException(
-                    "GeoFront visual sortie runtime gate failed: "
-                            + audit.summary());
-        }
-        if (!audit.valid())
-        {
-            ProjectSeele.LOGGER.warn(
-                    "Visual sortie proceeding on a safe launch route while non-sortie facility audit remains incomplete: {}",
-                    audit.summary());
-        }
-        loadSortieChunks(geoFront);
-        restoreManualPlayerPhysics(player);
-        BlockPos origin = IntegratedNervMapBuilder.geoFrontOrigin(geoFront);
-        player.teleportTo(geoFront,
-                origin.getX() + 0.5D,
-                origin.getY() + GeoFrontBuilder.OBSERVATION_Y + 1.0D,
-                origin.getZ() + GeoFrontBuilder.OBSERVATION_Z + 0.5D,
-                180.0F, 0.0F);
-        ProjectSeele.LOGGER.info(
-                "Visual GeoFront sortie preloaded the three launch-bay chunk columns "
-                        + "and entered them to activate persistent entities");
-    }
 
-    /** Dedicated-world reset before the unattended cross-dimension sortie. */
-    static int linkVisualCapture(CommandSourceStack source) throws CommandSyntaxException
-    {
-        ServerPlayer player = source.getPlayerOrException();
-        ServerLevel geoFront = geoFront(player);
-        if (geoFront == null)
-        {
-            throw new IllegalStateException("GeoFront visual sortie dimension is unavailable");
-        }
-        int staleUnits = clearVisualSortieEntities(geoFront);
-        ProjectSeele.LOGGER.info(
-                "Visual GeoFront sortie cleanup removed {} persistent EVA entities",
-                staleUnits);
-        player.teleportTo(player.getServer().overworld(),
-                0.5D, 97.0D, 0.5D, 180.0F, 0.0F);
-        visualLinkInProgress = true;
-        try
-        {
-            return link(player.createCommandSourceStack());
-        }
-        finally
-        {
-            visualLinkInProgress = false;
-        }
-    }
 
     /** Loads only the launch-bay neighbourhood before querying parked EVAs. */
     private static int clearVisualSortieEntities(ServerLevel geoFront)
@@ -654,34 +580,6 @@ public final class GeoFrontCommands
                 variants, gantries);
     }
 
-    /** Removes persistent entities from earlier unattended runs after the
-     * destination dimension has activated its entity index. */
-    static int pruneVisualSortieDuplicates(ServerLevel geoFront)
-    {
-        if (VISUAL_SORTIE_UNITS.size() != 3)
-        {
-            throw new IllegalStateException(
-                    "Visual GeoFront sortie did not retain exactly three linked UUIDs");
-        }
-        List<EvaUnit01Entity> loaded = geoFront.getEntitiesOfClass(
-                EvaUnit01Entity.class,
-                new AABB(IntegratedNervMapBuilder.lowerLiftBed(
-                        geoFront, 1)).inflate(
-                        SORTIE_ENTITY_RADIUS, 384.0D, SORTIE_ENTITY_RADIUS));
-        int removed = 0;
-        for (EvaUnit01Entity unit : loaded)
-        {
-            if (!VISUAL_SORTIE_UNITS.contains(unit.getUUID()))
-            {
-                unit.discard();
-                removed++;
-            }
-        }
-        ProjectSeele.LOGGER.info(
-                "Visual GeoFront sortie retained 3 linked UUIDs and removed {} stale entities",
-                removed);
-        return removed;
-    }
 
     private static boolean hasAllVariants(List<EvaUnit01Entity> units)
     {

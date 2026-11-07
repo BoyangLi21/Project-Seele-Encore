@@ -108,16 +108,6 @@ minecraft {
             if (project.hasProperty('quickPlayWorld')) {
                 args '--quickPlaySingleplayer', project.property('quickPlayWorld')
             }
-            // Development-only visual regression: build the fixed lab and
-            // capture all approved Unit-01 keyframes without keyboard input.
-            if (project.hasProperty('visualCapture')) {
-                property 'projectseele.visualCapture', 'true'
-            }
-            if (project.hasProperty('foundationVideoCapture')) {
-                property 'projectseele.visualCapture', 'true'
-                property 'projectseele.foundationVideoCapture', 'true'
-                property 'projectseele.manifoldInnerAuditOnly', 'true'
-            }
             if (project.hasProperty('strictHighDetail')) {
                 property 'projectseele.strictHighDetail', 'true'
                 args '--width', '1280', '--height', '720'
@@ -212,12 +202,6 @@ minecraft {
             jvmArgs project.hasProperty('clientHeap') || project.hasProperty('lowEndClient') ? '-Xms1G' : '-Xms2G',
                     '-Xmx' + clientMaxHeap, '-XX:+UseG1GC',
                     '-XX:MaxGCPauseMillis=80'
-            if (project.hasProperty('visualCapturePose')) {
-                property 'projectseele.visualCapturePose', project.property('visualCapturePose')
-            }
-            if (project.hasProperty('visualCaptureUnit')) {
-                property 'projectseele.visualCaptureUnit', project.property('visualCaptureUnit')
-            }
         }
 
         server {

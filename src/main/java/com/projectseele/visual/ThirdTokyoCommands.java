@@ -26,7 +26,6 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -181,25 +180,6 @@ public final class ThirdTokyoCommands
         return 1;
     }
 
-    static BlockPos fixedVisualOrigin(ServerLevel level)
-    {
-        // S22 is an authored coastal migration whose surface is valid before
-        // the legacy integrated-map receipt becomes valid.  Falling back to
-        // (0, 96, 0) made visual capture photograph unrelated seed terrain.
-        if (FacilityWorldPolicy.isS22Coastal(level.getServer()))
-        {
-            return IntegratedNervMapBuilder.tokyo3Origin(level);
-        }
-        if (level.dimension().equals(GeoFrontCommands.GEOFRONT)
-                && IntegratedNervMapBuilder.inspect(level).valid())
-        {
-            return IntegratedNervMapBuilder.tokyo3Origin(level);
-        }
-        return new BlockPos(0,
-                Math.max(level.getMinBuildHeight() + 36,
-                        Math.min(level.getMaxBuildHeight() - 48, 96)),
-                0);
-    }
 
     private static int audit(CommandSourceStack source) throws CommandSyntaxException
     {
