@@ -5,7 +5,8 @@ engine on a copied snapshot, so rails, the route, the depot
 and a moving train are proved before any block exists. `edits` lays the bed under
 the exact native samples and writes a cell patch for release_map_patch.py. Mapped
 future water stays open under the deck; `doors` buries the block MTR needs to open
-train doors at a platform. Nothing here opens the actual world.
+train doors at a platform, and `edges` closes a platform gap wide enough to fall
+into. Nothing here opens the actual world.
 """
 import argparse
 from collections import Counter
@@ -594,9 +595,68 @@ def doors(a):
         raise SystemExit(1)
 
 
+def edges(a):
+    """Older platforms stand too far from the track, so a passenger steps down into the gap."""
+    spec = read(a.config)
+    source = CapturedSurface(spec['source'], partial=True)
+    root = Path(spec['native_snapshot']) / 'projectseele/geofront'
+    limit = spec.get('platform_clearance', 1.6)
+    wanted = {tuple(p) for p in spec['platforms']}
+    platforms = [Parser(p.read_bytes()).node().value for p in (root / 'platforms').rglob('*') if p.is_file()]
+    rows, report, errors = {}, [], []
+    for platform in platforms:
+        p, q = platform['position1'], platform['position2']
+        if (p['x'], p['y'], p['z']) not in wanted:
+            continue
+        y = p['y']
+        start = np.array([p['x'] + .5, p['z'] + .5])
+        delta = np.array([q['x'] + .5, q['z'] + .5]) - start
+        length = float(np.linalg.norm(delta))
+        along = delta / length
+        out = np.array([-along[1], along[0]])
+        side = max((1, -1), key=lambda k: len(platform_edge(source, start, along, length, out * k, y)[0]))
+        row = platform_edge(source, start, along, length, out * side, y)[0]
+        floor = {cell: source.state(cell[0], y, cell[1]) for cell in row}
+        added = 0
+        for _ in range(3):
+            frontier = {}
+            for (x, z), state in floor.items():
+                for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                    cell = x + dx, z + dz
+                    if cell in floor or cell in frontier:
+                        continue
+                    corners = np.array([[cell[0] + i, cell[1] + j] for i in (0, 1) for j in (0, 1)]) - start
+                    lateral = corners @ (out * side)
+                    run = (corners @ along).mean()
+                    if lateral.min() >= limit and lateral.min() < 3.5 and 0 < run < length and all(source.state(cell[0], y + h, cell[1]).split('[')[0] in AIR for h in (0, 1, 2)):
+                        frontier[cell] = state
+            for cell, state in frontier.items():
+                rows[cell[0], y, cell[1]] = dict(pos=[cell[0], y, cell[1]], before=source.state(cell[0], y, cell[1]), after=state, purpose='platform edge fill')
+            added += len(frontier)
+            floor.update(frontier)
+            if not frontier:
+                break
+        report.append(dict(position=[p['x'], y, p['z']], side=side, added=added))
+    if {tuple(r['position']) for r in report} != wanted:
+        errors.append(['Platform outside the snapshot', sorted(wanted - {tuple(r['position']) for r in report})])
+    check = dict(errors=errors, cells=len(rows), platforms=report, world_written=False)
+    write(a.out / 'edge-check.json', check)
+    patch = dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'], edits=[],
+                 native_snapshot=spec['native_snapshot'], error_reports=[], views_reviewed_by_root=False,
+                 continuation_work=spec['continuation_work'])
+    if a.out.joinpath('patch.json').exists():
+        patch = read(a.out / 'patch.json')
+    patch['edits'] = [r for r in patch['edits'] if r['purpose'] != 'platform edge fill'] + list(rows.values())
+    patch['error_reports'] = sorted({*patch['error_reports'], str(a.out / 'edge-check.json')})
+    write(a.out / 'patch.json', patch)
+    print(json.dumps(dict(cells=len(rows), platforms=report, errors=errors[:3]), ensure_ascii=False))
+    if errors:
+        raise SystemExit(1)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('fit', 'native', 'edits', 'doors'))
+    parser.add_argument('mode', choices=('fit', 'native', 'edits', 'doors', 'edges'))
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--java', type=Path)
