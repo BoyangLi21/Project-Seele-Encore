@@ -142,14 +142,15 @@ public final class NervRouteRuntimeStateR52 extends SavedData
     }
     public static String relativeBundleR52(String name){
         if(name==null||name.isBlank()||name.length()>1024||name.contains(":"))throw new IllegalArgumentException("Explicit world-relative installed bundle required");
-        var path=java.nio.file.Path.of(name);if(path.isAbsolute()||path.getRoot()!=null||path.normalize().startsWith("..")||path.normalize().toString().isEmpty())throw new IllegalArgumentException("Explicit world-relative installed bundle required");return path.normalize().toString().replace('\\','/');
+        // A Windows separator is an ordinary character on Linux: read both as '/', so \x\y is rooted on every platform.
+        var path=java.nio.file.Path.of(name.replace('\\','/'));if(path.isAbsolute()||path.getRoot()!=null||path.normalize().startsWith("..")||path.normalize().toString().isEmpty())throw new IllegalArgumentException("Explicit world-relative installed bundle required");return path.normalize().toString().replace('\\','/');
     }
     private static long checkedInstallationChunkR52(long chunk){int x=(int)chunk,z=(int)(chunk>>32);if(Math.abs((long)x)>1875000||Math.abs((long)z)>1875000)throw new IllegalArgumentException("Actual installed actor chunk exceeds world bounds");return chunk;}
     public void installationActorChunkR52(UUID actor,long chunk){if(installationBundle.isEmpty()&&pendingInstallation==null||actor==null)throw new IllegalStateException("Accepted or pending bundle and original actor required");checkedInstallationChunkR52(chunk);if(!Objects.equals(installationActorChunks.put(actor,chunk),chunk))setDirty();}
     public void retainInstallationActorsR52(Set<UUID> actual){if(installationActorChunks.keySet().removeIf(id->!actual.contains(id)))setDirty();}
     public void personnelLiftManifest(String relativeRootFile)
     {
-        var path=java.nio.file.Path.of(relativeRootFile);if(path.isAbsolute()||relativeRootFile.contains(":")||path.normalize().startsWith(".."))throw new IllegalArgumentException("Root world-relative lift manifest required");
+        var path=java.nio.file.Path.of(relativeRootFile.replace('\\','/'));if(path.isAbsolute()||path.getRoot()!=null||relativeRootFile.contains(":")||path.normalize().startsWith(".."))throw new IllegalArgumentException("Root world-relative lift manifest required");
         personnelLiftManifest=relativeRootFile;setDirty();
     }
     public Job job(int variant){return jobs.get(variant);}
