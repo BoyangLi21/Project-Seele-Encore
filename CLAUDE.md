@@ -60,7 +60,7 @@ resources/
 ## 协作约定（用户偏好，务必遵守）
 
 1. **中文交流**。
-2. **Commit 署名**：每个提交末尾加 `Co-Authored-By: Ayanami_Rei <liboyang_621@126.com>`（用户的项目分身账号），**不要**加 Claude 署名——这是用户明确要求。多行提交信息用 `git commit -F <文件>` 避免引号问题。
+2. **Commit 署名**：每个提交末尾加 `Co-Authored-By: Ayanami_Rei <liboyang_621@126.com>` 和 `Co-Authored-By: AsukaSoryu9 <2549517657@qq.com>` 两行（用户的项目分身账号），**不要**加 Claude 署名——这是用户明确要求。多行提交信息用 `git commit -F <文件>` 避免引号问题。
 3. **工作流**：构建通过 + runClient 日志验证无误 → commit + push（用户已授权此流程）。提交用 `git -c user.name=BoyangLi21 -c user.email=liboyang621@gmail.com commit -F <文件>`；推送前 rebase 到 `origin/main`，`./gradlew build` 退出码为 0 才 `git push origin <分支>:main`。游戏内目视测试由用户负责——你看不到画面，写好日志检查点后把"看什么"列清楚交给用户。
 4. `.claude/` 目录已 gitignore，**永不提交**。
 5. 用户负责 GUI 安装类操作（装软件、网页建仓库）；其余全部你来。
