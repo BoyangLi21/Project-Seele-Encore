@@ -142,6 +142,7 @@ def main():
     ap.add_argument('--turn', type=float, default=.7, help='how much of the captured twist of the trunk to keep')
     ap.add_argument('--narrow', type=float, default=.5, help='how much of the sideways flare of the arms to keep')
     ap.add_argument('--align', type=float, default=.955, help='phase of the middle of the left foot on the ground')
+    ap.add_argument('--ankle', type=float, default=0.0, help='most the foot may turn from the shin, degrees; 0 leaves it as captured')
     ap.add_argument('--label', default='')
     ap.add_argument('--licence', default='')
     a = ap.parse_args()
@@ -240,6 +241,17 @@ def main():
             toe = unit(Q['to_' + s][f] - Q['an_' + s][f])
             toe = R.qmat(R.qaxis(side, -math.radians(flat[s]))) @ toe
             q_foot = body_rotation(side, np.cross(toe, side))
+            if a.ankle:
+                # A performer on the forefoot sets flat too low, and the foot then folds past the shin in the air.
+                rel = R.qmul(R.qconj(q_shin), q_foot)
+                if rel[0] < 0:
+                    rel = -rel
+                angle = 2 * math.degrees(math.acos(min(1.0, float(rel[0]))))
+                knee = .7 * a.ankle
+                if angle > knee:
+                    room = a.ankle - knee
+                    kept = knee + room * math.tanh((angle - knee) / room)
+                    q_foot = R.qmul(q_shin, R.qslerp(ident, rel, kept / angle))
             rot['ankle_' + s] = ident.copy()
             rot['foot_' + s] = R.qmul(R.qconj(R.qmul(qw, ql)), q_foot)
         for s in 'lr':
