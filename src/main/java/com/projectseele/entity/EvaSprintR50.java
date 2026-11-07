@@ -39,8 +39,8 @@ public final class EvaSprintR50
         Float previous=PREVIOUS.get(e);
         return e.level().isClientSide?Mth.lerp(partial,previous==null?current:previous,current):current;
     }
-    /** Full sprint speed over the ordinary sprint (Left Alt): the TV 12 dash covers ground at three times the run. */
-    private static final float GAIN=3F;
+    /** Full sprint speed over the ordinary sprint (Left Alt): four and a half times the run, as fast as the stride can still read. */
+    private static final float GAIN=4.5F;
     /**
      * Travel per gait cycle at full sprint (blocks). This keeps the captured
      * sprint at about its own cadence; its full stride is far longer, and the

@@ -55,8 +55,8 @@ R10 负责人授权下载的九份 Battle Orchestra 模型与纹理仅放在 `ex
 
 | 资产 | 来源 | 状态 |
 |---|---|---|
-| NERV 总部地图（本机源 `external-assets/work/maps/source_nerv_command`，世界名 `Nerv Comand Module`，2025-08-15） | [Evangelion: NERV Headquarters Command Center](https://www.planetminecraft.com/project/evangelion-nerv-headquarters-command-center/)，作者 Audijon2，Planet Minecraft | 本项目已大幅改造。负责人 2026-11-07 决定：发布时署名并附原帖链接，发布前告知作者，并在地图合适位置致敬 |
-| 早期测试存档 `run/saves/NERV_HQ_1to1_Poodcie` | 另一个 PMC 项目 `nerv-hq`（`NERV_V_3_-_1.15.zip`，2026-07-06 下载，见存档内 `_SOURCE.txt`） | 仅本地测试，永不提交，不随发布分发 |
+| NERV 总部地图（本机源 `external-assets/work/maps/source_nerv_command`，世界名 `Nerv Comand Module`，下载名 `nerv-comand-module`，2025-08-15） | [Evangelion: NERV Headquarters Command Center](https://www.planetminecraft.com/project/evangelion-nerv-headquarters-command-center/)，作者 Audijon2，Planet Minecraft | 本项目已大幅改造。负责人 2026-11-07 决定：发布时署名并附原帖链接，发布前告知作者，并在地图合适位置致敬 |
+| 早期测试存档（已删除） | 另一个 PMC 项目 `nerv-hq`（`NERV_V_3_-_1.15.zip`，2026-07-06 下载） | 没有用到，2026-11-07 按负责人要求删除了本机存档 |
 | SmOd EVA/使徒本地参考包 | SmOd `EVANGELION: END ADDON V1.0`（Planet Minecraft / Bedrock addon），作者 SmOd774YT，未列开放许可证 | 旧版 EVA 转换结果已退出当前机体管线；仍作为使徒和造型参考保留。仅本地测试，**公开使用前必须取得作者许可** |
 | 当前 EVA-00/01/02/量产机本机身体资源 | Tigerar1 的四个 Sketchfab 模型（逐项链接见下表），CC BY-SA | `make_tiger_unit01_pack.py` 与 `make_tiger_eva_variants_pack.py` 生成到忽略目录；这是当前测试身体来源，转换美术不属于 MIT 代码许可，正式发行前必须完成完整署名与 ShareAlike 审核 |
 | 初号机/零号机通用高振动粒子刀 | [Udon-San `Progressive Knife`](https://sketchfab.com/3d-models/progressive-knife-e104dbec8c904f9b840c29c4a7d5d770)，CC Attribution | 用户下载的 FBX/贴图；3,766 三角面；由 `make_downloaded_eva_accessories_pack.py` 转换到本机包并以反握插槽使用。源文件与转换 mesh 均不入库 |
@@ -65,7 +65,6 @@ R10 负责人授权下载的九份 Battle Orchestra 模型与纹理仅放在 `ex
 | 朗基努斯之枪本机附件（`tools/make_downloaded_eva_accessories_pack.py`） | EUD 1.1.0 的 Blockbench 方块模型与贴图 | 转换为 384 三角、独立 `longinus_lance` 附件，初号机/零号机使用双手前后握持；生成到本机资源包。公开发行前确认 EUD 作者署名，并遵守其清单所列 CC BY-NC 4.0 |
 | 零号机本机头部模型（`tools/make_eud_eva00_pack.py`） | EUD 1.1.0 的 `eva00structure.nbt` 零号机头部雕塑 | 与 Project SEELE 原创可动画身体组合，仅本机测试；公开发行前确认 EUD 作者署名，并遵守 CC BY-NC 4.0 |
 | EVA-X / GeoFront 球体世界（用户下载的 `EVA.rar`） | Bilibili 分享存档；当前缺少可核验作者与再发布许可 | `prepare_local_map_assets.py` 只把该存档作为测量参考；新的 `SEELE_TOKYO3_REBUILT` 使用普通噪声地表与原创深埋球体。源文件、转换结构和存档全部 gitignored，作者身份与许可确认前绝不发布 |
-| `Nerv Comand Module` 世界 | Planet Minecraft `nerv-comand-module`，用户手动下载；作者/许可信息待登记 | 本机转换为 NERV 指挥区并叠加原创四屏实时遥测；不进入 jar。发布前必须补齐项目链接、作者署名与明确授权 |
 | `tokyo-3-type-skyscrapper1-converted.schem` | 用户手动下载的 Tokyo-3 高楼 schematic；作者/许可信息待登记 | 本机在东京-3 战区放置三座实例；结构和拼接存档均不提交。未获得授权时发布版使用原创回退楼群 |
 
 `run/` 已 gitignore，上表资产不会进入版本库与发行物。
@@ -483,7 +482,7 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 ## R57 狂奔（左 Alt）
 
-R59：`assets/projectseele/motion/eva_dash_r59.json` 由 Mixamo 的 `Fast Run`（Adobe Mixamo，用户 2026-11-02 自行下载并同意使用，非 CC0，不属于本项目 MIT 范围；仓库不含原始文件）重定向到初号机的单圈循环。生成：`tools/finale/run_retarget.py`。肢体方向取自动捕，长度和关节用 EVA 自己的，手臂向外张开的分量减半，步幅保持原样不压缩，脚落地滑步。此前的 Mesh2Motion `Sprint` 是手工关键帧，手肘固定在 79～94 度，已弃用，下面的压缩步幅做法也已废弃。若公开发布时不想保留 Mixamo 内容，同一工具可换用 Bandai Namco Research Motiondataset-1 的 `dash_masculinity`（CC BY-NC 4.0，需署名）。
+R60：`assets/projectseele/motion/eva_dash_r59.json` 来自 Bandai Namco Research Motiondataset-1 的 `dash_masculinity_001`（Bandai Namco Research Inc.，CC BY-NC 4.0：需署名、不得商用；仓库不含原始文件），由 `tools/finale/run_retarget.py` 重定向到初号机的单圈循环。肢体方向取自动捕，长度和关节用 EVA 自己的；手臂外张减半，脚相对小腿最多转 75°，躯干多前倾 8°，摆臂幅度 ×1.4，摆腿幅度 ×1.3；步幅不压缩，脚落地滑步。负责人 2026-11-07 选定，替换此前的 Mixamo `Fast Run`。署名与修改说明见 [第三方动作声明](THIRD_PARTY_MOTION_NOTICES.md)。
 
 候选私有资源（未经用户验收，不入库）：`eva_body_r44.json` 中三台机体的 `dash_run` 循环改用 Mesh2Motion `human-base-animations.glb` 的 `Sprint`（CC0）。修改：沿用刺拳/直拳同一 Mesh2Motion 管线重定向到 EVA 比例，整段循环统一落地以保留腾空期，再用 `warp_locomotion_r44` 把实测步幅（约 214 格/周期）压到实际移动距离 100 格/周期，运行步幅与动画步幅一致，支撑脚不打滑。生成脚本为本机 `motion-work/toolroot/sprint_dash_r57.py`。
 

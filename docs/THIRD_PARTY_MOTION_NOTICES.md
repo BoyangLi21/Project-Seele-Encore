@@ -5,6 +5,21 @@ source files and private review renders are not committed to the public mod.
 Promotion into a release pack additionally requires a per-clip provenance and
 QA record.
 
+## Bandai Namco Research Motion Dataset
+
+- Creator: Bandai Namco Research Inc.
+- Official page: https://github.com/BandaiNamcoResearchInc/Bandai-Namco-Research-Motiondataset
+- Licence: Creative Commons Attribution-NonCommercial 4.0 International.
+- Licence text: https://creativecommons.org/licenses/by-nc/4.0/
+- Shipped clip: `assets/projectseele/motion/eva_dash_r59.json`, the EVA sprint, from
+  dataset-1 `dash_masculinity_001`.
+- Modifications: one gait cycle resampled to 51 frames and retargeted to the
+  Unit-01 rig by `tools/finale/run_retarget.py` (limb directions from the capture,
+  EVA limb lengths and hinges); sideways arm flare halved, foot turn from the shin
+  limited to 75 degrees, trunk leaned 8 degrees further forward, arm swing x1.4,
+  leg swing x1.3.
+- Non-commercial use only, which matches this project being free.
+
 ## 100STYLE Dataset
 
 - Creators: Ian Mason, Sebastian Starke and Taku Komura.

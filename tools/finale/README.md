@@ -23,6 +23,12 @@
 | `gait_clip.py` / `hipcurve.py` | 量步态片段本身 / 实机骨盆曲线 |
 | `skin_compare.py` / `bend_test.py` / `fix_eva_plates.py` | 蒙皮对比、弯折测试、肘部装甲板归属修正 |
 
+现用冲刺的生成命令（在本目录运行，`<bvh>` 是 Bandai 数据集 dataset-1 的 `dash_masculinity_001.bvh`）：
+
+```
+python run_retarget.py <bvh> bandai ../../src/main/resources/assets/projectseele/motion/eva_dash_r59.json --ankle 75 --lean 8 --gain 1.4 --leg-gain 1.3 --licence "Bandai Namco Research Motion Dataset, dash_masculinity_001 (CC BY-NC 4.0), retargeted to Unit-01 by tools/finale/run_retarget.py"
+```
+
 ## 流程
 
 ```

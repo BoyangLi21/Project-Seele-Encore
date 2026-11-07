@@ -143,6 +143,7 @@ def main():
     ap.add_argument('--narrow', type=float, default=.5, help='how much of the sideways flare of the arms to keep')
     ap.add_argument('--align', type=float, default=.955, help='phase of the middle of the left foot on the ground')
     ap.add_argument('--ankle', type=float, default=0.0, help='most the foot may turn from the shin, degrees; 0 leaves it as captured')
+    ap.add_argument('--leg-gain', type=float, default=1.0, help='swing of the legs about their mean')
     ap.add_argument('--label', default='')
     ap.add_argument('--licence', default='')
     a = ap.parse_args()
@@ -185,7 +186,7 @@ def main():
         chest_yaw.append(math.atan2(-l[2], l[0]))
     pelvis_yaw = np.array(pelvis_yaw)
     chest_yaw = np.array(chest_yaw)
-    lean_extra = R.qx(-math.radians(a.lean))
+    lean_extra = R.qx(math.radians(a.lean))
     hip_mean = hip.mean(0)
 
     def frame_pose(f, lift):
@@ -228,6 +229,15 @@ def main():
             start = B.point(m['torso_lower'], pv['leg_' + s])
             du = unit(Q['kn_' + s][f] - Q['hp_' + s][f])
             dv = unit(Q['an_' + s][f] - Q['kn_' + s][f])
+            if a.leg_gain != 1.0:
+                # A longer swing of the whole leg about its mean; the knee keeps its captured bend.
+                mid = unit(unit(Q['kn_' + s] - Q['hp_' + s]).mean(0))
+                axis = np.cross(mid, du)
+                n = np.linalg.norm(axis)
+                if n > 1e-6:
+                    extra = R.qaxis(axis / n, (a.leg_gain - 1) * math.atan2(n, float(mid @ du)))
+                    du = R.qmat(extra) @ du
+                    dv = R.qmat(extra) @ dv
             ankle = start + thigh * du + shin * dv
             limb = solver.limbs['leg_' + s]
             # The knee points the way the captured bend does.

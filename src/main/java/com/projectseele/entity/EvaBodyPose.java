@@ -307,7 +307,7 @@ public final class EvaBodyPose
         phase-=Mth.floor(phase);
         boolean left=side.equals("l");
         float weight=(1-run)*down(phase,left?.69F:.20F,.5F)+run*(1-dash)*down(phase,left?.84F:.31F,.23F)
-                +run*dash*down(phase,left?.84F:.34F,left?.24F:.22F);
+                +run*dash*down(phase,left?.82F:.36F,left?.26F:.22F);
         return weight>.5F;
     }
     private static float down(float phase,float from,float share){return Mth.positiveModulo(phase-from,1F)<share?1:0;}
