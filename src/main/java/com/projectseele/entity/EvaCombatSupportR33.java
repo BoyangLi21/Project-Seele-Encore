@@ -38,11 +38,6 @@ public final class EvaCombatSupportR33
         return p!=null&&p.has("combat_foundation")&&p.get("combat_foundation").getAsInt()>=33;
     }
     public static boolean strike(EvaUnit01Entity e){return !EvaGameplayMotionR32.activeGroundClip(e,0).isEmpty();}
-    public static CompoundTag diagnosticR44(EvaUnit01Entity e)
-    {
-        var tag=e.getEntityData().get(CONTACTS).copy();var floor=FLOOR_WITNESS.get(e);if(floor!=null)tag.put("free_floor_r44",floor.copy());
-        var release=CLIENT_RELEASES.get(e);if(release!=null)tag.putDouble("client_release_ticks",(FirstBattleSignals.clientFrameTime()-release.start())/50_000_000D);return tag;
-    }
     public static float renderLocomotionSignalR44(EvaUnit01Entity e,float partial,int channel,float fallback)
     {
         if(!e.level().isClientSide

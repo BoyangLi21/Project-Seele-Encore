@@ -8,10 +8,7 @@ import net.minecraft.nbt.*;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.*;
 import net.minecraft.util.Mth;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.*;
 import net.minecraftforge.event.TickEvent;
@@ -70,13 +67,6 @@ public final class UNAirLiftR29
         s.last.put(serial,"运输已由管理员维护复位接管");s.setDirty();
     }
     public static String phaseName(ServerLevel l,int serial){var j=state(l).jobs.get(serial);return j==null?"IDLE":j.phase.name();}
-    public static void resumeReview(ServerLevel level,int serial,ServerPlayer owner)
-    {
-        if(!"r29-un".equals(System.getProperty("projectseele.regionalBuild","")))throw new IllegalStateException("Review only");
-        var j=state(level).jobs.get(serial);if(j==null||j.phase!=Phase.HOLD||j.carrying||!j.owner.equals(owner.getUUID()))return;
-        if(ServiceAircraftR32.payload(level,j.unit) instanceof EvaPrototypeEntity eva&&eva.position().distanceTo(UNRecoveryR22.home(level,serial))<8)
-        {begin(level,j,Phase.ROLL_OUT,eva.position(),apron(level,serial),240,eva);state(level).setDirty();}
-    }
     public static boolean ownsMotion(ServerLevel l,int serial)
     {
         UUID id=UNRecoveryR22.identity(l,serial);
@@ -105,22 +95,6 @@ public final class UNAirLiftR29
         if(eva instanceof EvaPrototypeEntity e&&e.getPilotEntity()!=null&&e.getPilotEntity()!=player)return "该机体由另一名驾驶员控制，请由驾驶员本人呼叫运输。";
         s.jobs.put(serial,j);s.setDirty();return "运输指令已接受。正在加载原机体与目的地，随后检查落点和机库联锁。";
     }
-    public static boolean stageCruiseReviewR39(ServerLevel level,ServerPlayer owner)
-    {
-        if(!"r39-transport".equals(System.getProperty("projectseele.regionalBuild"))||!level.getServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT).normalize().getFileName().toString().equals("SEELE_FIELD_R39_REVIEW"))throw new IllegalStateException("Isolated flight fixture only");
-        var id=UNRecoveryR22.identity(level,0);if(id==null)throw new IllegalStateException("No original UN-00");
-        var known=UNRecoveryR22.lastKnownPosition(level,id);retain(level,known==null?BlockPos.containing(UNRecoveryR22.home(level,0)):known,4);
-        if(!(ServiceAircraftR32.payload(level,id) instanceof EvaPrototypeEntity eva))return false;
-        if(active(level,0))throw new IllegalStateException("Existing UN flight in review copy");
-        var j=new Job();j.serial=0;j.unit=id;j.owner=owner.getUUID();j.homebound=true;j.carrying=true;j.siteReady=true;j.destination=apron(level,0);
-        var from=new Vec3(-1800.5,cruise(level)-OFFSET,1300.5);retain(level,BlockPos.containing(from),4);
-        if(!readyAt(level,from))return false;
-        var plane=ModEntities.UN_TRANSPORT.get().create(level);plane.configure(0,true);plane.addTag("seele_un_airlift");plane.setPos(from.add(0,OFFSET,0));plane.setHoistDistance((float)OFFSET);
-        if(!level.addFreshEntity(plane))return false;
-        eva.normalizeAfterTransportR30(false);EvaAirTransportR31.begin(eva);EvaAirTransportR31.transition(eva,90,1,1);lock(eva);eva.moveOnNervCarrier(from.x,from.y,from.z,0);
-        j.plane=plane.getUUID();j.planePosition=plane.position();state(level).jobs.put(0,j);UNRecoveryR22.remember(eva);
-        begin(level,j,Phase.CRUISE,from,new Vec3(j.destination.x,from.y,j.destination.z),duration(from,j.destination),eva);state(level).setDirty();return true;
-    }
 
     public static String cancel(ServerPlayer player,int serial)
     {
@@ -131,16 +105,6 @@ public final class UNAirLiftR29
         j.cancel=true;s.setDirty();return "已收到取消指令，将先安全返回基地，不会在空中释放机体。";
     }
     public static Vec3 apron(ServerLevel level,int serial){return UNRecoveryR22.home(level,serial).add(0,DECK,104);}
-    public static boolean resumeGroundReviewR40(ServerLevel level,int serial)
-    {
-        if(!"r40-airlift".equals(System.getProperty("projectseele.regionalBuild"))||!level.getServer().getWorldPath(net.minecraft.world.level.storage.LevelResource.ROOT).normalize().getFileName().toString().equals("SEELE_R32_AIR_REVIEW"))throw new IllegalStateException("Isolated recovery fixture only");
-        var j=state(level).jobs.get(serial);
-        if(j==null||!j.groundOnly||j.phase!=Phase.HOLD)throw new IllegalStateException("No held ground transfer to resume");
-        if(!(ServiceAircraftR32.payload(level,j.unit) instanceof EvaPrototypeEntity eva))return false;
-        Phase phase=j.to.distanceToSqr(apron(level,serial))<.01?Phase.GROUND_APPROACH:j.to.distanceToSqr(UNRecoveryR22.home(level,serial))<.01?Phase.GROUND_LOWER:Phase.ROLL_IN;
-        j.total=0;j.rebase=false;var target=phase==Phase.GROUND_LOWER?AirCradleClearanceR31.landingRoot(eva,UNRecoveryR22.home(level,serial),eva.getYRot()):j.to;
-        begin(level,j,phase,eva.position(),target,120,eva);state(level).setDirty();return true;
-    }
     private static final Map<ServerLevel,Map<Integer,Vec3>> RECEIVING_PADS=new WeakHashMap<>();
     public static Vec3 reception(ServerLevel level,int serial)
     {

@@ -81,19 +81,6 @@ public final class NervAirLiftR30
         if(!Files.isRegularFile(level.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_transport_r30.json")))return "此存档尚未安装 NERV 重型运输设施。";
         var s=state(level);s.forceRecovery=true;s.last="强制回收已受理，正在加载原运输机和载荷。";s.setDirty();return s.last;
     }
-    public static CompoundTag inspectionR38(ServerLevel level){if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.state(level).save(new CompoundTag());return state(level).save(new CompoundTag());}
-    public static boolean stageCarriedReviewR38(ServerLevel level,int variant,UUID owner)
-    {
-        if(NervRouteRuntimeR52.claimed(level))return false;
-        if(!"r38-recovery".equals(System.getProperty("projectseele.regionalBuild"))||!level.getServer().getWorldPath(LevelResource.ROOT).normalize().getFileName().toString().equals("SEELE_FIELD_R38_REVIEW"))throw new IllegalStateException("Isolated cargo fixture only");
-        var s=state(level);boolean airport=ready(level,STAND,4);var known=s.locations.get(variant);if(known!=null)ready(level,Vec3.atCenterOf(known),4);
-        EvaLogisticsDirector.loadControlTarget(level,variant);var receipt=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
-        var unit=receipt==null?null:ServiceAircraftR32.payload(level,receipt.canonicalId());var plane=ServiceAircraftR32.find(level,s.aircraft);
-        if(unit==null||plane==null||!airport)return false;
-        var job=new Job();job.variant=variant;job.unit=unit.getUUID();job.owner=owner;job.phase=Phase.HOLD;job.carrying=true;job.returning=true;job.destination=head(level,variant);job.from=STAND.add(0,160,0);job.to=job.from;job.duration=100;
-        EvaAirTransportR31.begin(unit);lock(unit);EvaAirTransportR31.transition(unit,90,1,1);unit.moveOnNervCarrier(job.from.x,job.from.y,job.from.z,0);
-        plane.setPos(job.from.add(0,OFFSET,0));plane.cargo(unit.getId(),true,1);s.aircraftAt=plane.position();s.locations.put(variant,unit.blockPosition());s.job=job;s.setDirty();return true;
-    }
     @SubscribeEvent public static void commands(net.minecraftforge.event.RegisterCommandsEvent event)
     {
         event.getDispatcher().register(net.minecraft.commands.Commands.literal("nerv")

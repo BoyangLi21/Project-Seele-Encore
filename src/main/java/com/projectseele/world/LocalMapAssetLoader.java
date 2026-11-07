@@ -3,7 +3,6 @@ package com.projectseele.world;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.EnumMap;
 import java.util.HashMap;
 import java.util.Map;
@@ -1048,31 +1047,6 @@ public final class LocalMapAssetLoader
         return found;
     }
 
-    /** Complete cargo check, including fragile lights omitted by old marker probes. */
-    public static int inspectTokyo3CargoMismatches(ServerLevel level, BlockPos origin, int depth)
-    {
-        StructureTemplate template = load(level, TOKYO3_SKYSCRAPER);
-        if (template == null) return -1;
-        int mismatches = 0;
-        for (int i = 0; i < SKYSCRAPERS.length; i++)
-        {
-            SkyscraperPlacement placement = SKYSCRAPERS[i];
-            int drop = skyscraperDrop(placement, rotatedSkyscraperSize(placement.rotation()), depth, origin, level);
-            BlockPos base = origin.offset(placement.offset()).below(drop);
-            for (var block : skyscraperBlueprint(template, placement.rotation()).entrySet())
-            {
-                BlockPos position = base.offset(block.getKey());
-                if (position.equals(skyscraperMarker(base, i))) continue;
-                if (!level.getBlockState(position).equals(block.getValue()))
-                {
-                    if (mismatches < 8) ProjectSeele.LOGGER.warn("Private Tokyo-3 cargo mismatch: {} actual={} expected={}",
-                            position, level.getBlockState(position), block.getValue());
-                    mismatches++;
-                }
-            }
-        }
-        return mismatches;
-    }
 
     /** Repairs only the three private towers' abandoned vertical travel
      * shafts. This is safe for a hand-edited city because no road or block

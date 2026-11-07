@@ -160,8 +160,6 @@ public final class NervSlidingDoorEntity extends Entity
         return Mth.lerp(partialTick, this.clientOpenO, this.clientOpen);
     }
     public float requestedOpenProgress(){return this.entityData.get(DATA_TARGET);}
-    /** Read-only actual server hold for the one-lane review witness. */
-    public int reviewHoldTicksR45(){return this.holdTicks;}
 
     public void requestOpen()
     {

@@ -141,9 +141,6 @@ public final class CarrierRearGuideR53
         catch(IOException failure){throw new IllegalStateException("Selected fixed rear rail source unavailable",failure);}
     }
 
-    /** The uninstalled diagnostic path cannot publish runtime geometry. */
-    public static FixedGeometry readFixedForAudit(byte[] bytes,byte[] hardware)throws IOException
-    {return readFixed(bytes,"uninstalled-diagnostic",false);}
 
     /** expectedSha is the identity of these bytes; directory is provenance only. */
     public static FixedGeometry readExistingFixed(byte[] bytes,String expectedSha,String directory)throws IOException

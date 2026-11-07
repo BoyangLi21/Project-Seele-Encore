@@ -39,7 +39,6 @@ public final class NervAccessReaderEntityR44 extends BlockEntity
     public int presentedClearance(){return presented;}
     public float swipeProgress(float partial)
     {return level==null||swipeAt<0?-1:(level.getGameTime()-swipeAt+partial)/12F;}
-    public boolean isOpen(){return level!=null&&level.getGameTime()<openUntil;}
     String chamberId(){return chamberId;}
     String chamberRole(){return chamberRole;}
     int requiredClearance(){return clearance;}

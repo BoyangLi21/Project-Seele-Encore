@@ -545,32 +545,6 @@ public final class RegionalTransitRidingChecks
     }
     public record MovieView(String service,boolean boarded,boolean inside,int ridingTicks,double travel,
                             Vec3 head,double speed,double length,boolean doors,boolean ending) {}
-    /** Read-only camera telemetry; the normal MTR passenger controller retains ownership. */
-    public static MovieView movieView()
-    {
-        if(!ENABLED||mode>=SERVICES.length)return null;
-        try
-        {
-            Object vehicle=currentVehicle();var mc=Minecraft.getInstance();
-            if(vehicle==null&&mc.player!=null)
-            {
-                Object data=Class.forName("org.mtr.mod.client.MinecraftClientData").getMethod("getInstance").invoke(null);double closest=Double.MAX_VALUE;
-                for(Object v:(Iterable<?>)data.getClass().getField("vehicles").get(data))
-                {
-                    if(!serverVehicleIds.contains((Long)call(v,"getId")))continue;
-                    Object h=call(v,"getHeadPosition");if(h==null)continue;
-                    Vec3 point=new Vec3(axis(h,"x"),axis(h,"y"),axis(h,"z"));double distance=mc.player.position().distanceToSqr(point);
-                    if(distance<closest){closest=distance;vehicle=v;}
-                }
-            }
-            if(vehicle==null)return null;Object h=call(vehicle,"getHeadPosition");if(h==null)return null;
-            Object extra=vehicle.getClass().getField("vehicleExtraData").get(vehicle);double length=0;
-            for(Object car:(Iterable<?>)extra.getClass().getField("immutableVehicleCars").get(extra))length+=(Double)call(car,"getLength");
-            double doors=(Double)call(vehicle.getClass().getField("persistentVehicleData").get(vehicle),"getDoorValue");
-            return new MovieView(SERVICES[mode],boarded,boarded&&stepInsideTicks==0,ridingTicks,travel,new Vec3(axis(h,"x"),axis(h,"y"),axis(h,"z")),(Double)call(vehicle,"getSpeed"),length,doors>.5,finishing||done);
-        }
-        catch(ReflectiveOperationException e){return null;}
-    }
     private static Vec3 aircraftEntrance(java.nio.file.Path world,String airport,Vec3 fallback) throws Exception
     {
         var path=world.resolve("regional_boarding_gates.json");if(!Files.exists(path))return fallback;

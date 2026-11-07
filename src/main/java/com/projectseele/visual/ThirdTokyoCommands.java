@@ -222,11 +222,6 @@ public final class ThirdTokyoCommands
         return 0;
     }
 
-    /** Runtime gate used after the unattended GeoFront sortie reaches Tokyo-3. */
-    static int auditVisualCapture(CommandSourceStack source) throws CommandSyntaxException
-    {
-        return audit(source);
-    }
 
     private static int setRetraction(CommandSourceStack source, boolean retract)
             throws CommandSyntaxException

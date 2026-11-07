@@ -2,7 +2,6 @@ package com.projectseele.world;
 
 import com.google.gson.JsonArray;
 import com.google.gson.JsonParser;
-import com.google.gson.JsonObject;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaDorsalMechanism;
 import com.projectseele.entity.EvaUnit01Entity;
@@ -21,9 +20,6 @@ import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
-import java.util.Arrays;
-import java.util.concurrent.ConcurrentHashMap;
 
 /** The review cage's physical support and swept-volume stop share its mesh clock. */
 public final class TvCageCollisionR44
@@ -33,39 +29,7 @@ public final class TvCageCollisionR44
                              List<AABB> boxes, AABB bounds) { }
     private record MotionSweep(Component part, Vec3 first, Vec3 last, AABB bounds) { }
     private static final double[] BAY_X = {-11.5, 30.5, 72.5};
-    private static final boolean METRICS = Boolean.getBoolean("projectseele.r44TvCageCollisionMetrics")
-            || Boolean.getBoolean("projectseele.r44TvCagePhysicalReview");
-    private static final Map<String, QueryStats> QUERY_STATS = new ConcurrentHashMap<>();
-    private static final class QueryStats
-    {
-        long calls, nanos, maxNanos, candidateBoxes, returnedShapes, skippedParts, missingGantries;
-        final long[] latestNanos = new long[4096];
-        synchronized void record(long elapsed, int candidates, int shapes, int skipped, int missing)
-        {
-            latestNanos[(int)(calls % latestNanos.length)] = elapsed;
-            calls++; nanos += elapsed; maxNanos = Math.max(maxNanos, elapsed);
-            candidateBoxes += candidates; returnedShapes += shapes; skippedParts += skipped; missingGantries += missing;
-        }
-        synchronized JsonObject snapshot()
-        {
-            int size=(int)Math.min(calls,latestNanos.length);
-            long[] sorted=Arrays.copyOf(latestNanos,size);Arrays.sort(sorted);
-            var row=new JsonObject();row.addProperty("calls",calls);row.addProperty("average_us",calls==0?0:nanos/1000.0/calls);
-            row.addProperty("max_us",maxNanos/1000.0);row.addProperty("recent_latency_samples",size);
-            row.addProperty("recent_p95_us",size==0?0:sorted[Math.max(0,(int)Math.ceil(size*.95)-1)]/1000.0);
-            row.addProperty("candidate_boxes_tested",candidateBoxes);row.addProperty("returned_shapes",returnedShapes);
-            row.addProperty("component_bounds_rejections",skippedParts);row.addProperty("missing_actual_gantry_queries",missingGantries);
-            return row;
-        }
-    }
 
-    public static JsonObject actualQueryMetricsR44()
-    {
-        var report=new JsonObject();report.addProperty("enabled",METRICS);
-        for(var row:QUERY_STATS.entrySet())report.add(row.getKey(),row.getValue().snapshot());
-        report.addProperty("scope","Measured common provider elapsed time, including query work and first resource load when applicable; latest4096 exact latency samples. Body queries and snapshot exports are separate. Not total Entity.move or whole-game performance.");
-        return report;
-    }
     private static final List<Component> COMPONENTS = new ArrayList<>();
     private static boolean attempted;
     private static boolean available;
@@ -188,39 +152,32 @@ public final class TvCageCollisionR44
         if(level.isClientSide){var declared=NervPlantMotionR52.declaredClientCollisions(level,actor,query,original);if(declared!=original)return declared;}
         if (!enabled() || !level.dimension().equals(FacilitySchemaV2.DIMENSION)
                 || actor instanceof EvaUnit01Entity || actor instanceof NervCarrierPlatformEntity) return original;
-        long began=METRICS?System.nanoTime():0;
         if(!load())return original;
-        boolean relevant=false;int tested=0,returned=0,skipped=0,missing=0;
         List<VoxelShape> result = null;
         for (int variant = 0; variant < 3; variant++)
         {
             double x = BAY_X[variant];
             if (!query.intersects(new AABB(x - 20.5, -444, -268, x + 20.5, -355, -213))) continue;
-            relevant=true;
             final int identity = variant;
             var gantries = level.getEntitiesOfClass(NervCarrierPlatformEntity.class,
                     new AABB(x - 1, -444, -240.5, x + 1, -440, -238.5),
                     e -> e.isAlive() && e.isRestraintGantry() && e.getUnitVariant() == identity);
-            if (gantries.isEmpty()) { missing++; continue; }
+            if (gantries.isEmpty()) continue;
             var gantry = gantries.get(0);
             for (var part : COMPONENTS)
             {
                 if (part.variant >= 0 && part.variant != variant) continue;
                 Vec3 move = gantry.position().add(translation(part, gantry.getRestraintProgress()));
                 AABB localQuery=query.move(-move.x,-move.y,-move.z);
-                if(!part.bounds.intersects(localQuery)) { skipped++; continue; }
+                if(!part.bounds.intersects(localQuery)) continue;
                 for (var local : part.boxes)
                 {
-                    tested++;
                     if (!local.intersects(localQuery)) continue;
                     if (result == null) result = new ArrayList<>(original);
-                    result.add(Shapes.create(local.move(move)));returned++;
+                    result.add(Shapes.create(local.move(move)));
                 }
             }
         }
-        if(METRICS&&relevant)
-            QUERY_STATS.computeIfAbsent((level.isClientSide?"client":"server")+(actor==null?"_snapshot":"_body"),unused->new QueryStats())
-                    .record(System.nanoTime()-began,tested,returned,skipped,missing);
         return result == null ? original : List.copyOf(result);
     }
 

@@ -5195,7 +5195,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
     }
 
-    public boolean pilotControlLockedForReviewR52(){return this.isPilotControlLocked();}
     /** Equipment handoff locks driving input while its ordinary feet remain supported. */
     public boolean ordinaryStandingSupportLockedR52(){return this.isPilotControlLocked(false);}
     protected boolean isPilotControlLocked()
