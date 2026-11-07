@@ -20,6 +20,7 @@ import numpy as np
 
 from author_hakone_lakefront import Editor
 from install_r53_carrier_trays import stopped_world
+from map_pipeline.corridors import publish_plan
 from map_pipeline.delivery_check import capture_identity, read, verify_delivery, write
 from map_pipeline.verify_corridors import write_replay_expected
 from native_transit_additions import assert_preserved, inventory
@@ -121,6 +122,17 @@ def record(a):
                        'world_written': True, 'client_jar_written': False, 'minimap_refreshed': False, 'distant_cache_refreshed': False})
     state.update(latest_installed_batch=a.batch, current_work=spec['continuation_work'])
     state.setdefault('pending_map_cache_releases', []).append(str(a.installation.parent))
+    if spec.get('road_candidate'):
+        # A regraded road must leave later street work reading the installed heights.
+        authority, following = Path(state['planning_authority']), Path(spec['next_authority'])
+        plan = publish_plan(Path(spec['road_candidate']), authority)
+        shutil.copytree(authority, following)
+        shutil.copy2(plan / 'network.npz', following / 'network.npz')
+        state['planning_authority'] = str(following)
+    work_path = Path(state['station_construction_worklist'])
+    work = read(work_path)
+    work.update(latest_installed_batch=a.batch, planning_authority=state['planning_authority'])
+    write(work_path, work)
     require(a.continuation.read_bytes() == before, 'Continuation changed during verification')
     temporary = a.continuation.with_name('.patch-continuation.json')
     write(temporary, state)

@@ -256,6 +256,11 @@ def longitudinal_design(config,out):
             minimum_clearance=clearance,deck_depth=depth,minimum_feet_y=required_feet,
             measured_water_present=False,navigation_verified=False,stage3_interface_constraint=True,
             permanent_piers_inside_opening=False,source_ground_range=[center_min,float(ground[use].max())]))
+    crossing=spec.get('level_crossing')
+    if crossing:
+        # The track stays level out of the platform, so the road climbs to rail height.
+        flat=(points[:,0]>=crossing['road_x'][0])&(points[:,0]<=crossing['road_x'][1])
+        lower[flat]=upper[flat]=target[flat]=crossing['rail_y']
     n=len(along);matrix=lil_matrix((6*n-6,2*n));rhs=np.zeros(6*n-6)
     for i in range(n-1):
         ds=along[i+1]-along[i]
@@ -843,6 +848,8 @@ def verify(config,out):
     for iz,ix in np.argwhere(band&walk):
         px,pz,py=x+int(ix),z+int(iz),int(floor[iz,ix])
         train_body+=[[px,y,pz]for y in range(py+1,py+6)if solid(e.state(px,y,pz))]
+    if band.any() and not np.all(feet[band&walk]==spec['level_crossing']['rail_y']):
+        errors.append('Level crossing surface is not at rail height')
     if train_body:errors.append(['Solid above a level crossing surface',train_body[:10]])
     # Exact future open-water envelope: existing soil awaits Stage3 excavation;
     # no newly introduced solid may occupy the reserved water/air cross-section.
