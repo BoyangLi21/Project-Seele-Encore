@@ -124,6 +124,33 @@ def install(a):
                     '--candidate', str(a.candidate), '--backup', str(a.installation.parent), '--workers', '2'], check=True)
 
 
+def swap(a):
+    """Replace whole native members in the stopped world; a line's route and depot cannot be added around."""
+    spec = read(a.config)
+    state = read(a.continuation)
+    require(state['latest_installed_batch'] == a.batch - 1, 'Stale release batch')
+    root = Path(spec['replacements'])
+    names = sorted(path.relative_to(root / 'after').as_posix() for path in (root / 'after').rglob('*') if path.is_file())
+    with stopped_world(a.world):
+        for name in names:
+            require((a.world / name).read_bytes() == (root / 'before' / name).read_bytes(), ('Native member changed since staging', name))
+        a.installation.parent.mkdir(parents=True, exist_ok=False)
+        for name in names:
+            backup = a.installation.parent / 'original' / name
+            backup.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(a.world / name, backup)
+        for name in names:
+            temporary = (a.world / name).with_suffix('.swap')
+            shutil.copy2(root / 'after' / name, temporary)
+            os.replace(temporary, a.world / name)
+        for name in names:
+            require((a.world / name).read_bytes() == (root / 'after' / name).read_bytes(), ('Member readback failed', name))
+    write(a.installation, dict(status='installed', members=names, batch=a.batch))
+    state.update(latest_installed_batch=a.batch, current_work=spec['continuation_work'])
+    write(a.continuation, state)
+    print('Replaced', len(names), 'native members as batch', a.batch)
+
+
 def record(a):
     spec = read(a.config)
     before = a.continuation.read_bytes()
@@ -156,7 +183,7 @@ def record(a):
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('author', 'prepare', 'install', 'record'))
+    parser.add_argument('mode', choices=('author', 'prepare', 'install', 'record', 'swap'))
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--out', type=Path)
     parser.add_argument('--batch', type=int)

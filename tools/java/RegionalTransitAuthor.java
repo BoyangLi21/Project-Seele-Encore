@@ -180,6 +180,24 @@ public final class RegionalTransitAuthor
             metadata.addRoute(route).addDepot(depot);depots.add(depot);depotKeys.put(depot,key);lineSidings.put(key,siding);
             JsonObject ids=new JsonObject();ids.addProperty("line",key);ids.addProperty("route_id",route.getId());ids.addProperty("depot_id",depot.getId());ids.addProperty("siding_id",siding.getId());lineIds.add(ids);
         }
+        // Rails carry one train each: MTR has no single-line token, so opposed trains meet and stop for good.
+        if(plan.has("extend_routes"))for(JsonElement e:plan.getAsJsonArray("extend_routes"))
+        {
+            JsonObject j=e.getAsJsonObject();
+            Route route=simulator.routes.stream().filter(r->r.getId()==j.get("route_id").getAsLong()).findFirst().orElseThrow();
+            oldRoutes.remove(route.getHexId());route.getRoutePlatforms().clear();
+            for(JsonElement id:j.getAsJsonArray("platforms"))route.getRoutePlatforms().add(new RoutePlatformData(id.getAsLong()));
+            metadata.addRoute(route);
+        }
+        if(plan.has("disable_depots"))for(JsonElement e:plan.getAsJsonArray("disable_depots"))
+        {
+            JsonObject j=e.getAsJsonObject();
+            Depot depot=simulator.depots.stream().filter(d->d.getId()==j.get("depot_id").getAsLong()).findFirst().orElseThrow();
+            for(int hour=0;hour<24;hour++)depot.setFrequency(hour,0);
+            depot.getRealTimeDepartures().clear();
+            simulator.sidings.stream().filter(s->s.getId()==j.get("siding_id").getAsLong()).findFirst().orElseThrow().clearVehicles();
+            metadata.addDepot(depot);
+        }
         metadata.update();simulator.sync();
         // UpdateDataRequest owns canonical runtime instances. New depot DTOs
         // do not carry the synchronized savedRails association; generating

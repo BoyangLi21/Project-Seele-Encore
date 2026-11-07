@@ -23,6 +23,7 @@ from scipy.ndimage import distance_transform_edt
 from shapely.geometry import LineString, shape
 from shapely.ops import unary_union
 
+from map_pipeline.native_rails import load_rails
 from native_transit_additions import inventory
 from plan_ashi_landscape_r54 import PLANTS, SOIL
 from plan_station_access_corridor import CapturedSurface
@@ -32,10 +33,14 @@ from query_blocks import AIR
 from verify_hakone_network_candidate import PAVEMENT
 
 NATURAL = SOIL | PLANTS | AIR
+TREE = ('_leaves', '_log')
 BALLAST, HALF = 'minecraft:gravel', 'minecraft:andesite_slab[type=bottom,waterlogged=false]'
 DECK = 'minecraft:stone_bricks'
 BED_RADIUS, CLEAR_RADIUS, BODY_RADIUS, BODY_HEIGHT = 2.6, 3.1, 1.9, 4.3
+PIER_RADIUS, PIER_SPACING, SHORT_RUN, BRIDGE_REACH, TUNNEL_HEIGHT = 1.6, 12, 6, 8, 6
 ANGLES = ('E', 'SEE', 'SE', 'SSE', 'S', 'SSW', 'SW', 'SWW', 'W', 'NWW', 'NW', 'NNW', 'N', 'NNE', 'NE', 'NEE')
+# Tallest stock in use, eidan_9000: 3.79 above the rail in its model data.
+TRAIN_TOP = 3.9
 DOOR_TRIGGER = 'mtr:platform[door_type=none,facing=north,side=0]'
 DOOR_LATERAL, DOOR_HALF_SPAN = (1.25, 1.5), .6875
 
@@ -104,12 +109,45 @@ def rail_shape(p, a, q, b):
     return np.vstack([points, np.linspace(end, q, max(2, int(s - t)))]), radius
 
 
+def ground_profile(chain, start, finish, ground, grade, pins=()):
+    """Node heights that follow the ground inside a grade limit.
+
+    Both platforms are fixed, and so is every node inside a pin: a pin holds the line
+    level over something it must clear, such as another railway.
+    """
+    lengths = [math.hypot(u[0] - w[0], u[1] - w[1]) for u, w in zip(chain, chain[1:])]
+    heights = [ground(u[0], u[1]) + 1 for u in chain]
+    fixed = {0: float(start), len(chain) - 1: float(finish)}
+    for pin in pins:
+        fixed.update({i: float(pin['y']) for i, u in enumerate(chain) if 0 < i < len(chain) - 1
+                      and math.hypot(u[0] - pin['x'], u[1] - pin['z']) <= pin['radius']})
+    anchors = sorted(fixed)
+    for first, last in zip(anchors, anchors[1:]):
+        heights[first], heights[last] = fixed[first], fixed[last]
+        for i in range(first + 1, last):
+            heights[i] = float(np.clip(heights[i], heights[i - 1] - grade * lengths[i - 1], heights[i - 1] + grade * lengths[i - 1]))
+        for i in range(last - 1, first, -1):
+            heights[i] = float(np.clip(heights[i], heights[i + 1] - grade * lengths[i], heights[i + 1] + grade * lengths[i]))
+    return [round(h) for h in heights]
+
+
 def fit(a):
     """Shortest chain of MTR rails that stays on each surveyed path, by dynamic programming."""
     spec = read(a.config)
+    terrain = None
+    if spec.get('source'):
+        with np.load(Path(spec['source']) / 'measured.npz') as measured:
+            mx, mz, _, _ = map(int, measured['bounds'])
+            top, known = measured['top'].astype(float), measured['full'].copy()
+        def terrain(x, z, reach=8):
+            area = np.s_[max(0, z - mz - reach):z - mz + reach + 1, max(0, x - mx - reach):x - mx + reach + 1]
+            return float(np.median(top[area][known[area]]))
     spacing, reach, tolerance, minimum = (spec.get(k, d) for k, d in (('node_spacing', 30), ('longest_rail', 8), ('tolerance', 3), ('minimum_radius', 80)))
     from scipy.spatial import cKDTree
     rows = []
+    # A second track is fitted against the first, whose bed it may share but whose trains it may not touch.
+    neighbour = cKDTree(spec['keep_clear_of']) if spec.get('keep_clear_of') else None
+    gap = spec.get('track_gap', 4.5)
     for segment in spec['segments']:
         line = LineString(segment['path'])
         tree = cKDTree([line.interpolate(float(d)).coords[0] for d in np.arange(0, line.length + 1, 1)])
@@ -132,10 +170,10 @@ def fit(a):
                         if earlier not in best:
                             continue
                         shape_ = rail_shape(earlier[:2], earlier[2], node[:2], ANGLES[(ANGLES.index(node[2]) + 8) % 16])
-                        if shape_ is None or shape_[1] < minimum:
+                        if shape_ is None or shape_[1] < segment.get('minimum_radius', minimum):
                             continue
                         off = tree.query(shape_[0])[0]
-                        if off.max() > tolerance:
+                        if off.max() > tolerance or (neighbour and neighbour.query(shape_[0])[0].min() < gap):
                             continue
                         cost = best[earlier][0] + float((off ** 2).sum()) + spec.get('node_cost', 40)
                         if node not in best or cost < best[node][0]:
@@ -149,8 +187,10 @@ def fit(a):
             node = best[node][1]
         chain.reverse()
         rise = (finish[1] - start[1]) / len(chain[:-1])
+        heights = (ground_profile(chain, start[1], finish[1], terrain, spec.get('grade', .03), spec.get('pins', ())) if terrain
+                   else [round(start[1] + rise * i) for i in range(len(chain))])
         for i, (u, w) in enumerate(zip(chain, chain[1:])):
-            rows.append(dict(id=f"{segment['id']}-{i}", kind='rail', **{'from': [u[0], round(start[1] + rise * i), u[1]], 'to': [w[0], round(start[1] + rise * (i + 1)), w[1]]},
+            rows.append(dict(id=f"{segment['id']}-{i}", kind='rail', **{'from': [u[0], heights[i], u[1]], 'to': [w[0], heights[i + 1], w[1]]},
                              from_angle=u[2], to_angle=ANGLES[(ANGLES.index(w[2]) + 8) % 16], vertical_radius=100, speed=80, reverse_speed=80))
         print(segment['id'], 'length', round(line.length), 'rails', len(chain) - 1, flush=True)
     write(a.out / 'fitted-rails.json', rows)
@@ -166,7 +206,7 @@ def native(a):
     (work / 'classes').mkdir(parents=True)
     staging, out = work / 'native', work / 'output'
     shutil.copytree(spec['native_snapshot'], staging)
-    plan = {key: spec[key] for key in ('rails', 'stations', 'lines', 'warmup_seconds')}
+    plan = {key: spec[key] for key in ('rails', 'stations', 'lines', 'warmup_seconds', 'extend_routes', 'regenerate_depots', 'disable_depots') if key in spec}
     plan['commission_clock'] = True
     write(work / 'plan.json', plan)
     options = argparse.Namespace(work=work, mtr=a.mtr, java=a.java)
@@ -176,9 +216,15 @@ def native(a):
                     str(staging), str(out), '--append'], check=True, cwd=work)
     before, after = inventory(Path(spec['native_snapshot'])), inventory(staging)
     # Staged trains keep moving, so sidings and the clock differ; neither is delivered.
-    changed = sorted(k for k in before if k in after and after[k] != before[k]
+    replaced = set(spec.get('replace_members', ()))
+    changed = sorted(k for k in before if k in after and after[k] != before[k] and k not in replaced
                      and Path(k).parts[2] not in ('settings', 'sidings'))
     gone = sorted(set(before) - set(after))
+    for name in replaced:
+        for folder, root in (('replacements/before', Path(spec['native_snapshot'])), ('replacements/after', staging)):
+            target = a.out / folder / 'mtr' / name
+            target.parent.mkdir(parents=True, exist_ok=True)
+            shutil.copy2(root / name, target)
     if changed or gone:
         raise ValueError(('Native authoring touched existing members', changed[:5], gone[:5]))
     additions = a.out / 'additions'
@@ -207,6 +253,70 @@ def water_mask(features, spec, cells, bounds):
     return shapely.intersects(reserve, cells)
 
 
+def mapped_bridges(features, cells, bounds):
+    """Samples beside a surveyed railway bridge, wherever the fitted line runs."""
+    with gzip.open(features, 'rt', encoding='utf8') as stream:
+        rows = json.load(stream)['features']
+    clip = shapely.box(*bounds)
+    shapes = [g.buffer(BRIDGE_REACH) for q in rows if q['properties'].get('source_layer') == 'RailCL' and q['properties'].get('vt_railstate') == '橋・高架'
+              for g in [shape(q['geometry'])] if g.intersects(clip)]
+    if not shapes:
+        return np.zeros(len(cells), bool)
+    reserve = unary_union(shapes)
+    shapely.prepare(reserve)
+    return shapely.intersects(reserve, cells)
+
+
+def runs(flags):
+    """(start, stop) of each true stretch of a boolean sequence."""
+    edges = np.flatnonzero(np.diff(np.r_[False, flags, False].astype(int)))
+    return edges.reshape(-1, 2).tolist()
+
+
+def existing_track(snapshot, area, sampled=()):
+    """Train rails near a new line, as a tree and rail heights.
+
+    Chords screen installed rails; a curve laid in an earlier batch of this plan can stray
+    far from its chord, so its exact native samples are named in `avoid_tracks`.
+    """
+    rows = [np.array(r['points'], float) - [.5, 0, .5] for path in sampled for r in read(path) if r['mode'] == 'TRAIN']
+    for rail in load_rails(snapshot):
+        if rail['mode'] == 'TRAIN':
+            a, b = np.array(rail['a'], float), np.array(rail['b'], float)
+            rows.append(a + np.linspace(0, 1, max(2, int(np.linalg.norm(b - a)) + 1))[:, None] * (b - a))
+    points = np.vstack(rows) + [.5, 0, .5]
+    points = points[shapely.intersects(area, shapely.points(points[:, [0, 2]]))]
+    if not len(points):
+        return None, None
+    from scipy.spatial import cKDTree
+    return cKDTree(points[:, [0, 2]]), points[:, 1]
+
+
+def spans(points, ground, block, wet, bridge, spec):
+    """Rail samples carried on a deck, and the stretches that need piers.
+
+    A channel beside the track runs along it for hundreds of metres, so only a short wet
+    stretch is a real crossing, unless the survey marks a bridge. High track stands on
+    piers, not on a wall of fill.
+    """
+    crossing = bridge.copy()
+    for start, stop in runs(wet):
+        if stop - start <= spec.get('crossing_limit', 30):
+            crossing[start:stop] = True
+    high = block - ground >= spec.get('viaduct_height', 5)
+    for start, stop in runs(~high):
+        if stop - start < SHORT_RUN and start and stop < len(high):
+            high[start:stop] = True
+    for start, stop in runs(high):
+        if stop - start < SHORT_RUN:
+            high[start:stop] = False
+    long_bridge = np.zeros(len(points), bool)
+    for start, stop in runs(bridge):
+        if stop - start >= PIER_SPACING * 2:
+            long_bridge[start:stop] = True
+    return crossing | high, (high & ~crossing) | long_bridge
+
+
 def bed_heights(ys):
     """Ballast top under a rail: full gravel near a whole block, a slab near a half."""
     rounded = np.rint(np.asarray(ys, float) * 2) / 2
@@ -220,7 +330,9 @@ def edits(a):
     # A diagonal line's bounding box holds ungenerated corners; state() refuses those columns.
     source = CapturedSurface(spec['source'], partial=True)
     points = np.array([p for r in samples for p in r['points']])
+    rail_ends = np.cumsum([len(r['points']) for r in samples])
     lines = unary_union([LineString(np.array(r['points'])[:, [0, 2]]) for r in samples])
+    existing, existing_heights = existing_track(spec['native_snapshot'], lines.buffer(16), spec.get('avoid_tracks', ()))
     sx, sz, sX, sZ = source.bounds
     x0, z0, x1, z1 = lines.buffer(16).bounds
     bx, bz, bX, bZ = max(sx, math.floor(x0)), max(sz, math.floor(z0)), min(sX, math.ceil(x1)), min(sZ, math.ceil(z1))
@@ -245,14 +357,27 @@ def edits(a):
     original = source.measured['top'][bz - sz:bZ - sz + 1, bx - sx:bX - sx + 1].astype(int)
     full = source.measured['full'][bz - sz:bZ - sz + 1, bx - sx:bX - sx + 1]
     water = water_mask(spec['features'], spec, cells, (bx, bz, bX, bZ))
-    d, near_bed = distance_transform_edt(~bed, return_indices=True)
+    along = np.floor(points[:, [0, 2]]).astype(int)
+    inside = (along[:, 0] >= bx) & (along[:, 0] <= bX) & (along[:, 1] >= bz) & (along[:, 1] <= bZ)
+    ground = np.full(len(points), -129)
+    ground[inside] = original[along[inside, 1] - bz, along[inside, 0] - bx]
+    sample_block = bed_heights(points[:, 1])[0]
+    wet_samples = water_mask(spec['features'], spec, shapely.points(points[:, [0, 2]]), (bx, bz, bX, bZ))
+    bridge_samples = mapped_bridges(spec['features'], shapely.points(points[:, [0, 2]]), (bx, bz, bX, bZ))
+    carried, piered = np.zeros(len(points), bool), np.zeros(len(points), bool)
+    for start, stop in zip(np.r_[0, rail_ends[:-1]], rail_ends):
+        carried[start:stop], piered[start:stop] = spans(points[start:stop], ground[start:stop], sample_block[start:stop], wet_samples[start:stop], bridge_samples[start:stop], spec)
+    spanned = carried[nearest].reshape(xx.shape)
+    d, near_bed = distance_transform_edt(~(bed & ~spanned), return_indices=True)
     top = (block + 0)[tuple(near_bed)]
     target = np.rint(np.clip(original, top - d, top + d)).astype(int)
-    active = (target != original) & (d <= spec.get('earthwork_reach', 10)) & ~bed & ~water & ~public & full
+    # Deep ground stays in place over a lined tunnel instead of opening a trench.
+    in_tunnel = (ground - sample_block >= spec.get('tunnel_depth', 7))[nearest].reshape(xx.shape)
+    active = (target != original) & (d <= spec.get('earthwork_reach', 10)) & ~bed & ~spanned & ~public & ~in_tunnel & full
     writes, purposes, skipped, blocked = {}, {}, Counter(), []
     def put(x, y, z, state, purpose):
         before = source.state(x, y, z)
-        if before.split('[')[0] not in NATURAL:
+        if before.split('[')[0] not in NATURAL and not before.split('[')[0].endswith(TREE) and before != HALF:
             skipped[before.split('[')[0]] += 1
             return
         if before != state:
@@ -265,19 +390,31 @@ def edits(a):
             put(x, y, z, state, 'embankment slope')
     for iz, ix in np.argwhere(bed):
         x, z, y = int(xx[iz, ix]), int(zz[iz, ix]), int(block[iz, ix])
-        if public[iz, ix]:
+        if public[iz, ix] and not spanned[iz, ix]:
             continue
         if not full[iz, ix]:
             blocked.append([x, y, z])
             continue
-        if water[iz, ix]:
-            put(x, y - 1, z, DECK, 'open deck over a mapped channel')
+        if spanned[iz, ix]:
+            put(x, y - 1, z, DECK, 'open deck')
         else:
             for yy in range(min(int(original[iz, ix]) - 1, y - 1), y):
                 put(x, yy, z, 'minecraft:stone', 'track bed fill')
         put(x, y, z, BALLAST, 'ballast')
         if half[iz, ix]:
             put(x, y + 1, z, HALF, 'ballast half step')
+    for start, stop in runs(piered):
+        for i in sorted({*range(start, stop, PIER_SPACING), stop - 1}):
+            cx, cz = points[i, [0, 2]]
+            for x in range(math.floor(cx - PIER_RADIUS), math.ceil(cx + PIER_RADIUS)):
+                for z in range(math.floor(cz - PIER_RADIUS), math.ceil(cz + PIER_RADIUS)):
+                    iz, ix = z - bz, x - bx
+                    if math.hypot(x + .5 - cx, z + .5 - cz) > PIER_RADIUS or public[iz, ix] or (water[iz, ix] and not bridge_samples[i]) or not full[iz, ix]:
+                        continue
+                    if existing is not None and existing.query([x + .5, z + .5])[0] < CLEAR_RADIUS + 1:
+                        continue
+                    for y in range(int(original[iz, ix]) - 1, int(sample_block[i]) - 1):
+                        put(x, y, z, DECK, 'viaduct pier')
     for iz, ix in np.argwhere(clear):
         x, z = int(xx[iz, ix]), int(zz[iz, ix])
         if not full[iz, ix]:
@@ -285,14 +422,21 @@ def edits(a):
                 blocked.append([x, 0, z])
             continue
         base = int(block[iz, ix]) + (2 if half[iz, ix] else 1)
-        for y in range(base, base + 6):
+        for y in range(base, base + TUNNEL_HEIGHT):
             before = source.state(x, y, z)
             if before.split('[')[0] in AIR or (x, y, z) in writes:
                 continue
-            if before.split('[')[0] in NATURAL:
+            if before.split('[')[0] in NATURAL or before.split('[')[0].endswith(TREE) or before == HALF:
                 put(x, y, z, 'minecraft:air', 'track clearance')
             elif body[iz, ix] and not public[iz, ix] and not station[iz, ix]:
                 blocked.append([x, y, z])
+    wall = near(CLEAR_RADIUS + 1.1) & ~clear
+    for iz, ix in np.argwhere(in_tunnel & (clear | wall) & full):
+        x, z = int(xx[iz, ix]), int(zz[iz, ix])
+        base = int(block[iz, ix]) + (2 if half[iz, ix] else 1)
+        for y in [base + TUNNEL_HEIGHT] if clear[iz, ix] else range(base - 1, base + TUNNEL_HEIGHT + 1):
+            if source.state(x, y, z).split('[')[0] in SOIL or (x, y, z) in writes:
+                put(x, y, z, DECK, 'tunnel lining')
     def state(x, y, z):
         return writes.get((x, y, z), source.state(x, y, z))
     floating, solid_in_body = [], []
@@ -309,6 +453,15 @@ def edits(a):
                 solid_in_body.append([px, y, pz, state(px, y, pz)[:40]])
     devices = {tuple(int(t[k]) for k in 'xyz') for t in source.devices}
     errors = []
+    if existing is not None:
+        foul = []
+        for (x, y, z), written in writes.items():
+            if written.split('[')[0] not in AIR:
+                d_, i_ = existing.query([x + .5, z + .5])
+                if d_ < BODY_RADIUS and existing_heights[i_] <= y < existing_heights[i_] + TRAIN_TOP:
+                    foul.append([x, y, z])
+        if foul:
+            errors.append(['Edit inside an installed train path', foul[:10]])
     if blocked:
         errors.append(['Track meets a public or unknown column', blocked[:10]])
     if floating:
@@ -319,21 +472,22 @@ def edits(a):
         errors.append('Track edits an original device')
     rows = [dict(pos=list(p), before=source.state(*p), after=s, purpose=purposes[p]) for p, s in sorted(writes.items())]
     report = dict(errors=errors, cells=len(rows), purposes=dict(Counter(r['purpose'] for r in rows)), skipped_foreign=dict(skipped),
-                  length=float(lines.length), open_deck_columns=int((bed & water).sum()), world_written=False, train_run_in_game=False)
+                  length=float(lines.length), open_deck_columns=int((bed & spanned).sum()), viaduct_samples=int(piered.sum()),
+                  world_written=False, train_run_in_game=False)
     write(a.out / 'bed-check.json', report)
     additions = a.out / 'additions'
     write(a.out / 'patch.json', dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'], edits=rows,
           native_snapshot=spec['native_snapshot'], native_additions=str(additions), error_reports=[str(a.out / 'bed-check.json')],
           views_reviewed_by_root=False, continuation_work=spec['continuation_work']))
-    print(json.dumps({k: report[k] for k in ('cells', 'purposes', 'skipped_foreign', 'length', 'open_deck_columns')}, ensure_ascii=False))
+    print(json.dumps({k: report[k] for k in ('cells', 'purposes', 'skipped_foreign', 'length', 'open_deck_columns', 'viaduct_samples')}, ensure_ascii=False))
     if errors:
         print(json.dumps(errors, ensure_ascii=False)[:1500])
         raise SystemExit(1)
 
 
-def door_scan(point, along, out, y):
+def door_scan(point, along, out, y, half_span=DOOR_HALF_SPAN):
     """Cells RenderVehicleHelper.canOpenDoors reads for one stopped door on a level rail."""
-    corners = np.array([point + along * s + out * w for s in (-DOOR_HALF_SPAN, DOOR_HALF_SPAN) for w in DOOR_LATERAL])
+    corners = np.array([point + along * s + out * w for s in (-half_span, half_span) for w in DOOR_LATERAL])
     low, high = corners.min(0) - 1, corners.max(0) + 1
     for x in np.arange(low[0], high[0] + 1e-9):
         for z in np.arange(low[1], high[1] + 1e-9):
@@ -342,17 +496,16 @@ def door_scan(point, along, out, y):
 
 
 def platform_edge(source, start, along, length, out, y):
-    """Walkable cells beside the rail, found by stepping outwards from the track."""
-    row = {}
+    """Cells beside the rail, stepping outwards from the track: walkable, then under a pillar."""
+    row, pillars = {}, {}
     for s in np.arange(0, length, .5):
         for w in np.arange(1, 3.6, .25):
             x, z = (math.floor(v) for v in start + along * s + out * w)
             if source.state(x, y, z).split('[')[0] in AIR:
                 continue
-            if all(source.state(x, y + h, z).split('[')[0] in AIR for h in (1, 2)):
-                row[x, z] = source.state(x, y - 1, z)
+            (row if all(source.state(x, y + h, z).split('[')[0] in AIR for h in (1, 2)) else pillars)[x, z] = source.state(x, y - 1, z)
             break
-    return row
+    return row, pillars
 
 
 def doors(a):
@@ -395,28 +548,47 @@ def doors(a):
         along = delta / length
         out = np.array([-along[1], along[0]])
         sides = {side: platform_edge(source, start, along, length, out * side, y) for side in (1, -1)}
-        side = max(sides, key=lambda k: len(sides[k]))
-        edge = sides[side]
+        side = max(sides, key=lambda k: len(sides[k][0]))
+        edge, pillars = sides[side]
         cells = set()
-        for (x, z), below in sorted(edge.items()):
-            if below.split('[')[0] in AIR or '[' in below:
+        # A canopy post stands on the edge row, but a door beside it still needs the trigger.
+        for (x, z), below in sorted({**pillars, **edge}.items()):
+            if below.split('[')[0] in AIR or any(k in below for k in ('type=', 'half=', 'shape=')):
                 errors.append(['Edge has no solid block to replace', name, [x, y - 1, z], below])
                 continue
             cells.add((x, y - 1, z))
             rows.append(dict(pos=[x, y - 1, z], before=below, after=DOOR_TRIGGER, purpose='platform door trigger'))
         # A door anywhere along the platform opens on the edge side and only there.
-        stops = np.arange(DOOR_HALF_SPAN, length - DOOR_HALF_SPAN, .5)
-        near = sum(any(c in cells for c in door_scan(start + along * s, along, out * side, y)) for s in stops)
-        far = sum(any(c in cells for c in door_scan(start + along * s, along, -out * side, y)) for s in stops)
+        span = spec.get('door_half_span', DOOR_HALF_SPAN)
+        stops = np.arange(span, length - span, .5)
+        # Older stations set the edge back past a door's reach; those stops take a trigger in the track floor.
+        for s in stops:
+            scan = list(door_scan(start + along * s, along, out * side, y, span))
+            if not any(c in cells for c in scan):
+                floor = [c for c in scan if c[1] == y - 1 and source.state(*c).split('[')[0] not in AIR and '[' not in source.state(*c)]
+                if floor:
+                    c = max(floor, key=lambda q: (np.array([q[0] + .5, q[2] + .5]) - start) @ (out * side))
+                    cells.add(c)
+                    rows.append(dict(pos=list(c), before=source.state(*c), after=DOOR_TRIGGER, purpose='platform door trigger'))
+        near = sum(any(c in cells for c in door_scan(start + along * s, along, out * side, y, span)) for s in stops)
+        far = sum(any(c in cells for c in door_scan(start + along * s, along, -out * side, y, span)) for s in stops)
         if near != len(stops) or far or len(edge) < .7 * length:
             errors.append(['Door reach', name, [p['x'], y, p['z']], near, len(stops), far, len(edge)])
         report.append(dict(station=name, position=[p['x'], y, p['z']], length=length, cells=len(cells), side=side, doors_checked=len(stops),
                            doors_in_reach=near, far_side_in_reach=far))
     check = dict(errors=errors, cells=len(rows), platforms=report, world_written=False, door_opened_in_game=False)
     write(a.out / 'door-check.json', check)
-    write(a.out / 'patch.json', dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'], edits=rows,
-          native_snapshot=spec['native_snapshot'], error_reports=[str(a.out / 'door-check.json')], views_reviewed_by_root=False,
-          continuation_work=spec['continuation_work']))
+    # A line's bed and its stations' doors come from one capture, so they install as one batch.
+    patch = dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'], edits=[],
+                 native_snapshot=spec['native_snapshot'], error_reports=[], views_reviewed_by_root=False,
+                 continuation_work=spec['continuation_work'])
+    if a.out.joinpath('patch.json').exists():
+        patch = read(a.out / 'patch.json')
+        if patch['source'] != spec['source']:
+            raise ValueError('Bed and doors must share one capture')
+    patch['edits'] = [r for r in patch['edits'] if r['purpose'] != 'platform door trigger'] + rows
+    patch['error_reports'] = sorted({*patch['error_reports'], str(a.out / 'door-check.json')})
+    write(a.out / 'patch.json', patch)
     print(json.dumps(dict(cells=len(rows), platforms=len(report), errors=errors[:5]), ensure_ascii=False))
     if errors:
         raise SystemExit(1)
