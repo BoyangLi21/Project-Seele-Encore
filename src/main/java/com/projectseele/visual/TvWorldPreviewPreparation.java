@@ -97,7 +97,6 @@ public final class TvWorldPreviewPreparation
             {
                 throw new IllegalStateException("Save-local TV dimension profile is not active; refusing preparation");
             }
-            if (MODE.equals("coast") && !TvCityReversalCheck.tick(generatedLevel)) return;
             if (MODE.equals("probe"))
             {
                 int x = -210, z = 320, floor = TvWorldPreviewTerrain.ground(x, z);

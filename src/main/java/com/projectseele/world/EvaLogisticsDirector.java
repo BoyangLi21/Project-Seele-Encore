@@ -1207,7 +1207,6 @@ public final class EvaLogisticsDirector
     private static void maintainSurfaceSiloDoor(ServerLevel level,
                                                 int variant)
     {
-        if(com.projectseele.visual.TvFacilityR16Review.controlsSurfaceHatches(level))return;
         FleetEntry fleet = entry(level, variant);
         BlockPos surface = surfaceLiftBed(level, variant);
         boolean active = fleet != null && fleet.phase() != Phase.PARKED;

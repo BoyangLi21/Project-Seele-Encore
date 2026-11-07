@@ -32,7 +32,6 @@ public final class CombatFoleyR36
         play(actor,contact.add(0,actor.getBbHeight()*.18,0),
                 ModSounds.EVA_JOINT_LOAD.get(),.9F,.86F);
         com.projectseele.ProjectSeele.LOGGER.info("EVA transport load transferred: unit={} contact={}",actor.getUUID(),contact);
-        com.projectseele.visual.AirLiftR30Review.touchdown(actor);
     }
     public static void swing(SachielEntity actor)
     {play(actor,SachielStrike.sample(actor,0).hand(),ModSounds.SACHIEL_SWING.get(),1.5F,1);}

@@ -42,7 +42,7 @@ public final class UNIdentityClient
     }
     @SubscribeEvent public static void draw(RenderLevelStageEvent event)
     {
-        if(event.getStage()!=RenderLevelStageEvent.Stage.AFTER_ENTITIES)return;var mc=Minecraft.getInstance();if(mc.level==null||mc.getSingleplayerServer()==null||!mc.level.dimension().location().toString().equals("projectseele:geofront")||!(mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize().getFileName().toString().equals("SEELE_TV_WORLD_PREVIEW_20260906")||com.projectseele.client.visual.UNWorldR11Tour.ENABLED&&mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize().getFileName().toString().equals("SEELE_R11_CANONICAL_ACCEPTANCE")))return;
+        if(event.getStage()!=RenderLevelStageEvent.Stage.AFTER_ENTITIES)return;var mc=Minecraft.getInstance();if(mc.level==null||mc.getSingleplayerServer()==null||!mc.level.dimension().location().toString().equals("projectseele:geofront")||!mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize().getFileName().toString().equals("SEELE_TV_WORLD_PREVIEW_20260906"))return;
         if(plates==null)load();if(texture==null||plates.isEmpty())return;var buffers=mc.renderBuffers().bufferSource();var type=RenderType.entityCutoutNoCull(TEXTURE);var vertex=buffers.getBuffer(type);var stack=event.getPoseStack();var cam=event.getCamera().getPosition();boolean drew=false;
         for(var p:plates)
         {

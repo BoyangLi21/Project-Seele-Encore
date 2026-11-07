@@ -20,7 +20,6 @@ import java.nio.file.*;
 public final class RegionalStationPhoto
 {
     private static final String MODE=System.getProperty("projectseele.regionalBuild","");
-    private static final boolean R10_MODELS=MODE.equals("r10-models")||MODE.equals("r10-choreography");
     private static final boolean R16=MODE.equals("r16-photos");
     private static final boolean R44=MODE.equals("r44-facility-photos");
     private static final boolean R43=R44||MODE.equals("r43-facility-photos");
@@ -30,7 +29,7 @@ public final class RegionalStationPhoto
     private static final boolean R39=MODE.equals("r39-lighting-photos");
     private static final boolean R38=MODE.equals("r38-lighting-photos");
     private static final boolean R30=MODE.equals("r30-lighting-photos")||R38||R39||R40;
-    private static final boolean R07=MODE.equals("r07-photos")||MODE.equals("r10-world")||R10_MODELS||R16,DETAIL=R30||R07||MODE.equals("detail-photos");
+    private static final boolean R07=MODE.equals("r07-photos")||MODE.equals("r10-world")||R16,DETAIL=R30||R07||MODE.equals("detail-photos");
     private static final boolean ENABLED=MODE.equals("station-photo")||MODE.equals("quality-photos")||DETAIL;
     private record View(String file,Vec3 position,float yaw,float pitch,String action,int warmup,
                         java.util.List<net.minecraft.core.BlockPos> requiredSections,int fov)
@@ -71,7 +70,7 @@ public final class RegionalStationPhoto
         if(!ENABLED||event.phase!=TickEvent.Phase.END)return;
         Minecraft mc=Minecraft.getInstance();if(mc.player==null||mc.getSingleplayerServer()==null)return;
         var server=mc.getSingleplayerServer();Path world=server.getWorldPath(LevelResource.ROOT).normalize();
-        if(!world.getFileName().toString().equals(R44?com.projectseele.visual.NativeReviewWorldsR45.expectedName():R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R39?"SEELE_FIELD_R39_REVIEW":R38?"SEELE_FIELD_R38_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R16?"SEELE_TV_FACILITIES_R16":R10_MODELS?"SEELE_ANGEL_MODEL_REVIEW_R10":"SEELE_TV_WORLD_PREVIEW_20260906"))return;
+        if(!world.getFileName().toString().equals(R44?com.projectseele.visual.NativeReviewWorldsR45.expectedName():R43?"SEELE_FIELD_R43_REVIEW":R42?"SEELE_FIELD_R42_REVIEW":R41?"SEELE_FIELD_R41_REVIEW":R40?"SEELE_FIELD_R40_REVIEW":R39?"SEELE_FIELD_R39_REVIEW":R38?"SEELE_FIELD_R38_REVIEW":R30?"SEELE_FIELD_R30_REVIEW":R16?"SEELE_TV_FACILITIES_R16":"SEELE_TV_WORLD_PREVIEW_20260906"))return;
         try
         {
             if(!positioningFailure.isEmpty())throw new IllegalStateException(positioningFailure);
@@ -165,10 +164,6 @@ public final class RegionalStationPhoto
                         clockLevel.getGameRules().getRule(net.minecraft.world.level.GameRules.RULE_DAYLIGHT).set(false,server);
                         clockLevel.setDayTime(daytime);actionReady=true;
                     }
-                    else if(R10_MODELS&&action.startsWith("pose:"))
-                    {
-                        com.projectseele.visual.AngelModelR10Review.seek(Float.parseFloat(action.substring(5)));actionReady=true;
-                    }
                     else if(R44&&action.equals("read_archive"))
                     {
                         var at=new net.minecraft.core.BlockPos(30,-329,340);
@@ -247,7 +242,7 @@ public final class RegionalStationPhoto
                     ProjectSeele.LOGGER.info("REGIONAL PHOTO WAIT file={} anchor={} loaded={} compiled={} state={}",
                             VIEWS[view].file(),p,mc.level.getChunkSource().hasChunk(p.getX()>>4,p.getZ()>>4),mc.levelRenderer.isChunkCompiled(p),mc.level.getBlockState(p));
             boolean cameraReady=mc.gameRenderer.getMainCamera().getPosition().distanceToSqr(VIEWS[view].position().add(0,1.62,0))<.01
-                    &&mc.level.dimension().equals(R10_MODELS?net.minecraft.world.level.Level.OVERWORLD:FacilitySchemaV2.DIMENSION)
+                    &&mc.level.dimension().equals(FacilitySchemaV2.DIMENSION)
                     &&mc.getCameraEntity()==mc.player;
             if(R44&&VIEWS[view].action().startsWith("daytime:"))
                 cameraReady&=Math.floorMod(mc.level.getDayTime(),24000)==Long.parseLong(VIEWS[view].action().substring(8));
@@ -353,7 +348,7 @@ public final class RegionalStationPhoto
     private static void position(Minecraft mc)
     {
         var server=mc.getSingleplayerServer();var p=server.getPlayerList().getPlayers().get(0);View camera=VIEWS[view];
-        var level=R10_MODELS?server.overworld():server.getLevel(FacilitySchemaV2.DIMENSION);
+        var level=server.getLevel(FacilitySchemaV2.DIMENSION);
         Vec3 eye=camera.position().add(0,1.62,0);var cell=net.minecraft.core.BlockPos.containing(eye);
         var state=level.getBlockState(cell);
         if(DETAIL&&state.getCollisionShape(level,cell).toAabbs().stream().anyMatch(b->b.move(cell).contains(eye)))

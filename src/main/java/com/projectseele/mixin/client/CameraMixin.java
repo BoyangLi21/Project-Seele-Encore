@@ -68,18 +68,6 @@ public abstract class CameraMixin
             Entity subject, boolean detached, boolean mirrored,
             float partialTick, CallbackInfo callback)
     {
-        var airReview=com.projectseele.client.visual.AirLiftR40Client.cameraView(partialTick);
-        if(airReview!=null)
-        {
-            Vec3 p=airReview.position(),d=airReview.target().subtract(p);this.setPosition(p.x,p.y,p.z);
-            this.setRotation((float)Math.toDegrees(Math.atan2(-d.x,d.z)),(float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));return;
-        }
-        var exterior=com.projectseele.client.visual.TransitExteriorR16Client.cameraView();
-        if(exterior!=null)
-        {
-            Vec3 p=exterior.position(),d=exterior.target().subtract(p);this.setPosition(p.x,p.y,p.z);
-            this.setRotation((float)Math.toDegrees(Math.atan2(-d.x,d.z)),(float)-Math.toDegrees(Math.atan2(d.y,d.horizontalDistance())));return;
-        }
         var directed=com.projectseele.client.FirstBattleClient.camera((Camera)(Object)this,partialTick);
         if(directed!=null)
         {

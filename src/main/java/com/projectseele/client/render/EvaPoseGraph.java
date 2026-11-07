@@ -194,9 +194,7 @@ public final class EvaPoseGraph
             return finish(entity,model,partialTick,modelToWorld,EvaMechanicalServicePoseR52.apply(entity,model,partialTick),EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         if(EvaLockedCagePoseR44.applies(entity))
         {
-            EvaLockedCagePoseR44.witness(entity,model,"after_gecko");
             var cage=EvaLockedCagePoseR44.apply(entity,model);
-            EvaLockedCagePoseR44.witness(entity,model,"locked_cage_final");
             return finish(entity,model,partialTick,modelToWorld,cage,EvaMotionEngineV2.BoneWrites.empty(),EvaMotionEngineV2.BoneWrites.empty());
         }
         if(com.projectseele.entity.EvaShutdownR30.displaysCapturedPoseR45(entity))

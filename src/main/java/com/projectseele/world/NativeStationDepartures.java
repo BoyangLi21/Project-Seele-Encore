@@ -103,7 +103,6 @@ public final class NativeStationDepartures
         if (rows.isEmpty()) rows.add("当前暂无待发班次");
         Snapshot snapshot = new Snapshot(id, now, List.copyOf(times), List.copyOf(rows));
         cache.put(cacheKey, new Cached(moment + 1_000_000_000L, snapshot));
-        if (Boolean.getBoolean("projectseele.r44DepartureBoardAudit")) com.projectseele.visual.DepartureBoardAuditR44.captureSource(snapshot, response);
         return snapshot;
     }
     private NativeStationDepartures() {}

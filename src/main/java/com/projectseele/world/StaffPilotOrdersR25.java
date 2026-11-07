@@ -44,7 +44,6 @@ public final class StaffPilotOrdersR25
         for(var job:selected)
         {
             jobs.remove(job.unit());
-            StaffOperationsTraceR45.event(player.serverLevel(),"pilot_pending_canceled",player.getUUID(),npc.getUUID(),job.unit(),job.standby()?"standby":"board","owner_checked_before_cancellation");
         }
         return Cancellation.CANCELED;
     }
@@ -58,7 +57,6 @@ public final class StaffPilotOrdersR25
         if(command!=null&&!command.owner.equals(player.getUUID()))return "这台机体已有其他指挥员的待执行指令，请先联系下令人。";
         if(jobs.containsKey(unit))return "该驾驶员已有登机指令，正在执行。";
         jobs.put(unit,new Order(player.getUUID(),npc.getUUID(),unit,player.server.getTickCount()+300,false,AutoSortieR32.missionToken(player.serverLevel())));
-        StaffOperationsTraceR45.event(player.serverLevel(),"pilot_pending_accepted",player.getUUID(),npc.getUUID(),unit,"board","commander_unchanged_until_native_dispatch_accepts");
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),unit);
         return "正在呼叫"+TrainingPilotEntity.pilotName(unit)+"，确认对应机库后开始登机。";
     }
@@ -71,7 +69,6 @@ public final class StaffPilotOrdersR25
         var jobs=ORDERS.computeIfAbsent(player.serverLevel(),l->new HashMap<>());
         if(jobs.containsKey(unit))return "该驾驶员的上一条指令尚未结束。";
         jobs.put(unit,new Order(player.getUUID(),npc.getUUID(),unit,player.server.getTickCount()+300,true,AutoSortieR32.missionToken(player.serverLevel())));
-        StaffOperationsTraceR45.event(player.serverLevel(),"pilot_pending_accepted",player.getUUID(),npc.getUUID(),unit,"standby","parked_phase_still_required_at_execution");
         EvaLogisticsDirector.loadControlTarget(player.serverLevel(),unit);
         return "正在确认机库联锁，随后通知驾驶员离开插入栓、返回待命。";
     }
@@ -87,13 +84,12 @@ public final class StaffPilotOrdersR25
                 var actor=level.getEntity(job.officer());
                 if(player==null || player.level()!=level || !(actor instanceof NervStaffEntity npc)
                         || !NervStaffDialogue.authorized(player) || !StaffAuthorityR25.allows(npc,"board"))
-                {jobs.remove(job.unit());StaffOperationsTraceR45.event(level,"pilot_pending_invalidated",job.caller(),job.officer(),job.unit(),job.standby()?"standby":"board","owner_presence_or_authority_changed");continue;}
+                {jobs.remove(job.unit());continue;}
                 if(event.getServer().getTickCount()>job.deadline())
                 {jobs.remove(job.unit());NervStaffDialogue.reply(player,npc,"机库信号超时，登机指令未执行。");continue;}
                 if(!job.standby()&&!missionContextCurrentR45(job.mission(),AutoSortieR32.missionToken(level)))
                 {
                     jobs.remove(job.unit());
-                    StaffOperationsTraceR45.event(level,"pilot_pending_invalidated",job.caller(),job.officer(),job.unit(),"board","mission_canceled_failed_or_replaced");
                     NervStaffDialogue.reply(player,npc,"作战安排已变更，上一条登机指令已撤销。");continue;
                 }
                 EvaLogisticsDirector.loadControlTarget(level,job.unit());
@@ -113,7 +109,6 @@ public final class StaffPilotOrdersR25
                 }
                 var result=TrainingPilotDirector.start(level,job.unit());
                 if(result.accepted())AutoSortieR32.assignCommander(EvaLogisticsDirector.canonicalUnit(level,job.unit()),player);
-                StaffOperationsTraceR45.event(level,result.accepted()?"pilot_native_dispatch_accepted":"pilot_native_dispatch_rejected",job.caller(),job.officer(),job.unit(),"board",result.message());
                 NervStaffDialogue.reply(player,npc,result.accepted()?"已通知"+TrainingPilotEntity.pilotName(job.unit())+"登机。":result.message());
             }
         }

@@ -1,7 +1,6 @@
 package com.projectseele.mixin;
 
 import com.supermartijn642.movingelevators.elevator.ElevatorCollisionHandler;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.entity.player.Player;
 import net.minecraft.world.level.Level;
 import net.minecraft.world.phys.*;
@@ -26,7 +25,6 @@ public abstract class MovingElevatorPassengerR22Mixin
         AABB car=bounds.move(position);double floor=car.minY+1;
         for(var p:level.getEntitiesOfClass(Player.class,car.inflate(.4),p->!p.isSpectator()&&!p.isPassenger()&&!p.noPhysics))
         {
-            projectSeele$trace("BEFORE",level,p,floor,motion);
             // Walking/gravity may put feet a fraction below the old floor.
             // A real jump has positive velocity and stays independent.
             if(p.getDeltaMovement().y<=.05&&Math.abs(p.getY()-floor)<.25
@@ -81,14 +79,7 @@ public abstract class MovingElevatorPassengerR22Mixin
             if(p instanceof net.minecraft.server.level.ServerPlayer serverPlayer
                     &&car.inflate(.25).contains(p.position()))serverPlayer.connection.resetPosition();
             if(level.isClientSide)com.projectseele.world.LiftPassengerPhaseR22.afterClientCarry.accept(p,motion.y);
-            projectSeele$trace("AFTER",level,p,floor,motion);
         }
         standing.clear();airborne.clear();projectSeele$localBounds.remove();
-    }
-    @Unique private static void projectSeele$trace(String phase,Level level,Player p,double floor,Vec3 motion)
-    {
-        int t=com.projectseele.visual.LiftPassengerR20Review.tripAge;
-        if(!level.isClientSide||!"r22-lift-descend".equals(System.getProperty("projectseele.regionalBuild",""))||t<55||t>100)return;
-        com.projectseele.ProjectSeele.LOGGER.info("LIFT R23 PHYS {} gameTick={} trip={} rel={} oldRel={} vy={} ground={} noGravity={} flying={} gravity={} carDy={}",phase,level.getGameTime(),t,p.getY()-floor,p.yo-floor,p.getDeltaMovement().y,p.onGround(),p.isNoGravity(),p.getAbilities().flying,p.getAttributeValue(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get()),motion.y);
     }
 }

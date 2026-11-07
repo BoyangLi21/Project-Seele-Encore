@@ -129,7 +129,6 @@ public final class StaffCommandBookR24
             return accepted;
         }
         var order = new Order(npc, player, operation, unit); orders.put(npc.getUUID(), order);
-        StaffOperationsTraceR45.event(level,"staff_order_accepted",player.getUUID(),npc.getUUID(),unit,operation,order.step.name());
         EvaLogisticsDirector.loadControlTarget(level, unit);
         NervStaffDialogue.reply(player, npc, operation.equals(StaffUndergroundChoiceR52.PREPARE_AND_DEPLOY)
                 ? "准备＋地下紧急部署已安排。驾驶员接入并完成准备，机体在发射井停稳待命后，再由承载板送出地下出口。"
@@ -164,7 +163,6 @@ public final class StaffCommandBookR24
         if(NervStaffDialogue.authorized(player)&&StaffAuthorityR25.commandContact(npc))
             AutoSortieR32.cancel(player,job==null?unit:job.unit);
         npc.finishTask();
-        StaffOperationsTraceR45.event(player.serverLevel(),"staff_pending_canceled",player.getUUID(),npc.getUUID(),job==null?unit:job.unit,"cancel",pilotCancellation.name());
         NervStaffDialogue.reply(player, npc, "后续按键操作已取消。已经开始的机械运输会按原流程运行到安全位置。");
         return 1;
     }
@@ -173,7 +171,6 @@ public final class StaffCommandBookR24
     {
         var job = order(npc); if (job == null) return;
         var level = (ServerLevel) npc.level(); ORDERS.get(level).remove(job.actor);
-        StaffOperationsTraceR45.event(level,"staff_order_failed",job.owner,job.actor,job.unit,job.operation,message);
         var owner = level.getServer().getPlayerList().getPlayer(job.owner);
         if (owner != null) NervStaffDialogue.reply(owner, npc, message);
     }
@@ -188,7 +185,6 @@ public final class StaffCommandBookR24
             failed(npc, "联锁没有接受这次操作。" + NervStaffDialogue.readinessHint(level, job.unit, job.operation));
             return;
         }
-        StaffOperationsTraceR45.event(level,"physical_console_press_accepted",job.owner,job.actor,job.unit,job.operation,job.step.name());
         if(job.automatic)
         {
             var airframe=EvaLogisticsDirector.canonicalUnit(level,job.unit);
@@ -294,7 +290,6 @@ public final class StaffCommandBookR24
                         || job.operation.equals("recover") && !status.phase().equals("DEPLOYED"))
                 { failed(npc, NervStaffDialogue.readinessHint(level, job.unit, job.operation)); continue; }
                 job.step = Step.PRESS; job.message = "前往控制台操作按键";
-                StaffOperationsTraceR45.event(level,"physical_console_path_requested",job.owner,job.actor,job.unit,job.operation,job.step.name());
                 if (NervStaffDialogue.beginNativeAction(owner, npc, job.operation, job.unit) == 0)
                     failed(npc, "未能抵达对应控制按键，指令已停止。");
             }
@@ -310,8 +305,6 @@ public final class StaffCommandBookR24
         // and airframe checks; it must not block itself or bypass another order.
         jobs.remove(job.actor);
         var result=StaffOperationsR48.undergroundDeploymentR52(owner,npc,job.unit);
-        StaffOperationsTraceR45.event(level,result.accepted()?"staff_underground_deploy_accepted":"staff_underground_deploy_rejected",
-                job.owner,job.actor,job.unit,"underground",result.message());
         NervStaffDialogue.reply(owner,npc,result.message());
     }
     private StaffCommandBookR24() {}

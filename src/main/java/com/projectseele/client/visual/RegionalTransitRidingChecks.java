@@ -128,7 +128,7 @@ public final class RegionalTransitRidingChecks
     {
         if(!ENABLED || event.phase!=TickEvent.Phase.END)return;
         Minecraft mc=Minecraft.getInstance();
-        if(done){if(TransitMovieR16Client.finishAndReady())mc.stop();return;}
+        if(done){mc.stop();return;}
         if(mc.screen instanceof net.minecraft.client.gui.screens.PauseScreen)
         {
             log("RESUME unattended review from pause screen");mc.setScreen(null);
@@ -142,8 +142,7 @@ public final class RegionalTransitRidingChecks
         if(mc.player==null || mc.level==null || mc.getSingleplayerServer()==null)return;
         var server=mc.getSingleplayerServer();var world=server.getWorldPath(LevelResource.ROOT).normalize();
         if(R25?!world.getFileName().toString().equals("SEELE_R25_REVIEW"):R22||R22_TRAIN?!world.getFileName().toString().equals("SEELE_R22_REVIEW"):R19?!world.getFileName().toString().equals(R21?"SEELE_R21_REVIEW":R20?"SEELE_R20_REVIEW":"SEELE_R19_NATIVE_REVIEW"):
-                !world.getFileName().toString().equals("SEELE_TV_WORLD_PREVIEW_20260906")
-                &&!(TransitMovieR16Client.ENABLED&&world.getFileName().toString().equals("SEELE_TV_FACILITIES_R16")))throw new IllegalStateException("Wrong transit review save");
+                !world.getFileName().toString().equals("SEELE_TV_WORLD_PREVIEW_20260906"))throw new IllegalStateException("Wrong transit review save");
         try
         {
             if(Files.exists(world.resolve("regional_stop_requested")))
@@ -156,7 +155,7 @@ public final class RegionalTransitRidingChecks
                 require(++nativeBoardingTicks<(mode==3?300:150),"real stair boarding window expired at "+mc.player.position());
             if(!entered)
             {
-                entered=true;timer=0;savedPause=mc.options.pauseOnLostFocus;savedDistance=mc.options.renderDistance().get();mc.options.pauseOnLostFocus=false;mc.options.renderDistance().set(TransitMovieR16Client.ENABLED&&!Boolean.getBoolean("projectseele.nativeCapture")?4:8);mc.options.broadcastOptions();
+                entered=true;timer=0;savedPause=mc.options.pauseOnLostFocus;savedDistance=mc.options.renderDistance().get();mc.options.pauseOnLostFocus=false;mc.options.renderDistance().set(8);mc.options.broadcastOptions();
                 server.execute(()->{
                     var p=server.getPlayerList().getPlayers().get(0);savedMode=p.gameMode.getGameModeForPlayer();
                     savedPosition=p.position();savedDimension=p.level().dimension();savedYaw=p.getYRot();savedPitch=p.getXRot();savedFlying=p.getAbilities().flying;
@@ -229,9 +228,9 @@ public final class RegionalTransitRidingChecks
                 {
                     require(!(Boolean)riding.getMethod("isRiding",long.class).invoke(null,vehicleId),"native dismount completed");
                     mc.options.keyShift.setDown(false);mode++;timer=0;boarded=false;dispatchRequested=false;boardingAligned=false;nativeBoardingTicks=0;boardingYaw=0;serverVehicleIds=java.util.Set.of();
-                    if(mode==(R25?2:PORT?1:MODE.equals("train-boarding")?3:MODE.equals("bay-boarding")||R19||TransitMovieR16Client.ENABLED&&MODE.equals("flight-riding")?4:SERVICES.length))
+                    if(mode==(R25?2:PORT?1:MODE.equals("train-boarding")?3:MODE.equals("bay-boarding")||R19?4:SERVICES.length))
                     {
-                        Files.writeString(world.resolve(PORT?"r07_port_riding_checks.txt":"regional_transit_riding_checks.txt"),String.join("\n",TRACE)+"\nCOMPLETE "+(PORT?(TransitMovieR16Client.ENABLED?"P1 native passenger initialization, full trip and harbor arrival":"P1 natural boarding, full trip and harbor arrival"):MODE.equals("flight-riding")?(TransitMovieR16Client.ENABLED?"F1 round trip":"F1 round trip and C1 circuit"):MODE.equals("circle-riding")?"C1 circuit":MODE.equals("bay-boarding")?"Bay aircraft natural boarding and taxi travel":MODE.equals("train-boarding")?"U1/S1/S2 natural boarding and passenger travel":"U1/S1/S2 trains, F1 round trip and C1 circuit")+" passenger rides\n");
+                        Files.writeString(world.resolve(PORT?"r07_port_riding_checks.txt":"regional_transit_riding_checks.txt"),String.join("\n",TRACE)+"\nCOMPLETE "+(PORT?"P1 natural boarding, full trip and harbor arrival":MODE.equals("flight-riding")?("F1 round trip and C1 circuit"):MODE.equals("circle-riding")?"C1 circuit":MODE.equals("bay-boarding")?"Bay aircraft natural boarding and taxi travel":MODE.equals("train-boarding")?"U1/S1/S2 natural boarding and passenger travel":"U1/S1/S2 trains, F1 round trip and C1 circuit")+" passenger rides\n");
                         Files.deleteIfExists(world.resolve("regional_transit_riding_failure.txt"));
                         finish(mc);return;
                     }
@@ -365,11 +364,6 @@ public final class RegionalTransitRidingChecks
                 if(!serverVehicleIds.contains(candidateId))continue;
                 if(head==null || mode==3 && axis(head,"y")>100 || (Double)call(vehicle,"getSpeed")>.001)continue;
                 Vec3 headPos=new Vec3(axis(head,"x"),axis(head,"y"),axis(head,"z"));
-                if(TransitMovieR16Client.ENABLED)
-                {
-                    Vec3 authority=serverVehicleHeads.get(candidateId);
-                    if(authority==null||authority.distanceTo(headPos)>1.5||serverVehicleSpeeds.getOrDefault(candidateId,1D)>.001)continue;
-                }
                 // A six-car train can stop with its head more than 64 m from
                 // a passenger waiting at the middle of the same platform.
                 double boardingSearchRadius=64;
@@ -401,7 +395,7 @@ public final class RegionalTransitRidingChecks
                 if(PORT&&!boardingAligned)writeAircraftGeometry(vehicle,cache,car,"port");
                 if(R22_TRAIN&&!boardingAligned)writeAircraftGeometry(vehicle,cache,car,"r23_"+SERVICES[mode]);
                 if(mode==3){flightOriginHakone=R21?headPos.x>6000:headPos.x<0;flightCache=cache;flightCar=car;writeAircraftGeometry(vehicle,cache,car,R21?(flightOriginHakone?"un_airport":"nerv_airport"):flightOriginHakone?"hakone":"bay");}
-                if(!boardingAligned&&(!TransitMovieR16Client.ENABLED||R20))
+                if(!boardingAligned)
                 {
                     double length=(Double)call(car,"getLength");boardingAligned=true;alignmentAge=0;alignTicks=20;
                     if(mode==3&&Files.exists(world.resolve("regional_boarding_gates.json")))
@@ -590,10 +584,6 @@ public final class RegionalTransitRidingChecks
     }
     private static boolean naturalBoarding(java.nio.file.Path world)
     {
-        // Review films begin with the native passenger interface. Walking
-        // doorway checks remain a separate test and must not be reported as
-        // passing merely because the subsequent recorded journey succeeds.
-        if(TransitMovieR16Client.ENABLED&&!R20)return false;
         return Files.exists(world.resolve(mode==3?"regional_boarding_gates.json":"regional_native_platforms_ready.json"));
     }
     public static Object nativeBodyFrame(Object vehicle,Object car) throws Exception
