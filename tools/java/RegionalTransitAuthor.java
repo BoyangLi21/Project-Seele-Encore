@@ -97,10 +97,12 @@ public final class RegionalTransitAuthor
             TransportMode mode=TransportMode.valueOf(str(r,"mode","TRAIN"));String kind=str(r,"kind","rail");
             var styles=new ObjectArrayList<String>();if(mode==TransportMode.TRAIN)styles.add("default_3d");
             double radius=integer(r,"vertical_radius",100);Rail rail;
-            if(kind.equals("platform"))rail=Rail.newPlatformRail(a,aa,b,ab,Rail.Shape.QUADRATIC,radius,styles,mode);
-            else if(kind.equals("siding"))rail=Rail.newSidingRail(a,aa,b,ab,Rail.Shape.QUADRATIC,radius,styles,mode);
-            else if(kind.equals("turnback"))rail=Rail.newTurnBackRail(a,aa,b,ab,Rail.Shape.QUADRATIC,radius,styles,mode);
-            else rail=Rail.newRail(a,aa,b,ab,Rail.Shape.QUADRATIC,radius,styles,
+            // The funicular climbs on TWO_RADII rails; a split section keeps the shape of the rail it replaces.
+            Rail.Shape shape=Rail.Shape.valueOf(str(r,"shape","QUADRATIC"));
+            if(kind.equals("platform"))rail=Rail.newPlatformRail(a,aa,b,ab,shape,radius,styles,mode);
+            else if(kind.equals("siding"))rail=Rail.newSidingRail(a,aa,b,ab,shape,radius,styles,mode);
+            else if(kind.equals("turnback"))rail=Rail.newTurnBackRail(a,aa,b,ab,shape,radius,styles,mode);
+            else rail=Rail.newRail(a,aa,b,ab,shape,radius,styles,
                     integer(r,"speed",80),integer(r,"reverse_speed",integer(r,"speed",80)),false,false,true,kind.equals("runway"),true,mode);
             if(!rail.isValid()){geometryErrors.add(r);continue;}
             railRequest.addRail(rail);rails.put(id,rail);definitions.put(id,r);
