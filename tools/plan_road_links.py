@@ -40,6 +40,7 @@ ROAD_WIDTH, FOOTWAY_WIDTH = 6, 2
 BRIDGE_HALF_SPAN = 6
 # An open cutting deeper than this many blocks below the ground is refused.
 MAX_CUT = 16
+MAX_COVER = 6
 # Metres either side of a rail kept whole: the bed radius of plan_rail_corridor plus a margin.
 TRACK_KEEP = 3.2
 
@@ -206,8 +207,12 @@ class Ground:
         level = np.where(walk, self.grade[own] + 2, np.where(narrow, 2 * (wet + 2), 2 * (top + 1)))
         return passable, cost, level, comp, crossing
 
-    def link(self, p, q, start, finish):
-        """Route one link between components p and q, as a road if both carry traffic, else a footway."""
+    def link(self, p, q, start, finish, pin=None):
+        """Route one link between components p and q, as a road if both carry traffic, else a footway.
+
+        With `pin` the link starts and ends within that many blocks of `start` and `finish`, which
+        is how a climb too steep for the nearest pair gets the longer run it needs.
+        """
         plan = float(np.linalg.norm(start[:2] - finish[:2]))
         rise = abs(float(start[2] - finish[2]))
         row = dict(components=[p, q], sizes=[self.size[p], self.size[q]], plan=round(plan, 1), rise=round(rise, 1),
@@ -226,6 +231,16 @@ class Ground:
             width = FOOTWAY_WIDTH if footway else ROAD_WIDTH
             passable, cost, level, comp, crossing = self.grid(lo, hi, capture, width / 2 + SIDEWALK, open_stations)
             shape_ = passable.shape
+            # A road in a tunnel is no place to join: only the rock above it is reachable.
+            zz, xx = np.nonzero(comp >= 0)
+            cover = capture.measured['top'][zz + lo[1] - capture.bounds[1], xx + lo[0] - capture.bounds[0]]
+            buried = cover - (self.grade[zz + lo[1] - self.az, xx + lo[0] - self.ax] / 2 + 1) > MAX_COVER
+            passable[zz[buried], xx[buried]] = False
+            if pin is not None:
+                # Off the pinned ends a link would just run along its own road to the nearest gap.
+                zs_, xs_ = np.mgrid[lo[1]:lo[1] + shape_[0], lo[0]:lo[0] + shape_[1]]
+                passable[(comp == p) & (np.hypot(xs_ - start[0], zs_ - start[1]) > pin)] = False
+                passable[(comp == q) & (np.hypot(xs_ - finish[0], zs_ - finish[1]) > pin)] = False
             ids_ = np.full(shape_, -1, np.int64)
             ids_[passable] = np.arange(int(passable.sum()))
             u, v, w = [], [], []
