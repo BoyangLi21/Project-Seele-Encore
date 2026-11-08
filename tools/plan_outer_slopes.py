@@ -149,6 +149,8 @@ def steps(height, mask, limit):
 
 def author(a):
     spec = read(a.config)
+    if a.source:
+        spec['source'] = a.source
     source = CapturedSurface(spec['source'], partial=True)
     x0, z0, x1, z1 = spec['bounds']
     top, tree, wet, built, known = columns(Path(spec['source']) / 'source', spec['bounds'])
@@ -172,6 +174,9 @@ def author(a):
     keep_off = ndimage.binary_dilation(public, iterations=spec.get('public_margin', 3)) | ndimage.binary_dilation(rails, iterations=spec.get('rail_margin', 4)) \
         | ndimage.binary_dilation(built | protected, iterations=1) | ndimage.binary_dilation(wet, iterations=1)
     movable = open_ground & ~keep_off
+    # Ground left as it is on purpose, as [x0, z0, x1, z1]; its edge anchors the slopes around it.
+    for ex0, ez0, ex1, ez1 in spec.get('exclude', ()):
+        movable[max(0, ez0 - z0):max(0, ez1 - z0 + 1), max(0, ex0 - x0):max(0, ex1 - x0 + 1)] = False
     limit, near, slope = spec.get('cliff', 4), spec.get('protect', 6), spec.get('slope', 1.0)
     cliff = np.zeros_like(known)
     cut_seed, fill_seed = np.zeros_like(known), np.zeros_like(known)
@@ -272,9 +277,13 @@ def author(a):
     a.out.mkdir(parents=True, exist_ok=True)
     write(a.out / 'slope-check.json', report)
     np.savez_compressed(a.out / 'slope-map.npz', bounds=spec['bounds'], top=top, after=after, cliff=cliff, cut=cut.astype(np.int16), fill=fill.astype(np.int16), built=built, wet=wet, working=working)
-    write(a.out / 'patch.json', dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'], edits=[rows[c] for c in sorted(rows)],
-                                     native_snapshot=spec['native_snapshot'], error_reports=[str((a.out / 'slope-check.json').resolve())], views_reviewed_by_root=False,
-                                     continuation_work=spec['continuation_work']))
+    # One patch per X strip when the config lists them; each is installed as its own batch.
+    for strip in spec.get('strips', [dict(id=spec['id'], label=spec['label'], x=[-10**6, 10**6], name='patch', continuation_work=spec['continuation_work'])]):
+        edits = [rows[c] for c in sorted(rows) if strip['x'][0] <= c[0] < strip['x'][1]]
+        write(a.out / f"{strip.get('name', strip['id'])}.json", dict(schema='map-cell-patch-v1', id=strip['id'], label=strip['label'], source=spec['source'], edits=edits,
+                                                                     native_snapshot=spec['native_snapshot'], error_reports=[str((a.out / 'slope-check.json').resolve())], views_reviewed_by_root=False,
+                                                                     continuation_work=strip['continuation_work']))
+        report.setdefault('strip_cells', {})[strip['id']] = len(edits)
     print(json.dumps(report, ensure_ascii=False))
 
 
@@ -283,5 +292,6 @@ if __name__ == '__main__':
     parser.add_argument('mode', choices=('author',))
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--source', help='Capture to plan from, in place of the one in the config')
     args = parser.parse_args()
     globals()[args.mode](args)
