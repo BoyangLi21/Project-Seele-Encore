@@ -69,20 +69,24 @@ final class EvaGroundContactR56
         // a folding body hanging in the air still stands on its feet.
         float floor=lowest(model,root,hulls);
         if(!Float.isFinite(floor))return;
-        float left=soleHeight(model,root,hulls,"l")-floor,right=soleHeight(model,root,hulls,"r")-floor;
+        float floorL=footFloor(eva,"l",ground,floor),floorR=footFloor(eva,"r",ground,floor);
+        float left=soleHeight(model,root,hulls,"l")-floorL,right=soleHeight(model,root,hulls,"r")-floorR;
         float walking=eva.isPilotProne()?0:Mth.clamp(eva.rifleMoveBlend(partial),0,1);
-        settleFoot(eva,model,root,hulls,"l",floor,right,now,walking);
-        settleFoot(eva,model,root,hulls,"r",floor,left,now,walking);
-        float lowest=lowest(model,root,hulls),support=lowest-ground;
-        // A sole set on a ledge already stands: measured against the drawn
-        // ground below, a foot off the ground pulled the whole body down and
-        // sank the ledge foot into the kerb. It only holds the body up: a
-        // swinging sole still below the top, toes in the face, lifted the
-        // whole body three blocks for a frame.
+        settleFoot(eva,model,root,hulls,"l",floorL,right,now,walking);
+        settleFoot(eva,model,root,hulls,"r",floorR,left,now,walking);
+        float support=lowestAboveFeet(model,root,hulls)-ground,sinkWanted=0;
         for(String side:new String[]{"l","r"})
         {
             double under=EvaFootPlacement.groundUnder(eva,side);
-            if(Double.isFinite(under)&&under>ground+.5)support=Math.min(support,Math.max(0,soleHeight(model,root,hulls,side)-(float)under));
+            float sole=soleHeight(model,root,hulls,side);
+            if(!Double.isFinite(under)||Math.abs(under-ground)<=.5){support=Math.min(support,sole-ground);continue;}
+            // A sole on ground of its own only holds the body up. Measured against the drawn ground,
+            // one on a ledge pulled the body down onto it, and one on lower ground lifted the whole
+            // body three blocks off the leg that was already reaching for its footing.
+            support=Math.min(support,Math.max(0,sole-(float)under));
+            var last=ANKLES.get(eva.getId()+side);
+            // A planted leg that still cannot reach the lower ground takes the pelvis down with it.
+            if(under<ground-.5&&last!=null)sinkWanted=Math.max(sinkWanted,(sole-(float)under)*step((last.planted()-.1F)/.3F));
         }
         // A run stands on its stance feet alone, by the clip's support mask: its body leaves the ground.
         float flight=EvaBodyPose.gaitFlight(eva,partial);
@@ -91,19 +95,23 @@ final class EvaGroundContactR56
         if(base==null)return;
         // Root offsets are model pixels; the world frame only turns and scales.
         float grounded=base.getPosY()-gap*16/EvaScale.RENDER_SCALE;
-        float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now)+EvaBodyWeightR59.pelvis(eva,partial,now,walking);
+        float sink=easeSink(eva,sinkWanted,now);
+        float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now)+EvaBodyWeightR59.pelvis(eva,partial,now,walking)-sink*16/EvaScale.RENDER_SCALE;
         base.setPosY(drawn);
         // The eased pelvis sits this far above (+) or below (-) the grounded
         // one: planted legs take up the difference so their soles stay down.
         float lift=(drawn-grounded)*EvaScale.RENDER_SCALE/16;
-        if(Math.abs(lift)>.01F)
-            for(String side:new String[]{"l","r"})
-            {
-                var last=ANKLES.get(eva.getId()+side);
-                // A stance foot takes the whole difference; a partial share
-                // left the sole floating while the foot eased onto the ground.
-                if(last!=null&&last.planted()>.1F)reachGround(model,root,side,lift*step((last.planted()-.1F)/.3F));
-            }
+        for(String side:new String[]{"l","r"})
+        {
+            var last=ANKLES.get(eva.getId()+side);
+            if(last==null||last.planted()<=.1F)continue;
+            // On ground of its own a planted sole is set on that ground wherever the pelvis went.
+            double under=EvaFootPlacement.groundUnder(eva,side);
+            float drop=Double.isFinite(under)&&Math.abs(under-ground)>.5?soleHeight(model,root,hulls,side)-(float)under:lift;
+            // A stance foot takes the whole difference; a partial share
+            // left the sole floating while the foot eased onto the ground.
+            if(Math.abs(drop)>.01F)reachGround(model,root,side,drop*step((last.planted()-.1F)/.3F));
+        }
         if(flight>.01F)for(String side:new String[]{"l","r"})
         {
             float contact=EvaBodyWeightR59.contact(eva,side);
@@ -168,6 +176,35 @@ final class EvaGroundContactR56
         if(PELVIS.size()>32)PELVIS.clear();
         PELVIS.put(eva.getId(),new Grounding(eased,speed,now));
         return Mth.lerp(walking,offset,eased);
+    }
+
+    private record Sink(float value,long time) {}
+    private static final Map<Integer,Sink> SINKS=new HashMap<>();
+    /** How far the pelvis goes down for a leg on lower ground (blocks), and how fast it goes down and comes back (1/s). */
+    private static final float MAX_SINK=8F,SINK_DOWN=14F,SINK_UP=5F;
+
+    /** Goes down quickly, for the foot that needs the ground, and comes back slowly, so it does not bob with each stride. */
+    private static float easeSink(EvaUnit01Entity eva,float wanted,long now)
+    {
+        wanted=Mth.clamp(wanted,0,MAX_SINK);
+        var last=SINKS.get(eva.getId());
+        if(last!=null&&last.time()==now)return last.value();
+        float value=wanted;
+        if(last!=null)
+        {
+            float dt=(now-last.time())/1e9F;
+            if(dt<.25F)value=last.value()+(wanted-last.value())*(1-(float)Math.exp(-dt*(wanted>last.value()?SINK_DOWN:SINK_UP)));
+        }
+        if(SINKS.size()>32)SINKS.clear();
+        SINKS.put(eva.getId(),new Sink(value,now));
+        return value;
+    }
+
+    /** The ground a foot is judged against: its own where that differs from the drawn plane, else the floor below the body. */
+    private static float footFloor(EvaUnit01Entity eva,String side,float ground,float floor)
+    {
+        double under=EvaFootPlacement.groundUnder(eva,side);
+        return Double.isFinite(under)&&Math.abs(under-ground)>.5?(float)under:floor;
     }
 
     /** Bend or reach a planted leg so its sole moves down by {@code drop} blocks (up when negative). */
@@ -280,6 +317,20 @@ final class EvaGroundContactR56
         float lowest=Float.POSITIVE_INFINITY;
         for(String name:PARTS)
         {
+            var bone=model.getBone(name).orElse(null);var points=hulls.get(name);
+            if(bone==null||points==null||bone.isHidden())continue;
+            lowest=Math.min(lowest,lowest(new Matrix4f(root).mul(EvaRigTransforms.model(bone)),points));
+        }
+        return lowest;
+    }
+
+    /** The lowest part of the body other than its soles (+infinity if none is known). */
+    private static float lowestAboveFeet(BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls)
+    {
+        float lowest=Float.POSITIVE_INFINITY;
+        for(String name:PARTS)
+        {
+            if(name.startsWith("foot_"))continue;
             var bone=model.getBone(name).orElse(null);var points=hulls.get(name);
             if(bone==null||points==null||bone.isHidden())continue;
             lowest=Math.min(lowest,lowest(new Matrix4f(root).mul(EvaRigTransforms.model(bone)),points));

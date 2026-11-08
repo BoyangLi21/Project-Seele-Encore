@@ -50,6 +50,8 @@ public final class EvaConnectedActionReview
     private static final boolean FX=Boolean.getBoolean("projectseele.tourFxR58");
     /** Movement check: turning on the spot, walking backward and sideways, curving, and hard turns at a run. */
     private static final boolean MOVES=Boolean.getBoolean("projectseele.tourMovesR59");
+    /** Terrain check: a terraced hill on the review ground, walked over and across. */
+    private static final boolean HILL=Boolean.getBoolean("projectseele.tourHillR60");
     private static final int DASH_END=Integer.getInteger("projectseele.tourDashEnd",130);
     /** Starts the sprint this many ticks sooner: the review ground ends in a wall. */
     private static final int DASH_LEAD=Integer.getInteger("projectseele.tourDashLead",0);
@@ -232,6 +234,7 @@ public final class EvaConnectedActionReview
     {
         if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
+        if(HILL){hillR60(mc);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<Math.max(140,DASH_END+10)||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -291,6 +294,33 @@ public final class EvaConnectedActionReview
         if(tourAt(1150)||tourAt(1165)||tourAt(1180)||tourAt(1370)||tourAt(1385)||tourAt(1400))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(tourAt(1220)||tourAt(1430))send(ServerboundEvaControlPacket.ACTION_SMASH);
         positionCamera(mc,eva);
+    }
+
+    /** Up a terraced hill with a stop on the slope, over the top, then across the slope and back. */
+    private static void hillR60(Minecraft mc)
+    {
+        int t=tick;
+        if(at(1))hillBlocksR60(mc);
+        if(at(TOUR_END-2))for(int z=-92;z<=60;z++)mc.player.connection.sendCommand("fill -44 -60 "+z+" 46 -30 "+z+" minecraft:air");
+        boolean up=t>=60&&t<120||t>=170&&t<300||t>=350&&t<410;
+        mc.options.keyUp.setDown(up);mc.player.input.up=up;mc.player.input.forwardImpulse=up?1:0;mc.player.zza=up?1:0;mc.player.xxa=0;
+        mc.player.setYRot(t<340?0:t<350?(t-340)*9:90);mc.player.setXRot(0);
+    }
+
+    /** One-block terraces a few blocks wide, uneven across the slope, as the Hakone hillsides are. */
+    private static void hillBlocksR60(Minecraft mc)
+    {
+        int[][] bands={{-44,-14},{-13,-4},{-3,5},{6,15},{16,46}};
+        for(int z=-92;z<=60;z++)
+        {
+            double along=Math.sin(Math.PI*(z+92)/152.0);
+            for(int[] band:bands)
+            {
+                double centre=(band[0]+band[1])*.5;
+                int height=(int)Math.round(26*along+1.6*Math.sin(z/5.0)+2.2*Math.sin((centre+z)/11.0));
+                if(height>0)mc.player.connection.sendCommand("fill "+band[0]+" -60 "+z+" "+band[1]+" "+(-61+height)+" "+z+" minecraft:grass_block");
+            }
+        }
     }
 
     private static void movesR59(Minecraft mc)

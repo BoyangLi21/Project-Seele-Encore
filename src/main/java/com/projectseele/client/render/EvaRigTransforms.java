@@ -97,6 +97,8 @@ final class EvaRigTransforms
             chain[i].setPosZ(p.z+(chain[i].getPosZ()-p.z)*weight);
         }
     }
+    /** A leg's pole closer than this share of its length to the hip-to-ankle line says nothing about the knee. */
+    private static final float KNEE_PLANE_OFF=.25F;
     static double solveGenericArm(GeoBone upper,GeoBone lower,GeoBone hand,Vector3f target,Quaternionf rotation,Vector3f pole,Matrix4f root)
     {return solveChain(upper,lower,hand,hand,pivot(lower),target,rotation,pole,root);}
     private static double solveChain(GeoBone upper,GeoBone lower,GeoBone wrist,GeoBone hand,Vector3f centre,Vector3f target,Quaternionf handRotation,Vector3f pole,Matrix4f root)
@@ -110,6 +112,19 @@ final class EvaRigTransforms
         float distance=Math.max(Math.abs(a-b)+.001F,Math.min(a+b-.001F,length));
         float along=(a*a-b*b+distance*distance)/(2*distance),height=(float)Math.sqrt(Math.max(0,a*a-along*along));
         var bend=new Vector3f(pole).sub(new Vector3f(direction).mul(pole.dot(direction)));
+        // A leg nearly straight along its solve has no knee plane of its own: a pole read off it is
+        // mostly noise, and the solver folded the knee backwards and twisted the thigh to match.
+        // Close to the line the toes decide, the way a knee bends over its foot.
+        if(upper.getName().startsWith("leg_"))
+        {
+            float off=bend.length()/Math.max(pole.length(),1e-5F);
+            var toes=handRotation.transform(new Vector3f(0,0,-1));toes.fma(-toes.dot(direction),direction);
+            if(off<KNEE_PLANE_OFF&&toes.lengthSquared()>1e-6F)
+            {
+                float t=off/KNEE_PLANE_OFF;t=t*t*(3-2*t);toes.normalize();
+                if(bend.lengthSquared()>1e-12F)bend.normalize().mul(t).fma(1-t,toes);else bend.set(toes);
+            }
+        }
         if(bend.lengthSquared()<1e-8F)bend.set(0,0,1).sub(new Vector3f(direction).mul(direction.z));
         bend.normalize();var joint=new Vector3f(shoulder).fma(along,direction).fma(height,bend);
         var du=new Vector3f(joint).sub(shoulder);var dl=new Vector3f(target).sub(joint);var axis=new Vector3f(du).cross(dl);

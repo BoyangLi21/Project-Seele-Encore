@@ -325,18 +325,22 @@ public final class EvaCapturedLocomotionR44
                 if(direction.lengthSquared()>1e-8F)direction.normalize();else direction.set(0,0,-1);
                 goal.x=neutral.x+swing.x+direction.x*forward*factor;goal.z=neutral.z+direction.z*forward*factor;
             }
+            // Standing, EvaFootPlacement sets the soles on the terrain in the drawn frame. Levelled
+            // here too, every rise and fall counted twice: on a hillside a sole was asked for five
+            // blocks under the ground and the leg was straightened to reach for it.
+            boolean levels=!e.level().isClientSide||e.rifleStanceLevel(partial)>1.01F;
             Plant plant=state.plants.computeIfAbsent(suffix,key->new Plant());boolean bearing=weight>.55F&&worldSpeed<160;
             Vector3f worldGoal=world.transformPosition(new Vector3f(goal));
             Vector3f beforeWorldGoal=new Vector3f(worldGoal);
             if(bearing)
             {
                 if(!plant.bearing||plant.anchor==null)
-                {plant.anchor=new Vector3f(worldGoal);plant.anchor.y=ground(e,plant.anchor,worldGoal.y);}
+                {plant.anchor=new Vector3f(worldGoal);plant.anchor.y=levels?ground(e,plant.anchor,worldGoal.y):worldGoal.y;}
                 else if(plant.footWorld!=null&&plant.patch!=null)
                 {
                     Vector3f prior=plant.footWorld.transformPosition(new Vector3f(plant.patch));
                     Vector3f next=plant.footWorld.transformPosition(new Vector3f(patch));plant.anchor.add(next.sub(prior));
-                    plant.anchor.y=ground(e,plant.anchor,plant.anchor.y);
+                    plant.anchor.y=levels?ground(e,plant.anchor,plant.anchor.y):worldGoal.y;
                 }
                 worldGoal.lerp(plant.anchor,ease((weight-.35F)/.45F));goal=inverse.transformPosition(new Vector3f(worldGoal));
             }
@@ -345,7 +349,7 @@ public final class EvaCapturedLocomotionR44
             com.projectseele.physics.AnatomicalLimbConstraints.reachAuthoredFoot(pose,physics,suffix,target,orientation);
             Matrix4f actual=new Matrix4f(world).mul(pose.matrix(bone));float minimum=Float.POSITIVE_INFINITY;
             for(Vector3f vertex:profile.boots().get(suffix))minimum=Math.min(minimum,actual.transformPosition(new Vector3f(vertex)).y);
-            float floor=ground(e,worldGoal,worldGoal.y);
+            float floor=levels?ground(e,worldGoal,worldGoal.y):Float.NEGATIVE_INFINITY;
             if(minimum<floor-.005F)
             {
                 target.y+=(floor-minimum)/EvaScale.RENDER_SCALE;

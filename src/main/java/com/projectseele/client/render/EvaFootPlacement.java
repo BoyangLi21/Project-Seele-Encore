@@ -118,9 +118,10 @@ public final class EvaFootPlacement
             Vector3f middle=new Vector3f(toeAt).add(heelAt).mul(.5F);middle.y=lowest.y;
             double top=ground(eva,new Vector3f(toeAt.x,lowest.y,toeAt.z)),below=ground(eva,new Vector3f(heelAt.x,lowest.y,heelAt.z));
             // Height above the drawn ground: while the body rises onto a kerb it is drawn below the entity.
-            double ground,lift=lowest.y-root.m31();
+            double ground=rampGround(eva,heelAt,toeAt,lowest.y,below,top),lift=lowest.y-root.m31();
             float onto=0;
-            if(Double.isFinite(top)&&Double.isFinite(below)&&top>below+.5)
+            boolean ramp=Double.isFinite(ground);
+            if(!ramp&&Double.isFinite(top)&&Double.isFinite(below)&&top>below+.5)
             {
                 ground=below;
                 if(stepping||top-lowest.y<lowest.y-below)
@@ -130,14 +131,17 @@ public final class EvaFootPlacement
                         if(solid(eva,heelAt.x+forward.x*d,top-.5,heelAt.z+forward.z*d)){onto=d+.5F;ground=top;break;}
                 }
             }
-            else ground=ground(eva,middle);
+            else if(!ramp)ground=ground(eva,middle);
+            // Further above or below the body than a leg goes, it is not ground to stand on: a hillside
+            // beside the foot, or the drop past an edge. The foot keeps the clip's height there.
+            if(Double.isFinite(ground)&&(!stepping&&ground-root.m31()>MAX_REACH_UP||ground-root.m31()<-MAX_REACH_DOWN))ground=Double.NaN;
             onto=(float)ease(key^0x20000000,onto);
             double plant=1-Math.max(0,Math.min(1,(lift-.35)/1.7));
             // A sole planted on a ledge stays where it landed while the body
             // passes over it and rises, until it lifts. The clips' stance feet
             // slide back faster than the body moves: on a ledge that slid the
             // foot off the edge and the leg folded to keep it up there.
-            updateHold(key,pivot,plant,Double.isFinite(ground)&&ground-root.m31()>.5);held=hold(key,pivot);
+            updateHold(key,pivot,plant,!ramp&&Double.isFinite(ground)&&ground-root.m31()>.5);held=hold(key,pivot);
             if(UNDER.size()>64)UNDER.clear();
             UNDER.put(eva.getId()*2+(s.equals("l")?0:1),new double[]{ground,com.projectseele.client.AircraftRenderClockR21.frameNanos()});
             // Only a planted sole carries the body up onto a ledge.
@@ -199,6 +203,29 @@ public final class EvaFootPlacement
         if(LEDGE.size()>32)LEDGE.clear();LEDGE.put(eva.getId(),ledge);
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(changed),"MOTION_ENGINE_LIVE_ACTION");
     }
+    /**
+     * The mean height along a sole lying across a slope, or NaN when it lies across a single
+     * step (or on level ground). The kerb rules stand a foot on one level or the other; a
+     * hillside has a level under every few blocks of a sole, and they carried the foot ten
+     * blocks to and fro as its heel and toe crossed one terrace after another.
+     */
+    private static double rampGround(EvaUnit01Entity eva,Vector3f heel,Vector3f toe,float y,double below,double top)
+    {
+        if(!Double.isFinite(below)||!Double.isFinite(top)||Math.abs(top-below)<=.5)return Double.NaN;
+        double sum=below+top,previous=below,biggest=0;
+        for(int i=1;i<=4;i++)
+        {
+            double here=top;
+            if(i<4)
+            {
+                var at=new Vector3f(heel).lerp(toe,i/4F);at.y=y;here=ground(eva,at);
+                if(!Double.isFinite(here))return Double.NaN;
+                sum+=here;
+            }
+            biggest=Math.max(biggest,Math.abs(here-previous));previous=here;
+        }
+        return biggest>RAMP_STEP_SHARE*Math.abs(top-below)?Double.NaN:sum/5;
+    }
     private static final class Hold {float x,z,weight=1;long time;boolean on=true;}
     private static final Map<Integer,Hold> HOLDS=new HashMap<>();
     /** Offset (x, z) from the clip's foot to where a ledge holds it this frame. */
@@ -246,7 +273,11 @@ public final class EvaFootPlacement
         for(float d=1;d<=reachOut;d+=1)
         {
             double x=tip.x-forward.x*(reachOut-d),z=tip.z-forward.z*(reachOut-d);
-            if(solid(eva,x,low,z)||solid(eva,x,tip.y+3,z))return reachOut-d+1;
+            // Ground a block above the column before it is a hillside rising under the foot, which
+            // lifts the foot; only a face taller than that stands in front of it. Every terrace of
+            // a slope read as a wall and the foot was drawn seven blocks back.
+            double beforeX=x-forward.x,beforeZ=z-forward.z;
+            if(solid(eva,x,low,z)&&!solid(eva,beforeX,low-1,beforeZ)||solid(eva,x,tip.y+3,z)&&!solid(eva,beforeX,tip.y+2,beforeZ))return reachOut-d+1;
         }
         return 0;
     }
@@ -269,6 +300,12 @@ public final class EvaFootPlacement
     }
     /** The EVA's step height (blocks): a sole is set on ground this far above or below it. */
     private static final double STEP=20;
+    /** Without a step up in progress a sole does not reach for ground higher than this above the body (blocks). */
+    private static final double MAX_REACH_UP=12;
+    /** A sole does not reach for ground lower than this below the body (blocks). */
+    private static final double MAX_REACH_DOWN=12;
+    /** A sole lies across a slope, not a step, when no column along it holds more than this share of the rise. */
+    private static final double RAMP_STEP_SHARE=.65;
     /** How far ahead of a swinging sole the ground is read at least (blocks). */
     private static final float REACH=5;
     private record Eased(double value,long time) {}
