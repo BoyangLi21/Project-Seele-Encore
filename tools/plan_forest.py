@@ -183,20 +183,15 @@ def attached(cells, x0, z0):
     return [(x, y, z, index[(x, y, z)]) for x, y, z in seen]
 
 
-def edits(a):
-    spec = json.loads(a.config.read_text('utf8'))
-    source = CapturedSurface(spec['source'], partial=True)
+def keep_outs(spec, source):
+    """Columns nothing of a tree may stand over, columns already holding a tree, and the road columns."""
     x0, z0, x1, z1 = source.bounds
     top, highest, full = (source.measured[k] for k in ('top', 'highest', 'full'))
     top, highest = top.astype(int), highest.astype(int)
-    with np.load(spec['classes']) as f:
-        cx, cz = map(int, f['bounds'][:2])
-        kinds = f['classes'][z0 - cz:z1 - cz + 1, x0 - cx:x1 - cx + 1]
     authority = Path(spec['authority'])
     with np.load(spec.get('network', authority / 'network.npz')) as f:
         ax, az = map(int, f['bounds'][:2])
         walk = f['walk'][z0 - az:z1 - az + 1, x0 - ax:x1 - ax + 1]
-    # Columns nothing of a tree may stand over.
     keep_out = walk | ~full | (top < -120)
     existing = np.zeros(top.shape, bool)
     structures = np.zeros(top.shape, bool)
@@ -223,6 +218,18 @@ def edits(a):
         for t in np.linspace(0, 1, max(2, int(np.linalg.norm(q - p)) + 1)):
             jx, jz = (p + (q - p) * t).astype(int) - (x0, z0)
             keep_out[max(0, jz - reach):max(0, jz + reach + 1), max(0, jx - reach):max(0, jx + reach + 1)] = True
+    return keep_out, existing, walk
+
+
+def edits(a):
+    spec = json.loads(a.config.read_text('utf8'))
+    source = CapturedSurface(spec['source'], partial=True)
+    x0, z0, x1, z1 = source.bounds
+    top, full = source.measured['top'].astype(int), source.measured['full']
+    with np.load(spec['classes']) as f:
+        cx, cz = map(int, f['bounds'][:2])
+        kinds = f['classes'][z0 - cz:z1 - cz + 1, x0 - cx:x1 - cx + 1]
+    keep_out, existing, walk = keep_outs(spec, source)
     rng = random.Random(spec.get('seed', 1))
     spacing = {CONIFER: spec.get('conifer_spacing', 5), PINE: spec.get('pine_spacing', 7), BROADLEAF: spec.get('broadleaf_spacing', 7), BAMBOO: 9, SHRUB: spec.get('shrub_spacing', 9)}
     rows, trees = {}, Counter()
@@ -277,10 +284,45 @@ def edits(a):
     print(json.dumps(report, ensure_ascii=False))
 
 
+def audit(a):
+    """Read an installed forest back from a fresh capture: what stands, and whether it stands right."""
+    spec = json.loads(a.config.read_text('utf8'))
+    source = CapturedSurface(a.capture, partial=True)
+    x0, z0, x1, z1 = source.bounds
+    keep_out = keep_outs(spec, source)[0]
+    cells = {tuple(e['pos']): e['after'] for e in json.loads((a.out / 'patch.json').read_text('utf8'))['edits'] if x0 <= e['pos'][0] <= x1 and z0 <= e['pos'][2] <= z1}
+    absent = [p for p, s in cells.items() if source.state(*p) != s]
+    over = [p for p in cells if keep_out[p[2] - z0, p[0] - x0]]
+    rooted = {p for p, s in cells.items() if '_log[' in s and source.state(p[0], p[1] - 1, p[2]).split('[')[0] in GROWS_ON}
+    seen, floating, trees = set(), [], 0
+    for start in cells:
+        if start in seen:
+            continue
+        group, frontier = {start}, [start]
+        while frontier:
+            x, y, z = frontier.pop()
+            for dx in (-1, 0, 1):
+                for dy in (-1, 0, 1):
+                    for dz in (-1, 0, 1):
+                        n = (x + dx, y + dy, z + dz)
+                        if n in cells and n not in group:
+                            group.add(n)
+                            frontier.append(n)
+        seen |= group
+        trees += 1
+        if not group & rooted:
+            floating.append(min(group))
+    report = dict(errors=[f'{len(absent)} cells not as planned'] * bool(absent) + [f'{len(over)} cells over a keep-out column'] * bool(over) + [f'{len(floating)} groups with no trunk on soil'] * bool(floating),
+                  cells=len(cells), tree_groups=trees, rooted_trunks=len(rooted), examples=dict(absent=absent[:5], over=over[:5], floating=floating[:5]), world_written=False)
+    (a.out / 'forest-audit.json').write_text(json.dumps(report, ensure_ascii=False, indent=1), 'utf8')
+    print(json.dumps(report, ensure_ascii=False))
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('classes', 'edits'))
+    parser.add_argument('mode', choices=('classes', 'edits', 'audit'))
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--capture', type=Path, help='audit: a capture taken after the install')
     arguments = parser.parse_args()
     globals()[arguments.mode](arguments)
