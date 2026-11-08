@@ -259,7 +259,13 @@ def author(a):
             for y in range(t + 1, t + f + 1):
                 put((x, y, z), source.state(x, y, z), TOP if y == t + f else FILL, 'slope surface' if y == t + f else 'slope body')
         else:
-            c = int(cut[i, j])
+            # Stop above anything that is not earth: buried road pieces and brickwork stay whole.
+            c = 0
+            while c < int(cut[i, j]) and source.state(x, t - c - 1, z).split('[')[0] in EARTH:
+                c += 1
+            cut[i, j] = c
+            if not c:
+                continue
             for y in range(t - c + 1, t + 1):
                 put((x, y, z), source.state(x, y, z), 'minecraft:air', 'slope cut')
             face = source.state(x, t - c, z)
