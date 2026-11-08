@@ -2,7 +2,8 @@
 
 Patch input lists every cell with its purpose. Each cell's current state must
 equal the capture, original devices are refused, and no network, native or
-identity state changes. Callers run their own geometric check and name its
+identity state changes. A cell may carry a new block entity (road paint) and
+may replace road paint already there. Callers run their own geometric check and name its
 report under error_reports; this tool proves the delta, not the design.
 """
 import argparse
@@ -51,17 +52,27 @@ def author(a):
         os.link(path, a.out / 'source' / path.name)
     for name in ('capture.json', 'captured-devices.dat', 'measured.npz'):
         shutil.copy2(source / name, a.out / name)
-    devices = {tuple(int(t[k]) for k in 'xyz') for t in nbtlib.load(source / 'captured-devices.dat')['Devices']}
+    devices = {tuple(int(t[k]) for k in 'xyz'): t for t in nbtlib.load(source / 'captured-devices.dat')['Devices']}
     editor = Editor(a.out)
-    rows = []
+    rows, entities = [], []
     for row in spec['edits']:
         pos = tuple(row['pos'])
-        require(pos not in devices, ('Patch touches an original device', pos))
+        # Road paint is the one kind of block data a patch may replace: converting a road again.
+        held = devices.get(pos)
+        require(held is None or str(held.get('id')) == 'trafficcraft:colored_block_entity', ('Patch touches an original device', pos))
         before = editor.state(*pos, True)
         require(before == row['before'], ('Capture differs from declared before state', pos, before))
         require(before != row['after'], ('Patch cell changes nothing', pos))
         editor.put(*pos, row['after'])
         rows.append(dict(pos=list(pos), before=before, after=row['after'], purpose=row['purpose']))
+        change = nbtlib.Compound({'Before': held}) if held is not None else nbtlib.Compound()
+        if 'block_entity' in row:
+            # A new block that carries data, such as a road marking's paint colour.
+            tag = nbtlib.Compound({k: nbtlib.String(v) if isinstance(v, str) else nbtlib.Int(v) for k, v in row['block_entity'].items()})
+            tag.update(x=nbtlib.Int(pos[0]), y=nbtlib.Int(pos[1]), z=nbtlib.Int(pos[2]))
+            change['After'] = tag
+        if change:
+            entities.append(change)
     require(len({tuple(r['pos']) for r in rows}) == len(rows), 'Repeated patch cell')
     regions = editor.save()
     for region in regions:
@@ -70,13 +81,13 @@ def author(a):
             payload = {k: data[k] for k in data.files}
         np.savez_compressed(path, **payload, y_origin=-128, height=448)
         region.update(y_origin=-128, height=448)
-    nbtlib.File({'Changes': nbtlib.List[nbtlib.Compound]([])}).save(a.out / 'block-entities.dat', gzipped=True)
+    nbtlib.File({'Changes': nbtlib.List[nbtlib.Compound](entities)}).save(a.out / 'block-entities.dat', gzipped=True)
     write(a.out / 'exact-edits.json', rows)
     write(a.out / 'forward-patch.json', dict(edits=rows, requires_exact_before=True))
     write(a.out / 'inverse-patch.json', dict(edits=[dict(pos=r['pos'], before=r['after'], after=r['before']) for r in rows],
                                              requires_exact_before=True))
     write(a.out / 'manifest.json', dict(schema=SCHEMA, world=cap['world'], source=str(source), cells=len(rows), regions=regions,
-                                        vertical_extent=[-128, 319], device_changes=0, native_changes=[], native_additions=[],
+                                        vertical_extent=[-128, 319], device_changes=len(entities), native_changes=[], native_additions=[],
                                         actor_changes=[], preserve_native_members=True, world_written=False))
     if spec.get('native_additions'):
         # Whole new native members only; the installer refuses to overwrite one.

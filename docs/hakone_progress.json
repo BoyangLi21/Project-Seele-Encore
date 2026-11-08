@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T12:45+08:00",
+ "updated": "2026-11-08T13:42+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -387,9 +387,9 @@
    "area": "水系",
    "title": "对照861个水系组件和118,736列参考水面核对覆盖",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "参考水面118,736列中101,710列（85.7%）有水，其中原本就有水5,395列。869个参考组件里92个没水（共1,825列，最大97列）；795个小组件不到一半有水，因为参考把溪流加宽了，实装溪流约2格宽",
    "owner": "map-bdb53d"
   },
   {
@@ -407,9 +407,9 @@
    "area": "水系",
    "title": "隔离客户端进游戏看水系（各区视点）",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "隔离客户端第124批副本10个视点50张：水都在河道里，没有外流；农田排水沟和河道连续。挖了没水的列只有464/260,996（多为上游回退处）。港口视点镜头落在建筑里，只拍到黑屏，不是水的问题",
    "owner": "map-bdb53d"
   },
   {
@@ -1247,9 +1247,9 @@
    "area": "缆车站与接站路",
    "title": "中间缆车站 勘测：登山缆车沿线地形、轨道和车型",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "map-edges 勘测完成",
    "owner": "map-edges"
   },
   {
@@ -1257,9 +1257,9 @@
    "area": "缆车站与接站路",
    "title": "中间缆车站 设计：公園下、公園上、中強羅、上強羅位置与斜坡站台",
    "units": 2,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "设计完成",
    "owner": "map-edges"
   },
   {
@@ -1307,9 +1307,9 @@
    "area": "缆车站与接站路",
    "title": "強羅南站台 (907,55,662) 接站路 勘测",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "勘测完成",
    "owner": "map-edges"
   },
   {
@@ -1417,9 +1417,9 @@
    "area": "边界",
    "title": "19个未生成完区块（X2128–2319，Z480–511）进游戏确认",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "map-edges 隔离客户端进入后24个区块全部生成，1,938列路面材料正确、净空无不足，沿路772 tick 0卡住；171列比登记低1格（半砖台阶），(2238,490–491)人行道外缘比草地低2格。正式世界里这些区块仍待用户进游戏时生成",
    "owner": "map-edges"
   },
   {
@@ -1497,9 +1497,9 @@
    "area": "核实",
    "title": "第12项 其余楼宇入口：西部",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "目录里554个门口逐个步行检查（reach 规则，30格窗口）：547个走得到登记道路，7个走不到，交 map-roads（anchor-1至7）。原地图自带、不在目录里的楼宇没有逐栋查",
    "owner": "map-bdb53d"
   },
   {
@@ -1507,9 +1507,9 @@
    "area": "核实",
    "title": "第12项 其余楼宇入口：中部",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "目录里554个门口逐个步行检查（reach 规则，30格窗口）：547个走得到登记道路，7个走不到，交 map-roads（anchor-1至7）。原地图自带、不在目录里的楼宇没有逐栋查",
    "owner": "map-bdb53d"
   },
   {
@@ -1517,9 +1517,9 @@
    "area": "核实",
    "title": "第12项 其余楼宇入口：东部与小田原",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "目录里554个门口逐个步行检查（reach 规则，30格窗口）：547个走得到登记道路，7个走不到，交 map-roads（anchor-1至7）。原地图自带、不在目录里的楼宇没有逐栋查",
    "owner": "map-bdb53d"
   },
   {
@@ -1596,10 +1596,10 @@
    "id": "verify-023",
    "area": "核实",
    "title": "既有列车边缘接触候选",
-   "units": 1,
+   "units": 2.0,
    "status": "todo",
    "batch": null,
-   "note": "",
+   "note": "第一次按轨道弦线扫车体空间：81,266格，58,634格是石头，弦线在弯道上切进隧道壁和路堑，太粗，要按 MTR 精确曲线采样重做",
    "owner": "map-bdb53d"
   },
   {
@@ -1657,9 +1657,9 @@
    "area": "核实",
    "title": "第87批停住路线重测（s22、s28）",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "s22 研究模拟区：原路线画进两道墙，墙旁 z563–565 和 z550–554 各有通道，隔离客户端按通道走到终点（185 tick，0 卡住）；s28 地下都市入口一次走到终点，另一次停在运行中的自动步道上；静态步行两条都能到",
    "owner": "map-bdb53d"
   },
   {
@@ -1810,6 +1810,266 @@
    "status": "done",
    "batch": 118,
    "note": "第118–121批：两船169格复原（含2格悬空涵洞、1格漏水），另3格漏水复原、1格封闭空格补水；读回全0错，复查无开口",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "anchor-7",
+   "area": "连接路",
+   "title": "valley/2162/1291 门口 (2162,-44,1282) 接路",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "门口只走得到3格；在 links-south / 上游抓取范围",
+   "owner": "map-roads"
+  },
+  {
+   "id": "tc-01",
+   "area": "其他",
+   "title": "TrafficCraft：勘测方块状态、坡度层数、标线方块实体格式",
+   "units": 1.0,
+   "status": "done",
+   "batch": null,
+   "note": "方块状态：asphalt_slope/concrete_slope layers=1..7 是平层（每层1/8格），标线 asphalt_pattern_N[facing]、asphalt_slope_pattern_N[facing,layers]；1=中心线，23=单侧边线，54=双线，108=斑马线条",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-02",
+   "area": "其他",
+   "title": "TrafficCraft：发布流程支持新方块和标线方块实体（作者、回放、读回）",
+   "units": 2.0,
+   "status": "done",
+   "batch": null,
+   "note": "release_map_patch 作者支持 block_entity，副本全流程（作者、准备、Java 回放、安装、记录、读回）通过，1,536格0错，244个 colored_block_entity 写入",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-03",
+   "area": "其他",
+   "title": "TrafficCraft：转换工具：路面高程换成 1/8 层坡块，横向水平、纵向每格最多 2 层",
+   "units": 2.0,
+   "status": "done",
+   "batch": null,
+   "note": "转换工具：1/8层高程、每格最多2层、不偏离原路面半格、人行道高一层；副本两片试转读回0错",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-04",
+   "area": "其他",
+   "title": "TrafficCraft：转换工具：人行道高出车道一层、日本式标线（山路黄实线、城区白虚线、窄路无中线）",
+   "units": 2.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-05",
+   "area": "其他",
+   "title": "TrafficCraft：副本样板（直路、1/2层坡、弯道、路口停止线和斑马线、人行道）实机截图交主会话",
+   "units": 2.0,
+   "status": "done",
+   "batch": null,
+   "note": "副本样板实机截图交主会话：颜色、朝向、人行道1/8高差、远景都正常；坡度是平层台阶、弯道中线分段，待主会话定",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-06",
+   "area": "其他",
+   "title": "TrafficCraft：所有打开正式世界或副本的客户端装 jar",
+   "units": 0.5,
+   "status": "doing",
+   "batch": null,
+   "note": "map-work 测试客户端已装；正式客户端已由主会话装；map-roads、map-edges 客户端未装",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-07",
+   "area": "其他",
+   "title": "TrafficCraft：道路审计改认新路面和 1/8 层高度",
+   "units": 2.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-area-1",
+   "area": "其他",
+   "title": "TrafficCraft 转换安装：箱根西部（十字城区）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "安装、读回",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-check-1",
+   "area": "其他",
+   "title": "TrafficCraft 转换核查：箱根西部（十字城区）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "审计、实机抽查",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-area-2",
+   "area": "其他",
+   "title": "TrafficCraft 转换安装：箱根中部（強羅、宮ノ下）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "安装、读回",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-check-2",
+   "area": "其他",
+   "title": "TrafficCraft 转换核查：箱根中部（強羅、宮ノ下）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "审计、实机抽查",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-area-3",
+   "area": "其他",
+   "title": "TrafficCraft 转换安装：箱根东部（湯本）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "安装、读回",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-check-3",
+   "area": "其他",
+   "title": "TrafficCraft 转换核查：箱根东部（湯本）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "审计、实机抽查",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-area-4",
+   "area": "其他",
+   "title": "TrafficCraft 转换安装：芦之湖岸与桃源台",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "安装、读回",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-check-4",
+   "area": "其他",
+   "title": "TrafficCraft 转换核查：芦之湖岸与桃源台",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "审计、实机抽查",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-area-5",
+   "area": "其他",
+   "title": "TrafficCraft 转换安装：小田原北部",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "安装、读回",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-check-5",
+   "area": "其他",
+   "title": "TrafficCraft 转换核查：小田原北部",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "审计、实机抽查",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-area-6",
+   "area": "其他",
+   "title": "TrafficCraft 转换安装：小田原中部",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "安装、读回",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-check-6",
+   "area": "其他",
+   "title": "TrafficCraft 转换核查：小田原中部",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "审计、实机抽查",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-area-7",
+   "area": "其他",
+   "title": "TrafficCraft 转换安装：小田原南部与海岸",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "安装、读回",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-check-7",
+   "area": "其他",
+   "title": "TrafficCraft 转换核查：小田原南部与海岸",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "审计、实机抽查",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-area-8",
+   "area": "其他",
+   "title": "TrafficCraft 转换安装：小田原东部",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "安装、读回",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-check-8",
+   "area": "其他",
+   "title": "TrafficCraft 转换核查：小田原东部",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "审计、实机抽查",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-tour",
+   "area": "其他",
+   "title": "TrafficCraft：全图实机巡视与远景检查",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "tc-guard",
+   "area": "其他",
+   "title": "TrafficCraft：护栏（可选）",
+   "units": 2.0,
+   "status": "todo",
+   "batch": null,
+   "note": "可选",
    "owner": "map-bdb53d"
   }
  ]
