@@ -1,14 +1,14 @@
 #!/usr/bin/env python3
 """Progress of the Hakone map round, from docs/hakone_progress.json.
 
-python tools/hakone_progress.py            summary by area
+python tools/hakone_progress.py            summary by area and by owner
 python tools/hakone_progress.py --todo     also list what is left
 python tools/hakone_progress.py --json     machine-readable summary
 
-Every task is counted in units of the same size (unit_minutes of work), so
-the percentage is done units over all units. A unit in progress counts as
-half done. Totals move when estimates change or new work is found; that is
-expected and is written in each task's note.
+Every task is counted in units of the same size (unit_minutes of work). The
+percentage counts finished units only; units in progress are shown apart and
+earn nothing until they are done. Totals move when estimates change or new
+work is found; that is expected and is written in each task's note.
 """
 import argparse
 import collections
@@ -41,21 +41,19 @@ def load(path):
     return data, tasks
 
 
-def credit(t):
-    return t['units'] if t['status'] == 'done' else t['units'] / 2 if t['status'] == 'doing' else 0
-
-
-def summary(tasks):
-    areas = collections.OrderedDict()
+def group(tasks, key):
+    out = collections.OrderedDict()
     for t in tasks:
-        a = areas.setdefault(t['area'], {'tasks': 0, 'units': 0, 'done': 0.0, 'left': 0})
-        a['tasks'] += 1
-        a['units'] += t['units']
-        a['done'] += credit(t)
-        a['left'] += 0 if t['status'] == 'done' else 1
-    total = sum(a['units'] for a in areas.values())
-    done = sum(a['done'] for a in areas.values())
-    return total, done, areas
+        g = out.setdefault(t.get(key, '?'), {'tasks': 0, 'units': 0, 'done': 0, 'doing': 0})
+        g['tasks'] += 1
+        g['units'] += t['units']
+        if t['status'] != 'todo':
+            g[t['status']] += t['units']
+    return out
+
+
+def pct(part, whole):
+    return round(100 * part / whole, 1) if whole else 0.0
 
 
 def main():
@@ -67,25 +65,30 @@ def main():
     ap.add_argument('--json', action='store_true')
     a = ap.parse_args()
     data, tasks = load(a.file)
-    total, done, areas = summary(tasks)
+    areas, owners = group(tasks, 'area'), group(tasks, 'owner')
+    total = sum(g['units'] for g in areas.values())
+    done = sum(g['done'] for g in areas.values())
+    doing = sum(g['doing'] for g in areas.values())
     minutes = data.get('unit_minutes', 30)
     if a.json:
         print(json.dumps({'updated': data.get('updated'), 'unit_minutes': minutes, 'units': total, 'done': done,
-                          'percent': round(100 * done / total, 1), 'tasks': len(tasks),
-                          'areas': {k: dict(v, percent=round(100 * v['done'] / v['units'], 1)) for k, v in areas.items()}},
+                          'doing': doing, 'percent': pct(done, total), 'tasks': len(tasks),
+                          'areas': {k: dict(v, percent=pct(v['done'], v['units'])) for k, v in areas.items()},
+                          'owners': {k: dict(v, percent=pct(v['done'], v['units'])) for k, v in owners.items()}},
                          ensure_ascii=False, indent=1))
         return
     print('Hakone map round, updated %s' % data.get('updated', '?'))
-    print('%.1f%% done: %g of %g units (%d tasks, 1 unit = about %d minutes of work)'
-          % (100 * done / total, done, total, len(tasks), minutes))
-    left = total - done
-    print('left: %g units, about %.0f hours of work' % (left, left * minutes / 60))
-    print()
-    width = max(len(k) for k in areas)
-    for name, v in areas.items():
-        pct = 100 * v['done'] / v['units']
-        bar = '#' * int(pct / 5) + '.' * (20 - int(pct / 5))
-        print('%-*s %s %5.1f%%  %g/%g units, %d tasks left' % (width, name, bar, pct, v['done'], v['units'], v['left']))
+    print('%.1f%% done: %g of %g units finished, %g more in progress (%d tasks, 1 unit = about %d minutes of work)'
+          % (pct(done, total), done, total, doing, len(tasks), minutes))
+    print('left: %g units, about %.0f hours of work' % (total - done, (total - done) * minutes / 60))
+    for title, groups in (('by area', areas), ('by owner', owners)):
+        print()
+        print(title)
+        width = max(len(str(k)) for k in groups)
+        for name, v in groups.items():
+            p = pct(v['done'], v['units'])
+            bar = '#' * int(p / 5) + '.' * (20 - int(p / 5))
+            print('  %-*s %s %5.1f%%  %g/%g units, %g in progress' % (width, name, bar, p, v['done'], v['units'], v['doing']))
     if a.todo:
         print()
         for t in tasks:
