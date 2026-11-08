@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T19:25+08:00",
+ "updated": "2026-11-08T23:23+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -1147,9 +1147,9 @@
    "area": "连接路",
    "title": "link-49 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-49，片段 316–328；方案已连通，未安装",
+   "status": "done",
+   "batch": 152,
+   "note": "第 152 批 S7（link-53 梯段人行道 115 m；link-49 接通两大路网），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1197,9 +1197,9 @@
    "area": "连接路",
    "title": "link-53 选线",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-53，片段 378–395；无路由且走不通",
+   "status": "done",
+   "batch": 152,
+   "note": "第 152 批 S7（link-53 梯段人行道 115 m；link-49 接通两大路网），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1207,9 +1207,9 @@
    "area": "连接路",
    "title": "link-53 施工",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-53，片段 378–395",
+   "status": "done",
+   "batch": 152,
+   "note": "第 152 批 S7（link-53 梯段人行道 115 m；link-49 接通两大路网），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1217,9 +1217,9 @@
    "area": "连接路",
    "title": "link-53 实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-53，片段 378–395",
+   "status": "done",
+   "batch": 152,
+   "note": "第 152 批 S7（link-53 梯段人行道 115 m；link-49 接通两大路网），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1337,9 +1337,9 @@
    "area": "边界",
    "title": "设施外坡：西部设施",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 153,
+   "note": "第 153 批 31,996 格，读回 0 错；验证通过，陡坎 1,812→1,446，道路/轨道/建筑/水列零改动",
    "owner": "map-edges"
   },
   {
