@@ -7,6 +7,7 @@
 
 - [环境搭建](SETUP.md)
 - [R55 快速开始](R55_QUICKSTART.zh.md) · [R55 发布说明](R55_RELEASE.zh.md)
+- [R60 快速开始](R60_QUICKSTART.zh.md) · [R60 发布说明](R60_RELEASE.zh.md)
 - [R54 联机说明](R54_FRIENDS_QUICKSTART.zh.md)
 - [本地人工试玩](R53_LOCAL_REVIEW.zh.md)
 - [发布记录与 R60 打包规则](RELEASE_LOG.zh.md)

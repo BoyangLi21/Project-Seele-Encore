@@ -20,7 +20,7 @@
 - R55 的两个包不动。
 - 打包时世界必须已正常保存并停止，打包工具会检查。
 
-**打包工具：** `tools/package_r55_current_review.py` 和它依赖的 `tools/package_r54_current_review.py` 在清理时移出了主分支，从 tag `archive/pre-cleanup-20261106` 取回，改名为 R60 再用。
+**打包工具：** `tools/package_r60.py`。默认只列清单，加 `--pack` 才写 zip，写完逐个校验 CRC。服务端启动文件、`server.properties`、图标和 PCL 清单取自 R55 的两个包。
 
 **联机：** 清理删掉了一批网络包，R60 客户端连不上 R55 服务器，两边必须一起发。
 
