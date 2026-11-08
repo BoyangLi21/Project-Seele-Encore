@@ -38,6 +38,8 @@ STEP_GRADE = .5
 ROAD_WIDTH, FOOTWAY_WIDTH = 6, 2
 # Channels up to twice this wide are bridged; wider water is not crossed.
 BRIDGE_HALF_SPAN = 6
+# An open cutting deeper than this many blocks below the ground is refused.
+MAX_CUT = 16
 
 
 def read(path):
@@ -46,6 +48,11 @@ def read(path):
 
 def write(path, value):
     Path(path).write_text(json.dumps(value, ensure_ascii=False, indent=1), 'utf8')
+
+
+def wet_block(state):
+    """Water or a waterlogged block; a slab's `waterlogged=false` property is not water."""
+    return state.split('[')[0] in ('minecraft:water', 'minecraft:bubble_column') or 'waterlogged=true' in state
 
 
 def natural(name):
@@ -93,7 +100,14 @@ class Ground:
         self.captures = [CapturedSurface(s, partial=True) for s in spec['sources']]
         # Station volumes are not walls: platforms and forecourts inside them are reached on foot,
         # and their real structures are found block by block like any other.
-        self.blocks = [r['occupied_bounds'] for r in read(Path(spec['authority']) / 'catalog.json') if r.get('occupied_bounds')]
+        # Stations and their access works span whole forecourts and the open ground under raised
+        # platforms; like station volumes they are found block by block, not as boxes.
+        catalog = [r for r in read(Path(spec['authority']) / 'catalog.json') if r.get('occupied_bounds')]
+        self.blocks = [r['occupied_bounds'] for r in catalog]
+        # Stations and their access works span whole forecourts and the open ground under raised
+        # platforms; a link that finds no way around them is routed again with those found block
+        # by block instead of as boxes.
+        self.open_blocks = [r['occupied_bounds'] for r in catalog if r.get('kind') not in ('station', 'station_access')]
         centrelines = []
         for features in spec['features']:
             with gzip.open(features, 'rt', encoding='utf8') as stream:
@@ -108,7 +122,7 @@ class Ground:
     def capture(self, lo, hi):
         return next((c for c in self.captures if c.bounds[0] <= lo[0] and c.bounds[1] <= lo[1] and c.bounds[2] >= hi[0] and c.bounds[3] >= hi[1]), None)
 
-    def grid(self, lo, hi, capture, need):
+    def grid(self, lo, hi, capture, need, open_stations=False):
         """Passability, step cost, height, component and level-crossing height over a window.
 
         Existing declared roads always pass; elsewhere a link keeps `need` clear of buildings,
@@ -125,7 +139,7 @@ class Ground:
         zz, xx = np.mgrid[z0:z1 + 1, x0:x1 + 1]
         # A column without captured soil is a void or a solid structure, not ground.
         core = ~full | (top < -120)
-        for b in self.blocks:
+        for b in (self.open_blocks if open_stations else self.blocks):
             core[max(0, b[2] - z0):max(0, b[5] - z0 + 1), max(0, b[0] - x0):max(0, b[3] - x0 + 1)] = True
         tracks, heights = existing_track(self.spec['native_snapshot'], shapely.box(x0 - 3, z0 - 3, x1 + 4, z1 + 4))
         crossing = np.full(xx.shape, np.nan)
@@ -150,9 +164,9 @@ class Ground:
             for y in range(ground + 1, min(int(highest[iz, ix]), ground + HEADROOM) + 1):
                 name = capture.state(x, y, z)
                 bare = name.split('[')[0]
-                if 'water' in bare or 'waterlogged=true' in name:
+                if wet_block(name):
                     surface = y
-                    while 'water' in capture.state(x, surface + 1, z):
+                    while wet_block(capture.state(x, surface + 1, z)):
                         surface += 1
                     wet[iz, ix] = surface
                     break
@@ -194,11 +208,11 @@ class Ground:
             return dict(row, error='No capture holds the link')
         lo, hi = np.maximum(lo, capture.bounds[:2]), np.minimum(hi, capture.bounds[2:])
         found = None
-        for footway in (False, True):
+        for open_stations, footway in ((False, False), (False, True), (True, False), (True, True)):
             if not footway and not (self.carries_traffic[p] and self.carries_traffic[q]):
                 continue
             width = FOOTWAY_WIDTH if footway else ROAD_WIDTH
-            passable, cost, level, comp, crossing = self.grid(lo, hi, capture, width / 2 + SIDEWALK)
+            passable, cost, level, comp, crossing = self.grid(lo, hi, capture, width / 2 + SIDEWALK, open_stations)
             shape_ = passable.shape
             ids_ = np.full(shape_, -1, np.int64)
             ids_[passable] = np.arange(int(passable.sum()))
@@ -243,7 +257,7 @@ class Ground:
             kind = 'Footway' if footway else 'Road'
             if grade <= (STEP_GRADE if footway else self.spec.get('max_grade', MAX_GRADE)):
                 line = LineString(gap[:, ::-1] + lo + .5)
-                return dict(row, footway=footway, width=width, length=round(length, 1), ends=ends, grade=round(grade, 3), points=line.simplify(.5).coords[:], source=str(capture.source),
+                return dict(row, footway=footway, width=width, stations_opened=open_stations, length=round(length, 1), ends=ends, grade=round(grade, 3), points=line.simplify(.5).coords[:], source=str(capture.source),
                             crossings=[[int(c[1] + lo[0]), int(c[0] + lo[1]), y] for _, y, c in rails])
             found = dict(row, error=f'{kind} grade {grade:.2f} over {length:.0f} m')
         return found or dict(row, error='No passable route')
@@ -254,13 +268,28 @@ def water_surface(source, x, z):
     bx, bz, _, _ = source.bounds
     y = int(source.measured['top'][z - bz, x - bx]) + 1
     try:
-        if 'water' not in source.state(x, y, z):
+        if not wet_block(source.state(x, y, z)):
             return None
     except ValueError:
         return None
-    while 'water' in source.state(x, y + 1, z):
+    while wet_block(source.state(x, y + 1, z)):
         y += 1
     return y
+
+
+def standing_height(source, x, z):
+    """Feet height on a column: the measured ground, or paving laid on it with room above."""
+    bx, bz, _, _ = source.bounds
+    top = int(source.measured['top'][z - bz, x - bx])
+    feet = top + 1
+    try:
+        for y in range(top, top + 4):
+            name = source.state(x, y, z)
+            if name.split('[')[0] in PAVEMENT and all(source.state(x, y + k, z).split('[')[0] in EMPTY for k in (1, 2)):
+                feet = max(feet, y + (.5 if 'type=bottom' in name else 1))
+    except ValueError:
+        pass
+    return feet
 
 
 def ground_profile(source, samples, along, pins, grade):
@@ -278,7 +307,7 @@ def ground_profile(source, samples, along, pins, grade):
         x, z = int(np.floor(x)), int(np.floor(z))
         surface = water_surface(source, x, z)
         # Over water the deck lies one block above the surface: feet two above it.
-        ground.append(source.measured['top'][z - bz, x - bx] + 1 if surface is None else surface + 2)
+        ground.append(standing_height(source, x, z) if surface is None else surface + 2)
     ground = np.array(ground, float)
     pin_s, pin_y = map(np.array, zip(*pins))
     upper = np.min(pin_y[None, :] + grade * np.abs(along[:, None] - pin_s[None, :]), axis=1)
@@ -367,31 +396,18 @@ def edits(a):
         along = np.arange(len(samples)) * .5
         pins = sorted([(0.0, link['ends'][0]), (float(along[-1]), link['ends'][1])]
                       + [(line.project(shapely.Point(x + .5, z + .5)), y) for x, z, y in link['crossings']])
-        feet = ground_profile(source, samples, along, pins, STEP_GRADE if link['footway'] else spec.get('max_grade', MAX_GRADE))
+        # A bridge keeps its own straight grade across a valley instead of dropping into it.
+        feet = np.interp(along, *zip(*pins)) if link.get('bridge') else ground_profile(source, samples, along, pins, STEP_GRADE if link['footway'] else spec.get('max_grade', MAX_GRADE))
         tree = cKDTree(samples)
         nearest = tree.query(np.c_[xx.ravel() + .5, zz.ravel() + .5])[1].reshape(xx.shape)
         height = np.ceil(feet[nearest] * 2 - 1e-9) / 2
         new_grade = np.rint(2 * (height - 1)).astype(np.int16)
-        # Cells on the inside of a sharp bend take heights from both legs; raise any cell more
-        # than half a block below a neighbour so every step stays walkable.
-        while True:
-            masked = np.where(walk, new_grade, -32000).astype(np.int32)
-            reach = masked.copy()
-            reach[1:, :] = np.maximum(reach[1:, :], masked[:-1, :] - 1)
-            reach[:-1, :] = np.maximum(reach[:-1, :], masked[1:, :] - 1)
-            reach[:, 1:] = np.maximum(reach[:, 1:], masked[:, :-1] - 1)
-            reach[:, :-1] = np.maximum(reach[:, :-1], masked[:, 1:] - 1)
-            raise_ = walk & (reach > masked)
-            if not raise_.any():
-                break
-            new_grade[raise_] = reach[raise_]
-        floor, slab = road_blocks(new_grade)
         top = source.measured['top'][bz - sz:bZ - sz + 1, bx - sx:bX - sx + 1].astype(int)
         known = source.measured['full'][bz - sz:bZ - sz + 1, bx - sx:bX - sx + 1]
         if not known[walk].all():
             errors.append([link['id'], 'Link leaves the capture'])
             continue
-        blocked, adopted, built = Counter(), 0, 0
+        blocked, adopted, built, blocked_at = Counter(), 0, 0, []
         # The crossing deck replaces ballast under the rails; the rails themselves are native data.
         deck = {(int(x + dx), int(z + dz)) for x, z, _ in link['crossings'] for dx in range(-4, 5) for dz in range(-4, 5)}
         def replaceable(x, z, name):
@@ -410,6 +426,7 @@ def edits(a):
             if before != state:
                 writes[x, y, z] = dict(pos=[x, y, z], before=before, after=state, purpose=purpose)
         build = walk & ~old_walk
+        adopted_at = np.full(xx.shape, -9999)
         for iz, ix in np.argwhere(build):
             x, z = int(xx[iz, ix]), int(zz[iz, ix])
             clearance = 4 if road[iz, ix] and not link['footway'] else 2
@@ -422,10 +439,58 @@ def edits(a):
                     if name not in EMPTY and natural(name):
                         put(x, yy, z, 'minecraft:air', 'link uncovered')
                 build[iz, ix] = False
+                adopted_at[iz, ix] = y
                 adopted += 1
                 network['walk'][iz + bz - az, ix + bx - ax] = True
                 network['road'][iz + bz - az, ix + bx - ax] = bool(road[iz, ix]) and not link['footway']
                 network['grade2'][iz + bz - az, ix + bx - ax] = grade
+        # Every step must stay walkable: a new cell sits within half a block of each neighbour,
+        # whether new or an old road at its real height. Cells on the inside of a sharp bend take
+        # heights from both legs, and the link meets old paving where it stands.
+        # Adopted paving is fixed like the old roads, so this runs after adoption.
+        old_grade = network['grade2'][window].astype(np.int32)
+        fresh = build.copy()
+        fixed = network['walk'][window] & ~fresh
+        for _ in range(300):
+            value = np.where(fresh, new_grade, np.where(fixed, old_grade, 0)).astype(np.int32)
+            known_ = fresh | fixed
+            upper = np.full(value.shape, 32000, np.int32)
+            lower = np.full(value.shape, -32000, np.int32)
+            for axis, shift in ((0, 1), (0, -1), (1, 1), (1, -1)):
+                v, k = np.roll(value, shift, axis), np.roll(known_, shift, axis)
+                if axis == 0:
+                    edge = np.s_[0, :] if shift == 1 else np.s_[-1, :]
+                else:
+                    edge = np.s_[:, 0] if shift == 1 else np.s_[:, -1]
+                k[edge] = False
+                upper = np.where(k, np.minimum(upper, v + 1), upper)
+                lower = np.where(k, np.maximum(lower, v - 1), lower)
+            target = np.clip(value, lower, np.maximum(upper, lower))
+            change = fresh & (target != value)
+            if not change.any():
+                break
+            new_grade[change] = target[change]
+        floor, slab = road_blocks(new_grade)
+        # Adopted paving keeps its own height, so old block-high steps survive adoption; a bottom
+        # slab on the lower block halves such a step.
+        for _ in range(3):
+            grades = network['grade2'][window].astype(np.int32)
+            walked = network['walk'][window]
+            # Old roads inside the link's footprint take the same step where the link meets them.
+            for iz, ix in np.argwhere((adopted_at > -9999) | (walk & old_walk)):
+                g = int(grades[iz, ix])
+                if g % 2 or not walked[iz, ix]:
+                    continue
+                if adopted_at[iz, ix] == -9999:
+                    adopted_at[iz, ix] = g // 2
+                higher = any(0 <= iz + dz < grades.shape[0] and 0 <= ix + dx < grades.shape[1] and walked[iz + dz, ix + dx]
+                             and grades[iz + dz, ix + dx] - g >= 2 for dz, dx in ((0, 1), (1, 0), (0, -1), (-1, 0)))
+                x, z, y = int(xx[iz, ix]), int(zz[iz, ix]), int(adopted_at[iz, ix])
+                if higher and all(source.state(x, y + k, z).split('[')[0] in EMPTY for k in (1, 2, 3)):
+                    slab_state = ('projectseele:road_asphalt_slab' if road[iz, ix] and not link['footway'] else 'minecraft:smooth_stone_slab') + '[type=bottom,waterlogged=false]'
+                    put(x, y + 1, z, slab_state, 'curb step')
+                    network['grade2'][iz + bz - az, ix + bx - ax] = g + 1
+                    adopted_at[iz, ix] = -9999
         # Declared roads the link joins may lie under a later layer of soil; the audit counts
         # them as open, a player meets a wall. Dig them out where the link reaches them.
         old_grade = network['grade2'][window]
@@ -448,6 +513,8 @@ def edits(a):
                 guarded[max(0, ob[2] - bz):max(0, ob[5] - bz + 1), max(0, ob[0] - bx):max(0, ob[3] - bx + 1)] = True
         guarded = distance_transform_edt(~guarded) <= 2
         dry = np.array([[water_surface(source, int(x), int(z)) is None for x, z in zip(rx, rz)] for rx, rz in zip(xx, zz)]) if ((target != top) & (d <= EARTHWORK_REACH)).any() else np.ones(xx.shape, bool)
+        if link.get('bridge'):
+            dry = np.zeros(xx.shape, bool)
         for iz, ix in np.argwhere((target != top) & (d <= EARTHWORK_REACH) & ~walk & ~old_walk & known & ~guarded & dry):
             x, z, old, new = int(xx[iz, ix]), int(zz[iz, ix]), int(top[iz, ix]), int(target[iz, ix])
             for y in range(min(old, new) - 2, max(old, new) + 1):
@@ -470,6 +537,12 @@ def edits(a):
             # there, old paving included, carries it as it is.
             column = [] if surface is not None else [(yy, 'minecraft:stone', 'link bearing') for yy in range(min(int(top[iz, ix]) - 1, y - 1), y)
                                                      if source.state(x, yy, z).split('[')[0] in EMPTY | PLANTS or source.state(x, yy, z).split('[')[0].endswith(('_leaves', '_log'))]
+            if link.get('bridge') and y - int(top[iz, ix]) > 2:
+                # Over a valley the deck stands on piers every eight metres along its centre, not
+                # on a bank that would dam the stream below.
+                at = float(along[nearest[iz, ix]])
+                centre_cell = line.distance(shapely.Point(x + .5, z + .5)) <= 1.0
+                column = [(yy, 'minecraft:stone_bricks', 'bridge pier') for yy in range(int(top[iz, ix]) + 1, y)] if surface is None and centre_cell and at % 8 < 1 else []
             # A road in cutting is open to the sky: clearing only its headroom would leave a lid of
             # ground over it.
             column += [(yy, 'minecraft:air', 'link headroom') for yy in range(y + 1, max(y + HEADROOM, int(top[iz, ix])) + 1)
@@ -481,8 +554,12 @@ def edits(a):
             stuck = [name for name in stuck if not replaceable(x, z, name)]
             if (x, z) in wet or any((x, yy, z) in keep_out for yy, _, _ in column):
                 stuck.append('planned water')
+            if int(top[iz, ix]) - y > MAX_CUT:
+                # Deeper than this is a tunnel, which needs its own design.
+                stuck.append('deep cut')
             if stuck:
                 blocked.update(stuck)
+                blocked_at.append([x, y, z, stuck[0]])
                 continue
             for yy, block, purpose in column:
                 put(x, yy, z, block, purpose)
@@ -508,7 +585,7 @@ def edits(a):
         structures = [r.get('id') for r in catalog if r.get('occupied_bounds') and footprint.intersects(shapely.box(r['occupied_bounds'][0], r['occupied_bounds'][2], r['occupied_bounds'][3] + 1, r['occupied_bounds'][5] + 1))]
         stations = [v for v in volumes if footprint.intersects(shapely.box(v[0], v[2], v[3] + 1, v[5] + 1))]
         report.append(dict(id=link['id'], components=link['components'], footway=link['footway'], length=link['length'], ends=link['ends'], grade=link['grade'],
-                           built=built, adopted=adopted, joined=bool(joined), blocked=dict(blocked), structures=structures[:4], stations=len(stations)))
+                           built=built, adopted=adopted, joined=bool(joined), blocked=dict(blocked), blocked_at=blocked_at[:12], structures=structures[:4], stations=len(stations)))
         if not joined:
             errors.append([link['id'], dict(blocked=dict(blocked), structures=structures[:4], joined=False)])
     a.out.mkdir(parents=True, exist_ok=True)
