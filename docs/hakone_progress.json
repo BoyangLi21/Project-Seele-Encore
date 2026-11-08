@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T13:42+08:00",
+ "updated": "2026-11-08T13:50+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -417,9 +417,9 @@
    "area": "连接路",
    "title": "link-0 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-0，片段 0–2；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -427,9 +427,9 @@
    "area": "连接路",
    "title": "link-1 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-1，片段 2–4；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -467,9 +467,9 @@
    "area": "连接路",
    "title": "link-5 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-5，片段 11–12；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -477,9 +477,9 @@
    "area": "连接路",
    "title": "link-6 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-6，片段 12–30；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -737,9 +737,9 @@
    "area": "连接路",
    "title": "link-22 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-22，片段 18–20；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -747,9 +747,9 @@
    "area": "连接路",
    "title": "link-23 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-23，片段 20–29；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -957,9 +957,9 @@
    "area": "连接路",
    "title": "link-36 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-36，片段 204–206；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -977,9 +977,9 @@
    "area": "连接路",
    "title": "link-38 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-38，片段 218–256；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -1097,9 +1097,9 @@
    "area": "连接路",
    "title": "link-44 已可步行，不施工",
    "units": 0.5,
-   "status": "done",
+   "status": "todo",
    "batch": null,
-   "note": "v2 link-44，片段 311–320；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
    "owner": "map-roads"
   },
   {
@@ -1267,9 +1267,9 @@
    "area": "缆车站与接站路",
    "title": "中间缆车站 原生改动：拆分轨道、站台、车站、线路",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 126,
+   "note": "第125、126批原生：17个新成员、换线路/车库/停车线、删3条旧轨",
    "owner": "map-edges"
   },
   {
@@ -1277,9 +1277,9 @@
    "area": "缆车站与接站路",
    "title": "中间缆车站 施工：公園下、公園上站台和接站路",
    "units": 2,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 125,
+   "note": "第125批 886格读回0错（四站站台、开门方块、接站步道）",
    "owner": "map-edges"
   },
   {
@@ -1287,9 +1287,9 @@
    "area": "缆车站与接站路",
    "title": "中间缆车站 施工：中強羅、上強羅站台和接站路",
    "units": 2,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 125,
+   "note": "第125批 886格读回0错（四站站台、开门方块、接站步道）",
    "owner": "map-edges"
   },
   {
@@ -1297,9 +1297,9 @@
    "area": "缆车站与接站路",
    "title": "中间缆车站 实测：缆车逐站停靠开门",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 125,
+   "note": "map-edges 隔离客户端：四站逐站停车开门，公園下下车走到街上；正式世界装后未再进游戏",
    "owner": "map-edges"
   },
   {
@@ -1317,9 +1317,9 @@
    "area": "缆车站与接站路",
    "title": "強羅南站台 (907,55,662) 接站路 设计施工",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 127,
+   "note": "第127批 33格读回0错",
    "owner": "map-edges"
   },
   {
@@ -1327,9 +1327,9 @@
    "area": "缆车站与接站路",
    "title": "強羅南站台 (907,55,662) 接站路 实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 127,
+   "note": "map-edges 隔离客户端步道往返0卡住",
    "owner": "map-edges"
   },
   {
@@ -1777,9 +1777,9 @@
    "area": "缆车站与接站路",
    "title": "登山缆车 HC：跑完一趟开进早雲山车库带走乘客，改为来回穿梭",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "11-08 map-edges 实测发现",
+   "status": "done",
+   "batch": 126,
+   "note": "第126批车库改来回运行",
    "owner": "map-edges"
   },
   {
@@ -1787,9 +1787,9 @@
    "area": "缆车站与接站路",
    "title": "索道 HRW/HRE 进站段与折返轨降速候选（站台沿用 2–3km/h）",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "车厢以 3.3m/s 穿过 12m 站台，约3.6秒，上不了车",
+   "status": "doing",
+   "batch": 129,
+   "note": "东段第128、129批：早雲山、大涌谷开门方块256格、进站降速、车库移到站内回环；桃源台、姥子开门方块待交付",
    "owner": "map-edges"
   },
   {
@@ -1797,9 +1797,9 @@
    "area": "缆车站与接站路",
    "title": "索道上车实测（各线至少一站 riding=true）及 railProgress≈1140 车厢不开门原因",
    "units": 1.0,
-   "status": "todo",
+   "status": "doing",
    "batch": null,
-   "note": "",
+   "note": "map-edges 实测 HRE 早雲山、HRW 大涌谷 riding=true；下车未实测；西段待装",
    "owner": "map-edges"
   },
   {
