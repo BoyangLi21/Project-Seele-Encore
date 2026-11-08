@@ -6,7 +6,7 @@
 |---|---|---|---:|---:|---|
 | R54 fix2 | 2026-10-28 | 旧版 | 929 MB | 1,294 MB | `delivery/R54_20261028_fix2_DELIVERY_RECEIPT.json` |
 | R55 | 2026-10-29 | 上一版，保留 | 945 MB | 1,328 MB | `delivery/R55_20261029_receipt.json`，[说明](R55_RELEASE.zh.md)，[快速开始](R55_QUICKSTART.zh.md) |
-| R60 | 未打包 | 下一版 | | | 见下 |
+| R60 | 2026-11-08 | 朋友小测试包，地图未完工 | 904 MB | 1,891 MB | `delivery/R60_20261108_receipt.json`，[说明](R60_RELEASE.zh.md)，[快速开始](R60_QUICKSTART.zh.md) |
 
 版本号从 R55 直接到 R60。R56–R59 是开发轮次，没有发布过。
 
