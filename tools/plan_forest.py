@@ -119,15 +119,19 @@ def conifer(rng, tall, wood, needles):
     height = rng.randint(*tall)
     cells = [(0, k, 0, log(wood)) for k in range(1, height + 1)]
     base = rng.randint(2, 3)
-    for k in range(base, height + 2):
+    for k in range(base, height + 1):
         taper = (height + 1 - k) / max(1, height + 1 - base)
-        radius = 2.6 * taper ** .85 * (1 if (k - base) % 2 == 0 else .72)
+        # Never thinner than the four cells around the log, or the top of the trunk stands bare.
+        radius = max(1.05, 2.6 * taper ** .85 * (1 if (k - base) % 2 == 0 else .72))
         reach = int(radius + .5)
         for dx in range(-reach, reach + 1):
             for dz in range(-reach, reach + 1):
                 d = dx * dx + dz * dz
-                if d <= radius * radius + .3 and d > (radius - 1.2) ** 2 and (dx or dz or k > height):
+                if d <= radius * radius + .3 and d > (radius - 1.2) ** 2 and (dx or dz):
                     cells.append((dx, k, dz, leaf(needles)))
+    # The leaf cap closes over the last log and the tip stands two above it.
+    cells += [(dx, height + 1, dz, leaf(needles)) for dx, dz in ((0, 0), (1, 0), (-1, 0), (0, 1), (0, -1))]
+    cells.append((0, height + 2, 0, leaf(needles)))
     return cells
 
 
@@ -232,7 +236,7 @@ def edits(a):
             return shrub(rng)
         return broadleaf(rng, (('oak', 'oak'), ('oak', 'oak'), ('birch', 'birch'), ('dark_oak', 'dark_oak')))
     for kind, step in spacing.items():
-        loose = 1 if kind == CONIFER else step - 1      # plantations stand in rows, broadleaf wanders
+        loose = 3 if kind == CONIFER else step - 1      # plantations loosely keep their rows, broadleaf wanders
         for iz in range(0, top.shape[0], step):
             for ix in range(0, top.shape[1], step):
                 jz, jx = iz + rng.randint(0, loose), ix + rng.randint(0, loose)

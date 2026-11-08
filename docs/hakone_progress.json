@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T17:01+08:00",
+ "updated": "2026-11-08T19:25+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -417,9 +417,9 @@
    "area": "连接路",
    "title": "link-0 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "note": "2026-11-08 map-roads 在 132 批副本上走通站台到街道，不需要修路",
    "owner": "map-roads"
   },
   {
@@ -427,9 +427,9 @@
    "area": "连接路",
    "title": "link-1 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "note": "2026-11-08 map-roads 在 132 批副本上走通站台到街道，不需要修路",
    "owner": "map-roads"
   },
   {
@@ -546,30 +546,30 @@
    "id": "road-v2-12a",
    "area": "连接路",
    "title": "link-12 选线",
-   "units": 1,
-   "status": "todo",
+   "units": 0.5,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-12，片段 15–177；无路由且走不通",
+   "note": "不需要建：旧地铁隧道内的侧道（主会话决定，2026-11-08）",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-12b",
    "area": "连接路",
    "title": "link-12 施工",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-12，片段 15–177",
+   "note": "不需要建，随 12a 关闭",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-12c",
    "area": "连接路",
    "title": "link-12 实测",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-12，片段 15–177",
+   "note": "不需要建，随 12a 关闭",
    "owner": "map-roads"
   },
   {
@@ -596,30 +596,30 @@
    "id": "road-v2-15a",
    "area": "连接路",
    "title": "link-15 选线",
-   "units": 1,
-   "status": "todo",
+   "units": 0.5,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-15，片段 15–213；无路由且走不通",
+   "note": "不需要建：旧地铁隧道内的侧道（主会话决定，2026-11-08）",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-15b",
    "area": "连接路",
    "title": "link-15 施工",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-15，片段 15–213",
+   "note": "不需要建，随 15a 关闭",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-15c",
    "area": "连接路",
    "title": "link-15 实测",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-15，片段 15–213",
+   "note": "不需要建，随 15a 关闭",
    "owner": "map-roads"
   },
   {
@@ -636,30 +636,30 @@
    "id": "road-v2-17a",
    "area": "连接路",
    "title": "link-17 选线",
-   "units": 1,
-   "status": "todo",
+   "units": 0.5,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-17，片段 15–259；无路由且走不通",
+   "note": "不需要建：旧地铁隧道内的侧道（主会话决定，2026-11-08）",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-17b",
    "area": "连接路",
    "title": "link-17 施工",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-17，片段 15–259",
+   "note": "不需要建，随 17a 关闭",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-17c",
    "area": "连接路",
    "title": "link-17 实测",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-17，片段 15–259",
+   "note": "不需要建，随 17a 关闭",
    "owner": "map-roads"
   },
   {
@@ -737,9 +737,9 @@
    "area": "连接路",
    "title": "link-22 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "note": "2026-11-08 map-roads 在 132 批副本上走通站台到街道，不需要修路",
    "owner": "map-roads"
   },
   {
@@ -809,7 +809,7 @@
    "units": 0.5,
    "status": "done",
    "batch": null,
-   "note": "v2 link-26，片段 29–30；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 在 132 批上双向走通（2026-11-08 不需要建）",
    "owner": "map-roads"
   },
   {
@@ -887,9 +887,9 @@
    "area": "连接路",
    "title": "link-33 选线",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-33，片段 149–155；无路由且走不通",
+   "status": "done",
+   "batch": 133,
+   "note": "由第 133 批 S3（s-2-127、alt-127-286、alt-9-127、alt-9-16）接通，不建地下通道；四段双向走通",
    "owner": "map-roads"
   },
   {
@@ -897,9 +897,9 @@
    "area": "连接路",
    "title": "link-33 施工",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-33，片段 149–155",
+   "status": "done",
+   "batch": 133,
+   "note": "由第 133 批 S3（s-2-127、alt-127-286、alt-9-127、alt-9-16）接通，不建地下通道；四段双向走通",
    "owner": "map-roads"
   },
   {
@@ -907,9 +907,9 @@
    "area": "连接路",
    "title": "link-33 实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-33，片段 149–155",
+   "status": "done",
+   "batch": 133,
+   "note": "由第 133 批 S3（s-2-127、alt-127-286、alt-9-127、alt-9-16）接通，不建地下通道；四段双向走通",
    "owner": "map-roads"
   },
   {
@@ -917,9 +917,9 @@
    "area": "连接路",
    "title": "link-34 修方案",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-34，片段 155–218；建了未连通",
+   "status": "done",
+   "batch": 133,
+   "note": "由第 133 批 S3（s-2-127、alt-127-286、alt-9-127、alt-9-16）接通，不建地下通道；四段双向走通",
    "owner": "map-roads"
   },
   {
@@ -927,9 +927,9 @@
    "area": "连接路",
    "title": "link-34 安装与实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-34，片段 155–218",
+   "status": "done",
+   "batch": 133,
+   "note": "由第 133 批 S3（s-2-127、alt-127-286、alt-9-127、alt-9-16）接通，不建地下通道；四段双向走通",
    "owner": "map-roads"
   },
   {
@@ -987,9 +987,9 @@
    "area": "连接路",
    "title": "link-39 选线",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-39，片段 256–301；无路由且走不通",
+   "status": "done",
+   "batch": 133,
+   "note": "由第 133 批 S3（s-2-127、alt-127-286、alt-9-127、alt-9-16）接通，不建地下通道；四段双向走通",
    "owner": "map-roads"
   },
   {
@@ -997,9 +997,9 @@
    "area": "连接路",
    "title": "link-39 施工",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-39，片段 256–301",
+   "status": "done",
+   "batch": 133,
+   "note": "由第 133 批 S3（s-2-127、alt-127-286、alt-9-127、alt-9-16）接通，不建地下通道；四段双向走通",
    "owner": "map-roads"
   },
   {
@@ -1007,69 +1007,69 @@
    "area": "连接路",
    "title": "link-39 实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-39，片段 256–301",
+   "status": "done",
+   "batch": 133,
+   "note": "由第 133 批 S3（s-2-127、alt-127-286、alt-9-127、alt-9-16）接通，不建地下通道；四段双向走通",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-40a",
    "area": "连接路",
    "title": "link-40 选线",
-   "units": 1,
-   "status": "todo",
+   "units": 0.5,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-40，片段 259–281；无路由且走不通",
+   "note": "不需要建：旧地铁隧道内的侧道（主会话决定，2026-11-08）",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-40b",
    "area": "连接路",
    "title": "link-40 施工",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-40，片段 259–281",
+   "note": "不需要建，随 40a 关闭",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-40c",
    "area": "连接路",
    "title": "link-40 实测",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-40，片段 259–281",
+   "note": "不需要建，随 40a 关闭",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-41a",
    "area": "连接路",
    "title": "link-41 选线",
-   "units": 1,
-   "status": "todo",
+   "units": 0.5,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-41，片段 281–305；无路由且走不通",
+   "note": "不需要建：旧地铁隧道内的侧道（主会话决定，2026-11-08）",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-41b",
    "area": "连接路",
    "title": "link-41 施工",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-41，片段 281–305",
+   "note": "不需要建，随 41a 关闭",
    "owner": "map-roads"
   },
   {
    "id": "road-v2-41c",
    "area": "连接路",
    "title": "link-41 实测",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "v2 link-41，片段 281–305",
+   "note": "不需要建，随 41a 关闭",
    "owner": "map-roads"
   },
   {
@@ -1097,9 +1097,9 @@
    "area": "连接路",
    "title": "link-44 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "note": "2026-11-08 map-roads 在 132 批副本上走通站台到街道，不需要修路",
    "owner": "map-roads"
   },
   {
@@ -1129,7 +1129,7 @@
    "units": 0.5,
    "status": "done",
    "batch": null,
-   "note": "v2 link-47，片段 311–387；楼梯/踏步静态步行检查通过，审计不计台阶，未进游戏",
+   "note": "map-roads 在 132 批上双向走通（2026-11-08 不需要建）",
    "owner": "map-roads"
   },
   {
@@ -1877,9 +1877,9 @@
    "area": "道路换用",
    "title": "TrafficCraft：所有打开正式世界或副本的客户端装 jar",
    "units": 0.5,
-   "status": "doing",
+   "status": "done",
    "batch": null,
-   "note": "map-work 测试客户端已装；正式客户端已由主会话装；map-roads、map-edges 客户端未装",
+   "note": "主会话确认 jar 已进主客户端、map-work、map-edges、map-roads 客户端（2026-11-08）",
    "owner": "map-bdb53d"
   },
   {
@@ -1895,17 +1895,17 @@
   {
    "id": "tc-area-1",
    "area": "道路换用",
-   "title": "TrafficCraft 转换安装：箱根西部（十字城区）",
+   "title": "TrafficCraft 转换安装：第1条带 x-2112..-513",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "安装、读回",
+   "status": "done",
+   "batch": 135,
+   "note": "第 135 批写入，第 144 批修复；全图审计地面失败 6 列（修复前 28,921）",
    "owner": "map-bdb53d"
   },
   {
    "id": "tc-check-1",
    "area": "道路换用",
-   "title": "TrafficCraft 转换核查：箱根西部（十字城区）",
+   "title": "TrafficCraft 转换核查：第1条带 x-2112..-513",
    "units": 0.5,
    "status": "todo",
    "batch": null,
@@ -1915,17 +1915,17 @@
   {
    "id": "tc-area-2",
    "area": "道路换用",
-   "title": "TrafficCraft 转换安装：箱根中部（強羅、宮ノ下）",
+   "title": "TrafficCraft 转换安装：第2条带 x-512..-1",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "安装、读回",
+   "status": "done",
+   "batch": 136,
+   "note": "第 136 批写入，第 145 批修复；全图审计地面失败 6 列（修复前 28,921）",
    "owner": "map-bdb53d"
   },
   {
    "id": "tc-check-2",
    "area": "道路换用",
-   "title": "TrafficCraft 转换核查：箱根中部（強羅、宮ノ下）",
+   "title": "TrafficCraft 转换核查：第2条带 x-512..-1",
    "units": 0.5,
    "status": "todo",
    "batch": null,
@@ -1935,17 +1935,17 @@
   {
    "id": "tc-area-3",
    "area": "道路换用",
-   "title": "TrafficCraft 转换安装：箱根东部（湯本）",
+   "title": "TrafficCraft 转换安装：第3条带 x0..511",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "安装、读回",
+   "status": "done",
+   "batch": 137,
+   "note": "第 137 批写入，第 146 批修复；全图审计地面失败 6 列（修复前 28,921）",
    "owner": "map-bdb53d"
   },
   {
    "id": "tc-check-3",
    "area": "道路换用",
-   "title": "TrafficCraft 转换核查：箱根东部（湯本）",
+   "title": "TrafficCraft 转换核查：第3条带 x0..511",
    "units": 0.5,
    "status": "todo",
    "batch": null,
@@ -1955,17 +1955,17 @@
   {
    "id": "tc-area-4",
    "area": "道路换用",
-   "title": "TrafficCraft 转换安装：芦之湖岸与桃源台",
+   "title": "TrafficCraft 转换安装：第4条带 x512..1535",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "安装、读回",
+   "status": "done",
+   "batch": 138,
+   "note": "第 138 批写入，第 147 批修复；全图审计地面失败 6 列（修复前 28,921）",
    "owner": "map-bdb53d"
   },
   {
    "id": "tc-check-4",
    "area": "道路换用",
-   "title": "TrafficCraft 转换核查：芦之湖岸与桃源台",
+   "title": "TrafficCraft 转换核查：第4条带 x512..1535",
    "units": 0.5,
    "status": "todo",
    "batch": null,
@@ -1975,17 +1975,17 @@
   {
    "id": "tc-area-5",
    "area": "道路换用",
-   "title": "TrafficCraft 转换安装：小田原北部",
+   "title": "TrafficCraft 转换安装：第5条带 x1536..2559",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "安装、读回",
+   "status": "done",
+   "batch": 139,
+   "note": "第 139 批写入，第 148 批修复；全图审计地面失败 6 列（修复前 28,921）",
    "owner": "map-bdb53d"
   },
   {
    "id": "tc-check-5",
    "area": "道路换用",
-   "title": "TrafficCraft 转换核查：小田原北部",
+   "title": "TrafficCraft 转换核查：第5条带 x1536..2559",
    "units": 0.5,
    "status": "todo",
    "batch": null,
@@ -1995,17 +1995,17 @@
   {
    "id": "tc-area-6",
    "area": "道路换用",
-   "title": "TrafficCraft 转换安装：小田原中部",
+   "title": "TrafficCraft 转换安装：第6条带 x2560..3071",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "安装、读回",
+   "status": "done",
+   "batch": 140,
+   "note": "第 140 批写入，第 149 批修复；全图审计地面失败 6 列（修复前 28,921）",
    "owner": "map-bdb53d"
   },
   {
    "id": "tc-check-6",
    "area": "道路换用",
-   "title": "TrafficCraft 转换核查：小田原中部",
+   "title": "TrafficCraft 转换核查：第6条带 x2560..3071",
    "units": 0.5,
    "status": "todo",
    "batch": null,
@@ -2015,17 +2015,17 @@
   {
    "id": "tc-area-7",
    "area": "道路换用",
-   "title": "TrafficCraft 转换安装：小田原南部与海岸",
+   "title": "TrafficCraft 转换安装：第7条带 x3072..3583",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "安装、读回",
+   "status": "done",
+   "batch": 141,
+   "note": "第 141 批写入，第 150 批修复；全图审计地面失败 6 列（修复前 28,921）",
    "owner": "map-bdb53d"
   },
   {
    "id": "tc-check-7",
    "area": "道路换用",
-   "title": "TrafficCraft 转换核查：小田原南部与海岸",
+   "title": "TrafficCraft 转换核查：第7条带 x3072..3583",
    "units": 0.5,
    "status": "todo",
    "batch": null,
@@ -2035,17 +2035,17 @@
   {
    "id": "tc-area-8",
    "area": "道路换用",
-   "title": "TrafficCraft 转换安装：小田原东部",
+   "title": "TrafficCraft 转换安装：第8条带 x3584..4511",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "安装、读回",
+   "status": "done",
+   "batch": 142,
+   "note": "第 142 批写入，第 151 批修复；全图审计地面失败 6 列（修复前 28,921）",
    "owner": "map-bdb53d"
   },
   {
    "id": "tc-check-8",
    "area": "道路换用",
-   "title": "TrafficCraft 转换核查：小田原东部",
+   "title": "TrafficCraft 转换核查：第8条带 x3584..4511",
    "units": 0.5,
    "status": "todo",
    "batch": null,
@@ -2321,6 +2321,16 @@
    "batch": null,
    "note": "",
    "owner": "map-bdb53d"
+  },
+  {
+   "id": "chunks-19-formal",
+   "area": "连接路",
+   "title": "把 x2128–2319、z480–511 的 19 个未生成区块补进正式世界，然后交 map-roads 做 link-35",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "排在转换修复之后；审计里的 1,938 个 unknown 列就是这片",
+   "owner": "map"
   }
  ]
 }

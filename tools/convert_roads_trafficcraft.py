@@ -16,7 +16,7 @@ import math
 from pathlib import Path
 
 import numpy as np
-from scipy.ndimage import distance_transform_edt, label
+from scipy.ndimage import center_of_mass, distance_transform_edt, label, mean, uniform_filter
 
 from plan_ashi_landscape_r54 import PLANTS, SOIL
 from plan_station_access_corridor import CapturedSurface
@@ -28,14 +28,17 @@ LAYERS = 8
 ROAD_FLOORS = {'minecraft:black_concrete', 'minecraft:white_concrete', 'minecraft:gray_concrete', 'minecraft:smooth_stone', 'minecraft:smooth_stone_slab',
                'projectseele:road_asphalt_slab', 'projectseele:road_marking_slab'}
 FOOT_FLOORS = {'minecraft:smooth_stone', 'minecraft:smooth_stone_slab'}
-MAX_STEP = 2            # layers between neighbours, 25%
+MAX_STEP = 2            # layers between neighbours, 25%, where the road's own gradient allows it
+STEEP_STEP = 4          # layers: a ramp too steep for MAX_STEP keeps its half-block steps
 DRIFT = 4               # layers a surface may move from where it was
 WHITE, YELLOW = 0, 4
 DASH = 5                # painted, then the same unpainted
 ZEBRA = 4               # cells of zebra along an approach
 ZEBRA_SKEW = 20         # degrees off the block grid beyond which a crossing has no clean bars
 EIGHT = np.ones((3, 3), int)
-TOWN_BUILDINGS, TOWN_RADIUS = 4, 40
+# Town: buildings on a tenth of the ground nearby, or streets on a fifth (a street grid whose towers rise from carriers).
+BUILT_WINDOW, BUILT_SHARE, STREET_WINDOW, STREET_SHARE = 61, .1, 121, .2
+MIN_JUNCTIONS, MIN_ZEBRA, TALLY_WIDTH = 20, 8, 1024       # a plan with fewer than MIN_ZEBRA cells per town junction has lost its crossings
 ENTITY = 'trafficcraft:colored_block_entity'
 REPLACEABLE = PAVEMENT | AIR | PLANTS | SOIL | {'minecraft:light', 'minecraft:snow'}
 # Facing that puts pattern 23's offset line on a side: it lies east when the texture faces north.
@@ -80,26 +83,29 @@ def smooth(height, walk, joined, passes=40):
         for axis, shift in ((0, 1), (0, -1), (1, 1), (1, -1)):
             n = np.roll(out, shift, axis)
             ok = joined[axis][..., 0 if shift == 1 else 1]
-            too_high = ok & (out > n + MAX_STEP)
+            # Never below the drift floor: a ramp steeper than MAX_STEP would otherwise sink without end.
+            target = np.maximum(n + MAX_STEP, low)
+            too_high = ok & (out > target)
             if too_high.any():
-                out[too_high] = n[too_high] + MAX_STEP
+                out[too_high] = target[too_high]
                 changed = True
         if not changed:
             break
     return out
 
 
-def limit(surface, joined, movable, rounds=400):
-    """Lower `movable` cells until no neighbour pair steps more than MAX_STEP within one class."""
+def limit(surface, joined, movable, lowest, rounds=400):
+    """Lower `movable` cells, never under `lowest`, until no neighbour pair steps more than MAX_STEP within one class."""
     out = surface.copy()
     for _ in range(rounds):
         changed = False
         for axis, shift in ((0, 1), (0, -1), (1, 1), (1, -1)):
             n = np.roll(out, shift, axis)
             same = movable & np.roll(movable, shift, axis)
-            ok = joined[axis][..., 0 if shift == 1 else 1] & same & (out > n + MAX_STEP)
+            target = np.maximum(n + MAX_STEP, lowest)
+            ok = joined[axis][..., 0 if shift == 1 else 1] & same & (out > target)
             if ok.any():
-                out[ok] = n[ok] + MAX_STEP
+                out[ok] = target[ok]
                 changed = True
         if not changed:
             break
@@ -235,7 +241,7 @@ def trace(path, allowed, smoothing=2, step=.05):
     return out
 
 
-def plan_marks(road, walk, x0, z0, centres):
+def plan_marks(road, walk, built):
     """Every painted cell: {(iz, ix): (pattern, facing, colour)}, its kind, and the road segments.
 
     Line type and colour are decided once per segment between junctions; centre and edge lines
@@ -277,13 +283,7 @@ def plan_marks(road, walk, x0, z0, centres):
                                for dz, dx in ((1, 0), (-1, 0), (0, 1), (0, -1))):
             kerb_cells[iz, ix] = True
     segments, _ = label(road & ~junction, EIGHT)
-    if len(centres):
-        crowd = np.zeros(shape_, int)
-        for iz, ix in np.argwhere(road):
-            crowd[iz, ix] = np.sum(np.hypot(*(centres - [ix + x0, iz + z0]).T) < TOWN_RADIUS)
-        town_cells = crowd >= TOWN_BUILDINGS
-    else:
-        town_cells = np.zeros(shape_, bool)
+    town_cells = (uniform_filter(built.astype(float), BUILT_WINDOW, mode='constant') >= BUILT_SHARE) | (uniform_filter(road.astype(float), STREET_WINDOW, mode='constant') >= STREET_SHARE)
     town_segment = {int(k): town_cells[segments == k].mean() > .5 for k in np.unique(segments[segments > 0])}
     # A chain is painted segment by segment, so a chain that grazes two segments cannot mix them.
     for mask, centre in ((centre_cells, True), (kerb_cells, False)):
@@ -378,7 +378,43 @@ def plan_marks(road, walk, x0, z0, centres):
                 marks.pop(c, None)
                 kinds.pop(c, None)
         crossings.append(dict(zone=k, facing=stripes, town=bool(town)))
-    return dict(marks=marks, kinds=kinds, segments=segments, town_segment=town_segment, crossings=crossings)
+    real = [b for b, n in arms.items() if n >= 3]
+    share = mean(town_cells, blobs, real) if real else []
+    places = center_of_mass(junction, blobs, real) if real else []
+    junctions = [dict(ix=int(p[1]), town=bool(t > .5)) for p, t in zip(places, share)]
+    return dict(marks=marks, kinds=kinds, segments=segments, town_segment=town_segment, crossings=crossings, junctions=junctions)
+
+
+def junction_tally(planned, x0):
+    """Junctions, town junctions and painted crossings, overall and per 1024 blocks of x."""
+    areas = {}
+
+    def add(x, key):
+        area = areas.setdefault((x + x0) // TALLY_WIDTH * TALLY_WIDTH, Counter())
+        area[key] += 1
+    for j in planned['junctions']:
+        add(j['ix'], 'junctions')
+        if j['town']:
+            add(j['ix'], 'town_junctions')
+    for (iz, ix), kind in planned['kinds'].items():
+        if kind in ('zebra', 'stop'):
+            add(ix, kind + '_cells')
+    total = Counter()
+    for area in areas.values():
+        total.update(area)
+    return dict({k: total[k] for k in ('junctions', 'town_junctions', 'zebra_cells', 'stop_cells')}, by_area={str(k): dict(v) for k, v in sorted(areas.items())})
+
+
+def built_up(source, x0, z0, x1, z1):
+    """Columns with something built on them, read from the world: the catalogue lists only some buildings."""
+    sx, sz = source.bounds[:2]
+    window = np.s_[z0 - sz:z1 - sz + 1, x0 - sx:x1 - sx + 1]
+    top, highest, full = (source.measured[k][window].astype(int) for k in ('top', 'highest', 'full'))
+    built = np.zeros(top.shape, bool)
+    for iz, ix in np.argwhere((full > 0) & (highest >= top + 3) & (top > -120)):
+        name = source.state(int(ix + x0), int(highest[iz, ix]), int(iz + z0)).split('[')[0]
+        built[iz, ix] = not name.endswith(('_leaves', '_log')) and name not in ('minecraft:water', 'minecraft:barrier', 'minecraft:vine', 'minecraft:snow')
+    return built
 
 
 def convert(a):
@@ -416,12 +452,9 @@ def convert(a):
     gap, near = distance_transform_edt(~road, return_indices=True)
     beside = walk & ~road & (gap <= 3) & (np.abs(height - height[tuple(near)]) <= DRIFT)
     surface = np.where(walk & ~road, np.where(beside, surface[tuple(near)], surface) + 1, surface)
-    surface = limit(surface, joined, walk & ~road)
+    surface = np.clip(limit(surface, joined, walk & ~road, height - DRIFT), height - DRIFT, height + DRIFT)
 
-    catalog = [r for r in read(spec['catalog']) if r.get('occupied_bounds') and r.get('kind') == 'building']
-    centres = np.array([[(r['occupied_bounds'][0] + r['occupied_bounds'][3]) / 2, (r['occupied_bounds'][2] + r['occupied_bounds'][5]) / 2] for r in catalog])
-
-    planned = plan_marks(road, walk | keep, x0, z0, centres)   # a kept footway is still a kerb
+    planned = plan_marks(road, walk | keep, built_up(source, x0, z0, x1, z1))   # a kept footway is still a kerb
     marks = planned['marks']
 
     rows, skipped = {}, Counter()
@@ -472,13 +505,21 @@ def convert(a):
             if paved(source.state(x, y, z)):
                 put(x, y, z, 'minecraft:air', 'old surface removed')
 
-    steps = []
+    steps, steep = [], 0
     for axis in (0, 1):
         # A kerb between carriageway and footway is one layer more than the slope allows.
         ok = joined[axis][..., 0] & (road == np.roll(road, 1, axis))
         d = np.abs(surface - np.roll(surface, 1, axis))[ok]
         steps.append(int(d.max()) if len(d) else 0)
-    report = dict(errors=[] if max(steps) <= MAX_STEP else [f'Step over {MAX_STEP} layers'], cells=len(rows), walk=int(walk.sum()),
+        steep += int((d > MAX_STEP).sum())
+    moved = np.abs(surface - height)[walk]
+    tally = junction_tally(planned, x0)
+    errors = [f'Step over {STEEP_STEP} layers'] * (max(steps) > STEEP_STEP) + [f'Surface moved {int(moved.max())} layers'] * bool((moved > DRIFT).any())
+    if tally['junctions'] >= MIN_JUNCTIONS and tally['town_junctions'] == 0:
+        errors.append('No junction counted as town')
+    if tally['town_junctions'] >= MIN_JUNCTIONS and tally['zebra_cells'] < MIN_ZEBRA * tally['town_junctions']:
+        errors.append(f"{tally['zebra_cells']} zebra cells for {tally['town_junctions']} town junctions")
+    report = dict(errors=errors, cells=len(rows), walk=int(walk.sum()), steep_steps=steep, surface_moved_layers={int(k): int(v) for k, v in zip(*np.unique(moved, return_counts=True))}, junctions=tally,
                   carriageway=int(road.sum()), markings=len(marks), marking_colours=dict(Counter(m[2] for m in marks.values())),
                   largest_step=max(steps), kept_as_built=kept, skipped=dict(skipped.most_common(12)), world_written=False)
     a.out.mkdir(parents=True, exist_ok=True)
@@ -486,7 +527,7 @@ def convert(a):
     write(a.out / 'patch.json', dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'],
           edits=[rows[k] for k in sorted(rows)], native_snapshot=spec['native_snapshot'], error_reports=[str(a.out / 'conversion-check.json')],
           views_reviewed_by_root=False, continuation_work=spec['continuation_work']))
-    print(json.dumps({k: report[k] for k in ('cells', 'walk', 'carriageway', 'kept_as_built', 'markings', 'marking_colours', 'largest_step', 'skipped')}, ensure_ascii=False))
+    print(json.dumps({k: report[k] for k in ('errors', 'cells', 'walk', 'carriageway', 'kept_as_built', 'markings', 'marking_colours', 'largest_step', 'steep_steps', 'surface_moved_layers', 'junctions', 'skipped')}, ensure_ascii=False))
 
 
 if __name__ == '__main__':

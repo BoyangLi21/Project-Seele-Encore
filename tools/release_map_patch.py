@@ -87,7 +87,7 @@ def author(a):
     write(a.out / 'forward-patch.json', dict(edits=rows, requires_exact_before=True))
     write(a.out / 'inverse-patch.json', dict(edits=[dict(pos=r['pos'], before=r['after'], after=r['before']) for r in rows],
                                              requires_exact_before=True))
-    write(a.out / 'manifest.json', dict(schema=SCHEMA, world=cap['world'], source=str(source), cells=len(rows), regions=regions,
+    write(a.out / 'manifest.json', dict(schema=SCHEMA, world=cap['world'], source=str(source), cells=sum(r['before'] != r['after'] for r in rows), regions=regions,
                                         vertical_extent=[-128, 319], device_changes=len(entities), native_changes=[], native_additions=[],
                                         actor_changes=[], preserve_native_members=True, world_written=False))
     if spec.get('native_additions'):
