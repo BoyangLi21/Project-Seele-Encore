@@ -78,7 +78,8 @@ def prepare(a):
     palette_aliases={}
     unresolved=sorted({state for _,state in changes.values()}-palette.keys())
     for name in unresolved:
-        alias=aliases.get(name)
+        # TrafficCraft surfaces and their markings map as the road blocks they replaced.
+        alias='minecraft:black_concrete' if name.startswith('trafficcraft:asphalt') else 'minecraft:smooth_stone' if name.startswith('trafficcraft:concrete') else aliases.get(name)
         if alias in palette:palette[name]=palette[alias];palette_aliases[name]=alias
     unresolved=sorted({state for _,state in changes.values()}-palette.keys())
     unmeasured={}
