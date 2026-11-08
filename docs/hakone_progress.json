@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T14:24+08:00",
+ "updated": "2026-11-08T14:43+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -2071,6 +2071,16 @@
    "batch": null,
    "note": "可选",
    "owner": "map-bdb53d"
+  },
+  {
+   "id": "rope-03",
+   "area": "缆车站与接站路",
+   "title": "姥子西行站台南墙外移，让出下车空间",
+   "units": 0.5,
+   "status": "done",
+   "batch": null,
+   "note": "第131批 187格读回0错",
+   "owner": "map-edges"
   }
  ]
 }

@@ -62,8 +62,9 @@ def author(a):
         require(held is None or str(held.get('id')) == 'trafficcraft:colored_block_entity', ('Patch touches an original device', pos))
         before = editor.state(*pos, True)
         require(before == row['before'], ('Capture differs from declared before state', pos, before))
-        require(before != row['after'], ('Patch cell changes nothing', pos))
-        editor.put(*pos, row['after'])
+        require(before != row['after'] or 'block_entity' in row, ('Patch cell changes nothing', pos))
+        if before != row['after']:
+            editor.put(*pos, row['after'])
         rows.append(dict(pos=list(pos), before=before, after=row['after'], purpose=row['purpose']))
         change = nbtlib.Compound({'Before': held}) if held is not None else nbtlib.Compound()
         if 'block_entity' in row:

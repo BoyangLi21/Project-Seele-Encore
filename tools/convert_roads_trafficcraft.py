@@ -24,11 +24,17 @@ from query_blocks import AIR
 from verify_hakone_network_candidate import PAVEMENT
 
 LAYERS = 8
+# Only these floors are road. Tactile strips, platforms, concourses and anything else keep what they are.
+ROAD_FLOORS = {'minecraft:black_concrete', 'minecraft:white_concrete', 'minecraft:gray_concrete', 'minecraft:smooth_stone', 'minecraft:smooth_stone_slab',
+               'projectseele:road_asphalt_slab', 'projectseele:road_marking_slab'}
+FOOT_FLOORS = {'minecraft:smooth_stone', 'minecraft:smooth_stone_slab'}
 MAX_STEP = 2            # layers between neighbours, 25%
 DRIFT = 4               # layers a surface may move from where it was
 WHITE, YELLOW = 0, 4
 DASH = 5                # painted, then the same unpainted
 ZEBRA = 4               # cells of zebra along an approach
+ZEBRA_SKEW = 20         # degrees off the block grid beyond which a crossing has no clean bars
+EIGHT = np.ones((3, 3), int)
 TOWN_BUILDINGS, TOWN_RADIUS = 4, 40
 ENTITY = 'trafficcraft:colored_block_entity'
 REPLACEABLE = PAVEMENT | AIR | PLANTS | SOIL | {'minecraft:light', 'minecraft:snow'}
@@ -229,41 +235,22 @@ def trace(path, allowed, smoothing=2, step=.05):
     return out
 
 
-def convert(a):
-    spec = read(a.config)
-    source = CapturedSurface(spec['source'], partial=True)
-    sx, sz, sX, sZ = source.bounds
-    x0, z0, x1, z1 = spec.get('bounds', [sx, sz, sX, sZ])
-    with np.load(spec['network']) as f:
-        net = {k: f[k] for k in ('walk', 'road', 'grade2', 'bounds')}
-    ax, az = map(int, net['bounds'][:2])
-    window = np.s_[z0 - az:z1 - az + 1, x0 - ax:x1 - ax + 1]
-    walk, road, grade = net['walk'][window].copy(), net['road'][window] & net['walk'][window], net['grade2'][window].astype(int)
-    full = source.measured['full'][z0 - sz:z1 - sz + 1, x0 - sx:x1 - sx + 1]
-    walk &= full
-    road &= walk
-    joined = adjacency(walk, grade)
-    height = 4 * grade + 8                     # eighths: grade2 is twice the foot height minus two
-    surface = smooth(height, walk, joined)
-    # Footways ride one layer over the carriageway beside them, so their steps line up with its
-    # steps; a footway away from any carriageway rides one layer over its own surface.
-    gap, near = distance_transform_edt(~road, return_indices=True)
-    beside = walk & ~road & (gap <= 3) & (np.abs(height - height[tuple(near)]) <= DRIFT)
-    surface = np.where(walk & ~road, np.where(beside, surface[tuple(near)], surface) + 1, surface)
-    surface = limit(surface, joined, walk & ~road)
+def plan_marks(road, walk, x0, z0, centres):
+    """Every painted cell: {(iz, ix): (pattern, facing, colour)}, its kind, and the road segments.
 
-    catalog = [r for r in read(spec['catalog']) if r.get('occupied_bounds') and r.get('kind') == 'building']
-    centres = np.array([[(r['occupied_bounds'][0] + r['occupied_bounds'][3]) / 2, (r['occupied_bounds'][2] + r['occupied_bounds'][5]) / 2] for r in catalog])
-
-    # Markings. Line type and colour are decided once per segment between junctions; centre and
-    # edge lines are traced as smooth curves and drawn cell by cell with the piece whose line meets
-    # the cell edges where the curve does, so a solid line stays solid round bends.
+    Line type and colour are decided once per segment between junctions; centre and edge lines
+    are traced as smooth curves and drawn cell by cell with the piece whose line meets the cell
+    edges where the curve does, so a solid line stays solid round bends.
+    """
     edge = distance_transform_edt(np.pad(road, 1))[1:-1, 1:-1]
-    marks = {}
+    marks, kinds = {}, {}
     shape_ = road.shape
 
-    def value(jz, jx):
-        return edge[jz, jx] if 0 <= jz < shape_[0] and 0 <= jx < shape_[1] else 0.0
+    def inside(iz, ix):
+        return 0 <= iz < shape_[0] and 0 <= ix < shape_[1]
+
+    def value(iz, ix):
+        return edge[iz, ix] if inside(iz, ix) else 0.0
 
     junction = np.zeros(shape_, bool)
     centre_cells = np.zeros(shape_, bool)
@@ -286,10 +273,10 @@ def convert(a):
         # One cell of the two in the middle of an even width: not below the one behind, above the one ahead.
         if here >= value(iz - perp[1], ix - perp[0]) and here > value(iz + perp[1], ix + perp[0]) and here > 1:
             centre_cells[iz, ix] = True
-        elif here == 1 and any(0 <= iz + dz < shape_[0] and 0 <= ix + dx < shape_[1] and walk[iz + dz, ix + dx] and not road[iz + dz, ix + dx]
+        elif here == 1 and any(inside(iz + dz, ix + dx) and walk[iz + dz, ix + dx] and not road[iz + dz, ix + dx]
                                for dz, dx in ((1, 0), (-1, 0), (0, 1), (0, -1))):
             kerb_cells[iz, ix] = True
-    segments, _ = label(road & ~junction, np.ones((3, 3), int))
+    segments, _ = label(road & ~junction, EIGHT)
     if len(centres):
         crowd = np.zeros(shape_, int)
         for iz, ix in np.argwhere(road):
@@ -298,9 +285,9 @@ def convert(a):
     else:
         town_cells = np.zeros(shape_, bool)
     town_segment = {int(k): town_cells[segments == k].mean() > .5 for k in np.unique(segments[segments > 0])}
-    towns = {cell: town_segment.get(int(segments[cell]), False) for cell in axes}
+    # A chain is painted segment by segment, so a chain that grazes two segments cannot mix them.
     for mask, centre in ((centre_cells, True), (kerb_cells, False)):
-        chains, count = label(mask, np.ones((3, 3), int))
+        chains, count = label(mask, EIGHT)
         for k in range(1, count + 1):
             cells = [tuple(c) for c in np.argwhere(chains == k)]
             if len(cells) < 3:
@@ -309,17 +296,15 @@ def convert(a):
             owner = Counter(int(segments[c]) for c in path).most_common(1)[0][0]
             town = town_segment.get(owner, False)
             colour = WHITE if (town or not centre) else YELLOW
-            for cell, piece, run in trace(path, road & ~junction):
+            for cell, piece, run in trace(path, segments == owner):
                 if centre and town and (run // DASH) % 2:
                     continue                   # the gap of a dashed town centre line
                 if centre or cell not in marks:
                     marks[cell] = (piece[0], piece[1], colour)
+                    kinds[cell] = 'centre' if centre else 'edge'
 
-    # Approaches: counted in cells from the junction along the carriageway. A town crossroads
-    # gets a zebra over the first ZEBRA cells, stripes along the traffic; behind it, a stop line
-    # across the inbound lane, which keeps left.
     # A bend reads as a junction too; only a blob that three or more arms leave is one.
-    blobs, _ = label(junction, np.ones((3, 3), int))
+    blobs, _ = label(junction, EIGHT)
     reach = np.full(shape_, 99, int)
     owner = np.where(junction, blobs, 0)
     frontier = [tuple(c) for c in np.argwhere(junction)]
@@ -330,52 +315,118 @@ def convert(a):
         for iz, ix in frontier:
             for dz, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 n = (iz + dz, ix + dx)
-                if 0 <= n[0] < shape_[0] and 0 <= n[1] < shape_[1] and road[n] and reach[n] == 99 and n in axes:
+                if inside(*n) and road[n] and reach[n] == 99 and n in axes:
                     reach[n] = step
                     owner[n] = owner[iz, ix]
                     following.append(n)
         frontier = following
-    first, _ = label(reach == 1, np.ones((3, 3), int))
-    arms = Counter()
-    for blob in np.unique(owner[reach == 1]):
-        arms[blob] = len(np.unique(first[(reach == 1) & (owner == blob)]))
-    for (iz, ix), axis in axes.items():
-        r = reach[iz, ix]
-        if r > ZEBRA + 1 or arms[owner[iz, ix]] < 3:
+    zones, zone_count = label((reach >= 1) & (reach <= ZEBRA + 1), EIGHT)
+    arms = Counter(int(owner[tuple(np.argwhere(zones == k)[0])]) for k in range(1, zone_count + 1))
+    crossings = []
+    for k in range(1, zone_count + 1):
+        cells = [tuple(c) for c in np.argwhere(zones == k)]
+        ring = [c for c in cells if reach[c] == 1]
+        far = [c for c in cells if reach[c] == ZEBRA + 1]
+        if arms[int(owner[cells[0]])] < 3 or not ring or not far:
             continue
-        stripes = 'east' if abs(axis[0]) >= abs(axis[1]) else 'north'
-        across = 'north' if stripes == 'east' else 'east'
-        if r <= ZEBRA:
-            if towns.get((iz, ix)):
-                marks[iz, ix] = (108, stripes, WHITE)
+        # One heading for the whole crossing; a crossing skewed off the block grid has no clean bars.
+        first = axes[cells[0]]
+        heading = np.mean([axes[c] * (1 if axes[c] @ first >= 0 else -1) for c in cells], axis=0)
+        if math.degrees(math.atan2(min(abs(heading)), max(abs(heading)))) > ZEBRA_SKEW:
+            continue
+        along = 1 if abs(heading[0]) >= abs(heading[1]) else 0       # index of the row coordinate in (iz, ix)
+        across = 1 - along
+        sign = 1 if np.mean([c[along] for c in far]) > np.mean([c[along] for c in ring]) else -1
+        middle = int(round(np.mean([c[across] for c in cells])))
+        start = max(sign * c[along] for c in ring)
+
+        def row(signed):
+            found = []
+            for step in (1, -1):
+                lateral = middle if step == 1 else middle - 1
+                while True:
+                    c = (signed * sign, lateral) if along == 0 else (lateral, signed * sign)
+                    if not inside(*c) or not road[c] or junction[c]:
+                        break
+                    found.append(c)
+                    lateral += step
+            return found
+        town = town_segment.get(int(segments[far[0]]), False)
+        rows = [row(start + i) for i in range(ZEBRA + 1)] if town else [row(start)]
+        if min(map(len, rows)) < 4:
+            continue
+        for c in cells:
+            if reach[c] <= ZEBRA + 1 and (town or sign * c[along] <= start):
+                marks.pop(c, None)
+                kinds.pop(c, None)
+        stripes, cross = ('north', 'east') if along == 0 else ('east', 'north')
+        if town:
+            for cells_ in rows[:-1]:
+                for c in cells_:
+                    marks[c], kinds[c] = (108, stripes, WHITE), 'zebra'
+        # The stop line crosses the inbound lane: keep left, travelling towards the junction.
+        travel = (-sign, 0) if along == 0 else (0, -sign)             # (dz, dx)
+        left = (-travel[1], travel[0])                                # (dz, dx), left of travel with z south
+        centre_line = np.mean([c[across] for c in rows[-1]])
+        for c in rows[-1]:
+            if (c[across] - centre_line) * left[across] > 0:
+                marks[c], kinds[c] = (1, cross, WHITE), 'stop'
             else:
-                marks.pop((iz, ix), None)
-            continue
-        # Travel towards the junction: down the reach count. Inbound is the left of that.
-        towards = None
-        for dz, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
-            n = (iz + dz, ix + dx)
-            if 0 <= n[0] < shape_[0] and 0 <= n[1] < shape_[1] and reach[n] < r:
-                towards = (dx, dz)
-        if towards is None:
-            continue
-        left = (towards[1], -towards[0])
-        z0_, x0_ = max(0, iz - 4), max(0, ix - 4)
-        zz_, xx_ = np.nonzero(road[z0_:iz + 5, x0_:ix + 5])
-        middle = np.array([xx_.mean() + x0_, zz_.mean() + z0_])
-        if (np.array([ix, iz]) - middle) @ np.array(left) > 0:
-            marks[iz, ix] = (1, across, WHITE)
-        else:
-            marks.pop((iz, ix), None)
+                marks.pop(c, None)
+                kinds.pop(c, None)
+        crossings.append(dict(zone=k, facing=stripes, town=bool(town)))
+    return dict(marks=marks, kinds=kinds, segments=segments, town_segment=town_segment, crossings=crossings)
+
+
+def convert(a):
+    spec = read(a.config)
+    source = CapturedSurface(spec['source'], partial=True)
+    sx, sz, sX, sZ = source.bounds
+    x0, z0, x1, z1 = spec.get('bounds', [sx, sz, sX, sZ])
+    with np.load(spec['network']) as f:
+        net = {k: f[k] for k in ('walk', 'road', 'grade2', 'bounds')}
+    ax, az = map(int, net['bounds'][:2])
+    window = np.s_[z0 - az:z1 - az + 1, x0 - ax:x1 - ax + 1]
+    walk, road, grade = net['walk'][window].copy(), net['road'][window] & net['walk'][window], net['grade2'][window].astype(int)
+    full = source.measured['full'][z0 - sz:z1 - sz + 1, x0 - sx:x1 - sx + 1]
+    walk &= full
+    road &= walk
+    # What is not road stays out of everything below: surfaces, kerbs and markings.
+    volumes = read(spec['station_volumes'])
+    keep = np.zeros(walk.shape, bool)
+    for iz, ix in np.argwhere(walk):
+        x, z, g = int(ix + x0), int(iz + z0), int(grade[iz, ix])
+        y = (g + 1) // 2
+        names = [source.state(x, v, z).split('[')[0] for v in (y - 1, y, y + 1)]
+        ours = (ROAD_FLOORS if road[iz, ix] else FOOT_FLOORS)
+        # A station's box takes in the streets around it; only its footways are station floor.
+        station = not road[iz, ix] and any(v[0] <= x <= v[3] and v[2] <= z <= v[5] and v[1] - 1 <= y <= v[4] for v in volumes)
+        keep[iz, ix] = station or not (names[1] in ours or any(n.startswith('trafficcraft:') for n in names))
+    kept = int(keep.sum())
+    walk &= ~keep
+    road &= walk
+    joined = adjacency(walk, grade)
+    height = 4 * grade + 8                     # eighths: grade2 is twice the foot height minus two
+    surface = smooth(height, walk, joined)
+    # Footways ride one layer over the carriageway beside them, so their steps line up with its
+    # steps; a footway away from any carriageway rides one layer over its own surface.
+    gap, near = distance_transform_edt(~road, return_indices=True)
+    beside = walk & ~road & (gap <= 3) & (np.abs(height - height[tuple(near)]) <= DRIFT)
+    surface = np.where(walk & ~road, np.where(beside, surface[tuple(near)], surface) + 1, surface)
+    surface = limit(surface, joined, walk & ~road)
+
+    catalog = [r for r in read(spec['catalog']) if r.get('occupied_bounds') and r.get('kind') == 'building']
+    centres = np.array([[(r['occupied_bounds'][0] + r['occupied_bounds'][3]) / 2, (r['occupied_bounds'][2] + r['occupied_bounds'][5]) / 2] for r in catalog])
+
+    planned = plan_marks(road, walk | keep, x0, z0, centres)   # a kept footway is still a kerb
+    marks = planned['marks']
 
     rows, skipped = {}, Counter()
     paint = {tuple(int(d[k]) for k in 'xyz'): int(d.get('color', -1)) for d in source.devices if str(d.get('id')) == ENTITY}
 
     def put(x, y, z, state, purpose, entity=None):
         before = source.state(x, y, z)
-        if before == state:
-            if entity is not None and paint.get((x, y, z)) != entity:
-                skipped['paint colour differs on an unchanged marking'] += 1
+        if before == state and (entity is None or paint.get((x, y, z)) == entity):
             return True
         if before.split('[')[0] not in REPLACEABLE and not before.startswith('trafficcraft:'):
             skipped[before.split('[')[0]] += 1
@@ -397,9 +448,6 @@ def convert(a):
         slope = 'trafficcraft:asphalt_slope' if carriage else 'trafficcraft:concrete_slope'
         mark = marks.get((iz, ix))
         # States are written in full, as the game saves them, so readbacks stay exact.
-        if not any(paved(source.state(x, y, z)) for y in (old_y - 1, old_y, old_y + 1)):
-            skipped['no paving at the declared height'] += 1
-            continue
         base = top - 1
         for y in range(min(base, old_y), base):
             put(x, y, z, solid, 'road base')
@@ -429,13 +477,13 @@ def convert(a):
         steps.append(int(d.max()) if len(d) else 0)
     report = dict(errors=[] if max(steps) <= MAX_STEP else [f'Step over {MAX_STEP} layers'], cells=len(rows), walk=int(walk.sum()),
                   carriageway=int(road.sum()), markings=len(marks), marking_colours=dict(Counter(m[2] for m in marks.values())),
-                  largest_step=max(steps), skipped=dict(skipped.most_common(12)), world_written=False)
+                  largest_step=max(steps), kept_as_built=kept, skipped=dict(skipped.most_common(12)), world_written=False)
     a.out.mkdir(parents=True, exist_ok=True)
     write(a.out / 'conversion-check.json', report)
     write(a.out / 'patch.json', dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'],
           edits=[rows[k] for k in sorted(rows)], native_snapshot=spec['native_snapshot'], error_reports=[str(a.out / 'conversion-check.json')],
           views_reviewed_by_root=False, continuation_work=spec['continuation_work']))
-    print(json.dumps({k: report[k] for k in ('cells', 'walk', 'carriageway', 'markings', 'marking_colours', 'largest_step', 'skipped')}, ensure_ascii=False))
+    print(json.dumps({k: report[k] for k in ('cells', 'walk', 'carriageway', 'kept_as_built', 'markings', 'marking_colours', 'largest_step', 'skipped')}, ensure_ascii=False))
 
 
 if __name__ == '__main__':
