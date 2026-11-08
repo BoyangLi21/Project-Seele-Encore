@@ -1824,7 +1824,7 @@
   },
   {
    "id": "tc-01",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：勘测方块状态、坡度层数、标线方块实体格式",
    "units": 1.0,
    "status": "done",
@@ -1834,7 +1834,7 @@
   },
   {
    "id": "tc-02",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：发布流程支持新方块和标线方块实体（作者、回放、读回）",
    "units": 2.0,
    "status": "done",
@@ -1844,7 +1844,7 @@
   },
   {
    "id": "tc-03",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：转换工具：路面高程换成 1/8 层坡块，横向水平、纵向每格最多 2 层",
    "units": 2.0,
    "status": "done",
@@ -1854,7 +1854,7 @@
   },
   {
    "id": "tc-04",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：转换工具：人行道高出车道一层、日本式标线（山路黄实线、城区白虚线、窄路无中线）",
    "units": 2.0,
    "status": "todo",
@@ -1864,7 +1864,7 @@
   },
   {
    "id": "tc-05",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：副本样板（直路、1/2层坡、弯道、路口停止线和斑马线、人行道）实机截图交主会话",
    "units": 2.0,
    "status": "done",
@@ -1874,7 +1874,7 @@
   },
   {
    "id": "tc-06",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：所有打开正式世界或副本的客户端装 jar",
    "units": 0.5,
    "status": "doing",
@@ -1884,7 +1884,7 @@
   },
   {
    "id": "tc-07",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：道路审计改认新路面和 1/8 层高度",
    "units": 2.0,
    "status": "todo",
@@ -1894,7 +1894,7 @@
   },
   {
    "id": "tc-area-1",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换安装：箱根西部（十字城区）",
    "units": 1.0,
    "status": "todo",
@@ -1904,7 +1904,7 @@
   },
   {
    "id": "tc-check-1",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换核查：箱根西部（十字城区）",
    "units": 0.5,
    "status": "todo",
@@ -1914,7 +1914,7 @@
   },
   {
    "id": "tc-area-2",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换安装：箱根中部（強羅、宮ノ下）",
    "units": 1.0,
    "status": "todo",
@@ -1924,7 +1924,7 @@
   },
   {
    "id": "tc-check-2",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换核查：箱根中部（強羅、宮ノ下）",
    "units": 0.5,
    "status": "todo",
@@ -1934,7 +1934,7 @@
   },
   {
    "id": "tc-area-3",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换安装：箱根东部（湯本）",
    "units": 1.0,
    "status": "todo",
@@ -1944,7 +1944,7 @@
   },
   {
    "id": "tc-check-3",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换核查：箱根东部（湯本）",
    "units": 0.5,
    "status": "todo",
@@ -1954,7 +1954,7 @@
   },
   {
    "id": "tc-area-4",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换安装：芦之湖岸与桃源台",
    "units": 1.0,
    "status": "todo",
@@ -1964,7 +1964,7 @@
   },
   {
    "id": "tc-check-4",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换核查：芦之湖岸与桃源台",
    "units": 0.5,
    "status": "todo",
@@ -1974,7 +1974,7 @@
   },
   {
    "id": "tc-area-5",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换安装：小田原北部",
    "units": 1.0,
    "status": "todo",
@@ -1984,7 +1984,7 @@
   },
   {
    "id": "tc-check-5",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换核查：小田原北部",
    "units": 0.5,
    "status": "todo",
@@ -1994,7 +1994,7 @@
   },
   {
    "id": "tc-area-6",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换安装：小田原中部",
    "units": 1.0,
    "status": "todo",
@@ -2004,7 +2004,7 @@
   },
   {
    "id": "tc-check-6",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换核查：小田原中部",
    "units": 0.5,
    "status": "todo",
@@ -2014,7 +2014,7 @@
   },
   {
    "id": "tc-area-7",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换安装：小田原南部与海岸",
    "units": 1.0,
    "status": "todo",
@@ -2024,7 +2024,7 @@
   },
   {
    "id": "tc-check-7",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换核查：小田原南部与海岸",
    "units": 0.5,
    "status": "todo",
@@ -2034,7 +2034,7 @@
   },
   {
    "id": "tc-area-8",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换安装：小田原东部",
    "units": 1.0,
    "status": "todo",
@@ -2044,7 +2044,7 @@
   },
   {
    "id": "tc-check-8",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft 转换核查：小田原东部",
    "units": 0.5,
    "status": "todo",
@@ -2054,7 +2054,7 @@
   },
   {
    "id": "tc-tour",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：全图实机巡视与远景检查",
    "units": 1.0,
    "status": "todo",
@@ -2064,7 +2064,7 @@
   },
   {
    "id": "tc-guard",
-   "area": "其他",
+   "area": "道路换用",
    "title": "TrafficCraft：护栏（可选）",
    "units": 2.0,
    "status": "todo",
