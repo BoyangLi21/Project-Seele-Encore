@@ -24,7 +24,7 @@ import shapely
 from shapely.geometry import LineString
 
 from hakone_earthworks import road_blocks
-from map_pipeline.road_crossings import TRACKBED, real_level_crossings
+from map_pipeline.road_crossings import TRACKBED, lower_tops_under_decks, real_level_crossings
 from plan_ashi_landscape_r54 import PLANTS, SOIL
 from plan_rail_corridor import existing_track
 from plan_station_access_corridor import CapturedSurface
@@ -40,6 +40,8 @@ ROAD_WIDTH, FOOTWAY_WIDTH = 6, 2
 BRIDGE_HALF_SPAN = 6
 # An open cutting deeper than this many blocks below the ground is refused.
 MAX_CUT = 16
+# Metres either side of a rail kept whole: the bed radius of plan_rail_corridor plus a margin.
+TRACK_KEEP = 3.2
 
 
 def read(path):
@@ -86,6 +88,7 @@ class Ground:
 
     def __init__(self, spec):
         self.spec = spec
+        self.spec_blocked = [tuple(c) for path in spec.get('blocked_reports', []) for row in read(path)['links'] for c in ((b[0], b[2]) for b in row.get('blocked_at', []))]
         with np.load(Path(spec['audit']) / 'actual-routes.npz') as f:
             self.ax, self.az = map(int, f['bounds'][:2])
             self.component, xs, zs, grades, roads = f['component'], f['x'], f['z'], f['grade2'], f['road']
@@ -98,6 +101,8 @@ class Ground:
         self.points = {k: np.c_[xs[labels == k], zs[labels == k], grades[labels == k] / 2 + 1] for k in self.kept}
         self.carries_traffic = {k: bool(roads[labels == k].any()) for k in self.kept}
         self.captures = [CapturedSurface(s, partial=True) for s in spec['sources']]
+        for capture in self.captures:
+            lower_tops_under_decks(capture, spec['native_snapshot'])
         # Station volumes are not walls: platforms and forecourts inside them are reached on foot,
         # and their real structures are found block by block like any other.
         # Stations and their access works span whole forecourts and the open ground under raised
@@ -141,6 +146,10 @@ class Ground:
         core = ~full | (top < -120)
         for b in (self.open_blocks if open_stations else self.blocks):
             core[max(0, b[2] - z0):max(0, b[5] - z0 + 1), max(0, b[0] - x0):max(0, b[3] - x0 + 1)] = True
+        # Columns an earlier edits pass could not build through; a re-route keeps clear of them.
+        for x, z in self.spec_blocked:
+            if x0 <= x <= x1 and z0 <= z <= z1:
+                core[z - z0, x - x0] = True
         tracks, heights = existing_track(self.spec['native_snapshot'], shapely.box(x0 - 3, z0 - 3, x1 + 4, z1 + 4))
         crossing = np.full(xx.shape, np.nan)
         if tracks is not None:
@@ -183,6 +192,9 @@ class Ground:
         narrow = water & (distance_transform_edt(water) <= BRIDGE_HALF_SPAN)
         core |= water & ~narrow
         passable = (distance_transform_edt(~core) >= need + 1) | walk
+        for x, z in self.spec_blocked:
+            if x0 <= x <= x1 and z0 <= z <= z1:
+                passable[max(0, z - z0 - int(need)):z - z0 + int(need) + 1, max(0, x - x0 - int(need)):x - x0 + int(need) + 1] = False
         near_centre = np.zeros(xx.shape, bool)
         c = self.centre_points
         inside = c[(c[:, 0] >= x0) & (c[:, 0] < x1 + 1) & (c[:, 1] >= z0) & (c[:, 1] < z1 + 1)]
@@ -386,6 +398,7 @@ def route(a):
 def edits(a):
     spec = read(a.config)
     source = CapturedSurface(spec['source'], partial=True)
+    lower_tops_under_decks(source, spec['native_snapshot'])
     # Each link is built from the capture it was routed on.
     links = [q for q in read(spec['links']) if 'points' in q and Path(q['source']) == Path(spec['source'])]
     # A run over a second capture continues from the first run's network.
@@ -437,7 +450,21 @@ def edits(a):
         deck = {(int(x + dx), int(z + dz)) for x, z, _ in link['crossings'] for dx in range(-4, 5) for dz in range(-4, 5)}
         def replaceable(x, z, name):
             return natural(name) or ((x, z) in deck and name in TRACKBED)
+        tracks, track_y = existing_track(spec['native_snapshot'], shapely.box(bx - 4, bz - 4, bX + 5, bZ + 5))
+        track_gap, track_h = np.full(xx.shape, np.inf), np.zeros(xx.shape)
+        if tracks is not None:
+            gap_, near_ = tracks.query(np.c_[xx.ravel() + .5, zz.ravel() + .5])
+            track_gap, track_h = gap_.reshape(xx.shape), track_y[near_].reshape(xx.shape)
+        def in_train_space(x, y, z):
+            # Ballast, bed and the train's own space stay whole except on a real level crossing;
+            # ground far below a viaduct is not part of it.
+            iz, ix = z - bz, x - bx
+            return (x, z) not in deck and track_gap[iz, ix] <= TRACK_KEEP and track_h[iz, ix] - 5 <= y <= track_h[iz, ix] + 6
         def put(x, y, z, state, purpose):
+            if in_train_space(x, y, z):
+                if purpose != 'link earthworks':
+                    blocked['train space'] += 1
+                return
             if (x, y, z) in keep_out:
                 if purpose != 'link earthworks':
                     blocked['planned water'] += 1
@@ -557,7 +584,8 @@ def edits(a):
             # A road in cutting is open to the sky: clearing only its headroom would leave a lid of
             # ground over it.
             column += [(yy, 'minecraft:air', 'link headroom') for yy in range(y + 1, max(y + HEADROOM, int(top[iz, ix])) + 1)
-                       if source.state(x, yy, z).split('[')[0] not in EMPTY]
+                       if source.state(x, yy, z).split('[')[0] not in EMPTY
+                       and (yy <= y + (4 if on_road else 2) or natural(source.state(x, yy, z).split('[')[0]))]
             column.append((y, state, 'link carriageway' if on_road else 'link footway'))
             # A column that meets a structure is left whole and stays undeclared; the joint
             # check below decides whether the link still connects around it.
@@ -565,6 +593,8 @@ def edits(a):
             stuck = [name for name in stuck if not replaceable(x, z, name)]
             if (x, z) in wet or any((x, yy, z) in keep_out for yy, _, _ in column):
                 stuck.append('planned water')
+            if any(in_train_space(x, yy, z) for yy, _, _ in column):
+                stuck.append('train space')
             if int(top[iz, ix]) - y > MAX_CUT:
                 # Deeper than this is a tunnel, which needs its own design.
                 stuck.append('deep cut')
@@ -596,7 +626,7 @@ def edits(a):
         structures = [r.get('id') for r in catalog if r.get('occupied_bounds') and footprint.intersects(shapely.box(r['occupied_bounds'][0], r['occupied_bounds'][2], r['occupied_bounds'][3] + 1, r['occupied_bounds'][5] + 1))]
         stations = [v for v in volumes if footprint.intersects(shapely.box(v[0], v[2], v[3] + 1, v[5] + 1))]
         report.append(dict(id=link['id'], components=link['components'], footway=link['footway'], length=link['length'], ends=link['ends'], grade=link['grade'],
-                           built=built, adopted=adopted, joined=bool(joined), blocked=dict(blocked), blocked_at=blocked_at[:12], structures=structures[:4], stations=len(stations)))
+                           built=built, adopted=adopted, joined=bool(joined), blocked=dict(blocked), blocked_at=blocked_at, structures=structures[:4], stations=len(stations)))
         if not joined:
             errors.append([link['id'], dict(blocked=dict(blocked), structures=structures[:4], joined=False)])
     a.out.mkdir(parents=True, exist_ok=True)

@@ -19,6 +19,7 @@ from map_pipeline.native_rails import load_rails
 # Trackbed a crossing deck replaces under existing rails: ballast is soil already, the
 # half-block ballast step is not.
 TRACKBED = {'minecraft:gravel', 'minecraft:andesite_slab'}
+OPEN = {'minecraft:air', 'minecraft:cave_air', 'minecraft:void_air'}
 
 
 def track_samples(snapshot):
@@ -61,3 +62,35 @@ def real_level_crossings(features, snapshot, snap=12.0):
         if not keep or np.hypot(*(row[:2] - keep[-1][:2])) > 2:
             keep.append(row)
     return np.array(keep)
+
+
+def lower_tops_under_decks(capture, snapshot):
+    """Set the measured ground of track on an open viaduct to the real ground below it.
+
+    A capture's top is the highest soil block, and ballast is soil, so a column under a raised
+    line measures as if the ground were at the deck: the road planner then reads the open space
+    beneath as solid and, worse, would dig the ballast as a cutting.
+    """
+    top, full = capture.measured['top'], capture.measured['full']
+    bx, bz, bX, bZ = capture.bounds
+    seen, lowered = set(), 0
+    for x_, z_, rail_y in track_samples(snapshot):
+        for dx in range(-3, 4):
+            for dz in range(-3, 4):
+                x, z = int(np.floor(x_)) + dx, int(np.floor(z_)) + dz
+                if (x, z) in seen or not (bx <= x <= bX and bz <= z <= bZ):
+                    continue
+                seen.add((x, z))
+                t = int(top[z - bz, x - bx])
+                if not full[z - bz, x - bx] or abs(t - rail_y) > 4:
+                    continue
+                y = t - 1
+                while y > t - 6 and capture.state(x, y, z).split('[')[0] not in OPEN:
+                    y -= 1
+                if not all(capture.state(x, y - k, z).split('[')[0] in OPEN for k in range(3)):
+                    continue
+                while y > -127 and capture.state(x, y, z).split('[')[0] in OPEN:
+                    y -= 1
+                top[z - bz, x - bx] = y
+                lowered += 1
+    return lowered
