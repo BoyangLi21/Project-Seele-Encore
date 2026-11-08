@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T23:23+08:00",
+ "updated": "2026-11-09T07:53+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -1357,9 +1357,9 @@
    "area": "边界",
    "title": "设施外坡：东部设施",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 154,
+   "note": "第 154 批 13,489 格，读回 0 错，验证通过",
    "owner": "map-edges"
   },
   {
@@ -1367,9 +1367,9 @@
    "area": "边界",
    "title": "设施外坡：小田原设施",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 155,
+   "note": "第 155 批 5,449 格，读回 0 错，验证通过",
    "owner": "map-edges"
   },
   {
@@ -2327,9 +2327,9 @@
    "area": "连接路",
    "title": "把 x2128–2319、z480–511 的 19 个未生成区块补进正式世界，然后交 map-roads 做 link-35",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "排在转换修复之后；审计里的 1,938 个 unknown 列就是这片",
+   "status": "done",
+   "batch": 156,
+   "note": "19 个区块在测试副本生成后整块移入正式世界（r.4.0.mca，原文件备份在 chunks19-install-v1/original），第 156 批转换其上 1,938 列道路，3,701 格读回 0 错",
    "owner": "map"
   }
  ]
