@@ -296,9 +296,12 @@ def plan_marks(road, walk, x0, z0, centres):
             owner = Counter(int(segments[c]) for c in path).most_common(1)[0][0]
             town = town_segment.get(owner, False)
             colour = WHITE if (town or not centre) else YELLOW
-            for cell, piece, run in trace(path, segments == owner):
-                if centre and town and (run // DASH) % 2:
-                    continue                   # the gap of a dashed town centre line
+            crossed = trace(path, segments == owner)
+            dashes = Counter(run // DASH for _, _, run in crossed)
+            for cell, piece, run in crossed:
+                # The gap of a dashed town centre line, and a dash the end of the line cut short.
+                if centre and town and ((run // DASH) % 2 or dashes[run // DASH] < 3):
+                    continue
                 if centre or cell not in marks:
                     marks[cell] = (piece[0], piece[1], colour)
                     kinds[cell] = 'centre' if centre else 'edge'

@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T14:43+08:00",
+ "updated": "2026-11-08T15:06+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -1477,9 +1477,9 @@
    "area": "核实",
    "title": "第10项 南街区与湖岸整体衔接",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "隔离客户端俯视桃源台湖岸（站房、码头、湖面、接路）：无空洞、无浮块，衔接连续；只看了这一片的外观",
    "owner": "map-bdb53d"
   },
   {
@@ -1527,9 +1527,9 @@
    "area": "核实",
    "title": "第15项 姥子—大涌谷—早云山其余公共空间",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "隔离客户端看姥子—大涌谷—早云山一片：无空洞无浮块；山坡地表上有东西的列只占13%（树很少），是否种林待用户定",
    "owner": "map-bdb53d"
   },
   {
@@ -1537,9 +1537,9 @@
    "area": "核实",
    "title": "第17项 河谷山林",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "隔离客户端看河谷山地：地形连续，无空洞无浮块；只有约6%的列有树或其他东西，山坡基本是裸草阶地，是否种林待用户定",
    "owner": "map-bdb53d"
   },
   {
@@ -1587,9 +1587,9 @@
    "area": "核实",
    "title": "湖岸城镇其余部分",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "隔离客户端看湖西城镇一片（x-600 z1000）：外观完整，无空洞、无浮块；其余湖岸没逐段看",
    "owner": "map-bdb53d"
   },
   {
@@ -2081,6 +2081,246 @@
    "batch": null,
    "note": "第131批 187格读回0错",
    "owner": "map-edges"
+  },
+  {
+   "id": "verify-030",
+   "area": "核实",
+   "title": "南港68栋建筑门口步行检查（z>1599，不在道路框内）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-01",
+   "area": "森林",
+   "title": "数据来源：环境省植生图条款、范围、登记 ASSETS",
+   "units": 1.0,
+   "status": "doing",
+   "batch": null,
+   "note": "用户 2026-11-08 决定验收前种上",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-02",
+   "area": "森林",
+   "title": "植被图转世界坐标，分杉桧人工林、阔叶林、草原和开阔地",
+   "units": 2.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-03",
+   "area": "森林",
+   "title": "规划工具：树种、密度、禁入区、只长在天然土上",
+   "units": 2.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-04",
+   "area": "森林",
+   "title": "副本样板：前后帧（x1200–1800 河谷、湯本）",
+   "units": 1.0,
+   "status": "doing",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-05",
+   "area": "森林",
+   "title": "FPS（光影包）和 DH、客户端体积测试，必要时减量",
+   "units": 1.0,
+   "status": "doing",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-06",
+   "area": "森林",
+   "title": "禁入区核对：索道和缆车包络、道路净空、站场、挡土墙、护栏、水面",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-area-1",
+   "area": "森林",
+   "title": "森林安装第 1 区（安装、读回）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-check-1",
+   "area": "森林",
+   "title": "森林第 1 区核查（浮叶、禁入）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-area-2",
+   "area": "森林",
+   "title": "森林安装第 2 区（安装、读回）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-check-2",
+   "area": "森林",
+   "title": "森林第 2 区核查（浮叶、禁入）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-area-3",
+   "area": "森林",
+   "title": "森林安装第 3 区（安装、读回）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-check-3",
+   "area": "森林",
+   "title": "森林第 3 区核查（浮叶、禁入）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-area-4",
+   "area": "森林",
+   "title": "森林安装第 4 区（安装、读回）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-check-4",
+   "area": "森林",
+   "title": "森林第 4 区核查（浮叶、禁入）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-area-5",
+   "area": "森林",
+   "title": "森林安装第 5 区（安装、读回）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-check-5",
+   "area": "森林",
+   "title": "森林第 5 区核查（浮叶、禁入）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-area-6",
+   "area": "森林",
+   "title": "森林安装第 6 区（安装、读回）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-check-6",
+   "area": "森林",
+   "title": "森林第 6 区核查（浮叶、禁入）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-area-7",
+   "area": "森林",
+   "title": "森林安装第 7 区（安装、读回）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-check-7",
+   "area": "森林",
+   "title": "森林第 7 区核查（浮叶、禁入）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-area-8",
+   "area": "森林",
+   "title": "森林安装第 8 区（安装、读回）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-check-8",
+   "area": "森林",
+   "title": "森林第 8 区核查（浮叶、禁入）",
+   "units": 0.5,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "forest-tour",
+   "area": "森林",
+   "title": "森林全图实机巡视",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-bdb53d"
   }
  ]
 }
