@@ -41,6 +41,18 @@ BRIDGE_HALF_SPAN = 6
 # An open cutting deeper than this many blocks below the ground is refused.
 MAX_CUT = 16
 MAX_COVER = 6
+
+
+def is_paving(state):
+    """Old road palette or a converted TrafficCraft road."""
+    return state.split('[')[0] in PAVEMENT or state.startswith('trafficcraft:')
+
+
+def surface_top(state, y):
+    """Height a player stands at on this block: TrafficCraft slopes rise in eighth layers."""
+    if 'layers=' in state:
+        return y + int(state.split('layers=')[1].split(',')[0].split(']')[0]) / 8
+    return y + (.5 if 'type=bottom' in state else 1)
 # Metres either side of a rail kept whole: the bed radius of plan_rail_corridor plus a margin.
 TRACK_KEEP = 3.2
 
@@ -75,9 +87,9 @@ def paved_floor(state, x, z, want, clearance, uncover=False):
     for y in range(max(-127, (want + 1) // 2 - 1), min(312, (want + 1) // 2 + 2)):
         name = state(x, y, z)
         bare = name.split('[')[0]
-        if bare not in PAVEMENT:
+        if not is_paving(name):
             continue
-        grade = 2 * y - 1 if 'type=bottom' in name else 2 * y
+        grade = round(2 * (surface_top(name, y) - 1))
         above = [state(x, y + k, z).split('[')[0] for k in range(1, clearance + 1)]
         if abs(grade - want) <= 1 and all(n in EMPTY or (uncover and natural(n)) for n in above):
             return grade, y
@@ -311,6 +323,22 @@ def relax(grade, fresh, fixed, fixed_grade):
     paving where it stands.
     """
     fixed_grade = fixed_grade.astype(np.int32)
+    # Clipping cell by cell stalls when a whole run is one half-step too high for the old paving
+    # at its end, so first bound every fresh cell by its distance from the fixed ones.
+    high = np.where(fixed & ~fresh, fixed_grade, 32000).astype(np.int32)
+    low = np.where(fixed & ~fresh, fixed_grade, -32000).astype(np.int32)
+    for _ in range(300):
+        new_high, new_low = high.copy(), low.copy()
+        for axis, shift in ((0, 1), (0, -1), (1, 1), (1, -1)):
+            edge = (np.s_[0, :] if shift == 1 else np.s_[-1, :]) if axis == 0 else (np.s_[:, 0] if shift == 1 else np.s_[:, -1])
+            h, l = np.roll(high, shift, axis) + 1, np.roll(low, shift, axis) - 1
+            h[edge], l[edge] = 32000, -32000
+            new_high, new_low = np.where(fresh, np.minimum(new_high, h), new_high), np.where(fresh, np.maximum(new_low, l), new_low)
+        if (new_high == high).all() and (new_low == low).all():
+            break
+        high, low = new_high, new_low
+    feasible = fresh & (low <= high)
+    grade[feasible] = np.clip(grade[feasible], low[feasible], high[feasible])
     for _ in range(300):
         value = np.where(fresh, grade, np.where(fixed, fixed_grade, 0)).astype(np.int32)
         known = fresh | fixed
@@ -337,8 +365,8 @@ def standing_height(source, x, z):
     try:
         for y in range(top, top + 4):
             name = source.state(x, y, z)
-            if name.split('[')[0] in PAVEMENT and all(source.state(x, y + k, z).split('[')[0] in EMPTY for k in (1, 2)):
-                feet = max(feet, y + (.5 if 'type=bottom' in name else 1))
+            if is_paving(name) and all(source.state(x, y + k, z).split('[')[0] in EMPTY for k in (1, 2)):
+                feet = max(feet, surface_top(name, y))
     except ValueError:
         pass
     return feet
@@ -475,6 +503,9 @@ def edits(a):
             # ground far below a viaduct is not part of it.
             iz, ix = z - bz, x - bx
             return (x, z) not in deck and track_gap[iz, ix] <= TRACK_KEEP and track_h[iz, ix] - 5 <= y <= track_h[iz, ix] + 6
+        def stray(x, z, state, purpose):
+            # A stray slab of old paving in the link's own bed, on no declared road, gives way.
+            return is_paving(state) and purpose in ('link footway', 'link carriageway', 'link bearing') and not old_walk[z - bz, x - bx]
         def put(x, y, z, state, purpose):
             if in_train_space(x, y, z):
                 if purpose != 'link earthworks':
@@ -485,7 +516,7 @@ def edits(a):
                     blocked['planned water'] += 1
                 return
             before = source.state(x, y, z)
-            if not replaceable(x, z, before.split('[')[0]):
+            if not stray(x, z, before, purpose) and not replaceable(x, z, before.split('[')[0]):
                 # Grading simply stops at a structure; only the road itself may not pass one.
                 if purpose != 'link earthworks':
                     blocked[before.split('[')[0]] += 1
@@ -545,7 +576,7 @@ def edits(a):
             # Only real paving at the declared height is dug out; a declared path on bare ground
             # has no buried floor, and digging would lower it.
             paving = source.state(x, (g + 1) // 2 if g % 2 else g // 2, z)
-            if paving.split('[')[0] not in PAVEMENT or (g % 2 and 'type=bottom' not in paving):
+            if not is_paving(paving) or (g % 2 and not paving.startswith('trafficcraft:') and 'type=bottom' not in paving):
                 continue
             feet = g // 2 + 1
             for yy in range(feet, feet + (4 if road[iz, ix] else 2) + (g % 2)):
@@ -604,8 +635,8 @@ def edits(a):
             column.append((y, state, 'link carriageway' if on_road else 'link footway'))
             # A column that meets a structure is left whole and stays undeclared; the joint
             # check below decides whether the link still connects around it.
-            stuck = [source.state(x, yy, z).split('[')[0] for yy, _, _ in column]
-            stuck = [name for name in stuck if not replaceable(x, z, name)]
+            stuck = [source.state(x, yy, z) for yy, _, kind in column if not stray(x, z, source.state(x, yy, z), kind)]
+            stuck = [name.split('[')[0] for name in stuck if not replaceable(x, z, name.split('[')[0])]
             if (x, z) in wet or any((x, yy, z) in keep_out for yy, _, _ in column):
                 stuck.append('planned water')
             if any(in_train_space(x, yy, z) for yy, _, _ in column):
