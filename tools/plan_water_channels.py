@@ -18,6 +18,7 @@ import math
 from pathlib import Path
 
 import numpy as np
+from scipy.ndimage import minimum_filter
 import shapely
 from shapely.geometry import shape
 
@@ -137,11 +138,16 @@ def edits(a):
                 standing[iz, ix] = True
                 standing_top[iz, ix] = y
     built &= ~standing
+    # A surveyed water area standing more than four blocks over the water near it is a deck, not
+    # ground: two ships in the port are built of stone, which reads as soil, and their decks were
+    # dug out.
+    beside = minimum_filter(np.where(standing, standing_top, 32767), size=31)
+    raised = river & ~standing & (beside < 32767) & (ground > beside + 4)
     # Only designed rivers and streams pass under a surface; a surveyed water area under paving
     # is land on purpose, such as a quay, and stays land.
     culvert = (designed | stream) & (public | near_track) & full & ~standing
     # A column with no soil found (all built, or bare void) has no ground to cut a channel into.
-    blocked = wet & ~standing & ((built & ~culvert) | station | ~full | (ground < -120) | (river & (public | near_track)))
+    blocked = wet & ~standing & ((built & ~culvert) | raised | station | ~full | (ground < -120) | (river & (public | near_track)))
     wet &= ~blocked
     wet |= standing
     # A culvert keeps the surface block and the one under it as its deck.

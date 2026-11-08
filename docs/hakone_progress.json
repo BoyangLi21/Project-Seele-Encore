@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T12:05+08:00",
+ "updated": "2026-11-08T12:45+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -297,9 +297,9 @@
    "area": "其他",
    "title": "提交工具、交接 map-roads 与 map-edges、建进度清单",
    "units": 0.5,
-   "status": "doing",
+   "status": "done",
    "batch": null,
-   "note": "11-08",
+   "note": "11-08 12:00–12:10",
    "owner": "map-bdb53d"
   },
   {
@@ -307,9 +307,9 @@
    "area": "水系",
    "title": "水系安装：x2384–2559 全段",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": 111,
-   "note": "安装、读回、漏水检查、记账",
+   "note": "61,168格，读回0错；漏水检查27,086个水格只1处单格开口（2490,-73,-1162，三面实心、下为石，水最多流进这1格），并入修补批",
    "owner": "map-bdb53d"
   },
   {
@@ -317,9 +317,9 @@
    "area": "水系",
    "title": "水系安装：x2560–3071 北半（z<-512）",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": 112,
-   "note": "安装、读回、漏水检查、记账",
+   "note": "135,846格，读回0错，漏水检查66,954个水格无开口",
    "owner": "map-bdb53d"
   },
   {
@@ -327,9 +327,9 @@
    "area": "水系",
    "title": "水系安装：x2560–3071 南半",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": 113,
-   "note": "安装、读回、漏水检查、记账",
+   "note": "98,856格，读回0错；漏水2格开口，第119批复原",
    "owner": "map-bdb53d"
   },
   {
@@ -337,9 +337,9 @@
    "area": "水系",
    "title": "水系安装：x3072–3583 北半",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": 114,
-   "note": "安装、读回、漏水检查、记账",
+   "note": "144,554格，读回0错，无开口",
    "owner": "map-bdb53d"
   },
   {
@@ -347,9 +347,9 @@
    "area": "水系",
    "title": "水系安装：x3072–3583 南半",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": 115,
-   "note": "安装、读回、漏水检查、记账",
+   "note": "94,060格，读回0错；港口两船甲板用的石头被当成土，166格被挖成河道，第118批复原",
    "owner": "map-bdb53d"
   },
   {
@@ -357,9 +357,9 @@
    "area": "水系",
    "title": "水系安装：x≥3584 北半（z<0）",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": 116,
-   "note": "安装、读回、漏水检查、记账",
+   "note": "102,587格，读回0错，无开口",
    "owner": "map-bdb53d"
   },
   {
@@ -367,9 +367,9 @@
    "area": "水系",
    "title": "水系安装：x≥3584 南半",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": 117,
-   "note": "安装、读回、漏水检查、记账",
+   "note": "89,360格，读回0错；2格开口，第120批复原",
    "owner": "map-bdb53d"
   },
   {
@@ -377,9 +377,9 @@
    "area": "水系",
    "title": "水系安装：上游早川及箱根水面（只按水面）",
    "units": 1,
-   "status": "todo",
-   "batch": 118,
-   "note": "安装、读回、漏水检查、记账",
+   "status": "done",
+   "batch": 122,
+   "note": "第122批上游77,584格读回0错；58处开口，第123、124批共196格回退成土（水面高出地面处逐圈回退），复查无开口",
    "owner": "map-bdb53d"
   },
   {
@@ -1557,9 +1557,9 @@
    "area": "核实",
    "title": "第20项 8个目录锚点",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "2个已能步行到路（tokyo_south/08-07、09-01）；6个门口被围或通不到路，交 map-roads 补人行道（anchor-1至6）",
    "owner": "map-bdb53d"
   },
   {
@@ -1577,9 +1577,9 @@
    "area": "核实",
    "title": "道路净空失败186→198的12格来源",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "第106批会车线路基桥下12格路面净空3格（道路要4格），旁边主线旧桥同高且已在168列结构限高里，按同类保留；行人可过",
    "owner": "map-bdb53d"
   },
   {
@@ -1649,7 +1649,7 @@
    "units": 1,
    "status": "todo",
    "batch": null,
-   "note": "",
+   "note": "改由 rope-02 实测",
    "owner": "map-bdb53d"
   },
   {
@@ -1710,6 +1710,106 @@
    "status": "todo",
    "batch": null,
    "note": "",
+   "owner": "map-bdb53d"
+  },
+  {
+   "id": "anchor-1",
+   "area": "连接路",
+   "title": "tokyo_south/07-05 住宅门口 (-207,108,844) 接路",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "门口只走得到3格",
+   "owner": "map-roads"
+  },
+  {
+   "id": "anchor-2",
+   "area": "连接路",
+   "title": "tokyo_south/12-07 住宅门口 (44,141,866) 接路",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "门口只走得到5格",
+   "owner": "map-roads"
+  },
+  {
+   "id": "anchor-3",
+   "area": "连接路",
+   "title": "tokyo_north/11-03 办公楼门口 (448,96,515) 接路",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "门口只走得到12格",
+   "owner": "map-roads"
+  },
+  {
+   "id": "anchor-4",
+   "area": "连接路",
+   "title": "tokyo_west/09-09 住宅门口 (-150,83,381) 接路",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "走得到2,802格但40格内没有登记道路",
+   "owner": "map-roads"
+  },
+  {
+   "id": "anchor-5",
+   "area": "连接路",
+   "title": "tokyo_south/12-01 住宅门口 (190,91,379) 接路",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "门口站不住",
+   "owner": "map-roads"
+  },
+  {
+   "id": "anchor-6",
+   "area": "连接路",
+   "title": "tokyo_south/13-01 喫茶店门口 (190,102,428) 接路",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "门口只走得到100格",
+   "owner": "map-roads"
+  },
+  {
+   "id": "cable-07",
+   "area": "缆车站与接站路",
+   "title": "登山缆车 HC：跑完一趟开进早雲山车库带走乘客，改为来回穿梭",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "11-08 map-edges 实测发现",
+   "owner": "map-edges"
+  },
+  {
+   "id": "rope-01",
+   "area": "缆车站与接站路",
+   "title": "索道 HRW/HRE 进站段与折返轨降速候选（站台沿用 2–3km/h）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "车厢以 3.3m/s 穿过 12m 站台，约3.6秒，上不了车",
+   "owner": "map-edges"
+  },
+  {
+   "id": "rope-02",
+   "area": "缆车站与接站路",
+   "title": "索道上车实测（各线至少一站 riding=true）及 railProgress≈1140 车厢不开门原因",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "",
+   "owner": "map-edges"
+  },
+  {
+   "id": "water-fix",
+   "area": "水系",
+   "title": "水系修补：船体复原、悬空涵洞、漏水格（第118–121批）",
+   "units": 1.0,
+   "status": "done",
+   "batch": 118,
+   "note": "第118–121批：两船169格复原（含2格悬空涵洞、1格漏水），另3格漏水复原、1格封闭空格补水；读回全0错，复查无开口",
    "owner": "map-bdb53d"
   }
  ]
