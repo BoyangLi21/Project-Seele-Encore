@@ -16,6 +16,7 @@ from pathlib import Path
 import numpy as np
 from scipy import ndimage
 
+from map_pipeline.launch_protection import load as load_launch_protection
 from plan_ashi_landscape_r54 import PLANTS, SOIL
 from plan_station_access_corridor import CapturedSurface
 from query_blocks import AIR
@@ -96,6 +97,10 @@ def cone(seed, height, sign, reach, slope):
         if np.array_equal(value, before):
             break
     return value
+
+
+def in_launch_volume(guard, cell):
+    return any(b[0] <= cell[0] <= b[3] and b[1] <= cell[1] <= b[4] and b[2] <= cell[2] <= b[5] for _, b in guard.by_chunk.get((cell[0] >> 4, cell[2] >> 4), ()))
 
 
 def monotone(surface, changed, seed, top, sign):
@@ -186,6 +191,16 @@ def author(a):
     # Ground left as it is on purpose, as [x0, z0, x1, z1]; its edge anchors the slopes around it.
     for ex0, ez0, ex1, ez1 in spec.get('exclude', ()):
         movable[max(0, ez0 - z0):max(0, ez1 - z0 + 1), max(0, ex0 - x0):max(0, ex1 - x0 + 1)] = False
+    # The EVA launch volumes are finite in height, so a column is held only where one of them
+    # overlaps the range this column could be dug, filled or cleared of a tree.
+    guard = load_launch_protection(spec['launch_world'])
+    reach_up = np.where(tree, 40, spec.get('max_fill', 24) + 2)
+    lowest, highest = top - spec.get('max_cut', 40) - 1, top + reach_up
+    launch_held = np.zeros_like(known)
+    for _, (bx, by, bz, BX, BY, BZ) in guard.boxes:
+        area = np.s_[max(bz, z0) - z0:max(min(BZ, z1) - z0 + 1, 0), max(bx, x0) - x0:max(min(BX, x1) - x0 + 1, 0)]
+        launch_held[area] |= (lowest[area] <= BY) & (highest[area] >= by)
+    movable &= ~launch_held
     limit, near, slope = spec.get('cliff', 4), spec.get('protect', 6), spec.get('slope', 1.0)
     cliff = np.zeros_like(known)
     cut_seed, fill_seed = np.zeros_like(known), np.zeros_like(known)
@@ -235,7 +250,7 @@ def author(a):
         queue = deque([start])
         while queue:
             cell = queue.popleft()
-            if cell in seen:
+            if cell in seen or in_launch_volume(guard, cell):
                 continue
             seen.add(cell)
             try:
@@ -289,11 +304,12 @@ def author(a):
             state = source.state(x, y, z)
             if state.split('[')[0] in PLANTS and (x, y, z) not in rows and y > t + int(fill[i, j]):
                 put((x, y, z), state, 'minecraft:air', 'slope clearance')
+    guard.assert_positions(list(rows))
     after = top + fill - cut
     measure = known & (top > -129) & ~built & ~wet
     report = dict(errors=[], bounds=spec['bounds'], cliff_columns=int(cliff.sum()), cut_columns=int((cut > 0).sum()), fill_columns=int((fill > 0).sum()),
                   cells=len(rows), steps_before=steps(top, measure, limit), steps_after=steps(after, measure, limit), skipped=skipped,
-                  max_cut=int(cut.max()), max_fill=int(fill.max()), tree_cells=sum(1 for r in rows.values() if r['purpose'].startswith('tree')), world_written=False)
+                  launch_held_columns=int((launch_held & open_ground).sum()), max_cut=int(cut.max()), max_fill=int(fill.max()), tree_cells=sum(1 for r in rows.values() if r['purpose'].startswith('tree')), world_written=False)
     a.out.mkdir(parents=True, exist_ok=True)
     write(a.out / 'slope-check.json', report)
     np.savez_compressed(a.out / 'slope-map.npz', bounds=spec['bounds'], top=top, after=after, cliff=cliff, cut=cut.astype(np.int16), fill=fill.astype(np.int16), built=built, wet=wet, working=working)
