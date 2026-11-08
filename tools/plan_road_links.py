@@ -277,6 +277,31 @@ def water_surface(source, x, z):
     return y
 
 
+def relax(grade, fresh, fixed, fixed_grade):
+    """Clip fresh cells to within half a block of every neighbour, fresh or fixed, in place.
+
+    Cells on the inside of a sharp bend take heights from both legs, and a link must meet old
+    paving where it stands.
+    """
+    fixed_grade = fixed_grade.astype(np.int32)
+    for _ in range(300):
+        value = np.where(fresh, grade, np.where(fixed, fixed_grade, 0)).astype(np.int32)
+        known = fresh | fixed
+        upper = np.full(value.shape, 32000, np.int32)
+        lower = np.full(value.shape, -32000, np.int32)
+        for axis, shift in ((0, 1), (0, -1), (1, 1), (1, -1)):
+            v, k = np.roll(value, shift, axis), np.roll(known, shift, axis)
+            edge = (np.s_[0, :] if shift == 1 else np.s_[-1, :]) if axis == 0 else (np.s_[:, 0] if shift == 1 else np.s_[:, -1])
+            k[edge] = False
+            upper = np.where(k, np.minimum(upper, v + 1), upper)
+            lower = np.where(k, np.maximum(lower, v - 1), lower)
+        target = np.clip(value, lower, np.maximum(upper, lower))
+        change = fresh & (target != value)
+        if not change.any():
+            return
+        grade[change] = target[change]
+
+
 def standing_height(source, x, z):
     """Feet height on a column: the measured ground, or paving laid on it with room above."""
     bx, bz, _, _ = source.bounds
@@ -427,6 +452,7 @@ def edits(a):
                 writes[x, y, z] = dict(pos=[x, y, z], before=before, after=state, purpose=purpose)
         build = walk & ~old_walk
         adopted_at = np.full(xx.shape, -9999)
+        relax(new_grade, build, old_walk, network['grade2'][window])
         for iz, ix in np.argwhere(build):
             x, z = int(xx[iz, ix]), int(zz[iz, ix])
             clearance = 4 if road[iz, ix] and not link['footway'] else 2
@@ -445,31 +471,8 @@ def edits(a):
                 network['road'][iz + bz - az, ix + bx - ax] = bool(road[iz, ix]) and not link['footway']
                 network['grade2'][iz + bz - az, ix + bx - ax] = grade
         # Every step must stay walkable: a new cell sits within half a block of each neighbour,
-        # whether new or an old road at its real height. Cells on the inside of a sharp bend take
-        # heights from both legs, and the link meets old paving where it stands.
-        # Adopted paving is fixed like the old roads, so this runs after adoption.
-        old_grade = network['grade2'][window].astype(np.int32)
-        fresh = build.copy()
-        fixed = network['walk'][window] & ~fresh
-        for _ in range(300):
-            value = np.where(fresh, new_grade, np.where(fixed, old_grade, 0)).astype(np.int32)
-            known_ = fresh | fixed
-            upper = np.full(value.shape, 32000, np.int32)
-            lower = np.full(value.shape, -32000, np.int32)
-            for axis, shift in ((0, 1), (0, -1), (1, 1), (1, -1)):
-                v, k = np.roll(value, shift, axis), np.roll(known_, shift, axis)
-                if axis == 0:
-                    edge = np.s_[0, :] if shift == 1 else np.s_[-1, :]
-                else:
-                    edge = np.s_[:, 0] if shift == 1 else np.s_[:, -1]
-                k[edge] = False
-                upper = np.where(k, np.minimum(upper, v + 1), upper)
-                lower = np.where(k, np.maximum(lower, v - 1), lower)
-            target = np.clip(value, lower, np.maximum(upper, lower))
-            change = fresh & (target != value)
-            if not change.any():
-                break
-            new_grade[change] = target[change]
+        # whether new or an old road at its real height, and adopted paving counts as old.
+        relax(new_grade, build, network['walk'][window] & ~build, network['grade2'][window])
         floor, slab = road_blocks(new_grade)
         # Adopted paving keeps its own height, so old block-high steps survive adoption; a bottom
         # slab on the lower block halves such a step.
@@ -496,8 +499,14 @@ def edits(a):
         old_grade = network['grade2'][window]
         for iz, ix in np.argwhere(walk & old_walk):
             x, z = int(xx[iz, ix]), int(zz[iz, ix])
-            feet = int(old_grade[iz, ix]) // 2 + 1
-            for yy in range(feet, feet + (4 if road[iz, ix] else 2) + (old_grade[iz, ix] % 2)):
+            g = int(old_grade[iz, ix])
+            # Only real paving at the declared height is dug out; a declared path on bare ground
+            # has no buried floor, and digging would lower it.
+            paving = source.state(x, (g + 1) // 2 if g % 2 else g // 2, z)
+            if paving.split('[')[0] not in PAVEMENT or (g % 2 and 'type=bottom' not in paving):
+                continue
+            feet = g // 2 + 1
+            for yy in range(feet, feet + (4 if road[iz, ix] else 2) + (g % 2)):
                 name = source.state(x, yy, z).split('[')[0]
                 if name not in EMPTY and natural(name) and not name.endswith(('_leaves', '_log')):
                     put(x, yy, z, 'minecraft:air', 'link uncovered')
@@ -542,7 +551,9 @@ def edits(a):
                 # on a bank that would dam the stream below.
                 at = float(along[nearest[iz, ix]])
                 centre_cell = line.distance(shapely.Point(x + .5, z + .5)) <= 1.0
-                column = [(yy, 'minecraft:stone_bricks', 'bridge pier') for yy in range(int(top[iz, ix]) + 1, y)] if surface is None and centre_cell and at % 8 < 1 else []
+                # No pier lands on a road below, which the bridge exists to pass over.
+                under_road = (iz + bz - az, ix + bx - ax) and old_walk[iz, ix]
+                column = [(yy, 'minecraft:stone_bricks', 'bridge pier') for yy in range(int(top[iz, ix]) + 1, y)] if surface is None and centre_cell and at % 8 < 1 and not under_road else []
             # A road in cutting is open to the sky: clearing only its headroom would leave a lid of
             # ground over it.
             column += [(yy, 'minecraft:air', 'link headroom') for yy in range(y + 1, max(y + HEADROOM, int(top[iz, ix])) + 1)
