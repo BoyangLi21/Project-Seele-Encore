@@ -21,8 +21,11 @@ def run(a):
     x,z,X,Z=map(int,d['bounds']);zz,xx=np.nonzero(d['walk']);px,pz=xx+x,zz+z;h,slab=road_blocks(d['grade2'][zz,xx]);road=d['road'][zz,xx];count=len(xx)
     columns=collections.defaultdict(list)
     for i,(cx,cz)in enumerate(zip(px//16,pz//16)):columns[int(cx),int(cz)].append(i)
-    columns={k:np.asarray(v,np.int32)for k,v in columns.items()};selection={k:set(((h[v,None]+np.arange(5)[None])//16).ravel().tolist())for k,v in columns.items()}
+    columns={k:np.asarray(v,np.int32)for k,v in columns.items()};selection={k:set(((h[v,None]+np.arange(-1,5)[None])//16).ravel().tolist())for k,v in columns.items()}
     flags=np.zeros(count,np.uint8);seen=np.zeros(count,np.uint8);full=np.zeros(count,bool);examples=[];chunks=set();failure_materials=collections.Counter()
+    # TrafficCraft roads sit on eighth layers, not half steps: a TrafficCraft block at the declared
+    # floor is a floor, and so is clear air there over one, where the surface came down a little.
+    lowered=np.zeros(count,bool);open_floor=np.zeros(count,bool)
     # Registry copies SMOOTH_STONE's full block shape for this native floor.
     floor_materials=PAVEMENT|{'projectseele:period_station_floor','projectseele:station_tactile_warning'}
     with stopped_world(a.world):
@@ -31,11 +34,16 @@ def run(a):
         print('Declared route columns',count,'FULL',int(full.sum()),'chunks',len(columns),flush=True)
         for cx,cz,sy,palette,ids in iter_selected_sections(a.world,'projectseele:geofront',selection,skip_unfinished=True):
             indexes=columns[cx,cz];bare=[s.split('[')[0]for s in palette];paved=np.array([s in floor_materials for s in bare]);empty=np.array([s in AIR|{'minecraft:light','minecraft:grass','minecraft:tall_grass','minecraft:fern'}for s in bare]);bottom=np.array(['type=bottom'in s for s in palette])
+            traffic=np.array([s.startswith('trafficcraft:')for s in bare]);layer=np.array([s.startswith('trafficcraft:')and'layers='in s for s in palette])
+            q=indexes[(h[indexes]-1)//16==sy]
+            if len(q):lowered[q]|=traffic[ids[((h[q]-1)%16)*256+(pz[q]%16)*16+px[q]%16]]
             for depth in range(5):
                 q=indexes[((h[indexes]+depth)//16==sy)&((depth<3)|road[indexes])]
                 if not len(q):continue
                 at=((h[q]+depth)%16)*256+(pz[q]%16)*16+px[q]%16;state=ids[at];bit=1<<depth;seen[q]|=bit
-                okay=(paved[state]&(bottom[state]==slab[q]))if depth==0 else empty[state]
+                if depth==0:
+                    okay=(paved[state]&(bottom[state]==slab[q]))|traffic[state];open_floor[q]|=empty[state]
+                else:okay=empty[state]|(layer[state]if depth==1 else False)
                 flags[q[okay]]|=bit
                 for value,amount in zip(*np.unique(state[~okay],return_counts=True)):failure_materials['floor'if depth==0 else'headroom',bare[value]]+=int(amount)
                 if len(examples)<300:
@@ -43,6 +51,7 @@ def run(a):
             if (cx,cz)not in chunks:
                 chunks.add((cx,cz))
                 if len(chunks)%1000==0:print('Read route chunks',len(chunks),'/',len(columns),flush=True)
+    flags[lowered&open_floor]|=1
     required=np.where(road,31,7).astype(np.uint8)
     # In a confirmed FULL chunk, a missing section is canonical air. It is
     # allowed for headroom and still fails the required floor. Missing chunks

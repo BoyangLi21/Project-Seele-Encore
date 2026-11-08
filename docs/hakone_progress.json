@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T14:20+08:00",
+ "updated": "2026-11-08T14:24+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -1887,9 +1887,9 @@
    "area": "道路换用",
    "title": "TrafficCraft：道路审计改认新路面和 1/8 层高度",
    "units": 2.0,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "审计认 TrafficCraft 路面（声明地板处是 TrafficCraft 方块，或路面降低后该处为空、下面是 TrafficCraft）；副本两片试转区地板/净空失败与转换前相同",
    "owner": "map-bdb53d"
   },
   {

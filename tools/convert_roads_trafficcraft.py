@@ -33,7 +33,13 @@ TOWN_BUILDINGS, TOWN_RADIUS = 4, 40
 ENTITY = 'trafficcraft:colored_block_entity'
 REPLACEABLE = PAVEMENT | AIR | PLANTS | SOIL | {'minecraft:light', 'minecraft:snow'}
 # Facing that puts pattern 23's offset line on a side: it lies east when the texture faces north.
-EDGE_FACING = {(1, 0): 'north', (0, 1): 'east', (-1, 0): 'south', (0, -1): 'west'}
+# Single-line pieces: where each line meets the cell edges with the texture facing north, as
+# (east, south) in 0..1, read from the pattern textures.
+LINE_PIECES = {1: ((0.5, 0.0), (0.5, 1.0)), 2: ((1.0, 0.531), (0.531, 1.0)), 3: ((1.0, 0.5), (0.5, 1.0)),
+               9: ((1.0, 0.562), (0.75, 1.0)), 10: ((0.688, 0.0), (0.5, 1.0)), 11: ((0.312, 0.0), (0.5, 1.0)),
+               12: ((0.25, 1.0), (0.0, 0.562)), 14: ((0.594, 0.0), (0.5, 1.0)), 15: ((0.406, 0.0), (0.5, 1.0)),
+               23: ((0.688, 0.0), (0.688, 1.0)), 24: ((1.0, 0.312), (0.312, 1.0)), 25: ((1.0, 0.75), (0.75, 1.0)),
+               29: ((0.5, 0.0), (0.688, 1.0)), 30: ((0.5, 0.0), (0.312, 1.0))}
 
 
 def paved(state):
@@ -77,6 +83,23 @@ def smooth(height, walk, joined, passes=40):
     return out
 
 
+def limit(surface, joined, movable, rounds=400):
+    """Lower `movable` cells until no neighbour pair steps more than MAX_STEP within one class."""
+    out = surface.copy()
+    for _ in range(rounds):
+        changed = False
+        for axis, shift in ((0, 1), (0, -1), (1, 1), (1, -1)):
+            n = np.roll(out, shift, axis)
+            same = movable & np.roll(movable, shift, axis)
+            ok = joined[axis][..., 0 if shift == 1 else 1] & same & (out > n + MAX_STEP)
+            if ok.any():
+                out[ok] = n[ok] + MAX_STEP
+                changed = True
+        if not changed:
+            break
+    return out
+
+
 def adjacency(walk, grade):
     """Neighbour pairs that are one surface (within half a block), per axis and direction."""
     joined = []
@@ -103,6 +126,109 @@ def direction(road, iz, ix, radius=4):
     return v[:, 1], float(1 - w[0] / max(w[1], 1e-9))
 
 
+def longest_chain(cells):
+    """The longest path through 8-connected cells: a centre or edge line's own order."""
+    cells = set(cells)
+
+    def farthest(start):
+        parent, frontier, last = {start: None}, [start], start
+        while frontier:
+            following = []
+            for iz, ix in frontier:
+                for dz in (-1, 0, 1):
+                    for dx in (-1, 0, 1):
+                        n = (iz + dz, ix + dx)
+                        if n in cells and n not in parent:
+                            parent[n] = (iz, ix)
+                            following.append(n)
+            if following:
+                last = following[-1]
+            frontier = following
+        return last, parent
+    a, _ = farthest(next(iter(cells)))
+    b, parent = farthest(a)
+    path = [b]
+    while parent[path[-1]] is not None:
+        path.append(parent[path[-1]])
+    return path
+
+
+def rotated(point, facing):
+    """A texture point (east, south in 0..1) after turning the texture to `facing`."""
+    u, v = point
+    return {'north': (u, v), 'east': (1 - v, u), 'south': (1 - u, 1 - v), 'west': (v, 1 - u)}[facing]
+
+
+def piece_for(entry, leave):
+    """Line piece and facing whose line meets the cell edges nearest to where the line does."""
+    best, choice = np.inf, None
+    for pattern, (a, b) in LINE_PIECES.items():
+        for facing in ('north', 'east', 'south', 'west'):
+            ra, rb = np.array(rotated(a, facing)), np.array(rotated(b, facing))
+            cost = min(np.abs(entry - ra).sum() + np.abs(leave - rb).sum(), np.abs(entry - rb).sum() + np.abs(leave - ra).sum())
+            if cost < best:
+                best, choice = cost, (pattern, facing)
+    return choice
+
+
+def trace(path, allowed, smoothing=2, step=.05):
+    """Cells along a centre or edge line, each with its piece and the arc length at its middle.
+
+    The 8-connected chain becomes a 4-connected one, so every cell is entered and left through
+    an edge, never a corner; the crossing point on each shared edge comes from the smoothed line,
+    which keeps a solid line solid round bends and dashes measured along the road.
+    """
+    pts = np.array([(ix + .5, iz + .5) for iz, ix in path], float)
+    if len(pts) > 2 * smoothing + 1:
+        kernel = np.ones(2 * smoothing + 1) / (2 * smoothing + 1)
+        inner = np.c_[np.convolve(pts[:, 0], kernel, 'valid'), np.convolve(pts[:, 1], kernel, 'valid')]
+        pts = np.vstack([pts[:1], inner, pts[-1:]])
+    seg = np.linalg.norm(np.diff(pts, axis=0), axis=1)
+    run = np.r_[0, np.cumsum(seg)]
+    dense_run = np.arange(0, run[-1] + step, step)
+    dense = np.c_[np.interp(dense_run, run, pts[:, 0]), np.interp(dense_run, run, pts[:, 1])]
+
+    def near(cell):
+        d = np.hypot(dense[:, 0] - cell[1] - .5, dense[:, 1] - cell[0] - .5)
+        i = int(np.argmin(d))
+        return d[i], dense_run[i]
+    chain = [path[0]]
+    for cell in path[1:]:
+        last = chain[-1]
+        if cell[0] != last[0] and cell[1] != last[1]:
+            options = [(last[0], cell[1]), (cell[0], last[1])]
+            options.sort(key=lambda c: (not (0 <= c[0] < allowed.shape[0] and 0 <= c[1] < allowed.shape[1] and allowed[c]), near(c)[0]))
+            chain.append(options[0])
+        chain.append(cell)
+
+    def crossing(a, b):
+        """Where the line crosses the edge shared by cells a and b, in a's cell coordinates."""
+        if a[1] != b[1]:
+            x_edge = max(a[1], b[1])
+            close = np.abs(dense[:, 0] - x_edge) < step * 1.5
+            close &= (dense[:, 1] > a[0] - .5) & (dense[:, 1] < a[0] + 1.5)
+            v = np.clip(dense[close, 1].mean() - a[0], .15, .85) if close.any() else .5
+            return np.array([x_edge - a[1], v])
+        z_edge = max(a[0], b[0])
+        close = np.abs(dense[:, 1] - z_edge) < step * 1.5
+        close &= (dense[:, 0] > a[1] - .5) & (dense[:, 0] < a[1] + 1.5)
+        u = np.clip(dense[close, 0].mean() - a[1], .15, .85) if close.any() else .5
+        return np.array([u, z_edge - a[0]])
+    out = []
+    for i, cell in enumerate(chain):
+        entry = crossing(cell, chain[i - 1]) if i > 0 else None
+        leave = crossing(cell, chain[i + 1]) if i + 1 < len(chain) else None
+        if entry is None and leave is None:
+            continue
+        if entry is None:
+            entry = 1 - leave if (leave == 0).any() or (leave == 1).any() else leave
+        if leave is None:
+            leave = 1 - entry
+        if 0 <= cell[0] < allowed.shape[0] and 0 <= cell[1] < allowed.shape[1] and allowed[cell]:
+            out.append((tuple(int(v) for v in cell), piece_for(entry, leave), near(cell)[1]))
+    return out
+
+
 def convert(a):
     spec = read(a.config)
     source = CapturedSurface(spec['source'], partial=True)
@@ -119,16 +245,19 @@ def convert(a):
     joined = adjacency(walk, grade)
     height = 4 * grade + 8                     # eighths: grade2 is twice the foot height minus two
     surface = smooth(height, walk, joined)
-    # Footways ride one layer over the surface they share with the carriageway: a kerb of an
-    # eighth, the same everywhere, so footway meets footway without a step.
-    surface = np.where(walk & ~road, surface + 1, surface)
+    # Footways ride one layer over the carriageway beside them, so their steps line up with its
+    # steps; a footway away from any carriageway rides one layer over its own surface.
+    gap, near = distance_transform_edt(~road, return_indices=True)
+    beside = walk & ~road & (gap <= 3) & (np.abs(height - height[tuple(near)]) <= DRIFT)
+    surface = np.where(walk & ~road, np.where(beside, surface[tuple(near)], surface) + 1, surface)
+    surface = limit(surface, joined, walk & ~road)
 
     catalog = [r for r in read(spec['catalog']) if r.get('occupied_bounds') and r.get('kind') == 'building']
     centres = np.array([[(r['occupied_bounds'][0] + r['occupied_bounds'][3]) / 2, (r['occupied_bounds'][2] + r['occupied_bounds'][5]) / 2] for r in catalog])
 
-    # Markings: centre and edge lines from the carriageway's own shape. The centre is the ridge
-    # of the distance to the kerbs, so it stays one continuous chain round bends; near 45 degrees
-    # it is drawn with the corner-to-corner pattern so the cells join at their corners.
+    # Markings. Line type and colour are decided once per segment between junctions; centre and
+    # edge lines are traced as smooth curves and drawn cell by cell with the piece whose line meets
+    # the cell edges where the curve does, so a solid line stays solid round bends.
     edge = distance_transform_edt(np.pad(road, 1))[1:-1, 1:-1]
     marks = {}
     shape_ = road.shape
@@ -137,44 +266,54 @@ def convert(a):
         return edge[jz, jx] if 0 <= jz < shape_[0] and 0 <= jx < shape_[1] else 0.0
 
     junction = np.zeros(shape_, bool)
-    axes, towns = {}, {}
+    centre_cells = np.zeros(shape_, bool)
+    kerb_cells = np.zeros(shape_, bool)
+    axes = {}
     for iz, ix in np.argwhere(road):
         half = edge[max(0, iz - 4):iz + 5, max(0, ix - 4):ix + 5].max()
-        width = 2 * half - 1
-        if width < 4:
+        if 2 * half - 1 < 4:
             continue                           # narrow lanes carry no lines
         # The window must be long against the width, or a wide road looks the same every way.
         axis, clarity = direction(road, iz, ix, radius=max(5, int(round(2.5 * half))))
         if axis is None or clarity < .65:
-            junction[iz, ix] = True            # a junction or a plaza
+            junction[iz, ix] = True            # a junction, a plaza or a sharp bend
             continue
         if axis[0] < 0 or (axis[0] == 0 and axis[1] < 0):
             axis = -axis
         axes[iz, ix] = axis
         perp = np.rint([-axis[1], axis[0]]).astype(int)
-        x, z = ix + x0, iz + z0
         here = edge[iz, ix]
         # One cell of the two in the middle of an even width: not below the one behind, above the one ahead.
-        centre = here >= value(iz - perp[1], ix - perp[0]) and here > value(iz + perp[1], ix + perp[0]) and here > 1
-        angle = math.degrees(math.atan2(axis[1], axis[0]))          # -90..90, z runs south
-        if abs(abs(angle) - 45) < 22.5:
-            pattern, facing = 24, ('north' if angle < 0 else 'east')  # '/' runs north-east; turned, north-west
-        else:
-            pattern, facing = 1, ('east' if abs(angle) < 45 else 'north')
-        town = bool(len(centres) and np.sum(np.hypot(*(centres - [x, z]).T) < TOWN_RADIUS) >= TOWN_BUILDINGS)
-        towns[iz, ix] = town
-        if centre:
-            s = int(math.floor(x * axis[0] + z * axis[1]))
-            if not town:
-                marks[iz, ix] = (pattern, facing, YELLOW)
-            elif (s // DASH) % 2 == 0:
-                marks[iz, ix] = (pattern, facing, WHITE)
-        elif here == 1:
-            for side in ((1, 0), (0, 1), (-1, 0), (0, -1)):
-                jz, jx = iz + side[1], ix + side[0]
-                if 0 <= jz < shape_[0] and 0 <= jx < shape_[1] and walk[jz, jx] and not road[jz, jx]:
-                    marks[iz, ix] = (23, EDGE_FACING[side], WHITE)
-                    break
+        if here >= value(iz - perp[1], ix - perp[0]) and here > value(iz + perp[1], ix + perp[0]) and here > 1:
+            centre_cells[iz, ix] = True
+        elif here == 1 and any(0 <= iz + dz < shape_[0] and 0 <= ix + dx < shape_[1] and walk[iz + dz, ix + dx] and not road[iz + dz, ix + dx]
+                               for dz, dx in ((1, 0), (-1, 0), (0, 1), (0, -1))):
+            kerb_cells[iz, ix] = True
+    segments, _ = label(road & ~junction, np.ones((3, 3), int))
+    if len(centres):
+        crowd = np.zeros(shape_, int)
+        for iz, ix in np.argwhere(road):
+            crowd[iz, ix] = np.sum(np.hypot(*(centres - [ix + x0, iz + z0]).T) < TOWN_RADIUS)
+        town_cells = crowd >= TOWN_BUILDINGS
+    else:
+        town_cells = np.zeros(shape_, bool)
+    town_segment = {int(k): town_cells[segments == k].mean() > .5 for k in np.unique(segments[segments > 0])}
+    towns = {cell: town_segment.get(int(segments[cell]), False) for cell in axes}
+    for mask, centre in ((centre_cells, True), (kerb_cells, False)):
+        chains, count = label(mask, np.ones((3, 3), int))
+        for k in range(1, count + 1):
+            cells = [tuple(c) for c in np.argwhere(chains == k)]
+            if len(cells) < 3:
+                continue
+            path = longest_chain(cells)
+            owner = Counter(int(segments[c]) for c in path).most_common(1)[0][0]
+            town = town_segment.get(owner, False)
+            colour = WHITE if (town or not centre) else YELLOW
+            for cell, piece, run in trace(path, road & ~junction):
+                if centre and town and (run // DASH) % 2:
+                    continue                   # the gap of a dashed town centre line
+                if centre or cell not in marks:
+                    marks[cell] = (piece[0], piece[1], colour)
 
     # Approaches: counted in cells from the junction along the carriageway. A town crossroads
     # gets a zebra over the first ZEBRA cells, stripes along the traffic; behind it, a stop line
