@@ -147,6 +147,26 @@ def steps(height, mask, limit):
     return count
 
 
+def declared(spec, bounds):
+    """Registered road and walk columns, and rail columns, inside bounds."""
+    x0, z0, x1, z1 = bounds
+    shape = (z1 - z0 + 1, x1 - x0 + 1)
+    net = np.load(spec['network'])
+    nx, nz = int(net['bounds'][0]), int(net['bounds'][1])
+    public = np.zeros(shape, bool)
+    px0, pz0 = max(x0, nx), max(z0, nz)
+    px1, pz1 = min(x1, int(net['bounds'][2])), min(z1, int(net['bounds'][3]))
+    if px0 <= px1 and pz0 <= pz1:
+        public[pz0 - z0:pz1 - z0 + 1, px0 - x0:px1 - x0 + 1] = (net['road'] | net['walk'])[pz0 - nz:pz1 - nz + 1, px0 - nx:px1 - nx + 1]
+    rails = np.zeros(shape, bool)
+    for r in read(spec['rails']):
+        for x, _, z in r['points']:
+            i, j = int(z) - z0, int(x) - x0
+            if 0 <= i < shape[0] and 0 <= j < shape[1]:
+                rails[i, j] = True
+    return public, rails
+
+
 def author(a):
     spec = read(a.config)
     if a.source:
@@ -156,18 +176,7 @@ def author(a):
     top, tree, wet, built, known = columns(Path(spec['source']) / 'source', spec['bounds'])
     sx, sz = source.bounds[:2]
     protected = source.measured['protected'][z0 - sz:z1 - sz + 1, x0 - sx:x1 - sx + 1]
-    net = np.load(spec['network'])
-    nx, nz = int(net['bounds'][0]), int(net['bounds'][1])
-    public = np.zeros_like(known)
-    px0, pz0 = max(x0, nx), max(z0, nz)
-    px1, pz1 = min(x1, int(net['bounds'][2])), min(z1, int(net['bounds'][3]))
-    public[pz0 - z0:pz1 - z0 + 1, px0 - x0:px1 - x0 + 1] = (net['road'] | net['walk'])[pz0 - nz:pz1 - nz + 1, px0 - nx:px1 - nx + 1]
-    rails = np.zeros_like(known)
-    for r in read(spec['rails']):
-        for x, _, z in r['points']:
-            i, j = int(z) - z0, int(x) - x0
-            if 0 <= i < rails.shape[0] and 0 <= j < rails.shape[1]:
-                rails[i, j] = True
+    public, rails = declared(spec, spec['bounds'])
     open_ground = known & (top > -129) & ~built & ~wet
     working = built | wet | public | rails | protected
     distance = ndimage.distance_transform_edt(~working)
@@ -241,8 +250,13 @@ def author(a):
                     for dz in (-1, 0, 1):
                         queue.append((cell[0] + dx, cell[1] + dy, cell[2] + dz))
 
-    for i, j in zip(*np.nonzero(changed)):
+    # Region by region: each decoded region takes about 450 MB and the capture reader keeps them.
+    region = None
+    for i, j in sorted(zip(*np.nonzero(changed)), key=lambda c: ((int(c[1]) + x0) >> 9, (int(c[0]) + z0) >> 9)):
         x, z, t = int(j + x0), int(i + z0), int(top[i, j])
+        if (x >> 9, z >> 9) != region:
+            source.editor.regions.clear()
+            region = x >> 9, z >> 9
         ground = source.state(x, t, z)
         if ground.split('[')[0] not in EARTH:
             skipped[ground.split('[')[0]] = skipped.get(ground.split('[')[0], 0) + 1
@@ -293,11 +307,85 @@ def author(a):
     print(json.dumps(report, ensure_ascii=False))
 
 
+def compare_captures(before_dir, after_dir, expected):
+    """Every cell that differs between two captures, and how the patch cells ended up."""
+    wanted = {}
+    for cell in expected:
+        wanted.setdefault((cell[0] >> 4, cell[2] >> 4), []).append(cell)
+    changed, not_applied, stale, uncovered = set(), [], [], set(wanted)
+    for path in sorted(Path(after_dir).glob('r.*.npz')):
+        other = Path(before_dir) / path.name
+        if not other.exists():
+            continue
+        with np.load(path) as data:
+            after_names, after_coords, after_blocks = [str(n) for n in data['palette']], data['coordinates'], data['blocks']
+        with np.load(other) as data:
+            before_names, before_coords, before_blocks = [str(n) for n in data['palette']], data['coordinates'], data['blocks']
+        union = {name: i for i, name in enumerate(sorted(set(after_names) | set(before_names)))}
+        after_ids = np.array([union[n] for n in after_names])
+        before_ids = np.array([union[n] for n in before_names])
+        index = {(int(c[0]), int(c[1])): i for i, c in enumerate(before_coords)}
+        for i, (cx, cz) in enumerate(after_coords.tolist()):
+            j = index.get((cx, cz))
+            if j is None:
+                continue
+            uncovered.discard((cx, cz))
+            now, then = after_ids[after_blocks[i]], before_ids[before_blocks[j]]
+            for y, z, x in zip(*np.nonzero(now != then)):
+                changed.add((cx * 16 + int(x), int(y) - 128, cz * 16 + int(z)))
+            for cell in wanted.get((cx, cz), ()):
+                y, z, x = cell[1] + 128, cell[2] & 15, cell[0] & 15
+                if after_names[after_blocks[i, y, z, x]] != expected[cell]['after']:
+                    not_applied.append(cell)
+                if before_names[before_blocks[j, y, z, x]] != expected[cell]['before']:
+                    stale.append(cell)
+    return changed, not_applied, stale, uncovered
+
+
+def verify(a):
+    """After install, from captures of the batch's area taken just before and just after it."""
+    spec, patch = read(a.config), read(a.patch)
+    expected = {tuple(e['pos']): e for e in patch['edits']}
+    changed, not_applied, stale, uncovered = compare_captures(a.before / 'source', a.after / 'source', expected)
+    cells = set(expected) | changed
+    bounds = [min(c[0] for c in cells), min(c[2] for c in cells), max(c[0] for c in cells), max(c[2] for c in cells)]
+    x0, z0 = bounds[:2]
+    top, _, wet, built, known = columns(a.before / 'source', bounds)
+    top_after, _, _, _, known_after = columns(a.after / 'source', bounds)
+    public, rails = declared(spec, bounds)
+    groups = dict(road=public, rail=rails, building=built, water=wet)
+    touched = {name: sorted({(c[0], c[2]) for c in changed if mask[c[2] - z0, c[0] - x0]}) for name, mask in groups.items()}
+    measure = known & known_after & (top > -129) & ~built & ~wet
+    limit = spec.get('cliff', 4)
+    cliffs_before, cliffs_after = steps(top, measure, limit), steps(top_after, measure, limit)
+    unexpected = sorted(changed - set(expected))
+    errors = []
+    for name, found in (('patch cells not at their after state', not_applied), ('patch cells whose before state did not match', stale),
+                        ('cells changed outside the patch', unexpected), ('chunks of the patch missing from the captures', sorted(uncovered))):
+        if found:
+            errors.append(f'{len(found)} {name}, first {found[:5]}')
+    for name, found in touched.items():
+        if found:
+            errors.append(f'{len(found)} {name} columns changed, first {found[:5]}')
+    if cliffs_after >= cliffs_before:
+        errors.append(f'cliffs did not fall: {cliffs_before} before, {cliffs_after} after')
+    report = dict(id=patch['id'], errors=errors, area=bounds, patch_cells=len(expected), cells_changed=len(changed), cliffs_before=cliffs_before, cliffs_after=cliffs_after,
+                  columns_changed={name: len(found) for name, found in touched.items()}, world_written=False)
+    a.out.mkdir(parents=True, exist_ok=True)
+    write(a.out / f"verify-{patch['id']}.json", report)
+    print(json.dumps(report, ensure_ascii=False))
+    if errors:
+        raise SystemExit(1)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument('mode', choices=('author',))
+    parser.add_argument('mode', choices=('author', 'verify'))
     parser.add_argument('--config', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--source', help='Capture to plan from, in place of the one in the config')
+    parser.add_argument('--patch', type=Path, help='verify: the patch that was installed')
+    parser.add_argument('--before', type=Path, help='verify: capture of the area just before the install')
+    parser.add_argument('--after', type=Path, help='verify: capture of the area just after the install')
     args = parser.parse_args()
     globals()[args.mode](args)
