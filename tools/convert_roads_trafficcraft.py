@@ -16,7 +16,7 @@ import math
 from pathlib import Path
 
 import numpy as np
-from scipy.ndimage import distance_transform_edt
+from scipy.ndimage import distance_transform_edt, label
 
 from plan_ashi_landscape_r54 import PLANTS, SOIL
 from plan_station_access_corridor import CapturedSurface
@@ -28,6 +28,7 @@ MAX_STEP = 2            # layers between neighbours, 25%
 DRIFT = 4               # layers a surface may move from where it was
 WHITE, YELLOW = 0, 4
 DASH = 5                # painted, then the same unpainted
+ZEBRA = 4               # cells of zebra along an approach
 TOWN_BUILDINGS, TOWN_RADIUS = 4, 40
 ENTITY = 'trafficcraft:colored_block_entity'
 REPLACEABLE = PAVEMENT | AIR | PLANTS | SOIL | {'minecraft:light', 'minecraft:snow'}
@@ -135,6 +136,8 @@ def convert(a):
     def value(jz, jx):
         return edge[jz, jx] if 0 <= jz < shape_[0] and 0 <= jx < shape_[1] else 0.0
 
+    junction = np.zeros(shape_, bool)
+    axes, towns = {}, {}
     for iz, ix in np.argwhere(road):
         half = edge[max(0, iz - 4):iz + 5, max(0, ix - 4):ix + 5].max()
         width = 2 * half - 1
@@ -143,9 +146,11 @@ def convert(a):
         # The window must be long against the width, or a wide road looks the same every way.
         axis, clarity = direction(road, iz, ix, radius=max(5, int(round(2.5 * half))))
         if axis is None or clarity < .65:
-            continue                           # a junction or a plaza
+            junction[iz, ix] = True            # a junction or a plaza
+            continue
         if axis[0] < 0 or (axis[0] == 0 and axis[1] < 0):
             axis = -axis
+        axes[iz, ix] = axis
         perp = np.rint([-axis[1], axis[0]]).astype(int)
         x, z = ix + x0, iz + z0
         here = edge[iz, ix]
@@ -156,8 +161,9 @@ def convert(a):
             pattern, facing = 24, ('north' if angle < 0 else 'east')  # '/' runs north-east; turned, north-west
         else:
             pattern, facing = 1, ('east' if abs(angle) < 45 else 'north')
+        town = bool(len(centres) and np.sum(np.hypot(*(centres - [x, z]).T) < TOWN_RADIUS) >= TOWN_BUILDINGS)
+        towns[iz, ix] = town
         if centre:
-            town = len(centres) and np.sum(np.hypot(*(centres - [x, z]).T) < TOWN_RADIUS) >= TOWN_BUILDINGS
             s = int(math.floor(x * axis[0] + z * axis[1]))
             if not town:
                 marks[iz, ix] = (pattern, facing, YELLOW)
@@ -169,6 +175,59 @@ def convert(a):
                 if 0 <= jz < shape_[0] and 0 <= jx < shape_[1] and walk[jz, jx] and not road[jz, jx]:
                     marks[iz, ix] = (23, EDGE_FACING[side], WHITE)
                     break
+
+    # Approaches: counted in cells from the junction along the carriageway. A town crossroads
+    # gets a zebra over the first ZEBRA cells, stripes along the traffic; behind it, a stop line
+    # across the inbound lane, which keeps left.
+    # A bend reads as a junction too; only a blob that three or more arms leave is one.
+    blobs, _ = label(junction, np.ones((3, 3), int))
+    reach = np.full(shape_, 99, int)
+    owner = np.where(junction, blobs, 0)
+    frontier = [tuple(c) for c in np.argwhere(junction)]
+    for c in frontier:
+        reach[c] = 0
+    for step in range(1, ZEBRA + 2):
+        following = []
+        for iz, ix in frontier:
+            for dz, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+                n = (iz + dz, ix + dx)
+                if 0 <= n[0] < shape_[0] and 0 <= n[1] < shape_[1] and road[n] and reach[n] == 99 and n in axes:
+                    reach[n] = step
+                    owner[n] = owner[iz, ix]
+                    following.append(n)
+        frontier = following
+    first, _ = label(reach == 1, np.ones((3, 3), int))
+    arms = Counter()
+    for blob in np.unique(owner[reach == 1]):
+        arms[blob] = len(np.unique(first[(reach == 1) & (owner == blob)]))
+    for (iz, ix), axis in axes.items():
+        r = reach[iz, ix]
+        if r > ZEBRA + 1 or arms[owner[iz, ix]] < 3:
+            continue
+        stripes = 'east' if abs(axis[0]) >= abs(axis[1]) else 'north'
+        across = 'north' if stripes == 'east' else 'east'
+        if r <= ZEBRA:
+            if towns.get((iz, ix)):
+                marks[iz, ix] = (108, stripes, WHITE)
+            else:
+                marks.pop((iz, ix), None)
+            continue
+        # Travel towards the junction: down the reach count. Inbound is the left of that.
+        towards = None
+        for dz, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            n = (iz + dz, ix + dx)
+            if 0 <= n[0] < shape_[0] and 0 <= n[1] < shape_[1] and reach[n] < r:
+                towards = (dx, dz)
+        if towards is None:
+            continue
+        left = (towards[1], -towards[0])
+        z0_, x0_ = max(0, iz - 4), max(0, ix - 4)
+        zz_, xx_ = np.nonzero(road[z0_:iz + 5, x0_:ix + 5])
+        middle = np.array([xx_.mean() + x0_, zz_.mean() + z0_])
+        if (np.array([ix, iz]) - middle) @ np.array(left) > 0:
+            marks[iz, ix] = (1, across, WHITE)
+        else:
+            marks.pop((iz, ix), None)
 
     rows, skipped = {}, Counter()
     paint = {tuple(int(d[k]) for k in 'xyz'): int(d.get('color', -1)) for d in source.devices if str(d.get('id')) == ENTITY}
