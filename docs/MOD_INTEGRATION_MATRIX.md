@@ -1,6 +1,6 @@
 # Project SEELE 模组联动矩阵
 
-更新日期：2026-08-16
+更新日期：2026-11-08
 
 本文件记录私人开发环境中允许启用、仅作参考、以及明确禁止接管 EVA 骨骼的模组。正式发布前仍需重新核对许可证与作者授权。
 
@@ -10,6 +10,7 @@
 |---|---:|---|---|
 | [GeckoLib](https://modrinth.com/mod/geckolib) | 4.8.4 / MC 1.20.1 Forge | EVA、插入栓与复杂实体动画 | EVA 唯一骨骼、动画与状态机权威 |
 | [Moving Elevators](https://www.curseforge.com/minecraft/mc-mods/moving-elevators) | 1.4.12 / MC 1.20.1 Forge | S20 人员电梯连续轿厢、楼层面板 | 只接管人员轿厢；不得接管 EVA 发射台、插入栓或物流机械 |
+| [TrafficCraft](https://modrinth.com/mod/trafficcraft) | 1.20.1-1.1.3 / MC 1.20.1 Forge | 地图道路的沥青、1/8 格坡道、标线、路缘和人行道 | 只提供方块；GPL-3.0，随包附许可证和源码链接；正式存档写入它的方块前，所有实例必须先装好，见 [道路换用计划](ROAD_TRAFFICCRAFT_PLAN.zh.md) |
 
 Create 与 Create: Connected 已于 2026-08-16 从运行时、构建、私人整合包和
 R28 权威存档退役。SEELE 吊机、轨道和状态机只能使用自身实体/原版方块；代码中

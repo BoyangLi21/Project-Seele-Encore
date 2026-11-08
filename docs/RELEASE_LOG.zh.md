@@ -26,12 +26,15 @@
 
 **jar：** 用 `client/mods` 里的完整 jar，不要用 `build/libs` 的公开构建，后者没有私有模型和贴图。
 
+**道路 mod：** R60 地图的道路用 TrafficCraft 1.1.3 的方块，客户端包和服务端包都必须带 `trafficcraft-forge-1.20.1-1.1.3.jar`（本机在 `external-assets/incoming/trafficcraft_20261108/`），`licenses/` 里放 GPL-3.0 全文和源码链接。少了它，进世界后路面会变成空气。见 [道路换用计划](ROAD_TRAFFICCRAFT_PLAN.zh.md)。
+
 ## 齐全检查
 
 客户端包打完后在干净实例里验证：
 - mod、`projectseele-local-maps`、资源包、光影、配置和 `licenses/` 都在，PCL 实例设置带 JIT 指令。
 - 能连上同版本服务器，进世界后 EVA、使徒、NPC、武器和车站模型都能显示，没有缺贴图。
 - 远景能加载，第 7 项修掉的 Distant Horizons 假墙没有带回来。
+- 道路标线有颜色，坡道是连续的 1/8 格，没有出现缺方块的提示。
 
 ## 客户端减重
 

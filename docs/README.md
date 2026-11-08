@@ -35,6 +35,7 @@
 
 - [地图现状、工具和规则](HANDOFF_CODEX_20261106.zh.md)，配套数据在 [`handoff_20261106/`](handoff_20261106/README.zh.md)
 - [地图编辑协议](MAP_EDITING_PROTOCOL.md)
+- [道路换用 TrafficCraft（本轮验收前）](ROAD_TRAFFICCRAFT_PLAN.zh.md)
 - [箱根完成台账](HAKONE_COMPLETION_LEDGER_20261102.zh.md) · [执行顺序](HAKONE_EXECUTION_ORDER_20261105.zh.md)
 - [箱根地理工作](HAKONE_GEOGRAPHY_WORK.md) · [长程规划](HAKONE_LONG_RANGE_PLAN_R53.zh.md) · [体积管线](HAKONE_VOLUME_PIPELINE.md) · [截图修复](HAKONE_SCREENSHOT_REPAIR_20261103.zh.md)
 - [城市与箱根更新记录](R54_CITY_GEOGRAPHY_20261026.zh.md)

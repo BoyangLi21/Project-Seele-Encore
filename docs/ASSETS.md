@@ -501,3 +501,7 @@ R60：`assets/projectseele/motion/eva_dash_r59.json` 来自 Bandai Namco Researc
 原先的 Tuffles `AerialSlapDownwards` / `LegsDivekickFightingGameInspired` 空中动作不再使用。
 
 走/跑：曾用步幅变形把原走、跑循环的步子压短以消除滑步（`walk_run_warp_r57.py`），用户验收认为动作变形（小碎步、膝内扣），已撤回，`eva_body_r44.json` 恢复原走、跑循环。
+
+## R60 道路方块（TrafficCraft）
+
+2026-11-08 起，地图道路改用第三方 mod [TrafficCraft](https://modrinth.com/mod/trafficcraft)（作者 MrJulsen，GPL-3.0-or-later，源码 <https://github.com/MisterJulsen/TrafficCraft>）的沥青、标线、路缘和人行道方块。用的是 Forge 1.20.1 正式版 1.1.3（`trafficcraft-forge-1.20.1-1.1.3.jar`，SHA-1 `b5793501c821591019d537f9eb3809227cd7738f`，内嵌 DragonLib 和 Architectury）。jar 不进仓库，本机存放在 `external-assets/incoming/trafficcraft_20261108/`；整合包和服务端包原样附带，并在 `licenses/` 放 GPL-3.0 全文和源码链接。我们的代码不链接它，地图只是放置它的方块。换法见 [道路换用计划](ROAD_TRAFFICCRAFT_PLAN.zh.md)。
