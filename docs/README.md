@@ -19,6 +19,7 @@
 - [开源发布](OPEN_SOURCE_RELEASE_R24.md) · [B 站与社区](BILIBILI_AND_COMMUNITY_R24.md)
 - [美术方向](ART_DIRECTION_R24.md) · [第三次冲击视觉](THIRD_IMPACT_VISUAL.md)
 - [R54 需求记录](R54_REQUIREMENTS_LOG.zh.md)
+- [GeoFront 改造计划（验收后的下一轮）](GEOFRONT_REMODEL_PLAN.zh.md)
 
 ## 动作与战斗
 
