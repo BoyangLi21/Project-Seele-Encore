@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T13:50+08:00",
+ "updated": "2026-11-08T13:54+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -1647,9 +1647,9 @@
    "area": "核实",
    "title": "索道上车实测",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "改由 rope-02 实测",
+   "note": "由 rope-02 实测：两线都能上车随车走；下车请验收时人工试",
    "owner": "map-bdb53d"
   },
   {
@@ -1787,9 +1787,9 @@
    "area": "缆车站与接站路",
    "title": "索道 HRW/HRE 进站段与折返轨降速候选（站台沿用 2–3km/h）",
    "units": 1.0,
-   "status": "doing",
-   "batch": 129,
-   "note": "东段第128、129批：早雲山、大涌谷开门方块256格、进站降速、车库移到站内回环；桃源台、姥子开门方块待交付",
+   "status": "done",
+   "batch": 130,
+   "note": "第128–130批：10个站台开门方块（东256、西272格）、进站降速、车库移到站内回环",
    "owner": "map-edges"
   },
   {
@@ -1797,9 +1797,9 @@
    "area": "缆车站与接站路",
    "title": "索道上车实测（各线至少一站 riding=true）及 railProgress≈1140 车厢不开门原因",
    "units": 1.0,
-   "status": "doing",
+   "status": "done",
    "batch": null,
-   "note": "map-edges 实测 HRE 早雲山、HRW 大涌谷 riding=true；下车未实测；西段待装",
+   "note": "map-edges 隔离客户端：HRW 桃源台上车随车到姥子，大涌谷西行、HRE 早雲山上车成功；姥子西行站台门侧离玻璃墙约1.5格待验收看",
    "owner": "map-edges"
   },
   {
