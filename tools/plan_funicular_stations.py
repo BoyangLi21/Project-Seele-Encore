@@ -317,7 +317,7 @@ def author(a):
     write(a.out / 'station-check.json', report)
     write(a.out / 'patch.json', dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'],
                                      edits=[patch.rows[c] for c in sorted(patch.rows)], native_snapshot=spec['native_snapshot'],
-                                     error_reports=[str(a.out / 'station-check.json')], views_reviewed_by_root=False,
+                                     error_reports=[str((a.out / 'station-check.json').resolve())], views_reviewed_by_root=False,
                                      continuation_work=spec['continuation_work']))
     print(json.dumps(dict(cells=len(patch.rows), platforms=report['platforms'],
                           paths=[{k: v for k, v in p.items() if k != 'line'} for p in report['paths']], errors=patch.errors[:8]), ensure_ascii=False))

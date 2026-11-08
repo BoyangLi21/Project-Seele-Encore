@@ -39,7 +39,7 @@ def author(a):
     check = dict(errors=[], cells=len(edits), platforms=report, world_written=False)
     (a.out / 'door-check.json').write_text(json.dumps(check, ensure_ascii=False, indent=1), 'utf8')
     patch = dict(schema='map-cell-patch-v1', id=spec['id'], label=spec['label'], source=spec['source'], edits=edits,
-                 native_snapshot=spec['native_snapshot'], error_reports=[str(a.out / 'door-check.json')], views_reviewed_by_root=False,
+                 native_snapshot=spec['native_snapshot'], error_reports=[str((a.out / 'door-check.json').resolve())], views_reviewed_by_root=False,
                  continuation_work=spec['continuation_work'])
     if spec.get('native_additions'):
         patch['native_additions'] = spec['native_additions']
