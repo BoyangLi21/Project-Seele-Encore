@@ -68,6 +68,15 @@ public final class RegionalTransitAuthor
         if(!append && (!simulator.rails.isEmpty()||!simulator.stations.isEmpty()))throw new IllegalStateException("Use a new staging directory; never replace an existing railway");
         Map<String,JsonObject> oldRails=snapshot(simulator.rails),oldRoutes=snapshot(simulator.routes),oldStations=snapshot(simulator.stations),oldPlatforms=snapshot(simulator.platforms),oldSidings=snapshot(simulator.sidings),oldDepots=snapshot(simulator.depots),oldLifts=snapshot(simulator.lifts);
         JsonArray retiredRails=new JsonArray();
+        // A cable car cannot reverse, so a dead-end siding sends every cabin round the whole line
+        // before it can park. A move keeps the old siding's cars and name on a rail of the station loop.
+        Map<String,Siding> movedFrom=new LinkedHashMap<>();
+        if(plan.has("siding_moves"))for(JsonElement e:plan.getAsJsonArray("siding_moves"))
+        {
+            JsonObject j=e.getAsJsonObject();
+            Siding old=simulator.sidings.stream().filter(sd->sd.getId()==j.get("old_siding_id").getAsLong()).findFirst().orElseThrow();
+            movedFrom.put(j.get("rail").getAsString(),old);oldSidings.remove(old.getHexId());
+        }
         if(plan.has("retire_rails"))
         {
             if(!append)throw new IllegalStateException("Rail retirement requires copied append staging");
@@ -77,7 +86,7 @@ public final class RegionalTransitAuthor
                 JsonObject definition=item.getAsJsonObject();List<Rail> found=simulator.rails.stream().filter(r->endpoints(r,definition)).toList();
                 if(found.size()!=1)throw new IllegalStateException("Retirement precondition is not unique "+definition);
                 Rail rail=found.get(0);
-                if(rail.isPlatform()||rail.isSiding()||rail.getStartAngle(pos(definition.getAsJsonArray("from")))!=Angle.valueOf(definition.get("from_angle").getAsString())
+                if(rail.isPlatform()||rail.isSiding()&&!bool(definition,"moved_siding",false)||rail.getStartAngle(pos(definition.getAsJsonArray("from")))!=Angle.valueOf(definition.get("from_angle").getAsString())
                         ||rail.getStartAngle(pos(definition.getAsJsonArray("to")))!=Angle.valueOf(definition.get("to_angle").getAsString()))
                     throw new IllegalStateException("Retirement geometry/type changed "+definition);
                 JsonObject record=new JsonObject();record.addProperty("id",rail.getHexId());record.add("before",json(rail));retiredRails.add(record);
@@ -96,7 +105,7 @@ public final class RegionalTransitAuthor
             Angle aa=Angle.valueOf(r.get("from_angle").getAsString()),ab=Angle.valueOf(r.get("to_angle").getAsString());
             TransportMode mode=TransportMode.valueOf(str(r,"mode","TRAIN"));String kind=str(r,"kind","rail");
             var styles=new ObjectArrayList<String>();if(mode==TransportMode.TRAIN)styles.add("default_3d");
-            double radius=integer(r,"vertical_radius",100);Rail rail;
+            double radius=r.has("vertical_radius")?r.get("vertical_radius").getAsDouble():100;Rail rail;
             // The funicular climbs on TWO_RADII rails; a split section keeps the shape of the rail it replaces.
             Rail.Shape shape=Rail.Shape.valueOf(str(r,"shape","QUADRATIC"));
             if(kind.equals("platform"))rail=Rail.newPlatformRail(a,aa,b,ab,shape,radius,styles,mode);
@@ -209,6 +218,23 @@ public final class RegionalTransitAuthor
             metadata.addDepot(depot);
         }
         metadata.update();simulator.sync();
+        if(plan.has("siding_moves"))
+        {
+            UpdateDataRequest moved=new UpdateDataRequest(simulator);
+            for(JsonElement e:plan.getAsJsonArray("siding_moves"))
+            {
+                JsonObject j=e.getAsJsonObject();Siding old=movedFrom.get(j.get("rail").getAsString());
+                Siding siding=simulator.sidings.stream().filter(sd->endpoints(sd,definitions.get(j.get("rail").getAsString()))).findFirst().orElseThrow();
+                siding.setVehicleCars(old.getVehicleCars());siding.setName(old.getName());siding.setIsManual(false);
+                siding.setMaxVehicles((int)Math.max(1,old.getMaxVehicles()));
+                moved.addSiding(siding);
+                JsonObject regen=new JsonObject();regen.addProperty("line",j.get("line").getAsString());regen.addProperty("depot_id",j.get("depot_id").getAsLong());
+                regen.addProperty("siding_id",siding.getId());regen.addProperty("restart_vehicles",true);
+                if(!plan.has("regenerate_depots"))plan.add("regenerate_depots",new JsonArray());
+                plan.getAsJsonArray("regenerate_depots").add(regen);
+            }
+            moved.update();simulator.sync();
+        }
         // A colour joins rails into one block: a train holding any of them stops the rest at its edge.
         if(plan.has("signals"))for(JsonElement e:plan.getAsJsonArray("signals"))
         {

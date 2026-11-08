@@ -207,7 +207,7 @@ def native(a):
     (work / 'classes').mkdir(parents=True)
     staging, out = work / 'native', work / 'output'
     shutil.copytree(spec['native_snapshot'], staging)
-    plan = {key: spec[key] for key in ('rails', 'stations', 'lines', 'warmup_seconds', 'extend_routes', 'regenerate_depots', 'disable_depots', 'signals', 'retire_rails') if key in spec}
+    plan = {key: spec[key] for key in ('rails', 'stations', 'lines', 'warmup_seconds', 'extend_routes', 'regenerate_depots', 'disable_depots', 'signals', 'retire_rails', 'siding_moves') if key in spec}
     plan['commission_clock'] = True
     write(work / 'plan.json', plan)
     options = argparse.Namespace(work=work, mtr=a.mtr, java=a.java)
@@ -224,7 +224,8 @@ def native(a):
     changed = sorted(k for k in before if k in after and after[k] != before[k] and k not in replaced
                      and Path(k).parts[2] not in ('settings', 'sidings'))
     retired = sorted(set(before) - set(after))
-    gone = [k for k in retired if Path(k).parts[2] != 'rails' or not spec.get('retire_rails')]
+    # A moved siding leaves with its rail; nothing else may disappear.
+    gone = [k for k in retired if not (Path(k).parts[2] == 'rails' and spec.get('retire_rails') or Path(k).parts[2] == 'sidings' and spec.get('siding_moves'))]
     write(a.out / 'retired-members.json', [k for k in retired if k not in gone])
     # A retired rail keeps its staged copy so the release can prove the world still holds it.
     for name in (k for k in retired if k not in gone):
