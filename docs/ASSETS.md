@@ -481,6 +481,12 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 `data/projectseele/worldgen/hakone_surface.bin.gz` 出典为国土地理院[地理院瓦片](https://maps.gsi.go.jp/development/ichiran.html)和[最适化矢量数据](https://github.com/gsi-cyberjapan/optimal_bvmap)，由本项目加工为 1:4 游戏坐标高程和水面。复用本地缓存，没有嵌入旅游照片或动画图像。42 个局部陆地 DEM 缺值经过邻域补齐；海床和芦之湖水下深度是游戏适配，不是水下测绘。来源、锚点及加工见 HAKONE_GEOGRAPHY_WORK.md。
 
+## R60 箱根森林分布
+
+地图上森林的位置和类型取自环境省生物多样性センター「現存植生図2024」（[G空間情報センター](https://www.geospatial.jp/ckan/dataset/biodic_veg2024)，公共データ利用規約 第1.0版／PDL 1.0，[规约原文](https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)）的关东、中部区块，2026-11-08 下载。
+
+加工说明：「現存植生図2024」（環境省生物多様性センター）を Project SEELE が加工して作成。由 `tools/plan_forest.py` 把植被图例归为杉桧人工林、松、阔叶、竹、灌木和开阔地，按 1:4 换算到游戏坐标，再在地图上种树。这不是政府发布的原始成果。原始文件 `veg2024bk3.gpkg`、`veg2024bk5.gpkg` 只放在本地 `external-assets/incoming/veg2024_20261108/`，不进仓库，也不随模组分发；树木全部用 Minecraft 原版方块。
+
 ## R57 狂奔（左 Alt）
 
 R60：`assets/projectseele/motion/eva_dash_r59.json` 来自 Bandai Namco Research Motiondataset-1 的 `dash_masculinity_001`（Bandai Namco Research Inc.，CC BY-NC 4.0：需署名、不得商用；仓库不含原始文件），由 `tools/finale/run_retarget.py` 重定向到初号机的单圈循环。肢体方向取自动捕，长度和关节用 EVA 自己的；手臂外张减半，脚相对小腿最多转 75°，躯干多前倾 8°，摆臂幅度 ×1.4，摆腿幅度 ×1.3；步幅不压缩，脚落地滑步。负责人 2026-11-07 选定，替换此前的 Mixamo `Fast Run`。署名与修改说明见 [第三方动作声明](THIRD_PARTY_MOTION_NOTICES.md)。

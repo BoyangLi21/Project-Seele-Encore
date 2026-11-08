@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-08T15:06+08:00",
+ "updated": "2026-11-08T17:01+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -437,9 +437,9 @@
    "area": "连接路",
    "title": "link-2 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-2，片段 2–7；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -447,9 +447,9 @@
    "area": "连接路",
    "title": "link-3 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-3，片段 3–7；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -457,9 +457,9 @@
    "area": "连接路",
    "title": "link-4 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-4，片段 7–14；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -467,9 +467,9 @@
    "area": "连接路",
    "title": "link-5 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
-   "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -487,9 +487,9 @@
    "area": "连接路",
    "title": "link-7 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-7，片段 14–27；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -497,9 +497,9 @@
    "area": "连接路",
    "title": "link-8 修方案",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-8，片段 15–156；建了未连通",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 路缘台阶已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -507,9 +507,9 @@
    "area": "连接路",
    "title": "link-8 安装与实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-8，片段 15–156",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 路缘台阶已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -517,9 +517,9 @@
    "area": "连接路",
    "title": "link-9 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-9，片段 15–160；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -527,9 +527,9 @@
    "area": "连接路",
    "title": "link-10 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-10，片段 15–163；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -537,9 +537,9 @@
    "area": "连接路",
    "title": "link-11 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-11，片段 15–168；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -577,9 +577,9 @@
    "area": "连接路",
    "title": "link-13 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-13，片段 15–192；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -587,9 +587,9 @@
    "area": "连接路",
    "title": "link-14 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-14，片段 15–204；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -627,9 +627,9 @@
    "area": "连接路",
    "title": "link-16 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-16，片段 15–216；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -667,9 +667,9 @@
    "area": "连接路",
    "title": "link-18 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-18，片段 15–282；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -677,9 +677,9 @@
    "area": "连接路",
    "title": "link-19 选线",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-19，片段 15–315；无路由且走不通",
+   "status": "done",
+   "batch": 132,
+   "note": "由 R7 alt-216-315 接通，读回0错",
    "owner": "map-roads"
   },
   {
@@ -687,9 +687,9 @@
    "area": "连接路",
    "title": "link-19 施工",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-19，片段 15–315",
+   "status": "done",
+   "batch": 132,
+   "note": "由 R7 alt-216-315 接通，读回0错",
    "owner": "map-roads"
   },
   {
@@ -697,9 +697,9 @@
    "area": "连接路",
    "title": "link-19 实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-19，片段 15–315",
+   "status": "done",
+   "batch": 132,
+   "note": "由 R7 alt-216-315 接通，读回0错",
    "owner": "map-roads"
   },
   {
@@ -707,9 +707,9 @@
    "area": "连接路",
    "title": "link-20 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-20，片段 15–316；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -717,9 +717,9 @@
    "area": "连接路",
    "title": "link-21 修方案",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-21，片段 15–340；建了未连通",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 link-21b 已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -727,9 +727,9 @@
    "area": "连接路",
    "title": "link-21 安装与实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-21，片段 15–340",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 link-21b 已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -757,9 +757,9 @@
    "area": "连接路",
    "title": "link-24 选线",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-24，片段 27–30；无路由且走不通",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 link-24 已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -767,9 +767,9 @@
    "area": "连接路",
    "title": "link-24 施工",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-24，片段 27–30",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 link-24 已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -777,9 +777,9 @@
    "area": "连接路",
    "title": "link-24 实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-24，片段 27–30",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 link-24 已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -787,9 +787,9 @@
    "area": "连接路",
    "title": "link-25 复看重做选线",
    "units": 1,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-25，片段 27–133；573米绕行、多次跨轨，要复看",
+   "status": "done",
+   "batch": 132,
+   "note": "由 R7 link-24、alt-12-133、alt-27-140 替代，读回0错",
    "owner": "map-roads"
   },
   {
@@ -797,9 +797,9 @@
    "area": "连接路",
    "title": "link-25 安装与实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-25，片段 27–133",
+   "status": "done",
+   "batch": 132,
+   "note": "由 R7 link-24、alt-12-133、alt-27-140 替代，读回0错",
    "owner": "map-roads"
   },
   {
@@ -817,9 +817,9 @@
    "area": "连接路",
    "title": "link-27 复看重做选线",
    "units": 1,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-27，片段 133–140；跨轨处坡度0.359，轨道在路堤上",
+   "status": "done",
+   "batch": 132,
+   "note": "由 R7 alt-27-140 替代，读回0错",
    "owner": "map-roads"
   },
   {
@@ -827,9 +827,9 @@
    "area": "连接路",
    "title": "link-27 安装与实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-27，片段 133–140",
+   "status": "done",
+   "batch": 132,
+   "note": "由 R7 alt-27-140 替代，读回0错",
    "owner": "map-roads"
   },
   {
@@ -837,9 +837,9 @@
    "area": "连接路",
    "title": "link-28 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-28，片段 134–135；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -847,9 +847,9 @@
    "area": "连接路",
    "title": "link-29 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-29，片段 134–147；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -857,9 +857,9 @@
    "area": "连接路",
    "title": "link-30 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-30，片段 135–144；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -867,9 +867,9 @@
    "area": "连接路",
    "title": "link-31 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-31，片段 140–149；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -877,9 +877,9 @@
    "area": "连接路",
    "title": "link-32 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-32，片段 147–155；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -967,9 +967,9 @@
    "area": "连接路",
    "title": "link-37 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-37，片段 206–219；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -977,9 +977,9 @@
    "area": "连接路",
    "title": "link-38 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
-   "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -1077,9 +1077,9 @@
    "area": "连接路",
    "title": "link-42 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-42，片段 282–349；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -1107,9 +1107,9 @@
    "area": "连接路",
    "title": "link-45 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-45，片段 311–348；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -1117,9 +1117,9 @@
    "area": "连接路",
    "title": "link-46 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-46，片段 311–378；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -1137,9 +1137,9 @@
    "area": "连接路",
    "title": "link-48 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-48，片段 311–396；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -1157,9 +1157,9 @@
    "area": "连接路",
    "title": "link-50 修方案",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-50，片段 328–330；建了未连通",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 link-50 已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -1167,9 +1167,9 @@
    "area": "连接路",
    "title": "link-50 安装与实测",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "v2 link-50，片段 328–330",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 link-50 已装，读回0错",
    "owner": "map-roads"
   },
   {
@@ -1177,9 +1177,9 @@
    "area": "连接路",
    "title": "link-51 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-51，片段 330–378；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -1187,9 +1187,9 @@
    "area": "连接路",
    "title": "link-52 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-52，片段 378–384；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -1227,9 +1227,9 @@
    "area": "连接路",
    "title": "link-54 复看方案、安装、读回",
    "units": 0.5,
-   "status": "doing",
-   "batch": null,
-   "note": "v2 link-54，片段 378–399；方案已连通，未安装",
+   "status": "done",
+   "batch": 132,
+   "note": "R7 已装，读回0错，双向实走（map-roads）",
    "owner": "map-roads"
   },
   {
@@ -1376,40 +1376,40 @@
    "id": "edge-ridge-1",
    "area": "边界",
    "title": "山脊保真：北侧山脊",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "保留设施平台，非缺陷；本轮不恢复（用户 2026-11-08 决定），需要时随 GeoFront 改造做，数据见 map-edges-work/ridge-quant.json",
    "owner": "map-edges"
   },
   {
    "id": "edge-ridge-2",
    "area": "边界",
    "title": "山脊保真：西侧山脊",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "保留设施平台，非缺陷；本轮不恢复（用户 2026-11-08 决定），需要时随 GeoFront 改造做，数据见 map-edges-work/ridge-quant.json",
    "owner": "map-edges"
   },
   {
    "id": "edge-ridge-3",
    "area": "边界",
    "title": "山脊保真：南侧山脊",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "保留设施平台，非缺陷；本轮不恢复（用户 2026-11-08 决定），需要时随 GeoFront 改造做，数据见 map-edges-work/ridge-quant.json",
    "owner": "map-edges"
   },
   {
    "id": "edge-ridge-4",
    "area": "边界",
    "title": "山脊保真：东侧山脊",
-   "units": 1,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "保留设施平台，非缺陷；本轮不恢复（用户 2026-11-08 决定），需要时随 GeoFront 改造做，数据见 map-edges-work/ridge-quant.json",
    "owner": "map-edges"
   },
   {
