@@ -503,3 +503,11 @@ UN 旧候选地块与交通/水域存在重叠，现扩展为 X3504–4383、Z�
 - 地形：第 310–314 批。cl2、cl10 的灰面是天然石切面，保留；cl9 的黑白台阶已换素色（第 312 批误改了旁边大楼 1,394 格，第 313 批已原样恢复）。
 - 站牌：第 315–334 批，61 块，立柱在站台后侧，距轨道中心至少 4 格，不挡车门。
 - 第 334 批是最后一次方块写入。之后只重建 Distant Horizons 并在副本上烘焙小地图（`.claude/dhjob/driver2.sh`），结果写在同目录 `RESULT.txt`。
+
+### 离线渲染完成（2026-11-10 02:50）
+
+- 远景：Distant Horizons 重建完成并装入正式世界，251,506,688 字节，89,585 行，完整性检查通过，旁边没有日志文件。
+- 小地图：191 个区域包，在 `F:/eva/.claude/map-work/client/xaero/world-map/MAP^us^REVIEW/projectseele$geofront`，比所有区域文件都新。
+- 02:04 主会话清理 F 盘时，`r54_remote_fix_20261027/server/SEELE_R53_WORLD` 是指向正式世界的目录链接，`robocopy /MOVE` 把正式世界的内容带去了 E 盘。已从 `E:/eva-archive-20261110/artifacts/` 原样复制回来：80,440 个文件，两边逐文件比对无差异，时间戳保留，世界仍是第 334 批。以后移动目录前先排除目录链接。
+- 接下来：主会话打包 R61 后，开始 GeoFront 改造（见 [GeoFront 改造计划](GEOFRONT_REMODEL_PLAN.zh.md)），再做 UN 迁移。两组批次都由负责人统一验收。
+- 全图实机巡视（tc-tour）这轮没有做，留到验收。

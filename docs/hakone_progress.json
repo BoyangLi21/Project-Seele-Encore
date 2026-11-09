@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-09T12:51+08:00",
+ "updated": "2026-11-10T02:51+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -1667,9 +1667,9 @@
    "area": "小地图远景",
    "title": "小地图重建：西部",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "Xaero 自带转换器离线烘好，191 个区域包，2026-11-10",
    "owner": "map-bdb53d"
   },
   {
@@ -1677,9 +1677,9 @@
    "area": "小地图远景",
    "title": "小地图重建：东部与小田原",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "Xaero 自带转换器离线烘好，191 个区域包，2026-11-10",
    "owner": "map-bdb53d"
   },
   {
@@ -1687,9 +1687,9 @@
    "area": "小地图远景",
    "title": "远景重建：西部",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "Distant Horizons 离线重建并装入正式世界，251 MB，89,585 行，2026-11-10",
    "owner": "map-bdb53d"
   },
   {
@@ -1697,9 +1697,9 @@
    "area": "小地图远景",
    "title": "远景重建：东部与小田原",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "Distant Horizons 离线重建并装入正式世界，251 MB，89,585 行，2026-11-10",
    "owner": "map-bdb53d"
   },
   {
@@ -2059,7 +2059,7 @@
    "units": 1.0,
    "status": "todo",
    "batch": null,
-   "note": "",
+   "note": "留待验收：未检查（负责人说这轮路面不用进游戏验证；远景已重建）",
    "owner": "map-bdb53d"
   },
   {
