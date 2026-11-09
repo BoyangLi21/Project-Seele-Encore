@@ -12,7 +12,10 @@ import io
 import json
 import os
 import re
+import shutil
+import sqlite3
 import struct
+import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
@@ -46,6 +49,7 @@ uniform float inDry;
 # is there. The mod raises this uniform while the sections in view are still unmeshed.
 DH_FADE_ORIGINAL = 'color.a *= mix(smoothstep(far * 0.5, far * 0.7, lengthCylinder), 1.0, SeeleCavernWeight());'
 DH_FADE_REPLACEMENT = 'color.a *= mix(smoothstep(far * 0.5, far * 0.7, lengthCylinder), 1.0, max(SeeleCavernWeight(), seeleDhNearFill));'
+SERVER_LOD_AGE_MS = 86_400_000
 SHADER_PATCHES = (
     ('shaders/lib/uniforms.glsl', DRY_ORIGINAL, DRY_REPLACEMENT),
     ('shaders/lib/seele/cavern.glsl', '#define SEELE_CAVERN_HELPER', '#define SEELE_CAVERN_HELPER\nuniform float seeleDhNearFill;'),
@@ -132,7 +136,29 @@ def dimensions(world):
                 yield from (p for p in sorted(namespace.iterdir()) if p.is_dir())
 
 
-def distant_caches(world, seed, pack):
+def aged_lod_copy(db, target):
+    """A copy of a LOD database with every row a day older than the client's copy of the same file.
+
+    A DH client asks for each section it shows and the server resends it when its row is newer,
+    after shifting the client's timestamp by the measured clock offset. With identical files any
+    offset below zero makes every row newer, so the client downloads and rebuilds a map it already
+    has. Later changes on the server carry their own, newer times and still reach the clients.
+    """
+    target.parent.mkdir(parents=True, exist_ok=True)
+    shutil.copyfile(db, target)
+    connection = sqlite3.connect(target)
+    try:
+        connection.execute('UPDATE FullData SET LastModifiedUnixDateTime = LastModifiedUnixDateTime - ?', (SERVER_LOD_AGE_MS,))
+        connection.commit()
+        connection.execute('PRAGMA wal_checkpoint(TRUNCATE)')
+    finally:
+        connection.close()
+    for suffix in ('-wal', '-shm'):
+        Path(str(target) + suffix).unlink(missing_ok=True)
+    return target
+
+
+def distant_caches(world, seed, pack, work):
     client, server, details = {}, {}, []
     for dim in dimensions(world):
         db = dim / 'data/DistantHorizons.sqlite'
@@ -144,7 +170,8 @@ def distant_caches(world, seed, pack):
         if pack and wal.exists() and wal.stat().st_size:
             raise RuntimeError('DH database has an unmerged WAL: ' + str(db))
         client['Distant_Horizons_server_data/SEELE/' + (seed + '@' + name).replace(':', '@@') + '/DistantHorizons.sqlite'] = db
-        server[db.relative_to(world).as_posix()] = db
+        entry = db.relative_to(world).as_posix()
+        server[entry] = aged_lod_copy(db, work / entry) if pack else db
         details.append(dict(dimension=name, bytes=db.stat().st_size))
     assert {'data/DistantHorizons.sqlite', 'dimensions/projectseele/geofront/data/DistantHorizons.sqlite'} <= set(server)
     return client, server, details
@@ -169,15 +196,23 @@ def shader_payload(path):
     return output.getvalue()
 
 
-def server_dh_config(text):
-    # Remote city motion must update LODs outside vanilla chunk tracking, without generating distant terrain.
-    settings = {'numberOfThreads': '2', 'threadRunTimeRatio': '"0.5"', 'enableDistantGeneration': 'false',
-                'distantGeneratorMode': '"PRE_EXISTING_ONLY"', 'enableRealTimeUpdates': 'true',
-                'realTimeUpdateDistanceRadiusInChunks': '256', 'synchronizeOnLoad': 'true',
-                'sendLevelKeys': 'true', 'levelKeyPrefix': '""'}
+def dh_config(text, settings):
     for key, value in settings.items():
         text = re.sub(r'(?m)^(\s*' + re.escape(key) + r'\s*=\s*)[^\r\n]*', lambda m: m[1] + value, text)
     return text.encode('utf8')
+
+
+def server_dh_config(text):
+    # Remote city motion must update LODs outside vanilla chunk tracking, without generating distant terrain.
+    return dh_config(text, {'numberOfThreads': '2', 'threadRunTimeRatio': '"0.5"', 'enableDistantGeneration': 'false',
+                            'distantGeneratorMode': '"PRE_EXISTING_ONLY"', 'enableRealTimeUpdates': 'true',
+                            'realTimeUpdateDistanceRadiusInChunks': '256', 'synchronizeOnLoad': 'true',
+                            'sendLevelKeys': 'true', 'levelKeyPrefix': '""'})
+
+
+def client_dh_config(text):
+    # Two threads at half duty leave the preinstalled terrain filling in for a minute after joining.
+    return dh_config(text, {'numberOfThreads': '4', 'threadRunTimeRatio': '"1.0"'})
 
 
 def servers_dat(name, address):
@@ -189,23 +224,34 @@ def servers_dat(name, address):
     return b'\x0a\x00\x00\x09\x00\x07servers\x0a' + struct.pack('>i', 1) + entry + b'\x00'
 
 
-def xaero_cache(client, world, address):
-    """The offline-staged world map, moved to where Xaero looks for it on this server."""
-    source = client / 'xaero/world-map' / world.name.replace('_', '^us^')
-    dimension = 'projectseele$geofront'
-    target = f'xaero/world-map/Multiplayer_{address}/{dimension}/mw$default/'
-    found = {target + p.relative_to(source / dimension).as_posix(): p
-             for p in (source / dimension).rglob('*')
-             if p.is_file() and p.name not in {'.lock', 'dimension_config.txt'} and p.suffix != '.outdated'}
-    assert any(n.endswith('.xwmc') for n in found), 'No staged world map in ' + str(source)
-    return found
+def xaero_map(source, world, address):
+    """The baked world map, moved to where Xaero looks for it on this server.
+
+    A multiplayer client only lists regions that have an N_M.zip in the map folder, so tile
+    caches without those files never show. Both come from a run with -Dprojectseele.xaeroBake=true.
+    """
+    converted = source / 'cm$converted'
+    target = f'xaero/world-map/Multiplayer_{address}/projectseele$geofront/mw$default/'
+    regions = {target + p.relative_to(converted).as_posix(): p for p in converted.rglob('*.zip')}
+    caches = {target + p.relative_to(source).as_posix(): p for p in source.rglob('*.xwmc') if converted not in p.parents}
+    region_name = lambda path: path.rsplit('/', 1)[1].split('.')[0]
+    leaves = {region_name(n) for n in caches if n.rsplit('/', 2)[1] == 'cache_1'}
+    # The regions around the baking player end up marked outdated; a client rebuilds those from their zips.
+    outdated = {region_name(p.as_posix()) for p in source.rglob('*.outdated')}
+    surface = {region_name(n) for n in regions if '/caves/' not in n}
+    assert surface, 'No baked region files in ' + str(converted)
+    assert surface <= leaves | outdated, ('Bake did not finish', sorted(surface - leaves - outdated)[:5])
+    saved = world / 'dimensions/projectseele/geofront/region'
+    assert min(p.stat().st_mtime for p in regions.values()) > max(p.stat().st_mtime for p in saved.glob('*.mca')), \
+        'The world changed after the map was baked; bake it again'
+    return regions | caches
 
 
-def build_inputs(a):
+def build_inputs(a, work):
     client, world = a.client.resolve(), a.world.resolve()
     assert (world / 'level.dat').is_file() and (client / 'mods/projectseele-0.1.0-all.jar').is_file()
     seed, provenance = dh_identifier(client, world)
-    client_lod, world_lod, lod_details = distant_caches(world, seed, a.pack)
+    client_lod, world_lod, lod_details = distant_caches(world, seed, a.pack, work)
 
     current = {p.relative_to(client).as_posix(): p for tree in CLIENT_TREES for p in files(client / tree)}
     for name in list(current):
@@ -248,7 +294,9 @@ def build_inputs(a):
     props = '\n'.join('motd=' + property_value(MOTD) if l.startswith('motd=') else l for l in props.splitlines())
     assert 'level-name=' + SERVER_WORLD in props
     server = {n: p for n, p in current.items() if n.startswith(('projectseele-local-maps/', 'config/', 'defaultconfigs/', 'licenses/')) or n in server_mods}
-    server['config/DistantHorizons.toml'] = server_dh_config(current['config/DistantHorizons.toml'].read_text('utf8'))
+    client_dh_text = current['config/DistantHorizons.toml'].read_text('utf8')
+    server['config/DistantHorizons.toml'] = server_dh_config(client_dh_text)
+    current['config/DistantHorizons.toml'] = client_dh_config(client_dh_text)
     server.update({SERVER_WORLD + '/' + n: p for n, p in world_files.items()})
     server.update({'server.properties': (props + '\n').encode('ascii'), 'server-icon.png': icon})
 
@@ -256,7 +304,7 @@ def build_inputs(a):
         manifest = json.loads(z.read('manifest.json'))
     assert not manifest.get('files')
     manifest.update(name=NAME, version=VERSION + '-' + a.date)
-    pcl = {'overrides/' + n: p for n, p in (current | client_lod | xaero_cache(client, world, a.server_address)).items()}
+    pcl = {'overrides/' + n: p for n, p in (current | client_lod | xaero_map(a.xaero_map.resolve(), world, a.server_address)).items()}
     pcl['overrides/servers.dat'] = servers_dat('SEELE', a.server_address)
     pcl['manifest.json'] = json_bytes(manifest)
     # PCL starts Java in the instance folder, so this relative path survives extraction anywhere.
@@ -326,11 +374,12 @@ def main():
     p.add_argument('--date', required=True)
     p.add_argument('--map-note', required=True, help='One line on the map state, recorded in R60_BATCH.json')
     p.add_argument('--server-address', required=True, help='Host friends connect to, default port; keyed into the client minimap cache and server list')
+    p.add_argument('--xaero-map', type=Path, required=True, help='xaero/world-map/WORLD/projectseele$geofront written by a -Dprojectseele.xaeroBake=true run on a copy of --world')
     p.add_argument('--pack', action='store_true')
     a = p.parse_args()
     assert re.fullmatch(r'\d{8}', a.date)
-    with stopped_world(a.world) if a.pack else nullcontext():
-        d = build_inputs(a)
+    with tempfile.TemporaryDirectory(dir=a.delivery, prefix='r60-lod-') as work, stopped_world(a.world) if a.pack else nullcontext():
+        d = build_inputs(a, Path(work))
         size = lambda payload: sum(v.stat().st_size if isinstance(v, Path) else len(v) for v in payload.values())
         report = dict(version=VERSION, date=a.date, pack_written=False, actual_world=str(d['world']), manifest_name=NAME,
                       server_world_directory=SERVER_WORLD, map_state=a.map_note, dh=d['lod'], dh_key=d['dh_key'],

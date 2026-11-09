@@ -80,6 +80,7 @@
     "client.PianoInventoryOverlayR22Mixin",
     "client.AircraftCorrectionBudgetMixin",
     "client.CommandShaderLightR39Mixin",
+    "client.DhFirstLevelKeyWaitMixin",
     "client.OculusDhReloadR53Mixin",
     "client.OculusDhRenderPassR54Mixin",
     "client.DhWaterTransparencyR53Mixin",
