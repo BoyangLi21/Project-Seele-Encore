@@ -515,3 +515,7 @@ UN 旧候选地块与交通/水域存在重叠，现扩展为 X3504–4383、Z�
 ### GeoFront 改造：城市和湖（2026-11-10）
 
 第 335–368 批，用深层写入工具直接写入，共 9,713,516 格，详情见 [GeoFront 改造计划](GEOFRONT_REMODEL_PLAN.zh.md)。第 334 批之后的所有写入，下一版发布前都要重建 Distant Horizons 和小地图。
+
+### GeoFront 螺旋线（2026-11-10）
+
+第 369–370 批路基，536,612 格，MTR 新增 41 个成员。比较结果和站位见 [GeoFront 改造计划](GEOFRONT_REMODEL_PLAN.zh.md)。下一步是 UN 整体迁移。
