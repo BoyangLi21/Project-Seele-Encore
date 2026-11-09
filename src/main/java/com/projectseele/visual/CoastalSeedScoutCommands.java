@@ -14,9 +14,9 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import com.google.gson.Gson;
 import com.google.gson.GsonBuilder;
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
 import com.mojang.brigadier.arguments.LongArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.ProjectSeele;
 import com.projectseele.world.FacilitySchemaV2;
 import com.projectseele.world.GeoFrontBoundedChunkGenerator;
@@ -35,13 +35,8 @@ import net.minecraft.world.level.levelgen.Heightmap;
 import net.minecraft.world.level.levelgen.NoiseGeneratorSettings;
 import net.minecraft.world.level.levelgen.RandomState;
 import net.minecraft.world.level.storage.LevelResource;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
 /** Read-only seed survey for the fixed Tokyo-3/GeoFront coordinate contract. */
-@Mod.EventBusSubscriber(modid = ProjectSeele.MODID,
-        bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class CoastalSeedScoutCommands
 {
     private static final ResourceKey<NoiseGeneratorSettings> SETTINGS =
@@ -78,14 +73,10 @@ public final class CoastalSeedScoutCommands
 
     private CoastalSeedScoutCommands() {}
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    /** /seele dev seedscout (formerly the separate /seele_coastal_seed_scout root). */
+    public static LiteralArgumentBuilder<CommandSourceStack> seedScoutCommand()
     {
-        if(!DevelopmentCommandsR43.enabled())return;
-        CommandDispatcher<CommandSourceStack> dispatcher =
-                event.getDispatcher();
-        dispatcher.register(Commands.literal("seele_coastal_seed_scout")
-                .requires(source -> source.hasPermission(2))
+        return Commands.literal("seedscout")
                 .then(Commands.argument("count", IntegerArgumentType.integer(
                                 8, 512))
                         .executes(context -> survey(context.getSource(),
@@ -108,7 +99,7 @@ public final class CoastalSeedScoutCommands
                                 .executes(context -> surveyAnchors(
                                         context.getSource(),
                                         LongArgumentType.getLong(context,
-                                                "value"))))));
+                                                "value")))));
     }
 
     private static int survey(CommandSourceStack source, int count)

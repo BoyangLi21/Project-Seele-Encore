@@ -1,41 +1,74 @@
 package com.projectseele.visual;
 
-import com.projectseele.ProjectSeele;
+import java.util.function.Function;
+
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.world.FacilitySchemaV2;
+import com.projectseele.world.FacilitySites;
 import com.projectseele.world.MilitaryR07Director;
+import com.projectseele.world.UNAnnexR20;
+import com.projectseele.world.UNRecoveryR22;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
+import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
-/** Operator navigation and the same physical wet-cell controls used by the wall panel. */
-@Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
+/**
+ * Development visit points at the UN base and the port (/seele dev visit). The points are the
+ * original survey coordinates, moved by the saved site offsets, so they follow a relocated base.
+ */
 public final class MilitaryR07Commands
 {
-    @SubscribeEvent public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> visitCommand()
     {
-        var root=Commands.literal("military");
-        for(String action:new String[]{"status","drain","door","fill","defense","power"})
-            root.then(Commands.literal(action).executes(c->{
-                var level=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);
-                if(level==null)return 0;
-                String message=MilitaryR07Director.request(level,action,c.getSource().getPlayerOrException());
-                c.getSource().sendSuccess(()->Component.literal(message),false);return 1;
-            }));
-        var visit=Commands.literal("visit");
-        String[] names={"port","base","hangar","gantry"};
-        Vec3[] points={new Vec3(1264.5,69,504.5),new Vec3(6560.5,75,-5968.5),new Vec3(6402.5,77,-6132.5),new Vec3(6446.5,127,-6217.5)};
-        for(int i=0;i<names.length;i++)
-        {
-            Vec3 p=points[i];float yaw=names[i].equals("gantry")?90:180;visit.then(Commands.literal(names[i]).executes(c->{
-                var level=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);
-                if(level==null||!MilitaryR07Director.state(level).commissioned){c.getSource().sendFailure(Component.literal("此存档尚未安装 R07 设施"));return 0;}
-                var player=c.getSource().getPlayerOrException();player.stopRiding();player.teleportTo(level,p.x,p.y,p.z,yaw,0);player.fallDistance=0;player.setDeltaMovement(Vec3.ZERO);return 1;
-            }));
-        }
-        if(DevelopmentCommandsR43.enabled())root.then(visit);
-        event.getDispatcher().register(Commands.literal("seele").requires(s->s.hasPermission(2)).then(root));
+        return Commands.literal("visit")
+                .then(r07("port", 180, level -> FacilitySites.port(level, new Vec3(1264.5, 69, 504.5))))
+                .then(r07("un_base", 180, level -> FacilitySites.un(level, new Vec3(6560.5, 75, -5968.5))))
+                .then(r07("un0_hangar", 180, level -> FacilitySites.un(level, new Vec3(6402.5, 77, -6132.5))))
+                .then(r07("un0_gantry", 90, level -> UNRecoveryR22.home(level, 0).add(4, 50, -12)))
+                .then(annex("un1_control", 180, level -> FacilitySites.un(level, new Vec3(6242.5, 77, -6136.5))))
+                .then(annex("un1_gantry", 90, level -> UNRecoveryR22.home(level, 1).add(4, 50, -12)));
     }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> r07(String name, float yaw, Function<ServerLevel, Vec3> point)
+    {
+        return Commands.literal(name).executes(c ->
+        {
+            var level = c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);
+            if (level == null || !MilitaryR07Director.state(level).commissioned)
+            {
+                c.getSource().sendFailure(Component.literal("此存档尚未安装 R07 设施"));
+                return 0;
+            }
+            return visit(c.getSource(), level, point.apply(level), yaw);
+        });
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> annex(String name, float yaw, Function<ServerLevel, Vec3> point)
+    {
+        return Commands.literal(name).executes(c ->
+        {
+            var level = c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);
+            if (level == null || !UNAnnexR20.installed(level))
+            {
+                c.getSource().sendFailure(Component.literal("此存档未安装 UN-01 试验舱"));
+                return 0;
+            }
+            return visit(c.getSource(), level, point.apply(level), yaw);
+        });
+    }
+
+    private static int visit(CommandSourceStack source, ServerLevel level, Vec3 p, float yaw)
+            throws com.mojang.brigadier.exceptions.CommandSyntaxException
+    {
+        var player = source.getPlayerOrException();
+        player.stopRiding();
+        player.teleportTo(level, p.x, p.y, p.z, yaw, 0);
+        player.fallDistance = 0;
+        player.setDeltaMovement(Vec3.ZERO);
+        return 1;
+    }
+
+    private MilitaryR07Commands() {}
 }

@@ -1,9 +1,9 @@
 package com.projectseele.visual;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.projectseele.ProjectSeele;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.world.EvaHangarBuilder;
 import com.projectseele.world.EvaLogisticsDirector;
@@ -13,8 +13,6 @@ import com.projectseele.world.FacilityV2EvaRuntime;
 import com.projectseele.world.FacilityWorldPolicy;
 import com.projectseele.world.IntegratedNervMapBuilder;
 import com.projectseele.world.NervRouteRuntimeR52;
-import com.projectseele.world.S20SurfaceTransitDirector;
-import com.projectseele.world.Tokyo3RecoveryConsole;
 import com.projectseele.world.TrainingPilotDirector;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -22,76 +20,71 @@ import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
 import java.util.Locale;
 
-/** Operator commands for canonical EVA wet-cage logistics and recovery. */
-@Mod.EventBusSubscriber(modid = ProjectSeele.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+/** Operator commands for canonical EVA wet-cage logistics and recovery (/seele eva, /seele dev eva dummy). */
 public final class EvaLogisticsCommands
 {
+    private static final SimpleCommandExceptionType UNKNOWN_VARIANT = new SimpleCommandExceptionType(
+            Component.literal("机体请用 unit00、unit01、unit02 或 all（也可写 0、1、2、rei、shinji、asuka）。"));
+    private static final SimpleCommandExceptionType NO_GEOFRONT = new SimpleCommandExceptionType(
+            Component.literal("GeoFront 维度未加载。"));
+
     private EvaLogisticsCommands() {}
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> evaCommand()
     {
-        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
-        dispatcher.register(Commands.literal("seele")
-                .requires(source -> source.hasPermission(2))
+        return Commands.literal("eva")
+                .then(Commands.literal("status")
+                        .executes(context -> status(context.getSource(), "all"))
+                        .then(Commands.argument("variant", StringArgumentType.word())
+                                .executes(context -> status(context.getSource(),
+                                        StringArgumentType.getString(context, "variant")))))
+                .then(Commands.literal("prepare")
+                        .then(Commands.argument("variant", StringArgumentType.word())
+                                .executes(context -> prepare(context.getSource(),
+                                        StringArgumentType.getString(context, "variant")))
+                                .then(Commands.argument("destination", StringArgumentType.word())
+                                        .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
+                                                java.util.List.of("geofront", "surface", "hakone"), builder))
+                                        .executes(context -> prepare(context.getSource(),
+                                                StringArgumentType.getString(context, "variant"),
+                                                StringArgumentType.getString(context, "destination"))))))
+                .then(Commands.literal("cancel")
+                        .then(Commands.argument("variant", StringArgumentType.word())
+                                .executes(context -> cancel(context.getSource(),
+                                        StringArgumentType.getString(context, "variant")))))
+                .then(Commands.literal("launch")
+                        .then(Commands.argument("variant", StringArgumentType.word())
+                                .executes(context -> launch(context.getSource(),
+                                        StringArgumentType.getString(context, "variant")))))
+                .then(Commands.literal("recover")
+                        .then(Commands.argument("variant", StringArgumentType.word())
+                                .executes(context -> recover(context.getSource(),
+                                        StringArgumentType.getString(context, "variant")))))
                 .then(Commands.literal("reset")
                         .then(Commands.argument("variant", StringArgumentType.word())
                                 .executes(context -> reset(context.getSource(),
-                                        StringArgumentType.getString(context, "variant"))))));
-        dispatcher.register(Commands.literal("seele")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("eva")
-                        .then(Commands.literal("status")
-                                .executes(context -> status(context.getSource(), "all"))
-                                .then(Commands.argument("variant", StringArgumentType.word())
-                                        .executes(context -> status(context.getSource(),
-                                                StringArgumentType.getString(context, "variant")))))
-                        .then(Commands.literal("prepare")
-                                .then(Commands.argument("variant", StringArgumentType.word())
-                                        .executes(context -> prepare(context.getSource(),
-                                                StringArgumentType.getString(context, "variant")))
-                                        .then(Commands.argument("destination", StringArgumentType.word())
-                                                .suggests((context, builder) -> net.minecraft.commands.SharedSuggestionProvider.suggest(
-                                                        java.util.List.of("geofront", "surface", "hakone"), builder))
-                                                .executes(context -> prepare(context.getSource(),
-                                                        StringArgumentType.getString(context, "variant"),
-                                                        StringArgumentType.getString(context, "destination"))))))
-                        .then(Commands.literal("cancel")
-                                .then(Commands.argument("variant", StringArgumentType.word())
-                                        .executes(context -> cancel(context.getSource(),
-                                                StringArgumentType.getString(context, "variant")))))
-                        .then(Commands.literal("launch")
-                                .then(Commands.argument("variant", StringArgumentType.word())
-                                        .executes(context -> launch(context.getSource(),
-                                                StringArgumentType.getString(context, "variant")))))
-                        .then(Commands.literal("recover")
-                                .then(Commands.argument("variant", StringArgumentType.word())
-                                        .executes(context -> recover(context.getSource(),
-                                                StringArgumentType.getString(context, "variant")))))
-                        .then(Commands.literal("reset")
-                                .then(Commands.argument("variant", StringArgumentType.word())
-                                        .executes(context -> reset(context.getSource(),
-                                                StringArgumentType.getString(context, "variant")))))
-                        .then(Commands.literal("dummy")
-                                .then(Commands.literal("start")
-                                        .then(Commands.argument("variant", StringArgumentType.word())
-                                                .executes(context -> dummyStart(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "variant")))))
-                                .then(Commands.literal("stop")
-                                        .then(Commands.argument("variant", StringArgumentType.word())
-                                                .executes(context -> dummyStop(
-                                                        context.getSource(),
-                                                        StringArgumentType.getString(context, "variant")))))
-                                .then(Commands.literal("status")
-                                        .executes(context -> dummyStatus(
-                                                context.getSource()))))));
+                                        StringArgumentType.getString(context, "variant")))));
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> dummyCommand()
+    {
+        return Commands.literal("dummy")
+                .then(Commands.literal("start")
+                        .then(Commands.argument("variant", StringArgumentType.word())
+                                .executes(context -> dummyStart(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "variant")))))
+                .then(Commands.literal("stop")
+                        .then(Commands.argument("variant", StringArgumentType.word())
+                                .executes(context -> dummyStop(
+                                        context.getSource(),
+                                        StringArgumentType.getString(context, "variant")))))
+                .then(Commands.literal("status")
+                        .executes(context -> dummyStatus(
+                                context.getSource())));
     }
 
     private static int status(CommandSourceStack source, String raw)
@@ -112,9 +105,9 @@ public final class EvaLogisticsCommands
                 loaded++;
             }
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d phase=%s loaded=%s canonical=%s LCL=%d/%d ticks=%d",
-                    status.variant(), status.phase(), status.loaded(),
-                    status.canonicalId() == null ? "none" : status.canonicalId(),
+                    "EVA-%02d：阶段 %s，%s，登记 %s，LCL %d/%d 层，计时 %d",
+                    status.variant(), status.phase(), status.loaded() ? "已加载" : "未加载",
+                    status.canonicalId() == null ? "无" : status.canonicalId(),
                     status.lclLayers(), EvaHangarBuilder.LCL_SHOULDER_LAYERS,
                     status.ticks())), false);
         }
@@ -156,7 +149,7 @@ public final class EvaLogisticsCommands
                     : NervRouteRuntimeR52.prepare(level, variant, destination);
             int current = variant;
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d: %s", current, result.message())), false);
+                    "EVA-%02d：%s", current, result.message())), false);
             if (result.accepted())
             {
                 accepted++;
@@ -177,7 +170,7 @@ public final class EvaLogisticsCommands
             ActionResult result = EvaLogisticsDirector.requestCancel(level, variant);
             int current = variant;
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d: %s", current, result.message())), false);
+                    "EVA-%02d：%s", current, result.message())), false);
             if (result.accepted()) accepted++;
         }
         return accepted;
@@ -243,7 +236,7 @@ public final class EvaLogisticsCommands
                     : EvaLogisticsDirector.requestRecovery(level, variant);
             int current = variant;
             source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                    "EVA-%02d: %s", current, result.message())), false);
+                    "EVA-%02d：%s", current, result.message())), false);
             if (result.accepted())
             {
                 accepted++;
@@ -315,18 +308,6 @@ public final class EvaLogisticsCommands
         return count;
     }
 
-
-    private static int requireSingleVariant(String raw)
-    {
-        int variant = parseVariant(raw);
-        if (variant < 0)
-        {
-            throw new IllegalArgumentException(
-                    "Choose one EVA: unit00, unit01 or unit02.");
-        }
-        return variant;
-    }
-
     public static int enterHangar(CommandSourceStack source)
             throws CommandSyntaxException
     {
@@ -359,54 +340,23 @@ public final class EvaLogisticsCommands
                 target.getZ() + 0.5D, 0.0F, 4.0F);
         player.fallDistance=0;player.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
         source.sendSuccess(() -> Component.literal(
-                "Entered NERV EVA wet-cage observation and logistics gallery."), false);
+                "已到达 EVA 湿式机库观察与后勤廊。"), false);
         return 1;
     }
 
-    private static int enterRecoveryControl(CommandSourceStack source)
-            throws CommandSyntaxException
-    {
-        ServerPlayer player = source.getPlayerOrException();
-        ServerLevel level = geoFront(source);
-        BlockPos target;
-        if (FacilityWorldPolicy.isS20Rebuild(level.getServer()))
-        {
-            source.sendFailure(Component.literal(
-                    "S20 surface recovery post is not commissioned; "
-                            + "no legacy Tokyo-3 geometry was generated."));
-            return 0;
-        }
-        if (FacilityV2EvaRuntime.ready(level, 1))
-        {
-            target = FacilityV2EvaRuntime.surfaceLiftBed(level, 1)
-                    .offset(48, 2, -48);
-        }
-        else
-        {
-            IntegratedNervMapBuilder.prepareRuntime(level);
-            target = Tokyo3RecoveryConsole.entryPosition(
-                    IntegratedNervMapBuilder.tokyo3Origin(level));
-        }
-        player.stopRiding();
-        player.teleportTo(level, target.getX() + 0.5D, target.getY(),
-                target.getZ() + 0.5D, 180.0F, 0.0F);
-        source.sendSuccess(() -> Component.literal(
-                "Entered Tokyo-3 surface recovery command post."), false);
-        return 1;
-    }
     private static ServerLevel geoFront(CommandSourceStack source)
             throws CommandSyntaxException
     {
         ServerLevel level = source.getServer().getLevel(GeoFrontCommands.GEOFRONT);
         if (level == null)
         {
-            throw new IllegalStateException("GeoFront dimension is unavailable");
+            throw NO_GEOFRONT.create();
         }
         return level;
     }
 
     /** Returns -1 for all. */
-    private static int parseVariant(String raw)
+    private static int parseVariant(String raw) throws CommandSyntaxException
     {
         String normalized = raw.toLowerCase(Locale.ROOT)
                 .replace("eva", "").replace("unit", "")
@@ -417,8 +367,7 @@ public final class EvaLogisticsCommands
             case "0", "00", "rei" -> 0;
             case "1", "01", "shinji" -> 1;
             case "2", "02", "asuka" -> 2;
-            default -> throw new IllegalArgumentException(
-                    "Variant must be unit00, unit01, unit02 or all.");
+            default -> throw UNKNOWN_VARIANT.create();
         };
     }
 }

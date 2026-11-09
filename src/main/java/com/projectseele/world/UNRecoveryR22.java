@@ -114,17 +114,5 @@ public final class UNRecoveryR22
             ProjectSeele.LOGGER.info("UN R22 {} serial={} eva={} plug={}",job.reset()?"reset":"recover",job.serial(),id,plug.getUUID());it.remove();
         }
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent e)
-    {
-        var military=Commands.literal("military");
-        for(String action:new String[]{"recover","reset"})
-        {
-            var branch=Commands.literal(action);
-            for(int serial=0;serial<2;serial++){final int s=serial;branch.then(Commands.literal("0"+s).executes(c->request(c.getSource(),s,action.equals("reset"))));}
-            military.then(branch);
-            for(int serial=0;serial<2;serial++){final int s=serial;military.then(Commands.literal("un0"+s).then(Commands.literal(action).executes(c->request(c.getSource(),s,action.equals("reset")))));}
-        }
-        e.getDispatcher().register(Commands.literal("seele").requires(s->s.hasPermission(2)).then(military));
-    }
     private UNRecoveryR22(){}
 }

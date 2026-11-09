@@ -1033,7 +1033,8 @@ public final class EntryPlugCarrierEntity extends PathfinderMob
             player.displayClientMessage(Component.literal(
                     "Entry plug is already occupied by "
                             + occupant.getName().getString()
-                            + " (/seele eva dummy stop to clear)."), true);
+                            + (com.projectseele.visual.DevelopmentCommandsR43.enabled()
+                                    ? " (/seele dev eva dummy stop to clear)." : ".")), true);
             return InteractionResult.CONSUME;
         }
         return this.tryBoardFromHatch(player);

@@ -152,16 +152,5 @@ public final class UNAnnexR20
         if(!(e.getLevel() instanceof ServerLevel l)||!installed(l))return;
         for(int i=0;i<BUTTONS.length;i++)if(e.getPos().equals(FacilitySites.un(l,BUTTONS[i]))){e.setCanceled(true);e.setCancellationResult(net.minecraft.world.InteractionResult.SUCCESS);if(e.getHand()==net.minecraft.world.InteractionHand.MAIN_HAND)e.getEntity().displayClientMessage(Component.literal(request(l,new String[]{"drain","door","fill"}[i],e.getEntity())),true);return;}
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent e)
-    {
-        var branch=net.minecraft.commands.Commands.literal("un01");
-        for(String a:new String[]{"status","drain","door","fill"})branch.then(net.minecraft.commands.Commands.literal(a).executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);String text=l==null?"地下维度未加载":request(l,a,c.getSource().getPlayerOrException());c.getSource().sendSuccess(()->Component.literal(text),false);return 1;}));
-        if(com.projectseele.visual.DevelopmentCommandsR43.enabled())for(String destination:new String[]{"control","gantry"})branch.then(net.minecraft.commands.Commands.literal("visit").then(net.minecraft.commands.Commands.literal(destination).executes(c->{
-            var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null||!installed(l))return 0;
-            var p=c.getSource().getPlayerOrException();Vec3 at=destination.equals("gantry")?UNRecoveryR22.home(l,1).add(4,50,-12):FacilitySites.un(l,new Vec3(6242.5,77,-6136.5));
-            p.stopRiding();p.teleportTo(l,at.x,at.y,at.z,destination.equals("gantry")?90:180,0);p.fallDistance=0;p.setDeltaMovement(Vec3.ZERO);return 1;
-        })));
-        e.getDispatcher().register(net.minecraft.commands.Commands.literal("seele").requires(s->s.hasPermission(2)).then(net.minecraft.commands.Commands.literal("military").then(branch)));
-    }
     private UNAnnexR20(){}
 }

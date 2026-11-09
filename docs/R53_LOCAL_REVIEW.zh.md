@@ -65,11 +65,13 @@ UN00 的独立动作路由和 15 段重定向动作、三号机自身握把接�
 
 ## 管理与定位
 
-- `/nerv npc reset all`：恢复已登记 NPC 的生命和岗位；在役驾驶员保持驾驶链。
-- `/nerv npc reset fuyutsuki`：恢复冬月。
-- `/nerv transit status`、`/nerv transit resume`：查看地表列车并恢复空线路发车，不重置仍在运行的线路。
-- `/nerv debug sortie`：查看当前出击阶段与等待条件。
-- `/nerv debug traversal status`：查看通行检查模式。正常游玩使用 NORMAL；STRICT 用于具体模型碰撞诊断。临时 BYPASS 仅用于定位碰撞，不作为流程通过依据，重启恢复 NORMAL。
+指令名已按 2026-11 的整理更新（旧的 `/nerv ...` 写法保留一个版本），完整列表见 [COMMANDS.zh.md](COMMANDS.zh.md)。
+
+- `/seele admin npc reset all`：恢复已登记 NPC 的生命和岗位；在役驾驶员保持驾驶链。
+- `/seele admin npc reset fuyutsuki`：恢复冬月。
+- `/seele admin transit status`、`/seele admin transit resume`：查看地表列车并恢复空线路发车，不重置仍在运行的线路。
+- `/seele dev sortie`（仅开发构建）：查看当前出击阶段与等待条件。
+- `/seele dev traversal status`（仅开发构建）：查看通行检查模式。正常游玩使用 NORMAL；STRICT 用于具体模型碰撞诊断。临时 BYPASS 仅用于定位碰撞，不作为流程通过依据，重启恢复 NORMAL。
 
 已有 UN 吊机异常与另外记录的 Oculus／Embeddium PoseStack 报错不是同一个问题。后者及整机卡死原因仍按实际日志追踪；本轮没有修改 BIOS 或驱动。
 

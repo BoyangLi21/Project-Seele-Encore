@@ -51,20 +51,25 @@ P1 使用 MTR 4.0.5 原生线路数据，新增七段轨道、两座站台、两
 
 排液/注液按每 tick 最多 512 格分批处理，进度写入 SavedData。余液检查、人员占用、门区障碍、机体是否归位、是否仍有驾驶员都参与联锁。机库停留在保存态时不维持整个基地常加载；已开始的机构动作可自行完成。实际墙上按钮会按下并反馈状态。
 
-港口海上支援建筑与基地南门旁的箱子放有身份卡和原创操作手册。具有操作员权限时也可使用：
+港口海上支援建筑与基地南门旁的箱子放有身份卡和原创操作手册。持 UN 卫星电话、驾驶 UN 机体或具有操作员权限时也可使用（2026-11 指令整理前写作 `/seele military status|drain|door|fill`）：
 
 ```text
-/seele military visit port
-/seele military visit base
-/seele military visit hangar
-/seele military visit gantry
-/seele military status
-/seele military drain
-/seele military door
-/seele military fill
+/seele un hangar status un0
+/seele un hangar drain un0
+/seele un hangar door un0
+/seele un hangar fill un0
 ```
 
-控制命令与实体面板走同一套联锁，不以命令强行穿过湿舱。
+开发构建里另有传送点（原 `/seele military visit port|base|hangar|gantry`），坐标随 UN 基地和港口的存档偏移移动：
+
+```text
+/seele dev visit port
+/seele dev visit un_base
+/seele dev visit un0_hangar
+/seele dev visit un0_gantry
+```
+
+控制命令与实体面板走同一套联锁，不以命令强行穿过湿舱。完整指令列表见 [COMMANDS.zh.md](COMMANDS.zh.md)。
 
 ## 原创未命名 EVA
 

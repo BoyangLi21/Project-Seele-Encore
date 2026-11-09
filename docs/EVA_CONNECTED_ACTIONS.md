@@ -74,10 +74,10 @@ gradlew --offline runClient -PstrictHighDetail=true -PquickPlayWorld=SEELE_EVA_C
 
 ## 人工复测顺序
 
-1. 启动动作实验室，执行 `/seele motionlab reset`，再执行 `/seele motionlab enter unit01`。
+1. 用开发构建启动动作实验室，执行 `/seele dev motionlab reset`，再执行 `/seele dev motionlab enter unit01`。
 2. 第三人称观察：走→跑→停；站立→蹲下→蹲行→起身。特别看停止蹲行后是否反弹到半站姿。
 3. 空手按住前进和左键，连击中按 B，保持前进到侧踹结束。看身体是否连续、动作位移是否生效、移动是否自然恢复。
-4. `/seele motionlab weapon unit01 knife` 后，左键出刀途中按右键，再在反手刀中按左键。看换握、刀 socket、肩胯与收势是否接续。
+4. `/seele dev motionlab weapon unit01 knife` 后，左键出刀途中按右键，再在反手刀中按左键。看换握、刀 socket、肩胯与收势是否接续。
 5. 刀起手后立即下蹲，再起身移动。看取消是否留有旧动作、跳姿或刀握点漂移。
 
 最近的完整实机记录位于 `run/screenshots/projectseele_connected/`；可播放版本位于

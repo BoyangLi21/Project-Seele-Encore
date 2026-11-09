@@ -64,7 +64,7 @@ CLAUDE.md），攒 2-3 个任务 push 一次。涉及画面效果的，停下来
 ```
 开工 Phase 5（SEELE 剧本与第三次冲击），读 docs/ROADMAP.md §6——尤其 6.2 的分镜表。
 顺序：5.1 朗基努斯 → 5.4 LCL 流体 → 5.2 Terminal Dogma → 5.3 量产机 → 6.2 三冲事件。
-三冲事件先搭 SavedData 状态机骨架 + 各阶段空实现 + 调试指令（/seele impact <阶段>），
+三冲事件先搭 SavedData 状态机骨架 + 各阶段空实现 + 调试指令（/seele dev impact <阶段>，挂到 SeeleCommands 的 dev 分支，见 docs/COMMANDS.zh.md），
 让我能跳阶段验收演出，再逐阶段填充视觉。生命之树渲染是视觉巅峰，单独留一轮打磨。
 ```
 

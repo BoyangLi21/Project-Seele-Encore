@@ -3,23 +3,28 @@ package com.projectseele.world;
 import com.projectseele.entity.*;
 import com.projectseele.network.*;
 import com.projectseele.registry.ModItems;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.*;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.chunk.ChunkStatus;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import net.minecraftforge.network.PacketDistributor;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.mojang.brigadier.builder.RequiredArgumentBuilder;
+import com.mojang.brigadier.context.CommandContext;
+import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import java.util.*;
 
 /** UN authority is carried by the UN handset or the actual UN pilot, not NERV staff roles. */
-@Mod.EventBusSubscriber(modid="projectseele")
 public final class UNCommandR29
 {
+    private static final SimpleCommandExceptionType UNKNOWN_UNIT=new SimpleCommandExceptionType(Component.literal("UN 机体请用 un0 或 un1。"));
     private static final Map<ServerPlayer,Integer> LAST=new WeakHashMap<>();
     private static final Map<ServerPlayer,Integer> LAST_QUERY=new WeakHashMap<>();
     private static final TicketType<ChunkPos> RADIO=TicketType.create("seele_un_radio",Comparator.comparingLong(ChunkPos::toLong),100);
@@ -94,19 +99,68 @@ public final class UNCommandR29
         }
         SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(()->p),new ClientboundUNStatusPacket(action.equals("open"),status(l,0),status(l,1),reply));
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    /** UN handset holders and UN pilots; an operator-level console or command block may use the admin leaves too. */
+    public static boolean canUse(CommandSourceStack source)
     {
-        var root=Commands.literal("un").requires(s->s.getEntity() instanceof ServerPlayer p&&authorized(p));
-        root.then(Commands.literal("phone").executes(c->{receive(c.getSource().getPlayerOrException(),"open",0,0,0);return 1;}));
-        root.then(Commands.literal("status").executes(c->{var p=c.getSource().getPlayerOrException();p.sendSystemMessage(Component.literal(status(p.serverLevel(),0)+"\n"+status(p.serverLevel(),1)));return 1;}));
-        var deliver=Commands.literal("deliver");
-        for(int i=0;i<2;i++)
+        return source.hasPermission(2)||source.getEntity() instanceof ServerPlayer p&&authorized(p);
+    }
+    /** /seele un. The handset screen keeps receive(); commands answer in chat, because a typed command has no open screen. */
+    public static LiteralArgumentBuilder<CommandSourceStack> command()
+    {
+        var un=Commands.literal("un");
+        un.then(Commands.literal("phone").executes(c->{receive(c.getSource().getPlayerOrException(),"open",0,0,0);return 1;}));
+        un.then(Commands.literal("status").executes(c->{var p=c.getSource().getPlayerOrException();p.sendSystemMessage(Component.literal(status(p.serverLevel(),0)+"\n"+status(p.serverLevel(),1)));return 1;}));
+        un.then(Commands.literal("deliver").then(unitArgument().then(Commands.argument("x",IntegerArgumentType.integer(-29999000,29999000)).then(Commands.argument("z",IntegerArgumentType.integer(-29999000,29999000))
+                .executes(c->transport(c,"deliver",IntegerArgumentType.getInteger(c,"x"),IntegerArgumentType.getInteger(c,"z")))))));
+        // One recovery for everyone: it docks a unit already at the receiving apron and otherwise calls the aircraft.
+        un.then(Commands.literal("recover").then(unitArgument().executes(c->UNRecoveryR22.request(c.getSource(),unit(c),false))));
+        for(String action:new String[]{"dock","cancel","board"})un.then(Commands.literal(action).then(unitArgument().executes(c->transport(c,action,0,0))));
+        var cells=Commands.literal("hangar");
+        for(String action:new String[]{"status","drain","door","fill"})cells.then(Commands.literal(action).then(unitArgument().executes(c->hangar(c.getSource(),action,unit(c)))));
+        un.then(cells);
+        un.then(Commands.literal("reset").requires(s->s.hasPermission(2)).then(unitArgument().executes(c->UNRecoveryR22.request(c.getSource(),unit(c),true))));
+        for(String toggle:new String[]{"defense","power"})un.then(Commands.literal(toggle).requires(s->s.hasPermission(2)).executes(c->{
+            var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;
+            String message=MilitaryR07Director.request(l,toggle,c.getSource().getPlayerOrException());c.getSource().sendSuccess(()->Component.literal(message),false);return 1;
+        }));
+        return un;
+    }
+    private static int transport(CommandContext<CommandSourceStack> c,String action,int x,int z)throws CommandSyntaxException
+    {
+        var p=c.getSource().getPlayerOrException();int serial=unit(c);
+        if(!p.serverLevel().dimension().equals(FacilitySchemaV2.DIMENSION)){c.getSource().sendFailure(Component.literal("请进入第三新东京市所在的项目世界后再联络 UN 运输。"));return 0;}
+        String reply=switch(action)
         {
-            int serial=i;
-            deliver.then(Commands.literal("0"+i).then(Commands.argument("x",IntegerArgumentType.integer(-29999000,29999000)).then(Commands.argument("z",IntegerArgumentType.integer(-29999000,29999000)).executes(c->{receive(c.getSource().getPlayerOrException(),"deliver",serial,IntegerArgumentType.getInteger(c,"x"),IntegerArgumentType.getInteger(c,"z"));return 1;}))));
-            for(String action:new String[]{"recover","dock","cancel","board","drain","door","fill"})root.then(Commands.literal(action).then(Commands.literal("0"+i).executes(c->{receive(c.getSource().getPlayerOrException(),action,serial,0,0);return 1;})));
-        }
-        root.then(deliver);event.getDispatcher().register(root);
+            case "deliver" -> UNAirLiftR29.request(p,serial,false,x,z);
+            case "dock" -> UNAirLiftR29.requestDock(p,serial);
+            case "cancel" -> UNAirLiftR29.cancel(p,serial);
+            default -> board(p,serial);
+        };
+        c.getSource().sendSuccess(()->Component.literal(Unit03SourceRigR53.displayName(serial)+"："+reply),false);return 1;
+    }
+    /** The wet cell of un0 or un1: the same interlock as the handset, answered in chat. */
+    public static int hangar(CommandSourceStack source,String action,int serial)throws CommandSyntaxException
+    {
+        var p=source.getPlayerOrException();var l=p.serverLevel();
+        if(!l.dimension().equals(FacilitySchemaV2.DIMENSION)){source.sendFailure(Component.literal("请进入第三新东京市所在的项目世界后再操作 UN 机库。"));return 0;}
+        unit(l,serial);
+        String reply=!action.equals("status")&&UNAirLiftR29.active(l,serial)?"运输任务正在使用机库，请先完成或取消运输。"
+                :serial==0?MilitaryR07Director.request(l,action,null):UNAnnexR20.request(l,action,null);
+        source.sendSuccess(()->Component.literal(reply),false);return 1;
+    }
+    private static RequiredArgumentBuilder<CommandSourceStack,String> unitArgument()
+    {
+        return Commands.argument("unit",StringArgumentType.word()).suggests((c,b)->SharedSuggestionProvider.suggest(new String[]{"un0","un1"},b));
+    }
+    /** un0 or un1; the 00/01 of the old /un and /seele military spellings still parses. */
+    private static int unit(CommandContext<CommandSourceStack> c)throws CommandSyntaxException
+    {
+        return switch(StringArgumentType.getString(c,"unit").toLowerCase(Locale.ROOT))
+        {
+            case "un0","un00","00","0" -> 0;
+            case "un1","un01","01","1" -> 1;
+            default -> throw UNKNOWN_UNIT.create();
+        };
     }
     private UNCommandR29() {}
 }

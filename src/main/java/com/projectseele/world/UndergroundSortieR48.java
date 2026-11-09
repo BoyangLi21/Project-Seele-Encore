@@ -512,7 +512,7 @@ public final class UndergroundSortieR48
         var row=row(level,v);var caller=owner(level,row);
         if(!bound(level,v,unit,row)||!authority(caller,v,unit))return result(false,"本机指挥员或驾驶员信息有变化，请重新确认回收许可。");
         boolean explicit=caller.getUUID().equals(RECOVERY_CALLERS.getOrDefault(level,Map.of()).get(v));
-        if(!explicit&&!StaffRecoveryR47.queuedBy(caller,v))return result(false,"请由本次出动的操作员通过电话请求回收，或使用 /nerv underground recover 指定机体。");
+        if(!explicit&&!StaffRecoveryR47.queuedBy(caller,v))return result(false,"请由本次出动的操作员通过电话请求回收，或使用 /seele recover 0|1|2 指定机体。");
         if(!row.mode.equals("DEPLOYED"))return result(false,"本机地下回收已在进行，请等待作业结束。");
         retain(level,v);
         if(!neighbourReady(level,v,true))return result(false,"相邻出口尚未关闭或承载板正在运送，请稍候再回收。");
@@ -657,15 +657,13 @@ public final class UndergroundSortieR48
             maintainDoor(level,v);
         }
     }
-    @SubscribeEvent public static void commands(net.minecraftforge.event.RegisterCommandsEvent event)
+    public static com.mojang.brigadier.builder.LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> recoverCommand()
     {
-        event.getDispatcher().register(net.minecraft.commands.Commands.literal("nerv")
-                .then(net.minecraft.commands.Commands.literal("underground")
-                .then(net.minecraft.commands.Commands.literal("recover")
+        return net.minecraft.commands.Commands.literal("recover")
                 .then(net.minecraft.commands.Commands.argument("unit",com.mojang.brigadier.arguments.IntegerArgumentType.integer(0,2)).executes(context->{
                     var caller=context.getSource().getPlayerOrException();var action=requestRecoveryR48(caller,com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(context,"unit"));
                     caller.sendSystemMessage(net.minecraft.network.chat.Component.literal(action.message()));return action.accepted()?1:0;
-                })))));
+                }));
     }
     private UndergroundSortieR48() { }
 }

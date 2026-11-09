@@ -9,7 +9,9 @@ import com.projectseele.entity.EntryPlugCarrierEntity;
 import com.projectseele.entity.NervStaffEntity;
 import com.projectseele.entity.TrainingPilotEntity;
 import com.projectseele.registry.ModEntities;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.core.BlockPos;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
@@ -34,7 +36,6 @@ import net.minecraft.world.level.ClipContext;
 import net.minecraft.world.phys.HitResult;
 import net.minecraftforge.event.AttachCapabilitiesEvent;
 import net.minecraftforge.event.TickEvent;
-import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.EntityMountEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -127,7 +128,7 @@ public final class SynchLabDirectorR47
         var s=known==null?null:known.slots.get(slot);
         if(s!=null&&s.phase.equals("HOLD"))return "实验设备已暂停，请由实验班确认实际状态。";
         if(s!=null&&!s.phase.equals("IDLE"))return "本槽实验仍在进行。请保持连接，等设备返回并开盖后再离舱。";
-        if(s==null||s.samples==0)return "本槽还没有完整读取记录。请实际进舱，再用 /nerv synch start 联络本槽实验技师。";
+        if(s==null||s.samples==0)return "本槽还没有完整读取记录。请实际进舱，再用 /seele synch start 联络本槽实验技师。";
         if(!s.completed)return "上次测试已经中止，没有记为完整测量。";
         return String.format(Locale.ROOT,"本槽最近记录：%s，同步率 %.1f%%，读取均值 %.1f%%。",s.subjectName,s.last,s.sum/s.samples);
     }
@@ -278,7 +279,7 @@ public final class SynchLabDirectorR47
             if(s.phase.equals("IDLE"))return "本槽没有正在进行的测试。";
             raising(state,s,"操作员中止测试",true);return "测试已中止，设备返回后开盖。";
         }
-        if(!s.phase.equals("IDLE"))return "本槽测试仍在进行，请等待结束，或用 /nerv synch abort 中止。";
+        if(!s.phase.equals("IDLE"))return "本槽测试仍在进行，请等待结束，或用 /seele synch abort 中止。";
         if(!(cap.getFirstPassenger() instanceof LivingEntity subject)||!subject.isAlive()
                 ||!subject.getCapability(EvaPilotCapability.DATA).isPresent())
             return "请先由受试者实际坐入本槽实验栓，并确认同步数据连接。";
@@ -304,7 +305,7 @@ public final class SynchLabDirectorR47
         if(!player.getCapability(EvaPilotCapability.DATA).isPresent())return "本人同步数据未接通，请由实验班核对后再测试。";
         if(abort&&s.phase.equals("IDLE"))return "本槽没有正在进行的测试。";
         if(abort&&(s.phase.equals("RAISING")||s.phase.equals("OPENING")))return "设备已在返回开盖流程，请等待安全离舱。";
-        if(!abort&&!s.phase.equals("IDLE"))return "本槽测试仍在进行，请等待结束，或用 /nerv synch abort 中止。";
+        if(!abort&&!s.phase.equals("IDLE"))return "本槽测试仍在进行，请等待结束，或用 /seele synch abort 中止。";
         var npc=technician(level,p,null);
         if(npc==null)return "本槽原登记实验技师未接通、已离开控制台或无操作职责，测试请求未执行。";
         var requests=RESEARCH_REQUESTS.computeIfAbsent(level,key->new HashMap<>());
@@ -344,13 +345,13 @@ public final class SynchLabDirectorR47
         caller.sendSystemMessage(Component.literal("["+npc.getName().getString()+"] "+operate(level,p,state,s,cap,caller,request.abort,npc.getUUID())));
         npc.finishTask();
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> synchCommand()
     {
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("synch")
+        return Commands.literal("synch")
                 .then(Commands.literal("start").executes(context->{var player=context.getSource().getPlayerOrException();
                     player.sendSystemMessage(Component.literal(requestResearch(player,false)));return 1;}))
                 .then(Commands.literal("abort").executes(context->{var player=context.getSource().getPlayerOrException();
-                    player.sendSystemMessage(Component.literal(requestResearch(player,true)));return 1;}))));
+                    player.sendSystemMessage(Component.literal(requestResearch(player,true)));return 1;}));
     }
     @SubscribeEvent public static void use(PlayerInteractEvent.RightClickBlock event)
     {

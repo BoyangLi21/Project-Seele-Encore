@@ -1,39 +1,24 @@
 package com.projectseele.visual;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
-import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
-import com.projectseele.network.SeeleNetwork;
 import com.projectseele.world.EvaMotionLabDirector;
-import com.projectseele.world.EvaPilotResolver;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
-import net.minecraftforge.network.PacketDistributor;
 
-/** Operator shortcuts for the isolated EVA motion laboratory. */
-@Mod.EventBusSubscriber(modid = ProjectSeele.MODID,
-        bus = Mod.EventBusSubscriber.Bus.FORGE)
+/** Operator shortcuts for the isolated EVA motion laboratory (/seele dev motionlab). */
 public final class EvaMotionLabCommands
 {
     private EvaMotionLabCommands() {}
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> motionLabCommand()
     {
-        if(!DevelopmentCommandsR43.enabled())return;
-        CommandDispatcher<CommandSourceStack> dispatcher =
-                event.getDispatcher();
-        dispatcher.register(Commands.literal("seele")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("motionlab")
+        return Commands.literal("motionlab")
                         .then(Commands.literal("setup")
                                 .executes(context -> setup(
                                         context.getSource(), false)))
@@ -71,7 +56,7 @@ public final class EvaMotionLabCommands
                                                                 context, "mode"))))))
                         .then(Commands.literal("camera")
                                 .executes(context -> camera(
-                                        context.getSource())))));
+                                        context.getSource())));
     }
 
     private static int setup(CommandSourceStack source, boolean force)
@@ -156,7 +141,7 @@ public final class EvaMotionLabCommands
                 source.getLevel(), variant, mode))
         {
             source.sendFailure(Component.literal(
-                    "Usage: /seele motionlab demo unit01 "
+                    "Usage: /seele dev motionlab demo unit01 "
                             + "walk|run|jump|attack_a|attack_b|attack_c|"
                             + "attack_combo|"
                             + "live|livepush|physics|recovery|stop"));

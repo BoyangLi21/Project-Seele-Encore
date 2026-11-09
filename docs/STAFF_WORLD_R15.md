@@ -10,6 +10,8 @@
 
 右键工作人员可以看到台词和可点击的对话选项。美里、律子支持：
 
+> 2026-11 指令整理后，下面的 `/nerv talk` 已删除：右键工作人员现在只打招呼，这条指令没有入口了。联络工作人员用 O 键指挥通信或 `/seele call`，见 [COMMANDS.zh.md](COMMANDS.zh.md)。以下保留 R15 当时的写法。
+
 ```text
 /nerv talk misato 整备 01
 /nerv talk ritsuko 回收 01

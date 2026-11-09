@@ -144,7 +144,7 @@ public final class TvWorldPreviewPreparation
                 {
                     started = true;
                     server.getCommands().performPrefixedCommand(server.createCommandSourceStack(),
-                            "seele_coastal_seed_scout fine " + seed);
+                            "seele dev seedscout fine " + seed);
                     ProjectSeele.LOGGER.info("TV WORLD PREVIEW natural-coast survey started seed={}", seed);
                 }
                 else if (Files.isRegularFile(report))

@@ -3,7 +3,7 @@ package com.projectseele.visual;
 import java.util.List;
 import java.util.Locale;
 
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
@@ -15,32 +15,23 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
-/** Deterministic setup and boarding helpers for the NERV launch-silo prototype. */
-@Mod.EventBusSubscriber(modid = ProjectSeele.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+/** Deterministic setup and boarding helpers for the NERV launch-silo prototype (/seele dev silo). */
 public final class LaunchSiloCommands
 {
     private LaunchSiloCommands() {}
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> siloCommand()
     {
-        if(!DevelopmentCommandsR43.enabled())return;
-        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
-        dispatcher.register(Commands.literal("seele")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("silo")
-                        .then(Commands.literal("setup")
-                                .executes(context -> setup(context.getSource())))
-                        .then(Commands.literal("board")
-                                .executes(context -> board(context.getSource())))
-                        .then(Commands.literal("status")
-                                .executes(context -> status(context.getSource())))
-                        .then(Commands.literal("audit")
-                                .executes(context -> audit(context.getSource())))));
+        return Commands.literal("silo")
+                .then(Commands.literal("setup")
+                        .executes(context -> setup(context.getSource())))
+                .then(Commands.literal("board")
+                        .executes(context -> board(context.getSource())))
+                .then(Commands.literal("status")
+                        .executes(context -> status(context.getSource())))
+                .then(Commands.literal("audit")
+                        .executes(context -> audit(context.getSource())));
     }
 
     static int setup(CommandSourceStack source) throws CommandSyntaxException
@@ -87,7 +78,7 @@ public final class LaunchSiloCommands
         player.teleportTo(level, origin.getX() + 0.5D, origin.getY() + 4.0D,
                 origin.getZ() + 14.5D, 180.0F, 16.0F);
         source.sendSuccess(() -> Component.literal(
-                "NERV launch complex ready. Use /seele silo board to start insertion."), false);
+                "NERV launch complex ready. Use /seele dev silo board to start insertion."), false);
         return 1;
     }
 

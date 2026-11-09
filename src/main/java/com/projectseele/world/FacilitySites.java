@@ -57,6 +57,9 @@ public final class FacilitySites
     public static BlockPos port(ServerLevel level, BlockPos original)
     { return original.offset(offset(level, Site.PORT)); }
 
+    public static Vec3 port(ServerLevel level, Vec3 original)
+    { return original.add(Vec3.atLowerCornerOf(offset(level, Site.PORT))); }
+
     public static Vec3 original(ServerLevel level, Site site, Vec3 position)
     { return position.subtract(Vec3.atLowerCornerOf(offset(level, site))); }
 

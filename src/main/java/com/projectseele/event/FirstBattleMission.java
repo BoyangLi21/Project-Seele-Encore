@@ -1,6 +1,7 @@
 package com.projectseele.event;
 
 import com.google.gson.JsonParser;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.SachielEntity;
@@ -8,6 +9,7 @@ import com.projectseele.registry.ModEntities;
 import com.projectseele.world.EvaPilotResolver;
 import com.projectseele.world.FirstBattleSavedData;
 import com.projectseele.world.CityBattlefieldR29;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -18,7 +20,6 @@ import net.minecraft.world.BossEvent;
 import net.minecraft.world.InteractionResult;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.player.PlayerInteractEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -93,13 +94,13 @@ public final class FirstBattleMission
         if(s==null||!event.getPos().equals(s.console)||player.distanceToSqr(Vec3.atCenterOf(s.console))>64)return;
         begin(player);event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    /** /seele dev firstbattle: the standalone replay that the TV campaign has since taken over. */
+    public static LiteralArgumentBuilder<CommandSourceStack> firstBattleCommand()
     {
-        if(!com.projectseele.visual.DevelopmentCommandsR43.enabled())return;
-        event.getDispatcher().register(Commands.literal("seele").then(Commands.literal("firstbattle")
-            .then(Commands.literal("begin").requires(s->s.hasPermission(2)).executes(c->begin(c.getSource().getPlayerOrException())?1:0))
+        return Commands.literal("firstbattle")
+            .then(Commands.literal("begin").executes(c->begin(c.getSource().getPlayerOrException())?1:0))
             .then(Commands.literal("cancel").executes(c->cancel(c.getSource().getPlayerOrException())?1:0))
-            .then(Commands.literal("status").executes(c->{ServerPlayer p=c.getSource().getPlayerOrException();ServerLevel l=missionLevel(p);if(l==null)return 0;var d=FirstBattleSavedData.get(l);p.displayClientMessage(Component.literal(d.active!=null?"自主行动中":d.missionOwner!=null?"迎击任务进行中":"作战资料室可下达迎击命令"),false);return 1;}))));
+            .then(Commands.literal("status").executes(c->{ServerPlayer p=c.getSource().getPlayerOrException();ServerLevel l=missionLevel(p);if(l==null)return 0;var d=FirstBattleSavedData.get(l);p.displayClientMessage(Component.literal(d.active!=null?"自主行动中":d.missionOwner!=null?"迎击任务进行中":"作战资料室可下达迎击命令"),false);return 1;}));
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {

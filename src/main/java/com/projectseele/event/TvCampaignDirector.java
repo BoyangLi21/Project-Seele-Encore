@@ -1,10 +1,12 @@
 package com.projectseele.event;
 
 import com.google.gson.JsonParser;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.*;
 import com.projectseele.registry.ModEntities;
 import com.projectseele.world.*;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -13,7 +15,6 @@ import net.minecraft.world.BossEvent;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.storage.LevelResource;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.entity.living.LivingDeathEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -539,10 +540,11 @@ public final class TvCampaignDirector
         if(!(event.getLevel() instanceof ServerLevel level))return;
         clearCombatBar(level);MISSING.remove(level);SITES.remove(level);SurfaceAngelPlanR52.clear(level);
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    /** /seele sortie; the support branch is added by TvSortiesR32. */
+    public static LiteralArgumentBuilder<CommandSourceStack> sortieCommand()
     {
-        event.getDispatcher().register(Commands.literal("seele").then(Commands.literal("tv")
-                .then(Commands.literal("collect_equipment").then(Commands.argument("unit",com.mojang.brigadier.arguments.IntegerArgumentType.integer(0,1)).executes(c->{
+        return Commands.literal("sortie")
+                .then(Commands.literal("collect").then(Commands.argument("unit",com.mojang.brigadier.arguments.IntegerArgumentType.integer(0,1)).executes(c->{
                     var player=c.getSource().getPlayerOrException();var unit=com.mojang.brigadier.arguments.IntegerArgumentType.getInteger(c,"unit");
                     var eva=TvSortiesR32.unit(player.serverLevel(),unit);
                     boolean collected=eva!=null&&TvMissionEquipmentR45.collectRecoveredCargo(eva,player,net.minecraft.world.InteractionHand.MAIN_HAND);
@@ -553,7 +555,7 @@ public final class TvCampaignDirector
                 .then(Commands.literal("select").then(Commands.literal("sachiel").executes(c->select(c.getSource().getPlayerOrException(),"sachiel"))).then(Commands.literal("shamshel").executes(c->select(c.getSource().getPlayerOrException(),"shamshel")))
                     .then(Commands.literal("ramiel").executes(c->select(c.getSource().getPlayerOrException(),"ramiel"))).then(Commands.literal("gaghiel").executes(c->select(c.getSource().getPlayerOrException(),"gaghiel"))))
                 .then(Commands.literal("retry").executes(c->retry(c.getSource().getPlayerOrException())))
-                .then(Commands.literal("cancel").executes(c -> cancel(c.getSource().getPlayerOrException())))));
+                .then(Commands.literal("cancel").executes(c -> cancel(c.getSource().getPlayerOrException())));
     }
     private TvCampaignDirector() {}
 }

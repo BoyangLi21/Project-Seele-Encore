@@ -1,9 +1,8 @@
 package com.projectseele.visual;
 
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
-import com.projectseele.ProjectSeele;
 import com.projectseele.world.FacilityV2BootstrapDirector;
 import com.projectseele.world.FacilityV2BuildDirector;
 import com.projectseele.world.FacilityV2Plans;
@@ -19,13 +18,8 @@ import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
-/** Explicit administrator controls for the isolated FacilitySchema v2 region. */
-@Mod.EventBusSubscriber(modid = ProjectSeele.MODID,
-        bus = Mod.EventBusSubscriber.Bus.FORGE)
+/** Development controls for the isolated FacilitySchema v2 region (/seele dev facility_v2). */
 public final class FacilityV2Commands
 {
     private static final SimpleCommandExceptionType GEOFRONT_UNAVAILABLE =
@@ -34,15 +28,9 @@ public final class FacilityV2Commands
 
     private FacilityV2Commands() {}
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> facilityCommand()
     {
-        if(!DevelopmentCommandsR43.enabled())return;
-        CommandDispatcher<CommandSourceStack> dispatcher =
-                event.getDispatcher();
-        dispatcher.register(Commands.literal("seele")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("facility_v2")
+        return Commands.literal("facility_v2")
                         .then(Commands.literal("bootstrap")
                                 .executes(context -> bootstrap(
                                         context.getSource())))
@@ -378,7 +366,7 @@ public final class FacilityV2Commands
                                 .then(Commands.literal("unit01_surface_head")
                                         .executes(context -> build(
                                                 context.getSource(),
-                                                "UNIT01_SURFACE_HEAD"))))));
+                                                "UNIT01_SURFACE_HEAD"))));
     }
 
     private static int bootstrap(CommandSourceStack source)
@@ -394,7 +382,7 @@ public final class FacilityV2Commands
         }
         source.sendSuccess(() -> Component.literal(
                 "FacilitySchema v2 zero-write preflight started. "
-                        + "Use /seele facility_v2 status; no legacy builder "
+                        + "Use /seele dev facility_v2 status; no legacy builder "
                         + "will run."), false);
         return 1;
     }
@@ -597,7 +585,7 @@ public final class FacilityV2Commands
         {
             source.sendFailure(Component.literal(
                     "Facility v2 is not commissioned. Run "
-                            + "/seele facility_v2 bootstrap first."));
+                            + "/seele dev facility_v2 bootstrap first."));
             return 0;
         }
         try

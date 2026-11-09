@@ -129,14 +129,14 @@ python tools/export_patch_lod_r54.py F:/eva/artifacts/r53_repair_20261015/client
 
 ## 战役结束后的城市区域升降查看
 
-当前屋岛战役进行中，不在此阶段升起城市。最短正常流程在战役自然结束后使用以下发行版玩家命令，均走既有城市控制入口：
+当前屋岛战役进行中，不在此阶段升起城市。最短正常流程在战役自然结束后使用以下发行版管理员命令（需 OP），均走既有城市控制入口：
 
 ```text
-/seele tokyo3 status
-/seele tokyo3 restore
+/seele city status
+/seele city raise
 ```
 
-等状态显示 `RIGID_IDLE`、事务终点 `0/312`（城市回到地表）之后，再执行 `/seele tokyo3 retract`，观看下沉，最后应回到 `RIGID_IDLE`、事务终点 `312/312`。状态中的0/312是端点编号，不是实际移动米数；移动阶段的“楼体实际已上升/下降 X～Y 米”来自原楼体当前位置。控制台调用需 `execute as <玩家名> at @s run seele tokyo3 ...`，因为命令需要玩家上下文。无需使用旧 `setup`、`restore_now` 或自动QA入口。
+等状态显示 `RIGID_IDLE`、事务终点 `0/312`（城市回到地表）之后，再执行 `/seele city lower`，观看下沉，最后应回到 `RIGID_IDLE`、事务终点 `312/312`。状态中的0/312是端点编号，不是实际移动米数；移动阶段的“楼体实际已上升/下降 X～Y 米”来自原楼体当前位置。控制台调用需 `execute as <玩家名> at @s run seele city ...`，因为命令需要玩家上下文。无需使用开发用的 `setup`、`raise_now` 或自动QA入口。（2026-11 整理前写作 `/seele tokyo3 status|restore|retract`，旧写法保留一个版本。）
 
 手动按钮同样可用：当前指挥台上升键 `(26,-498,277)` 是诡异木按钮，下沉键 `(30,-498,277)` 是绯红木按钮，实际方块已只读确认。也可正常联络冬月“城市升起/城市降下”，由他按这两个原按钮。
 

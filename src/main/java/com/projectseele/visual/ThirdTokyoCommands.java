@@ -3,7 +3,7 @@ package com.projectseele.visual;
 import java.util.List;
 import java.util.Locale;
 
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
@@ -27,74 +27,63 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
-/** Builds and audits the connected NERV-to-Tokyo-3 sortie battlefield. */
-@Mod.EventBusSubscriber(modid = ProjectSeele.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
+/** Builds and audits the connected NERV-to-Tokyo-3 sortie battlefield and moves the city. */
 public final class ThirdTokyoCommands
 {
     private ThirdTokyoCommands() {}
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    /** Lower sinks the armour towers into the GeoFront (the old "retract"); raise returns them to street level. */
+    public static LiteralArgumentBuilder<CommandSourceStack> cityCommand()
     {
-        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
-        if(!DevelopmentCommandsR43.enabled())
-        {
-            dispatcher.register(Commands.literal("seele").requires(s->s.hasPermission(2))
-                    .then(Commands.literal("tokyo3")
-                            .then(Commands.literal("status").executes(c->status(c.getSource())))
-                            .then(Commands.literal("retract").executes(c->setRetraction(c.getSource(),true)))
-                            .then(Commands.literal("restore").executes(c->setRetraction(c.getSource(),false)))));
-            return;
-        }
-        dispatcher.register(Commands.literal("seele")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("tokyo3")
-                        .then(Commands.literal("setup")
-                                .executes(context -> setup(context.getSource())))
-                        .then(Commands.literal("audit")
-                                .executes(context -> audit(context.getSource())))
-                        .then(Commands.literal("retract")
-                                .executes(context -> setRetraction(
-                                        context.getSource(), true)))
-                        .then(Commands.literal("restore")
-                                .executes(context -> setRetraction(
-                                        context.getSource(), false)))
-                        .then(Commands.literal("retract_now")
-                                .executes(context -> forceRetraction(
-                                        context.getSource(), true)))
-                        .then(Commands.literal("restore_now")
-                                .executes(context -> forceRetraction(
-                                        context.getSource(), false)))                        .then(Commands.literal("status")
-                                .executes(context -> status(context.getSource())))
-                        .then(Commands.literal("ramiel")
-                                .executes(context -> ramielStart(context.getSource()))
-                                .then(Commands.literal("start")
-                                        .executes(context -> ramielStart(
-                                                context.getSource())))
-                                .then(Commands.literal("status")
-                                        .executes(context -> ramielStatus(
-                                                context.getSource())))
-                                .then(Commands.literal("abort")
-                                        .executes(context -> ramielAbort(
-                                                context.getSource()))))
-                        .then(Commands.literal("overview")
-                                .executes(context -> overview(context.getSource()))))
-                .then(Commands.literal("siege")
+        return Commands.literal("city")
+                .then(Commands.literal("status").executes(c -> status(c.getSource())))
+                .then(Commands.literal("raise").executes(c -> setRetraction(c.getSource(), false)))
+                .then(Commands.literal("lower").executes(c -> setRetraction(c.getSource(), true)));
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> devCityCommand()
+    {
+        return Commands.literal("city")
+                .then(Commands.literal("setup")
+                        .executes(context -> setup(context.getSource())))
+                .then(Commands.literal("audit")
+                        .executes(context -> audit(context.getSource())))
+                .then(Commands.literal("lower_now")
+                        .executes(context -> forceRetraction(
+                                context.getSource(), true)))
+                .then(Commands.literal("raise_now")
+                        .executes(context -> forceRetraction(
+                                context.getSource(), false)))
+                .then(Commands.literal("ramiel")
+                        .executes(context -> ramielStart(context.getSource()))
+                        .then(Commands.literal("start")
+                                .executes(context -> ramielStart(
+                                        context.getSource())))
                         .then(Commands.literal("status")
-                                .executes(context -> siegeStatus(
+                                .executes(context -> ramielStatus(
                                         context.getSource())))
                         .then(Commands.literal("abort")
-                                .executes(context -> siegeAbort(
-                                        context.getSource())))));
+                                .executes(context -> ramielAbort(
+                                        context.getSource()))))
+                .then(Commands.literal("overview")
+                        .executes(context -> overview(context.getSource())));
+    }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> siegeCommand()
+    {
+        return Commands.literal("siege")
+                .then(Commands.literal("status")
+                        .executes(context -> siegeStatus(
+                                context.getSource())))
+                .then(Commands.literal("abort")
+                        .executes(context -> siegeAbort(
+                                context.getSource())));
     }
 
     static int setup(CommandSourceStack source) throws CommandSyntaxException
     {
-        if (rejectRetiredAliasInCleanWorld(source, "setup"))
+        if (rejectRetiredAliasInCleanWorld(source, "/seele dev city setup"))
         {
             return 0;
         }
@@ -113,7 +102,7 @@ public final class ThirdTokyoCommands
                 IntegratedNervMapBuilder.tokyo3Origin(player.serverLevel()));
         source.sendSuccess(() -> Component.literal(
                 "Tokyo-3 skyline ready above the same GeoFront dimension. "
-                        + "Run /seele geofront link, then board from the lower gantry."), false);
+                        + "Run /seele dev geofront link, then board from the lower gantry."), false);
         return 1;
     }
 
@@ -138,7 +127,7 @@ public final class ThirdTokyoCommands
         {
             throw new IllegalStateException(
                     "Tokyo-3 restoration is running as a bounded transaction; "
-                            + "rerun the visual capture after /seele tokyo3 status reports DEPLOYED");
+                            + "rerun the visual capture after /seele city status reports DEPLOYED");
         }
         IntegratedNervMapBuilder.IntegratedAudit mapAudit =
                 IntegratedNervMapBuilder.ensure(level);
@@ -183,7 +172,7 @@ public final class ThirdTokyoCommands
 
     private static int audit(CommandSourceStack source) throws CommandSyntaxException
     {
-        if (rejectRetiredAliasInCleanWorld(source, "audit"))
+        if (rejectRetiredAliasInCleanWorld(source, "/seele dev city audit"))
         {
             return 0;
         }
@@ -207,7 +196,7 @@ public final class ThirdTokyoCommands
             throws CommandSyntaxException
     {
         if (rejectRetiredAliasInCleanWorld(
-                source, retract ? "retract" : "restore"))
+                source, retract ? "/seele city lower" : "/seele city raise"))
         {
             return 0;
         }
@@ -223,7 +212,7 @@ public final class ThirdTokyoCommands
             throws CommandSyntaxException
     {
         if (rejectRetiredAliasInCleanWorld(
-                source, retract ? "retract_now" : "restore_now"))
+                source, retract ? "/seele dev city lower_now" : "/seele dev city raise_now"))
         {
             return 0;
         }
@@ -236,7 +225,7 @@ public final class ThirdTokyoCommands
     }
     private static int status(CommandSourceStack source) throws CommandSyntaxException
     {
-        if (rejectRetiredAliasInCleanWorld(source, "status"))
+        if (rejectRetiredAliasInCleanWorld(source, "/seele city status"))
         {
             return 0;
         }
@@ -254,7 +243,7 @@ public final class ThirdTokyoCommands
     private static int ramielStart(CommandSourceStack source)
             throws CommandSyntaxException
     {
-        if (rejectRetiredAliasInCleanWorld(source, "ramiel start"))
+        if (rejectRetiredAliasInCleanWorld(source, "/seele dev city ramiel start"))
         {
             return 0;
         }
@@ -289,7 +278,7 @@ public final class ThirdTokyoCommands
     private static int ramielStatus(CommandSourceStack source)
             throws CommandSyntaxException
     {
-        if (rejectRetiredAliasInCleanWorld(source, "ramiel status"))
+        if (rejectRetiredAliasInCleanWorld(source, "/seele dev city ramiel status"))
         {
             return 0;
         }
@@ -304,7 +293,7 @@ public final class ThirdTokyoCommands
     private static int ramielAbort(CommandSourceStack source)
             throws CommandSyntaxException
     {
-        if (rejectRetiredAliasInCleanWorld(source, "ramiel abort"))
+        if (rejectRetiredAliasInCleanWorld(source, "/seele dev city ramiel abort"))
         {
             return 0;
         }
@@ -348,7 +337,7 @@ public final class ThirdTokyoCommands
 
     private static int overview(CommandSourceStack source) throws CommandSyntaxException
     {
-        if (rejectRetiredAliasInCleanWorld(source, "overview"))
+        if (rejectRetiredAliasInCleanWorld(source, "/seele dev city overview"))
         {
             return 0;
         }
@@ -425,16 +414,14 @@ public final class ThirdTokyoCommands
     }
 
     private static boolean rejectRetiredAliasInCleanWorld(
-            CommandSourceStack source, String alias)
+            CommandSourceStack source, String command)
     {
         if (!FacilityWorldPolicy.isCleanRebuild(source.getServer()))
         {
             return false;
         }
         source.sendFailure(Component.literal(
-                "/seele tokyo3 " + alias
-                        + " belongs to the retired overlapping map pipeline "
-                        + "and is disabled in SEELE_S19_CLEAN."));
+                command + " 属于已退役的重叠地图流程，在 SEELE_S19_CLEAN 存档中不可用。"));
         return true;
     }
 

@@ -2,19 +2,17 @@ package com.projectseele.world;
 
 import com.projectseele.entity.*;
 import com.projectseele.event.TvCampaignDirector;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.*;
 import net.minecraft.world.entity.Mob;
 import net.minecraft.world.level.ChunkPos;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import com.mojang.brigadier.arguments.IntegerArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import java.util.*;
 
 /** A single encounter, with independent original airframes and original riding chains. */
-@Mod.EventBusSubscriber(modid="projectseele")
 public final class TvSortiesR32
 {
     private static final TicketType<ChunkPos> TICKET=TicketType.create("tv_sorties_r32",Comparator.comparingLong(ChunkPos::toLong),100);
@@ -170,12 +168,12 @@ public final class TvSortiesR32
             if(s.wasRiding!=riding){s.wasRiding=riding;d.setDirty();}
         }
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    /** /seele sortie support: slots 0-2 are the NERV units, 3-4 the UN units. */
+    public static LiteralArgumentBuilder<CommandSourceStack> supportCommand()
     {
-        event.getDispatcher().register(Commands.literal("seele").then(Commands.literal("tv")
-            .then(Commands.literal("support").then(Commands.argument("unit",IntegerArgumentType.integer(0,4))
+        return Commands.literal("support").then(Commands.argument("unit",IntegerArgumentType.integer(0,4))
                 .then(Commands.literal("player").executes(c->TvCampaignDirector.beginAssigned(c.getSource().getPlayerOrException(),IntegerArgumentType.getInteger(c,"unit"),false,false)))
-                .then(Commands.literal("npc").executes(c->TvCampaignDirector.beginAssigned(c.getSource().getPlayerOrException(),IntegerArgumentType.getInteger(c,"unit"),true,true)))))));
+                .then(Commands.literal("npc").executes(c->TvCampaignDirector.beginAssigned(c.getSource().getPlayerOrException(),IntegerArgumentType.getInteger(c,"unit"),true,true))));
     }
     private TvSortiesR32(){}
 }

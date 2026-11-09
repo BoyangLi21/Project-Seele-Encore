@@ -1,30 +1,49 @@
 package com.projectseele.visual;
 
-import com.projectseele.ProjectSeele;
-import com.projectseele.world.NervStaffDialogue;
-import com.mojang.brigadier.arguments.StringArgumentType;
-import net.minecraft.commands.Commands;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
+import java.util.List;
+import java.util.stream.Stream;
 
-@Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
+import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
+import com.projectseele.world.NervWayfindingR24;
+import com.projectseele.world.OperatorNavigationProductionR45;
+import com.projectseele.world.StaffConversationR24;
+import net.minecraft.commands.CommandSourceStack;
+import net.minecraft.commands.Commands;
+import net.minecraft.commands.SharedSuggestionProvider;
+import net.minecraft.network.chat.Component;
+
+/** Player commands for calling NERV staff and for walking guidance. */
 public final class NervStaffCommands
 {
-    @SubscribeEvent public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> callCommand()
     {
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("route")
-                .then(Commands.argument("destination",StringArgumentType.word())
-                        .suggests((c,b)->net.minecraft.commands.SharedSuggestionProvider.suggest(java.util.stream.Stream.concat(java.util.stream.Stream.concat(com.projectseele.world.NervWayfindingR24.GOALS.stream(),com.projectseele.world.OperatorNavigationProductionR45.availableGoals(c.getSource().getPlayer()).stream()),java.util.stream.Stream.of("stop")),b))
-                        .executes(c->{var player=c.getSource().getPlayerOrException();player.sendSystemMessage(net.minecraft.network.chat.Component.literal(com.projectseele.world.NervWayfindingR24.start(player,StringArgumentType.getString(c,"destination"))));return 1;}))));
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("contact")
-                .executes(c->com.projectseele.world.StaffConversationR24.contact(c.getSource().getPlayerOrException(),"美里"))
-                .then(Commands.argument("person",StringArgumentType.string())
-                        .suggests((c,b)->net.minecraft.commands.SharedSuggestionProvider.suggest(java.util.List.of("美里","律子","冬月","misato","ritsuko","fuyutsuki"),b))
-                        .executes(c->com.projectseele.world.StaffConversationR24.contact(c.getSource().getPlayerOrException(),StringArgumentType.getString(c,"person"))))));
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("talk")
-                .then(Commands.argument("person",StringArgumentType.string()).then(Commands.argument("message",StringArgumentType.greedyString())
-                        .executes(c->NervStaffDialogue.talk(c.getSource().getPlayerOrException(),StringArgumentType.getString(c,"person"),StringArgumentType.getString(c,"message")))))));
+        return Commands.literal("call")
+                .executes(c -> StaffConversationR24.contact(c.getSource().getPlayerOrException(), "美里"))
+                // Greedy so Chinese names parse unquoted; quotes left over from /nerv contact "美里" are dropped.
+                .then(Commands.argument("person", StringArgumentType.greedyString())
+                        .suggests((c, b) -> SharedSuggestionProvider.suggest(
+                                List.of("misato", "ritsuko", "fuyutsuki", "maya", "美里", "律子", "冬月", "摩耶"), b))
+                        .executes(c -> StaffConversationR24.contact(c.getSource().getPlayerOrException(),
+                                StringArgumentType.getString(c, "person").replace("\"", ""))));
     }
+
+    public static LiteralArgumentBuilder<CommandSourceStack> routeCommand()
+    {
+        return Commands.literal("route")
+                .then(Commands.argument("destination", StringArgumentType.word())
+                        .suggests((c, b) -> SharedSuggestionProvider.suggest(Stream.concat(Stream.concat(
+                                NervWayfindingR24.GOALS.stream(),
+                                OperatorNavigationProductionR45.availableGoals(c.getSource().getPlayer()).stream()),
+                                Stream.of("stop")), b))
+                        .executes(c ->
+                        {
+                            var player = c.getSource().getPlayerOrException();
+                            player.sendSystemMessage(Component.literal(NervWayfindingR24.start(player,
+                                    StringArgumentType.getString(c, "destination"))));
+                            return 1;
+                        }));
+    }
+
     private NervStaffCommands() {}
 }

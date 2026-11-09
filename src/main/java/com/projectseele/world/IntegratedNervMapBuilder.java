@@ -352,7 +352,7 @@ public final class IntegratedNervMapBuilder
                     "Integrated NERV runtime detail: hangars={} operations={} magi={}",
                     hangars.summary(), operations.summary(), magi.summary());
             ProjectSeele.LOGGER.warn(
-                    "Run /seele geofront audit for detailed shaft diagnostics; "
+                    "Run /seele dev geofront audit for detailed shaft diagnostics; "
                             + "live sortie controls never rebuild the map.");
         }
         return audit;

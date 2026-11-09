@@ -1,7 +1,8 @@
 package com.projectseele.world;
 
-import com.projectseele.ProjectSeele;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.entity.NervHangarDoorEntity;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.nbt.CompoundTag;
@@ -11,14 +12,10 @@ import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.level.saveddata.SavedData;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import java.util.Map;
 import java.util.WeakHashMap;
 
 /** Manual override for the original three rear pressure gates into the transfer corridor. */
-@Mod.EventBusSubscriber(modid = ProjectSeele.MODID)
 public final class HangarEmergencyR47
 {
     private static final class State extends SavedData
@@ -191,9 +188,9 @@ public final class HangarEmergencyR47
         }
         return open;
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> doorCommand()
     {
-        var emergency = Commands.literal("emergency");
+        var door = Commands.literal("door");
         for (String action : new String[] {"open", "close", "status"})
         {
             var branch = Commands.literal(action);
@@ -210,10 +207,9 @@ public final class HangarEmergencyR47
                     return 1;
                 }));
             }
-            emergency.then(branch);
+            door.then(branch);
         }
-        event.getDispatcher().register(Commands.literal("nerv")
-                .then(Commands.literal("hangar").then(emergency)));
+        return door;
     }
     private HangarEmergencyR47() {}
 }

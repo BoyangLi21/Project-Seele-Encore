@@ -2,12 +2,14 @@ package com.projectseele.world;
 
 import com.google.gson.*;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import java.io.IOException;
 import java.nio.file.*;
 import java.security.MessageDigest;
 import java.util.HexFormat;
 import java.util.*;
 import net.minecraft.core.BlockPos;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
@@ -15,7 +17,6 @@ import net.minecraft.server.level.TicketType;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
 import net.minecraft.world.level.storage.LevelResource;
-import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.eventbus.api.EventPriority;
@@ -175,20 +176,27 @@ public final class NervRootAssemblyInstallationR52
         String filename=source.get("file").getAsString();var relative=Path.of(filename);require(!relative.isAbsolute()&&relative.getRoot()==null&&!filename.contains(":")&&!relative.normalize().startsWith(".."),"Root-relative component file required");var file=parent.resolve(relative).toRealPath();require(file.startsWith(world)&&file.startsWith(parent.toRealPath())&&Files.size(file)<=maximumBytes,"Bounded same-world Root component file required");
         byte[] bytes;try(var input=Files.newInputStream(file)){bytes=input.readNBytes(maximumBytes+1);}require(bytes.length<=maximumBytes,"Bounded complete Root component required");return new SourceBytesR52(file,bytes);
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> equipmentUpdateCommand()
     {
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("r52").requires(source->source.hasPermission(2)).then(Commands.literal("equipment_update").then(Commands.argument("previous_metadata_directory",StringArgumentType.greedyString()).executes(context->{
+        return Commands.literal("equipment_update").then(Commands.argument("previous_metadata_directory",StringArgumentType.greedyString()).executes(context->{
             var source=context.getSource();try{var result=CarrierEquipmentUpdateR53.admit(source.getLevel(),Path.of(StringArgumentType.getString(context,"previous_metadata_directory")));source.sendSuccess(()->Component.literal(result.reason()),true);return result.accepted()?1:0;}
-            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("Original equipment update held: "+failure.getMessage()));return 0;}
-        })))));
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("r52").requires(source->source.hasPermission(2)).then(Commands.literal("install_cancel").executes(context->{
+            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("原设备更新未执行："+failure.getMessage()));return 0;}
+        }));
+    }
+    public static LiteralArgumentBuilder<CommandSourceStack> installCancelCommand()
+    {
+        return Commands.literal("install_cancel").executes(context->{
             var source=context.getSource();var saved=NervRouteRuntimeR52.installationStateR52(source.getLevel());if(saved==null||saved.pendingInstallationR52()==null){source.sendFailure(Component.literal("没有待推进的地图安装。"));return 0;}
             saved.pauseInstallationR52("管理员已取消自动安装推进；原实体、任务及已验证安装凭证保留。再次安装同一凭证可继续。");PENDING_TICKETS.remove(source.getLevel());TICKET_REFRESH.remove(source.getLevel());restoreHoldR52(source.getLevel(),saved.pendingInstallationHoldR52());source.sendSuccess(()->Component.literal(saved.pendingInstallationHoldR52()),true);return 1;
-        }))));
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("r52").requires(source->source.hasPermission(2)).then(Commands.literal("install").then(Commands.argument("world_relative_bundle",StringArgumentType.greedyString()).executes(context->{
+        });
+    }
+    /** /seele admin install (formerly /nerv r52 install). */
+    public static LiteralArgumentBuilder<CommandSourceStack> installCommand()
+    {
+        return Commands.literal("install").then(Commands.argument("world_relative_bundle",StringArgumentType.greedyString()).executes(context->{
             var source=context.getSource();try{String name=NervRouteRuntimeStateR52.relativeBundleR52(StringArgumentType.getString(context,"world_relative_bundle"));var relative=Path.of(name);var result=install(source.getLevel(),source.getServer().getWorldPath(LevelResource.ROOT).resolve(relative));source.sendSuccess(()->Component.literal(result.reason()+" [epoch="+result.epoch()+", directory="+result.directoryFingerprint()+"]"),true);return result.accepted()?1:0;}
-            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("R52 Root installation held: "+failure.getMessage()));return 0;}
-        })))));
+            catch(IOException|RuntimeException failure){source.sendFailure(Component.literal("地图安装未执行："+failure.getMessage()));return 0;}
+        }));
     }
     private static String sha(byte[] bytes){try{return HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(bytes));}catch(Exception impossible){throw new IllegalStateException(impossible);}}
     private static void require(boolean okay,String why){if(!okay)throw new IllegalArgumentException(why);}

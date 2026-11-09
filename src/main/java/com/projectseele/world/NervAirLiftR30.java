@@ -81,12 +81,11 @@ public final class NervAirLiftR30
         if(!Files.isRegularFile(level.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_transport_r30.json")))return "此存档尚未安装 NERV 重型运输设施。";
         var s=state(level);s.forceRecovery=true;s.last="强制回收已受理，正在加载原运输机和载荷。";s.setDirty();return s.last;
     }
-    @SubscribeEvent public static void commands(net.minecraftforge.event.RegisterCommandsEvent event)
+    public static com.mojang.brigadier.builder.LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> transportCommand()
     {
-        event.getDispatcher().register(net.minecraft.commands.Commands.literal("nerv")
-            .then(net.minecraft.commands.Commands.literal("transport").requires(source->source.hasPermission(2))
+        return net.minecraft.commands.Commands.literal("transport")
                 .then(net.minecraft.commands.Commands.literal("status").executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;c.getSource().sendSuccess(()->Component.literal(status(l)),false);return 1;}))
-                .then(net.minecraft.commands.Commands.literal("force_recover").executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;String reply=forceRecover(l);c.getSource().sendSuccess(()->Component.literal(reply),true);return 1;}))));
+                .then(net.minecraft.commands.Commands.literal("force_recover").executes(c->{var l=c.getSource().getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null)return 0;String reply=forceRecover(l);c.getSource().sendSuccess(()->Component.literal(reply),true);return 1;}));
     }
     private static void completeForcedRecovery(ServerLevel l,State s)
     {

@@ -4,8 +4,8 @@ import java.util.Arrays;
 import java.util.Locale;
 import java.util.Optional;
 
-import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
@@ -27,12 +27,11 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
-import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
 
-/** Player-facing NERV crew coordination and operator server diagnostics. */
+/** Player-facing NERV crew coordination (/seele crew) and operator server diagnostics (/seele admin server). */
 @Mod.EventBusSubscriber(modid = ProjectSeele.MODID, bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class NervCrewCommands
 {
@@ -41,57 +40,41 @@ public final class NervCrewCommands
 
     private NervCrewCommands() {}
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> crewCommand()
     {
-        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
-        dispatcher.register(Commands.literal("nerv")
+        return Commands.literal("crew")
                 .executes(context -> crewStatus(context.getSource()))
-                .then(Commands.literal("crew")
-                        .executes(context -> crewStatus(context.getSource()))
-                        .then(Commands.literal("status")
-                                .executes(context -> crewStatus(context.getSource())))
-                        .then(Commands.literal("claim")
-                                .then(Commands.argument("station", StringArgumentType.word())
-                                        .suggests((context, builder) ->
-                                                SharedSuggestionProvider.suggest(
-                                                        STATION_IDS, builder))
-                                        .executes(context -> claim(
-                                                context.getSource(),
-                                                StringArgumentType.getString(
-                                                        context, "station")))))
-                        .then(Commands.literal("ready")
-                                .executes(context -> ready(context.getSource(), true)))
-                        .then(Commands.literal("standby")
-                                .executes(context -> ready(context.getSource(), false)))
-                        .then(Commands.literal("release")
-                                .executes(context -> release(context.getSource())))
-                        .then(Commands.literal("clear")
-                                .requires(source -> source.hasPermission(2))
-                                .then(Commands.argument("station", StringArgumentType.word())
-                                        .suggests((context, builder) ->
-                                                SharedSuggestionProvider.suggest(
-                                                        STATION_IDS, builder))
-                                        .executes(context -> clear(
-                                                context.getSource(),
-                                                StringArgumentType.getString(
-                                                        context, "station"))))))
-                .then(Commands.literal("server")
-                        .then(Commands.literal("status")
-                                .executes(context -> serverStatus(context.getSource())))
-                        .then(Commands.literal("audit")
-                                .requires(source -> source.hasPermission(2))
-                                .executes(context -> serverAudit(context.getSource())))));
+                .then(Commands.literal("status")
+                        .executes(context -> crewStatus(context.getSource())))
+                .then(Commands.literal("claim")
+                        .then(Commands.argument("station", StringArgumentType.word())
+                                .suggests((context, builder) ->
+                                        SharedSuggestionProvider.suggest(STATION_IDS, builder))
+                                .executes(context -> claim(context.getSource(),
+                                        StringArgumentType.getString(context, "station")))))
+                .then(Commands.literal("ready")
+                        .executes(context -> ready(context.getSource(), true)))
+                .then(Commands.literal("standby")
+                        .executes(context -> ready(context.getSource(), false)))
+                .then(Commands.literal("release")
+                        .executes(context -> release(context.getSource())))
+                .then(Commands.literal("clear")
+                        .requires(source -> source.hasPermission(2))
+                        .then(Commands.argument("station", StringArgumentType.word())
+                                .suggests((context, builder) ->
+                                        SharedSuggestionProvider.suggest(STATION_IDS, builder))
+                                .executes(context -> clear(context.getSource(),
+                                        StringArgumentType.getString(context, "station")))));
+    }
 
-        // Operator alias under the existing permission-gated SEELE tree.
-        dispatcher.register(Commands.literal("seele")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("server")
-                        .executes(context -> serverStatus(context.getSource()))
-                        .then(Commands.literal("status")
-                                .executes(context -> serverStatus(context.getSource())))
-                        .then(Commands.literal("audit")
-                                .executes(context -> serverAudit(context.getSource())))));
+    public static LiteralArgumentBuilder<CommandSourceStack> serverCommand()
+    {
+        return Commands.literal("server")
+                .executes(context -> serverStatus(context.getSource()))
+                .then(Commands.literal("status")
+                        .executes(context -> serverStatus(context.getSource())))
+                .then(Commands.literal("audit")
+                        .executes(context -> serverAudit(context.getSource())));
     }
 
     @SubscribeEvent
@@ -107,12 +90,24 @@ public final class NervCrewCommands
             boolean ready = data.assignment(station)
                     .map(Assignment::ready).orElse(false);
             player.displayClientMessage(Component.literal(
-                    "NERV CREW / " + station.label() + " / "
-                            + (ready ? "READY" : "STANDBY")
-                            + "  (/nerv crew status)")
+                    "NERV 岗位：" + name(station) + "，" + (ready ? "已就绪" : "待命")
+                            + "（/seele crew status）")
                     .withStyle(ready ? ChatFormatting.GREEN
                             : ChatFormatting.GOLD), false);
         });
+    }
+
+    private static String name(Station station)
+    {
+        return switch (station)
+        {
+            case COMMANDER -> "司令";
+            case OPERATIONS -> "作战指挥";
+            case MAGI -> "MAGI";
+            case UNIT_00 -> "零号机驾驶员";
+            case UNIT_01 -> "初号机驾驶员";
+            case UNIT_02 -> "二号机驾驶员";
+        };
     }
 
     private static int claim(CommandSourceStack source, String raw)
@@ -123,8 +118,7 @@ public final class NervCrewCommands
         if (parsed.isEmpty())
         {
             source.sendFailure(Component.literal(
-                    "Unknown NERV station. Use: "
-                            + String.join(", ", STATION_IDS)));
+                    "没有这个岗位。可选：" + String.join("、", STATION_IDS)));
             return 0;
         }
         NervCrewSavedData data = NervCrewSavedData.get(source.getServer());
@@ -133,17 +127,15 @@ public final class NervCrewCommands
         if (result == ClaimResult.OCCUPIED)
         {
             String owner = data.assignment(station)
-                    .map(Assignment::playerName).orElse("UNKNOWN");
-            source.sendFailure(Component.literal(station.label()
-                    + " is reserved by " + owner
-                    + ". Ask an operator to clear it if stale."));
+                    .map(Assignment::playerName).orElse("未知玩家");
+            source.sendFailure(Component.literal(name(station) + "已由 " + owner
+                    + " 认领。对方已不在时，请管理员执行 /seele crew clear " + station.id() + "。"));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(
                 result == ClaimResult.ALREADY_ASSIGNED
-                        ? "NERV station retained: " + station.label()
-                        : "NERV station claimed: " + station.label()
-                                + ". Set /nerv crew ready when prepared."), false);
+                        ? "仍保留岗位：" + name(station)
+                        : "已认领岗位：" + name(station) + "。准备好后执行 /seele crew ready。"), false);
         return 1;
     }
 
@@ -155,12 +147,11 @@ public final class NervCrewCommands
         if (!data.setReady(player.getUUID(), ready))
         {
             source.sendFailure(Component.literal(
-                    "Claim a station first: /nerv crew claim <station>"));
+                    "请先认领岗位：/seele crew claim <岗位>"));
             return 0;
         }
         Station station = data.stationFor(player.getUUID()).orElseThrow();
-        source.sendSuccess(() -> Component.literal("NERV " + station.label()
-                        + " -> " + (ready ? "READY" : "STANDBY"))
+        source.sendSuccess(() -> Component.literal(name(station) + "：" + (ready ? "已就绪" : "待命"))
                 .withStyle(ready ? ChatFormatting.GREEN
                         : ChatFormatting.GOLD), false);
         return 1;
@@ -174,11 +165,11 @@ public final class NervCrewCommands
                 .release(player.getUUID());
         if (released.isEmpty())
         {
-            source.sendFailure(Component.literal("No NERV station is assigned."));
+            source.sendFailure(Component.literal("你还没有认领岗位。"));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(
-                "NERV station released: " + released.get().label()), false);
+                "已释放岗位：" + name(released.get())), false);
         return 1;
     }
 
@@ -188,21 +179,18 @@ public final class NervCrewCommands
         if (parsed.isEmpty())
         {
             source.sendFailure(Component.literal(
-                    "Unknown NERV station. Use: "
-                            + String.join(", ", STATION_IDS)));
+                    "没有这个岗位。可选：" + String.join("、", STATION_IDS)));
             return 0;
         }
         Optional<Assignment> removed = NervCrewSavedData.get(source.getServer())
                 .clear(parsed.get());
         if (removed.isEmpty())
         {
-            source.sendFailure(Component.literal(parsed.get().label()
-                    + " is already unassigned."));
+            source.sendFailure(Component.literal(name(parsed.get()) + "当前无人认领。"));
             return 0;
         }
-        source.sendSuccess(() -> Component.literal("Cleared "
-                + parsed.get().label() + " assignment for "
-                + removed.get().playerName()), true);
+        source.sendSuccess(() -> Component.literal("已清除 " + removed.get().playerName()
+                + " 认领的" + name(parsed.get()) + "岗位。"), true);
         return 1;
     }
 
@@ -212,7 +200,7 @@ public final class NervCrewCommands
         NervCrewSavedData data = NervCrewSavedData.get(server);
         CrewOverview overview = data.overview(server);
         source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                        "NERV CREW / assigned %d/6 / online %d / ready %d / online-ready %d",
+                        "NERV 岗位：已认领 %d/6，在线 %d，就绪 %d，在线且就绪 %d",
                         overview.assigned(), overview.online(), overview.ready(),
                         overview.onlineReady()))
                 .withStyle(overview.allAssignedOnlineReady()
@@ -224,7 +212,7 @@ public final class NervCrewCommands
             ChatFormatting colour;
             if (assignment.isEmpty())
             {
-                line = String.format(Locale.ROOT, "%-10s [OPEN]", station.shortLabel());
+                line = name(station) + "（" + station.id() + "）：空缺";
                 colour = ChatFormatting.DARK_GRAY;
             }
             else
@@ -232,10 +220,8 @@ public final class NervCrewCommands
                 Assignment value = assignment.get();
                 boolean online = server.getPlayerList()
                         .getPlayer(value.playerId()) != null;
-                line = String.format(Locale.ROOT, "%-10s %-16s %s / %s",
-                        station.shortLabel(), value.playerName(),
-                        online ? "ONLINE" : "OFFLINE",
-                        value.ready() ? "READY" : "STANDBY");
+                line = name(station) + "（" + station.id() + "）：" + value.playerName()
+                        + "，" + (online ? "在线" : "离线") + "，" + (value.ready() ? "已就绪" : "待命");
                 colour = !online ? ChatFormatting.DARK_RED
                         : value.ready() ? ChatFormatting.GREEN
                         : ChatFormatting.YELLOW;
@@ -252,14 +238,14 @@ public final class NervCrewCommands
         MinecraftServer server = source.getServer();
         ServerLevel level = server.getLevel(GeoFrontCommands.GEOFRONT);
         source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                        "PROJECT SEELE SERVER / %s / players %d/%d",
-                        server.isDedicatedServer() ? "DEDICATED" : "INTEGRATED",
+                        "Project SEELE 服务器：%s，玩家 %d/%d",
+                        server.isDedicatedServer() ? "专用服务器" : "单人内置服务器",
                         server.getPlayerCount(), server.getMaxPlayers()))
                 .withStyle(ChatFormatting.GOLD), false);
         if (level == null)
         {
             source.sendFailure(Component.literal(
-                    "GeoFront dimension is unavailable; verify the mod and datapack load."));
+                    "GeoFront 维度未加载，请检查模组和数据包是否正常加载。"));
             return 0;
         }
         boolean installed = IntegratedNervMapBuilder.isInstalled(level);
@@ -287,19 +273,19 @@ public final class NervCrewCommands
         boolean finalInstalled = installed;
         int finalFeeds = feeds;
         source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                        "MAP %s / loaded EVA %d/3 / telemetry %d/%d / cockpit feeds %d/3",
-                        finalInstalled ? "CONNECTED" : "MISSING",
+                        "地图：%s，已加载 EVA %d/3，遥测屏 %d/%d，驾驶舱画面 %d/3",
+                        finalInstalled ? "已接入" : "缺失",
                         airframes, screens, NervCommandTelemetry.SCREEN_COUNT,
                         finalFeeds))
                 .withStyle(finalInstalled ? ChatFormatting.GREEN
                         : ChatFormatting.RED), false);
         source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
-                        "CREW assigned %d/6 / online %d / online-ready %d",
+                        "岗位：已认领 %d/6，在线 %d，在线且就绪 %d",
                         crew.assigned(), crew.online(), crew.onlineReady()))
                 .withStyle(crew.allAssignedOnlineReady()
                         ? ChatFormatting.GREEN : ChatFormatting.YELLOW), false);
         source.sendSuccess(() -> Component.literal(
-                "Use /nerv server audit for the bounded sortie gate; it never rebuilds the full map.")
+                "出击前的有界检查用 /seele admin server audit，不会重建整张地图。")
                 .withStyle(ChatFormatting.GRAY), false);
         return installed ? 1 : 0;
     }
@@ -309,7 +295,7 @@ public final class NervCrewCommands
         ServerLevel level = source.getServer().getLevel(GeoFrontCommands.GEOFRONT);
         if (level == null)
         {
-            source.sendFailure(Component.literal("GeoFront dimension is unavailable."));
+            source.sendFailure(Component.literal("GeoFront 维度未加载。"));
             return 0;
         }
         IntegratedNervMapBuilder.RuntimeAudit audit =
@@ -317,11 +303,11 @@ public final class NervCrewCommands
         if (!audit.valid())
         {
             source.sendFailure(Component.literal(
-                    "NERV runtime gate FAILED: " + audit.summary()));
+                    "NERV 运行检查未通过：" + audit.summary()));
             return 0;
         }
         source.sendSuccess(() -> Component.literal(
-                        "NERV runtime gate READY: " + audit.summary())
+                        "NERV 运行检查通过：" + audit.summary())
                 .withStyle(ChatFormatting.GREEN), true);
         return 1;
     }

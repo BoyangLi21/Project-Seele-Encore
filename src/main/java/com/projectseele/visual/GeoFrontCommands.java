@@ -6,7 +6,7 @@ import java.util.Locale;
 import java.util.Set;
 import java.util.UUID;
 
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
@@ -40,7 +40,6 @@ import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
 import net.minecraftforge.fml.common.Mod;
@@ -73,54 +72,49 @@ public final class GeoFrontCommands
 
     private GeoFrontCommands() {}
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> geofrontCommand()
     {
-        if(!DevelopmentCommandsR43.enabled())return;
-        CommandDispatcher<CommandSourceStack> dispatcher = event.getDispatcher();
-        dispatcher.register(Commands.literal("seele")
-                .requires(source -> source.hasPermission(2))
-                .then(Commands.literal("geofront")
-                        .then(Commands.literal("setup")
-                                .executes(context -> setup(context.getSource())))
-                        .then(Commands.literal("rebuild")
-                                .executes(context -> rebuild(context.getSource())))
-                        .then(Commands.literal("enter")
-                                .executes(context -> enter(context.getSource())))
-                        .then(Commands.literal("link")
-                                .executes(context -> link(context.getSource())))
-                        .then(Commands.literal("sortie_audit")
-                                .executes(context -> sortieAudit(context.getSource())))
-                        .then(Commands.literal("surface")
-                                .executes(context -> surface(context.getSource())))
-                        .then(Commands.literal("exit")
-                                .executes(context -> exit(context.getSource())))
-                        .then(Commands.literal("audit")
-                                .executes(context -> audit(context.getSource())))
-                        .then(Commands.literal("operations")
-                                .executes(context -> operations(context.getSource())))
-                        .then(Commands.literal("dogma")
-                                .executes(context -> dogma(context.getSource())))
-                        .then(Commands.literal("overview")
-                                .executes(context -> overview(context.getSource())))
-                        .then(Commands.literal("coastal")
-                                .then(Commands.literal("entrance")
-                                        .executes(context -> coastalLanding(
-                                                context.getSource(),
-                                                S22_MAIN_ENTRANCE_FEET,
-                                                "NERV main entrance", 90.0F, 0.0F)))
-                                .then(Commands.literal("lake")
-                                        .executes(context -> coastalLanding(
-                                                context.getSource(),
-                                                S22_LAKE_TERMINAL_FEET,
-                                                "GeoFront underground-lake terminal",
-                                                -90.0F, 0.0F)))
-                                .then(Commands.literal("dock")
-                                        .executes(context -> coastalLanding(
-                                                context.getSource(),
-                                                S22_EVA_DOCK_FEET,
-                                                "three-berth EVA docking apron",
-                                                90.0F, 0.0F))))));
+        return Commands.literal("geofront")
+                .then(Commands.literal("setup")
+                        .executes(context -> setup(context.getSource())))
+                .then(Commands.literal("rebuild")
+                        .executes(context -> rebuild(context.getSource())))
+                .then(Commands.literal("enter")
+                        .executes(context -> enter(context.getSource())))
+                .then(Commands.literal("link")
+                        .executes(context -> link(context.getSource())))
+                .then(Commands.literal("sortie_audit")
+                        .executes(context -> sortieAudit(context.getSource())))
+                .then(Commands.literal("surface")
+                        .executes(context -> surface(context.getSource())))
+                .then(Commands.literal("exit")
+                        .executes(context -> exit(context.getSource())))
+                .then(Commands.literal("audit")
+                        .executes(context -> audit(context.getSource())))
+                .then(Commands.literal("operations")
+                        .executes(context -> operations(context.getSource())))
+                .then(Commands.literal("dogma")
+                        .executes(context -> dogma(context.getSource())))
+                .then(Commands.literal("overview")
+                        .executes(context -> overview(context.getSource())))
+                .then(Commands.literal("coastal")
+                        .then(Commands.literal("entrance")
+                                .executes(context -> coastalLanding(
+                                        context.getSource(),
+                                        S22_MAIN_ENTRANCE_FEET,
+                                        "NERV main entrance", 90.0F, 0.0F)))
+                        .then(Commands.literal("lake")
+                                .executes(context -> coastalLanding(
+                                        context.getSource(),
+                                        S22_LAKE_TERMINAL_FEET,
+                                        "GeoFront underground-lake terminal",
+                                        -90.0F, 0.0F)))
+                        .then(Commands.literal("dock")
+                                .executes(context -> coastalLanding(
+                                        context.getSource(),
+                                        S22_EVA_DOCK_FEET,
+                                        "three-berth EVA docking apron",
+                                        90.0F, 0.0F))));
     }
 
     /**
@@ -247,7 +241,7 @@ public final class GeoFrontCommands
         source.sendSuccess(() -> Component.literal(
                 "Connected Tokyo-3 / GeoFront map ready: three physical "
                         + IntegratedNervMapBuilder.ascentDistance() + "-block shafts. "
-                        + "Run /seele geofront link to prepare Unit-00/01/02."),
+                        + "Run /seele dev geofront link to prepare Unit-00/01/02."),
                 false);
         return 1;
     }
@@ -392,7 +386,7 @@ public final class GeoFrontCommands
         {
             source.sendFailure(Component.literal(
                     "The connected map is not installed. "
-                            + "Run /seele geofront setup first."));
+                            + "Run /seele dev geofront setup first."));
             return 0;
         }
         saveReturn(player);
@@ -634,7 +628,7 @@ public final class GeoFrontCommands
         if (!IntegratedNervMapBuilder.isInstalled(destination))
         {
             source.sendFailure(Component.literal(
-                    "The connected map is not installed. Run /seele geofront setup first."));
+                    "The connected map is not installed. Run /seele dev geofront setup first."));
             return 0;
         }
         if (!player.serverLevel().dimension().equals(GEOFRONT))
@@ -775,7 +769,7 @@ public final class GeoFrontCommands
         if (!IntegratedNervMapBuilder.isInstalled(level))
         {
             source.sendFailure(Component.literal(
-                    "The connected map is not installed. Run /seele geofront setup first."));
+                    "The connected map is not installed. Run /seele dev geofront setup first."));
             return 0;
         }
         if (!player.serverLevel().dimension().equals(GEOFRONT))
@@ -802,7 +796,7 @@ public final class GeoFrontCommands
         if (!IntegratedNervMapBuilder.isInstalled(level))
         {
             source.sendFailure(Component.literal(
-                    "The connected map is not installed. Run /seele geofront setup first."));
+                    "The connected map is not installed. Run /seele dev geofront setup first."));
             return 0;
         }
         BlockPos origin = IntegratedNervMapBuilder.geoFrontOrigin(level);
@@ -1019,12 +1013,12 @@ public final class GeoFrontCommands
             return false;
         }
         source.sendFailure(Component.literal(
-                "/seele geofront " + alias
+                "/seele dev geofront " + alias
                         + " belongs to the retired overlapping map pipeline "
                         + "and is disabled in "
                         + (s20 ? "SEELE_S20_REBUILD" : "SEELE_S19_CLEAN")
                         + ". Use the bounded S20 directors or "
-                        + "/seele facility_v2 status for S19."));
+                        + "/seele dev facility_v2 status for S19."));
         return true;
     }
 

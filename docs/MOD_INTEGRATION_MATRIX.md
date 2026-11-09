@@ -113,10 +113,12 @@ python tools\catalog_reference_motion_clips.py ^
 
 ```mcfunction
 /seele eva reset unit01
-/seele eva dummy start unit01
+/seele dev eva dummy start unit01
 /seele eva prepare unit01
 /seele eva status unit01
 ```
+
+`/seele dev ...` 只在开发构建里存在，见 [COMMANDS.zh.md](COMMANDS.zh.md)。
 
 目视检查：固定拘束架不得随载台消失；原版吊机梁、吊索、推杆和夹具必须连续；
 两条转运主轨必须可见；EVA 在解锁前仍由 SEELE 状态机固定。PREPARE 不得依赖

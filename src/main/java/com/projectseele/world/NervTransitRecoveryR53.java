@@ -1,26 +1,22 @@
 package com.projectseele.world;
 
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.ProjectSeele;
 import com.projectseele.visual.RegionalNativeTransitInspection;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.network.chat.Component;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import java.lang.reflect.Field;
 import java.util.*;
 
-/** Uses MTR's own departure restoration without replacing routes or running trains. */
-@Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
+/** Uses MTR's own departure restoration without replacing routes or running trains (/seele admin transit). */
 public final class NervTransitRecoveryR53
 {
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> transitCommand()
     {
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("transit")
-                .requires(s->s.hasPermission(2))
+        return Commands.literal("transit")
                 .then(Commands.literal("status").executes(c->run(c.getSource(),false)))
-                .then(Commands.literal("resume").executes(c->run(c.getSource(),true)))));
+                .then(Commands.literal("resume").executes(c->run(c.getSource(),true)));
     }
     private static int run(CommandSourceStack source,boolean resume)
     {

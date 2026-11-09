@@ -1,9 +1,11 @@
 package com.projectseele.world;
 
 import com.google.gson.*;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.entity.*;
 import java.nio.file.Files;
 import java.util.*;
+import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
 import net.minecraft.network.chat.Component;
@@ -313,11 +315,13 @@ public final class TvYashimaStationR52
         var p=plan(player.serverLevel()).orElse(null);if(p==null||!p.control().equals(event.getPos())||player.position().distanceTo(Vec3.atCenterOf(p.control()))>6)return;
         event.setCanceled(true);event.setCancellationResult(InteractionResult.SUCCESS);player.sendSystemMessage(Component.literal(raise(player)));
     }
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> cannonCommand()
     {
-        event.getDispatcher().register(Commands.literal("seele").then(Commands.literal("tv")
-            .then(Commands.literal("raise_cannon").executes(c->{var player=c.getSource().getPlayerOrException();player.sendSystemMessage(Component.literal(raise(player)));return 1;}))
-            .then(Commands.literal("leave_cannon").executes(c->{var player=c.getSource().getPlayerOrException();var eva=EvaPilotResolver.controlTarget(player);var gun=gun(player.serverLevel());if(eva==null||gun==null||boundEva(player.serverLevel(),gun)!=eva)return 0;release(eva,gun);player.sendSystemMessage(Component.literal("已解除固定炮位占用，可以撤离。"));return 1;}))));
+        return Commands.literal("cannon")
+            .then(Commands.literal("raise").executes(c->{var player=c.getSource().getPlayerOrException();player.sendSystemMessage(Component.literal(raise(player)));return 1;}))
+            .then(Commands.literal("release").executes(c->{var player=c.getSource().getPlayerOrException();var eva=EvaPilotResolver.controlTarget(player);var gun=gun(player.serverLevel());
+                if(eva==null||gun==null||boundEva(player.serverLevel(),gun)!=eva){c.getSource().sendFailure(Component.literal("你驾驶的机体没有占用固定炮位。"));return 0;}
+                release(eva,gun);player.sendSystemMessage(Component.literal("已解除固定炮位占用，可以撤离。"));return 1;}));
     }
     @SubscribeEvent public static void unloaded(net.minecraftforge.event.level.LevelEvent.Unload event){if(event.getLevel() instanceof ServerLevel level)CACHE.remove(level);}
     private TvYashimaStationR52(){}

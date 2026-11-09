@@ -1,8 +1,7 @@
 package com.projectseele.visual;
 
-import com.mojang.brigadier.CommandDispatcher;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.context.CommandContext;
-import com.projectseele.ProjectSeele;
 import com.projectseele.entity.NervArmamentStationEntity;
 import com.projectseele.registry.ModEntities;
 import net.minecraft.commands.CommandSourceStack;
@@ -11,13 +10,8 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 
-/** Reversible test controls for the blockless armament-building prototype. */
-@Mod.EventBusSubscriber(modid = ProjectSeele.MODID,
-        bus = Mod.EventBusSubscriber.Bus.FORGE)
+/** Weapon-well controls (/seele armament) and the prototype's reversible test controls (/seele dev armament). */
 public final class ArmamentStationCommands
 {
     private static final double COMMAND_RANGE = 128.0D;
@@ -26,33 +20,24 @@ public final class ArmamentStationCommands
     {
     }
 
-    @SubscribeEvent
-    public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> armamentCommand()
     {
-        CommandDispatcher<CommandSourceStack> dispatcher =
-                event.getDispatcher();
-        if(!DevelopmentCommandsR43.enabled())
-        {
-            dispatcher.register(Commands.literal("seele").then(Commands.literal("armament").requires(s->s.hasPermission(2))
-                    .then(payloadBranches("deploy",true))
-                    .then(payloadBranches("recall",false))
-                    .then(Commands.literal("status").executes(ArmamentStationCommands::status))));
-            return;
-        }
-        dispatcher.register(Commands.literal("seele")
-                .then(Commands.literal("armament")
-                        .requires(source -> source.hasPermission(2))
-                        .then(Commands.literal("spawn_here")
-                                .executes(ArmamentStationCommands::spawnHere))
-                        .then(payloadBranches("deploy",true))
-                        .then(payloadBranches("recall",false))
-                        .then(Commands.literal("status")
-                                .executes(ArmamentStationCommands::status))
-                        .then(Commands.literal("remove")
-                                .executes(ArmamentStationCommands::remove))));
+        return Commands.literal("armament")
+                .then(payloadBranches("deploy",true))
+                .then(payloadBranches("recall",false))
+                .then(Commands.literal("status").executes(ArmamentStationCommands::status));
     }
 
-    private static com.mojang.brigadier.builder.LiteralArgumentBuilder<CommandSourceStack> payloadBranches(String name,boolean deploy)
+    public static LiteralArgumentBuilder<CommandSourceStack> devArmamentCommand()
+    {
+        return Commands.literal("armament")
+                .then(Commands.literal("spawn_here")
+                        .executes(ArmamentStationCommands::spawnHere))
+                .then(Commands.literal("remove")
+                        .executes(ArmamentStationCommands::remove));
+    }
+
+    private static LiteralArgumentBuilder<CommandSourceStack> payloadBranches(String name,boolean deploy)
     {
         return Commands.literal(name).executes(c->change(c,deploy))
                 .then(Commands.literal("rifle").executes(c->changePayload(c,deploy,4)))
@@ -138,11 +123,28 @@ public final class ArmamentStationCommands
             return 0;
         }
         context.getSource().sendSuccess(() -> Component.literal(
-                "NERV ARMAMENT: " + station.stateName()
-                        + " / stocked=" + station.isStocked()
-                        + " / " + station.blockPosition().toShortString()),
+                "最近的兵装升降站：" + stateName(station.stateName())
+                        + "，" + (station.isStocked() ? "已装填" : "空载")
+                        + "，位置 " + station.blockPosition().toShortString()),
                 false);
         return 1;
+    }
+
+    private static String stateName(String state)
+    {
+        return switch (state)
+        {
+            case "OPENING" -> "井盖开启中";
+            case "RISING" -> "上升中";
+            case "READY" -> "已升起";
+            case "EMPTY" -> "已取走武器";
+            case "LOWERING" -> "下降中";
+            case "CLOSING" -> "井盖关闭中";
+            case "DOOR_OPENING" -> "舱门开启中";
+            case "DOOR_CLOSING" -> "舱门关闭中";
+            case "STOWED" -> "收纳";
+            default -> state;
+        };
     }
 
     private static int remove(CommandContext<CommandSourceStack> context)

@@ -2,6 +2,7 @@ package com.projectseele.world;
 
 import com.projectseele.ProjectSeele;
 import com.mojang.brigadier.arguments.StringArgumentType;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -12,7 +13,6 @@ import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.PathfinderMob;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.RegisterCommandsEvent;
 import net.minecraftforge.event.TickEvent;
 import net.minecraftforge.event.server.ServerStoppedEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -47,12 +47,12 @@ public final class NervNpcResetR53
     @SubscribeEvent public static void stopped(ServerStoppedEvent event)
     {PENDING.values().removeIf(p->p.level().getServer()==event.getServer());}
 
-    @SubscribeEvent public static void commands(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> npcCommand()
     {
-        event.getDispatcher().register(Commands.literal("nerv").then(Commands.literal("npc").requires(s->s.hasPermission(2))
+        return Commands.literal("npc")
                 .then(Commands.literal("reset").then(Commands.argument("target",StringArgumentType.word())
                         .suggests((c,b)->net.minecraft.commands.SharedSuggestionProvider.suggest(List.of("all","fuyutsuki","misato","ritsuko","rei","shinji","asuka"),b))
-                        .executes(c->request(c.getSource(),StringArgumentType.getString(c,"target")))))));
+                        .executes(c->request(c.getSource(),StringArgumentType.getString(c,"target")))));
     }
     private static int request(CommandSourceStack source,String id)
     {

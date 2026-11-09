@@ -2,7 +2,7 @@ package com.projectseele.visual;
 
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.mojang.brigadier.arguments.StringArgumentType;
-import com.projectseele.ProjectSeele;
+import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.projectseele.world.FacilitySchemaV2;
 import com.projectseele.world.RegionalGatewayDirector;
 import com.projectseele.world.NervTravelDirectoryR52;
@@ -14,13 +14,9 @@ import net.minecraft.network.chat.ClickEvent;
 import net.minecraft.network.chat.Component;
 import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
-import net.minecraftforge.event.RegisterCommandsEvent;
-import net.minecraftforge.eventbus.api.SubscribeEvent;
-import net.minecraftforge.fml.common.Mod;
 import java.util.List;
 
-/** Fixed, measured arrivals in the current commissioned world. Never builds terrain. */
-@Mod.EventBusSubscriber(modid=ProjectSeele.MODID)
+/** Fixed, measured arrivals in the current commissioned world (/seele tp, /seele enter). Never builds terrain. */
 public final class SeeleTravelCommandsR43
 {
     public record Destination(String key,String label,Vec3 point,float yaw) {}
@@ -42,15 +38,16 @@ public final class SeeleTravelCommandsR43
         new Destination("misato","美里家公寓入口",new Vec3(196.5,81,527.5),0),
         new Destination("school","第三新东京第一中学校门外",new Vec3(253.5,73,-679.5),180));
 
-    @SubscribeEvent public static void register(RegisterCommandsEvent event)
+    public static LiteralArgumentBuilder<CommandSourceStack> enterCommand()
     {
-        var root=Commands.literal("seele").requires(s->s.hasPermission(2));
-        root.then(Commands.literal("enter").executes(c->teleport(c.getSource(),"entrance")));
-        var travel=Commands.literal("tp").executes(c->list(c.getSource()));
-        travel.then(Commands.argument("destination",StringArgumentType.word())
-                .suggests((context,builder)->SharedSuggestionProvider.suggest(destinations(context.getSource()).stream().map(Destination::key),builder))
-                .executes(c->teleport(c.getSource(),StringArgumentType.getString(c,"destination"))));
-        root.then(travel);event.getDispatcher().register(root);
+        return Commands.literal("enter").executes(c->teleport(c.getSource(),"entrance"));
+    }
+    public static LiteralArgumentBuilder<CommandSourceStack> tpCommand()
+    {
+        return Commands.literal("tp").executes(c->list(c.getSource()))
+                .then(Commands.argument("destination",StringArgumentType.word())
+                        .suggests((context,builder)->SharedSuggestionProvider.suggest(destinations(context.getSource()).stream().map(Destination::key),builder))
+                        .executes(c->teleport(c.getSource(),StringArgumentType.getString(c,"destination"))));
     }
     private static List<Destination> destinations(CommandSourceStack source)
     {

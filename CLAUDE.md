@@ -54,6 +54,7 @@ resources/
 ```
 
 **注册模式**：一律 `DeferredRegister` + `RegistryObject`，注册类放 `registry/`，在主类构造器挂到 mod 总线。
+**指令**：`/seele` 只在 `visual/SeeleCommands` 注册一次，权限写在一级子指令上；别的类只提供返回 `LiteralArgumentBuilder` 的方法，不要再自己 `register(Commands.literal("seele"))`。指令表见 `docs/COMMANDS.zh.md`。
 **代码风格**：跟随 Forge MDK（Allman 大括号、UTF-8），注释只写代码看不出来的约束。
 **渲染惯例**：几何体（使徒、特效）优先直连顶点渲染（参考 `RamielRenderer` 的八面体画法）；人形/复杂动画用 GeckoLib。
 
