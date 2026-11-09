@@ -14,5 +14,5 @@ public abstract class RamielDistantProjectionR52Mixin
 {
     @Inject(method="getProjectionMatrix",at=@At("RETURN"),cancellable=true)
     private void seele$remoteDepthR52(double fov,CallbackInfoReturnable<Matrix4f> result)
-    {result.setReturnValue(RamielDistantViewR52.projection(result.getReturnValue()));}
+    {result.setReturnValue(com.projectseele.client.GiantFarViewR61.projection(RamielDistantViewR52.projection(result.getReturnValue())));}
 }

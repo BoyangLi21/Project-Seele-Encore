@@ -42,6 +42,16 @@ const float inDry = 0.0;
 #else
 uniform float inDry;
 #endif'''
+# The shader always discards LODs near the player, on the promise that vanilla terrain
+# is there. The mod raises this uniform while the sections in view are still unmeshed.
+DH_FADE_ORIGINAL = 'color.a *= mix(smoothstep(far * 0.5, far * 0.7, lengthCylinder), 1.0, SeeleCavernWeight());'
+DH_FADE_REPLACEMENT = 'color.a *= mix(smoothstep(far * 0.5, far * 0.7, lengthCylinder), 1.0, max(SeeleCavernWeight(), seeleDhNearFill));'
+SHADER_PATCHES = (
+    ('shaders/lib/uniforms.glsl', DRY_ORIGINAL, DRY_REPLACEMENT),
+    ('shaders/lib/seele/cavern.glsl', '#define SEELE_CAVERN_HELPER', '#define SEELE_CAVERN_HELPER\nuniform float seeleDhNearFill;'),
+    ('shaders/program/dh_terrain.glsl', DH_FADE_ORIGINAL, DH_FADE_REPLACEMENT),
+    ('shaders/program/dh_water.glsl', DH_FADE_ORIGINAL, DH_FADE_REPLACEMENT),
+)
 
 
 @contextmanager
@@ -141,16 +151,19 @@ def distant_caches(world, seed, pack):
 
 
 def shader_payload(path):
-    member = 'shaders/lib/uniforms.glsl'
     with zipfile.ZipFile(path) as source:
-        text = source.read(member).decode('utf8')
-        if DRY_REPLACEMENT in text:
+        patched = {}
+        for member, original, replacement in SHADER_PATCHES:
+            text = patched.get(member, source.read(member).decode('utf8'))
+            if replacement not in text:
+                assert text.count(original) == 1
+                patched[member] = text.replace(original, replacement)
+        if not patched:
             return path
-        assert text.count(DRY_ORIGINAL) == 1
         output = io.BytesIO()
         with zipfile.ZipFile(output, 'w') as target:
             for entry in source.infolist():
-                data = text.replace(DRY_ORIGINAL, DRY_REPLACEMENT).encode('utf8') if entry.filename == member else source.read(entry)
+                data = patched[entry.filename].encode('utf8') if entry.filename in patched else source.read(entry)
                 target.writestr(entry, data)
             target.comment = source.comment
     return output.getvalue()

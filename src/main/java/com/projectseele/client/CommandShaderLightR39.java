@@ -41,6 +41,7 @@ public final class CommandShaderLightR39
                 final int component=axis;
                 holder.getMethod("uniform1i",frequency,String.class,IntSupplier.class).invoke(uniforms,perFrame,"seeleHeadquarters"+"XYZ".charAt(axis),(IntSupplier)()->headquartersOffset(component));
             }
+            holder.getMethod("uniform1f",frequency,String.class,java.util.function.DoubleSupplier.class).invoke(uniforms,perFrame,"seeleDhNearFill",(java.util.function.DoubleSupplier)DhNearFillR61::current);
         }
         catch(ReflectiveOperationException failure){throw new IllegalStateException("Pinned Oculus command-light binding changed",failure);}
     }

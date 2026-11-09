@@ -82,7 +82,9 @@
     "client.CommandShaderLightR39Mixin",
     "client.OculusDhReloadR53Mixin",
     "client.OculusDhRenderPassR54Mixin",
-    "client.DhWaterTransparencyR53Mixin"
+    "client.DhWaterTransparencyR53Mixin",
+    "client.SoundChannelAccessorR61",
+    "client.GiantEntityVisibilityR61Mixin"
   ],
   "injectors": {
     "defaultRequire": 1

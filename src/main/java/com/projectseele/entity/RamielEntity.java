@@ -783,11 +783,18 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
 
     // ----- boss bar -----
 
-    @Override
-    public void startSeenByPlayer(ServerPlayer player)
+    // Far tracking outlives the battle area; the bar keeps the old combat radius.
+    public void updateBossBarAudienceR61(net.minecraft.server.level.ServerLevel level)
     {
-        super.startSeenByPlayer(player);
-        this.bossEvent.addPlayer(player);
+        double range = Math.min(32 * 16, level.getServer().getPlayerList().getViewDistance() * 16);
+        for (var player : level.players())
+        {
+            double dx = player.getX() - this.getX(), dz = player.getZ() - this.getZ();
+            boolean near = dx * dx + dz * dz <= range * range;
+            boolean listed = this.bossEvent.getPlayers().contains(player);
+            if (near && !listed) this.bossEvent.addPlayer(player);
+            else if (!near && listed) this.bossEvent.removePlayer(player);
+        }
     }
 
     @Override
