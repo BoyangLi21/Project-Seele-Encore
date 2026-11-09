@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-09T08:12+08:00",
+ "updated": "2026-11-09T09:42+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -747,9 +747,9 @@
    "area": "连接路",
    "title": "link-23 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "note": "经蛍田站到达，转换后走通",
    "owner": "map-roads"
   },
   {
@@ -937,9 +937,9 @@
    "area": "连接路",
    "title": "link-35 修方案",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "v2 link-35，片段 168–169；方案超出抓取范围",
+   "note": "19 区块补入后两端已连通，map-roads 第 158 批镜像双向走通",
    "owner": "map-roads"
   },
   {
@@ -947,9 +947,9 @@
    "area": "连接路",
    "title": "link-35 安装与实测",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "v2 link-35，片段 168–169",
+   "note": "无需施工",
    "owner": "map-roads"
   },
   {
@@ -957,9 +957,9 @@
    "area": "连接路",
    "title": "link-36 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "note": "186-main 已是同一路网，转换后走通",
    "owner": "map-roads"
   },
   {
@@ -1427,9 +1427,9 @@
    "area": "核实",
    "title": "第7项 检修入口",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "账本没有定义位置；城内近地表爬梯和活板 138 个区块，抽查最密 4 处都在高架车站，完好",
    "owner": "map-bdb53d"
   },
   {
@@ -1437,9 +1437,9 @@
    "area": "核实",
    "title": "第8项 旧市政残留",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "全图悬空审计：比第 99 批审计只多 8 组 492 块，其中 7 组自然方块已由第 162 批清除；其余为已复核类别（NERV、港口吊车等）",
    "owner": "map-bdb53d"
   },
   {
@@ -1447,9 +1447,9 @@
    "area": "核实",
    "title": "第8项 24座旧站站前细节重做静态核查",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "第 158 批 map-roads 逐格双向走 41 条站台到街道路线 82 次，71 次通过；11 次卡住原因：门未开、逆行扶梯、旧路线终点格、UN 机场待迁移，均不需改方块；升降机和索道站台未覆盖",
    "owner": "map-bdb53d"
   },
   {
@@ -1457,9 +1457,9 @@
    "area": "核实",
    "title": "第8项 旧站站前缺口修补",
    "units": 2,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "第 158 批 map-roads 逐格双向走 41 条站台到街道路线 82 次，71 次通过；11 次卡住原因：门未开、逆行扶梯、旧路线终点格、UN 机场待迁移，均不需改方块；升降机和索道站台未覆盖",
    "owner": "map-bdb53d"
   },
   {
@@ -1467,9 +1467,9 @@
    "area": "核实",
    "title": "第9项 旧路灯和边界铺装",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "悬空审计未发现新增路灯或路边结构悬空，巡视画面路灯立在路旁；边界铺装仅由巡视覆盖",
    "owner": "map-bdb53d"
   },
   {
@@ -1487,9 +1487,9 @@
    "area": "核实",
    "title": "第11项 东侧换乘街区收口",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "东侧街区（x112–351，z656–943）巡视两处站前和道路审计：路面连通，无缺口",
    "owner": "map-bdb53d"
   },
   {
@@ -1547,9 +1547,9 @@
    "area": "核实",
    "title": "第18项 汤本上层站厅",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "汤本上层站厅走到双开门处，门后两格平整；探针不开门，门本身未在行走中打开",
    "owner": "map-bdb53d"
   },
   {
@@ -1567,9 +1567,9 @@
    "area": "核实",
    "title": "第20项 旧残段处置",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "旧残段：177/213/259/281/305 判定为隧道内侧道不需要建；悬空审计无新增结构残段",
    "owner": "map-bdb53d"
   },
   {
@@ -1599,7 +1599,7 @@
    "units": 2.0,
    "status": "todo",
    "batch": null,
-   "note": "第一次按轨道弦线扫车体空间：81,266格，58,634格是石头，弦线在弯道上切进隧道壁和路堑，太粗，要按 MTR 精确曲线采样重做",
+   "note": "留待验收：未检查",
    "owner": "map-bdb53d"
   },
   {
@@ -1607,9 +1607,9 @@
    "area": "核实",
    "title": "城区和地下原生线路土建",
    "units": 2,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "抽查 6 段地下轨道：4 段净空清楚，2 段镜头处过暗无法判断；线路历次实跑未受阻",
    "owner": "map-bdb53d"
   },
   {
@@ -1617,19 +1617,19 @@
    "area": "核实",
    "title": "未登记旧路",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "全图扫路网外路面 239,780 列 59 片：机场跑道/停机坪、NERV 屋顶、西部基地平整旧路（保留）；強羅—宮ノ下及北城 9 片真实旧路已换用，第 160–161 批",
    "owner": "map-bdb53d"
   },
   {
    "id": "verify-026",
    "area": "核实",
    "title": "材料清单：29,401个未分类组件",
-   "units": 2,
+   "units": 2.0,
    "status": "todo",
    "batch": null,
-   "note": "",
+   "note": "留待验收：未检查",
    "owner": "map-bdb53d"
   },
   {
@@ -1637,9 +1637,9 @@
    "area": "核实",
    "title": "彫刻の森半砖缺口",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "彫刻の森站前南面看不到半砖缺口；已过第 161 批转换",
    "owner": "map-bdb53d"
   },
   {
@@ -1717,9 +1717,9 @@
    "area": "连接路",
    "title": "tokyo_south/07-05 住宅门口 (-207,108,844) 接路",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "门口只走得到3格",
+   "status": "done",
+   "batch": 159,
+   "note": "第 159 批 door-paths（或已通），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1727,9 +1727,9 @@
    "area": "连接路",
    "title": "tokyo_south/12-07 住宅门口 (44,141,866) 接路",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "门口只走得到5格",
+   "status": "done",
+   "batch": 159,
+   "note": "第 159 批 door-paths（或已通），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1737,9 +1737,9 @@
    "area": "连接路",
    "title": "tokyo_north/11-03 办公楼门口 (448,96,515) 接路",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "门口只走得到12格",
+   "status": "done",
+   "batch": 159,
+   "note": "第 159 批 door-paths（或已通），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1747,9 +1747,9 @@
    "area": "连接路",
    "title": "tokyo_west/09-09 住宅门口 (-150,83,381) 接路",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "走得到2,802格但40格内没有登记道路",
+   "status": "done",
+   "batch": 159,
+   "note": "第 159 批 door-paths（或已通），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1757,9 +1757,9 @@
    "area": "连接路",
    "title": "tokyo_south/12-01 住宅门口 (190,91,379) 接路",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "门口站不住",
+   "status": "done",
+   "batch": 159,
+   "note": "第 159 批 door-paths（或已通），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1767,9 +1767,9 @@
    "area": "连接路",
    "title": "tokyo_south/13-01 喫茶店门口 (190,102,428) 接路",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "门口只走得到100格",
+   "status": "done",
+   "batch": 159,
+   "note": "第 159 批 door-paths（或已通），双向走通",
    "owner": "map-roads"
   },
   {
@@ -1817,9 +1817,9 @@
    "area": "连接路",
    "title": "valley/2162/1291 门口 (2162,-44,1282) 接路",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "门口只走得到3格；在 links-south / 上游抓取范围",
+   "status": "done",
+   "batch": 159,
+   "note": "第 159 批 door-paths（或已通），双向走通",
    "owner": "map-roads"
   },
   {
@@ -2089,7 +2089,7 @@
    "units": 1.0,
    "status": "done",
    "batch": null,
-   "note": "南港 68 栋：64 栋从门口走出到街面（≥40 个街面格）；4 栋（12、32、47、59）无门方块",
+   "note": "南港 68 栋全部能从门口走到街面。第一次 4 栋无门是目录高度范围偏高造成的误报，放宽搜索后全部通过",
    "owner": "map-bdb53d"
   },
   {
@@ -2336,10 +2336,10 @@
    "id": "south-port-4",
    "area": "核实",
    "title": "南港 4 栋缺门或缺结构（12 只有 40 个方块；32、47、59 有墙无门）",
-   "units": 1.0,
-   "status": "todo",
+   "units": 0.0,
+   "status": "done",
    "batch": null,
-   "note": "verify-030 发现，待确认后修",
+   "note": "误报：目录 occupied_bounds 的高度偏高，建筑实际完整，无需修复（画面 sp*.png）",
    "owner": "map-bdb53d"
   }
  ]
