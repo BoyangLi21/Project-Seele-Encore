@@ -983,17 +983,21 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         launchDoors.sort(Comparator.comparingDouble(g->g.frame().translation().y));
         if(!route.id().equals(data.getString("LaunchDoorsRouteR54")))
         {data.remove("LaunchDoorsStartedR54");data.putString("LaunchDoorsRouteR54",route.id());}
-        if(atBank&&!data.contains("LaunchDoorsStartedR54"))data.putLong("LaunchDoorsStartedR54",l.getGameTime());
-        for(int i=0;atBank&&i<launchDoors.size();i++)
+        boolean doorsDue=atBank||launchDoorsDueR60(route,data,travelled,launchDoors);
+        if(doorsDue&&!data.contains("LaunchDoorsStartedR54"))data.putLong("LaunchDoorsStartedR54",l.getGameTime());
+        boolean launchDoorsOpen=doorsDue;
+        for(int i=0;doorsDue&&i<launchDoors.size();i++)
         {
             var door=launchDoors.get(i);
-            boolean started=l.getGameTime()-data.getLong("LaunchDoorsStartedR54")>=i*12L;
+            boolean started=l.getGameTime()-data.getLong("LaunchDoorsStartedR54")>=i*LAUNCH_DOOR_STAGGER_R60;
             boolean open=started&&gateLeafR54(l,door,true,TransportMembershipR52.members(o,kind(data)));
+            launchDoorsOpen&=open;
             // Open each higher leaf twelve ticks later, while the stopped
             // carrier retracts and changes guide axis below. In NORMAL mode
             // animation completion is not a prerequisite for those actuators.
-            if(geometry.strict()&&!open){ready=false;pending="opening_launch_gate/"+door.resource();}
+            if(atBank&&geometry.strict()&&!open){ready=false;pending="opening_launch_gate/"+door.resource();}
         }
+        data.putBoolean("LaunchDoorsOpenR60",launchDoorsOpen);
         for(String id:geometry.resources())
         {
             var r=directory.resource(id);var scope=geometry.strict()?null:geometry.resourceScope();
@@ -1020,6 +1024,18 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         }
         if(ready)holds.remove(o.eva());else hold(o,pending);
         return ready;
+    }
+    private static final int LAUNCH_DOOR_STAGGER_R60=12;
+    /** A requested launch must not stand at the bank waiting for its shaft.
+     *  The staged doors start while the carrier is still approaching, so the
+     *  last leaf finishes no later than the moment it stops. */
+    private boolean launchDoorsDueR60(Route route,CompoundTag data,double travelled,List<Gate> doors)
+    {
+        if(doors.isEmpty()||!route.phased()||route.recovery()
+                ||!data.getBoolean("ContinuousAutoLaunchR52")&&!data.getBoolean("ReleaseWhenReady"))return false;
+        int leadTicks=0;
+        for(int i=0;i<doors.size();i++){var hatch=doors.get(i).siloHatch();leadTicks=Math.max(leadTicks,i*LAUNCH_DOOR_STAGGER_R60+(hatch==null?30:hatch.openTicks()));}
+        return directory.readyDistanceR53(route)-travelled<=leadTicks/20D*NervLaunchPhasesR53.transferCruiseMps(route);
     }
     private boolean prepareRearLateralR53(ServerLevel l,Original o,Route route,CompoundTag data,double target)
     {

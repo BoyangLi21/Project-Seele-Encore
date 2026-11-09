@@ -34,6 +34,8 @@ public final class NervLaunchPhasesR53
         if(transfer)speed=new NervRouteDirectoryR52.SpeedProfile(speed.cruiseMps()*4,speed.accelerationMps2()*16,speed.decelerationMps2()*16);
         return new Run(stage,bank?ready:total,speed);
     }
+    public static double transferCruiseMps(NervRouteDirectoryR52.Route route)
+    {return route.motionProfile().prelaunch().cruiseMps()*4;}
     /** A complete native distance clock is necessary; a request flag cannot skip the stop. */
     public static Run crossStoppedBank(CompoundTag data,UUID task,NervRouteDirectoryR52 directory,NervRouteDirectoryR52.Route route,double at)
     {

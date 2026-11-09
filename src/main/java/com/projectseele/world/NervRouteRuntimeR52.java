@@ -613,7 +613,10 @@ public final class NervRouteRuntimeR52
                     {saved.put(job.update(snapshot,Phase.RETURNING,data,"滑靴转回转移导向"));return;}
                     boolean requested=route.recovery()||data.getBoolean("ContinuousAutoLaunchR52")||data.getBoolean("ReleaseWhenReady");
                     if(!requested){saved.put(job.update(snapshot,Phase.READY,data,""));return;}
-                    if(!route.recovery()&&!FacilityRouteAudioR53.countdown(level,job,data,headsPrepared)){saved.put(job.update(snapshot,Phase.READY,data,"发射倒计时"));return;}
+                    // The first launch step needs every shaft door open. Counting
+                    // down while they were still opening left the airframe
+                    // waiting at "one" until the last leaf finished.
+                    if(!route.recovery()&&!FacilityRouteAudioR53.countdown(level,job,data,headsPrepared&&data.getBoolean("LaunchDoorsOpenR60"))){saved.put(job.update(snapshot,Phase.READY,data,"发射倒计时"));return;}
                     phased=NervLaunchPhasesR53.crossStoppedBank(data,snapshot.task(),directory,route,at);
                     continuousPrimedR52.remove(snapshot.task());stored=data.getCompound("ContinuousClockR52");
                     job=job.update(snapshot,route.recovery()?Phase.RETURNING:Phase.DEPARTING,data,"");saved.put(job);

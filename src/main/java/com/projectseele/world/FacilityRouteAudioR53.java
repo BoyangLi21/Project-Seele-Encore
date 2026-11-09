@@ -22,8 +22,9 @@ final class FacilityRouteAudioR53
         int advance(long now,boolean prepared)
         {
             if(next<0)return 0;
+            // Nothing is announced until the launch can follow it directly.
+            if(!prepared)return -1;
             if(next<3&&now-announcedAt<1_000_000_000L)return -1;
-            if(next<=1&&!prepared)return -1;
             // Start each interval when its cue is actually sent. Never consume
             // missed intervals after a stall or a burst of server catch-up ticks.
             announcedAt=now;
