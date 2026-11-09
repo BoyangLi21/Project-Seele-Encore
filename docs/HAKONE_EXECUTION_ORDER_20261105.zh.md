@@ -511,3 +511,7 @@ UN 旧候选地块与交通/水域存在重叠，现扩展为 X3504–4383、Z�
 - 02:04 主会话清理 F 盘时，`r54_remote_fix_20261027/server/SEELE_R53_WORLD` 是指向正式世界的目录链接，`robocopy /MOVE` 把正式世界的内容带去了 E 盘。已从 `E:/eva-archive-20261110/artifacts/` 原样复制回来：80,440 个文件，两边逐文件比对无差异，时间戳保留，世界仍是第 334 批。以后移动目录前先排除目录链接。
 - 接下来：主会话打包 R61 后，开始 GeoFront 改造（见 [GeoFront 改造计划](GEOFRONT_REMODEL_PLAN.zh.md)），再做 UN 迁移。两组批次都由负责人统一验收。
 - 全图实机巡视（tc-tour）这轮没有做，留到验收。
+
+### GeoFront 改造：城市和湖（2026-11-10）
+
+第 335–368 批，用深层写入工具直接写入，共 9,713,516 格，详情见 [GeoFront 改造计划](GEOFRONT_REMODEL_PLAN.zh.md)。第 334 批之后的所有写入，下一版发布前都要重建 Distant Horizons 和小地图。
