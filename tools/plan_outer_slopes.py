@@ -246,6 +246,10 @@ def author(a):
 
     seen = set()
 
+    def open_above(cell):
+        names = (source.state(cell[0], y, cell[2]).split('[')[0] for y in range(cell[1] + 1, 320))
+        return all(name in OPEN or is_tree(name) for name in names)
+
     def clear_tree(start):
         queue = deque([start])
         while queue:
@@ -257,7 +261,8 @@ def author(a):
                 state = source.state(*cell)
             except ValueError:
                 continue
-            if not is_tree(state.split('[')[0]):
+            # A log or leaf buried in the ground stays: clearing it would leave a hole underground.
+            if not is_tree(state.split('[')[0]) or not open_above(cell):
                 continue
             put(cell, state, 'minecraft:air', 'tree on graded ground')
             for dx in (-1, 0, 1):
