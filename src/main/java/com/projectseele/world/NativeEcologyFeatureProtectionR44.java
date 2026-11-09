@@ -115,6 +115,10 @@ public final class NativeEcologyFeatureProtectionR44
                     @Override public void removeBlockEntity(BlockPos p){throw new Clipped();}
                 });
             }
+            // Release builds run obfuscated names, so the branch above is skipped and the
+            // interface default would demand FULL neighbours in the middle of generation.
+            if(args.length==2&&args[0] instanceof Integer&&args[1] instanceof Integer&&method.getReturnType()==net.minecraft.world.level.chunk.ChunkAccess.class)
+                return world.getChunk((Integer)args[0],(Integer)args[1]);
             if(name.equals("addFreshEntity")||name.equals("destroyBlock")||name.equals("removeBlock")||name.equals("setBlockEntity")||name.equals("removeBlockEntity"))throw new Clipped();
             if(name.equals("setCurrentlyGenerating")||name.equals("scheduleTick")||name.equals("blockUpdated")||name.equals("levelEvent")||name.equals("gameEvent"))return null;
             if(method.isDefault())return InvocationHandler.invokeDefault(self,method,args);
