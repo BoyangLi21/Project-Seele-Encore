@@ -118,7 +118,7 @@ final class EvaRigTransforms
         if(upper.getName().startsWith("leg_"))
         {
             float off=bend.length()/Math.max(pole.length(),1e-5F);
-            var toes=handRotation.transform(new Vector3f(0,0,-1));toes.fma(-toes.dot(direction),direction);
+            var toes=handRotation.transform(new Vector3f(0,0,-1)).add(0,.5F,0);toes.fma(-toes.dot(direction),direction);
             if(off<KNEE_PLANE_OFF&&toes.lengthSquared()>1e-6F)
             {
                 float t=off/KNEE_PLANE_OFF;t=t*t*(3-2*t);toes.normalize();
@@ -150,9 +150,12 @@ final class EvaRigTransforms
             // the front of the thigh/upper arm. A kneecap faces the way the knee bends out; an elbow's
             // front faces away from it (the point is behind). Keeping the incoming axis sign instead let
             // an already-twisted limb stay turned back to front.
+            // The hinge is the normal of the plane the solve chose. Read off the two bones, its sign
+            // turned over once the joint folded so far that the upper bone pointed past the target,
+            // and a foot drawn up onto a high step rolled the thigh half a turn for two frames.
             boolean leg=upper.getName().startsWith("leg_");
-            boolean frontToBend=new Vector3f(axis).cross(du).dot(bend)>0;
-            if(leg!=frontToBend)axis.negate();
+            axis.set(direction).cross(bend).normalize();
+            if(!leg)axis.negate();
         }
         for(var bone:new GeoBone[]{lower,wrist,hand}){bone.setPosX(0);bone.setPosY(0);bone.setPosZ(0);}
         wrist.setRotX(0);wrist.setRotY(0);wrist.setRotZ(0);
