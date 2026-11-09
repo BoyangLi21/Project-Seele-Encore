@@ -217,6 +217,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private static final float STOMP_DAMAGE = 50.0F;
     private static final int STOMP_COOLDOWN_TICKS = 50;
     private static final double STOMP_RADIUS = EvaScale.fromLegacy(9.4D);
+    private static final double KICK_RADIUS_R60 = 4;
+    /** Share of the kick before and after its authored contact in which the swinging leg can land. */
+    private static final float KICK_WINDOW_LEAD_R60 = .21F, KICK_WINDOW_TAIL_R60 = .2F;
     private static final float KICK_SOURCE_FPS = 60.0F;
     private static final float KICK_PLAYBACK_SPEED = 1.5F;
     private static final int KICK_FRAME_INTERVALS = 83;
@@ -633,6 +636,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private float kickDurationAtStart;
     private Vec3 liveCombatRootPrevious = Vec3.ZERO;
     private int pendingKickContactTicks;
+    private boolean kickContactR60;
+    private Vec3 kickPreviousFootR60;
+    private boolean strikeAngelsOnlyR60;
     private int ordinaryAfterKickBufferTicks;
     private int kickAfterOrdinaryBufferTicks;
     private int knifeVisualTicks;
@@ -3737,6 +3743,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.kickDurationAtStart = this.kickDurationTicks();
         this.liveCombatRootPrevious = EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.root(this,"kick",0):EvaLiveCombatMotion.kick(0.0F);
         this.pendingKickContactTicks = this.kickContactTicks();
+        this.kickContactR60=false;
+        this.kickPreviousFootR60=null;
         this.stompCooldown = this.fastMeleeCooldownR43(STOMP_COOLDOWN_TICKS);
         this.entityData.set(DATA_KICK_SEQUENCE,
                 (this.entityData.get(DATA_KICK_SEQUENCE) + 1)
@@ -3770,6 +3778,28 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     "EVA motion-lab side kick contact: eva={}",
                     this.getStringUUID());
         }
+    }
+
+    /**
+     * One tick of the side kick's contact window. The whole leg strikes, on every tick of its
+     * swing: tested only at the foot on a single tick, the kick passed over anything nearer than
+     * its full reach, and whatever the foot's height left out. Empty ticks stay quiet; the whiff
+     * belongs to the authored contact below.
+     */
+    private boolean sideKickContactR60(LivingEntity pilot)
+    {
+        Vec3[] leg=EvaGameplayMotionR32.kickingLeg(this,EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.side(this,"kick"):"l",1);
+        Vec3 hip=leg[0],foot=leg[1],previous=this.kickPreviousFootR60==null?foot:this.kickPreviousFootR60;
+        this.kickPreviousFootR60=foot;
+        float damage=STOMP_DAMAGE*this.getMeleeMultiplier();
+        // The longer reach is for the Angels: it must not catch a friendly unit standing beside the kick.
+        this.strikeAngelsOnlyR60=true;
+        try
+        {
+            return this.strikeZoneR32(pilot,new AABB(hip,foot).inflate(KICK_RADIUS_R60),damage,2.4D,foot,hip,KICK_RADIUS_R60,true)
+                    ||this.strikeZoneR32(pilot,new AABB(previous,foot).inflate(KICK_RADIUS_R60),damage,2.4D,foot,previous,KICK_RADIUS_R60,true);
+        }
+        finally{this.strikeAngelsOnlyR60=false;}
     }
 
     private void resolveStompContact(LivingEntity pilot)
@@ -4116,6 +4146,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         for (Entity target : actualCandidates)
         {
             if(pilot instanceof TrainingPilotEntity&&(target instanceof EvaUnit01Entity||target instanceof TrainingPilotEntity||target instanceof NervStaffEntity))continue;
+            if(this.strikeAngelsOnlyR60&&!(target instanceof Angel))continue;
             if(from==null&&!com.projectseele.physics.CombatDamageTargetsR44.overlap(target,zone))continue;
             var bodyContact=from==null?java.util.Optional.of(fxCenter):com.projectseele.physics.CombatDamageTargetsR44.clip(target,from,fxCenter,radius);
             if(bodyContact.isEmpty())
@@ -5525,10 +5556,17 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 }
             }
         }
+        if(this.kickVisualTicks>0&&!this.kickContactR60&&combatPilot!=null&&!this.isPilotControlLocked())
+        {
+            float phase=this.entityData.get(DATA_LIVE_ACTION_PHASE);
+            float contact=EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.contactPhase(this,"kick"):KICK_CONTACT_FRAME/(float)KICK_FRAME_INTERVALS;
+            if(phase>=contact-KICK_WINDOW_LEAD_R60&&phase<=contact+KICK_WINDOW_TAIL_R60)this.kickContactR60=this.sideKickContactR60(combatPilot);
+        }
         if (this.pendingKickContactTicks > 0)
         {
             this.pendingKickContactTicks--;
             if (this.pendingKickContactTicks == 0
+                    && !this.kickContactR60
                     && combatPilot != null
                     && !this.isPilotControlLocked())
             {

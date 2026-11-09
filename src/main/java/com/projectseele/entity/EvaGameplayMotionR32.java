@@ -721,6 +721,17 @@ public final class EvaGameplayMotionR32
         var local=pose.matrix(bone).transformPosition(point).mul(EvaScale.RENDER_SCALE).rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD);
         return (e.level().isClientSide?e.getPosition(partial):e.position()).add(local.x,local.y,local.z);
     }
+    /** Hip and foot of a leg in the world, on this tick's pose: everything between them can strike. */
+    public static Vec3[] kickingLeg(EvaUnit01Entity e,String side,float partial)
+    {
+        var pose=EvaBodyPose.sample(e,partial);
+        return new Vec3[]{posedPoint(e,pose,"leg_"+side,partial),posedPoint(e,pose,"foot_"+side,partial)};
+    }
+    private static Vec3 posedPoint(EvaUnit01Entity e,EvaBodyPose.Sample pose,String bone,float partial)
+    {
+        var local=pose.matrix(bone).transformPosition(new Vector3f(pose.rig.get(bone).pivot())).mul(EvaScale.RENDER_SCALE).rotateY((180-EvaAirTransportR31.frameYaw(e,partial))*Mth.DEG_TO_RAD);
+        return (e.level().isClientSide?e.getPosition(partial):e.position()).add(local.x,local.y,local.z);
+    }
     public static Vec3 airContact(EvaUnit01Entity e,float partial)
     {
         if(EvaCombatR31.action(e)!=EvaCombatR31.AIR_SLAM)return hand(e,side(e,"air_strike"),partial);

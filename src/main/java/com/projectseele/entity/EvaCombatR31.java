@@ -141,16 +141,24 @@ public final class EvaCombatR31
             if(motion&&strokeAge(e,0)<0&&age>=EvaAirDriveR59.gather(a))
             {e.getEntityData().set(STROKE,e.level().getGameTime());e.playSound(ModSounds.EVA_SWING.get(),2.6F,a==AIR_SLAM?.58F:.75F);}
             float stroke=strokeAge(e,0);
-            boolean window=motion?stroke>=0&&stroke<=9:a==AIR_STRIKE&&age>=6&&age<=18;
+            // The air kick is thrown from high up and is live until the body lands: stopped nine
+            // ticks after the stroke, it ended in mid-air on any jump above a low hop.
+            boolean kick=a==AIR_SLAM&&motion;
+            boolean window=motion?stroke>=0&&(kick||stroke<=9):a==AIR_STRIKE&&age>=6&&age<=18;
             if(window&&!s.contact)
             {
                 Vec3 hand=aerialHand(e,1),previous=s.previousContact==null?hand:s.previousContact;
+                double radius=kick?AIR_KICK_RADIUS:2;
+                // The kicking leg strikes along its length, not only at the foot.
+                Vec3 hip=kick?EvaGameplayMotionR32.kickingLeg(e,EvaGameplayMotionR32.side(e,"air_kick"),1)[0]:hand;
                 // Vanilla's section index stores a giant at its feet. A small
                 // hand-height query omits it even when the hand crosses its body.
                 // Broaden only the candidate search; keep the swept contact below.
-                for(var t:com.projectseele.physics.CombatEntityQueryR44.candidates(e.level(),new AABB(previous,hand).inflate(2),t->t instanceof Angel&&t.isAlive()))
+                for(var t:com.projectseele.physics.CombatEntityQueryR44.candidates(e.level(),new AABB(previous,hand).minmax(new AABB(hip,hip)).inflate(radius),t->t instanceof Angel&&t.isAlive()))
                 {
-                    var clipped=com.projectseele.physics.CombatBodyContacts.clip(t,previous,hand,2);if(clipped.isEmpty())continue;
+                    var clipped=com.projectseele.physics.CombatBodyContacts.clip(t,previous,hand,radius);
+                    if(clipped.isEmpty()&&kick)clipped=com.projectseele.physics.CombatBodyContacts.clip(t,hip,hand,radius);
+                    if(clipped.isEmpty())continue;
                     Vec3 hit=clipped.orElse(previous);
                     if(e.distanceTo(t)<45&&visible(e,previous,hit))
                     {Vec3 impulse=hand.subtract(previous).normalize().scale(.35).add(forward(e).scale(.65)).normalize();s.contact=EvaHitFeedback.hurt(t,e.damageSources().mobAttack(e),35,hit,impulse);if(s.contact)break;}
@@ -199,6 +207,8 @@ public final class EvaCombatR31
         }
         if(a==THROW&&age>26)clear(e);
     }
+    /** How far from the kicking leg an air kick connects (blocks). */
+    private static final double AIR_KICK_RADIUS=4;
     private static boolean visible(EvaUnit01Entity e,Vec3 a,Vec3 b)
     {return e.level().clip(new ClipContext(a,b,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,e)).getType()==HitResult.Type.MISS;}
     private static void slam(EvaUnit01Entity e)

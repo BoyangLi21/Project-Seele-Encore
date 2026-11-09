@@ -52,6 +52,17 @@ public final class EvaConnectedActionReview
     private static final boolean MOVES=Boolean.getBoolean("projectseele.tourMovesR59");
     /** Terrain check: a terraced hill on the review ground, walked over and across. */
     private static final boolean HILL=Boolean.getBoolean("projectseele.tourHillR60");
+    /** Melee check: a still Sachiel placed around the body, kicked on the ground and from the air. */
+    private static final boolean STRIKE=Boolean.getBoolean("projectseele.tourStrikeR60");
+    private static final int STRIKE_LEAD=20,STRIKE_CYCLE=140;
+    /** Each case: air (1) or ground (0), blocks ahead of the body, blocks to its right, blocks up, the target. */
+    private static final int[][] STRIKE_CASES={{0,10,0,0,0},{0,20,0,0,0},{0,32,0,0,0},{0,20,10,0,0},{0,20,-10,0,0},
+            {0,18,0,2,1},{0,18,0,14,1},{0,18,0,28,1},{0,24,0,2,1},{0,24,0,14,1},{0,24,0,28,1},
+            {0,16,0,0,2},{0,24,0,0,2},
+            {1,24,0,0,0},{1,34,0,0,0},{1,30,10,0,0},{1,24,0,2,1},{1,34,0,2,1}};
+    private static final String[] STRIKE_TARGETS={"sachiel","ramiel","shamshel"};
+    private static int strikeSpawned=-1,strikeFired=-1;
+    private static boolean strikeCleared;
     private static final int DASH_END=Integer.getInteger("projectseele.tourDashEnd",130);
     /** Starts the sprint this many ticks sooner: the review ground ends in a wall. */
     private static final int DASH_LEAD=Integer.getInteger("projectseele.tourDashLead",0);
@@ -235,6 +246,7 @@ public final class EvaConnectedActionReview
         if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
         if(HILL){hillR60(mc);positionCamera(mc,eva);return;}
+        if(STRIKE){strikeR60(mc,eva);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<Math.max(140,DASH_END+10)||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -297,6 +309,34 @@ public final class EvaConnectedActionReview
     }
 
     /** Up a terraced hill with a stop on the slope, over the top, then across the slope and back. */
+    private static void strikeR60(Minecraft mc,EvaUnit01Entity eva)
+    {
+        // Slopes left by an earlier hill tour would stand between the body and the target.
+        if(at(2))for(int z=-110;z<=70;z++)mc.player.connection.sendCommand("fill -60 -60 "+z+" 60 -25 "+z+" minecraft:air");
+        int t=tick-STRIKE_LEAD;
+        if(t<0)return;
+        int index=t/STRIKE_CYCLE,local=t%STRIKE_CYCLE;
+        mc.options.keyJump.setDown(false);
+        if(index>=STRIKE_CASES.length)
+        {
+            if(!strikeCleared){strikeCleared=true;for(var name:STRIKE_TARGETS)mc.player.connection.sendCommand("kill @e[type=projectseele:"+name+"]");}
+            return;
+        }
+        var c=STRIKE_CASES[index];
+        double yaw=Math.toRadians(eva.getYRot());
+        Vec3 ahead=new Vec3(-Math.sin(yaw),0,Math.cos(yaw)),right=new Vec3(-ahead.z,0,ahead.x);
+        if(index!=strikeSpawned)
+        {
+            strikeSpawned=index;
+            Vec3 at=eva.position().add(ahead.scale(c[1])).add(right.scale(c[2])).add(0,c[3],0);
+            for(var name:STRIKE_TARGETS)mc.player.connection.sendCommand("kill @e[type=projectseele:"+name+"]");
+            mc.player.connection.sendCommand("summon projectseele:"+STRIKE_TARGETS[c[4]]+" "+at.x+" "+at.y+" "+at.z+" {NoAI:1b,Rotation:["+(eva.getYRot()+180)+"F,0F]}");
+            com.projectseele.ProjectSeele.LOGGER.info("R60CASE {} kind {} ahead {} right {} up {} target {}",index,c[0],c[1],c[2],c[3],STRIKE_TARGETS[c[4]]);
+        }
+        if(c[0]==1)mc.options.keyJump.setDown(local>=30&&local<33);
+        if(index!=strikeFired&&local>=(c[0]==1?46:30)){strikeFired=index;send(ServerboundEvaControlPacket.ACTION_SMASH);}
+    }
+
     private static void hillR60(Minecraft mc)
     {
         int t=tick;
