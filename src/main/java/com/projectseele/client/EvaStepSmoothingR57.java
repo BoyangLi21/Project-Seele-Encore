@@ -31,7 +31,9 @@ public final class EvaStepSmoothingR57
         if(s.frame==now)return (float)s.offset;
         double dt=(now-s.frame)/1e9,y=e.getPosition(partial).y;
         s.frame=now;
-        if(Double.isNaN(s.y)||dt<=0||dt>.25){s.y=y;var at=e.getPosition(partial);s.x=at.x;s.z=at.z;s.pace=0;s.offset=0;s.speed=0;return 0;}
+        // A carrier's rise is not a ledge. Entity.onGround stays stale through
+        // transport, and dropping the body here left it hanging below its rack.
+        if(Double.isNaN(s.y)||dt<=0||dt>.25||carried(e)){s.y=y;var at=e.getPosition(partial);s.x=at.x;s.z=at.z;s.pace=0;s.offset=0;s.speed=0;return 0;}
         double rise=y-s.y;s.y=y;
         var at=e.getPosition(partial);
         // Horizontal speed, eased: a running body rises onto the ledge within
@@ -61,6 +63,11 @@ public final class EvaStepSmoothingR57
         s.offset=(s.offset+step)*decay;s.speed=(s.speed-rate*step)*decay;
         if(s.offset>0){s.offset=0;s.speed=0;}
         return (float)s.offset;
+    }
+    private static boolean carried(EvaUnit01Entity e)
+    {
+        return e.isNervLogisticsLocked()||e.isLaunchSequenceActive()||e.hasActiveCarrierMotion()
+                ||com.projectseele.entity.EvaMechanicalFrameR52.active(e)||com.projectseele.entity.EvaAirTransportR31.active(e);
     }
     private EvaStepSmoothingR57(){}
 }
