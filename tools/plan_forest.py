@@ -18,6 +18,7 @@ from PIL import Image, ImageDraw
 from scipy.ndimage import binary_dilation
 import shapely
 
+from map_pipeline.launch_protection import load as load_launch_protection
 from map_pipeline.native_rails import load_rails
 from plan_ashi_landscape_r54 import PLANTS
 from plan_station_access_corridor import CapturedSurface
@@ -183,6 +184,15 @@ def attached(cells, x0, z0):
     return [(x, y, z, index[(x, y, z)]) for x, y, z in seen]
 
 
+def in_launch_volume(guard, cells):
+    """Whether any cell of a tree stands in the space an EVA launches through."""
+    try:
+        guard.assert_positions([c[:3] for c in cells])
+    except ValueError:
+        return True
+    return False
+
+
 def keep_outs(spec, source):
     """Columns nothing of a tree may stand over, columns already holding a tree, and the road columns."""
     x0, z0, x1, z1 = source.bounds
@@ -218,6 +228,9 @@ def keep_outs(spec, source):
         for t in np.linspace(0, 1, max(2, int(np.linalg.norm(q - p)) + 1)):
             jx, jz = (p + (q - p) * t).astype(int) - (x0, z0)
             keep_out[max(0, jz - reach):max(0, jz + reach + 1), max(0, jx - reach):max(0, jx + reach + 1)] = True
+    # Areas left open whatever the survey says, such as the street grid of the retractable city.
+    for a, b, c, d in spec.get('no_plant', ()):
+        keep_out[max(0, b - z0):max(0, d - z0 + 1), max(0, a - x0):max(0, c - x0 + 1)] = True
     return keep_out, existing, walk
 
 
@@ -230,6 +243,7 @@ def edits(a):
         cx, cz = map(int, f['bounds'][:2])
         kinds = f['classes'][z0 - cz:z1 - cz + 1, x0 - cx:x1 - cx + 1]
     keep_out, existing, walk = keep_outs(spec, source)
+    guard = load_launch_protection(spec['launch_world']) if spec.get('launch_world') else None
     rng = random.Random(spec.get('seed', 1))
     spacing = {CONIFER: spec.get('conifer_spacing', 5), PINE: spec.get('pine_spacing', 7), BROADLEAF: spec.get('broadleaf_spacing', 7), BAMBOO: 9, SHRUB: spec.get('shrub_spacing', 9)}
     rows, trees = {}, Counter()
@@ -249,6 +263,8 @@ def edits(a):
                 jz, jx = iz + rng.randint(0, loose), ix + rng.randint(0, loose)
                 if not (0 <= jz < top.shape[0] and 0 <= jx < top.shape[1]) or kinds[jz, jx] != kind or keep_out[jz, jx] or existing[jz, jx]:
                     continue
+                if 'core' in spec and not (spec['core'][0] <= jx + x0 <= spec['core'][2] and spec['core'][1] <= jz + z0 <= spec['core'][3]):
+                    continue                    # the margin is for crowns of trunks inside the core, so tiles join without a seam
                 x, z, y = int(jx + x0), int(jz + z0), int(top[jz, jx])
                 if source.state(x, y, z).split('[')[0] not in GROWS_ON:
                     continue
@@ -270,6 +286,8 @@ def edits(a):
                 if not ok or len(cells) < 4:
                     continue
                 if not any(c[0] == x and c[2] == z for c in cells):
+                    continue
+                if guard and in_launch_volume(guard, cells):
                     continue
                 for cx_, cy_, cz_, state in attached(cells, x, z):
                     rows[cx_, cy_, cz_] = dict(pos=[cx_, cy_, cz_], before=source.state(cx_, cy_, cz_), after=state, purpose='forest ' + NAMES[kind])

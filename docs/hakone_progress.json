@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-09T09:44+08:00",
+ "updated": "2026-11-09T12:51+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -477,9 +477,9 @@
    "area": "连接路",
    "title": "link-6 已可步行，不施工",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "map-roads 的不跳跃步行检查走不通（我的检查到达判定太松：目标片段±1.5格、窗口150格），改回待办",
+   "note": "由 S3 的 alt-9-127、alt-9-16 覆盖，转换后实走通过",
    "owner": "map-roads"
   },
   {
@@ -2097,9 +2097,9 @@
    "area": "森林",
    "title": "数据来源：环境省植生图条款、范围、登记 ASSETS",
    "units": 1.0,
-   "status": "doing",
+   "status": "done",
    "batch": null,
-   "note": "用户 2026-11-08 决定验收前种上",
+   "note": "样板、FPS、体积和禁入审计完成；用户选密集 5/7",
    "owner": "map-bdb53d"
   },
   {
@@ -2107,9 +2107,9 @@
    "area": "森林",
    "title": "植被图转世界坐标，分杉桧人工林、阔叶林、草原和开阔地",
    "units": 2.0,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "样板、FPS、体积和禁入审计完成；用户选密集 5/7",
    "owner": "map-bdb53d"
   },
   {
@@ -2117,9 +2117,9 @@
    "area": "森林",
    "title": "规划工具：树种、密度、禁入区、只长在天然土上",
    "units": 2.0,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "样板、FPS、体积和禁入审计完成；用户选密集 5/7",
    "owner": "map-bdb53d"
   },
   {
@@ -2127,9 +2127,9 @@
    "area": "森林",
    "title": "副本样板：前后帧（x1200–1800 河谷、湯本）",
    "units": 1.0,
-   "status": "doing",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "样板、FPS、体积和禁入审计完成；用户选密集 5/7",
    "owner": "map-bdb53d"
   },
   {
@@ -2137,9 +2137,9 @@
    "area": "森林",
    "title": "FPS（光影包）和 DH、客户端体积测试，必要时减量",
    "units": 1.0,
-   "status": "doing",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "样板、FPS、体积和禁入审计完成；用户选密集 5/7",
    "owner": "map-bdb53d"
   },
   {
@@ -2147,9 +2147,9 @@
    "area": "森林",
    "title": "禁入区核对：索道和缆车包络、道路净空、站场、挡土墙、护栏、水面",
    "units": 1.0,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "样板、FPS、体积和禁入审计完成；用户选密集 5/7",
    "owner": "map-bdb53d"
   },
   {
@@ -2157,9 +2157,9 @@
    "area": "森林",
    "title": "森林安装第 1 区（安装、读回）",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 185,
+   "note": "第 163–185 批中前 17 片，读回 0 错",
    "owner": "map-bdb53d"
   },
   {
@@ -2167,9 +2167,9 @@
    "area": "森林",
    "title": "森林第 1 区核查（浮叶、禁入）",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "每批审计：0 个禁入列、0 组无根",
    "owner": "map-bdb53d"
   },
   {
@@ -2177,9 +2177,9 @@
    "area": "森林",
    "title": "森林安装第 2 区（安装、读回）",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 197,
+   "note": "截至第 197 批，读回 0 错",
    "owner": "map-bdb53d"
   },
   {
@@ -2187,9 +2187,9 @@
    "area": "森林",
    "title": "森林第 2 区核查（浮叶、禁入）",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "每批审计通过",
    "owner": "map-bdb53d"
   },
   {
@@ -2197,9 +2197,9 @@
    "area": "森林",
    "title": "森林安装第 3 区（安装、读回）",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 222,
+   "note": "截至第 222 批，读回 0 错",
    "owner": "map-bdb53d"
   },
   {
@@ -2207,9 +2207,9 @@
    "area": "森林",
    "title": "森林第 3 区核查（浮叶、禁入）",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "每批审计通过；第 220 批移除十字城区内的树",
    "owner": "map-bdb53d"
   },
   {
@@ -2217,9 +2217,9 @@
    "area": "森林",
    "title": "森林安装第 4 区（安装、读回）",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 246,
+   "note": "截至第 246 批，读回 0 错",
    "owner": "map-bdb53d"
   },
   {
@@ -2227,9 +2227,9 @@
    "area": "森林",
    "title": "森林第 4 区核查（浮叶、禁入）",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "每批审计通过",
    "owner": "map-bdb53d"
   },
   {
@@ -2237,9 +2237,9 @@
    "area": "森林",
    "title": "森林安装第 5 区（安装、读回）",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 246,
+   "note": "截至第 246 批，读回 0 错",
    "owner": "map-bdb53d"
   },
   {
@@ -2247,9 +2247,9 @@
    "area": "森林",
    "title": "森林第 5 区核查（浮叶、禁入）",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "每批审计通过",
    "owner": "map-bdb53d"
   },
   {
@@ -2257,9 +2257,9 @@
    "area": "森林",
    "title": "森林安装第 6 区（安装、读回）",
    "units": 1.0,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 258,
+   "note": "截至第 258 批，读回 0 错",
    "owner": "map-bdb53d"
   },
   {
@@ -2267,9 +2267,9 @@
    "area": "森林",
    "title": "森林第 6 区核查（浮叶、禁入）",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "每批审计通过",
    "owner": "map-bdb53d"
   },
   {
@@ -2277,9 +2277,9 @@
    "area": "森林",
    "title": "森林安装第 7 区（安装、读回）",
    "units": 1.0,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "截至最后一批，读回 0 错",
    "owner": "map-bdb53d"
   },
   {
@@ -2287,9 +2287,9 @@
    "area": "森林",
    "title": "森林第 7 区核查（浮叶、禁入）",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "每批审计通过",
    "owner": "map-bdb53d"
   },
   {
@@ -2297,9 +2297,9 @@
    "area": "森林",
    "title": "森林安装第 8 区（安装、读回）",
    "units": 1.0,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "截至最后一批，读回 0 错",
    "owner": "map-bdb53d"
   },
   {
@@ -2307,9 +2307,9 @@
    "area": "森林",
    "title": "森林第 8 区核查（浮叶、禁入）",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "每批审计通过",
    "owner": "map-bdb53d"
   },
   {
@@ -2317,9 +2317,9 @@
    "area": "森林",
    "title": "森林全图实机巡视",
    "units": 1.0,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "全图 10 处巡视：山坡成林，道路和设施不受影响；第 297 批清除接缝处 21 片悬空树叶",
    "owner": "map-bdb53d"
   },
   {
