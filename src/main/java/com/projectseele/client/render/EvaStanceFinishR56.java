@@ -38,6 +38,8 @@ final class EvaStanceFinishR56
     private static final float PALM_TURN=10*Mth.DEG_TO_RAD;
     /** A hand turns palm down from this height above the ground and is flat by the first (blocks). */
     private static final float PALM_NEAR=1.5F,PALM_FAR=8F;
+    /** How far a free hand is turned from the captured pose toward its palm and toward its thumb (degrees). */
+    private static final float WRIST_TOWARD_PALM=20,WRIST_TOWARD_THUMB=12;
     /** Where a reaching hand lands: ahead of and outside its shoulder, a palm's thickness up (blocks). */
     private static final float REACH_AHEAD=9F,REACH_OUT=1.5F,PALM_REST=1F;
 
@@ -71,6 +73,25 @@ final class EvaStanceFinishR56
             for(String side:new String[]{"l","r"})
                 model.getBone("hand_"+side).ifPresent(b->EvaRigTransforms.rotate(b,
                         new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX()).slerp(new Quaternionf(),crouch)));
+        float relaxed=(1-prone)*(1-crouch);
+        if(emptyLeft)relaxWrist(model,"l",relaxed);
+        if(emptyRight)relaxWrist(model,"r",relaxed);
+    }
+
+    /**
+     * A free hand hangs relaxed: bent a little toward the palm and in line with the forearm. The
+     * captured hands stood cocked back toward the knuckles and out to the side, and with the
+     * fingers open the wrist read as broken. Measured in the game on the posed hand: +X bends
+     * either hand toward its palm, and Z turns it toward the thumb (-Z on bone hand_r, +Z on
+     * hand_l). The two hands mirror each other, so only Z changes sign.
+     */
+    private static void relaxWrist(BakedGeoModel model,String side,float weight)
+    {
+        if(weight<=.01F)return;
+        model.getBone("hand_"+side).ifPresent(b->EvaRigTransforms.rotate(b,
+                new Quaternionf().rotationZYX(b.getRotZ(),b.getRotY(),b.getRotX())
+                        .rotateX(WRIST_TOWARD_PALM*Mth.DEG_TO_RAD*weight)
+                        .rotateZ((side.equals("l")?1:-1)*WRIST_TOWARD_THUMB*Mth.DEG_TO_RAD*weight)));
     }
 
     private static void plantHand(BakedGeoModel model,Matrix4f root,String side,float reach,float prone)
