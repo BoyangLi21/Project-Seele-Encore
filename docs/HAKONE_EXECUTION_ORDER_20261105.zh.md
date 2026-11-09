@@ -497,3 +497,9 @@ UN 旧候选地块与交通/水域存在重叠，现扩展为 X3504–4383、Z�
 - 最后重建远景和小地图，放在以上全部做完之后；小地图缓存路径等主会话的结论。
 
 脚本在本会话临时目录 `C:/Users/liboy/AppData/Local/Temp/claude/aefb0ea8583168a8/29181be3-d449-46fb-849e-a26e362f6e76/scratchpad`（terrain2.py、scars.py、boards.py、signfix.py、entfix.py、fixroads2.py、forestrun.sh），重建脚本在 worktree 的 `.claude/dhjob/`，画面在 `F:/eva/.claude/map-work/client/screenshots/`。
+
+### 100% 后清单收口（2026-11-09）
+
+- 地形：第 310–314 批。cl2、cl10 的灰面是天然石切面，保留；cl9 的黑白台阶已换素色（第 312 批误改了旁边大楼 1,394 格，第 313 批已原样恢复）。
+- 站牌：第 315–334 批，61 块，立柱在站台后侧，距轨道中心至少 4 格，不挡车门。
+- 第 334 批是最后一次方块写入。之后只重建 Distant Horizons 并在副本上烘焙小地图（`.claude/dhjob/driver2.sh`），结果写在同目录 `RESULT.txt`。
