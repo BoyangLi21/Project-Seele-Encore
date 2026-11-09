@@ -119,7 +119,7 @@ public final class UNAirLiftR29
                 for(var item:json.getAsJsonArray("pads"))
                 {
                     var row=item.getAsJsonObject();int key=row.get("serial").getAsInt();var p=row.getAsJsonArray("deck");
-                    var value=new Vec3(p.get(0).getAsDouble(),p.get(1).getAsDouble(),p.get(2).getAsDouble());
+                    var value=FacilitySites.un(level,new Vec3(p.get(0).getAsDouble(),p.get(1).getAsDouble(),p.get(2).getAsDouble()));
                     if(key<0||key>1||!Double.isFinite(value.lengthSqr())||value.distanceTo(UNRecoveryR22.home(level,key))>512)throw new IllegalArgumentException("UN receiving pad location");
                     result.put(key,value);
                 }

@@ -19,7 +19,7 @@ public final class SbwPhantomLoadR24
         long now=System.nanoTime();
         if(equal&&entity.tickCount==old.tick&&now<old.expires&&entity.isAlive()&&!entity.isVehicle()&&!entity.isPassenger()
                 &&entity.level().dimension().location().toString().equals("projectseele:geofront")
-                &&entity.getX()>=6000&&entity.getX()<=7200&&entity.getZ()>=-7400&&entity.getZ()<=-5900)
+                &&com.projectseele.entity.SbwStaticShapesR24.unFleetArea(entity.getX(),entity.getZ()))
             return;
         entity.load(tag);
         previous.put(entity,new Entry(tag.copy(),entity.tickCount,now+1_000_000_000L));

@@ -69,7 +69,7 @@ public final class SbwRestCollisionR24
         if(e.isVehicle()||e.isPassenger())return null;
         if(e.isOnFire()||e.isInWaterOrBubble())return null;
         if(input.x!=0||input.z!=0||input.y>=0||input.y<-.25)return null;
-        if(!e.level().dimension().location().toString().equals("projectseele:geofront")||e.getX()<6000||e.getX()>7200||e.getZ()<-7400||e.getZ()>-5900
+        if(!e.level().dimension().location().toString().equals("projectseele:geofront")||!SbwStaticShapesR24.unFleetArea(e.getX(),e.getZ())
                 ||net.minecraftforge.fml.ModList.get().isLoaded("valkyrienskies"))return null;
         try
         {
