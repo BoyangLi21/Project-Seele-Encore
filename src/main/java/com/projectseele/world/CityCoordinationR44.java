@@ -130,9 +130,9 @@ public final class CityCoordinationR44
             if(unit<0||unit>4||!Set.of("human","npc").contains(parts[2])||unit>2&&parts[2].equals("npc"))return "这台机体没有对应的 NERV 驾驶员。";
             UUID person=player.getUUID();
             if(parts.length==4)
-            {if(!parts[2].equals("human"))return "NPC 驾驶员不能指定其他玩家身份。";try{person=UUID.fromString(parts[3]);}catch(IllegalArgumentException error){return "请指定真实玩家 UUID。";}}
+            {if(!parts[2].equals("human"))return "NPC 驾驶员不能指定其他玩家身份。";try{person=UUID.fromString(parts[3]);}catch(IllegalArgumentException error){return "请从列表中选择在线玩家。";}}
             var actual=actualBinding(level,unit,parts[2],person);
-            if(actual==null)return "原机体或实际驾驶员尚未接通，请等候，不能用替代实例确认。";
+            if(actual==null)return "机体或驾驶员的信号尚未接通，请稍候再确认。";
             if(!data.bind(expected,actual))return "这名驾驶员已有另一台编成，或当前档案已变更。";
             return TvSortiesR32.name(unit)+"已加入编成，等待驾驶员确认。";
         }
@@ -140,7 +140,7 @@ public final class CityCoordinationR44
         {
             if(data.stage!=6||!data.tested||data.supply.isEmpty()||!data.allConfirmed())return "准备或本次驾驶员确认还没有完成，不能归档。";
             for(int unit:data.formation.keySet())
-            {var old=data.binding(unit);var actual=actualBinding(level,unit,old.kind(),old.pilot());if(!old.equals(actual))return "实际驾驶员或原机体已变更，请重新编成与确认。";}
+            {var old=data.binding(unit);var actual=actualBinding(level,unit,old.kind(),old.pilot());if(!old.equals(actual))return "驾驶员或机体已变更，请重新编成并确认。";}
             data.archive();return "美里：准备情况已记下。未知的射击条件还要继续确认。\n"+data.notice;
         }
         return "请选择档案中的有效操作。";
@@ -182,16 +182,16 @@ public final class CityCoordinationR44
         catch(NumberFormatException error){return "请选择当前档案中的有效机体确认。";}
         if(formationRevision!=data.formationRevisionR45||evidenceRevision!=data.evidenceRevisionR45)return "这条确认来自旧编成或旧资料，请重新核对当前档案。";
         var binding=data.binding(unit);
-        if(binding==null||data.stage!=5&&data.stage!=6)return "这台机体尚未绑定本次实际驾驶员，请重新编成。";
+        if(binding==null||data.stage!=5&&data.stage!=6)return "这台机体还没有编入本次的驾驶员，请重新编成。";
         if(action.startsWith("withdraw/"))
             return data.withdraw(expected,unit,player.getUUID())?"驾驶员已撤回，后续指令不会继续下达。":"这项撤回请由本人或本次司令确认。";
         if(binding.kind().equals("human")&&!player.getUUID().equals(binding.pilot()))return "请由已编入的驾驶员本人确认，司令不能替其他玩家同意。";
         if(binding.kind().equals("npc")&&!player.getUUID().equals(data.owner))return "请由本次司令接通这名驾驶员的频道。";
-        if(!data.requiredReadingComplete())return "本次要求的实体文书还没有服务端阅读回执，请在真实书台确认。";
+        if(!data.requiredReadingComplete())return "本次要求的文书还没有阅读记录，请到书台上阅读确认。";
         if(binding.kind().equals("human")&&!data.dossierReadCurrent(player.getUUID()))return "请本人先查阅当前三份记录，不能由其他玩家代读后确认。";
         if(binding.kind().equals("npc")&&data.knowledge!=7)return participantLine(unit,false)+"\n请先共享三份记录。";
         var actual=actualBinding(level,unit,binding.kind(),binding.pilot());
-        if(!binding.equals(actual))return "原机体或驾驶员身份已变更，请重新编成，不沿用旧确认。";
+        if(!binding.equals(actual))return "机体或驾驶员已变更，请重新编成，之前的确认不再有效。";
         if(!data.confirm(expected,actual,formationRevision,evidenceRevision,actual.pilot()))return "本次确认已失效，请核对当前编成与资料修订。";
         return actual.kind().equals("human")?"已记录 "+player.getName().getString()+" 本人驾驶确认，尚未下达发射指令。":participantLine(unit,true);
     }

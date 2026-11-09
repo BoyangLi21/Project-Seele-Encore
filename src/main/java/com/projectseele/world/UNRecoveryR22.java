@@ -47,11 +47,11 @@ public final class UNRecoveryR22
     }
     public static int request(CommandSourceStack source,int serial,boolean reset)
     {
-        var l=source.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null||identity(l,serial)==null){source.sendFailure(Component.literal("没有该 UN 机体的已登记身份，未生成替代机"));return 0;}
+        var l=source.getServer().getLevel(FacilitySchemaV2.DIMENSION);if(l==null||identity(l,serial)==null){source.sendFailure(Component.literal("这台 UN 机体尚未登记。"));return 0;}
         if(!reset)
         {
             var caller=source.getPlayer();
-            if(caller==null){source.sendFailure(Component.literal("正常回收需要实际通信操作员；请由玩家呼叫原运输机与地面接应载台。"));return 0;}
+            if(caller==null){source.sendFailure(Component.literal("回收需要由玩家在 UN 指挥通信里呼叫运输机和地面接应载台。"));return 0;}
             String reply=UNAirLiftR29.requestRecoveryR47(caller,serial);
             source.sendSuccess(()->Component.literal("EVA-UN-0"+serial+"："+reply),false);return 1;
         }
@@ -60,7 +60,7 @@ public final class UNRecoveryR22
             if(!reset){source.sendFailure(Component.literal("运输任务仍在执行，请先取消运输并等待安全返回。"));return 0;}
         }
         JOBS.computeIfAbsent(l,k->new HashMap<>()).put(serial,new Job(serial,reset,source,source.getServer().getTickCount()));
-        source.sendSuccess(()->Component.literal("EVA-UN-0"+serial+"：正在定位原机体与插入栓"),false);return 1;
+        source.sendSuccess(()->Component.literal("EVA-UN-0"+serial+"：正在定位机体与插入栓"),false);return 1;
     }
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {
@@ -70,7 +70,7 @@ public final class UNRecoveryR22
         {
             var job=it.next();UUID id=identity(l,job.serial());Vec3 home=home(l,job.serial());
             load(l,locations(l).positions.getOrDefault(id,BlockPos.containing(home)));load(l,BlockPos.containing(home));
-            if(event.getServer().getTickCount()-job.started()>200){job.source().sendFailure(Component.literal("原机体或插入栓仍未加载，未删除或复制实体"));it.remove();continue;}
+            if(event.getServer().getTickCount()-job.started()>200){job.source().sendFailure(Component.literal("机体或插入栓仍未加载，请稍后重试。"));it.remove();continue;}
             if(!(l.getEntity(id) instanceof EvaPrototypeEntity eva))continue;
             load(l,eva.blockPosition());var data=eva.getPersistentData();
             if(data.hasUUID("UNPlug"))
@@ -81,7 +81,7 @@ public final class UNRecoveryR22
             boolean destroyed=plug==null&&EntryPlugDisposalR31.replacementAuthorized(eva);
             if(plug==null&&!destroyed)continue;
             if(eva.getPilotEntity()!=null||eva.getPassengers().stream().anyMatch(person->!(person instanceof EntryPlugCarrierEntity))||plug!=null&&!plug.getPassengers().isEmpty())
-            {job.source().sendFailure(Component.literal("原驾驶员仍在机体或插入栓中，维护复位已取消；请先正常离栓。"));it.remove();continue;}
+            {job.source().sendFailure(Component.literal("驾驶员仍在机体或插入栓中，维护复位已取消；请先离开插入栓。"));it.remove();continue;}
             if(UNAirLiftR29.active(l,job.serial()))UNAirLiftR29.abortForMaintenance(l,job.serial());
             eva.stopUNFlight();
             var pilot=eva.getPilotEntity();var passengers=new ArrayList<net.minecraft.world.entity.Entity>();if(plug!=null)passengers.addAll(plug.getPassengers());passengers.addAll(eva.getPassengers());

@@ -93,21 +93,21 @@ public final class StaffRecoveryR47
                 queued.nextAirRequest=0;
                 queued.expires=level.getGameTime()+20*60*12;
                 state.setDirty();
-                return "运输机尚未派出："+queued.stage.substring("R53_AIR_WAIT:".length())+" 正在重新确认接载条件。";
+                return "运输机尚未派出："+queued.stage.substring("R53_AIR_WAIT:".length())+"正在重新确认接载条件。";
             }
             return "这台机体的回收已经在安排，请查看运输状态。";
         }
         var receipt = EvaFleetSavedData.get(level.getServer()).entry(unit).orElse(null);
-        if (receipt == null) return "原机体登记尚未接通，不能安排回收。";
+        if (receipt == null) return "机体登记尚未接通，不能安排回收。";
         if (receipt.phase() != EvaFleetSavedData.Phase.DEPLOYED && receipt.phase() != EvaFleetSavedData.Phase.PARKED
                 &&receipt.phase()!=EvaFleetSavedData.Phase.PLUG_FAULT)
             return "机体仍在机库运输过程中。请等它到安全位置，再安排回收。";
         var eva = EvaLogisticsDirector.canonicalUnit(level, unit);
         boolean emptyFault=receipt.phase()==EvaFleetSavedData.Phase.PLUG_FAULT;
         if(emptyFault&&(eva==null||!AutoSortieR32.releaseEmptyFaultBayDelegationR50(caller,eva)))
-            return "故障原机须已经在原湿舱停稳、原栓空置锁定，且无活作战、待指令、运输或未归还装备，才能正常抽栓回收。";
+            return "故障机体要先在所属湿舱停稳，插入栓空置并锁定，且没有进行中的作战、待执行指令、运输或未归还的装备，才能抽出插入栓回收。";
         if (eva != null && eva.getPilotEntity() instanceof ServerPlayer pilot && pilot != caller)
-            return "请由当前驾驶员请求回收，或先让驾驶员按原流程离栓。";
+            return "请由当前驾驶员请求回收，或先让驾驶员离开插入栓。";
         String ownership=EntryPlugEjectionR48.recoveryCallerBlocker(caller,eva);if(!ownership.isEmpty())return ownership;
         if(emptyFault)
         {
@@ -122,7 +122,7 @@ public final class StaffRecoveryR47
         job.officer = officer.getUUID(); job.expires = level.getGameTime() + 20 * 60 * 12;
         state.jobs.put(unit, job); state.setDirty(); AutoSortieR32.suspendAutomaticForRecovery(level,unit);
         if(eva!=null){eva.stopAutonomousR30();TvEncounterRulesR45.pauseNpcUnitForRecoveryR47(eva);}
-        return emptyFault?"收到。故障原机已在原湿舱，原空栓正沿正常吊架抽出；回吊位后恢复注液和登机桥，未复位或替换机体。"
+        return emptyFault?"收到。故障机体已在所属湿舱，空插入栓正沿吊架抽出；回到吊位后恢复注液和登机桥。"
                 :"收到。先安排机体返回所属发射井，再按常规流程回库。驾驶员保持通信。";
     }
 
@@ -186,7 +186,7 @@ public final class StaffRecoveryR47
                     var capsule=EntryPlugDirector.canonical(level,job.unit);
                     if (eva.getPilotEntity() != null || capsule!=null&&capsule.getFirstPassenger()!=null)
                     {
-                        if(!job.stage.equals("HUMAN_EXIT_WAIT"))NervStaffDialogue.say(owner,"赤木律子 · 回收联络","机体已回到湿舱。驾驶员，请按原流程离栓。");
+                        if(!job.stage.equals("HUMAN_EXIT_WAIT"))NervStaffDialogue.say(owner,"赤木律子 · 回收联络","机体已回到湿舱。驾驶员，请离开插入栓。");
                         stage(state,job,"HUMAN_EXIT_WAIT");continue;
                     }
                     state.jobs.remove(job.unit); state.setDirty();
@@ -212,7 +212,7 @@ public final class StaffRecoveryR47
                         String next=attempted!=null&&attempted.active()?"R53_AIR_HANDOFF_WAIT":"R53_AIR_STOPPED";
                         if(next.equals("R53_AIR_STOPPED")&&!next.equals(job.stage))
                             NervStaffDialogue.say(owner,"NERV 运输联络","本次空运已停止，未重新派机。请查看运输状态；确认可以继续后，取消后续操作并重新请求回收。"
-                                    +(attempted==null?"":attempted.waiting()));
+                                    +(attempted==null?"":NervAirTransportRuntimeR52.humanWaitingR52(attempted.waiting())));
                         stage(state,job,next);continue;
                     }
                     if(level.getGameTime()<job.nextAirRequest)continue;

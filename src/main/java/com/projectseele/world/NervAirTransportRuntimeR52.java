@@ -88,15 +88,34 @@ public final class NervAirTransportRuntimeR52
         var controller=LIVE.get(l);var jobs=state(l).jobs().stream().filter(Job::active).toList();return jobs.isEmpty()?"运输机在各泊位待命。":String.join(" ｜ ",jobs.stream().map(j->{var aircraft=controller.manifest.aircraft().values().stream().filter(a->a.entity().equals(j.aircraft())).findFirst().orElse(null);return "运输机"+(aircraft==null?"":aircraft.serial())+"："+NervStaffDialogue.unitName(j.original().variant())+" "+phaseLabelR52(j.phase())+" "+humanWaitingR52(j.waiting());}).toList());
     }
     private static String phaseLabelR52(Phase phase){return switch(phase){case PREPARE->"准备中";case TAKEOFF,FERRY->"前往接载点";case APPROACH,CLAMP->"接载中";case ASCEND,STOW,CRUISE->"运输中";case UNSTOW,DESCEND,HANDOFF,RELEASE->"交接中";case RETREAT->"退出接应点";case RETURN,LAND->"返场中";case HOLD->"等待";case COMPLETE->"已完成";case CANCELLED->"已取消";};}
-    private static String humanWaitingR52(String reason){
+    // Hold reasons stay precise in the job record and debug log. One that uses
+    // internal wording reaches players only as a plain line; first key wins.
+    private static final java.util.regex.Pattern INTERNAL_WAIT_R54=java.util.regex.Pattern.compile(
+            "[A-Za-z]|原(?![位地路有])|实际|真实|样本|时钟|占域|租约|资源域|整组|来源|几何|帧|包络|链|目录|版本|索引|线程|皮肤|双鞋|栓座");
+    private static final String[][] PLAIN_WAIT_R54={
+            {"旋翼实际停止","正在确认旋翼安全间隔，原位等待。"},{"扶正","正在扶正机体，请保持周围净空。"},
+            {"缓慢下降","夹具正承托机体缓慢下降。"},{"链","返场航路尚未准备完成，原位等待。"},
+            {"Root","返场航路尚未准备完成，原位等待。"},{"逆向时钟","返场航路尚未准备完成，原位等待。"},
+            {"解锁","运输机已返场，等待机体解锁。"},{"收尾","运输机正在泊位收尾。"},
+            {"未在实际原泊位","运输机正在返回泊位。"},{"取消于","已在泊位取消，运输机未起飞。"},
+            {"绕行","正在规划绕行航路，原位等待。"},{"避让","正在规划绕行航路，原位等待。"},
+            {"退出","运输机正在退出接应区，等待航路净空。"},{"离开接应","运输机正在退出接应区，等待航路净空。"},
+            {"返场","运输机沿来路返场。"},{"受阻/未加载","运输机周围受阻或尚未加载，原位等待。"},
+            {"sweep",""},{"受阻",""},{"接应","等待接收架承托机体。"},{"转移架","等待接收架承托机体。"},
+            {"停稳原姿势","正在确认机体姿势与承托，原位等待。"},{"停稳","等待机体站稳后再接载。"},
+            {"fraction","正在确认运输机位置，原位等待。"},{"租约","航路被其他任务占用，原位等待。"},
+            {"UUID","等待运输机、机体与沿途区域就绪。"},{"加载","等待运输机、机体与沿途区域就绪。"},
+            {"载入","等待运输机、机体与沿途区域就绪。"},{"就绪","等待运输机、机体与沿途区域就绪。"},
+            {"邻近停机体","夹具碰到相邻机体，正在收回并重新选择夹持点。"},{"已重选","已重新选择夹持点，夹具重新伸出。"},
+            {"夹具收回中","夹具收回中，机体保持原位。"},{"夹具","正在调整夹具。"},{"夹爪","正在调整夹具。"},
+            {"接点","正在调整夹具。"},{"姿","正在确认机体姿势与承托，原位等待。"},
+            {"来源","正在确认机体姿势与承托，原位等待。"},{"几何","正在确认机体姿势与承托，原位等待。"}};
+    static String humanWaitingR52(String reason){
         if(reason==null||reason.isBlank())return "";
-        if(reason.contains("sweep"))return reason.contains("夹具")?"夹具附近受阻，等待净空。":"航路受阻，等待净空。";
-        if(reason.contains("fraction"))return "正在确认运输机位置，原位等待。";
-        if(reason.contains("UUID"))return "等待原运输机就绪。";
-        if(reason.contains("Root"))return "返场航路尚未准备完成，原位等待。";
-        if(reason.contains("旋翼实际停止样本验证失败"))return "正在确认旋翼安全间隔，原位等待。";
-        if(reason.contains("来源")||reason.contains("几何"))return "正在确认机体姿势与承托，原位等待。";
-        return reason;
+        if(!INTERNAL_WAIT_R54.matcher(reason).find())return reason;
+        for(String[] rule:PLAIN_WAIT_R54)if(reason.contains(rule[0]))
+            return !rule[1].isEmpty()?rule[1]:reason.contains("夹具")||reason.contains("夹爪")||reason.contains("撤爪")?"夹具附近受阻，等待净空。":"航路受阻，等待净空。";
+        return "正在核对运输状态，原位等待。";
     }
     public static String request(ServerPlayer caller,int variant,boolean returning,int x,int z)
     {
@@ -137,11 +156,11 @@ public final class NervAirTransportRuntimeR52
         var controller=LIVE.get(level);
         if(controller==null)return new EvaLogisticsDirector.ActionResult(false,status(level));
         if(variant<0||variant>2||commander==null||receiverId==null||receiverId.isBlank())
-            return new EvaLogisticsDirector.ActionResult(false,"原回库编队或所选接收口不完整。");
+            return new EvaLogisticsDirector.ActionResult(false,"回库机体或所选接收口信息不完整。");
         var original=NervRouteRuntimeR52.originalForFlight(level,variant,commander);
-        if(original==null)return new EvaLogisticsDirector.ActionResult(false,"原出击编队尚未满足航空接应条件。");
+        if(original==null)return new EvaLogisticsDirector.ActionResult(false,"这台机体的出击记录尚未满足空运接应条件。");
         if(controller.saved.payload(original.eva())!=null)
-            return new EvaLogisticsDirector.ActionResult(false,"同一原机已有航空任务，保留该任务与接收口。");
+            return new EvaLogisticsDirector.ActionResult(false,"这台机体已有空运任务，现有任务和接收口保持不变。");
         String reply;
         try{reply=controller.request(variant,commander,Intent.RECOVER,0,0,receiverId);}
         catch(IllegalArgumentException|IllegalStateException denied)
@@ -155,12 +174,12 @@ public final class NervAirTransportRuntimeR52
                 &&accepted.ownerData().getBoolean("Returning")
                 &&accepted.ownerData().getString("Intent").equals(Intent.RECOVER.name());
         return new EvaLogisticsDirector.ActionResult(queued,queued
-                ?"已安排原运输机接应至同一回收口；实物接载、原架升起并承托后再交接回库。":reply);
+                ?"已安排运输机把机体送往同一回收口；回收架升起并承托机体后再交接回库。":reply);
     }
     public static String cancel(ServerPlayer p,int variant)
     {
         var s=state(p.serverLevel());var j=s.jobs().stream().filter(x->x.active()&&(variant<0||x.original().variant()==variant)&&x.original().owner().equals(p.getUUID())).findFirst().orElse(null);
-        if(j==null)return "没有属于当前指挥者的原运输任务。";s.put(j.requestCancel());return j.carrying()?"原载荷和占域已保持；取消等待已验证接应链交付后返场。":"原飞机将沿已走过的实际航段逆向返场。";
+        if(j==null)return "没有由你下达的运输任务。";s.put(j.requestCancel());return j.carrying()?"运输机正载着机体，取消会在机体交给接收架后生效，随后返场。":"运输机将沿来路返场。";
     }
     public static boolean abortForMaintenance(ServerLevel l,int variant,UUID eva)
     {
@@ -179,7 +198,7 @@ public final class NervAirTransportRuntimeR52
         c.saved.put(j.update(0,0,Phase.CANCELLED,false,false,Set.of(),Set.of(),new CompoundTag(),"管理员复位"));
         c.previews.remove(j.task());c.hullPlans.remove(eva);return true;
     }
-    public static String forceRecover(ServerLevel l){return "R52 禁止传送或重建原飞机；"+status(l);}
+    public static String forceRecover(ServerLevel l){return "当前地图不支持强制回收：运输机不会被传送或重建。"+status(l);}
     public static String phaseName(ServerLevel l){var jobs=state(l).jobs().stream().filter(Job::active).toList();return jobs.isEmpty()?"IDLE":String.join(",",jobs.stream().map(j->j.aircraft()+"/"+j.phase()).toList());}
     @SubscribeEvent public static void tick(TickEvent.ServerTickEvent event)
     {if(event.phase!=TickEvent.Phase.END)return;for(var level:event.getServer().getAllLevels()){var c=LIVE.get(level);if(c!=null)c.tick();}}
@@ -212,21 +231,21 @@ public final class NervAirTransportRuntimeR52
                 var selected=manifest.receiver(receiverId);
                 if(intent==Intent.RECOVER)
                 {
-                    if(selected==null||selected.delivery()||!selected.reverseRoutes().containsKey(variant))return "所选接收口没有登记本机的原回库路线。";
+                    if(selected==null||selected.delivery()||!selected.reverseRoutes().containsKey(variant))return "所选接收口没有登记本机的回库路线。";
                     var route=manifest.directory().route(selected.reverseRoutes().get(variant));
                     var port=manifest.directory().ports().get(receiverId);
                     if(route==null||!route.recovery()||route.variant()!=variant||!receiverId.equals(route.port())
-                            ||port==null||!Objects.equals(port.reverseRoutes().get(variant),route.id()))return "所选接收口的原回库线路尚未就绪。";
+                            ||port==null||!Objects.equals(port.reverseRoutes().get(variant),route.id()))return "所选接收口的回库路线尚未就绪。";
                 }
-                else if(selected==null||!selected.delivery())return "远山原运输接应口身份尚未登记。";
+                else if(selected==null||!selected.delivery())return "远山运输接应口尚未登记。";
             }
-            var ground=ground();if(ground==null||!saved.fault().isEmpty())return status(level);var original=original(variant,commander);if(original==null)return "原 EVA、原插入栓、实际驾驶员或任务归属尚未就绪。";
-            if(intent==Intent.RECOVER&&NervRouteRuntimeR52.originalForFlight(level,variant,commander)==null)return "原 EVA 的出击记录与回库承接尚未接通，原机体保持原位。";
-            if(saved.payload(original.eva())!=null)return "同一原 EVA 已有运输任务。";
+            var ground=ground();if(ground==null||!saved.fault().isEmpty())return status(level);var original=original(variant,commander);if(original==null)return "机体、插入栓、驾驶员或任务归属尚未就绪。";
+            if(intent==Intent.RECOVER&&NervRouteRuntimeR52.originalForFlight(level,variant,commander)==null)return "机体的出击记录与回库接应尚未接通，机体保持原位。";
+            if(saved.payload(original.eva())!=null)return "这台机体已有运输任务。";
             if(intent==Intent.RECOVER&&receiverId==null&&NervRouteRuntimeR52.atRecoveryPortR54(level,variant))
                 return NervRouteRuntimeR52.recover(level,variant).message();
             var eva=(EvaUnit01Entity)level.getEntity(original.eva());Kind kind=EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())?Kind.HULL_ONLY_RECOVERY:Kind.OCCUPIED;
-            var data=new CompoundTag();data.putString("AssemblyKindR52",kind.name());data.putBoolean("Returning",intent==Intent.RECOVER);data.putString("Intent",intent.name());var preview=ground.owner().previewFlight(level,original,kind,data);if(preview==null)return "原机体须在真实支撑上停稳；空运不能替换原姿势、乘员或夹具。";
+            var data=new CompoundTag();data.putString("AssemblyKindR52",kind.name());data.putBoolean("Returning",intent==Intent.RECOVER);data.putString("Intent",intent.name());var preview=ground.owner().previewFlight(level,original,kind,data);if(preview==null)return "机体须先在地面上站稳，才能安排空运。";
             Vec3 actualFoot=preview.root().transformPoint(preview.binding().contactCentre());var region=manifest.region(actualFoot);if(region==null)return "当前位置尚未开放空运接载。";
             var candidates=manifest.missions().values().stream().filter(m->(m.intent()==intent||intent==Intent.DELIVER&&m.intent()==Intent.FAR_MOUNTAIN)&&m.variants().contains(variant)&&m.region()==region)
                     .filter(m->receiverId!=null?m.receiver().equals(receiverId):intent==Intent.RECOVER||NervAirDeliveryTargetR53.selected(m)||nearDestination(m,x,z))
@@ -263,11 +282,11 @@ public final class NervAirTransportRuntimeR52
                 if(saved.aircraft(aircraft.entity())!=null||!(level.getEntity(aircraft.entity()) instanceof UNTransportEntity plane)||plane.carrying())
                 {blocked="运输机正在执行其他接载任务。";continue;}
                 if(!aircraftSupported(aircraft)||!NervAirTransportManifestR52.same(NervAircraftFrameR52.actual(plane),manifest.node(aircraft.stand()).frame().plane()))
-                {blocked="运输机的原停机位或支承尚未就绪。";continue;}
+                {blocked="运输机的停机位或支承尚未就绪。";continue;}
                 data.put("PickupRoot",NervAircraftFrameR52.encodeRigid(preview.root()));
                 var pickupCells=pickupSpaces(m,preview);data.put("PickupHeldSpaces",writeList(pickupCells));var standFrame=frameAt(m,aircraft.stand(),preview,data,false);var initialClock=NervAircraftFrameR52.rotorClock(plane);var required=new HashSet<>(sourceSpaces(preview,standFrame,standFrame,false,initialClock,initialClock+1,manifest.node(aircraft.stand()).spaces()));required.addAll(pickupCells);
                 if(!ground.pool().resourcesAvailable(null,required)){blocked="接载区或航路正在被其他编队占用。";continue;}
-                if(!NervAircraftFrameR52.bind(plane,manifest,aircraft)){blocked="原运输机位置与停机位不符。";continue;}
+                if(!NervAircraftFrameR52.bind(plane,manifest,aircraft)){blocked="运输机不在停机位上。";continue;}
                 var stand=manifest.node(aircraft.stand());var heldSpaces=new HashSet<>(stand.spaces());heldSpaces.addAll(pickupCells);var frame=frameAt(m,aircraft.stand(),preview,data,false);
                 // Region tickets complete asynchronously. Before a job exists,
                 // only this candidate's stopped source needs a synchronous read.
@@ -277,9 +296,9 @@ public final class NervAirTransportRuntimeR52
                 for(var box:stoppedSource.envelopes())for(int cx=(int)Math.floor(box.minX)>>4;cx<=(int)Math.floor(box.maxX)>>4;cx++)for(int cz=(int)Math.floor(box.minZ)>>4;cz<=(int)Math.floor(box.maxZ)>>4;cz++)stoppedChunks.add(new ChunkPos(cx,cz));
                 for(var at:stoppedChunks)if(level.getChunkSource().getChunkNow(at.x,at.z)==null)level.getChunk(at.x,at.z);
                 var stationary=proof(aircraft.entity(),preview,frame,frame,heldSpaces,false);
-                if(stationary==null){blocked="正在确认原停机位及接载机体的状态。";continue;}
+                if(stationary==null){blocked="正在确认停机位和待接载机体的状态。";continue;}
                 UUID task=UUID.randomUUID();var access=access(original,kind,aircraft.entity(),stationary,false);
-                if(!ground.pool().reserveFlight(task,original,aircraft.entity(),kind,heldSpaces,Set.of(),access)){blocked="原机体或运输机的上次任务尚未交接。";continue;}
+                if(!ground.pool().reserveFlight(task,original,aircraft.entity(),kind,heldSpaces,Set.of(),access)){blocked="机体或运输机的上一次任务尚未交接完成。";continue;}
                 data.putString("FlightStage","PREFLIGHT");NervAircraftFrameR52.putFrame(data,"Frame",frame);data.putInt("PassedOutbound",0);var j=new Job(task,aircraft.entity(),original,kind,manifest.fingerprint(),m.id(),m.receiver(),0,0,Phase.PREPARE,Phase.PREPARE,false,false,false,heldSpaces,Set.of(),data,"");save(j);previews.put(task,preview);return "已安排运输机，正在准备接载。";
             }
             return blocked;

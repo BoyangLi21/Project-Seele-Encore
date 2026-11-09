@@ -72,14 +72,14 @@ public final class NervAirLiftR30
     {
         if(NervRouteRuntimeR52.claimed(l))return NervAirTransportRuntimeR52.status(l);
         var s=state(l);String surface=s.forceRecovery?s.last:s.job==null?s.last:NervStaffDialogue.unitName(s.job.variant)+"："+s.job.note;
-        String underground=NervUndergroundTransportSiteR50.get(l)==null?"本轮 GeoFront 地下机场尚未交付":NervUndergroundAirLiftR50.status(l);
+        String underground=NervUndergroundTransportSiteR50.get(l)==null?"GeoFront 地下机场尚未开放":NervUndergroundAirLiftR50.status(l);
         return "地表运输："+surface+" ｜ 地下运输："+underground;
     }
     public static String forceRecover(ServerLevel level)
     {
         if(NervRouteRuntimeR52.claimed(level))return NervAirTransportRuntimeR52.forceRecover(level);
         if(!Files.isRegularFile(level.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_transport_r30.json")))return "此存档尚未安装 NERV 重型运输设施。";
-        var s=state(level);s.forceRecovery=true;s.last="强制回收已受理，正在加载原运输机和载荷。";s.setDirty();return s.last;
+        var s=state(level);s.forceRecovery=true;s.last="强制回收已受理，正在加载运输机和机体。";s.setDirty();return s.last;
     }
     public static com.mojang.brigadier.builder.LiteralArgumentBuilder<net.minecraft.commands.CommandSourceStack> transportCommand()
     {
@@ -115,7 +115,7 @@ public final class NervAirLiftR30
         }
         plane.cargo(-1,false,0);plane.teleportTo(STAND.x,STAND.y,STAND.z);plane.setYRot(0);plane.setDeltaMovement(Vec3.ZERO);
         s.aircraftAt=STAND;s.aircraftBackup=plane.saveWithoutId(new CompoundTag());s.job=null;s.forceRecovery=false;s.aircraftMissingTicks=0;
-        s.last=returnedCargo?"NERV 运输机已强制返回机场；原机体交付原发射井顶部，等待常规回收。":"NERV 运输机已返回机场，旧任务已清理；当前登记机体的位置保持不变。";s.setDirty();
+        s.last=returnedCargo?"NERV 运输机已强制返回机场；机体已放到所属发射井顶部，等待常规回收。":"NERV 运输机已返回机场，旧任务已清理；当前登记机体的位置保持不变。";s.setDirty();
         com.projectseele.ProjectSeele.LOGGER.info("R38 NERV force recovery completed aircraft={} cargo={}",s.aircraft,job==null?null:job.unit);
     }
     private static boolean ownsRegisteredCargo(State state)
@@ -159,7 +159,7 @@ public final class NervAirLiftR30
         String problem=TransportClearanceR30.pickupProblem(level,eva);
         if(!problem.equals("机体或四肢上方有遮挡，等待起吊通道清空")
                 &&!problem.equals("运输机机翼或吊架上方有遮挡，等待空域清空"))return "";
-        s.job=null;s.last="原未起吊运输已暂停，驾驶员沿实际地面通路继续；"+problem;s.setDirty();
+        s.job=null;s.last="尚未起吊的运输已暂停，驾驶员改走地面通道；"+problem;s.setDirty();
         String key=commander+":"+expectedReturning+":"+eva.blockPosition()+":"+problem;
         if(!key.equals(eva.getPersistentData().getString("R50GroundYieldReason")))
         {
@@ -177,7 +177,7 @@ public final class NervAirLiftR30
         if(eva==null||job==null||job.phase!=Phase.PREPARE||job.carrying||s.forceRecovery||!job.unit.equals(eva.getUUID())
                 ||!job.owner.equals(commander)||EvaAirTransportR31.active(eva)&&!EvaGroundReceiverR50.active(eva))return;
         if(!UndergroundSortieR48.undergroundRecoveryRouteR50(level,job.variant,eva)&&!NervUndergroundAirLiftR50.registeredPickup(level,eva))return;
-        s.job=null;s.last="原未挂载地下请求已交给同一空腔运输/接应管制，地表原飞机保持原位。";s.setDirty();
+        s.job=null;s.last="尚未挂载的请求已转交地下运输管制，地表运输机留在原位。";s.setDirty();
         com.projectseele.ProjectSeele.LOGGER.info("R50 released unstarted wrong-domain surface airlift: eva={} owner={} aircraft={} position preserved",eva.getUUID(),commander,s.aircraft);
     }
     private static boolean roofBlocksSurfaceFlightR50(ServerLevel level,EvaUnit01Entity eva)
@@ -198,7 +198,7 @@ public final class NervAirLiftR30
         unit.endNervCarrierMotion();EvaAirTransportR31.hold(unit);
         plane.cargo(-1,false,0);plane.setPos(STAND);plane.setYRot(0);plane.setDeltaMovement(Vec3.ZERO);
         s.aircraftAt=STAND;s.aircraftBackup=plane.saveWithoutId(new CompoundTag());s.job=null;s.forceRecovery=false;
-        s.last="运输后续已交由原机体维护复位，原运输机返回机场。";s.setDirty();return true;
+        s.last="机体转入维护复位，运输机返回机场。";s.setDirty();return true;
     }
     private static void report(ServerLevel level,State s,Job job)
     {
@@ -217,16 +217,16 @@ public final class NervAirLiftR30
         boolean underground=original!=null&&(UndergroundSortieR48.undergroundRecoveryRouteR50(l,variant,original)||NervUndergroundAirLiftR50.registeredPickup(l,original));
         if(underground)
         {
-            if(!returning)return "同一 GeoFront 地下航线用于所属接应架回收；地表投放须先沿原发射线路抵达地表。";
+            if(!returning)return "GeoFront 地下航线只用于把机体送回接应架；要投放到地表，请先经发射线路抵达地表。";
             releaseWrongUndergroundPrepareR50(l,original,p.getUUID());
             if(NervUndergroundAirLiftR50.directReceiver(l,variant,original))return UndergroundSortieR48.requestRecoveryR48(p,variant).message();
             return NervUndergroundAirLiftR50.request(p,variant);
         }
-        if(roofBlocksSurfaceFlightR50(l,original))return "此位置没有已登记连通地下航线，完整起吊通道也未连通地表；原机体保持当前位置。";
-        if(!Files.isRegularFile(l.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_transport_r30.json")))return "机场重型运输区尚未交付。";
+        if(roofBlocksSurfaceFlightR50(l,original))return "此位置没有连通的地下航线，起吊通道也不通往地表；机体保持当前位置。";
+        if(!Files.isRegularFile(l.getServer().getWorldPath(LevelResource.ROOT).resolve("nerv_transport_r30.json")))return "机场重型运输区尚未开放。";
         var s=state(l);if(s.job!=null)return "运输机已有任务："+s.job.note;
         var receipt=EvaFleetSavedData.get(l.getServer()).entry(variant).orElse(null);
-        if(receipt==null)return "未找到原机体登记。";
+        if(receipt==null)return "未找到这台机体的登记。";
         if(receipt.phase()!=EvaFleetSavedData.Phase.DEPLOYED)return "地下机库与发射井禁止直接起吊。请先完成正常发射，让机体抵达地表。";
         if(Math.abs((long)x)>29999000||Math.abs((long)z)>29999000||!l.getWorldBorder().isWithinBounds(new BlockPos(x,80,z)))return "指定位置超出世界边界。";
         var e=EvaLogisticsDirector.canonicalUnit(l,variant);
@@ -265,7 +265,7 @@ public final class NervAirLiftR30
         int underground=NervUndergroundAirLiftR50.ownedCancelVariantR50(p);
         if(surface&&underground>=0)return "你有地表和地下两项运输任务，请在电话中明确选择机体后取消。";
         if(surface)return cancel(p,j.variant);if(underground>=0)return cancel(p,underground);
-        return "没有由你下达且身份匹配的运输任务；其他操作者任务保持。";
+        return "没有由你下达的运输任务；其他人的任务不受影响。";
     }
     public static String cancel(ServerPlayer p,int variant)
     {
@@ -274,14 +274,14 @@ public final class NervAirLiftR30
         var s=state(p.serverLevel());var j=s.job;var fleet=EvaFleetSavedData.get(p.server).entry(variant).orElse(null);
         boolean surface=j!=null&&j.variant==variant&&j.owner.equals(p.getUUID())&&fleet!=null&&fleet.canonicalId().equals(j.unit);
         boolean underground=NervUndergroundAirLiftR50.ownedCancelVariantR50(p)==variant;
-        if(surface&&underground)return "同一原机体存在两项运输登记，请先核对任务状态；没有自动取消任何一项。";
+        if(surface&&underground)return "这台机体同时有两项运输登记，请先核对任务状态；两项都未取消。";
         if(underground)return NervUndergroundAirLiftR50.cancel(p,variant);
-        if(!surface)return "所选原机体没有由你下达的运输任务；其他机体与操作者任务保持。";
+        if(!surface)return "所选机体没有由你下达的运输任务；其他机体和其他人的任务不受影响。";
         if(j.phase==Phase.PREPARE){s.job=null;s.last="运输指令已取消";s.setDirty();return s.last;}
         if(j.phase==Phase.HOLD&&!j.carrying){if(p.serverLevel().getEntity(j.unit) instanceof EvaUnit01Entity e)e.normalizeAfterTransportR30(false);j.phase=Phase.RETREAT;j.from=s.aircraftAt;j.to=new Vec3(s.aircraftAt.x,cruise(p.serverLevel()),s.aircraftAt.z);j.age=0;j.duration=100;j.rebase=true;}
         j.returning=true;j.destination=head(p.serverLevel(),j.variant);
         if(j.carrying&&p.serverLevel().getEntity(j.unit) instanceof EvaUnit01Entity e)begin(p.serverLevel(),j,Phase.ASCEND,e.position(),new Vec3(e.getX(),cruise(p.serverLevel())-OFFSET,e.getZ()),100,e);
-        s.setDirty();return "运输机将安全返回原发射井顶部，机体接地后等待回收指令。";
+        s.setDirty();return "运输机将安全返回所属发射井顶部，机体着地后等待回收指令。";
     }
     private static boolean ready(ServerLevel l,Vec3 p,int radius)
     {
@@ -325,16 +325,16 @@ public final class NervAirLiftR30
     {
         var j=s.job;Vec3 location=s.locations.containsKey(j.variant)?Vec3.atCenterOf(s.locations.get(j.variant)):head(l,j.variant);ready(l,location,2);ready(l,s.aircraftAt,2);
         var e=ServiceAircraftR32.payload(l,j.unit);
-        if(e==null){EvaLogisticsDirector.loadControlTarget(l,j.variant);note(l,j,"正在加载原机体；不会生成替代机");return;}
+        if(e==null){EvaLogisticsDirector.loadControlTarget(l,j.variant);note(l,j,"正在加载机体");return;}
         UNTransportEntity plane=ServiceAircraftR32.find(l,s.aircraft);
         if(plane==null)plane=restoreAircraft(l,s);
-        if(plane==null){note(l,j,"正在加载原运输机");return;}
+        if(plane==null){note(l,j,"正在加载运输机");return;}
         s.aircraftMissingTicks=0;
         plane.rebindCargo(e.getId());plane.setHoistDistance((float)OFFSET);
         var owner=l.getServer().getPlayerList().getPlayer(j.owner);
         if(j.crew&&owner==null&&j.phase!=Phase.RETURN&&j.phase!=Phase.LAND){e.endNervCarrierMotion();e.setDeltaMovement(Vec3.ZERO);if(!j.paused)EvaAirTransportR31.hold(e);j.paused=true;note(l,j,"驾驶员离线，保持位置等待通信恢复");return;}
         if(j.paused){j.paused=false;j.rebase=true;}
-        if(e.getPilotEntity() instanceof ServerPlayer pilot&&pilot!=owner&&j.phase==Phase.PREPARE){s.last="原机体已有其他驾驶员，运输未开始";s.job=null;s.setDirty();return;}
+        if(e.getPilotEntity() instanceof ServerPlayer pilot&&pilot!=owner&&j.phase==Phase.PREPARE){s.last="机体已有其他驾驶员，运输未开始";s.job=null;s.setDirty();return;}
         if(j.phase==Phase.HOLD){if(j.carrying)lock(e);return;}
         if(j.phase==Phase.PREPARE)
         {
@@ -389,7 +389,7 @@ public final class NervAirLiftR30
             case CLAMP -> {j.carrying=true;e.getPersistentData().remove("R30AwaitingNervRecovery");EvaShutdownR30.waitingR31(e,false);begin(l,j,Phase.ASCEND,e.position(),new Vec3(e.getX(),cruise(l)-OFFSET,e.getZ()),100,e);}
             case ASCEND -> {Vec3 dest=new Vec3(j.destination.x,cruise(l)-OFFSET,j.destination.z);begin(l,j,Phase.CRUISE,e.position(),dest,duration(e.position(),dest),e);}
             case CRUISE -> {
-                if(j.returning){j.landingYaw=AirCradleClearanceR31.landingYaw(e,j.destination,EvaUnit01Entity.SILO_BAY_YAW);if(!Float.isFinite(j.landingYaw))throw new IllegalStateException("原发射口周围没有容纳当前机体姿态的净空");}
+                if(j.returning){j.landingYaw=AirCradleClearanceR31.landingYaw(e,j.destination,EvaUnit01Entity.SILO_BAY_YAW);if(!Float.isFinite(j.landingYaw))throw new IllegalStateException("所属发射口周围空间不足，放不下当前姿态的机体");}
                 Vec3 floor=j.returning?head(l,j.variant):j.destination;
                 j.destination=AirCradleClearanceR31.landingRoot(e,floor,j.returning?j.landingYaw:e.getYRot());
                 if(j.returning)e.getPersistentData().putDouble("R39LandingLift",j.destination.y-floor.y);
@@ -405,7 +405,7 @@ public final class NervAirLiftR30
             }
             case RETREAT -> {if(j.returning&&waitingAtHead(e))EvaLogisticsDirector.requestRecovery(l,j.variant);Vec3 atStand=new Vec3(STAND.x,cruise(l),STAND.z);begin(l,j,Phase.RETURN,plane.position(),atStand,duration(plane.position(),atStand),e);}
             case RETURN -> begin(l,j,Phase.LAND,plane.position(),STAND,100,e);
-            case LAND -> {plane.setPos(STAND);plane.setYRot(0);s.aircraftAt=STAND;s.last=j.returning?"机体已交付原发射井，支撑架与舱门按回收顺序工作；运输机已返回 NERV 机场。":"机体投放完成，运输机在 NERV 机场待命。";note(l,j,s.last);s.job=null;s.setDirty();}
+            case LAND -> {plane.setPos(STAND);plane.setYRot(0);s.aircraftAt=STAND;s.last=j.returning?"机体已送到所属发射井，支撑架与舱门按回收顺序工作；运输机已返回 NERV 机场。":"机体投放完成，运输机在 NERV 机场待命。";note(l,j,s.last);s.job=null;s.setDirty();}
             default -> {}
         }
     }

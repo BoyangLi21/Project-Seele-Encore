@@ -52,23 +52,23 @@ public final class UNCommandR29
     }
     private static String board(ServerPlayer p,int serial)
     {
-        var l=p.serverLevel();var eva=unit(l,serial);if(eva==null)return "正在加载原机体，请稍后重试。";
+        var l=p.serverLevel();var eva=unit(l,serial);if(eva==null)return "正在加载机体，请稍后重试。";
         if(p.isPassenger())return "你已经在载具内，请先离开当前座舱。";
         if(UNAirLiftR29.ownsMotion(l,serial)||eva.isUNFlying()||eva.isNervLogisticsLocked())return "请等机体落地、夹具释放，并确认舱门已开启后再接入。";
-        if(p.distanceToSqr(eva)>90*90)return "请先走到这台 UN EVA 附近，再请求接入。";
-        var plug=UNPlugDirector.capsule(eva);if(plug==null)return "原插入栓仍在加载，没有生成替代插入栓。";
+        if(p.distanceToSqr(eva)>90*90)return "请先走到 "+Unit03SourceRigR53.displayName(serial)+" 附近，再请求接入。";
+        var plug=UNPlugDirector.capsule(eva);if(plug==null)return "插入栓仍在加载，请稍后重试。";
         if(plug.isVehicle()||eva.getPilotEntity()!=null)return "驾驶舱已有乘员。";
         if(plug.isLockedToEva())
         {
             if(!p.startRiding(plug,true)||!eva.bindEntryPlug(plug,70)){p.stopRiding();return "驾驶连接未被接受。";}
-            plug.syncPilotPositionNow();l.getChunkSource().move(p);return "已接入原插入栓，正在完成同步。";
+            plug.syncPilotPositionNow();l.getChunkSource().move(p);return "已接入插入栓，正在完成同步。";
         }
-        return plug.boardPassenger(p)?"已进入原插入栓，等待正常吊机接入。":"插入栓当前不可登机。";
+        return plug.boardPassenger(p)?"已进入插入栓，等待吊机把插入栓接入机体。":"插入栓当前不可登机。";
     }
     public static void receive(ServerPlayer p,String action,int serial,int x,int z)
     {
         if(serial<0||serial>1||!authorized(p))return;
-        if(!p.serverLevel().dimension().equals(FacilitySchemaV2.DIMENSION)){p.sendSystemMessage(Component.literal("请进入第三新东京市所在的项目世界后使用 UN 通信。"));return;}
+        if(!p.serverLevel().dimension().equals(FacilitySchemaV2.DIMENSION)){p.sendSystemMessage(Component.literal("请进入第三新东京市所在的项目世界后使用 UN 指挥通信。"));return;}
         int tick=p.server.getTickCount();
         if(action.equals("status"))
         {

@@ -24,15 +24,14 @@ public final class StaffConversationR24
     {
         final UUID nonce = UUID.randomUUID(), actor;
         final ServerLevel level;
-        final boolean radio;
         long lastAction = -100, lastRefresh = -100;
         long requestWindow = -100;
         int requestCount;
         String reply;
         int pilotContact=-1;
         UUID coordinationInstance;
-        Session(NervStaffEntity npc, boolean radio, String reply)
-        { actor = npc.getUUID(); level = (ServerLevel) npc.level(); this.radio = radio; this.reply = reply; }
+        Session(NervStaffEntity npc, String reply)
+        { actor = npc.getUUID(); level = (ServerLevel) npc.level(); this.reply = reply; }
     }
     private record Pending(String skin, long until) {}
     private static final Map<MinecraftServer, Map<UUID, Session>> SESSIONS = new WeakHashMap<>();
@@ -60,16 +59,15 @@ public final class StaffConversationR24
         return false;
     }
 
-    private static boolean available(ServerPlayer player, NervStaffEntity npc, Session session)
+    private static boolean available(ServerPlayer player, NervStaffEntity npc)
     {
-        return npc.isAlive() && (session.radio ? radioAllowed(player)
-                :player.level() == npc.level()&&player.distanceToSqr(npc) <= 100);
+        return npc.isAlive() && radioAllowed(player);
     }
 
-    public static void open(ServerPlayer player, NervStaffEntity npc, boolean radio)
+    private static void open(ServerPlayer player, NervStaffEntity npc)
     {
-        if (radio ? !radioAllowed(player) : player.level() != npc.level() || player.distanceToSqr(npc) > 100) return;
-        var session = new Session(npc, radio, StaffDialogueCatalogR24.line(StaffDialogueCatalogR24.profile(npc), npc.staffRole(), "greeting", player.tickCount / 100));
+        if (!radioAllowed(player)) return;
+        var session = new Session(npc, StaffDialogueCatalogR24.line(StaffDialogueCatalogR24.profile(npc), npc.staffRole(), "greeting", player.tickCount / 100));
         sessions(player).put(player.getUUID(), session); send(player, npc, session, true);
     }
 
@@ -96,8 +94,10 @@ public final class StaffConversationR24
         }
         var job = StaffCommandBookR24.order(npc);
         String order = job == null ? "" : NervStaffDialogue.unitName(job.unit) + " · " + job.message;
-        boolean canCommand = NervStaffDialogue.authorized(player) && StaffAuthorityR25.commandContact(npc);
-        if (!canCommand && order.isEmpty()) order = "本次对话可查询信息，出动指令需要相应岗位与通行权限";
+        boolean authorized = NervStaffDialogue.authorized(player);
+        boolean canCommand = authorized && StaffAuthorityR25.commandContact(npc);
+        if (!canCommand && order.isEmpty())
+            order = "本次通话只能查询信息；出动指令" + StaffAuthorityR25.denial(authorized, npc.skin(), StaffAuthorityR25.COMMAND) + "。";
         var coordination=CityCoordinationSavedDataR44.get(player.serverLevel());
         boolean current=coordination.active&&session.coordinationInstance!=null&&session.coordinationInstance.equals(coordination.instance);
         List<String> participants=new ArrayList<>();
@@ -114,7 +114,7 @@ public final class StaffConversationR24
             participants.add(row);
         }
         var packet = new ClientboundStaffConversationPacket(session.nonce, npc.getUUID(), npc.getId(),
-                npc.getName().getString(), role(npc), npc.skin(), open, true, canCommand, session.radio,
+                npc.getName().getString(), role(npc), npc.skin(), open, true, canCommand, authorized,
                 session.reply, order, List.copyOf(units),current?coordination.formationRevisionR45:0,
                 current?coordination.evidenceRevisionR45:0,List.copyOf(participants),com.projectseele.event.TvCampaignDirector.selectedMissionR54(player));
         SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), packet);
@@ -123,7 +123,7 @@ public final class StaffConversationR24
     public static void note(ServerPlayer player, NervStaffEntity npc, String line)
     {
         Session session = sessions(player).get(player.getUUID());
-        if (session != null && session.actor.equals(npc.getUUID()) && available(player, npc, session))
+        if (session != null && session.actor.equals(npc.getUUID()) && available(player, npc))
         { session.reply = line; send(player, npc, session, false); }
     }
 
@@ -135,19 +135,19 @@ public final class StaffConversationR24
         if (session == null || !session.nonce.equals(nonce) || request.length() > 160) return;
         if (request.equals("CLOSE")) { sessions(player).remove(player.getUUID()); return; }
         var entity = session.level.getEntity(session.actor);
-        if (!(entity instanceof NervStaffEntity npc) || !available(player, npc, session))
+        if (!(entity instanceof NervStaffEntity npc) || !available(player, npc))
         {
             sessions(player).remove(player.getUUID());
             SeeleNetwork.CHANNEL.send(PacketDistributor.PLAYER.with(() -> player), new ClientboundStaffConversationPacket(
-                    nonce, session.actor, -1, "NERV", "", "", false, false, false, session.radio,
-                    "对话链路已结束。已经下达的指令仍按原联锁流程执行。", "", List.of()));
+                    nonce, session.actor, -1, "NERV", "", "", false, false, false, false,
+                    "通话已结束。已经下达的指令会照常执行。", "", List.of()));
             return;
         }
         long tick = player.server.getTickCount();
         if (request.equals("REFRESH"))
         {
             if (tick - session.lastRefresh < 20) return;
-            session.lastRefresh = tick; if (session.radio) load(session.level, npc.blockPosition());
+            session.lastRefresh = tick; load(session.level, npc.blockPosition());
             if(session.pilotContact>=0)session.reply=pilotStatus(player,session.pilotContact);
             send(player, npc, session, false); return;
         }
@@ -375,7 +375,7 @@ public final class StaffConversationR24
                 :NervStaffSavedData.get(level).identity(station.id());
         if(id==null)return false;
         if (level.getEntity(id) instanceof NervStaffEntity npc&&npc.isAlive())
-        { load(level,npc.blockPosition()); open(player, npc, true); return true; }
+        { load(level,npc.blockPosition()); open(player, npc); return true; }
         load(level, station.feet());
         return false;
     }

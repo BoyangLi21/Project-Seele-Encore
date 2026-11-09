@@ -76,7 +76,7 @@ public final class TrainingPilotDirector
     {
         if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.requestPilot(level,variant,"board");
         if(PilotRestroomsR47.configured(level)&&PilotRestroomsR47.plan(level,variant).isEmpty())
-            return new ActionResult(false,"原驾驶员待命室元数据未接通，登机保持原位。");
+            return new ActionResult(false,"驾驶员待命室尚未接通，驾驶员留在原地。");
         if(!parkedR45(level,variant))
             return new ActionResult(false,"机体尚未在机库停稳，请先完成回收，驾驶员保持原位。");
         boolean compactS20 = FacilityWorldPolicy.isS20Rebuild(
@@ -124,7 +124,7 @@ public final class TrainingPilotDirector
         }
         if(com.projectseele.entity.EvaShutdownR30.wreck(unit)||unit.getHealth()<=0
                 ||com.projectseele.entity.EvaBayRepairR33.active(unit))
-            return new ActionResult(false,"原机体仍有损毁或检修，驾驶员保持原位，等待真实整备完成。");
+            return new ActionResult(false,"机体仍有损毁或在检修，驾驶员保持原位，等待整备完成。");
         level.getChunkAt(requestedStandby(level,variant));
         TrainingPilotEntity pilot = existingPilotR45(level,variant);
         if (pilot == null)
@@ -138,12 +138,12 @@ public final class TrainingPilotDirector
                 &&current.getAssignedVariant()==variant)
             return new ActionResult(true,"驾驶员已进入对应插入栓，等待机库联锁。");
         if(PilotRestroomsR47.isSeated(level,pilot)&&!PilotRestroomsR47.standUp(level,pilot))
-            return new ActionResult(false,"待命室离座干点暂不可用，驾驶员保持原座位。");
+            return new ActionResult(false,"待命室的离座位置暂不可用，驾驶员留在座位上。");
         if(pilot.getVehicle()!=null)
             return new ActionResult(false,"驾驶员还在另一台设备内，请先让驾驶员返回待命。");
         pilot.setNoAi(false);pilot.setNoGravity(false);
         if(ACTIVE_REMOTE_PILOTS.contains(variant))
-            return new ActionResult(true,"登机指令正在执行，驾驶员继续沿原通道行走。");
+            return new ActionResult(true,"登机指令正在执行，驾驶员继续沿登机通道行走。");
         boolean parked = EvaFleetSavedData.get(level.getServer())
                 .entry(variant)
                 .map(entry -> entry.phase()

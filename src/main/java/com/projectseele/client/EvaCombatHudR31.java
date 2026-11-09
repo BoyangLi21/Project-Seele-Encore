@@ -105,9 +105,9 @@ public final class EvaCombatHudR31
     {
         String key=Keybinds.EVA_GRAPPLE.getTranslatedKeyMessage().getString();
         String radio=Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString();
-        if(EvaAirTransportR31.active(eva))return "运输中  /  "+radio+" 通信";
-        if(EvaShutdownR30.disabled(eva))return radio+" 呼叫回收";
-        if(eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive())return "机械联锁  /  "+radio+" 通信";
+        if(EvaAirTransportR31.active(eva))return "运输中  /  "+radio+" 指挥通信";
+        if(EvaShutdownR30.disabled(eva))return "呼叫回收  /  "+radio+" 指挥通信";
+        if(eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive())return "机械联锁  /  "+radio+" 指挥通信";
         return switch(EvaCombatR31.action(eva))
         {
             case EvaCombatR31.REACH -> "双手接近";

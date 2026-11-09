@@ -163,7 +163,7 @@ public final class StaffCommandBookR24
         if(NervStaffDialogue.authorized(player)&&StaffAuthorityR25.commandContact(npc))
             AutoSortieR32.cancel(player,job==null?unit:job.unit);
         npc.finishTask();
-        NervStaffDialogue.reply(player, npc, "后续按键操作已取消。已经开始的机械运输会按原流程运行到安全位置。");
+        NervStaffDialogue.reply(player, npc, "后续按键操作已取消。已经开始的机械运输会继续运行到安全位置。");
         return 1;
     }
 

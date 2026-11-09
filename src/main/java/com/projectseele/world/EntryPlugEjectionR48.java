@@ -78,18 +78,18 @@ public final class EntryPlugEjectionR48
 
     public static String recoveryCallerBlocker(net.minecraft.server.level.ServerPlayer caller, EvaUnit01Entity unit)
     {
-        if (unit == null) return "原机体尚未加载，等待原身份信号。";
+        if (unit == null) return "机体尚未加载，请稍候再试。";
         var pilot = unit.getPilotEntity();
         if (pilot instanceof net.minecraft.server.level.ServerPlayer actual && actual != caller)
-            return "请由当前驾驶员请求原机体回收。";
+            return "请由当前驾驶员请求回收这台机体。";
         var receipt = unit.getPersistentData();
         AutoSortieR32.releaseRecoveredDelegationR50(caller.serverLevel(),unit);
         AutoSortieR32.acceptOriginalHumanBoardingR50(caller.serverLevel(),unit,caller);
         if (pilot == null && receipt.hasUUID("R49RecoveryOwner")
                 && !caller.getUUID().equals(receipt.getUUID("R49RecoveryOwner")))
-            return "弹出后的原机体仍属于原驾驶员/指挥员，请联系原操作者回收。";
+            return "插入栓弹出后，这台机体仍归原来的驾驶员或指挥员管理，请联系对方回收。";
         if (receipt.hasUUID("R32SortieCommander") && !caller.getUUID().equals(receipt.getUUID("R32SortieCommander")))
-            return "这台原机体仍由另一位指挥员受托，请联系原下令人。";
+            return "这台机体仍由另一位指挥员负责，请联系下达指令的人。";
         return "";
     }
 

@@ -15,7 +15,7 @@ public final class UNPhoneScreen extends Screen
     private boolean restoring,scaling;
     private EditBox targetX,targetZ;
     private final Map<AbstractWidget,Integer> actionRows=new LinkedHashMap<>();
-    private UNPhoneScreen(ClientboundUNStatusPacket view){super(Component.literal("联合国战略运输通信"));this.view=view;}
+    private UNPhoneScreen(ClientboundUNStatusPacket view){super(Component.literal("UN 指挥通信"));this.view=view;}
     public static void receive(ClientboundUNStatusPacket packet)
     {
         var mc=Minecraft.getInstance();
@@ -52,7 +52,7 @@ public final class UNPhoneScreen extends Screen
         String oldZ=targetZ==null?Integer.toString(minecraft.player.getBlockZ()):targetZ.getValue();
         w=Math.min(640,width-16);h=Math.min(410,height-16);x=(width-w)/2;y=(height-h)/2;actionRows.clear();
         int tabWidth=(w-28)/2;
-        addRenderableWidget(new PhoneUiR54.Action(x+12,y+50,tabWidth,21,"EVA-UN-00",()->{serial=0;statusScroll=0;},PhoneUiR54.UN,()->serial==0));
+        addRenderableWidget(new PhoneUiR54.Action(x+12,y+50,tabWidth,21,com.projectseele.entity.Unit03SourceRigR53.displayName(0),()->{serial=0;statusScroll=0;},PhoneUiR54.UN,()->serial==0));
         addRenderableWidget(new PhoneUiR54.Action(x+16+tabWidth,y+50,tabWidth,21,com.projectseele.entity.Unit03SourceRigR53.displayName(1),()->{serial=1;statusScroll=0;},PhoneUiR54.UN,()->serial==1));
         addRenderableWidget(new PhoneUiR54.Action(x+w-60,y+12,48,20,"关闭",this::onClose,PhoneUiR54.UN,()->false));
         int col=columnWidth(),rx=right(),half=(col-12)/2;
@@ -105,7 +105,7 @@ public final class UNPhoneScreen extends Screen
     @Override public void render(GuiGraphics g,int mx,int my,float partial)
     {
         renderBackground(g);var theme=PhoneUiR54.UN;int col=columnWidth(),rx=right();
-        PhoneUiR54.frame(g,font,theme,x,y,w,h,"UN / 战略运输通信","联合国基地  ·  机体运输与机库控制");
+        PhoneUiR54.frame(g,font,theme,x,y,w,h,"UN 指挥通信","联合国基地  ·  机体运输与机库控制");
         int statusH=statusHeight(),replyY=y+90+statusH,replyH=y+h-12-replyY;
         PhoneUiR54.card(g,font,theme,x+10,y+82,col,statusH,"机体状态","");
         statusScroll=PhoneUiR54.text(g,font,theme,serial==0?view.unit00():view.unit01(),x+18,y+104,col-16,statusH-27,statusScroll);

@@ -38,7 +38,7 @@ public final class NervRouteNativeR52 implements NativeAccess
         default RigidTransform finishingReferenceFrameR52(ServerLevel level,Original original,CompoundTag ownerData,RigidTransform directoryEndpoint){return directoryEndpoint;}
         default boolean restoreFinishingOriginal(ServerLevel level,Original original,CompoundTag ownerData){return false;}
         default boolean originalPersonnelBindingsReady(ServerLevel level){return false;}
-        default TrainingPilotDirector.ActionResult requestOriginalPilot(ServerLevel level,int variant,String operation){return new TrainingPilotDirector.ActionResult(false,"R52 原座椅/电话/人员通道绑定尚未就绪。");}
+        default TrainingPilotDirector.ActionResult requestOriginalPilot(ServerLevel level,int variant,String operation){return new TrainingPilotDirector.ActionResult(false,"驾驶员待命室的座椅、电话和通道尚未就绪，暂时不能调遣驾驶员。");}
         default boolean routeOriginalPilot(ServerLevel level,TrainingPilotEntity pilot,String operation){return false;}
         default boolean atOriginalPilotStandby(ServerLevel level,int variant){return false;}
         Preparation prepareOriginal(ServerLevel level,Original original,CompoundTag ownerData);

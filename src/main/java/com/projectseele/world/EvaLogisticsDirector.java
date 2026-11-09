@@ -399,7 +399,7 @@ public final class EvaLogisticsDirector
 
     public static ActionResult requestPrepare(ServerLevel level, int variant)
     {
-        if(variant<0||variant>2)return new ActionResult(false,"请指定原零号/初号/二号机。");
+        if(variant<0||variant>2)return new ActionResult(false,"请指定零号机、初号机或二号机。");
         if(NervRouteRuntimeR52.claimed(level))return NervRouteRuntimeR52.prepare(level,variant);
         loadControlTarget(level,variant);
         var rearFault=EntryPlugBridgeLayoutR48.retractionFaultR48(level,variant);
@@ -540,64 +540,64 @@ public final class EvaLogisticsDirector
     /** Only the installed underground service may begin a bound original carrier trip. */
     public static ActionResult requestUndergroundDepartureR48(ServerPlayer caller,int variant,UUID expected)
     {
-        if(NervRouteRuntimeR52.claimed(caller.serverLevel()))return new ActionResult(false,"R52 原编队由统一路线 owner 控制；旧地下承载入口未调用。");
+        if(NervRouteRuntimeR52.claimed(caller.serverLevel()))return new ActionResult(false,"此地下出口入口已停用，机体由机库运输系统调度。");
         var level=caller.serverLevel();var unit=canonical(level,variant);var entry=entry(level,variant);
         if(!logisticsReady(level,variant)||unit==null||entry==null||!entry.canonicalId().equals(expected)
                 ||!unit.getUUID().equals(expected)||entry.phase()!=Phase.SILO_READY
                 ||!UndergroundSortieR48.departureAuthorizedR48(caller,variant,unit))
-            return new ActionResult(false,"地下出击的原机体与准备许可已变化。");
+            return new ActionResult(false,"地下出击的机体或准备许可已变化。");
         var ready=FacilityReadinessService.read(level,FacilityReadinessService.Operation.LAUNCH,variant);
         if(!ready.accepted())return new ActionResult(false,ready.faultCode()+": "+ready.message());
         var bed=lowerLiftBed(level,variant);
         if(unit.position().distanceToSqr(new Vec3(bed.getX()+.5,bed.getY()+1,bed.getZ()+.5))>.25
                 ||!EntryPlugDirector.hasLaunchLock(level,variant,unit)||unit.isLaunchCommandReleased())
-            return new ActionResult(false,"原插入栓/下层承载床尚未锁定。");
+            return new ActionResult(false,"插入栓或下层承载床尚未锁定。");
         if(unit.getLaunchPhase()==EvaUnit01Entity.LAUNCH_IDLE&&UndergroundSortieR48.cancelledReservationR48(level,variant,unit))
-            return new ActionResult(true,"原地下弹射取消许可保持，承载板等待真实门全开。");
+            return new ActionResult(true,"地下出击许可保持，承载板等待出口门全开。");
         if(unit.getLaunchPhase()!=EvaUnit01Entity.LAUNCH_LOCKED&&!unit.armPreparedLaunch(bed))
-            return new ActionResult(false,"原下层预备锁尚未恢复。");
+            return new ActionResult(false,"下层预备锁尚未恢复。");
         if(!unit.cancelPreparedLaunch())return new ActionResult(false,"弹射已释放，不能切换地下出口。");
         unit.clearSortieDestination();unit.setNervLogisticsLocked(true);unit.setNoGravity(true);
-        return new ActionResult(true,"预备弹射已取消，原承载板转向地下接应平台。");
+        return new ActionResult(true,"预备弹射已取消，承载板转向地下接应平台。");
     }
     public static ActionResult completeUndergroundDepartureR48(ServerLevel level,int variant,UUID expected)
     {
-        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"R52 必须由真实整组 owner 确认完成。");
+        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"此地下出口入口已停用，机体由机库运输系统调度。");
         var unit=canonical(level,variant);var entry=entry(level,variant);
         if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
                 ||entry.phase()!=Phase.SILO_READY||!UndergroundSortieR48.finishAuthorizedR48(level,variant,unit,false)
                 ||!EntryPlugDirector.hasLaunchLock(level,variant,unit))
-            return new ActionResult(false,"地下平台到达许可或原插入栓连接已变化。");
+            return new ActionResult(false,"地下平台到达许可或插入栓连接已变化。");
         unit.endNervCarrierMotion();unit.clearSortieDestination();unit.setCarrierRiseProgress(0);
         put(level,variant,entry.withPhase(Phase.DEPLOYED,0,lowerLiftBed(level,variant).getY(),0));
         unit.setNervLogisticsLocked(false);unit.setNoGravity(false);
-        return new ActionResult(true,"原机体已到实心地下平台，可驾驶沿台阶驶向草地。");
+        return new ActionResult(true,"机体已到达地下平台，可以沿台阶驶向草地。");
     }
     public static ActionResult requestUndergroundRecoveryR48(ServerLevel level,int variant,UUID expected)
     {
-        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"R52 原编队由统一逆向路线 owner 控制。");
+        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"此地下回收入口已停用，机体由机库运输系统调度。");
         var unit=canonical(level,variant);var entry=entry(level,variant);
         if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
                 ||entry.phase()!=Phase.DEPLOYED||!UndergroundSortieR48.recoveryAuthorizedR48(level,variant,unit)
                 ||!recoveryMotionSettled(unit)||!EntryPlugDirector.hasLaunchLock(level,variant,unit)
                     &&!UndergroundSortieR48.emptyRecoveryR49(level,variant,unit))
-            return new ActionResult(false,"原地下接应平台回收条件尚未满足。");
+            return new ActionResult(false,"地下接应平台的回收条件尚未满足。");
         if(!HangarEmergencyR47.releaseForRecoveryR47(level,variant))
             return new ActionResult(false,"湿舱后门仍在通行，地下回收暂缓。");
         unit.prepareForNervRecovery();unit.setNervLogisticsLocked(true);
-        return new ActionResult(true,"地下承载板开始连续返回原下层床。");
+        return new ActionResult(true,"地下承载板开始返回下层承载床。");
     }
     public static ActionResult completeUndergroundRecoveryR48(ServerLevel level,int variant,UUID expected)
     {
-        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"R52 必须由真实整组 owner 确认回库完成。");
+        if(NervRouteRuntimeR52.claimed(level))return new ActionResult(false,"此地下回收入口已停用，机体由机库运输系统调度。");
         var unit=canonical(level,variant);var entry=entry(level,variant);var bed=lowerLiftBed(level,variant);
         if(unit==null||entry==null||!expected.equals(entry.canonicalId())||!expected.equals(unit.getUUID())
                 ||entry.phase()!=Phase.DEPLOYED||!UndergroundSortieR48.finishAuthorizedR48(level,variant,unit,true)
                 ||unit.position().distanceToSqr(new Vec3(bed.getX()+.5,bed.getY()+1,bed.getZ()+.5))>.25)
-            return new ActionResult(false,"原下层床返回许可尚未满足。");
+            return new ActionResult(false,"返回下层承载床的条件尚未满足。");
         unit.endNervCarrierMotion();unit.clearSortieDestination();unit.setNervLogisticsLocked(true);
         setGate(level,variant,true);put(level,variant,entry.withPhase(Phase.TO_HANGAR,0,bed.getZ(),0));
-        return new ActionResult(true,"已回到原下层床，沿正常通路返回同一湿舱。");
+        return new ActionResult(true,"已回到下层承载床，正沿通路返回所属湿舱。");
     }
 
     public static boolean recoveryMotionSettled(EvaUnit01Entity unit)
@@ -645,13 +645,13 @@ public final class EvaLogisticsDirector
         var level=caller.serverLevel();
         var unit=canonical(level,variant);var receipt=entry(level,variant);
         if(unit==null||receipt==null||!AutoSortieR32.releaseEmptyFaultBayDelegationR50(caller,unit))
-            return new ActionResult(false,"故障原机尚未在所属湿舱停稳，原空栓或实际锁姿不符，未复位或替换。");
+            return new ActionResult(false,"故障机体尚未在所属湿舱停稳，或空插入栓的锁定姿态不符。");
         if(!HangarEmergencyR47.releaseForRecoveryR47(level,variant)||!EntryPlugDirector.extractEmptyCapsule(level,variant,unit))
-            return new ActionResult(false,"原空栓的正常抽出联锁尚未满足，机体与原栓保持当前状态。");
+            return new ActionResult(false,"空插入栓的抽出条件尚未满足，机体和插入栓保持当前状态。");
         unit.setNervLogisticsLocked(true);unit.setNoGravity(true);unit.setDeltaMovement(Vec3.ZERO);
         unit.getPersistentData().putBoolean("R50EmptyFaultBayRecovery",true);
         put(level,variant,receipt.withPhase(Phase.FILLING,0,hangarBed(level,variant).getZ(),receipt.lclLayers()));
-        return new ActionResult(true,"原空栓沿现有吊架抽出，回到原吊位后按正常湿舱注液与栈桥流程完成回收。");
+        return new ActionResult(true,"空插入栓正沿吊架抽出，回到吊位后按湿舱注液和登机桥流程完成回收。");
     }
     public static ActionResult requestRecovery(ServerLevel level, int variant)
     {
@@ -671,7 +671,7 @@ public final class EvaLogisticsDirector
         loadControlTarget(level, variant);
         FleetEntry parkedFault=entry(level,variant);
         if(parkedFault!=null&&parkedFault.phase()==Phase.PLUG_FAULT)
-            return new ActionResult(false,"故障原机回收需要原调用者与完整借用联锁，请通过电话美里或律子的正常回收入口请求；未执行旁路抽栓。");
+            return new ActionResult(false,"故障机体的回收需由下达出击的指挥员申请：请在指挥通信里联络美里或律子，选择回收。");
         FacilityReadinessService.FacilityReadiness readiness =
                 FacilityReadinessService.read(level,
                         FacilityReadinessService.Operation.RECOVERY, variant);

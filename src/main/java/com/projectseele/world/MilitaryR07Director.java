@@ -130,7 +130,7 @@ public final class MilitaryR07Director
             case "fill" -> {
                 if(data.phase!=Phase.DRY)return "请先关闭舱门";
                 Entity unit=entity(level,data,"prototype");
-                if(unit==null||unit.position().distanceTo(home)>3||unit.isVehicle())return "试验机须归位并解除驾驶";
+                if(unit==null||unit.position().distanceTo(home)>3||unit.isVehicle())return "EVA-UN-00 须归位并解除驾驶";
                 if(!level.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(level,0),p->!p.isSpectator()).isEmpty())return "请先离开 LCL 试验区";
                 data.phase=Phase.FILLING;data.cursor=0;
             }
@@ -146,7 +146,7 @@ public final class MilitaryR07Director
     public static String status(State data)
     {
         String phase=switch(data.phase){case WET->"LCL 保管";case DRAINING->"排液中";case DRY->"干燥 / 舱门关闭";case OPENING->"舱门开启中";case OPEN->"允许出舱";case CLOSING->"舱门关闭中";case FILLING->"注液中";};
-        return "试验格纳库 · "+phase+((data.phase==Phase.DRAINING||data.phase==Phase.FILLING)?" "+(100*data.cursor/(data.poolWidth*90*44))+"%":"");
+        return "EVA-UN-00 试验舱 · "+phase+((data.phase==Phase.DRAINING||data.phase==Phase.FILLING)?" "+(100*data.cursor/(data.poolWidth*90*44))+"%":"");
     }
     private static boolean occupiedDoor(ServerLevel level)
     {

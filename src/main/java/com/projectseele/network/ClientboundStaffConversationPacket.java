@@ -10,16 +10,16 @@ import net.minecraftforge.network.NetworkEvent;
 /** Small authoritative dialogue snapshot; no client-side command execution. */
 public record ClientboundStaffConversationPacket(UUID session, UUID person, int entityId,
         String name, String role, String skin, boolean open, boolean valid,
-        boolean canCommand, boolean radio, String reply, String order, List<String> units,
+        boolean canCommand, boolean authorized, String reply, String order, List<String> units,
         long coordinationFormationRevision,long coordinationEvidenceRevision,List<String> participants,String selectedMission)
 {
     public ClientboundStaffConversationPacket(UUID session,UUID person,int entityId,String name,String role,String skin,
-            boolean open,boolean valid,boolean canCommand,boolean radio,String reply,String order,List<String> units,
+            boolean open,boolean valid,boolean canCommand,boolean authorized,String reply,String order,List<String> units,
             long coordinationFormationRevision,long coordinationEvidenceRevision,List<String> participants)
-    {this(session,person,entityId,name,role,skin,open,valid,canCommand,radio,reply,order,units,coordinationFormationRevision,coordinationEvidenceRevision,participants,"");}
+    {this(session,person,entityId,name,role,skin,open,valid,canCommand,authorized,reply,order,units,coordinationFormationRevision,coordinationEvidenceRevision,participants,"");}
     public ClientboundStaffConversationPacket(UUID session,UUID person,int entityId,String name,String role,String skin,
-            boolean open,boolean valid,boolean canCommand,boolean radio,String reply,String order,List<String> units)
-    {this(session,person,entityId,name,role,skin,open,valid,canCommand,radio,reply,order,units,0,0,List.of());}
+            boolean open,boolean valid,boolean canCommand,boolean authorized,String reply,String order,List<String> units)
+    {this(session,person,entityId,name,role,skin,open,valid,canCommand,authorized,reply,order,units,0,0,List.of());}
     public ClientboundStaffConversationPacket(FriendlyByteBuf buffer)
     {
         this(buffer.readUUID(), buffer.readUUID(), buffer.readVarInt(),
@@ -46,7 +46,7 @@ public record ClientboundStaffConversationPacket(UUID session, UUID person, int 
     {
         buffer.writeUUID(session); buffer.writeUUID(person); buffer.writeVarInt(entityId);
         buffer.writeUtf(name, 80); buffer.writeUtf(role, 40); buffer.writeUtf(skin, 40);
-        buffer.writeBoolean(open); buffer.writeBoolean(valid); buffer.writeBoolean(canCommand); buffer.writeBoolean(radio);
+        buffer.writeBoolean(open); buffer.writeBoolean(valid); buffer.writeBoolean(canCommand); buffer.writeBoolean(authorized);
         buffer.writeUtf(reply, 1400); buffer.writeUtf(order, 180); buffer.writeVarInt(units.size());
         for (String row : units) buffer.writeUtf(row, 120);
         buffer.writeLong(coordinationFormationRevision);buffer.writeLong(coordinationEvidenceRevision);buffer.writeVarInt(participants.size());

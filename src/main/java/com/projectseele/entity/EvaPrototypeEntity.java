@@ -23,13 +23,13 @@ public final class EvaPrototypeEntity extends EvaUnit01Entity
     public void toggleUNFlight(net.minecraft.server.level.ServerPlayer pilot)
     {
         if(getPilotEntity()!=pilot||CombatFeelR31.restrained(this)||EvaCombatR31.active(this))return;
-        if(Unit03SourceRigR53.uses(this)){pilot.sendSystemMessage(Component.literal("三号机没有独立飞行系统。"));return;}
+        if(Unit03SourceRigR53.uses(this)){pilot.sendSystemMessage(Component.literal("EVA-UN-01 当前型号没有独立飞行系统。"));return;}
         if(getUNSerial()!=1){pilot.sendSystemMessage(Component.literal("飞行系统仅配置于 EVA-UN-01。"));return;}
-        if(isUNFlying()){entityData.set(LANDING,!isUNLanding());pilot.sendSystemMessage(Component.literal(isUNLanding()?"UN-01 自动降落中。":"UN-01 恢复悬停。"));return;}
+        if(isUNFlying()){entityData.set(LANDING,!isUNLanding());pilot.sendSystemMessage(Component.literal(isUNLanding()?"EVA-UN-01 自动降落中。":"EVA-UN-01 恢复悬停。"));return;}
         if(isNervLogisticsLocked()||!isPoweredOn()||getActivationTicks()>0||isInsideTestHangar()||isPilotProne()||isPilotCrouching()||isFirstBattleActive())
         {pilot.sendSystemMessage(Component.literal("请先完成接入、站立并离开机库，再开启飞行。"));return;}
         entityData.set(FLIGHT,true);entityData.set(LANDING,false);flightInput=0;noPilotFlightTicks=0;setNoGravity(true);
-        pilot.sendSystemMessage(Component.literal("UN-01 飞行开启：WASD 平移，空格上升，Shift 下降，Ctrl 加速；F 自动降落。"));
+        pilot.sendSystemMessage(Component.literal("EVA-UN-01 飞行开启：WASD 平移，空格上升，Shift 下降，Ctrl 加速；F 自动降落。"));
     }
     @Override public boolean isNoGravity(){return isUNFlying()||super.isNoGravity();}
     @Override public void setPilotCrouching(net.minecraft.server.level.ServerPlayer p,boolean crouching){if(!isUNFlying())super.setPilotCrouching(p,crouching);}

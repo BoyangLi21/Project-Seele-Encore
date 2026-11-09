@@ -66,7 +66,7 @@ public final class UNAnnexR20
     private static boolean occupied(ServerLevel l){if(!NervTraversalPolicyR53.strict(l))return false;return !l.getEntities((net.minecraft.world.entity.Entity)null,UNHangarDimensionsR31.sweep(l,1),e->e.isAlive()&&!e.isSpectator()&&!(e instanceof NervHangarDoorEntity)&&!(e instanceof NervCarrierPlatformEntity)).isEmpty();}
     public static String request(ServerLevel l,String action,Player p)
     {
-        if(!installed(l))return "此存档未安装 UN-01 试验舱";if(!card(p))return "需要工作人员身份卡";State s=state(l);
+        if(!installed(l))return "此存档未安装 EVA-UN-01 试验舱";if(!card(p))return "需要工作人员身份卡";State s=state(l);
         var repairId=UNRecoveryR22.identity(l,1);
         if(repairId!=null&&l.getEntity(repairId) instanceof EvaUnit01Entity repairing&&EvaBayRepairR33.active(repairing))return "机体正在检修，请等待机械臂撤回。";
         switch(action)
@@ -78,7 +78,7 @@ public final class UNAnnexR20
                 else if(s.phase==MilitaryR07Director.Phase.OPEN){if(occupied(l))return "舱门区域有人员或载具";s.phase=MilitaryR07Director.Phase.CLOSING;}
                 else return "请等待排液或舱门动作完成";
             }
-            case "fill" -> {if(s.phase!=MilitaryR07Director.Phase.DRY)return "请先关闭舱门";var unit=airframe(l);if(modelsInstalled(l)&&(unit==null||unit.position().distanceTo(UNRecoveryR22.home(l,1))>3||unit.isVehicle()))return "UN-01 须归位并解除驾驶";if(!l.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(l,1),q->!q.isSpectator()).isEmpty())return "请先离开 LCL 试验区";s.phase=MilitaryR07Director.Phase.FILLING;s.cursor=0;}
+            case "fill" -> {if(s.phase!=MilitaryR07Director.Phase.DRY)return "请先关闭舱门";var unit=airframe(l);if(modelsInstalled(l)&&(unit==null||unit.position().distanceTo(UNRecoveryR22.home(l,1))>3||unit.isVehicle()))return "EVA-UN-01 须归位并解除驾驶";if(!l.getEntitiesOfClass(Player.class,UNHangarDimensionsR31.pit(l,1),q->!q.isSpectator()).isEmpty())return "请先离开 LCL 试验区";s.phase=MilitaryR07Director.Phase.FILLING;s.cursor=0;}
             default -> {return status(s);}
         }
         s.setDirty();return status(s);

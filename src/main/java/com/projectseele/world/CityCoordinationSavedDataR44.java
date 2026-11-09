@@ -204,7 +204,7 @@ public final class CityCoordinationSavedDataR44 extends SavedData
         if(tag.getInt("Version")<2&&tag.getIntArray("Confirmed").length>0)
             data.inherited.putIntArray("LegacyUnboundConfirmedR45",tag.getIntArray("Confirmed"));
         if(data.active&&data.stage==6&&!data.allConfirmed())
-        {data.stage=5;data.notice="旧编成确认缺少本人或原机体绑定，请重新确认。原档案记录保留。";}
+        {data.stage=5;data.notice="旧的编成确认缺少驾驶员本人或机体信息，请重新确认。档案记录已保留。";}
         for(var raw:tag.getList("Acquired",Tag.TAG_STRING))data.acquired.add(raw.getAsString());
         data.archives.addAll(tag.getList("Archives",Tag.TAG_COMPOUND).copy());
         if(data.active&&(data.instance==null||data.owner==null)){data.active=false;data.restoring=true;data.notice="档案缺少指令归属，已停止后续操作。";}

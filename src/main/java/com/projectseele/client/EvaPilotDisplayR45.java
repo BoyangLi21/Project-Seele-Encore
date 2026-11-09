@@ -45,7 +45,7 @@ public final class EvaPilotDisplayR45
         tile(g, right, bottom, panel, 29, eva.isAtFieldOn() ? GREEN : AMBER);
         line(g, font, Component.translatable(eva.getWeaponTranslationKey()).getString(), right + 5, bottom + 4, panel - 10, WHITE);
         String stance = eva.isPilotProne() ? "趴伏" : eva.isPilotCrouching() ? "下蹲" : eva.isPilotSprinting() ? "冲刺" : "常规操纵";
-        String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " 通信";
+        String radio = Keybinds.COMMAND_RADIO.getTranslatedKeyMessage().getString() + " 指挥通信";
         line(g, font, stance + "  /  " + radio, right + 5, bottom + 16, panel - 10, MUTED);
 
         if (eva.isLaunchSequenceActive())

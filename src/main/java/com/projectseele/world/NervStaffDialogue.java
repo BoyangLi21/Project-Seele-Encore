@@ -36,8 +36,6 @@ public final class NervStaffDialogue
         if(!authorized(player))return "请先出示 NERV 通行证。";
         return StaffDialogueCatalogR24.next(player,StaffDialogueCatalogR24.profile(npc),npc.staffRole(),"command_denied");
     }
-    private static MutableComponent option(String text,String command)
-    {return Component.literal("["+text+"] ").withStyle(s->s.withColor(ChatFormatting.GOLD).withClickEvent(new ClickEvent(ClickEvent.Action.RUN_COMMAND,command)));}
     public static String stage(String value)
     {
         if("SERVICE_HOLD".equals(value))return "机库现场整备待修复";
@@ -51,20 +49,6 @@ public final class NervStaffDialogue
             case SILO_READY->"发射待命";case DEPLOYED->"已出动";case DESCENDING->"回收下降";
             case TO_HANGAR->"返回机库";case FILLING->"恢复 LCL";case CANCELLED->"任务已取消，原位停止";
         };
-    }
-    public static void open(ServerPlayer player,NervStaffEntity npc)
-    { StaffConversationR24.open(player,npc,false); }
-    public static void openChat(ServerPlayer player,NervStaffEntity npc)
-    {
-        reply(player,npc,StaffDialogueCatalogR24.line(StaffDialogueCatalogR24.profile(npc),npc.staffRole(),"greeting",player.tickCount / 100));
-        String prefix="/nerv talk \""+npc.memberId()+"\" ";var menu=option("战况",prefix+"状态");
-        if(StaffAuthorityR25.commandContact(npc))
-        {
-            for(int v=0;v<3;v++){String unit=String.format(Locale.ROOT,"%02d",v);menu.append(option("整备 "+unit,prefix+"整备 "+unit)).append(option("发射 "+unit,prefix+"发射 "+unit)).append(option("回收 "+unit,prefix+"回收 "+unit));}
-            menu.append(option("整备后发射 01",prefix+"整备后发射 01")).append(option("取消后续操作",prefix+"停止操作"));
-        }
-        player.sendSystemMessage(menu);
-        player.sendSystemMessage(option("道路指引",prefix+"TOPIC:directions").append(option("同步与驾驶",prefix+"TOPIC:sync")).append(option("插入栓",prefix+"TOPIC:plug")).append(option("作战",prefix+"TOPIC:campaign")).append(option("值班闲聊",prefix+"TOPIC:duty")));
     }
     public static boolean authorized(ServerPlayer player)
     {
@@ -231,7 +215,7 @@ public final class NervStaffDialogue
         if(!status.loaded())return "还没收到机库的信号，请稍等。";
         return switch(status.phase())
         {
-            case "SERVICE_HOLD" -> "回库记录与现场不一致。留在原插入栓内，下达回收指令以补完机库整备。";
+            case "SERVICE_HOLD" -> "回库记录与现场不一致。请留在插入栓内，下达回收指令以完成机库整备。";
             case "PARKED" -> boarded(level,variant)?"驾驶员已登机，可以开始整备。":"驾驶员还没登机。先进入机库里悬挂的插入栓，再开始整备。";
             case "SILO_READY" -> "机体已到发射台，等待发射命令。";
             case "DEPLOYED" -> "机体已经出动。回收时，请回到本机的地表平台停稳。";

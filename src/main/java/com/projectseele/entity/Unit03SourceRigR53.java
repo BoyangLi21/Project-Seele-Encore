@@ -17,7 +17,7 @@ public final class Unit03SourceRigR53
 
     public static String displayName(int serial)
     {
-        return serial == 1 && loaded() ? "EVA-03" : "EVA-UN-0" + serial;
+        return "EVA-UN-0" + serial;
     }
 
     public static boolean sharesGroundActions(EvaUnit01Entity eva)

@@ -145,10 +145,10 @@ public final class NervRouteRuntimeR52
         if(!ready(level)||job==null||job.phase()!=Phase.PARKED||job.snapshot().stage()!=Stage.COMPLETE
                 ||!(controller.owner instanceof NervAssemblyOwnerR52 plant))return unavailable();
         var observed=plant.parkedServiceReadbackR53(level,job.snapshot().original(),job.ownerData());
-        if(observed==null)return new EvaLogisticsDirector.ActionResult(false,"现场原机、原栓、封口或已知液体/桥状态不满足整备续接，未修改现场。");
+        if(observed==null)return new EvaLogisticsDirector.ActionResult(false,"机体、插入栓、舱口或 LCL/登机桥状态不满足继续整备的条件，现场未做改动。");
         observed.putUUID("ServiceReadbackTaskR53",job.snapshot().task());observed.putLong("ServiceReadbackTickR53",level.getGameTime());
         controller.saved.resumeParkedServiceR53(job,observed);controller.mirror(controller.saved.job(variant));
-        return new EvaLogisticsDirector.ActionResult(true,"原任务已按实际液体和桥状态续接注液/桥复位；机体、驾驶员及任务身份保留。");
+        return new EvaLogisticsDirector.ActionResult(true,"已按当前 LCL 和登机桥状态继续注液与登机桥复位。");
     }
     public static boolean pending(ServerLevel level,int variant)
     {var saved=state(level,false);var job=saved==null?null:saved.job(variant);return job!=null&&!Set.of(Phase.PARKED,Phase.DEPLOYED,Phase.CANCELLED).contains(job.phase());}
@@ -157,7 +157,7 @@ public final class NervRouteRuntimeR52
         var list=new ArrayList<EvaUnit01Entity>();for(int variant=0;variant<3;variant++)
         {var entry=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);if(entry!=null&&level.getEntity(entry.canonicalId()) instanceof EvaUnit01Entity eva&&eva.getUnitVariant()==variant&&!eva.isExperimentalUnit())list.add(eva);}return List.copyOf(list);
     }
-    private static EvaLogisticsDirector.ActionResult unavailable(){return new EvaLogisticsDirector.ActionResult(false,"R52 运行目录或整组机械接口尚未就绪；原机体保持当前位置。");}
+    private static EvaLogisticsDirector.ActionResult unavailable(){return new EvaLogisticsDirector.ActionResult(false,"机库运输系统尚未就绪，机体保持当前位置。");}
     public static EvaLogisticsDirector.ActionResult prepare(ServerLevel level,int variant)
     {
         var c=LIVE.get(level);if(c==null||!ready(level))return unavailable();
@@ -178,7 +178,7 @@ public final class NervRouteRuntimeR52
     public static EvaLogisticsDirector.ActionResult underground(ServerPlayer caller,int variant,boolean open)
     {
         var c=LIVE.get(caller.serverLevel());if(c==null||!ready(caller.serverLevel()))return unavailable();
-        var job=c.saved.job(variant);if(job==null||!job.snapshot().original().owner().equals(caller.getUUID()))return new EvaLogisticsDirector.ActionResult(false,"原编队与当前指挥许可不符。");
+        var job=c.saved.job(variant);if(job==null||!job.snapshot().original().owner().equals(caller.getUUID()))return new EvaLogisticsDirector.ActionResult(false,"这台机体由其他指挥员调度。");
         if(!open)return c.cancel(variant,caller.getUUID());return c.launch(variant,"geofront");
     }
     public static EvaLogisticsDirector.ActionResult recover(ServerLevel level,int variant)
@@ -195,7 +195,7 @@ public final class NervRouteRuntimeR52
         return c.owner.actualRecoveryRegion(level,original,data)!=null;
     }
     public static EvaLogisticsDirector.ActionResult recover(ServerPlayer caller,int variant)
-    {var c=LIVE.get(caller.serverLevel());if(c==null||!ready(caller.serverLevel()))return unavailable();var job=c.saved.job(variant);return job==null||!job.snapshot().original().owner().equals(caller.getUUID())?new EvaLogisticsDirector.ActionResult(false,"本次原编队的回收指挥者不符。"):c.recover(variant);}
+    {var c=LIVE.get(caller.serverLevel());if(c==null||!ready(caller.serverLevel()))return unavailable();var job=c.saved.job(variant);return job==null||!job.snapshot().original().owner().equals(caller.getUUID())?new EvaLogisticsDirector.ActionResult(false,"只有下达本次出动的指挥员可以安排回收。"):c.recover(variant);}
     public static EvaLogisticsDirector.ActionResult cancel(ServerLevel level,int variant)
     {var c=LIVE.get(level);var s=state(level,false);var job=s==null?null:s.job(variant);return c==null||job==null?unavailable():c.cancel(variant,job.snapshot().original().owner());}
     /** Pilot C-key abort. Unlike the operator's stop-in-place cancel, the
@@ -206,7 +206,7 @@ public final class NervRouteRuntimeR52
     {
         var c=LIVE.get(level);if(c==null||!ready(level))return unavailable();
         var job=c.saved.job(variant);
-        if(job!=null&&!job.snapshot().original().pilot().equals(pilot))return new EvaLogisticsDirector.ActionResult(false,"只有本机原驾驶员可以中止发射。");
+        if(job!=null&&!job.snapshot().original().pilot().equals(pilot))return new EvaLogisticsDirector.ActionResult(false,"只有本机驾驶员可以中止发射。");
         return c.pilotAbortR55(variant);
     }
     public static void cancelOwner(ServerLevel level,UUID owner,int variant)
@@ -256,7 +256,7 @@ public final class NervRouteRuntimeR52
     {var c=LIVE.get(level);if(c==null||!ready(level)||!(c.owner instanceof NervAssemblyOwnerR52 owner))return original;var extra=owner.actualCageCollisions(level,actor,query);if(extra.isEmpty())return original;var result=new ArrayList<>(original);result.addAll(extra);return result;}
     public static boolean personnelBindingsReady(ServerLevel level){var c=LIVE.get(level);return c!=null&&c.owner.originalPersonnelBindingsReady(level);}
     public static TrainingPilotDirector.ActionResult requestPilot(ServerLevel level,int variant,String operation)
-    {var c=LIVE.get(level);return c!=null&&personnelBindingsReady(level)?c.owner.requestOriginalPilot(level,variant,operation):new TrainingPilotDirector.ActionResult(false,"R52 原驾驶员待命/电话/座椅绑定尚未接通，保持原位。");}
+    {var c=LIVE.get(level);return c!=null&&personnelBindingsReady(level)?c.owner.requestOriginalPilot(level,variant,operation):new TrainingPilotDirector.ActionResult(false,"驾驶员待命室的座椅、电话和通道尚未接通，驾驶员留在原地。");}
     public static boolean pilotRouting(ServerLevel level,TrainingPilotEntity pilot,String operation)
     {var c=LIVE.get(level);if(c!=null&&personnelBindingsReady(level)&&c.owner.routeOriginalPilot(level,pilot,operation))return true;pilot.getNavigation().stop();return false;}
     public static boolean pilotStandby(ServerLevel level,int variant){var c=LIVE.get(level);return c!=null&&personnelBindingsReady(level)&&c.owner.atOriginalPilotStandby(level,variant);}
@@ -324,14 +324,14 @@ public final class NervRouteRuntimeR52
         }
         EvaLogisticsDirector.ActionResult prepare(int variant,String intent)
         {
-            var existing=saved.job(variant);if(existing!=null&&!Set.of(Phase.PARKED,Phase.CANCELLED).contains(existing.phase()))return new EvaLogisticsDirector.ActionResult(false,"原机体已有运行安排，请先确认当前状态。");
+            var existing=saved.job(variant);if(existing!=null&&!Set.of(Phase.PARKED,Phase.CANCELLED).contains(existing.phase()))return new EvaLogisticsDirector.ActionResult(false,"这台机体已有运行安排，请先确认当前状态。");
             if(existing!=null&&existing.phase()==Phase.PARKED&&owner instanceof NervAssemblyOwnerR52 plant)
             {
                 plant.retainOriginalBayBlocksR54(level,existing.snapshot().original());
                 String hold=plant.parkedServiceHoldR53(level,existing.snapshot().original());
                 if(!hold.isEmpty()){saved.put(existing.update(existing.snapshot(),existing.phase(),existing.ownerData(),hold));return new EvaLogisticsDirector.ActionResult(false,hold);}
             }
-            Original original=original(variant);String route=defaults.get(variant+"/"+intent);if(original==null||route==null)return new EvaLogisticsDirector.ActionResult(false,"等待原驾驶员、原插入栓与 Root 路线许可。");
+            Original original=original(variant);String route=defaults.get(variant+"/"+intent);if(original==null||route==null)return new EvaLogisticsDirector.ActionResult(false,"等待驾驶员登上插入栓，并等待出动线路可用。");
             var preparation=new CompoundTag();
             if(existing!=null&&existing.phase()==Phase.CANCELLED&&existing.ownerData().contains("Prepare"))
             {
@@ -340,63 +340,63 @@ public final class NervRouteRuntimeR52
                         ||!stopped.original().equals(original)||!stopped.route().equals(route)
                         ||!(owner instanceof NervAssemblyOwnerR52 plant)
                         ||!plant.canResumeDockPreparationR53(level,original,existing.ownerData()))
-                    return new EvaLogisticsDirector.ActionResult(false,"取消后的原编队不在可续接的登乘位；请按实际停止位置回收，未重置整备。");
+                    return new EvaLogisticsDirector.ActionResult(false,"取消后的机体不在可继续整备的登乘位置，请从它停下的位置安排回收。");
                 preparation=existing.ownerData().copy();
                 preparation.remove("ReleaseWhenReady");preparation.remove("ContinuousAutoLaunchR52");
                 preparation.putUUID("ResumedPreparationTaskR53",stopped.task());
             }
             var result=pool.reserve(UUID.randomUUID(),original,route,nativeAccess);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
             if(level.getEntity(original.eva()) instanceof EvaUnit01Entity eva)TvMissionEquipmentR45.issueFromRecoveryStorage(eva,eva.getPilotEntity());
-            saved.put(new Job(result.state(),Phase.PREPARING,preparation,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"原编队已登记；按真实机械反馈整备并转移到预备位。");
+            saved.put(new Job(result.state(),Phase.PREPARING,preparation,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"整备已登记，机体完成整备后转移到预备位。");
         }
         EvaLogisticsDirector.ActionResult launch(int variant,String intent)
         {
-            var job=saved.job(variant);if(job==null)return new EvaLogisticsDirector.ActionResult(false,"请先登记原编队并完成实际整备。");
-            var selected=directory.route(job.snapshot().route());if(job.ownerData().getString("ContinuousBrakeR52").equals("CANCEL"))return new EvaLogisticsDirector.ActionResult(false,"原编队正在实际减速取消，请先等待停稳。");
+            var job=saved.job(variant);if(job==null)return new EvaLogisticsDirector.ActionResult(false,"请先下达整备并等待整备完成。");
+            var selected=directory.route(job.snapshot().route());if(job.ownerData().getString("ContinuousBrakeR52").equals("CANCEL"))return new EvaLogisticsDirector.ActionResult(false,"机体正在减速取消，请等它停稳。");
             if(selected!=null&&selected.continuousUpright()&&job.phase()==Phase.PREPARING)
             {
                 String requested=intent==null?selected.id():defaults.get(variant+"/"+intent);if(!selected.id().equals(requested))return new EvaLogisticsDirector.ActionResult(false,"当前选定线路已预留；请在预备位选择已接通的支路。");
-                var data=job.ownerData().copy();data.putBoolean("ContinuousAutoLaunchR52",true);if(!selected.phased())NervMechanicalTravelR52.extendContinuousR52(data,selected.id(),directory.fingerprint(),directory.routeLength(selected));saved.put(job.update(job.snapshot(),Phase.PREPARING,data,""));return new EvaLogisticsDirector.ActionResult(true,"发射已接续整备：备发先停稳，再完成真实换轨准备后发射。");
+                var data=job.ownerData().copy();data.putBoolean("ContinuousAutoLaunchR52",true);if(!selected.phased())NervMechanicalTravelR52.extendContinuousR52(data,selected.id(),directory.fingerprint(),directory.routeLength(selected));saved.put(job.update(job.snapshot(),Phase.PREPARING,data,""));return new EvaLogisticsDirector.ActionResult(true,"发射已排在整备之后：机体到预备位停稳、完成换轨准备后发射。");
             }
-            if(job.phase()!=Phase.READY)return new EvaLogisticsDirector.ActionResult(false,"原编队当前尚不能追加发射。");
+            if(job.phase()!=Phase.READY)return new EvaLogisticsDirector.ActionResult(false,"机体当前还不能发射。");
             if(intent!=null&&!defaults.get(variant+"/"+intent).equals(job.snapshot().route()))
             {
                 if(selected!=null&&selected.phased())
                 {
-                    var target=directory.route(defaults.get(variant+"/"+intent));if(target==null||target.bank()<=selected.bank()||job.snapshot().leg()>=target.legs().size())return new EvaLogisticsDirector.ActionResult(false,"该目标没有同向备发轨接续，请保留当前停稳位置。");for(int i=0;i<job.snapshot().leg();i++)if(!selected.legs().get(i).equals(target.legs().get(i)))return new EvaLogisticsDirector.ActionResult(false,"目标与已走过的实际轨道不一致。");
-                    var data=job.ownerData().copy();data.putString("RetargetPreparedRouteR53",target.id());data.remove("ContinuousAutoLaunchR52");data.remove("ReleaseWhenReady");saved.put(job.update(job.snapshot(),Phase.PREPARING,data,"先将局部滑靴转回备发导向"));return new EvaLogisticsDirector.ActionResult(true,"换道已登记；原机停稳转回备发导向，再沿后门轨道到下一准备位。");
+                    var target=directory.route(defaults.get(variant+"/"+intent));if(target==null||target.bank()<=selected.bank()||job.snapshot().leg()>=target.legs().size())return new EvaLogisticsDirector.ActionResult(false,"该目标没有同向备发轨接续，请保留当前停稳位置。");for(int i=0;i<job.snapshot().leg();i++)if(!selected.legs().get(i).equals(target.legs().get(i)))return new EvaLogisticsDirector.ActionResult(false,"目标与机体已经走过的轨道不一致。");
+                    var data=job.ownerData().copy();data.putString("RetargetPreparedRouteR53",target.id());data.remove("ContinuousAutoLaunchR52");data.remove("ReleaseWhenReady");saved.put(job.update(job.snapshot(),Phase.PREPARING,data,"先将局部滑靴转回备发导向"));return new EvaLogisticsDirector.ActionResult(true,"换道已登记：机体停稳后转回备发导轨，再沿后门轨道到下一个准备位。");
                 }
                 nativeAccess.ownerData(job.ownerData());var switched=pool.retargetPrepared(job.snapshot().task(),defaults.get(variant+"/"+intent),nativeAccess);
-                if(!switched.accepted())return new EvaLogisticsDirector.ActionResult(false,"地下准备支路尚未实际接通或被占用，原机仍停在预备位。");
-                var data=job.ownerData().copy();data.putBoolean("ReleaseWhenReady",true);if(directory.route(switched.state().route()).continuousUpright()){data.remove("ContinuousClockR52");data.remove("ContinuousDistanceR52");data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("ContinuousCheckedStartR52",true);continuousPrimedR52.remove(job.snapshot().task());}saved.put(job.update(switched.state(),Phase.PREPARING,data,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"原机沿真实后门轨道转至地下准备位，确认停稳后再部署。");
+                if(!switched.accepted())return new EvaLogisticsDirector.ActionResult(false,"地下准备支路尚未接通或被占用，机体仍停在预备位。");
+                var data=job.ownerData().copy();data.putBoolean("ReleaseWhenReady",true);if(directory.route(switched.state().route()).continuousUpright()){data.remove("ContinuousClockR52");data.remove("ContinuousDistanceR52");data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("ContinuousCheckedStartR52",true);continuousPrimedR52.remove(job.snapshot().task());}saved.put(job.update(switched.state(),Phase.PREPARING,data,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"机体沿后门轨道转往地下准备位，停稳后再部署。");
             }
-            nativeAccess.ownerData(job.ownerData());if(!nativeAccess.sameOriginalAssembly(job.snapshot().original()))return new EvaLogisticsDirector.ActionResult(false,"原驾驶员或原栓连接已变化，未发射。");
+            nativeAccess.ownerData(job.ownerData());if(!nativeAccess.sameOriginalAssembly(job.snapshot().original()))return new EvaLogisticsDirector.ActionResult(false,"驾驶员或插入栓的连接已变化，未发射。");
             var launchData=job.ownerData().copy();if(selected!=null&&selected.continuousUpright()){launchData.putBoolean("ContinuousAutoLaunchR52",true);if(!selected.phased())NervMechanicalTravelR52.extendContinuousR52(launchData,selected.id(),directory.fingerprint(),directory.routeLength(selected));continuousPrimedR52.remove(job.snapshot().task());}
-            saved.put(job.update(job.snapshot(),selected!=null&&selected.phased()?Phase.READY:Phase.DEPARTING,launchData,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"发射已登记；全路实际预开验线通过后连续出动。");
+            saved.put(job.update(job.snapshot(),selected!=null&&selected.phased()?Phase.READY:Phase.DEPARTING,launchData,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"发射已登记：全线检查通过后连续出动。");
         }
         EvaLogisticsDirector.ActionResult recover(int variant)
         {
             var job=saved.job(variant);
             if(job!=null&&job.phase()==Phase.PARKED&&!job.waiting().isEmpty())return resumeParkedServiceR53(level,variant);
-            if(job!=null&&job.phase()==Phase.CANCELLED)return recoverCancelledContinuousR52(job);if(job==null||job.phase()!=Phase.DEPLOYED)return new EvaLogisticsDirector.ActionResult(false,"没有可接应的原出动编队记录。");
-            var moving=level.getEntity(job.snapshot().original().eva());if(moving instanceof EvaUnit01Entity current&&NervAirTransportRuntimeR52.pending(level,current))return new EvaLogisticsDirector.ActionResult(false,"同一原机体仍由已保存的航空任务保持，不另抢地面路线。");
+            if(job!=null&&job.phase()==Phase.CANCELLED)return recoverCancelledContinuousR52(job);if(job==null||job.phase()!=Phase.DEPLOYED)return new EvaLogisticsDirector.ActionResult(false,"没有这台机体的出动记录，无法安排接应。");
+            var moving=level.getEntity(job.snapshot().original().eva());if(moving instanceof EvaUnit01Entity current&&NervAirTransportRuntimeR52.pending(level,current))return new EvaLogisticsDirector.ActionResult(false,"这台机体已有空运任务，不再另排地面路线。");
             var old=job.snapshot().original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level,old.variant()),old.dimension());
             if(job.snapshot().stage()==Stage.COMPLETE)pool.releaseCompletion(job.snapshot().task(),old.owner());
-            Entity actor=level.getEntity(original.eva());if(!(actor instanceof EvaUnit01Entity eva)||!((eva.getDeltaMovement().horizontalDistanceSqr()<.001)))return new EvaLogisticsDirector.ActionResult(false,"原机体尚未在实际支撑上停稳。");
+            Entity actor=level.getEntity(original.eva());if(!(actor instanceof EvaUnit01Entity eva)||!((eva.getDeltaMovement().horizontalDistanceSqr()<.001)))return new EvaLogisticsDirector.ActionResult(false,"机体尚未停稳。");
             Kind kind=EntryPlugEjectionR48.originalFieldEjection(level,variant,eva,original.pilot())?Kind.HULL_ONLY_RECOVERY:Kind.OCCUPIED;
             var data=job.ownerData().copy();for(String oldPhase:List.of("Finish","FinishTicks","FinishRoot","FinishFeet","FinishPlugLocal","LastFinishTick","RouteR52","ContinuousClockR52","ContinuousDistanceR52","ContinuousRotationR52","ContinuousAutoLaunchR52","ContinuousCheckedStartR52"))data.remove(oldPhase);data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("Returning",true);data.putString("AssemblyKindR52",kind.name());nativeAccess.ownerData(data);
             var binding=owner.originalBinding(level,original,data);if(binding==null)return unavailable();
             var region=owner.actualRecoveryRegion(level,original,data);var feet=owner.actualFootBearingCentre(level,original,data);if(region==null||feet==null)return unavailable();
             var route=pool.nearestRecovery(original,region,feet,(port,reverse)->owner.approachReachable(level,original,port,reverse,data),kind);
-            if(route.isEmpty())return new EvaLogisticsDirector.ActionResult(false,"同一原机没有可达且空闲的对应回收口。");
+            if(route.isEmpty())return new EvaLogisticsDirector.ActionResult(false,"附近没有这台机体能到达且空闲的回收口。");
             // The local receiver aligns its original body and raises its rack.
             // A lowered rack is a preparation step, not a reason for air pickup.
             var result=pool.reserve(UUID.randomUUID(),original,route.get().id(),nativeAccess,kind);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
-            saved.put(new Job(result.state(),Phase.RETURNING,data,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,kind==Kind.HULL_ONLY_RECOVERY?"原无人机体沿真实逆向线路回库；已分离的原栓与驾驶员保持原位。":"原机体沿该入口绑定的真实逆向线路回库。");
+            saved.put(new Job(result.state(),Phase.RETURNING,data,""));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,kind==Kind.HULL_ONLY_RECOVERY?"无人机体沿回库线路返回；已弹出的插入栓和驾驶员留在原地。":"机体沿这个入口的回库线路返回机库。");
         }
         private EvaLogisticsDirector.ActionResult recoverCancelledContinuousR52(Job job)
         {
-            var snapshot=job.snapshot();var route=directory.route(snapshot.route());var stored=job.ownerData().getCompound("ContinuousClockR52");if(route==null||!route.continuousUpright()||stored.getDouble("SpeedMps")!=0)return new EvaLogisticsDirector.ActionResult(false,"等待已取消的原编队沿实轨减速停稳。");
+            var snapshot=job.snapshot();var route=directory.route(snapshot.route());var stored=job.ownerData().getCompound("ContinuousClockR52");if(route==null||!route.continuousUpright()||stored.getDouble("SpeedMps")!=0)return new EvaLogisticsDirector.ActionResult(false,"等待已取消的机体减速停稳。");
             // Route-wide gate admission happens before the first distance
             // clock exists. Cancelling there must still run normal bay
             // service; a missing clock at a moved point remains invalid.
@@ -404,12 +404,12 @@ public final class NervRouteRuntimeR52
                     &&job.ownerData().getString("Prepare").equals("READY")
                     &&job.ownerData().getDouble("ContinuousDistanceR52")==0;
             if(stored.isEmpty()&&(!unstarted||!owner.restoreOriginalPreparation(level,snapshot.original(),job.ownerData())))
-                return new EvaLogisticsDirector.ActionResult(false,"原取消任务缺少行驶时钟，且未通过原登乘位整备实况检查。");
+                return new EvaLogisticsDirector.ActionResult(false,"取消时的运行记录不完整，且机体不在可继续整备的登乘位置。");
             NervMechanicalTravelR52.ContinuousClock originalStop=null;
-            try{if(!unstarted){var resumeSpeed=route.phased()?NervLaunchPhasesR53.current(job.ownerData().copy(),snapshot.task(),directory,route,directory.routeDistance(route,snapshot.leg(),snapshot.fraction())).speed():route.motionProfile().launch();originalStop=NervMechanicalTravelR52.continuousClock(job.ownerData(),route.id(),directory.fingerprint(),directory.routeDistance(route,snapshot.leg(),snapshot.fraction()),directory.routeLength(route),stored.getDouble("ToMetres"),resumeSpeed.cruiseMps(),resumeSpeed.accelerationMps2(),resumeSpeed.decelerationMps2());if(originalStop.speed()!=0)return new EvaLogisticsDirector.ActionResult(false,"原取消任务尚未真正停稳。");}}
-            catch(IllegalArgumentException|IllegalStateException mismatch){return new EvaLogisticsDirector.ActionResult(false,"原取消任务的实际位置与保存时钟不符，保持原UUID等待修复。");}
+            try{if(!unstarted){var resumeSpeed=route.phased()?NervLaunchPhasesR53.current(job.ownerData().copy(),snapshot.task(),directory,route,directory.routeDistance(route,snapshot.leg(),snapshot.fraction())).speed():route.motionProfile().launch();originalStop=NervMechanicalTravelR52.continuousClock(job.ownerData(),route.id(),directory.fingerprint(),directory.routeDistance(route,snapshot.leg(),snapshot.fraction()),directory.routeLength(route),stored.getDouble("ToMetres"),resumeSpeed.cruiseMps(),resumeSpeed.accelerationMps2(),resumeSpeed.decelerationMps2());if(originalStop.speed()!=0)return new EvaLogisticsDirector.ActionResult(false,"已取消的机体尚未完全停稳。");}}
+            catch(IllegalArgumentException|IllegalStateException mismatch){return new EvaLogisticsDirector.ActionResult(false,"已取消机体的位置与运行记录不符，保持原状等待检修。");}
             var old=snapshot.original();var original=new Original(old.epoch(),old.variant(),old.eva(),old.plug(),old.pilot(),old.owner(),AutoSortieR32.missionToken(level,old.variant()),old.dimension());var data=job.ownerData().copy();data.putString("AssemblyKindR52",snapshot.kind().name());nativeAccess.ownerData(data);
-            if(!owner.rebindStoppedContinuousR52(level,original,data))return new EvaLogisticsDirector.ActionResult(false,"原UUID编队的实际恒定姿态与停止承托尚未通过。");
+            if(!owner.rebindStoppedContinuousR52(level,original,data))return new EvaLogisticsDirector.ActionResult(false,"机体的停止姿态和承托检查尚未通过。");
             var result=pool.reclaimCancelledContinuousR52(snapshot,UUID.randomUUID(),original,nativeAccess);if(!result.accepted())return new EvaLogisticsDirector.ActionResult(false,result.reason());
             for(String field:List.of("Finish","FinishTicks","FinishRoot","FinishFeet","FinishPlugLocal","LastFinishTick","ContinuousClockR52","ContinuousBrakeR52","ContinuousResumeStopR52","ContinuousAutoLaunchR52","ReleaseWhenReady","RetargetPreparedRouteR53"))data.remove(field);data.remove(NervLaunchPhasesR53.KEY);data.putBoolean("Returning",true);data.putBoolean("ContinuousCheckedStartR52",true);data.putString("RouteR52",result.state().route());data.putDouble("ContinuousDistanceR52",directory.routeDistance(directory.route(result.state().route()),result.state().leg(),result.state().fraction()));
             data.putUUID("HeadReturnFromTaskR53",snapshot.task());data.putString("HeadReturnFromRouteR53",snapshot.route());
@@ -419,27 +419,27 @@ public final class NervRouteRuntimeR52
 
             var returning=job.update(result.state(),Phase.RETURNING,data,"");saved.put(returning);
             if(result.state().stage()==Stage.COMPLETE)saved.put(returning.update(result.state(),Phase.FINISHING,data,""));
-            mirror(saved.job(original.variant()));return new EvaLogisticsDirector.ActionResult(true,"同一原编队已重占原路；从实际停止点沿对应反向轨道回库。");
+            mirror(saved.job(original.variant()));return new EvaLogisticsDirector.ActionResult(true,"机体从停下的位置沿原轨道反向回库。");
         }
         EvaLogisticsDirector.ActionResult cancel(int variant,UUID commander)
         {
-            var job=saved.job(variant);if(job==null||!job.snapshot().original().owner().equals(commander))return new EvaLogisticsDirector.ActionResult(false,"原任务指挥者不符。");
-            if(Set.of(Phase.DEPLOYED,Phase.PARKED,Phase.CANCELLED).contains(job.phase()))return new EvaLogisticsDirector.ActionResult(false,"原编队当前没有运行中的路线任务。");
+            var job=saved.job(variant);if(job==null||!job.snapshot().original().owner().equals(commander))return new EvaLogisticsDirector.ActionResult(false,"只有下达这项任务的指挥员可以取消。");
+            if(Set.of(Phase.DEPLOYED,Phase.PARKED,Phase.CANCELLED).contains(job.phase()))return new EvaLogisticsDirector.ActionResult(false,"机体当前没有正在运行的线路任务。");
             var selected=directory.route(job.snapshot().route());var clock=job.ownerData().getCompound("ContinuousClockR52");if(selected!=null&&selected.continuousUpright()&&clock.getDouble("SpeedMps")>0)
-            {var data=job.ownerData().copy();NervMechanicalTravelR52.brakeContinuousR52(data,selected.id(),directory.fingerprint(),directory.routeLength(selected),"CANCEL");saved.put(job.update(job.snapshot(),job.phase(),data,"原路减速取消中"));return new EvaLogisticsDirector.ActionResult(true,"取消已接受：沿当前实轨减速，停稳后释放任务；原机、原栓和载架均保留。");}
+            {var data=job.ownerData().copy();NervMechanicalTravelR52.brakeContinuousR52(data,selected.id(),directory.fingerprint(),directory.routeLength(selected),"CANCEL");saved.put(job.update(job.snapshot(),job.phase(),data,"原路减速取消中"));return new EvaLogisticsDirector.ActionResult(true,"取消已接受：机体沿当前轨道减速，停稳后结束任务。");}
             owner.brakeOriginalInPlace(level,job.snapshot().original(),job.ownerData());if(job.snapshot().stage()==Stage.COMPLETE)pool.releaseCompletion(job.snapshot().task(),commander);else pool.cancel(job.snapshot().task(),commander);
-            var s=job.snapshot();var cancelled=new Snapshot(s.task(),s.original(),s.directoryFingerprint(),s.route(),s.leg(),s.fraction(),Stage.CANCELLED,"",s.kind());saved.put(job.update(cancelled,Phase.CANCELLED,job.ownerData(),"原位停止；未瞬移回库"));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"已取消并原位停止，原机、原栓与驾驶员均保留。");
+            var s=job.snapshot();var cancelled=new Snapshot(s.task(),s.original(),s.directoryFingerprint(),s.route(),s.leg(),s.fraction(),Stage.CANCELLED,"",s.kind());saved.put(job.update(cancelled,Phase.CANCELLED,job.ownerData(),"原位停止；未瞬移回库"));mirror(saved.job(variant));return new EvaLogisticsDirector.ActionResult(true,"已取消，机体在原位停止。");
         }
         static final String PILOT_ABORT_R55="PilotAbortR55",ABORT_RETRY_R55="PilotAbortRetryR55",ABORT_MISSION_R55="R55PilotAbortMission";
         EvaLogisticsDirector.ActionResult pilotAbortR55(int variant)
         {
             var job=saved.job(variant);
             if(job==null||Set.of(Phase.PARKED,Phase.DEPLOYED).contains(job.phase()))return new EvaLogisticsDirector.ActionResult(false,"当前没有进行中的发射流程。");
-            if(Set.of(Phase.RETURNING,Phase.FINISHING).contains(job.phase()))return new EvaLogisticsDirector.ActionResult(false,"原机已在回库途中。");
+            if(Set.of(Phase.RETURNING,Phase.FINISHING).contains(job.phase()))return new EvaLogisticsDirector.ActionResult(false,"机体已在回库途中。");
             var data=job.ownerData().copy();
-            if(data.getBoolean(PILOT_ABORT_R55))return new EvaLogisticsDirector.ActionResult(true,"中止已登记，原机正在回库。");
+            if(data.getBoolean(PILOT_ABORT_R55))return new EvaLogisticsDirector.ActionResult(true,"中止已登记，机体正在回库。");
             var route=directory.route(job.snapshot().route());
-            if(route==null)return new EvaLogisticsDirector.ActionResult(false,"Root 路线已变化，请由指挥部处理。");
+            if(route==null)return new EvaLogisticsDirector.ActionResult(false,"出动线路已变化，请联络指挥部处理。");
             boolean committed=data.getCompound(NervLaunchPhasesR53.KEY).getBoolean("LaunchCommitted")
                     ||route.continuousUpright()&&!route.phased()&&job.phase()==Phase.DEPARTING
                     &&data.getDouble("ContinuousDistanceR52")>readyDistanceR52(route)+.01;
@@ -450,7 +450,7 @@ public final class NervRouteRuntimeR52
             var eva=EvaLogisticsDirector.canonicalUnit(level,variant);
             if(eva!=null)eva.getPersistentData().putString(ABORT_MISSION_R55,AutoSortieR32.missionToken(level,variant));
             if(job.phase()==Phase.CANCELLED)
-            {saved.put(job.update(job.snapshot(),Phase.CANCELLED,data,"驾驶员中止：准备回库"));return new EvaLogisticsDirector.ActionResult(true,"中止已接受：原机将从当前停止位置回库。");}
+            {saved.put(job.update(job.snapshot(),Phase.CANCELLED,data,"驾驶员中止：准备回库"));return new EvaLogisticsDirector.ActionResult(true,"中止已接受：机体将从当前停止位置回库。");}
             boolean stopped=data.getCompound("ContinuousClockR52").getDouble("SpeedMps")<=0;
             String stage=data.getString("Prepare");
             if(job.phase()==Phase.PREPARING&&stopped&&!data.getBoolean("Prepared")&&!Set.of("","HATCH","BRIDGE").contains(stage))
@@ -465,7 +465,7 @@ public final class NervRouteRuntimeR52
             saved.put(job.update(job.snapshot(),job.phase(),data,job.waiting()));
             var result=cancel(variant,job.snapshot().original().owner());
             if(!result.accepted()){saved.put(job);return result;}
-            return new EvaLogisticsDirector.ActionResult(true,stopped?"中止已接受：原机回库。":"中止已接受：沿当前实轨减速停稳后反向回库。");
+            return new EvaLogisticsDirector.ActionResult(true,stopped?"中止已接受：机体回库。":"中止已接受：机体沿当前轨道减速停稳后反向回库。");
         }
         boolean automaticSuspendedR55(int variant,String mission,Job job)
         {
