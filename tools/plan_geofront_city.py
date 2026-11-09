@@ -16,6 +16,7 @@ from scipy.ndimage import binary_dilation, distance_transform_edt, label, unifor
 from map_pipeline.launch_protection import load as load_launch
 from map_pipeline.native_rails import load_rails
 from query_blocks import iter_selected_sections
+from write_deep_cells import split_rows
 
 SCALE = 0.5
 DIM = 'projectseele:geofront'
@@ -221,6 +222,7 @@ def plan(a):
                   world_written=False)
     a.out.parent.mkdir(parents=True, exist_ok=True)
     a.out.write_text(json.dumps(output), 'utf8')
+    report['batches'] = split_rows(output, a.out.parent)
     Path(str(a.out) + '.report.json').write_text(json.dumps(report, indent=1), 'utf8')
     print(json.dumps(report))
 

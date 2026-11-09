@@ -104,6 +104,32 @@ def write_chunk(buf, i, loc, count, root):
     buf[i + 3] = need
 
 
+def clear_light(root):
+    """Drop every stored light value so the game, with Starlight, relights the chunk when it loads."""
+    for holder in (root, *root['sections']):
+        for key in [k for k in holder if k in ('SkyLight', 'BlockLight') or k.startswith('starlight.')]:
+            del holder[key]
+    root['isLightOn'] = nbtlib.Byte(0)
+
+
+def split_rows(rows, folder, limit=300000):
+    """Write rows as batch-NNN.json files of at most limit cells, whole chunks at a time, by region."""
+    chunks = defaultdict(list)
+    for row in rows:
+        chunks[row[0] >> 4, row[2] >> 4].append(row)
+    batches, current = [], []
+    for key in sorted(chunks, key=lambda c: (c[0] >> 5, c[1] >> 5, c)):
+        if current and len(current) + len(chunks[key]) > limit:
+            batches.append(current)
+            current = []
+        current += chunks[key]
+    if current:
+        batches.append(current)
+    for number, batch in enumerate(batches):
+        (Path(folder) / f'batch-{number:03d}.json').write_text(json.dumps(batch), 'utf8')
+    return [len(batch) for batch in batches]
+
+
 def apply(a):
     rows = json.loads(a.rows.read_text('utf8'))
     grouped = defaultdict(lambda: defaultdict(list))
@@ -126,6 +152,8 @@ def apply(a):
                 for sy, part in by_section.items():
                     if sy not in sections:
                         raise ValueError(f'Section {sy} missing in chunk {cx},{cz}')
+                    if 'block_states' not in sections[sy]:
+                        raise ValueError(f'Section {sy} in chunk {cx},{cz} holds no blocks')
                     states = sections[sy]['block_states']
                     ids, palette = decode(states)
                     index = {s: n for n, s in enumerate(palette)}
@@ -139,7 +167,7 @@ def apply(a):
                         ids[at] = index[after]
                         changed += 1
                     encode(states, ids, palette)
-                root['isLightOn'] = nbtlib.Byte(0)     # the game relights the chunk when it loads
+                clear_light(root)
                 write_chunk(buf, i, loc, count, root)
             swap = path.with_name(path.name + '.swap')
             swap.write_bytes(buf)
