@@ -19,6 +19,12 @@ import java.util.*;
 public final class FirstBattleClip
 {
     public static final int DURATION_TICKS=460,DEATH_TICK=372,RETURN_TICK=432;
+    /**
+     * Share of the clip's root drop the Angel takes. The clip was written for a rig with its waist
+     * 1.7 units higher: the shipped model's waist sits 5.65 units above its root against the rig's
+     * 7.39, so the full drop laid the whole body under the ground.
+     */
+    private static final double ANGEL_ROOT_DROP=(5.65-.92)/(7.39-.92);
     public record BonePose(String[] names,Quaternionf[] rotations,Vector3f[] positions) {}
     public record CameraPose(Vec3 position,Vec3 target,float fov) {}
     private record Role(String[] bones,Quaternionf[][] rotations,Vector3f[][] positions,Map<String,Vec3[]> curves) {}
@@ -77,6 +83,7 @@ public final class FirstBattleClip
                         if(!qs[i][b].isFinite()||qs[i][b].lengthSquared()<.5F)throw new IllegalArgumentException("Invalid first-battle quaternion");
                         qs[i][b].normalize();
                         Vec3 p=bones[b].equals("root")?vector(frame.getAsJsonArray("root_m")).scale(112):offsets!=null&&offsets.has(bones[b])?vector(offsets.getAsJsonArray(bones[b])):Vec3.ZERO;
+                        if(name.equals("angel")&&bones[b].equals("root"))p=new Vec3(p.x,p.y*ANGEL_ROOT_DROP,p.z);
                         ps[i][b]=new Vector3f((float)p.x,(float)p.y,(float)p.z);
                         if(!ps[i][b].isFinite())throw new IllegalArgumentException("Invalid first-battle translation");
                     }
