@@ -1,4 +1,4 @@
-"""Package the current game as R60: a server zip with the world and a PCL client zip without it.
+"""Package the current game as one release: a server zip with the world and a PCL client zip without it.
 
 Inventory only by default; --pack writes both zips. The R55 packages supply the server
 bootstrap (libraries, start scripts), server.properties, the icon and the PCL manifest.
@@ -19,13 +19,13 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = 'R60'
-NAME = 'EVANGELION_Encore_R60'
+VERSION = 'R61'
+NAME = 'EVANGELION_Encore_' + VERSION
 SHADER = 'SEELE_Local_Cavern_R53_Review_20261026.zip'
 SERVER_WORLD = 'SEELE_R53_WORLD'
 JIT = 'jit-recovery-r54.json'
 JVM = '-XX:+UnlockDiagnosticVMOptions -XX:CompilerDirectivesFile=' + JIT
-MOTD = '§b§lEVANGELION:Encore R60 小测试 §r\n§6NERV！ §8| §aEVA！§8| §fSEELE!'
+MOTD = '§b§lEVANGELION:Encore ' + VERSION + ' §r\n§6NERV！ §8| §aEVA！§8| §fSEELE!'
 DH_MOD = 'mods/DistantHorizons-2.3.4-b-1.20.1-fabric-forge.jar'
 TRAFFICCRAFT = 'mods/trafficcraft-forge-1.20.1-1.1.3.jar'
 CLIENT_TREES = ('mods', 'projectseele-local-maps', 'config', 'defaultconfigs', 'resourcepacks', 'shaderpacks', 'licenses')
@@ -314,9 +314,9 @@ def build_inputs(a, work):
                  acceptance='Friends test package; content and archive integrity checked, not verified in game')
     for payload, prefix in ((server, ''), (pcl, 'overrides/')):
         payload[prefix + JIT] = client / JIT
-        payload[prefix + 'R60_QUICKSTART.zh.md'] = ROOT / 'docs/R60_QUICKSTART.zh.md'
-        payload[prefix + 'R60_RELEASE.zh.md'] = ROOT / 'docs/R60_RELEASE.zh.md'
-        payload[prefix + 'R60_BATCH.json'] = json_bytes(batch)
+        payload[prefix + VERSION + '_QUICKSTART.zh.md'] = ROOT / f'docs/{VERSION}_QUICKSTART.zh.md'
+        payload[prefix + VERSION + '_RELEASE.zh.md'] = ROOT / f'docs/{VERSION}_RELEASE.zh.md'
+        payload[prefix + VERSION + '_BATCH.json'] = json_bytes(batch)
         for name, value in payload.items():
             if isinstance(value, Path):
                 assert value.is_file(), value
@@ -372,13 +372,13 @@ def main():
     p.add_argument('--world', type=Path, default=Path('F:/eva/artifacts/r53_repair_20261015/client/saves/HOTFIX_20261025'))
     p.add_argument('--delivery', type=Path, default=Path('F:/eva/delivery'))
     p.add_argument('--date', required=True)
-    p.add_argument('--map-note', required=True, help='One line on the map state, recorded in R60_BATCH.json')
+    p.add_argument('--map-note', required=True, help='One line on the map state, recorded in the batch file')
     p.add_argument('--server-address', required=True, help='Host friends connect to, default port; keyed into the client minimap cache and server list')
     p.add_argument('--xaero-map', type=Path, required=True, help='xaero/world-map/WORLD/projectseele$geofront written by a -Dprojectseele.xaeroBake=true run on a copy of --world')
     p.add_argument('--pack', action='store_true')
     a = p.parse_args()
     assert re.fullmatch(r'\d{8}', a.date)
-    with tempfile.TemporaryDirectory(dir=a.delivery, prefix='r60-lod-') as work, stopped_world(a.world) if a.pack else nullcontext():
+    with tempfile.TemporaryDirectory(dir=a.delivery, prefix='release-lod-') as work, stopped_world(a.world) if a.pack else nullcontext():
         d = build_inputs(a, Path(work))
         size = lambda payload: sum(v.stat().st_size if isinstance(v, Path) else len(v) for v in payload.values())
         report = dict(version=VERSION, date=a.date, pack_written=False, actual_world=str(d['world']), manifest_name=NAME,
@@ -389,11 +389,11 @@ def main():
         print(json.dumps({k: report[k] for k in ('dh', 'dh_key', 'raw_bytes')}, ensure_ascii=False), flush=True)
         if a.pack:
             report['outputs'] = [
-                package(a.delivery / f'Project_SEELE_Encore_R60_{a.date}_Client_PCL.zip', d['pcl'], 9),
-                package(a.delivery / f'Project_SEELE_Encore_R60_{a.date}_Server.zip', d['server'], 3, d['template'], d['bootstrap'])]
+                package(a.delivery / f'Project_SEELE_Encore_{VERSION}_{a.date}_Client_PCL.zip', d['pcl'], 9),
+                package(a.delivery / f'Project_SEELE_Encore_{VERSION}_{a.date}_Server.zip', d['server'], 3, d['template'], d['bootstrap'])]
             report['pack_written'] = True
-            (a.delivery / f'R60_{a.date}_receipt.json').write_bytes(json_bytes(report))
-    print('R60 packed' if a.pack else 'R60 inventory ready (nothing written)', flush=True)
+            (a.delivery / f'{VERSION}_{a.date}_receipt.json').write_bytes(json_bytes(report))
+    print(VERSION + (' packed' if a.pack else ' inventory ready (nothing written)'), flush=True)
 
 
 if __name__ == '__main__':
