@@ -53,6 +53,110 @@ public final class MechanicalVisualClockR54
     public double fraction(long now)
     { return span == 0 ? 1 : Math.max(0, Math.min(1, (now - received) / (double)span)); }
 
+    /** Replays per-tick samples on one steady clock a little behind the newest
+     *  stamp: packet timing and a slow server change the lead, not the motion. */
+    public static final class TickPlayback<T>
+    {
+        public interface Mix<T> { T mix(T from, T to, double fraction); }
+        private record Sample<T>(long tick, T value) {}
+
+        private static final double MIN_LEAD = 1.25D, MAX_LEAD = 6.0D, GAIN = .35D, MAX_TRIM = .45D;
+        private static final int STALL_TICKS = 12, RETAINED_TICKS = 48;
+
+        private final java.util.ArrayDeque<Sample<T>> samples = new java.util.ArrayDeque<>();
+        private final Mix<T> mix;
+        private double head, velocity, lead = MIN_LEAD, rate = 20D, jitter;
+        private long anchor, lastArrival, windowStart;
+        private int windowTicks;
+
+        public TickPlayback(Mix<T> mix) { this.mix = mix; }
+
+        /** Pure in time between packets: every reader of a frame gets the same pose. */
+        private double headAt(long now)
+        {
+            double at = head + velocity * Math.max(0D, (now - anchor) / 1.0E9D);
+            return Math.min(at, samples.peekLast().tick());
+        }
+
+        public void receive(long tick, T value, long now)
+        {
+            var newest = samples.peekLast();
+            if (newest == null || tick < newest.tick() - 200L)
+            {
+                samples.clear();
+                samples.add(new Sample<>(tick, value));
+                head = tick;
+                velocity = 0D;
+                anchor = lastArrival = windowStart = now;
+                windowTicks = 0;
+                return;
+            }
+            if (tick <= newest.tick())
+            {
+                if (tick == newest.tick() && !value.equals(newest.value()))
+                {
+                    samples.removeLast();
+                    samples.add(new Sample<>(tick, value));
+                }
+                return;
+            }
+            double current = headAt(now);
+            long elapsed = now - lastArrival;
+            lastArrival = now;
+            int ticks = (int) Math.min(100L, tick - newest.tick());
+            if (ticks > STALL_TICKS || elapsed > 500_000_000L)
+            {
+                // A long stop is not motion: hold the last pose until just
+                // before this new sample and restart the lead from there.
+                samples.clear();
+                samples.add(new Sample<>(tick - 1L, newest.value()));
+                samples.add(new Sample<>(tick, value));
+                head = tick - 1L - lead;
+                velocity = rate;
+                anchor = windowStart = now;
+                windowTicks = 0;
+                return;
+            }
+            windowTicks += ticks;
+            if (now - windowStart >= 400_000_000L)
+            {
+                double measured = windowTicks / ((now - windowStart) / 1.0E9D);
+                rate += (Math.max(4D, Math.min(30D, measured)) - rate) * .5D;
+                windowStart = now;
+                windowTicks = 0;
+            }
+            // Deviation from the steady arrival, in ticks. TCP batching shows
+            // up here as well, so bunched samples widen the safety lead.
+            double expected = ticks / rate, deviation = Math.abs(elapsed / 1.0E9D - expected) * rate;
+            jitter = deviation > jitter ? jitter + (deviation - jitter) * .25D : jitter + (deviation - jitter) * .02D;
+            lead = Math.max(MIN_LEAD, Math.min(MAX_LEAD, MIN_LEAD + jitter * 1.8D));
+            samples.add(new Sample<>(tick, value));
+            while (samples.size() > 2 && samples.peekFirst().tick() < tick - RETAINED_TICKS)
+                samples.removeFirst();
+            // Only a packet changes the speed, always from the drawn position.
+            double error = tick - lead - current;
+            head = Math.abs(error) > 40D ? tick - lead : current;
+            velocity = rate * (1D + Math.max(-MAX_TRIM, Math.min(MAX_TRIM, error * GAIN)));
+            anchor = now;
+        }
+
+        public T sample(long now)
+        {
+            if (samples.isEmpty()) throw new IllegalStateException("Playback sampled before its first sample");
+            double position = headAt(now);
+            Sample<T> before = null, after = null;
+            for (var sample : samples)
+            {
+                if (sample.tick() <= position) before = sample;
+                else { after = sample; break; }
+            }
+            if (before == null) return samples.peekFirst().value();
+            if (after == null) return before.value();
+            double fraction = (position - before.tick()) / (double) (after.tick() - before.tick());
+            return mix.mix(before.value(), after.value(), Math.max(0D, Math.min(1D, fraction)));
+        }
+    }
+
     /** Retarget from the currently drawn value when packets are batched or delayed. */
     public static final class Value
     {

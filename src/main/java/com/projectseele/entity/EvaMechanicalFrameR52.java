@@ -352,25 +352,31 @@ public final class EvaMechanicalFrameR52
     }
     private static final class ClientFrameR54
     {
-        private final MechanicalVisualClockR54 clock=new MechanicalVisualClockR54();
-        private RigidTransform from,to,displayed;
-        private long revision;
+        private static final long HANDOFF_NANOS=120_000_000L;
+        private final MechanicalVisualClockR54.TickPlayback<RigidTransform> playback=new MechanicalVisualClockR54.TickPlayback<>(RigidTransform::interpolate);
+        private RigidTransform to,displayed,handoff;
+        private long handoffAt;
         private boolean external;
 
-        void receive(RigidTransform target,long now)
+        void receive(RigidTransform target,long stamp,long now)
         {
             if(target.equals(to))return;
-            // A curve/carrier-to-ballistic handoff starts at the frame that
-            // body and capsule last shared, not the new packet's old endpoint.
-            from=to==null?target:external&&displayed!=null?displayed:sample(now);
-            to=target;clock.receive(++revision,now);external=false;
+            to=target;playback.receive(stamp,target,now);
         }
 
-        RigidTransform sample(long now){return from.interpolate(to,clock.fraction(now));}
+        RigidTransform sample(long now)
+        {
+            var frame=playback.sample(now);if(handoff==null)return frame;
+            double blend=Math.min(1,Math.max(0,(now-handoffAt)/(double)HANDOFF_NANOS));
+            if(blend>=1){handoff=null;return frame;}
+            // A carrier-to-own-clock handoff starts at the frame that body and
+            // capsule last shared, not at the buffered sample's own position.
+            return handoff.interpolate(frame,blend);
+        }
         void takeControl(long now)
         {
             if(!external||displayed==null)return;
-            from=displayed;clock.receive(++revision,now);external=false;
+            handoff=displayed;handoffAt=now;external=false;
         }
         RigidTransform remember(RigidTransform frame,boolean external)
         {displayed=frame;this.external=external;return frame;}
@@ -385,7 +391,7 @@ public final class EvaMechanicalFrameR52
             long now=System.nanoTime();
             boolean initialSnapshot=!CLIENT_FRAMES_R54.containsKey(eva);
             if(tag.getBoolean("Active")&&tag.contains("Current",net.minecraft.nbt.Tag.TAG_COMPOUND))
-                CLIENT_FRAMES_R54.computeIfAbsent(eva,ignored->new ClientFrameR54()).receive(decode(tag.getCompound("Current")),now);
+                CLIENT_FRAMES_R54.computeIfAbsent(eva,ignored->new ClientFrameR54()).receive(decode(tag.getCompound("Current")),tag.getLong("AcceptedAt"),now);
             else CLIENT_FRAMES_R54.remove(eva);
             if(!tag.contains("ContinuousWindowR52",net.minecraft.nbt.Tag.TAG_COMPOUND))
             {CLIENT_CONTINUOUS_R52.remove(eva);CLIENT_CONTINUOUS_RECEIPTS_R52.remove(eva);return;}
@@ -455,7 +461,7 @@ public final class EvaMechanicalFrameR52
         synchronized(CLIENT_CONTINUOUS_R52)
         {
             var visual=CLIENT_FRAMES_R54.computeIfAbsent(eva,ignored->new ClientFrameR54());
-            visual.receive(current,System.nanoTime());
+            visual.receive(current,t.getLong("AcceptedAt"),System.nanoTime());
             long now=MechanicalVisualClockR54.presentationTime(eva.level().getGameTime(),partial);
             // Received rail windows can skip ticks on a remote server. Starting
             // each new one-tick window at its own first point jumps over the
