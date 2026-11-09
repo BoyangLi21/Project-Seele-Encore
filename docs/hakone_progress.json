@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-09T07:53+08:00",
+ "updated": "2026-11-09T08:12+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -1347,9 +1347,9 @@
    "area": "边界",
    "title": "设施外坡：中部设施",
    "units": 1,
-   "status": "todo",
-   "batch": null,
-   "note": "",
+   "status": "done",
+   "batch": 157,
+   "note": "第 157 批 65,275 格，读回 0 错；陡坎 2,717→2,009；第 158 批填实 99 格埋藏旧树留下的空洞",
    "owner": "map-edges"
   },
   {
@@ -1907,9 +1907,9 @@
    "area": "道路换用",
    "title": "TrafficCraft 转换核查：第1条带 x-2112..-513",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "审计、实机抽查",
+   "note": "全图审计地面失败 6 列；第 158 批副本上实机抽查该条带（路面连续、标线和路缘正常），画面 t-*.png",
    "owner": "map-bdb53d"
   },
   {
@@ -1927,9 +1927,9 @@
    "area": "道路换用",
    "title": "TrafficCraft 转换核查：第2条带 x-512..-1",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "审计、实机抽查",
+   "note": "全图审计地面失败 6 列；第 158 批副本上实机抽查该条带（路面连续、标线和路缘正常），画面 t-*.png",
    "owner": "map-bdb53d"
   },
   {
@@ -1947,9 +1947,9 @@
    "area": "道路换用",
    "title": "TrafficCraft 转换核查：第3条带 x0..511",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "审计、实机抽查",
+   "note": "全图审计地面失败 6 列；第 158 批副本上实机抽查该条带（路面连续、标线和路缘正常），画面 t-*.png",
    "owner": "map-bdb53d"
   },
   {
@@ -1967,9 +1967,9 @@
    "area": "道路换用",
    "title": "TrafficCraft 转换核查：第4条带 x512..1535",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "审计、实机抽查",
+   "note": "全图审计地面失败 6 列；第 158 批副本上实机抽查该条带（路面连续、标线和路缘正常），画面 t-*.png",
    "owner": "map-bdb53d"
   },
   {
@@ -1987,9 +1987,9 @@
    "area": "道路换用",
    "title": "TrafficCraft 转换核查：第5条带 x1536..2559",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "审计、实机抽查",
+   "note": "全图审计地面失败 6 列；第 158 批副本上实机抽查该条带（路面连续、标线和路缘正常），画面 t-*.png",
    "owner": "map-bdb53d"
   },
   {
@@ -2007,9 +2007,9 @@
    "area": "道路换用",
    "title": "TrafficCraft 转换核查：第6条带 x2560..3071",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "审计、实机抽查",
+   "note": "全图审计地面失败 6 列；第 158 批副本上实机抽查该条带（路面连续、标线和路缘正常），画面 t-*.png",
    "owner": "map-bdb53d"
   },
   {
@@ -2027,9 +2027,9 @@
    "area": "道路换用",
    "title": "TrafficCraft 转换核查：第7条带 x3072..3583",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "审计、实机抽查",
+   "note": "全图审计地面失败 6 列；第 158 批副本上实机抽查该条带（路面连续、标线和路缘正常），画面 t-*.png",
    "owner": "map-bdb53d"
   },
   {
@@ -2047,9 +2047,9 @@
    "area": "道路换用",
    "title": "TrafficCraft 转换核查：第8条带 x3584..4511",
    "units": 0.5,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "审计、实机抽查",
+   "note": "全图审计地面失败 6 列；第 158 批副本上实机抽查该条带（路面连续、标线和路缘正常），画面 t-*.png",
    "owner": "map-bdb53d"
   },
   {
@@ -2087,9 +2087,9 @@
    "area": "核实",
    "title": "南港68栋建筑门口步行检查（z>1599，不在道路框内）",
    "units": 1.0,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "南港 68 栋：64 栋从门口走出到街面（≥40 个街面格）；4 栋（12、32、47、59）无门方块",
    "owner": "map-bdb53d"
   },
   {
@@ -2331,6 +2331,16 @@
    "batch": 156,
    "note": "19 个区块在测试副本生成后整块移入正式世界（r.4.0.mca，原文件备份在 chunks19-install-v1/original），第 156 批转换其上 1,938 列道路，3,701 格读回 0 错",
    "owner": "map"
+  },
+  {
+   "id": "south-port-4",
+   "area": "核实",
+   "title": "南港 4 栋缺门或缺结构（12 只有 40 个方块；32、47、59 有墙无门）",
+   "units": 1.0,
+   "status": "todo",
+   "batch": null,
+   "note": "verify-030 发现，待确认后修",
+   "owner": "map-bdb53d"
   }
  ]
 }
