@@ -111,13 +111,14 @@ public class ZeruelEntity extends Monster implements Angel, SiegeAnchorAware, so
         Vec3 forward = toward.normalize();
         Vec3 center = this.position().add(0.0D, 12.0D, 0.0D).add(forward.scale(15.0D));
         AABB zone = new AABB(center, center).inflate(18.0D, 10.0D, 18.0D);
+        CombatFoleyR36.angelSwing(this,center,2.2F,.66F);
         for (LivingEntity victim : com.projectseele.physics.CombatEntityQueryR44.overlap(this.level(),zone,
                 e -> e != this && (e instanceof EvaUnit01Entity || e instanceof Player)))
         {
             Vec3 contact=com.projectseele.physics.CombatBodyContacts.nearestSurfacePoint(victim,center);
             if(this.level().clip(new net.minecraft.world.level.ClipContext(this.position().add(0,12,0),contact,
                     net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this)).getType()!=net.minecraft.world.phys.HitResult.Type.MISS)continue;
-            victim.hurt(this.damageSources().mobAttack(this), 72.0F);
+            if(victim.hurt(this.damageSources().mobAttack(this), 72.0F))CombatFoleyR36.impact(this,victim,contact,false,true);
             Vec3 push = victim.position().subtract(this.position()).normalize().scale(2.2D);
             victim.push(push.x, 0.8D, push.z);
         }
@@ -131,6 +132,7 @@ public class ZeruelEntity extends Monster implements Angel, SiegeAnchorAware, so
         }
         Vec3 from = this.position().add(0.0D, 22.0D, 0.0D);
         Vec3 far=target.getBoundingBox().getCenter();
+        this.playSound(com.projectseele.registry.ModSounds.BEAM_FIRE.get(),5.0F,1.2F);
         var wall=server.clip(new net.minecraft.world.level.ClipContext(from,far,net.minecraft.world.level.ClipContext.Block.COLLIDER,net.minecraft.world.level.ClipContext.Fluid.NONE,this));
         Vec3 impact=wall.getLocation();
         var hit=com.projectseele.physics.CombatEntityQueryR44.ray(server,from,impact,.3,
@@ -175,7 +177,9 @@ public class ZeruelEntity extends Monster implements Angel, SiegeAnchorAware, so
         {
             if (source.getEntity() instanceof EvaUnit01Entity eva && eva.isMeleeWeapon())
             {
+                float fieldBefore=this.atField;
                 this.atField = Math.max(0.0F, this.atField - amount);
+                CombatFoleyR36.fieldBroken(this,fieldBefore,this.atField);
                 if (this.level() instanceof ServerLevel server)
                 {
                     AtFieldFX.ripple(server, this.getBoundingBox().getCenter(), eva.getForward());

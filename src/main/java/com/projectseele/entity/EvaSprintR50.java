@@ -31,6 +31,7 @@ public final class EvaSprintR50
                 &&e.getWeapon()!=EvaUnit01Entity.WEAPON_CANNON&&e.getWeapon()!=EvaUnit01Entity.WEAPON_N2
                 &&e.getWeapon()!=EvaUnit01Entity.WEAPON_SHIELD_R45;
         if(e.getPilotEntity()==null)e.getEntityData().set(HELD,false);
+        EvaActionFoleyR61.dash(e,enabled);
         e.getEntityData().set(BLEND,Mth.approach(old,enabled?1:0,.1F));
     }
     public static float blend(EvaUnit01Entity e,float partial)

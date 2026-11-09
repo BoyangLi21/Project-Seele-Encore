@@ -46,6 +46,8 @@ public final class EvaMovementSounds
     {
         if(eva.level().isClientSide||com.projectseele.physics.CombatBodyDynamics.active(eva))return;
         float phase=eva.rifleGaitPhase(1);Float previous=PREVIOUS.put(eva,phase);
+        if(previous!=null&&eva.isPilotProne()&&eva.onGround()&&eva.isPoweredOn()&&!eva.isNervLogisticsLocked()&&!eva.isSilent()&&!EvaCombatSupportR33.strike(eva))
+            EvaActionFoleyR61.crawl(eva,previous,phase,moving);
         if(previous==null||!eva.onGround()||!eva.isPoweredOn()||eva.isNervLogisticsLocked()||eva.isPilotProne()||eva.isSilent()||EvaCombatSupportR33.strike(eva))
         {SOLES.remove(eva);return;}
         if(GEOMETRIC_CONTACTS&&!eva.isExperimentalUnit()

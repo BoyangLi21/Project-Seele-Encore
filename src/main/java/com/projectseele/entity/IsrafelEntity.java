@@ -76,6 +76,16 @@ public class IsrafelEntity extends Monster implements Angel, GeoEntity
     }
 
     @Override
+    public boolean doHurtTarget(Entity target)
+    {
+        boolean accepted = super.doHurtTarget(target);
+        CombatFoleyR36.angelSwing(this,target.position().add(0.0D,target.getBbHeight()*.5D,0.0D),1.6F,.72F);
+        if(accepted&&target instanceof net.minecraft.world.entity.LivingEntity victim)
+            CombatFoleyR36.impact(this,victim,victim.getBoundingBox().getCenter(),false,false);
+        return accepted;
+    }
+
+    @Override
     public boolean hurt(DamageSource source, float amount)
     {
         if (this.downedTicks > 0 || this.resolved)
@@ -86,7 +96,9 @@ public class IsrafelEntity extends Monster implements Angel, GeoEntity
         {
             if (source.getEntity() instanceof EvaUnit01Entity eva && eva.isMeleeWeapon())
             {
+                float fieldBefore=this.atField;
                 this.atField = Math.max(0.0F, this.atField - amount);
+                CombatFoleyR36.fieldBroken(this,fieldBefore,this.atField);
                 if (this.level() instanceof ServerLevel server)
                 {
                     AtFieldFX.ripple(server, this.getBoundingBox().getCenter(), eva.getForward());
@@ -116,6 +128,7 @@ public class IsrafelEntity extends Monster implements Angel, GeoEntity
                 }
                 this.setHealth(1.0F);
                 this.downedTicks = 100;
+                this.playSound(com.projectseele.registry.ModSounds.EVA_LAND.get(),3.0F,.8F);
                 this.setNoAi(true);
                 this.setDeltaMovement(Vec3.ZERO);
                 return true;
@@ -140,6 +153,7 @@ public class IsrafelEntity extends Monster implements Angel, GeoEntity
         twin.split = true;
         twin.setHealth(twin.getMaxHealth() * 0.5F);
         twin.moveTo(this.getX() + 8.0D, this.getY(), this.getZ(), this.getYRot() + 12.0F, 0.0F);
+        this.playSound(com.projectseele.registry.ModSounds.EVA_AT_TEAR.get(),3.0F,.8F);
         this.twinId = twin.getUUID();
         twin.twinId = this.getUUID();
         twin.setPersistenceRequired();

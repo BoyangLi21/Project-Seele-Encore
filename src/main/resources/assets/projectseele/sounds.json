@@ -11,19 +11,28 @@
   "beam_charge": {
     "subtitle": "subtitles.projectseele.beam_charge",
     "sounds": [
-      "projectseele:beam_charge"
+      {
+        "name": "projectseele:beam_charge",
+        "attenuation_distance": 64
+      }
     ]
   },
   "beam_fire": {
     "subtitle": "subtitles.projectseele.beam_fire",
     "sounds": [
-      "projectseele:beam_fire"
+      {
+        "name": "projectseele:beam_fire",
+        "attenuation_distance": 64
+      }
     ]
   },
   "cross_explosion": {
     "subtitle": "subtitles.projectseele.cross_explosion",
     "sounds": [
-      "projectseele:cross_explosion"
+      {
+        "name": "projectseele:cross_explosion",
+        "attenuation_distance": 64
+      }
     ]
   },
   "crystal_hit": {
@@ -41,7 +50,10 @@
   "drill": {
     "subtitle": "subtitles.projectseele.drill",
     "sounds": [
-      "projectseele:drill"
+      {
+        "name": "projectseele:drill",
+        "attenuation_distance": 64
+      }
     ]
   },
   "ramiel_hum": {

@@ -89,7 +89,7 @@ public final class EvaCombatR31
         var destination=t.position().subtract(direction.scale(holdDistance(e,t)));destination=new Vec3(destination.x,e.getY(),destination.z);
         e.getEntityData().set(APPROACH_FROM,e.position().toVector3f());e.getEntityData().set(APPROACH_TO,destination.toVector3f());
         e.getEntityData().set(FACING,(float)Math.toDegrees(Math.atan2(-direction.x,direction.z)));
-        e.interruptCombatR31();start(e,REACH,t);
+        e.interruptCombatR31();start(e,REACH,t);CombatFoleyR36.load(e);
     }
     private static LivingEntity nearest(EvaUnit01Entity e,double range)
     {
@@ -145,6 +145,7 @@ public final class EvaCombatR31
             // ticks after the stroke, it ended in mid-air on any jump above a low hop.
             boolean kick=a==AIR_SLAM&&motion;
             boolean window=motion?stroke>=0&&(kick||stroke<=9):a==AIR_STRIKE&&age>=6&&age<=18;
+            boolean hadContact=s.contact;
             if(window&&!s.contact)
             {
                 Vec3 hand=aerialHand(e,1),previous=s.previousContact==null?hand:s.previousContact;
@@ -165,6 +166,7 @@ public final class EvaCombatR31
                 }
                 s.previousContact=hand;
             }
+            if(s.contact&&!hadContact)CombatFoleyR36.impact(e,victim,aerialHand(e,1),victim instanceof Angel angel&&angel.getAtField()>0,true);
             if(e.onGround()&&s.airborne&&age>0)
             {
                 if(a==AIR_SLAM){if(motion)landingDust(e);else slam(e);}
@@ -182,6 +184,7 @@ public final class EvaCombatR31
                 if(e.distanceTo(victim)>holdDistance(e,victim)+4||!e.hasLineOfSight(victim)||!CombatReachR31.canReach(e,victim,0))
                 {if(age>36)clear(e);return;}
                 start(e,HOLD,victim);CombatFeelR31.send(victim,CombatFeelR31.STAGGER,forward(e),.8F,24,2);
+                CombatFoleyR36.impact(e,victim,grip(e,victim,true,1),false,false);
             }
             return;
         }

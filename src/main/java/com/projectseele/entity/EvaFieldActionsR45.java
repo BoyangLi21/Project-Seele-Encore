@@ -124,7 +124,7 @@ public final class EvaFieldActionsR45
         state.putDouble("rise",ledge[0]);state.putDouble("advance",ledge[1]);
         runtime.previous=Vec3.ZERO;runtime.lastStep=Long.MIN_VALUE;runtime.elapsed=0;
         e.setDeltaMovement(Vec3.ZERO);
-        EvaWeaponHandlingR45.fieldActionR45(e,state);e.fieldActionPhaseR45(0);return true;
+        EvaWeaponHandlingR45.fieldActionR45(e,state);e.fieldActionPhaseR45(0);EvaActionFoleyR61.fieldStart(e,CLIMB);return true;
     }
     /** {rise, advance} in blocks onto the ledge right ahead, or null. */
     private static double[] ledge(EvaUnit01Entity e)
@@ -176,7 +176,7 @@ public final class EvaFieldActionsR45
         state.putUUID("pilot",pilot.getUUID());state.putFloat("facing",yaw);
         runtime.previous=root(authored,0);runtime.lastStep=Long.MIN_VALUE;runtime.elapsed=0;
         e.setDeltaMovement(new Vec3(0,e.getDeltaMovement().y,0));
-        EvaWeaponHandlingR45.fieldActionR45(e,state);e.fieldActionPhaseR45(0);return true;
+        EvaWeaponHandlingR45.fieldActionR45(e,state);e.fieldActionPhaseR45(0);EvaActionFoleyR61.fieldStart(e,name);return true;
     }
     private static boolean pendingValid(EvaUnit01Entity e,Runtime runtime)
     {
@@ -221,6 +221,7 @@ public final class EvaFieldActionsR45
         e.setYRot(state.getFloat("facing"));e.yBodyRot=e.getYRot();e.yHeadRot=e.getYRot();
         float at=Mth.clamp(++runtime.elapsed/(float)state.getInt("duration"),0,1);
         e.fieldActionPhaseR45(at);
+        EvaActionFoleyR61.fieldTick(e,state,runtime.elapsed,state.getInt("duration"));
         if(climbing)
         {
             // Along the climb path, scaled to this ledge; no gravity or

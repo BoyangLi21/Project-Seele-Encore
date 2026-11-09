@@ -47,7 +47,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     public boolean beginArmorBeamR52(Vec3 aim)
     {
         if(level().isClientSide||aim==null||!Double.isFinite(aim.lengthSqr())||isArmorBeamR52()||isStrikeActive()||isFirstBattleActive()||isSelfDestructing()||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this)||!SachielGameplayMotionR32.ready())return false;
-        entityData.set(ARMOR_BEAM_AIM_R52,aim.toVector3f());entityData.set(ARMOR_BEAM_AGE_R52,0);getNavigation().stop();return true;
+        entityData.set(ARMOR_BEAM_AIM_R52,aim.toVector3f());entityData.set(ARMOR_BEAM_AGE_R52,0);getNavigation().stop();playSound(com.projectseele.registry.ModSounds.BEAM_CHARGE.get(),3F,1.62F);return true;
     }
     public void cancelArmorBeamR52(){if(isArmorBeamR52()){entityData.set(ARMOR_BEAM_AGE_R52,-1);meleeRecovery=Math.max(meleeRecovery,8);}}
     private float committedStrikeYaw;
@@ -279,7 +279,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         if(isArmorBeamR52())
         {
             getNavigation().stop();setDeltaMovement(getDeltaMovement().multiply(0,1,0));
-            if(!CombatFeelR31.hitPaused(this)){int age=entityData.get(ARMOR_BEAM_AGE_R52)+1;entityData.set(ARMOR_BEAM_AGE_R52,age);if(age>=SachielArmorBeamR52.DURATION)cancelArmorBeamR52();}
+            if(!CombatFeelR31.hitPaused(this)){int age=entityData.get(ARMOR_BEAM_AGE_R52)+1;entityData.set(ARMOR_BEAM_AGE_R52,age);if(age==SachielArmorBeamR52.CHARGE)playSound(com.projectseele.registry.ModSounds.BEAM_FIRE.get(),4F,1.35F);if(age>=SachielArmorBeamR52.DURATION)cancelArmorBeamR52();}
             return;
         }
         if(isStrikeActive()){if(spearCooldown>0)spearCooldown--;tickStrike();return;}
@@ -312,6 +312,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         {
             rememberSelfDestructSource(getLastDamageSource());
             this.selfDestructTicks = 60;
+            CombatFoleyR36.selfDestructWarning(this,60);
         }
     }
 
@@ -327,7 +328,9 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         {
             if (source.getEntity() instanceof EvaUnit01Entity eva && eva.isMeleeWeapon())
             {
+                float fieldBefore=this.atField;
                 this.atField = Math.max(0.0F, this.atField - amount);
+                CombatFoleyR36.fieldBroken(this,fieldBefore,this.atField);
                 this.entityData.set(FIELD,this.atField);
                 if (this.level() instanceof ServerLevel server)
                 {
@@ -360,6 +363,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
             if(lethal.getEntity() instanceof EvaUnit01Entity eva&&com.projectseele.event.FirstBattleDirector.tryStart(this,eva,false))return true;
             rememberSelfDestructSource(lethal);
             this.selfDestructTicks = 45;
+            CombatFoleyR36.selfDestructWarning(this,45);
             return true;
         }
         if(accepted&&source.getEntity() instanceof EvaUnit01Entity eva)com.projectseele.event.FirstBattleDirector.tryStart(this,eva,false);

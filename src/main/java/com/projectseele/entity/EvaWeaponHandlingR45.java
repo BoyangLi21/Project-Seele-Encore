@@ -66,6 +66,7 @@ public final class EvaWeaponHandlingR45
         state.putInt("before",old);state.putInt("after",weapon);state.putBoolean("draw",draw);
         state.putLong("started",e.level().getGameTime());state.putInt("duration",draw?26:40);
         e.getEntityData().set(STATE,state);
+        CombatFoleyR36.load(e);
         return true;
     }
     public static float phase(EvaUnit01Entity e,float partial)
@@ -108,6 +109,7 @@ public final class EvaWeaponHandlingR45
         // from the rack. Publishing it at the stow contact made a sword/gun
         // appear in the still-open knife retrieval hand.
         float t=phase(e,0),handoff=state.getBoolean("draw")?.54F:1F;
+        EvaActionFoleyR61.weaponTick(e,state,t);
         if(t>=handoff&&!state.getBoolean("committed"))
         {
             e.commitHandledWeaponR45(state.getInt("after"));

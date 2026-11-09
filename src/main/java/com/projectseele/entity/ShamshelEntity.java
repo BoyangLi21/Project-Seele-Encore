@@ -182,7 +182,9 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
                         if(contact.isEmpty())continue;
                         hitVictims.add(victim.getUUID());Vec3 motion=points.get(i).subtract(previous.get(i));
                         Vec3 direction=motion.lengthSqr()>1e-6?motion.normalize():end.subtract(from).normalize();
-                        if(com.projectseele.event.EvaHitFeedback.hurt(victim,damageSources().mobAttack(this),30F,contact.orElse(from),direction)&&!(victim instanceof EvaUnit01Entity))
+                        boolean accepted=com.projectseele.event.EvaHitFeedback.hurt(victim,damageSources().mobAttack(this),30F,contact.orElse(from),direction);
+                        if(accepted)CombatFoleyR36.impact(this,victim,contact.orElse(from),false,false);
+                        if(accepted&&!(victim instanceof EvaUnit01Entity))
                             victim.push(direction.x*.8,.22,direction.z*.8);
                     }
                     if(wall.getType()!=net.minecraft.world.phys.HitResult.Type.MISS)break;
@@ -235,7 +237,9 @@ public class ShamshelEntity extends Monster implements Angel, SiegeAnchorAware, 
         {
             if (source.getEntity() instanceof EvaUnit01Entity eva && eva.isMeleeWeapon())
             {
-                this.entityData.set(FIELD,Math.max(0.0F,this.getAtField()-amount));
+                float fieldBefore=this.getAtField();
+                this.entityData.set(FIELD,Math.max(0.0F,fieldBefore-amount));
+                CombatFoleyR36.fieldBroken(this,fieldBefore,this.getAtField());
                 if (this.level() instanceof ServerLevel server)
                 {
                     AtFieldFX.ripple(server, this.getBoundingBox().getCenter(), eva.getForward());

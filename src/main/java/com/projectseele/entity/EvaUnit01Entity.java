@@ -3745,6 +3745,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.pendingKickContactTicks = this.kickContactTicks();
         this.kickContactR60=false;
         this.kickPreviousFootR60=null;
+        CombatFoleyR36.load(this);
         this.stompCooldown = this.fastMeleeCooldownR43(STOMP_COOLDOWN_TICKS);
         this.entityData.set(DATA_KICK_SEQUENCE,
                 (this.entityData.get(DATA_KICK_SEQUENCE) + 1)
@@ -3834,6 +3835,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.knifeVisualTicks = this.knifeVisualTicks(reverse);
         this.knifeElapsedTicks = 0;
         this.knifeDurationAtStart = this.knifeDurationTicks(reverse);
+        CombatFoleyR36.load(this);
         if(this.getTags().contains("seele_ordinary_motion_r52"))
             ProjectSeele.LOGGER.info("EVA native knife committed: eva={} tick={} reverse={} duration={} meleeSequence={} smashSequence={}",
                     this.getStringUUID(),this.level().getGameTime(),reverse,this.knifeDurationAtStart,
@@ -3913,6 +3915,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return;
         }
         this.knifeElapsedTicks++;
+        EvaActionFoleyR61.knifeStroke(this,this.knifeReverseMotion,this.knifeElapsedTicks,this.knifeDurationAtStart);
         this.entityData.set(DATA_LIVE_ACTION_PHASE, Mth.clamp(
                 this.knifeElapsedTicks / this.knifeDurationAtStart, 0.0F, 1.0F));
         float phase=Mth.clamp(this.knifeElapsedTicks/this.knifeDurationAtStart,0,1);
@@ -3945,6 +3948,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             this.kickElapsedTicks++;
             elapsed = this.kickElapsedTicks;
+            if(elapsed==EvaActionFoleyR61.strokeTick(duration,this.kickContactTicks()))EvaMovementSounds.swing(this,2.4F);
             authored = EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.root(this,"kick",Mth.clamp(elapsed/duration,0,1))
                     :EvaLiveCombatMotion.kick(Mth.clamp(elapsed/duration,0,1));
         }
@@ -4226,7 +4230,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         if (!anyHit)
         {
-            EvaMovementSounds.play(this,fxCenter,ModSounds.EVA_SWING.get(),1.1F,1);
+            if(!EvaActionFoleyR61.strokeSwung(this))EvaMovementSounds.play(this,fxCenter,ModSounds.EVA_SWING.get(),1.1F,1);
             // Whiff: a little air displacement so empty swings still feel weighty.
             serverLevel.sendParticles(ParticleTypes.CLOUD, fxCenter.x, fxCenter.y, fxCenter.z,
                     6, 1.2D, 0.8D, 1.2D, 0.02D);
@@ -4461,6 +4465,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.jumpBufferTicks = 0;
         this.groundedGraceTicks = 0;
         EvaMovementSounds.swing(this,1.0F);
+        EvaActionFoleyR61.takeoff(this);
         return true;
     }
 
@@ -5847,6 +5852,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             this.entityData.set(DATA_CANNON_CHARGE, 0);
         }
+        EvaActionFoleyR61.cannonCharge(this);
 
         int n2Arm = this.getN2ArmTicks();
         boolean canArmN2 = !this.isPilotControlLocked()

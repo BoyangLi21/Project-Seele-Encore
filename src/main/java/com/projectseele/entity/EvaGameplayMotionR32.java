@@ -55,7 +55,7 @@ public final class EvaGameplayMotionR32
     public static boolean prepareJump(EvaUnit01Entity e)
     {
         if(!ready(e))return true;
-        if(age(e,TAKEOFF,0)<0){beginAction(e);EvaCombatSupportR33.release(e);e.getEntityData().set(TAKEOFF,e.level().getGameTime());return false;}
+        if(age(e,TAKEOFF,0)<0){beginAction(e);EvaCombatSupportR33.release(e);e.getEntityData().set(TAKEOFF,e.level().getGameTime());CombatFoleyR36.load(e);return false;}
         return age(e,TAKEOFF,0)>=takeoffTicks(e);
     }
     public static void beginAction(EvaUnit01Entity e)

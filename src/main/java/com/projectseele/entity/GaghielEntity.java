@@ -244,7 +244,9 @@ public final class GaghielEntity extends Mob implements Enemy, Angel, software.b
         {
             if(source.getEntity() instanceof EvaUnit01Entity eva&&eva.isMeleeWeapon())
             {
-                entityData.set(FIELD,Math.max(0,getAtField()-amount));
+                float fieldBefore=getAtField();
+                entityData.set(FIELD,Math.max(0,fieldBefore-amount));
+                CombatFoleyR36.fieldBroken(this,fieldBefore,getAtField());
                 if(level() instanceof ServerLevel server)com.projectseele.fx.AtFieldFX.ripple(server,damagePoint==null?mouthWorldPos(1):damagePoint,eva.getForward());
                 return true;
             }
@@ -290,6 +292,7 @@ public final class GaghielEntity extends Mob implements Enemy, Angel, software.b
         if(attackKind()==SWIM&&live&&cooldown<=0&&mouthWorldPos(1).distanceTo(targetContact)<36*modelScaleR50()+22)
         {
             int selected=choice++%3;entityData.set(ATTACK,selected==0?BITE:selected==1?BREACH:FIN_SWEEP);
+            CombatFoleyR36.angelSwing(this,mouthWorldPos(1),2.4F,selected==1?.5F:.62F);
             entityData.set(AGE,0);strikeYaw=(float)Math.toDegrees(Math.atan2(-(targetContact.x-getX()),targetContact.z-getZ()));hit.clear();
         }
         if(attackKind()!=SWIM)
@@ -349,7 +352,8 @@ public final class GaghielEntity extends Mob implements Enemy, Angel, software.b
             Optional<Vec3> contact=com.projectseele.physics.CombatBodyContacts.clip(victim,from,to,radius*modelScaleR50());
             if(contact.isEmpty())continue;
             hit.add(victim.getUUID());Vec3 direction=to.subtract(from).lengthSqr()>1e-6?to.subtract(from).normalize():getForward();
-            EvaHitFeedback.hurt(victim,damageSources().mobAttack(this),attackKind()==BREACH?42:attackKind()==FIN_SWEEP?28:36,contact.get(),direction);
+            if(EvaHitFeedback.hurt(victim,damageSources().mobAttack(this),attackKind()==BREACH?42:attackKind()==FIN_SWEEP?28:36,contact.get(),direction))
+                CombatFoleyR36.impact(this,victim,contact.get(),false,attackKind()==BREACH);
         }
         if(level() instanceof ServerLevel server)TvMarineDirectorR50.cargoContactR50(server,this,from,to);
     }

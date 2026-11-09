@@ -14,7 +14,7 @@ public final class CombatFoleyR36
     private static void play(LivingEntity actor,Vec3 point,SoundEvent sound,float volume,float pitch)
     {
         if(actor.level().isClientSide||actor.isSilent())return;
-        actor.level().playSound(null,point.x,point.y,point.z,SoundEvent.createFixedRangeEvent(sound.getLocation(),384),actor instanceof SachielEntity?SoundSource.HOSTILE:SoundSource.PLAYERS,volume,pitch);
+        actor.level().playSound(null,point.x,point.y,point.z,SoundEvent.createFixedRangeEvent(sound.getLocation(),384),actor instanceof Angel?SoundSource.HOSTILE:SoundSource.PLAYERS,volume,pitch);
     }
     public static void step(LivingEntity actor,Vec3 foot,boolean soil,float load)
     {
@@ -35,6 +35,15 @@ public final class CombatFoleyR36
     }
     public static void swing(SachielEntity actor)
     {play(actor,SachielStrike.sample(actor,0).hand(),ModSounds.SACHIEL_SWING.get(),1.5F,1);}
+    /** An Angel's blow leaving, on the shared giant-limb air sound. */
+    public static void angelSwing(LivingEntity actor,Vec3 point,float volume,float pitch)
+    {play(actor,point,ModSounds.SACHIEL_SWING.get(),volume,pitch);}
+    /** Plays once, when an Angel's field pool first reaches empty. */
+    public static void fieldBroken(LivingEntity actor,float before,float after)
+    {if(before>0&&after<=0)play(actor,actor.getBoundingBox().getCenter(),ModSounds.EVA_AT_TEAR.get(),3F,1);}
+    /** A self-destruct countdown, on the charge sound stretched to its length. */
+    public static void selfDestructWarning(LivingEntity actor,int ticks)
+    {play(actor,actor.getBoundingBox().getCenter(),ModSounds.BEAM_CHARGE.get(),3F,net.minecraft.util.Mth.clamp(52F/ticks,.5F,2F));}
     public static void impact(LivingEntity actor,LivingEntity target,Vec3 point,boolean field,boolean heavy)
     {
         var sound=field?ModSounds.EVA_AT_PRESSURE.get():heavy?ModSounds.EVA_IMPACT_HEAVY.get():target instanceof EvaUnit01Entity?ModSounds.EVA_ARMOR_IMPACT.get():ModSounds.EVA_IMPACT.get();
