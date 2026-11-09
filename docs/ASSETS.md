@@ -513,3 +513,7 @@ R60：`assets/projectseele/motion/eva_dash_r59.json` 来自 Bandai Namco Researc
 ## R60 道路方块（TrafficCraft）
 
 2026-11-08 起，地图道路改用第三方 mod [TrafficCraft](https://modrinth.com/mod/trafficcraft)（作者 MrJulsen，GPL-3.0-or-later，源码 <https://github.com/MisterJulsen/TrafficCraft>）的沥青、标线、路缘和人行道方块。用的是 Forge 1.20.1 正式版 1.1.3（`trafficcraft-forge-1.20.1-1.1.3.jar`，SHA-1 `b5793501c821591019d537f9eb3809227cd7738f`，内嵌 DragonLib 和 Architectury）。jar 不进仓库，本机存放在 `external-assets/incoming/trafficcraft_20261108/`；整合包和服务端包原样附带，并在 `licenses/` 放 GPL-3.0 全文和源码链接。我们的代码不链接它，地图只是放置它的方块。换法见 [道路换用计划](ROAD_TRAFFICCRAFT_PLAN.zh.md)。
+
+## GeoFront 改造的布局来源（polcuenca，CC BY）
+
+GeoFront 倒挂城市的楼群布局，以及后续的湖面和螺旋路线，取自 [Evangelion Geofront](https://sketchfab.com/3d-models/evangelion-geofront-1fb54331408147c3b9fb502b6c883cb0)（作者 polcuenca，Sketchfab，2014-10-18，Creative Commons Attribution）。我们用它的网格位置转成原版方块，没有使用它的贴图。发布时在说明里署名作者并附上述链接。模型文件留在本机 `external-assets/incoming/geofront_polcuenca_20261108/`，不进仓库。做法见 [GeoFront 改造计划](GEOFRONT_REMODEL_PLAN.zh.md)。
