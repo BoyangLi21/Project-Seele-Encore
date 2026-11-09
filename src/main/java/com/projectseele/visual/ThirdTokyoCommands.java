@@ -5,6 +5,7 @@ import java.util.Locale;
 
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
 import com.mojang.brigadier.exceptions.CommandSyntaxException;
+import com.mojang.brigadier.exceptions.SimpleCommandExceptionType;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.event.AngelSiegeDirector;
@@ -359,7 +360,7 @@ public final class ThirdTokyoCommands
                 180.0F, 18.0F);
     }
 
-    private static BlockPos findOrigin(ServerPlayer player)
+    private static BlockPos findOrigin(ServerPlayer player) throws CommandSyntaxException
     {
         /*
          * The integrated dimension has one immutable Tokyo-3 datum.  Do not
@@ -388,8 +389,8 @@ public final class ThirdTokyoCommands
         return Tokyo3RetractionSavedData.get(player.serverLevel())
                 .nearest(player.blockPosition(), 320.0D)
                 .map(Tokyo3RetractionSavedData.StoredDistrict::origin)
-                .orElseThrow(() -> new IllegalStateException(
-                        "No registered Tokyo-3 district within 320 blocks."));
+                .orElseThrow(() -> new SimpleCommandExceptionType(Component.literal(
+                        "附近 320 格内没有已登记的第三新东京市街区，请到城区再试。")).create());
     }
 
     private static TokyoAudit inspect(ServerLevel level, BlockPos origin, int depth,

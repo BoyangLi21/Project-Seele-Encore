@@ -55,13 +55,6 @@ public final class NervStaffDialogue
         if(!player.isSpectator()&&com.projectseele.config.SeeleConfig.ALL_PLAYERS_AUTHORIZED.get())return true;
         return player.createCommandSourceStack().hasPermission(2)||java.util.stream.Stream.concat(player.getInventory().items.stream(),player.getInventory().offhand.stream()).anyMatch(s->s.is(ModItems.NERV_EMPLOYEE_CARD.get())||s.is(ModItems.TERMINAL_DOGMA_ACCESS_CARD.get()));
     }
-    public static int talk(ServerPlayer player,String target,String text)
-    {
-        var nearby=player.serverLevel().getEntitiesOfClass(NervStaffEntity.class,player.getBoundingBox().inflate(10),n->n.memberId().equals(target)||n.getStringUUID().equals(target));
-        if(nearby.isEmpty()){player.sendSystemMessage(Component.literal("请走到工作人员身边再交谈。"));return 0;}
-        var npc=nearby.get(0);if(player.distanceToSqr(npc)>100)return 0;
-        return converse(player,npc,text);
-    }
     public static int converse(ServerPlayer player,NervStaffEntity npc,String text)
     {
         if(text.equals("TOPIC:chat"))
