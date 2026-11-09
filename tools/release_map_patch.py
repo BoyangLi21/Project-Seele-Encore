@@ -69,7 +69,7 @@ def author(a):
         change = nbtlib.Compound({'Before': held}) if held is not None else nbtlib.Compound()
         if 'block_entity' in row:
             # A new block that carries data, such as a road marking's paint colour.
-            tag = nbtlib.Compound({k: nbtlib.String(v) if isinstance(v, str) else nbtlib.Int(v) for k, v in row['block_entity'].items()})
+            tag = nbtlib.Compound({k: nbtlib.String(v) if isinstance(v, str) else nbtlib.Long(v) if abs(v) >= 2 ** 31 else nbtlib.Int(v) for k, v in row['block_entity'].items()})
             tag.update(x=nbtlib.Int(pos[0]), y=nbtlib.Int(pos[1]), z=nbtlib.Int(pos[2]))
             change['After'] = tag
         if change:
