@@ -157,8 +157,11 @@ public final class EquipmentVaultsR47
     }
     private static void updateLid(ServerLevel level,NervArmamentStationEntity station,Vault vault)
     {
-        boolean closed=station.getStationState()==NervArmamentStationEntity.STOWED
-                ||station.getStationState()==NervArmamentStationEntity.CLOSING;
+        // Open only while the hatch or pod is moving through the plane: a pod
+        // parked at the top draws a floor people can walk onto.
+        int phase=station.getStationState();
+        boolean closed=phase!=NervArmamentStationEntity.OPENING&&phase!=NervArmamentStationEntity.RISING
+                &&phase!=NervArmamentStationEntity.LOWERING;
         var desired=closed?Blocks.BARRIER.defaultBlockState():Blocks.AIR.defaultBlockState();
         for(var position:vault.lids)
         {
