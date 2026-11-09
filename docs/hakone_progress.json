@@ -1,6 +1,6 @@
 {
  "unit_minutes": 30,
- "updated": "2026-11-09T09:42+08:00",
+ "updated": "2026-11-09T09:44+08:00",
  "tasks": [
   {
    "id": "rail-082",
@@ -397,9 +397,9 @@
    "area": "水系",
    "title": "新连接路装好后重算跨水处涵洞",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "依赖连接路",
+   "note": "批次 110–124 的 428,954 个水格在第 158 批采集中全部还是水；连接路未覆盖水道，无需新涵洞",
    "owner": "map-bdb53d"
   },
   {
@@ -1237,9 +1237,9 @@
    "area": "连接路",
    "title": "连接路全部装完后重跑道路审计",
    "units": 1,
-   "status": "todo",
+   "status": "done",
    "batch": null,
-   "note": "",
+   "note": "第 161 批全图审计：未知 0，地面失败 7（共 615,335 列），净空失败 198（早已存在）",
    "owner": "map-bdb53d"
   },
   {
