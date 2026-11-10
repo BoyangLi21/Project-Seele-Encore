@@ -19,7 +19,7 @@ import tempfile
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = 'R61'
+VERSION = 'R62'
 NAME = 'EVANGELION_Encore_' + VERSION
 SHADER = 'SEELE_Local_Cavern_R53_Review_20261026.zip'
 SERVER_WORLD = 'SEELE_R53_WORLD'
