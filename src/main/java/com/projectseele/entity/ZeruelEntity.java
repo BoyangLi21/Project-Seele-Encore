@@ -186,6 +186,10 @@ public class ZeruelEntity extends Monster implements Angel, SiegeAnchorAware, so
                 }
                 return true;
             }
+            if (amount > 0.0F && this.level() instanceof ServerLevel server)
+            {
+                AtFieldFX.blocked(server, this, source);
+            }
             return false;
         }
         return super.hurt(source, amount);

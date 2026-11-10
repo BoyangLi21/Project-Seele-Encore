@@ -7104,11 +7104,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void rippleAt(DamageSource source)
     {
-        if (!(this.level() instanceof ServerLevel serverLevel))
+        // Damage nobody dealt (a wall at the head, fire) is absorbed without showing the field.
+        if (!(this.level() instanceof ServerLevel serverLevel) || source.getEntity() == null && source.getDirectEntity() == null)
         {
             return;
         }
-        Vec3 origin = source.getSourcePosition();
+        Vec3 origin = AtFieldFX.origin(source);
         Vec3 center = this.position().add(0.0D, this.getBbHeight() * 0.55D, 0.0D);
         Vec3 dir = origin != null && origin.distanceToSqr(center) > 1.0E-4D
                 ? origin.subtract(center).normalize()

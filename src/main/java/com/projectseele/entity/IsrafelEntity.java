@@ -105,6 +105,10 @@ public class IsrafelEntity extends Monster implements Angel, GeoEntity
                 }
                 return true;
             }
+            if (amount > 0.0F && this.level() instanceof ServerLevel server)
+            {
+                AtFieldFX.blocked(server, this, source);
+            }
             return false;
         }
         if (!this.split && (amount >= this.getHealth()

@@ -14,7 +14,7 @@ import os
 import numpy as np
 from PIL import Image, ImageDraw
 
-HOLD, FRONTS, FRONT_GAP, FRONT_TRAVEL, RINGS = 1.45, 4, 0.07, 0.8, 11
+HOLD, FRONTS, FRONT_GAP, FRONT_TRAVEL, RINGS = 1.7, 4, 0.07, 0.8, 11
 NORMALS = np.array([[np.cos(k * np.pi / 4), np.sin(k * np.pi / 4)] for k in range(4)])
 
 
@@ -54,7 +54,7 @@ def render(frame, px, py, valid, pulses, now, R=1.0):
     def tint(alpha_map, col):
         nonlocal frame
         a = np.clip(alpha_map, 0, 1)[..., None] * v
-        frame = frame * (1 - a) + np.array(col) * a
+        frame = frame * (1 - a) + np.asarray(col) * a
 
     glow = np.zeros_like(frame)
 
@@ -65,8 +65,10 @@ def render(frame, px, py, valid, pulses, now, R=1.0):
     flash = max([p[3] * np.exp(-(now - p[2]) * 7.0) for p in pulses if now >= p[2]] + [0.0])
     d0 = octa(px, py)
     fr = R * 1.04
-    alpha = presence * (0.07 + 0.16 * flash)
-    tint(np.where(d0 <= fr, alpha * (1.6 + (0.55 - 1.6) * d0 / fr), 0.0).clip(0, 0.6), (1.0, 0.5, 0.1))
+    alpha = presence * (0.15 + 0.22 * flash)
+    u = np.clip(d0 / fr, 0, 1)[..., None]
+    centre, rim = np.array((1.0, 0.68, 0.24)), np.array((1.0, 0.38, 0.05))
+    tint(np.where(d0 <= fr, alpha * (1.5 + (0.75 - 1.5) * d0 / fr), 0.0).clip(0, 0.7), centre * (1 - u) + rim * u)
     flicker = 0.95
     rings = []
     for ring in range(RINGS):
@@ -96,16 +98,20 @@ def render(frame, px, py, valid, pulses, now, R=1.0):
             bright = inten * flicker * presence * (1 - 0.18 * f) * beyond * (1 - prog) ** 1.4 * min(prog / 0.04, 1)
             fronts.append((d, front, R * (0.008 + 0.022 * (1 - prog)), bright))
         fl = inten * np.exp(-age * 9.0) * presence
-        disk = R * (0.06 + 0.12 * ease_out(age / 0.2, 2.0))
+        disk = R * (0.08 + 0.16 * ease_out(age / 0.2, 2.0))
         fronts.append((d, None, disk, fl))
     for core in (False, True):
         for rr, lit, edge in rings:
             if core:
                 w = R * 0.006
-                add(presence * flicker * lit * 0.8 * edge * profile((d0 - rr) / w), (1.0, 0.8, 0.5))
+                add(presence * flicker * (0.10 + 0.9 * lit) * edge * profile((d0 - rr) / w), (1.0, 0.82, 0.55))
             else:
                 w = R * (0.02 + 0.012 * lit)
-                tint(presence * flicker * (0.16 + 0.5 * lit) * edge * profile((d0 - rr) / w), (1.0, 0.46, 0.08))
+                tint(presence * flicker * (0.24 + 0.55 * lit) * edge * profile((d0 - rr) / w), (1.0, 0.46, 0.08))
+        if core:
+            add(presence * flicker * 0.55 * profile((d0 - R * 0.995) / (R * 0.01)), (1.0, 0.88, 0.62))
+        else:
+            tint(presence * flicker * 0.42 * profile((d0 - R * 0.9925) / (R * 0.0375)), (1.0, 0.44, 0.07))
         for d, front, w, bright in fronts:
             if front is None:
                 if bright <= 0.01:
@@ -113,7 +119,7 @@ def render(frame, px, py, valid, pulses, now, R=1.0):
                 if core:
                     add(bright * profile(d / w), (1.0, 0.94, 0.8))
                 else:
-                    tint(bright * 0.6 * profile(d / (w * 2.2)), (1.0, 0.5, 0.1))
+                    tint(bright * 0.75 * profile(d / (w * 2.2)), (1.0, 0.5, 0.1))
             elif core:
                 add(bright * profile((d - front) / w), (1.0, 0.9, 0.68))
             else:

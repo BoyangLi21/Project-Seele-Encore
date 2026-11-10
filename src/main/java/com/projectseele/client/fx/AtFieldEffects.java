@@ -13,6 +13,7 @@ import com.projectseele.ProjectSeele;
 import com.projectseele.client.render.RibbonRenderer;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.multiplayer.ClientLevel;
+import net.minecraft.client.renderer.LightTexture;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.texture.DynamicTexture;
@@ -42,7 +43,7 @@ public final class AtFieldEffects
 {
     private static final float TICKS = 20.0F;
     /** Seconds a pulse keeps the field visible after it lands. */
-    private static final float HOLD = 1.45F;
+    private static final float HOLD = 1.7F;
     private static final int FRONTS = 4;
     private static final float FRONT_GAP = 0.07F;
     private static final float FRONT_TRAVEL = 0.8F;
@@ -68,6 +69,10 @@ public final class AtFieldEffects
             return;
         }
         ensureLevel();
+        if (com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)
+        {
+            ProjectSeele.LOGGER.info("AT FIELD impact tick {} at {} radius {} intensity {}", clock, point, radius, intensity);
+        }
         Vector3f n = new Vector3f(normal);
         if (n.lengthSquared() < 1.0E-6F)
         {
@@ -303,16 +308,17 @@ public final class AtFieldEffects
                 return;
             }
             float flash = this.flash(now);
-            float alpha = presence * (0.07F + 0.16F * flash);
+            // Strong enough to read under a shader pack: golden centre, deep orange edge.
+            float alpha = presence * (0.15F + 0.22F * flash);
             float r = this.radius * 1.04F * CORNER;
             for (int edge = 0; edge < 8; edge++)
             {
                 float a0 = (float) (Math.PI / 8 + edge * Math.PI / 4);
                 float a1 = a0 + (float) (Math.PI / 4);
-                fillVertex(pose, out, 0.0F, 0.0F, alpha * 1.6F);
-                fillVertex(pose, out, Mth.cos(a0) * r, Mth.sin(a0) * r, alpha * 0.55F);
-                fillVertex(pose, out, Mth.cos(a1) * r, Mth.sin(a1) * r, alpha * 0.55F);
-                fillVertex(pose, out, 0.0F, 0.0F, alpha * 1.6F);
+                fillVertex(pose, out, 0.0F, 0.0F, 1.0F, 0.68F, 0.24F, alpha * 1.5F);
+                fillVertex(pose, out, Mth.cos(a0) * r, Mth.sin(a0) * r, 1.0F, 0.38F, 0.05F, alpha * 0.75F);
+                fillVertex(pose, out, Mth.cos(a1) * r, Mth.sin(a1) * r, 1.0F, 0.38F, 0.05F, alpha * 0.75F);
+                fillVertex(pose, out, 0.0F, 0.0F, 1.0F, 0.68F, 0.24F, alpha * 1.5F);
             }
         }
 
@@ -354,14 +360,23 @@ public final class AtFieldEffects
                 {
                     float width = R * 0.006F;
                     band(pose, out, 0.0F, 0.0F, rr - width, rr + width, 0.0F, 1.0F,
-                            1.0F, 0.8F, 0.5F, presence * flicker * lit * 0.8F * edge);
+                            1.0F, 0.82F, 0.55F, presence * flicker * (0.10F + 0.9F * lit) * edge);
                 }
                 else
                 {
                     float width = R * (0.02F + 0.012F * lit);
                     band(pose, out, 0.0F, 0.0F, rr - width, rr + width, 0.0F, 1.0F,
-                            1.0F, 0.46F, 0.08F, presence * flicker * (0.16F + 0.5F * lit) * edge);
+                            1.0F, 0.46F, 0.08F, presence * flicker * (0.24F + 0.55F * lit) * edge);
                 }
+            }
+            // A crisp rim keeps the field's boundary readable on any sky.
+            if (core)
+            {
+                band(pose, out, 0.0F, 0.0F, R * 0.985F, R * 1.005F, 0.0F, 1.0F, 1.0F, 0.88F, 0.62F, presence * flicker * 0.55F);
+            }
+            else
+            {
+                band(pose, out, 0.0F, 0.0F, R * 0.955F, R * 1.03F, 0.0F, 1.0F, 1.0F, 0.44F, 0.07F, presence * flicker * 0.42F);
             }
             // Wavefronts from every strike, then a hot contact flash.
             for (Pulse p : this.pulses)
@@ -397,14 +412,14 @@ public final class AtFieldEffects
                 float flash = p.intensity * (float) Math.exp(-age * 9.0F) * presence;
                 if (flash > 0.01F)
                 {
-                    float disk = R * (0.06F + 0.12F * easeOut(age / 0.2F, 2.0F));
+                    float disk = R * (0.08F + 0.16F * easeOut(age / 0.2F, 2.0F));
                     if (core)
                     {
                         band(pose, out, p.a, p.b, 0.0F, disk, 0.5F, 0.0F, 1.0F, 0.94F, 0.8F, flash);
                     }
                     else
                     {
-                        band(pose, out, p.a, p.b, 0.0F, disk * 2.2F, 0.5F, 0.0F, 1.0F, 0.5F, 0.1F, flash * 0.6F);
+                        band(pose, out, p.a, p.b, 0.0F, disk * 2.2F, 0.5F, 0.0F, 1.0F, 0.5F, 0.1F, flash * 0.75F);
                     }
                 }
             }
@@ -438,36 +453,44 @@ public final class AtFieldEffects
             }
         }
 
-        private void fillVertex(Matrix4f pose, VertexConsumer out, float x, float y, float alpha)
+        private void fillVertex(Matrix4f pose, VertexConsumer out, float x, float y, float red, float green, float blue, float alpha)
         {
+            // The profile's peak texel is opaque white, so the fill takes the vertex colour alone.
             out.vertex(pose, this.u.x * x + this.v.x * y, this.u.y * x + this.v.y * y, this.u.z * x + this.v.z * y)
-                    .color(1.0F, 0.5F, 0.1F, Mth.clamp(alpha, 0.0F, 0.6F)).endVertex();
+                    .color(red, green, blue, Mth.clamp(alpha, 0.0F, 0.7F)).uv(0.5F, 0.5F)
+                    .uv2(LightTexture.FULL_BRIGHT).normal(0.0F, 1.0F, 0.0F).endVertex();
         }
 
         private void glowVertex(Matrix4f pose, VertexConsumer out, float x, float y, float texU,
                                 float red, float green, float blue, float alpha)
         {
             out.vertex(pose, this.u.x * x + this.v.x * y, this.u.y * x + this.v.y * y, this.u.z * x + this.v.z * y)
-                    .color(red, green, blue, alpha).uv(texU, 0.5F).endVertex();
+                    .color(red, green, blue, alpha).uv(texU, 0.5F).uv2(LightTexture.FULL_BRIGHT).normal(0.0F, 1.0F, 0.0F).endVertex();
         }
     }
 
+    /**
+     * All three passes use the beacon beam's shader and vertex format. Shader packs draw that one
+     * unlit and bright; with the plain position-colour shaders they lit the field like a solid
+     * surface, so under the sun it washed out to a pale sheet and the rings vanished.
+     */
     private abstract static class Types extends RenderType
     {
-        static final RenderType FILL = create("seele_at_field_fill", DefaultVertexFormat.POSITION_COLOR,
-                VertexFormat.Mode.QUADS, 8192, false, true, CompositeState.builder()
-                        .setShaderState(POSITION_COLOR_SHADER).setTransparencyState(TRANSLUCENT_TRANSPARENCY)
+        static final RenderType FILL = create("seele_at_field_fill", DefaultVertexFormat.BLOCK,
+                VertexFormat.Mode.QUADS, 16384, false, true, CompositeState.builder()
+                        .setShaderState(RENDERTYPE_BEACON_BEAM_SHADER).setTextureState(new TextureStateShard(PROFILE, false, false))
+                        .setTransparencyState(TRANSLUCENT_TRANSPARENCY)
                         .setCullState(NO_CULL).setDepthTestState(LEQUAL_DEPTH_TEST).setWriteMaskState(COLOR_WRITE)
                         .createCompositeState(false));
-        static final RenderType TINT = create("seele_at_field_tint", DefaultVertexFormat.POSITION_COLOR_TEX,
-                VertexFormat.Mode.QUADS, 65536, false, true, CompositeState.builder()
-                        .setShaderState(POSITION_COLOR_TEX_SHADER).setTextureState(new TextureStateShard(PROFILE, true, false))
+        static final RenderType TINT = create("seele_at_field_tint", DefaultVertexFormat.BLOCK,
+                VertexFormat.Mode.QUADS, 131072, false, true, CompositeState.builder()
+                        .setShaderState(RENDERTYPE_BEACON_BEAM_SHADER).setTextureState(new TextureStateShard(PROFILE, true, false))
                         .setTransparencyState(TRANSLUCENT_TRANSPARENCY).setCullState(NO_CULL)
                         .setDepthTestState(LEQUAL_DEPTH_TEST).setWriteMaskState(COLOR_WRITE)
                         .createCompositeState(false));
-        static final RenderType GLOW = create("seele_at_field_glow", DefaultVertexFormat.POSITION_COLOR_TEX,
-                VertexFormat.Mode.QUADS, 65536, false, true, CompositeState.builder()
-                        .setShaderState(POSITION_COLOR_TEX_SHADER).setTextureState(new TextureStateShard(PROFILE, true, false))
+        static final RenderType GLOW = create("seele_at_field_glow", DefaultVertexFormat.BLOCK,
+                VertexFormat.Mode.QUADS, 131072, false, true, CompositeState.builder()
+                        .setShaderState(RENDERTYPE_BEACON_BEAM_SHADER).setTextureState(new TextureStateShard(PROFILE, true, false))
                         .setTransparencyState(LIGHTNING_TRANSPARENCY).setCullState(NO_CULL)
                         .setDepthTestState(LEQUAL_DEPTH_TEST).setWriteMaskState(COLOR_WRITE)
                         .createCompositeState(false));

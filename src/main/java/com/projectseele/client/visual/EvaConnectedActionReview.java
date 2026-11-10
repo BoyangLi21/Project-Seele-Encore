@@ -54,6 +54,8 @@ public final class EvaConnectedActionReview
     private static final boolean HILL=Boolean.getBoolean("projectseele.tourHillR60");
     /** Melee check: a still Sachiel placed around the body, kicked on the ground and from the air. */
     private static final boolean STRIKE=Boolean.getBoolean("projectseele.tourStrikeR60");
+    /** A.T. Field look: a still Sachiel's field struck from the pilot's side, then the piloted unit's own field, at noon and at dusk. */
+    private static final boolean ATF=Boolean.getBoolean("projectseele.tourAtFieldR63");
     private static final int STRIKE_LEAD=20,STRIKE_CYCLE=140;
     /** Each case: air (1) or ground (0), blocks ahead of the body, blocks to its right, blocks up, the target. */
     private static final int[][] STRIKE_CASES={{0,10,0,0,0},{0,20,0,0,0},{0,32,0,0,0},{0,20,10,0,0},{0,20,-10,0,0},
@@ -266,6 +268,7 @@ public final class EvaConnectedActionReview
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
         if(HILL){hillR60(mc,lane(eva));positionCamera(mc,eva);return;}
         if(STRIKE){strikeR60(mc,eva);positionCamera(mc,eva);return;}
+        if(ATF){atFieldR63(mc,eva);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<Math.max(140,DASH_END+10)||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -355,6 +358,31 @@ public final class EvaConnectedActionReview
         }
         if(c[0]==1)mc.options.keyJump.setDown(local>=30&&local<33);
         if(index!=strikeFired&&local>=(c[0]==1?46:30)){strikeFired=index;send(ServerboundEvaControlPacket.ACTION_SMASH);}
+    }
+
+    private static void atFieldR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        int t=tick;
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),right=new Vec3(-fwd.z,0,fwd.x);
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit="@e[type=projectseele:eva_unit01,limit=1,sort=nearest]";
+        if(at(1))
+        {
+            // A field turns /kill away: an Angel left by an earlier run is emptied instead.
+            for(int i=0;i<4;i++)mc.player.connection.sendCommand("data merge entity "+angel+" {Health:0.0f}");
+            mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");
+        }
+        if(at(12))
+        {
+            Vec3 a=eva.position().add(fwd.scale(40));
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+        }
+        // Single hits, then one every tick (the field shows at most every third), then the unit's own field.
+        if(at(40)||at(70)||t>=100&&t<=106||at(210))mc.player.connection.sendCommand("damage "+angel+" 4 minecraft:arrow by @s");
+        if(at(130))send(ServerboundEvaControlPacket.ACTION_TOGGLE_AT_FIELD);
+        if(at(160)||at(240))mc.player.connection.sendCommand("damage "+unit+" 6 minecraft:mob_attack by "+angel);
+        if(at(190))mc.player.connection.sendCommand("time set 12900");
+        camPos=eva.position().add(fwd.scale(-30)).add(right.scale(45)).add(0,30,0);camAim=eva.position().add(fwd.scale(32)).add(0,26,0);
     }
 
     private static void hillR60(Minecraft mc,int x)
@@ -525,7 +553,7 @@ public final class EvaConnectedActionReview
         }
         Vec3 target = eva.position().add(0, Double.parseDouble(System.getProperty("projectseele.reviewAimY","28")), 0);
         Vec3 position = eva.position().add(RIFLE && eva.getUnitVariant() == 0 ? -60 : Double.parseDouble(System.getProperty("projectseele.reviewCamX","60")), Double.parseDouble(System.getProperty("projectseele.reviewCamY","32")), Double.parseDouble(System.getProperty("projectseele.reviewCamZ","48")));
-        if (FX && camPos != null) { position = camPos; target = camAim; }
+        if ((FX || ATF) && camPos != null) { position = camPos; target = camAim; }
         // Close follow of the fists: -Dprojectseele.reviewTrackHand=<distance>.
         double track=Double.parseDouble(System.getProperty("projectseele.reviewTrackHand","0"));
         if(track>0)
@@ -639,6 +667,7 @@ public final class EvaConnectedActionReview
         // halve the frame rate, so it keeps one still every two seconds.
         if (TOUR && tick >= TOUR_END) return;
         if (TOUR && FX) { if (!fxCapture(tick)) return; }
+        else if (TOUR && ATF) { if (tick < 36) return; }
         else if (TOUR && !Boolean.getBoolean("projectseele.tourCapture") && tick % 40 != 0) return;
         Minecraft mc = Minecraft.getInstance();
         capturedTick = tick;

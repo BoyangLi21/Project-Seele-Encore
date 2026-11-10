@@ -338,6 +338,10 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
                 }
                 return true;
             }
+            if (amount > 0.0F && this.level() instanceof ServerLevel server)
+            {
+                AtFieldFX.blocked(server, this, source);
+            }
             return false;
         }
         // Let vanilla/Forge accept the hit, apply armor, resistance and

@@ -250,6 +250,7 @@ public final class GaghielEntity extends Mob implements Enemy, Angel, software.b
                 if(level() instanceof ServerLevel server)com.projectseele.fx.AtFieldFX.ripple(server,damagePoint==null?mouthWorldPos(1):damagePoint,eva.getForward());
                 return true;
             }
+            if(amount>0&&level() instanceof ServerLevel server)com.projectseele.fx.AtFieldFX.blocked(server,this,source);
             return false;
         }
         return super.hurt(source,damagePoint!=null&&coreContactR50(damagePoint)?amount:amount*.35F);
