@@ -130,12 +130,43 @@ def split_rows(rows, folder, limit=300000):
     return [len(batch) for batch in batches]
 
 
+def sign_text(lines):
+    """Four sign lines as the 1.20 text component strings."""
+    lines = list(lines) + [''] * (4 - len(lines))
+    if len(lines) != 4:
+        raise ValueError('A sign side holds four lines')
+    return nbtlib.List[nbtlib.String]([nbtlib.String(json.dumps({'text': t}, ensure_ascii=False)) for t in lines])
+
+
+def sign_entity(sign, state):
+    x, y, z = sign['pos']
+    side = lambda key: nbtlib.Compound({'messages': sign_text(sign.get(key, [])), 'color': nbtlib.String(sign.get('color', 'black')),
+                                        'has_glowing_text': nbtlib.Byte(1 if sign.get('glow') else 0)})
+    return nbtlib.Compound({'id': nbtlib.String('minecraft:hanging_sign' if 'hanging_sign' in state else 'minecraft:sign'),
+                            'x': nbtlib.Int(x), 'y': nbtlib.Int(y), 'z': nbtlib.Int(z), 'keepPacked': nbtlib.Byte(0),
+                            'is_waxed': nbtlib.Byte(1), 'front_text': side('front'), 'back_text': side('back')})
+
+
+def block_at(root, x, y, z):
+    for s in root['sections']:
+        if int(s['Y']) == y >> 4 and 'block_states' in s:
+            ids, palette = decode(s['block_states'])
+            return palette[ids[((y & 15) << 8) | ((z & 15) << 4) | (x & 15)]]
+    return 'minecraft:air'
+
+
 def apply(a):
     rows = json.loads(a.rows.read_text('utf8'))
+    signs = json.loads(a.signs.read_text('utf8')) if a.signs else []
     grouped = defaultdict(lambda: defaultdict(list))
     for x, y, z, before, after in rows:
         grouped[x >> 9, z >> 9][x >> 4, z >> 4].append((x, y, z, before, after))
-    positions = [(x, y, z) for x, y, z, _, _ in rows]
+    sign_chunks = defaultdict(list)
+    for sign in signs:
+        x, y, z = sign['pos']
+        sign_chunks[x >> 4, z >> 4].append(sign)
+        grouped[x >> 9, z >> 9][x >> 4, z >> 4]       # the chunk is visited even without block rows
+    positions = [(x, y, z) for x, y, z, _, _ in rows] + [tuple(sign['pos']) for sign in signs]
     if not a.allow_city_lift:
         # The city lift compares its hatch cover and needs its travel space empty: refuse before any change.
         from map_pipeline.city_protection import load as city_protection
@@ -178,6 +209,18 @@ def apply(a):
                         ids[at] = index[after]
                         changed += 1
                     encode(states, ids, palette)
+                for sign in sign_chunks.get((cx, cz), ()):
+                    x, y, z = sign['pos']
+                    state = block_at(root, x, y, z)
+                    if not state.split('[')[0].endswith('sign'):
+                        raise ValueError(f'{x},{y},{z} is {state}, not a sign')
+                    entities = root.setdefault('block_entities', nbtlib.List[nbtlib.Compound]())
+                    for e in list(entities):
+                        if (int(e['x']), int(e['y']), int(e['z'])) == (x, y, z):
+                            if not str(e['id']).endswith('sign'):
+                                raise ValueError(f'{x},{y},{z} holds a {e["id"]} block entity')
+                            entities.remove(e)
+                    entities.append(sign_entity(sign, state))
                 clear_light(root)
                 write_chunk(buf, i, loc, count, root)
             swap = path.with_name(path.name + '.swap')
@@ -194,6 +237,16 @@ def apply(a):
                 planned = defaultdict(dict)
                 for x, y, z, _, after in cells:
                     planned[y >> 4][((y & 15) << 8) | ((z & 15) << 4) | (x & 15)] = after
+                new_entities = {(int(e['x']), int(e['y']), int(e['z'])): e for e in read_chunk(buf, cx, cz)[3].get('block_entities', [])}
+                old_entities = {(int(e['x']), int(e['y']), int(e['z'])): e for e in read_chunk(old, cx, cz)[3].get('block_entities', [])}
+                wanted = {tuple(sign['pos']): sign for sign in sign_chunks.get((cx, cz), ())}
+                for pos in set(new_entities) | set(old_entities):
+                    if pos in wanted:
+                        e = new_entities.get(pos)
+                        if e is None or [json.loads(str(m))['text'] for m in e['front_text']['messages']] != (list(wanted[pos].get('front', [])) + [''] * 4)[:4]:
+                            wrong += 1
+                    elif new_entities.get(pos) != old_entities.get(pos):
+                        collateral += 1
                 if set(new_sections) != set(old_sections):
                     raise SystemExit(f'Chunk {cx},{cz} changed its section list')
                 for sy, section in new_sections.items():
@@ -210,8 +263,8 @@ def apply(a):
                     wrong += sum(new_names[at] != after for at, after in planned[sy].items())
     if wrong or collateral:
         raise SystemExit(f'Readback: {wrong} of {changed} cells wrong, {collateral} cells changed outside the plan')
-    (a.out / 'installation.json').write_text(json.dumps(dict(status='installed', cells=changed, regions=len(grouped), readback_wrong=0, collateral=0), indent=1), 'utf8')
-    print(json.dumps(dict(cells=changed, regions=len(grouped), readback_wrong=0, collateral=0)))
+    (a.out / 'installation.json').write_text(json.dumps(dict(status='installed', cells=changed, signs=len(signs), regions=len(grouped), readback_wrong=0, collateral=0), indent=1), 'utf8')
+    print(json.dumps(dict(cells=changed, signs=len(signs), regions=len(grouped), readback_wrong=0, collateral=0)))
 
 
 if __name__ == '__main__':
@@ -220,5 +273,6 @@ if __name__ == '__main__':
     parser.add_argument('--rows', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--allow-city-lift', action='store_true', help='only to restore the hatch cover of the city lift itself')
+    parser.add_argument('--signs', type=Path, help='JSON list of {pos, front, back, color, glow}: writes only those sign block entities')
     parser.add_argument('--allow-lift-shaft', action='store_true', help='only to clear the travel space of a lift itself')
     apply(parser.parse_args())
