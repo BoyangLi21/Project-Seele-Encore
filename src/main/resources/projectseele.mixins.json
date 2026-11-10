@@ -65,6 +65,7 @@
     "client.LargeStructureRenderMixin",
     "client.PlayerModelGendoPoseMixin",
     "client.MovingElevatorDisplayMixin",
+    "client.CreateVirtualLightStarlightGuardMixin",
     "client.MovingElevatorPanelMixin",
     "client.MovingElevatorRenderOriginR47Mixin",
     "client.LocalPlayerLiftPacketsR22Mixin",
