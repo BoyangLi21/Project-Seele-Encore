@@ -529,12 +529,20 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
     private static Map<String,JointSkin> resolvedJointSkins(LocalMeshJsonR53.Document document,Map<String,MeshPart> parts,int stride) throws IOException
     {
         JsonObject root=document.metadata();
-        if(!root.has("jointSkins"))return jointSkins(parts,stride);
+        if(!root.has("jointSkins"))return jointSkins(parts,stride,Map.of(),true);
         var authored=authoredJointSkins(document,parts,stride);
-        if(!root.has("r37_mouth"))return authored;
-        // A new jaw membrane must not disable the source rig's welded knees
-        // and elbows simply by adding the first authored skin to this mesh.
-        var merged=new HashMap<>(jointSkins(parts,stride));merged.putAll(authored);return Map.copyOf(merged);
+        // Authored skins stay on top. A part the mesh left rigid beside a
+        // skinned neighbour (the feet of all three units) is welded onto that
+        // neighbour's own weights. Welds between two unskinned parts and the
+        // neck sleeve stay with the mesh that already had them (Unit-01's jaw
+        // marker): the prototype's shells skin none of their limbs and must
+        // stay rigid.
+        var merged=new HashMap<>(jointSkins(parts,stride,authored,root.has("r37_mouth")));merged.putAll(authored);return Map.copyOf(merged);
+    }
+
+    private static boolean influenced(Map<String,JointSkin> skins,String name)
+    {
+        var skin=skins.get(name);return skin!=null&&!skin.influences().isEmpty();
     }
 
     private static Map<String,JointSkin> authoredJointSkins(LocalMeshJsonR53.Document document,Map<String,MeshPart> parts,int stride) throws IOException
@@ -631,7 +639,13 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 p.vertices()[offset+1]+p.pivotY(),p.vertices()[offset+2]+p.pivotZ());
     }
 
-    private static Map<String,JointSkin> jointSkins(Map<String,MeshPart> parts,int stride)
+    /**
+     * Seam welds for the parts a mesh did not skin itself. {@code authored}
+     * holds the mesh's own skins: a part beside one of them follows that
+     * neighbour's weights. {@code automatic} admits the half-and-half welds
+     * between two unskinned parts and the neck sleeve.
+     */
+    private static Map<String,JointSkin> jointSkins(Map<String,MeshPart> parts,int stride,Map<String,JointSkin> authored,boolean automatic)
     {
         Map<String,JointSkin> result=new HashMap<>();
             for(String joint:new String[]{"elbow","ankle","wrist","hip","waist"})for(String side:new String[]{"l","r"})
@@ -640,11 +654,16 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 String upper=switch(joint){case "hip","waist"->"torso_lower";case "elbow"->"arm_"+side;case "ankle"->"shin_"+side;default->"forearm_"+side;};
                 String lower=switch(joint){case "waist"->"torso_upper";case "hip"->"leg_"+side;case "elbow"->"forearm_"+side;case "ankle"->"foot_"+side;default->"hand_"+side;};
             var a=parts.get(upper);var b=parts.get(lower);if(a==null||b==null)continue;
+            // Decided before the seam search, which compares every vertex pair:
+            // both sides skinned by the mesh leaves nothing to weld, and two
+            // unskinned sides are welded only where automatic welds are admitted.
+            boolean upperSkinned=influenced(authored,upper),lowerSkinned=influenced(authored,lower);
+            if(upperSkinned&&lowerSkinned||!upperSkinned&&!lowerSkinned&&!automatic)continue;
             // Pivot + relative coordinates can round to opposite sides of a
             // quantization cell. Match spatially and give BOTH copies the same
             // rest point and exactly half weight; a near-half weight still tears.
             float epsilonSquared=.002F*.002F;
-            var seam=new ArrayList<Vector3f>();
+            var seam=new ArrayList<Vector3f>();var seamUpper=new ArrayList<Integer>();var seamLower=new ArrayList<Integer>();
             for(int i=0;i<a.vertices().length;i+=stride)
             {
                 var point=restPoint(a,i);
@@ -652,33 +671,46 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
                 {
                     var other=restPoint(b,j);if(point.distanceSquared(other)>epsilonSquared)continue;
                     var centre=new Vector3f(point).add(other).mul(.5F);
-                    if(seam.stream().noneMatch(v->v.distanceSquared(centre)<epsilonSquared))seam.add(centre);
+                    if(seam.stream().noneMatch(v->v.distanceSquared(centre)<epsilonSquared)){seam.add(centre);seamUpper.add(i/stride);seamLower.add(j/stride);}
                     break;
                 }
             }
             if(seam.size()<3)continue;
             for(String name:new String[]{upper,lower})
             {
-                var p=parts.get(name);float[] weights=new float[p.vertices().length/stride],rest=p.vertices().clone();
+                if(authored.containsKey(name))continue;
+                String other=name.equals(upper)?lower:upper;
+                // A skinned neighbour is not moved, so this part takes the
+                // neighbour's own vertex and weights at each shared point:
+                // half weight against an authored blend left the seam open.
+                var followed=influenced(authored,other)?authored.get(other):null;
+                var neighbour=parts.get(other);var neighbourVertices=name.equals(upper)?seamLower:seamUpper;
+                var p=parts.get(name);var previous=result.get(name);float full=followed==null?.5F:1F;
+                float[] weights=new float[p.vertices().length/stride],rest=followed!=null&&previous!=null?previous.rest().clone():p.vertices().clone();
+                int[] source=new int[weights.length];
                 for(int i=0;i<weights.length;i++)
                 {
-                    var point=restPoint(p,i*stride);float distanceSquared=Float.POSITIVE_INFINITY;Vector3f nearest=null;
-                    for(var s:seam){float d=point.distanceSquared(s);if(d<distanceSquared){distanceSquared=d;nearest=s;}}
+                    var point=restPoint(p,i*stride);float distanceSquared=Float.POSITIVE_INFINITY;int nearest=0;
+                    for(int k=0;k<seam.size();k++){float d=point.distanceSquared(seam.get(k));if(d<distanceSquared){distanceSquared=d;nearest=k;}}
+                    source[i]=neighbourVertices.get(nearest);
                     if(distanceSquared<epsilonSquared)
                     {
-                        weights[i]=.5F;rest[i*stride]=nearest.x-p.pivotX();
-                        rest[i*stride+1]=nearest.y-p.pivotY();rest[i*stride+2]=nearest.z-p.pivotZ();
+                        var at=followed==null?seam.get(nearest):restPoint(neighbour,source[i]*stride);
+                        weights[i]=full;rest[i*stride]=at.x-p.pivotX();
+                        rest[i*stride+1]=at.y-p.pivotY();rest[i*stride+2]=at.z-p.pivotZ();
                     }
                     else
                     {
-                        float t=Math.max(0,1-(float)Math.sqrt(distanceSquared)/6);weights[i]=.5F*t*t*(3-2*t);
+                        float t=Math.max(0,1-(float)Math.sqrt(distanceSquared)/6);weights[i]=full*t*t*(3-2*t);
                     }
                 }
-                    mergeJointSkin(result,name,p,name.equals(upper)?lower:upper,weights,rest);
+                if(followed==null)mergeJointSkin(result,name,p,other,weights,rest);
+                else mergeFollowingSkin(result,name,weights,rest,source,followed.influences());
             }
-            ProjectSeele.LOGGER.info("EVA joint skin seam: joint={} side={} sharedVertices={}",joint,side,seam.size());
+            ProjectSeele.LOGGER.info("EVA joint skin seam: joint={} side={} sharedVertices={} follows={}",joint,side,seam.size(),
+                    upperSkinned?upper:lowerSkinned?lower:"none");
         }
-            if(parts.containsKey("head")&&parts.containsKey("torso_upper"))
+            if(automatic&&parts.containsKey("head")&&parts.containsKey("torso_upper"))
             {
                 var p=parts.get("head");float[] weights=new float[p.vertices().length/stride];
                 for(int i=0;i<weights.length;i++)
@@ -705,6 +737,30 @@ public final class LocalTriangleMeshLayer<T extends GeoAnimatable> extends GeoRe
         else previous.influences().forEach((n,w)->all.put(n,w.clone()));
         float[] own=all.get(name),added=all.computeIfAbsent(other,n->new float[count]);
         for(int i=0;i<count;i++){float take=Math.min(own[i],weights[i]);own[i]-=take;added[i]+=take;}
+        result.put(name,new JointSkin("",new float[0],rest,rest.clone(),Map.copyOf(all)));
+    }
+
+    /** A weld whose vertices copy the skinned neighbour's weights at their nearest shared point. */
+    private static void mergeFollowingSkin(Map<String,JointSkin> result,String name,float[] weights,float[] rest,int[] source,Map<String,float[]> neighbour)
+    {
+        int count=weights.length;Map<String,float[]> all=new java.util.TreeMap<>();var previous=result.get(name);
+        if(previous==null){float[] whole=new float[count];java.util.Arrays.fill(whole,1);all.put(name,whole);}
+        else if(previous.influences().isEmpty())
+        {
+            all.put(previous.other(),previous.weights().clone());float[] rigid=new float[count];for(int i=0;i<count;i++)rigid[i]=1-previous.weights()[i];all.put(name,rigid);
+        }
+        else previous.influences().forEach((n,w)->all.put(n,w.clone()));
+        float[] own=all.get(name);
+        for(int i=0;i<count;i++)
+        {
+            float take=Math.min(own[i],weights[i]);if(take<=0)continue;
+            own[i]-=take;
+            for(var entry:neighbour.entrySet())
+            {
+                float share=take*entry.getValue()[source[i]];
+                if(share!=0)all.computeIfAbsent(entry.getKey(),n->new float[count])[i]+=share;
+            }
+        }
         result.put(name,new JointSkin("",new float[0],rest,rest.clone(),Map.copyOf(all)));
     }
 

@@ -221,7 +221,11 @@ class RigidMesh:
     Mirrors LocalTriangleMeshLayer.jointSkins: vertices shared by the two parts
     meeting at an elbow/ankle/wrist/hip/waist get half weight on each bone
     (snapped to the shared rest point), fading to 0 within 6 px of the seam,
-    and the head's neck sleeve blends toward torso_upper.  LBS here, DQS in game.
+    and the head's neck sleeve blends toward torso_upper.  A part left rigid
+    beside a part the mesh skinned itself (the feet) takes that neighbour's
+    weights at the shared vertices instead.  Welds between two unskinned parts
+    and the neck sleeve apply to meshes without authored skins and to Unit-01's
+    (its jaw marker), as in resolvedJointSkins.  LBS here, DQS in game.
     """
 
     JOINTS = [('torso_lower', 'torso_upper')] + [(u.replace('%s', s), l.replace('%s', s)) for s in 'lr' for u, l in
@@ -247,9 +251,14 @@ class RigidMesh:
                 col = col * np.array(part['tint'], float)[None, :]
             raw[name] = (xyz, file_px, col, np.array(part['pivot'], float))
         self.skin = {}
+        skinned = {name for name, skin in m.get('jointSkins', {}).items() if name in raw and 'influences' in skin}
+        automatic = 'jointSkins' not in m or 'r37_mouth' in m
+        follow = {}
         if weld:
             for upper, lower in self.JOINTS:
                 if upper not in raw or lower not in raw:
+                    continue
+                if (upper in skinned and lower in skinned) or not (upper in skinned or lower in skinned or automatic):
                     continue
                 a, b = raw[upper][1], raw[lower][1]
                 d = np.linalg.norm(a[:, None, :] - b[None, :, :], axis=2)
@@ -258,21 +267,29 @@ class RigidMesh:
                 if len(ia) < 3:
                     continue
                 seam = (a[ia] + b[ib]) / 2
-                for name, other in ((upper, lower), (lower, upper)):
+                for name, other, theirs in ((upper, lower, ib), (lower, upper, ia)):
+                    if name in skinned:
+                        continue
                     pts = raw[name][1]
                     dd = np.linalg.norm(pts[:, None, :] - seam[None, :, :], axis=2)
                     k = dd.argmin(1)
                     dist = dd[np.arange(len(pts)), k]
                     t = np.clip(1 - dist / 6.0, 0, 1)
+                    on = dist < 0.002
+                    if other in skinned:
+                        # beside a skinned part: that part's own weights at each shared point
+                        w = t * t * (3 - 2 * t)
+                        w[on] = 1.0
+                        follow.setdefault(name, []).append((other, w, theirs[k]))
+                        continue
                     w = 0.5 * t * t * (3 - 2 * t)
                     rest = raw[name][0].copy()
-                    on = dist < 0.002
                     w[on] = 0.5
                     snap = seam[k[on]].copy()
                     snap[:, 0] *= -1
                     rest[on] = snap / 16
                     self.skin.setdefault(name, []).append((other, w, rest))
-            if 'head' in raw and 'torso_upper' in raw:
+            if automatic and 'head' in raw and 'torso_upper' in raw:
                 fp, pv = raw['head'][1], raw['head'][3]
                 blend = np.clip((pv[1] + 1.5 - fp[:, 1]) / 7.0, 0, 1)
                 blend[(fp[:, 1] > pv[1] - 3) & (fp[:, 2] < -6)] = 0
@@ -286,6 +303,17 @@ class RigidMesh:
             if name in raw and 'influences' in skin:
                 self.authored[name] = {b: np.array(w, float) for b, w in skin['influences'].items() if b in rig.pivot}
                 self.skin.pop(name, None)
+        for name, rows in follow.items():
+            own = np.ones(len(raw[name][0]))
+            blend = {}
+            for other, w, source in rows:
+                take = np.minimum(own, w)
+                own = own - take
+                for b, wb in self.authored[other].items():
+                    blend[b] = blend.get(b, 0) + take * wb[source]
+            blend[name] = blend.get(name, 0) + own
+            self.authored[name] = blend
+            self.skin.pop(name, None)
 
     def triangles(self, mats, world):
         out_t, out_c = [], []
