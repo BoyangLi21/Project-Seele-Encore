@@ -69,6 +69,9 @@ public final class EvaConnectedActionReview
     private static final String DASH_WEAPON=System.getProperty("projectseele.tourDashWeapon");
     /** The unit the tour pilots: unit00, unit01 or unit02. */
     private static final String UNIT=System.getProperty("projectseele.tourUnit","unit01");
+    private static final int UNIT_VARIANT=UNIT.endsWith("00")?EvaUnit01Entity.UNIT_00:UNIT.endsWith("02")?EvaUnit01Entity.UNIT_02:EvaUnit01Entity.UNIT_01;
+    /** Ticks a terrain tour keeps running after its script, unrecorded, so its cleanup is carried out. */
+    private static final int TERRAIN_GRACE=30;
     private static Vec3 camPos, camAim, fxRamiel, fxFront, fxOrigin;
     private static EvaUnit01Entity fxUnit00;
     /** Record every drawn frame, not the first of each tick: offline renders then show the frames the game drew. */
@@ -119,7 +122,10 @@ public final class EvaConnectedActionReview
             return;
         }
         EvaUnit01Entity eva = EvaPilotResolver.controlTarget(mc.player);
-        if (eva == null || eva.getActivationTicks() > 0 || !eva.isPoweredOn())
+        // The link to the unit the previous run piloted outlives the request for
+        // this one by a few ticks: do not start on it.
+        if (eva == null || eva.getActivationTicks() > 0 || !eva.isPoweredOn()
+                || serverStart < 0 && eva.getUnitVariant() != UNIT_VARIANT)
         {
             if (++missingPilotTicks > 400) finish(mc, "pilot_setup_timeout");
             return;
@@ -151,7 +157,10 @@ public final class EvaConnectedActionReview
         {
             tour(mc, eva);
             previousTick = tick;
-            if (tick >= TOUR_END) finish(mc, "complete");
+            // A tour that built terrain clears it two ticks before its end; the
+            // server needs time to run those commands before the client stops,
+            // or half a hill stays in the save and blocks every later tour.
+            if (tick >= TOUR_END + (HILL || STEPS || CLIMB ? TERRAIN_GRACE : 0)) finish(mc, "complete");
             return;
         }
         if (RIFLE)
@@ -340,11 +349,19 @@ public final class EvaConnectedActionReview
     private static void hillR60(Minecraft mc)
     {
         int t=tick;
-        if(at(1))hillBlocksR60(mc);
-        if(at(TOUR_END-2))for(int z=-92;z<=60;z++)mc.player.connection.sendCommand("fill -44 -60 "+z+" 46 -30 "+z+" minecraft:air");
+        // Clear first: commands sent in one tick run in order, and an earlier
+        // run that was cut short may have left its hill standing.
+        if(at(1)){hillClearR60(mc);hillBlocksR60(mc);}
+        if(at(TOUR_END-2))hillClearR60(mc);
         boolean up=t>=60&&t<120||t>=170&&t<300||t>=350&&t<410;
         mc.options.keyUp.setDown(up);mc.player.input.up=up;mc.player.input.forwardImpulse=up?1:0;mc.player.zza=up?1:0;mc.player.xxa=0;
         mc.player.setYRot(t<340?0:t<350?(t-340)*9:90);mc.player.setXRot(0);
+    }
+
+    /** The hill's own box only: nothing else on the review ground stands in it. */
+    private static void hillClearR60(Minecraft mc)
+    {
+        for(int z=-92;z<=60;z++)mc.player.connection.sendCommand("fill -44 -60 "+z+" 46 -30 "+z+" minecraft:air");
     }
 
     /** One-block terraces a few blocks wide, uneven across the slope, as the Hakone hillsides are. */
@@ -527,7 +544,8 @@ public final class EvaConnectedActionReview
             warmupFrames++;
             return;
         }
-        if (poses == null || !EVERY_FRAME && poseTick == tick) return;
+        // Past the script a terrain tour only waits for its cleanup, the ground gone from under the body.
+        if (poses == null || !EVERY_FRAME && poseTick == tick || TOUR && tick >= TOUR_END) return;
         // A frame can draw the body more than once (shadow and main pass).
         if (EVERY_FRAME && eva.tickCount + partialTick == poseTime) return;
         poseTick = tick;poseTime = eva.tickCount + partialTick;
@@ -599,6 +617,7 @@ public final class EvaConnectedActionReview
                 || tick == capturedTick) return;
         // The tour measures per-frame continuity: a screenshot per tick would
         // halve the frame rate, so it keeps one still every two seconds.
+        if (TOUR && tick >= TOUR_END) return;
         if (TOUR && FX) { if (!fxCapture(tick)) return; }
         else if (TOUR && !Boolean.getBoolean("projectseele.tourCapture") && tick % 40 != 0) return;
         Minecraft mc = Minecraft.getInstance();
