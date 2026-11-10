@@ -73,6 +73,7 @@ VOWELS = {
     'a': [(800, 80, 1.0), (1150, 90, .5), (2900, 120, .25), (3900, 130, .12)],
     'o': [(450, 70, 1.0), (800, 80, .45), (2830, 100, .12), (3800, 120, .06)],
     'u': [(325, 50, 1.0), (700, 60, .25), (2530, 170, .06)],
+    'a_f': [(900, 90, 1.0), (1300, 100, .55), (3000, 130, .28), (4000, 150, .12)],
 }
 
 
@@ -167,6 +168,31 @@ def fire_dark_choir(seed):
     return fire_choir(seed, [73.42, 110.0, 146.83, 174.61, 220.0], 'o', .45, .03, 1.0)
 
 
+def fire_mixed(seed, female_notes, female_gain, female_delay):
+    """Round-two male choir with a female choir on top (the owner: the low choir lacked women's voices)."""
+    t = times(HOLD)
+    male = choir(t, [73.42, 110.0, 146.83, 174.61, 220.0], 'o', seed) * choir_envelope(t, .45, .03)
+    late = np.maximum(t - female_delay, 0)
+    female = choir(t, female_notes, 'a_f', seed + 3) * choir_envelope(late, .5, .03) * (t >= female_delay)
+    column = np.pad(r61.fire_column(seed + 7), (0, len(t)))[:len(t)]
+    thump = osc(32 + 70 * np.exp(-t / .06)) * np.exp(-t / .35) * attack(t, .004)
+    air = shaped_noise(HOLD, lambda f, u: log_band(f, 1100 - 600 * u, .9), seed + 8) * np.exp(-t / .4)
+    dry = .45 * male + female_gain * female + .5 * column + thump + .1 * air
+    return huge_space(dry, 6.5, seed + 60, wet=.55, predelay=.07)
+
+
+def fire_mixed_choir(seed):
+    return fire_mixed(seed, [293.66, 349.23, 440.0, 587.33], .4, 0)
+
+
+def fire_mixed_soar(seed):
+    return fire_mixed(seed, [349.23, 440.0, 587.33, 698.46, 880.0], .45, .08)
+
+
+def fire_mixed_alto(seed):
+    return fire_mixed(seed, [220.0, 293.66, 349.23, 440.0], .35, 0)
+
+
 # ------------------------------------------------------------------ impact
 def rumble(seconds, seed):
     t = times(seconds)
@@ -234,6 +260,9 @@ EVENTS = {
         'v2_choir_hit': (fire_choir_hit, '合唱和弦瞬间爆发再持续，叠第一轮 D 的音柱和低频冲击，尾巴很长。'),
         'v2_choir_swell': (fire_choir_swell, '同样的合唱，起音稍缓、更明亮，叠 D 的音柱。'),
         'v2_dark_choir': (fire_dark_choir, '低一个八度的男声合唱，更阴沉，叠 D 的音柱和更重的冲击。'),
+        'v3_mixed_choir': (fire_mixed_choir, '第二轮新 3 的男声合唱，上面叠女声合唱（D4 到 D5），一起爆发。'),
+        'v3_mixed_soar': (fire_mixed_soar, '同样的男声，女高音晚 0.08 秒进来，音区更高（到 A5），像往上飞。'),
+        'v3_mixed_alto': (fire_mixed_alto, '同样的男声，叠音区偏低的女中音，整体更暗更厚。'),
     }),
     'cross_explosion': dict(target=-10.5, seed=7400, variants={
         'v2_dark_vast': (blast_dark_vast, '现在用的暗爆炸，加 5 秒低频滚动和大空间回声，更响、更开阔。'),
@@ -247,11 +276,13 @@ EVENTS = {
 }
 
 
-def build(out):
+def build(out, only=''):
     out.mkdir(parents=True, exist_ok=True)
     report = {}
     for event, spec in EVENTS.items():
         for name, (make, note) in spec['variants'].items():
+            if only and not f'{event}__{name}'.startswith(only):
+                continue
             x = make(spec['seed'])
             m = r61.measure(x)
             x = x * 10 ** ((spec['target'] - m['momentary_max']) / 20)
@@ -262,7 +293,10 @@ def build(out):
             report[f'{event}__{name}'] = dict(note=note, seconds=round(len(x) / RATE, 2), lufs=m['lufs'],
                                               momentary_max=m['momentary_max'], true_peak_db=m['true_peak_db'])
             print(f'{event}__{name}: {len(x) / RATE:.1f}s Mmax {m["momentary_max"]} TP {m["true_peak_db"]}')
-    (out / 'measurements_v2.json').write_text(json.dumps(report, ensure_ascii=False, indent=2), encoding='utf8')
+    path = out / 'measurements_v2.json'
+    merged = json.loads(path.read_text(encoding='utf8')) if path.exists() else {}
+    merged.update(report)
+    path.write_text(json.dumps(merged, ensure_ascii=False, indent=2), encoding='utf8')
     return report
 
 
@@ -277,11 +311,12 @@ def main():
     a = argparse.ArgumentParser(description=__doc__)
     a.add_argument('--out', type=Path, required=True)
     a.add_argument('--install', default='')
+    a.add_argument('--only', default='', help='build only candidates whose event__name starts with this')
     args = a.parse_args()
     if args.install:
         install(args.out, args.install)
     else:
-        build(args.out)
+        build(args.out, args.only)
 
 
 if __name__ == '__main__':

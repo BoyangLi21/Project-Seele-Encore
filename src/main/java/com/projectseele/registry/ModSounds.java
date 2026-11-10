@@ -15,12 +15,12 @@ public class ModSounds
 
     public static final RegistryObject<SoundEvent> ALARM = register("alarm");
     // Fixed at the 96 blocks where RamielBattleSoundR54 takes over for distant observers.
-    public static final RegistryObject<SoundEvent> BEAM_CHARGE = registerFixed("beam_charge",96);
-    public static final RegistryObject<SoundEvent> BEAM_FIRE = registerFixed("beam_fire",96);
-    public static final RegistryObject<SoundEvent> CROSS_EXPLOSION = register("cross_explosion");
+    public static final RegistryObject<SoundEvent> BEAM_CHARGE = registerFixed("beam_charge",384);
+    public static final RegistryObject<SoundEvent> BEAM_FIRE = registerFixed("beam_fire",384);
+    public static final RegistryObject<SoundEvent> CROSS_EXPLOSION = registerFixed("cross_explosion",384);
     public static final RegistryObject<SoundEvent> CRYSTAL_HIT = register("crystal_hit");
     public static final RegistryObject<SoundEvent> CRYSTAL_BREAK = register("crystal_break");
-    public static final RegistryObject<SoundEvent> DRILL = registerFixed("drill",96);
+    public static final RegistryObject<SoundEvent> DRILL = registerFixed("drill",160);
     public static final RegistryObject<SoundEvent> RAMIEL_HUM = register("ramiel_hum");
     public static final RegistryObject<SoundEvent> RIFLE_FIRE = register("rifle_fire");
     public static final RegistryObject<SoundEvent> EVA_FOOT_CONCRETE=register("eva_foot_concrete");

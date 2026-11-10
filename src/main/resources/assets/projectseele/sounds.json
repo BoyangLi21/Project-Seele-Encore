@@ -13,7 +13,7 @@
     "sounds": [
       {
         "name": "projectseele:beam_charge",
-        "attenuation_distance": 64
+        "attenuation_distance": 128
       }
     ]
   },
@@ -22,7 +22,7 @@
     "sounds": [
       {
         "name": "projectseele:beam_fire",
-        "attenuation_distance": 64
+        "attenuation_distance": 128
       }
     ]
   },
@@ -31,7 +31,7 @@
     "sounds": [
       {
         "name": "projectseele:cross_explosion",
-        "attenuation_distance": 64
+        "attenuation_distance": 128
       }
     ]
   },

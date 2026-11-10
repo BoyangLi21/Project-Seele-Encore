@@ -1121,6 +1121,15 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         public void stop()
         {
             this.cooldown = SeeleConfig.DRILL_COOLDOWN_TICKS.get();
+            if (this.drilling && this.drillTicks < DRILL_DURATION_TICKS && this.ramiel.level() instanceof ServerLevel server)
+            {
+                // The take runs the full four seconds; cut it when the attack ends early.
+                var halt = new net.minecraft.network.protocol.game.ClientboundStopSoundPacket(ModSounds.DRILL.getId(), this.ramiel.getSoundSource());
+                for (var player : server.players())
+                {
+                    if (player.distanceToSqr(this.ramiel) < 160 * 160) player.connection.send(halt);
+                }
+            }
             this.drilling = false;
             this.ramiel.entityData.set(DATA_DRILLING, false);
             this.ramiel.entityData.set(DATA_DRILL_DEPTH, 0.0F);
@@ -1154,8 +1163,9 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             // Hold the anchor: the column stays put, giving the target a way out.
             this.ramiel.getMoveControl().setWantedPosition(this.anchor.x, this.anchor.y, this.anchor.z, 1.0D);
             this.ramiel.setDeltaMovement(this.ramiel.getDeltaMovement().scale(0.6D));
-            if (this.drillTicks % 20 == 1)
+            if (this.drillTicks == 1)
             {
+                // One continuous take covers the whole drill (DRILL_DURATION_TICKS, four seconds).
                 this.ramiel.playSound(ModSounds.DRILL.get(), 3.0F, 1.0F);
             }
 
