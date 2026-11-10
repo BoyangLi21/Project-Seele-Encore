@@ -35,9 +35,9 @@ public final class SbwStaticShapesR24
     @SubscribeEvent public static void reload(TagsUpdatedEvent event){EPOCH.incrementAndGet();}
     public static int epoch(){return EPOCH.get();}
     public static boolean vehicle(Entity entity){return entity!=null&&VEHICLE.get(entity.getClass());}
-    /** The UN base's parking ground, on the old site and the reclaimed one; the client cannot read the saved site offset. */
+    /** The UN base's parking ground on the reclaimed land; the client cannot read the saved site offset. */
     public static boolean unFleetArea(double x,double z)
-    {return x>=6000&&x<=7200&&z>=-7400&&z<=-5900||x>=3600&&x<=4800&&z>=136&&z<=1636;}
+    {return x>=3600&&x<=4800&&z>=136&&z<=1636;}
     /** Null means use the untouched original contextual lookup. */
     public static VoxelShape shape(BlockState state,CollisionContext context)
     {
