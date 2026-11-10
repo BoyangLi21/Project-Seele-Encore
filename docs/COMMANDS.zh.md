@@ -92,9 +92,9 @@
 | `/seele dev visit <地点>` | port、un_base、un0_hangar、un0_gantry、un1_control、un1_gantry；随 UN 基地和港口的存档偏移移动 |
 | `/seele dev seedscout <数量>\|seed <种子>\|fine <种子>\|anchor <种子>` | 海岸种子扫描（原 `/seele_coastal_seed_scout`） |
 
-## 旧写法（下一轮删除）
+## 旧写法对照（R63 起已删除）
 
-下列旧写法暂时保留一个版本，转到新指令执行，权限与新指令相同。旧的 `00|01` 机体写法在 `/seele un` 里也暂时可用。
+下列旧写法在 R62 还能用，R63 起已删除，输入会提示未知指令，请改用右边的新写法。机体参数只接受 `un0`、`un1`，旧的 `00`、`01` 也不再接受。
 
 | 旧写法 | 新写法 |
 |---|---|

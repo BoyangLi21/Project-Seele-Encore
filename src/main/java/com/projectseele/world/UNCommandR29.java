@@ -152,13 +152,13 @@ public final class UNCommandR29
     {
         return Commands.argument("unit",StringArgumentType.word()).suggests((c,b)->SharedSuggestionProvider.suggest(new String[]{"un0","un1"},b));
     }
-    /** un0 or un1; the 00/01 of the old /un and /seele military spellings still parses. */
+    /** un0 or un1. */
     private static int unit(CommandContext<CommandSourceStack> c)throws CommandSyntaxException
     {
         return switch(StringArgumentType.getString(c,"unit").toLowerCase(Locale.ROOT))
         {
-            case "un0","un00","00","0" -> 0;
-            case "un1","un01","01","1" -> 1;
+            case "un0" -> 0;
+            case "un1" -> 1;
             default -> throw UNKNOWN_UNIT.create();
         };
     }

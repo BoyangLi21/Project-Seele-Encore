@@ -4,7 +4,6 @@ import java.util.function.Predicate;
 
 import com.mojang.brigadier.CommandDispatcher;
 import com.mojang.brigadier.builder.LiteralArgumentBuilder;
-import com.mojang.brigadier.tree.CommandNode;
 import com.projectseele.ProjectSeele;
 import com.projectseele.event.FirstBattleMission;
 import com.projectseele.event.TvCampaignDirector;
@@ -84,103 +83,5 @@ public final class SeeleCommands
                     .then(CoastalSeedScoutCommands.seedScoutCommand()));
         }
         dispatcher.register(seele);
-        registerDeprecatedAliases(dispatcher, dispatcher.getRoot().getChild("seele"));
-    }
-
-    /**
-     * Deprecated: the names used up to R61, kept for one version after the 2026-11 command
-     * cleanup so saved worlds, manuals and habits keep working. Remove this method next round.
-     */
-    private static void registerDeprecatedAliases(CommandDispatcher<CommandSourceStack> dispatcher,
-                                                  CommandNode<CommandSourceStack> seele)
-    {
-        LiteralArgumentBuilder<CommandSourceStack> nerv = Commands.literal("nerv")
-                .executes(child(seele, "crew").getCommand())
-                .then(alias("route", seele, "route"))
-                .then(alias("contact", seele, "call"))
-                .then(alias("crew", seele, "crew"))
-                .then(alias("synch", seele, "synch"))
-                .then(Commands.literal("hangar").then(alias("emergency", seele, "hangar", "door")))
-                .then(Commands.literal("underground").then(alias("recover", seele, "recover")))
-                .then(alias("server", seele, "admin", "server"))
-                .then(alias("transport", seele, "admin", "transport"))
-                .then(alias("npc", seele, "admin", "npc"))
-                .then(alias("transit", seele, "admin", "transit"))
-                .then(Commands.literal("r52").requires(ADMIN)
-                        .then(alias("install", seele, "admin", "install"))
-                        .then(alias("install_cancel", seele, "admin", "install_cancel"))
-                        .then(alias("equipment_update", seele, "admin", "equipment_update")));
-        if (DevelopmentCommandsR43.enabled())
-        {
-            nerv.then(Commands.literal("debug").requires(ADMIN)
-                    .then(alias("sortie", seele, "dev", "sortie"))
-                    .then(alias("traversal", seele, "dev", "traversal")));
-        }
-        dispatcher.register(nerv);
-
-        LiteralArgumentBuilder<CommandSourceStack> un = Commands.literal("un").requires(UNCommandR29::canUse);
-        for (String action : new String[] {"phone", "status", "deliver", "recover", "dock", "cancel", "board"})
-        {
-            un.then(alias(action, seele, "un", action));
-        }
-        for (String action : new String[] {"drain", "door", "fill"})
-        {
-            un.then(alias(action, seele, "un", "hangar", action));
-        }
-        dispatcher.register(un);
-
-        LiteralArgumentBuilder<CommandSourceStack> tv = Commands.literal("tv");
-        for (String action : new String[] {"status", "begin", "select", "retry", "cancel", "support"})
-        {
-            tv.then(alias(action, seele, "sortie", action));
-        }
-        tv.then(alias("collect_equipment", seele, "sortie", "collect"))
-                .then(alias("raise_cannon", seele, "cannon", "raise"))
-                .then(alias("leave_cannon", seele, "cannon", "release"));
-        seele.addChild(tv.build());
-
-        seele.addChild(Commands.literal("tokyo3").requires(ADMIN)
-                .then(alias("status", seele, "city", "status"))
-                .then(alias("retract", seele, "city", "lower"))
-                .then(alias("restore", seele, "city", "raise"))
-                .build());
-
-        // The old UN-00 and un01 wet-cell spellings had no unit argument, so they call the same handler.
-        LiteralArgumentBuilder<CommandSourceStack> military = Commands.literal("military").requires(ADMIN)
-                .then(alias("defense", seele, "un", "defense"))
-                .then(alias("power", seele, "un", "power"))
-                .then(alias("recover", seele, "un", "recover"))
-                .then(alias("reset", seele, "un", "reset"));
-        LiteralArgumentBuilder<CommandSourceStack> un01 = Commands.literal("un01");
-        for (String action : new String[] {"status", "drain", "door", "fill"})
-        {
-            military.then(Commands.literal(action).executes(c -> UNCommandR29.hangar(c.getSource(), action, 0)));
-            un01.then(Commands.literal(action).executes(c -> UNCommandR29.hangar(c.getSource(), action, 1)));
-        }
-        seele.addChild(military.then(un01).build());
-    }
-
-    private static LiteralArgumentBuilder<CommandSourceStack> alias(String name, CommandNode<CommandSourceStack> seele,
-                                                                   String... path)
-    {
-        CommandNode<CommandSourceStack> target = seele;
-        Predicate<CommandSourceStack> requirement = seele.getRequirement();
-        for (String step : path)
-        {
-            target = child(target, step);
-            requirement = requirement.and(target.getRequirement());
-        }
-        // A redirect skips the requirements above its target, so the alias carries the whole path's.
-        return Commands.literal(name).requires(requirement).executes(target.getCommand()).redirect(target);
-    }
-
-    private static CommandNode<CommandSourceStack> child(CommandNode<CommandSourceStack> parent, String name)
-    {
-        CommandNode<CommandSourceStack> child = parent.getChild(name);
-        if (child == null)
-        {
-            throw new IllegalStateException("No /seele command node '" + name + "' under '" + parent.getName() + "'");
-        }
-        return child;
     }
 }
