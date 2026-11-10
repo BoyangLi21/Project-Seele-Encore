@@ -98,6 +98,15 @@ final class EvaGroundContactR56
         float sink=easeSink(eva,sinkWanted,now);
         float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now)+EvaBodyWeightR59.pelvis(eva,partial,now,walking)-sink*16/EvaScale.RENDER_SCALE;
         base.setPosY(drawn);
+        if(com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)
+        {
+            // Review witness: drawn plane, floor, per sole height over its floor and ground under it, support,
+            // gap, sink wanted and eased, flight, walking, planted shares, root offset over the grounded one.
+            var l=ANKLES.get(eva.getId()+"l");var r=ANKLES.get(eva.getId()+"r");
+            if(EvaFootPlacement.GROUNDING.size()>32)EvaFootPlacement.GROUNDING.clear();
+            EvaFootPlacement.GROUNDING.put(eva.getId(),new double[]{ground,floor,left,right,EvaFootPlacement.groundUnder(eva,"l"),EvaFootPlacement.groundUnder(eva,"r"),support,gap,sinkWanted,sink,flight,walking,
+                    l==null?-1:l.planted(),r==null?-1:r.planted(),(drawn-grounded)*EvaScale.RENDER_SCALE/16});
+        }
         // The eased pelvis sits this far above (+) or below (-) the grounded
         // one: planted legs take up the difference so their soles stay down.
         float lift=(drawn-grounded)*EvaScale.RENDER_SCALE/16;

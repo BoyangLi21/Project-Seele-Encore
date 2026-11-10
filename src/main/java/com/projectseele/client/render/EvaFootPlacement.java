@@ -16,6 +16,8 @@ public final class EvaFootPlacement
 {
     private static final Map<Integer,Map<String,Vector3f[]>> GEOMETRY=new HashMap<>();
     public static final Map<Integer,double[]> LAST=new HashMap<>();
+    /** Per EVA, what ground contact decided in its last frame (written by EvaGroundContactR56 while a review records). */
+    public static final Map<Integer,double[]> GROUNDING=new HashMap<>();
     /** Per EVA, last frame: highest ground found under either sole, above the drawn ground (blocks). */
     private static final Map<Integer,Double> LEDGE=new HashMap<>();
     public static double ledgeUnderFoot(EvaUnit01Entity eva){return LEDGE.getOrDefault(eva.getId(),Double.NEGATIVE_INFINITY);}
@@ -81,7 +83,7 @@ public final class EvaFootPlacement
         LAST.remove(eva.getId());
         if(eva.hasLegacyStrikeForRender())return EvaMotionEngineV2.BoneWrites.empty();
         if(root==null||!eva.isPoweredOn()||eva.isCrucified()||eva.hasActiveCarrierMotion()||eva.isExperimentalUnit()&&!EvaBodyPose.hasOwnUnRig(eva)||eva.isFirstBattleActive()||eva.isVisuallyAirborneForRender()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()||eva.isBerserk()||eva.getActivationTicks()>0||eva.getVisualPose()!=0||eva.hasLiveActionForRender(partial)||eva.rifleStanceLevel(partial)>1.01F)return EvaMotionEngineV2.BoneWrites.empty();
-        var mesh=feet(eva);Set<String> changed=new LinkedHashSet<>();double[] witness=new double[6];int index=0;double ledge=Double.NEGATIVE_INFINITY;
+        var mesh=feet(eva);Set<String> changed=new LinkedHashSet<>();double[] witness=new double[24];int index=0;double ledge=Double.NEGATIVE_INFINITY;
         float yaw=net.minecraft.util.Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot)*net.minecraft.util.Mth.DEG_TO_RAD;
         Vector3f forward=new Vector3f(-net.minecraft.util.Mth.sin(yaw),0,net.minecraft.util.Mth.cos(yaw));
         // A swinging foot crosses the ground at about twice the body's speed:
@@ -163,7 +165,6 @@ public final class EvaFootPlacement
             rise=rise*plant+clear*(1-plant);
             double flat=Math.max(0,Math.min(1,(Math.abs(rise)-.15)/.3));
             double correction=ease(eva.getId()*2+(s.equals("l")?0:1),rise*flat*flat*(3-2*flat));
-            witness[index++]=lowest.y;witness[index++]=ground;witness[index++]=correction;
             float holding=holdWeight(key);
             // A toe that reaches into or through a wall or a kerb's face is
             // drawn back to stand in front of it, along the heading: the long
@@ -177,6 +178,10 @@ public final class EvaFootPlacement
             float back=(float)easeUnder(key^0x40000000,blocked(eva,tip,lowest.y+(float)correction,centre,forward));
             // Carried onto the ledge only as it rises over the edge, not through the face.
             float up=rise>.5?(float)Math.max(0,Math.min(1,(correction/rise-.6)/.4)):1,shift=onto*up-back;
+            // Review witness, per sole: lowest point, ground at toe and heel, ground used, planted share,
+            // wanted and eased correction, carry onto a ledge, draw-back, hold, height above the drawn plane, ramp.
+            witness[index++]=lowest.y;witness[index++]=top;witness[index++]=below;witness[index++]=ground;witness[index++]=plant;witness[index++]=rise;
+            witness[index++]=correction;witness[index++]=onto;witness[index++]=back;witness[index++]=holding;witness[index++]=lift;witness[index++]=ramp?1:0;
             if(Math.abs(correction)<.005&&holding<.005&&back<.005&&onto<.005)continue;
             Vector3f target=new Vector3f(pivot).add(held.x+forward.x*shift,(float)correction,held.z+forward.z*shift);
             // The knee bends forward, and up when the foot is lifted high in

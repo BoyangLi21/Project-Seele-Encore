@@ -72,6 +72,12 @@ public final class EvaConnectedActionReview
     private static final int UNIT_VARIANT=UNIT.endsWith("00")?EvaUnit01Entity.UNIT_00:UNIT.endsWith("02")?EvaUnit01Entity.UNIT_02:EvaUnit01Entity.UNIT_01;
     /** Ticks a terrain tour keeps running after its script, unrecorded, so its cleanup is carried out. */
     private static final int TERRAIN_GRACE=30;
+    /** Where the piloted unit last stood, and for how many ticks: a tour starts once it stands still on its pad. */
+    private static Vec3 settledAt;
+    private static int settledTicks;
+    /** Block x of the piloted unit's pad: the terrain tours build in its lane (Unit-01's is 0). */
+    private static int lane=Integer.MIN_VALUE;
+    private static int lane(EvaUnit01Entity eva){if(lane==Integer.MIN_VALUE)lane=(int)Math.floor(eva.getX());return lane;}
     private static Vec3 camPos, camAim, fxRamiel, fxFront, fxOrigin;
     private static EvaUnit01Entity fxUnit00;
     /** Record every drawn frame, not the first of each tick: offline renders then show the frames the game drew. */
@@ -134,6 +140,10 @@ public final class EvaConnectedActionReview
         entityId = eva.getId();
         if (serverStart < 0)
         {
+            // The lab reset walks or carries the unit back to its pad over the next second or two.
+            // A tour that started before it stood there built its terrain where the last run ended.
+            if (settledAt == null || eva.position().distanceToSqr(settledAt) > .0001) { settledAt = eva.position(); settledTicks = 0; return; }
+            if (++settledTicks < 20) return;
             positionCamera(mc, eva);
             if (warmupFrames < 10) return;
             serverStart = mc.getSingleplayerServer().getTickCount();
@@ -254,7 +264,7 @@ public final class EvaConnectedActionReview
     {
         if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
-        if(HILL){hillR60(mc);positionCamera(mc,eva);return;}
+        if(HILL){hillR60(mc,lane(eva));positionCamera(mc,eva);return;}
         if(STRIKE){strikeR60(mc,eva);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
@@ -273,10 +283,11 @@ public final class EvaConnectedActionReview
         int sprintEnd=DASH?DASH_END:110;
         if(DASH)com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=98-DASH_LEAD&&t<sprintEnd);
         mc.options.keySprint.setDown(!CLIMB&&t>=70-DASH_LEAD&&t<sprintEnd);
+        int x=lane(eva);
         if(STEPS&&at(1))
         {
-            mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:stone");
-            mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:stone");
+            mc.player.connection.sendCommand("fill "+(x-30)+" -60 -88 "+(x+30)+" -57 -78 minecraft:stone");
+            mc.player.connection.sendCommand("fill "+(x-30)+" -60 -72 "+(x+30)+" -54 -60 minecraft:stone");
         }
         // A kerb 20 high (walked up), on it a ledge 30 high, hip height (Space:
         // stepped up), and on that a wall 54 high, above the shoulders (Space: climbed).
@@ -284,9 +295,9 @@ public final class EvaConnectedActionReview
         if(CLIMB&&(at(1)||at(TOUR_END-2)))
         {
             String block=at(1)?" minecraft:stone":" minecraft:air";
-            mc.player.connection.sendCommand("fill -24 -60 -66 24 -41 -41"+block);
-            for(int z=-40;z<=-14;z+=10)mc.player.connection.sendCommand("fill -24 -40 "+z+" 24 -11 "+Math.min(-14,z+9)+block);
-            for(int z=-13;z<=14;z+=10)mc.player.connection.sendCommand("fill -24 -10 "+z+" 24 43 "+Math.min(14,z+9)+block);
+            mc.player.connection.sendCommand("fill "+(x-24)+" -60 -66 "+(x+24)+" -41 -41"+block);
+            for(int z=-40;z<=-14;z+=10)mc.player.connection.sendCommand("fill "+(x-24)+" -40 "+z+" "+(x+24)+" -11 "+Math.min(-14,z+9)+block);
+            for(int z=-13;z<=14;z+=10)mc.player.connection.sendCommand("fill "+(x-24)+" -10 "+z+" "+(x+24)+" 43 "+Math.min(14,z+9)+block);
         }
         if(CLIMB)mc.options.keyJump.setDown(t>=100&&t<104||t>=166&&t<170);
         // A plain jump, then one with the hammer and one with the kick.
@@ -296,8 +307,8 @@ public final class EvaConnectedActionReview
         if(JUMP&&tourAt(164))send(ServerboundEvaControlPacket.ACTION_SMASH);
         if(STEPS&&at(TOUR_END-2))
         {
-            mc.player.connection.sendCommand("fill -30 -60 -88 30 -57 -78 minecraft:air");
-            mc.player.connection.sendCommand("fill -30 -60 -72 30 -54 -60 minecraft:air");
+            mc.player.connection.sendCommand("fill "+(x-30)+" -60 -88 "+(x+30)+" -57 -78 minecraft:air");
+            mc.player.connection.sendCommand("fill "+(x-30)+" -60 -72 "+(x+30)+" -54 -60 minecraft:air");
         }
         if(WEAPONS)weaponsR57(mc,tick);
         if(tourAt(sprintEnd))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
@@ -346,26 +357,26 @@ public final class EvaConnectedActionReview
         if(index!=strikeFired&&local>=(c[0]==1?46:30)){strikeFired=index;send(ServerboundEvaControlPacket.ACTION_SMASH);}
     }
 
-    private static void hillR60(Minecraft mc)
+    private static void hillR60(Minecraft mc,int x)
     {
         int t=tick;
         // Clear first: commands sent in one tick run in order, and an earlier
         // run that was cut short may have left its hill standing.
-        if(at(1)){hillClearR60(mc);hillBlocksR60(mc);}
-        if(at(TOUR_END-2))hillClearR60(mc);
+        if(at(1)){hillClearR60(mc,x);hillBlocksR60(mc,x);}
+        if(at(TOUR_END-2))hillClearR60(mc,x);
         boolean up=t>=60&&t<120||t>=170&&t<300||t>=350&&t<410;
         mc.options.keyUp.setDown(up);mc.player.input.up=up;mc.player.input.forwardImpulse=up?1:0;mc.player.zza=up?1:0;mc.player.xxa=0;
         mc.player.setYRot(t<340?0:t<350?(t-340)*9:90);mc.player.setXRot(0);
     }
 
     /** The hill's own box only: nothing else on the review ground stands in it. */
-    private static void hillClearR60(Minecraft mc)
+    private static void hillClearR60(Minecraft mc,int x)
     {
-        for(int z=-92;z<=60;z++)mc.player.connection.sendCommand("fill -44 -60 "+z+" 46 -30 "+z+" minecraft:air");
+        for(int z=-92;z<=60;z++)mc.player.connection.sendCommand("fill "+(x-44)+" -60 "+z+" "+(x+46)+" -30 "+z+" minecraft:air");
     }
 
     /** One-block terraces a few blocks wide, uneven across the slope, as the Hakone hillsides are. */
-    private static void hillBlocksR60(Minecraft mc)
+    private static void hillBlocksR60(Minecraft mc,int x)
     {
         int[][] bands={{-44,-14},{-13,-4},{-3,5},{6,15},{16,46}};
         for(int z=-92;z<=60;z++)
@@ -375,7 +386,7 @@ public final class EvaConnectedActionReview
             {
                 double centre=(band[0]+band[1])*.5;
                 int height=(int)Math.round(26*along+1.6*Math.sin(z/5.0)+2.2*Math.sin((centre+z)/11.0));
-                if(height>0)mc.player.connection.sendCommand("fill "+band[0]+" -60 "+z+" "+band[1]+" "+(-61+height)+" "+z+" minecraft:grass_block");
+                if(height>0)mc.player.connection.sendCommand("fill "+(x+band[0])+" -60 "+z+" "+(x+band[1])+" "+(-61+height)+" "+z+" minecraft:grass_block");
             }
         }
     }
@@ -587,6 +598,15 @@ public final class EvaConnectedActionReview
             transforms.add(bone.getName(), values);
         }
         row.add("bones", transforms);
+        // What the terrain stages decided this frame (EvaFootPlacement.LAST and GROUNDING).
+        for (var witness : new Object[][]{{"footPlacement", com.projectseele.client.render.EvaFootPlacement.LAST.get(eva.getId())},
+                {"groundContact", com.projectseele.client.render.EvaFootPlacement.GROUNDING.get(eva.getId())}})
+        {
+            if (!(witness[1] instanceof double[] values)) continue;
+            JsonArray list = new JsonArray();
+            for (double value : values) list.add(Double.isFinite(value) ? (Number) value : null);
+            row.add((String) witness[0], list);
+        }
         if (RIFLE && eva.getWeapon() == EvaUnit01Entity.WEAPON_RIFLE)
         {
             var witness = com.projectseele.client.render.EvaRifleContactRig.LAST.get(eva.getId());
