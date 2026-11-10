@@ -8,6 +8,7 @@ import math
 import numpy as np
 
 import chor
+import mesh_check
 import rig as R
 import scene as S
 
@@ -24,6 +25,9 @@ def foot_vertices(actors, mats, side):
 
 
 def main():
+    # numbers measured on a mesh the game does not draw are worth nothing
+    if not mesh_check.report():
+        raise SystemExit(1)
     actors = S.Actors()
     sc = chor.Scene(actors)
     n = 23 * FPS + 1

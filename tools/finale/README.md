@@ -13,7 +13,8 @@
 | `chor.py` | **编排本体**：各段关键姿势与双方接触（抓前臂、砸核心、推肩、抱背） |
 | `film.py` | 电影镜头（位置/目标/FOV/切镜） |
 | `export.py` | 导出游戏用 clip（30fps、460 tick、曲线、镜头、事件重映射、手型时间表） |
-| `qa.py` | 物理质检：穿地、落地脚滑动、关节单帧突变、够不到、极向量退化 |
+| `qa.py` | 物理质检：穿地、落地脚滑动、关节单帧突变、够不到、极向量退化。开头先跑 `mesh_check.py` |
+| `mesh_check.py` | 比对离线工具读的网格、骨架和游戏 jar 里渲染器读的是否同一份（`SEELE_GAME_JAR` 指定 jar，默认复查客户端）；不一致退出码 1 |
 | `review.py` / `video.py` | 多视角接触表 / MP4 预览（需 `imageio-ffmpeg`） |
 | `idle.py` | 原创站立待机（`eva_idle_r59.json`） |
 | `rifle_stance.py` | 持枪跪姿到趴下的骨盆和双腿（`eva_rifle_legs_r59.json`，运行时覆盖到捕捉片段上） |
