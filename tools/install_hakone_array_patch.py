@@ -244,9 +244,12 @@ def install(a):
     launch_checks = [check_candidate(protection, candidate) for candidate in a.candidate]
     from map_pipeline.city_protection import load as city_protection
     city = city_protection(a.world)
+    from map_pipeline.lift_protection import load as lift_protection
+    lifts = lift_protection(a.world)
     for candidate in a.candidate:
         for delta in (candidate/'delta').glob('*.npz'):
             city.assert_delta(delta)
+            lifts.assert_delta(delta)
     for candidate in a.candidate:
         check = json.loads((candidate/'functional-check.json').read_text('utf8'))
         from verify_hakone_owakudani_release import require_verified

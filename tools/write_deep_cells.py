@@ -135,13 +135,20 @@ def apply(a):
     grouped = defaultdict(lambda: defaultdict(list))
     for x, y, z, before, after in rows:
         grouped[x >> 9, z >> 9][x >> 4, z >> 4].append((x, y, z, before, after))
-    a.out.mkdir(parents=True, exist_ok=False)
-    folder = a.world / REGION
-    changed = 0
+    positions = [(x, y, z) for x, y, z, _, _ in rows]
     if not a.allow_city_lift:
         # The city lift compares its hatch cover and needs its travel space empty: refuse before any change.
         from map_pipeline.city_protection import load as city_protection
-        city_protection(a.world).assert_positions([(x, y, z) for x, y, z, _, _ in rows])
+        city_protection(a.world).assert_positions(positions)
+    if not a.allow_lift_shaft:
+        # A buried shaft is how a lift stops reaching a floor; doors and controllers count too.
+        from map_pipeline.lift_protection import load as lift_protection
+        lift_protection(a.world).assert_positions(positions)
+    from map_pipeline.launch_protection import load as launch_protection
+    launch_protection(a.world).assert_positions(positions)
+    a.out.mkdir(parents=True, exist_ok=False)
+    folder = a.world / REGION
+    changed = 0
     with stopped_world(a.world):
         for (rx, rz), chunks in sorted(grouped.items()):
             path = folder / f'r.{rx}.{rz}.mca'
@@ -213,4 +220,5 @@ if __name__ == '__main__':
     parser.add_argument('--rows', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
     parser.add_argument('--allow-city-lift', action='store_true', help='only to restore the hatch cover of the city lift itself')
+    parser.add_argument('--allow-lift-shaft', action='store_true', help='only to clear the travel space of a lift itself')
     apply(parser.parse_args())
