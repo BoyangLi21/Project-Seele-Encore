@@ -1,7 +1,8 @@
 """Package the current game as one release: a server zip with the world and a PCL client zip without it.
 
-Inventory only by default; --pack writes both zips. The R55 packages supply the server
-bootstrap (libraries, start scripts), server.properties, the icon and the PCL manifest.
+Inventory only by default; --pack writes both zips. The previous release's packages (--template,
+kept in the delivery folder) supply the server bootstrap (libraries, start scripts),
+server.properties, the icon and the PCL manifest.
 --pack holds the world's session.lock while it reads, so nothing may have the world open.
 """
 from contextlib import contextmanager, nullcontext
@@ -281,7 +282,7 @@ def build_inputs(a, work):
     world_files.update(world_lod)
     assert any(n.startswith('dimensions/projectseele/geofront/data/city_rigid_generation_r45/') for n in world_files)
 
-    template = a.delivery / 'Project_SEELE_Encore_R55_20261029_Server.zip'
+    template = a.delivery / f'Project_SEELE_Encore_{a.template}_Server.zip'
     with zipfile.ZipFile(template) as z:
         names = [n for n in z.namelist() if not n.endswith('/')]
         server_mods = {n for n in names if n.startswith('mods/') and n.endswith('.jar')} | {DH_MOD, TRAFFICCRAFT}
@@ -300,7 +301,7 @@ def build_inputs(a, work):
     server.update({SERVER_WORLD + '/' + n: p for n, p in world_files.items()})
     server.update({'server.properties': (props + '\n').encode('ascii'), 'server-icon.png': icon})
 
-    with zipfile.ZipFile(a.delivery / 'Project_SEELE_Encore_R55_20261029_Client_PCL.zip') as z:
+    with zipfile.ZipFile(a.delivery / f'Project_SEELE_Encore_{a.template}_Client_PCL.zip') as z:
         manifest = json.loads(z.read('manifest.json'))
     assert not manifest.get('files')
     manifest.update(name=NAME, version=VERSION + '-' + a.date)
@@ -375,6 +376,7 @@ def main():
     p.add_argument('--map-note', required=True, help='One line on the map state, recorded in the batch file')
     p.add_argument('--server-address', required=True, help='Host friends connect to, default port; keyed into the client minimap cache and server list')
     p.add_argument('--xaero-map', type=Path, required=True, help='xaero/world-map/WORLD/projectseele$geofront written by a -Dprojectseele.xaeroBake=true run on a copy of --world')
+    p.add_argument('--template', default='R62_20261110', help='Version and date of the previous release whose zips supply the bootstrap')
     p.add_argument('--pack', action='store_true')
     a = p.parse_args()
     assert re.fullmatch(r'\d{8}', a.date)

@@ -15,6 +15,8 @@
 
 ## R60 打包规则
 
+打包脚本用上一版的两个包做模板（`--template`，默认 `R62_20261110`），从里面取服务端启动文件、server.properties、图标和 PCL 清单，所以 `delivery` 里至少要保留上一版的 Client 和 Server 两个 zip。R55 的模板包已经不在了。
+
 **格式沿用 R55：**
 - `delivery/Project_SEELE_Encore_R60_<日期>_Client_PCL.zip`：PCL 整合包，`manifest.json` 加 `overrides/`，实例名 `EVANGELION_Encore_R60`，不含存档。
 - `delivery/Project_SEELE_Encore_R60_<日期>_Server.zip`：服务端和世界。
