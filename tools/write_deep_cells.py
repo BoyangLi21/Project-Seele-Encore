@@ -138,6 +138,10 @@ def apply(a):
     a.out.mkdir(parents=True, exist_ok=False)
     folder = a.world / REGION
     changed = 0
+    if not a.allow_city_lift:
+        # The city lift compares its hatch cover and needs its travel space empty: refuse before any change.
+        from map_pipeline.city_protection import load as city_protection
+        city_protection(a.world).assert_positions([(x, y, z) for x, y, z, _, _ in rows])
     with stopped_world(a.world):
         for (rx, rz), chunks in sorted(grouped.items()):
             path = folder / f'r.{rx}.{rz}.mca'
@@ -208,4 +212,5 @@ if __name__ == '__main__':
     parser.add_argument('--world', type=Path, required=True)
     parser.add_argument('--rows', type=Path, required=True)
     parser.add_argument('--out', type=Path, required=True)
+    parser.add_argument('--allow-city-lift', action='store_true', help='only to restore the hatch cover of the city lift itself')
     apply(parser.parse_args())
