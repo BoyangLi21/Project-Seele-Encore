@@ -961,22 +961,6 @@ public final class TerminalDogmaBuilder
         return AABB.ofSize(Vec3.atCenterOf(origin.offset(0, -59, 0)),
                 64.0D, 48.0D, 96.0D);
     }
-    private static void buildLine(ServerLevel level, BlockPos origin,
-                                  int x0, int y0, int z0,
-                                  int x1, int y1, int z1,
-                                  BlockState state)
-    {
-        int steps = Math.max(Math.max(Math.abs(x1 - x0), Math.abs(y1 - y0)),
-                Math.abs(z1 - z0));
-        for (int step = 0; step <= steps; step++)
-        {
-            double amount = steps == 0 ? 0.0D : step / (double) steps;
-            int x = (int) Math.round(x0 + (x1 - x0) * amount);
-            int y = (int) Math.round(y0 + (y1 - y0) * amount);
-            int z = (int) Math.round(z0 + (z1 - z0) * amount);
-            set(level, origin.offset(x, y, z), state);
-        }
-    }
 
     private static void fillBox(ServerLevel level, BlockPos origin,
                                 int minX, int maxX, int minY, int maxY,

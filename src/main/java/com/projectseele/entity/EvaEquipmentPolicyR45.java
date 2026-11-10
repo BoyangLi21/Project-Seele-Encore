@@ -21,16 +21,6 @@ public final class EvaEquipmentPolicyR45
         return allowed(weapon, unit, experimental) ? weapon : 1;
     }
 
-    public static FieldInput contextualC(boolean experimental, boolean mechanical,
-            boolean launchSequence, boolean legacyRequest, boolean fieldControllable,
-            boolean anotherAction, boolean hasDirection, boolean sprinting)
-    {
-        if (experimental || mechanical || launchSequence || legacyRequest)
-            return FieldInput.CANCEL_LAUNCH;
-        if (!fieldControllable || anotherAction) return FieldInput.NONE;
-        if (sprinting) return FieldInput.ROLL;
-        return hasDirection ? FieldInput.EVADE : FieldInput.NONE;
-    }
 
     private EvaEquipmentPolicyR45() {}
 }

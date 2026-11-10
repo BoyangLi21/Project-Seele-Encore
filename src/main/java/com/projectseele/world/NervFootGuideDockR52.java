@@ -232,7 +232,6 @@ public final class NervFootGuideDockR52 {
 
     private static double ease(double t){t=Math.max(0,Math.min(1,t));return t*t*t*(10+t*(-15+6*t));}
 
-    private static RigidTransform railFrame(Spec s,double end,Vec3 up){var r=s.directory().sample(s.leg(),end,s.binding()).evaRoot();var b=s.binding();var axis=r.transformVector(b.rightFoot().subtract(b.leftFoot())).normalize();var normal=axis.subtract(up.scale(axis.dot(up))).normalize();return NervFootGuideRigR52.bearingFrame(r.transformPoint(b.contactCentre()),normal,up);}
 
     private static List<Piece> buildPieces(Spec s,Sample p)throws IOException {return buildPieces(view(s),stationPose(s,p));}
 
@@ -244,9 +243,7 @@ public final class NervFootGuideDockR52 {
 
     private static Vec3 postAt(ViewSpec s,double turn,int side,double exterior){if(upperDock(s)&&s.legId().contains("/turn_out")&&side==1)exterior-=2.0;var centre=axisFrame(s,0).translation();var anchor=axisFrame(s,turn).transformPoint(new Vec3(side*15.10,0,0));var axis=baseAxis(s);return anchor.add(axis.scale(side*exterior-anchor.subtract(centre).dot(axis))).add(axis.cross(new Vec3(0,1,0)).scale(upperDock(s)?(s.legId().contains("/turn_in")?side*.4+6:side*.4+(side==1?-3:6)):side*.4));}
 
-    private static RigidTransform railFrame(ViewSpec s,double end,Vec3 up){var r=root(s,end);var axis=r.transformVector(s.binding().rightFoot().subtract(s.binding().leftFoot())).normalize();var normal=axis.subtract(up.scale(axis.dot(up))).normalize();return NervFootGuideRigR52.bearingFrame(r.transformPoint(s.binding().contactCentre()),normal,up);}
 
-    private static RigidTransform rotateAbout(RigidTransform frame,RigidTransform pivot,Quaternionf rotation){var local=frame.translation().subtract(pivot.translation());var point=pivot.translation().add(new Vec3(rotation.transform(local.toVector3f())));return RigidTransform.of(point,new Quaternionf(rotation).mul(frame.rotation()).normalize());}
 
     private static boolean upperDock(ViewSpec s){return s.legId().contains("/exit3/");}
 
@@ -308,7 +305,6 @@ public final class NervFootGuideDockR52 {
 
     private static synchronized double bridgeOutsideStroke(ViewSpec s,boolean in,int side)throws IOException{String key="outside/"+in+"/"+side;var known=bridgeStrokes.computeIfAbsent(s,q->new HashMap<>());if(known.containsKey(key))return known.get(key);var origin=axisFrame(s,0).translation();var axis=baseAxis(s).scale(side);double minimum=Double.POSITIVE_INFINITY;for(int k=0;k<=32;k++)for(var p:bridgePieces("outside_measure",side,bridgeBaseFrame(s,in,side,.15+.45*k/32D),ease((.15+.45*k/32D-(upperDock(s)?.35:.30))/.15))){var xyz=p.mesh().triangles();for(int n=0;n<xyz.length;n+=3)minimum=Math.min(minimum,p.frame().transformPoint(new Vec3(xyz[n],xyz[n+1],xyz[n+2])).subtract(origin).dot(axis));}double stroke=Math.max(0,(!upperDock(s)&&s.legId().contains("/turn_in")&&!in?18.04:16.10)-minimum);known.put(key,stroke);return stroke;}
 
-    private static synchronized double bridgeGateInboardStroke(ViewSpec s,boolean in,int side)throws IOException{String key="gate/"+in+"/"+side;var known=bridgeStrokes.computeIfAbsent(s,q->new HashMap<>());if(known.containsKey(key))return known.get(key);var centre=axisFrame(s,0).translation();var axis=baseAxis(s).scale(side);double maximum=Double.NEGATIVE_INFINITY;var parked=bridgeOpen(s,in,side,1);for(var piece:bridgePieces("gate_measure",side,parked,1)){var xyz=piece.mesh().triangles();for(int n=0;n<xyz.length;n+=3)maximum=Math.max(maximum,piece.frame().transformPoint(new Vec3(xyz[n],xyz[n+1],xyz[n+2])).subtract(centre).dot(axis));}double stroke=Math.max(0,maximum-15.40);known.put(key,stroke);return stroke;}
 
     /** A finite driven branch shares the actual middle steel column. Its
 

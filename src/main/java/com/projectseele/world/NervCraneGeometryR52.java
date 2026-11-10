@@ -50,7 +50,6 @@ public final class NervCraneGeometryR52
     public String sourceFingerprint(){return source;}public Vec3 mount(){return anchors.get("mount");}
     public static synchronized NervCraneGeometryR52 loadClasspath()throws IOException
     {if(classpathSourceR52!=null)return classpathSourceR52;var loaded=load(path->{if(path.equals("eva/actual_crane_procedural_triangles_r52.json"))try(var stream=new java.util.zip.GZIPInputStream(new ByteArrayInputStream(EvaOriginalMeshGeometryR52.classpathBytes("eva/stable_crane_triangles_r53.json.gz")))){return stream.readAllBytes();}return EvaOriginalMeshGeometryR52.classpathBytes(path);});classpathSourceR52=loaded;return loaded;}
-    public static boolean classpathReadyR52(){return classpathSourceR52!=null;}
     public static synchronized NervCraneGeometryR52 loadRefittedClasspath()throws IOException
     {
         if(classpathRefitR53!=null)return classpathRefitR53;

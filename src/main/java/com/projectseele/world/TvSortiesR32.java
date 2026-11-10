@@ -42,22 +42,6 @@ public final class TvSortiesR32
     }
     public static EvaUnit01Entity assignedUnit(ServerLevel l,TvCampaignSavedData data,int unit)
     {var sortie=data.sorties.get(unit);return sortie==null?null:assignedUnit(l,sortie);}
-    /** Unloaded originals are retained and investigated, never counted as destroyed. */
-    public static boolean allOriginalsUnavailable(ServerLevel l,TvCampaignSavedData data)
-    {
-        if(data.sorties.isEmpty())return false;
-        for(var sortie:data.sorties.values())
-        {
-            var eva=assignedUnit(l,sortie);
-            if(eva==null)
-            {
-                if(sortie.unit<3)EvaLogisticsDirector.loadControlTarget(l,sortie.unit);
-                return false;
-            }
-            if(readyAssigned(l,sortie))return false;
-        }
-        return true;
-    }
     public static int reinforce(ServerPlayer caller,int unit,boolean npc,boolean rifle)
     {
         var l=TvCampaignDirector.level(caller);

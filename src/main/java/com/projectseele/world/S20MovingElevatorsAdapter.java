@@ -1969,30 +1969,6 @@ public final class S20MovingElevatorsAdapter
                 : fixedExit.getClockWise();
     }
 
-    private static boolean unrestrictedLandingPanel(
-            S20PhysicalElevatorDirector.LiftSpec spec, BlockPos clicked)
-    {
-        for (S20PhysicalElevatorDirector.Landing landing : spec.stops())
-        {
-            if (restrictedLanding(spec, landing))
-            {
-                continue;
-            }
-            BlockPos wall = S20PhysicalElevatorDirector
-                    .movingElevatorLandingPanelPosition(landing);
-            BlockPos old = S20PhysicalElevatorDirector
-                    .exteriorCallPosition(landing);
-            for (int dy = 0; dy <= 2; dy++)
-            {
-                if (clicked.equals(wall.above(dy))
-                        || clicked.equals(old.above(dy)))
-                {
-                    return true;
-                }
-            }
-        }
-        return false;
-    }
 
     private static void bindRemote(
             ServerLevel level, BlockPos position, Direction facing,

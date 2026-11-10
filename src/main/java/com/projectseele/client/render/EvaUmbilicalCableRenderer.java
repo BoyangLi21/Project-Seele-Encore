@@ -9,7 +9,6 @@ import net.minecraft.client.multiplayer.ClientLevel;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.client.renderer.RenderType;
 import net.minecraft.core.BlockPos;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.client.event.RenderLevelStageEvent;
@@ -23,7 +22,6 @@ import org.joml.Vector3f;
         bus = Mod.EventBusSubscriber.Bus.FORGE)
 public final class EvaUmbilicalCableRenderer
 {
-    private static final double RENDER_RANGE = 160.0D;
 
     private EvaUmbilicalCableRenderer() {}
 

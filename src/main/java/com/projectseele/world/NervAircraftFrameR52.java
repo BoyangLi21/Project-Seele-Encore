@@ -113,8 +113,6 @@ public final class NervAircraftFrameR52
     {long now=com.projectseele.entity.MechanicalVisualClockR54.presentationTime(p.level().getGameTime(),partial);return clientFrame(p,now).rotor(now);}
     public static List<NervAirframeGeometryR52.Part> renderCradleParts(UNTransportEntity p,float partial)
     {long now=com.projectseele.entity.MechanicalVisualClockR54.presentationTime(p.level().getGameTime(),partial);var visual=clientFrame(p,now);return renderGeometry(p).cradleParts(visual.sample(now),visual.anchors(now),visual.axes(now),false);}
-    public static List<NervAirframeGeometryR52.Part> renderParts(UNTransportEntity p,float partial)
-    {long now=com.projectseele.entity.MechanicalVisualClockR54.presentationTime(p.level().getGameTime(),partial);var visual=clientFrame(p,now);return renderGeometry(p).parts(visual.sample(now),visual.anchors(now),visual.axes(now),visual.rotor(now));}
     public static double rotorClock(UNTransportEntity p){return p.getEntityData().get(DATA).getDouble("RotorCurrent");}
     public static long sampledAt(UNTransportEntity p){return p.getEntityData().get(DATA).getLong("At");}
     public static List<Vec3> jawAxes(UNTransportEntity p){var list=new ArrayList<Vec3>();for(var a:p.getEntityData().get(DATA).getList("JawAxes",Tag.TAG_COMPOUND))list.add(readPoint((CompoundTag)a));return List.copyOf(list);}

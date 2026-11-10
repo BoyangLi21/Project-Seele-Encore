@@ -39,12 +39,7 @@ public final class TvWorldPreviewPreparation
 
     private TvWorldPreviewPreparation() {}
 
-    public static boolean isFinished() { return finished; }
 
-    public static void completeExternalStage(net.minecraft.server.MinecraftServer server)
-    {
-        finish(server);
-    }
 
     private static void finish(net.minecraft.server.MinecraftServer server)
     {

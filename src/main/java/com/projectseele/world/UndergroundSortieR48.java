@@ -7,7 +7,6 @@ import com.projectseele.entity.EvaGroundReceiverR50;
 import com.projectseele.entity.EvaBodyPose;
 import com.projectseele.entity.NervHangarDoorEntity;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.nbt.CompoundTag;
 import net.minecraft.nbt.ListTag;
 import net.minecraft.nbt.Tag;
@@ -480,8 +479,6 @@ public final class UndergroundSortieR48
     }
     public static boolean recoveringR48(ServerLevel level,int v,EvaUnit01Entity unit)
     {return enabled(level)&&v>=0&&v<3&&bound(level,v,unit,row(level,v))&&Set.of("RECEIVING","RECOVER_OPENING","RETURNING").contains(row(level,v).mode);}
-    public static boolean atDeployedPadR48(ServerLevel level,int v,EvaUnit01Entity unit)
-    {return deployedBindingR48(level,v,unit)&&row(level,v).mode.equals("DEPLOYED")&&padSupported(level,v,unit);}
     /** Select the recorded underground route before testing its readiness.
      * Pilot/ejection proof and complete feet are admission interlocks, not a
      * reason to dispatch an aircraft to the same deep underground airframe. */

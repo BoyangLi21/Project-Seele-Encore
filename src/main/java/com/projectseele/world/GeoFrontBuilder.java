@@ -450,10 +450,6 @@ public final class GeoFrontBuilder
         return origin.offset(0, CAVERN_CENTRE_Y, CAVERN_CENTRE_Z);
     }
 
-    public static boolean skyweaveAvailable()
-    {
-        return true;
-    }
 
     private static BlockState skyweaveState()
     {
@@ -1360,10 +1356,6 @@ public final class GeoFrontBuilder
             }
         }
     }
-    private static void removeArtificialSun(ServerLevel level, BlockPos origin)
-    {
-        clearLegacyArtificialSun(level, origin);
-    }
 
     private static void buildForestRing(ServerLevel level, BlockPos origin)
     {
@@ -1678,23 +1670,7 @@ public final class GeoFrontBuilder
             }
         }
     }
-    private static boolean isCavernStone(BlockState state)
-    {
-        return state.is(Blocks.DEEPSLATE) || state.is(Blocks.CALCITE)
-                || state.is(Blocks.POLISHED_BASALT);
-    }
 
-    private static void squarePerimeter(ServerLevel level, BlockPos centre,
-                                        int y, int half, BlockState state)
-    {
-        for (int i = -half; i <= half; i++)
-        {
-            set(level, centre.offset(-half, y, i), state);
-            set(level, centre.offset(half, y, i), state);
-            set(level, centre.offset(i, y, -half), state);
-            set(level, centre.offset(i, y, half), state);
-        }
-    }
 
     private static void fillSquare(ServerLevel level, BlockPos centre, int y,
                                    int half, BlockState state)

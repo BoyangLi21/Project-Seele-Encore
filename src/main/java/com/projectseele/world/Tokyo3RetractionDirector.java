@@ -8,7 +8,6 @@ import java.util.concurrent.ConcurrentHashMap;
 
 import com.projectseele.ProjectSeele;
 import com.projectseele.config.SeeleConfig;
-import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.registry.ModBlocks;
 import com.projectseele.world.Tokyo3RetractionSavedData.StoredDistrict;
 import net.minecraft.core.BlockPos;
@@ -39,13 +38,6 @@ public final class Tokyo3RetractionDirector
      * bounded imported-tower cursor keeps individual server ticks small.
      */
     public static final int TICKS_PER_LAYER = 5;
-    /**
-     * Towers of one layer are stepped across this many ticks. The client
-     * retraction audit needs a settled skyline for twelve consecutive ticks
-     * inside every layer period, so this has to stay a small fraction of
-     * {@link #TICKS_PER_LAYER}.
-     */
-    private static final int LAYER_SPREAD_TICKS = 2;
     /**
      * Long-lived, non-persistent load ticket. The order is given from the
      * GeoFront command centre some five hundred blocks below the skyline,

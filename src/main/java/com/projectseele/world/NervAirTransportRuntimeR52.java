@@ -50,7 +50,6 @@ public final class NervAirTransportRuntimeR52
         if(!compatibleGroundInstall(level,directory))return false;var saved=level.getDataStorage().get(NervAirTransportStateR52::load,NervAirTransportStateR52.NAME);if(saved==null)return true;
         for(var j:saved.jobs())if(j.active()&&!pool.quarantineFlight(new FlightLease(j.task(),j.original(),directory.fingerprint(),j.spaces(),j.aircraft(),j.kind(),j.payloadTransferred(),j.mechanisms())))return false;return true;
     }
-    public static boolean loadAndInstall(ServerLevel l,Path explicitRootFile)throws java.io.IOException{return install(l,JsonParser.parseString(Files.readString(explicitRootFile)).getAsJsonObject());}
     public static boolean install(ServerLevel l,JsonObject root)throws java.io.IOException
     {
         if(LIVE.containsKey(l)&&state(l).jobs().stream().anyMatch(Job::active))return false;

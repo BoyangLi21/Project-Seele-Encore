@@ -3,7 +3,6 @@ package com.projectseele.world;
 import net.minecraft.core.BlockPos;
 import net.minecraft.world.level.ChunkPos;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.LeavesBlock;
 import net.minecraft.world.level.block.state.BlockState;
 import net.minecraft.world.level.chunk.ChunkAccess;
 import net.minecraft.world.level.levelgen.Heightmap;
@@ -15,7 +14,6 @@ public final class TvWorldPreviewTerrain
     public static final int CENTRE_X = 30, CENTRE_Z = 296;
     public static final int RADIUS = 1800, FLAT_RADIUS = 600;
     public static final int ROOF_Y = 24, FLOOR_Y = -478, LAKE_Y = -473;
-    public static final int CITY_WALK_Y = 80;
 
     private TvWorldPreviewTerrain() {}
 
@@ -164,41 +162,6 @@ public final class TvWorldPreviewTerrain
         return Math.floorMod(y-FLOOR_Y,32)==0?Blocks.BLACK_CONCRETE.defaultBlockState():roofArmor(x,z);
     }
 
-    private static void plantForest(ChunkAccess chunk)
-    {
-        int minX = chunk.getPos().getMinBlockX(), minZ = chunk.getPos().getMinBlockZ();
-        BlockPos.MutableBlockPos p = new BlockPos.MutableBlockPos();
-        // Jittered world cells with crowns clipped per chunk avoid grid seams.
-        for (int gz = Math.floorDiv(minZ - 5, 14); gz <= Math.floorDiv(minZ + 20, 14); gz++)
-        {
-            for (int gx = Math.floorDiv(minX - 5, 14); gx <= Math.floorDiv(minX + 20, 14); gx++)
-            {
-                long h = hash(gx, gz);
-                int x = gx * 14 + 2 + (int) Math.floorMod(h, 10);
-                int z = gz * 14 + 2 + (int) Math.floorMod(h >>> 12, 10);
-                if (rectangleDistance(x, z, -85, 75, 190, 425) < 35
-                        || lakeDistance(x, z) < 1.28 || roof(x, z) < ground(x, z) + 20) continue;
-                double density = Math.max(gaussian(x, z, -520, 810, 420),
-                        Math.max(gaussian(x, z, 370, 860, 350), gaussian(x, z, 730, 230, 420)));
-                if (Math.floorMod(h >>> 24, 1000) > density * 740) continue;
-                int base = ground(x, z), height = 7 + (int) Math.floorMod(h >>> 34, 5);
-                BlockState trunk = (Math.floorMod(h, 7) == 0 ? Blocks.BIRCH_LOG : Blocks.OAK_LOG).defaultBlockState();
-                BlockState leaves = Blocks.OAK_LEAVES.defaultBlockState().setValue(LeavesBlock.PERSISTENT, true);
-                for (int dy = 1; dy <= height + 2; dy++)
-                    for (int dz = -4; dz <= 4; dz++)
-                        for (int dx = -4; dx <= 4; dx++)
-                        {
-                            int px = x + dx, pz = z + dz;
-                            if (px < minX || px >= minX + 16 || pz < minZ || pz >= minZ + 16) continue;
-                            if (dx == 0 && dz == 0 && dy <= height)
-                                chunk.setBlockState(p.set(px, base + dy, pz), trunk, false);
-                            else if (dy >= height - 4 && (dx * dx + dz * dz) / 16.0
-                                    + Math.pow((dy - height + 1) / 3.4, 2) < 1)
-                                chunk.setBlockState(p.set(px, base + dy, pz), leaves, false);
-                        }
-            }
-        }
-    }
 
     private static double rectangleDistance(double x, double z, int x0, int z0, int x1, int z1)
     {

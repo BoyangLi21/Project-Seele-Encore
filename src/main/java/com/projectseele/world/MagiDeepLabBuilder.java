@@ -40,9 +40,6 @@ public final class MagiDeepLabBuilder
     public static final int LAB_FLOOR_Y = -27;
     public static final int LAB_CENTRE_X = -60;
     public static final int LAB_CENTRE_Z = 12;
-    public static final int CAMERA_X = -44;
-    public static final int CAMERA_Y = -21;
-    public static final int CAMERA_Z = 12;
 
     private static final int UPDATE_CLIENTS = Block.UPDATE_CLIENTS;
     private static final int ENTRY_FLOOR_Y = 7;
@@ -325,13 +322,6 @@ public final class MagiDeepLabBuilder
         return online;
     }
 
-    public static String consensusLine(ServerLevel level, BlockPos origin)
-    {
-        int online = onlineCount(level, origin);
-        return online == 3
-                ? "MAGI CONSENSUS: 3/3 UNANIMOUS"
-                : "MAGI DEGRADED: " + online + "/3 CORES ONLINE";
-    }
 
     private static void buildLaboratoryShell(ServerLevel level, BlockPos origin)
     {

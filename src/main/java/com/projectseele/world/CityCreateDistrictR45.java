@@ -77,78 +77,7 @@ public final class CityCreateDistrictR45
         return active != null && active.level == level && active.origin.equals(origin) && !active.loadingPlans;
     }
 
-    /** Reuses the production complete-plan validator; native QA never substitutes collision bodies. */
-    static void verifyNativeGroundContract2Plan(ServerLevel level, BlockPos origin, CompoundTag tag, int from, int to)
-    {
-        if (active == null || active.level != level || !active.origin.equals(origin) || from + to != 312
-                || (from != 0 && from != 312) || tag.getInt("GroundContract") != 2
-                || !tag.contains("GroundContract", Tag.TAG_INT) || !tag.contains("InitialWorldImageCount", Tag.TAG_INT)
-                || tag.getInt("Index") < 0 || tag.getInt("Index") >= active.towers.size()
-                || tag.getLong("Origin") != origin.asLong() || !active.world.equals(tag.getString("WorldUUID"))
-                || !active.state.journey.equals(tag.getUUID("Journey")))
-            throw new IllegalStateException("Native new-plan witness requires the actual complete GroundContract2 producer");
-        var expected = active.towers.get(tag.getInt("Index"));
-        Plan plan = Plan.load(tag);
-        plan.validate(expected, from, to, expected.owner(active.world, origin));
-        plan.validateOperationSequence();
-    }
 
-    /** Bounded opt-in QA snapshot; the controller, ownership and stock collider readiness stay authoritative. */
-    public static JsonObject nativeDiagnostics(ServerLevel level, BlockPos origin) throws Exception
-    {
-        if (active == null || active.level != level || !active.origin.equals(origin)) return null;
-        Context c = active; c.observePhaseTiming(); long now = System.nanoTime();
-        JsonObject report = new JsonObject(); report.addProperty("phase", c.state.phase);
-        report.addProperty("journey_uuid", c.state.journey.toString()); report.addProperty("world_touched", c.state.worldTouched);
-        report.addProperty("saved_plans", c.state.savedPlans); report.addProperty("created", c.state.created);
-        report.addProperty("index", c.state.index); report.addProperty("cursor", c.state.cursor);
-        report.addProperty("motion_tick", c.state.motionTick); report.addProperty("progress", c.state.progress);
-        if (c.endpointFinalizer != null)
-        {
-            report.addProperty("endpoint_owners", c.endpointFinalizer.size());
-            report.addProperty("endpoint_owners_verified", c.endpointFinalizer.verified());
-            report.addProperty("endpoint_owners_removed", c.endpointFinalizer.removed());
-        }
-        report.addProperty("loading_plans", c.loadingPlans); report.addProperty("occupied", c.occupied);
-        report.add("exact_union", CityExactShapeUnionR45.diagnostics());
-        report.addProperty("quality_hold", c.qualityHold); report.addProperty("current_phase_elapsed_ms", (now - c.phaseStartedNanos) / 1e6);
-        JsonObject phases = new JsonObject(); c.phaseTotalsNanos.forEach((phase, nanos) -> phases.addProperty(phase, nanos / 1e6));
-        report.add("completed_phase_ms", phases); report.addProperty("peak_controller_work_ms", c.peakWorkNanos / 1e6);
-        report.addProperty("peak_motion_ms", c.peakMotionNanos / 1e6); report.addProperty("wal_preflight_ms", c.walPreflightNanos / 1e6);
-        report.addProperty("wal_serialization_ms", c.walSerializationNanos / 1e6); report.addProperty("wal_io_ms", c.walIoNanos / 1e6);
-        report.addProperty("journal_load_ms", c.journalLoadNanos / 1e6); report.addProperty("ledger_io_ms", c.ledgerIoNanos / 1e6);
-        var runtime = Runtime.getRuntime(); report.addProperty("used_heap_bytes", runtime.totalMemory() - runtime.freeMemory());
-        report.addProperty("committed_heap_bytes", runtime.totalMemory()); report.addProperty("max_heap_bytes", runtime.maxMemory());
-        var pool = java.util.concurrent.ForkJoinPool.commonPool(); JsonObject threads = new JsonObject();
-        threads.addProperty("parallelism", pool.getParallelism()); threads.addProperty("pool_size", pool.getPoolSize());
-        threads.addProperty("active_threads", pool.getActiveThreadCount()); threads.addProperty("running_threads", pool.getRunningThreadCount());
-        threads.addProperty("queued_tasks", pool.getQueuedTaskCount()); threads.addProperty("queued_submissions", pool.getQueuedSubmissionCount());
-        threads.addProperty("steals", pool.getStealCount()); report.add("common_pool", threads);
-        com.google.gson.JsonArray collectors = new com.google.gson.JsonArray();
-        for (var gc : java.lang.management.ManagementFactory.getGarbageCollectorMXBeans())
-        {
-            JsonObject row = new JsonObject(); row.addProperty("name", gc.getName()); row.addProperty("collection_count", gc.getCollectionCount());
-            row.addProperty("collection_time_ms", gc.getCollectionTime()); collectors.add(row);
-        }
-        report.add("garbage_collectors", collectors); com.google.gson.JsonArray owners = new com.google.gson.JsonArray();
-        JsonObject reader = new JsonObject(); reader.addProperty("thread", c.journalReader.threadName());
-        reader.addProperty("queued", c.journalReader.queuedTasks()); reader.addProperty("active", c.journalReader.activeTasks());
-        reader.addProperty("pending", c.journalReader.pendingTasks()); reader.addProperty("closed", c.journalReader.isClosed());
-        reader.addProperty("load_cursor", c.loadCursor); report.add("journal_reader", reader);
-        report.addProperty("reconcile_fold_index", c.reconcileFoldIndex);
-        report.addProperty("reconcile_fold_pending", c.pendingFold != null && !c.pendingFold.isDone());
-        report.addProperty("reconcile_fold_retained_rows", c.currentReconcileFold == null ? 0 : c.currentReconcileFold.size());
-        for (var spec : c.towers)
-        {
-            UUID owner = spec.owner(c.world, c.origin);
-            Entity entity = level.getEntity(owner); JsonObject row;
-            if (entity == null) { row = new JsonObject(); row.addProperty("owner_uuid", owner.toString()); }
-            else row = CityCreateBridgeR45.collisionDiagnostics(entity);
-            row.addProperty("actual_loaded", entity != null); row.addProperty("index", spec.index()); owners.add(row);
-        }
-        report.add("actual_owner_colliders", owners); report.addProperty("read_only_diagnostics", true);
-        report.addProperty("original_colliders_not_replaced", true); return report;
-    }
 
     /** Legacy register/generator/maintenance hooks must gate on topology owns, not this JVM flag. */
     public static boolean owns(ServerLevel level, BlockPos origin)
@@ -156,13 +85,6 @@ public final class CityCreateDistrictR45
         return CityRigidTopologyR45.owns(level, origin);
     }
 
-    /** Root-only native checkpoint; keeps the original owners and active transaction. */
-    public static boolean holdNativeCheckpoint(ServerLevel level, BlockPos origin)
-    {
-        if (active == null || active.level != level || !active.origin.equals(origin) || !active.state.phase.equals("MOVE")) return false;
-        try { active.qualityHold = true; active.stopEntities(); active.persist(); return true; }
-        catch (Exception failure) { fault(failure); return false; }
-    }
 
     public static Tokyo3RetractionDirector.RequestResult request(ServerLevel level, BlockPos origin, boolean retract)
     {

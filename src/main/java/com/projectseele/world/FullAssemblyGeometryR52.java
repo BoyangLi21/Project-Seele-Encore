@@ -31,9 +31,6 @@ public final class FullAssemblyGeometryR52
     private record CheckedClasspath(Map<String,String> expected,Provider provider){}
     private static volatile CheckedClasspath checkedClasspath;
     @FunctionalInterface private interface StreamSource{InputStream open(String path)throws IOException;}
-    /** Nonblocking status for the pure-resource warmup worker. No World or
-     * entity access, and no monitor acquisition on the server tick. */
-    public static boolean classpathReadyR52(){return checkedClasspath!=null;}
     public static void installClasspath()throws IOException
     {
         var root=JsonParser.parseString(new String(EvaOriginalMeshGeometryR52.classpathBytes("eva/full_assembly_geometry_r52_sources.json"),StandardCharsets.UTF_8)).getAsJsonObject();require(root.get("schema").getAsString().equals("projectseele.r52.full-assembly-geometry-sources.v1"),"Explicit actual assembly source receipt required");var hashes=new HashMap<String,String>();root.getAsJsonObject("resources").entrySet().forEach(e->hashes.put(e.getKey(),e.getValue().getAsString()));installClasspath(hashes);

@@ -103,10 +103,6 @@ public final class LilithRenderer extends GeoEntityRenderer<LilithEntity>
         return FALLBACK_TEXTURE;
     }
 
-    public static boolean hasLocalModel()
-    {
-        return LocalTriangleMeshLayer.hasPart(PRIMARY_MESH, "root");
-    }
 
     private static ResourceLocation meshResource(String layer)
     {

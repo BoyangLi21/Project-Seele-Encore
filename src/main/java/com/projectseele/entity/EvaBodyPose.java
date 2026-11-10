@@ -352,30 +352,6 @@ public final class EvaBodyPose
     {if(data==null)reload();return data.carrierHulls().getOrDefault(rigKey(eva),List.of());}
     public static Sample neutralForTransportR32(EvaUnit01Entity eva)
     {if(data==null)reload();return new Sample(data.rigs().get(rigKey(eva)));}
-    /** Original posed sole bearings in model metre space, before world yaw.
-     * Both belong to the same supplied pose; missing geometry is a hard hold. */
-    public static List<Vec3> pairedFootContactsR52(EvaUnit01Entity eva,Sample pose)
-    {
-        if(data==null)reload();var support=data.rigSupport().getOrDefault(rigKey(eva),data.support());
-        var result=new ArrayList<Vec3>();
-        for(String name:List.of("foot_l","foot_r"))
-        {
-            var vertices=support.get(name);
-            if(vertices==null||vertices.length==0||!pose.rig.containsKey(name))
-                throw new IllegalStateException("Original paired foot geometry unavailable: "+name);
-            var matrix=pose.matrix(name);var points=new ArrayList<Vector3f>();float low=Float.POSITIVE_INFINITY;
-            for(var vertex:vertices)
-            {
-                var point=matrix.transformPosition(new Vector3f(vertex)).mul(EvaScale.RENDER_SCALE);
-                if(!Float.isFinite(point.x+point.y+point.z))throw new IllegalStateException("Nonfinite original foot geometry");
-                points.add(point);low=Math.min(low,point.y);
-            }
-            var centre=new Vector3f();int count=0;
-            for(var point:points)if(point.y<=low+.02F){centre.add(point);count++;}
-            centre.div(count);centre.y=low;result.add(new Vec3(centre.x,centre.y,centre.z));
-        }
-        return List.copyOf(result);
-    }
     public static List<net.minecraft.world.phys.Vec3> carrierVerticesR40(EvaUnit01Entity eva,Sample pose)
     {
         if(data==null)reload();var result=new ArrayList<net.minecraft.world.phys.Vec3>();

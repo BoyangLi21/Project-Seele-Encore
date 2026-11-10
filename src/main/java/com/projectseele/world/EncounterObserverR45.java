@@ -200,18 +200,6 @@ public final class EncounterObserverR45
         TvEncounterRulesR45.remoteTargetObserved(player, actual.getUUID(), data.generationR43, true);
     }
 
-    public static boolean actualFrameSeen(ServerPlayer player, UUID target, long generation)
-    {
-        if (player == null || target == null || generation < 1) return false;
-        var data = TvCampaignSavedData.get(player.serverLevel());
-        var session = SESSIONS.getOrDefault(player.serverLevel(), Map.of()).get(player.getUUID());
-        return live(data) && participant(player.serverLevel(), data, player)
-                && session != null && session.capable && session.drawn && session.generation == generation
-                && generation == data.generationR43 && target.equals(data.angel) && target.equals(session.target)
-                && player.serverLevel().getGameTime() >= session.lastReceipt
-                && player.serverLevel().getGameTime() - session.lastReceipt
-                    <= ClientboundEncounterObserverPacket.STALE_TICKS;
-    }
 
     public static void clear(ServerLevel level)
     {

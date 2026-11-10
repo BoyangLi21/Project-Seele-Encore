@@ -102,37 +102,6 @@ public final class CityCreateBridgeR45
         return ((java.util.Optional<?>) contraption.getClass().getMethod("getSimplifiedEntityColliders").invoke(contraption)).isPresent();
     }
 
-    /** QA observation only: never starts, cancels, joins pending work or supplies surrogate colliders. */
-    public static JsonObject collisionDiagnostics(Entity entity) throws Exception
-    {
-        Object contraption = entity.getClass().getMethod("getContraption").invoke(entity);
-        Class<?> base = Class.forName("com.simibubi.create.content.contraptions.Contraption");
-        var field = base.getDeclaredField("simplifiedEntityColliderProvider");
-        field.setAccessible(true);
-        var future = (java.util.concurrent.CompletableFuture<?>) field.get(contraption);
-        JsonObject row = new JsonObject(); row.addProperty("owner_uuid", entity.getUUID().toString());
-        row.addProperty("alive", entity.isAlive()); row.addProperty("future_created", future != null);
-        row.addProperty("colliders_present", ((java.util.Optional<?>) contraption.getClass()
-                .getMethod("getSimplifiedEntityColliders").invoke(contraption)).isPresent());
-        if (future != null)
-        {
-            boolean done = future.isDone(), exceptional = done && future.isCompletedExceptionally(), cancelled = done && future.isCancelled();
-            row.addProperty("future_done", done); row.addProperty("future_pending", !done);
-            row.addProperty("future_exceptional", exceptional); row.addProperty("future_cancelled", cancelled);
-            row.addProperty("colliders_present_after_future_sample", ((java.util.Optional<?>) contraption.getClass()
-                    .getMethod("getSimplifiedEntityColliders").invoke(contraption)).isPresent());
-            if (done && exceptional)
-            {
-                try { future.join(); }
-                catch (java.util.concurrent.CompletionException | java.util.concurrent.CancellationException failure)
-                {
-                    java.io.StringWriter text = new java.io.StringWriter();
-                    failure.printStackTrace(new java.io.PrintWriter(text)); row.addProperty("completed_failure_stack", text.toString());
-                }
-            }
-        }
-        return row;
-    }
 
     public static void move(Entity entity, Vec3 target) throws Exception
     {

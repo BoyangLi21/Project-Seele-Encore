@@ -29,7 +29,6 @@ import com.projectseele.world.RigidTransform;
 import com.projectseele.world.UmbilicalPylonBlockEntity;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.Registries;
-import net.minecraft.core.particles.DustParticleOptions;
 import net.minecraft.core.particles.BlockParticleOption;
 import net.minecraft.core.particles.ParticleTypes;
 import net.minecraft.nbt.CompoundTag;
@@ -299,35 +298,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             EvaScale.fromLegacy(8.25D);
     private static final double ENTRY_PLUG_AIM_RADIUS =
             EvaScale.fromLegacy(2.0D);
-    // Final entry-plug pivots in the reviewed 2.5x Tiger meshes. Keeping the
-    // three sockets explicit makes interaction follow each airframe instead
-    // of guessing from the entity AABB or a legacy cube body's chest.
-    private static final double ENTRY_PLUG_HEIGHT_00 = 26.9164D;
-    private static final double ENTRY_PLUG_HEIGHT_01 = 26.9170D;
-    private static final double ENTRY_PLUG_HEIGHT_02 = 26.9178D;
-    public static final double ENTRY_PLUG_REAR_OFFSET = 1.25D;
     private static final int LAUNCH_PASSENGER_RESTORE_GRACE_TICKS = 40;
     private static final int NO_LAUNCH_CARRIER = Integer.MIN_VALUE;
     /** Mechanical elevation envelope of the shared cannon/body aim rig. */
     public static final float MIN_CANNON_AIM_PITCH = -55.0F;
     public static final float MAX_CANNON_AIM_PITCH = 55.0F;
-    // Muzzle sockets measured from the reviewed 2.5x Tiger rig and the
-    // locally installed TV Pallet Rifle. The ray still starts at the pilot's
-    // eye for fair aiming; tracers and sound start at the visible muzzle.
-    // Re-measured from the current 5x Tiger rig and the installed 292-triangle
-    // Pallet Rifle far cap. Preview coordinates are divided by 16 and then
-    // multiplied by EvaScale.RENDER_SCALE; the previous legacy constants put
-    // the tracer roughly six blocks beyond and three blocks above the barrel.
-    private static final double RIFLE_STANDING_PIVOT_HEIGHT = 46.7184D;
-    private static final double RIFLE_STANDING_PIVOT_FORWARD = 0.0D;
-    private static final double RIFLE_STANDING_MUZZLE_FORWARD = 30.8104D;
-    private static final double RIFLE_STANDING_MUZZLE_UP = 0.0D;
-    private static final double RIFLE_STANDING_MUZZLE_RIGHT = 3.2323D;
-    private static final double RIFLE_PRONE_PIVOT_HEIGHT = 9.4404D;
-    private static final double RIFLE_PRONE_PIVOT_FORWARD = 0.0D;
-    private static final double RIFLE_PRONE_MUZZLE_FORWARD = 49.5601D;
-    private static final double RIFLE_PRONE_MUZZLE_UP = 0.0D;
-    private static final double RIFLE_PRONE_MUZZLE_RIGHT = 5.5370D;
     // Far-cap coordinates measured from the installed Kantrophe positron
     // cannon after the final two-hand pose. The old 12.5-block approximation
     // began the beam inside the receiver, visibly behind the barrel.
@@ -5179,19 +5154,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaMovementSounds.swing(this,3);
     }
 
-    private void emitBerserkEyes(ServerLevel server)
-    {
-        Vec3 forward = this.getForward().multiply(1.0D, 0.0D, 1.0D).normalize();
-        Vec3 right = new Vec3(forward.z, 0.0D, -forward.x);
-        Vec3 eye = this.position().add(0.0D, this.getBbHeight() * 0.88D, 0.0D)
-                .add(forward.scale(2.2D));
-        for (double side : new double[] {-0.42D, 0.42D})
-        {
-            Vec3 point = eye.add(right.scale(side));
-            server.sendParticles(DustParticleOptions.REDSTONE,
-                    point.x, point.y, point.z, 2, 0.05D, 0.05D, 0.05D, 0.0D);
-        }
-    }
 
     private void finishBerserk()
     {
@@ -6831,40 +6793,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return true;
     }
 
-    /** Circular carrier-clearance audit between the two station markers. */
-    private static boolean isContinuousSortieShaftClear(ServerLevel level,
-                                                         BlockPos lowerBed,
-                                                         BlockPos upperBed)
-    {
-        if (lowerBed.getX() != upperBed.getX()
-                || lowerBed.getZ() != upperBed.getZ()
-                || upperBed.getY() <= lowerBed.getY())
-        {
-            return false;
-        }
-        for (int y = lowerBed.getY() + 1; y < upperBed.getY(); y++)
-        {
-            for (int x = -LAUNCH_CARRIER_HALF;
-                 x <= LAUNCH_CARRIER_HALF; x++)
-            {
-                for (int z = -LAUNCH_CARRIER_HALF;
-                     z <= LAUNCH_CARRIER_HALF; z++)
-                {
-                    if (!withinLaunchShaftClearance(x, z))
-                    {
-                        continue;
-                    }
-                    BlockPos position = new BlockPos(lowerBed.getX() + x, y,
-                            lowerBed.getZ() + z);
-                    if (!isSortieClearance(level, position))
-                    {
-                        return false;
-                    }
-                }
-            }
-        }
-        return true;
-    }
 
     private static boolean isContinuousSortieRouteClear(ServerLevel level,
                                                          BlockPos lowerBed,
@@ -7548,13 +7476,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
 
 
-    private void setPilotMovementState(boolean crouching, boolean sprinting)
-    {
-        this.entityData.set(DATA_CROUCHING, crouching);
-        this.entityData.set(DATA_SPRINTING, sprinting);
-        this.entityData.set(DATA_PRONE, false);
-        this.updatePoseDimensions();
-    }
 
     /** Stop input-driven motion without making a prone Unit pop upright. */
     private void clearPilotMotion()
@@ -8418,14 +8339,6 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return Mth.clamp(speed, 0.45D, 1.35D);
     }
 
-    private RawAnimation groundedLocomotionAnimation()
-    {
-        if (this.isVisualRunRequested())
-        {
-            return ANIM_RUN;
-        }
-        return ANIM_WALK;
-    }
 
     private PlayState continueBaseAnimation(
             AnimationState<EvaUnit01Entity> state, RawAnimation animation,

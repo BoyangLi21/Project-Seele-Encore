@@ -3,7 +3,6 @@ package com.projectseele.world;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Locale;
-import java.util.Optional;
 
 import com.projectseele.ProjectSeele;
 import com.projectseele.registry.ModBlocks;
@@ -59,57 +58,6 @@ public final class IntegratedNervMapBuilder
 
     private IntegratedNervMapBuilder() {}
 
-    /**
-     * Restores only the retained three-line EVA plant.  Unlike {@link #ensure}
-     * this method never invokes old GeoFront, Tokyo-3, command-room, Dogma or
-     * topology repair passes.
-     */
-    public static boolean restoreLegacyMechanicalOnly(ServerLevel level)
-    {
-        if (NervLegacyGenerationGuardR52.retired(level)) return false;
-        FacilityWorldPolicy.requireLegacyGenerationAllowed(
-                level.getServer(), "restoreLegacyMechanicalOnly");
-        if (level.getBlockState(RESCUE_MECHANICAL_MARKER_A)
-                .is(Blocks.BARRIER)
-                && level.getBlockState(RESCUE_MECHANICAL_MARKER_B)
-                .is(Blocks.STRUCTURE_VOID)
-                && rescueMechanicalReady(level))
-        {
-            return false;
-        }
-
-        /*
-         * A marker is only a receipt, not the plant itself.  Earlier rescue
-         * builds returned here even after scenery reconciliation had removed
-         * a cage control or a lift bed, permanently leaving a "complete"
-         * marker in front of a broken sortie line.  The cheap mechanical audit
-         * above now has to pass before the receipt can suppress reconstruction.
-         */
-        EvaHangarBuilder.buildMechanicalOnly(level, GEOFRONT_ORIGIN);
-        for (LiftLink link : LIFT_LINKS)
-        {
-            if (!lowerLiftInterfaceValid(level, link))
-            {
-                rebuildLowerLiftInterface(level, link);
-            }
-            if (!shaftIsContinuous(level, link)
-                    || !surfaceExitIsClear(level, link))
-            {
-                buildContinuousShaft(level, link);
-                buildSurfaceHead(level, link);
-            }
-        }
-        ensurePowerPylons(level);
-        buildControlMarkers(level);
-        set(level, RESCUE_MECHANICAL_MARKER_A,
-                Blocks.BARRIER.defaultBlockState());
-        set(level, RESCUE_MECHANICAL_MARKER_B,
-                Blocks.STRUCTURE_VOID.defaultBlockState());
-        ProjectSeele.LOGGER.info(
-                "NERV rescue restored legacy mechanical-only authority: "
-                        + "three wet cages, carriers and launch shafts");
-        return true;
-    }
 
     /**
      * Cheap read-only gameplay gate for the retained three-line plant.
@@ -527,35 +475,9 @@ public final class IntegratedNervMapBuilder
         return links.get(index);
     }
 
-    /** Unit variants 00/01/02 use lift indices 0/1/2 respectively. */
-    public static LiftLink liftForUnitVariant(int unitVariant)
-    {
-        return lift(unitVariant);
-    }
 
-    /** Resolves a real station only while its lodestone marker is present. */
-    public static Optional<LiftLink> readLiftMarker(ServerLevel level, BlockPos marker)
-    {
-        if (!level.getBlockState(marker).is(Blocks.LODESTONE))
-        {
-            return Optional.empty();
-        }
-        return liftLinks(level).stream().filter(link -> link.lowerBed().equals(marker)
-                || link.surfaceBed().equals(marker)).findFirst();
-    }
 
-    public static Optional<LiftLink> findLift(BlockPos stationBed)
-    {
-        return LIFT_LINKS.stream()
-                .filter(link -> link.lowerBed().equals(stationBed)
-                        || link.surfaceBed().equals(stationBed))
-                .findFirst();
-    }
 
-    public static boolean isLowerStation(BlockPos stationBed)
-    {
-        return LIFT_LINKS.stream().anyMatch(link -> link.lowerBed().equals(stationBed));
-    }
 
     public static boolean isSurfaceStation(BlockPos stationBed)
     {
@@ -622,30 +544,6 @@ public final class IntegratedNervMapBuilder
         return TOKYO3_ORIGIN.offset(0, -2, 16);
     }
 
-    /** Hard exclusion used by every Tokyo-3 terrain and building write path. */
-    public static boolean isCityMovementProtected(BlockPos position)
-    {
-        for (LiftLink link : LIFT_LINKS)
-        {
-            if (position.getY() >= link.lowerBed().getY()
-                    && position.getY() <= link.surfaceBed().getY() + SURFACE_HEADROOM
-                    && Math.abs(position.getX() - link.x()) <= SHAFT_OUTER_RADIUS
-                    && Math.abs(position.getZ() - link.z()) <= SHAFT_OUTER_RADIUS)
-            {
-                return true;
-            }
-        }
-        for (BlockPos marker : new BlockPos[] {lowerControlMarker(),
-                legacyLowerControlMarker(), surfaceControlMarker()})
-        {
-            if (position.equals(marker) || position.equals(marker.east())
-                    || position.equals(marker.west()))
-            {
-                return true;
-            }
-        }
-        return false;
-    }
     private static List<LiftLink> createLiftLinks(BlockPos surfaceOrigin,
                                                    BlockPos geoFrontOrigin)
     {
@@ -1191,33 +1089,6 @@ public final class IntegratedNervMapBuilder
         return true;
     }
 
-    private static String shaftFailure(ServerLevel level, LiftLink link)
-    {
-        int bottom = link.lowerBed().getY() + 2;
-        int top = link.surfaceBed().getY() - 2;
-        for (int y = bottom; y <= top; y++)
-        {
-            for (int x = -SHAFT_CLEAR_RADIUS; x <= SHAFT_CLEAR_RADIUS; x++)
-            {
-                for (int z = -SHAFT_CLEAR_RADIUS; z <= SHAFT_CLEAR_RADIUS; z++)
-                {
-                    BlockPos position = new BlockPos(
-                            link.x() + x, y, link.z() + z);
-                    BlockState state = level.getBlockState(position);
-                    if (!state.isAir())
-                    {
-                        return "core obstruction at " + position.toShortString()
-                                + " block=" + state.getBlock();
-                    }
-                }
-            }
-            if (!shaftLayerIsClear(level, link, y))
-            {
-                return "pressure-wall contract failed at y=" + y;
-            }
-        }
-        return null;
-    }
 
     private static boolean shaftLayerIsClear(ServerLevel level,
                                              LiftLink link, int y)

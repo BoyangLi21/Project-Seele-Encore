@@ -76,7 +76,6 @@ public final class DirectoryTrajectoryR52
         }
         if(parts.isEmpty())throw new IllegalArgumentException("Nonempty actual portable window required");return new PortableWindowR52(parts);
     }
-    public static RigidTransform samplePortableR52(CompoundTag tag,double localMetres){return decodePortableR52(tag).sample(localMetres);}
     private static double angle(Quaternionf a,Quaternionf b)
     {if(a.x==b.x&&a.y==b.y&&a.z==b.z&&a.w==b.w||a.x==-b.x&&a.y==-b.y&&a.z==-b.z&&a.w==-b.w)return 0;double aa=(double)a.x*a.x+(double)a.y*a.y+(double)a.z*a.z+(double)a.w*a.w,bb=(double)b.x*b.x+(double)b.y*b.y+(double)b.z*b.z+(double)b.w*b.w;double dot=Math.abs((double)a.x*b.x+(double)a.y*b.y+(double)a.z*b.z+(double)a.w*b.w)/Math.sqrt(aa*bb);return 2*Math.acos(Math.min(1,dot));}
     public synchronized FootSupportFrameR52.Sample sample(double time)

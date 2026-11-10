@@ -7,18 +7,10 @@ import java.util.Locale;
 import com.projectseele.ProjectSeele;
 import com.projectseele.registry.ModBlocks;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
-import net.minecraft.core.registries.BuiltInRegistries;
-import net.minecraft.resources.ResourceLocation;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
-import net.minecraft.world.level.block.DoorBlock;
-import net.minecraft.world.level.block.LeverBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.state.properties.AttachFace;
-import net.minecraft.world.level.block.state.properties.BlockStateProperties;
-import net.minecraft.world.level.block.state.properties.DoubleBlockHalf;
 import net.minecraft.world.level.levelgen.Heightmap;
 
 /**
@@ -460,94 +452,7 @@ public final class ThirdTokyoSurfaceBuilder
                 tower,oldDepth,newDepth,cursor);
     }
 
-    /* Retained only as the historical geometric reference for old receipts. */
-    private static void applyLegacyShellRetractionDepth(ServerLevel level,BlockPos origin,
-                                                       int oldDepth,int newDepth,int towerIndex)
-    {
-        TowerSpec tower=movableBuildings(level).get(towerIndex);
-        int oldVisible = Math.max(0, tower.height() - oldDepth);
-        int newVisible = Math.max(0, tower.height() - newDepth);
-        int oldCeilingVisible = ceilingVisibleHeight(tower, oldDepth, origin);
-        int newCeilingVisible = ceilingVisibleHeight(tower, newDepth, origin);
-        if (oldVisible != newVisible)
-        {
-            BlockPos centre = origin.offset(tower.x(), 0, tower.z());
-            if (newVisible < oldVisible)
-            {
-                descendTowerLayer(level, centre, tower, oldVisible, newVisible);
-            }
-            else
-            {
-                ascendTowerLayer(level, centre, tower, oldVisible, newVisible);
-            }
-        }
-        if (oldCeilingVisible != newCeilingVisible)
-        {
-            if (newCeilingVisible > oldCeilingVisible)
-            {
-                emergeCeilingLayer(level, origin, tower,
-                        oldCeilingVisible, newCeilingVisible);
-            }
-            else
-            {
-                withdrawCeilingLayer(level, origin, tower,
-                        oldCeilingVisible, newCeilingVisible);
-            }
-        }
-    }
 
-    /**
-     * Translates the complete visible building down by one real block.
-     *
-     * <p>The old implementation shortened the tower from its roof. That made
-     * the antenna and roof appear to descend while the door and first floor
-     * stayed frozen until the final tick. Moving bottom-to-top is safe because
-     * every destination is below its unread source; the ground-floor doorway
-     * now enters the armour hatch first, exactly like a telescoping Tokyo-3
-     * building.</p>
-     */
-    private static void descendTowerLayer(ServerLevel level, BlockPos centre,
-                                          TowerSpec tower,
-                                          int oldVisible, int newVisible)
-    {
-        BlockState core = level.getBlockState(centre);
-        boolean preserveCore = core.is(
-                ModBlocks.RETRACTABLE_BUILDING_CORE.get());
-        int half = tower.halfSize();
-        setRoofMasts(level, centre, tower, oldVisible + 2,
-                Blocks.AIR.defaultBlockState());
-        fillSquare(level, centre, oldVisible + 1, half,
-                Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
-        for (int y = 1; y <= oldVisible; y++)
-        {
-            copyTowerWallAndCentre(level, centre, half, y, y - 1);
-        }
-
-        paintRetractedHatch(level, centre, half, tower.outerWard());
-        if (preserveCore)
-        {
-            set(level, centre, core, UPDATE_TRAVEL);
-        }
-
-        if (newVisible > 0)
-        {
-            fillSquare(level, centre, newVisible + 1, half,
-                    Blocks.SMOOTH_STONE.defaultBlockState(), UPDATE_TRAVEL);
-            set(level, centre.offset(0, newVisible + 1, 0),
-                    Blocks.REDSTONE_LAMP.defaultBlockState(), UPDATE_TRAVEL);
-            setRoofMasts(level, centre, tower, newVisible + 2,
-                    Blocks.LIGHTNING_ROD.defaultBlockState());
-            return;
-        }
-
-        // The final one-block building still carried its roof and antenna at
-        // Y=1..2 after translation. Remove that complete last silhouette.
-        for (int y = 1; y <= 3; y++)
-        {
-            fillSquare(level, centre, y, half,
-                    Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
-        }
-    }
 
     /**
      * Deletes lightning rods left standing in a mast column.
@@ -751,85 +656,7 @@ public final class ThirdTokyoSurfaceBuilder
                 centre.offset(8, y, -8), centre.offset(8, y, 8));
     }
 
-    /**
-     * Exact visual inverse of descent: move the visible stack upward, then
-     * reveal the next original wall layer at street level.
-     *
-     * <p>The source layer runs from the roof down to floor one. Consequently
-     * the lobby doorway is the last feature to emerge during restoration.</p>
-     */
-    private static void ascendTowerLayer(ServerLevel level, BlockPos centre,
-                                         TowerSpec tower,
-                                         int oldVisible, int newVisible)
-    {
-        BlockState core = level.getBlockState(centre);
-        boolean preserveCore = core.is(
-                ModBlocks.RETRACTABLE_BUILDING_CORE.get());
-        int half = tower.halfSize();
-        if (oldVisible > 0)
-        {
-            setRoofMasts(level, centre, tower, oldVisible + 2,
-                    Blocks.AIR.defaultBlockState());
-            fillSquare(level, centre, oldVisible + 1, half,
-                    Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
-            for (int y = oldVisible; y >= 1; y--)
-            {
-                copyTowerWallAndCentre(level, centre, half, y, y + 1);
-            }
-            clearTowerWallLayer(level, centre, 1, half);
-            set(level, centre.offset(0, 1, 0),
-                    Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
-        }
 
-        int sourceY = tower.height() - newVisible + 1;
-        buildTowerWallLayer(level, centre, tower, sourceY, 1);
-        fillSquare(level, centre, newVisible + 1, half,
-                Blocks.SMOOTH_STONE.defaultBlockState(), UPDATE_TRAVEL);
-        set(level, centre.offset(0, newVisible + 1, 0),
-                Blocks.REDSTONE_LAMP.defaultBlockState(), UPDATE_TRAVEL);
-        setRoofMasts(level, centre, tower, newVisible + 2,
-                Blocks.LIGHTNING_ROD.defaultBlockState());
-
-        paintRetractedHatch(level, centre, half, tower.outerWard());
-        if (preserveCore)
-        {
-            set(level, centre, core, UPDATE_TRAVEL);
-        }
-        if (!tower.outerWard())
-        {
-            set(level, centre.offset(0, newVisible, 0),
-                    Blocks.REDSTONE_BLOCK.defaultBlockState(), UPDATE_TRAVEL);
-        }
-    }
-
-    /**
-     * Copies only the inhabited shell and its centre marker. Towers are hollow,
-     * so translating every interior air cell would turn one animation layer
-     * into tens of thousands of needless block updates.
-     */
-    private static void copyTowerWallAndCentre(ServerLevel level,
-                                               BlockPos centre, int half,
-                                               int sourceY, int targetY)
-    {
-        for (int span = -half; span <= half; span++)
-        {
-            set(level, centre.offset(-half, targetY, span),
-                    level.getBlockState(centre.offset(-half, sourceY, span)),
-                    UPDATE_TRAVEL);
-            set(level, centre.offset(half, targetY, span),
-                    level.getBlockState(centre.offset(half, sourceY, span)),
-                    UPDATE_TRAVEL);
-            set(level, centre.offset(span, targetY, -half),
-                    level.getBlockState(centre.offset(span, sourceY, -half)),
-                    UPDATE_TRAVEL);
-            set(level, centre.offset(span, targetY, half),
-                    level.getBlockState(centre.offset(span, sourceY, half)),
-                    UPDATE_TRAVEL);
-        }
-        set(level, centre.offset(0, targetY, 0),
-                level.getBlockState(centre.offset(0, sourceY, 0)),
-                UPDATE_TRAVEL);
-    }
 
     private static void setRoofMasts(ServerLevel level, BlockPos centre,
                                      TowerSpec tower, int y, BlockState state)
@@ -848,62 +675,7 @@ public final class ThirdTokyoSurfaceBuilder
         }
     }
 
-    /**
-     * Builds one more layer below the curved GeoFront ceiling. A temporary
-     * solid underside moves with the building, so from the cavern the city
-     * reads as real mass descending rather than wall rings appearing in air.
-     */
-    private static void emergeCeilingLayer(ServerLevel level, BlockPos origin,
-                                           TowerSpec tower,
-                                           int oldVisible, int newVisible)
-    {
-        int roofY = ceilingRoofRelativeY(tower, origin);
-        BlockPos centre = origin.offset(tower.x(), 0, tower.z());
-        if (oldVisible == 0)
-        {
-            fillSquare(level, centre, roofY, tower.halfSize(),
-                    Blocks.SMOOTH_STONE.defaultBlockState(), UPDATE_TRAVEL);
-            set(level, centre.offset(0, roofY, 0),
-                    Blocks.REDSTONE_LAMP.defaultBlockState(), UPDATE_TRAVEL);
-        }
-        int wallY = roofY - newVisible;
-        if (oldVisible > 0)
-        {
-            fillSquare(level, centre, wallY, tower.halfSize(),
-                    Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
-        }
-        int sourceY = tower.height() - newVisible + 1;
-        buildTowerWallLayer(level, centre, tower, sourceY, wallY);
-        fillSquare(level, centre, wallY - 1, tower.halfSize(),
-                Blocks.POLISHED_DEEPSLATE.defaultBlockState(), UPDATE_TRAVEL);
-        set(level, centre.offset(0, wallY - 1, 0),
-                Blocks.SEA_LANTERN.defaultBlockState(), UPDATE_TRAVEL);
-    }
 
-    /** Exact inverse of {@link #emergeCeilingLayer}. */
-    private static void withdrawCeilingLayer(ServerLevel level, BlockPos origin,
-                                             TowerSpec tower,
-                                             int oldVisible, int newVisible)
-    {
-        int roofY = ceilingRoofRelativeY(tower, origin);
-        BlockPos centre = origin.offset(tower.x(), 0, tower.z());
-        int oldWallY = roofY - oldVisible;
-        fillSquare(level, centre, oldWallY - 1, tower.halfSize(),
-                Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
-        clearTowerWallLayer(level, centre, oldWallY, tower.halfSize());
-        if (newVisible > 0)
-        {
-            fillSquare(level, centre, oldWallY, tower.halfSize(),
-                    Blocks.POLISHED_DEEPSLATE.defaultBlockState(), UPDATE_TRAVEL);
-            set(level, centre.offset(0, oldWallY, 0),
-                    Blocks.SEA_LANTERN.defaultBlockState(), UPDATE_TRAVEL);
-        }
-        else
-        {
-            fillSquare(level, centre, roofY, tower.halfSize(),
-                    Blocks.AIR.defaultBlockState(), UPDATE_TRAVEL);
-        }
-    }
 
     private static void buildFoundation(ServerLevel level, BlockPos origin)
     {
@@ -1151,18 +923,6 @@ public final class ThirdTokyoSurfaceBuilder
         }
     }
 
-    private static void clearTowerWallLayer(ServerLevel level, BlockPos centre,
-                                            int y, int halfSize)
-    {
-        BlockState air = Blocks.AIR.defaultBlockState();
-        for (int i = -halfSize; i <= halfSize; i++)
-        {
-            set(level, centre.offset(-halfSize, y, i), air, UPDATE_TRAVEL);
-            set(level, centre.offset(halfSize, y, i), air, UPDATE_TRAVEL);
-            set(level, centre.offset(i, y, -halfSize), air, UPDATE_TRAVEL);
-            set(level, centre.offset(i, y, halfSize), air, UPDATE_TRAVEL);
-        }
-    }
 
     private static void buildTowerWallLayer(ServerLevel level, BlockPos centre,
                                             TowerSpec tower,
@@ -1688,39 +1448,9 @@ public final class ThirdTokyoSurfaceBuilder
                 depth - ceilingTravelDepth(tower)));
     }
 
-    private static boolean compatBlockAvailable(String namespace, String path)
-    {
-        return BuiltInRegistries.BLOCK.getOptional(
-                        new ResourceLocation(namespace, path))
-                .filter(block -> block != Blocks.AIR)
-                .isPresent();
-    }
 
-    private static BlockState compatBlock(String namespace, String path,
-                                          BlockState fallback)
-    {
-        return BuiltInRegistries.BLOCK.getOptional(
-                        new ResourceLocation(namespace, path))
-                .filter(block -> block != Blocks.AIR)
-                .map(Block::defaultBlockState)
-                .orElse(fallback);
-    }
 
-    private static BlockState facingIfPresent(BlockState state,
-                                               Direction facing)
-    {
-        return state.hasProperty(BlockStateProperties.FACING)
-                ? state.setValue(BlockStateProperties.FACING, facing)
-                : state;
-    }
 
-    private static BlockState axisIfPresent(BlockState state,
-                                            Direction.Axis axis)
-    {
-        return state.hasProperty(BlockStateProperties.AXIS)
-                ? state.setValue(BlockStateProperties.AXIS, axis)
-                : state;
-    }
 
     private static int ceilingVisibleHeight(TowerSpec tower, int depth,
                                             BlockPos origin)

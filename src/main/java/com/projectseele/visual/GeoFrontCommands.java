@@ -23,7 +23,6 @@ import com.projectseele.world.S24CoordinateTransform;
 import com.projectseele.world.TerminalDogmaBuilder;
 import com.projectseele.world.ThirdTokyoSurfaceBuilder;
 import com.projectseele.world.Tokyo3RetractionDirector;
-import com.projectseele.world.Tokyo3RetractionDirector.RequestResult;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
 import net.minecraft.core.BlockPos;
@@ -38,7 +37,6 @@ import net.minecraft.world.level.Level;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.phys.AABB;
 import net.minecraft.world.phys.Vec3;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -58,8 +56,6 @@ public final class GeoFrontCommands
     private static final String RETURN_X = "SeeleGeoFrontReturnX";
     private static final String RETURN_Y = "SeeleGeoFrontReturnY";
     private static final String RETURN_Z = "SeeleGeoFrontReturnZ";
-    private static final int SORTIE_CHUNK_RADIUS = 4;
-    private static final double SORTIE_ENTITY_RADIUS = 72.0D;
     /** Measured, read-only S22 review landings; never repair geometry here. */
     private static final BlockPos S22_MAIN_ENTRANCE_FEET =
             new BlockPos(-80, -443, 210);
@@ -291,83 +287,6 @@ public final class GeoFrontCommands
         return 1;
     }
 
-    static int setupVisualCapture(CommandSourceStack source) throws CommandSyntaxException
-    {
-        ServerPlayer player = source.getPlayerOrException();
-        ServerLevel level = geoFront(player);
-        if (level == null)
-        {
-            throw new IllegalStateException("GeoFront visual dimension is unavailable");
-        }
-        // A previous manual session may have saved the automation player in
-        // Unit-01.  Release that stale passenger relation before the strict
-        // three-airframe canonicalization gate runs.
-        restoreManualPlayerPhysics(player);
-        level.setDayTime(6000L);
-        level.setWeatherParameters(12000, 0, false, false);
-        // Visual captures must not inherit a CITY ARMOUR state left by a
-        // previous manual session. Restore the physical tower volumes before
-        // the fixed-camera audit; changing SavedData alone can leave a valid
-        // looking marker set above an empty skyline.
-        RequestResult cityReset = Tokyo3RetractionDirector.forceDepth(level,
-                IntegratedNervMapBuilder.tokyo3Origin(level), false);
-        if (cityReset.accepted())
-        {
-            throw new IllegalStateException(
-                    "Tokyo-3 restoration is running as a bounded transaction; "
-                            + "rerun the visual capture after the skyline reaches DEPLOYED");
-        }
-        IntegratedAudit result = IntegratedNervMapBuilder.ensure(level);
-        logIntegratedAudit("visual-setup", result);
-        if (!result.valid())
-        {
-            throw new IllegalStateException(
-                    "Integrated GeoFront visual setup failed audit: " + result.summary());
-        }
-        List<EvaUnit01Entity> linked = ensureContinuousSortieUnits(level);
-        SortieAudit sortie = inspectLinkedUnits(player.getServer(), level, linked);
-        if (!sortie.valid())
-        {
-            // Unattended captures are a destructive development fixture, not
-            // a player command. Recover all three canonical units when an old
-            // run left one deployed or its UUID in another dimension; normal
-            // login and readiness checks continue to preserve deployed EVAs.
-            ProjectSeele.LOGGER.warn(
-                    "Visual GeoFront fixture repairing incomplete fleet: {}",
-                    sortie.summary());
-            for (int variant = 0; variant < 3; variant++)
-            {
-                EvaLogisticsDirector.forceReset(level, variant);
-            }
-            linked = ensureContinuousSortieUnits(level);
-            sortie = inspectLinkedUnits(player.getServer(), level, linked);
-        }
-        logSortieAudit("geofront-visual", sortie);
-        if (!sortie.valid())
-        {
-            throw new IllegalStateException(
-                    "GeoFront visual launch bays failed audit after canonical reset: "
-                            + sortie.summary());
-        }
-        // Exercise the same public navigation paths used during manual QA.
-        // This catches unsafe overview landings and operations-route audit
-        // regressions before the client starts jumping between camera rigs.
-        if (overview(source) != 1 || operations(source) != 1)
-        {
-            throw new IllegalStateException(
-                    "GeoFront overview/operations navigation smoke test failed");
-        }
-        ProjectSeele.LOGGER.info(
-                "GeoFront navigation smoke test passed: overview landing is dry and operations routes are valid");
-        BlockPos hiddenPlatform = IntegratedNervMapBuilder
-                .geoFrontOrigin(level).offset(0, 3, 0);
-        level.setBlock(hiddenPlatform, net.minecraft.world.level.block.Blocks.BARRIER
-                .defaultBlockState(), net.minecraft.world.level.block.Block.UPDATE_CLIENTS);
-        player.teleportTo(level, hiddenPlatform.getX() + 0.5D,
-                hiddenPlatform.getY() + 1.0D, hiddenPlatform.getZ() + 0.5D,
-                180.0F, 0.0F);
-        return 1;
-    }
 
     private static int enter(CommandSourceStack source) throws CommandSyntaxException
     {
@@ -475,42 +394,7 @@ public final class GeoFrontCommands
     }
 
 
-    /** Loads only the launch-bay neighbourhood before querying parked EVAs. */
-    private static int clearVisualSortieEntities(ServerLevel geoFront)
-    {
-        loadSortieChunks(geoFront);
 
-        BlockPos centre = IntegratedNervMapBuilder.lowerLiftBed(geoFront, 1);
-        List<EvaUnit01Entity> stale = geoFront.getEntitiesOfClass(
-                EvaUnit01Entity.class,
-                new AABB(centre).inflate(SORTIE_ENTITY_RADIUS,
-                        384.0D, SORTIE_ENTITY_RADIUS));
-        // Reset through the fleet director so SavedData and the three new
-        // UUIDs move together. Directly discarding entities leaves PARKED
-        // canonical UUIDs pointing at nothing on the next launch.
-        for (int variant = 0; variant < 3; variant++)
-        {
-            EvaLogisticsDirector.forceReset(geoFront, variant);
-        }
-        return stale.size();
-    }
-
-    private static void loadSortieChunks(ServerLevel geoFront)
-    {
-        BlockPos centre = IntegratedNervMapBuilder.lowerLiftBed(geoFront, 1);
-        int originChunkX = centre.getX() >> 4;
-        int originChunkZ = centre.getZ() >> 4;
-        int chunkRadius = SORTIE_CHUNK_RADIUS;
-        for (int chunkX = originChunkX - chunkRadius;
-             chunkX <= originChunkX + chunkRadius; chunkX++)
-        {
-            for (int chunkZ = originChunkZ - chunkRadius;
-                 chunkZ <= originChunkZ + chunkRadius; chunkZ++)
-            {
-                geoFront.getChunk(chunkX, chunkZ);
-            }
-        }
-    }
 
     private static int sortieAudit(CommandSourceStack source) throws CommandSyntaxException
     {

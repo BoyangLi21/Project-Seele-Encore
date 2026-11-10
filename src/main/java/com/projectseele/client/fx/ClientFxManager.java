@@ -732,10 +732,6 @@ public final class ClientFxManager
         private static final float INTERNAL_ARCHANGEL_SCALE = 0.24F;
         private static final float INTERNAL_CHOIR_SCALE = 0.20F;
         private static final float PATH_NUMBER_SCALE = 0.34F;
-        private static final String[] SEPHIRA_NAMES = {
-                "KETER", "CHOKMAH", "BINAH", "CHESED", "GEVURAH",
-                "TIFERET", "NETZACH", "HOD", "YESOD", "MALKUTH"
-        };
         private static final String[] SEPHIRA_HEBREW = {
                 "\u05DB\u05EA\u05E8", "\u05D7\u05DB\u05DE\u05D4", "\u05D1\u05D9\u05E0\u05D4",
                 "\u05D7\u05E1\u05D3", "\u05D2\u05D1\u05D5\u05E8\u05D4", "\u05EA\u05E4\u05D0\u05E8\u05EA",

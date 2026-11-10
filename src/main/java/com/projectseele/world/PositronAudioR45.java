@@ -69,13 +69,6 @@ public final class PositronAudioR45
         }
     }
 
-    /** Optional hook for actual rearm completion; never schedules the SBW 80-tick reload onto EVA. */
-    public static void rearmed(ServerLevel level, Vec3 muzzle)
-    {
-        if (ModList.get().isLoaded("superbwarfare"))
-            level.playSound(null, muzzle.x, muzzle.y, muzzle.z,
-                    event("annihilator_reload"), SoundSource.PLAYERS, 1.0F, 1.0F);
-    }
 
     private static SoundEvent event(String path)
     {

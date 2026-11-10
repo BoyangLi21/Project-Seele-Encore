@@ -533,50 +533,6 @@ public final class S20PhysicalElevatorDirector
         return true;
     }
 
-    /**
-     * Re-authors the two landing interfaces after a fixed shaft-shell pass.
-     * Shaft construction is intentionally allowed to run before this method;
-     * otherwise its west wall can overwrite the door aperture and call panel.
-     */
-    public static void repairLandingHardware(ServerLevel level, LiftSpec spec)
-    {
-        if(NervTravelDirectoryR52.applies(level))return;
-        for (Landing landing : spec.stops())
-        {
-            buildLanding(level, landing);
-        }
-        LiftRuntime runtime = RuntimeData.get(level)
-                .find(spec.id()).orElse(null);
-        if (USE_LEGACY_BLOCK_CABIN)
-        {
-            if (runtime != null)
-            {
-                Landing current = spec.landingAt(runtime.currentY);
-                for (Landing landing : spec.stops())
-                {
-                    setLandingDoor(level, landing,
-                            current == landing
-                                    && runtime.mode == Mode.IDLE_OPEN);
-                }
-            }
-            return;
-        }
-        NervCarrierPlatformEntity cabin = runtime == null ? null
-                : resolvePersistentCabin(level, spec, runtime);
-        for (Landing landing : spec.stops())
-        {
-            if (cabin != null && cabin.isAtLiftY(landing.walkY()))
-            {
-                buildLandingDeck(level, landing);
-            }
-            else
-            {
-                clearLandingDeck(level, landing);
-            }
-            setLandingDoor(level, landing, cabin != null
-                    && cabin.canOpenLandingDoorAt(landing.walkY()));
-        }
-    }
 
     private static LiftRuntime recoverExistingCabin(
             ServerLevel level, LiftSpec spec)
@@ -2395,12 +2351,6 @@ public final class S20PhysicalElevatorDirector
                 stopIndex, CABIN_RADIUS - 1);
     }
 
-    /** Fixed wall cell for the official car panel; it never follows the door. */
-    public static BlockPos movingElevatorCabinPanelPosition(
-            BlockPos cabinCentre, Direction fixedExit)
-    {
-        return interiorBackingPosition(cabinCentre, fixedExit, 0);
-    }
 
     private static BlockPos interiorBackingPosition(
             BlockPos cabinCentre, Direction exit, int stopIndex)

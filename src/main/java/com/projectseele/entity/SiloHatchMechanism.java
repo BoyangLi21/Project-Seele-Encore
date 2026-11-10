@@ -8,7 +8,6 @@ public final class SiloHatchMechanism
     public static final int PANELS = 4;
     public static final double WIDTH = 4.0D;
     public static final double POCKET_X = 16.4D;
-    public static final double CASE_OUTER_X = 20.7D;
     public static final double PANEL_TOP = .98D;
 
     public record Panel(double x, double y) {}

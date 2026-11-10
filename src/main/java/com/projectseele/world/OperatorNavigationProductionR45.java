@@ -100,8 +100,6 @@ public final class OperatorNavigationProductionR45
         }
         CACHE.put(server,new Cached(level,root,tick,fingerprint,result,failure));return result;
     }
-    /** Root may connect the actual facility enable path only after installed acceptance. */
-    public static boolean installedFacility(ServerLevel level) { return load(level).isPresent(); }
     public static List<String> availableGoals(ServerPlayer player)
     {
         // Do not advertise a development goal, absent installation or disabled real facility.

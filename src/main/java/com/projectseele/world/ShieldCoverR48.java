@@ -2,7 +2,6 @@ package com.projectseele.world;
 
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaShieldRigR47;
-import com.projectseele.entity.EvaShutdownR30;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.RamielEntity;
 import com.projectseele.physics.CombatDamageTargetsR44;
@@ -124,25 +123,6 @@ public final class ShieldCoverR48
         return yashima(boss)&&TvEncounterRulesR45.missionBeamAllowed(boss);
     }
 
-    /** Shared with the mission director's live-combat hold, never with setup or victory admission. */
-    public static boolean shieldOnlyBlockerAfterCombat(ServerLevel level, TvCampaignSavedData data, String blocker)
-    {
-        if (!blocker.equals("零号机尚未装备防护盾。")
-                && !blocker.equals("零号机请调整盾面，遮挡目标到初号机的射线。")) return false;
-        if (data.angel == null || !(level.getEntity(data.angel) instanceof RamielEntity boss) || !yashima(boss)) return false;
-        var owner = data.owner == null ? null : level.getServer().getPlayerList().getPlayer(data.owner);
-        if (owner == null || owner.level() != level || !TvEncounterRulesR45.targetFrameReady(level, data, owner)) return false;
-        // equipmentBlocker has already checked participants, ready states,
-        // cannon/loadout/range before its shield clause. Recheck the later
-        // clauses explicitly; removing that early return must not skip them.
-        var site = TvEncounterSitesR45.site(level, data.active).orElse(null);
-        var cover = TvSortiesR32.assignedUnit(level, data, 0);
-        var shooter = TvSortiesR32.assignedUnit(level, data, 1);
-        var target = cover != null && cover.isAlive() && cover.getHealth() > 0 && !EvaShutdownR30.wreck(cover) ? cover : shooter;
-        return site != null && shooter != null && target != null
-                && shooter.position().distanceTo(site.hero()) <= 12
-                && boss.effectiveBeamRangeR45() >= boss.getBoundingBox().getCenter().distanceTo(target.getEyePosition());
-    }
 
     /** Called once by fireBeam, never by the afterglow renderer or damage ticks. */
     public static void receiveYashima(Contact contact, RamielEntity boss, UUID shot, DamageSource source)

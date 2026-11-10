@@ -19,10 +19,8 @@ import net.minecraft.util.Mth;
 import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.ButtonBlock;
-import net.minecraft.world.level.block.DirectionalBlock;
 import net.minecraft.world.level.block.LadderBlock;
 import net.minecraft.world.level.block.state.BlockState;
-import net.minecraft.world.level.block.StairBlock;
 import net.minecraft.world.level.block.state.properties.AttachFace;
 import net.minecraft.world.phys.Vec3;
 
@@ -64,7 +62,6 @@ public final class EvaHangarBuilder
     /** Half-width of the clear lane the 17-wide airframe needs to leave. */
     private static final int EXIT_LANE_HALF_WIDTH = 16;
     private static final int SIDE_CATWALK_X = 19;
-    private static final int BOARDING_CONNECTOR_HALF_WIDTH = 2;
     private static final int GALLERY_SIDE_MARGIN = 4;
     private static final int CONTROL_ROOM_HALF_WIDTH = 10;
     private static final int OBSERVATION_CEILING_Y = GALLERY_Y + 18;
@@ -904,21 +901,6 @@ public final class EvaHangarBuilder
         return HangarStructuralFrameR44.CRANE_RUNNING_SURFACE_ABOVE_BED;
     }
 
-    /**
-     * Foot of a rear ladder, on the shoulder catwalk.
-     *
-     * <p>This is the last point of the boarding route a walking entity can
-     * actually reach: it shares the gallery's floor level, whereas the gantry
-     * above it is ladder-only.
-     */
-    public static BlockPos ladderFootPosition(BlockPos origin, int variant)
-    {
-        requireVariant(variant);
-        BlockPos bed = hangarBed(origin, variant);
-        return new BlockPos(bed.getX() - SIDE_CATWALK_X,
-                bed.getY() + CATWALK_FLOOR_ABOVE_BED + 1,
-                bed.getZ() + REAR_GANTRY_Z_FROM_BED - 1);
-    }
 
     /** Human-scale endpoint of the extended dorsal boarding bridge. */
     public static BlockPos boardingPosition(BlockPos origin, int variant)
@@ -1226,49 +1208,6 @@ public final class EvaHangarBuilder
         }
     }
 
-    /**
-     * Slides a carrier without destroying and repainting its overlapping
-     * 29x29 footprint. Only cells whose final state changes are sent to
-     * clients, which keeps three simultaneous EVA transfers within the tick
-     * budget.
-     */
-    public static void moveCarrier(ServerLevel level, BlockPos origin,
-                                   int variant, int oldCentreZ, int newCentreZ)
-    {
-        if(NervLegacyGenerationGuardR52.retired(level))return;
-        if (oldCentreZ == newCentreZ)
-        {
-            return;
-        }
-        BlockPos hangar = hangarBed(origin, variant);
-        int y = hangar.getY();
-        int centreX = hangar.getX();
-        int minZ = Math.min(oldCentreZ, newCentreZ) - CARRIER_HALF;
-        int maxZ = Math.max(oldCentreZ, newCentreZ) + CARRIER_HALF;
-        for (int worldZ = minZ; worldZ <= maxZ; worldZ++)
-        {
-            int relativeNewZ = worldZ - newCentreZ;
-            boolean insideNew = Math.abs(relativeNewZ) <= CARRIER_HALF;
-            for (int x = -CARRIER_HALF; x <= CARRIER_HALF; x++)
-            {
-                BlockPos position = new BlockPos(centreX + x, y, worldZ);
-                if (insideNew)
-                {
-                    boolean rim = Math.abs(x) == CARRIER_HALF
-                            || Math.abs(relativeNewZ) == CARRIER_HALF;
-                    set(level, position, rim
-                            ? Blocks.IRON_BLOCK.defaultBlockState()
-                            : Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState());
-                }
-                else
-                {
-                    set(level, position, transportFloor(level, position, origin, variant));
-                }
-            }
-        }
-        set(level, new BlockPos(centreX, y, newCentreZ),
-                Blocks.LODESTONE.defaultBlockState());
-    }
 
     public static void restoreStaticCarrier(ServerLevel level, BlockPos origin,
                                             int variant, BlockPos station)
@@ -1610,38 +1549,6 @@ public final class EvaHangarBuilder
         }
     }
 
-    /**
-     * Clears the complete moving airframe envelope immediately before either
-     * horizontal transfer. This removes single legacy gate, bridge or ceiling
-     * cells left by older map revisions without touching the pressure walls or
-     * carrier floor.
-     */
-    public static void clearTransferEnvelope(ServerLevel level,
-                                             BlockPos origin, int variant)
-    {
-        if(NervLegacyGenerationGuardR52.retired(level))return;
-        requireVariant(variant);
-        BlockPos bed = hangarBed(origin, variant);
-        BlockPos silo = IntegratedNervMapBuilder.lowerLiftBed(origin, variant);
-        int shaftPortalZ = silo.getZ()
-                - IntegratedNervMapBuilder.SHAFT_OUTER_RADIUS;
-        int minimumZ = bed.getZ() - CARRIER_HALF;
-        int maximumZ = silo.getZ() + CARRIER_HALF;
-        for (int z = minimumZ; z <= maximumZ; z++)
-        {
-            int halfWidth = z <= shaftPortalZ
-                    ? CORRIDOR_HALF_WIDTH - 1
-                    : IntegratedNervMapBuilder.SHAFT_CLEAR_RADIUS;
-            for (int x = -halfWidth; x <= halfWidth; x++)
-            {
-                for (int y = 1; y <= 66; y++)
-                {
-                    clear(level, new BlockPos(
-                            bed.getX() + x, bed.getY() + y, z));
-                }
-            }
-        }
-    }
 
     private static void buildObservationGallery(ServerLevel level, BlockPos origin)
     {

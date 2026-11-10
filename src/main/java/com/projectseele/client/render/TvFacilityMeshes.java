@@ -8,8 +8,6 @@ import com.projectseele.entity.EvaDorsalMechanism;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.SiloHatchMechanism;
 import net.minecraft.client.Minecraft;
-import net.minecraft.client.renderer.GameRenderer;
-import net.minecraft.client.renderer.RenderType;
 import net.minecraft.client.renderer.MultiBufferSource;
 import net.minecraft.resources.ResourceLocation;
 import java.io.InputStreamReader;
@@ -74,8 +72,6 @@ public final class TvFacilityMeshes
         load();RigidMachineryPartR44 mesh=PARTS.get(part);if(mesh==null)return;
         mesh.draw(poses,currentBuffers(),light);
     }
-    public static float[] partBounds(String part)
-    {load();var mesh=PARTS.get(part);return mesh==null?null:mesh.bounds();}
     private static float ramp(float value,float a,float b){return EvaDorsalMechanism.smooth((value-a)/(b-a));}
     public static void cage(PoseStack poses,int light,float closed)
     {cage(poses,light,closed,-1);}

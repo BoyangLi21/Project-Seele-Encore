@@ -1,10 +1,8 @@
 package com.projectseele.world;
 
 import com.google.gson.*;
-import com.google.gson.stream.JsonReader;
 import java.io.ByteArrayInputStream;
 import java.io.IOException;
-import java.io.InputStreamReader;
 import java.nio.charset.StandardCharsets;
 import java.security.*;
 import java.util.*;
@@ -157,56 +155,6 @@ public final class CarrierRearGuideR53
             new NervStaticSpatialIndexR52<>(anchors,a->new AABB(a.point(),a.point()).inflate(.0001)));
     }
 
-    private static FixedGeometry readFixed(byte[] bytes,String legacy,boolean requireSupports)throws IOException
-    {
-            var pieces=new ArrayList<Fixed>();var anchors=new ArrayList<Anchor>();var names=new HashSet<String>();
-            String schema=null,directory="";boolean complete=false,missing=false;
-            // Do not materialize the 146 MB decimal document as a Gson tree.
-            // Each measured primitive is validated before joining the index.
-            try(var reader=new JsonReader(new InputStreamReader(new ByteArrayInputStream(bytes),StandardCharsets.UTF_8)))
-            {
-                reader.beginObject();
-                while(reader.hasNext())switch(reader.nextName())
-                {
-                case "schema" -> schema=reader.nextString();
-                case "directory" -> directory=reader.nextString();
-                case "supports_complete" -> complete=reader.nextBoolean();
-                case "support_missing" -> missing=!JsonParser.parseReader(reader).getAsJsonArray().isEmpty();
-                case "pieces" -> {
-                reader.beginArray();while(reader.hasNext())
-                {
-                var p=JsonParser.parseReader(reader).getAsJsonObject();String name=p.get("name").getAsString(),component=p.get("component").getAsString();
-                require(names.add(name)&&Set.of("head","web","support").contains(component),"Unique declared fixed rail part required");
-                var a=p.getAsJsonArray("triangles_rgb");require(!a.isEmpty()&&a.size()%18==0,"Complete fixed rail triangles required");
-                double[] rgb=new double[a.size()],xyz=new double[a.size()/2];
-                for(int i=0,k=0;i<a.size();i+=6)
-                {
-                    for(int j=0;j<6;j++){rgb[i+j]=a.get(i+j).getAsDouble();require(Double.isFinite(rgb[i+j]),"Finite fixed rail vertices required");}
-                    xyz[k++]=rgb[i];xyz[k++]=rgb[i+1];xyz[k++]=rgb[i+2];
-                }
-                var frame=new RigidTransform(point(p.getAsJsonArray("origin")),0,0,0,1);
-                pieces.add(new Fixed(name,p.get("leg").getAsString(),p.get("mount").getAsString(),component,
-                    new NervLegacyCarrierRideR52.Piece(name,new NervRigidMeshSweepR52(xyz),rgb,frame,component)));
-                }reader.endArray();}
-                case "sockets" -> {
-                reader.beginArray();while(reader.hasNext())
-                {
-                var p=JsonParser.parseReader(reader).getAsJsonObject();
-                if(!p.has("anchor")){require(!requireSupports,"Actual support seat required");continue;}
-                var a=p.getAsJsonObject("anchor");var normal=point(a.getAsJsonArray("normal"));
-                require(normal.lengthSqr()==1&&(Math.abs(normal.x)==1||Math.abs(normal.y)==1||Math.abs(normal.z)==1),"Native axis-aligned support face required");
-                anchors.add(new Anchor(p.get("leg").getAsString(),p.get("mount").getAsString(),BlockPos.containing(point(a.getAsJsonArray("at"))),
-                    a.get("state").getAsString(),point(a.getAsJsonArray("bearing")),normal));
-                }reader.endArray();}
-                default -> reader.skipValue();
-                }
-                reader.endObject();
-            }
-            require("projectseele.r53.rear-guide-rails.v1".equals(schema)&&(!requireSupports||complete&&!missing),"Complete measured rear rail supports required");
-            require(!pieces.isEmpty()&&(!requireSupports||!anchors.isEmpty()),"Fixed rails and actual native anchors required");
-            return new FixedGeometry(directory,legacy,List.copyOf(pieces),List.copyOf(anchors),new NervStaticSpatialIndexR52<>(pieces,Fixed::bounds),
-                new NervStaticSpatialIndexR52<>(anchors,a->new AABB(a.point(),a.point()).inflate(.0001)));
-    }
 
     public static boolean anchorBears(Level level,Anchor anchor)
     {

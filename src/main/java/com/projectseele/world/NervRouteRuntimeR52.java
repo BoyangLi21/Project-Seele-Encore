@@ -97,8 +97,6 @@ public final class NervRouteRuntimeR52
     /** Root may stamp its migrated world pending before any native tick; no
      * default filename/world/coordinates are selected by this method. */
     public static void claimPending(ServerLevel level,long epoch,String rootReceiptSha256){state(level,true).claim(epoch,rootReceiptSha256);}
-    public static boolean loadAndInstall(ServerLevel level,Path explicitRootFile,NervRouteNativeR52.AssemblyOwner owner)throws java.io.IOException
-    {return install(level,JsonParser.parseString(Files.readString(explicitRootFile)).getAsJsonObject(),owner);}
     public static boolean install(ServerLevel level,JsonObject root,NervRouteNativeR52.AssemblyOwner owner)
     {
         return installParsed(level,root,NervRouteDirectoryR52.parse(root),owner,null);

@@ -102,17 +102,6 @@ public final class NervUprightGuidewayR52 {
  public record CrossSection(String name,double minX,double minY,double maxX,double maxY){}
  public record RunnerSample(RigidTransform frame,double yaw,double pitch){}
  private static final List<Vec3> MOUNTS=List.of(new Vec3(-6,-2.12,-10),new Vec3(-6,-2.12,10),new Vec3(6,-2.12,-10),new Vec3(6,-2.12,10));
- /** Profile coordinates are in the independent runner frame: Z along rail,
-  * Y its capture normal, X across rail. The original pad bottom is Y=-.08. */
- public static List<CrossSection> railSectionR52(){return List.of(new CrossSection("head",-.30,-.20,.30,-.08),new CrossSection("web",-.10,-.55,.10,-.20));}
- public static List<Vec3> mountOffsetsR52(){return MOUNTS;}
- public static RunnerSample sampleR52(RigidTransform fixedDeck,int shoe,Vec3 worldTangent){return sampleR52(fixedDeck,shoe,worldTangent,0);}
- public static RunnerSample sampleR52(RigidTransform fixedDeck,int shoe,Vec3 worldTangent,double verticalYaw){
-  if(shoe<0||shoe>=4||fixedDeck.transformVector(new Vec3(0,1,0)).distanceTo(new Vec3(0,1,0))>1e-5||worldTangent==null||!Double.isFinite(worldTangent.lengthSqr())||worldTangent.lengthSqr()<1e-12)throw new IllegalArgumentException("Fixed upright deck and real nonzero route tangent required");
-  var local=fixedDeck.inverse().transformVector(worldTangent.normalize());double h=Math.hypot(local.x,local.z),yaw=h>1e-9?Math.atan2(local.x,local.z):verticalYaw,pitch=-Math.atan2(local.y,h);
-  var frame=fixedDeck.compose(RigidTransform.of(MOUNTS.get(shoe),new Quaternionf().rotationY((float)yaw).rotateX((float)pitch)));return new RunnerSample(frame,yaw,pitch);
- }
- public static RunnerSample sampleR52(DirectoryTrajectoryR52 curve,int shoe,double t){return sampleR52(curve.sample(t).evaRoot(),shoe,curve.directory().tangent(curve.leg(),curve.fromFraction()+(curve.toFraction()-curve.fromFraction())*t));}
  /** Real compact cheeks, upper crossbar and two under-flange captures.
   * Every added box touches another steel box or the unchanged original fork. */
  public static List<NervLegacyCarrierRideR52.Piece> capturedRunnerPartsR52(String prefix,RigidTransform frame){
@@ -139,8 +128,5 @@ public final class NervUprightGuidewayR52 {
   double[] rgb=a.stream().mapToDouble(x->x).toArray(),xyz=new double[rgb.length/2];for(int i=0,k=0;i<rgb.length;i+=6){xyz[k++]=rgb[i];xyz[k++]=rgb[i+1];xyz[k++]=rgb[i+2];}return new NervLegacyCarrierRideR52.Piece(name,new NervRigidMeshSweepR52(xyz),rgb,frame,"yaw_bearing");
  }
  private static void tri(List<Double> out,Vec3... p){for(var v:p)for(double d:new double[]{v.x,v.y,v.z,.36,.43,.48})out.add((double)(float)d);}
- /** Same measured original mount followed by XYZ translation. This method
-  * supplies Root geometry offsets; it creates no path or world coordinates. */
- public static Vec3 railCentreR52(DirectoryTrajectoryR52 curve,int shoe,double t){return curve.sample(t).evaRoot().transformPoint(MOUNTS.get(shoe));}
  private NervUprightGuidewayR52(){}
 }

@@ -314,9 +314,6 @@ public final class CommandRoomSlidingDoorDirector
         }
     }
 
-    /** Parses the same complete door contract used by the live maintenance path. */
-    static int validateDeclaredDoorDocument(JsonObject document,NervHeadquartersFrameR52.Frame frame)
-    {if(frame==null)throw new IllegalArgumentException("Declared Root headquarters frame required");return parseConfig(document,frame).buttons().size();}
     private static RuntimeConfig parseConfig(JsonObject root,NervHeadquartersFrameR52.Frame headquarters)
     {
         List<DoorSpec> current=headquarters==null?DOORS:DOORS.stream()

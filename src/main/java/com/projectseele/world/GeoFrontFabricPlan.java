@@ -25,7 +25,6 @@ public final class GeoFrontFabricPlan
 {
     public static final int FORMAT_VERSION = 2;
     public static final int FABRIC_REVISION = 8;
-    public static final String PLAN_REVISION = "geofront-fabric-r2-a7";
     public static final int GEOMETRY_VERSION = 1;
 
     public static final int CAVERN_CENTRE_Y = -336;

@@ -48,7 +48,6 @@ public final class NervFootGuideRigR52 {
  public record AxleFit(double area,double maximumFitError,double upwardNormal){}
  private record FitMemo(RigidTransform relative,AxleFit fit){}
  private static final Map<String,FitMemo> AXLE_FITS=new HashMap<>();
- public static List<AxleFit> actualAxleFitsR52(FootSupportFrameR52.Binding binding,RigidTransform root,float rise,Vec3 up)throws IOException {var all=draws(binding,root,rise,up);var out=new ArrayList<AxleFit>();for(int side:new int[]{-1,1})out.add(axleFit(all.stream().filter(d->d.part().name().equals("foot_guide_rotor_"+side)).findFirst().orElseThrow(),all.stream().filter(d->d.part().name().equals("foot_guide_stator_"+side)).findFirst().orElseThrow()));return List.copyOf(out);}
  public static boolean actualAxleBearingR52(FootSupportFrameR52.Binding binding,RigidTransform root,float rise,Vec3 up)throws IOException {
   var all=draws(binding,root,rise,up);for(int side:new int[]{-1,1}){var rotor=all.stream().filter(d->d.part().name().equals("foot_guide_rotor_"+side)).findFirst().orElseThrow();var stator=all.stream().filter(d->d.part().name().equals("foot_guide_stator_"+side)).findFirst().orElseThrow();var fit=axleFit(rotor,stator);if(fit.area()<.005||fit.maximumFitError()>.0002||fit.upwardNormal()<.1)return false;}return true;
  }

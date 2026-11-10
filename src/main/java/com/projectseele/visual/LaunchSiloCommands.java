@@ -82,43 +82,6 @@ public final class LaunchSiloCommands
         return 1;
     }
 
-    /** Rebuilds one fixed complex so unattended screenshot runs are repeatable. */
-    static int setupVisualCapture(CommandSourceStack source) throws CommandSyntaxException
-    {
-        ServerPlayer player = source.getPlayerOrException();
-        ServerLevel level = player.serverLevel();
-        player.stopRiding();
-        int minSurface = level.getMinBuildHeight() + 52;
-        int maxSurface = level.getMaxBuildHeight() - 72;
-        int surfaceY = Math.max(minSurface, Math.min(maxSurface, 96));
-        BlockPos origin = new BlockPos(0, surfaceY, 0);
-
-        // Visual regression frames must expose the machinery, not inherit a
-        // persisted world's midnight storm. This changes only the dedicated
-        // unattended test world used by setupVisualCapture.
-        level.setDayTime(6000L);
-        level.setWeatherParameters(12000, 0, false, false);
-
-        // The quick-play world persists between runs. Remove only old EVA
-        // airframes in the fixed test envelope; buildComplex overwrites every
-        // shaft/carrier block at the same origin without touching the rest of
-        // the user's world.
-        level.getEntitiesOfClass(EvaUnit01Entity.class,
-                new AABB(origin).inflate(80.0D, 80.0D, 80.0D)).forEach(EvaUnit01Entity::discard);
-        NervConstructionKitItem.buildComplex(level, origin);
-        SiloAudit setupAudit = inspectComplex(level, origin);
-        logAudit("visual-setup", setupAudit);
-        if (!setupAudit.valid())
-        {
-            throw new IllegalStateException(
-                    "Visual launch complex failed structural audit: " + setupAudit.summary());
-        }
-        player.teleportTo(level, origin.getX() + 0.5D, origin.getY() + 4.0D,
-                origin.getZ() + 14.5D, 180.0F, 16.0F);
-        source.sendSuccess(() -> Component.literal(
-                "Repeatable NERV launch complex ready for visual capture."), false);
-        return 1;
-    }
 
     static int board(CommandSourceStack source) throws CommandSyntaxException
     {

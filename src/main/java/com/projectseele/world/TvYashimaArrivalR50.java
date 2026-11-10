@@ -40,13 +40,6 @@ public final class TvYashimaArrivalR50
         Vec3 forward=site.angel().subtract(site.hero()).multiply(1,0,1).normalize();
         return site.cover().add(forward.z*12,0,-forward.x*12);
     }
-    static double laneDistanceR54(Vec3 point,Vec3 from,Vec3 to)
-    {
-        Vec3 line=to.subtract(from).multiply(1,0,1).normalize(),offset=point.subtract(from);
-        return Math.abs(offset.x*line.z-offset.z*line.x);
-    }
-    static boolean enterCoverR54(boolean charging,int remaining,int beamTicks)
-    {return beamTicks>0||charging&&remaining>0&&remaining<=20;}
     static Vec3 guardStepR54(Vec3 current,Vec3 goal)
     {Vec3 delta=goal.subtract(current).multiply(1,0,1);return delta.horizontalDistanceSqr()<=2.25?current:goal;}
 
@@ -114,8 +107,6 @@ public final class TvYashimaArrivalR50
     {return plan(level)==null?"零号机独立落点、原盾架与实际盾位的步行接口尚未接通。":"";}
     private static boolean at(EvaUnit01Entity eva,Vec3 point,double radius)
     {return eva.position().subtract(point).horizontalDistance()<=radius&&Math.abs(eva.getY()-point.y)<=1.35&&!EvaAirTransportR31.active(eva)&&!NervAirTransportRuntimeR52.ownsMotion(eva)&&AirCradleClearanceR31.touchdownContact(eva)!=null;}
-    public static boolean npcCannonEmplacementReadyR50(ServerLevel level,TvCampaignSavedData data,EvaUnit01Entity eva)
-    {return eva!=null&&eva.getUnitVariant()==1&&TvYashimaTransitR52.landed(level,data,eva)&&TvYashimaStationR52.fireBlocker(eva).isEmpty();}
     public static Next next(ServerLevel level,TvCampaignSavedData data,EvaUnit01Entity eva,ServerPlayer owner,boolean equipped)
     {
         if(!TvYashimaTransitR52.landed(level,data,eva))return new Next(null,true);

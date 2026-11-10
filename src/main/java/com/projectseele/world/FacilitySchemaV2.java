@@ -58,18 +58,9 @@ public final class FacilitySchemaV2
             new BlockPos(-1970, 0, -760);
 
     public static final int GF_FLOOR_Y = -360;
-    public static final int CV_B2_Y = -368;
-    public static final int CV_B1_Y = -360;
-    public static final int CV_L0_Y = -348;
-    public static final int CV_L1_Y = -340;
-    public static final int CV_L2_Y = -332;
-    public static final int CV_L3_Y = -324;
-    public static final int EVA_LOGISTICS_DECK_Y = -464;
-    public static final int LILITH_TERMINAL_Y = -652;
 
     public static final int EVA_STANDING_MIN_HEIGHT = 60;
     public static final int EVA_SURFACE_SWEEP_HEIGHT = 80;
-    public static final int ROOF_COVER = 96;
 
     public static final List<BlockPos> CANDIDATE_CENTRES = List.of(
             // Rescue epoch deliberately shares X/Z with the complete legacy

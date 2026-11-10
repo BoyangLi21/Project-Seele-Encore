@@ -404,11 +404,6 @@ public final class EvaPoseGraph
         return committed;
     }
 
-    public static Snapshot committedSnapshot(EvaUnit01Entity entity,
-                                             Snapshot fallback)
-    {
-        return LAST_COMMITS.getOrDefault(entity.getId(), fallback);
-    }
 
     private static Snapshot snapshot(EvaUnit01Entity entity,
                                      float partialTick,

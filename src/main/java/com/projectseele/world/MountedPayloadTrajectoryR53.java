@@ -62,13 +62,4 @@ public final class MountedPayloadTrajectoryR53
         if(state.elevation()==0)return controller;var root=state.payloadFrame(controller.evaRoot());
         return new FootSupportFrameR52.Sample(root,root.transformPoint(binding.leftFoot()),root.transformPoint(binding.rightFoot()),root.compose(binding.plugInEva()));
     }
-    /** Keep the controller source and clock portable; explicitly encode the
-     * payload binding rather than hiding an offset in renderer coordinates. */
-    public static CompoundTag encodePortable(List<DirectoryTrajectoryR52> paths,Mount mount)
-    {
-        var encoded=DirectoryTrajectoryR52.encodePortableR52(paths);
-        if(mount.state().elevation()==0)return encoded;
-        if(mount.carrier()==null||mount.source().isEmpty())throw new IllegalArgumentException("Explicit actual payload binding required");
-        var tag=new CompoundTag();tag.putString("Type","r53-mounted-payload-window-v1");tag.put("Controller",encoded);tag.putUUID("Carrier",mount.carrier());tag.put("Mount",mount.source());tag.putDouble("Elevation",mount.state().elevation());return tag;
-    }
 }

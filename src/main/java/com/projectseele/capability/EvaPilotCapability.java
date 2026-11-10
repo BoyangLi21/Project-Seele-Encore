@@ -53,16 +53,6 @@ public final class EvaPilotCapability
         return 1.0F + maximumBonus * progress;
     }
 
-    /** Fraction of actual hull damage transferred to the pilot. */
-    public static float neuralFeedbackFraction(float synchronization)
-    {
-        float threshold = SeeleConfig.COMMON_SPEC.isLoaded()
-                ? SeeleConfig.EVA_SYNC_FEEDBACK_THRESHOLD.get().floatValue() : 60.0F;
-        float maximum = SeeleConfig.COMMON_SPEC.isLoaded()
-                ? SeeleConfig.EVA_SYNC_MAX_FEEDBACK_FRACTION.get().floatValue() : 0.35F;
-        float span = Math.max(1.0F, EvaPilotData.maxSynchronization() - threshold);
-        return maximum * Mth.clamp((synchronization - threshold) / span, 0.0F, 1.0F);
-    }
 
     private static float normalizedGrowth(float synchronization)
     {

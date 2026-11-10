@@ -44,8 +44,6 @@ public final class EncounterObserverCacheR45
         renderer = Objects.requireNonNull(actualSupport);
     }
 
-    public static void removeRendererSupport()
-    { clear(true); renderer = null; }
 
     private static Proof proof()
     {

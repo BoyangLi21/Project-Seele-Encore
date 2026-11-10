@@ -3,14 +3,12 @@ package com.projectseele.world;
 import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
-import java.nio.file.Paths;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Locale;
 import java.util.Map;
 import java.util.Set;
 
@@ -35,7 +33,6 @@ import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
 import net.minecraft.world.entity.Display;
 import net.minecraft.world.entity.Entity;
-import net.minecraft.world.entity.EntityType;
 import net.minecraft.world.entity.LivingEntity;
 import net.minecraft.world.level.BlockGetter;
 import net.minecraft.world.level.block.Block;
@@ -688,12 +685,6 @@ public final class S20CommandPresentationDirector
         }
     }
 
-    private static String fleetPhase(EvaFleetSavedData fleet, int variant)
-    {
-        return clip(fleet.entry(variant)
-                .map(entry -> entry.phase().name())
-                .orElse("UNREGISTERED"), 27);
-    }
 
     private static String clip(String value, int columns)
     {
@@ -701,17 +692,6 @@ public final class S20CommandPresentationDirector
                 ? value : value.substring(0, columns);
     }
 
-    private static CompoundTag displayTransform(float scale)
-    {
-        CompoundTag transformation = new CompoundTag();
-        transformation.put("translation", floatList(0.0F, 0.0F, 0.0F));
-        transformation.put("left_rotation",
-                floatList(0.0F, 0.0F, 0.0F, 1.0F));
-        transformation.put("scale", floatList(scale, scale, scale));
-        transformation.put("right_rotation",
-                floatList(0.0F, 0.0F, 0.0F, 1.0F));
-        return transformation;
-    }
 
     private static ListTag floatList(float... values)
     {

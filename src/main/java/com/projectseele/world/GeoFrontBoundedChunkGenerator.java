@@ -361,96 +361,6 @@ public final class GeoFrontBoundedChunkGenerator
         chunk.setUnsaved(true);
     }
 
-    /**
-     * Sparse broad-leaf forest masses from the TV GeoFront setting plan.
-     * Trees are planted only after every cavern column has been carved, or a
-     * later column would erase neighbouring leaves.  The two-block chunk
-     * margin keeps every tree self-contained and deterministic under lazy
-     * generation; the central NERV campus remains an open artificial sector.
-     */
-    private void plantCanonicalForest(ChunkAccess chunk, BlockPos centre)
-    {
-        ChunkPos chunkPos = chunk.getPos();
-        BlockPos.MutableBlockPos position = new BlockPos.MutableBlockPos();
-        for (int localZ = 2; localZ < 14; localZ++)
-        {
-            int worldZ = chunkPos.getMinBlockZ() + localZ;
-            int relativeZ = worldZ - centre.getZ();
-            for (int localX = 2; localX < 14; localX++)
-            {
-                int worldX = chunkPos.getMinBlockX() + localX;
-                int relativeX = worldX - centre.getX();
-                if (canonicalLake(relativeX, relativeZ))
-                {
-                    continue;
-                }
-                double density = canonicalForestDensity(
-                        relativeX, relativeZ);
-                if (density <= 0.0D)
-                {
-                    continue;
-                }
-                long hash = mixCoordinates(worldX, worldZ);
-                if (Math.floorMod(hash, 1000L)
-                        >= Math.round(density * 11.0D))
-                {
-                    continue;
-                }
-
-                int terrainTop = canonicalTerrainHeight(
-                        relativeX, relativeZ);
-                double dx = (worldX + 0.5D - centre.getX())
-                        / CANONICAL_RADIUS_XZ;
-                double dz = (worldZ + 0.5D - centre.getZ())
-                        / CANONICAL_RADIUS_XZ;
-                double radial = 1.0D - dx * dx - dz * dz;
-                if (radial <= 0.0D)
-                {
-                    continue;
-                }
-                int roof = canonicalRoofHeight(
-                        relativeX, relativeZ, this.surfaceDatum);
-                int trunkHeight = 6 + (int) Math.floorMod(hash >> 10, 4L);
-                if (terrainTop + trunkHeight + 3 >= roof)
-                {
-                    continue;
-                }
-
-                for (int y = terrainTop + 1;
-                     y <= terrainTop + trunkHeight; y++)
-                {
-                    position.set(worldX, y, worldZ);
-                    chunk.setBlockState(position,
-                            Blocks.OAK_LOG.defaultBlockState(), false);
-                }
-                int crownY = terrainTop + trunkHeight;
-                for (int dy = -2; dy <= 1; dy++)
-                {
-                    int radius = dy == 1 ? 1 : 2;
-                    for (int ox = -radius; ox <= radius; ox++)
-                    {
-                        for (int oz = -radius; oz <= radius; oz++)
-                        {
-                            if (Math.abs(ox) == radius
-                                    && Math.abs(oz) == radius
-                                    && dy != -1)
-                            {
-                                continue;
-                            }
-                            position.set(worldX + ox, crownY + dy,
-                                    worldZ + oz);
-                            if (chunk.getBlockState(position).isAir())
-                            {
-                                chunk.setBlockState(position,
-                                        Blocks.OAK_LEAVES
-                                                .defaultBlockState(), false);
-                            }
-                        }
-                    }
-                }
-            }
-        }
-    }
 
     @Override
     public void applyBiomeDecoration(net.minecraft.world.level.WorldGenLevel world,
@@ -573,26 +483,5 @@ public final class GeoFrontBoundedChunkGenerator
         return shore < 1.0D;
     }
 
-    private static double canonicalForestDensity(int x, int z)
-    {
-        // Three asymmetric masses leave the NERV/HQ centre and lake arrival
-        // axis readable, matching the setting diagram's forest/hill sectors.
-        double northWest = gaussian(x, z, -650.0D, 330.0D, 560.0D);
-        double south = gaussian(x, z, -160.0D, 760.0D, 520.0D);
-        double east = gaussian(x, z, 720.0D, 180.0D, 520.0D);
-        double campusClearance = gaussian(x, z, 0.0D, 0.0D, 300.0D);
-        return Math.max(0.0D,
-                Math.min(1.0D, Math.max(northWest,
-                        Math.max(south, east)) - campusClearance * 0.92D));
-    }
 
-    private static long mixCoordinates(int x, int z)
-    {
-        long value = x * 341873128712L ^ z * 132897987541L;
-        value ^= value >>> 33;
-        value *= 0xff51afd7ed558ccdL;
-        value ^= value >>> 33;
-        value *= 0xc4ceb9fe1a85ec53L;
-        return value ^ value >>> 33;
-    }
 }

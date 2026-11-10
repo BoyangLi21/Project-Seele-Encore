@@ -282,14 +282,6 @@ public final class TvEncounterRulesR45
         return owner!=null&&owner.level()==l&&d.phase.equals("combat")&&fireControlReadyR53(l,d,owner)
                 &&obstruction(l,d).isEmpty()&&equipmentBlocker(l,d).isEmpty()&&TvYashimaDirectorR50.cannonBlocker(eva).isEmpty();
     }
-    /** Real incoming ray consumer: only this original mission defender can intercept. */
-    public static java.util.Optional<Vec3> missionShieldContactR45(net.minecraft.world.entity.Mob boss,Vec3 from,Vec3 to)
-    {
-        if(!(boss.level() instanceof ServerLevel l)||missionRamielAnchor(boss)==null)return java.util.Optional.empty();
-        var d=TvCampaignSavedData.get(l);var cover=TvSortiesR32.assignedUnit(l,d,0);
-        if(!Set.of("alert","approach","combat").contains(d.phase)||cover==null||!TvMissionEquipmentR45.operational(cover))return java.util.Optional.empty();
-        return equipment.shieldBeamContact(cover,from,to);
-    }
     /** A tactical hold stops firing while the defender keeps its physical shield posture. */
     public static void pauseFire(ServerLevel l,TvCampaignSavedData d)
     {

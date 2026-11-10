@@ -2,11 +2,7 @@ package com.projectseele.world;
 
 import java.util.ArrayList;
 import java.util.List;
-import net.minecraft.core.BlockPos;
-import net.minecraft.world.level.BlockGetter;
-import net.minecraft.world.level.levelgen.structure.templatesystem.StructureTemplate.StructureBlockInfo;
 import net.minecraft.world.phys.shapes.BooleanOp;
-import net.minecraft.world.phys.shapes.CollisionContext;
 import net.minecraft.world.phys.shapes.Shapes;
 import net.minecraft.world.phys.shapes.VoxelShape;
 
@@ -15,17 +11,6 @@ public final class ExactBalancedUnionCandidateR45
 {
     private ExactBalancedUnionCandidateR45() {}
 
-    public static List<VoxelShape> captureEveryOriginalShape(Iterable<StructureBlockInfo> blocks, BlockGetter collisionLevel)
-    {
-        List<VoxelShape> shapes = new ArrayList<>();
-        for (StructureBlockInfo info : blocks)
-        {
-            BlockPos pos = info.pos();
-            VoxelShape original = info.state().getCollisionShape(collisionLevel, pos, CollisionContext.empty());
-            if (!original.isEmpty()) shapes.add(original.move(pos.getX(), pos.getY(), pos.getZ()));
-        }
-        return shapes;
-    }
 
     public static VoxelShape stockLeftFold(List<VoxelShape> originalMovedShapes)
     {

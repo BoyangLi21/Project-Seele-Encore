@@ -12,10 +12,6 @@ import net.minecraft.server.MinecraftServer;
  */
 public final class FacilityV2RescueDirector
 {
-    public static final String TARGET_WORLD =
-            FacilityWorldPolicy.BROKEN_ARCHIVE_DIRECTORY;
-    public static final String BROKEN_ARCHIVE_WORLD =
-            FacilityWorldPolicy.BROKEN_ARCHIVE_DIRECTORY;
 
     private FacilityV2RescueDirector() {}
 
@@ -29,8 +25,4 @@ public final class FacilityV2RescueDirector
         return FacilityWorldPolicy.isReadOnlyBrokenArchive(server);
     }
 
-    public static boolean isBrokenArchiveWorld(MinecraftServer server)
-    {
-        return FacilityWorldPolicy.isReadOnlyBrokenArchive(server);
-    }
 }

@@ -156,7 +156,6 @@ public final class NervRootAssemblyInstallationR52
     private static void advanceAdmissionR53(ServerLevel level,NervChunkAdmissionR53 admission)
     {admission.advance(level.getGameTime(),(chunk,radius)->level.getChunkSource().getChunkNow(chunk.x,chunk.z)!=null&&(radius==0||level.areEntitiesLoaded(chunk.toLong())),(chunk,radius)->retain(level,chunk,radius));}
     private static void captureActorChunksR52(ServerLevel level,NervRouteRuntimeStateR52 saved){for(var id:INSTALLED_ACTORS.getOrDefault(level,Set.of())){var actor=level.getEntity(id);if(actor!=null&&actor.isAlive())saved.installationActorChunkR52(id,new ChunkPos(BlockPos.containing(actor.position())).toLong());}}
-    public static String restorationHoldR52(ServerLevel level){return RESTORE_HOLDS.getOrDefault(level,"");}
     private static Result heldResultR52(ServerLevel level,String reason,NervRouteRuntimeStateR52.PendingInstallationR52 request){restoreHoldR52(level,reason);return new Result(false,reason,request.directory(),request.epoch());}
     @SubscribeEvent(priority=EventPriority.LOWEST) public static void restoreTickR52(TickEvent.ServerTickEvent event){
         if(event.phase!=TickEvent.Phase.END||!NervRouteRuntimeR52.mapRebuildEnabledR52())return;for(var level:event.getServer().getAllLevels()){

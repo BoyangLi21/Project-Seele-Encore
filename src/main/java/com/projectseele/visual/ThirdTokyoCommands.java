@@ -15,7 +15,6 @@ import com.projectseele.event.Tokyo3RamielBattleDirector.BattleStatus;
 import com.projectseele.world.ThirdTokyoSurfaceBuilder;
 import com.projectseele.world.ThirdTokyoSurfaceBuilder.DistrictAudit;
 import com.projectseele.world.IntegratedNervMapBuilder;
-import com.projectseele.world.EvaLogisticsDirector;
 import com.projectseele.world.FacilityWorldPolicy;
 import com.projectseele.world.Tokyo3RetractionDirector;
 import com.projectseele.world.Tokyo3RetractionDirector.RequestResult;
@@ -107,68 +106,6 @@ public final class ThirdTokyoCommands
         return 1;
     }
 
-    /** Fixed-world setup used by the unattended map screenshot target. */
-    static int setupVisualCapture(CommandSourceStack source) throws CommandSyntaxException
-    {
-        ServerPlayer player = source.getPlayerOrException();
-        ServerLevel level = player.getServer().getLevel(GeoFrontCommands.GEOFRONT);
-        if (level == null)
-        {
-            throw new IllegalStateException("GeoFront dimension is unavailable");
-        }
-        player.stopRiding();
-        BlockPos origin = IntegratedNervMapBuilder.tokyo3Origin(level);
-        level.setDayTime(6000L);
-        level.setWeatherParameters(12000, 0, false, false);
-        // Do not let a prior manual CITY ARMOUR toggle make this fixed
-        // visual fixture audit a different skyline on the next run.
-        RequestResult cityReset = Tokyo3RetractionDirector.forceDepth(
-                level, origin, false);
-        if (cityReset.accepted())
-        {
-            throw new IllegalStateException(
-                    "Tokyo-3 restoration is running as a bounded transaction; "
-                            + "rerun the visual capture after /seele city status reports DEPLOYED");
-        }
-        IntegratedNervMapBuilder.IntegratedAudit mapAudit =
-                IntegratedNervMapBuilder.ensure(level);
-        if (!mapAudit.valid())
-        {
-            throw new IllegalStateException(
-                    "Integrated Tokyo-3 visual map failed audit: "
-                            + mapAudit.summary());
-        }
-        List<EvaUnit01Entity> units = new java.util.ArrayList<>(3);
-        for (int variant = 0; variant < 3; variant++)
-        {
-            units.add(EvaLogisticsDirector.forceReset(level, variant));
-        }
-        for (EvaUnit01Entity unit : units)
-        {
-            IntegratedNervMapBuilder.LiftLink lift =
-                    IntegratedNervMapBuilder.lift(
-                            level, unit.getUnitVariant());
-            BlockPos bed = lift.surfaceBed();
-            unit.clearSortieDestination();
-            unit.moveTo(bed.getX() + 0.5D, bed.getY() + 1.0D,
-                    bed.getZ() + 0.5D, EvaUnit01Entity.SILO_BAY_YAW, 0.0F);
-            unit.setYRot(EvaUnit01Entity.SILO_BAY_YAW);
-            unit.setYBodyRot(EvaUnit01Entity.SILO_BAY_YAW);
-            unit.setYHeadRot(EvaUnit01Entity.SILO_BAY_YAW);
-            unit.setDeltaMovement(net.minecraft.world.phys.Vec3.ZERO);
-            unit.setNoGravity(true);
-            unit.setNoAi(true);
-            EvaLogisticsDirector.markDeployedForVisual(level, unit);
-        }
-        ProjectSeele.LOGGER.info(
-                "Tokyo-3 integrated visual setup: map={} surfaceUnits={}",
-                mapAudit.summary(), units.size());
-        // The real player remains high over the city centre so all imported
-        // chunks stay tracked while the independent camera visits each view.
-        player.teleportTo(level, origin.getX() + 0.5D, origin.getY() + 50.0D,
-                origin.getZ() + 0.5D, 180.0F, 0.0F);
-        return 1;
-    }
 
 
     private static int audit(CommandSourceStack source) throws CommandSyntaxException

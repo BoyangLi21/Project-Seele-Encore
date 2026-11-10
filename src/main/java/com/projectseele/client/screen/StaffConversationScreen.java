@@ -3,7 +3,6 @@ package com.projectseele.client.screen;
 import com.projectseele.network.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.gui.GuiGraphics;
-import net.minecraft.client.gui.components.Button;
 import net.minecraft.client.gui.components.EditBox;
 import net.minecraft.client.gui.components.AbstractWidget;
 import net.minecraft.client.gui.components.Tooltip;
@@ -390,17 +389,6 @@ public final class StaffConversationScreen extends Screen
             addButton((unit==i?"● ":"")+com.projectseele.world.NervStaffDialogue.unitName(i),
                     x+12+i*(column+4),top,column,()->{unit=selection;rebuildWidgets();},"");
         }
-    }
-    private String equipmentLabel()
-    {
-        if(sortieEquipment.equals("special")&&unit==0)return "零号机盾 · 到盾井领取";
-        if(sortieEquipment.equals("special")&&unit==2)return "二号机长剑 · 到剑井领取";
-        return sortieEquipment.equals("rifle")?"步枪 · 到武器井领取":"近战";
-    }
-    private void cycleEquipment()
-    {
-        String current=sortieEquipment.equals("special")&&unit!=0&&unit!=2?"melee":sortieEquipment;
-        sortieEquipment=switch(current){case "melee" -> "rifle";case "rifle" -> unit==0||unit==2?"special":"melee";default -> "melee";};
     }
     static String sortieRequest(String mission,int unit,boolean npc,String equipment)
     {

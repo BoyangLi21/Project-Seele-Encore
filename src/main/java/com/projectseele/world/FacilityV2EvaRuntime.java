@@ -177,10 +177,6 @@ public final class FacilityV2EvaRuntime
                 bed.getZ() - 46);
     }
 
-    public static BlockPos powerPylon(ServerLevel level, int variant)
-    {
-        return hangarBed(level, variant).offset(54, 41, 4);
-    }
 
     public static BlockPos boardingPosition(ServerLevel level, int variant)
     {
@@ -188,11 +184,6 @@ public final class FacilityV2EvaRuntime
         return new BlockPos(bed.getX() + 2, -408, bed.getZ() + 27);
     }
 
-    public static BlockPos rescueFootPosition(
-            ServerLevel level, int variant)
-    {
-        return statusControl(level, variant).above();
-    }
 
     /**
      * Installs the tiny dynamic control surface separately from the immutable
@@ -708,114 +699,6 @@ public final class FacilityV2EvaRuntime
         CRANE_FRAMES.clear();
     }
 
-    private static void paintCraneFrame(
-            ServerLevel level, int variant,
-            CraneFrame frame, boolean present)
-    {
-        BlockPos bed = hangarBed(level, variant);
-        FacilitySchemaV2.IntBox[] owners = owners(level, variant);
-        BlockState accent = switch (variant)
-        {
-            case 0 -> Blocks.ORANGE_CONCRETE.defaultBlockState();
-            case 2 -> Blocks.RED_CONCRETE.defaultBlockState();
-            default -> Blocks.PURPLE_CONCRETE.defaultBlockState();
-        };
-        BlockState girder = Blocks.POLISHED_DEEPSLATE.defaultBlockState();
-        BlockState casing = Blocks.COPPER_BLOCK.defaultBlockState();
-        BlockState brassCasing = Blocks.CUT_COPPER.defaultBlockState();
-        BlockState carriage = Blocks.POLISHED_BLACKSTONE.defaultBlockState();
-        BlockState pulley = Blocks.PISTON.defaultBlockState()
-                .setValue(net.minecraft.world.level.block.piston.PistonBaseBlock.FACING,
-                        Direction.DOWN);
-        BlockState magnet = Blocks.EXPOSED_COPPER.defaultBlockState();
-
-        // A real rectangular bridge trolley: two parallel structural girders,
-        // end ties and a central carriage. The old single row of unrelated
-        // copper blocks read as floating debris from every oblique view.
-        for (int dz : new int[] {-CRANE_DEPTH, CRANE_DEPTH})
-        {
-            for (int dx = -CRANE_HALF_SPAN; dx <= CRANE_HALF_SPAN; dx++)
-            {
-                setOwned(level, owners,
-                        new BlockPos(bed.getX() + dx, CRANE_TROLLEY_Y,
-                                frame.z() + dz),
-                        present ? girder : AIR);
-            }
-        }
-        for (int dx : new int[] {-CRANE_HALF_SPAN, CRANE_HALF_SPAN})
-        {
-            for (int dz = -CRANE_DEPTH; dz <= CRANE_DEPTH; dz++)
-            {
-                setOwned(level, owners,
-                        new BlockPos(bed.getX() + dx, CRANE_TROLLEY_Y,
-                                frame.z() + dz),
-                        present ? girder : AIR);
-            }
-        }
-        setOwned(level, owners,
-                new BlockPos(bed.getX(), CRANE_TROLLEY_Y, frame.z()),
-                present ? carriage : AIR);
-
-        // The underside crosshead visibly carries two rope pulleys.  Both
-        // suspension lines terminate in magnets on the lower spreader, so no
-        // cable or piston is left hovering beside the capsule.
-        for (int dx = -4; dx <= 4; dx++)
-        {
-            BlockState crosshead = Math.abs(dx) == CRANE_CABLE_X
-                    ? pulley : girder;
-            setOwned(level, owners,
-                    new BlockPos(bed.getX() + dx, CRANE_TROLLEY_Y - 1,
-                            frame.z()), present ? crosshead : AIR);
-        }
-        for (int dx : new int[] {-CRANE_CABLE_X, CRANE_CABLE_X})
-        {
-            for (int y = frame.bottomY() + 2;
-                  y < CRANE_TROLLEY_Y - 1; y++)
-            {
-                setOwned(level, owners,
-                        new BlockPos(bed.getX() + dx, y, frame.z()),
-                        present ? CRANE_CABLE : AIR);
-            }
-        }
-        for (int dx : new int[] {-CRANE_CABLE_X, CRANE_CABLE_X})
-        {
-            setOwned(level, owners,
-                    new BlockPos(bed.getX() + dx, frame.bottomY() + 1,
-                            frame.z()), present ? magnet : AIR);
-        }
-
-        // Four-sided lower spreader.  Its centre collar touches the entry-plug
-        // crane marker while the rectangular frame remains legible from the
-        // gallery and from either side of the cage.
-        for (int dz : new int[] {-CRANE_DEPTH, CRANE_DEPTH})
-        {
-            for (int dx = -4; dx <= 4; dx++)
-            {
-                setOwned(level, owners,
-                        new BlockPos(bed.getX() + dx, frame.bottomY(),
-                                frame.z() + dz),
-                        present ? girder : AIR);
-            }
-        }
-        for (int dx : new int[] {-4, 4})
-        {
-            for (int dz = -CRANE_DEPTH; dz <= CRANE_DEPTH; dz++)
-            {
-                setOwned(level, owners,
-                        new BlockPos(bed.getX() + dx, frame.bottomY(),
-                                frame.z() + dz),
-                        present ? girder : AIR);
-            }
-        }
-        for (int dx = -2; dx <= 2; dx++)
-        {
-            BlockState collar = dx == 0 ? accent
-                    : Math.abs(dx) == 1 ? brassCasing : casing;
-            setOwned(level, owners,
-                    new BlockPos(bed.getX() + dx, frame.bottomY(), frame.z()),
-                    present ? collar : AIR);
-        }
-    }
 
     /** Exact persisted crane volume, independent of the process-local cache. */
     public static boolean isPlugCraneCell(ServerLevel level, int variant,

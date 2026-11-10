@@ -112,16 +112,6 @@ public final class S20PersonnelRouteDirector
                 .is(Blocks.STRUCTURE_VOID);
     }
 
-    /** Rebuilds only the corrected B-40 stair and its upper handoff. */
-    public static void repairB40RiseAndHandoff(ServerLevel level)
-    {
-        if(NervLegacyGenerationGuardR52.retired(level))return;
-        buildB40Rise(level);
-        for (int x = 57; x <= 77; x++)
-        {
-            buildUpperConcourseSlice(level, x);
-        }
-    }
 
     private static boolean authorised(MinecraftServer server)
     {

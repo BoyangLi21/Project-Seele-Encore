@@ -10,17 +10,13 @@ import net.minecraft.world.phys.Vec3;
  */
 public final class TreeOfLifeLayout
 {
-    /** Ritual-space orientation; semantic indices remain Keter through Malkuth. */
-    public static final String TABLEAU_ORIENTATION = "EOE_INVERTED";
     // Unit-01 now uses the approved 2x airframe. Keep the ritual bodies at
     // humanly readable spacing in world space, then frame the whole tableau
     // from farther away; compressing the old 62 x 134 field made the central
     // cruciform airframe physically intersect six Mass-Production Evas.
     public static final float COLUMN_X = 48.0F;
     public static final float ROW_Y = 40.0F;
-    public static final int KETER = 0;
     public static final int TIFERET = 5;
-    public static final int MALKUTH = 9;
 
     /**
      * Local plane coordinates (x across, y up), index 0..9 = Keter..Malkuth.

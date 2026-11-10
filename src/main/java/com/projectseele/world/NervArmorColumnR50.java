@@ -3,7 +3,6 @@ package com.projectseele.world;
 import com.google.gson.JsonParser;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.RamielEntity;
-import com.projectseele.entity.LilithEntity;
 import com.projectseele.event.TvEncounterDirectorR45;
 import net.minecraft.core.BlockPos;
 import net.minecraft.core.registries.BuiltInRegistries;
@@ -132,15 +131,6 @@ public final class NervArmorColumnR50
         {s.stepBudget-=stepTicks;damageLayer(level,p,s,layer,20,hit.getLocation());}
         s.setDirty();
     }
-    /** A real laser consumer can submit its actual traced segment to the same plate integrity. */
-    public static boolean beamImpactR50(ServerLevel level,LivingEntity attacker,Vec3 from,Vec3 to,float damage)
-    {
-        var p=plan(level).orElse(null);if(p==null||!p.installed()||!Float.isFinite(damage)||damage<=0)return false;
-        var s=initialized(level,p);var layer=front(p,s);if(layer==null)return false;
-        var hit=level.clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,attacker));
-        if(hit.getType()!=HitResult.Type.BLOCK||!inLayer(p,layer,hit.getBlockPos())||!level.getBlockState(hit.getBlockPos()).is(layer.block()))return false;
-        damageLayer(level,p,s,layer,Math.min(damage,layer.hp()),hit.getLocation());return true;
-    }
     /** Only the original surface plate is vulnerable to the first two Angels. They never drill deeper. */
     public static Optional<Vec3> surfaceAimR52(ServerLevel level)
     {
@@ -176,20 +166,6 @@ public final class NervArmorColumnR50
             level.playSound(null,BlockPos.containing(point),net.minecraft.sounds.SoundEvents.ANVIL_BREAK,net.minecraft.sounds.SoundSource.HOSTILE,4,.55F);
         }
         level.sendParticles(net.minecraft.core.particles.ParticleTypes.SMOKE,point.x,point.y,point.z,12,2,.5,2,.03);s.setDirty();publish(level,p,s);
-    }
-    /** Kept for future physical invasion stages; a roof hole does not grant a path through HQ. */
-    public static boolean actualTerminalContactR50(ServerLevel level,LivingEntity angel,Vec3 actualContact)
-    {
-        if(!(angel instanceof com.projectseele.entity.Angel))return false;var p=plan(level).orElse(null);if(p==null||actualContact==null)return false;
-        if(actualContact.distanceTo(p.terminal())>12||!angel.getBoundingBox().inflate(2).contains(actualContact))return false;
-        for(var lilith:level.getEntitiesOfClass(LilithEntity.class,new AABB(p.terminal(),p.terminal()).inflate(80)))
-        {
-            if(!lilith.isAlive()||!lilith.getBoundingBox().inflate(2).contains(actualContact))continue;
-            var wall=level.clip(new ClipContext(angel.getBoundingBox().getCenter(),actualContact,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,angel));
-            if(wall.getType()!=HitResult.Type.MISS&&wall.getLocation().distanceTo(actualContact)>1)return false;
-            var s=initialized(level,p);s.terminalContact=true;s.phase="terminal_contact";s.setDirty();return true;
-        }
-        return false;
     }
     public static String repair(ServerPlayer operator)
     {

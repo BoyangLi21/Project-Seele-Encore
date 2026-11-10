@@ -58,7 +58,6 @@ public final class EvaLogisticsDirector
     private static final double VERTICAL_BLOCKS_PER_TICK = 2.0D;
     private static final double RECOVERY_RADIUS = 10.0D;
     private static final double RECOVERY_MAX_SPEED_SQR = 0.0025D;
-    private static final int MAP_RADIUS = 400;
     private static final int ROUTE_CHUNK_MARGIN = 16;
     /** Keep station entity attachment alive until the readiness check completes. */
     private static final TicketType<ChunkPos> STATION_LOAD_TICKET = TicketType.create(
@@ -851,27 +850,6 @@ public final class EvaLogisticsDirector
         return canonical(level, variant);
     }
 
-    /** Keeps deterministic screenshot fixtures out of the live parking loop. */
-    public static void markDeployedForVisual(ServerLevel level,
-                                             EvaUnit01Entity unit)
-    {
-        requireCompactLogistics(level, "markDeployedForVisual");
-        int variant = unit.getUnitVariant();
-        FleetEntry current = entry(level, variant);
-        if (current == null || !current.canonicalId().equals(unit.getUUID()))
-        {
-            EvaFleetSavedData.get(level.getServer()).put(variant,
-                    new FleetEntry(unit.getUUID(), Phase.DEPLOYED, 0,
-                            unit.blockPosition().getY(), 0));
-        }
-        else
-        {
-            put(level, variant, current.withPhase(Phase.DEPLOYED,
-                    0, unit.blockPosition().getY(), 0));
-        }
-        unit.clearSortieDestination();
-        unit.setNervLogisticsLocked(false);
-    }
     /** Hangar preparation controls plus three supported Tokyo-3 recovery keys. */
     public static boolean handleUse(ServerPlayer player, BlockPos position)
     {
@@ -2322,50 +2300,7 @@ public final class EvaLogisticsDirector
                 FacilityV2EvaRuntime.LCL_SHOULDER_LAYERS);
     }
 
-    private static void setVerticalCarrier(ServerLevel level, BlockPos shaft,
-                                           int y, boolean present)
-    {
-        int half = EvaHangarBuilder.CARRIER_HALF_EXTENT;
-        for (int x = -half; x <= half; x++)
-        {
-            for (int z = -half; z <= half; z++)
-            {
-                BlockPos position = new BlockPos(shaft.getX() + x, y,
-                        shaft.getZ() + z);
-                if (present)
-                {
-                    boolean rim = Math.abs(x) == half
-                            || Math.abs(z) == half;
-                    level.setBlock(position, rim
-                            ? net.minecraft.world.level.block.Blocks.IRON_BLOCK.defaultBlockState()
-                            : net.minecraft.world.level.block.Blocks.LIGHT_GRAY_CONCRETE.defaultBlockState(), 2);
-                }
-                else
-                {
-                    level.setBlock(position,
-                            net.minecraft.world.level.block.Blocks.AIR.defaultBlockState(), 2);
-                }
-            }
-        }
-        if (present && y == shaft.getY())
-        {
-            level.setBlock(new BlockPos(shaft.getX(), y, shaft.getZ()),
-                    net.minecraft.world.level.block.Blocks.LODESTONE.defaultBlockState(), 2);
-        }
-    }
 
-    private static void setVerticalCarrier(
-            ServerLevel level, int variant, BlockPos shaft,
-            int y, boolean present)
-    {
-        if (FacilityV2EvaRuntime.ready(level, variant))
-        {
-            FacilityV2EvaRuntime.setCarrier(level, variant,
-                    new BlockPos(shaft.getX(), y, shaft.getZ()), present);
-            return;
-        }
-        setVerticalCarrier(level, shaft, y, present);
-    }
 
     private static boolean isAtAssignedHangar(ServerLevel level,
                                                EvaUnit01Entity unit,

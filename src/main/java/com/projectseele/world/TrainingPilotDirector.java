@@ -20,11 +20,9 @@ import com.projectseele.entity.EntryPlugCarrierEntity;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.entity.TrainingPilotEntity;
 import com.projectseele.network.ServerboundEvaVideoFramePacket;
-import com.projectseele.registry.ModEntities;
 import com.projectseele.registry.ModFluids;
 import com.projectseele.visual.GeoFrontCommands;
 import net.minecraft.core.BlockPos;
-import net.minecraft.core.Direction;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.sounds.SoundEvents;
@@ -453,60 +451,6 @@ public final class TrainingPilotDirector
         if(keeper!=null&&keeper.getVehicle()==null)holdAtStandby(level,keeper);
     }
 
-    public static TrainingPilotEntity resetToStandby(ServerLevel level,
-                                                       int variant)
-    {
-        if(NervRouteRuntimeR52.claimed(level)){var original=existingPilotR45(level,variant);if(original!=null)NervRouteRuntimeR52.pilotRouting(level,original,"return");return original;}
-        if(PilotRestroomsR47.configured(level))
-        {
-            var original=existingPilotR45(level,variant);
-            if(original!=null)beginReturnOrReset(level,original);
-            return original;
-        }
-        BlockPos standby = requestedStandby(level, variant);
-        level.getChunkAt(standby);
-        if (!level.areEntitiesLoaded(net.minecraft.world.level.ChunkPos.asLong(standby)))
-        {
-            return null;
-        }
-        BlockPos safeStandby=nearestSafeFeet(level,standby);
-        if(safeStandby==null)return null;
-        clearRouteState(variant);
-        TrainingPilotEntity keeper = null;
-        for (TrainingPilotEntity pilot : pilots(level))
-        {
-            if (pilot.getAssignedVariant() != variant)
-            {
-                continue;
-            }
-            if (keeper == null)
-            {
-                keeper = pilot;
-            }
-            else
-            {
-                pilot.stopRiding();
-                pilot.discard();
-            }
-        }
-        if (keeper == null)
-        {
-            keeper = ModEntities.TRAINING_PILOT.get().create(level);
-            if (keeper == null)
-            {
-                return null;
-            }
-            keeper.assignVariant(variant);
-            if (!level.addFreshEntity(keeper))
-            {
-                return null;
-            }
-        }
-        keeper.stopRiding();
-        keeper.moveTo(safeStandby.getX()+.5D,safeStandby.getY(),safeStandby.getZ()+.5D,0,0);
-        parkPilot(level, keeper);
-        return keeper;
-    }
 
     private static boolean beginReturnOrReset(ServerLevel level,TrainingPilotEntity pilot)
     {
