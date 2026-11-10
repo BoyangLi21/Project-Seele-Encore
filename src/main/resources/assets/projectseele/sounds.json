@@ -1,4 +1,13 @@
 {
+  "ropeway_ride": {
+    "subtitle": "subtitles.projectseele.ropeway_ride",
+    "sounds": [
+      {
+        "name": "projectseele:ropeway_ride",
+        "stream": true
+      }
+    ]
+  },
   "alarm": {
     "subtitle": "subtitles.projectseele.alarm",
     "sounds": [

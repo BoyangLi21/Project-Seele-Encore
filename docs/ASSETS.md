@@ -37,6 +37,7 @@ R10 负责人授权下载的九份 Battle Orchestra 模型与纹理仅放在 `ex
 | `sounds/crystal_break.ogg` | 拉米尔死亡 | 同上（下行玻璃音簇+噪声） |
 | `sounds/drill.ogg` | 二阶段钻击 | R63 重做：同上的 `v2_rotor_continuous`（55 Hz 奇次谐波、转子起伏和研磨噪声，一整段 4 秒，每次钻击只播一次） |
 | `sounds/ramiel_hum.ogg` | 拉米尔环境音 | 同上（110/164.6Hz 拍频） |
+| `sounds/ropeway_ride.ogg` | 坐箱根缆车时的车厢声（16 秒循环） | 原创：`tools/build_ropeway_audio_r63.py` 数学合成（电机嗡鸣、钢缆低频、窗外风声、过支架滑轮的咔哒声），无采样 |
 | `sounds/rifle_fire.ogg` | EVA 帕雷特步枪 | 原创合成：机械枪机、爆音噪声与低频尾响，不含影视或现实枪械采样 |
 
 全部由脚本以固定随机种子生成，可复现；无采样、无原作旋律。许可随仓库 MIT。`tools/gen_sounds.ps1` 已在 c0ffbb9e 清理时移出工作树，取用见 git 历史；上表其余未标 R61 的文件仍由它生成。

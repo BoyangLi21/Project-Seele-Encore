@@ -21,6 +21,7 @@ public class ModSounds
     public static final RegistryObject<SoundEvent> CRYSTAL_HIT = register("crystal_hit");
     public static final RegistryObject<SoundEvent> CRYSTAL_BREAK = register("crystal_break");
     public static final RegistryObject<SoundEvent> DRILL = registerFixed("drill",160);
+    public static final RegistryObject<SoundEvent> ROPEWAY_RIDE = register("ropeway_ride");
     public static final RegistryObject<SoundEvent> RAMIEL_HUM = register("ramiel_hum");
     public static final RegistryObject<SoundEvent> RIFLE_FIRE = register("rifle_fire");
     public static final RegistryObject<SoundEvent> EVA_FOOT_CONCRETE=register("eva_foot_concrete");
