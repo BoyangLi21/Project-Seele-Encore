@@ -12,8 +12,6 @@ import com.projectseele.util.WeakIdentityMap;
  */
 public final class EvaStepSmoothingR57
 {
-    /** A rise this fast while standing (blocks per frame) is a step, not a slope. */
-    private static final double STEP_RISE=.6;
     /** Spring stiffness (1/s): a kerb takes about a third of a second, a bench-high ledge about half. */
     private static final double RATE=12,RATE_HIGH=7;
     /** Longest the body waits low for a sole to reach over the ledge (seconds). */
@@ -45,7 +43,10 @@ public final class EvaStepSmoothingR57
         if(com.projectseele.entity.EvaFieldActionsR45.CLIMB.equals(com.projectseele.entity.EvaFieldActionsR45.clip(e)))
         {s.offset=0;s.speed=0;s.held=0;return 0;}
         boolean standing=e.onGround()&&!e.isVisuallyAirborneForRender();
-        if(standing&&rise>STEP_RISE&&rise<24)s.offset-=rise;
+        // Every rise while standing, however slow: a climb up a terraced slope goes up a block in a
+        // tick and stands for the next two, and a rise per frame under the old step threshold reached
+        // the screen as that staircase (and counted as a step or not by the frame rate).
+        if(standing&&rise>0&&rise<24)s.offset-=rise;
         double rate=Math.max(s.offset<-10?RATE_HIGH:RATE,Math.min(30,s.pace/2.5));
         // A tall step rises only once a sole stands over the ledge: lifting
         // the body while both feet were still before the kerb floated it.
@@ -58,7 +59,10 @@ public final class EvaStepSmoothingR57
             return (float)s.offset;
         }
         if(s.offset>-.05)s.held=0;
-        if(!standing&&s.offset<0&&rise<0)s.offset=Math.min(0,s.offset-rise);
+        // A fall while the body still lags below its entity comes out of that lag first, standing or
+        // not: on a climb the entity is set a block back down several times, and each correction
+        // reached the screen as a drop of the whole body.
+        if(s.offset<0&&rise<0)s.offset=Math.min(0,s.offset-rise);
         double step=(s.speed+rate*s.offset)*dt,decay=Math.exp(-rate*dt);
         s.offset=(s.offset+step)*decay;s.speed=(s.speed-rate*step)*decay;
         if(s.offset>0){s.offset=0;s.speed=0;}

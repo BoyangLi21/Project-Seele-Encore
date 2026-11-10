@@ -96,7 +96,14 @@ final class EvaGroundContactR56
         // Root offsets are model pixels; the world frame only turns and scales.
         float grounded=base.getPosY()-gap*16/EvaScale.RENDER_SCALE;
         float sink=easeSink(eva,sinkWanted,now);
-        float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now)+EvaBodyWeightR59.pelvis(eva,partial,now,walking)-sink*16/EvaScale.RENDER_SCALE;
+        // How far the ground under either sole lies from the drawn plane, 0 on level ground to 1.
+        float uneven=0;
+        for(String side:new String[]{"l","r"})
+        {
+            double under=EvaFootPlacement.groundUnder(eva,side);
+            if(Double.isFinite(under))uneven=Math.max(uneven,Mth.clamp(((float)Math.abs(under-ground)-.5F)/1.5F,0,1));
+        }
+        float drawn=base.getPosY()+easeGrounding(eva,-gap*16/EvaScale.RENDER_SCALE,walking,now,uneven)+EvaBodyWeightR59.pelvis(eva,partial,now,walking)-sink*16/EvaScale.RENDER_SCALE;
         base.setPosY(drawn);
         if(com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)
         {
@@ -157,10 +164,17 @@ final class EvaGroundContactR56
 
     /** A running sole this far off the ground (blocks) is held to it, fading out by the second. */
     private static final float PIN_NEAR=.5F,PIN_FAR=2.2F;
-    private record Grounding(float offset,float speed,long time) {}
+    private record Grounding(float offset,float speed,long time,float uneven) {}
     private static final Map<Integer,Grounding> PELVIS=new HashMap<>();
     /** Stiffness (1/s) of the walking grounding spring, and its largest lag behind the grounding offset (model pixels). */
     private static final float PELVIS_RATE=18F,PELVIS_LAG=1.1F;
+    /**
+     * On uneven ground the offset may lag this much further (model pixels), let go of over the
+     * given time (seconds) once the ground is level again. Which sole holds the body up changes
+     * with every terrace there, by up to three blocks at once; held within the walking lag, the
+     * whole body jumped that far in a frame.
+     */
+    private static final float PELVIS_LAG_UNEVEN=14F,UNEVEN_RELEASE=.6F;
 
     /**
      * Walking, the grounding offset (not the pelvis height) follows through a
@@ -169,11 +183,18 @@ final class EvaGroundContactR56
      * height lagged that bob by a third of a block, and the stance legs were
      * bent every frame to take it up.
      */
-    private static float easeGrounding(EvaUnit01Entity eva,float offset,float walking,long now)
+    private static float easeGrounding(EvaUnit01Entity eva,float offset,float walking,long now,float unevenNow)
     {
         var last=PELVIS.get(eva.getId());
-        if(last!=null&&last.time()==now)return Mth.lerp(walking,offset,Mth.clamp(last.offset(),offset-PELVIS_LAG,offset+PELVIS_LAG));
+        if(last!=null&&last.time()==now)
+        {
+            float held=PELVIS_LAG+PELVIS_LAG_UNEVEN*last.uneven();
+            return Mth.lerp(walking,offset,Mth.clamp(last.offset(),offset-held,offset+held));
+        }
         float dt=last==null?0:(now-last.time())/1e9F;
+        float uneven=unevenNow;
+        if(last!=null&&dt>0&&dt<.25F)uneven=Math.max(unevenNow,last.uneven()*(float)Math.exp(-dt/UNEVEN_RELEASE));
+        float lag=PELVIS_LAG+PELVIS_LAG_UNEVEN*uneven;
         float eased=offset,speed=0;
         if(last!=null&&dt>0&&dt<.25F)
         {
@@ -181,9 +202,9 @@ final class EvaGroundContactR56
             eased=offset+(error+step)*decay;
             speed=(last.speed()-PELVIS_RATE*step)*decay;
         }
-        eased=Mth.clamp(eased,offset-PELVIS_LAG,offset+PELVIS_LAG);
+        eased=Mth.clamp(eased,offset-lag,offset+lag);
         if(PELVIS.size()>32)PELVIS.clear();
-        PELVIS.put(eva.getId(),new Grounding(eased,speed,now));
+        PELVIS.put(eva.getId(),new Grounding(eased,speed,now,uneven));
         return Mth.lerp(walking,offset,eased);
     }
 
