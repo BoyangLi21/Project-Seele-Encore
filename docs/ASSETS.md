@@ -14,7 +14,7 @@ R48选用CC0 1.0实录的公开HQ MP3预览，并非原始WAV。没有喷气声�
 | `r48_hydraulic_charge_recorded.ogg` | kr15h液压泵／阀门：https://freesound.org/people/kr15h/sounds/689263/ |
 | `r48_catapult_release_recorded.ogg` | newagesoup钢材撞击：https://freesound.org/people/newagesoup/sounds/337832/ ；Philipp Grzemba／Sheyvan集装箱：https://freesound.org/people/Sheyvan/sounds/569413/ |
 | `r48_catapult_acceleration_recorded.ogg` | lolamadeus货梯门：https://freesound.org/people/lolamadeus/sounds/161228/ ；上述kr15h液压泵 |
-| `r48_surface_door_slide_recorded.ogg`、`r48_surface_door_slide_heavy_recorded.ogg` | 上述lolamadeus货梯门；heavy层来自同份录音低频结构层，正式地表门只绑定heavy版 |
+| `r48_surface_door_slide_heavy_recorded.ogg` | 上述lolamadeus货梯门；heavy层来自同份录音低频结构层，正式地表门只绑定heavy版 |
 | `r48_surface_door_endstop_recorded.ogg` | 上述newagesoup钢材撞击与Sheyvan集装箱 |
 
 newagesoup原棚门源EpicWizard https://freesound.org/people/EpicWizard/sounds/264889/ 同为CC0。CC0文本：https://creativecommons.org/publicdomain/zero/1.0/ 。地下18tick TV门不使用这份较长地表门录音。运行接线不代表已完成听觉或原生验收。
