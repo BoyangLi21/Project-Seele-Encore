@@ -3,7 +3,6 @@ package com.projectseele.client.sound;
 import com.mojang.blaze3d.audio.Channel;
 import com.projectseele.ProjectSeele;
 import com.projectseele.mixin.client.SoundChannelAccessorR61;
-import com.projectseele.world.EvaPilotResolver;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.resources.sounds.SimpleSoundInstance;
 import net.minecraft.client.resources.sounds.SoundInstance;
@@ -68,7 +67,6 @@ public final class VenueReverbR61
     private static final float WET_DISTANCE_ROLLOFF = .7F;
 
     private static volatile Venue current = Venue.OPEN;
-    private static volatile boolean sealedInPlug;
     private static int tick;
     private static long context;
     private static int effect;
@@ -130,7 +128,6 @@ public final class VenueReverbR61
         var minecraft = Minecraft.getInstance();
         if (minecraft.level == null || minecraft.player == null) return;
         var player = minecraft.player;
-        sealedInPlug = EvaPilotResolver.sealedInAirframe(player) && minecraft.options.getCameraType().isFirstPerson();
         Vec3 ear = minecraft.gameRenderer.getMainCamera().getPosition();
         var lengths = new float[DIRECTIONS.length];
         for (int index = 0; index < lengths.length; index++)
@@ -229,7 +226,7 @@ public final class VenueReverbR61
 
     private static void attach(SoundInstance sound, Channel channel)
     {
-        if (!announcement(sound) || sealedInPlug || !ready()) return;
+        if (!announcement(sound) || !ready()) return;
         Venue venue = current;
         if (venue != loaded) load(venue);
         int source = ((SoundChannelAccessorR61) channel).seele$source();

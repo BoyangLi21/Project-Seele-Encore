@@ -65,9 +65,12 @@ public final class NervLaunchFeedbackR53
         if(burst)
         {
             feedback.putLong("BurstAt",now);
-            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.LAUNCH_ELECTRIC_BURST_R53.get(),12F,2F,.82F);
-            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.FACILITY.get("facility_hydraulic_launch").get(),12F,2F,.85F);
-            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.FACILITY.get("facility_catapult").get(),10F,1.6F,.8F);
+            // Exaggerated on purpose: twice the reach, plus a deep blast and a rolling rumble layered under the release.
+            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.LAUNCH_ELECTRIC_BURST_R53.get(),24F,2F,.82F);
+            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.FACILITY.get("facility_hydraulic_launch").get(),24F,2F,.85F);
+            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,ModSounds.FACILITY.get("facility_catapult").get(),20F,1.6F,.8F);
+            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,net.minecraft.sounds.SoundEvents.GENERIC_EXPLODE,24F,2F,.55F);
+            FacilityRouteAudioR53.mechanical(level,eva,soundPoint,net.minecraft.sounds.SoundEvents.LIGHTNING_BOLT_THUNDER,24F,1.5F,.7F);
         }
         // A single startup cloud remained behind the accelerating 60 m body.
         // Emit a short continuous pressure release at the measured moving heads,

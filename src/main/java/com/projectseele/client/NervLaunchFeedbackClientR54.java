@@ -19,7 +19,8 @@ public final class NervLaunchFeedbackClientR54
         var last=LAST.computeIfAbsent(mc.level,ignored->new HashMap<>());
         if(packet.tick()<=last.getOrDefault(packet.entity(),Long.MIN_VALUE))return;
         last.put(packet.entity(),packet.tick());
-        if(com.projectseele.config.SeeleConfig.FX_INTENSITY.get()<=0)return;
+        double fx=com.projectseele.config.SeeleConfig.FX_INTENSITY.get();
+        if(fx<=0)return;
         var camera=mc.gameRenderer.getMainCamera().getPosition();var random=mc.level.random;
         double strength=Math.min(1,packet.speed()/100D);
         Vec3 centre=Vec3.ZERO;
@@ -35,16 +36,27 @@ public final class NervLaunchFeedbackClientR54
             // The measured facets are pressed against steel. Release the
             // visible plume beyond that contact instead of inside the bearing.
             Vec3 nozzle=point.add(outward.scale(3.5)).add(tangent.scale(-1.5));
-            int clouds=packet.burst()?28:8;
+            // The owner asked for a heavier launch: a bigger first blast and a denser trail.
+            int clouds=(int)Math.round((packet.burst()?60:14)*fx);
+            double spread=packet.burst()?4.5:2.8;
             for(int i=0;i<clouds;i++)
             {
-                var origin=nozzle.add((random.nextDouble()-.5)*2.8,(random.nextDouble()-.5)*1.8,(random.nextDouble()-.5)*2.8);
+                var origin=nozzle.add((random.nextDouble()-.5)*spread,(random.nextDouble()-.5)*1.8,(random.nextDouble()-.5)*spread);
                 Vec3 jet=outward.scale(.7+random.nextDouble()*.6).add(tangent.scale(-(.7+strength*1.2)));
                 var particle=mc.particleEngine.createParticle(ParticleTypes.CLOUD,origin.x,origin.y,origin.z,jet.x,jet.y,jet.z);
                 // createParticle already enqueues the instance in ParticleEngine.
-                if(particle!=null){particle.scale(packet.burst()?60F:42F);particle.setColor(.94F,.97F,1F);particle.setLifetime(packet.burst()?55:38);}
+                if(particle!=null){particle.scale(packet.burst()?80F:50F);particle.setColor(.94F,.97F,1F);particle.setLifetime(packet.burst()?80:48);}
             }
-            int sparks=packet.burst()?32:6+(int)(strength*8);
+            // A slow steam column stays over the launch rails after the first blast.
+            int column=packet.burst()?(int)Math.round(10*fx):0;
+            for(int i=0;i<column;i++)
+            {
+                var origin=nozzle.add((random.nextDouble()-.5)*3,(random.nextDouble()-.5)*2,(random.nextDouble()-.5)*3);
+                var particle=mc.particleEngine.createParticle(ParticleTypes.CAMPFIRE_SIGNAL_SMOKE,origin.x,origin.y,origin.z,
+                        outward.x*.05,.08+random.nextDouble()*.07,outward.z*.05);
+                if(particle!=null){particle.scale(6F);particle.setColor(.92F,.95F,.98F);}
+            }
+            int sparks=packet.burst()?48:6+(int)(strength*8);
             for(int i=0;i<sparks;i++)
             {
                 var velocity=outward.scale(.35).add(tangent.scale(-(.8+strength*2.2))).add((random.nextDouble()-.5)*.7,(random.nextDouble()-.5)*.7,(random.nextDouble()-.5)*.7);
