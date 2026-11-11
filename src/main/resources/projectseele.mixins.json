@@ -84,6 +84,7 @@
     "client.MtrAnnouncementPronunciationMixin",
     "client.MtrSpokenAnnouncementR25Mixin",
     "client.MtrSpokenPlatformR25Mixin",
+    "client.MtrRideSyncR63Mixin",
     "client.PianoInventoryOverlayR22Mixin",
     "client.AircraftCorrectionBudgetMixin",
     "client.CommandShaderLightR39Mixin",
