@@ -4,7 +4,8 @@ The map patch pipeline covers y -128..319; the GeoFront cavern lies far below th
 touched region file is copied to the output folder first, each cell's prior state is
 checked, and the rewritten chunks are compared with those copies: every planned cell must
 hold its new state and no other block may differ.
-Rows: [x, y, z, before, after] with block states written as name[prop=value,...].
+Rows: [x, y, z, before, after] with block states written as name[prop=value,...], optionally a sixth item
+{"id": "trafficcraft:colored_block_entity", "color": n} giving the new block its paint.
 """
 import argparse
 from collections import defaultdict
@@ -183,6 +184,12 @@ def preflight(folder, grouped, allow_block_entities):
 
 def apply(a):
     rows = json.loads(a.rows.read_text('utf8'))
+    # A row may carry a sixth item, the block entity to give the new block (only TrafficCraft paint for now).
+    given = {(r[0], r[1], r[2]): r[5] for r in rows if len(r) > 5 and r[5]}
+    for pos, e in given.items():
+        if e.get('id') != 'trafficcraft:colored_block_entity':
+            raise SystemExit(f'{pos}: only trafficcraft:colored_block_entity can be given, not {e.get("id")}')
+    rows = [r[:5] for r in rows]
     signs = json.loads(a.signs.read_text('utf8')) if a.signs else []
     grouped = defaultdict(lambda: defaultdict(list))
     for x, y, z, before, after in rows:
@@ -204,10 +211,14 @@ def apply(a):
     from map_pipeline.launch_protection import load as launch_protection
     launch_protection(a.world).assert_positions(positions)
     folder = a.world / REGION
+    if given:
+        # Rows that bring their own paint replace marked blocks; any other replaced block entity goes with its block.
+        a.allow_block_entities = True
     preflight(folder, grouped, a.allow_block_entities)
     a.out.mkdir(parents=True, exist_ok=False)
     changed = 0
     dropped = set()
+    written_entities = 0
     with stopped_world(a.world):
         for (rx, rz), chunks in sorted(grouped.items()):
             path = folder / f'r.{rx}.{rz}.mca'
@@ -246,6 +257,18 @@ def apply(a):
                         if pos in gone:
                             entities.remove(e)
                             dropped.add(pos)
+                mine = [(x, y, z) for x, y, z, _, _ in cells if (x, y, z) in given]
+                if mine:
+                    entities = root.get('block_entities')
+                    if entities is None or not len(entities):
+                        root['block_entities'] = entities = nbtlib.List[nbtlib.Compound]()
+                    for e in list(entities):
+                        if (int(e['x']), int(e['y']), int(e['z'])) in given:
+                            entities.remove(e)
+                    for (x, y, z) in mine:
+                        entities.append(nbtlib.Compound({'id': nbtlib.String(given[x, y, z]['id']), 'x': nbtlib.Int(x), 'y': nbtlib.Int(y), 'z': nbtlib.Int(z),
+                                                         'color': nbtlib.Int(int(given[x, y, z]['color'])), 'keepPacked': nbtlib.Byte(0)}))
+                        written_entities += 1
                 for sign in sign_chunks.get((cx, cz), ()):
                     x, y, z = sign['pos']
                     state = block_at(root, x, y, z)
@@ -285,6 +308,10 @@ def apply(a):
                         e = new_entities.get(pos)
                         if e is None or [json.loads(str(m))['text'] for m in e['front_text']['messages']] != (list(wanted[pos].get('front', [])) + [''] * 4)[:4]:
                             wrong += 1
+                    elif pos in given:
+                        e = new_entities.get(pos)
+                        if e is None or str(e['id']) != given[pos]['id'] or int(e['color']) != int(given[pos]['color']):
+                            wrong += 1
                     elif pos in dropped:
                         if pos in new_entities:
                             wrong += 1
@@ -306,8 +333,9 @@ def apply(a):
                     wrong += sum(new_names[at] != after for at, after in planned[sy].items())
     if wrong or collateral:
         raise SystemExit(f'Readback: {wrong} of {changed} cells wrong, {collateral} cells changed outside the plan')
-    (a.out / 'installation.json').write_text(json.dumps(dict(status='installed', cells=changed, signs=len(signs), dropped_block_entities=len(dropped), regions=len(grouped), readback_wrong=0, collateral=0), indent=1), 'utf8')
-    print(json.dumps(dict(cells=changed, signs=len(signs), regions=len(grouped), readback_wrong=0, collateral=0)))
+    (a.out / 'installation.json').write_text(json.dumps(dict(status='installed', cells=changed, signs=len(signs), dropped_block_entities=len(dropped), written_block_entities=written_entities, regions=len(grouped), readback_wrong=0, collateral=0), indent=1), 'utf8')
+    print(json.dumps(dict(cells=changed, signs=len(signs), regions=len(grouped), readback_wrong=0, collateral=0, dropped_block_entities=len(dropped),
+                          written_block_entities=written_entities)))
 
 
 if __name__ == '__main__':
