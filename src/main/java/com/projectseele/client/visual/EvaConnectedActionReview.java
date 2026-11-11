@@ -74,6 +74,16 @@ public final class EvaConnectedActionReview
      * and releases the lock by the same rule. -Dprojectseele.launchCustody=false leaves it out.
      */
     private static final boolean LAUNCH_CUSTODY=!"false".equals(System.getProperty("projectseele.launchCustody"));
+    /**
+     * -Dprojectseele.launchReal=true runs the sortie the game runs, in a copy of the facility world
+     * (a save named SEELE_LAUNCH_REVIEW...): the unit is put back in its hangar, the pilot boards its
+     * entry plug through the hatch, and the logistics commands prepare and launch it to the exit
+     * named by -Dprojectseele.launchExit (geofront, surface or hakone). The launch director holds
+     * and releases the unit itself; nothing is emulated.
+     */
+    private static final boolean LAUNCH_REAL=Boolean.getBoolean("projectseele.launchReal");
+    private static final String LAUNCH_EXIT=System.getProperty("projectseele.launchExit","surface");
+    private static int realStage,realStageAt,realFreeTicks;
     private static final int STRIKE_LEAD=20,STRIKE_CYCLE=140;
     /** Each case: air (1) or ground (0), blocks ahead of the body, blocks to its right, blocks up, the target. */
     private static final int[][] STRIKE_CASES={{0,10,0,0,0},{0,20,0,0,0},{0,32,0,0,0},{0,20,10,0,0},{0,20,-10,0,0},
@@ -130,7 +140,9 @@ public final class EvaConnectedActionReview
         if (!ENABLED || finished || event.phase != TickEvent.Phase.END
                 || mc.player == null || mc.level == null || mc.getSingleplayerServer() == null) return;
         Path world = mc.getSingleplayerServer().getWorldPath(LevelResource.ROOT).normalize();
-        if (!world.getFileName().toString().startsWith("SEELE_EVA_CONNECTED_REVIEW"))
+        String save = world.getFileName().toString();
+        // The launch check may also run in a copy of the facility world, made for it under this name.
+        if (!save.startsWith("SEELE_EVA_CONNECTED_REVIEW") && !(LAUNCH && LAUNCH_REAL && save.startsWith("SEELE_LAUNCH_REVIEW")))
         {
             finished = true;
             ProjectSeele.LOGGER.error("Connected action review requires a disposable SEELE_EVA_CONNECTED_REVIEW save");
@@ -240,8 +252,118 @@ public final class EvaConnectedActionReview
         }
     }
 
+    /**
+     * On the integrated server: where the unit and its own entry plug stand and whether the
+     * facility has finished loading; with {@code board}, the pilot is set before the plug's hatch,
+     * within reach and looking at it, and presses it as a right click does. Boarding itself is the
+     * plug's own check of range, view and line of sight.
+     */
+    private static void boardR63(Minecraft mc,boolean board)
+    {
+        var server=mc.getSingleplayerServer();var id=mc.player.getUUID();int variant=UNIT_VARIANT;
+        server.execute(()->{
+            var pilot=server.getPlayerList().getPlayer(id);
+            if(pilot==null)return;
+            var level=pilot.serverLevel();
+            var unit=com.projectseele.world.EvaLogisticsDirector.canonicalUnit(level,variant);
+            var plug=com.projectseele.world.EntryPlugDirector.canonical(level,variant);
+            boolean ready=com.projectseele.world.NervRouteRuntimeR52.ready(level);
+            ProjectSeele.LOGGER.info("Real launch review: facility ready={} unit={} plug={}",ready,
+                    unit==null?"none":unit.blockPosition().toShortString()+" locked "+unit.isNervLogisticsLocked()+" phase "+unit.getLaunchPhase(),
+                    plug==null?"none":plug.blockPosition().toShortString()+" stage "+plug.getInsertionStage()+" hatch open "+plug.isHatchOpen()+" rider "+(plug.getFirstPassenger()==null?"none":plug.getFirstPassenger().getName().getString()));
+            if(!board||unit==null||plug==null||!ready||pilot.isPassenger())return;
+            Vec3 hatch=plug.hasCanonicalPose()?plug.transformPlugMarker(com.projectseele.world.EntryPlugKinematics.HATCH_PORTAL_CENTRE_P):plug.getBoundingBox().getCenter();
+            Vec3 out=hatch.subtract(plug.getBoundingBox().getCenter()).multiply(1,0,1);
+            out=out.lengthSqr()<1e-4?new Vec3(0,0,1):out.normalize();
+            Vec3 stand=hatch.add(out.scale(4)).add(0,-1.6,0),look=hatch.subtract(stand.add(0,pilot.getEyeHeight(),0));
+            float yaw=(float)(Mth.atan2(look.z,look.x)*Mth.RAD_TO_DEG)-90,pitch=(float)(-Mth.atan2(look.y,look.horizontalDistance())*Mth.RAD_TO_DEG);
+            pilot.getAbilities().flying=pilot.getAbilities().mayfly;pilot.onUpdateAbilities();
+            pilot.teleportTo(level,stand.x,stand.y,stand.z,yaw,pitch);
+            var result=plug.mobInteract(pilot,net.minecraft.world.InteractionHand.MAIN_HAND);
+            ProjectSeele.LOGGER.info("Real launch review: pressed the hatch from {} -> {} riding {}",stand,result,pilot.getVehicle()==null?"nothing":pilot.getVehicle().getType().toShortString());
+        });
+    }
+
+    private static void realStage(int stage,int step)
+    {
+        ProjectSeele.LOGGER.info("Real launch review: stage {} at step {}",stage,step);
+        realStage=stage;realStageAt=step;
+    }
+
+    private static void launchRealR63(Minecraft mc, Path world)
+    {
+        int step=wait-100,since=step-realStageAt;
+        var link=mc.player.connection;
+        EvaUnit01Entity eva=EvaPilotResolver.controlTarget(mc.player);
+        if(step%40==0)ProjectSeele.LOGGER.info("Real launch review: step={} stage={} dim={} at={} vehicle={} eva={}",step,realStage,
+                mc.level.dimension().location(),mc.player.blockPosition().toShortString(),
+                mc.player.getVehicle()==null?"none":mc.player.getVehicle().getType().toShortString(),
+                eva==null?"none":String.format("phase %d ticks %d activation %d locked %s y %.1f",eva.getLaunchPhase(),eva.getLaunchTicks(),eva.getActivationTicks(),eva.isNervLogisticsLocked(),eva.getY()));
+        switch(realStage)
+        {
+            case 0 ->
+            {
+                // Whatever the last run left: off the seat, and the unit, its plug and the pilot back in the hangar.
+                if(step==0)link.sendCommand("ride @s dismount");
+                if(step==5){link.sendCommand("time set 6000");link.sendCommand("weather clear");}
+                if(step==10)link.sendCommand("seele eva reset "+UNIT);
+                if(step==80)link.sendCommand("seele tp hangar");
+                if(step==160){link.sendCommand("seele eva status "+UNIT);realStage(1,step);}
+            }
+            case 1 ->
+            {
+                // The facility loads its units after the world: ask until the unit and its plug are there.
+                if(mc.player.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity||eva!=null){realStage(3,step);return;}
+                if(since%40==20)boardR63(mc,since>=100);
+                if(since>2400)finish(mc,"launch_boarding_timeout");
+            }
+            case 3 ->
+            {
+                if(since==10)link.sendCommand("seele eva prepare "+UNIT+" "+LAUNCH_EXIT);
+                // The director refuses a launch until the unit stands ready in its silo: ask until it goes.
+                if(since>200&&since%60==0)
+                {
+                    link.sendCommand("seele eva status "+UNIT);
+                    link.sendCommand("seele eva launch "+UNIT);
+                }
+                if(eva!=null&&eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_ASCENT){launchAscentAt=step;realStage(4,step);}
+                else if(since>8000)finish(mc,"launch_prepare_timeout");
+            }
+            default ->
+            {
+                // The unit changes dimension on the way: on the far side the client has a new entity for it.
+                if(eva==null)
+                {
+                    if(++missingPilotTicks>600)finish(mc,"launch_pilot_lost");
+                    return;
+                }
+                missingPilotTicks=0;
+                entityId=eva.getId();
+                if(!Boolean.getBoolean("projectseele.launchFirstPerson"))positionCamera(mc,eva);
+                if(serverStart<0)
+                {
+                    if(warmupFrames<3)return;
+                    serverStart=mc.getSingleplayerServer().getTickCount();
+                }
+                tick=mc.getSingleplayerServer().getTickCount()-serverStart;
+                openPoses(mc,world);
+                // Handed back: the launch over and the lock open for half a second (a new entity reads idle for a tick).
+                realFreeTicks=!eva.isLaunchSequenceActive()&&!eva.isNervLogisticsLocked()?realFreeTicks+1:0;
+                if(launchIdleAt<0&&realFreeTicks>=10)
+                {
+                    launchIdleAt=tick-10;
+                    ProjectSeele.LOGGER.info("Real launch review: control back at tick {} y={} dim={}",launchIdleAt,String.format("%.2f",eva.getY()),mc.level.dimension().location());
+                }
+                previousTick=tick;
+                if(launchIdleAt>=0&&tick>=launchIdleAt+LAUNCH_AFTER)finish(mc,"complete");
+                else if(tick>3000)finish(mc,"launch_timeout");
+            }
+        }
+    }
+
     private static void launchR62(Minecraft mc, Path world)
     {
+        if(LAUNCH_REAL){launchRealR63(mc,world);return;}
         int step=wait-100,x=8000+LAUNCH_SITE*400,z=8000,bay=UNIT_VARIANT==0?-42:UNIT_VARIANT==2?42:0;
         var net=mc.player.connection;
         // The last run may have ended in a lab unit's seat; a complex is not built from a seat.
