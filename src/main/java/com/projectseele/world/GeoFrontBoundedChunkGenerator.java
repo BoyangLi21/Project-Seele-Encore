@@ -182,6 +182,14 @@ public final class GeoFrontBoundedChunkGenerator
                     : (y > surveyed.ground() ? (y <= surveyed.water() ? Blocks.WATER : Blocks.AIR)
                     : y == surveyed.ground() ? (surveyed.water() > y ? Blocks.GRAVEL : Blocks.GRASS_BLOCK)
                     : y >= surveyed.ground() - 3 ? Blocks.DIRT : Blocks.STONE).defaultBlockState();
+        // Same cover as TvWorldPreviewTerrain.shape writes on outer columns.
+        if (OuterBoundaryTerrain.enabled() && OuterBoundaryTerrain.unknown(x, z))
+        {
+            var cover = OuterBoundaryTerrain.top(x, z, surveyed.ground());
+            if (cover != null)
+                for (int d = 0; d < (cover.is(Blocks.STONE) ? 4 : 1); d++)
+                    if (surveyed.ground() - d >= from) blocks[surveyed.ground() - d - from] = cover;
+        }
         return new NoiseColumn(from, blocks);
     }
 
