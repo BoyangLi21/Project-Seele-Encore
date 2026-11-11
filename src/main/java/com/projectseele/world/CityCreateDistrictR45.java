@@ -62,6 +62,12 @@ public final class CityCreateDistrictR45
     private static final String JOB = System.getProperty("projectseele.r45CityCreateDistrict", "");
     private static final int WORK_LIMIT = 4096;
     private static final int ENDPOINT_OWNER_LIMIT = 4;
+    /**
+     * Ticks between the last tower block written back and the first moving tower removed. A client
+     * redraws a section a few frames after its last block arrives; a tower removed at once was drawn
+     * for a frame as only the few sections already redrawn (floating walls and slabs).
+     */
+    private static final int MESH_SETTLE_TICKS = 10;
     private static final int PREPARE_READ_LIMIT = 16384;
     private static final long WORK_NANOS = 8_000_000L;
     private static final double SPEED = .25;
@@ -184,6 +190,7 @@ public final class CityCreateDistrictR45
             context.state.rollback = rollback;
             context.clearReconcileFold();
             context.endpointFinalizer = null;
+            context.meshSettleFrom = -1;
             context.state.allowMissingRecovery = true;
             context.state.phase = !rollback && java.util.Set.of("OPEN", "DETACH", "SPAWN", "READY", "MOVE").contains(context.state.faultPhase)
                     ? "REPLAY_OPEN" : "RECONCILE";
@@ -357,6 +364,8 @@ public final class CityCreateDistrictR45
         final List<Plan> plans = new ArrayList<>();
         final Map<Integer, Entity> entities = new HashMap<>();
         CityEndpointFinalizerR51<EndpointOwner> endpointFinalizer;
+        /** Game time the last endpoint write finished, or -1; kept only in memory, a restart waits again. */
+        long meshSettleFrom = -1;
         final java.util.Set<UUID> ownerIds = new java.util.HashSet<>();
         final List<ChunkPos> chunks = new ArrayList<>();
         State state;
@@ -451,6 +460,7 @@ public final class CityCreateDistrictR45
             if (activationFailure != null) throw new IllegalStateException("Required release union not ready before next journey: " + activationFailure);
             clearReconcileFold();
             endpointFinalizer = null;
+            meshSettleFrom = -1;
             if (pending != null && !pending.isDone()) throw new IllegalStateException("The cancelled unplaced journal is still draining; original city remains untouched");
             pending = null;
             assemblyLimit = CityCreateBridgeR45.backendBlockLimit();
@@ -731,6 +741,11 @@ public final class CityCreateDistrictR45
                 if (next.equals("FLUSH"))
                 {
                     if (System.nanoTime() - began >= WORK_NANOS) { checkpoint(); return; }
+                    if (endpointFinalizer == null)
+                    {
+                        if (meshSettleFrom < 0) meshSettleFrom = level.getGameTime();
+                        if (level.getGameTime() - meshSettleFrom < MESH_SETTLE_TICKS) { checkpoint(); return; }
+                    }
                     if (!finishEndpointOwners(false, began)) { checkpoint(); return; }
                     entities.clear();
                 }
@@ -955,6 +970,7 @@ public final class CityCreateDistrictR45
         {
             clearReconcileFold();
             endpointFinalizer = null;
+            meshSettleFrom = -1;
             int endpoint = state.rollback ? state.journeySourceDepth : state.journeyTargetDepth;
             int queued = state.queued;
             state.depth = state.target = endpoint; state.phase = "IDLE";
