@@ -369,6 +369,7 @@ public final class EvaPoseGraph
         // to it afterwards, the thighs came round and the whole body, set down a moment before,
         // stood 0.7 to 0.9 blocks in the ground (shins, upper arms and belly) for as long as it lay.
         EvaJointLimitsR57.apply(model);
+        EvaKneeHingeR63.apply(entity,model,modelToWorld,partialTick);
         EvaPoseContinuity.trace(entity,model,"joint.limits");
         seatHinges(model);
         EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
