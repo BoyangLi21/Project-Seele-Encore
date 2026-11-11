@@ -12,6 +12,12 @@ public final class AtFieldRules
 
     public static boolean bypassesAtField(DamageSource source)
     {
+        // /kill and the void bypass invulnerability in vanilla; a field must not keep an Angel alive
+        // against them either (Ramiel and the EVA already let them through).
+        if (source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY))
+        {
+            return true;
+        }
         if (!(source.getEntity() instanceof LivingEntity attacker))
         {
             return false;
