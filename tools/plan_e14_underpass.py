@@ -31,7 +31,7 @@ out.mkdir(parents=True, exist_ok=True)
 X0, Z0, X1, Z1, SX, SZ = map(int, sys.argv[5:11])
 ax, az = map(int, network['bounds'][:2])
 road, walk, g2 = network['road'], network['walk'], network['grade2']
-LOW, DECK_Y, DECK_REACH, PARAPET_FROM, RAMP_GRADE, MARGIN = 92.0, 96, 2.5, 1.8, 3 / 16, 1.0
+LOW, DECK_Y, DECK_REACH, PARAPET_FROM, RAMP_GRADE, MARGIN = 92.0, 96, 2.5, 2.0, 3 / 16, 1.0
 LIGHT = 'projectseele:nerv_ceiling_light[hanging=true,lit=true]'
 AIR = ('minecraft:air', 'minecraft:cave_air', 'minecraft:void_air')
 
@@ -138,7 +138,8 @@ for (x, z), (old, new) in lowered.items():
         if y + 1 - new < 1.5 or name(cap.state(q[0], y + 1, q[1])) not in AIR:
             continue
         d, ry = rail_at(*q)
-        if d < PARAPET_FROM and y + 1 >= ry - .5:
+        if d < PARAPET_FROM:
+            # Centre within 2 means the block edge may be within the 1.3 car envelope at any height near the rail.
             notes['curb skipped inside the car envelope'] += 1
             continue
         put(q[0], y + 1, q[1], 'minecraft:light_gray_concrete', 'E14 curb')
