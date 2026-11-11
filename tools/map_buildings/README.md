@@ -16,3 +16,10 @@ Order:
    2-column apron at the floor, 1:1 grassed slope, trees on cut ground removed whole).
 
 The writer refuses city-lift, lift and launch protected cells and, by default, any row on a block entity.
+
+Floating buildings (the floor hangs over open space with ground or water below):
+8. `float_scan.py <region dir> <workers>`: float.npy, every building cell with open space under it.
+9. `float_cluster.py`, `float_rank.py`: pieces, then house-like (walls on the floor) and exposed (the gap shows at the edge).
+10. `float_views.py <views.json>`: side and aerial views for `shots.py`.
+11. `f_plan.py <sites.json> <out>`: fill under the floor; the outer ring continues the base block down;
+    the ground around rises 1:1 to the base but never more than one cell above a road or path next to it.
