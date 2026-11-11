@@ -36,7 +36,20 @@ public abstract class MovingElevatorMotionR22Mixin
         if(!level.isClientSide||!isMoving)return;
         ci.cancel();
         double direction=Math.signum(targetY-currentY),error=(received-currentY)*direction;
-        if(error<=0)return;
+        if(error<=0)
+        {
+            // Ahead of the server: wait for it beyond about two ticks of travel. During a server
+            // stall the client car ran on six blocks and more, the server's car then held the
+            // rider far above the floor the client drew, and the passenger sync pulled them back.
+            double nominal=Math.max(speed,receivedSpeed),excess=-error-(2*nominal+.25);
+            if(excess>0)
+            {
+                double step=Math.max(0,nominal-excess);
+                syncCurrentY=currentY+direction*Math.min(Math.abs(targetY-currentY),step);
+                speed=Math.min(speed,step);
+            }
+            return;
+        }
         if(error>3)
         {
             // A stalled/loading client must catch up as a rigid car+rider

@@ -28,6 +28,15 @@ public final class NervLiftPassengerSync
     public static boolean carPresent(ServerLevel level,S20PhysicalElevatorDirector.LiftSpec spec,S20PhysicalElevatorDirector.Landing stop)
     {return spec.id().equals(GATEWAY)?RegionalGatewayDirector.carAt(level,stop.walkY()):S20PhysicalElevatorDirector.hasAuthoredCabinAt(level,stop.cabinCentre());}
     private static final Map<ServerLevel,Map<String,Riders>> LEVELS=new WeakHashMap<>();
+    /**
+     * How far (blocks) a passenger of a travelling car may stand below its floor or above its
+     * standing height before the server puts them back. At 0.85 block a tick the client's own car
+     * runs a few blocks from the server's after a stall or over a slow link. Corrected inside that
+     * margin, a rider going down was teleported out of the car the client drew, fell from rest,
+     * and never caught a car that outran gravity: they hung two to four blocks above the floor
+     * for the whole trip, teleported again every few ticks.
+     */
+    private static final double TRAVEL_SLACK=6.0D;
     private static final class Riders
     {
         final Set<UUID> passengers=new HashSet<>();
@@ -66,7 +75,7 @@ public final class NervLiftPassengerSync
                 var roof=local.move(riders.cageAnchor);
                 if(roof.minY>floor+.9&&roof.minX<x+.3&&roof.maxX>x-.3&&roof.minZ<z+.3&&roof.maxZ>z-.3)top=Math.min(top,roof.minY-p.getBbHeight()-.02);
             }
-            double y=Mth.clamp(p.getY(),floor,Math.max(floor,top));
+            double y=p.getY()<floor-TRAVEL_SLACK||p.getY()>Math.max(floor,top)+TRAVEL_SLACK?floor:p.getY();
             if(Math.abs(x-p.getX())>.001||Math.abs(y-p.getY())>.001||Math.abs(z-p.getZ())>.001)
                 reconcile(p,x,y,z,floor,entry.getKey());
         }
@@ -146,7 +155,9 @@ public final class NervLiftPassengerSync
                                 &&roof.minZ<player.getBoundingBox().maxZ&&roof.maxZ>player.getBoundingBox().minZ)
                             top=Math.min(top,roof.minY-player.getBbHeight()-.02);
                     }
-                    if(y<currentFloor-.10D||y>top+.10D)y=Mth.clamp(y,currentFloor,Math.max(currentFloor,top));
+                    // Back onto the floor, not up against the roof: a rider left above the floor of a car
+                    // going down falls from rest and cannot catch it.
+                    if(y<currentFloor-TRAVEL_SLACK||y>Math.max(currentFloor,top)+TRAVEL_SLACK)y=currentFloor;
                     if(Math.abs(x-player.getX())>.01D||Math.abs(z-player.getZ())>.01D||Math.abs(y-player.getY())>.01D)
                         reconcile(player,x,y,z,currentFloor,spec.id());
                     player.resetFallDistance();
