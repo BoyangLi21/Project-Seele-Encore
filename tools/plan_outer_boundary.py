@@ -24,9 +24,10 @@ DEM = (-1982, -1548, 4386, 3720)
 ANCHOR = dict(lon=139.0085, lat=35.2662, x=30, z=220, metres_per_block=4.0)
 COAST_BOUNDS = (-12000, -10000, 20000, 24000)
 COAST_STEP = 16
-# Coarse fallback, west to east with land on the left (Irozaki ... Atami, the surveyed
-# coast's exits, Kozu ... Jogashima). Used only where no GSI tile covers a cell.
-FALLBACK = [(-100000, 18699), (-3572, 18699), (-1299, 16618), (859, 13845), (3018, 10377), (2904, 9129), (2177, 8547),
+# Coarse fallback, west to east with land on the left: Suruga Bay from Yaizu to Numazu, the
+# Izu west coast to Irozaki, its east coast to Atami, the surveyed coast's exits, Kozu ... Jogashima. Used only where no GSI tile covers a cell.
+FALLBACK = [(-100000, 11320), (-15404, 11320), (-13585, 8990), (-11765, 7326), (-7443, 3998), (-3348, 5385), (-5168, 8436), (-5395, 10100),
+            (-5213, 14482), (-5395, 15924), (-3576, 18698), (-1299, 16618), (859, 13845), (3018, 10377), (2904, 9129), (2177, 8547),
             (1882, 7326), (1950, 6356), (1655, 4941), (2360, 3720), (4386, 78), (4654, -52), (5631, -607), (6926, -856),
             (7790, -1217), (9040, -1189), (10744, -718), (12334, -856), (12902, -412), (13130, 392), (13879, 3942), (100000, 3942)]
 
