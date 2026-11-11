@@ -486,6 +486,14 @@ The private `forward_strikes_v187` study uses the already credited Haley Tuffles
 
 `data/projectseele/worldgen/hakone_surface.bin.gz` 出典为国土地理院[地理院瓦片](https://maps.gsi.go.jp/development/ichiran.html)和[最适化矢量数据](https://github.com/gsi-cyberjapan/optimal_bvmap)，由本项目加工为 1:4 游戏坐标高程和水面。复用本地缓存，没有嵌入旅游照片或动画图像。42 个局部陆地 DEM 缺值经过邻域补齐；海床和芦之湖水下深度是游戏适配，不是水下测绘。来源、锚点及加工见 HAKONE_GEOGRAPHY_WORK.md。
 
+## R63 外圈海岸线（F1）
+
+`data/projectseele/worldgen/outer_coast.bin.gz` 的海岸位置，在实测矩形以外取自国土地理院[地理院瓦片・標高タイル](https://maps.gsi.go.jp/development/demtile.html)（DEM10B，`https://cyberjapandata.gsi.go.jp/xyz/dem_png/12/{x}/{y}.png`），署名：**出典：国土地理院**。利用規約：[国土地理院コンテンツ利用規約](https://www.gsi.go.jp/kikakuchousei/kikakuchousei40182.html)。
+
+- 2026-11-11 下载，负责人批准范围内：经度 138.8–139.4、纬度 35.0–35.5，z12 共请求 64 块，其中 52 块 PNG 合计 4,966,368 字节，另 12 块为全海（服务器返回 404，没有文件）。
+- 加工：只用标高瓦片的无数据值（海）判定海陆，换算到 1:4 游戏坐标，求出每 16 格到海岸线的带符号距离（`tools/plan_outer_boundary.py`）。实测矩形内仍用 `hakone_surface.bin.gz` 自己的海岸，两者 99.84% 一致。下载范围以外的海岸是按公开地名坐标手标的估算线，不是政府数据。
+- 原始瓦片只放在本地 `F:/eva/.claude/map-edges-work/f12/gsi-z12/`，不进仓库。这不是国土地理院发布的原始成果。
+
 ## R60 箱根森林分布
 
 地图上森林的位置和类型取自环境省生物多样性センター「現存植生図2024」（[G空間情報センター](https://www.geospatial.jp/ckan/dataset/biodic_veg2024)，公共データ利用規約 第1.0版／PDL 1.0，[规约原文](https://www.digital.go.jp/resources/open_data/public_data_license_v1.0)）的关东、中部区块，2026-11-08 下载。
