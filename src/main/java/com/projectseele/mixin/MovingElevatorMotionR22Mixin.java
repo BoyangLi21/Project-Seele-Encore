@@ -18,8 +18,23 @@ public abstract class MovingElevatorMotionR22Mixin
     @Shadow private double syncCurrentY;
     @Shadow private int targetY;
     @Shadow private boolean isMoving;
+    /** Ticks a client car runs on without hearing from the server; it reports every second tick. */
+    @Unique private static final int PROJECTSEELE$COAST_TICKS=4;
+    @Unique private long projectSeele$lastSync=Long.MIN_VALUE;
     @ModifyConstant(method="update",constant=@Constant(intValue=10),remap=false)
     private int projectSeele$moreFrequentMotionSync(int original){return 2;}
+    @Inject(method="read",at=@At("TAIL"),remap=false)
+    private void projectSeele$groupSynced(net.minecraft.nbt.CompoundTag tag,CallbackInfo ci)
+    {if(level!=null&&level.isClientSide)projectSeele$lastSync=level.getGameTime();}
+    @Inject(method="update",at=@At("HEAD"),remap=false)
+    private void projectSeele$waitForStalledServer(CallbackInfo ci)
+    {
+        // A stalled server sends nothing, so no correction could hold the car back: it ran eight to
+        // ten blocks ahead, and when the server caught up the passenger sync pulled the rider back to
+        // the server's car. Without word for a few ticks, the client car stops where it is.
+        if(!level.isClientSide||!isMoving||projectSeele$lastSync==Long.MIN_VALUE)return;
+        if(level.getGameTime()-projectSeele$lastSync>PROJECTSEELE$COAST_TICKS&&syncCurrentY==Integer.MAX_VALUE)syncCurrentY=currentY;
+    }
     @Inject(method="stopElevator",at=@At("HEAD"),remap=false)
     private void projectSeele$doNotCarryFinalStepTwice(CallbackInfo ci){lastY=currentY;}
     @Inject(method="stopElevator",at=@At("TAIL"),remap=false)
@@ -35,6 +50,7 @@ public abstract class MovingElevatorMotionR22Mixin
     {
         if(!level.isClientSide||!isMoving)return;
         ci.cancel();
+        projectSeele$lastSync=level.getGameTime();
         double direction=Math.signum(targetY-currentY),error=(received-currentY)*direction;
         if(error<=0)
         {
