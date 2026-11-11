@@ -2,13 +2,15 @@
 
 Each connection: {"id", "points": [[x, z], ...] from the dead end to the road it joins,
 "feet": [start, end] walking heights (optional: taken from the declared network at the two ends),
+or "profile": one walking height per point (the line follows it instead of a straight grade),
 "road": asphalt half width in cells, "walk": footway width each side, "purpose"}.
 Cells within road+0.5 of the centreline get asphalt, the next `walk` cells concrete; declared cells
 are left as they are. The walking height runs linearly along the line in eighths (TrafficCraft
 slope layers), at most a quarter of a block per block. Under the deck: up to 4 blocks of air or
 water are filled with dirt; deeper gaps become a bridge (stone brick beam under the deck, stone
 brick piers every 6 blocks on the outer cells, stone brick walls on the outer footway). Above the
-deck 4 blocks are cleared of soil and plants only; anything built there is reported as blocked.
+deck 4 blocks are cleared of soil, plants and undeclared old paving only; anything built there is reported as blocked.
+Paving already lying within a block of the planned height is declared as it stands instead of rebuilt.
 Outputs rows.json (write_deep_cells.py), network.npz, check.json.
 usage: build_road_connection.py <capture> <network.npz> <connections.json> <outdir>"""
 import json
@@ -35,10 +37,31 @@ LOOSE = ('minecraft:water', 'minecraft:grass', 'minecraft:short_grass', 'minecra
 SOIL = ('minecraft:grass_block', 'minecraft:dirt', 'minecraft:coarse_dirt', 'minecraft:stone', 'minecraft:gravel', 'minecraft:sand', 'minecraft:podzol',
         'minecraft:andesite', 'minecraft:granite', 'minecraft:diorite', 'minecraft:moss_block', 'minecraft:rooted_dirt', 'minecraft:clay', 'minecraft:mud')
 FILL_MAX, PIER_EVERY, HEAD = 4, 6, 4
+from verify_hakone_network_candidate import PAVEMENT as OLD_PAVING
 
 
 def name(s):
     return s.split('[')[0]
+
+
+def is_paving(s):
+    n = name(s)
+    return n.startswith('trafficcraft:') or n in OLD_PAVING
+
+
+def existing_paving(x, z, feet):
+    """Walking height of paving already there within a block of the planned height, or None."""
+    for y in range(math.floor(feet) + 1, math.floor(feet) - 3, -1):
+        s = cap.state(x, y, z)
+        if is_paving(s) and name(cap.state(x, y + 1, z)) in AIR + LOOSE:
+            if 'layers=' in s:
+                top = y + int(s.split('layers=')[1][0]) / 8
+            elif 'type=bottom' in s:
+                top = y + .5
+            else:
+                top = y + 1.0
+            return top if abs(top - feet) <= 1.0 else None
+    return None
 
 
 def soft(n):
@@ -74,7 +97,8 @@ def deck(x, z, feet, surface, purpose):
         n = name(cap.state(x, y, z))
         if n in AIR:
             continue
-        if soft(n) or n in SOIL:
+        if soft(n) or n in SOIL or n in OLD_PAVING or n.startswith('trafficcraft:'):
+            # Soil, plants, or undeclared old paving (buried or stray) above the new deck.
             put(x, y, z, 'minecraft:air', 'connection headroom')
         else:
             errors.append([purpose, 'blocked', [x, y, z], n])
@@ -115,8 +139,15 @@ for c in conns:
     seg = np.diff(pts, axis=0)
     lens = np.hypot(*seg.T)
     total = float(lens.sum())
-    f0, f1 = c.get('feet') or (declared_feet(*map(int, c['points'][0])), declared_feet(*map(int, c['points'][-1])))
-    if abs(f1 - f0) > total * .25 + .01:
+    f0, f1 = (c['profile'][0], c['profile'][-1]) if c.get('profile') else (c.get('feet') or (declared_feet(*map(int, c['points'][0])), declared_feet(*map(int, c['points'][-1]))))
+    if c.get('profile'):
+        prof = np.array(c['profile'], float)
+        f0, f1 = float(prof[0]), float(prof[-1])
+        steep = np.abs(np.diff(prof)) > lens * .25 + .13      # an eighth for rounding
+        if steep.any():
+            errors.append([c['id'], f'profile steeper than 1/4 at segment {int(np.argmax(steep))}'])
+            continue
+    elif abs(f1 - f0) > total * .25 + .01:
         errors.append([c['id'], f'too steep: {f1 - f0:+.2f} over {total:.1f}'])
         continue
     rw, ww = c.get('road', 2), c.get('walk', 1)
@@ -139,8 +170,21 @@ for c in conns:
     for (x, z), (d, s) in sorted(cells.items()):
         if road[z - az, x - ax] or walk[z - az, x - ax]:
             continue
-        feet = round((f0 + (f1 - f0) * s / total) * 8) / 8
+        if c.get('profile'):
+            # Walking heights given per point: interpolate along the line.
+            cum = np.concatenate([[0], np.cumsum(lens)])
+            feet = round(float(np.interp(s, cum, c['profile'])) * 8) / 8
+        else:
+            feet = round((f0 + (f1 - f0) * s / total) * 8) / 8
         surface = 'trafficcraft:asphalt' if d <= rw + .5 else 'trafficcraft:concrete'
+        adopt = existing_paving(x, z, feet)
+        if adopt is not None:
+            # Paving already lies here at about the right height (an undeclared old street, say): declare it as it is.
+            walk[z - az, x - ax] = True
+            road[z - az, x - ax] = surface == 'trafficcraft:asphalt'
+            g2[z - az, x - ax] = int(round((adopt - 1) * 2))
+            kinds['adopted'] += 1
+            continue
         base = math.floor(feet) - 1
         layers = int(round((feet - math.floor(feet)) * 8))
         put(x, base, z, surface, 'connection deck')
@@ -150,7 +194,8 @@ for c in conns:
             n = name(cap.state(x, y, z))
             if n in AIR:
                 continue
-            if soft(n) or n in SOIL:
+            if soft(n) or n in SOIL or n in OLD_PAVING or n.startswith('trafficcraft:'):
+                # Soil, plants, or undeclared old paving (buried or stray) above the new deck.
                 put(x, y, z, 'minecraft:air', 'connection headroom')
             else:
                 errors.append([c['id'], 'blocked', [x, y, z], n])
