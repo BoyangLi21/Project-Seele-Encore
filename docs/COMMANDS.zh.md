@@ -59,6 +59,7 @@
 | `/seele city status` | 第三新东京市升降状态 |
 | `/seele city raise` | 楼群升回地表（原 `tokyo3 restore`） |
 | `/seele city lower` | 楼群降入地下（原 `tokyo3 retract`） |
+| `/seele city recover` | 升降被中断（崩溃、断电）后停在故障状态时，从中断的那一步重做 |
 | `/seele un reset <un0\|un1>` | UN 机体维护复位：回到库位，机体和插入栓复位；驾驶员在舱内时拒绝 |
 | `/seele un defense\|power` | 切换 UN 基地防御系统、防御能源网 |
 | `/seele admin server [status]` | 服务器、地图接入、驾驶舱画面和岗位概况 |
