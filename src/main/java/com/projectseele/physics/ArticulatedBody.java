@@ -1,6 +1,5 @@
 package com.projectseele.physics;
 
-import com.bulletphysics.collision.broadphase.DbvtBroadphase;
 import com.bulletphysics.collision.dispatch.*;
 import com.bulletphysics.collision.shapes.*;
 import com.bulletphysics.dynamics.*;
@@ -15,7 +14,7 @@ public final class ArticulatedBody implements AutoCloseable
 {
     public record Frame(Map<String,org.joml.Matrix4f> deformation,org.joml.Vector3f min,org.joml.Vector3f max,float speed,int supportContacts,float groundImpulse,org.joml.Vector3f impactPoint) {}
     private final CollisionDispatcher dispatcher;
-    private final DiscreteDynamicsWorld world;
+    private final TerrainSteadyWorld world;
     private final Map<String,RigidBody> bodies=new LinkedHashMap<>();
     private final Map<String,Transform> binds=new LinkedHashMap<>();
     private final Map<String,List<Vector3f>> surfaceVertices=new HashMap<>();
@@ -44,7 +43,7 @@ public final class ArticulatedBody implements AutoCloseable
     public ArticulatedBody(JsonObject definition,Map<String,org.joml.Matrix4f> initialDeformation)
     {
         var configuration=new DefaultCollisionConfiguration();dispatcher=new CollisionDispatcher(configuration);
-        world=new DiscreteDynamicsWorld(dispatcher,new DbvtBroadphase(),new SequentialImpulseConstraintSolver(),configuration);
+        world=new TerrainSteadyWorld(dispatcher,new TerrainPruningBroadphase(),new SequentialImpulseConstraintSolver(),configuration);
         world.setGravity(new Vector3f(0,-9.81F,0));world.getSolverInfo().numIterations=30;
         // Separating an overlap with an animated opponent must not become
         // launch velocity that drives a connected limb through a thin floor.
@@ -100,7 +99,7 @@ public final class ArticulatedBody implements AutoCloseable
     public void addStaticBox(org.joml.Vector3f centre,org.joml.Vector3f halfSize,org.joml.Quaternionf orientation)
     {
         Transform pose=new Transform();pose.setIdentity();pose.origin.set(centre.x,centre.y,centre.z);pose.setRotation(new Quat4f(orientation.x,orientation.y,orientation.z,orientation.w));
-        var body=makeBody(0,new BoxShape(new Vector3f(halfSize.x,halfSize.y,halfSize.z)),pose);body.setUserPointer("terrain");scenery.add(body);
+        var body=makeBody(0,new BoxShape(new Vector3f(halfSize.x,halfSize.y,halfSize.z)),pose);body.setUserPointer("terrain");world.terrain(body);scenery.add(body);
         if(Math.abs(orientation.x)<1e-5F&&Math.abs(orientation.z)<1e-5F){Transform inverse=new Transform(pose);inverse.inverse();Vector3f low=new Vector3f(),high=new Vector3f();body.getAabb(low,high);surfaces.add(new TerrainSurface(inverse,new Vector3f(halfSize.x,halfSize.y,halfSize.z),low,high));}
     }
     public void clearTerrain()
