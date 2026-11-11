@@ -298,9 +298,27 @@ def ground_cover(box, ids, where, rng, grass=.3, fern=.06):
     grass_id = box.state_id(GRASS)
     air = box.state_id(AIR_STATE)
     plants = [box.state_id('minecraft:grass'), box.state_id('minecraft:fern')]
+    tall = [box.state_id('minecraft:tall_grass[half=lower]'), box.state_id('minecraft:tall_grass[half=upper]')]
+    bushes = [box.state_id(f'minecraft:{s}_leaves[distance=1,persistent=true,waterlogged=false]') for s in ('oak', 'dark_oak')]
     top = top_of(k[ids] == SOIL, y0)
+    # A column standing in front of a higher neighbour shows that step's dirt face; tall grass and low
+    # bushes there hide most of it, which short grass alone does not.
+    pad = np.pad(top, 1, mode='edge')
+    riser = np.max([pad[:-2, 1:-1], pad[2:, 1:-1], pad[1:-1, :-2], pad[1:-1, 2:]], axis=0) > top
     roll = rng.random(where.shape)
-    for z, x in zip(*np.nonzero(where & (roll < grass + fern))):
+    pick = rng.random(where.shape)
+    for z, x in zip(*np.nonzero(where & ((roll < grass + fern) | riser))):
         y = int(top[z, x]) - y0
-        if y + 1 < ids.shape[0] and ids[y, z, x] == grass_id and ids[y + 1, z, x] == air:
-            ids[y + 1, z, x] = plants[0] if roll[z, x] < grass else plants[1]
+        if not (y + 2 < ids.shape[0] and ids[y, z, x] == grass_id and ids[y + 1, z, x] == air):
+            continue
+        r = roll[z, x]
+        if riser[z, x] and r < .4 and ids[y + 2, z, x] == air:
+            ids[y + 1, z, x], ids[y + 2, z, x] = tall
+        elif riser[z, x] and r < .55:
+            ids[y + 1, z, x] = bushes[int(pick[z, x] < .5)]
+        elif riser[z, x] and r < .61:
+            ids[y + 1, z, x] = plants[1]
+        elif riser[z, x] and r < .85:
+            ids[y + 1, z, x] = plants[0]
+        elif not riser[z, x] and r < grass + fern:
+            ids[y + 1, z, x] = plants[0] if r < grass else plants[1]
