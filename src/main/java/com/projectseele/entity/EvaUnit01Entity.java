@@ -383,6 +383,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private boolean rifleStanceInitialized;
     private double riflePreviousX=Double.NaN,riflePreviousZ;
     private int rifleZeroTravelTicksR45;
+    /** The walking blend has been falling since it last rose. */
+    private boolean rifleMoveFallingR63;
+    /** Ticks without travel through which the walking blend is held: a pilot's client down to seven frames a second. */
+    private static final int TRAVEL_GAP_R63=3;
+    /** Unasked travel slower than this (blocks a tick, a quarter of a walk) is a body coming to rest, not walking. */
+    private static final double COAST_PACE_R63=.25;
     private static final EntityDataAccessor<Integer> DATA_N2_ARM_TICKS =
             SynchedEntityData.defineId(EvaUnit01Entity.class, EntityDataSerializers.INT);
     private static final EntityDataAccessor<Boolean> DATA_CROUCHING =
@@ -1459,21 +1465,31 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // dash that is over 11 blocks, which must not read as standing still.
             boolean moving=distance>.006&&distance<32&&!this.isPilotControlLocked()
                     &&(!actionDisplacement||this.pilotMovementRequested);
-            rifleZeroTravelTicksR45=moving?0:Math.min(3,rifleZeroTravelTicksR45+1);
+            rifleZeroTravelTicksR45=moving?0:Math.min(TRAVEL_GAP_R63+1,rifleZeroTravelTicksR45+1);
             float oldMove=this.entityData.get(DATA_RIFLE_MOVE),oldRun=this.entityData.get(DATA_RIFLE_RUN);
             // Contact spacing/hit pause can stop translation for a few ticks
             // while forward input remains held. Hold the supporting gait pose
             // and its phase; blending toward idle then back produced a knee snap.
             boolean holdSupport=!moving&&actionDisplacement&&this.pilotMovementRequested
                     &&this.onGround()&&!this.isPilotControlLocked()&&distance<.006&&oldMove>.05F;
-            // A mounted position packet can arrive after this tick's sample.
-            // Held input plus a bounded two-tick travel gap is not a new idle
-            // pose. Keep phase distance-driven; never invent forward movement.
+            // A mounted body's position reaches the server in bursts, several ticks' travel at once and
+            // none in between, whenever its pilot's client draws fewer than twenty frames a second or a
+            // packet is late. A tick without travel read as standing still. The gap was held for two
+            // ticks, with the input held and the body on the ground: a body going up a terraced slope
+            // is off the ground every few ticks, and one coming to rest has no input. There the blend
+            // fell and rose again several times a second, and the body went between its walking and its
+            // standing height, four blocks apart on a hillside, each time. Travel within the last three
+            // ticks holds the blend wherever the body is, and carries it on while the input is held.
+            // Keep phase distance-driven; never invent forward movement.
             boolean holdTravelGap=!this.isExperimentalUnit()&&!moving&&!actionDisplacement
-                    &&this.pilotMovementRequested&&this.onGround()&&!this.isPilotControlLocked()
-                    &&distance<.006&&oldMove>.05F&&rifleZeroTravelTicksR45<=2;
-            boolean holdGait=holdSupport||holdTravelGap;
-            float move=Mth.approach(oldMove,moving?1F:holdGait?oldMove:0F,.16F);
+                    &&!this.isPilotControlLocked()&&distance<.006&&oldMove>.05F&&rifleZeroTravelTicksR45<=TRAVEL_GAP_R63;
+            // The last of a piloted body's travel as it comes to rest, a few hundredths of a block a
+            // tick with the input let go, keeps a blend that is already falling where it is and does
+            // not raise it again. A body at rest that is pushed walks with the push, as it always did.
+            boolean coasting=moving&&rifleMoveFallingR63&&!this.pilotMovementRequested&&this.getPilotEntity()!=null&&distance<COAST_PACE_R63;
+            boolean holdGait=holdSupport||holdTravelGap||coasting;
+            float move=Mth.approach(oldMove,moving&&!coasting||holdTravelGap&&this.pilotMovementRequested?1F:holdGait?oldMove:0F,.16F);
+            rifleMoveFallingR63=move<oldMove||rifleMoveFallingR63&&move==oldMove&&move>0F;
             float run=Mth.approach(oldRun,holdGait?oldRun:moving&&this.isPilotSprinting()&&!this.isPilotCrouching()?1F:0F,.14F);
             this.entityData.set(DATA_RIFLE_MOVE,move);this.entityData.set(DATA_RIFLE_RUN,run);
             boolean packGait=com.projectseele.anim.EvaAnimator.handlesGait(this);
