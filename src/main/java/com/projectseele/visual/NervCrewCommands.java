@@ -10,6 +10,7 @@ import com.mojang.brigadier.exceptions.CommandSyntaxException;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.EvaUnit01Entity;
 import com.projectseele.network.ServerboundEvaVideoFramePacket;
+import com.projectseele.world.FacilityWorldPolicy;
 import com.projectseele.world.IntegratedNervMapBuilder;
 import com.projectseele.world.NervCommandTelemetry;
 import com.projectseele.world.NervCrewSavedData;
@@ -17,6 +18,7 @@ import com.projectseele.world.NervCrewSavedData.Assignment;
 import com.projectseele.world.NervCrewSavedData.ClaimResult;
 import com.projectseele.world.NervCrewSavedData.CrewOverview;
 import com.projectseele.world.NervCrewSavedData.Station;
+import com.projectseele.world.RegionalGatewayDirector;
 import net.minecraft.ChatFormatting;
 import net.minecraft.commands.CommandSourceStack;
 import net.minecraft.commands.Commands;
@@ -25,7 +27,6 @@ import net.minecraft.network.chat.Component;
 import net.minecraft.server.MinecraftServer;
 import net.minecraft.server.level.ServerLevel;
 import net.minecraft.server.level.ServerPlayer;
-import net.minecraft.world.entity.Entity;
 import net.minecraft.world.phys.AABB;
 import net.minecraftforge.event.entity.player.PlayerEvent;
 import net.minecraftforge.eventbus.api.SubscribeEvent;
@@ -248,7 +249,13 @@ public final class NervCrewCommands
                     "GeoFront 维度未加载，请检查模组和数据包是否正常加载。"));
             return 0;
         }
-        boolean installed = IntegratedNervMapBuilder.isInstalled(level);
+        // The current world retires the old map's installation receipt on purpose, so reading it
+        // reported every such server's map as missing. Its facility is installed when its regional
+        // plan is, the same test /seele tp uses. Its feeds are drawn on the command room's sloped
+        // screens; the old text-display wall is never built in an S20 world.
+        boolean s20 = FacilityWorldPolicy.isS20Rebuild(server);
+        boolean regional = RegionalGatewayDirector.active(level);
+        boolean installed = regional || IntegratedNervMapBuilder.isInstalled(level);
         AABB area = new AABB(
                 IntegratedNervMapBuilder.GEOFRONT_ORIGIN.getX() - 360.0D,
                 level.getMinBuildHeight(),
@@ -257,8 +264,9 @@ public final class NervCrewCommands
                 level.getMaxBuildHeight(),
                 IntegratedNervMapBuilder.GEOFRONT_ORIGIN.getZ() + 360.0D);
         int airframes = level.getEntitiesOfClass(EvaUnit01Entity.class, area,
-                Entity::isAlive).size();
-        int screens = installed ? NervCommandTelemetry.countScreens(level,
+                eva -> eva.isAlive() && eva.getUnitVariant() >= EvaUnit01Entity.UNIT_00
+                        && eva.getUnitVariant() <= EvaUnit01Entity.UNIT_02).size();
+        int screens = installed && !s20 ? NervCommandTelemetry.countScreens(level,
                 IntegratedNervMapBuilder.GEOFRONT_ORIGIN) : 0;
         int feeds = 0;
         for (int variant = EvaUnit01Entity.UNIT_00;
@@ -272,7 +280,10 @@ public final class NervCrewCommands
         CrewOverview crew = NervCrewSavedData.get(server).overview(server);
         boolean finalInstalled = installed;
         int finalFeeds = feeds;
-        source.sendSuccess(() -> Component.literal(String.format(Locale.ROOT,
+        source.sendSuccess(() -> Component.literal(regional
+                        ? String.format(Locale.ROOT, "设施：%s，已加载 EVA %d/3，驾驶舱画面 %d/3",
+                                finalInstalled ? "已安装" : "缺失", airframes, finalFeeds)
+                        : String.format(Locale.ROOT,
                         "地图：%s，已加载 EVA %d/3，遥测屏 %d/%d，驾驶舱画面 %d/3",
                         finalInstalled ? "已接入" : "缺失",
                         airframes, screens, NervCommandTelemetry.SCREEN_COUNT,
