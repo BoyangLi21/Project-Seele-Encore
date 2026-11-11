@@ -25,6 +25,12 @@ import java.util.Map;
  * The unit now takes its own weight. From the last pose drawn under the lock the body flows into
  * the live one, the arms after the trunk, while the pelvis sinks past the stance on bending
  * knees and comes back up. Only a release at the end of a launch is treated this way.
+ * <p>
+ * There are two launches. The unit's own launch sequence carries it up on its rack and stops at
+ * the surface. The facility's route (NervAssemblyOwnerR52) never starts that sequence: it moves
+ * the unit in the mechanical frame of EvaMechanicalFrameR52, throws it out of the shaft and
+ * opens the lock in the tick it comes down on the closed hatch. Either one counts here, and a
+ * unit that comes down keeps the speed of its fall into the sink.
  */
 public final class EvaRackReleaseR63
 {
@@ -39,8 +45,14 @@ public final class EvaRackReleaseR63
     private static final float SINK_EASE=.12F;
     /** At its lowest the chest has given this far forward over the waist (radians); the head stays level by its share. */
     private static final float GIVE=.07F,HEAD_SHARE=.6F;
-    /** The lock opening this soon after the launch sequence was last seen ends that launch (seconds). */
+    /** The lock opening this soon after the launch sequence or the mechanical frame was last seen ends that launch (seconds). */
     private static final float AFTER_LAUNCH=.6F;
+    /**
+     * A unit that comes down at more than the first speed (blocks per second) goes on down at that
+     * speed, losing it over the given time (seconds); the second speed is the most that counts, and
+     * the sink never passes the last figure (blocks).
+     */
+    private static final float FALL_FROM=4F,FALL_MOST=40F,FALL_TIME=.2F,MOST_SINK=4.5F;
     /** The settle advances by at most this much per frame (seconds): a long frame slows it down, it does not skip ahead. */
     private static final float LONGEST_STEP=.05F;
     /** Bones that follow the body; weapons, the plug and the dorsal machinery keep their own state. */
@@ -54,6 +66,8 @@ public final class EvaRackReleaseR63
         boolean locked;
         /** Seconds of the settle played so far, and how far the body is drawn below its stance this frame (blocks). */
         float clock,sink;
+        /** Where the held body was drawn last frame (world y), how fast it was coming down, and the speed it landed with (blocks per second). */
+        float height=Float.NaN,fall,impact;
         /** The pilot's eye as the held unit's fixed seat gave it, from the unit's position. */
         Vec3 eye;
         final Map<String,float[]> held=new HashMap<>();
@@ -64,8 +78,9 @@ public final class EvaRackReleaseR63
     static void apply(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root)
     {
         long now=AircraftRenderClockR21.frameNanos();
-        // The lock itself, whichever owner draws the held body (the bind pose in a cage, a held service pose).
-        boolean locked=eva.isNervLogisticsLocked(),launching=eva.isLaunchSequenceActive();
+        // The lock itself, whichever owner draws the held body (the bind pose in a cage, the frozen pose of the frame).
+        boolean locked=eva.isNervLogisticsLocked();
+        boolean launching=eva.isLaunchSequenceActive()||com.projectseele.entity.EvaMechanicalFrameR52.active(eva);
         State s=STATES.get(eva);
         if(s==null)
         {
@@ -87,10 +102,21 @@ public final class EvaRackReleaseR63
                 s.released=NEVER;
                 // Held again long after its launch (parked, under repair): nothing to prepare for.
                 if(!recent){STATES.remove(eva);return;}
+                // How fast the held body is coming down, over the last tenth of a second.
+                if(root!=null)
+                {
+                    float dt=s.frame==NEVER?0:(now-s.frame)/1e9F;
+                    if(Float.isFinite(s.height)&&dt>0&&dt<.25F)s.fall+=((s.height-root.m31())/dt-s.fall)*(1-(float)Math.exp(-dt/.08F));
+                    s.height=root.m31();
+                }
             }
             else if(s.released==NEVER)
             {
-                if(s.locked&&recent&&s.frame!=NEVER&&now-s.frame<300_000_000L&&eva.isPoweredOn()&&!s.held.isEmpty()){s.released=now;s.clock=0;}
+                if(s.locked&&recent&&s.frame!=NEVER&&now-s.frame<300_000_000L&&eva.isPoweredOn()&&!s.held.isEmpty())
+                {
+                    s.released=now;s.clock=0;
+                    s.impact=s.fall>FALL_FROM?Math.min(FALL_MOST,s.fall):0;
+                }
                 else if(!recent){STATES.remove(eva);return;}
             }
             else s.clock+=Math.min(LONGEST_STEP,(now-s.frame)/1e9F);
@@ -106,7 +132,9 @@ public final class EvaRackReleaseR63
         float t=s.clock;
         if(t>=END){STATES.remove(eva);return;}
         for(GeoBone bone:model.topLevelBones())follow(bone,s.held,t);
-        float x=t/SINK_AT,sink=SINK*x*x*(float)Math.exp(2*(1-x))*smooth(t/SINK_EASE)*(1-smooth((t-BACK_FROM)/(END-BACK_FROM)));
+        // Its weight coming onto the legs, and on top of that the speed it came down with.
+        float x=t/SINK_AT,weight=SINK*x*x*(float)Math.exp(2*(1-x))*smooth(t/SINK_EASE),landing=s.impact*t*(float)Math.exp(-t/FALL_TIME);
+        float sink=Math.min(MOST_SINK,weight+landing)*(1-smooth((t-BACK_FROM)/(END-BACK_FROM)));
         GeoBone base=model.getBone("root").orElse(null);
         if(sink<.005F||root==null||base==null||!EvaGroundContactR56.applies(eva))return;
         float give=GIVE*sink/SINK;
