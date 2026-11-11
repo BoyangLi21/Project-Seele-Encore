@@ -156,8 +156,7 @@ public final class RigidCapsuleGpu
             // with our vanilla-only shader. ExtendedShader derives its normal
             // matrix from the supplied model-view matrix on every apply().
             BufferBuilder builder=beginUpload();
-            for(int i=0;i+stride*3<=vertices.length;i+=stride*3)for(int corner=0;corner<3;corner++)
-            {int at=i+corner*stride;builder.vertex(-(vertices[at]+px)/16,(vertices[at+1]+py)/16,(vertices[at+2]+pz)/16,r,g,b,1,vertices[at+3],vertices[at+4],overlay,light,-vertices[at+5],vertices[at+6],vertices[at+7]);}
+            DirectMeshWriter.uploadTriangles(builder,vertices,stride,px,py,pz,r,g,b,overlay,light);
             VertexBuffer buffer=cached==null?new VertexBuffer(revision==0?VertexBuffer.Usage.STATIC:VertexBuffer.Usage.DYNAMIC):cached.buffer();
             if(!upload(buffer,builder)){if(cached==null)buffer.close();type.clearRenderState();return false;}
             if(revision>0)
