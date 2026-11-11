@@ -23,6 +23,8 @@
     "SbwRestCollisionR24Mixin",
     "SbwTerrainBoxesR53Mixin",
     "SbwParkingTicketsR44Mixin",
+    "SbwTowerDutyMixin",
+    "SbwIdlePauseMixin",
     "SbwBootstrapTicketsR44Mixin",
     "GiantExplosionQueryMixinR44",
     "GiantMoveBlockQueryR53Mixin",
