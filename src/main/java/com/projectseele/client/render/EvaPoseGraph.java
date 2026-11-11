@@ -373,6 +373,9 @@ public final class EvaPoseGraph
         String continuityOwner=motionWrites.owner();
         EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
         EvaGroundContactR56.keepSolesUp(entity,model,modelToWorld);
+        EvaRackReleaseR63.apply(entity,model,modelToWorld);
+        if(EvaRackReleaseR63.active(entity))EvaGroundContactR56.keepSolesUp(entity,model,modelToWorld);
+        EvaPoseContinuity.trace(entity,model,"rack.release");
         // Last word on the joints: every layer above may have turned a forearm or shin (lag, limits,
         // continuity residuals decayed apart from rotation); seat each back on its real elbow/knee centre.
         for(String side:new String[]{"l","r"})

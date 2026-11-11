@@ -238,7 +238,7 @@ final class EvaGroundContactR56
     }
 
     /** Bend or reach a planted leg so its sole moves down by {@code drop} blocks (up when negative). */
-    private static void reachGround(BakedGeoModel model,Matrix4f root,String side,float drop)
+    static void reachGround(BakedGeoModel model,Matrix4f root,String side,float drop)
     {
         var leg=model.getBone("leg_"+side).orElse(null);var shin=model.getBone("shin_"+side).orElse(null);
         var ankle=model.getBone("ankle_"+side).orElse(null);var foot=model.getBone("foot_"+side).orElse(null);
@@ -381,6 +381,8 @@ final class EvaGroundContactR56
         return t*t*(3-2*t);
     }
 
+    /** Reads the unit's hull samples now if no frame has needed them yet (a mesh file: tens of milliseconds). */
+    static void warm(EvaUnit01Entity eva){hulls(eva);}
     private static Map<String,Vector3f[]> hulls(EvaUnit01Entity eva)
     {
         return HULLS.computeIfAbsent(EvaBodyPose.rigKey(eva),v->

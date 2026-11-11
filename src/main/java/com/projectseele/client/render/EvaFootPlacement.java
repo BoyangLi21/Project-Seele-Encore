@@ -30,6 +30,8 @@ public final class EvaFootPlacement
         return under!=null&&under[1]==com.projectseele.client.AircraftRenderClockR21.frameNanos()?under[0]:Double.NaN;
     }
     public static void clear(){GEOMETRY.clear();LAST.clear();}
+    /** Reads the unit's sole geometry now if no frame has needed it yet (a mesh file: tens of milliseconds). */
+    static void warm(EvaUnit01Entity eva){feet(eva);}
     private static Map<String,Vector3f[]> feet(EvaUnit01Entity eva)
     {
         return GEOMETRY.computeIfAbsent(EvaBodyPose.rigKey(eva),v->{
