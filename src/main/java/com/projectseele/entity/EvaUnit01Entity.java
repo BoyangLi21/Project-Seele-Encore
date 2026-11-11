@@ -3913,7 +3913,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         Vec3 authored=EvaGameplayMotionR32.knifeReady(this)
                 ?EvaGameplayMotionR32.root(this,this.knifeReverseMotion?"knife_reverse":"knife_forward",phase)
                 :EvaLiveCombatMotion.knife(this.knifeReverseMotion,phase);
-        this.applyAuthoredRootDelta(authored);
+        this.applyAuthoredRootDelta(authored,this.knifeElapsedTicks==1);
     }
 
     private void applyLiveCombatRootMotion(boolean ordinary)
@@ -3944,14 +3944,33 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                     :EvaLiveCombatMotion.kick(Mth.clamp(elapsed/duration,0,1));
         }
         this.entityData.set(DATA_LIVE_ACTION_PHASE, Mth.clamp(elapsed / duration, 0.0F, 1.0F));
-        this.applyAuthoredRootDelta(authored);
+        this.applyAuthoredRootDelta(authored,elapsed==1);
     }
 
-    private void applyAuthoredRootDelta(Vec3 authored)
+    /** Forward travel the running attack's clip has asked for so far, and what of it the body made (blocks). */
+    private double authoredAdvanceAskedR63,authoredAdvanceMadeR63;
+
+    private void applyAuthoredRootDelta(Vec3 authored,boolean first)
     {
+        if(first)this.authoredAdvanceAskedR63=this.authoredAdvanceMadeR63=0;
         Vec3 local = authored.subtract(this.liveCombatRootPrevious);
         this.liveCombatRootPrevious = authored;
+        // A clip that lunges and then draws back does the second for the first. Stopped at its
+        // target's body the lunge is not made, and the draw-back alone carried the attacker away:
+        // a kick at a target ten blocks ahead ended 13.6 blocks behind where it began, the last 4.8
+        // in its final tick, drawn as a standing body sliding back. The draw-back is cut to the
+        // share of the lunge that was made. A step back before any advance, the wind-up, is whole.
+        double asked=-local.z*112.0D*EvaScale.RENDER_SCALE/16.0D;
+        if(asked<0&&this.authoredAdvanceAskedR63>1)
+            local=new Vec3(local.x,local.y,local.z*Mth.clamp(this.authoredAdvanceMadeR63/this.authoredAdvanceAskedR63,0,1));
+        Vec3 before=this.position();
         this.moveAuthoredRootDelta(local);
+        Vec3 forward=this.getForward().multiply(1.0D,0.0D,1.0D);
+        if(asked>0&&forward.lengthSqr()>1.0e-8D)
+        {
+            this.authoredAdvanceAskedR63+=asked;
+            this.authoredAdvanceMadeR63+=Math.max(0,this.position().subtract(before).dot(forward.normalize()));
+        }
     }
 
     private void moveAuthoredRootDelta(Vec3 local)
@@ -5570,7 +5589,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 float swingPhase=EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.swingSoundPhaseR45(this,"heavy"):.40F;
                 if(EvaGameplayMotionR32.directed(this)&&heavyElapsed>=heavyDuration*swingPhase&&heavyElapsed-1<heavyDuration*swingPhase)EvaMovementSounds.swing(this,2.8F);
                 this.entityData.set(DATA_LIVE_ACTION_PHASE, phase);
-                this.applyAuthoredRootDelta(EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.root(this,"heavy",phase):EvaLiveCombatMotion.heavy(phase));
+                this.applyAuthoredRootDelta(EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.root(this,"heavy",phase):EvaLiveCombatMotion.heavy(phase),this.heavyElapsed==1);
                 if(EvaGameplayMotionR32.ready(this))
                 {
                     if(!this.heavyContact&&EvaGameplayMotionR32.inContactWindowR45(this,"heavy",phase)&&combatPilot!=null)this.heavyContact=this.gameplayContactR32(combatPilot,"heavy",true);
