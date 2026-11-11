@@ -26,6 +26,7 @@
     "SbwBootstrapTicketsR44Mixin",
     "GiantExplosionQueryMixinR44",
     "GiantMoveBlockQueryR53Mixin",
+    "GiantInsideBlocksMixin",
     "BiomeManagerMixin",
     "EcologyPlacedFeatureR44Mixin",
     "PianoSyncServerR23Mixin",
