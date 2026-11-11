@@ -97,6 +97,13 @@ public final class TvWorldPreviewTerrain
                                 : y >= surfaceTop - 3 ? Blocks.DIRT : Blocks.STONE).defaultBlockState();
                         chunk.setBlockState(p.set(x, y, z), state, false);
                     }
+                    if (OuterBoundaryTerrain.enabled() && OuterBoundaryTerrain.outsideSurvey(x, z))
+                    {
+                        BlockState cover = OuterBoundaryTerrain.top(x, z, surfaceTop);
+                        if (cover != null)
+                            for (int d = 0; d < (cover.is(Blocks.STONE) ? 4 : 1); d++)
+                                chunk.setBlockState(p.set(x, surfaceTop - d, z), cover, false);
+                    }
                 }
                 else if (cityDistance < 160)
                 {

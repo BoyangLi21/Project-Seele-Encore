@@ -70,6 +70,9 @@ public final class HakoneSurfaceField
     {
         Field f = FIELD;
         if (f == null) return null;
+        // Prototype: beyond the survey and the saved chunks the outer terrain decides alone;
+        // it already starts from the nearest known ground.
+        if (OuterBoundaryTerrain.enabled() && OuterBoundaryTerrain.unknown(x, z)) return OuterBoundaryTerrain.surface(x, z);
         double fx = Math.max(0, Math.min(f.width - 1, (x - (double) f.x) / f.step));
         double fz = Math.max(0, Math.min(f.depth - 1, (z - (double) f.z) / f.step));
         int ix = (int) fx, iz = (int) fz, jx = Math.min(ix + 1, f.width - 1), jz = Math.min(iz + 1, f.depth - 1);
@@ -87,7 +90,7 @@ public final class HakoneSurfaceField
                 Math.max(f.z - z, z - (f.z + (f.depth - 1) * f.step)));
         if (distance > 0) weight = 1 - (1-weight) * (1-smooth(distance/256));
         if (weight == 0) return new Surface((int) Math.round(height), water);
-        var outer = exterior(x, z, nativeGround);
+        var outer = OuterBoundaryTerrain.enabled() ? OuterBoundaryTerrain.surface(x, z) : exterior(x, z, nativeGround);
         double result = height * (1-weight) + outer.ground * weight;
         if (water != outer.water)
         {
@@ -103,6 +106,19 @@ public final class HakoneSurfaceField
         int ground = (int) Math.round(result);
         int level = weight < .5 ? water : outer.water;
         return new Surface(ground, ground < level ? level : NO_WATER);
+    }
+
+    /** Surveyed field height alone, without the exterior blend. */
+    static double surveyedHeight(int x, int z)
+    {
+        Field f = FIELD;
+        if (f == null) return 80;
+        double fx = Math.max(0, Math.min(f.width - 1, (x - (double) f.x) / f.step));
+        double fz = Math.max(0, Math.min(f.depth - 1, (z - (double) f.z) / f.step));
+        int ix = (int) fx, iz = (int) fz, jx = Math.min(ix + 1, f.width - 1), jz = Math.min(iz + 1, f.depth - 1);
+        double dx = fx - ix, dz = fz - iz;
+        return ((f.heights[iz * f.width + ix] * (1 - dx) + f.heights[iz * f.width + jx] * dx) * (1 - dz)
+                + (f.heights[jz * f.width + ix] * (1 - dx) + f.heights[jz * f.width + jx] * dx) * dz) / 16.0;
     }
 
     private static double smooth(double value)
