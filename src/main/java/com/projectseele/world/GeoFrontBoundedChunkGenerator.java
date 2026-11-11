@@ -142,6 +142,15 @@ public final class GeoFrontBoundedChunkGenerator
             Executor executor, Blender blender, RandomState randomState,
             StructureManager structureManager, ChunkAccess chunk)
     {
+        if (this.tvPreview && OuterBoundaryTerrain.enabled() && OuterBoundaryTerrain.wholeChunkUnknown(chunk.getPos()))
+        {
+            // The outer terrain rewrites everything from -128 up, so the 992-block native
+            // noise column would be thrown away; stone below is all it leaves.
+            OuterBoundaryTerrain.fillDeep(chunk);
+            this.carveBoundedBaseline(chunk);
+            GeoFrontHeightR52.fillFoundation(chunk);
+            return CompletableFuture.completedFuture(chunk);
+        }
         return super.fillFromNoise(executor, blender, randomState,
                         structureManager, chunk)
                 .thenApply(generated ->

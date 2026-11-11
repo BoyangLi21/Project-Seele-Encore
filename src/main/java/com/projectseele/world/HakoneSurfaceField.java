@@ -68,11 +68,18 @@ public final class HakoneSurfaceField
 
     public static Surface sample(int x, int z, int nativeGround)
     {
+        if (!OuterBoundaryTerrain.enabled()) return sampleField(x, z, nativeGround);
+        // Beyond the survey and the saved chunks the outer terrain decides alone; it
+        // already starts from the nearest known ground.
+        if (OuterBoundaryTerrain.unknown(x, z)) return OuterBoundaryTerrain.surface(x, z);
+        Surface field = sampleField(x, z, nativeGround);
+        return field == null ? null : OuterBoundaryTerrain.surveyedSea(x, z, field);
+    }
+
+    private static Surface sampleField(int x, int z, int nativeGround)
+    {
         Field f = FIELD;
         if (f == null) return null;
-        // Prototype: beyond the survey and the saved chunks the outer terrain decides alone;
-        // it already starts from the nearest known ground.
-        if (OuterBoundaryTerrain.enabled() && OuterBoundaryTerrain.unknown(x, z)) return OuterBoundaryTerrain.surface(x, z);
         double fx = Math.max(0, Math.min(f.width - 1, (x - (double) f.x) / f.step));
         double fz = Math.max(0, Math.min(f.depth - 1, (z - (double) f.z) / f.step));
         int ix = (int) fx, iz = (int) fz, jx = Math.min(ix + 1, f.width - 1), jz = Math.min(iz + 1, f.depth - 1);
