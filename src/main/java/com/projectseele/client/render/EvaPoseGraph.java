@@ -377,6 +377,8 @@ public final class EvaPoseGraph
         EvaBodyWeightR59.apply(entity,model,partialTick);
         EvaFollowThroughR56.apply(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"follow.through");
+        EvaArmClearanceR63.apply(entity,model,modelToWorld,partialTick);
+        EvaPoseContinuity.trace(entity,model,"arm.clearance");
         // Follow-through leans the spine and the head: back within their ranges once more.
         EvaJointLimitsR57.apply(model);
         EvaPoseContinuity.trace(entity,model,"joint.limits.after");
