@@ -36,18 +36,27 @@ public final class HakoneSurfaceFieldTest
         var coastGap = HakoneSurfaceField.sample(3148, 1088, 50);
         if (coastGap == null || coastGap.ground() > -60)
             throw new AssertionError("Missing coastal DEM sample became an elevated artificial island");
+        // Outer boundary (F1/F2): land beyond the survey is mountain on the one sea datum,
+        // seaward of the Sagami Bay coast it is open sea, and no inland 62 datum remains.
         for (int[] at : new int[][]{{-4096,-1000},{0,-3072},{6500,-6500}})
         {
-            var retained = HakoneSurfaceField.sample(at[0],at[1],45);
-            if (retained.ground()!=45 || retained.water()!=62)
-                throw new AssertionError("Legacy continent/UN exterior lost its original water datum");
+            var land = HakoneSurfaceField.sample(at[0],at[1],45);
+            if (!OuterBoundaryTerrain.unknown(at[0],at[1]) || land.ground() <= HakoneSurfaceField.SEA_Y + 20 || land.water() != HakoneSurfaceField.SEA_Y)
+                throw new AssertionError("Outer land is not mountain on the sea datum at "+at[0]+","+at[1]);
         }
         for (int[] at : new int[][]{{6500,1000},{3000,5200},{6500,5200}})
         {
             var sea = HakoneSurfaceField.sample(at[0],at[1],45);
-            if (sea.ground()!=-99 || sea.water()!=-82)
-                throw new AssertionError("Surveyed coast did not continue into the unsaved exterior");
+            if (sea.ground() >= HakoneSurfaceField.SEA_Y - 10 || sea.water() != HakoneSurfaceField.SEA_Y)
+                throw new AssertionError("Sagami Bay did not continue into the unsaved exterior at "+at[0]+","+at[1]);
         }
+        for (int x = -9000; x < 12000; x += 37)
+            for (int z = -8000; z < 10000; z += 41)
+            {
+                var outer = HakoneSurfaceField.sample(x, z, 45);
+                if (OuterBoundaryTerrain.unknown(x, z) && (outer.water() != HakoneSurfaceField.SEA_Y || outer.ground() > 300 || outer.ground() < -120))
+                    throw new AssertionError("Outer column left the single sea datum or the height range at "+x+","+z);
+            }
         var lake=HakoneSurfaceField.sample(-1230,-1802,45);
         var bank=HakoneSurfaceField.sample(-1228,-1802,45);
         if(lake.water()!=62 || bank.ground()<62)
@@ -94,7 +103,40 @@ public final class HakoneSurfaceFieldTest
         if (!chunk.getBlockState(new BlockPos(2432,-129,1087)).is(Blocks.GOLD_BLOCK))
             throw new AssertionError("Surface repair touched the underground");
         verifyConsumers(registry,biome);
-        System.out.println("Hakone boundary PASS: retained native waters, continuous coast/watershed, matching chunk/column/height consumers, underground retained");
+        verifyOuterFastPath(registry);
+        System.out.println("Hakone boundary PASS: surveyed land and coast retained, outer mountains and Sagami Bay on one sea datum, matching chunk/column/height consumers including the outer fast path, underground retained");
+    }
+
+    /** A whole outer chunk skips the native noise; its surface must match the column consumers. */
+    private static void verifyOuterFastPath(MappedRegistry<Biome> registry)throws Exception
+    {
+        var lookup=VanillaRegistries.createLookup();
+        var stream=HakoneSurfaceFieldTest.class.getResourceAsStream("/data/projectseele/worldgen/noise_settings/geofront_surface.json");
+        var json=JsonParser.parseReader(new java.io.InputStreamReader(stream,java.nio.charset.StandardCharsets.UTF_8));
+        stream.close();
+        var settings=NoiseGeneratorSettings.DIRECT_CODEC.parse(RegistryOps.create(JsonOps.INSTANCE,lookup),json)
+                .getOrThrow(false,message->{throw new AssertionError(message);});
+        var random=RandomState.create(settings,lookup.lookupOrThrow(Registries.NOISE),-3816295015381828007L);
+        var biome=lookup.lookupOrThrow(Registries.BIOME).getOrThrow(Biomes.PLAINS);
+        var shaped=new GeoFrontBoundedChunkGenerator(new net.minecraft.world.level.biome.FixedBiomeSource(biome),Holder.direct(settings),0,80,true);
+        var bounds=LevelHeightAccessor.create(-672,992);
+        for(int[] at:new int[][]{{9000,-6000},{6400,5120},{-6000,-1000}})
+        {
+            var pos=new ChunkPos(at[0]>>4,at[1]>>4);
+            if(!OuterBoundaryTerrain.wholeChunkUnknown(pos))throw new AssertionError("Expected a whole outer chunk at "+at[0]+","+at[1]);
+            var c=new ProtoChunk(pos,UpgradeData.EMPTY,bounds,registry,null);
+            shaped.fillFromNoise(Runnable::run,Blender.empty(),random,null,c).join();
+            var p=new BlockPos.MutableBlockPos();
+            for(int dz:new int[]{0,7,15})for(int dx:new int[]{0,7,15})
+            {
+                int x=pos.getMinBlockX()+dx,z=pos.getMinBlockZ()+dz;
+                var col=shaped.getBaseColumn(x,z,bounds,random);
+                int ground=HakoneSurfaceField.sample(x,z,-128).ground();
+                for(int y=Math.max(-128,ground-3);y<320;y++)if(c.getBlockState(p.set(x,y,z))!=col.getBlock(y))
+                    throw new AssertionError("Outer fast path and base column differ at "+x+","+y+","+z);
+                if(!c.getBlockState(p.set(x,-200,z)).is(Blocks.STONE))throw new AssertionError("Outer fast path left no stone below at "+x+","+z);
+            }
+        }
     }
 
     private static void verifyConsumers(MappedRegistry<Biome> registry,Holder<Biome> biome)throws Exception
