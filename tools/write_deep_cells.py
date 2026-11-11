@@ -252,6 +252,9 @@ def apply(a):
                             entities.remove(e)
                     entities.append(sign_entity(sign, state))
                 clear_light(root)
+                if a.refresh_heightmaps and 'Heightmaps' in root:
+                    # The game rebuilds missing heightmaps on load; stale ones keep rain and spawning at the old ground.
+                    del root['Heightmaps']
                 write_chunk(buf, i, loc, count, root)
             swap = path.with_name(path.name + '.swap')
             swap.write_bytes(buf)
@@ -307,4 +310,5 @@ if __name__ == '__main__':
     parser.add_argument('--allow-lift-shaft', action='store_true', help='only to clear the travel space of a lift itself')
     parser.add_argument('--allow-block-entities', action='store_true',
                         help='let rows replace blocks that carry a block entity (chests, signs, machines); off by default')
+    parser.add_argument('--refresh-heightmaps', action='store_true', help='drop the stored heightmaps of touched chunks, for terrain cut or raised')
     apply(parser.parse_args())
