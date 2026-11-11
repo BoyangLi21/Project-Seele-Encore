@@ -82,7 +82,9 @@ def plant(w, sites, benches, rows):
         site['planting'] = dict(density=round(density, 2), log=log)
         for x, t, z, p, _ in mine:
             r = ((x * 73856093) ^ (z * 19349663)) % 1000 / 1000.0
-            if p == 2 and r < density * 0.45 and all((x + dx, z + dz) not in taken for dx in range(-3, 4) for dz in range(-3, 4)):
+            if near_road(x, z, 1):
+                continue
+            if p == 2 and r < density * 0.45 and not near_road(x, z) and all((x + dx, z + dz) not in taken for dx in range(-3, 4) for dz in range(-3, 4)):
                 taken.add((x, z))
                 for k in range(1, 4):
                     set_cell(x, t + k, z, trunk)
@@ -94,6 +96,17 @@ def plant(w, sites, benches, rows):
                 set_cell(x, t + 5, z, leaves)
             elif r < density * 0.6 and (x, z) not in taken:
                 set_cell(x, t + 1, z, leaves)
+
+
+import os
+AVOID = set()
+if os.environ.get('E13_AVOID'):
+    AVOID = {(c[0], c[1]) for c in json.load(open(os.environ['E13_AVOID']))}
+
+
+def near_road(x, z, r=3):
+    """Road columns of another session's plans (E13_AVOID): no trunk within r of them, no crown over them."""
+    return bool(AVOID) and any((x + dx, z + dz) in AVOID for dx in range(-r, r + 1) for dz in range(-r, r + 1))
 
 
 def tall_tree(set_cell, x, t, z, log, leaves, h):
@@ -147,7 +160,7 @@ def replant(w, sites, rows, removed, filled_cols):
         for (x, z) in sorted(cols, key=lambda c: ((c[0] * 73856093) ^ (c[1] * 19349663)) % 9973):
             if len(planted) >= want:
                 break
-            if any(abs(x - px) < 3 and abs(z - pz) < 3 for px, pz in planted):
+            if any(abs(x - px) < 3 and abs(z - pz) < 3 for px, pz in planted) or near_road(x, z):
                 continue
             # top of the column after the plan: the highest grass we set, or the ground
             t = gtop.get((x, z))
