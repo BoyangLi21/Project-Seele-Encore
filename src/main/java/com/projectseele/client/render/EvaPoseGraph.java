@@ -363,26 +363,33 @@ public final class EvaPoseGraph
         EvaStanceFinishR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"stance.finish");
         EvaTurnStepR59.apply(entity,model,partialTick,modelToWorld);
+        // The body is set on the ground as it will be drawn: with its joints already held to their
+        // ranges and its forearms and shins seated on their elbows and knees. Both used to come
+        // after. Kneeling down and lying, the hips are turned out past their 45 degrees; held back
+        // to it afterwards, the thighs came round and the whole body, set down a moment before,
+        // stood 0.7 to 0.9 blocks in the ground (shins, upper arms and belly) for as long as it lay.
+        EvaJointLimitsR57.apply(model);
+        EvaPoseContinuity.trace(entity,model,"joint.limits");
+        seatHinges(model);
         EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"ground.contact");
         EvaBodyWeightR59.apply(entity,model,partialTick);
         EvaFollowThroughR56.apply(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"follow.through");
+        // Follow-through leans the spine and the head: back within their ranges once more.
         EvaJointLimitsR57.apply(model);
-        EvaPoseContinuity.trace(entity,model,"joint.limits");
+        EvaPoseContinuity.trace(entity,model,"joint.limits.after");
         String continuityOwner=motionWrites.owner();
         EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
+        // Follow-through, the joint limits and the settle each turn a shin: seated again before the soles are checked.
+        seatHinges(model);
         EvaGroundContactR56.keepSolesUp(entity,model,modelToWorld);
         EvaRackReleaseR63.apply(entity,model,modelToWorld);
         if(EvaRackReleaseR63.active(entity))EvaGroundContactR56.keepSolesUp(entity,model,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"rack.release");
         // Last word on the joints: every layer above may have turned a forearm or shin (lag, limits,
         // continuity residuals decayed apart from rotation); seat each back on its real elbow/knee centre.
-        for(String side:new String[]{"l","r"})
-        {
-            model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
-            model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
-        }
+        seatHinges(model);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
         EvaShutdownPoseR30.rememberFinalLiveR45(entity,model);
@@ -407,6 +414,15 @@ public final class EvaPoseGraph
         return committed;
     }
 
+
+    private static void seatHinges(BakedGeoModel model)
+    {
+        for(String side:new String[]{"l","r"})
+        {
+            model.getBone("forearm_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.elbow(b,side)));
+            model.getBone("shin_"+side).ifPresent(b->EvaRigTransforms.hinge(b,EvaRigTransforms.knee(b)));
+        }
+    }
 
     private static Snapshot snapshot(EvaUnit01Entity entity,
                                      float partialTick,
