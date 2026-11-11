@@ -1,100 +1,84 @@
 package com.projectseele.world;
 
-import java.util.Locale;
+import java.io.BufferedInputStream;
+import java.io.DataInputStream;
+import java.io.IOException;
+import java.util.zip.GZIPInputStream;
 import net.minecraft.util.RandomSource;
+import net.minecraft.world.level.ChunkPos;
+import net.minecraft.world.level.block.Block;
 import net.minecraft.world.level.block.Blocks;
 import net.minecraft.world.level.block.state.BlockState;
+import net.minecraft.world.level.chunk.ChunkAccess;
+import net.minecraft.world.level.chunk.LevelChunkSection;
+import net.minecraft.world.level.chunk.PalettedContainer;
 import net.minecraft.world.level.levelgen.synth.SimplexNoise;
 
 /**
- * F1/F2 design prototype: terrain beyond the surveyed GSI rectangle. Seaward of
- * the Sagami Bay coastline the sea never ends; everywhere else rolling high
- * mountains rise out of the surveyed edge. Off unless the JVM is started with
- * -Dprojectseele.outerBoundary=sea=beach|rocky,mountain=ridged|rolling|layered,
- * so a world opened without it keeps the existing exterior.
+ * Terrain beyond the surveyed rectangle and the saved chunks (F1/F2). Seaward of the
+ * Sagami Bay coastline the sea never ends: sand from Odawara east, rocks and stacks
+ * from Manazuru south. Everywhere else mountains rise from the nearest known ground,
+ * low beside the map and higher further out. Both resources are built offline by
+ * tools/plan_outer_boundary.py. -Dprojectseele.outerBoundary=off restores the old
+ * exterior.
  */
 public final class OuterBoundaryTerrain
 {
-    /** Surveyed GSI rectangle (geography.json bounds at 1:4). */
     public static final int DEM_X0 = -1982, DEM_Z0 = -1548, DEM_X1 = 4386, DEM_Z1 = 3720;
 
-    private static final String SEA = sea(), MOUNTAIN = mountain();
+    private static final boolean ENABLED = !"off".equalsIgnoreCase(System.getProperty("projectseele.outerBoundary", ""));
     private static final SimplexNoise A = noise(1), B = noise(2), C = noise(3), D = noise(4), E = noise(5);
+    private static final Edge EDGE = Edge.load();
+    private static final Coast COAST = Coast.load();
 
-    /**
-     * Approximate coastline, west to east, land on the left: the Izu east coast
-     * from Irozaki to Atami, the surveyed coast's two exits, then Shonan to
-     * Jogashima. Placeholder points from public coordinates; the design replaces
-     * them with the GSI coastline before anything is written.
-     */
-    private static final double[][] COAST = {
+    /** Fallback coastline beyond the coast grid only, west to east with land on the left. */
+    private static final double[][] FALLBACK = {
             {-100000, 18699}, {-3572, 18699}, {-1299, 16618}, {859, 13845}, {3018, 10377},
             {2904, 9129}, {2177, 8547}, {1882, 7326}, {1950, 6356}, {1655, 4941},
             {2360, 3720}, {4386, 78}, {4654, -52}, {5631, -607}, {6926, -856}, {7790, -1217},
             {9040, -1189}, {10744, -718}, {12334, -856}, {12902, -412}, {13130, 392},
             {13879, 3942}, {100000, 3942}};
 
-    private static final Edge EDGE = Edge.load();
-
     private OuterBoundaryTerrain() {}
-
-    /** Offline grid: blocks to the nearest known column and that column's ground. */
-    private record Edge(int x, int z, int step, int width, int depth, short[] distance, short[] height)
-    {
-        static Edge load()
-        {
-            try (var in = new java.io.DataInputStream(new java.io.BufferedInputStream(new java.util.zip.GZIPInputStream(
-                    OuterBoundaryTerrain.class.getResourceAsStream("/data/projectseele/worldgen/outer_edge.bin.gz")))))
-            {
-                if (in.readInt() != 0x484B4531) throw new java.io.IOException("Invalid outer edge grid");
-                int x = in.readInt(), z = in.readInt(), step = in.readInt(), width = in.readInt(), depth = in.readInt();
-                short[] distance = new short[width * depth], height = new short[width * depth];
-                for (int i = 0; i < distance.length; i++) distance[i] = in.readShort();
-                for (int i = 0; i < height.length; i++) height[i] = in.readShort();
-                return new Edge(x, z, step, width, depth, distance, height);
-            }
-            catch (Exception exception)
-            {
-                throw new IllegalStateException("Outer boundary prototype needs outer_edge.bin.gz", exception);
-            }
-        }
-
-        double[] sample(int bx, int bz)
-        {
-            int i = clamp(Math.round((bx - x) / (float) step), 0, width - 1), j = clamp(Math.round((bz - z) / (float) step), 0, depth - 1);
-            double beyond = Math.hypot(bx - (x + i * step), bz - (z + j * step));
-            int k = j * width + i;
-            return new double[]{distance[k] + beyond, height[k]};
-        }
-    }
 
     public static boolean enabled()
     {
-        return SEA != null;
+        return ENABLED && EDGE != null;
     }
 
     /** True beyond both the surveyed rectangle and every saved chunk. */
-    static boolean unknown(int x, int z)
+    public static boolean unknown(int x, int z)
     {
-        return EDGE.sample(x, z)[0] > 0;
+        return EDGE.distance(x, z) > 0;
     }
 
-    public static boolean outsideSurvey(int x, int z)
+    /** A chunk with no known column anywhere in it: the native noise can be skipped. */
+    public static boolean wholeChunkUnknown(ChunkPos chunk)
     {
-        return x < DEM_X0 || x > DEM_X1 || z < DEM_Z0 || z > DEM_Z1;
+        return EDGE.distance(chunk.getMiddleBlockX(), chunk.getMiddleBlockZ()) > 24;
     }
 
     /** Ground and water for one exterior column. */
     static HakoneSurfaceField.Surface surface(int x, int z)
     {
-        // Distance to, and height of, the nearest saved or surveyed column: the
-        // new terrain rises from whatever ground the map already ends on.
-        double[] known = EDGE.sample(x, z);
-        double away = known[0], edge = known[1];
+        double away = EDGE.distance(x, z), edge = EDGE.ground(x, z);
         double target = ground(x, z, away);
         double height = edge + (target - edge) * smooth(away / 900);
         int ground = (int) Math.round(Math.max(-120, Math.min(300, height)));
         return new HakoneSurfaceField.Surface(ground, HakoneSurfaceField.SEA_Y);
+    }
+
+    /**
+     * Unsaved surveyed sea from Manazuru to Yugawara keeps the field's coast and depth,
+     * with rock stacks added near the shore.
+     */
+    static HakoneSurfaceField.Surface surveyedSea(int x, int z, HakoneSurfaceField.Surface field)
+    {
+        if (field.water() != HakoneSurfaceField.SEA_Y || field.ground() >= HakoneSurfaceField.SEA_Y || EDGE.saved(x, z)) return field;
+        double s = coast(x, z);
+        if (s <= 0 || s > 120 || rocky(z) < 0.5) return field;
+        int top = stack(x, z, field.ground());
+        return top == field.ground() ? field : new HakoneSurfaceField.Surface(top, HakoneSurfaceField.SEA_Y);
     }
 
     /** Material for the top block, or null to keep the default grass or gravel. */
@@ -109,10 +93,10 @@ public final class OuterBoundaryTerrain
         };
     }
 
-    /** 0 default, 1 sand, 2 snow, 3 stone; kept free of block classes for offline previews. */
+    /** 0 default, 1 sand, 2 snow, 3 stone; free of block classes for offline previews. */
     static int cover(int x, int z, int ground)
     {
-        boolean beach = "beach".equals(SEA);
+        boolean beach = rocky(z) < 0.5;
         if (ground < HakoneSurfaceField.SEA_Y - 1) return coast(x, z) < 60 && beach ? 1 : 0;
         double steep = Math.max(Math.abs(surface(x + 2, z).ground() - surface(x - 2, z).ground()),
                 Math.abs(surface(x, z + 2).ground() - surface(x, z - 2).ground())) / 4.0;
@@ -123,77 +107,85 @@ public final class OuterBoundaryTerrain
         return 0;
     }
 
+    /** Stone below -128 in a chunk whose surface the outer terrain writes anyway. */
+    public static void fillDeep(ChunkAccess chunk)
+    {
+        int from = Math.max(GeoFrontHeightR52.LEGACY_MIN_Y, chunk.getMinBuildHeight()), to = -128;
+        var sections = chunk.getSections();
+        BlockState stone = Blocks.STONE.defaultBlockState();
+        for (int y = from; y < to; y += 16)
+        {
+            int index = chunk.getSectionIndex(y);
+            var states = new PalettedContainer<>(Block.BLOCK_STATE_REGISTRY, stone, PalettedContainer.Strategy.SECTION_STATES);
+            sections[index] = new LevelChunkSection(states, sections[index].getBiomes());
+        }
+        for (var entry : chunk.getHeightmaps())
+            for (int z = 0; z < 16; z++)
+                for (int x = 0; x < 16; x++)
+                    entry.getValue().update(x, to - 1, z, stone);
+        chunk.setUnsaved(true);
+    }
+
+    /** Rocks from Manazuru south, sand from Odawara east. */
+    private static double rocky(int z)
+    {
+        return smooth((z - 1800) / 500.0);
+    }
+
     private static double ground(int x, int z, double away)
     {
-        double s = coast(x, z);
-        boolean rocky = "rocky".equals(SEA);
+        double s = coast(x, z), r = rocky(z);
         if (s > 0)
         {
-            // Shelf, then the bay floor. Rocky coasts drop faster and keep stacks.
-            double depth = rocky ? 6 + s / 12 : 2 + s / 30;
+            double depth = (2 + s / 30) * (1 - r) + (6 + s / 12) * r;
             double bed = HakoneSurfaceField.SEA_Y - Math.min(38, depth) + 2 * B.getValue(x / 70.0, z / 70.0);
-            if (rocky && s < 260)
-            {
-                double stack = C.getValue(x / 70.0, z / 70.0);
-                if (stack > 0.74) bed = Math.max(bed, HakoneSurfaceField.SEA_Y + 3 + 60 * (stack - 0.74));
-            }
-            return bed;
+            return r >= 0.5 && s < 120 ? stack(x, z, (int) Math.round(bed)) : bed;
         }
-        double inland = -s;
         double peak = mountain(x, z, away);
-        // Beaches leave a coastal plain; rocky coasts let the ridges reach the sea.
-        double plain = rocky ? 180 : 340;
-        double shore = HakoneSurfaceField.SEA_Y + (rocky ? 6 : 2);
-        return shore + (peak - shore) * smooth(inland / plain);
+        double plain = 340 * (1 - r) + 180 * r;
+        double shore = HakoneSurfaceField.SEA_Y + 2 + 4 * r;
+        return shore + (peak - shore) * smooth(-s / plain);
     }
 
-    private static double mountain(int x, int z, double away)
+    private static int stack(int x, int z, int bed)
     {
-        // Massifs and broad valleys several kilometres across, so no two stretches of the
-        // horizon carry the same ridge pattern at the same height.
-        double massif = 0.55 + 0.45 * smooth(0.5 + 0.9 * fbm(E, x / 5200.0, z / 5200.0, 3));
-        return 72 + (shape(x, z, away) - 72) * massif;
+        double rock = C.getValue(x / 70.0, z / 70.0);
+        return rock > 0.8 ? Math.max(bed, (int) Math.round(HakoneSurfaceField.SEA_Y + 3 + 70 * (rock - 0.8))) : bed;
     }
 
-    private static double shape(int x, int z, double away)
+    /**
+     * Low hills beside the map, the high ranges further out. Ridges come from one warped,
+     * isotropic ridged noise mixed with rounded noise, so no row of identical spires forms;
+     * massifs several kilometres across vary the height along the horizon.
+     */
+    private static double mountain(int x, int z, double away)
     {
         double wx = x + 700 * A.getValue(x / 2300.0, z / 2300.0) + 160 * B.getValue(x / 600.0, z / 600.0);
         double wz = z + 700 * B.getValue(x / 2300.0 + 31, z / 2300.0 - 17) + 160 * A.getValue(x / 600.0 - 5, z / 600.0 + 9);
-        switch (MOUNTAIN)
-        {
-            case "rolling":
-                return 90 + 230 * Math.pow(Math.max(0, 0.5 + 0.7 * fbm(C, wx / 1300, wz / 1300, 5)), 1.3) + 14 * fbm(D, x / 210.0, z / 210.0, 3);
-            case "layered":
-            {
-                // Foothills at the survey edge, the high ranges further out.
-                double amplitude = 60 + 200 * smooth((away - 200) / 1800);
-                double rx = wx * 0.8 + wz * 0.6, rz = (-wx * 0.6 + wz * 0.8) * 1.9;
-                return 85 + amplitude * ridged(C, rx / 1300, rz / 1300, 5) + 12 * fbm(D, x / 230.0, z / 230.0, 3);
-            }
-            default:
-                return 85 + 200 * Math.pow(ridged(C, wx / 1500, wz / 1500, 6), 1.1) + 14 * fbm(D, x / 240.0, z / 240.0, 3);
-        }
+        double ridges = 0.65 * Math.pow(ridged(C, wx / 1800, wz / 1800, 6), 1.05) + 0.35 * (0.5 + 0.5 * fbm(D, wx / 800, wz / 800, 4));
+        double amplitude = 70 + 175 * smooth((away - 200) / 1800);
+        double massif = 0.55 + 0.45 * smooth(0.5 + 0.9 * fbm(E, x / 5200.0, z / 5200.0, 3));
+        return 85 + amplitude * massif * ridges + 12 * fbm(D, x / 230.0, z / 230.0, 3);
     }
 
     /** Signed distance to the coastline: positive at sea, negative on land. */
     static double coast(int x, int z)
     {
+        if (COAST != null && COAST.covers(x, z)) return COAST.sample(x, z);
         double best = Double.MAX_VALUE;
-        for (int i = 0; i + 1 < COAST.length; i++)
+        for (int i = 0; i + 1 < FALLBACK.length; i++)
         {
-            double ax = COAST[i][0], az = COAST[i][1], bx = COAST[i + 1][0], bz = COAST[i + 1][1];
-            double dx = bx - ax, dz = bz - az, t = ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz);
-            t = Math.max(0, Math.min(1, t));
+            double ax = FALLBACK[i][0], az = FALLBACK[i][1], bx = FALLBACK[i + 1][0], bz = FALLBACK[i + 1][1];
+            double dx = bx - ax, dz = bz - az, t = Math.max(0, Math.min(1, ((x - ax) * dx + (z - az) * dz) / (dx * dx + dz * dz)));
             best = Math.min(best, Math.hypot(x - ax - t * dx, z - az - t * dz));
         }
         return land(x, z) ? -best : best;
     }
 
-    /** Land lies north of the coastline: the line closed through the far north. */
     private static boolean land(double x, double z)
     {
         boolean inside = false;
-        int n = COAST.length;
+        int n = FALLBACK.length;
         for (int i = 0, j = n + 1; i < n + 2; j = i++)
         {
             double[] a = vertex(i), b = vertex(j);
@@ -204,8 +196,8 @@ public final class OuterBoundaryTerrain
 
     private static double[] vertex(int i)
     {
-        int n = COAST.length;
-        return i < n ? COAST[i] : i == n ? new double[]{100000, -100000} : new double[]{-100000, -100000};
+        int n = FALLBACK.length;
+        return i < n ? FALLBACK[i] : i == n ? new double[]{100000, -100000} : new double[]{-100000, -100000};
     }
 
     private static double ridged(SimplexNoise n, double x, double z, int octaves)
@@ -240,38 +232,104 @@ public final class OuterBoundaryTerrain
         return new SimplexNoise(RandomSource.create(0x5EE1EF12L * 31 + salt));
     }
 
-    private static int clamp(int v, int lo, int hi)
-    {
-        return Math.max(lo, Math.min(hi, v));
-    }
-
     private static double smooth(double value)
     {
         double t = Math.max(0, Math.min(1, value));
         return t * t * (3 - 2 * t);
     }
 
-    private static String option(String key)
+    private static DataInputStream open(String name) throws IOException
     {
-        String spec = System.getProperty("projectseele.outerBoundary");
-        if (spec == null || spec.isBlank()) return null;
-        for (String part : spec.toLowerCase(Locale.ROOT).split(","))
+        var raw = OuterBoundaryTerrain.class.getResourceAsStream("/data/projectseele/worldgen/" + name);
+        if (raw == null) throw new IOException("Missing " + name);
+        return new DataInputStream(new BufferedInputStream(new GZIPInputStream(raw), 65536));
+    }
+
+    /** Every 8 blocks: distance to the nearest known column, its ground, and saved chunks. */
+    private record Edge(int x, int z, int step, int width, int depth, short[] distance, short[] ground, byte[] saved)
+    {
+        static Edge load()
         {
-            String[] kv = part.trim().split("=");
-            if (kv.length == 2 && kv[0].equals(key)) return kv[1];
+            try (var in = open("outer_edge.bin.gz"))
+            {
+                if (in.readInt() != 0x484B4532) throw new IOException("Unexpected outer edge format");
+                int x = in.readInt(), z = in.readInt(), step = in.readInt(), width = in.readInt(), depth = in.readInt();
+                short[] distance = new short[width * depth], ground = new short[width * depth];
+                byte[] saved = new byte[width * depth];
+                for (int i = 0; i < distance.length; i++) distance[i] = in.readShort();
+                for (int i = 0; i < ground.length; i++) ground[i] = in.readShort();
+                in.readFully(saved);
+                return new Edge(x, z, step, width, depth, distance, ground, saved);
+            }
+            catch (IOException exception)
+            {
+                // Without the grid the generator keeps the previous exterior.
+                return null;
+            }
         }
-        return "";
+
+        private boolean outside(int bx, int bz)
+        {
+            return bx < x || bz < z || bx > x + (width - 1) * step || bz > z + (depth - 1) * step;
+        }
+
+        private int index(int bx, int bz)
+        {
+            int i = Math.max(0, Math.min(width - 1, Math.round((bx - x) / (float) step)));
+            int j = Math.max(0, Math.min(depth - 1, Math.round((bz - z) / (float) step)));
+            return j * width + i;
+        }
+
+        double distance(int bx, int bz)
+        {
+            int k = index(bx, bz);
+            if (!outside(bx, bz)) return distance[k];
+            int i = k % width, j = k / width;
+            return distance[k] + Math.hypot(bx - (x + i * step), bz - (z + j * step));
+        }
+
+        double ground(int bx, int bz)
+        {
+            return ground[index(bx, bz)];
+        }
+
+        boolean saved(int bx, int bz)
+        {
+            return !outside(bx, bz) && saved[index(bx, bz)] != 0;
+        }
     }
 
-    private static String sea()
+    /** Every 16 blocks over Sagami Bay: signed distance to the coast, positive at sea. */
+    private record Coast(int x, int z, int step, int width, int depth, short[] signed)
     {
-        String value = option("sea");
-        return value == null ? null : value.equals("rocky") ? "rocky" : "beach";
-    }
+        static Coast load()
+        {
+            try (var in = open("outer_coast.bin.gz"))
+            {
+                if (in.readInt() != 0x484B4331) throw new IOException("Unexpected coast format");
+                int x = in.readInt(), z = in.readInt(), step = in.readInt(), width = in.readInt(), depth = in.readInt();
+                short[] signed = new short[width * depth];
+                for (int i = 0; i < signed.length; i++) signed[i] = in.readShort();
+                return new Coast(x, z, step, width, depth, signed);
+            }
+            catch (IOException exception)
+            {
+                return null;
+            }
+        }
 
-    private static String mountain()
-    {
-        String value = option("mountain");
-        return value == null ? "ridged" : value.equals("rolling") || value.equals("layered") ? value : "ridged";
+        boolean covers(int bx, int bz)
+        {
+            return bx >= x && bz >= z && bx < x + (width - 1) * step && bz < z + (depth - 1) * step;
+        }
+
+        double sample(int bx, int bz)
+        {
+            double fx = (bx - x) / (double) step, fz = (bz - z) / (double) step;
+            int i = (int) fx, j = (int) fz;
+            double dx = fx - i, dz = fz - j;
+            return (signed[j * width + i] * (1 - dx) + signed[j * width + i + 1] * dx) * (1 - dz)
+                    + (signed[(j + 1) * width + i] * (1 - dx) + signed[(j + 1) * width + i + 1] * dx) * dz;
+        }
     }
 }

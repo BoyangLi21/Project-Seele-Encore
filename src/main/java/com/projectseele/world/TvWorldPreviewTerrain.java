@@ -97,7 +97,7 @@ public final class TvWorldPreviewTerrain
                                 : y >= surfaceTop - 3 ? Blocks.DIRT : Blocks.STONE).defaultBlockState();
                         chunk.setBlockState(p.set(x, y, z), state, false);
                     }
-                    if (OuterBoundaryTerrain.enabled() && OuterBoundaryTerrain.outsideSurvey(x, z))
+                    if (OuterBoundaryTerrain.enabled() && OuterBoundaryTerrain.unknown(x, z))
                     {
                         BlockState cover = OuterBoundaryTerrain.top(x, z, surfaceTop);
                         if (cover != null)
