@@ -127,11 +127,13 @@ public final class CityCreateCargoR45
             CompoundTag before = expected.get(pos);
             require(before != null && seen.add(pos), "Unknown or duplicate Create cargo coordinate");
             int state = cell.getInt("State");
-            require(state >= 0 && state < palette.size() && before.getCompound("State").equals(palette.getCompound(state)),
-                    "Create changed exact cargo state at " + BlockPos.of(pos));
-            require(before.contains("NBT", Tag.TAG_COMPOUND) == cell.contains("Data", Tag.TAG_COMPOUND),
+            // The position is only spelled out for a failure: a district has tens of thousands of cells, and this runs three times per spawn.
+            if (state < 0 || state >= palette.size() || !before.getCompound("State").equals(palette.getCompound(state)))
+                throw new IllegalStateException("Create changed exact cargo state at " + BlockPos.of(pos));
+            boolean blockEntity = before.contains("NBT", Tag.TAG_COMPOUND);
+            require(blockEntity == cell.contains("Data", Tag.TAG_COMPOUND),
                     "Create lost/added a cargo block entity");
-            if (before.contains("NBT", Tag.TAG_COMPOUND))
+            if (blockEntity)
                 require(before.getCompound("NBT").equals(cell.getCompound("Data")), "Create changed full BE NBT");
         }
     }

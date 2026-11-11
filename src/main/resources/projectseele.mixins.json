@@ -43,6 +43,7 @@
     "SbwDefenseLoadedLosR56Mixin",
     "SbwGaghielContactMixinR50",
     "EvaSmallObstacleMixin",
+    "CreateContraptionFlagsMixin",
     "CityExactUnionCreateMixinR45",
     "CitySavedOwnerUnionMixinR45"
   ],
