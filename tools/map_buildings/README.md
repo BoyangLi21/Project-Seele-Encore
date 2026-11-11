@@ -38,3 +38,8 @@ Round 4 (2026-11-11 evening):
     A platform piece is only E13 if it is terrain-like: elevated road/station decks and viaducts
     (open space used underneath) must stay empty — bay-side batch B and C1/C3 were withdrawn for that.
 17. `e13_views.py`, `b07_plan.py` (paves pits at street level, clears terrain resting on floors).
+18. `e13_plan.py` (round 5): the fill takes the place of trunks inside it; dirt left under removed
+    trunks turns to grass; as many trees replanted on the new ground as were taken off it (same log);
+    retaining walls are capped next to roads too.
+19. `cliff_plan.py <dig rows> <x0,z0,x1,z1> <out>`: cliffs left at the edge of a dig-out become a
+    1:1 slope (up to 6 high) or stone-brick terraces with planted benches.

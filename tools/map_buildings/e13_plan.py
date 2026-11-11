@@ -96,8 +96,72 @@ def plant(w, sites, benches, rows):
                 set_cell(x, t + 1, z, leaves)
 
 
+def tall_tree(set_cell, x, t, z, log, leaves, h):
+    """A tree of trunk height h on a grass top at t; spruce gets a cone, others a round crown."""
+    for k in range(1, h + 1):
+        set_cell(x, t + k, z, log)
+    top = t + h
+    if 'spruce' in log:
+        layers = [(top + 1, 0), (top, 1), (top - 1, 2), (top - 2, 1), (top - 3, 2)]
+    else:
+        layers = [(top + 1, 1), (top, 2), (top - 1, 2)]
+    for y, r in layers:
+        for dx in range(-r, r + 1):
+            for dz in range(-r, r + 1):
+                if (dx, dz) != (0, 0) or y > top:
+                    if abs(dx) + abs(dz) <= r + (1 if r == 2 else 0):
+                        set_cell(x + dx, y, z + dz, leaves)
+
+
+def replant(w, sites, rows, removed, filled_cols):
+    """As many trees per column on the new ground as stood there before (trunk bases removed)."""
+    bases = {}
+    for (x, y, z) in removed:
+        if (x, y - 1, z) in rows or not ('_log' in (w.get(x, y - 1, z) or '')):
+            bases[x, z] = w.get(x, y, z).split('[')[0]
+    def free(x, y, z):
+        if (x, y, z) in rows:
+            return rows[x, y, z][4] == 'minecraft:air'
+        return w.get(x, y, z) in ('minecraft:air', 'minecraft:cave_air')
+    def set_cell(x, y, z, after):
+        if free(x, y, z):
+            rows[x, y, z] = [x, y, z, rows[x, y, z][3] if (x, y, z) in rows else w.get(x, y, z), after]
+    gtop = {}
+    for (cx, y, cz), r in rows.items():
+        if r[4].startswith('minecraft:grass_block') and y > gtop.get((cx, cz), -10 ** 6):
+            gtop[cx, cz] = y
+    for site in sites:
+        cols = [c for c, sid in filled_cols.items() if sid == site['id']]
+        if not cols:
+            continue
+        colset = set(cols)
+        mine = [b for c, b in bases.items() if c in colset or any((c[0] + dx, c[1] + dz) in colset for dx in (-1, 0, 1) for dz in (-1, 0, 1))]
+        density = len(mine) / len(cols)
+        log = Counter(mine).most_common(1)[0][0] if mine else None
+        if not log:
+            continue
+        leaves = log.replace('_log', '_leaves') + '[distance=1,persistent=true,waterlogged=false]'
+        want = round(density * len(cols))
+        site['replant'] = dict(trees_removed=len(mine), columns=len(cols), planted=0, log=log)
+        planted = []
+        for (x, z) in sorted(cols, key=lambda c: ((c[0] * 73856093) ^ (c[1] * 19349663)) % 9973):
+            if len(planted) >= want:
+                break
+            if any(abs(x - px) < 3 and abs(z - pz) < 3 for px, pz in planted):
+                continue
+            # top of the column after the plan: the highest grass we set, or the ground
+            t = gtop.get((x, z))
+            if t is None:
+                continue
+            h = 5 + ((x * 31 + z * 17) % 3)
+            tall_tree(set_cell, x, t, z, log + '[axis=y]', leaves, h)
+            planted.append((x, z))
+        site['replant']['planted'] = len(planted)
+
+
 def plan(w, sites, A):
     rows, trees, benches = {}, [], []
+    filled_cols = {}
 
     def put(x, y, z, after):
         s = w.get(x, y, z)
@@ -218,7 +282,7 @@ def plan(w, sites, A):
         while changed:
             changed = False
             for c in target:
-                if not can[c] or kind[c] == 'wall':
+                if not can[c]:
                     continue
                 lim = min((final[n] for n in ((c[0] + 1, c[1]), (c[0] - 1, c[1]), (c[0], c[1] + 1), (c[0], c[1] - 1))
                            if n in final and n not in U and not can.get(n, False)), default=10 ** 6) + 1
@@ -239,8 +303,10 @@ def plan(w, sites, A):
                     after = GRASS if yy == t else DIRT
                 s = w.get(x, yy, z)
                 if is_veg(s):
-                    continue           # handled with the tree
+                    rows[x, yy, z] = [x, yy, z, s, after]   # the fill takes the trunk's place
+                    continue
                 put(x, yy, z, after)
+            filled_cols[x, z] = site['id']
             top = w.get(x, y, z)
             if base(top) == 'minecraft:grass_block':
                 rows[x, y, z] = [x, y, z, top, DIRT]
@@ -262,7 +328,8 @@ def plan(w, sites, A):
             for d in ((1, 0, 0), (-1, 0, 0), (0, 1, 0), (0, -1, 0), (0, 0, 1), (0, 0, -1)):
                 q.append((c[0] + d[0], c[1] + d[1], c[2] + d[2]))
     for c in removed:
-        rows[c] = [*c, w.get(*c), 'minecraft:air']
+        if c not in rows:
+            rows[c] = [*c, w.get(*c), 'minecraft:air']
 
     def near_log(p, mine, r=4):
         best = 99
@@ -287,7 +354,12 @@ def plan(w, sites, A):
     for q in leaves:
         if near_log(q, True) <= near_log(q, False):
             rows[q] = [*q, w.get(*q), 'minecraft:air']
+    for (x, y, z) in removed:
+        below = (x, y - 1, z)
+        if below not in rows and (w.get(*below) or '').split('[')[0] in ('minecraft:dirt', 'minecraft:coarse_dirt', 'minecraft:podzol'):
+            rows[below] = [*below, w.get(*below), GRASS]
     plant(w, sites, benches, rows)
+    replant(w, sites, rows, removed, filled_cols)
     for r in rows.values():
         if w.block_entity(r[0], r[1], r[2]):
             raise SystemExit(f'block entity at {r[:3]}')
