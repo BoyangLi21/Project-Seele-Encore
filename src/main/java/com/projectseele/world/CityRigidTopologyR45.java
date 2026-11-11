@@ -20,6 +20,7 @@ public final class CityRigidTopologyR45
 {
     private static final String NAME = "projectseele_city_rigid_topology_r45_";
     private static final Map<Path, Cache> CACHE = new ConcurrentHashMap<>();
+    private static final int FILE_TICKS = 10;
     private CityRigidTopologyR45() {}
 
     public static Path file(ServerLevel level, BlockPos origin)
@@ -116,15 +117,21 @@ public final class CityRigidTopologyR45
     private static CompoundTag read(ServerLevel level, BlockPos origin)
     {
         Path path = file(level, origin).toAbsolutePath().normalize();
-        if (!Files.isRegularFile(path)) return null;
+        // The file is looked at twice a second, as the policy markers are; this ran three stats every tick.
+        int tick = level.getServer().getTickCount();
+        Cache cache = CACHE.get(path);
+        boolean fresh = cache != null && tick >= cache.tick && tick - cache.tick < FILE_TICKS;
+        if (!fresh && !Files.isRegularFile(path)) { CACHE.put(path, new Cache(0, -1, null, tick)); return null; }
+        if (fresh && cache.tag == null) return null;
         try
         {
-            long modified = Files.getLastModifiedTime(path).toMillis(), size = Files.size(path);
-            Cache cache = CACHE.get(path);
-            if (cache == null || cache.modified != modified || cache.size != size)
+            if (!fresh)
             {
-                CompoundTag tag = NbtIo.readCompressed(path.toFile()).getCompound("data");
-                cache = new Cache(modified, size, tag); CACHE.put(path, cache);
+                long modified = Files.getLastModifiedTime(path).toMillis(), size = Files.size(path);
+                if (cache == null || cache.tag == null || cache.modified != modified || cache.size != size)
+                    cache = new Cache(modified, size, NbtIo.readCompressed(path.toFile()).getCompound("data"), tick);
+                else cache = new Cache(modified, size, cache.tag, tick);
+                CACHE.put(path, cache);
             }
             CompoundTag tag = cache.tag;
             if (tag.getInt("Version") != 1 || tag.getLong("Origin") != origin.asLong()
@@ -140,7 +147,8 @@ public final class CityRigidTopologyR45
         }
     }
 
-    private record Cache(long modified, long size, CompoundTag tag) {}
+    /** The file as last looked at; a null tag means it was absent. */
+    private record Cache(long modified, long size, CompoundTag tag, int tick) {}
     /** A translated installation retains the original identity frame and all non-positional metadata. */
     static boolean retainsOriginalFrame(CompoundTag original, CompoundTag current)
     {
