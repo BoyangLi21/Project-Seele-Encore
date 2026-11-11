@@ -261,7 +261,7 @@ public final class DirectMeshWriter
         }
     }
 
-    private static int tangent(float nx,float ny,float nz,float e1x,float e1y,float e1z,float e2x,float e2y,float e2z,float du1,float dv1,float du2,float dv2)
+    static int tangent(float nx,float ny,float nz,float e1x,float e1y,float e1z,float e2x,float e2y,float e2z,float du1,float dv1,float du2,float dv2)
     {
         float denominator=du1*dv2-du2*dv1,f=denominator==0?1:1/denominator;
         float tx=f*(dv2*e1x-dv1*e2x),ty=f*(dv2*e1y-dv1*e2y),tz=f*(dv2*e1z-dv1*e2z);
@@ -274,7 +274,7 @@ public final class DirectMeshWriter
 
     private static float inverseRoot(float value){return value==0?1:(float)(1/Math.sqrt(value));}
 
-    private static int pack(float x,float y,float z,float w)
+    static int pack(float x,float y,float z,float w)
     {
         return (int)(x*127)&255|((int)(y*127)&255)<<8|((int)(z*127)&255)<<16|((int)(w*127)&255)<<24;
     }
