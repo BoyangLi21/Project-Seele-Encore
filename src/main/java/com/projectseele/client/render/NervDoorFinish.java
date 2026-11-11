@@ -29,12 +29,19 @@ final class NervDoorFinish
             box(stack,out,light,x+width*.17,y+height*.84,plane+side*.02,Math.min(.15,width*.16),.045,.018,0xd0be8b);
         }
     }
+    /**
+     * Jambs and head stand {@value #INSET} block inside the opening. Flush with it, their inner faces
+     * lay in the planes of the wall's own faces around the opening and flickered against them
+     * (z-fighting), more with distance and under a shader pack's temporal anti-aliasing.
+     */
+    private static final double INSET=.02;
     static void frame(PoseStack stack,MultiBufferSource buffers,int light,double half,double height,boolean open)
     {
         var out=buffers.getBuffer(RenderType.entitySolid(METAL));
-        box(stack,out,light,-half-.09,0,-.12,.09,height,.24,0x263832);box(stack,out,light,half,0,-.12,.09,height,.24,0x263832);
-        box(stack,out,light,-half-.09,height,-.12,2*half+.18,.08,.24,0x263832);
-        for(double z:new double[]{-.133,.121})box(stack,out,LightTexture.FULL_BRIGHT,-.18,height+.015,z,.36,.026,.012,open?0x7cbe89:0xb86647);
+        box(stack,out,light,-half-.09,0,-.12,.09+INSET,height,.24,0x263832);box(stack,out,light,half-INSET,0,-.12,.09+INSET,height,.24,0x263832);
+        box(stack,out,light,-half-.09,height-INSET,-.12,2*half+.18,.08+INSET,.24,0x263832);
+        // The status lights stand clear of the head's faces for the same reason.
+        for(double z:new double[]{-.142,.13})box(stack,out,LightTexture.FULL_BRIGHT,-.18,height+.015,z,.36,.026,.012,open?0x7cbe89:0xb86647);
     }
     private static void box(PoseStack stack,VertexConsumer out,int light,double x,double y,double z,double w,double h,double d,int colour)
     {
