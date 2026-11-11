@@ -71,6 +71,7 @@
     "client.MovingElevatorDisplayMixin",
     "client.CreateVirtualLightStarlightGuardMixin",
     "client.CatnipBlockQuadsMixin",
+    "client.EntityShadowRangeMixin",
     "client.MovingElevatorPanelMixin",
     "client.MovingElevatorRenderOriginR47Mixin",
     "client.LocalPlayerLiftPacketsR22Mixin",
