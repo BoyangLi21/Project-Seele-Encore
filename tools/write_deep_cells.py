@@ -214,7 +214,10 @@ def apply(a):
                     state = block_at(root, x, y, z)
                     if not state.split('[')[0].endswith('sign'):
                         raise ValueError(f'{x},{y},{z} is {state}, not a sign')
-                    entities = root.setdefault('block_entities', nbtlib.List[nbtlib.Compound]())
+                    entities = root.get('block_entities')
+                    if entities is None or not len(entities):
+                        # An empty list is saved with an End element type and refuses compounds.
+                        root['block_entities'] = entities = nbtlib.List[nbtlib.Compound]()
                     for e in list(entities):
                         if (int(e['x']), int(e['y']), int(e['z'])) == (x, y, z):
                             if not str(e['id']).endswith('sign'):
