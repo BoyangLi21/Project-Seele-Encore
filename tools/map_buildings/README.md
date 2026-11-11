@@ -23,3 +23,9 @@ Floating buildings (the floor hangs over open space with ground or water below):
 10. `float_views.py <views.json>`: side and aerial views for `shots.py`.
 11. `f_plan.py <sites.json> <out>`: fill under the floor; the outer ring continues the base block down;
     the ground around rises 1:1 to the base but never more than one cell above a road or path next to it.
+
+Round 2 (2026-11-11):
+12. `deep_check.py`, `deep_plan.py B01,B03 <out>`: swallowed buildings, exposure to sky, and rows that take
+    them away and close the slope (writer needs --allow-block-entities; the replaced blocks' entities are dropped).
+13. `e13_plan.py <sites.json> <out> [float file]`: ground a platform edge: 1:1 earth cone where the drop is
+    small, 8-cell retaining walls with 3-column grass benches where it is deep; `write` clips a sample.

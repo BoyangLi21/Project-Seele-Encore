@@ -61,7 +61,7 @@ def footprint(w, seed, F, limit=30):
 def site_targets(w, site, fill, foot_floor, targets, interior, near):
     """Add one site's footprint floors, ring targets and interior fill cells to the shared maps."""
     F = site['floor']
-    cols = footprint(w, site['seed'], F) if 'seed' in site else None
+    cols = footprint(w, site['seed'], F, site.get('limit', 30)) if 'seed' in site else None
     if cols:
         xs, zs = [c[0] for c in cols], [c[1] for c in cols]
         site['bbox'] = [min(xs), min(zs), max(xs), max(zs)]

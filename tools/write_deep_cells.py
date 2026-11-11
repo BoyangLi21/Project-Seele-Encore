@@ -207,6 +207,7 @@ def apply(a):
     preflight(folder, grouped, a.allow_block_entities)
     a.out.mkdir(parents=True, exist_ok=False)
     changed = 0
+    dropped = set()
     with stopped_world(a.world):
         for (rx, rz), chunks in sorted(grouped.items()):
             path = folder / f'r.{rx}.{rz}.mca'
@@ -236,6 +237,15 @@ def apply(a):
                         ids[at] = index[after]
                         changed += 1
                     encode(states, ids, palette)
+                if a.allow_block_entities:
+                    # a replaced block takes its block entity with it (chest, sign, machine data)
+                    gone = {(x, y, z) for x, y, z, before, after in cells if before.split('[')[0] != after.split('[')[0]}
+                    entities = root.get('block_entities')
+                    for e in list(entities or ()):
+                        pos = (int(e['x']), int(e['y']), int(e['z']))
+                        if pos in gone:
+                            entities.remove(e)
+                            dropped.add(pos)
                 for sign in sign_chunks.get((cx, cz), ()):
                     x, y, z = sign['pos']
                     state = block_at(root, x, y, z)
@@ -275,6 +285,9 @@ def apply(a):
                         e = new_entities.get(pos)
                         if e is None or [json.loads(str(m))['text'] for m in e['front_text']['messages']] != (list(wanted[pos].get('front', [])) + [''] * 4)[:4]:
                             wrong += 1
+                    elif pos in dropped:
+                        if pos in new_entities:
+                            wrong += 1
                     elif new_entities.get(pos) != old_entities.get(pos):
                         collateral += 1
                 if set(new_sections) != set(old_sections):
@@ -293,7 +306,7 @@ def apply(a):
                     wrong += sum(new_names[at] != after for at, after in planned[sy].items())
     if wrong or collateral:
         raise SystemExit(f'Readback: {wrong} of {changed} cells wrong, {collateral} cells changed outside the plan')
-    (a.out / 'installation.json').write_text(json.dumps(dict(status='installed', cells=changed, signs=len(signs), regions=len(grouped), readback_wrong=0, collateral=0), indent=1), 'utf8')
+    (a.out / 'installation.json').write_text(json.dumps(dict(status='installed', cells=changed, signs=len(signs), dropped_block_entities=len(dropped), regions=len(grouped), readback_wrong=0, collateral=0), indent=1), 'utf8')
     print(json.dumps(dict(cells=changed, signs=len(signs), regions=len(grouped), readback_wrong=0, collateral=0)))
 
 
@@ -306,5 +319,5 @@ if __name__ == '__main__':
     parser.add_argument('--signs', type=Path, help='JSON list of {pos, front, back, color, glow}: writes only those sign block entities')
     parser.add_argument('--allow-lift-shaft', action='store_true', help='only to clear the travel space of a lift itself')
     parser.add_argument('--allow-block-entities', action='store_true',
-                        help='let rows replace blocks that carry a block entity (chests, signs, machines); off by default')
+                        help='let rows replace blocks that carry a block entity (chests, signs, machines) and drop that entity; off by default')
     apply(parser.parse_args())
