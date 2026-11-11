@@ -32,6 +32,7 @@ def main():
     p.add_argument('--verge', type=float, default=3)
     p.add_argument('--box', type=int, nargs=4, default=[180, 1530, -350, 250], help='x0 x1 z0 z1 of the area read and regraded')
     p.add_argument('--apron-y', type=int, default=APRON_Y, help='top of the pavement')
+    p.add_argument('--keep', type=Path, help='JSON list of [x0, z0, x1, z1] boxes another task owns; they and 8 columns round them stay as they are')
     a = p.parse_args()
     globals()["APRON_Y"] = a.apron_y
     a.out.mkdir(parents=True, exist_ok=True)
@@ -50,6 +51,9 @@ def main():
     outside_built[:APRON_Y - y0 + 1, foot] = False
     built_cols = outside_built.any(0)
     frozen = ndimage.binary_dilation(built_cols, iterations=4) | ~box.loaded
+    if a.keep:
+        for bx0, bz0, bx1, bz1 in json.loads(a.keep.read_text('utf8')):
+            frozen[max(0, bz0 - 8 - z0):max(0, bz1 + 9 - z0), max(0, bx0 - 8 - x0):max(0, bx1 + 9 - x0)] = True
     rng = np.random.default_rng(11)
     dist = ndimage.distance_transform_edt(~foot)
     s = a.slope * (1 + .12 * noise(foot.shape, 18, rng))
