@@ -56,6 +56,24 @@ public final class EvaConnectedActionReview
     private static final boolean STRIKE=Boolean.getBoolean("projectseele.tourStrikeR60");
     /** A.T. Field look: a still Sachiel's field struck from the pilot's side, then the piloted unit's own field, at noon and at dusk. */
     private static final boolean ATF=Boolean.getBoolean("projectseele.tourAtFieldR63");
+    /**
+     * Launch check: one catapult launch of the unit, recorded from the start of its ascent to a few
+     * seconds after control comes back. It builds a test launch complex of its own at a far site of
+     * the review world (-Dprojectseele.launchSite=<n>, a fresh number for every run: a launched unit
+     * does not go back into its cage).
+     */
+    private static final boolean LAUNCH=Boolean.getBoolean("projectseele.tourLaunchR62");
+    private static final int LAUNCH_SITE=Integer.getInteger("projectseele.launchSite",0);
+    /** Ticks recorded after the launch sequence hands the unit back. */
+    private static final int LAUNCH_AFTER=Integer.getInteger("projectseele.launchAfter",160);
+    private static int launchAscentAt=-1,launchIdleAt=-1;
+    /**
+     * A sortie from the GeoFront runs under the launch director, which keeps the unit under the
+     * logistics lock from its cage until the launch sequence has ended on the surface (phase
+     * SILO_READY of EvaLogisticsDirector). The test complex has no director: the review holds
+     * and releases the lock by the same rule. -Dprojectseele.launchCustody=false leaves it out.
+     */
+    private static final boolean LAUNCH_CUSTODY=!"false".equals(System.getProperty("projectseele.launchCustody"));
     private static final int STRIKE_LEAD=20,STRIKE_CYCLE=140;
     /** Each case: air (1) or ground (0), blocks ahead of the body, blocks to its right, blocks up, the target. */
     private static final int[][] STRIKE_CASES={{0,10,0,0,0},{0,20,0,0,0},{0,32,0,0,0},{0,20,10,0,0},{0,20,-10,0,0},
@@ -121,6 +139,7 @@ public final class EvaConnectedActionReview
         if(!preferencesSaved){preferencesSaved=true;oldPause=mc.options.pauseOnLostFocus;oldGui=mc.options.hideGui;oldCamera=mc.options.getCameraType();}
         mc.options.pauseOnLostFocus = false;
         if (++wait < 100) return;
+        if (LAUNCH) { launchR62(mc, world); return; }
         if (wait == 100)
         {
             mc.player.connection.sendCommand("seele dev motionlab reset");
@@ -151,20 +170,7 @@ public final class EvaConnectedActionReview
             serverStart = mc.getSingleplayerServer().getTickCount();
         }
         tick = mc.getSingleplayerServer().getTickCount() - serverStart;
-        if (poses == null)
-        {
-            ProjectSeele.LOGGER.info("Connected action review started: batch={} entity={} world={}", BATCH, entityId, world);
-            try
-            {
-                Path dir = mc.gameDirectory.toPath().resolve("screenshots/projectseele_connected/" + BATCH);
-                Files.createDirectories(dir);
-                poses = Files.newBufferedWriter(dir.resolve("poses.jsonl"), StandardCharsets.UTF_8);
-            }
-            catch (Exception exception)
-            {
-                throw new IllegalStateException("Unable to create action review", exception);
-            }
-        }
+        openPoses(mc, world);
         if (TOUR)
         {
             tour(mc, eva);
@@ -216,6 +222,79 @@ public final class EvaConnectedActionReview
         positionCamera(mc, eva);
         previousTick = tick;
         if (tick >= 690) finish(mc, "complete");
+    }
+
+    private static void openPoses(Minecraft mc, Path world)
+    {
+        if (poses != null) return;
+        ProjectSeele.LOGGER.info("Connected action review started: batch={} entity={} world={}", BATCH, entityId, world);
+        try
+        {
+            Path dir = mc.gameDirectory.toPath().resolve("screenshots/projectseele_connected/" + BATCH);
+            Files.createDirectories(dir);
+            poses = Files.newBufferedWriter(dir.resolve("poses.jsonl"), StandardCharsets.UTF_8);
+        }
+        catch (Exception exception)
+        {
+            throw new IllegalStateException("Unable to create action review", exception);
+        }
+    }
+
+    private static void launchR62(Minecraft mc, Path world)
+    {
+        int step=wait-100,x=8000+LAUNCH_SITE*400,z=8000,bay=UNIT_VARIANT==0?-42:UNIT_VARIANT==2?42:0;
+        var net=mc.player.connection;
+        // The last run may have ended in a lab unit's seat; a complex is not built from a seat.
+        if(step==0)net.sendCommand("ride @s dismount");
+        if(step==5){net.sendCommand("time set 6000");net.sendCommand("weather clear");}
+        if(step==10)net.sendCommand("tp @s "+x+" -59 "+z);
+        if(step==70)net.sendCommand("seele dev silo setup");
+        // Setup leaves the player on Unit-01's gantry; boarding takes the nearest caged unit.
+        if(step==140&&bay!=0)net.sendCommand("tp @s ~"+bay+" ~ ~");
+        if(step==160)net.sendCommand("seele dev silo board");
+        if(step<180)return;
+        EvaUnit01Entity eva=EvaPilotResolver.controlTarget(mc.player);
+        if(eva==null||eva.getUnitVariant()!=UNIT_VARIANT)
+        {
+            if(++missingPilotTicks>400)finish(mc,"launch_boarding_timeout");
+            return;
+        }
+        missingPilotTicks=0;
+        entityId=eva.getId();
+        // -Dprojectseele.launchFirstPerson=true stays in the pilot's seat, to check what the pilot sees of the landing.
+        if(!Boolean.getBoolean("projectseele.launchFirstPerson"))positionCamera(mc,eva);
+        if(LAUNCH_CUSTODY)
+        {
+            var server=mc.getSingleplayerServer();var id=eva.getUUID();
+            server.execute(()->{
+                for(var level:server.getAllLevels())
+                    if(level.getEntity(id) instanceof EvaUnit01Entity unit)unit.setNervLogisticsLocked(unit.isLaunchSequenceActive());
+            });
+        }
+        // The cage holds the unit until it is released; the pilot's own test release stands in for operations.
+        if(launchAscentAt<0&&eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_LOCKED&&eva.getActivationTicks()<=21&&step%10==0)
+            send(ServerboundEvaControlPacket.ACTION_SELF_LAUNCH);
+        if(launchAscentAt<0&&eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_ASCENT)launchAscentAt=step;
+        if(launchAscentAt<0)
+        {
+            if(step>3000)finish(mc,"launch_release_timeout");
+            return;
+        }
+        if(serverStart<0)
+        {
+            if(warmupFrames<3)return;
+            serverStart=mc.getSingleplayerServer().getTickCount();
+        }
+        tick=mc.getSingleplayerServer().getTickCount()-serverStart;
+        openPoses(mc,world);
+        if(launchIdleAt<0&&!eva.isLaunchSequenceActive())
+        {
+            launchIdleAt=tick;
+            ProjectSeele.LOGGER.info("Launch review: control back at tick {} y={}",tick,String.format("%.2f",eva.getY()));
+        }
+        previousTick=tick;
+        if(launchIdleAt>=0&&tick>=launchIdleAt+LAUNCH_AFTER)finish(mc,"complete");
+        else if(tick>1500)finish(mc,"launch_timeout");
     }
 
     private static boolean at(int requested)
@@ -584,7 +663,7 @@ public final class EvaConnectedActionReview
             return;
         }
         // Past the script a terrain tour only waits for its cleanup, the ground gone from under the body.
-        if (poses == null || !EVERY_FRAME && poseTick == tick || TOUR && tick >= TOUR_END) return;
+        if (poses == null || !EVERY_FRAME && poseTick == tick || TOUR && !LAUNCH && tick >= TOUR_END) return;
         // A frame can draw the body more than once (shadow and main pass).
         if (EVERY_FRAME && eva.tickCount + partialTick == poseTime) return;
         poseTick = tick;poseTime = eva.tickCount + partialTick;
@@ -597,6 +676,17 @@ public final class EvaConnectedActionReview
         row.addProperty("key", eva.poseTransitionKey(partialTick));
         row.addProperty("heavyActive", eva.isHeavyMotionActive());
         if (TOUR) row.addProperty("writers", com.projectseele.client.render.EvaPoseGraph.traceWriters(eva));
+        if (LAUNCH)
+        {
+            // Which part of the launch this frame belongs to, and what holds the body.
+            JsonArray launch = new JsonArray();
+            launch.add(eva.getLaunchPhase()); launch.add(eva.getLaunchTicks()); launch.add(eva.getActivationTicks());
+            launch.add(eva.onGround() ? 1 : 0); launch.add(eva.isNoGravity() ? 1 : 0); launch.add(eva.isNervLogisticsLocked() ? 1 : 0);
+            launch.add(eva.hasActiveCarrierMotion() ? 1 : 0); launch.add(eva.isVisuallyAirborneForRender() ? 1 : 0);
+            launch.add(eva.isPoweredOn() ? 1 : 0); launch.add(eva.getDeltaMovement().y);
+            launch.add(Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().y);
+            row.add("launch", launch);
+        }
         if (eva.isHeavyMotionActive()) row.addProperty("heavyPhase", eva.heavyMotionProgress(partialTick));
         JsonArray world = new JsonArray();
         world.add(eva.getX()); world.add(eva.getY()); world.add(eva.getZ());
@@ -665,7 +755,7 @@ public final class EvaConnectedActionReview
                 || tick == capturedTick) return;
         // The tour measures per-frame continuity: a screenshot per tick would
         // halve the frame rate, so it keeps one still every two seconds.
-        if (TOUR && tick >= TOUR_END) return;
+        if (TOUR && !LAUNCH && tick >= TOUR_END) return;
         if (TOUR && FX) { if (!fxCapture(tick)) return; }
         else if (TOUR && ATF) { if (tick < 36) return; }
         else if (TOUR && !Boolean.getBoolean("projectseele.tourCapture") && tick % 40 != 0) return;
