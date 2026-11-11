@@ -72,9 +72,18 @@ def main():
     keep_on_apron = ndimage.binary_dilation(on_apron_built.any(0) & foot, iterations=3)
     target = np.where(foot & keep_on_apron, ground, target)
     frozen_all = frozen & ~foot | foot & keep_on_apron
-    plant = (dist >= a.verge + 3) & ~ndimage.binary_dilation(frozen, iterations=3)
+    plant = (dist >= a.verge + 2) & ~ndimage.binary_dilation(frozen, iterations=3)
     keepout = ndimage.binary_dilation(foot, iterations=2) | frozen
-    new_ids, change = tr.apply_heights(box, ground, target, frozen_all, plant=plant, plant_keepout=keepout, chance=tr.local_tree_chances(box, 24))
+    # Density as the hill stood (pavement not counted); near the apron fewer conifers, so the first rows
+    # do not stand as one dark wall.
+    con, broad = tr.local_tree_chances(box, 24, counts=~foot)
+    front = np.clip((dist - a.verge) / 25, 0, 1)
+    share = con / 25 / np.maximum(con / 25 + broad / 49, 1e-6)
+    cap = np.where(share > .4, .4 / np.maximum(share, 1e-6), 1)
+    con2 = con * (front + (1 - front) * cap)
+    broad2 = broad + (con - con2) * 49 / 25
+    chance = (np.clip(con2, 0, .9), np.clip(broad2, 0, .9))
+    new_ids, change = tr.apply_heights(box, ground, target, frozen_all, plant=plant, plant_keepout=keepout, chance=chance)
     rows = tr.rows_between(box, new_ids)
     tr.write_rows(a.out / 'rows.json', rows)
     after_ground = tr.top_of(box.kinds[new_ids] == tr.SOIL, y0)

@@ -144,7 +144,7 @@ def softmin(a, b, k):
     return m - k * np.log(np.exp(-(a - m) / k) + np.exp(-(b - m) / k))
 
 
-def apply_heights(box, ground, target, frozen, rng_seed=7, steep_rock=2.5, plant=None, plant_keepout=None, chance=None):
+def apply_heights(box, ground, target, frozen, rng_seed=7, steep_rock=2.5, plant=None, plant_keepout=None, chance=None, cover=True):
     """Rewrite box.ids so each unfrozen column's natural ground top sits at target. Returns new ids."""
     y0 = box.origin[1]
     ids = box.ids.copy()
@@ -190,6 +190,8 @@ def apply_heights(box, ground, target, frozen, rng_seed=7, steep_rock=2.5, plant
     orphan_leaves(box, ids, change)
     if plant is not None:
         replant(box, ids, target, plant & change, plant_keepout, random.Random(rng_seed), chance=chance)
+    if cover:
+        ground_cover(box, ids, change, np.random.default_rng(rng_seed))
     return ids, change
 
 
@@ -269,9 +271,10 @@ def write_rows(path, rows):
         json.dump(rows, f)
 
 
-def local_tree_chances(box, radius=15):
+def local_tree_chances(box, radius=15, counts=None):
     """Per-column planting chances (conifer grid of 5, broadleaf grid of 7) that reproduce the trunk
-    density and conifer share standing around each column now."""
+    density and conifer share standing around each column now. counts limits which columns are
+    sampled (leave out pavement, which would read as clearing)."""
     names = np.array([q.split('[')[0] for q in box.palette]).astype(str)
     y0 = box.origin[1]
     k = box.kind_grid()
@@ -281,6 +284,23 @@ def local_tree_chances(box, radius=15):
     trunk = np.char.endswith(base, '_log')
     conifer = trunk & (base == 'minecraft:spruce_log')
     size = 2 * radius + 1
-    d = ndimage.uniform_filter(trunk.astype(float), size)
-    share = ndimage.uniform_filter(conifer.astype(float), size) / np.maximum(d, 1e-6)
+    weight = np.ones(trunk.shape) if counts is None else counts.astype(float)
+    n = np.maximum(ndimage.uniform_filter(weight, size), 1e-6)
+    d = ndimage.uniform_filter(trunk * weight, size) / n
+    share = ndimage.uniform_filter(conifer * weight, size) / n / np.maximum(d, 1e-6)
     return np.clip(25 * d * share, 0, .9), np.clip(49 * d * (1 - share), 0, .9)
+
+
+def ground_cover(box, ids, where, rng, grass=.3, fern=.06):
+    """Short grass and ferns on bare grass blocks in where, so a fresh cut does not read as raw steps."""
+    y0 = box.origin[1]
+    k = box.kinds
+    grass_id = box.state_id(GRASS)
+    air = box.state_id(AIR_STATE)
+    plants = [box.state_id('minecraft:grass'), box.state_id('minecraft:fern')]
+    top = top_of(k[ids] == SOIL, y0)
+    roll = rng.random(where.shape)
+    for z, x in zip(*np.nonzero(where & (roll < grass + fern))):
+        y = int(top[z, x]) - y0
+        if y + 1 < ids.shape[0] and ids[y, z, x] == grass_id and ids[y + 1, z, x] == air:
+            ids[y + 1, z, x] = plants[0] if roll[z, x] < grass else plants[1]
