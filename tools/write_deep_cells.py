@@ -155,6 +155,32 @@ def block_at(root, x, y, z):
     return 'minecraft:air'
 
 
+def preflight(folder, grouped, allow_block_entities):
+    """Check every row before anything is written: prior state, and no block entity under a row unless allowed."""
+    problems = []
+    for (rx, rz), chunks in sorted(grouped.items()):
+        buf = (folder / f'r.{rx}.{rz}.mca').read_bytes()
+        for (cx, cz), cells in chunks.items():
+            root = read_chunk(buf, cx, cz)[3]
+            entities = {(int(e['x']), int(e['y']), int(e['z'])): str(e['id']) for e in root.get('block_entities', [])}
+            decoded = {}
+            for s in root['sections']:
+                if 'block_states' in s:
+                    decoded[int(s['Y'])] = decode(s['block_states'])
+            for x, y, z, before, _ in cells:
+                if y >> 4 not in decoded:
+                    problems.append(f'{x},{y},{z}: section {y >> 4} missing')
+                    continue
+                ids, palette = decoded[y >> 4]
+                state = palette[ids[((y & 15) << 8) | ((z & 15) << 4) | (x & 15)]]
+                if state != before:
+                    problems.append(f'{x},{y},{z} is {state}, expected {before}')
+                if (x, y, z) in entities and not allow_block_entities:
+                    problems.append(f'{x},{y},{z} holds a {entities[x, y, z]} block entity')
+    if problems:
+        raise SystemExit(f'Preflight refused {len(problems)} rows, nothing written:\n' + '\n'.join(problems[:20]))
+
+
 def apply(a):
     rows = json.loads(a.rows.read_text('utf8'))
     signs = json.loads(a.signs.read_text('utf8')) if a.signs else []
@@ -177,8 +203,9 @@ def apply(a):
         lift_protection(a.world).assert_positions(positions)
     from map_pipeline.launch_protection import load as launch_protection
     launch_protection(a.world).assert_positions(positions)
-    a.out.mkdir(parents=True, exist_ok=False)
     folder = a.world / REGION
+    preflight(folder, grouped, a.allow_block_entities)
+    a.out.mkdir(parents=True, exist_ok=False)
     changed = 0
     with stopped_world(a.world):
         for (rx, rz), chunks in sorted(grouped.items()):
@@ -278,4 +305,6 @@ if __name__ == '__main__':
     parser.add_argument('--allow-city-lift', action='store_true', help='only to restore the hatch cover of the city lift itself')
     parser.add_argument('--signs', type=Path, help='JSON list of {pos, front, back, color, glow}: writes only those sign block entities')
     parser.add_argument('--allow-lift-shaft', action='store_true', help='only to clear the travel space of a lift itself')
+    parser.add_argument('--allow-block-entities', action='store_true',
+                        help='let rows replace blocks that carry a block entity (chests, signs, machines); off by default')
     apply(parser.parse_args())
