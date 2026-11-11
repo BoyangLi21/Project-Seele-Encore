@@ -29,7 +29,17 @@ public final class EvaFootPlacement
         var under=UNDER.get(eva.getId()*2+(side.equals("l")?0:1));
         return under!=null&&under[1]==com.projectseele.client.AircraftRenderClockR21.frameNanos()?under[0]:Double.NaN;
     }
-    public static void clear(){GEOMETRY.clear();LAST.clear();}
+    /**
+     * The line of the ground under a sole this frame, or null on level ground or without ground:
+     * [2] its rise per block toward the toes, [3] and [4] the x and z of the point where it has the
+     * height {@link #groundUnder} gives, [5] and [6] the sole's heading.
+     */
+    static double[] slopeUnder(EvaUnit01Entity eva,String side)
+    {
+        var under=UNDER.get(eva.getId()*2+(side.equals("l")?0:1));
+        return under!=null&&under[1]==com.projectseele.client.AircraftRenderClockR21.frameNanos()&&Double.isFinite(under[0])&&Math.abs(under[2])>1e-4?under:null;
+    }
+    public static void clear(){GEOMETRY.clear();SOLES.clear();LAST.clear();}
     /** Reads the unit's sole geometry now if no frame has needed it yet (a mesh file: tens of milliseconds). */
     static void warm(EvaUnit01Entity eva){feet(eva);}
     private static Map<String,Vector3f[]> feet(EvaUnit01Entity eva)
@@ -85,13 +95,17 @@ public final class EvaFootPlacement
         LAST.remove(eva.getId());
         if(eva.hasLegacyStrikeForRender())return EvaMotionEngineV2.BoneWrites.empty();
         if(root==null||!eva.isPoweredOn()||eva.isCrucified()||eva.hasActiveCarrierMotion()||eva.isExperimentalUnit()&&!EvaBodyPose.hasOwnUnRig(eva)||eva.isFirstBattleActive()||eva.isVisuallyAirborneForRender()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()||eva.isBerserk()||eva.getActivationTicks()>0||eva.getVisualPose()!=0||eva.hasLiveActionForRender(partial)||eva.rifleStanceLevel(partial)>1.01F)return EvaMotionEngineV2.BoneWrites.empty();
-        var mesh=feet(eva);Set<String> changed=new LinkedHashSet<>();double[] witness=new double[24];int index=0;double ledge=Double.NEGATIVE_INFINITY;
+        var mesh=feet(eva);Set<String> changed=new LinkedHashSet<>();double[] witness=new double[28];int index=0;double ledge=Double.NEGATIVE_INFINITY;
         float yaw=net.minecraft.util.Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot)*net.minecraft.util.Mth.DEG_TO_RAD;
         Vector3f forward=new Vector3f(-net.minecraft.util.Mth.sin(yaw),0,net.minecraft.util.Mth.cos(yaw));
         // A swinging foot crosses the ground at about twice the body's speed:
         // read far enough ahead that it is already up when it reaches the edge.
         float reach=(float)Math.max(REACH,Math.min(20,Math.hypot(eva.getX()-eva.xo,eva.getZ()-eva.zo)*20*.6));
         boolean stepping=com.projectseele.client.EvaStepSmoothingR57.offset(eva,partial)<-3;
+        // The lie of the land under the body, along its heading (rise per block), eased as the feet's corrections are.
+        var body=eva.getPosition(partial);
+        double land=ease((eva.getId()*2)^0x08000000,landSlope(eva,body,forward,root.m31()),LAND_EASE);
+        witness[26]=land;
         for(String s:List.of("l","r"))
         {
             var foot=model.getBone("foot_"+s).orElse(null);var leg=model.getBone("leg_"+s).orElse(null);var shin=model.getBone("shin_"+s).orElse(null);var ankle=model.getBone("ankle_"+s).orElse(null);
@@ -103,7 +117,8 @@ public final class EvaFootPlacement
             for(Vector3f rest:mesh.get(s))
             {
                 float y=matrix.m01()*rest.x+matrix.m11()*rest.y+matrix.m21()*rest.z+matrix.m31();if(y<minimum){minimum=y;selected=rest;}
-                float ahead=(matrix.m00()*rest.x+matrix.m10()*rest.y+matrix.m20()*rest.z+matrix.m30())*forward.x+(matrix.m02()*rest.x+matrix.m12()*rest.y+matrix.m22()*rest.z+matrix.m32())*forward.z;
+                float wx=matrix.m00()*rest.x+matrix.m10()*rest.y+matrix.m20()*rest.z+matrix.m30(),wz=matrix.m02()*rest.x+matrix.m12()*rest.y+matrix.m22()*rest.z+matrix.m32();
+                float ahead=wx*forward.x+wz*forward.z;
                 if(ahead>front){front=ahead;toe=rest;}
                 if(ahead<rear){rear=ahead;heel=rest;}
             }
@@ -120,11 +135,54 @@ public final class EvaFootPlacement
             // edge; otherwise it stays below and its toes are drawn back out.
             Vector3f toeAt=matrix.transformPosition(new Vector3f(toe)).add(held.x,0,held.z),heelAt=matrix.transformPosition(new Vector3f(heel)).add(held.x,0,held.z);
             Vector3f middle=new Vector3f(toeAt).add(heelAt).mul(.5F);middle.y=lowest.y;
-            double top=ground(eva,new Vector3f(toeAt.x,lowest.y,toeAt.z)),below=ground(eva,new Vector3f(heelAt.x,lowest.y,heelAt.z));
+            // From the middle of the sole up to the ankle, and the way the sole points.
+            Vector3f ankleOverSole=new Vector3f(pivot).sub(middle.x-held.x,lowest.y,middle.z-held.z);
+            double span=Math.hypot(toeAt.x-heelAt.x,toeAt.z-heelAt.z);
+            float alongX=span>1?(float)((toeAt.x-heelAt.x)/span):forward.x,alongZ=span>1?(float)((toeAt.z-heelAt.z)/span):forward.z;
+            double[] lie={0,0};
+            // Where the ground of an even slope would be under this sole. The clips walk on the level:
+            // a lifted foot went back to the height of the body's own ground, so up a hillside the
+            // rear foot was let go from ten blocks below and came up all of them in two frames, and
+            // the front foot fell as far onto its footing downhill. A lifted foot now keeps to the
+            // lie of the land and only what the ground differs from it comes and goes with the step.
+            // Past a leg's reach it lets go as the ground itself does, by its own depth: tied to
+            // whether a ray found ground under the sole, a lifted foot far down a steep slope
+            // jumped eight blocks each time the ray lost and found it.
+            double even=Math.max(-STEP,Math.min(STEP,land*((middle.x-body.x)*forward.x+(middle.z-body.z)*forward.z)));
+            double past=Math.max(0,Math.min(1,(Math.abs(even)-MAX_REACH_DOWN)/REACH_FADE));
+            even*=1-past*past*(3-2*past);
+            // The rays under the sole start at the height it will be drawn at. Started from the
+            // clip's height, they ran out above the ground a lifted rear foot is carried down to.
+            float from=lowest.y+(float)even;
+            double top=ground(eva,new Vector3f(toeAt.x,from,toeAt.z)),below=ground(eva,new Vector3f(heelAt.x,from,heelAt.z));
             // Height above the drawn ground: while the body rises onto a kerb it is drawn below the entity.
-            double ground=rampGround(eva,heelAt,toeAt,lowest.y,below,top),lift=lowest.y-root.m31();
+            double ground=rampGround(eva,heelAt,toeAt,from,below,top,lie),lift=lowest.y-root.m31();
             float onto=0;
             boolean ramp=Double.isFinite(ground);
+            // The line through the mean heights runs through the middle of every riser: a sole laid
+            // on it had each terrace's edge half a block inside it. A flat sole rests on the edges.
+            if(ramp)
+            {
+                double steep=Math.min(1,Math.abs(lie[0])/SLOPE_FROM),edge=TERRACE_EDGE*steep*steep*(3-2*steep);
+                // A rigid sole rests on the highest ground under it. It is ten blocks long and five
+                // wide, and a hillside is uneven along it and across it: set at the mean height of
+                // its centre line, one planted sole in seven stood more than a block inside a higher
+                // terrace under an edge or an end. It is raised until the line it lies along clears
+                // the highest of the five heights and the ground under its four corners. A corner
+                // on ground higher than a terrace stands against a kerb or a wall, not on it.
+                // Its edges are its own: feet stand turned out, and across the body's heading the
+                // far corners of a turned sole lie three blocks outside it.
+                float[] box=sole(eva,s,mesh.get(s));
+                double tilt=Math.max(-MAX_SOLE_SLOPE,Math.min(MAX_SOLE_SLOPE,lie[0])),beside=Double.NEGATIVE_INFINITY;
+                for(float x:new float[]{box[0]+SOLE_INSET,box[1]-SOLE_INSET})for(float z:new float[]{box[2]+SOLE_INSET,box[3]-SOLE_INSET})
+                {
+                    var at=matrix.transformPosition(new Vector3f(x,box[4],z)).add(held.x,0,held.z);
+                    double here=ground(eva,new Vector3f(at.x,from,at.z));
+                    // Against the line, not the mean: the ends of a sole on a slope stand above and below its middle.
+                    if(Double.isFinite(here))beside=Math.max(beside,here-ground-tilt*((at.x-middle.x)*alongX+(at.z-middle.z)*alongZ));
+                }
+                ground+=Math.max(edge,Math.max(lie[1],beside<=BESIDE_MOST?beside:0));
+            }
             boolean across=!ramp&&Double.isFinite(top)&&Double.isFinite(below)&&top>below+.5;
             if(across)
             {
@@ -141,7 +199,7 @@ public final class EvaFootPlacement
                         if(solid(eva,heelAt.x+forward.x*d,top-.5,heelAt.z+forward.z*d)){onto=d+.5F;ground=top;break;}
                 }
             }
-            else if(!ramp)ground=ground(eva,middle);
+            else if(!ramp)ground=ground(eva,new Vector3f(middle.x,from,middle.z));
             if(ON_TOP.size()>64)ON_TOP.clear();
             if(across&&ground==top)ON_TOP.put(key,true);else ON_TOP.remove(key);
             // Further above or below the body than a leg goes, it is not ground to stand on: a hillside
@@ -163,8 +221,21 @@ public final class EvaFootPlacement
             // slide back faster than the body moves: on a ledge that slid the
             // foot off the edge and the leg folded to keep it up there.
             updateHold(key,pivot,plant,!ramp&&Double.isFinite(ground)&&ground-root.m31()>.5);held=hold(key,pivot);
+            // A sole on a slope lies along it, as far as an ankle gives. Kept level it was set at the
+            // mean height of the ground under it: on a steep hillside its toes stood up to five
+            // blocks inside the terrace above and its heel as far over the one below.
+            double slope=ease(key^0x10000000,ramp&&Double.isFinite(ground)&&span>1?Math.max(-MAX_SOLE_SLOPE,Math.min(MAX_SOLE_SLOPE,lie[0]))*within:0,SOLE_EASE);
+            // Planted, the sole lies along the ground under it; lifted, along the lie of the land.
+            // Levelled with the planted share alone it turned thirty degrees in the two frames of
+            // each lift and landing, and the ankle swung over the sole's middle as fast.
+            float pitch=(float)Math.atan(slope*plant+Math.max(-MAX_SOLE_SLOPE,Math.min(MAX_SOLE_SLOPE,land))*(1-plant));
+            witness[24+(s.equals("l")?0:1)]=slope;
             if(UNDER.size()>64)UNDER.clear();
-            UNDER.put(eva.getId()*2+(s.equals("l")?0:1),new double[]{ground,com.projectseele.client.AircraftRenderClockR21.frameNanos()});
+            // No ground found under a sole that the slope carries: the stages after this one judge it
+            // against the slope. Against the drawn plane, a lifted rear foot carried four blocks
+            // below it read as four blocks underground and was pulled up to the plane in one frame.
+            double shown=Double.isFinite(ground)?ground:Math.abs(even)>.5?root.m31()+even:Double.NaN;
+            UNDER.put(eva.getId()*2+(s.equals("l")?0:1),new double[]{shown,com.projectseele.client.AircraftRenderClockR21.frameNanos(),slope,middle.x,middle.z,alongX,alongZ});
             // Only a planted sole carries the body up onto a ledge.
             if(Double.isFinite(ground)&&plant>.5)ledge=Math.max(ledge,ground-root.m31());
             // Only the terrain's rise or fall under the sole, measured from the
@@ -172,7 +243,13 @@ public final class EvaFootPlacement
             // down and lagged it behind the clip, so the legs shook each step
             // on flat ground; resting the body on its feet is ground contact's.
             // Flat ground reads a hair below the drawn one; no block edge is that small.
-            double rise=Double.isFinite(ground)?Math.max(-STEP,Math.min(STEP,ground-root.m31()))*within:0;
+            // A clip's sole is never under the drawn plane. One that comes in below it was set there
+            // by the body pose for the ground it stands on (the standing support sets both feet of a
+            // unit at rest on their floors): that much of the way down is already made. Counted
+            // again, a foot on ground three blocks down was sent six, and as the unit stopped or
+            // started the leg was thrown between the two answers, forty degrees in a frame.
+            double rise=Double.isFinite(ground)?Math.max(-STEP,Math.min(STEP,ground-root.m31()-Math.min(0,lift)))*within:0;
+            double uneven=Double.isFinite(ground)?rise-even:0;
             // A swinging foot rises to the higher of the ground under it and a
             // stride ahead, so it clears a ledge's edge and comes down on top.
             // Swinging feet were left to the clip: the toe went through the
@@ -180,10 +257,12 @@ public final class EvaFootPlacement
             double ahead=ground(eva,new Vector3f(lowest).add(forward.x*reach,0,forward.z*reach));
             // A wall taller than a step reads as ground at the ray's start: no clearance for that.
             boolean ledgeAhead=Double.isFinite(ahead)&&ahead<lowest.y+STEP+.5;
-            double clear=Math.max(0,Math.max(rise,ledgeAhead?Math.min(STEP,ahead-root.m31()):0));
-            rise=rise*plant+clear*(1-plant);
-            double flat=Math.max(0,Math.min(1,(Math.abs(rise)-.15)/.3));
-            double correction=ease(eva.getId()*2+(s.equals("l")?0:1),rise*flat*flat*(3-2*flat));
+            double clear=Math.max(0,Math.max(uneven,ledgeAhead?Math.min(STEP,ahead-root.m31()-even-land*reach):0));
+            uneven=uneven*plant+clear*(1-plant);
+            rise=even+uneven;
+            // Only what differs from the even slope has the dead band: the slope itself passes through zero under the body.
+            double flat=Math.max(0,Math.min(1,(Math.abs(uneven)-.15)/.3));
+            double correction=ease(eva.getId()*2+(s.equals("l")?0:1),even+uneven*flat*flat*(3-2*flat));
             float holding=holdWeight(key);
             // A toe that reaches into or through a wall or a kerb's face is
             // drawn back to stand in front of it, along the heading: the long
@@ -201,15 +280,23 @@ public final class EvaFootPlacement
             // wanted and eased correction, carry onto a ledge, draw-back, hold, height above the drawn plane, ramp.
             witness[index++]=lowest.y;witness[index++]=top;witness[index++]=below;witness[index++]=ground;witness[index++]=plant;witness[index++]=rise;
             witness[index++]=correction;witness[index++]=onto;witness[index++]=back;witness[index++]=holding;witness[index++]=lift;witness[index++]=ramp?1:0;
-            if(Math.abs(correction)<.005&&holding<.005&&back<.005&&onto<.005)continue;
+            if(Math.abs(correction)<.005&&holding<.005&&back<.005&&onto<.005&&Math.abs(pitch)<.005F)continue;
             Vector3f target=new Vector3f(pivot).add(held.x+forward.x*shift,(float)correction,held.z+forward.z*shift);
+            var turn=EvaRigTransforms.rotation(matrix);
+            if(Math.abs(pitch)>=.005F)
+            {
+                // Turned about the middle of the sole: the sole stays where it stands and the ankle moves over it.
+                var lean=new org.joml.Quaternionf().rotationAxis(pitch,-alongZ,0,alongX);
+                target.add(lean.transform(new Vector3f(ankleOverSole)).sub(ankleOverSole));
+                turn=lean.mul(turn);
+            }
             // The knee bends forward, and up when the foot is lifted high in
             // front. The clip's own knee direction lay along the thigh when a
             // foot was raised onto a ledge, and the solver flipped the knee
             // backwards and flung the foot up behind.
             Vector3f pole=new Vector3f(forward).add(0,.5F,0);
             // Small corrections fade in: a solver switched on at a fixed threshold snapped the walking leg.
-            EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(matrix),pole,root,Math.max(Math.max(holding,Math.min(1,(back+onto)/.5F)),(float)Math.min(1,Math.abs(correction)/.2)));
+            EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,turn,pole,root,Math.max(Math.max(holding,Math.min(1,(back+onto)/.5F)),(float)Math.max(Math.min(1,Math.abs(correction)/.2),Math.min(1,Math.abs(pitch)/.05))));
             // The solved leg can fall short of its target, a foot lifted onto a
             // kerb lower than asked: the toes are checked again where they are drawn.
             // The solver keeps the foot's turn, so the sole sits where it did under the toe.
@@ -217,9 +304,9 @@ public final class EvaFootPlacement
             float more=blocked(eva,drawnToe,drawnToe.y+lowest.y-matrix.transformPosition(new Vector3f(toe)).y,centre,forward);
             if(more>0)
             {
-                back+=more;EASED.put(key^0x40000000,new Eased(back,com.projectseele.client.AircraftRenderClockR21.frameNanos()));
+                back+=more;remember(key^0x40000000,new Eased(back,com.projectseele.client.AircraftRenderClockR21.frameNanos()));
                 target.sub(forward.x*more,0,forward.z*more);
-                EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,EvaRigTransforms.rotation(matrix),pole,root,1);
+                EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,turn,pole,root,1);
             }
             changed.addAll(List.of("leg_"+s,"shin_"+s,"ankle_"+s,"foot_"+s));
         }
@@ -233,10 +320,11 @@ public final class EvaFootPlacement
      * hillside has a level under every few blocks of a sole, and they carried the foot ten
      * blocks to and fro as its heel and toe crossed one terrace after another.
      */
-    private static double rampGround(EvaUnit01Entity eva,Vector3f heel,Vector3f toe,float y,double below,double top)
+    private static double rampGround(EvaUnit01Entity eva,Vector3f heel,Vector3f toe,float y,double below,double top,double[] lie)
     {
         if(!Double.isFinite(below)||!Double.isFinite(top))return Double.NaN;
-        double sum=below+top,previous=below,biggest=0;
+        double sum=below+top,previous=below,biggest=0,moment=2*(top-below);
+        double[] heights={below,0,0,0,top};
         for(int i=1;i<=4;i++)
         {
             double here=top;
@@ -244,14 +332,44 @@ public final class EvaFootPlacement
             {
                 var at=new Vector3f(heel).lerp(toe,i/4F);at.y=y;here=ground(eva,at);
                 if(!Double.isFinite(here))return Double.NaN;
-                sum+=here;
+                sum+=here;moment+=(i-2)*here;heights[i]=here;
             }
             biggest=Math.max(biggest,Math.abs(here-previous));previous=here;
         }
+        // The line of best fit through the five heights: rise per block from heel to toe.
+        double spacing=Math.hypot(toe.x-heel.x,toe.z-heel.z)/4;
+        lie[0]=spacing>.25?moment/10/spacing:0;
+        // How far the highest of them stands over the line the sole will lie along through their mean.
+        double along=Math.max(-MAX_SOLE_SLOPE,Math.min(MAX_SOLE_SLOPE,lie[0]))*spacing;
+        lie[1]=0;
+        for(int i=0;i<5;i++)lie[1]=Math.max(lie[1],heights[i]-sum/5-along*(i-2));
         // A terrace edge of a block or two is not a kerb to stand on or before, whatever share of the
         // rise it holds: the kerb rules set the sole on one level and carried it forward onto the
         // other from frame to frame as it crossed each edge, six times a second on a hillside.
         return biggest>KERB_MIN&&biggest>RAMP_STEP_SHARE*Math.abs(top-below)?Double.NaN:sum/5;
+    }
+    /**
+     * The slope of the ground under the body along its heading: the line of best fit through nine
+     * heights from twelve blocks behind to twelve ahead. Zero where one of them is missing or two
+     * neighbours differ by a kerb: a step is climbed by the kerb rules, not walked as a slope.
+     */
+    private static double landSlope(EvaUnit01Entity eva,Vec3 body,Vector3f forward,float plane)
+    {
+        double moment=0,previous=Double.NaN;
+        for(int i=-4;i<=4;i++)
+        {
+            double here=ground(eva,new Vector3f((float)body.x+forward.x*i*LAND_STEP,plane,(float)body.z+forward.z*i*LAND_STEP));
+            if(!Double.isFinite(here))return 0;
+            if(Double.isFinite(previous)&&Math.abs(here-previous)>KERB_MIN)
+            {
+                // Terraces rise that much over three blocks on the steepest hillsides. A kerb does it within one half.
+                double between=ground(eva,new Vector3f((float)body.x+forward.x*(i-.5F)*LAND_STEP,plane,(float)body.z+forward.z*(i-.5F)*LAND_STEP));
+                if(!Double.isFinite(between)||Math.max(Math.abs(between-previous),Math.abs(here-between))>KERB_MIN)return 0;
+            }
+            moment+=i*here;previous=here;
+        }
+        // Sum of i squared over -4..4 is 60.
+        return Math.max(-MAX_LAND_SLOPE,Math.min(MAX_LAND_SLOPE,moment/60/LAND_STEP));
     }
     private static final class Hold {float x,z,weight=1;long time;boolean on=true,far;}
     private static final Map<Integer,Hold> HOLDS=new HashMap<>();
@@ -317,8 +435,7 @@ public final class EvaFootPlacement
     {
         var last=EASED.get(key);
         if(last!=null&&wanted<last.value())return ease(key,wanted);
-        if(EASED.size()>64)EASED.clear();
-        EASED.put(key,new Eased(wanted,com.projectseele.client.AircraftRenderClockR21.frameNanos()));
+        remember(key,new Eased(wanted,com.projectseele.client.AircraftRenderClockR21.frameNanos()));
         return wanted;
     }
     private static boolean solid(EvaUnit01Entity eva,double x,double y,double z)
@@ -337,6 +454,38 @@ public final class EvaFootPlacement
     private static final double MAX_REACH_DOWN=12;
     /** A sole lies across a slope, not a step, when no column along it holds more than this share of the rise. */
     private static final double RAMP_STEP_SHARE=.65;
+    /** The ground under the body is read every this many blocks along its heading, and counts as a slope up to this steep. */
+    private static final float LAND_STEP=3;
+    private static final double MAX_LAND_SLOPE=1;
+    /**
+     * The slopes are fitted to heights that change a whole block at a time: followed as fast as the
+     * corrections, each change reached the foot as a small turn. Seconds for the land and for a sole.
+     */
+    private static final double LAND_EASE=.25,SOLE_EASE=.2;
+    /** A terrace's edge stands this far over the mean line of a slope (blocks: half a block step), fully from the given slope on. */
+    private static final double TERRACE_EDGE=.5,SLOPE_FROM=.25;
+    /** Ground under a sole's corner counts as under the sole up to this far over the line it lies along (blocks), read this far in from the corner. */
+    private static final double BESIDE_MOST=2.5;
+    /** Model units: a twentieth is a quarter of a block of the drawn unit. */
+    private static final float SOLE_INSET=.05F,SOLE_LAYER=.02F;
+    private static final Map<Integer,float[]> SOLES=new HashMap<>();
+    /** The rectangle of a sole at rest (model units): x from and to, z from and to, and its height. */
+    private static float[] sole(EvaUnit01Entity eva,String side,Vector3f[] points)
+    {
+        return SOLES.computeIfAbsent(EvaBodyPose.rigKey(eva)*2+(side.equals("l")?0:1),key->{
+            float low=Float.POSITIVE_INFINITY;
+            for(var p:points)low=Math.min(low,p.y);
+            float[] box={Float.POSITIVE_INFINITY,Float.NEGATIVE_INFINITY,Float.POSITIVE_INFINITY,Float.NEGATIVE_INFINITY,low};
+            for(var p:points)
+            {
+                if(p.y>=low+SOLE_LAYER)continue;
+                box[0]=Math.min(box[0],p.x);box[1]=Math.max(box[1],p.x);box[2]=Math.min(box[2],p.z);box[3]=Math.max(box[3],p.z);
+            }
+            return box;
+        });
+    }
+    /** A sole lies along a slope up to this steep (rise per block: thirty degrees), the give of an ankle. */
+    private static final double MAX_SOLE_SLOPE=.58;
     /** Per sole: it stands on the top of the kerb it lies across. */
     private static final Map<Integer,Boolean> ON_TOP=new HashMap<>();
     /** A sole on a kerb's top goes back down only when it is this much nearer the level below (blocks). */
@@ -350,12 +499,24 @@ public final class EvaFootPlacement
     private record Eased(double value,long time) {}
     private static final Map<Integer,Eased> EASED=new HashMap<>();
     /**
+     * A unit has nine eased values. Cleared whole at sixty-four, the map was emptied every few
+     * frames once eight units stood in view, and each of them lost its easing in the same frame.
+     * Only what has not been drawn for a second is dropped.
+     */
+    private static void remember(int key,Eased value)
+    {
+        if(EASED.size()>256){long old=value.time()-1_000_000_000L;EASED.values().removeIf(e->e.time()<old);}
+        EASED.put(key,value);
+    }
+    /**
      * The ground under a sole changes block by block, and a ray that found
      * nothing read as no ground: the correction jumped by up to a block
      * between frames and snapped the leg. It now follows over about a tenth of
      * a second.
      */
-    private static double ease(int key,double wanted)
+    private static double ease(int key,double wanted){return ease(key,wanted,.05);}
+    /** As {@link #ease(int,double)}, over the given time (seconds). */
+    private static double ease(int key,double wanted,double time)
     {
         long now=com.projectseele.client.AircraftRenderClockR21.frameNanos();var last=EASED.get(key);double value=wanted;
         if(last!=null)
@@ -364,10 +525,9 @@ public final class EvaFootPlacement
             if(dt==0)return last.value();
             // A ledge coming under the foot changes it by up to a full step:
             // that eases too, quickly, instead of jumping there.
-            if(dt>0&&dt<.25)value=last.value()+(wanted-last.value())*(1-Math.exp(-dt/.05));
+            if(dt>0&&dt<.25)value=last.value()+(wanted-last.value())*(1-Math.exp(-dt/time));
         }
-        if(EASED.size()>64)EASED.clear();
-        EASED.put(key,new Eased(value,now));
+        remember(key,new Eased(value,now));
         return value;
     }
     private EvaFootPlacement() {}
