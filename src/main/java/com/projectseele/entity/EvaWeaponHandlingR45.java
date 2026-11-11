@@ -43,6 +43,12 @@ public final class EvaWeaponHandlingR45
         // The drawn-knife arm is a standing pose. Lying down, the prone arm
         // keeps the knife along the ground instead of driving it through it.
         float prone=e.rifleProneBlend(partial),upright=1-prone*prone*(3-2*prone);
+        // The prone signal is back at nought six ticks after the pilot asks to stand, and the
+        // body takes a second and a half to get up. Followed alone, the standing arm hung from a
+        // chest still on the ground: the hand and the knife went seven blocks into it for thirteen
+        // ticks. The arm stands up with the body, between kneeling (stance 2) and crouching (1).
+        float low=Math.max(0,Math.min(1,e.rifleStanceLevel(partial)-1));
+        upright=Math.min(upright,1-low*low*(3-2*low));
         for(String name:java.util.List.of("arm_r","forearm_r","wrist_r","hand_r"))
         {
             body.rotations.put(name,new org.joml.Quaternionf(body.rotations.get(name)).slerp(end.rotations.get(name),upright));
