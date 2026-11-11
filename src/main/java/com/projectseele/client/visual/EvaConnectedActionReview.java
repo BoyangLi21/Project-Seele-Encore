@@ -521,8 +521,10 @@ public final class EvaConnectedActionReview
         // Optional chain check: the heavy pressed during the punch string.
         if(COMBO&&tourAt(193))send(ServerboundEvaControlPacket.ACTION_SMASH);
         if(!CLIMB&&tourAt(290))send(ServerboundEvaControlPacket.ACTION_STOMP);
-        if(tourAt(340)||tourAt(820))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
-        if(tourAt(440)||tourAt(920))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
+        // The last crouch is with the knife drawn, after the unit has stood all the way up from prone
+        // (the tour used to end fifty ticks into that rise). Runs that end at 1600 never reach it.
+        if(tourAt(340)||tourAt(820)||tourAt(1650))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
+        if(tourAt(440)||tourAt(920)||tourAt(1730))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
         if(tourAt(470)||tourAt(600)||tourAt(940)||tourAt(1080)||tourAt(1340)||tourAt(1550))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
         if(tourAt(660))mc.player.connection.sendCommand("seele dev motionlab weapon unit01 rifle");
         if((t>=680&&t<900||t>=970&&t<1000)&&tick/4!=previousTick/4)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
