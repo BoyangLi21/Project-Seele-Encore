@@ -125,10 +125,16 @@ public final class EvaFootPlacement
             double ground=rampGround(eva,heelAt,toeAt,lowest.y,below,top),lift=lowest.y-root.m31();
             float onto=0;
             boolean ramp=Double.isFinite(ground);
-            if(!ramp&&Double.isFinite(top)&&Double.isFinite(below)&&top>below+.5)
+            boolean across=!ramp&&Double.isFinite(top)&&Double.isFinite(below)&&top>below+.5;
+            if(across)
             {
                 ground=below;
-                if(stepping||top-lowest.y<lowest.y-below)
+                // Once on the top a sole stays there until it is clearly nearer the level below. The
+                // two reasons to go up left a gap on a four-block kerb: the body no longer three
+                // blocks under its entity, the sole not yet nearer the top. For a frame or two in
+                // that gap the foot was sent back down and up again.
+                boolean stay=Boolean.TRUE.equals(ON_TOP.get(key))&&top-lowest.y<lowest.y-below+KERB_STAY;
+                if(stepping||top-lowest.y<lowest.y-below||stay)
                 {
                     float length=(float)((toeAt.x-heelAt.x)*forward.x+(toeAt.z-heelAt.z)*forward.z);
                     for(float d=0;d<=length;d+=.5F)
@@ -136,6 +142,8 @@ public final class EvaFootPlacement
                 }
             }
             else if(!ramp)ground=ground(eva,middle);
+            if(ON_TOP.size()>64)ON_TOP.clear();
+            if(across&&ground==top)ON_TOP.put(key,true);else ON_TOP.remove(key);
             // Further above or below the body than a leg goes, it is not ground to stand on: a hillside
             // beside the foot, or the drop past an edge. The foot keeps the clip's height there.
             // Lower ground is still reported and let go of gradually. Cut off at the limit, a rear foot
@@ -329,6 +337,10 @@ public final class EvaFootPlacement
     private static final double MAX_REACH_DOWN=12;
     /** A sole lies across a slope, not a step, when no column along it holds more than this share of the rise. */
     private static final double RAMP_STEP_SHARE=.65;
+    /** Per sole: it stands on the top of the kerb it lies across. */
+    private static final Map<Integer,Boolean> ON_TOP=new HashMap<>();
+    /** A sole on a kerb's top goes back down only when it is this much nearer the level below (blocks). */
+    private static final double KERB_STAY=2;
     /** A single rise under a sole lower than this (blocks) is uneven ground, never a kerb. */
     private static final double KERB_MIN=3.5;
     /** Past its reach down, a sole lets go of the ground over this much further depth (blocks). */
