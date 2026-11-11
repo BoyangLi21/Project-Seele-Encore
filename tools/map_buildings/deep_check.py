@@ -33,7 +33,7 @@ def building_set(b):
         for d in [(a, b, c) for a in (-1, 0, 1) for b in (-1, 0, 1) for c in (-1, 0, 1) if (a, b, c) != (0, 0, 0)]:
             # 26 neighbours: gutters and awnings touch the walls only along an edge
             n = (x + d[0], y + d[1], z + d[2])
-            if n in seen or not (x0 - 4 <= n[0] <= x1 + 4 and z0 - 4 <= n[2] <= z1 + 4 and lo <= n[1] <= hi):
+            if n in seen or not (x0 - 8 <= n[0] <= x1 + 8 and z0 - 8 <= n[2] <= z1 + 8 and lo <= n[1] <= hi):
                 continue
             if is_building(w.get(*n)):
                 seen.add(n)
