@@ -12,6 +12,7 @@ import com.projectseele.event.AngelSiegeDirector;
 import com.projectseele.event.Tokyo3RamielBattleDirector;
 import com.projectseele.event.Tokyo3RamielBattleDirector.BattleResult;
 import com.projectseele.event.Tokyo3RamielBattleDirector.BattleStatus;
+import com.projectseele.world.CityCreateDistrictR45;
 import com.projectseele.world.ThirdTokyoSurfaceBuilder;
 import com.projectseele.world.ThirdTokyoSurfaceBuilder.DistrictAudit;
 import com.projectseele.world.IntegratedNervMapBuilder;
@@ -39,7 +40,8 @@ public final class ThirdTokyoCommands
         return Commands.literal("city")
                 .then(Commands.literal("status").executes(c -> status(c.getSource())))
                 .then(Commands.literal("raise").executes(c -> setRetraction(c.getSource(), false)))
-                .then(Commands.literal("lower").executes(c -> setRetraction(c.getSource(), true)));
+                .then(Commands.literal("lower").executes(c -> setRetraction(c.getSource(), true)))
+                .then(Commands.literal("recover").executes(c -> recover(c.getSource())));
     }
 
     public static LiteralArgumentBuilder<CommandSourceStack> devCityCommand()
@@ -146,6 +148,23 @@ public final class ThirdTokyoCommands
         return result.accepted() ? 1 : 0;
     }
 
+    /**
+     * A lift that was cut off (a crash, a power cut) is held as a fault when the world is opened again, because the
+     * buildings on disk and the ledger no longer agree. This takes the lift up again from the start of the step it
+     * was in: the street openings are checked, the buildings are put back on their carriers and the move runs again.
+     */
+    private static int recover(CommandSourceStack source) throws CommandSyntaxException
+    {
+        ServerPlayer player = source.getPlayerOrException();
+        BlockPos origin = findOrigin(player);
+        RequestResult result = CityCreateDistrictR45.recover(player.serverLevel(), origin, false);
+        String text = result.accepted() ? "已重新接管被中断的城市升降，从中断的那一步重做。"
+                : result.message().startsWith("No held transaction fault") ? "城市升降没有故障，不需要恢复。"
+                : "无法恢复：" + result.message();
+        source.sendSuccess(() -> Component.literal(text), false);
+        return result.accepted() ? 1 : 0;
+    }
+
     private static int forceRetraction(CommandSourceStack source, boolean retract)
             throws CommandSyntaxException
     {
@@ -175,6 +194,10 @@ public final class ThirdTokyoCommands
                 status.motionReport(),
                 status.phase(), status.depth(), status.maximumDepth(),
                 status.targetDepth())), false);
+        if (status.phase().contains("FAULT"))
+        {
+            source.sendSuccess(() -> Component.literal("升降被中断后停在故障状态：用 /seele city recover 从中断的那一步重做。"), false);
+        }
         return 1;
     }
 
