@@ -29,3 +29,12 @@ Round 2 (2026-11-11):
     them away and close the slope (writer needs --allow-block-entities; the replaced blocks' entities are dropped).
 13. `e13_plan.py <sites.json> <out> [float file]`: ground a platform edge: 1:1 earth cone where the drop is
     small, 8-cell retaining walls with 3-column grass benches where it is deep; `write` clips a sample.
+
+Round 4 (2026-11-11 evening):
+14. `rails.py`: MTR rail paths per block (quadratic through the tangent intersection) -> column map.
+15. `viaduct_piers.py <plates.json> <out>`: spans over MAXSPAN with no support within 6 columns of the
+    rail get 2x2 piers of the deck block. Still over-reports dense stone viaducts; check pictures first.
+16. `e13_plan.py` plants bushes and small trees on terrace benches at the density of the woods around.
+    A platform piece is only E13 if it is terrain-like: elevated road/station decks and viaducts
+    (open space used underneath) must stay empty — bay-side batch B and C1/C3 were withdrawn for that.
+17. `e13_views.py`, `b07_plan.py` (paves pits at street level, clears terrain resting on floors).

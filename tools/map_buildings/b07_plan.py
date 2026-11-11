@@ -9,7 +9,6 @@ floors goes too (the fill cells found by the scan, re-checked against the world)
 import json, sys
 from collections import Counter
 from pathlib import Path
-import numpy as np
 sys.path.insert(0, str(Path(__file__).parent))
 from mca import REGION, World
 from blocks import is_open, is_natural, short
@@ -47,8 +46,8 @@ for (x, z) in zone:
         if is_natural(s) or is_veg(s) or (is_open(s) and s not in ('minecraft:air', 'minecraft:cave_air')):
             put(x, y, z, AIR)
     s = w.get(x, F, z)
-    if is_natural(s):
-        put(x, F, z, PAVE)
+    if is_natural(s) or is_open(s):
+        put(x, F, z, PAVE)       # paving also where the old ground stood lower (a pit otherwise)
 
 
 def dist(c):
@@ -81,12 +80,21 @@ for (x, z), (d, t) in ring.items():
     elif d == 5 and t > T1:
         for y in range(T1 + 1, t + 1):
             put(x, y, z, WALL)
-# terrain inside the building
-fill = np.load(Path(__file__).parent / 'fill_room.npy')
-m = (fill[:, 0] >= 184) & (fill[:, 0] <= 208) & (fill[:, 2] >= 527) & (fill[:, 2] <= 556)
-for x, y, z, _ in fill[m].tolist():
-    if is_natural(w.get(x, y, z)):
-        put(x, y, z, AIR)
+# terrain inside the building: natural cells resting on a floor (walking down through terrain
+# reaches a building block at or above the street level) and covered by a roof
+for x in range(184, 209):
+    for z in range(527, 557):
+        for y in range(F + 1, F + 32):
+            if not is_natural(w.get(x, y, z)):
+                continue
+            k = y - 1
+            while k > F - 2 and is_natural(w.get(x, k, z)):
+                k -= 1
+            if k < F or not is_building(w.get(x, k, z)):
+                continue
+            if not any(is_building(w.get(x, y + j, z)) for j in range(1, 21)):
+                continue
+            put(x, y, z, AIR)
 out = Path(sys.argv[1])
 out.mkdir(parents=True, exist_ok=True)
 R = list(rows.values())

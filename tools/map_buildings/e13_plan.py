@@ -30,8 +30,74 @@ def fillable(s):
     return s is not None and is_open(s) and 'water' not in s and 'lava' not in s
 
 
+def local_trees(w, bbox):
+    """Share of columns around the site whose top is a tree, and the commonest log there."""
+    x0, y0, z0, x1, y1, z1 = bbox
+    n = hit = 0
+    logs = Counter()
+    for x in range(x0 - 40, x1 + 41, 4):
+        for z in range(z0 - 40, z1 + 41, 4):
+            if x0 <= x <= x1 and z0 <= z <= z1:
+                continue
+            for y in range(y1 + 40, y0 - 80, -1):
+                st = w.get(x, y, z)
+                if st is None or st in ('minecraft:air', 'minecraft:cave_air'):
+                    continue
+                n += 1
+                if 'leaves' in st or '_log' in st:
+                    hit += 1
+                    for yy in range(y, y - 20, -1):
+                        b = w.get(x, yy, z) or ''
+                        if '_log' in b:
+                            logs[b.split('[')[0]] += 1
+                            break
+                break
+    kind = logs.most_common(1)[0][0] if logs else 'minecraft:oak_log'
+    return (hit / n if n else 0.0), kind
+
+
+def plant(w, sites, benches, rows):
+    """Bushes and small trees on the terrace benches, as thick as the woods around the site."""
+    def free(x, y, z):
+        if (x, y, z) in rows and rows[x, y, z][4] not in ('minecraft:air',):
+            return False
+        s = w.get(x, y, z)
+        return s is not None and (s in ('minecraft:air', 'minecraft:cave_air') or (x, y, z) in rows and rows[x, y, z][4] == 'minecraft:air')
+
+    def set_cell(x, y, z, after):
+        if free(x, y, z):
+            rows[x, y, z] = [x, y, z, rows[x, y, z][3] if (x, y, z) in rows else w.get(x, y, z), after]
+
+    by_site = {}
+    for b in benches:
+        by_site.setdefault(b[4], []).append(b)
+    taken = set()
+    for site in sites:
+        mine = by_site.get(site['id'], [])
+        if not mine:
+            continue
+        density, log = local_trees(w, site['bbox'])
+        leaves = log.replace('_log', '_leaves') + '[distance=1,persistent=true,waterlogged=false]'
+        trunk = log + '[axis=y]'
+        site['planting'] = dict(density=round(density, 2), log=log)
+        for x, t, z, p, _ in mine:
+            r = ((x * 73856093) ^ (z * 19349663)) % 1000 / 1000.0
+            if p == 2 and r < density * 0.45 and all((x + dx, z + dz) not in taken for dx in range(-3, 4) for dz in range(-3, 4)):
+                taken.add((x, z))
+                for k in range(1, 4):
+                    set_cell(x, t + k, z, trunk)
+                for dy in (3, 4):
+                    for dx in (-1, 0, 1):
+                        for dz in (-1, 0, 1):
+                            if (dx, dz) != (0, 0) or dy == 4:
+                                set_cell(x + dx, t + dy, z + dz, leaves)
+                set_cell(x, t + 5, z, leaves)
+            elif r < density * 0.6 and (x, z) not in taken:
+                set_cell(x, t + 1, z, leaves)
+
+
 def plan(w, sites, A):
-    rows, trees = {}, []
+    rows, trees, benches = {}, [], []
 
     def put(x, y, z, after):
         s = w.get(x, y, z)
@@ -117,6 +183,7 @@ def plan(w, sites, A):
                 put(x, yy, z, wall if face and yy >= u - TIER_H else DIRT)
         # outside targets
         target, kind = {}, {}
+        benchpos = {}
         for c, d in dist.items():
             if d == 0:
                 continue
@@ -127,6 +194,7 @@ def plan(w, sites, A):
                 p = (d - 1) % TIER_W + 1
                 t = u - TIER_H * tier
                 k = 'wall' if p == TIER_W else 'bench'
+                benchpos[c] = p
             else:
                 if d > REACH:
                     continue
@@ -176,6 +244,9 @@ def plan(w, sites, A):
             top = w.get(x, y, z)
             if base(top) == 'minecraft:grass_block':
                 rows[x, y, z] = [x, y, z, top, DIRT]
+            if kind[x, z] == 'bench':
+                benches.append((x, t, z, benchpos.get((x, z), 2), site['id']))
+        site['_bbox_for_density'] = site['bbox']
     # trees on filled ground go whole
     removed = set()
     for tx, ty, tz in trees:
@@ -216,7 +287,7 @@ def plan(w, sites, A):
     for q in leaves:
         if near_log(q, True) <= near_log(q, False):
             rows[q] = [*q, w.get(*q), 'minecraft:air']
-    # a filled cell where a removed tree stood: fill it after all
+    plant(w, sites, benches, rows)
     for r in rows.values():
         if w.block_entity(r[0], r[1], r[2]):
             raise SystemExit(f'block entity at {r[:3]}')
