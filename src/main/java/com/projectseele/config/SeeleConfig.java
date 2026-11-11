@@ -102,6 +102,8 @@ public final class SeeleConfig
     // ----- client -----
     public static final ForgeConfigSpec.BooleanValue ALARM_VIGNETTE;
     public static final ForgeConfigSpec.DoubleValue FX_INTENSITY;
+    public static final ForgeConfigSpec.IntValue SMALL_ENTITY_SHADOW_DISTANCE;
+    public static final ForgeConfigSpec.IntValue MEDIUM_ENTITY_SHADOW_DISTANCE;
     public static final ForgeConfigSpec.IntValue VIDEO_TARGET_FPS;
     public static final ForgeConfigSpec.IntValue VIDEO_CAPTURE_WIDTH;
     public static final ForgeConfigSpec.DoubleValue VIDEO_JPEG_QUALITY;
@@ -379,6 +381,15 @@ public final class SeeleConfig
         FX_INTENSITY = client
                 .comment("Global brightness/opacity multiplier for beam and explosion effects (0 disables cross explosions).")
                 .defineInRange("fxIntensity", 1.0D, 0.0D, 1.0D);
+        client.pop();
+        client.push("shadows");
+        SMALL_ENTITY_SHADOW_DISTANCE = client
+                .comment("With a shader pack: entities under 4 blocks across cast no shadow beyond this many blocks from the camera.",
+                        "Evangelions, Angels and this mod's own entities always cast one. 0 keeps every shadow.")
+                .defineInRange("smallEntityShadowDistance", 64, 0, 512);
+        MEDIUM_ENTITY_SHADOW_DISTANCE = client
+                .comment("The same for entities from 4 to under 12 blocks across, such as vehicles. 0 keeps every shadow.")
+                .defineInRange("mediumEntityShadowDistance", 128, 0, 512);
         client.pop();
         client.push("cockpit_video");
         VIDEO_TARGET_FPS=client.comment("Target optical-feed frame rate; stale work is dropped instead of queued.")
