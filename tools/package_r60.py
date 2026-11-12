@@ -182,7 +182,9 @@ def aged_lod_copy(db, target):
 
 
 def lod_summary(db):
-    c = sqlite3.connect(Path(db).resolve().as_uri() + '?mode=ro', uri=True)
+    # immutable: even mode=ro leaves -wal and -shm files beside a WAL database, and these sit in the formal world.
+    # The caller has already refused a database with a non-empty WAL, so nothing is skipped.
+    c = sqlite3.connect(Path(db).resolve().as_uri() + '?mode=ro&immutable=1', uri=True)
     try:
         levels = c.execute('select DetailLevel, count(*) from FullData group by DetailLevel').fetchall()
         pending = c.execute('select count(*) from FullData where ApplyToParent = 1').fetchone()[0]

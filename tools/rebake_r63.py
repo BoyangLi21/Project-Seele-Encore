@@ -256,21 +256,28 @@ def classify(level, x, z, saved_grid):
     return 'core' if hit == n * n else 'ring' if hit == 0 else 'mixed'
 
 
-def rows_of(db):
-    c = sqlite3.connect(Path(db).resolve().as_uri() + '?mode=ro', uri=True)
+def open_ro(db, live=False):
+    """A read-only connection. Even mode=ro leaves -wal and -shm files beside a WAL database, so a database
+    nobody is writing (the formal world's, our own outputs) is opened immutable, which creates nothing.
+    Only the map-edges copy, which its client may be writing, is opened live."""
+    return sqlite3.connect(Path(db).resolve().as_uri() + ('?mode=ro' if live else '?mode=ro&immutable=1'), uri=True, timeout=60)
+
+
+def rows_of(db, live=False):
+    c = open_ro(db, live)
     try:
         return {(l, x, z): (n or 0) for l, x, z, n in c.execute('select DetailLevel,PosX,PosZ,length(Data) from FullData')}
     finally:
         c.close()
 
 
-def snapshot(src, dst):
-    """Consistent copy of a live SQLite database, read-only on the source; the copy has no WAL."""
+def snapshot(src, dst, live=False):
+    """Consistent copy of a SQLite database, read-only on the source; the copy has no WAL."""
     guard(dst)
     dst.parent.mkdir(parents=True, exist_ok=True)
     if dst.exists():
         dst.unlink()
-    s = sqlite3.connect(Path(src).resolve().as_uri() + '?mode=ro', uri=True, timeout=60)
+    s = open_ro(src, live)
     d = sqlite3.connect(dst)
     try:
         s.backup(d)
@@ -458,7 +465,7 @@ def step_check(a):
     changed, added, removed = chunk_changes(FORMAL)
     newest = max(p.stat().st_mtime for p in (FORMAL / GEO / 'region').glob('*.mca'))
     formal_db = FORMAL / GEO / 'data/DistantHorizons.sqlite'
-    core_rows, ring_rows = rows_of(formal_db), rows_of(RING_DB)
+    core_rows, ring_rows = rows_of(formal_db), rows_of(RING_DB, live=True)
     plan = plan_merge(core_rows, ring_rows, saved, changed | added)
     points = viewpoints(plan['rebuild'])
     sg = plan['saved_grid']
@@ -521,7 +528,10 @@ def mirror_world(locked=True):
         raise SystemExit('Formal world contains links, refusing to mirror: ' + ', '.join(links[:5]))
     wait_no_exclusive('mirroring the world')
     with held_world(FORMAL) if locked else nullcontext():
-        tail = robocopy(FORMAL, target, '/MIR', '/XF', 'session.lock')
+        tail = robocopy(FORMAL, target, '/MIR', '/XF', 'session.lock', '*.sqlite-shm')
+        wal = FORMAL / GEO / 'data/DistantHorizons.sqlite-wal'
+        if wal.exists() and wal.stat().st_size:
+            raise SystemExit('The formal GeoFront LOD database has an unmerged WAL; someone has the world open')
         src = {p.relative_to(FORMAL).as_posix(): p.stat().st_size for p in (FORMAL / GEO / 'region').glob('*.mca')}
         dst = {p.relative_to(target).as_posix(): p.stat().st_size for p in (target / GEO / 'region').glob('*.mca')}
         newest = max(p.stat().st_mtime for p in (FORMAL / GEO / 'region').glob('*.mca'))
@@ -539,10 +549,11 @@ def step_mirror(a):
 def step_prepare(a):
     world = Path(a.world) if a.world else WORK / 'client/saves' / COPY
     db = guard(Path(a.db) if a.db else world / GEO / 'data/DistantHorizons.sqlite')
-    for suffix in ('-wal', '-shm'):
-        if Path(str(db) + suffix).exists() and Path(str(db) + suffix).stat().st_size:
-            raise SystemExit('Database has an unmerged ' + suffix + ': ' + str(db))
-    ring = snapshot(Path(a.ring_db or RING_DB), WORK / 'lod/ring_snapshot.sqlite')
+    wal = Path(str(db) + '-wal')
+    if wal.exists() and wal.stat().st_size:
+        raise SystemExit('Database has an unmerged WAL: ' + str(db))
+    Path(str(db) + '-shm').unlink(missing_ok=True)  # only an index; the copy is ours
+    ring = snapshot(Path(a.ring_db or RING_DB), WORK / 'lod/ring_snapshot.sqlite', live=True)
     t = time.time()
     saved = saved_chunks(world)
     changed, added, removed = chunk_changes(world)
@@ -595,7 +606,7 @@ def step_prepare(a):
 
 def coverage(world, db):
     saved = saved_chunks(world)
-    rows = rows_of(db)
+    rows = rows_of(db, live=True)
     span = span_of(list(rows), saved)
     sg = Grid(saved, span)
     have = {(x, z) for (l, x, z), n in rows.items() if l == 0 and n > 64}
@@ -604,7 +615,7 @@ def coverage(world, db):
         for z in range(min(c[1] for c in saved) // 4, max(c[1] for c in saved) // 4 + 1):
             if sg.count(x * 4, z * 4, 4) == 16:
                 want.add((x, z))
-    c = sqlite3.connect(Path(db).resolve().as_uri() + '?mode=ro', uri=True)
+    c = open_ro(db, live=True)
     try:
         pending = c.execute('select count(*) from FullData where ApplyToParent = 1').fetchone()[0]
         check = c.execute('pragma quick_check').fetchone()[0]
@@ -641,7 +652,7 @@ def step_core(a):
     finally:
         restore_mods(game, held)
         shutil.copyfile(WORK / 'jars/final.jar', game / JAR)
-    out = snapshot(db, WORK / 'out/geofront_lod.sqlite')
+    out = snapshot(db, WORK / 'out/geofront_lod.sqlite', live=True)
     gate = dict(script_done=done, client=result, quick_check=cover['quick_check'], core_missing=len(cover['core_missing']),
                 pending_parent_updates=cover['pending_parent_updates'])
     ok = done and cover['quick_check'] == 'ok' and len(cover['core_missing']) <= a.fill_threshold
