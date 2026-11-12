@@ -182,6 +182,9 @@ public abstract class CameraMixin
         if(!detached&&controlled!=null&&com.projectseele.entity.EvaAirTransportR31.active(controlled))
         {
             Vec3 optical=controlled.getPilotCameraSeatPosition(subject,partialTick).add(0,subject.getEyeHeight(),0);
+            // The facility's route holds the unit in this branch until the tick it is let go, and the eye
+            // of the held pose stands 2.9 blocks above the eye of the stance: the release has to know it.
+            optical=com.projectseele.client.render.EvaRackReleaseR63.seat(controlled,partialTick,optical);
             optical=com.projectseele.client.PilotOpticsContinuity.apply(controlled,partialTick,optical);
             Camera camera=(Camera)(Object)this;
             float localYaw=camera.getYRot()-com.projectseele.entity.EvaAirTransportR31.frameYaw(controlled,partialTick)+180;

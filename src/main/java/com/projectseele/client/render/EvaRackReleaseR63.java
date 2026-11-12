@@ -149,10 +149,13 @@ public final class EvaRackReleaseR63
     }
 
     /**
-     * The pilot's eye through the release. A held unit seats the pilot at a fixed point, a live one
-     * at its head: the view jumped 1.9 blocks up in the frame the lock opened. It now goes from the
-     * one to the other with the trunk, and down with the body, or the landing would be something
-     * only bystanders see. The camera is placed before the body is posed, so it follows by a frame.
+     * The pilot's eye through the release. A held unit seats the pilot at a fixed point (its own
+     * launch sequence) or at the head of the held pose (the facility's route, where the camera goes
+     * the way of a carried unit), a live one at the head of its stance: the view jumped 1.9 blocks
+     * up, or 2.9 down, in the frame the lock opened. It now goes from the one to the other with the
+     * trunk, and down with the body, or the landing would be something only bystanders see. Both
+     * camera branches of a piloted unit come through here. The camera is placed before the body is
+     * posed, so it follows by a frame.
      */
     public static Vec3 seat(EvaUnit01Entity eva,float partial,Vec3 live)
     {
@@ -164,6 +167,13 @@ public final class EvaRackReleaseR63
         // The frame the lock opened, before the body has been posed: still where it was held.
         if(s.released==NEVER)return s.locked?at.add(s.eye):live;
         return at.add(s.eye.lerp(live.subtract(at),smooth(s.clock/BODY))).add(0,-s.sink,0);
+    }
+
+    /** For the review recording: what the release knows of this unit in this frame. */
+    public static String traceR63(EvaUnit01Entity eva)
+    {
+        State s=STATES.get(eva);if(s==null)return "none";
+        return (s.eye==null?"noeye":"eye")+(s.locked?" locked":" free")+(s.released==NEVER?" unreleased":" released")+" age "+(AircraftRenderClockR21.frameNanos()-s.frame)/1_000_000L+" clock "+s.clock;
     }
 
     /** True while the body is still leaving the locked pose: a pose between two standing ones can put a sole a hair under the ground. */
