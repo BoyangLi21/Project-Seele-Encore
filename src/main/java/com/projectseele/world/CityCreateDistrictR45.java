@@ -553,7 +553,10 @@ public final class CityCreateDistrictR45
                     for (Entity entity : entities.values()) if (!CityCreateBridgeR45.collisionReady(entity)) return;
                     state.phase = "MOVE"; persist();
                 }
-                case "MOVE" -> { if (level.getGameTime() % 20 == 0) persist(); }
+                // The ledger keeps the motion tick MOVE began with. A clean stop
+                // writes the current one; after a crash an explicit recovery
+                // puts the buildings back where MOVE began and moves them again.
+                case "MOVE" -> { }
                 case "PLACE" -> applyStage(2, "COVER", start);
                 case "COVER" -> applyStage(3, "FLUSH", start);
                 case "RECONCILE" -> reconcile(start);
@@ -1068,8 +1071,10 @@ public final class CityCreateDistrictR45
             // All images are already durable. An older partial cursor is safe:
             // restart replays known before/after images from index zero. Every
             // phase transition and first WorldTouched barrier remains forced.
-            if (!state.phase.equals(lastPersistPhase) || lastPersistTick == Long.MIN_VALUE
-                    || level.getGameTime() - lastPersistTick >= 20) persist();
+            // The cursor inside a phase is not written: loading discards it and
+            // starts the phase again, so writing it every second bought nothing
+            // for its fsync on the server thread.
+            if (!state.phase.equals(lastPersistPhase) || lastPersistTick == Long.MIN_VALUE) persist();
         }
     }
 
