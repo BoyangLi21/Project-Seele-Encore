@@ -3019,6 +3019,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     }
 
     /** Never let a client clock outrun the authoritative contact/root timeline. */
+    /** Review only: the action phase as the server last sent it, and as this frame draws it. */
+    public float liveActionPhaseSentR63(){return this.entityData.get(DATA_LIVE_ACTION_PHASE);}
+    public float liveActionPhaseDrawnR63(float partialTick){return this.liveActionProgress(partialTick);}
+
     private float liveActionProgress(float partialTick)
     {
         if(CombatFeelR31.hitPaused(this))return CombatFeelR31.frozenPhase(this);

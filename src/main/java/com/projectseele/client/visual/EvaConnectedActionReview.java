@@ -112,6 +112,10 @@ public final class EvaConnectedActionReview
     /** The unit the tour pilots: unit00, unit01 or unit02. */
     private static final String UNIT=System.getProperty("projectseele.tourUnit","unit01");
     private static final int UNIT_VARIANT=UNIT.endsWith("00")?EvaUnit01Entity.UNIT_00:UNIT.endsWith("02")?EvaUnit01Entity.UNIT_02:EvaUnit01Entity.UNIT_01;
+    /** -Dprojectseele.tourUnit=un00 or un01: the tour pilots a UN unit, put on the lab's fourth pad for it. */
+    private static final boolean UN=UNIT.equals("un00")||UNIT.equals("un01");
+    /** The lab command that arms the toured unit, up to the weapon's name. */
+    private static final String ARM=UN?"seele dev motionlab un "+(UNIT.endsWith("1")?1:0)+" ":"seele dev motionlab weapon "+UNIT+" ";
     /** Ticks a terrain tour keeps running after its script, unrecorded, so its cleanup is carried out. */
     private static final int TERRAIN_GRACE=30;
     /** Where the piloted unit last stood, and for how many ticks: a tour starts once it stands still on its pad. */
@@ -167,16 +171,22 @@ public final class EvaConnectedActionReview
         if (wait == 100)
         {
             mc.player.connection.sendCommand("seele dev motionlab reset");
+            if (UN)
+            {
+                mc.player.connection.sendCommand("seele dev motionlab un " + (UNIT.endsWith("1") ? 1 : 0));
+                if (RIFLE) mc.player.connection.sendCommand(ARM + "rifle");
+                return;
+            }
             mc.player.connection.sendCommand("seele dev motionlab demo " + UNIT + " stop");
             mc.player.connection.sendCommand("seele dev motionlab enter " + UNIT);
-            mc.player.connection.sendCommand("seele dev motionlab weapon " + UNIT + " " + (RIFLE ? "rifle" : "fists"));
+            mc.player.connection.sendCommand(ARM + (RIFLE ? "rifle" : "fists"));
             return;
         }
         EvaUnit01Entity eva = EvaPilotResolver.controlTarget(mc.player);
         // The link to the unit the previous run piloted outlives the request for
         // this one by a few ticks: do not start on it.
         if (eva == null || eva.getActivationTicks() > 0 || !eva.isPoweredOn()
-                || serverStart < 0 && eva.getUnitVariant() != UNIT_VARIANT)
+                || serverStart < 0 && (UN ? !eva.isExperimentalUnit() : eva.isExperimentalUnit() || eva.getUnitVariant() != UNIT_VARIANT))
         {
             if (++missingPilotTicks > 400) finish(mc, "pilot_setup_timeout");
             return;
@@ -574,11 +584,16 @@ public final class EvaConnectedActionReview
 
     private static void tour(Minecraft mc,EvaUnit01Entity eva)
     {
+        // A target left standing by an earlier run is in reach of this one's blows (a punch of the evade tour
+        // landed on one). Commands sent in one tick run in order: a tour that places its own target does so later.
+        if(at(1))for(var name:STRIKE_TARGETS)removeTargetR63(mc,name);
         if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
         if(HILL){hillR60(mc,lane(eva));positionCamera(mc,eva);return;}
         if(STRIKE){strikeR60(mc,eva);positionCamera(mc,eva);return;}
         if(ATF){atFieldR63(mc,eva);positionCamera(mc,eva);return;}
+        if(ARMS!=null){armsR63(mc);positionCamera(mc,eva);return;}
+        if(EVADE){evadeR63(mc,eva);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<Math.max(140,DASH_END+10)||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -590,7 +605,7 @@ public final class EvaConnectedActionReview
         mc.player.setYRot(TOUR_START==0&&t>=610&&t<1085?180:0);mc.player.setXRot(0);
         // The ledge check walks onto the step, as a pilot usually does.
         if(tourAt(70-DASH_LEAD)&&!CLIMB)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
-        if(tourAt(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand("seele dev motionlab weapon "+UNIT+" "+DASH_WEAPON);
+        if(tourAt(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand(ARM+DASH_WEAPON);
         // Optional checks: a full sprint over the run, and kerbs on the walk.
         // The client re-syncs held sprint and dash to the real keys, so hold them.
         int sprintEnd=DASH?DASH_END:110;
@@ -635,9 +650,9 @@ public final class EvaConnectedActionReview
         if(tourAt(340)||tourAt(820)||tourAt(1650))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
         if(tourAt(440)||tourAt(920)||tourAt(1730))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
         if(tourAt(470)||tourAt(600)||tourAt(940)||tourAt(1080)||tourAt(1340)||tourAt(1550))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
-        if(tourAt(660))mc.player.connection.sendCommand("seele dev motionlab weapon unit01 rifle");
+        if(tourAt(660))mc.player.connection.sendCommand(ARM+"rifle");
         if((t>=680&&t<900||t>=970&&t<1000)&&tick/4!=previousTick/4)send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
-        if(tourAt(1130))mc.player.connection.sendCommand("seele dev motionlab weapon unit01 knife");
+        if(tourAt(1130))mc.player.connection.sendCommand(ARM+"knife");
         if(tourAt(1150)||tourAt(1165)||tourAt(1180)||tourAt(1370)||tourAt(1385)||tourAt(1400))send(ServerboundEvaControlPacket.ACTION_MELEE);
         if(tourAt(1220)||tourAt(1430))send(ServerboundEvaControlPacket.ACTION_SMASH);
         positionCamera(mc,eva);
@@ -654,7 +669,7 @@ public final class EvaConnectedActionReview
         mc.options.keyJump.setDown(false);
         if(index>=STRIKE_CASES.length)
         {
-            if(!strikeCleared){strikeCleared=true;for(var name:STRIKE_TARGETS)mc.player.connection.sendCommand("kill @e[type=projectseele:"+name+"]");}
+            if(!strikeCleared){strikeCleared=true;for(var name:STRIKE_TARGETS)removeTargetR63(mc,name);}
             return;
         }
         var c=STRIKE_CASES[index];
@@ -664,12 +679,23 @@ public final class EvaConnectedActionReview
         {
             strikeSpawned=index;
             Vec3 at=eva.position().add(ahead.scale(c[1])).add(right.scale(c[2])).add(0,c[3],0);
-            for(var name:STRIKE_TARGETS)mc.player.connection.sendCommand("kill @e[type=projectseele:"+name+"]");
+            for(var name:STRIKE_TARGETS)removeTargetR63(mc,name);
             mc.player.connection.sendCommand("summon projectseele:"+STRIKE_TARGETS[c[4]]+" "+at.x+" "+at.y+" "+at.z+" {NoAI:1b,Rotation:["+(eva.getYRot()+180)+"F,0F]}");
             com.projectseele.ProjectSeele.LOGGER.info("R60CASE {} kind {} ahead {} right {} up {} target {}",index,c[0],c[1],c[2],c[3],STRIKE_TARGETS[c[4]]);
         }
         if(c[0]==1)mc.options.keyJump.setDown(local>=30&&local<33);
         if(index!=strikeFired&&local>=(c[0]==1?46:30)){strikeFired=index;send(ServerboundEvaControlPacket.ACTION_SMASH);}
+    }
+
+    /**
+     * Takes a tour's target away. A Sachiel that is killed stands for 45 ticks more and then goes up in a blast
+     * 32 blocks wide: killed where it stood, the last case's target took 162 points off the unit in the middle of
+     * the next case, and three cases later the unit went berserk. It is lifted out of reach first.
+     */
+    private static void removeTargetR63(Minecraft mc,String name)
+    {
+        mc.player.connection.sendCommand("execute as @e[type=projectseele:"+name+"] at @s run tp @s ~ ~600 ~");
+        mc.player.connection.sendCommand("kill @e[type=projectseele:"+name+"]");
     }
 
     private static void atFieldR63(Minecraft mc,EvaUnit01Entity eva)
@@ -734,7 +760,7 @@ public final class EvaConnectedActionReview
     private static void movesR59(Minecraft mc)
     {
         int t=tick;
-        if(at(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand("seele dev motionlab weapon "+UNIT+" "+DASH_WEAPON);
+        if(at(20)&&DASH_WEAPON!=null)mc.player.connection.sendCommand(ARM+DASH_WEAPON);
         boolean sprint=t>=400&&t<500;
         boolean up=t>=320&&t<380||sprint,down=t>=130&&t<175,left=t>=195&&t<240,right=t>=255&&t<300;
         float forward=(up?1:0)-(down?1:0),side=(left?1:0)-(right?1:0);
@@ -747,6 +773,74 @@ public final class EvaConnectedActionReview
         // A slow quarter turn on the spot and a fast one back; a steady curve; a right angle and a reversal at a run.
         float yaw=t<30?0:t<70?(t-30)*2.25F:t<90?90:t<100?90-(t-90)*9:t<320?0:t<380?(t-320)*3:t<430?180:t<460?270:90;
         mc.player.setYRot(yaw);mc.player.setXRot(0);
+    }
+
+    /**
+     * -Dprojectseele.tourArmsR63=sword or shield, with -Dprojectseele.tourUnit: the unit's own weapon
+     * carried at a walk and a run, a strike string and a heavy strike, a crouch with a few steps in
+     * it, and down to prone and up again (run to tick 560).
+     */
+    private static final String ARMS=System.getProperty("projectseele.tourArmsR63");
+    /**
+     * -Dprojectseele.tourEvadeR63=true: an evade from standing, then one asked for during a punch before its blow
+     * has landed (eight ticks in) and one after (fourteen), one out of the kick's recovery (thirteen) and one out
+     * of the knife cut's (twenty-five); then a still Sachiel strikes the unit five ticks into an evade and twelve
+     * ticks into the next. Run with tourEnd=600.
+     */
+    private static final boolean EVADE=Boolean.getBoolean("projectseele.tourEvadeR63");
+    private static void evadeR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        // In the evade's direction mask two is the backward key and one the forward key. Each evade carries the unit
+        // 46 blocks: all of them backward took it out of the lab after the third (no weapon could be given to it
+        // there, and the Sachiel of the last part was left behind), so they go backward and forward in turn.
+        if(at(40)||at(108)||at(293)||at(440))
+            SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,2));
+        if(at(194)||at(385)||at(500))
+            SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,1));
+        if(at(100)||at(180)||at(360))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(280))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        // The evade asked for at 293 plays until 334, and a unit in an action takes no other weapon.
+        if(at(345))mc.player.connection.sendCommand(ARM+"knife");
+        // The slip: a blow by another body five ticks into an evade, and one twelve ticks into the next. The server
+        // is asked for the unit's health before and after each (the answers are in the log).
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit="@e[type=projectseele:eva_unit01,limit=1,sort=nearest]";
+        if(at(432))
+        {
+            Vec3 a=eva.position().add(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(60));
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+        }
+        if(at(445)||at(512))
+        {
+            mc.player.connection.sendCommand("damage "+unit+" 6 minecraft:mob_attack by "+angel);
+            ProjectSeele.LOGGER.info("R63EVADE blow sent at tour tick {}",tick);
+        }
+        if(at(436)||at(460)||at(530))
+        {
+            mc.player.connection.sendCommand("data get entity "+unit+" Health");
+            ProjectSeele.LOGGER.info("R63EVADE health asked at tour tick {}",tick);
+        }
+        if(at(570))removeTargetR63(mc,"sachiel");
+    }
+
+    private static void armsR63(Minecraft mc)
+    {
+        int t=tick;
+        // The run ends at 95: the strikes that follow carry the unit 120 blocks on, and the open
+        // review ground ends 250 blocks from the pad (a run to 110 left the crouched walk against its edge).
+        boolean move=t>=40&&t<95||t>=300&&t<335;
+        mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        mc.options.keySprint.setDown(t>=75&&t<95);
+        if(at(10))mc.player.connection.sendCommand(ARM+ARMS);
+        if(at(75))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(95))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(at(140)||at(150)||at(160)||at(170))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(210))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        if(at(270))send(ServerboundEvaControlPacket.ACTION_CROUCH_START);
+        if(at(350))send(ServerboundEvaControlPacket.ACTION_CROUCH_STOP);
+        if(at(390)||at(470))send(ServerboundEvaControlPacket.ACTION_TOGGLE_PRONE);
     }
 
     private static void weaponsR57(Minecraft mc,int w)
@@ -789,8 +883,8 @@ public final class EvaConnectedActionReview
         if(fxAt(1))
         {
             // The review save keeps entities between runs.
-            mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
-            mc.player.connection.sendCommand("kill @e[type=projectseele:sachiel]");
+            removeTargetR63(mc,"ramiel");
+            removeTargetR63(mc,"sachiel");
             mc.player.connection.sendCommand("seele dev motionlab weapon unit01 cannon");
         }
         if(fxAt(30))send(ServerboundEvaControlPacket.ACTION_CHARGE_START);
@@ -812,8 +906,8 @@ public final class EvaConnectedActionReview
         if(t<620&&fxRamiel!=null){Vec3 mid=fxUnit00.position().lerp(fxRamiel,.5);camPos=mid.add(r0.scale(190)).add(0,10,0);camAim=mid;return;}
         if(fxAt(620))
         {
-            mc.player.connection.sendCommand("kill @e[type=projectseele:ramiel]");
-            mc.player.connection.sendCommand("kill @e[type=projectseele:sachiel]");
+            removeTargetR63(mc,"ramiel");
+            removeTargetR63(mc,"sachiel");
             mc.player.connection.sendCommand("seele dev motionlab weapon unit00 fists");
             mc.player.connection.sendCommand("seele dev motionlab weapon unit01 fists");
         }
@@ -908,6 +1002,8 @@ public final class EvaConnectedActionReview
         row.addProperty("entityTick", eva.tickCount + partialTick);
         row.addProperty("key", eva.poseTransitionKey(partialTick));
         row.addProperty("heavyActive", eva.isHeavyMotionActive());
+        row.addProperty("phaseSent", eva.liveActionPhaseSentR63());
+        row.addProperty("phaseDrawn", eva.liveActionPhaseDrawnR63(partialTick));
         if (TOUR) row.addProperty("writers", com.projectseele.client.render.EvaPoseGraph.traceWriters(eva));
         if (LAUNCH)
         {

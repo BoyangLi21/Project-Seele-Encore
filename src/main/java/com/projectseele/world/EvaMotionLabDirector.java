@@ -249,8 +249,54 @@ public final class EvaMotionLabDirector
         return level.getEntitiesOfClass(EvaUnit01Entity.class, ARENA,
                         eva -> eva.isAlive()
                                 && eva.getTags().contains(ENTITY_TAG)
+                                && !eva.isExperimentalUnit()
                                 && eva.getUnitVariant() == variant)
                 .stream().findFirst().orElse(null);
+    }
+
+    /** The UN unit put on the lab's fourth pad by {@link #enterUnR63}, if there is one. */
+    public static EvaUnit01Entity unUnitR63(ServerLevel level)
+    {
+        return level.getEntitiesOfClass(EvaUnit01Entity.class, ARENA,
+                        eva -> eva.isAlive()
+                                && eva.getTags().contains(ENTITY_TAG)
+                                && eva.isExperimentalUnit())
+                .stream().findFirst().orElse(null);
+    }
+
+    /**
+     * Review only: a UN unit (serial 0 or 1) on a pad of its own between Unit-01 and Unit-02,
+     * with the player aboard. The three lab units stay where they are; a UN unit left by an
+     * earlier run is replaced, and a lab reset removes it like every other unit in the arena.
+     */
+    public static boolean enterUnR63(ServerPlayer player, int serial)
+    {
+        ServerLevel level = player.serverLevel();
+        if (!setup(level, false))
+        {
+            return false;
+        }
+        level.getEntitiesOfClass(EvaUnit01Entity.class, ARENA,
+                EvaUnit01Entity::isExperimentalUnit).forEach(EvaUnit01Entity::discard);
+        var eva = ModEntities.EVA_PROTOTYPE.get().create(level);
+        if (eva == null)
+        {
+            return false;
+        }
+        eva.setUNSerial(serial);
+        eva.addTag(ENTITY_TAG);
+        eva.prepareForMotionLab();
+        eva.moveTo((UNIT_X[1] + UNIT_X[2]) / 2 + 0.5D, FLOOR_Y + 1.0D,
+                UNIT_Z + 0.5D, 0.0F, 0.0F);
+        eva.yRotO = eva.yBodyRot = eva.yHeadRot = 0.0F;
+        level.addFreshEntity(eva);
+        if (player.isPassenger())
+        {
+            player.stopRiding();
+        }
+        player.teleportTo(level, eva.getX(), eva.getY() + 2, eva.getZ() + 20,
+                eva.getYRot(), 0);
+        return eva.boardFromExternalPlug(player, 100);
     }
 
     public static boolean enter(ServerPlayer player, int variant)
@@ -331,7 +377,8 @@ public final class EvaMotionLabDirector
         {
             int wanted = variant;
             List<EvaUnit01Entity> matches = existing.stream()
-                    .filter(candidate -> candidate.getUnitVariant() == wanted)
+                    .filter(candidate -> !candidate.isExperimentalUnit()
+                            && candidate.getUnitVariant() == wanted)
                     .toList();
             EvaUnit01Entity eva = matches.isEmpty() ? null : matches.get(0);
             matches.stream().skip(1).forEach(EvaUnit01Entity::discard);
