@@ -4034,6 +4034,19 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     record RecoveryInputStampR51(int melee,int smash,int kick){}
     RecoveryInputStampR51 recoveryInputStampR51()
     {return new RecoveryInputStampR51(this.entityData.get(DATA_MELEE_SEQUENCE),this.entityData.get(DATA_SMASH_SEQUENCE),this.entityData.get(DATA_KICK_SEQUENCE));}
+    /**
+     * True once the strike in hand has landed or missed and only its recovery is left. The phases are
+     * the ones a retreating step already cancels a punch from (0.72), the end of the kick's sweep
+     * (0.78) and, for the knife, whose cuts land in the first quarter of a long clip, 0.45.
+     */
+    boolean strikeSpentR63()
+    {
+        float phase=this.entityData.get(DATA_LIVE_ACTION_PHASE);
+        if(this.getKnifeMotionType(0)>=0)return phase>=.45F;
+        if(this.isKickMotionActive(0))return phase>=.78F;
+        if(this.getOrdinaryAttackStage()>=0||this.isHeavyMotionActive())return phase>=.72F;
+        return false;
+    }
     boolean recoveryInputTailR51()
     {return this.ordinaryAttackVisualTicks>0&&this.ordinaryAttackVisualTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
             ||this.heavyTicks>0&&this.heavyTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
@@ -7025,6 +7038,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         if(amount>0&&com.projectseele.world.ShieldCoverR48.blocksFallback(this,source))return false;
         if(this.isBerserk()&&!source.is(DamageTypeTags.BYPASSES_INVULNERABILITY))return false;
+        // An evade timed onto a blow lets it pass: no damage, no reaction, and the evade plays on.
+        if(amount>0&&EvaFieldActionsR45.slipsR63(this,source))return false;
         if(EvaShutdownR30.wreck(this)&&source.is(DamageTypes.GENERIC_KILL)){remove(RemovalReason.KILLED);return true;}
         if(EvaShutdownR30.wreck(this)&&!source.is(DamageTypes.GENERIC_KILL))return false;
         if(this.isFirstBattleActive()&&!source.is(DamageTypeTags.BYPASSES_INVULNERABILITY))return false;

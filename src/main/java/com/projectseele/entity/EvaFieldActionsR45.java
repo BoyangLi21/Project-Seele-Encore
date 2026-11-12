@@ -75,6 +75,24 @@ public final class EvaFieldActionsR45
         }
         return c;
     }
+    /** The ticks of an evade or roll, counted from its start, in which a blow passes the body by. */
+    private static final int SLIP_FROM_R63=1,SLIP_TO_R63=7;
+    /** -Dprojectseele.evadeCancelR63=false plays an evade asked for during a strike as it used to, for comparison. */
+    private static final boolean CANCEL_R63=!"false".equals(System.getProperty("projectseele.evadeCancelR63"));
+    /**
+     * True while an evade is slipping a blow: its first seven ticks, against a blow struck by another
+     * body. A blast or a beam fills the place the body is leaving and is not slipped.
+     */
+    public static boolean slipsR63(EvaUnit01Entity e,net.minecraft.world.damagesource.DamageSource source)
+    {
+        if(e.level().isClientSide||!active(e))return false;
+        var runtime=RUNTIMES.get(e);
+        if(runtime==null||runtime.elapsed<SLIP_FROM_R63||runtime.elapsed>SLIP_TO_R63)return false;
+        return source.getDirectEntity() instanceof net.minecraft.world.entity.LivingEntity attacker&&attacker!=e
+                &&source.getDirectEntity()==source.getEntity()
+                &&!source.is(net.minecraft.tags.DamageTypeTags.IS_EXPLOSION)&&!source.is(net.minecraft.tags.DamageTypeTags.IS_PROJECTILE)
+                &&!source.is(net.minecraft.tags.DamageTypeTags.BYPASSES_INVULNERABILITY);
+    }
     public static boolean request(EvaUnit01Entity e,ServerPlayer pilot,int directions,boolean sprinting)
     {
         if(e.level().isClientSide||pilot==null||e.getPilotEntity()!=pilot||!stableOwner(e)
@@ -82,6 +100,15 @@ public final class EvaFieldActionsR45
                 ||e.isPilotProne()||e.isPilotCrouching()||e.rifleStanceLevel(0)>.01F)return false;
         if(directions<0||directions>15||(directions&3)==3||(directions&12)==12)return false;
         if(!sprinting&&directions==0)return false;
+        // A strike that has landed or missed has only its recovery left, and an evade asked for then
+        // takes its place at once. It used to be held until the strike had played out, and was only
+        // accepted in the strike's last eight ticks: up to four tenths of a second between the key
+        // and the body moving, with an Angel's blow on its way.
+        if(CANCEL_R63&&!active(e)&&!e.isPilotControlLocked()&&e.strikeSpentR63())
+        {
+            e.interruptCombatR31();
+            return start(e,pilot,directions,sprinting,requestedYaw(e,directions,sprinting));
+        }
         if(active(e)||e.hasLiveActionForRender(0)||e.hasLegacyStrikeForRender()||e.isPilotControlLocked())
         {
             var state=EvaWeaponHandlingR45.fieldActionR45(e);var runtime=RUNTIMES.get(e);
