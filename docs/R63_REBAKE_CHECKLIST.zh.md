@@ -4,7 +4,7 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
 
 ## 为什么要重做
 
-- 正式世界的 GeoFront 远景库还是 R62 那份（第 378 批，2026-11-10 06:53）。拿 R62 服务端包里的世界逐区块比对，到第 448 批为止：9,614 个区块内容变了，54,538 个外圈区块被删（第 415 批），没有新增区块。
+- 正式世界的 GeoFront 远景库还是 R62 那份（第 378 批，2026-11-10 06:53）。拿 R62 服务端包里的世界逐区块比对，到第 455 批为止：9,828 个区块内容变了，54,538 个外圈区块被删（第 415 批），没有新增区块。
 - 旧远景库 90,949 行里有 80,965 行画的是删掉的旧外圈（远处那堵“墙”），必须换成 map-edges 在 E 盘按新边界烘的外圈。
 - 小地图是 R62 当天烘的，世界之后又写了很多批，打包工具会拒绝。
 
@@ -27,9 +27,20 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
 - 核心缺段 1,172 → 709。视点范围内 1,433 段补了 801 段，但越近的越少：开局两分钟 DH 线程 15 次堆内存溢出，最先处理的近处任务丢了。主会话 2026-11-13 定了：最终重烘在独占窗口里用 R62 验证过的 8 GB 堆、4 线程（`--exclusive` 的默认）；6 GB 的规矩是为了两个共享客户端能同时放下，独占时不适用。不独占时退回 6 GB、3 线程。
 - 第一次试跑客户端一分钟就退了：探针 jar 漏了内部类。现在探针类整套从 map-edges 的 jar 取，客户端日志里必须看到 `Project SEELE initialized`、没有坏模组的行才算过。
 
+## 第 455 批的镜像（2026-11-13 06:48–06:52）
+
+主会话说计划内的写入全部完成，正式世界停在第 455 批（449–455：学校和 B17 的陡坎、H02、17 个高架桥墩、路面带、A10 坡、R1 最后的连接路和断头）。负责人上午游戏内验收后如果再下修补单，从“镜像”一步重来。
+
+- 开镜像前确认没人打开正式世界：`session.lock` 能拿到锁；所有 java/javaw 的命令行里都没有正式世界或主客户端目录。当时在跑的两个客户端分别是 map-edges 的 E 盘副本和 Fable 的 `motion-work/review_client`，其余三个是 gradle。
+- 持锁 216 秒。80,501 个文件两边逐个 sha256 一致（清单 `E:/eva-r63-rebake/logs/manifest-MAP_REVIEW.json`）。
+  - 全部文件的总哈希：`67aef5a7f507609935f43a7ca349ced61155f03009d34d6922a486c155dea678`
+  - GeoFront 区域文件的总哈希：`a7a9e6612c1fe5a3d6b8e567e19ec9514e2557caf81ff9d905a4deaee8b94c65`
+  - 最新区域文件时间 2026-11-13 06:41:52；批次表（`docs/HAKONE_EXECUTION_ORDER_20261105.zh.md`）最大是 455。`continuation.json` 的 `latest_installed_batch` 还停在 334，不能用来判断批次。
+- prepare：变动区块 9,828，删 83,801 行（变动 1,194、外圈 80,965、边缘 1,642），从外圈取 45,267 行，合并后 52,415 行（601 MB），integrity ok，打标 2,036 行。要重建 1,376 段，3 个视点：(160,544) 1,081 段、(4384,544) 289 段、(-3040,-736) 6 段。
+
 ## 开始之前
 
-- [ ] 地图会话说最后一批写完了，`continuation.json` 里没有进行中的批次。之后任何一次写入都要从“镜像”重来。
+- [ ] 地图会话说最后一批写完了。批次以 `docs/HAKONE_EXECUTION_ORDER_20261105.zh.md` 的批次表为准，`mirror --batch N` 会核对。之后任何一次写入都要从“镜像”重来；`core` 发现正式世界的区域文件在镜像之后变过会拒绝。
 - [ ] map-edges 的外圈烘焙停了（`loop.sh` 那个文件夹里放 `STOP`，或者等它自己结束），它的客户端已经退出。没烘完也可以打，覆盖率会写进说明（见“卡点”）。
 - [ ] 要进 R63 的分支都合进 main 并装进主客户端（`client/mods/projectseele-0.1.0-all.jar`）。拿 main 编一个 jar 给 `--compare-build` 比对：`slot.py status` 没有别人的 exclusive 时，在这个工作树里 `./gradlew build`。
 - [ ] `frpy F:/eva/.claude/client-slots/slot.py status`：没有别人的 exclusive。
@@ -41,10 +52,12 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
 |---|---|---|---|
 | 1 | `frpy tools/rebake_r63.py check` | 20 秒 | `problems` 为空；记下变动区块数、视点、外圈覆盖率、估时和磁盘 |
 | 2 | `frpy tools/rebake_r63.py instance` | 3 分钟 | 把主客户端（不含存档、日志、旧小地图）复制到 `E:/eva-r63-rebake/client`，0.77 GB；DH 配置改成烘焙用，静音；`jars/` 里有最终 jar 和加了探针类的 jar |
-| 3 | `frpy tools/rebake_r63.py mirror` | 首次约 8 分钟，之后 1–2 分钟 | 期间持有正式世界的 `session.lock`，地图会话的写入会等；GeoFront 区域文件大小逐个一致 |
-| 4 | `frpy tools/rebake_r63.py prepare` | 1 分钟 | `integrity` = ok；删/取/打标数目和演练同一量级；视点和分钟数 |
-| 5 | `frpy tools/rebake_r63.py core --exclusive`（8 GB、4 线程；`slot.py exclusive r63-pack` 会等别的客户端退出） | 约 40 分钟，缺得多时再加不超过 25 分钟的补烘 | 先拿到 slot 的 `ok:` 才启动；`ok` = true：模组加载成功、脚本跑完、quick_check ok、核心缺段不超过 50；`pending_parent_updates` 接近 0；`out_of_memory` 应为 0 |
-| 6 | `frpy tools/rebake_r63.py xaero --exclusive` | 约 12 分钟 | 重新镜像后烘焙；日志有 `Xaero map bake finished`，区域 zip 数和 R62 的 191 差不多（外圈删掉后可能更少） |
+| 3 | `frpy tools/rebake_r63.py mirror --batch <批次>` | 约 4 分钟（持锁复制再两边算哈希） | 期间持有正式世界的 `session.lock`，地图会话的写入会等；全部文件 sha256 一致；把两个总哈希抄进本清单 |
+| 4 | `frpy tools/rebake_r63.py prepare` | 1 分钟 | `integrity` = ok；`world_unchanged_since_mirror` = true；删/取/打标数目和上次同一量级；视点和分钟数 |
+| 5 | `frpy tools/rebake_r63.py core --exclusive`（8 GB、4 线程；`slot.py exclusive r63-pack` 会等别的客户端退出） | 30–40 分钟，缺得多时再加 15–25 分钟的补烘 | 先拿到 slot 的 `ok:` 才启动；`ok` = true：模组加载成功、脚本跑完、quick_check ok、核心缺段不超过 50；`pending_parent_updates` 接近 0；`out_of_memory` 应为 0 |
+| 6 | `frpy tools/rebake_r63.py xaero` | 约 12 分钟 | 不用独占，普通槽位就行；用自己的镜像 `saves/R63_XAERO`，不会冲掉第 4 步的结果；日志有 `Xaero map bake finished`，区域 zip 数和 R62 的 191 差不多（外圈删掉后可能更少） |
+
+**第 2–4 步要在第 5 步之前紧挨着重跑一遍**，因为：`instance` 要拿主客户端里最新装的 jar（Fable 的代码合进来、装机之后）；`prepare` 要在 map-edges 烘完之后重新快照外圈库；`mirror` 会把镜像里的远景库还原成正式世界那份，所以 `prepare` 必须跟在它后面。这三步都不用独占，合计约 6 分钟。第 6 步只依赖世界，世界不再写之后什么时候跑都行。
 | 7 | `frpy tools/rebake_r63.py report` | — | 打印打包命令 |
 | 8 | `frpy tools/package_r60.py --check <报告路径> --geofront-lod E:/eva-r63-rebake/out/geofront_lod.sqlite --xaero-map "E:/eva-r63-rebake/out/xaero/projectseele$geofront" --compare-build <main 编出的 -all.jar> --server-address <服务器地址>` | 1 分钟 | `check_failures` 为空。配置检查只应报两个新键（`shadows.*`，首次启动自动写默认值 64 和 128） |
 | 9 | 填好 `docs/R63_RELEASE.zh.md` 的空格并删掉“打包前确认”一节，提交 | — | |
@@ -56,10 +69,11 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
 ## 时间和磁盘
 
 - 槽位空着时，第 1–10 步合计约 1.5–2 小时，大头是第 5 步的客户端。
-- 外圈：2026-11-13 00:20 还差 22,584 个 level-0 段。map-edges 实测约 63 段/分钟，还要约 6 小时客户端时间，而且要和别的会话排队。
+- **第 5 步要的独占窗口：申请 75 分钟。** 按第 455 批的计划，3 个视点悬停 16 + 6 + 6 分钟，加上启动约 4 分钟，约 32 分钟（视点悬停按每分钟 80 段估：试跑在 6 GB 下溢出时约 50 段/分钟，R62 在 8 GB、6 线程时约 170）。缺段超过 50 时自动补烘，最多 8 个视点，按现在的规模一般 1–3 个，再加 15–25 分钟。`slot.py exclusive` 还要先等正在跑的客户端退出，这段时间不算在内。
+- 外圈：2026-11-13 00:20 还差 22,584 个 level-0 段；06:45 主会话说还差约 7,700 段（共 39,160）。map-edges 实测约 63 段/分钟。
 - E 盘：工作目录约 6 GB（客户端 0.77 GB、世界镜像 1.6 GB、外圈快照和导出的远景库各约 0.3–1 GB）。
 - F 盘：两个 zip。R62 是 0.95 GB 和 2.0 GB；R63 的 GeoFront 远景库现在 0.30 GB，外圈烘满后估计 0.7–1 GB，客户端包会到约 1.4 GB、服务端包约 2.6 GB，再加打包时的临时副本，留 10 GB。
-- 2026-11-13 00:20 实测空闲：F 盘 50 GB，E 盘 53 GB。
+- 2026-11-13 00:20 实测空闲：F 盘 50 GB，E 盘 53 GB；06:53 再测：F 盘 31 GB，E 盘 48 GB（第 455 批合并后的 GeoFront 远景库已经 601 MB，外圈烘满后还会再大）。
 
 ## 卡点和没验证的
 

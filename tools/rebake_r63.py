@@ -59,6 +59,7 @@ JAVAW = find_javaw()
 SLOT = Path('F:/eva/.claude/client-slots/slot.py')
 SLOT_NAME = 'r63-pack'
 COPY = 'MAP_REVIEW'  # MapProbeLocal and the args template open this save
+XAERO_COPY = 'R63_XAERO'  # the minimap bake's own mirror (Xaero names its folder R63^us^XAERO)
 GEO = 'dimensions/projectseele/geofront'
 R62_PREFIX = 'SEELE_R53_WORLD/' + GEO + '/region/'
 JAR = 'mods/projectseele-0.1.0-all.jar'
@@ -69,7 +70,7 @@ R63_CLASSES = ('world/OuterBoundaryTerrain', 'world/SbwIdlePause', 'physics/Gian
 INSTANCE_SKIP = ('saves', 'logs', 'crash-reports', 'screenshots', 'xaero', 'Distant_Horizons_server_data', 'local-review-updates',
                  'backups', 'backup', 'debug', 'pose-captures', '.codex', 'resourcepacks-off', 'mods-off', 'replay_recordings')
 SECTION_REACH = 40        # level-0 sections a viewpoint fills around itself (2,560 blocks; DH radius is 192 chunks)
-SECTIONS_PER_MINUTE = 110  # saved-chunk LOD rebuild, 4 DH threads (R62 morning run: about 170 with 6 threads)
+SECTIONS_PER_MINUTE = 80  # saved-chunk rebuild per hover minute: about 50 in the 6 GB trial (OOM), about 170 in R62 (8 GB, 6 threads)
 CLIENT_START_MIN = 4
 DH_BAKE = {'enableDistantGeneration': 'true', 'distantGeneratorMode': '"PRE_EXISTING_ONLY"', 'numberOfThreads': '4',
            'threadRunTimeRatio': '"1.0"'}
@@ -384,12 +385,12 @@ def set_toml(path, settings):
     guard(path).write_text(text, 'utf8')
 
 
-def client_args(game, extra_props, out_name, heap='6G'):
+def client_args(game, extra_props, out_name, heap='6G', world=COPY):
     text = ARGS_TEMPLATE.read_text('utf8')
     assert TEMPLATE_GAME_DIR in text and '"--quickPlaySingleplayer"' in text and '"-Xmx8G"' in text
     text = text.replace(TEMPLATE_GAME_DIR, game.as_posix()).replace('"-Xmx8G"', '"-Xmx%s"' % heap)
     text = re.sub(r'"-Dprojectseele\.mapProbe=[^"]*"\s*', '', text)
-    text = re.sub(r'("--quickPlaySingleplayer"\s+)"[^"]*"', lambda m: m[1] + '"' + COPY + '"', text)
+    text = re.sub(r'("--quickPlaySingleplayer"\s+)"[^"]*"', lambda m: m[1] + '"' + world + '"', text)
     props = ' '.join('"-D%s=%s"' % kv for kv in extra_props.items())
     text = text.replace('"-Xms512m"', '"-Xms512m" ' + props, 1)
     assert '-Xmx' + heap in text and all(k in text for k in extra_props)
@@ -566,30 +567,76 @@ def step_instance(a):
     save('instance', dict(game=str(game), robocopy=tail, dh=DH_BAKE, final_jar_bytes=(WORK / 'jars/final.jar').stat().st_size))
 
 
-def mirror_world(locked=True):
+BATCH_LOG = ROOT / 'docs/HAKONE_EXECUTION_ORDER_20261105.zh.md'
+MIRROR_SKIP = ('session.lock',)
+
+
+def latest_batch():
+    """Highest batch number in the map session's batch table (rows like '| 455 | ...')."""
+    numbers = [int(m) for m in re.findall(r'(?m)^\|\s*(\d{3,4})\s*\|', BATCH_LOG.read_text('utf8'))]
+    return max(numbers) if numbers else None
+
+
+def manifest(root):
+    """sha256 of every file the mirror copies, and one digest over all of them (sorted paths)."""
+    import hashlib
+    files = {}
+    for path in sorted(Path(root).rglob('*')):
+        if path.is_file() and path.name not in MIRROR_SKIP and not path.name.endswith('.sqlite-shm'):
+            digest = hashlib.sha256()
+            with path.open('rb') as handle:
+                for block in iter(lambda: handle.read(1 << 20), b''):
+                    digest.update(block)
+            files[path.relative_to(root).as_posix()] = digest.hexdigest()
+    whole = hashlib.sha256(''.join(f'{k}\t{v}\n' for k, v in files.items()).encode()).hexdigest()
+    region = hashlib.sha256(''.join(f'{k}\t{v}\n' for k, v in files.items() if k.startswith(GEO + '/region/')).encode()).hexdigest()
+    return files, whole, region
+
+
+def region_fingerprint(world):
+    return {p.name: [p.stat().st_size, p.stat().st_mtime_ns] for p in sorted((world / GEO / 'region').glob('*.mca'))}
+
+
+def mirror_world(locked=True, name=COPY):
     game = WORK / 'client'
-    target = guard(game / 'saves' / COPY)
+    target = guard(game / 'saves' / name)
     _, _, links = tree_bytes(FORMAL)
     if links:
         raise SystemExit('Formal world contains links, refusing to mirror: ' + ', '.join(links[:5]))
     wait_no_exclusive('mirroring the world')
     with held_world(FORMAL) if locked else nullcontext():
-        tail = robocopy(FORMAL, target, '/MIR', '/XF', 'session.lock', '*.sqlite-shm')
+        t = time.time()
         wal = FORMAL / GEO / 'data/DistantHorizons.sqlite-wal'
         if wal.exists() and wal.stat().st_size:
             raise SystemExit('The formal GeoFront LOD database has an unmerged WAL; someone has the world open')
-        src = {p.relative_to(FORMAL).as_posix(): p.stat().st_size for p in (FORMAL / GEO / 'region').glob('*.mca')}
-        dst = {p.relative_to(target).as_posix(): p.stat().st_size for p in (target / GEO / 'region').glob('*.mca')}
+        tail = robocopy(FORMAL, target, '/MIR', '/XF', *MIRROR_SKIP, '*.sqlite-shm')
+        src, whole, region = manifest(FORMAL) if locked else ({}, None, None)
+        fingerprint = region_fingerprint(FORMAL)
         newest = max(p.stat().st_mtime for p in (FORMAL / GEO / 'region').glob('*.mca'))
-    if src != dst:
-        raise SystemExit('Mirror differs from the formal world in the GeoFront regions')
-    return dict(target=str(target), robocopy=tail, regions=len(src),
+    if locked:
+        dst, mirror_whole, _ = manifest(target)
+        if dst != src:
+            differ = sorted(k for k in src.keys() | dst.keys() if src.get(k) != dst.get(k))
+            raise SystemExit('Mirror differs from the formal world in %d files, e.g. %s' % (len(differ), differ[:5]))
+        json.dump(dict(files=src), guard(WORK / 'logs' / ('manifest-%s.json' % name)).open('w'), indent=0)
+    return dict(target=str(target), robocopy=tail, files=len(src), sha256_all_files=whole, sha256_geofront_regions=region,
+                region_fingerprint=fingerprint, recorded_batch=latest_batch(), seconds_locked=round(time.time() - t),
                 formal_newest_region=datetime.datetime.fromtimestamp(newest).isoformat(timespec='seconds'))
 
 
 def step_mirror(a):
     # --no-lock is for trial runs only: a writer may change the world while it is copied.
-    save('mirror', dict(locked=not a.no_lock, **mirror_world(not a.no_lock)))
+    data = mirror_world(not a.no_lock)
+    if a.batch and data['recorded_batch'] != a.batch:
+        raise SystemExit('Batch table says %s, expected %s' % (data['recorded_batch'], a.batch))
+    fingerprint = data.pop('region_fingerprint')
+    save('mirror', dict(locked=not a.no_lock, **data))
+    json.dump(fingerprint, guard(WORK / 'logs/mirror-fingerprint.json').open('w'))
+
+
+def world_unchanged_since_mirror():
+    path = WORK / 'logs/mirror-fingerprint.json'
+    return path.exists() and json.load(path.open()) == region_fingerprint(FORMAL)
 
 
 def step_prepare(a):
@@ -644,7 +691,10 @@ def step_prepare(a):
     json.dump(plan['rebuild'], guard(WORK / 'lod/rebuild_sections.json').open('w'))
     # The bake client saves outer chunks around its viewpoints; coverage counts only what the world had now.
     json.dump(sorted(fully_saved(saved)), guard(WORK / 'lod/core_sections.json').open('w'))
+    mirror = json.loads(log_path('mirror').read_text('utf8')) if log_path('mirror').exists() and not a.db else {}
     save('prepare', dict(database=str(db), ring_snapshot=str(ring), rows=rows, levels=levels, integrity=check,
+                         mirror=dict((k, mirror.get(k)) for k in ('at', 'locked', 'recorded_batch', 'sha256_all_files', 'sha256_geofront_regions')),
+                         world_unchanged_since_mirror=world_unchanged_since_mirror(),
                          chunks=dict(saved=len(saved), changed=len(changed), added=len(added), removed=len(removed)),
                          dropped=len(plan['drop']), dropped_by_reason=plan['why'], taken_from_ring=len(plan['take']),
                          flagged_for_parent_rebuild=len(plan['flag']), level0_to_rebuild=len(plan['rebuild']),
@@ -682,6 +732,8 @@ def step_core(a):
     script = WORK / 'scripts/r63-dh-core.json'
     if not script.exists():
         raise SystemExit('Run prepare first')
+    if not world_unchanged_since_mirror():
+        raise SystemExit('The formal world changed since the mirror (or was never mirrored): run mirror and prepare again')
     shutil.copyfile(WORK / 'jars/probe.jar', guard(game / JAR))
     held = WORK / 'mods-held'
     moved = hold_mods(game, ['oculus-*.jar'], held)
@@ -716,16 +768,18 @@ def step_core(a):
 
 
 def step_xaero(a):
+    # Its own mirror, so a minimap redo never wipes the prepared LOD database in MAP_REVIEW.
     game = WORK / 'client'
-    info = mirror_world()
-    baked = game / 'xaero/world-map' / COPY.replace('_', '^us^') / 'projectseele$geofront'
+    info = mirror_world(name=XAERO_COPY)
+    info.pop('region_fingerprint')
+    baked = game / 'xaero/world-map' / XAERO_COPY.replace('_', '^us^') / 'projectseele$geofront'
     if baked.exists():
         shutil.move(str(baked), str(guard(baked.with_name('projectseele$geofront.before-' + time.strftime('%H%M%S')))))
     shutil.copyfile(WORK / 'jars/final.jar', guard(game / JAR))
     held = WORK / 'mods-held'
     moved = hold_mods(game, ['DistantHorizons-*.jar', 'oculus-*.jar'], held)
     try:
-        args = client_args(game, {'projectseele.xaeroBake': 'true'}, 'xaero.args')
+        args = client_args(game, {'projectseele.xaeroBake': 'true'}, 'xaero.args', world=XAERO_COPY)
         result = run_client(args, 25, 'R63 Xaero minimap bake', a.exclusive)
     finally:
         restore_mods(game, held)
@@ -764,6 +818,7 @@ def main():
     p.add_argument('--heap', help='core: client heap (default 8G with --exclusive, else 6G)')
     p.add_argument('--dh-threads', type=int, help='core: DH worker threads (default 4 with --exclusive, else 3: 4 at 6G ran out of heap in the trial)')
     p.add_argument('--no-lock', action='store_true', help='mirror: copy without holding session.lock (trial runs only, never for packing)')
+    p.add_argument('--batch', type=int, help='mirror: the batch the formal world should be at; refuse if the batch table says otherwise')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
     a = p.parse_args()
     # Review session, 2026-11-13: with the machine to ourselves R62's 8 GB / 4 threads; shared, 6 GB / 3 threads.
