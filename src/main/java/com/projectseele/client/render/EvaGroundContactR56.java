@@ -1,6 +1,5 @@
 package com.projectseele.client.render;
 
-import com.google.gson.JsonParser;
 import com.projectseele.entity.EvaAirTransportR31;
 import com.projectseele.entity.EvaBodyPose;
 import com.projectseele.entity.EvaScale;
@@ -28,10 +27,9 @@ import java.util.Map;
  */
 final class EvaGroundContactR56
 {
-    private static final String[] PARTS={"foot_l","foot_r","shin_l","shin_r","leg_l","leg_r","torso_lower","torso_upper",
+    static final String[] PARTS={"foot_l","foot_r","shin_l","shin_r","leg_l","leg_r","torso_lower","torso_upper",
             "arm_l","arm_r","forearm_l","forearm_r","hand_l","hand_r","head"};
     /** Rest-pose hull samples per part (model units): the extremes along 26 directions. */
-    private static final Map<Integer,Map<String,Vector3f[]>> HULLS=new HashMap<>();
     private record Ankle(float x,float z,long time,float planted,float rate) {}
     /** Last ankle position per EVA and side (world), its frame time and planted weight. */
     private static final Map<String,Ankle> ANKLES=new HashMap<>();
@@ -423,40 +421,12 @@ final class EvaGroundContactR56
         return t*t*(3-2*t);
     }
 
-    /** Reads the unit's hull samples now if no frame has needed them yet (a mesh file: tens of milliseconds). */
+    /** Reads the unit's hull samples now if no frame has needed them yet (taken from the mesh held for drawing). */
     static void warm(EvaUnit01Entity eva){hulls(eva);}
     private static Map<String,Vector3f[]> hulls(EvaUnit01Entity eva)
     {
-        return HULLS.computeIfAbsent(EvaBodyPose.rigKey(eva),v->
-        {
-            Map<String,Vector3f[]> result=new HashMap<>();
-            String asset=eva.isExperimentalUnit()?eva.experimentalAssetName():"eva_unit0"+v;
-            try(var reader=Minecraft.getInstance().getResourceManager().getResource(new ResourceLocation("projectseele","mesh/"+asset+".mesh.json")).orElseThrow().openAsReader())
-            {
-                var document=JsonParser.parseReader(reader).getAsJsonObject();var parts=document.getAsJsonObject("parts");
-                int stride=document.has("stride")?document.get("stride").getAsInt():8;
-                List<Vector3f> directions=new ArrayList<>();
-                for(int x=-1;x<=1;x++)for(int y=-1;y<=1;y++)for(int z=-1;z<=1;z++)
-                    if(x!=0||y!=0||z!=0)directions.add(new Vector3f(x,y,z).normalize());
-                for(String name:PARTS)
-                {
-                    if(!parts.has(name))continue;
-                    var part=parts.getAsJsonObject(name);var pivot=part.getAsJsonArray("pivot");var a=part.getAsJsonArray("vertices");
-                    float px=pivot.get(0).getAsFloat(),py=pivot.get(1).getAsFloat(),pz=pivot.get(2).getAsFloat();
-                    Vector3f[] best=new Vector3f[directions.size()];float[] score=new float[directions.size()];
-                    java.util.Arrays.fill(score,Float.NEGATIVE_INFINITY);
-                    for(int i=0;i+2<a.size();i+=stride)
-                    {
-                        var p=new Vector3f(-(a.get(i).getAsFloat()+px)/16,(a.get(i+1).getAsFloat()+py)/16,(a.get(i+2).getAsFloat()+pz)/16);
-                        for(int d=0;d<best.length;d++){float s=p.dot(directions.get(d));if(s>score[d]){score[d]=s;best[d]=p;}}
-                    }
-                    var kept=java.util.Arrays.stream(best).filter(java.util.Objects::nonNull).distinct().toArray(Vector3f[]::new);
-                    if(kept.length>0)result.put(name,kept);
-                }
-            }
-            catch(Exception failure){com.projectseele.ProjectSeele.LOGGER.warn("R56 ground contact hull unavailable for variant {}",v,failure);}
-            return result;
-        });
+        // Empty when the unit has no mesh to draw: it then stands as posed.
+        return EvaMeshPointsR63.of(eva,PARTS).hulls();
     }
 
     private EvaGroundContactR56() {}

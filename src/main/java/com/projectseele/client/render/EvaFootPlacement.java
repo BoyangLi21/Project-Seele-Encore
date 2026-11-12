@@ -1,5 +1,4 @@
 package com.projectseele.client.render;
-import com.google.gson.JsonParser;
 import com.projectseele.entity.*;
 import net.minecraft.client.Minecraft;
 import net.minecraft.resources.ResourceLocation;
@@ -14,7 +13,6 @@ import java.util.*;
 /** Small terrain corrections around planted soles, using the actual rendered coordinate frame. */
 public final class EvaFootPlacement
 {
-    private static final Map<Integer,Map<String,Vector3f[]>> GEOMETRY=new HashMap<>();
     public static final Map<Integer,double[]> LAST=new HashMap<>();
     /** Per EVA, what ground contact decided in its last frame (written by EvaGroundContactR56 while a review records). */
     public static final Map<Integer,double[]> GROUNDING=new HashMap<>();
@@ -39,27 +37,13 @@ public final class EvaFootPlacement
         var under=UNDER.get(eva.getId()*2+(side.equals("l")?0:1));
         return under!=null&&under[1]==com.projectseele.client.AircraftRenderClockR21.frameNanos()&&Double.isFinite(under[0])&&Math.abs(under[2])>1e-4?under:null;
     }
-    public static void clear(){GEOMETRY.clear();SOLES.clear();LAST.clear();}
-    /** Reads the unit's sole geometry now if no frame has needed it yet (a mesh file: tens of milliseconds). */
+    public static void clear(){EvaMeshPointsR63.clear();SOLES.clear();LAST.clear();}
+    /** Reads the unit's sole geometry now if no frame has needed it yet (taken from the mesh held for drawing). */
     static void warm(EvaUnit01Entity eva){feet(eva);}
     private static Map<String,Vector3f[]> feet(EvaUnit01Entity eva)
     {
-        return GEOMETRY.computeIfAbsent(EvaBodyPose.rigKey(eva),v->{
-            Map<String,Vector3f[]> result=new HashMap<>();
-            String asset=eva.isExperimentalUnit()?eva.experimentalAssetName():"eva_unit0"+v;
-            try(var reader=Minecraft.getInstance().getResourceManager().getResource(new ResourceLocation("projectseele","mesh/"+asset+".mesh.json")).orElseThrow().openAsReader())
-            {
-                var parts=JsonParser.parseReader(reader).getAsJsonObject().getAsJsonObject("parts");
-                for(String side:List.of("l","r"))
-                {
-                    var part=parts.getAsJsonObject("foot_"+side);var p=part.getAsJsonArray("pivot");var a=part.getAsJsonArray("vertices");List<Vector3f> points=new ArrayList<>();
-                    for(int i=0;i<a.size();i+=8)points.add(new Vector3f(-(a.get(i).getAsFloat()+p.get(0).getAsFloat())/16,(a.get(i+1).getAsFloat()+p.get(1).getAsFloat())/16,(a.get(i+2).getAsFloat()+p.get(2).getAsFloat())/16));
-                    result.put(side,points.toArray(Vector3f[]::new));
-                }
-            }
-            catch(Exception e){com.projectseele.ProjectSeele.LOGGER.warn("R11 foot support unavailable for variant {}",v,e);}
-            return result;
-        });
+        // Every vertex of each foot, once. Empty when the unit has no mesh to draw.
+        return EvaMeshPointsR63.of(eva,EvaGroundContactR56.PARTS).feet();
     }
     private static double ground(EvaUnit01Entity eva,Vector3f point)
     {
