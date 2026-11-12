@@ -5,6 +5,7 @@ walking profile follows the ground within MAX_GRADE, pinned to the declared heig
 cut: the declared cells whose nearest skeleton cell lies on the spur part being taken up (end to the
 junction, or to the last door) are taken up like R1-A: paving back to the natural top of the untouched
 columns around, buried paving filled, the declaration dropped.
+undeclare (取消声明): the same spur columns as a cut leave the declaration and no block changes (paving buried in the hill).
 viewpoint: the end stays as a terminal; its outer edge cells that face water or a drop of 2 or more get a
 stone brick wall on the footway, and a lantern on a wall post marks the end.
 Writes connections.json (for build_road_connection), rows-cut.json, rows-view.json, network-cut.npz,
@@ -163,12 +164,18 @@ def natural_top(x, y, z, skip):
 cut_rows, cut_report = {}, []
 for i in ids:
     d = decisions[i]
-    if not (d['decision'].startswith('截回') or i in failed):
+    undeclare = d['decision'] == '取消声明'
+    if not (d['decision'].startswith('截回') or i in failed or undeclare):
         continue
     path = spur(d['x'], d['z'])
     if not path:
         cut_report.append(dict(id=i, error='no skeleton near the end'))
         continue
+    # In plan view a tunnel road and the hill road over it share skeleton cells; stop where the height jumps.
+    for k in range(1, len(path)):
+        if abs(feet_at(*path[k]) - feet_at(*path[k - 1])) > 2:
+            path = path[:k]
+            break
     doors = doors_along(path)
     stop = min(doors) if doors else len(path) - 3       # leave the last cells before the junction to the junction road
     # Another end of the same piece is being connected in this batch: take up only this end's half.
@@ -188,10 +195,15 @@ for i in ids:
                 if not (G(road, x, z) or G(walk, x, z)):
                     continue
                 nz, nx = dt_idx[:, z - az, x - ax]
-                if (int(nx) + ax, int(nz) + az) in taken:
+                q = (int(nx) + ax, int(nz) + az)
+                # A road passing over or under the spur (hill road over a tunnel) shares the plan view, not the height.
+                if q in taken and abs(feet_at(x, z) - feet_at(*q)) <= 3:
                     cols.add((x, z))
     n0 = len(cut_rows)
     for (x, z) in sorted(cols):
+        if undeclare:
+            walk[z - az, x - ax] = road[z - az, x - ax] = False
+            continue
         f = feet_at(x, z)
         ys = [y for y in range(math.floor(f) - 3, math.floor(f) + 2) if paving(cap.state(x, y, z))]
         if ys:
