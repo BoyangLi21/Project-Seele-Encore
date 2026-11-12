@@ -385,6 +385,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private int rifleZeroTravelTicksR45;
     /** The walking blend has been falling since it last rose. */
     private boolean rifleMoveFallingR63;
+    /** Ticks since a strike or other live action ended, and for how many of them its remaining travel is not walking. */
+    private int sinceLiveActionR63=100;
+    private static final int AFTER_ACTION_R63=12;
     /** Ticks without travel through which the walking blend is held: a pilot's client down to seven frames a second. */
     private static final int TRAVEL_GAP_R63=3;
     /** Unasked travel slower than this (blocks a tick, a quarter of a walk) is a body coming to rest, not walking. */
@@ -1486,7 +1489,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             // The last of a piloted body's travel as it comes to rest, a few hundredths of a block a
             // tick with the input let go, keeps a blend that is already falling where it is and does
             // not raise it again. A body at rest that is pushed walks with the push, as it always did.
-            boolean coasting=moving&&rifleMoveFallingR63&&!this.pilotMovementRequested&&this.getPilotEntity()!=null&&distance<COAST_PACE_R63;
+            // The same for what is left of a strike's own travel in the half second after it. With the
+            // blend at nought that travel raised it: a unit that had kicked an Angel stood up out of
+            // its guard onto walking legs, a block's drift in four ticks, and sank back half a second
+            // later (pelvis 23.2, 27.9 for six ticks, 23.7).
+            sinceLiveActionR63=this.hasLiveActionForRender(0)?0:Math.min(AFTER_ACTION_R63+1,sinceLiveActionR63+1);
+            boolean coasting=moving&&(rifleMoveFallingR63||sinceLiveActionR63<=AFTER_ACTION_R63)
+                    &&!this.pilotMovementRequested&&this.getPilotEntity()!=null&&distance<COAST_PACE_R63;
             boolean holdGait=holdSupport||holdTravelGap||coasting;
             float move=Mth.approach(oldMove,moving&&!coasting||holdTravelGap&&this.pilotMovementRequested?1F:holdGait?oldMove:0F,.16F);
             rifleMoveFallingR63=move<oldMove||rifleMoveFallingR63&&move==oldMove&&move>0F;
