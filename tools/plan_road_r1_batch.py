@@ -61,6 +61,18 @@ def feet_at(x, z):
     return G(g2, x, z) / 2 + 1
 
 
+def measured_feet(x, z):
+    """Walking height of the paving actually at (x, z), near its declared height; the declared one if none."""
+    near = feet_at(x, z)
+    for y in range(math.floor(near) + 3, math.floor(near) - 4, -1):
+        s = cap.state(x, y, z)
+        if paving(s) and name(cap.state(x, y + 1, z)) in AIR:
+            top = y + int(s.split('layers=')[1][0]) / 8 if 'layers=' in s else (y + .5 if 'type=bottom' in s else y + 1.0)
+            if abs(top - near) <= 2.5:
+                return top
+    return near
+
+
 # ---- connections
 conns, report, failed = [], [], set(int(a) for a in __import__('os').environ.get('R1_CUT_INSTEAD', '').split(',') if a)
 for i in ids:
@@ -74,7 +86,7 @@ for i in ids:
     seg = [math.hypot(a[0] - b[0], a[1] - b[1]) for a, b in zip(pts, pts[1:])]
     s = np.concatenate([[0], np.cumsum(seg)])
     ground = np.array([G(top, x, z, cx, cz) + 1.0 for x, z in pts])
-    f0, f1 = feet_at(*pts[0]), feet_at(*pts[-1])
+    f0, f1 = measured_feet(*pts[0]), measured_feet(*pts[-1])     # what the new road will actually meet
     lo, hi = np.full(len(pts), -1e9), np.full(len(pts), 1e9)
     lo[0] = hi[0] = f0
     lo[-1] = hi[-1] = f1
@@ -165,40 +177,58 @@ cut_rows, cut_report = {}, []
 for i in ids:
     d = decisions[i]
     undeclare = d['decision'] == '取消声明'
-    if not (d['decision'].startswith('截回') or i in failed or undeclare):
+    if d['decision'] == '拆除碎片':
+        # A stray piece of declared road joined to nothing: all of it goes, not just the spur.
+        pieces, _ = ndimage.label(road | walk, structure=np.ones((3, 3)))
+        near = [(d['x'] + dx, d['z'] + dz) for r in range(4) for dx in range(-r, r + 1) for dz in range(-r, r + 1)
+                if G(road, d['x'] + dx, d['z'] + dz) or G(walk, d['x'] + dx, d['z'] + dz)]
+        if not near:
+            cut_report.append(dict(id=i, error='no declared cell near the fragment'))
+            continue
+        lab = G(pieces, *near[0])
+        zs, xs = np.nonzero(pieces == lab)
+        if len(xs) > 2000:
+            cut_report.append(dict(id=i, error=f'piece of {len(xs)} cells is not a fragment'))
+            continue
+        cols = {(int(x) + ax, int(z) + az) for x, z in zip(xs, zs)}
+        path, doors = [], {}
+    elif not (d['decision'].startswith('截回') or i in failed or undeclare):
         continue
-    path = spur(d['x'], d['z'])
-    if not path:
-        cut_report.append(dict(id=i, error='no skeleton near the end'))
-        continue
-    # In plan view a tunnel road and the hill road over it share skeleton cells; stop where the height jumps.
-    for k in range(1, len(path)):
-        if abs(feet_at(*path[k]) - feet_at(*path[k - 1])) > 2:
-            path = path[:k]
-            break
-    doors = doors_along(path)
-    stop = min(doors) if doors else len(path) - 3       # leave the last cells before the junction to the junction road
-    # Another end of the same piece is being connected in this batch: take up only this end's half.
-    for j in ids:
-        if j != i and decisions[j]['decision'] in ('接通', '架桥接通') and j not in failed:
-            near = [k for k, p in enumerate(path) if abs(p[0] - decisions[j]['x']) + abs(p[1] - decisions[j]['z']) <= 4]
-            if near:
-                stop = min(stop, max(0, near[0] // 2))
-    taken = set(path[:max(0, stop)])
-    cols = set()
-    if taken:
-        xs = [p[0] for p in path]
-        zs = [p[1] for p in path]
-        x0, x1, z0, z1 = min(xs) - 12, max(xs) + 12, min(zs) - 12, max(zs) + 12
-        for z in range(z0, z1 + 1):
-            for x in range(x0, x1 + 1):
-                if not (G(road, x, z) or G(walk, x, z)):
-                    continue
-                nz, nx = dt_idx[:, z - az, x - ax]
-                q = (int(nx) + ax, int(nz) + az)
-                # A road passing over or under the spur (hill road over a tunnel) shares the plan view, not the height.
-                if q in taken and abs(feet_at(x, z) - feet_at(*q)) <= 3:
-                    cols.add((x, z))
+    else:
+        path = None
+    if path is None:
+        path = spur(d['x'], d['z'])
+        if not path:
+            cut_report.append(dict(id=i, error='no skeleton near the end'))
+            continue
+        # In plan view a tunnel road and the hill road over it share skeleton cells; stop where the height jumps.
+        for k in range(1, len(path)):
+            if abs(feet_at(*path[k]) - feet_at(*path[k - 1])) > 2:
+                path = path[:k]
+                break
+        doors = doors_along(path)
+        stop = min(doors) if doors else len(path) - 3       # leave the last cells before the junction to the junction road
+        # Another end of the same piece is being connected in this batch: take up only this end's half.
+        for j in ids:
+            if j != i and decisions[j]['decision'] in ('接通', '架桥接通') and j not in failed:
+                near = [k for k, p in enumerate(path) if abs(p[0] - decisions[j]['x']) + abs(p[1] - decisions[j]['z']) <= 4]
+                if near:
+                    stop = min(stop, max(0, near[0] // 2))
+        taken = set(path[:max(0, stop)])
+        cols = set()
+        if taken:
+            xs = [p[0] for p in path]
+            zs = [p[1] for p in path]
+            x0, x1, z0, z1 = min(xs) - 12, max(xs) + 12, min(zs) - 12, max(zs) + 12
+            for z in range(z0, z1 + 1):
+                for x in range(x0, x1 + 1):
+                    if not (G(road, x, z) or G(walk, x, z)):
+                        continue
+                    nz, nx = dt_idx[:, z - az, x - ax]
+                    q = (int(nx) + ax, int(nz) + az)
+                    # A road passing over or under the spur (hill road over a tunnel) shares the plan view, not the height.
+                    if q in taken and abs(feet_at(x, z) - feet_at(*q)) <= 3:
+                        cols.add((x, z))
     n0 = len(cut_rows)
     for (x, z) in sorted(cols):
         if undeclare:

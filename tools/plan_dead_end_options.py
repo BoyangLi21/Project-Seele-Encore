@@ -35,6 +35,12 @@ built, water = obs['built'], obs['water']
 MAX_ROUTE, MAX_GRADE, R, WIDTH = 150, 0.2, 160, 7
 AIR = ('minecraft:air', 'minecraft:cave_air', 'minecraft:void_air')
 deg = ndimage.convolve(sk.astype(np.int16), np.ones((3, 3), np.int16), mode='constant') - 1
+# R1_MIN_PIECE: a target must lie in a declared piece of at least this many cells; joining a stray fragment
+# only moves the dead end (five such connections were withdrawn on 2026-11-12).
+MIN_PIECE = int(__import__('os').environ.get('R1_MIN_PIECE', '0'))
+if MIN_PIECE:
+    piece, _ = ndimage.label(road | walk, structure=np.ones((3, 3)))
+    piece_size = np.bincount(piece.ravel())
 
 
 def G(a, x, z, ox=ax, oz=az):
@@ -143,7 +149,8 @@ for e in ends:
             continue
         x, z = x0 + j - R, z0 + i - R
         r = math.hypot(i - R, j - R)
-        if (i, j) != (R, R) and G(road, x, z) and r > 6 and near.get((x, z), 1e9) > 2 * r + 40:
+        if (i, j) != (R, R) and G(road, x, z) and r > 6 and near.get((x, z), 1e9) > 2 * r + 40 \
+                and (not MIN_PIECE or piece_size[G(piece, x, z)] >= MIN_PIECE):
             found = (i, j)
             break
         for di in (-1, 0, 1):

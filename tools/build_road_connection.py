@@ -11,6 +11,10 @@ water are filled with dirt; deeper gaps become a bridge (stone brick beam under 
 brick piers every 6 blocks on the outer cells, stone brick walls on the outer footway). Above the
 deck 4 blocks are cleared of soil, plants and undeclared old paving only; anything built there is reported as blocked.
 Paving already lying within a block of the planned height is declared as it stands instead of rebuilt.
+Joins: the old paving's measured height (slope layers included), not the declared one, is what the new road
+meets. New cells bend so no step to old asphalt or between new cells exceeds half a block; old footway that
+would still stand off is relevelled towards the connection, up to three cells out. check.json lists any step
+over half a block left at a join ("smooth": false on a connection turns this off).
 Outputs rows.json (write_deep_cells.py), network.npz, check.json.
 usage: build_road_connection.py <capture> <network.npz> <connections.json> <outdir>"""
 import json
@@ -37,6 +41,7 @@ LOOSE = ('minecraft:water', 'minecraft:grass', 'minecraft:short_grass', 'minecra
 SOIL = ('minecraft:grass_block', 'minecraft:dirt', 'minecraft:coarse_dirt', 'minecraft:stone', 'minecraft:gravel', 'minecraft:sand', 'minecraft:podzol',
         'minecraft:andesite', 'minecraft:granite', 'minecraft:diorite', 'minecraft:moss_block', 'minecraft:rooted_dirt', 'minecraft:clay', 'minecraft:mud')
 FILL_MAX, PIER_EVERY, HEAD = 4, 6, 4
+LAMP = ('minecraft:iron_bars', 'minecraft:lantern', 'minecraft:soul_lantern', 'minecraft:end_rod', 'minecraft:sea_lantern', 'minecraft:glowstone', 'minecraft:redstone_lamp')
 from verify_hakone_network_candidate import PAVEMENT as OLD_PAVING
 
 
@@ -68,6 +73,15 @@ def soft(n):
     return n in AIR or n in LOOSE or n.endswith(('_leaves', '_log', 'flower', 'tulip', 'sapling', 'bush', 'vine', 'roots', 'mushroom'))
 
 
+def tall(x, y, z):
+    """Paving-coloured blocks that go on up are built work (a viaduct pier is light grey concrete), not old paving
+    lying on the ground: true when the solid run from y reaches three blocks or more."""
+    run = 0
+    while run < 3 and not soft(name(cap.state(x, y + run, z))) and name(cap.state(x, y + run, z)) not in SOIL + LAMP:
+        run += 1
+    return run >= 3
+
+
 def declared_feet(x, z):
     for d in range(4):
         for dx in range(-d, d + 1):
@@ -97,7 +111,7 @@ def deck(x, z, feet, surface, purpose):
         n = name(cap.state(x, y, z))
         if n in AIR:
             continue
-        if soft(n) or n in SOIL or n in OLD_PAVING or n.startswith('trafficcraft:'):
+        if soft(n) or n in SOIL or ((n in OLD_PAVING or n.startswith('trafficcraft:')) and not tall(x, y, z)):
             # Soil, plants, or undeclared old paving (buried or stray) above the new deck.
             put(x, y, z, 'minecraft:air', 'connection headroom')
         else:
@@ -114,6 +128,161 @@ def deck(x, z, feet, surface, purpose):
 
 def paved_near(x, z, feet):
     return any(cap.state(x, y, z).startswith('trafficcraft:') for y in range(math.floor(feet) - 2, math.floor(feet) + 1))
+
+
+STEP, K = 0.5, 0.375          # largest step allowed; slope used for bounds (an eighth left for rounding)
+relevelled = set()
+N4 = ((1, 0), (-1, 0), (0, 1), (0, -1))
+# BRC_GONE=rows.json[,rows.json]: lists written in the same batch (cut-backs); paving they take up is not
+# something a connection should meet.
+GONE = set()
+for f in filter(None, __import__('os').environ.get('BRC_GONE', '').split(',')):
+    GONE |= {(r[0], r[2]) for r in json.load(open(f, encoding='utf8'))}
+
+
+def measured_surface(x, z, near):
+    """Walking height of the paving at (x, z) within 2.5 of `near`, from the capture; None if there is none."""
+    if (x, z) in GONE:
+        return None
+    for y in range(math.floor(near) + 3, math.floor(near) - 4, -1):
+        s = cap.state(x, y, z)
+        if is_paving(s) and name(cap.state(x, y + 1, z)) in AIR + LOOSE:
+            top = y + int(s.split('layers=')[1][0]) / 8 if 'layers=' in s else (y + .5 if 'type=bottom' in s else y + 1.0)
+            return (top, name(s)) if abs(top - near) <= 2.5 else None
+    return None
+
+
+def smooth_junctions(cid, plan, anchors):
+    """Bend the connection's heights so it meets the old paving with steps of at most STEP.
+
+    Old asphalt beside the connection (and paving adopted as it stands) is fixed; every new cell is kept
+    within K per block of it, measured through the new cells. Old footway beside the connection that would
+    still stand more than STEP off is relevelled towards the connection, up to three cells out."""
+    old = {}
+    for (x, z), (feet, *_rest) in plan.items():
+        for dx, dz in N4:
+            q = (x + dx, z + dz)
+            if q in plan or q in old:
+                continue
+            if q in anchors:
+                old[q] = (anchors[q][0], 'adopted')
+                continue
+            m = measured_surface(q[0], q[1], feet)
+            if m:
+                old[q] = m
+    hard = {q: h for q, (h, n) in old.items() if 'concrete' not in n}
+    lo = {p: -1e9 for p in plan}
+    hi = {p: 1e9 for p in plan}
+    for p in plan:
+        for dx, dz in N4:
+            q = (p[0] + dx, p[1] + dz)
+            if q in hard:
+                lo[p] = max(lo[p], hard[q] - K)
+                hi[p] = min(hi[p], hard[q] + K)
+    for _ in range(len(plan)):
+        moved = False
+        for p in plan:
+            for dx, dz in N4:
+                q = (p[0] + dx, p[1] + dz)
+                if q in plan:
+                    if lo[q] - K > lo[p] + 1e-9:
+                        lo[p] = lo[q] - K
+                        moved = True
+                    if hi[q] + K < hi[p] - 1e-9:
+                        hi[p] = hi[q] + K
+                        moved = True
+        if not moved:
+            break
+    for p in plan:
+        if lo[p] > hi[p] + 1e-9:
+            # Two old roads pull this cell apart by a little more than the bounds allow: split the difference.
+            plan[p][0] = (lo[p] + hi[p]) / 2
+            continue
+        plan[p][0] = min(max(plan[p][0], lo[p]), hi[p])
+    # New cells side by side but far apart along the line (a hairpin) can still differ: take the peaks down
+    # until no two neighbours differ by more than K. This never goes below the old asphalt's bounds.
+    for _ in range(len(plan)):
+        moved = False
+        for p in plan:
+            for dx, dz in N4:
+                q = (p[0] + dx, p[1] + dz)
+                if q in plan and plan[p][0] > plan[q][0] + K + 1e-9:
+                    plan[p][0] = plan[q][0] + K
+                    moved = True
+        if not moved:
+            break
+    # Old footway still off by more than a step: bring it towards the connection.
+    queue = []
+    for p in list(plan):
+        for dx, dz in N4:
+            q = (p[0] + dx, p[1] + dz)
+            if q in old and q not in hard:
+                queue.append((q, plan[p][0], 0))
+    done = []
+    while queue:
+        q, ref, depth = queue.pop(0)
+        if q in plan:
+            continue
+        m = old.get(q) or measured_surface(q[0], q[1], ref)
+        if not m or 'concrete' not in m[1] or abs(m[0] - ref) <= STEP - 1 / 8:
+            continue
+        # Within K of every connection cell beside it, and of the old asphalt beside it too (a dropped kerb), if all can be met.
+        a, b = ref - K, ref + K
+        for dx, dz in N4:
+            r = (q[0] + dx, q[1] + dz)
+            if r in plan:
+                a, b = max(a, plan[r][0] - K), min(b, plan[r][0] + K)
+                continue
+            mr = measured_surface(r[0], r[1], m[0])
+            if mr and 'concrete' not in mr[1]:
+                a, b = max(a, mr[0] - K), min(b, mr[0] + K)
+        h = min(max(m[0], a), b) if a <= b else (a + b) / 2
+        plan[q] = [h, 'trafficcraft:concrete', 0, 0]
+        relevelled.add(q)
+        done.append(q)
+        if depth < 2:
+            for dx, dz in N4:
+                r = (q[0] + dx, q[1] + dz)
+                if r not in plan and (road[r[1] - az, r[0] - ax] or walk[r[1] - az, r[0] - ax]):
+                    queue.append((r, h, depth + 1))
+    return done
+
+
+JOIN = 4      # cells along the line from either end that count as the join
+
+
+def step_check(cid, plan, anchors, total):
+    """Steps of more than STEP between a connection cell and any paved neighbour, after rounding.
+
+    At the joins (within JOIN of either end) every such step is an error. Further along, a footway cell
+    standing more than a step off another road it runs beside gets a stone brick wall instead, so nobody
+    walks off the edge; on the carriageway it is an error."""
+    final = {p: round(v[0] * 8) / 8 for p, v in plan.items()}
+    final.update({p: a[0] for p, a in anchors.items()})
+    bad, walls = [], set()
+    for p, h in final.items():
+        if p in anchors:
+            continue
+        for dx, dz in N4:
+            q = (p[0] + dx, p[1] + dz)
+            hq = final.get(q)
+            if hq is None:
+                m = measured_surface(q[0], q[1], h)
+                hq = m[0] if m else None
+            if hq is None or abs(hq - h) <= STEP + 1e-9:
+                continue
+            feet, surface, d, s = plan[p]
+            if p not in relevelled and q not in final and JOIN <= s <= total - JOIN and 'concrete' in surface:
+                walls.add(p)
+            else:
+                bad.append([list(p), list(q), h, hq])
+    for x, z in walls:
+        h = final[(x, z)]
+        base, layers = math.floor(h) - 1, int(round((h - math.floor(h)) * 8))
+        put(x, base + (2 if layers else 1), z, 'minecraft:stone_brick_wall', cid + ' side wall over another road')
+    for b in bad:
+        errors.append([cid, 'step over half a block at the join'] + b)
+    return len(bad), len(walls)
 
 
 for c in [c for c in conns if 'repave_box' in c]:
@@ -140,6 +309,10 @@ for c in conns:
     lens = np.hypot(*seg.T)
     total = float(lens.sum())
     f0, f1 = (c['profile'][0], c['profile'][-1]) if c.get('profile') else (c.get('feet') or (declared_feet(*map(int, c['points'][0])), declared_feet(*map(int, c['points'][-1]))))
+    if c.get('measure_ends') and not c.get('profile'):
+        # End heights from the paving actually at the two end points (declared heights can be a block or two off).
+        ms = [measured_surface(*map(int, c['points'][k]), f) for k, f in ((0, f0), (-1, f1))]
+        f0, f1 = [m[0] if m else f for m, f in zip(ms, (f0, f1))]
     if c.get('profile'):
         prof = np.array(c['profile'], float)
         f0, f1 = float(prof[0]), float(prof[-1])
@@ -167,23 +340,36 @@ for c in conns:
                         cells[x, z] = (d, s)
     n0 = len(writes)
     kinds = Counter()
+    plan, anchors = {}, {}
     for (x, z), (d, s) in sorted(cells.items()):
         if road[z - az, x - ax] or walk[z - az, x - ax]:
             continue
         if c.get('profile'):
             # Walking heights given per point: interpolate along the line.
             cum = np.concatenate([[0], np.cumsum(lens)])
-            feet = round(float(np.interp(s, cum, c['profile'])) * 8) / 8
+            feet = float(np.interp(s, cum, c['profile']))
         else:
-            feet = round((f0 + (f1 - f0) * s / total) * 8) / 8
+            feet = f0 + (f1 - f0) * s / total
         surface = 'trafficcraft:asphalt' if d <= rw + .5 else 'trafficcraft:concrete'
-        adopt = existing_paving(x, z, feet)
+        adopt = existing_paving(x, z, round(feet * 8) / 8)
         if adopt is not None:
             # Paving already lies here at about the right height (an undeclared old street, say): declare it as it is.
             walk[z - az, x - ax] = True
             road[z - az, x - ax] = surface == 'trafficcraft:asphalt'
             g2[z - az, x - ax] = int(round((adopt - 1) * 2))
             kinds['adopted'] += 1
+            anchors[x, z] = (adopt, surface)
+            continue
+        plan[x, z] = [feet, surface, d, s]
+    if c.get('smooth', True) and plan:
+        relevel = smooth_junctions(c['id'], plan, anchors)
+        kinds['relevelled old footway'] = len(relevel)
+    for (x, z), (feet, surface, d, s) in sorted(plan.items()):
+        feet = round(feet * 8) / 8
+        if (x, z) in relevelled:
+            # An old footway cell brought to the connection's height so the join has no kerb.
+            deck(x, z, feet, surface, c['id'] + ' junction footway')
+            g2[z - az, x - ax] = int(round((feet - 1) * 2))
             continue
         base = math.floor(feet) - 1
         layers = int(round((feet - math.floor(feet)) * 8))
@@ -194,9 +380,16 @@ for c in conns:
             n = name(cap.state(x, y, z))
             if n in AIR:
                 continue
-            if soft(n) or n in SOIL or n in OLD_PAVING or n.startswith('trafficcraft:'):
+            if soft(n) or n in SOIL or ((n in OLD_PAVING or n.startswith('trafficcraft:')) and not tall(x, y, z)):
                 # Soil, plants, or undeclared old paving (buried or stray) above the new deck.
                 put(x, y, z, 'minecraft:air', 'connection headroom')
+            elif n in LAMP:
+                # A street lamp standing where the new road goes: the whole post comes out, lamp on top included.
+                yy = y
+                while name(cap.state(x, yy, z)) in LAMP + AIR and yy < y + 12:
+                    if name(cap.state(x, yy, z)) in LAMP:
+                        put(x, yy, z, 'minecraft:air', 'street lamp taken out')
+                    yy += 1
             else:
                 errors.append([c['id'], 'blocked', [x, y, z], n])
         # Support.
@@ -219,8 +412,9 @@ for c in conns:
         walk[z - az, x - ax] = True
         road[z - az, x - ax] = surface == 'trafficcraft:asphalt'
         g2[z - az, x - ax] = int(round((feet - 1) * 2))
+    steps = step_check(c['id'], plan, anchors, total) if c.get('smooth', True) else None
     report.append(dict(id=c['id'], length=round(total, 1), feet=[f0, f1], grade=round(abs(f1 - f0) / total, 3), columns=sum(kinds.values()),
-                       support=dict(kinds), cells=len(writes) - n0, purpose=c.get('purpose', '')))
+                       support=dict(kinds), cells=len(writes) - n0, steps_over_half=steps, purpose=c.get('purpose', '')))
 rows = [w[:5] for w in writes.values()]
 json.dump(rows, open(out / 'rows.json', 'w', encoding='utf8'))
 np.savez_compressed(out / 'network.npz', **network)
