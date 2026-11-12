@@ -44,7 +44,18 @@ ARGS_TEMPLATE = Path('F:/eva/.claude/map-work/run17.args')
 TEMPLATE_GAME_DIR = 'F:/eva/.claude/map-work/client'
 # Probe classes (MapProbeLocal and inner classes) come from the jar map-edges bakes the outer ring with.
 PROBE_JAR = Path('E:/eva-map-edges/client/mods/projectseele-0.1.0-all.jar')
-JAVAW = Path('E:/Users/liboy/jdks/jdk-17.0.19+10/bin/javaw.exe')
+JAVAW_FALLBACK = Path('E:/Users/liboy/jdks/jdk-17.0.19+10/bin/javaw.exe')
+
+
+def find_javaw():
+    """javaw.exe of JAVA_HOME when it is set and has one, otherwise the JDK 17 this machine's bakes have used."""
+    home = os.environ.get('JAVA_HOME')
+    if home and (Path(home) / 'bin/javaw.exe').is_file():
+        return Path(home) / 'bin/javaw.exe'
+    return JAVAW_FALLBACK
+
+
+JAVAW = find_javaw()
 SLOT = Path('F:/eva/.claude/client-slots/slot.py')
 SLOT_NAME = 'r63-pack'
 COPY = 'MAP_REVIEW'  # MapProbeLocal and the args template open this save
@@ -152,8 +163,9 @@ def exclusive_holder():
     rc, text = slot('status')
     if rc != 0 or 'exclusive:' not in text:
         raise SystemExit('slot.py status failed (rc %d): %s' % (rc, text.strip()[:300]))
-    line = next(l for l in text.splitlines() if l.startswith('exclusive:'))
-    return None if line.strip() == 'exclusive: none' else line.strip()
+    line = next(l for l in text.splitlines() if l.startswith('exclusive:')).strip()
+    # Our own window does not block us.
+    return None if line == 'exclusive: none' or line.startswith('exclusive: %s ' % SLOT_NAME) else line
 
 
 def wait_no_exclusive(what):
@@ -395,11 +407,18 @@ def client_log():
                 ok='Project SEELE initialized' in text and not bad)
 
 
-def run_client(args_file, minutes, purpose):
-    """One client under a slot; returns the exit text. Never starts without an 'ok:' from slot.py."""
-    wait_no_exclusive('a client')
-    rc, text = slot('acquire', SLOT_NAME, str(minutes + 10), purpose)
-    if not re.search(r'(?m)^(ok|extended):', text):
+def run_client(args_file, minutes, purpose, exclusive=False):
+    """One client under a slot, or with the whole machine (slot.py exclusive, which waits for running clients
+    to end); returns the exit text. Never starts without an 'ok:' from slot.py."""
+    while True:
+        wait_no_exclusive('a client')
+        rc, text = slot('exclusive' if exclusive else 'acquire', SLOT_NAME, str(minutes + 10), purpose)
+        if re.search(r'(?m)^(ok|extended):', text):
+            break
+        if exclusive and re.search(r'(?m)^refused:', text):
+            print('exclusive refused, retrying in a minute: ' + text.strip()[-200:], flush=True)
+            time.sleep(60)
+            continue
         raise SystemExit('No slot (rc %d): %s' % (rc, text.strip()[-400:]))
     try:
         p = subprocess.Popen([str(JAVAW), '@' + str(args_file)], cwd=str(WORK / 'client'))
@@ -470,6 +489,11 @@ def step_check(a):
     if missing:
         problems.append('shipped jar lacks R63 classes: ' + ', '.join(missing))
     jar_time = datetime.datetime.fromtimestamp((SHIP / JAR).stat().st_mtime).isoformat(timespec='minutes')
+    java = JAVAW.with_name('java.exe')
+    version = subprocess.run([str(java), '-version'], capture_output=True, text=True, errors='replace').stderr.splitlines()[:1] \
+        if java.is_file() else []
+    if not version or '"17.' not in version[0]:
+        problems.append('Forge 1.20.1 needs Java 17; %s reports %s' % (java, version))
     lock_free = world_lock_free(FORMAL)
     if not lock_free:
         notes.append('formal world is locked now (a writer or a game has it open); mirror waits for it')
@@ -512,6 +536,7 @@ def step_check(a):
         problems=problems, notes=notes, formal_world=str(FORMAL), world_lock_free=lock_free, world_files=world_files,
         newest_region=datetime.datetime.fromtimestamp(newest).isoformat(timespec='seconds'),
         shipped_jar=dict(path=str(SHIP / JAR), modified=jar_time, bytes=(SHIP / JAR).stat().st_size, r63_classes_missing=missing),
+        javaw=dict(path=str(JAVAW), from_java_home=JAVAW != JAVAW_FALLBACK, version=version[:1]),
         chunks=dict(saved=len(saved), changed_since_r62=len(changed), added=len(added), removed=len(removed)),
         lod=dict(formal_rows=len(core_rows), ring_rows=len(ring_rows), drop=len(plan['drop']), drop_by_reason=plan['why'],
                  take_from_ring=len(plan['take']), flag_parent_rebuild=len(plan['flag']), rebuild_level0=len(plan['rebuild']),
@@ -666,7 +691,7 @@ def step_core(a):
         # 4 threads in a 6 GB heap lost the first, nearest tasks to OutOfMemoryError in the 2026-11-13 trial.
         set_toml(game / 'config/DistantHorizons.toml', {'numberOfThreads': str(a.dh_threads)})
         args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'core.args', a.heap)
-        result = run_client(args, minutes, 'R63 DH core rebake')
+        result = run_client(args, minutes, 'R63 DH core rebake', a.exclusive)
         log = client_log()
         done = Path(str(script) + '.log').exists() and Path(str(script) + '.log').read_text('utf8', 'replace').rstrip().endswith('done')
         cover = coverage(world, db)
@@ -675,7 +700,7 @@ def step_core(a):
             points = viewpoints(cover['core_missing'], minimum=20)[:8]
             plan = probe_script(points, WORK / 'scripts/r63-dh-fill.json')
             args = client_args(game, {'projectseele.mapProbe': (WORK / 'scripts/r63-dh-fill.json').as_posix()}, 'fill.args', a.heap)
-            fill = dict(points=plan, result=run_client(args, sum(p['minutes'] for p in plan) + CLIENT_START_MIN + 10, 'R63 DH fill'))
+            fill = dict(points=plan, result=run_client(args, sum(p['minutes'] for p in plan) + CLIENT_START_MIN + 10, 'R63 DH fill', a.exclusive))
             cover = coverage(world, db)
     finally:
         restore_mods(game, held)
@@ -701,7 +726,7 @@ def step_xaero(a):
     moved = hold_mods(game, ['DistantHorizons-*.jar', 'oculus-*.jar'], held)
     try:
         args = client_args(game, {'projectseele.xaeroBake': 'true'}, 'xaero.args')
-        result = run_client(args, 25, 'R63 Xaero minimap bake')
+        result = run_client(args, 25, 'R63 Xaero minimap bake', a.exclusive)
     finally:
         restore_mods(game, held)
     logtext = (game / 'logs/latest.log').read_text('utf8', 'replace')
@@ -735,11 +760,15 @@ def main():
     p.add_argument('--minutes', type=int, help='core: client time limit (default: the plan plus 10)')
     p.add_argument('--fill-threshold', type=int, default=50, help='core: missing core sections tolerated without a fill pass')
     p.add_argument('--points', type=int, help='prepare: keep only the first N viewpoints (trial runs)')
-    p.add_argument('--heap', default='6G', help='core: client heap; 8G (as R62 used) needs the review session to allow it')
-    p.add_argument('--dh-threads', type=int, default=3, help='core: DH worker threads (4 at 6G ran out of heap in the trial)')
+    p.add_argument('--exclusive', action='store_true', help='core, xaero: run with the whole machine (slot.py exclusive); core then defaults to 8G and 4 DH threads')
+    p.add_argument('--heap', help='core: client heap (default 8G with --exclusive, else 6G)')
+    p.add_argument('--dh-threads', type=int, help='core: DH worker threads (default 4 with --exclusive, else 3: 4 at 6G ran out of heap in the trial)')
     p.add_argument('--no-lock', action='store_true', help='mirror: copy without holding session.lock (trial runs only, never for packing)')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
     a = p.parse_args()
+    # Review session, 2026-11-13: with the machine to ourselves R62's 8 GB / 4 threads; shared, 6 GB / 3 threads.
+    a.heap = a.heap or ('8G' if a.exclusive else '6G')
+    a.dh_threads = a.dh_threads or (4 if a.exclusive else 3)
     if a.work:
         globals()['WORK'] = Path(a.work)
     globals()['step_' + a.step](a)
