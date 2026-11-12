@@ -5,16 +5,18 @@ import org.spongepowered.asm.mixin.Mixin;
 import org.spongepowered.asm.mixin.Pseudo;
 import org.spongepowered.asm.mixin.Shadow;
 
-/** Tells {@link SbwIdlePause} which towers are switched on: those look for targets in their own tick. */
+/** Tells {@link SbwIdlePause} which towers hold a target. */
 @Pseudo
 @Mixin(targets = "com.atsuishio.superbwarfare.entity.vehicle.base.AutoAimableEntity", remap = false)
 public abstract class SbwTowerDutyMixin implements SbwIdlePause.Tower
 {
-    @Shadow public abstract boolean getActive();
+    @Shadow public abstract String getTargetUUID();
 
     @Override
-    public boolean projectseele$onDuty()
+    public boolean projectseele$hasTarget()
     {
-        return getActive();
+        // SBW keeps an empty string for no target; anything it did not write counts as one.
+        String target = getTargetUUID();
+        return target == null || !target.isBlank() && !target.equals("undefined");
     }
 }
