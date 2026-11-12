@@ -408,6 +408,35 @@ public final class EvaAnatomicalHandsR45
         body.rotations.put("lance",local.getUnnormalizedRotation(new Quaternionf()).normalize());
         body.positions.put("lance",local.transformPosition(new Vector3f(socket.pivot())).sub(socket.pivot()));body.dirty();
     }
+    /** The most the wrist gives to keep the blade out of the ground (radians: twenty degrees). */
+    private static final float BLADE_GIVE_R63=.35F;
+    /**
+     * A blade swept low meets the ground and rides along it. Unit-02's low cut carried the tip
+     * ten blocks under the ground for eight ticks. Where the tip would pass below the unit's own
+     * footing, the wrist turns the blade up to it, by no more than twenty degrees. Called before
+     * the sword is fitted to the hand, so the drawn blade and the blade that cuts are the same.
+     */
+    public static void liftBladeR63(EvaUnit01Entity e,EvaBodyPose.Sample body)
+    {
+        if(e.getWeapon()!=EvaUnit01Entity.WEAPON_SWORD_R45||!swordAttachmentReadyR45(e)||!body.rig.containsKey("hand_r"))return;
+        var sword=rig(2).sword();var grip=sword.grip();var hand=body.matrix("hand_r");
+        var fitted=new Matrix4f(hand).translate(grip.targetCentre()).rotate(grip.rotation()).translate(new Vector3f(grip.sourceCentre()).negate());
+        var wrist=hand.transformPosition(new Vector3f(body.rig.get("hand_r").pivot()));
+        var tip=fitted.transformPosition(new Vector3f(sword.bladeTip()));
+        float floor=sword.radius();
+        if(tip.y>=floor)return;
+        var blade=new Vector3f(tip).sub(wrist);float length=blade.length();
+        var axis=new Vector3f(blade).cross(0,1,0);
+        if(length<1e-3F||axis.lengthSquared()<1e-6F)return;
+        axis.normalize();
+        // Turning about the level axis across the blade raises its tip by the angle turned.
+        float now=(float)Math.asin(Mth.clamp(blade.y/length,-1,1)),clear=(float)Math.asin(Mth.clamp((floor-wrist.y)/length,-1,1));
+        float turn=Math.min(BLADE_GIVE_R63,clear-now);
+        if(turn<=0)return;
+        var turned=new Quaternionf().rotationAxis(turn,axis.x,axis.y,axis.z).mul(hand.getUnnormalizedRotation(new Quaternionf()).normalize());
+        String parent=body.rig.get("hand_r").parent();
+        body.rotations.put("hand_r",body.matrix(parent).getUnnormalizedRotation(new Quaternionf()).normalize().invert().mul(turned));body.dirty();
+    }
     public static SwordBladeR45 swordBladeWorldR45(EvaUnit01Entity e,float partial)
     {
         if(e.getWeapon()!=EvaUnit01Entity.WEAPON_SWORD_R45||!swordAttachmentReadyR45(e))return null;

@@ -798,6 +798,7 @@ public final class EvaBodyPose
         if(EvaWeaponHandlingR45.active(entity))body=EvaWeaponHandlingR45.apply(entity,body,partial);
         EvaMarineBraceR50.apply(entity,body,partial);
         if(!EvaWeaponHandlingR45.active(entity))EvaAnatomicalHandsR45.attachKnife(entity,body);
+        EvaAnatomicalHandsR45.liftBladeR63(entity,body);
         EvaAnatomicalHandsR45.attachSwordR45(entity,body);
         EvaShieldRigR47.applyCarryR48(entity,body);
         EvaShieldRigR47.attach(entity,body);
