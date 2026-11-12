@@ -167,8 +167,18 @@ public final class EvaLiveCombatMotion
         {
             return Vec3.ZERO;
         }
-        double position = Mth.clamp(progress, 0.0F, 1.0F)
-                * (clip.positions.length - 1);
+        // The source clips return to their start in their last frames: held where that begins.
+        int held = EvaRootClosureR63.holdFrom(clip, () ->
+        {
+            double[] forward = new double[clip.positions.length];
+            for (int index = 0; index < forward.length; index++)
+            {
+                forward[index] = EvaRootClosureR63.blocks(clip.positions[0].z - clip.positions[index].z);
+            }
+            return forward;
+        });
+        double position = Math.min(held, Mth.clamp(progress, 0.0F, 1.0F)
+                * (clip.positions.length - 1));
         int first = Math.min(clip.positions.length - 1,
                 (int)Math.floor(position));
         int second = Math.min(clip.positions.length - 1, first + 1);

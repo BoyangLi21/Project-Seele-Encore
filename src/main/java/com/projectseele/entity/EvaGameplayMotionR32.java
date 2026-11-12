@@ -293,8 +293,16 @@ public final class EvaGameplayMotionR32
     public static Vec3 root(EvaUnit01Entity e,String name,float phase)
     {
         phase=phase(e,name,phase);
-        var points=clip(e,name).getAsJsonArray("trajectory_m");float f=Mth.clamp(phase,0,1)*(points.size()-1);int a=(int)f,b=Math.min(a+1,points.size()-1);
+        var points=clip(e,name).getAsJsonArray("trajectory_m");
+        float f=Math.min(EvaRootClosureR63.holdFrom(points,()->forwardR63(points)),Mth.clamp(phase,0,1)*(points.size()-1));int a=(int)f,b=Math.min(a+1,points.size()-1);
         var x=points.get(a).getAsJsonArray();var y=points.get(b).getAsJsonArray();return new Vec3(Mth.lerp(f-a,x.get(0).getAsDouble(),y.get(0).getAsDouble()),0,Mth.lerp(f-a,x.get(2).getAsDouble(),y.get(2).getAsDouble()));
+    }
+    /** How far each point of a root path lies ahead of its first (blocks): the clips advance along -z. */
+    static double[] forwardR63(com.google.gson.JsonArray points)
+    {
+        double[] forward=new double[points.size()];double start=points.get(0).getAsJsonArray().get(2).getAsDouble();
+        for(int i=0;i<forward.length;i++)forward[i]=EvaRootClosureR63.blocks(start-points.get(i).getAsJsonArray().get(2).getAsDouble());
+        return forward;
     }
     public static float airAge(EvaUnit01Entity e,float partial){return age(e,AIR,partial);}
     public static float landAge(EvaUnit01Entity e,float partial){return age(e,LAND,partial);}

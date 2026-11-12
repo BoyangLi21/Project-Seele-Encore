@@ -15,6 +15,8 @@ public final class EvaCombatSupportR33
     private record ReactionOrigin(long start,Vec3 position){}
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,ReactionOrigin> REACTIONS=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,Vec3[]> TARGETS=new com.projectseele.util.WeakIdentityMap<>();
+    /** Blocks from the body's axis beyond which a planted foot has been left behind. */
+    private static final double STRAY_R63=22;
     private record FootFrame(long tick,Vec3[] feet){}
     private record ReleaseFrame(long signal,long start,Vec3[] feet){}
     private static final com.projectseele.util.WeakIdentityMap<EvaUnit01Entity,FootFrame> FINAL_FEET=new com.projectseele.util.WeakIdentityMap<>();
@@ -300,6 +302,18 @@ public final class EvaCombatSupportR33
         }
         e.getEntityData().set(CONTACTS,t);
     }
+    /**
+     * True when a planted foot is farther from the body's axis than a standing unit sets its feet (the guard stands
+     * with its toes 12 to 14 blocks out; a leg is 27 long). Not during a strike, which lunges off a planted foot,
+     * nor in a walk or a run, whose planted foot is a step old at most.
+     */
+    private static boolean leftBehindR63(EvaUnit01Entity e,CompoundTag t,Vec3 body,float partial)
+    {
+        if(t.isEmpty()||strike(e)||t.getBoolean("locomotion_r44")&&e.rifleMoveBlend(partial)>.05F)return false;
+        for(String s:new String[]{"l","r"})
+            if(t.getBoolean(s+"active")&&Math.hypot(t.getDouble(s+"x")-body.x,t.getDouble(s+"z")-body.z)>STRAY_R63)return true;
+        return false;
+    }
     private static Vec3 plantTarget(EvaUnit01Entity e,CompoundTag t,String side,float partial,float soleOffset)
     {
         long since=EvaGameplayMotionR32.directed(e)?t.getLong(side+"plant"):t.getLong("plant");
@@ -337,6 +351,12 @@ public final class EvaCombatSupportR33
                     &&Math.abs(Mth.wrapDegrees(EvaAirTransportR31.frameYaw(e,0)-anchors.getFloat("yaw")))>12;
         }
         if(release&&!e.getEntityData().get(CONTACTS).isEmpty())e.getEntityData().set(CONTACTS,new CompoundTag());
+        // R63: a unit is left where its strike took it, and the feet it stood on when the strike began are then
+        // behind it. The stance that follows was held to them: after four kicks that met nothing, 18 blocks on
+        // each, the legs were drawn 75 to 100 blocks out behind the body and the pelvis stood 5.5 blocks over the
+        // ground. (The strike used to carry the body back over them.) Outside a strike, a planted foot farther
+        // from the body than a standing unit sets its feet is let go with the other.
+        if(leftBehindR63(e,e.getEntityData().get(CONTACTS),e.position(),0))e.getEntityData().set(CONTACTS,new CompoundTag());
         var t=e.getEntityData().get(CONTACTS);
         if(t.contains("release")&&!strike(e))
         {
@@ -421,6 +441,8 @@ public final class EvaCombatSupportR33
         if(!ready(e)||!supported(e)||!EvaGameplayMotionR32.owns(e,partial)||e.isNervLogisticsLocked()||EvaShutdownR30.disabled(e))return;
         var beat=CombatFeelR31.beat(e);if(beat!=null&&(beat.kind()==CombatFeelR31.DOWN||beat.kind()==CombatFeelR31.THROWN))return;
         var t=e.getEntityData().get(CONTACTS);if(t.isEmpty()||t.getInt("weapon")!=e.getWeapon())return;
+        // A foot left behind (see tick) is not stood on, in the frames before the server has let it go either.
+        if(leftBehindR63(e,t,e.level().isClientSide?e.getPosition(partial):e.position(),partial))return;
         if(!t.contains("release"))CLIENT_RELEASES.remove(e);
         else if(e.level().isClientSide)
         {

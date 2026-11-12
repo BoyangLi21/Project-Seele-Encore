@@ -90,7 +90,9 @@ public final class EvaSwordActionsR45
     }
     private static Vec3 sourceRoot(JsonObject clip,float phase)
     {
-        var points=clip.getAsJsonArray("trajectory_m");float at=phase*(points.size()-1);int a=(int)at,b=Math.min(a+1,points.size()-1);
+        var points=clip.getAsJsonArray("trajectory_m");
+        // The sword clips return to their start in their last frames: held where that begins.
+        float at=Math.min(EvaRootClosureR63.holdFrom(points,()->EvaGameplayMotionR32.forwardR63(points)),phase*(points.size()-1));int a=(int)at,b=Math.min(a+1,points.size()-1);
         var x=points.get(a).getAsJsonArray();var y=points.get(b).getAsJsonArray();
         return new Vec3(net.minecraft.util.Mth.lerp(at-a,x.get(0).getAsDouble(),y.get(0).getAsDouble()),0,
                 net.minecraft.util.Mth.lerp(at-a,x.get(2).getAsDouble(),y.get(2).getAsDouble()));
