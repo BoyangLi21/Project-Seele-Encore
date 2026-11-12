@@ -339,9 +339,20 @@ public final class EvaPoseGraph
         return finish(entity,model,partialTick,modelToWorld,motionWrites,transitions,firearm);
     }
 
+    /**
+     * The finishing layers a body goes without while the simulation owns it (knocked down, lying, getting up).
+     * The server has held that pose to the body's ranges and set it on the ground by its own hulls; the layers
+     * below are made for a body standing on its feet. Held back to the hips' standing range, the thighs of a body
+     * getting up came round and its feet and shins stood 11 to 21 blocks in the ground for 8 to 18 ticks.
+     * -Dprojectseele.physicalFinishR63=none runs every layer on it, as before.
+     */
+    private static final Set<String> PHYSICAL_SKIPS_R63=Set.of(System.getProperty("projectseele.physicalFinishR63","feet,stance,turn,limits,weight,arms").split(","));
+    private static boolean runsR63(boolean physical,String layer){return !physical||!PHYSICAL_SKIPS_R63.contains(layer);}
+
     private static Snapshot finish(EvaUnit01Entity entity,BakedGeoModel model,float partialTick,org.joml.Matrix4f modelToWorld,
                                    EvaMotionEngineV2.BoneWrites motionWrites,EvaMotionEngineV2.BoneWrites transitions,EvaMotionEngineV2.BoneWrites firearm)
     {
+        boolean physical=com.projectseele.physics.CombatBodyDynamics.active(entity);
         EvaDorsalPose.applyVisibility(entity, model);
         EvaCannonContactRigR45.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"cannon.contact");
@@ -358,29 +369,28 @@ public final class EvaPoseGraph
                     ||com.projectseele.entity.EvaGameplayMotionR32.sharedJumpActive(entity,partialTick)))
             transitions=EvaPoseTransition.applySharedExitR45(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"shared.exit");
-        EvaFootPlacement.ensure(entity,model,partialTick,modelToWorld);
+        if(runsR63(physical,"feet"))EvaFootPlacement.ensure(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"foot.placement.finish");
-        EvaStanceFinishR56.apply(entity,model,partialTick,modelToWorld);
+        if(runsR63(physical,"stance"))EvaStanceFinishR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"stance.finish");
-        EvaTurnStepR59.apply(entity,model,partialTick,modelToWorld);
+        if(runsR63(physical,"turn"))EvaTurnStepR59.apply(entity,model,partialTick,modelToWorld);
         // The body is set on the ground as it will be drawn: with its joints already held to their
         // ranges and its forearms and shins seated on their elbows and knees. Both used to come
         // after. Kneeling down and lying, the hips are turned out past their 45 degrees; held back
         // to it afterwards, the thighs came round and the whole body, set down a moment before,
         // stood 0.7 to 0.9 blocks in the ground (shins, upper arms and belly) for as long as it lay.
-        EvaJointLimitsR57.apply(model);
-        EvaKneeHingeR63.apply(entity,model,modelToWorld,partialTick);
+        if(runsR63(physical,"limits")){EvaJointLimitsR57.apply(model);EvaKneeHingeR63.apply(entity,model,modelToWorld,partialTick);}
         EvaPoseContinuity.trace(entity,model,"joint.limits");
         seatHinges(model);
         EvaGroundContactR56.apply(entity,model,partialTick,modelToWorld);
         EvaPoseContinuity.trace(entity,model,"ground.contact");
-        EvaBodyWeightR59.apply(entity,model,partialTick);
+        if(runsR63(physical,"weight"))EvaBodyWeightR59.apply(entity,model,partialTick);
         EvaFollowThroughR56.apply(entity,model,partialTick);
         EvaPoseContinuity.trace(entity,model,"follow.through");
-        EvaArmClearanceR63.apply(entity,model,modelToWorld,partialTick);
+        if(runsR63(physical,"arms"))EvaArmClearanceR63.apply(entity,model,modelToWorld,partialTick);
         EvaPoseContinuity.trace(entity,model,"arm.clearance");
         // Follow-through leans the spine and the head: back within their ranges once more.
-        EvaJointLimitsR57.apply(model);
+        if(runsR63(physical,"limits"))EvaJointLimitsR57.apply(model);
         EvaPoseContinuity.trace(entity,model,"joint.limits.after");
         String continuityOwner=motionWrites.owner();
         EvaPoseContinuity.settle(entity,model,EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
