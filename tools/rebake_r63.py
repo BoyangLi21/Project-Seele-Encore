@@ -44,6 +44,8 @@ ARGS_TEMPLATE = Path('F:/eva/.claude/map-work/run17.args')
 TEMPLATE_GAME_DIR = 'F:/eva/.claude/map-work/client'
 # Probe classes (MapProbeLocal and inner classes) come from the jar map-edges bakes the outer ring with.
 PROBE_JAR = Path('E:/eva-map-edges/client/mods/projectseele-0.1.0-all.jar')
+# Public build of main (b5ef09c1 or later) for the DH bake client; the pack still ships the private jar.
+PUBLIC_JAR = Path('F:/eva/.claude/worktrees/motion/build/libs/projectseele-0.1.0-all.jar')
 JAVAW_FALLBACK = Path('E:/Users/liboy/jdks/jdk-17.0.19+10/bin/javaw.exe')
 
 
@@ -403,9 +405,11 @@ def client_log():
     """What the last client run's log says: a broken mod load still exits with code 0."""
     text = (WORK / 'client/logs/latest.log').read_text('utf8', 'replace')
     bad = [m for m in ('Failed to register automatic subscribers', 'Unhandled game exception', 'broken mod state',
-                       'Missing required mod', 'Registry Object not present') if m in text]
-    return dict(seele_initialized='Project SEELE initialized' in text, failures=bad, out_of_memory=text.count('OutOfMemoryError'),
-                ok='Project SEELE initialized' in text and not bad)
+                       'Missing required mod', 'Registry Object not present', 'Hand joint missing', 'missing registry entries',
+                       'Encountered an unexpected exception', 'This crash report has been saved') if m.lower() in text.lower()]
+    world = 'logged in with entity id' in text or 'Preparing start region' in text
+    return dict(seele_initialized='Project SEELE initialized' in text, world_opened=world, failures=bad,
+                out_of_memory=text.count('OutOfMemoryError'), ok='Project SEELE initialized' in text and world and not bad)
 
 
 def run_client(args_file, minutes, purpose, exclusive=False):
@@ -563,8 +567,86 @@ def step_instance(a):
     guard(game / 'options.txt').write_text(options, 'utf8')
     guard(WORK / 'jars').mkdir(parents=True, exist_ok=True)
     shutil.copyfile(SHIP / JAR, guard(WORK / 'jars/final.jar'))
-    probe_jar(SHIP / JAR, WORK / 'jars/probe.jar')
-    save('instance', dict(game=str(game), robocopy=tail, dh=DH_BAKE, final_jar_bytes=(WORK / 'jars/final.jar').stat().st_size))
+    # The private jar's 821 MB Unit-00 prototype mesh filled most of a heap on its own (map-edges' server OOM,
+    # 2026-11-13 06:26), but the public build cannot open the world: the server reads the three units' private
+    # meshes, hands and GEO before it loads (dry start 07:17). So the bake jar is the shipped jar with only the
+    # heavy client-render meshes swapped for the public build's placeholders.
+    bake = slim_jar(SHIP / JAR, Path(a.bake_jar), WORK / 'jars/bake.jar')
+    missing = jar_classes(bake)
+    if missing:
+        raise SystemExit('Bake jar lacks R63 classes: ' + ', '.join(missing))
+    probe_jar(bake, WORK / 'jars/probe.jar')
+    save('instance', dict(game=str(game), robocopy=tail, dh=DH_BAKE, final_jar_bytes=(WORK / 'jars/final.jar').stat().st_size,
+                          bake_jar=dict(path=str(bake), bytes=bake.stat().st_size, sha256=sha256_file(bake),
+                                        modified=datetime.datetime.fromtimestamp(bake.stat().st_mtime).isoformat(timespec='seconds')),
+                          probe_jar_bytes=(WORK / 'jars/probe.jar').stat().st_size))
+
+
+HEAVY_RENDER_MESHES = ('assets/projectseele/mesh/eva_prototype.mesh.json',)  # only EvaUnit01Renderer reads it
+
+
+def slim_jar(private, public, out):
+    """private with each HEAVY_RENDER_MESHES entry taken from public; every class and other asset unchanged."""
+    guard(out)
+    partial = out.with_suffix('.partial')
+    with zipfile.ZipFile(public) as pub, zipfile.ZipFile(private) as src, \
+            zipfile.ZipFile(partial, 'w', zipfile.ZIP_DEFLATED, compresslevel=1, allowZip64=True) as dst:
+        for name in HEAVY_RENDER_MESHES:
+            if name not in pub.namelist():
+                raise SystemExit('Public build has no placeholder for ' + name)
+        for info in src.infolist():
+            source = pub if info.filename in HEAVY_RENDER_MESHES else src
+            entry = source.getinfo(info.filename)
+            target = zipfile.ZipInfo(entry.filename, entry.date_time)
+            target.compress_type = entry.compress_type  # ZipInfo defaults to stored
+            with source.open(entry) as reader, dst.open(target, 'w', force_zip64=True) as writer:
+                shutil.copyfileobj(reader, writer, 1 << 20)
+    with zipfile.ZipFile(partial) as check, zipfile.ZipFile(private) as src:
+        same = [n for n in src.namelist() if n not in HEAVY_RENDER_MESHES and check.getinfo(n).CRC != src.getinfo(n).CRC]
+        if same or check.namelist() != src.namelist():
+            raise SystemExit('Slim bake jar differs from the shipped jar beyond the swapped meshes: %s' % same[:5])
+    os.replace(partial, out)
+    return out
+
+
+def sha256_file(path):
+    import hashlib
+    digest = hashlib.sha256()
+    with Path(path).open('rb') as handle:
+        for block in iter(lambda: handle.read(1 << 20), b''):
+            digest.update(block)
+    return digest.hexdigest()
+
+
+def step_drystart(a):
+    """Open the mirror with the bake jar for a few minutes, DH on, and read the log. Changes the mirror's LOD
+    database, so run mirror and prepare again before core."""
+    game = WORK / 'client'
+    script = WORK / 'scripts/r63-dry.json'
+    minutes = a.minutes or 3
+    steps = [dict(op='cmd', text='gamerule doDaylightCycle false', wait=5), dict(op='cmd', text='time set 6000', wait=minutes * 1200)]
+    guard(script).parent.mkdir(parents=True, exist_ok=True)
+    script.write_text(json.dumps(steps), 'utf8')
+    Path(str(script) + '.log').unlink(missing_ok=True)
+    started = time.time()
+    shutil.copyfile(WORK / 'jars/probe.jar', guard(game / JAR))
+    held = WORK / 'mods-held'
+    moved = hold_mods(game, ['oculus-*.jar'], held)
+    try:
+        set_toml(game / 'config/DistantHorizons.toml', {'numberOfThreads': str(a.dh_threads)})
+        args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'dry.args', a.heap)
+        result = run_client(args, minutes + 10, 'R63 bake jar dry start', a.exclusive)
+    finally:
+        restore_mods(game, held)
+        shutil.copyfile(WORK / 'jars/final.jar', game / JAR)
+    log = client_log()
+    done = Path(str(script) + '.log').exists() and Path(str(script) + '.log').read_text('utf8', 'replace').rstrip().endswith('done')
+    crashes = [p.name for p in (game / 'crash-reports').glob('*.txt') if p.stat().st_mtime > started] if (game / 'crash-reports').exists() else []
+    ok = log['ok'] and done and not crashes
+    save('drystart', dict(ok=ok, client=result, client_log=log, script_done=done, crash_reports=crashes, heap=a.heap,
+                          dh_threads=a.dh_threads, held_mods=moved, note='the mirror LOD database was used: run mirror and prepare before core'))
+    if not ok:
+        raise SystemExit('Dry start failed')
 
 
 BATCH_LOG = ROOT / 'docs/HAKONE_EXECUTION_ORDER_20261105.zh.md'
@@ -807,7 +889,8 @@ def step_report(a):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('step', choices=['check', 'instance', 'mirror', 'prepare', 'core', 'xaero', 'report'])
+    p.add_argument('step', choices=['check', 'instance', 'mirror', 'prepare', 'drystart', 'core', 'xaero', 'report'])
+    p.add_argument('--bake-jar', default=str(PUBLIC_JAR), help='instance: public build of main whose placeholder meshes replace the heavy render meshes in the bake jar')
     p.add_argument('--world', help='prepare: world whose saved chunks count (default: the mirror)')
     p.add_argument('--db', help='prepare: database to change in place (default: the mirror\'s GeoFront database); must be under WORK')
     p.add_argument('--ring-db', help='prepare: outer ring database (default: the map-edges copy on E:)')

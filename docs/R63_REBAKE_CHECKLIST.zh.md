@@ -48,6 +48,14 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
 
 所以第 455 批时打包还差：外圈烘完后的 `instance`、`mirror`、`prepare`，然后独占窗口里的 `core`；Fable 的 R63 代码装机后重跑一次 `--check`（jar 比对）。
 
+### 烘焙客户端用的 jar（2026-11-13 07:15–07:33）
+
+主会话要求 DH 烘焙客户端不用 415 MB 的私有 jar：私有 jar 里 821 MB 的零号机原型模型（`mesh/eva_prototype.mesh.json`）启动就读进堆，Fable 量到光它就占约 5.5 GB；map-edges 06:26 那次服务端 OOM 也是这个原因。打包照旧用私有 jar。
+- **纯公开 jar 打不开世界。** 07:17 干跑：服务端开服前 `EvaMechanicalFrameR52.prepareBeforeServerLoadR52` 要读三台机体的私有模型、手部模型和 GEO，公开 jar 里没有 `mesh/eva_unit00.mesh.json`，世界载入前崩溃（`crash-2026-11-13_07.17.36-server.txt`）。
+- **改用瘦身 jar。** `instance` 现在生成 `jars/bake.jar`：打包那份私有 jar，只把 `eva_prototype.mesh.json` 换成公开构建（`--bake-jar`，默认 motion 工作树在 main b5ef09c1 上编的 jar）里 26 MB 的占位版。这个文件只有客户端渲染器读。其余 3,322 个条目逐个 CRC 核对和打包 jar 一致，类也完全相同。jar 从 415 MB 降到 325 MB，解压后少约 800 MB。`jars/probe.jar` = 瘦身 jar + 探针类。
+- **07:28–07:33 干跑通过**（`drystart`，6 GB、3 线程、普通槽位）：`Project SEELE initialized`，内置服务器启动，07:29:54 玩家进入世界，DH 四个维度启动，3 分钟脚本跑完后正常退出；没有崩溃报告、内存溢出、缺方块或缺映射的行。
+- 干跑用过镜像里的远景库，所以 `core` 之前照原计划重跑 `mirror` 和 `prepare`。
+
 ## 开始之前
 
 - [ ] 地图会话说最后一批写完了。批次以 `docs/HAKONE_EXECUTION_ORDER_20261105.zh.md` 的批次表为准，`mirror --batch N` 会核对。之后任何一次写入都要从“镜像”重来；`core` 发现正式世界的区域文件在镜像之后变过会拒绝。
@@ -61,7 +69,7 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
 | # | 命令 | 时间 | 看什么 |
 |---|---|---|---|
 | 1 | `frpy tools/rebake_r63.py check` | 20 秒 | `problems` 为空；记下变动区块数、视点、外圈覆盖率、估时和磁盘 |
-| 2 | `frpy tools/rebake_r63.py instance` | 3 分钟 | 把主客户端（不含存档、日志、旧小地图）复制到 `E:/eva-r63-rebake/client`，0.77 GB；DH 配置改成烘焙用，静音；`jars/` 里有最终 jar 和加了探针类的 jar |
+| 2 | `frpy tools/rebake_r63.py instance` | 1 分钟 | 把主客户端（不含存档、日志、旧小地图）复制到 `E:/eva-r63-rebake/client`，0.77 GB；DH 配置改成烘焙用，静音；`jars/` 里有最终 jar、瘦身 jar（prototype 模型换成公开占位版）和加了探针类的瘦身 jar。公开构建要是 main 的当前版本（`--bake-jar`） |
 | 3 | `frpy tools/rebake_r63.py mirror --batch <批次>` | 约 4 分钟（持锁复制再两边算哈希） | 期间持有正式世界的 `session.lock`，地图会话的写入会等；全部文件 sha256 一致；把两个总哈希抄进本清单 |
 | 4 | `frpy tools/rebake_r63.py prepare` | 1 分钟 | `integrity` = ok；`world_unchanged_since_mirror` = true；删/取/打标数目和上次同一量级；视点和分钟数 |
 | 5 | `frpy tools/rebake_r63.py core --exclusive`（8 GB、4 线程；`slot.py exclusive r63-pack` 会等别的客户端退出） | 30–40 分钟，缺得多时再加 15–25 分钟的补烘 | 先拿到 slot 的 `ok:` 才启动；`ok` = true：模组加载成功、脚本跑完、quick_check ok、核心缺段不超过 50；`pending_parent_updates` 接近 0；`out_of_memory` 应为 0 |
@@ -91,7 +99,7 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
 - **内存。** 6 GB 堆配 4 个 DH 线程会溢出，近处的段会漏（试跑实测）。最终重烘用 `--exclusive`（8 GB、4 线程）；不独占时默认 6 GB、3 线程。第 5 步结束看 `out_of_memory`，不为 0 时缺段多半要靠补烘。
 - **上层重建在试跑里验证过**（打标 828 → 24，7–9 层重建回来）。剩下的少量标记服务器第一次启动时 DH 也会处理。
 - **边缘段的取舍是近似的。** 边缘 level-0 行优先用外圈库里的（第 415 批的核心边缘 + 新边界）；只要其中有区块在 R62 之后变过，就改由第 5 步从已保存区块重建，这样不会带回旧内容，但边缘段里外圈那一半会空着，直到玩家走近。
-- **探针类。** 第 5 步从 map-edges 烘外圈用的 jar（`E:/eva-map-edges/client/mods/`）取 `MapProbeLocal` 和它的内部类（只在本机，不进仓库），加进最终 jar。它的 `tp` 等满 1200 刻就超时，所以悬停用 `cmd` 步骤等待，和 map-edges 一样。map-edges 收工删副本前，先跑一次 `instance`，`jars/probe.jar` 就留在工作目录里了。
+- **探针类。** 第 5 步从 map-edges 烘外圈用的 jar（`E:/eva-map-edges/client/mods/`）取 `MapProbeLocal` 和它的内部类（只在本机，不进仓库），加进瘦身 jar。它的 `tp` 等满 1200 刻就超时，所以悬停用 `cmd` 步骤等待，和 map-edges 一样。map-edges 收工删副本前，先跑一次 `instance`，`jars/probe.jar` 就留在工作目录里了。
 - **第 5、6 步要客户端槽位。** 夜里两个槽位常被占满，`acquire` 会排队等。
 
 ## 读正式世界的远景库
