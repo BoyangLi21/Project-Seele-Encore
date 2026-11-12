@@ -16,6 +16,8 @@ public final class EvaFootPlacement
     public static final Map<Integer,double[]> LAST=new HashMap<>();
     /** Per EVA, what ground contact decided in its last frame (written by EvaGroundContactR56 while a review records). */
     public static final Map<Integer,double[]> GROUNDING=new HashMap<>();
+    /** Review witness of EvaGroundContactR56.witnessLowestR63: world height of the lowest drawn hull point, its part. */
+    public static final Map<Integer,double[]> LOWEST_R63=new HashMap<>();
     /** Per EVA, last frame: highest ground found under either sole, above the drawn ground (blocks). */
     private static final Map<Integer,Double> LEDGE=new HashMap<>();
     public static double ledgeUnderFoot(EvaUnit01Entity eva){return LEDGE.getOrDefault(eva.getId(),Double.NEGATIVE_INFINITY);}

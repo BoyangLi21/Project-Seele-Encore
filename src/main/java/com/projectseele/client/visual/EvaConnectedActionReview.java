@@ -1102,7 +1102,8 @@ public final class EvaConnectedActionReview
         row.add("bones", transforms);
         // What the terrain stages decided this frame (EvaFootPlacement.LAST and GROUNDING).
         for (var witness : new Object[][]{{"footPlacement", com.projectseele.client.render.EvaFootPlacement.LAST.get(eva.getId())},
-                {"groundContact", com.projectseele.client.render.EvaFootPlacement.GROUNDING.get(eva.getId())}})
+                {"groundContact", com.projectseele.client.render.EvaFootPlacement.GROUNDING.get(eva.getId())},
+                {"lowestHull", com.projectseele.client.render.EvaFootPlacement.LOWEST_R63.get(eva.getId())}})
         {
             if (!(witness[1] instanceof double[] values)) continue;
             JsonArray list = new JsonArray();

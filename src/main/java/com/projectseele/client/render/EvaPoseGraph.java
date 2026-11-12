@@ -403,6 +403,7 @@ public final class EvaPoseGraph
         // Last word on the joints: every layer above may have turned a forearm or shin (lag, limits,
         // continuity residuals decayed apart from rotation); seat each back on its real elbow/knee centre.
         seatHinges(model);
+        EvaGroundContactR56.witnessLowestR63(entity,model,modelToWorld);
         EvaPowerAttachmentR25.capture(entity,model,modelToWorld);
         EvaPoseTransition.recordFinal(entity,model);
         EvaShutdownPoseR30.rememberFinalLiveR45(entity,model);

@@ -369,6 +369,29 @@ final class EvaGroundContactR56
         return step((tilt-LEVEL_SHIN)/(INSTEP_SHIN-LEVEL_SHIN));
     }
 
+    /**
+     * Review witness: the world height of the lowest point of the body as this frame draws it, and the index in
+     * PARTS of the part it belongs to. On the unit's own hull points, whatever owns the pose: the offline scan has
+     * no mesh for UN-00 and put a UN unit's bones on Unit-01's.
+     */
+    static void witnessLowestR63(EvaUnit01Entity eva,BakedGeoModel model,Matrix4f root)
+    {
+        if(root==null||!com.projectseele.client.visual.EvaConnectedActionReview.ENABLED)return;
+        var hulls=hulls(eva);
+        if(hulls.isEmpty())return;
+        float lowest=Float.POSITIVE_INFINITY;int part=-1;
+        for(int i=0;i<PARTS.length;i++)
+        {
+            var bone=model.getBone(PARTS[i]).orElse(null);var points=hulls.get(PARTS[i]);
+            if(bone==null||points==null||bone.isHidden())continue;
+            float y=lowest(new Matrix4f(root).mul(EvaRigTransforms.model(bone)),points);
+            if(y<lowest){lowest=y;part=i;}
+        }
+        if(part<0)return;
+        if(EvaFootPlacement.LOWEST_R63.size()>32)EvaFootPlacement.LOWEST_R63.clear();
+        EvaFootPlacement.LOWEST_R63.put(eva.getId(),new double[]{lowest,part});
+    }
+
     private static float lowest(BakedGeoModel model,Matrix4f root,Map<String,Vector3f[]> hulls)
     {
         float lowest=Float.POSITIVE_INFINITY;
