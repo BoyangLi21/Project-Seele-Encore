@@ -594,6 +594,7 @@ public final class EvaConnectedActionReview
         if(ATF){atFieldR63(mc,eva);positionCamera(mc,eva);return;}
         if(ARMS!=null){armsR63(mc);positionCamera(mc,eva);return;}
         if(EVADE){evadeR63(mc,eva);positionCamera(mc,eva);return;}
+        if(HITS){hitsR63(mc,eva);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<Math.max(140,DASH_END+10)||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -703,7 +704,7 @@ public final class EvaConnectedActionReview
         int t=tick;
         mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
         Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),right=new Vec3(-fwd.z,0,fwd.x);
-        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit="@e[type=projectseele:eva_unit01,limit=1,sort=nearest]";
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
         if(at(1))
         {
             // A field turns /kill away: an Angel left by an earlier run is emptied instead.
@@ -788,6 +789,48 @@ public final class EvaConnectedActionReview
      * ticks into the next. Run with tourEnd=600.
      */
     private static final boolean EVADE=Boolean.getBoolean("projectseele.tourEvadeR63");
+    /**
+     * -Dprojectseele.tourHitsR63=true: the piloted unit is struck with its field off. Two light hits from no body
+     * (a flinch each), two from a still Sachiel ahead (a stagger each), a third while it walks, then three heavy
+     * blows in a row from ahead, from behind and from its right: each row knocks it down, it gets up by itself
+     * and is repaired. Run with tourEnd=1140.
+     */
+    private static final boolean HITS=Boolean.getBoolean("projectseele.tourHitsR63");
+    private static void hitsR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        boolean walk=tick>=200&&tick<270;
+        mc.options.keyUp.setDown(walk);mc.player.setYRot(0);mc.player.setXRot(0);
+        if(!walk){mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;}
+        Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),right=new Vec3(-fwd.z,0,fwd.x);
+        // The piloted unit by its own id. Units 00 and 02 and the UN units are entity types of their own: "the nearest
+        // eva_unit01" was Unit-01 on the pad beside them, which took every blow of their tours while they stood idle.
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");}
+        // The still Sachiel each part's blows come from: ahead, behind, to the right.
+        int[] placed={2,560,820};
+        for(int part=0;part<placed.length;part++)
+        {
+            if(at(placed[part]))removeTargetR63(mc,"sachiel");
+            if(at(placed[part]+12))
+            {
+                Vec3 a=eva.position().add((part==0?fwd:part==1?fwd.scale(-1):right).scale(40));
+                double yaw=Math.toDegrees(Math.atan2(-(eva.getX()-a.x),eva.getZ()-a.z));
+                mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,yaw));
+            }
+        }
+        if(at(40)||at(70))mc.player.connection.sendCommand("damage "+unit+" 6 minecraft:generic");
+        if(at(110)||at(230))mc.player.connection.sendCommand("damage "+unit+" 6 minecraft:mob_attack by "+angel);
+        if(at(150))mc.player.connection.sendCommand("damage "+unit+" 20 minecraft:mob_attack by "+angel);
+        // The light blows above have taken 44 points, and a piloted Unit-01 at 50 goes berserk: the first row of
+        // heavy blows left it there and the rest of the tour was the berserk unit's. It is repaired first.
+        if(at(300))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        // Three heavy blows eleven ticks apart (vanilla's hurt cooldown is ten) fill the poise: the third knocks down.
+        for(int row:new int[]{340,620,880})
+        {
+            for(int n=0;n<3;n++)if(at(row+n*11))mc.player.connection.sendCommand("damage "+unit+" 75 minecraft:mob_attack by "+angel);
+            if(at(row+190))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        }
+    }
     private static void evadeR63(Minecraft mc,EvaUnit01Entity eva)
     {
         mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
@@ -805,7 +848,7 @@ public final class EvaConnectedActionReview
         if(at(345))mc.player.connection.sendCommand(ARM+"knife");
         // The slip: a blow by another body five ticks into an evade, and one twelve ticks into the next. The server
         // is asked for the unit's health before and after each (the answers are in the log).
-        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit="@e[type=projectseele:eva_unit01,limit=1,sort=nearest]";
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
         if(at(432))
         {
             Vec3 a=eva.position().add(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(60));
@@ -1004,6 +1047,13 @@ public final class EvaConnectedActionReview
         row.addProperty("heavyActive", eva.isHeavyMotionActive());
         row.addProperty("phaseSent", eva.liveActionPhaseSentR63());
         row.addProperty("phaseDrawn", eva.liveActionPhaseDrawnR63(partialTick));
+        // The pose key does not tell a struck body from a standing one: the reaction it is in, how long, and
+        // whether the knocked-down body is falling or lying (1) or getting up (2).
+        var beat=com.projectseele.entity.CombatFeelR31.beat(eva);
+        if(beat!=null){row.addProperty("beat",beat.kind());row.addProperty("beatAge",com.projectseele.entity.CombatFeelR31.age(eva,partialTick));}
+        int fallen=com.projectseele.physics.CombatBodyDynamics.phase(eva);
+        if(fallen!=0)row.addProperty("fallen",fallen);
+        row.addProperty("health",eva.getHealth());
         if (TOUR) row.addProperty("writers", com.projectseele.client.render.EvaPoseGraph.traceWriters(eva));
         if (LAUNCH)
         {
