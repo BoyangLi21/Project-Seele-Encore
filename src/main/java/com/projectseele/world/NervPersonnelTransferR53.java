@@ -37,6 +37,10 @@ public final class NervPersonnelTransferR53
     {
         PathSpec seele$transferPath();
         boolean seele$transferActive();
+        /** Client: a group sync arrives as a new group object; carry on from the car it replaces. */
+        void seele$continueFrom(ElevatorGroup previous);
+        /** Client: the car still travels toward the transfer level, so a sync placing it there would skip its riders. */
+        boolean seele$approachingTransfer();
     }
     private static final class Cached
     {

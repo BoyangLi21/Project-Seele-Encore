@@ -28,8 +28,6 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     @Unique private PathSpec seele$path;
     /** Client: where this car still was when the server's transfer sync placed it on the transfer level. */
     @Unique private double seele$approachFrom=Double.NaN;
-    @Unique private double seele$readFromY=Double.NaN;
-    @Unique private double seele$readFromLastY;
     @Unique private boolean seele$transferring;
     @Unique private boolean seele$descending;
     @Unique private long seele$started=-1;
@@ -185,25 +183,22 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     {
         var path=seele$path();if(path==null)return;var tag=path.encode();tag.putBoolean("Active",seele$transferring);tag.putBoolean("Descending",seele$descending);tag.putLong("Started",seele$started);tag.putInt("Duration",seele$duration);tag.putDouble("Fraction",seele$fraction);result.getReturnValue().put(NervPersonnelTransferR53.TAG,tag);
     }
-    @Inject(method="read",at=@At("HEAD"),remap=false)
-    private void seele$beforeRead(CompoundTag input,CallbackInfo ci)
-    {
-        boolean approaching=!seele$transferring||!Double.isNaN(seele$approachFrom);
-        seele$readFromY=level.isClientSide&&isMoving&&seele$path!=null&&approaching?currentY:Double.NaN;seele$readFromLastY=lastY;
-    }
     @Inject(method="read",at=@At("TAIL"),remap=false)
     private void seele$readTransfer(CompoundTag input,CallbackInfo ci)
     {
-        double from=seele$readFromY;seele$readFromY=Double.NaN;seele$approachFrom=Double.NaN;
         var tag=input.getCompound(NervPersonnelTransferR53.TAG);if(tag.isEmpty()){seele$path=null;seele$transferring=false;return;}
         seele$path=PathSpec.decode(tag);seele$transferring=tag.getBoolean("Active");seele$descending=tag.getBoolean("Descending");seele$started=tag.getLong("Started");seele$duration=Math.max(1,tag.getInt("Duration"));seele$fraction=tag.getDouble("Fraction");
-        if(!level.isClientSide||!seele$transferring)return;
-        syncCurrentY=Integer.MAX_VALUE;
-        // The server enters the transfer when its own car crosses the level, so this sync often finds
-        // the client car about a tick of travel short of it. Keep the car where it was drawn; the next
-        // update carries it and its riders the rest of the way.
-        double remaining=from-seele$path.transferY();
-        if(isMoving&&!Double.isNaN(from)&&(seele$descending?remaining>0:remaining<0))
-        {seele$approachFrom=from;currentY=from;lastY=seele$readFromLastY;}
+    }
+    @Override public boolean seele$approachingTransfer()
+    {return level.isClientSide&&isMoving&&seele$path!=null&&(!seele$transferring||!Double.isNaN(seele$approachFrom));}
+    @Override public void seele$continueFrom(ElevatorGroup previous)
+    {
+        // The server enters the transfer when its own car crosses the level, so its sync often finds the
+        // client car a tick or two of travel short of it. Keep the car where it was drawn; the next update
+        // carries it and its riders the rest of the way.
+        if(!level.isClientSide||!isMoving||!seele$transferring||seele$path==null)return;
+        if(!(previous instanceof NervPersonnelTransferR53.NativeState old)||!old.seele$approachingTransfer())return;
+        double from=previous.getCurrentY(),remaining=from-seele$path.transferY();
+        if(seele$descending?remaining>0:remaining<0){seele$approachFrom=from;currentY=from;lastY=previous.getLastY();}
     }
 }
