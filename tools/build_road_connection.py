@@ -211,40 +211,84 @@ def smooth_junctions(cid, plan, anchors):
                     moved = True
         if not moved:
             break
-    # Old footway still off by more than a step: bring it towards the connection.
-    queue = []
-    for p in list(plan):
-        for dx, dz in N4:
-            q = (p[0] + dx, p[1] + dz)
-            if q in old and q not in hard:
-                queue.append((q, plan[p][0], 0))
+    # Old footway still off by more than a step: bring it towards the connection; repeat with the flattening
+    # below until neither moves anything (each can undo a little of the other).
     done = []
-    while queue:
-        q, ref, depth = queue.pop(0)
-        if q in plan:
+    for _round in range(4):
+        queue = []
+        for p in list(plan):
+            for dx, dz in N4:
+                q = (p[0] + dx, p[1] + dz)
+                if q not in plan and q not in hard:
+                    queue.append((q, plan[p][0], 0))
+        while queue:
+            q, ref, depth = queue.pop(0)
+            if q in plan:
+                continue
+            m = old.get(q) or measured_surface(q[0], q[1], ref)
+            if not m or 'concrete' not in m[1] or abs(m[0] - ref) <= STEP - 1 / 8:
+                continue
+            # Within K of every connection cell beside it, and of the old asphalt beside it too (a dropped kerb), if all can be met.
+            a, b = ref - K, ref + K
+            for dx, dz in N4:
+                r = (q[0] + dx, q[1] + dz)
+                if r in plan:
+                    a, b = max(a, plan[r][0] - K), min(b, plan[r][0] + K)
+                    continue
+                mr = measured_surface(r[0], r[1], m[0])
+                if mr and 'concrete' not in mr[1]:
+                    a, b = max(a, mr[0] - K), min(b, mr[0] + K)
+            h = min(max(m[0], a), b) if a <= b else (a + b) / 2
+            plan[q] = [h, 'trafficcraft:concrete', 0, 0]
+            relevelled.add(q)
+            done.append(q)
+            if depth < 2:
+                for dx, dz in N4:
+                    r = (q[0] + dx, q[1] + dz)
+                    if r not in plan and (road[r[1] - az, r[0] - ax] or walk[r[1] - az, r[0] - ax]):
+                        queue.append((r, h, depth + 1))
+        # Once more over everything planned, relevelled footway included: no two neighbours more than K apart.
+        for _ in range(len(plan)):
+            moved = False
+            for p in plan:
+                for dx, dz in N4:
+                    q = (p[0] + dx, p[1] + dz)
+                    if q in plan and plan[p][0] > plan[q][0] + K + 1e-9 and plan[p][0] > lo.get(p, -1e9) + 1e-9:
+                        plan[p][0] = max(plan[q][0] + K, lo.get(p, -1e9))
+                        moved = True
+            if not moved:
+                break
+    # Last repair: any old paving still more than a step off a planned neighbour joins the transition,
+    # asphalt too (the old road ramps into the new one), up to three cells out, then one more flattening.
+    rq = [((p[0] + dx, p[1] + dz), p, 0) for p in list(plan) for dx, dz in N4]
+    while rq:
+        q, p, depth = rq.pop(0)
+        if q in plan or p not in plan:
             continue
-        m = old.get(q) or measured_surface(q[0], q[1], ref)
-        if not m or 'concrete' not in m[1] or abs(m[0] - ref) <= STEP - 1 / 8:
+        m = measured_surface(q[0], q[1], plan[p][0])
+        if not m or abs(m[0] - plan[p][0]) <= STEP - 1 / 8:
             continue
-        # Within K of every connection cell beside it, and of the old asphalt beside it too (a dropped kerb), if all can be met.
-        a, b = ref - K, ref + K
+        a, b = -1e9, 1e9
         for dx, dz in N4:
             r = (q[0] + dx, q[1] + dz)
             if r in plan:
                 a, b = max(a, plan[r][0] - K), min(b, plan[r][0] + K)
-                continue
-            mr = measured_surface(r[0], r[1], m[0])
-            if mr and 'concrete' not in mr[1]:
-                a, b = max(a, mr[0] - K), min(b, mr[0] + K)
         h = min(max(m[0], a), b) if a <= b else (a + b) / 2
-        plan[q] = [h, 'trafficcraft:concrete', 0, 0]
+        plan[q] = [h, 'trafficcraft:asphalt' if 'asphalt' in m[1] else 'trafficcraft:concrete', 0, 0]
         relevelled.add(q)
         done.append(q)
-        if depth < 2:
+        if depth < 3:
+            rq += [((q[0] + dx, q[1] + dz), q, depth + 1) for dx, dz in N4]
+    for _ in range(len(plan)):
+        moved = False
+        for p in plan:
             for dx, dz in N4:
-                r = (q[0] + dx, q[1] + dz)
-                if r not in plan and (road[r[1] - az, r[0] - ax] or walk[r[1] - az, r[0] - ax]):
-                    queue.append((r, h, depth + 1))
+                q = (p[0] + dx, p[1] + dz)
+                if q in plan and plan[p][0] > plan[q][0] + K + 1e-9:
+                    plan[p][0] = plan[q][0] + K
+                    moved = True
+        if not moved:
+            break
     return done
 
 
@@ -271,6 +315,11 @@ def step_check(cid, plan, anchors, total):
                 hq = m[0] if m else None
             if hq is None or abs(hq - h) <= STEP + 1e-9:
                 continue
+            if p in relevelled and q not in final:
+                # Both old paving: a step that was there before the connection is the old road's own, not the join's.
+                mp = measured_surface(p[0], p[1], h)
+                if mp and abs(mp[0] - hq) > STEP + 1e-9:
+                    continue
             feet, surface, d, s = plan[p]
             if p not in relevelled and q not in final and JOIN <= s <= total - JOIN and 'concrete' in surface:
                 walls.add(p)
@@ -342,14 +391,17 @@ for c in conns:
     kinds = Counter()
     plan, anchors = {}, {}
     for (x, z), (d, s) in sorted(cells.items()):
-        if road[z - az, x - ax] or walk[z - az, x - ax]:
-            continue
         if c.get('profile'):
             # Walking heights given per point: interpolate along the line.
             cum = np.concatenate([[0], np.cumsum(lens)])
             feet = float(np.interp(s, cum, c['profile']))
         else:
             feet = f0 + (f1 - f0) * s / total
+        if road[z - az, x - ax] or walk[z - az, x - ax]:
+            # Declared and paved: the old road, left as it is. Declared but grass (a stale declaration left
+            # by an earlier cut-back): built like any new cell, or the join keeps a grass sill.
+            if (x, z) in GONE or measured_surface(x, z, feet):
+                continue
         surface = 'trafficcraft:asphalt' if d <= rw + .5 else 'trafficcraft:concrete'
         adopt = existing_paving(x, z, round(feet * 8) / 8)
         if adopt is not None:
