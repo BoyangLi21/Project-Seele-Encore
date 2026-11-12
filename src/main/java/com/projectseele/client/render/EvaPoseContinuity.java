@@ -33,6 +33,7 @@ final class EvaPoseContinuity
     private static final long STALE_NANOS = 300_000_000L;
     /** Development diagnostic: log pose pops and tick-held bones (-Dprojectseele.poseDiag=true). */
     private static final boolean DIAG = Boolean.getBoolean("projectseele.poseDiag");
+    private static final boolean PHYSICAL_GIVEN_R63 = !"false".equals(System.getProperty("projectseele.physicalSettleR63"));
     private static final java.util.Set<String> DIAG_BONES = java.util.Set.of("root", "torso_lower", "torso_upper", "neck", "head",
             "clavicle_l", "arm_l", "forearm_l", "hand_l", "clavicle_r", "arm_r", "forearm_r", "hand_r",
             "leg_l", "shin_l", "foot_l", "leg_r", "shin_r", "foot_r");
@@ -53,6 +54,8 @@ final class EvaPoseContinuity
         int diagLines;
         final Map<String, int[]> diagCounts = new HashMap<>();
         Map<String, float[]> offsets;
+        /** The simulation owned the body on the last frame drawn. */
+        boolean physical;
         /** The undamped pose of the last frame of a running blend. */
         Map<String, float[]> lastTarget;
         long blendStart;
@@ -119,7 +122,25 @@ final class EvaPoseContinuity
         {
             gaitTrace(entity, model, partialTick, now);
         }
-        if (!repeat && now - state.lastNanos < STALE_NANOS && !state.last.isEmpty())
+        // While the simulation keeps a body no blend starts, and the frame it is handed back on is drawn as
+        // given. The server moves the unit under the body as it tumbles and gets up, and ends the get-up on the
+        // standing pose with the unit set under it in the same tick: the bones jump in the unit's own frame by
+        // what the unit jumped in the world, and nothing moves. Blended from the bones of the frame before, a
+        // body handed back was drawn 21 blocks off and 59 degrees round for a frame and came back over the next
+        // two, and one getting up had a foot 8 blocks in the ground for a frame. The blend into the first
+        // simulated frame stays: the fall starts from the server's pose of the body, not from the one drawn.
+        boolean physical = PHYSICAL_GIVEN_R63 && com.projectseele.physics.CombatBodyDynamics.active(entity);
+        boolean given = state.physical;
+        if (!repeat)
+        {
+            if (given && !physical)
+            {
+                state.offsets = null;
+                state.lastTarget = null;
+            }
+            state.physical = physical;
+        }
+        if (!repeat && !given && now - state.lastNanos < STALE_NANOS && !state.last.isEmpty())
         {
             long blend = !key.equals(state.key) ? transitionNanos(state.key, key)
                     : state.offsets == null && popped(model, state, now - state.lastNanos) ? POP_NANOS : 0L;
@@ -172,7 +193,7 @@ final class EvaPoseContinuity
         // Pops were only caught with no blend running, so a target that jumped
         // mid-blend (a combo strike taking over the previous one) reached the
         // screen in one frame. Restart the blend from the last drawn pose.
-        if (raw != null && state.offsets != null && now != state.blendFrame && targetJumped(raw, state, now - state.lastNanos))
+        if (raw != null && state.offsets != null && now != state.blendFrame && !given && targetJumped(raw, state, now - state.lastNanos))
         {
             Map<String, float[]> offsets = new HashMap<>();
             for (var entry : raw.entrySet())
