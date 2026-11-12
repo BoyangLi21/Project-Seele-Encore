@@ -153,6 +153,7 @@ public final class CombatBodyDynamics
             var pivot=new Vector3f(s.profile.rig().get(entry.getKey()).pivot()).mul(CombatBodyProfiles.MODEL_TO_PHYSICS);
             float d=entry.getValue().transformPosition(pivot).distanceSquared(p);if(d<distance){distance=d;nearest=entry.getKey();}
         }
+        if(DIAG_R63)ProjectSeele.LOGGER.info("R63BODY impulse age {} strength {} direction {} force {} on {}",s.age,strength,direction,force,nearest);
         s.simulation.impulse(nearest,p,force);
     }
     public static boolean thrown(LivingEntity entity,Vec3 velocity)
@@ -211,9 +212,11 @@ public final class CombatBodyDynamics
         AABB result=null;for(float x:new float[]{min.x,max.x})for(float y:new float[]{min.y,max.y})for(float z:new float[]{min.z,max.z})
         {Vec3 p=world(s,new Vector3f(x,y,z));AABB point=new AABB(p,p);result=result==null?point:result.minmax(point);}return result;
     }
+    private static final boolean DIAG_R63=Boolean.getBoolean("projectseele.bodyDiagR63");
+    private static final boolean ACTORS_R63=!"false".equals(System.getProperty("projectseele.bodyActorsR63"));
     private static void updateStandingActors(LivingEntity entity,State s)
     {
-        if(!CombatReactionsR36.enabled(entity))return;s.simulation.beginActorFrame();
+        if(!CombatReactionsR36.enabled(entity)||!ACTORS_R63)return;s.simulation.beginActorFrame();
         for(var other:entity.level().getEntitiesOfClass(LivingEntity.class,s.bounds.inflate(45),e->e!=entity&&(e instanceof EvaUnit01Entity||e instanceof SachielEntity)&&e.isAlive()&&!active(e)))
         {
             if(other instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)))continue;
@@ -255,6 +258,7 @@ public final class CombatBodyDynamics
                     {if(!addTerrain((ServerLevel)entity.level(),entity,s)){entity.setDeltaMovement(Vec3.ZERO);continue;}}
                     else if(s.age%20==0&&!retainTerrain((ServerLevel)entity.level(),s.terrainCoverage))
                     {s.terrainCoverage=null;entity.setDeltaMovement(Vec3.ZERO);continue;}
+                    Vec3 beforeR63=s.position;
                     if(s.age>2)s.simulation.step(.05F);var frame=s.simulation.frame();s.bounds=worldBounds(s,frame.min(),frame.max());
                     if(!s.groundImpact&&s.age>5&&frame.groundImpulse()>4)
                     {s.groundImpact=true;groundImpact((ServerLevel)entity.level(),world(s,frame.impactPoint()));}
@@ -263,6 +267,17 @@ public final class CombatBodyDynamics
                     Vector3f offset=new Vector3f(moved.x-hip.x,frame.min().y,moved.z-hip.z);s.position=world(s,offset);
                     s.pose=CombatBodyProfiles.render(s.template,frame.deformation(),offset);
                     stitch(s.pose,s.profile);
+                    if(DIAG_R63&&(s.age<=120||s.position.distanceTo(beforeR63)>3))
+                    {
+                        StringBuilder near=new StringBuilder();
+                        for(var other:entity.level().getEntitiesOfClass(LivingEntity.class,s.bounds.inflate(45),e->e!=entity&&(e instanceof EvaUnit01Entity||e instanceof SachielEntity)&&e.isAlive()))
+                            near.append(String.format(java.util.Locale.ROOT," %s at %.1f moved %.2f%s",other.getType().toShortString(),other.position().distanceTo(s.position),
+                                    other.position().distanceTo(new Vec3(other.xo,other.yo,other.zo)),other instanceof SachielEntity a?" strike "+a.isStrikeActive()+" mode "+a.strikeMode()+" age "+a.strikeAge(0):""));
+                        ProjectSeele.LOGGER.info("R63BODY {} age {} at {} moved {} torso speed {} contacts {}; {};{}",entity.getType().toShortString(),s.age,
+                                String.format(java.util.Locale.ROOT,"%.1f %.1f %.1f",s.position.x,s.position.y,s.position.z),
+                                String.format(java.util.Locale.ROOT,"%.2f",s.position.distanceTo(beforeR63)),String.format(java.util.Locale.ROOT,"%.2f",frame.speed()),
+                                frame.supportContacts(),s.simulation.actorContactsR63(),near);
+                    }
                     s.stable=frame.supportContacts()>1&&frame.speed()<.40F?s.stable+1:0;
                     var beat=CombatFeelR31.beat(entity);
                     if(s.stable>0&&s.age>10&&s.thrown)

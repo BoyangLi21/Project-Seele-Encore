@@ -130,6 +130,40 @@ public final class ArticulatedBody implements AutoCloseable
             body.setCenterOfMassTransform(at);body.setInterpolationWorldTransform(at);body.getMotionState().setWorldTransform(at);
         }
     }
+    /**
+     * What the standing bodies are doing to this one: points of contact with them, the deepest overlap (physics
+     * units, negative inside), the largest impulse a contact applied, and the fastest part with its speed.
+     */
+    public String actorContactsR63()
+    {
+        int points=0;float deepest=0,impulse=0;String part="-";
+        for(int i=0;i<dispatcher.getNumManifolds();i++)
+        {
+            var contact=dispatcher.getManifoldByIndexInternal(i);var a=(CollisionObject)contact.getBody0();var b=(CollisionObject)contact.getBody1();
+            boolean first="other-actor".equals(a.getUserPointer());
+            if(!first&&!"other-actor".equals(b.getUserPointer()))continue;
+            for(int n=0;n<contact.getNumContacts();n++)
+            {
+                var point=contact.getContactPoint(n);points++;impulse=Math.max(impulse,point.appliedImpulse);
+                if(point.getDistance()<deepest){deepest=point.getDistance();part=String.valueOf(first?b.getUserPointer():a.getUserPointer());}
+            }
+        }
+        String fastest="-";float speed=0,mass=0;Vector3f momentum=new Vector3f();
+        for(var body:bodies.values())
+        {
+            float m=body.getInvMass()>0?1/body.getInvMass():0;Vector3f v=body.getLinearVelocity(new Vector3f());
+            mass+=m;momentum.x+=v.x*m;momentum.y+=v.y*m;momentum.z+=v.z*m;
+        }
+        if(mass>0)momentum.scale(1/mass);
+        String centre=String.format(java.util.Locale.ROOT,"; mass centre %.2f %.2f %.2f; swept lift %.3f in %d sub-steps",momentum.x,momentum.y,momentum.z,liftedR63,liftsR63);
+        liftedR63=0;liftsR63=0;
+        for(var entry:bodies.entrySet())
+        {
+            float v=entry.getValue().getLinearVelocity(new Vector3f()).length();
+            if(v>speed){speed=v;fastest=entry.getKey();}
+        }
+        return String.format(java.util.Locale.ROOT,"actors %d parts, %d points, deepest %.3f at %s, impulse %.2f; fastest %s %.2f",actors.size(),points,deepest,part,impulse,fastest,speed)+centre;
+    }
     public void endActorFrame()
     {var it=actors.entrySet().iterator();while(it.hasNext()){var e=it.next();if(!actorFrame.contains(e.getKey())){world.removeRigidBody(e.getValue());it.remove();}}world.updateAabbs();}
     public void impulse(String bone,org.joml.Vector3f point,org.joml.Vector3f impulse)
@@ -167,6 +201,7 @@ public final class ArticulatedBody implements AutoCloseable
     // cannot separate a knee or shoulder. A restitution-free contact impulse
     // removes closing velocity at the actual surface; tangential motion remains.
     // Side walls and ceilings remain owned by Bullet collision detection.
+    private float liftedR63;private int liftsR63;
     private void projectSweptTerrain(Map<String,Transform> previous)
     {
         float lift=0;
@@ -201,6 +236,7 @@ public final class ArticulatedBody implements AutoCloseable
             }
         }
         if(lift<=0)return;
+        liftedR63+=lift;liftsR63++;
         Vector3f normal=new Vector3f(0,1,0);
         for(var contact:contacts.entrySet())
         {
