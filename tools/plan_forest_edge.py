@@ -27,7 +27,7 @@ def main():
     a = p.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
     seams = {s['id']: s for s in json.loads(a.seams.read_text('utf8'))['seams']}
-    rows, report = [], []
+    planned, by_chunk, report = {}, {}, []
     for n, sid in enumerate(a.ids):
         s = seams[sid]
         along_x = s['direction'] < 45 or s['direction'] > 135
@@ -36,19 +36,37 @@ def main():
         z0, z1 = s['z'][0] - (m if along_x else 12), s['z'][1] + (m if along_x else 12)
         box = tr.Box(a.world, x0, x1, -64, 250, z0, z1)
         by = box.origin[1]
+        # seams whose boxes overlap see the trees planted for the earlier ones, and a cell planned twice
+        # keeps its first before and its last after
+        for cx in range(x0 >> 4, (x1 >> 4) + 1):
+            for cz in range(z0 >> 4, (z1 >> 4) + 1):
+                for key in by_chunk.get((cx, cz), ()):
+                    px, py, pz = key
+                    if key in planned and x0 <= px <= x1 and z0 <= pz <= z1:
+                        box.ids[py - by, pz - z0, px - x0] = box.state_id(planned[key][4])
         k = box.kind_grid()
         ground = tr.top_of(k == tr.SOIL, by)
         names = np.array([q.split('[')[0] for q in box.palette])
         trees = np.isin(k, (tr.SOFT,)) & np.char.endswith(names.astype(str), ('_leaves'))[box.ids]
         canopy = trees.any(0)
-        built = ((k == tr.BUILT) | (k == tr.FLUID)).any(0)
+        # NERV's halls and tunnels lie far under the woods: only what is built near the surface keeps trees off
+        yy = np.arange(k.shape[0])[:, None, None] + by
+        built = (((k == tr.BUILT) | (k == tr.FLUID)) & (yy >= ground[None] - 8)).any(0)
         keepout = ndimage.binary_dilation(built, iterations=4) | ~box.loaded
         line = (s['z'][0] + s['z'][1]) // 2 - z0 if along_x else (s['x'][0] + s['x'][1]) // 2 - x0
         coord = np.arange(ground.shape[0])[:, None] if along_x else np.arange(ground.shape[1])[None, :]
         coord = np.broadcast_to(coord, ground.shape)
         before_side, after_side = coord < line, coord > line
-        bare = after_side if canopy[before_side].mean() > canopy[after_side].mean() else before_side
         dist = np.abs(coord - line).astype(float)
+        # the bare side is told by the twelve columns along the line, not by the whole box, which can
+        # hold other woods or clearings further out
+        strip = np.zeros(ground.shape, bool)
+        if along_x:
+            strip[:, max(0, s['x'][0] - x0):s['x'][1] - x0 + 1] = True
+        else:
+            strip[max(0, s['z'][0] - z0):s['z'][1] - z0 + 1, :] = True
+        strip &= dist <= 12
+        bare = after_side if canopy[before_side & strip].mean() > canopy[after_side & strip].mean() else before_side
         rng = np.random.default_rng(300 + sid)
         wobble = ndimage.gaussian_filter(rng.standard_normal(ground.shape), 9)
         wobble /= wobble.std() + 1e-9
@@ -64,15 +82,19 @@ def main():
         ids = box.ids.copy()
         tr.replant(box, ids, ground, where, keepout, random.Random(400 + sid), chance=chance)
         r = tr.rows_between(box, ids)
-        rows += r
+        for q in r:
+            key = tuple(q[:3])
+            if key in planned:
+                planned[key][4] = q[4]
+                if planned[key][4] == planned[key][3]:
+                    del planned[key]
+            else:
+                planned[key] = q
+                by_chunk.setdefault((key[0] >> 4, key[2] >> 4), []).append(key)
         report.append(dict(seam=sid, line='z=%d' % (line + z0) if along_x else 'x=%d' % (line + x0), box=[x0, z0, x1, z1], cells=len(r),
                            log_cells=sum(1 for q in r if q[4].split('[')[0].endswith('_log'))))
         print(json.dumps(report[-1]), flush=True)
-    seen = set()
-    for row in rows:
-        if tuple(row[:3]) in seen:
-            raise SystemExit(f'{row[:3]} planned twice')
-        seen.add(tuple(row[:3]))
+    rows = list(planned.values())
     tr.write_rows(a.out / 'rows.json', rows)
     (a.out / 'report.json').write_text(json.dumps(dict(cells=len(rows), seams=report), indent=1), 'utf8')
 
