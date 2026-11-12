@@ -1,0 +1,70 @@
+# R63 重烘和打包清单
+
+R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做，正式世界不打开、不写入。工具是 `tools/rebake_r63.py`（重烘）和 `tools/package_r60.py`（打包，版本已改成 R63）。下面的命令都在仓库根目录跑。电话工具开着时，Python 的可执行文件名不能以 `python` 开头，用 `F:/eva/.claude/fable-review/pyfr/Scripts/frpy.exe`，下文写作 `frpy`。
+
+## 为什么要重做
+
+- 正式世界的 GeoFront 远景库还是 R62 那份（第 378 批，2026-11-10 06:53）。拿 R62 服务端包里的世界逐区块比对，到第 448 批为止：9,614 个区块内容变了，54,538 个外圈区块被删（第 415 批），没有新增区块。
+- 旧远景库 90,949 行里有 80,965 行画的是删掉的旧外圈（远处那堵“墙”），必须换成 map-edges 在 E 盘按新边界烘的外圈。
+- 小地图是 R62 当天烘的，世界之后又写了很多批，打包工具会拒绝。
+
+## 远景怎么合
+
+在镜像副本的 GeoFront 远景库上（`prepare` 一步做完，不碰正式世界）：
+1. 按正式世界当前已保存的区块给每一行分类：全部已保存 = 核心，一个都没保存 = 外圈，其余 = 边缘。
+2. 删掉：外圈行、边缘行，以及含有变动区块的核心 level-0 行。
+3. 从 map-edges 的远景库（E 盘副本，用 SQLite 备份接口只读快照）取：外圈的所有层级，加上没有变动区块的边缘 level-0 行。
+4. 父行被删掉的行打上 `ApplyToParent`，让 DH 自己重建上层（DH 平时就是这样从下往上合成粗层级的）。
+5. 列出所有有已保存区块、却没有 level-0 行的段，按每个视点覆盖 40 段（2,560 格）贪心选视点。
+
+然后 `core` 一步开一个客户端（`PRE_EXISTING_ONLY`，4 个 DH 线程，-Xmx6G，Oculus 移开），DH 只用已保存的区块重建这些段并处理上层，结果导出成 `WORK/out/geofront_lod.sqlite`，打包时用 `--geofront-lod` 传进去。服务端包里那份照旧调早一天。主世界远景库没变，照旧从正式世界取。
+
+2026-11-13 00:20 的演练结果（第 448 批之前的世界，外圈烘到 29%）：删 83,779 行（变动 1,172、外圈 80,965、边缘 1,642），从外圈取 12,895 行，合并后 20,195 行，打标 792 行，完整性检查 ok，仍是 WAL 模式。要重建 1,999 个 level-0 段，4 个视点：(-160,160) 1,439 段、(2656,-224) 452 段、(-2784,608) 96 段、(288,2784) 12 段。
+
+## 开始之前
+
+- [ ] 地图会话说最后一批写完了，`continuation.json` 里没有进行中的批次。之后任何一次写入都要从“镜像”重来。
+- [ ] map-edges 的外圈烘焙停了（`loop.sh` 那个文件夹里放 `STOP`，或者等它自己结束），它的客户端已经退出。没烘完也可以打，覆盖率会写进说明（见“卡点”）。
+- [ ] 要进 R63 的分支都合进 main 并装进主客户端（`client/mods/projectseele-0.1.0-all.jar`）。拿 main 编一个 jar 给 `--compare-build` 比对：`slot.py status` 没有别人的 exclusive 时，在这个工作树里 `./gradlew build`。
+- [ ] `frpy F:/eva/.claude/client-slots/slot.py status`：没有别人的 exclusive。
+- [ ] F 盘至少 10 GB 空闲，E 盘至少 15 GB 空闲。
+
+## 步骤
+
+| # | 命令 | 时间 | 看什么 |
+|---|---|---|---|
+| 1 | `frpy tools/rebake_r63.py check` | 20 秒 | `problems` 为空；记下变动区块数、视点、外圈覆盖率、估时和磁盘 |
+| 2 | `frpy tools/rebake_r63.py instance` | 3 分钟 | 把主客户端（不含存档、日志、旧小地图）复制到 `E:/eva-r63-rebake/client`，0.77 GB；DH 配置改成烘焙用，静音；`jars/` 里有最终 jar 和加了探针类的 jar |
+| 3 | `frpy tools/rebake_r63.py mirror` | 首次约 8 分钟，之后 1–2 分钟 | 期间持有正式世界的 `session.lock`，地图会话的写入会等；GeoFront 区域文件大小逐个一致 |
+| 4 | `frpy tools/rebake_r63.py prepare` | 1 分钟 | `integrity` = ok；删/取/打标数目和演练同一量级；视点和分钟数 |
+| 5 | `frpy tools/rebake_r63.py core` | 约 40 分钟，缺得多时再加不超过 25 分钟的补烘 | 先拿到 slot 的 `ok:` 才启动；`ok` = true：脚本跑完、quick_check ok、核心缺段不超过 50；`pending_parent_updates` 接近 0 |
+| 6 | `frpy tools/rebake_r63.py xaero` | 约 12 分钟 | 重新镜像后烘焙；日志有 `Xaero map bake finished`，区域 zip 数和 R62 的 191 差不多（外圈删掉后可能更少） |
+| 7 | `frpy tools/rebake_r63.py report` | — | 打印打包命令 |
+| 8 | `frpy tools/package_r60.py --check <报告路径> --geofront-lod E:/eva-r63-rebake/out/geofront_lod.sqlite --xaero-map "E:/eva-r63-rebake/out/xaero/projectseele$geofront" --compare-build <main 编出的 -all.jar> --server-address <服务器地址>` | 1 分钟 | `check_failures` 为空。配置检查只应报两个新键（`shadows.*`，首次启动自动写默认值 64 和 128） |
+| 9 | 填好 `docs/R63_RELEASE.zh.md` 的空格并删掉“打包前确认”一节，提交 | — | |
+| 10 | 同一条命令把 `--check <报告>` 换成 `--pack --date YYYYMMDD --map-note "<一行地图状态>"` | 3 分钟 | 两个 zip 写完并逐个校验 CRC；回执 `delivery/R63_<日期>_receipt.json` |
+| 11 | 本机专用服务器进服测试（R62 的做法：服务器启动、小地图区域数、远景加载完的秒数、有没有 override 警告） | 15 分钟 | 回执和测试结果写进 `docs/RELEASE_LOG.zh.md` |
+
+服务器地址只在命令行里给，不写进仓库。打包时世界要停着，打包工具会持锁检查。
+
+## 时间和磁盘
+
+- 槽位空着时，第 1–10 步合计约 1.5–2 小时，大头是第 5 步的客户端。
+- 外圈：2026-11-13 00:20 还差 22,584 个 level-0 段。map-edges 实测约 63 段/分钟，还要约 6 小时客户端时间，而且要和别的会话排队。
+- E 盘：工作目录约 6 GB（客户端 0.77 GB、世界镜像 1.6 GB、外圈快照和导出的远景库各约 0.3–1 GB）。
+- F 盘：两个 zip。R62 是 0.95 GB 和 2.0 GB；R63 的 GeoFront 远景库现在 0.30 GB，外圈烘满后估计 0.7–1 GB，客户端包会到约 1.4 GB、服务端包约 2.6 GB，再加打包时的临时副本，留 10 GB。
+- 2026-11-13 00:20 实测空闲：F 盘 50 GB，E 盘 53 GB。
+
+## 卡点和没验证的
+
+- **外圈没烘完。** 要么等 map-edges 烘完，要么按当时的覆盖率打包，说明里写明“没烘到的要走近才出现”。这个由主会话或负责人定。
+- **上层重建没在游戏里验证过。** 演练只验证了合并本身（完整性、行数、WAL）。DH 会不会按 `ApplyToParent` 把删掉的上层重建出来，要看第 5 步结束时 `pending_parent_updates` 是否归零、远处有没有缺块。不行的话退路是：服务器第一次启动时 DH 也会处理这些标记，或者把打标的行改成从外圈库整层取。
+- **边缘段的取舍是近似的。** 边缘 level-0 行优先用外圈库里的（第 415 批的核心边缘 + 新边界）；只要其中有区块在 R62 之后变过，就改由第 5 步从已保存区块重建，这样不会带回旧内容，但边缘段里外圈那一半会空着，直到玩家走近。
+- **探针类。** 第 5 步用 map-edges 编好的 `MapProbeLocal.class`（只在本机，不进仓库）加进最终 jar。它的 `tp` 等满 1200 刻就超时，所以悬停用 `cmd` 步骤等待，和 map-edges 一样。
+- **第 5、6 步要客户端槽位。** 夜里两个槽位常被占满，`acquire` 会排队等。
+
+## 相关文件
+
+- 外圈烘焙进度：共享笔记 `map-edges-dh-outer-bake-handover-20261111.md`，工具在 `F:/eva/.claude/map-edges-work/f12bake/`。
+- R62 的远景和小地图流程：`F:/eva/.claude/worktrees/map-bdb53d/.claude/dhjob/driver4.sh`，以及 `F:/eva/.claude/motion-work/agent-render/HANDOFF_20261109.md`（小地图只认区域 zip、服务端远景要调早、客户端 4 线程）。
+- 每一步的结果：`E:/eva-r63-rebake/logs/<步骤>.json`。

@@ -11,7 +11,17 @@
 | R61 | 2026-11-10 | 世界第 334 批，等待人工验收 | 955 MB | 2,010 MB | `delivery/R61_20261110_receipt.json`，[说明](R61_RELEASE.zh.md)，[快速开始](R61_QUICKSTART.zh.md) |
 | R62 | 2026-11-10 | 世界第 378 批，含 GeoFront 改造和 UN 基地迁移，等待人工验收 | 952 MB | 2,007 MB | `delivery/R62_20261110_receipt.json`，[说明](R62_RELEASE.zh.md)，[快速开始](R62_QUICKSTART.zh.md) |
 
+| R63 | — | 准备中：打包工具、说明草稿和重烘清单已就绪，等最后一批世界写入和外圈远景 | — | — | [清单](R63_REBAKE_CHECKLIST.zh.md)，[说明草稿](R63_RELEASE.zh.md)，[快速开始](R63_QUICKSTART.zh.md) |
+
 版本号从 R55 直接到 R60。R56–R59 是开发轮次，没有发布过。
+
+## R63 起的变化
+
+- 打包工具仍是 `tools/package_r60.py`，版本改为 R63，模板默认 `R62_20261110`。
+- 远景和小地图都在副本上重做，步骤见 [R63 重烘和打包清单](R63_REBAKE_CHECKLIST.zh.md)。GeoFront 远景库用 `--geofront-lod` 从重烘结果传入，不再装回正式世界；主世界远景库照旧从正式世界取。
+- `--check <报告>` 跑完所有检查、一次列出全部问题，只写报告。打包前先跑一遍。
+- 新增的检查：MTR 和 TrafficCraft 两边都在；模组 jar 含 R63 的标志类（外圈生成、性能第一二批、Fable 第三到五阶段、MTR 乘车同步）；给了 `--compare-build` 时，jar 里每个 `com/projectseele` 类都要和 main 编出来的一致；配置文件和代码默认值逐项比对，回执里写明不一致、缺少（首次启动自动补默认值）和多余的键。
+- `--pack` 必须同时给 `--date`、`--map-note`、`--server-address`、`--xaero-map` 和 `--geofront-lod`。
 
 ## R60 打包规则
 
