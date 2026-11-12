@@ -24,7 +24,12 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     @Shadow private double speed;
     @Shadow private int targetY;
     @Shadow private boolean isMoving;
+    @Shadow private double syncCurrentY;
     @Unique private PathSpec seele$path;
+    /** Client: where this car still was when the server's transfer sync placed it on the transfer level. */
+    @Unique private double seele$approachFrom=Double.NaN;
+    @Unique private double seele$readFromY=Double.NaN;
+    @Unique private double seele$readFromLastY;
     @Unique private boolean seele$transferring;
     @Unique private boolean seele$descending;
     @Unique private long seele$started=-1;
@@ -33,6 +38,7 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     @Unique private static final TicketType<ChunkPos> seele$ticket=TicketType.create("seele_personnel_transfer_r53",Comparator.comparingLong(ChunkPos::toLong),40);
 
     @Override public PathSpec seele$transferPath(){return seele$path;}
+    @Override public boolean seele$transferActive(){return seele$transferring;}
     @Inject(method="getTargetSpeed",at=@At("RETURN"),cancellable=true,remap=false)
     private void seele$deepShaftSpeed(CallbackInfoReturnable<Double> result)
     {
@@ -139,7 +145,7 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
         if(!down&&!up)return;
         seele$descending=down;seele$fraction=down?0:1;seele$transferring=true;
         seele$duration=path.duration(seele$group().getTargetSpeed());
-        seele$started=-1;currentY=path.transferY();lastY=currentY;speed=0;
+        seele$started=-1;currentY=path.transferY();lastY=currentY;speed=0;syncCurrentY=Integer.MAX_VALUE;
         seele$carry(seele$anchor(from,seele$fraction),seele$anchor(currentY,seele$fraction));
         if(seele$retainPath())seele$started=level.getGameTime();
         seele$sync();ci.cancel();
@@ -149,9 +155,24 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     {
         if(seele$path()==null||!seele$transferring)return;
         ci.cancel();currentY=lastY=seele$path.transferY();speed=0;
+        // Upstream update would have consumed a pending correction; after the transfer it would put
+        // the car back where the server was before the transfer began.
+        syncCurrentY=Integer.MAX_VALUE;
+        double arrival=seele$approachFrom;seele$approachFrom=Double.NaN;
+        if(!Double.isNaN(arrival))
+        {
+            // The server's transfer sync found this client car short of the transfer level. Cover the
+            // rest of the shaft with the riders aboard, as the server did, instead of leaving them a
+            // block above (or below) the floor that the sync jumped to.
+            double side=seele$descending?0:1;
+            seele$carry(seele$anchor(arrival,side),seele$anchor(currentY,side));lastY=arrival;
+        }
         if(seele$started<0)
         {
             if(!level.isClientSide&&seele$retainPath()){seele$started=level.getGameTime();seele$sync();}
+            // A travelling car has no block collision: without this the riders fall through its floor
+            // while it waits for the path to load or for the server's start.
+            else if(Double.isNaN(arrival))seele$carry(seele$anchor(currentY,seele$fraction),seele$anchor(currentY,seele$fraction));
             return;
         }
         if(!level.isClientSide&&level.getGameTime()%20==0)seele$retainPath();
@@ -164,10 +185,25 @@ public abstract class MovingElevatorTransferR53Mixin implements NervPersonnelTra
     {
         var path=seele$path();if(path==null)return;var tag=path.encode();tag.putBoolean("Active",seele$transferring);tag.putBoolean("Descending",seele$descending);tag.putLong("Started",seele$started);tag.putInt("Duration",seele$duration);tag.putDouble("Fraction",seele$fraction);result.getReturnValue().put(NervPersonnelTransferR53.TAG,tag);
     }
+    @Inject(method="read",at=@At("HEAD"),remap=false)
+    private void seele$beforeRead(CompoundTag input,CallbackInfo ci)
+    {
+        boolean approaching=!seele$transferring||!Double.isNaN(seele$approachFrom);
+        seele$readFromY=level.isClientSide&&isMoving&&seele$path!=null&&approaching?currentY:Double.NaN;seele$readFromLastY=lastY;
+    }
     @Inject(method="read",at=@At("TAIL"),remap=false)
     private void seele$readTransfer(CompoundTag input,CallbackInfo ci)
     {
+        double from=seele$readFromY;seele$readFromY=Double.NaN;seele$approachFrom=Double.NaN;
         var tag=input.getCompound(NervPersonnelTransferR53.TAG);if(tag.isEmpty()){seele$path=null;seele$transferring=false;return;}
         seele$path=PathSpec.decode(tag);seele$transferring=tag.getBoolean("Active");seele$descending=tag.getBoolean("Descending");seele$started=tag.getLong("Started");seele$duration=Math.max(1,tag.getInt("Duration"));seele$fraction=tag.getDouble("Fraction");
+        if(!level.isClientSide||!seele$transferring)return;
+        syncCurrentY=Integer.MAX_VALUE;
+        // The server enters the transfer when its own car crosses the level, so this sync often finds
+        // the client car about a tick of travel short of it. Keep the car where it was drawn; the next
+        // update carries it and its riders the rest of the way.
+        double remaining=from-seele$path.transferY();
+        if(isMoving&&!Double.isNaN(from)&&(seele$descending?remaining>0:remaining<0))
+        {seele$approachFrom=from;currentY=from;lastY=seele$readFromLastY;}
     }
 }

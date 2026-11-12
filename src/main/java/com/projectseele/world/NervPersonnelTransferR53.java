@@ -36,6 +36,7 @@ public final class NervPersonnelTransferR53
     public interface NativeState
     {
         PathSpec seele$transferPath();
+        boolean seele$transferActive();
     }
     private static final class Cached
     {
