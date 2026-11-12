@@ -142,12 +142,13 @@ def doors_along(path):
 
 def natural_top(x, y, z, skip):
     seen = Counter()
-    for r in (1, 2, 3):
+    for r in range(1, 9):     # wide cuts have only paving within three columns
         for dx in range(-r, r + 1):
             for dz in range(-r, r + 1):
                 if max(abs(dx), abs(dz)) != r or (x + dx, z + dz) in skip:
                     continue
-                for yy in range(y + 3, y - 5, -1):
+                # From well above, so an uphill neighbour gives its surface (grass) and not the rock inside the hill.
+                for yy in range(y + 16, y - 5, -1):
                     n = name(cap.state(x + dx, yy, z + dz))
                     if n in AIR or n.endswith(PLANTS) or n.endswith(('_leaves', '_log')):
                         continue
