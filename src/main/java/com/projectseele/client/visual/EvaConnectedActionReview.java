@@ -824,10 +824,12 @@ public final class EvaConnectedActionReview
         // The light blows above have taken 44 points, and a piloted Unit-01 at 50 goes berserk: the first row of
         // heavy blows left it there and the rest of the tour was the berserk unit's. It is repaired first.
         if(at(300))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
-        // Three heavy blows eleven ticks apart (vanilla's hurt cooldown is ten) fill the poise: the third knocks down.
+        // Three heavy blows fill the poise: the third knocks down. They stand 14 ticks apart. Vanilla's hurt cooldown
+        // is ten, and at 11 apart a client drawing 7 frames a second sent two of them within it: the unit took two
+        // blows of a row and stayed on its feet (rows lost in six captures of thirteen).
         for(int row:new int[]{340,620,880})
         {
-            for(int n=0;n<3;n++)if(at(row+n*11))mc.player.connection.sendCommand("damage "+unit+" 75 minecraft:mob_attack by "+angel);
+            for(int n=0;n<3;n++)if(at(row+n*14))mc.player.connection.sendCommand("damage "+unit+" 75 minecraft:mob_attack by "+angel);
             if(at(row+190))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
         }
     }
