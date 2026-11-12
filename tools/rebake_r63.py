@@ -567,11 +567,11 @@ def step_instance(a):
     guard(game / 'options.txt').write_text(options, 'utf8')
     guard(WORK / 'jars').mkdir(parents=True, exist_ok=True)
     shutil.copyfile(SHIP / JAR, guard(WORK / 'jars/final.jar'))
-    # The private jar's 821 MB Unit-00 prototype mesh filled most of a heap on its own (map-edges' server OOM,
-    # 2026-11-13 06:26), but the public build cannot open the world: the server reads the three units' private
-    # meshes, hands and GEO before it loads (dry start 07:17). So the bake jar is the shipped jar with only the
-    # heavy client-render meshes swapped for the public build's placeholders.
-    bake = slim_jar(SHIP / JAR, Path(a.bake_jar), WORK / 'jars/bake.jar')
+    # The bake client runs on the jar the pack ships; in the 8 GB exclusive window its 821 MB Unit-00 prototype
+    # mesh fits (review session, 2026-11-13). The public build cannot open the world at all: the server reads the
+    # three units' private meshes, hands and GEO before it loads (dry starts 07:17 and map-edges 07:30).
+    # --slim-bake swaps only that client-render mesh for the public placeholder (dry start passed at 6 GB, 07:33).
+    bake = slim_jar(SHIP / JAR, Path(a.bake_jar), WORK / 'jars/bake.jar') if a.slim_bake else SHIP / JAR
     missing = jar_classes(bake)
     if missing:
         raise SystemExit('Bake jar lacks R63 classes: ' + ', '.join(missing))
@@ -890,7 +890,8 @@ def step_report(a):
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
     p.add_argument('step', choices=['check', 'instance', 'mirror', 'prepare', 'drystart', 'core', 'xaero', 'report'])
-    p.add_argument('--bake-jar', default=str(PUBLIC_JAR), help='instance: public build of main whose placeholder meshes replace the heavy render meshes in the bake jar')
+    p.add_argument('--slim-bake', action='store_true', help='instance: bake on the shipped jar minus the 821 MB prototype mesh (default: the shipped jar as is)')
+    p.add_argument('--bake-jar', default=str(PUBLIC_JAR), help='instance --slim-bake: public build of main whose placeholder replaces the prototype mesh')
     p.add_argument('--world', help='prepare: world whose saved chunks count (default: the mirror)')
     p.add_argument('--db', help='prepare: database to change in place (default: the mirror\'s GeoFront database); must be under WORK')
     p.add_argument('--ring-db', help='prepare: outer ring database (default: the map-edges copy on E:)')
