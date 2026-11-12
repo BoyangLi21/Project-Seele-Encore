@@ -121,7 +121,15 @@ public final class SeeleTravelCommandsR43
         {
             source.sendFailure(Component.literal("“"+destination.label()+"”的落脚点暂时不安全，未执行传送。"));return 0;
         }
-        player.stopRiding();player.teleportTo(level,p.x,p.y,p.z,destination.yaw(),0);player.fallDistance=0;player.setDeltaMovement(Vec3.ZERO);
+        player.stopRiding();
+        // The facility keeps a pilot in an entry plug that has no safe place to step out (inserted in a unit that
+        // stands deployed, for one). Teleported while still seated, the pilot's client lost the ground under the
+        // unit it drives, and the unit fell through its closed hatch and down the launch shaft.
+        if(player.isPassenger())
+        {
+            source.sendFailure(Component.literal("当前座位不能离开（驾驶中，或插入栓不在可下机的位置），未执行传送。请先退出驾驶。"));return 0;
+        }
+        player.teleportTo(level,p.x,p.y,p.z,destination.yaw(),0);player.fallDistance=0;player.setDeltaMovement(Vec3.ZERO);
         source.sendSuccess(()->Component.literal("已到达："+destination.label()),false);return 1;
     }
     private SeeleTravelCommandsR43() {}
