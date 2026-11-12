@@ -507,6 +507,7 @@ def step_instance(a):
     options = (game / 'options.txt').read_text('utf8')
     options = re.sub(r'(?m)^soundCategory_master:.*$', 'soundCategory_master:0.0', options)
     guard(game / 'options.txt').write_text(options, 'utf8')
+    guard(WORK / 'jars').mkdir(parents=True, exist_ok=True)
     shutil.copyfile(SHIP / JAR, guard(WORK / 'jars/final.jar'))
     probe_jar(SHIP / JAR, WORK / 'jars/probe.jar')
     save('instance', dict(game=str(game), robocopy=tail, dh=DH_BAKE, final_jar_bytes=(WORK / 'jars/final.jar').stat().st_size))
