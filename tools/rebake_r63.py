@@ -372,15 +372,15 @@ def set_toml(path, settings):
     guard(path).write_text(text, 'utf8')
 
 
-def client_args(game, extra_props, out_name):
+def client_args(game, extra_props, out_name, heap='6G'):
     text = ARGS_TEMPLATE.read_text('utf8')
-    assert TEMPLATE_GAME_DIR in text and '"--quickPlaySingleplayer"' in text
-    text = text.replace(TEMPLATE_GAME_DIR, game.as_posix()).replace('"-Xmx8G"', '"-Xmx6G"')
+    assert TEMPLATE_GAME_DIR in text and '"--quickPlaySingleplayer"' in text and '"-Xmx8G"' in text
+    text = text.replace(TEMPLATE_GAME_DIR, game.as_posix()).replace('"-Xmx8G"', '"-Xmx%s"' % heap)
     text = re.sub(r'"-Dprojectseele\.mapProbe=[^"]*"\s*', '', text)
     text = re.sub(r'("--quickPlaySingleplayer"\s+)"[^"]*"', lambda m: m[1] + '"' + COPY + '"', text)
     props = ' '.join('"-D%s=%s"' % kv for kv in extra_props.items())
     text = text.replace('"-Xms512m"', '"-Xms512m" ' + props, 1)
-    assert '-Xmx6G' in text and all(k in text for k in extra_props)
+    assert '-Xmx' + heap in text and all(k in text for k in extra_props)
     path = guard(WORK / 'logs' / out_name)
     path.write_text(text, 'ascii')
     return path
@@ -617,6 +617,8 @@ def step_prepare(a):
     points = viewpoints(plan['rebuild'])[:a.points or None]
     plan_steps = probe_script(points, WORK / 'scripts/r63-dh-core.json')
     json.dump(plan['rebuild'], guard(WORK / 'lod/rebuild_sections.json').open('w'))
+    # The bake client saves outer chunks around its viewpoints; coverage counts only what the world had now.
+    json.dump(sorted(fully_saved(saved)), guard(WORK / 'lod/core_sections.json').open('w'))
     save('prepare', dict(database=str(db), ring_snapshot=str(ring), rows=rows, levels=levels, integrity=check,
                          chunks=dict(saved=len(saved), changed=len(changed), added=len(added), removed=len(removed)),
                          dropped=len(plan['drop']), dropped_by_reason=plan['why'], taken_from_ring=len(plan['take']),
@@ -625,17 +627,19 @@ def step_prepare(a):
                          seconds=round(time.time() - t, 1)))
 
 
+def fully_saved(saved):
+    """Level-0 sections whose 16 chunks are all saved."""
+    count = {}
+    for x, z in saved:
+        count[(x >> 2, z >> 2)] = count.get((x >> 2, z >> 2), 0) + 1
+    return {s for s, n in count.items() if n == 16}
+
+
 def coverage(world, db):
-    saved = saved_chunks(world)
     rows = rows_of(db, live=True)
-    span = span_of(list(rows), saved)
-    sg = Grid(saved, span)
     have = {(x, z) for (l, x, z), n in rows.items() if l == 0 and n > 64}
-    want = set()
-    for x in range(min(c[0] for c in saved) // 4, max(c[0] for c in saved) // 4 + 1):
-        for z in range(min(c[1] for c in saved) // 4, max(c[1] for c in saved) // 4 + 1):
-            if sg.count(x * 4, z * 4, 4) == 16:
-                want.add((x, z))
+    recorded = WORK / 'lod/core_sections.json'
+    want = {tuple(s) for s in json.load(recorded.open())} if recorded.exists() else fully_saved(saved_chunks(world))
     c = open_ro(db, live=True)
     try:
         pending = c.execute('select count(*) from FullData where ApplyToParent = 1').fetchone()[0]
@@ -659,7 +663,9 @@ def step_core(a):
     try:
         prep = json.loads(log_path('prepare').read_text('utf8'))
         minutes = a.minutes or prep['client_minutes'] + 10
-        args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'core.args')
+        # 4 threads in a 6 GB heap lost the first, nearest tasks to OutOfMemoryError in the 2026-11-13 trial.
+        set_toml(game / 'config/DistantHorizons.toml', {'numberOfThreads': str(a.dh_threads)})
+        args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'core.args', a.heap)
         result = run_client(args, minutes, 'R63 DH core rebake')
         log = client_log()
         done = Path(str(script) + '.log').exists() and Path(str(script) + '.log').read_text('utf8', 'replace').rstrip().endswith('done')
@@ -668,7 +674,7 @@ def step_core(a):
         if log['ok'] and cover['core_missing'] and len(cover['core_missing']) > a.fill_threshold:
             points = viewpoints(cover['core_missing'], minimum=20)[:8]
             plan = probe_script(points, WORK / 'scripts/r63-dh-fill.json')
-            args = client_args(game, {'projectseele.mapProbe': (WORK / 'scripts/r63-dh-fill.json').as_posix()}, 'fill.args')
+            args = client_args(game, {'projectseele.mapProbe': (WORK / 'scripts/r63-dh-fill.json').as_posix()}, 'fill.args', a.heap)
             fill = dict(points=plan, result=run_client(args, sum(p['minutes'] for p in plan) + CLIENT_START_MIN + 10, 'R63 DH fill'))
             cover = coverage(world, db)
     finally:
@@ -729,6 +735,8 @@ def main():
     p.add_argument('--minutes', type=int, help='core: client time limit (default: the plan plus 10)')
     p.add_argument('--fill-threshold', type=int, default=50, help='core: missing core sections tolerated without a fill pass')
     p.add_argument('--points', type=int, help='prepare: keep only the first N viewpoints (trial runs)')
+    p.add_argument('--heap', default='6G', help='core: client heap; 8G (as R62 used) needs the review session to allow it')
+    p.add_argument('--dh-threads', type=int, default=3, help='core: DH worker threads (4 at 6G ran out of heap in the trial)')
     p.add_argument('--no-lock', action='store_true', help='mirror: copy without holding session.lock (trial runs only, never for packing)')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
     a = p.parse_args()
