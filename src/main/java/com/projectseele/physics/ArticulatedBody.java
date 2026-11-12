@@ -194,6 +194,37 @@ public final class ArticulatedBody implements AutoCloseable
         {
             Map<String,Transform> previous=new HashMap<>();bodies.forEach((n,b)->previous.put(n,b.getCenterOfMassTransform(new Transform())));
             world.stepSimulation(dt,0,dt);projectSweptTerrain(previous);
+            if(fuseSideR63>0)limitMassCentreR63();
+        }
+    }
+    private float fuseSideR63,fuseUpR63,fusedR63;
+    /**
+     * A fuse, not a feel: the body's mass centre goes no faster than this sideways or upward (units a second;
+     * falling is not limited). Of 90 knock-downs measured, the fastest mass centre went 4.1 units a second, most
+     * of it downward; one body left its knock-down at about 19 and landed 904 blocks away, and what threw it has
+     * not been found. Over the limit, the excess is taken off every part alike: the body keeps its tumbling.
+     */
+    public void fuseR63(float sideways,float upward){fuseSideR63=sideways;fuseUpR63=upward;}
+    /** The fastest the mass centre was found over its limits since this was last asked, 0 if it never was. */
+    public float fusedR63(){float f=fusedR63;fusedR63=0;return f;}
+    private void limitMassCentreR63()
+    {
+        float mass=0,x=0,y=0,z=0;
+        for(var body:bodies.values())
+        {
+            if(body.getInvMass()<=0)continue;
+            float m=1/body.getInvMass();Vector3f v=body.getLinearVelocity(new Vector3f());mass+=m;x+=v.x*m;y+=v.y*m;z+=v.z*m;
+        }
+        if(mass<=0)return;
+        x/=mass;y/=mass;z/=mass;float side=(float)Math.sqrt(x*x+z*z);
+        if(side<=fuseSideR63&&y<=fuseUpR63)return;
+        fusedR63=Math.max(fusedR63,Math.max(side,y));
+        float keep=side>fuseSideR63?fuseSideR63/side:1;
+        Vector3f excess=new Vector3f(x*(1-keep),y>fuseUpR63?y-fuseUpR63:0,z*(1-keep));
+        for(var body:bodies.values())
+        {
+            if(body.getInvMass()<=0)continue;
+            Vector3f v=body.getLinearVelocity(new Vector3f());v.sub(excess);body.setLinearVelocity(v);
         }
     }
     // A matched surface-vertex sweep catches rotational crossings missed by

@@ -34,7 +34,7 @@ public final class CombatBodyDynamics
     private static final class State
     {
         CombatBodyProfiles.Profile profile;ArticulatedBody simulation;EvaBodyPose.Sample template,pose,resting;
-        boolean groundImpact,thrown;
+        boolean groundImpact,thrown;int fuseSaidR63;
         Vec3 origin,position;float yaw;AABB bounds,terrainCoverage;long started;int age,stable,recoveryAge=-1;float recoveryStart,recoveryYaw,groundY;Vector3f recoveryOffset,endShift;
     }
     private static final class ClientState
@@ -139,14 +139,21 @@ public final class CombatBodyDynamics
             Map<String,Matrix4f> previousFrames=new HashMap<>();history.matrices.forEach((n,m)->previousFrames.put(n,new Matrix4f(transform).mul(m)));
             s.simulation.motionFromPose(previousFrames,since/20F);
         }
+        if(FUSE_R63)s.simulation.fuseR63(FUSE_SIDE_R63,FUSE_UP_R63);
         if(strength>=0)impulse(s,point,direction,strength);SERVER.put(entity,s);
         if(entity instanceof EvaUnit01Entity eva){eva.beginPhysicalControlR35();EvaCombatR31.clear(eva);if(eva instanceof EvaPrototypeEntity un)un.stopUNFlight();}
         if(entity instanceof SachielEntity angel)angel.cancelStrikeR31();
         send(entity,s,1);ProjectSeele.LOGGER.info("Articulated impact started actor={} rig={} point={}",entity.getUUID(),s.profile.key(),point);return true;
     }
+    private static final boolean FUSE_R63=!"false".equals(System.getProperty("projectseele.bodyFuseR63"));
+    private static final float FUSE_SIDE_R63=Float.parseFloat(System.getProperty("projectseele.bodyFuseSideR63","6")),FUSE_UP_R63=Float.parseFloat(System.getProperty("projectseele.bodyFuseUpR63","4"));
+    /** Review: every blow's impulse times this, and pointed up as Sachiel's overhead points it, to blow the fuse on purpose. */
+    private static final float BLOW_SCALE_R63=Float.parseFloat(System.getProperty("projectseele.bodyBlowScaleR63","1"));
+    private static final boolean BLOW_UP_R63=Boolean.getBoolean("projectseele.bodyBlowUpR63");
     private static void impulse(State s,Vec3 point,Vec3 direction,float strength)
     {
-        Vector3f p=local(s,point),force=direction.toVector3f().rotateY(-(180-s.yaw)*Mth.DEG_TO_RAD).normalize().mul(45+30*strength);
+        if(BLOW_UP_R63){Vec3 flat=direction.multiply(1,0,1);direction=(flat.lengthSqr()<1e-8?new Vec3(0,1,0):flat.normalize().scale(.35).add(0,.93,0)).normalize();}
+        Vector3f p=local(s,point),force=direction.toVector3f().rotateY(-(180-s.yaw)*Mth.DEG_TO_RAD).normalize().mul((45+30*strength)*BLOW_SCALE_R63);
         var frame=s.simulation.frame();String nearest="torso_upper";double distance=Double.MAX_VALUE;
         for(var entry:frame.deformation().entrySet())
         {
@@ -260,6 +267,13 @@ public final class CombatBodyDynamics
                     {s.terrainCoverage=null;entity.setDeltaMovement(Vec3.ZERO);continue;}
                     Vec3 beforeR63=s.position;
                     if(s.age>2)s.simulation.step(.05F);var frame=s.simulation.frame();s.bounds=worldBounds(s,frame.min(),frame.max());
+                    float fused=s.simulation.fusedR63();
+                    if(fused>0&&s.age>=s.fuseSaidR63)
+                    {
+                        s.fuseSaidR63=s.age+10;
+                        ProjectSeele.LOGGER.warn("Fallen body held to its speed limit: actor={} rig={} age={} mass centre {} units a second at {}; {}",entity.getUUID(),s.profile.key(),s.age,
+                                String.format(java.util.Locale.ROOT,"%.1f",fused),s.position,s.simulation.actorContactsR63());
+                    }
                     if(!s.groundImpact&&s.age>5&&frame.groundImpulse()>4)
                     {s.groundImpact=true;groundImpact((ServerLevel)entity.level(),world(s,frame.impactPoint()));}
                     var hip=new Vector3f(s.profile.rig().get("leg_l").pivot()).add(s.profile.rig().get("leg_r").pivot()).mul(.5F*CombatBodyProfiles.MODEL_TO_PHYSICS);
