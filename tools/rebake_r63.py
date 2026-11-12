@@ -18,7 +18,7 @@ Changed chunks are found by comparing every GeoFront chunk with the world inside
 exactly the world the current LOD database was built from. The map writer does not update chunk timestamps.
 Run with a Python whose executable name does not start with "python" while the phone tool is running.
 """
-from contextlib import contextmanager
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 import argparse
 import datetime
@@ -512,14 +512,14 @@ def step_instance(a):
     save('instance', dict(game=str(game), robocopy=tail, dh=DH_BAKE, final_jar_bytes=(WORK / 'jars/final.jar').stat().st_size))
 
 
-def mirror_world():
+def mirror_world(locked=True):
     game = WORK / 'client'
     target = guard(game / 'saves' / COPY)
     _, _, links = tree_bytes(FORMAL)
     if links:
         raise SystemExit('Formal world contains links, refusing to mirror: ' + ', '.join(links[:5]))
     wait_no_exclusive('mirroring the world')
-    with held_world(FORMAL):
+    with held_world(FORMAL) if locked else nullcontext():
         tail = robocopy(FORMAL, target, '/MIR', '/XF', 'session.lock')
         src = {p.relative_to(FORMAL).as_posix(): p.stat().st_size for p in (FORMAL / GEO / 'region').glob('*.mca')}
         dst = {p.relative_to(target).as_posix(): p.stat().st_size for p in (target / GEO / 'region').glob('*.mca')}
@@ -531,7 +531,8 @@ def mirror_world():
 
 
 def step_mirror(a):
-    save('mirror', mirror_world())
+    # --no-lock is for trial runs only: a writer may change the world while it is copied.
+    save('mirror', dict(locked=not a.no_lock, **mirror_world(not a.no_lock)))
 
 
 def step_prepare(a):
@@ -580,7 +581,7 @@ def step_prepare(a):
         c.close()
     if check != 'ok':
         raise SystemExit('Prepared database failed integrity_check: ' + check)
-    points = viewpoints(plan['rebuild'])
+    points = viewpoints(plan['rebuild'])[:a.points or None]
     plan_steps = probe_script(points, WORK / 'scripts/r63-dh-core.json')
     json.dump(plan['rebuild'], guard(WORK / 'lod/rebuild_sections.json').open('w'))
     save('prepare', dict(database=str(db), ring_snapshot=str(ring), rows=rows, levels=levels, integrity=check,
@@ -693,6 +694,8 @@ def main():
     p.add_argument('--ring-db', help='prepare: outer ring database (default: the map-edges copy on E:)')
     p.add_argument('--minutes', type=int, help='core: client time limit (default: the plan plus 10)')
     p.add_argument('--fill-threshold', type=int, default=50, help='core: missing core sections tolerated without a fill pass')
+    p.add_argument('--points', type=int, help='prepare: keep only the first N viewpoints (trial runs)')
+    p.add_argument('--no-lock', action='store_true', help='mirror: copy without holding session.lock (trial runs only, never for packing)')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
     a = p.parse_args()
     if a.work:
