@@ -185,16 +185,21 @@ def face_bare(w, sites, rows):
     def after(c):
         return rows[c][4] if c in rows else w.get(*c)
 
-    def wall_for(x, z):
+    def site_at(x, z):
         for s in sites:
             b = s['bbox']
             if b[0] - 30 <= x <= b[3] + 30 and b[2] - 30 <= z <= b[5] + 30:
-                return s.get('wall', 'minecraft:stone_bricks')
-        return 'minecraft:stone_bricks'
+                return s
+        return {}
+
+    def wall_for(x, z):
+        return site_at(x, z).get('wall', 'minecraft:stone_bricks')
     faced = 0
     for (x, y, z), r in rows.items():
         if base(r[4]) not in ('minecraft:dirt', 'minecraft:coarse_dirt'):
             continue
+        if site_at(x, z).get('style') == 'slope':
+            continue    # open hillside: earth steps like the terraces around, no wall
         for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             s = after((x + dx, y, z + dz))
             if s and is_open(s):
@@ -269,7 +274,8 @@ def plan(w, sites, A):
             if d == 1:
                 outs = [ground(c[0] + dx, c[1] + dz, U[c]) for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)) if (c[0] + dx, c[1] + dz) not in U]
                 drop[c] = U[c] - min(outs) if outs else 0
-        terr = {c: drop[c] > SLOPE_MAX for c in drop}
+        # style "slope": a site in open hillside keeps the 1:1 earth cone whatever the drop (no walls)
+        terr = {c: drop[c] > SLOPE_MAX and site.get('style') != 'slope' for c in drop}
         site['edge_cols'] = len(drop)
         site['terrace_edge_cols'] = sum(terr.values())
         site['max_drop'] = max(drop.values(), default=0)
