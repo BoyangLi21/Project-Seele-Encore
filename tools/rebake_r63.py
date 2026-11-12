@@ -42,7 +42,8 @@ RING_DB = Path('E:/eva-map-edges/client/saves/MAP_REVIEW/dimensions/projectseele
 WORK = Path('E:/eva-r63-rebake')
 ARGS_TEMPLATE = Path('F:/eva/.claude/map-work/run17.args')
 TEMPLATE_GAME_DIR = 'F:/eva/.claude/map-work/client'
-PROBE_CLASS = Path('F:/eva/.claude/map-edges-work/f12/probe/MapProbeLocal.class')
+# Probe classes (MapProbeLocal and inner classes) come from the jar map-edges bakes the outer ring with.
+PROBE_JAR = Path('E:/eva-map-edges/client/mods/projectseele-0.1.0-all.jar')
 JAVAW = Path('E:/Users/liboy/jdks/jdk-17.0.19+10/bin/javaw.exe')
 SLOT = Path('F:/eva/.claude/client-slots/slot.py')
 SLOT_NAME = 'r63-pack'
@@ -385,6 +386,15 @@ def client_args(game, extra_props, out_name):
     return path
 
 
+def client_log():
+    """What the last client run's log says: a broken mod load still exits with code 0."""
+    text = (WORK / 'client/logs/latest.log').read_text('utf8', 'replace')
+    bad = [m for m in ('Failed to register automatic subscribers', 'Unhandled game exception', 'broken mod state',
+                       'Missing required mod', 'Registry Object not present') if m in text]
+    return dict(seele_initialized='Project SEELE initialized' in text, failures=bad, out_of_memory=text.count('OutOfMemoryError'),
+                ok='Project SEELE initialized' in text and not bad)
+
+
 def run_client(args_file, minutes, purpose):
     """One client under a slot; returns the exit text. Never starts without an 'ok:' from slot.py."""
     wait_no_exclusive('a client')
@@ -419,14 +429,25 @@ def restore_mods(game, held):
         shutil.move(str(jar), str(game / 'mods' / jar.name))
 
 
+def probe_classes(source=None):
+    """MapProbeLocal and its inner classes from the probe jar map-edges bakes with (never committed)."""
+    with zipfile.ZipFile(source or PROBE_JAR) as z:
+        found = {n: z.read(n) for n in z.namelist() if n.startswith('com/projectseele/client/MapProbeLocal') and n.endswith('.class')}
+    if not {'com/projectseele/client/MapProbeLocal.class', 'com/projectseele/client/MapProbeLocal$ProbeInput.class'} <= set(found):
+        raise SystemExit('Probe classes incomplete in ' + str(source or PROBE_JAR) + ': ' + ', '.join(sorted(found)))
+    return found
+
+
 def probe_jar(final_jar, out):
-    """The final jar plus the local probe class (never committed): same private assets, one extra class."""
+    """The final jar plus the local probe classes: same private assets, the probe and its inner classes added."""
     guard(out)
+    classes = probe_classes()
     shutil.copyfile(final_jar, out)
     with zipfile.ZipFile(out, 'a') as z:
-        name = 'com/projectseele/client/MapProbeLocal.class'
-        if name not in z.namelist():
-            z.write(PROBE_CLASS, name)
+        present = set(z.namelist())
+        for name, data in classes.items():
+            if name not in present:
+                z.writestr(name, data)
     return out
 
 
@@ -441,7 +462,7 @@ def jar_classes(path):
 def step_check(a):
     problems, notes = [], []
     for name, path in (('formal world', FORMAL / 'level.dat'), ('shipped client jar', SHIP / JAR), ('R62 server zip', R62_SERVER_ZIP),
-                       ('outer ring LOD database', RING_DB), ('args template', ARGS_TEMPLATE), ('probe class', PROBE_CLASS),
+                       ('outer ring LOD database', RING_DB), ('args template', ARGS_TEMPLATE), ('probe jar', PROBE_JAR),
                        ('javaw', JAVAW), ('slot tool', SLOT)):
         if not path.exists():
             problems.append('missing ' + name + ': ' + str(path))
@@ -640,10 +661,11 @@ def step_core(a):
         minutes = a.minutes or prep['client_minutes'] + 10
         args = client_args(game, {'projectseele.mapProbe': script.as_posix()}, 'core.args')
         result = run_client(args, minutes, 'R63 DH core rebake')
+        log = client_log()
         done = Path(str(script) + '.log').exists() and Path(str(script) + '.log').read_text('utf8', 'replace').rstrip().endswith('done')
         cover = coverage(world, db)
         fill = None
-        if cover['core_missing'] and len(cover['core_missing']) > a.fill_threshold:
+        if log['ok'] and cover['core_missing'] and len(cover['core_missing']) > a.fill_threshold:
             points = viewpoints(cover['core_missing'], minimum=20)[:8]
             plan = probe_script(points, WORK / 'scripts/r63-dh-fill.json')
             args = client_args(game, {'projectseele.mapProbe': (WORK / 'scripts/r63-dh-fill.json').as_posix()}, 'fill.args')
@@ -653,9 +675,9 @@ def step_core(a):
         restore_mods(game, held)
         shutil.copyfile(WORK / 'jars/final.jar', game / JAR)
     out = snapshot(db, WORK / 'out/geofront_lod.sqlite', live=True)
-    gate = dict(script_done=done, client=result, quick_check=cover['quick_check'], core_missing=len(cover['core_missing']),
+    gate = dict(script_done=done, client=result, client_log=log, quick_check=cover['quick_check'], core_missing=len(cover['core_missing']),
                 pending_parent_updates=cover['pending_parent_updates'])
-    ok = done and cover['quick_check'] == 'ok' and len(cover['core_missing']) <= a.fill_threshold
+    ok = log['ok'] and done and cover['quick_check'] == 'ok' and len(cover['core_missing']) <= a.fill_threshold
     save('core', dict(ok=ok, gate=gate, held_mods=moved, fill=fill, output=str(out), output_bytes=out.stat().st_size,
                       core_level0=cover['core_level0'], missing_sample=cover['core_missing'][:20]))
     if not ok:
@@ -677,7 +699,7 @@ def step_xaero(a):
     finally:
         restore_mods(game, held)
     logtext = (game / 'logs/latest.log').read_text('utf8', 'replace')
-    finished = 'Xaero map bake finished' in logtext
+    finished = 'Xaero map bake finished' in logtext and client_log()['ok']
     zips = sorted(baked.rglob('*.zip')) if baked.exists() else []
     out = WORK / 'out/xaero/projectseele$geofront'
     if finished and zips:
