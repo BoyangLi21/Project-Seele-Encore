@@ -38,6 +38,16 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
   - 最新区域文件时间 2026-11-13 06:41:52；批次表（`docs/HAKONE_EXECUTION_ORDER_20261105.zh.md`）最大是 455。`continuation.json` 的 `latest_installed_batch` 还停在 334，不能用来判断批次。
 - prepare：变动区块 9,828，删 83,801 行（变动 1,194、外圈 80,965、边缘 1,642），从外圈取 45,267 行，合并后 52,415 行（601 MB），integrity ok，打标 2,036 行。要重建 1,376 段，3 个视点：(160,544) 1,081 段、(4384,544) 289 段、(-3040,-736) 6 段。
 
+打包检查（06:58，`--compare-build` 用这个工作树在 main b5ef09c1 上编的 jar，模板是交付目录里 R62 的两个包）：
+- 主客户端 jar（06:50 装）2,136 个类，和 main b5ef09c1 的编译结果 0 处不同；sha256 `1c5fef6adf0e3781e306cae497a488c197093d478f15cd9e4a898ccaf0557cfd`。Fable 的 R63 代码再合进来、装机以后，这一项要重跑。
+- 服务端 mod 20 个，含 MTR 和 TrafficCraft；配置和默认值没有不同，只缺两个 `shadows.*` 新键（首次启动写 64、128）。
+- 未压缩大小：服务端 2.80 GB，客户端 1.47 GB（GeoFront 远景库 601 MB，合并后、核心重烘之前）。
+- 唯一的失败：小地图还是 11-10 烘的，比世界旧。
+
+小地图（07:00–07:11，普通槽位，自己的镜像 `R63_XAERO`，持锁 295 秒，全部文件总哈希同上）：烘完 133 个区域 zip（R62 是 191，少的是删掉的外圈），在 `E:/eva-r63-rebake/out/xaero/projectseele$geofront`。换上它再跑 `--check`：0 处失败。世界再写就要重烘。
+
+所以第 455 批时打包还差：外圈烘完后的 `instance`、`mirror`、`prepare`，然后独占窗口里的 `core`；Fable 的 R63 代码装机后重跑一次 `--check`（jar 比对）。
+
 ## 开始之前
 
 - [ ] 地图会话说最后一批写完了。批次以 `docs/HAKONE_EXECUTION_ORDER_20261105.zh.md` 的批次表为准，`mirror --batch N` 会核对。之后任何一次写入都要从“镜像”重来；`core` 发现正式世界的区域文件在镜像之后变过会拒绝。
