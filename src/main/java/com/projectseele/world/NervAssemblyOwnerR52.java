@@ -1586,7 +1586,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     {
         var start=getFrame(data,"FinishRoot");var landing=deploymentLandingRootR53(hatch,start);if(landing==null)return null;var profile=new NervBallisticHandoffR52.Profile(landing.translation().y-start.translation().y);var expected=new CompoundTag();expected.putInt("Version",1);expected.putString("Route",data.getString("RouteR52"));expected.putString("Gate",hatch.resource());expected.putUUID("GateUUID",hatch.visual());expected.putDouble("Gravity",e.getAttributeValue(net.minecraftforge.common.ForgeMod.ENTITY_GRAVITY.get()));expected.putDouble("LandingDelta",profile.landingDelta());expected.putInt("FlightTicks",NervBallisticHandoffR52.FLIGHT_TICKS);expected.putInt("CarrierTicks",NervBallisticHandoffR52.CARRIER_TICKS);expected.putInt("CloseTicks",hatch.siloHatch().closeTicks());putFrame(expected,"Start",start);putFrame(expected,"Landing",landing);putFrame(expected,"Hatch",hatch.frame());
         // Older saved profiles also carry source digests; only the physical profile is compared.
-        if(data.contains("BallisticProfileR53")){var saved=data.getCompound("BallisticProfileR53").copy();for(String key:List.of("Directory","HatchSource","PayloadSource"))saved.remove(key);if(!saved.equals(expected))return null;}else{if(directory.schemaVersionR52()>=2&&!data.getString("Finish").equals(Finish.RECEIVE.name()))return null;data.put("BallisticProfileR53",expected);}
+        if(data.contains("BallisticProfileR53")){var saved=data.getCompound("BallisticProfileR53").copy();for(String key:List.of("Directory","HatchSource","PayloadSource"))saved.remove(key);if(!saved.equals(expected)){if(!data.getString("Finish").equals(Finish.RECEIVE.name()))return null;data.put("BallisticProfileR53",expected);}}else{if(directory.schemaVersionR52()>=2&&!data.getString("Finish").equals(Finish.RECEIVE.name()))return null;data.put("BallisticProfileR53",expected);}
         var proof=ballistic.get(o.eva());if(proof!=null&&!proof.profile().equals(profile))return null;if(proof==null){proof=NervBallisticHandoffR52.capture(l,o,e,start,profile);if(proof!=null)ballistic.put(o.eva(),proof);}return proof;
     }
     private NervOriginalCarrierR52.CheckedStep outletPairHeldR53(Original original, String reason)
@@ -1635,7 +1635,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     }
 
     private boolean advanceOutletPairR53(ServerLevel level, Original original, EvaUnit01Entity eva,
-            CompoundTag data, Set<UUID> own, NervBallisticHandoffR52.Proof proof, float next)
+            CompoundTag data, Set<UUID> own, NervBallisticHandoffR52.Proof proof, float next, Gate hatch)
     {
         var carrier = NervOriginalCarrierR52.controller(level, original);
         var admission = carrierActuatorAdmissionR52(level, original, data);
@@ -1651,6 +1651,15 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if (payload == null) return hold(original, proof.rejectionR53());
         var rack = outletPairR53(level, original, eva, data, own, payload, next);
         if (rack == null) return false;
+        if (hatch != null)
+        {
+            // The hatch's step of this tick, taken before the rack's and the body's are committed (as EJECT_CLOSE does).
+            if (!proof.clearHatchStepR53(level, eva, hatch, payload)) return hold(original, proof.rejectionR53());
+            var door = (NervSiloDoorEntity) level.getEntity(hatch.visual());
+            float proposed = door.proposedDeclaredProgressR52(false);
+            gate(level, hatch, false, own);
+            if (door.actualOpenProgressR52() != proposed) return hold(original, "outlet_hatch_step_not_accepted");
+        }
         if (!rack.commit(level) || !EvaMechanicalFrameR52.acceptBallisticStepR53(eva, payload))
             throw new IllegalStateException("Current paired outlet proof changed during same-tick commit");
         eva.setCarrierRiseProgress(next);return true;
@@ -1665,8 +1674,10 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         {
             case RECEIVE -> {for(String id:receiver.gates())if(!gateAtRest(l,gates.get(id),true))return hold(o,"deployment_hatch_must_be_physically_open");if(!carrierSupportReadyR53(l,e)||((!EvaMechanicalFrameR52.beginControlledBallisticR53(e,o,proof))))return hold(o,"actual_full_payload_carrier_and_hatch_ballistic_sweep_blocked");data.putString("Finish",Finish.EJECT_LOWER.name());data.putInt("FinishTicks",0);}
             case EJECT_LOWER -> {
-                if(!proof.placement(l,e)||!gateAtRest(l,hatch,true))return hold(o,"actual_ballistic_custody_or_open_hatch_changed");
                 float next=Math.max(0,1-age/(float)NervBallisticHandoffR52.CARRIER_TICKS);
+                // The jaws let go under an open hatch. Once the deck drops (the second half) the hatch closes with it.
+                boolean dropping=next<.5F;
+                if(!proof.placement(l,e)||!dropping&&!gateAtRest(l,hatch,true))return hold(o,"actual_ballistic_custody_or_open_hatch_changed");
                 {
                     if(!EvaMechanicalFrameR52.controlledBallisticR53(e))
                     {
@@ -1675,7 +1686,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
                                 :EvaMechanicalFrameR52.adoptControlledBallisticR53(e,proof);
                         if(!admitted)return hold(o,"outlet_original_supported_launch_or_preserved_flight_required");
                     }
-                    if(!advanceOutletPairR53(l,o,e,data,own,proof,next))return false;
+                    if(!advanceOutletPairR53(l,o,e,data,own,proof,next,dropping?hatch:null))return false;
                 }
                 if(next==0){data.putString("Finish",Finish.EJECT_CLOSE.name());data.putInt("FinishTicks",0);}
             }
