@@ -99,9 +99,12 @@ def plant(w, sites, benches, rows):
 
 
 import os
-AVOID = set()
+AVOID, ROAD_Y = set(), {}
 if os.environ.get('E13_AVOID'):
-    AVOID = {(c[0], c[1]) for c in json.load(open(os.environ['E13_AVOID']))}
+    for c in json.load(open(os.environ['E13_AVOID'])):
+        AVOID.add((c[0], c[1]))
+        if len(c) > 2:
+            ROAD_Y[c[0], c[1]] = c[2]
 
 
 def near_road(x, z, r=3):
@@ -285,6 +288,10 @@ def plan(w, sites, A):
             cur[x, z] = y
             can[x, z] = is_natural(top) and all(fillable(w.get(x, yy, z)) or is_veg(w.get(x, yy, z)) for yy in range(y + 1, t + 1))
         final = {c: max(cur[c], target[c]) if can[c] else cur[c] for c in target}
+        for c in final:
+            if c in ROAD_Y and can.get(c):
+                # another session paves this column: earth may hold the road up, never take its cell
+                final[c] = max(cur[c], min(final[c], ROAD_Y[c] - 1))
         for (x, z) in list(target):
             for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
                 n = (x + dx, z + dz)
