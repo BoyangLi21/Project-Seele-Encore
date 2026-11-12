@@ -83,6 +83,18 @@ public final class EvaConnectedActionReview
      */
     private static final boolean LAUNCH_REAL=Boolean.getBoolean("projectseele.launchReal");
     private static final String LAUNCH_EXIT=System.getProperty("projectseele.launchExit","surface");
+    /**
+     * -Dprojectseele.launchWatch=<ticks>: the real mode sends no sortie command and only logs where the toured unit is,
+     * for so many ticks (what a unit left deployed does when its world is loaded again).
+     * -Dprojectseele.launchWatchReset=<unit> also asks for that unit's reset at the start, as a sortie run does.
+     */
+    private static final int LAUNCH_WATCH=Integer.getInteger("projectseele.launchWatch",0);
+    private static final String LAUNCH_WATCH_RESET=System.getProperty("projectseele.launchWatchReset");
+    /**
+     * -Dprojectseele.launchWatchCommand=<command>: one command sent during a watch (for instance "ride @s dismount"),
+     * at step 10 or at -Dprojectseele.launchWatchCommandAt=<step>.
+     */
+    private static final String LAUNCH_WATCH_COMMAND=System.getProperty("projectseele.launchWatchCommand");
     private static int realStage,realStageAt,realFreeTicks;
     private static final int STRIKE_LEAD=20,STRIKE_CYCLE=140;
     /** Each case: air (1) or ground (0), blocks ahead of the body, blocks to its right, blocks up, the target. */
@@ -299,6 +311,7 @@ public final class EvaConnectedActionReview
         realStage=stage;realStageAt=step;
     }
 
+    private static boolean launchStrictSent;
     private static void launchRealR63(Minecraft mc, Path world)
     {
         int step=wait-100,since=step-realStageAt;
@@ -337,6 +350,33 @@ public final class EvaConnectedActionReview
             }
         }
         boolean departing=route.startsWith("DEPARTING")||route.startsWith("FINISHING")||route.startsWith("DEPLOYED");
+        // -Dprojectseele.launchStrict=true: the strict traversal diagnostic is switched on once this sortie's
+        // finish has begun (a job left DEPLOYED by the sortie before does not count). On the review save it then
+        // holds the finish at the deck's drop, shallow_bay_complete_source_stroke_held, whatever the hatch
+        // timing; switched on earlier it already holds the preparation in the hangar bay
+        // (shallow_tray_original_sole_bearing_missing).
+        if(realStage==4&&(realFinish.equals("RECEIVE")||realFinish.equals("EJECT_LOWER"))&&!launchStrictSent&&Boolean.getBoolean("projectseele.launchStrict")){launchStrictSent=true;link.sendCommand("seele dev traversal strict");}
+        if(LAUNCH_WATCH>0)
+        {
+            // Nothing is asked of the facility: where the toured unit is and what holds it, every half second.
+            if(LAUNCH_WATCH_RESET!=null&&step==10)link.sendCommand("seele eva reset "+LAUNCH_WATCH_RESET);
+            if(LAUNCH_WATCH_COMMAND!=null&&step==Integer.getInteger("projectseele.launchWatchCommandAt",10))link.sendCommand(LAUNCH_WATCH_COMMAND);
+            if(step%10==0)
+            {
+                var server=mc.getSingleplayerServer();int variant=UNIT_VARIANT;String job=route.length()>90?route.substring(0,90):route;
+                server.execute(()->
+                {
+                    var level=server.getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
+                    var unit=level==null?null:com.projectseele.world.EvaLogisticsDirector.canonicalUnit(level,variant);
+                    ProjectSeele.LOGGER.info("Real launch review: watch step={} unit={} job={}",step,unit==null?"not loaded"
+                            :String.format("y %.2f vy %.2f ground %s noGravity %s locked %s frame %s riders %d under %s",unit.getY(),unit.getDeltaMovement().y,
+                                    unit.onGround(),unit.isNoGravity(),unit.isNervLogisticsLocked(),com.projectseele.entity.EvaMechanicalFrameR52.active(unit),
+                                    unit.getPassengers().size(),level.getBlockState(unit.blockPosition().below()).getBlock().getDescriptionId()),job);
+                });
+            }
+            if(step>=LAUNCH_WATCH)finish(mc,"watch_complete");
+            return;
+        }
         switch(realStage)
         {
             case 0 ->
@@ -878,6 +918,9 @@ public final class EvaConnectedActionReview
             launch.add(eva.hasActiveCarrierMotion() ? 1 : 0); launch.add(eva.isVisuallyAirborneForRender() ? 1 : 0);
             launch.add(eva.isPoweredOn() ? 1 : 0); launch.add(eva.getDeltaMovement().y);
             launch.add(Minecraft.getInstance().gameRenderer.getMainCamera().getPosition().y);
+            row.addProperty("rack", com.projectseele.client.render.EvaRackReleaseR63.traceR63(eva));
+            row.addProperty("framed", com.projectseele.entity.EvaMechanicalFrameR52.active(eva));
+            row.addProperty("seatY", eva.getPilotCameraSeatPosition(Minecraft.getInstance().player, partialTick).y);
             row.add("launch", launch);
         }
         if (eva.isHeavyMotionActive()) row.addProperty("heavyPhase", eva.heavyMotionProgress(partialTick));
