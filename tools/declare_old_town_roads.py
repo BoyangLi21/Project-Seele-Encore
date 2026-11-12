@@ -5,7 +5,9 @@ Carriageway: black, white, grey or yellow concrete (old asphalt and its paint) a
 the soil top). Footway: smooth stone, its slab or stone bricks within 3 blocks of a carriageway cell, at
 ground level. The walking height is the block top (half a block lower on a bottom slab). Pieces under
 MIN_PIECE cells are left out. Cells already declared keep their declaration.
-usage: declare_old_town_roads.py <capture> <network.npz> <out-network.npz> x0 z0 x1 z1"""
+usage: declare_old_town_roads.py <capture> <network.npz> <out-network.npz> x0 z0 x1 z1 [ymin ymax]
+With ymin ymax, paving whose top block lies in that height band counts even over air (a town platform's
+edge roads standing over a slope that is still to be filled), instead of the ground-level test."""
 import sys
 from collections import Counter
 
@@ -18,6 +20,7 @@ cap = CapturedSurface(sys.argv[1], partial=True)
 net = np.load(sys.argv[2])
 network = {k: net[k].copy() for k in net.files}
 X0, Z0, X1, Z1 = map(int, sys.argv[4:8])
+BAND = tuple(map(int, sys.argv[8:10])) if len(sys.argv) > 9 else None
 ax, az = map(int, network['bounds'][:2])
 cx, cz = map(int, cap.bounds[:2])
 hi, top = cap.measured['highest'], cap.measured['top']
@@ -39,7 +42,10 @@ for j in range(H):
             y -= 1
             s = cap.state(x, y, z)
         n = s.split('[')[0]
-        if y - int(top[z - cz, x - cx]) > 2:
+        if BAND:
+            if not (BAND[0] <= y <= BAND[1]):
+                continue
+        elif y - int(top[z - cz, x - cx]) > 2:
             continue
         if n in CARRIAGE:
             kind[j, i] = 1
