@@ -23,14 +23,19 @@ public final class CombatFeelClientR31
         var mc=Minecraft.getInstance();if(mc.player==null||mc.getCameraEntity()!=mc.player)return;
         var eva=EvaPilotResolver.controlTarget(mc.player);
         if(eva==null||eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaCommandFeedClient.isOpticalRenderPass())return;
-        var b=CombatFeelR31.beat(eva);float pulse=0;
+        var b=CombatFeelR31.beat(eva);float pulse=0,held=0;
         if(b!=null)
         {
             float t=CombatFeelR31.age(eva,(float)e.getPartialTick());
-            pulse=(float)(Math.exp(-t/3.5)*Math.sin(t*1.15))*b.strength();
+            // A heavier blow holds both bodies longer and swings the view further: by a quarter more for
+            // each tick held past the first. Landing the kick on an Angel used to move it a third of a degree.
+            float weight=b.stopTicks()<=1?1F:.75F+.25F*b.stopTicks();
+            pulse=(float)(Math.exp(-t/3.5)*Math.sin(t*1.15))*b.strength()*weight;
+            // While the bodies are held on the blow the view rattles, dying away as they let go.
+            if(t<b.stopTicks())held=(float)Math.sin(t*6.5)*(1-t/b.stopTicks())*b.strength()*.55F;
         }
-        float pitch=pulse*(b!=null&&b.kind()==CombatFeelR31.CONTACT?.65F:1.4F);
-        float roll=pulse*(b!=null&&b.kind()==CombatFeelR31.CONTACT?.22F:.6F);
+        float pitch=pulse*(b!=null&&b.kind()==CombatFeelR31.CONTACT?.65F:1.4F)+held*(b!=null&&b.kind()==CombatFeelR31.CONTACT?.8F:1F);
+        float roll=pulse*(b!=null&&b.kind()==CombatFeelR31.CONTACT?.22F:.6F)+held*.45F;
         if(mc.options.getCameraType().isFirstPerson())
         {
             var impact=EvaImpactResponse.sample(eva,(float)e.getPartialTick());
