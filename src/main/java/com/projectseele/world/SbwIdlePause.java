@@ -22,9 +22,14 @@ import net.minecraft.world.phys.Vec3;
  * A vehicle's tick costs the same whether it drives or stands, and the bases hold a hundred of them standing.
  * A vehicle is passed over only while all of this holds: nobody rides it and it rides nothing, its engine and
  * weapons are off with no target, it tows nothing, it is undamaged, it stands on the ground and has not moved or
- * turned for five seconds, it is not a tower switched on to look for targets, no story or transport event runs,
- * nothing hostile is within 256 blocks, and every player is more than 160 blocks away. Each condition is looked at
- * again every tick, so the vehicle ticks again in the tick one of them fails.
+ * turned for five seconds, no story or transport event runs, nothing hostile is within 256 blocks, and every player
+ * is more than 160 blocks away. Each condition is looked at again every tick, so the vehicle ticks again in the tick
+ * one of them fails.
+ *
+ * An auto-aiming tower that is switched on looks for targets in its own tick, so one that is passed over sees
+ * nothing. It is woken by the same two things as any vehicle: a player within 160 blocks, or something hostile
+ * within 256, which is as far as the HPJ-11 looks. What that list of hostile things leaves out, a shell fired from
+ * further off for one, reaches a base whose towers are still asleep.
  *
  * Nothing is stored and nothing is moved: a vehicle that ticks again carries on from where it stood. While it is
  * passed over, the chunk ticket its own tick would have asked for is kept alive, so what is loaded and what the
@@ -41,18 +46,18 @@ public final class SbwIdlePause
         void projectseele$holdChunk();
     }
 
-    /** An auto-aiming tower; one that is switched on finds its targets in its own tick. */
+    /** An auto-aiming tower. One that holds a target is working, whatever its weapon is doing this tick. */
     public interface Tower
     {
-        boolean projectseele$onDuty();
+        boolean projectseele$hasTarget();
     }
 
     private static final boolean DISABLED = Boolean.getBoolean("projectseele.tickIdleVehicles");
     private static final double PLAYER_RANGE = 160, THREAT_RANGE = 256;
     private static final int SETTLE_TICKS = 100, THREAT_TICKS = 20;
     private static final String[] REASONS = {"paused", "ridden_or_riding", "moving_or_unsupported", "engine_weapon_target_towing_or_damaged",
-            "tower_on_duty", "story_or_transport", "player_within_160", "settling", "hostile_within_256"};
-    private static final int PAUSED = 0, RIDDEN = 1, MOVING = 2, WORKING = 3, ON_DUTY = 4, EVENT = 5, PLAYER = 6, SETTLING = 7, THREAT = 8;
+            "tower_has_target", "story_or_transport", "player_within_160", "settling", "hostile_within_256"};
+    private static final int PAUSED = 0, RIDDEN = 1, MOVING = 2, WORKING = 3, TOWER_TARGET = 4, EVENT = 5, PLAYER = 6, SETTLING = 7, THREAT = 8;
 
     // Server thread only.
     private static final Map<Entity, Rest> REST = new WeakHashMap<>();
@@ -81,7 +86,7 @@ public final class SbwIdlePause
         if (!entity.onGround() || entity.isOnFire() || entity.isInWaterOrBubble() || entity.hurtMarked
                 || motion.horizontalDistanceSqr() > 1.0E-6D || Math.abs(motion.y) > 0.12D) return moved(entity, MOVING);
         if (!vehicle.projectseele$atRest()) return moved(entity, WORKING);
-        if (entity instanceof Tower tower && tower.projectseele$onDuty()) return moved(entity, ON_DUTY);
+        if (entity instanceof Tower tower && tower.projectseele$hasTarget()) return moved(entity, TOWER_TARGET);
         long now = level.getGameTime();
         Scene scene = SCENES.computeIfAbsent(level, key -> new Scene());
         if (scene.eventTick != now) { scene.eventTick = now; scene.event = event(level); }
