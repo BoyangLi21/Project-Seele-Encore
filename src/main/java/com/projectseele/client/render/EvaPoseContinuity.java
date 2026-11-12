@@ -27,6 +27,8 @@ final class EvaPoseContinuity
     private static final long POP_NANOS = 120_000_000L;
     /** A pop at 60 frames a second; longer frames are allowed their extra turn. */
     private static final float POP_DEGREES = 25.0F;
+    /** The same for the root's offset (model pixels: two and a half blocks). A kick's own leap moves it five a frame. */
+    private static final float POP_PIXELS = 8.0F;
     private static final long FRAME_NANOS = 16_666_667L;
     private static final long STALE_NANOS = 300_000_000L;
     /** Development diagnostic: log pose pops and tick-held bones (-Dprojectseele.poseDiag=true). */
@@ -54,6 +56,8 @@ final class EvaPoseContinuity
         /** The undamped pose of the last frame of a running blend. */
         Map<String, float[]> lastTarget;
         long blendStart;
+        /** The frame a blend was last started on (blendStart itself lies a frame earlier). */
+        long blendFrame;
         long lastNanos;
         long stepNanos;
         String owner;
@@ -137,7 +141,10 @@ final class EvaPoseContinuity
                             prev[3] - bone.getPosX(), prev[4] - bone.getPosY(), prev[5] - bone.getPosZ()});
                 });
                 state.offsets = offsets;
-                state.blendStart = now;
+                // The blend runs from the last frame drawn, not from this one. Started on this frame it
+                // drew the old pose a second time: every change of action held one frame, then moved.
+                state.blendStart = now - lead(now - state.lastNanos, blend);
+                state.blendFrame = now;
                 state.blendNanos = blend;
                 state.trigger = !key.equals(state.key) ? state.key + "->" + key : "pop";
             }
@@ -159,34 +166,13 @@ final class EvaPoseContinuity
             }
             else
             {
-                float w = 1 - t * t * (3 - 2 * t);
-                Map<String, float[]> offsets = state.offsets;
-                Quaternionf identity = new Quaternionf();
-                forEach(model, bone ->
-                {
-                    float[] o = offsets.get(bone.getName());
-                    if (o == null)
-                    {
-                        return;
-                    }
-                    Quaternionf delta = new Quaternionf(o[0], o[1], o[2], o[3]);
-                    Quaternionf q = rotation(bone).mul(new Quaternionf(identity).slerp(delta, w));
-                    // JOML 1.10.5 getEulerAnglesZYX does not invert rotationZYX (up to 75
-                    // degrees off); the project's channel conversion does.
-                    Vector3f euler = QuaternionChannels.euler(q);
-                    bone.setRotX(euler.x);
-                    bone.setRotY(euler.y);
-                    bone.setRotZ(euler.z);
-                    bone.setPosX(bone.getPosX() + o[4] * w);
-                    bone.setPosY(bone.getPosY() + o[5] * w);
-                    bone.setPosZ(bone.getPosZ() + o[6] * w);
-                });
+                blend(model, state.offsets, 1 - t * t * (3 - 2 * t));
             }
         }
         // Pops were only caught with no blend running, so a target that jumped
         // mid-blend (a combo strike taking over the previous one) reached the
         // screen in one frame. Restart the blend from the last drawn pose.
-        if (raw != null && state.offsets != null && now != state.blendStart && targetJumped(raw, state, now - state.lastNanos))
+        if (raw != null && state.offsets != null && now != state.blendFrame && targetJumped(raw, state, now - state.lastNanos))
         {
             Map<String, float[]> offsets = new HashMap<>();
             for (var entry : raw.entrySet())
@@ -202,24 +188,28 @@ final class EvaPoseContinuity
             }
             long remaining = state.blendStart + state.blendNanos - now;
             state.offsets = offsets;
-            state.blendStart = now;
             state.blendNanos = Math.max(POP_NANOS, remaining);
+            state.blendStart = now - lead(now - state.lastNanos, state.blendNanos);
+            state.blendFrame = now;
             state.trigger = state.trigger + "+pop";
-            State s = state;
+            // From the new target, back toward the last drawn pose by what is left of the blend.
+            Map<String, float[]> target = raw;
             forEach(model, bone ->
             {
-                float[] prev = s.last.get(bone.getName());
-                if (prev == null || !offsets.containsKey(bone.getName()))
+                float[] r = target.get(bone.getName());
+                if (r == null || !offsets.containsKey(bone.getName()))
                 {
                     return;
                 }
-                bone.setRotX(prev[0]);
-                bone.setRotY(prev[1]);
-                bone.setRotZ(prev[2]);
-                bone.setPosX(prev[3]);
-                bone.setPosY(prev[4]);
-                bone.setPosZ(prev[5]);
+                bone.setRotX(r[0]);
+                bone.setRotY(r[1]);
+                bone.setRotZ(r[2]);
+                bone.setPosX(r[3]);
+                bone.setPosY(r[4]);
+                bone.setPosZ(r[5]);
             });
+            float t = (now - state.blendStart) / (float) state.blendNanos;
+            blend(model, offsets, 1 - t * t * (3 - 2 * t));
         }
         if (!repeat)
         {
@@ -539,6 +529,37 @@ final class EvaPoseContinuity
     }
 
     /** Blend length for a change of pose key "owner|weapon:pose[:...]". */
+    /** How far before this frame a blend starts: the time since the last frame, and no more than a third of the blend. */
+    private static long lead(long sinceLast, long blend)
+    {
+        return Math.max(0L, Math.min(sinceLast, blend / 3));
+    }
+
+    /** Draw each bone its share {@code w} of the way back from the pose it holds to the pose the blend left. */
+    private static void blend(BakedGeoModel model, Map<String, float[]> offsets, float w)
+    {
+        Quaternionf identity = new Quaternionf();
+        forEach(model, bone ->
+        {
+            float[] o = offsets.get(bone.getName());
+            if (o == null)
+            {
+                return;
+            }
+            Quaternionf delta = new Quaternionf(o[0], o[1], o[2], o[3]);
+            Quaternionf q = rotation(bone).mul(new Quaternionf(identity).slerp(delta, w));
+            // JOML 1.10.5 getEulerAnglesZYX does not invert rotationZYX (up to 75
+            // degrees off); the project's channel conversion does.
+            Vector3f euler = QuaternionChannels.euler(q);
+            bone.setRotX(euler.x);
+            bone.setRotY(euler.y);
+            bone.setRotZ(euler.z);
+            bone.setPosX(bone.getPosX() + o[4] * w);
+            bone.setPosY(bone.getPosY() + o[5] * w);
+            bone.setPosZ(bone.getPosZ() + o[6] * w);
+        });
+    }
+
     private static long transitionNanos(String from, String to)
     {
         String[] a = from.split("\\|", 2), b = to.split("\\|", 2);
@@ -581,6 +602,20 @@ final class EvaPoseContinuity
     /** A body bone turned far more since the last drawn frame than that frame's own motion predicts. */
     private static boolean popped(BakedGeoModel model, State state, long elapsed)
     {
+        // A whole pose can be swapped without any one bone turning that far. Standing beside an
+        // Angel, the full guard stance replaced the walking legs in the frame the gait blend
+        // reached nought: no key changed, no bone turned fifty degrees, and the body dropped five
+        // blocks, stepped back five and turned 37 degrees at once. The root's offset is watched too.
+        float[] before = state.last.get("root");
+        GeoBone base = model.getBone("root").orElse(null);
+        if (before != null && base != null)
+        {
+            float x = base.getPosX() - before[3], y = base.getPosY() - before[4], z = base.getPosZ() - before[5];
+            if (Math.sqrt(x * x + y * y + z * z) > POP_PIXELS * Math.max(1.0F, elapsed / (float) FRAME_NANOS))
+            {
+                return true;
+            }
+        }
         float limit = POP_DEGREES * Math.max(1.0F, elapsed / (float) FRAME_NANOS);
         float stretch = Math.max(1.0F, elapsed / (float) Math.max(1L, state.stepNanos));
         for (String name : DIAG_BONES)
