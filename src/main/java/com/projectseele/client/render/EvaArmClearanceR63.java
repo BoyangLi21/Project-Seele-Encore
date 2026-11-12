@@ -14,6 +14,9 @@ import software.bernie.geckolib.cache.object.BakedGeoModel;
  * blocks into the thigh and the forearm 0.8, once a stride, on all three units. Where the hand
  * comes nearer the thigh's axis than the two are thick, the upper arm is turned outward at the
  * shoulder by the angle that takes the hand clear. Away from the thigh the clip is untouched.
+ * <p>
+ * Standing still counts too: Unit-02 carrying its sword stood with the free hand 1.8 blocks inside
+ * the thigh. The bare-handed stance hangs its hands clear of the legs and is not changed.
  */
 final class EvaArmClearanceR63
 {
@@ -27,7 +30,7 @@ final class EvaArmClearanceR63
         // The rifle's hands are on the gun; a strike, a fall or a low stance sets its arms itself.
         if(root==null||eva.isExperimentalUnit()||eva.getWeapon()==EvaUnit01Entity.WEAPON_RIFLE||eva.hasLiveActionForRender(partial)
                 ||eva.isFirstBattleActive()||eva.isNervLogisticsLocked()||eva.isVisuallyAirborneForRender()
-                ||eva.rifleStanceLevel(partial)>.5F||eva.rifleMoveBlend(partial)<.05F)return;
+                ||eva.rifleStanceLevel(partial)>.5F)return;
         var left=model.getBone("arm_l").orElse(null);var right=model.getBone("arm_r").orElse(null);
         if(left==null||right==null)return;
         float yaw=Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot)*Mth.DEG_TO_RAD;
