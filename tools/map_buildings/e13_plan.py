@@ -437,6 +437,9 @@ if __name__ == '__main__':
             x0, z0, x1, z1 = site['bbox'][0] - 30, site['bbox'][2] - 30, site['bbox'][3] + 30, site['bbox'][5] + 30
         return x0 <= r[0] <= x1 and z0 <= r[2] <= z1
     rows = [r for r in rows if any(inside(r, s) for s in sites)]
+    same = sum(r[3] == r[4] for r in rows)
+    rows = [r for r in rows if r[3] != r[4]]   # a kept tree replanted in place is no change
+    print('unchanged rows dropped', same)
     if SKIP:
         before = len(rows)
         rows = [r for r in rows if tuple(r[:3]) not in SKIP]
