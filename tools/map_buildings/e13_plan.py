@@ -105,6 +105,10 @@ if os.environ.get('E13_AVOID'):
         AVOID.add((c[0], c[1]))
         if len(c) > 2:
             ROAD_Y[c[0], c[1]] = c[2]
+# Cells another session's pending plans write ([x, y, z] list): never planned here, so two lists never share a cell.
+SKIP = set()
+if os.environ.get('E13_SKIP'):
+    SKIP = {tuple(c[:3]) for c in json.load(open(os.environ['E13_SKIP']))}
 
 
 def near_road(x, z, r=3):
@@ -173,6 +177,31 @@ def replant(w, sites, rows, removed, filled_cols):
             tall_tree(set_cell, x, t, z, log + '[axis=y]', leaves, h)
             planted.append((x, z))
         site['replant']['planted'] = len(planted)
+
+
+def face_bare(w, sites, rows):
+    """Planned dirt with open air beside it (a fill cut off at a road, house or another fill's step)
+    is a bare earth face, under a house or not: face it with the site's wall block."""
+    def after(c):
+        return rows[c][4] if c in rows else w.get(*c)
+
+    def wall_for(x, z):
+        for s in sites:
+            b = s['bbox']
+            if b[0] - 30 <= x <= b[3] + 30 and b[2] - 30 <= z <= b[5] + 30:
+                return s.get('wall', 'minecraft:stone_bricks')
+        return 'minecraft:stone_bricks'
+    faced = 0
+    for (x, y, z), r in rows.items():
+        if base(r[4]) not in ('minecraft:dirt', 'minecraft:coarse_dirt'):
+            continue
+        for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
+            s = after((x + dx, y, z + dz))
+            if s and is_open(s):
+                r[4] = wall_for(x, z)
+                faced += 1
+                break
+    print('faced bare earth', faced)
 
 
 def plan(w, sites, A):
@@ -380,6 +409,7 @@ def plan(w, sites, A):
             rows[below] = [*below, w.get(*below), GRASS]
     plant(w, sites, benches, rows)
     replant(w, sites, rows, removed, filled_cols)
+    face_bare(w, sites, rows)
     for r in rows.values():
         if w.block_entity(r[0], r[1], r[2]):
             raise SystemExit(f'block entity at {r[:3]}')
@@ -401,6 +431,10 @@ if __name__ == '__main__':
             x0, z0, x1, z1 = site['bbox'][0] - 30, site['bbox'][2] - 30, site['bbox'][3] + 30, site['bbox'][5] + 30
         return x0 <= r[0] <= x1 and z0 <= r[2] <= z1
     rows = [r for r in rows if any(inside(r, s) for s in sites)]
+    if SKIP:
+        before = len(rows)
+        rows = [r for r in rows if tuple(r[:3]) not in SKIP]
+        print('E13_SKIP dropped', before - len(rows), 'cells another session writes')
     for site in sites:
         x0, y0, z0, x1, y1, z1 = site['bbox']
         mine = [r for r in rows if inside(r, site)]

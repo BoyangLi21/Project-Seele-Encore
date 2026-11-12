@@ -33,9 +33,22 @@ def main(plates_file, out):
         for x, y, z, gap, gr, gy in A[m].tolist():
             if (x, z) not in under or y < under[x, z][0]:
                 under[x, z] = (y, gap)
-        # pier block: the deck's own block (what stands under it is often a road)
+        # pier block: what the viaduct's existing piers are made of (vertical runs of one man-made
+        # block just under the deck level); the deck's own block only when no pier is found
+        skip = ('slab', 'stairs', 'wall', 'fence', 'pane', 'rail', 'bars', 'light', 'edge', 'glass', 'leaves', 'log')
+        piers = Counter()
+        for x in range(x0, x1 + 1):
+            for z in range(z0, z1 + 1):
+                if (x, z) in under:
+                    continue
+                for y in range(y0 - 2, y0 - 10, -1):
+                    s = w.get(x, y, z)
+                    if s and not is_open(s) and not is_natural(s) and not any(k in s for k in skip) \
+                            and w.get(x, y - 1, z) == s and w.get(x, y - 2, z) == s and w.get(x, y - 3, z) == s:
+                        piers[s] += 1
+                        break
         deck = Counter(w.get(x, y, z) for (x, z), (y, g) in list(under.items())[:400])
-        block = next((b for b, _ in deck.most_common() if b and not any(k in b for k in ('slab', 'stairs', 'wall', 'fence', 'pane', 'rail', 'bars', 'light', 'edge'))),
+        block = next((b for b, _ in piers.most_common() + deck.most_common() if b and not any(k in b for k in skip)),
                      'minecraft:light_gray_concrete')
 
         def supported(c, ry):
