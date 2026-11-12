@@ -376,11 +376,27 @@ public final class CombatBodyDynamics
         if(entity instanceof EvaUnit01Entity eva&&eva.getPilotEntity() instanceof net.minecraft.server.level.ServerPlayer pilot)
             pilot.connection.send(new net.minecraft.network.protocol.game.ClientboundMoveVehiclePacket(entity));
     }
+    private static final boolean HANDBACK_R63=!"false".equals(System.getProperty("projectseele.physicalHandbackR63"));
     public static void receive(LivingEntity entity,ClientboundCombatBodyPose packet)
     {
         if(entity instanceof FirstBattleSignals.Actor actor&&actor.firstBattleSignals().active(entity))
         {CLIENT.remove(entity);return;}
-        if(packet.mode()==0){CLIENT.remove(entity);entity.setPos(packet.position().x,packet.position().y,packet.position().z);entity.setYRot(packet.yaw());entity.yBodyRot=entity.yHeadRot=packet.yaw();entity.setDeltaMovement(Vec3.ZERO);entity.resetFallDistance();entity.refreshDimensions();entity.setOnGround(true);return;}
+        if(packet.mode()==0)
+        {
+            CLIENT.remove(entity);entity.setPos(packet.position().x,packet.position().y,packet.position().z);entity.setYRot(packet.yaw());entity.yBodyRot=entity.yHeadRot=packet.yaw();
+            // The get-up ends on the standing pose with the unit set under it, 20 blocks and more from where the
+            // simulation held it and turned. Only the present position and yaw were set: a frame drawn before the
+            // next tick stood between the old place and the new, and the interpolation still running toward the
+            // last position sent took the unit back to it over the following ticks. With the standing pose on it,
+            // the body was drawn 24 blocks off and 137 degrees round for a frame (7 FPS), then back.
+            if(HANDBACK_R63)
+            {
+                entity.lerpTo(entity.getX(),entity.getY(),entity.getZ(),packet.yaw(),entity.getXRot(),1,true);
+                entity.xo=entity.xOld=entity.getX();entity.yo=entity.yOld=entity.getY();entity.zo=entity.zOld=entity.getZ();
+                entity.yRotO=entity.yBodyRotO=entity.yHeadRotO=packet.yaw();
+            }
+            entity.setDeltaMovement(Vec3.ZERO);entity.resetFallDistance();entity.refreshDimensions();entity.setOnGround(true);return;
+        }
         var profile=CombatBodyProfiles.get(entity);if(profile==null)return;var pose=new EvaBodyPose.Sample(profile.rig());EvaShutdownR30.decode(packet.pose(),pose);
         ClientState s=CLIENT.get(entity);if(s==null){s=new ClientState();s.current=pose;s.position=packet.position();CLIENT.put(entity,s);if(entity instanceof EvaUnit01Entity eva)eva.beginPhysicalControlR35();}
         float alpha=s.blendClock.sample(System.nanoTime());
