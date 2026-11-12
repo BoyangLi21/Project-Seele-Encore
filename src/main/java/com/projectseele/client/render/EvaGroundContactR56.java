@@ -27,8 +27,7 @@ import java.util.Map;
  */
 final class EvaGroundContactR56
 {
-    static final String[] PARTS={"foot_l","foot_r","shin_l","shin_r","leg_l","leg_r","torso_lower","torso_upper",
-            "arm_l","arm_r","forearm_l","forearm_r","hand_l","hand_r","head"};
+    static final String[] PARTS=EvaMeshPointsR63.PARTS;
     /** Rest-pose hull samples per part (model units): the extremes along 26 directions. */
     private record Ankle(float x,float z,long time,float planted,float rate) {}
     /** Last ankle position per EVA and side (world), its frame time and planted weight. */

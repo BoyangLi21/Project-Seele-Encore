@@ -45,6 +45,26 @@ public final class EvaFootPlacement
         // Every vertex of each foot, once. Empty when the unit has no mesh to draw.
         return EvaMeshPointsR63.of(eva,EvaGroundContactR56.PARTS).feet();
     }
+    /** What is walked every frame for a foot's lowest, foremost and rearmost point: all of it, or a dense foot's outline. */
+    private static Map<String,Vector3f[]> outlines(EvaUnit01Entity eva)
+    {
+        return EvaMeshPointsR63.of(eva,EvaGroundContactR56.PARTS).outlines();
+    }
+    /** -Dprojectseele.poseDiag=true: what the walk over the feet costs, and how far an outline's answer is from the whole foot's. */
+    private static final boolean TIMED=Boolean.getBoolean("projectseele.poseDiag");
+    /** Per rig: feet walked, points walked, nanoseconds, and the largest difference from the whole foot (blocks of the drawn unit). */
+    private static final Map<Integer,double[]> WALKED=new HashMap<>();
+    private static void walked(EvaUnit01Entity eva,int points,long nanos,double differs)
+    {
+        double[] w=WALKED.computeIfAbsent(EvaBodyPose.rigKey(eva),k->new double[5]);
+        w[0]++;w[1]+=points;w[2]+=nanos;w[3]=Math.max(w[3],differs);
+        if(w[0]>=240)
+        {
+            com.projectseele.ProjectSeele.LOGGER.info("R63 foot walk rig {}: {} points a foot, {} microseconds a foot, outline within {} blocks of the whole foot ({} checks)",
+                    EvaBodyPose.rigKey(eva),Math.round(w[1]/w[0]),String.format(java.util.Locale.ROOT,"%.1f",w[2]/w[0]/1000),String.format(java.util.Locale.ROOT,"%.4f",w[3]),(int)w[4]);
+            java.util.Arrays.fill(w,0);
+        }
+    }
     private static double ground(EvaUnit01Entity eva,Vector3f point)
     {
         // Reach a kerb up to a full step above the sole, or the ground a step below.
@@ -79,7 +99,7 @@ public final class EvaFootPlacement
         LAST.remove(eva.getId());
         if(eva.hasLegacyStrikeForRender())return EvaMotionEngineV2.BoneWrites.empty();
         if(root==null||!eva.isPoweredOn()||eva.isCrucified()||eva.hasActiveCarrierMotion()||eva.isExperimentalUnit()&&!EvaBodyPose.hasOwnUnRig(eva)||eva.isFirstBattleActive()||eva.isVisuallyAirborneForRender()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()||eva.isBerserk()||eva.getActivationTicks()>0||eva.getVisualPose()!=0||eva.hasLiveActionForRender(partial)||eva.rifleStanceLevel(partial)>1.01F)return EvaMotionEngineV2.BoneWrites.empty();
-        var mesh=feet(eva);Set<String> changed=new LinkedHashSet<>();double[] witness=new double[28];int index=0;double ledge=Double.NEGATIVE_INFINITY;
+        var mesh=feet(eva);var outlines=outlines(eva);Set<String> changed=new LinkedHashSet<>();double[] witness=new double[28];int index=0;double ledge=Double.NEGATIVE_INFINITY;
         float yaw=net.minecraft.util.Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot)*net.minecraft.util.Mth.DEG_TO_RAD;
         Vector3f forward=new Vector3f(-net.minecraft.util.Mth.sin(yaw),0,net.minecraft.util.Mth.cos(yaw));
         // A swinging foot crosses the ground at about twice the body's speed:
@@ -98,13 +118,33 @@ public final class EvaFootPlacement
             // Dense sole meshes need one scalar reduction, not tens of thousands
             // of temporary vectors per frame. The minimum remains exact.
             Vector3f toe=null,heel=null;float front=Float.NEGATIVE_INFINITY,rear=Float.POSITIVE_INFINITY;
-            for(Vector3f rest:mesh.get(s))
+            Vector3f[] walk=outlines.getOrDefault(s,mesh.get(s));
+            long began=TIMED?System.nanoTime():0;
+            for(Vector3f rest:walk)
             {
                 float y=matrix.m01()*rest.x+matrix.m11()*rest.y+matrix.m21()*rest.z+matrix.m31();if(y<minimum){minimum=y;selected=rest;}
                 float wx=matrix.m00()*rest.x+matrix.m10()*rest.y+matrix.m20()*rest.z+matrix.m30(),wz=matrix.m02()*rest.x+matrix.m12()*rest.y+matrix.m22()*rest.z+matrix.m32();
                 float ahead=wx*forward.x+wz*forward.z;
                 if(ahead>front){front=ahead;toe=rest;}
                 if(ahead<rear){rear=ahead;heel=rest;}
+            }
+            if(TIMED)
+            {
+                long nanos=System.nanoTime()-began;double differs=0;
+                double[] w=WALKED.computeIfAbsent(EvaBodyPose.rigKey(eva),k->new double[5]);
+                // One walk in a hundred the whole foot is walked as well, when an outline stands for it.
+                if(walk!=mesh.get(s)&&((int)w[0])%100==0)
+                {
+                    float low=Float.POSITIVE_INFINITY,most=Float.NEGATIVE_INFINITY,least=Float.POSITIVE_INFINITY;
+                    for(Vector3f rest:mesh.get(s))
+                    {
+                        low=Math.min(low,matrix.m01()*rest.x+matrix.m11()*rest.y+matrix.m21()*rest.z+matrix.m31());
+                        float ahead=(matrix.m00()*rest.x+matrix.m10()*rest.y+matrix.m20()*rest.z+matrix.m30())*forward.x+(matrix.m02()*rest.x+matrix.m12()*rest.y+matrix.m22()*rest.z+matrix.m32())*forward.z;
+                        most=Math.max(most,ahead);least=Math.min(least,ahead);
+                    }
+                    differs=Math.max(minimum-low,Math.max(most-front,rear-least));w[4]++;
+                }
+                walked(eva,walk.length,nanos,differs);
             }
             if(selected==null)continue;Vector3f lowest=matrix.transformPosition(new Vector3f(selected));
             int key=eva.getId()*2+(s.equals("l")?0:1);
