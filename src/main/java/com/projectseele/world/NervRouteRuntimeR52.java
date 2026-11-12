@@ -216,6 +216,45 @@ public final class NervRouteRuntimeR52
         return new EvaLogisticsDirector.Status(variant,job==null?(entry==null?"UNREGISTERED":entry.phase().name()):job.phase()==Phase.PARKED&&!job.waiting().isEmpty()?"SERVICE_HOLD":NervRouteRuntimeStateR52.legacyPhase(job),entry!=null&&level.getEntity(entry.canonicalId()) instanceof EvaUnit01Entity,
                 entry==null?null:entry.canonicalId(),entry==null?0:entry.lclLayers(),job==null?0:job.snapshot().leg());
     }
+    /** Review only: a unit's route job as "PHASE leg wait {owner data}", or "none". */
+    public static String reviewJobR63(ServerLevel level,int variant)
+    {
+        var s=state(level,false);var job=s==null?null:s.job(variant);
+        return job==null?"none":job.phase()+" leg="+job.snapshot().leg()+" wait="+job.waiting()+" "+job.ownerData();
+    }
+    /** Review only: which readable condition keeps a preparation from being registered. */
+    public static String reviewPrepareR63(ServerLevel level,int variant,String intent)
+    {
+        var c=LIVE.get(level);if(c==null)return "no live controller";if(!ready(level))return "runtime not ready";
+        var unit=c.directory.unit(variant);if(unit==null)return "directory has no unit "+variant;
+        Entity p=level.getEntity(unit.plug());
+        if(!(p instanceof EntryPlugCarrierEntity plug))return "plug "+unit.plug()+" is not loaded";
+        if(plug.getFirstPassenger()==null)return "plug has no passenger";
+        if(c.defaults.get(variant+"/"+intent)==null)return "no default route for "+variant+"/"+intent+" among "+c.defaults.keySet();
+        // The tests of the original assembly, read here one by one without the owner data the command itself sets.
+        var pilot=plug.getFirstPassenger();
+        var fleet=EvaFleetSavedData.get(level.getServer()).entry(variant).orElse(null);
+        if(fleet==null)return "no fleet entry";
+        if(!fleet.canonicalId().equals(unit.eva()))return "fleet unit "+fleet.canonicalId()+" is not the directory's "+unit.eva();
+        if(!unit.plug().equals(fleet.entryPlugId()))return "fleet plug "+fleet.entryPlugId()+" is not the directory's "+unit.plug();
+        if(!(level.getEntity(unit.eva()) instanceof EvaUnit01Entity eva))return "unit entity is not loaded";
+        if(eva.getUnitVariant()!=variant||!eva.isAlive())return "unit entity is of variant "+eva.getUnitVariant()+" or dead";
+        if(!plug.isAlive()||plug.getAssignedVariant()!=variant)return "plug is assigned to variant "+plug.getAssignedVariant();
+        if(pilot.getVehicle()!=plug)return "the pilot's vehicle is not the plug";
+        if(plug.getLinkedEva()!=null&&plug.getLinkedEva()!=eva)return "plug is linked to another unit";
+        if(eva.getPilotEntity()!=null&&eva.getPilotEntity()!=pilot)return "unit has another pilot";
+        String mission=AutoSortieR32.missionToken(level,variant);
+        var tag=eva.getPersistentData();
+        var sortie=mission.isEmpty()?null:TvCampaignSavedData.get(level).sorties.get(variant);
+        boolean crew=sortie!=null&&sortie.npc==(pilot instanceof TrainingPilotEntity)&&pilot.getUUID().equals(sortie.commander);
+        if(!crew&&tag.hasUUID("R32SortieCommander")&&!tag.getUUID("R32SortieCommander").equals(pilot.getUUID()))
+            return "unit is stamped with commander "+tag.getUUID("R32SortieCommander")+", the pilot is "+pilot.getUUID()+", mission '"+mission+"'";
+        if(AutoSortieR32.cancellationCurrentR45(tag.getBoolean("R32AutoCancelled"),tag.getString("R43AutoMission"),mission))
+            return "an automatic sortie's cancellation is current (mission '"+mission+"', stamped '"+tag.getString("R43AutoMission")+"')";
+        if(!(pilot instanceof ServerPlayer player))return "the pilot is not a player (mission '"+mission+"')";
+        if(player.isSpectator()||!NervStaffDialogue.authorized(player))return "the player is a spectator or not authorised";
+        return "nothing found: mission '"+mission+"', crew "+crew+", job "+reviewJobR63(level,variant);
+    }
     public static List<String> sortieStatusR53(ServerLevel level)
     {
         var result=new ArrayList<String>();var controller=LIVE.get(level);var saved=state(level,false);

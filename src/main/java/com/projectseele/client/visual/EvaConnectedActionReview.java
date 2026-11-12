@@ -271,6 +271,8 @@ public final class EvaConnectedActionReview
             ProjectSeele.LOGGER.info("Real launch review: facility ready={} unit={} plug={}",ready,
                     unit==null?"none":unit.blockPosition().toShortString()+" locked "+unit.isNervLogisticsLocked()+" phase "+unit.getLaunchPhase(),
                     plug==null?"none":plug.blockPosition().toShortString()+" stage "+plug.getInsertionStage()+" hatch open "+plug.isHatchOpen()+" rider "+(plug.getFirstPassenger()==null?"none":plug.getFirstPassenger().getName().getString()));
+            // Still in the seat of the unit launched before this one: out of it first.
+            if(board&&pilot.isPassenger()&&pilot.getVehicle()!=plug){pilot.stopRiding();return;}
             if(!board||unit==null||plug==null||!ready||pilot.isPassenger())return;
             Vec3 hatch=plug.hasCanonicalPose()?plug.transformPlugMarker(com.projectseele.world.EntryPlugKinematics.HATCH_PORTAL_CENTRE_P):plug.getBoundingBox().getCenter();
             Vec3 out=hatch.subtract(plug.getBoundingBox().getCenter()).multiply(1,0,1);
@@ -282,6 +284,13 @@ public final class EvaConnectedActionReview
             var result=plug.mobInteract(pilot,net.minecraft.world.InteractionHand.MAIN_HAND);
             ProjectSeele.LOGGER.info("Real launch review: pressed the hatch from {} -> {} riding {}",stand,result,pilot.getVehicle()==null?"nothing":pilot.getVehicle().getType().toShortString());
         });
+    }
+
+    /** In the toured unit's own plug or seat: not another unit's, left from the launch before. */
+    private static boolean aboardR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        return mc.player.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity plug&&plug.getAssignedVariant()==UNIT_VARIANT
+                ||eva!=null&&!eva.isExperimentalUnit()&&eva.getUnitVariant()==UNIT_VARIANT;
     }
 
     private static void realStage(int stage,int step)
@@ -299,6 +308,35 @@ public final class EvaConnectedActionReview
                 mc.level.dimension().location(),mc.player.blockPosition().toShortString(),
                 mc.player.getVehicle()==null?"none":mc.player.getVehicle().getType().toShortString(),
                 eva==null?"none":String.format("phase %d ticks %d activation %d locked %s y %.1f",eva.getLaunchPhase(),eva.getLaunchTicks(),eva.getActivationTicks(),eva.isNervLogisticsLocked(),eva.getY()));
+        // The facility's route (NervRouteRuntimeR52) never starts the unit's own launch sequence: the
+        // unit is carried in the mechanical frame and its launch phase stays idle throughout. What the
+        // route is doing is read from its job, and written to the log whenever it changes.
+        String route="none";
+        var geo=mc.getSingleplayerServer().getLevel(com.projectseele.world.FacilitySchemaV2.DIMENSION);
+        if(geo!=null)
+        {
+            try{route=com.projectseele.world.NervRouteRuntimeR52.reviewJobR63(geo,UNIT_VARIANT);}
+            catch(RuntimeException busy){route=realRoute;}
+            String shape=route.replaceAll("-?[0-9]+([.][0-9]+)?(E-?[0-9]+)?[bsLfdBSFD]?","#");
+            if(!shape.equals(realRouteShape)||step%400==0)
+            {
+                realRouteShape=shape;
+                ProjectSeele.LOGGER.info("Real launch review: route server={} step={} {}",mc.getSingleplayerServer().getTickCount(),step,
+                        route.length()>900?route.substring(0,900):route);
+                if(step%400==0)for(String line:com.projectseele.world.NervRouteRuntimeR52.sortieStatusR53(geo))
+                    if(line.startsWith("EVA-0"+UNIT_VARIANT)||!line.startsWith("EVA-0"))ProjectSeele.LOGGER.info("Real launch review: status {}",line.length()>600?line.substring(0,600):line);
+            }
+            realRoute=route;
+            // The step of the deployment's finish (RECEIVE, EJECT_LOWER, EJECT_CLOSE, LAND, RELEASE), with the tick it began.
+            int key=route.indexOf("Finish:\"");
+            String finish=key<0?"":route.substring(key+8,Math.max(key+8,route.indexOf('"',key+8)));
+            if(!finish.equals(realFinish))
+            {
+                realFinish=finish;
+                ProjectSeele.LOGGER.info("Real launch review: finish step '{}' server={} step={}",finish,mc.getSingleplayerServer().getTickCount(),step);
+            }
+        }
+        boolean departing=route.startsWith("DEPARTING")||route.startsWith("FINISHING")||route.startsWith("DEPLOYED");
         switch(realStage)
         {
             case 0 ->
@@ -306,27 +344,56 @@ public final class EvaConnectedActionReview
                 // Whatever the last run left: off the seat, and the unit, its plug and the pilot back in the hangar.
                 if(step==0)link.sendCommand("ride @s dismount");
                 if(step==5){link.sendCommand("time set 6000");link.sendCommand("weather clear");}
+                // A spectator is not accepted as a unit's pilot (the facility copy's player was saved as one).
+                if(step==7)link.sendCommand("gamemode creative");
                 if(step==10)link.sendCommand("seele eva reset "+UNIT);
-                if(step==80)link.sendCommand("seele tp hangar");
-                if(step==160){link.sendCommand("seele eva status "+UNIT);realStage(1,step);}
+                // A unit launched by an earlier run stands deployed with this pilot still in its plug, and
+                // neither a dismount nor leaving the seat on the server gets the pilot out of an inserted
+                // plug. Its own reset does: every unit is put back, the toured one first.
+                if(step==12)for(String other:new String[]{"unit00","unit01","unit02"})if(!other.equals(UNIT))link.sendCommand("seele eva reset "+other);
+                // The facility loads in batches for about two minutes and holds the reset until it has.
+                // The pilot boards only after that reset has run: boarded earlier, the reset put the
+                // pilot off the plug again and the preparation waited for a pilot who never came back.
+                if(realInstalledAt<0&&step>10&&step%20==0&&geo!=null)
+                {
+                    var status=com.projectseele.world.NervRouteRuntimeR52.sortieStatusR53(geo);
+                    if(!status.isEmpty()&&status.get(0).contains("installed=true"))
+                    {
+                        realInstalledAt=step;
+                        ProjectSeele.LOGGER.info("Real launch review: facility installed at step {}",step);
+                    }
+                }
+                if(realInstalledAt>=0&&step==realInstalledAt+200)link.sendCommand("seele tp hangar");
+                if(realInstalledAt>=0&&step==realInstalledAt+280){link.sendCommand("seele eva status "+UNIT);realStage(1,step);}
+                if(step>8000)finish(mc,"launch_facility_timeout");
             }
             case 1 ->
             {
                 // The facility loads its units after the world: ask until the unit and its plug are there.
-                if(mc.player.getVehicle() instanceof com.projectseele.entity.EntryPlugCarrierEntity||eva!=null){realStage(3,step);return;}
+                if(aboardR63(mc,eva)){realStage(3,step);return;}
                 if(since%40==20)boardR63(mc,since>=100);
                 if(since>2400)finish(mc,"launch_boarding_timeout");
             }
             case 3 ->
             {
-                if(since==10)link.sendCommand("seele eva prepare "+UNIT+" "+LAUNCH_EXIT);
+                // A reset asked for before the facility had loaded runs when it has, and can land on the
+                // preparation: asked once, the preparation was refused and never registered. Ask until it is.
+                boolean idle=route.equals("none")||route.startsWith("PARKED")||route.startsWith("CANCELLED");
+                // Put off the plug with nothing registered yet: board again.
+                if(idle&&since>40&&!aboardR63(mc,eva)){realStage(1,step);return;}
+                if(since%100==10&&idle)
+                {
+                    if(geo!=null)mc.getSingleplayerServer().execute(()->ProjectSeele.LOGGER.info("Real launch review: prepare asked at step {}; held by: {}",step,
+                            com.projectseele.world.NervRouteRuntimeR52.reviewPrepareR63(geo,UNIT_VARIANT,LAUNCH_EXIT)));
+                    link.sendCommand("seele eva prepare "+UNIT+" "+LAUNCH_EXIT);
+                }
                 // The director refuses a launch until the unit stands ready in its silo: ask until it goes.
                 if(since>200&&since%60==0)
                 {
                     link.sendCommand("seele eva status "+UNIT);
                     link.sendCommand("seele eva launch "+UNIT);
                 }
-                if(eva!=null&&eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_ASCENT){launchAscentAt=step;realStage(4,step);}
+                if(eva!=null&&(eva.getLaunchPhase()==EvaUnit01Entity.LAUNCH_ASCENT||since>200&&departing)){launchAscentAt=step;realStage(4,step);}
                 else if(since>8000)finish(mc,"launch_prepare_timeout");
             }
             default ->
@@ -356,10 +423,12 @@ public final class EvaConnectedActionReview
                 }
                 previousTick=tick;
                 if(launchIdleAt>=0&&tick>=launchIdleAt+LAUNCH_AFTER)finish(mc,"complete");
-                else if(tick>3000)finish(mc,"launch_timeout");
+                else if(tick>9000)finish(mc,"launch_timeout");
             }
         }
     }
+    private static String realRoute="none",realRouteShape="",realFinish="";
+    private static int realInstalledAt=-1;
 
     private static void launchR62(Minecraft mc, Path world)
     {
