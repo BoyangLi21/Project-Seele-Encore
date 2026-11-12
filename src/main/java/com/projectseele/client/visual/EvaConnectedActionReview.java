@@ -170,6 +170,12 @@ public final class EvaConnectedActionReview
         if (LAUNCH) { launchR62(mc, world); return; }
         if (wait == 100)
         {
+            // The lab's reset clears and remakes the units inside its arena. One left outside by the run before (a
+            // body thrown 650 blocks in a test of the fall's speed limit) stayed where it was, a second was made on
+            // its pad, and the next tour was given the one outside: it stood under the floor and took no blow.
+            // Every unit is brought into the arena first.
+            for (String type : new String[]{"eva_unit00", "eva_unit01", "eva_unit02", "eva_prototype"})
+                mc.player.connection.sendCommand("execute as @e[type=projectseele:" + type + "] run tp @s 0 -40 0");
             mc.player.connection.sendCommand("seele dev motionlab reset");
             if (UN)
             {
