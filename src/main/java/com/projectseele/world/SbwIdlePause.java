@@ -71,8 +71,9 @@ public final class SbwIdlePause
     /** What is the same for every vehicle of a level in one tick. */
     private static final class Scene
     {
-        long eventTick = Long.MIN_VALUE, threatTick = Long.MIN_VALUE;
-        boolean event;
+        long eventTick = Long.MIN_VALUE, threatTick;
+        /** Whether the hostile things have been listed at all: before that there is no tick to count from. */
+        boolean event, listed;
         final List<AABB> threats = new ArrayList<>();
     }
 
@@ -103,7 +104,10 @@ public final class SbwIdlePause
             return count(SETTLING);
         }
         if (now - rest.since < SETTLE_TICKS) return count(SETTLING);
-        if (now - scene.threatTick >= THREAT_TICKS || now < scene.threatTick) { scene.threatTick = now; threats(level, scene.threats); }
+        if (!scene.listed || now - scene.threatTick >= THREAT_TICKS || now < scene.threatTick)
+        {
+            scene.listed = true; scene.threatTick = now; threats(level, scene.threats);
+        }
         if (!scene.threats.isEmpty())
         {
             AABB reach = entity.getBoundingBox().inflate(THREAT_RANGE);
