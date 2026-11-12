@@ -63,6 +63,12 @@ R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做�
 - **探针类。** 第 5 步用 map-edges 编好的 `MapProbeLocal.class`（只在本机，不进仓库）加进最终 jar。它的 `tp` 等满 1200 刻就超时，所以悬停用 `cmd` 步骤等待，和 map-edges 一样。
 - **第 5、6 步要客户端槽位。** 夜里两个槽位常被占满，`acquire` 会排队等。
 
+## 读正式世界的远景库
+
+SQLite 就算用 `mode=ro` 只读打开 WAL 模式的库，也会在旁边建 `-wal` 和 `-shm` 两个文件。两个工具读正式世界的远景库时一律用 `immutable=1`，什么都不建；只有 map-edges 那份正在被它的客户端写的库、以及烘焙客户端刚写完的库才按普通只读打开（它们都不在正式世界里）。别的脚本要读正式世界的远景库，也照这样做。
+
+2026-11-13 演练时我先用 `mode=ro` 读过，正式世界里因此多了：GeoFront `data/` 下一个空的 `DistantHorizons.sqlite-wal`（0 字节，00:06）和 32 KB 的 `-shm`（00:15），主世界 `data/` 下的 `-shm` 时间刷新到 00:24。库文件本身没变（大小、修改时间仍是 11-10 06:53 和 11-01 20:19）。空 WAL 没有要合并的内容，DH 下次打开会照常使用；打包工具只拒绝非空的 WAL。要不要删由地图会话在停写时决定。
+
 ## 相关文件
 
 - 外圈烘焙进度：共享笔记 `map-edges-dh-outer-bake-handover-20261111.md`，工具在 `F:/eva/.claude/map-edges-work/f12bake/`。
