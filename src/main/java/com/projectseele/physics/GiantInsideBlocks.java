@@ -3,6 +3,7 @@ package com.projectseele.physics;
 import com.projectseele.ProjectSeele;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.function.Predicate;
 import net.minecraft.CrashReport;
 import net.minecraft.CrashReportCategory;
 import net.minecraft.ReportedException;
@@ -25,7 +26,11 @@ import net.minecraft.world.phys.AABB;
  * (vanilla reads plain air from such a section too), and the three vanilla air blocks get no callback because theirs
  * does nothing. Every other block, a modded air block included, gets its callbacks as before, in x, y, z order.
  *
+ * One thing is kept from the walk RamielEntity had of its own and is not vanilla's: a modded air block in a section
+ * that holds nothing but air gets its callbacks. Vanilla reads plain air from such a section and gives none.
+ *
  * The first boxes are also walked the vanilla way and compared; a difference turns this off for the session.
+ * The comparison leaves out the modded air blocks vanilla cannot see.
  */
 public final class GiantInsideBlocks
 {
@@ -48,6 +53,8 @@ public final class GiantInsideBlocks
     /** Giants that touch nothing never show that many blocks; this many matching boxes are enough then. */
     private static final int COMPARED_BOXES_BARE = 2000;
     private static final long MIX = 0x9E3779B97F4A7C15L;
+    private static final Predicate<BlockState> MODDED_AIR = found -> found.isAir()
+            && !found.is(Blocks.AIR) && !found.is(Blocks.CAVE_AIR) && !found.is(Blocks.VOID_AIR);
     private static volatile int state = UNTESTED;
     private static final AtomicInteger matched = new AtomicInteger();
     private static final AtomicLong matchedBlocks = new AtomicLong(), matchedCells = new AtomicLong();
@@ -88,7 +95,7 @@ public final class GiantInsideBlocks
         int minY = Math.max(first.getY(), level.getMinBuildHeight()), maxY = Math.min(last.getY(), level.getMaxBuildHeight() - 1);
         if (minY > maxY) return true;
         if (state == UNTESTED && !compare(level, first, last, minY, maxY, sections, firstChunkX, firstChunkZ, rows)) return false;
-        walk(level, first, last, minY, maxY, sections, firstChunkX, firstChunkZ, rows, (found, at) ->
+        walk(level, first, last, minY, maxY, sections, firstChunkX, firstChunkZ, rows, true, (found, at) ->
         {
             try
             {
@@ -107,7 +114,7 @@ public final class GiantInsideBlocks
     }
 
     private static void walk(Level level, BlockPos first, BlockPos last, int minY, int maxY, LevelChunkSection[][] sections,
-                             int firstChunkX, int firstChunkZ, int rows, Visitor visitor)
+                             int firstChunkX, int firstChunkZ, int rows, boolean moddedAir, Visitor visitor)
     {
         BlockPos.MutableBlockPos at = new BlockPos.MutableBlockPos();
         int firstZ = first.getZ(), lastZ = last.getZ();
@@ -122,7 +129,8 @@ public final class GiantInsideBlocks
                     int end = Math.min(lastZ, z | 15);
                     // Read again for every run: a callback may have changed any section.
                     LevelChunkSection section = sections[column + (z >> 4)][index];
-                    if (section.hasOnlyAir()) { z = end + 1; continue; }
+                    // Vanilla stops at hasOnlyAir. With moddedAir the palette is asked as well, as RamielEntity's walk did.
+                    if (section.hasOnlyAir() && !(moddedAir && section.maybeHas(MODDED_AIR))) { z = end + 1; continue; }
                     for (; z <= end; z++)
                     {
                         BlockState found = section.getBlockState(x & 15, y & 15, z & 15);
@@ -149,7 +157,7 @@ public final class GiantInsideBlocks
                     vanilla[0] = (vanilla[0] * MIX + at.asLong()) * MIX + System.identityHashCode(found);
                     vanilla[1]++;
                 }
-        walk(level, first, last, minY, maxY, sections, firstChunkX, firstChunkZ, rows, (found, where) ->
+        walk(level, first, last, minY, maxY, sections, firstChunkX, firstChunkZ, rows, false, (found, where) ->
         {
             here[0] = (here[0] * MIX + where.asLong()) * MIX + System.identityHashCode(found);
             here[1]++;
