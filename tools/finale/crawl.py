@@ -6,12 +6,21 @@ and out, the body hauls itself over them, then the other side.  The chest
 swings and rolls towards the reaching shoulder, the pelvis swings against it,
 the spine snakes between them, and the head stays up looking ahead.  Hands and
 feet in contact hold still on the ground: the entity travels 12 blocks a cycle.
-Armed, the hands are on the gun and the elbows on the ground, so the body stays
-down on its belly and the arms do not hold it up.
+The body lies on its belly, thighs and knees. Each limb is then brought down by
+itself until it is on the ground while it bears, and just clear of it while it
+is carried forward: a body fitted by its one lowest point lay on its hands with
+the belly, knees and feet 1 to 3 blocks in the air.  An arm bears on its whole
+forearm: the hand is set on the ground by its own height, and the elbow, which
+would go under the ground with the hand so near the shoulder, is turned out to
+the side until it lies on the ground too.  (Bringing the arm down by its one
+lowest point put the elbow on the ground and held the forearm upright, the
+fist nine blocks in the air.)
+Armed, the hands are on the gun and the rifle rig poses the arms afterwards.
 Written as an overlay in the {bones, frames} form EvaBodyPose reads.
 """
 import json
 import math
+import os
 import sys
 
 import numpy as np
@@ -35,6 +44,13 @@ SURGE, HEAVE = 1.8, .8                    # two lunges a cycle: blocks forward, 
 HAND_FAR, HAND_OUT, HAND_Y, HAND_LIFT = 32.0, 8.2, 2.6, 4.6
 FOOT_DRAWN, FOOT_OUT, FOOT_Y, FOOT_LIFT = -15.0, 10.0, 3.6, 2.4
 TOE_PITCH = -128.0
+LIMBS = {'arm_l': ('arm_l', 'forearm_l', 'hand_l'), 'arm_r': ('arm_r', 'forearm_r', 'hand_r'),
+         'leg_l': ('shin_l', 'foot_l'), 'leg_r': ('shin_r', 'foot_r')}
+# A limb carried forward clears the ground by this much at its lowest point: the hand or the foot rises by its lift,
+# the elbow and the shin slide along just over the ground under it.
+CLEAR = .6
+# The elbow is turned out from straight down by no more than this (radians).
+SPLAY_MOST = 1.45
 
 
 ARMED = len(sys.argv) > 3 and sys.argv[3] == 'armed'
@@ -45,6 +61,9 @@ if ARMED:
     PELVIS_SWING, CHEST_SWING, PELVIS_ROLL, CHEST_ROLL = 6.0, 5.0, 6.0, 6.0
     CHEST_LEAD = 8.0
     SURGE, HEAVE, HIP_Y, CHEST_PITCH = 1.2, .4, 7.2, 78.0
+else:
+    # The feet trail low, toes back, and are carried forward just clear of the ground.
+    FOOT_Y, FOOT_LIFT, TOE_PITCH = 2.0, 1.4, -104.0
 
 
 def smooth(t):
@@ -66,10 +85,42 @@ def spine(yaw, pitch, twist):
     return R.qmul(R.qmul(B.heading_q(yaw), R.qx(-math.radians(pitch))), R.qy(math.radians(twist)))
 
 
-def lowest(actors, m):
-    # Armed, the rifle rig poses the arms afterwards: only the body and legs lie on the ground.
+def lowest(actors, m, parts=None):
+    """Height of the lowest point of the body. Armed it is the body and legs (the rifle rig poses the arms
+    afterwards); unarmed the belly and thighs, each limb being put on the ground by itself."""
+    if parts is None and not ARMED:
+        # the belly, the thighs and the knees: a knee drawn up under the body carries the hip over it
+        return min(lowest(actors, m, ('leg_', 'torso_lower')), lowest_end(actors, m, 'shin_l', True), lowest_end(actors, m, 'shin_r', True))
+    if parts is None:
+        parts = ('leg_', 'shin_', 'foot_', 'torso_lower')
     return min(float((t.reshape(-1, 3) @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()) for b, t, _ in actors.eva_mesh.parts
-               if not ARMED or b.startswith(('leg_', 'shin_', 'foot_', 'torso_lower')))
+               if b.startswith(parts))
+
+
+def lowest_end(actors, m, bone, upper):
+    """Height of the lowest point of one end of a bone's mesh: the half that is higher (or lower) in the rest pose."""
+    best = 1e9
+    for b, t, _ in actors.eva_mesh.parts:
+        if b == bone:
+            v = t.reshape(-1, 3)
+            middle = np.median(v[:, 1])
+            v = v[v[:, 1] >= middle] if upper else v[v[:, 1] < middle]
+            best = min(best, float((v @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()))
+    return best
+
+
+def lowest_half(actors, m, bone, start, end, first):
+    """Height of the lowest point of the half of a bone's mesh nearer its start (or its end), the two given in the rest pose."""
+    best = 1e9
+    axis = end - start
+    for b, t, _ in actors.eva_mesh.parts:
+        if b == bone:
+            v = t.reshape(-1, 3)
+            along = (v - start) @ axis / float(axis @ axis)
+            v = v[along < .5] if first else v[along >= .5]
+            if len(v):
+                best = min(best, float((v @ m[b][:3, :3].T + m[b][:3, 3])[:, 1].min()))
+    return best
 
 
 def main():
@@ -86,7 +137,54 @@ def main():
     ident = np.array([1.0, 0, 0, 0])
 
     def pose(f, drop):
+        """The frame with every limb on the ground: each limb's target is moved up or down until the limb's own
+        lowest point is on the ground while it bears, and just clear of it while it is carried forward."""
+        if ARMED:
+            return solve(f, drop, {})
+        # The ankle's height sets the foot and the ankle end of the shin; the knee end lies with the body.
+        # The wrist's height sets the hand and the wrist end of the forearm; the elbow is turned out (splay,
+        # radians from straight down) until the upper arm and the elbow end of the forearm are on the ground.
+        shift = dict.fromkeys(LIMBS, 0.0)
+        splay = {'arm_l': 0.0, 'arm_r': 0.0}
+
+        def hand_low(m, side):
+            return min(lowest(actors, m, ('hand_' + side,)), lowest_half(actors, m, 'forearm_' + side, pv['forearm_' + side], pv['wrist_' + side], False))
+
+        def elbow_low(m, side):
+            return min(lowest(actors, m, ('arm_' + side,)), lowest_half(actors, m, 'forearm_' + side, pv['forearm_' + side], pv['wrist_' + side], True))
+
+        for _ in range(2):
+            for _ in range(4):
+                rot, pos, m, lifts = solve(f, drop, shift, splay, True)
+                for limb in LIMBS:
+                    side = limb[-1]
+                    if limb.startswith('leg_'):
+                        shift[limb] += .7 * (min(CLEAR, lifts[limb]) - min(lowest(actors, m, ('foot_' + side,)), lowest_end(actors, m, 'shin_' + side, False)))
+                    else:
+                        # the hand rises by its whole lift
+                        shift[limb] += .8 * (lifts[limb] - hand_low(m, side))
+            # Both elbows at once: halve the range of each until it lies at its own clearance.
+            lo = dict.fromkeys(splay, 0.0)
+            hi = dict.fromkeys(splay, SPLAY_MOST)
+            for _ in range(7):
+                for arm in splay:
+                    splay[arm] = (lo[arm] + hi[arm]) / 2
+                rot, pos, m, lifts = solve(f, drop, shift, splay, True)
+                for arm in splay:
+                    if elbow_low(m, arm[-1]) < min(CLEAR, lifts[arm]):
+                        lo[arm] = splay[arm]
+                    else:
+                        hi[arm] = splay[arm]
+            for arm in splay:
+                # an elbow that is clear of the ground hanging straight down stays there: the arm is reaching
+                splay[arm] = hi[arm] if hi[arm] < SPLAY_MOST else SPLAY_MOST
+                if lo[arm] == 0.0 and hi[arm] < .03:
+                    splay[arm] = 0.0
+        return solve(f, drop, shift, splay)
+
+    def solve(f, drop, shift, splay=None, tell=False):
         u = f / period
+        lifts = {}
         rot, pos = G.frame_pose(bones, clip, min(f, len(clip['frames']) - 1))
         raw = rig.fk(rot, pos, world)
         hands = {s: B.mat_rot(raw['hand_' + s]) for s in 'lr'}
@@ -115,7 +213,8 @@ def main():
             v = u + phase
             along, lift = stroke(v, FOOT_DRAWN, FOOT_LIFT)
             drawn = (math.cos(2 * math.pi * v) + 1) / 2
-            ankle = np.array([side * (FOOT_OUT + 3.6 * drawn), FOOT_Y + lift - drop * 0, along])
+            lifts['leg_' + s] = lift
+            ankle = np.array([side * (FOOT_OUT + 3.6 * drawn), max(.4, FOOT_Y + lift + shift.get('leg_' + s, 0.0)), along])
             q_foot = B.foot_q(side * 12, TOE_PITCH)
             pole = R.qmat(B.heading_q(side * (62 + 24 * drawn))) @ np.array([0, 0, -1.0]) + np.array([0, -.55, 0])
             limb = solver.limbs['leg_' + s]
@@ -128,16 +227,19 @@ def main():
         for s, side, phase in (('l', 1.0, .5), ('r', -1.0, 0.0)):
             m = rig.fk(rot, pos, world)
             along, lift = stroke(u + phase, HAND_FAR, HAND_LIFT)
-            target_hand = np.array([side * HAND_OUT, HAND_Y + lift, along])
+            lifts['arm_' + s] = lift
+            target_hand = np.array([side * HAND_OUT, max(.4, HAND_Y + lift + shift.get('arm_' + s, 0.0)), along])
             shoulder = B.point(m['clavicle_' + s], pv['arm_' + s])
             limb = solver.limbs['arm_' + s]
-            qu, ql, qw, ang, err = limb.solve(shoulder, target_hand, np.array([side * .45, -1.0, -.2]), B.mat_rot(m['clavicle_' + s]))
+            turn = splay['arm_' + s] if splay else 0.0
+            pole = np.array([side * (.45 * math.cos(turn) + math.sin(turn)), -math.cos(turn), -.2])
+            qu, ql, qw, ang, err = limb.solve(shoulder, target_hand, pole, B.mat_rot(m['clavicle_' + s]))
             rot['arm_' + s], rot['forearm_' + s] = qu, ql
             pos['forearm_' + s] = R.Rig.hinge_offset(ql, pv['forearm_' + s], solver.elbow[s])
             rot['wrist_' + s] = ident
             m = rig.fk(rot, pos, world)
             rot['hand_' + s] = R.qmul(R.qconj(B.mat_rot(m['wrist_' + s])), hands[s])
-        return rot, pos, rig.fk(rot, pos, world)
+        return (rot, pos, rig.fk(rot, pos, world), lifts) if tell else (rot, pos, rig.fk(rot, pos, world))
 
     low = np.array([lowest(actors, pose(f, 0.0)[2]) for f in range(FRAMES)])
     print('lowest point by itself: %.2f .. %.2f' % (low.min(), low.max()))
@@ -168,6 +270,19 @@ def main():
             d = abs(float(np.dot(B.mat_rot(posed[i][2][b]), B.mat_rot(posed[i - 1][2][b]))))
             fastest = max(fastest, 2 * math.degrees(math.acos(min(1, d))))
     print('fastest joint %.1f deg/frame, lowest point %.2f .. %.2f' % (fastest, min(lowest(actors, p[2]) for p in posed), max(lowest(actors, p[2]) for p in posed)))
+    for limb, parts in LIMBS.items():
+        # a limb bears for the first half of its own stroke
+        own = [lowest(actors, p[2], parts) for p in posed]
+        print('  %s lowest point %.2f .. %.2f, on the ground (under 0.3) in %d of %d frames' % (limb, min(own), max(own), sum(v < .3 for v in own), FRAMES))
+    if not ARMED:
+        for side in 'lr':
+            hand = [min(lowest(actors, p[2], ('hand_' + side,)), lowest_half(actors, p[2], 'forearm_' + side, pv['forearm_' + side], pv['wrist_' + side], False)) for p in posed]
+            elbow = [min(lowest(actors, p[2], ('arm_' + side,)), lowest_half(actors, p[2], 'forearm_' + side, pv['forearm_' + side], pv['wrist_' + side], True)) for p in posed]
+            both = sum(h < .3 and e < .3 for h, e in zip(hand, elbow))
+            print('  arm_%s: hand %.2f .. %.2f (on the ground in %d frames), elbow %.2f .. %.2f (on the ground in %d), whole forearm down in %d of %d'
+                  % (side, min(hand), max(hand), sum(v < .3 for v in hand), min(elbow), max(elbow), sum(v < .3 for v in elbow), both, FRAMES))
+    whole = [lowest(actors, p[2], ('',)) for p in posed]
+    print('  whole body lowest point %.2f .. %.2f' % (min(whole), max(whole)))
     names = sorted({b for b, _, _ in actors.eva_mesh.parts})
     for f in range(0, FRAMES, 15):
         m = posed[f][2]
@@ -179,20 +294,23 @@ def main():
     print('wrote', out, FRAMES, 'frames')
     if len(sys.argv) > 2 and sys.argv[2] != '-':
         images = []
-        size = (320, 240)
-        for f in range(0, FRAMES - 1, 10):
+        # CRAWL_TILE=WxH and CRAWL_STEP=n for a closer look: larger tiles, every n-th frame
+        size = tuple(int(v) for v in os.environ.get('CRAWL_TILE', '320x240').split('x'))
+        step = int(os.environ.get('CRAWL_STEP', '10'))
+        shown = range(0, FRAMES - 1, step)
+        for f in shown:
             m = posed[f][2]
             groups = [actors.eva_mesh.triangles(m, np.eye(4))]
             images.append(R.render(R.Camera((-90, 30, 16), (0, 8, 4), 36, size), groups, label='side %d' % f, ground=(-70, 70, -70, 70)))
-        for f in range(0, FRAMES - 1, 10):
+        for f in shown:
             m = posed[f][2]
             groups = [actors.eva_mesh.triangles(m, np.eye(4))]
             images.append(R.render(R.Camera((-8, 100, 2), (0, 6, 4), 40, size, up=(0, 0, 1)), groups, label='top %d' % f, ground=(-70, 70, -70, 70)))
-        for f in range(0, FRAMES - 1, 10):
+        for f in shown:
             m = posed[f][2]
             groups = [actors.eva_mesh.triangles(m, np.eye(4))]
             images.append(R.render(R.Camera((-40, 26, 100), (0, 8, 10), 36, size), groups, label='front %d' % f, ground=(-70, 70, -70, 70)))
-        R.sheet(images, 6).save(sys.argv[2])
+        R.sheet(images, len(shown)).save(sys.argv[2])
 
 
 if __name__ == '__main__':
