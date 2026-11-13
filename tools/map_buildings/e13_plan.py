@@ -232,8 +232,8 @@ def plan(w, sites, A):
             if gr == 1:
                 U[x, z] = min(U.get((x, z), 10 ** 6), y)
         mat = Counter(short(w.get(x, u, z)) for (x, z), u in list(U.items())[:500]).most_common(1)[0][0]
-        wall = 'minecraft:light_gray_concrete' if 'concrete' in mat else 'minecraft:stone_bricks'
-        site['wall'] = wall
+        wall = site.get('wall') or ('minecraft:light_gray_concrete' if 'concrete' in mat else 'minecraft:stone_bricks')
+        site['wall'] = wall     # a site may name its wall (urban parts: concrete)
         # distance inside the platform to its outline
         din = {}
         q = deque()
@@ -444,6 +444,10 @@ if __name__ == '__main__':
         before = len(rows)
         rows = [r for r in rows if tuple(r[:3]) not in SKIP]
         print('E13_SKIP dropped', before - len(rows), 'cells another session writes')
+        # a dropped cell stays as it is (often air): wall the fill that now faces it
+        kept = {tuple(r[:3]): r for r in rows}
+        face_bare(w, sites, kept)
+        rows = list(kept.values())
     for site in sites:
         x0, y0, z0, x1, y1, z1 = site['bbox']
         mine = [r for r in rows if inside(r, site)]
