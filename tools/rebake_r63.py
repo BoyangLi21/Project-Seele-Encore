@@ -349,12 +349,12 @@ def viewpoints(sections, reach=SECTION_REACH, minimum=1):
     return points
 
 
-def probe_script(points, path, total_minutes_cap=None):
+def probe_script(points, path, total_minutes_cap=None, hover=None):
     steps = [dict(op='cmd', text=t, wait=5) for t in ('gamerule doDaylightCycle false', 'time set 6000', 'weather clear 1000000',
                                                       'gamerule doMobSpawning false', 'gamemode spectator')]
     plan = []
     for i, (x, z, count) in enumerate(points):
-        minutes = min(25, max(6, math.ceil(count / SECTIONS_PER_MINUTE) + 2))
+        minutes = hover or min(25, max(6, math.ceil(count / SECTIONS_PER_MINUTE) + 2))
         plan.append(dict(x=x, z=z, sections=count, minutes=minutes))
         # tp gives up after 1200 ticks whatever its wait says; a cmd step waits as long as asked (map-edges, 2026-11-11).
         steps += [dict(op='tp', x=x, y=300, z=z, yaw=0, pitch=0, wait=100, fly=True),
@@ -849,6 +849,69 @@ def step_core(a):
         raise SystemExit('Core rebake did not pass its gate')
 
 
+def step_fill(a):
+    """Another pass over the core sections still missing after core, with a fixed hover per viewpoint. With
+    --backfill-old, sections DH still has not built take their R62 rows (batch 378 content) and are flagged so
+    DH folds them into the levels above: a slightly old far view instead of a hole."""
+    game = WORK / 'client'
+    world = game / 'saves' / COPY
+    db = world / GEO / 'data/DistantHorizons.sqlite'
+    if not world_unchanged_since_mirror():
+        raise SystemExit('The formal world changed since the mirror: run mirror, prepare and core again')
+    before = coverage(world, db)
+    points = viewpoints(before['core_missing'], minimum=a.min_sections)[:8]
+    plan, result, log = [], None, None
+    if points and a.hover != 0:
+        plan = probe_script(points, WORK / 'scripts/r63-dh-fill2.json', hover=a.hover or 20)
+        shutil.copyfile(WORK / 'jars/probe.jar', guard(game / JAR))
+        held = WORK / 'mods-held'
+        hold_mods(game, ['oculus-*.jar'], held)
+        try:
+            set_toml(game / 'config/DistantHorizons.toml', {'numberOfThreads': str(a.dh_threads)})
+            args = client_args(game, {'projectseele.mapProbe': (WORK / 'scripts/r63-dh-fill2.json').as_posix()}, 'fill2.args', a.heap)
+            result = run_client(args, sum(p['minutes'] for p in plan) + CLIENT_START_MIN + 10, 'R63 DH second fill', a.exclusive)
+        finally:
+            restore_mods(game, held)
+            shutil.copyfile(WORK / 'jars/final.jar', game / JAR)
+        log = client_log()
+    script_log = Path(str(WORK / 'scripts/r63-dh-fill2.json') + '.log')
+    done = not plan or (script_log.exists() and script_log.read_text('utf8', 'replace').rstrip().endswith('done'))
+    after = coverage(world, db)
+    missing_after_pass = len(after['core_missing'])
+    after_pass = list(after['core_missing'])
+    backfilled = 0
+    # 2026-11-13 11:39 the client was closed after 23 s and old rows went in anyway: backfill only after a full pass.
+    if a.backfill_old and after['core_missing'] and not done:
+        raise SystemExit('The fill client did not finish its viewpoints; refusing to backfill R62 rows')
+    if a.backfill_old and after['core_missing']:
+        old = (FORMAL / GEO / 'data/DistantHorizons.sqlite').resolve().as_uri() + '?mode=ro&immutable=1'
+        c = sqlite3.connect(guard(db).as_uri(), uri=True)
+        try:
+            c.execute('attach database ? as old', (old,))
+            cols = [r[1] for r in c.execute('pragma table_info(FullData)')]
+            c.execute('create temp table pick(PosX int, PosZ int, primary key (PosX, PosZ))')
+            c.executemany('insert into pick values (?,?)', after['core_missing'])
+            before_rows = c.execute('select count(*) from FullData').fetchone()[0]
+            c.execute('insert or ignore into FullData (%s) select %s from old.FullData o where o.DetailLevel = 0 and (o.PosX, o.PosZ) in '
+                      '(select PosX, PosZ from pick)' % (','.join(cols), ','.join('o.' + x for x in cols)))
+            c.execute('update FullData set ApplyToParent = 1 where DetailLevel = 0 and (PosX, PosZ) in (select PosX, PosZ from pick)')
+            c.commit()
+            backfilled = c.execute('select count(*) from FullData').fetchone()[0] - before_rows
+            c.execute('detach database old')
+        finally:
+            c.close()
+        after = coverage(world, db)
+    out = snapshot(db, WORK / 'out/geofront_lod.sqlite', live=True)
+    ok = after['quick_check'] == 'ok' and len(after['core_missing']) <= a.fill_threshold and (log is None or log['ok']) and done
+    save('fill', dict(ok=ok, missing_before=len(before['core_missing']), points=plan, client=result, client_log=log, script_done=done,
+                      missing_after_pass=missing_after_pass, backfilled_sections=after_pass if backfilled else [],
+                      backfilled_from_r62=backfilled, missing_after=len(after['core_missing']),
+                      pending_parent_updates=after['pending_parent_updates'], quick_check=after['quick_check'],
+                      output=str(out), output_bytes=out.stat().st_size))
+    if not ok:
+        raise SystemExit('Fill did not pass its gate')
+
+
 def step_xaero(a):
     # Its own mirror, so a minimap redo never wipes the prepared LOD database in MAP_REVIEW.
     game = WORK / 'client'
@@ -889,7 +952,10 @@ def step_report(a):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    p.add_argument('step', choices=['check', 'instance', 'mirror', 'prepare', 'drystart', 'core', 'xaero', 'report'])
+    p.add_argument('step', choices=['check', 'instance', 'mirror', 'prepare', 'drystart', 'core', 'fill', 'xaero', 'report'])
+    p.add_argument('--hover', type=int, help='fill: minutes per viewpoint (default 20; 0 skips the client pass)')
+    p.add_argument('--min-sections', type=int, default=1, help='fill: smallest group of missing sections worth a viewpoint')
+    p.add_argument('--backfill-old', action='store_true', help='fill: give sections still missing their R62 rows, flagged for the levels above')
     p.add_argument('--slim-bake', action='store_true', help='instance: bake on the shipped jar minus the 821 MB prototype mesh (default: the shipped jar as is)')
     p.add_argument('--bake-jar', default=str(PUBLIC_JAR), help='instance --slim-bake: public build of main whose placeholder replaces the prototype mesh')
     p.add_argument('--world', help='prepare: world whose saved chunks count (default: the mirror)')
