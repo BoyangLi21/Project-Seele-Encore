@@ -162,10 +162,44 @@ public final class ArticulatedBody implements AutoCloseable
             float v=entry.getValue().getLinearVelocity(new Vector3f()).length();
             if(v>speed){speed=v;fastest=entry.getKey();}
         }
-        return String.format(java.util.Locale.ROOT,"actors %d parts, %d points, deepest %.3f at %s, impulse %.2f; fastest %s %.2f",actors.size(),points,deepest,part,impulse,fastest,speed)+centre;
+        return String.format(java.util.Locale.ROOT,"actors %d parts (%d passed through), %d points, deepest %.3f at %s, impulse %.2f; fastest %s %.2f",actors.size(),ghostsR63,points,deepest,part,impulse,fastest,speed)+centre;
     }
     public void endActorFrame()
-    {var it=actors.entrySet().iterator();while(it.hasNext()){var e=it.next();if(!actorFrame.contains(e.getKey())){world.removeRigidBody(e.getValue());it.remove();}}world.updateAabbs();}
+    {
+        var it=actors.entrySet().iterator();while(it.hasNext()){var e=it.next();if(!actorFrame.contains(e.getKey())){world.removeRigidBody(e.getValue());it.remove();}}world.updateAabbs();
+        if(GHOST_R63>0&&!actors.isEmpty())ghostDeepActorsR63();
+    }
+    /**
+     * Overlap (units of 25 blocks) past which a standing body's part does not push this one. A standing body is
+     * set where its pose puts it each tick, with no speed of its own, and two bodies at arm's length stand with
+     * their legs through each other's hulls. The solver answers an overlap it is handed with whatever impulse
+     * parts them. Up to two blocks that is a shove, as it always was. Deeper, it was 556 and 621 units, eight
+     * blows' worth: the body left its knock-down at 155 blocks a second, and one before the fuse went 904 blocks.
+     * A part that deep in is passed through until the bodies have come within two blocks of apart by themselves.
+     * A body that falls against a standing one meets it at no depth and is stopped as before.
+     * 0 turns it off; .02 passes through nearly every part that touches (measured: no impulse over 61, but the
+     * body lies 7 blocks into Sachiel for most of a second).
+     */
+    private static final float GHOST_R63=Float.parseFloat(System.getProperty("projectseele.bodyGhostR63",".08"));
+    private int ghostsR63;
+    private void ghostDeepActorsR63()
+    {
+        world.performDiscreteCollisionDetection();
+        Set<CollisionObject> deep=Collections.newSetFromMap(new IdentityHashMap<>());
+        for(int i=0;i<dispatcher.getNumManifolds();i++)
+        {
+            var contact=dispatcher.getManifoldByIndexInternal(i);var a=(CollisionObject)contact.getBody0();var b=(CollisionObject)contact.getBody1();
+            boolean first="other-actor".equals(a.getUserPointer());
+            if(!first&&!"other-actor".equals(b.getUserPointer()))continue;
+            for(int n=0;n<contact.getNumContacts();n++)if(contact.getContactPoint(n).getDistance()<-GHOST_R63){deep.add(first?a:b);break;}
+        }
+        for(var body:actors.values())
+        {
+            int flags=body.getCollisionFlags();
+            body.setCollisionFlags(deep.contains(body)?flags|CollisionFlags.NO_CONTACT_RESPONSE:flags&~CollisionFlags.NO_CONTACT_RESPONSE);
+        }
+        ghostsR63=deep.size();
+    }
     public void impulse(String bone,org.joml.Vector3f point,org.joml.Vector3f impulse)
     {
         var body=bodies.getOrDefault(bone,bodies.get("torso_upper"));var origin=body.getCenterOfMassPosition(new Vector3f());
