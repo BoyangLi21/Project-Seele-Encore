@@ -595,6 +595,7 @@ public final class EvaConnectedActionReview
         if(at(1))for(var name:STRIKE_TARGETS)removeTargetR63(mc,name);
         if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
+        if(GAIT){gaitR64(mc);positionCamera(mc,eva);return;}
         if(HILL){hillR60(mc,lane(eva));positionCamera(mc,eva);return;}
         if(STRIKE){strikeR60(mc,eva);positionCamera(mc,eva);return;}
         if(ATF){atFieldR63(mc,eva);positionCamera(mc,eva);return;}
@@ -762,6 +763,29 @@ public final class EvaConnectedActionReview
                 if(height>0)mc.player.connection.sendCommand("fill "+(x+band[0])+" -60 "+z+" "+(x+band[1])+" "+(-61+height)+" "+z+" minecraft:grass_block");
             }
         }
+    }
+
+    /**
+     * -Dprojectseele.tourGaitR64=true: straight ahead and nothing else, to measure how far a standing foot slides
+     * over the ground: a walk of 130 ticks out, a run of 110 back, a fast run (sprint and dash held) of 30 out again,
+     * the unit turned about while it stands between them. The other tours walk for a second and a half at a time,
+     * and their walks also go backward, sideways and round. Run with tourEnd=420.
+     * -Dprojectseele.tourGaitFastR64=<ticks>: the fast run's length, where 30 is too short to count its cycles (it
+     * is at full speed from its 14th tick); tourEnd is then 390 and these ticks.
+     */
+    private static final boolean GAIT=Boolean.getBoolean("projectseele.tourGaitR64");
+    private static final int GAIT_FAST_R64=Integer.getInteger("projectseele.tourGaitFastR64",30);
+    private static void gaitR64(Minecraft mc)
+    {
+        int t=tick;
+        boolean walk=t>=30&&t<160,run=t>=200&&t<310,fast=t>=350&&t<350+GAIT_FAST_R64,move=walk||run||fast;
+        mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
+        mc.player.setYRot(t>=170&&t<320?180:0);mc.player.setXRot(0);
+        // The client re-syncs held sprint and dash to the real keys, so hold them.
+        mc.options.keySprint.setDown(run||fast);
+        com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=354&&t<350+GAIT_FAST_R64);
+        if(at(200)||at(350))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(310)||at(350+GAIT_FAST_R64))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
     }
 
     private static void movesR59(Minecraft mc)
