@@ -4242,7 +4242,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {continue;}
             // Damage sourced directly from the Unit: Angel A.T. Fields
             // treat EVA contact as neutralized and let it through.
-            boolean field=target instanceof Angel angel&&angel.getAtField()>0;
+            // Ramiel's field has no finite strength to report, but a blow on it while it is sealed lands on it:
+            // it was told as a blow that met nothing, with the whiff's sound and dust.
+            boolean field=target instanceof Angel angel&&angel.getAtField()>0||target instanceof RamielEntity crystal&&crystal.fieldSealedR63();
             Vec3 hitPoint=bodyContact.orElse(fxCenter);
             Vec3 away=target.position().subtract(this.position()).multiply(1,0,1).normalize();
             Vec3 impulse=from==null?away:away.scale(.65).add(fxCenter.subtract(from).multiply(1,.12,1).normalize().scale(.35)).normalize();

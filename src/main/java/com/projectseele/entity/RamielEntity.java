@@ -92,6 +92,25 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Float> DATA_AT_ENERGY =
             SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.FLOAT);
+    /**
+     * R63: the last blow the crystal answered. Where it came from, seen from the core, times how hard it was (0 to
+     * 1.5), and a count that moves with every blow so two alike are still two.
+     */
+    private static final EntityDataAccessor<Vector3f> DATA_STRUCK_R63 =
+            SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.VECTOR3);
+    private static final EntityDataAccessor<Integer> DATA_STRUCK_COUNT_R63 =
+            SynchedEntityData.defineId(RamielEntity.class, EntityDataSerializers.INT);
+    /** How hard the crystal answers a deflected shot, a Unit's blow on the field, and the field breaking. */
+    public static final float STRUCK_SHOT_R63=.2F,STRUCK_BLOW_R63=.45F,STRUCK_BREAK_R63=1.1F;
+    /**
+     * The answer itself, for strength 1: the crystal gives this far away from the blow (blocks) and tips this far
+     * over (degrees), swinging back and forth with this period and dying out over this time (ticks); it flashes
+     * white for this long.
+     */
+    public static final float RECOIL_R63=1.6F,TILT_R63=7F,SWING_R63=11F,DECAY_R63=7F,FLASH_R63=3F;
+    private int struckSeenR63;
+    private float struckAgeR63=1000,struckAgeOR63=1000;
+    private Vector3f struckR63=new Vector3f();
 
     // Balance values (damage, ranges, cooldowns) live in SeeleConfig; the
     // constants left here are presentation/geometry, not tuning knobs.
@@ -313,6 +332,63 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         this.entityData.define(DATA_DRILL_DEPTH, 0.0F);
         this.entityData.define(DATA_EXPOSED, false);
         this.entityData.define(DATA_AT_ENERGY, 1750.0F);
+        this.entityData.define(DATA_STRUCK_R63, new Vector3f());
+        this.entityData.define(DATA_STRUCK_COUNT_R63, 0);
+    }
+
+    /** True while the field stands closed round the crystal: a blow lands on it, not on nothing. */
+    public boolean fieldSealedR63()
+    {
+        return !this.isExposed() && this.hasAtField();
+    }
+
+    /** Server: the crystal answers a blow that came from there. */
+    private void struckR63(Vec3 from, float strength)
+    {
+        Vec3 core = this.beamOrigin();
+        Vec3 dir = from != null && from.distanceToSqr(core) > 1.0E-4D ? from.subtract(core).normalize() : new Vec3(0, 1, 0);
+        float s = Mth.clamp(strength, 0, 1.5F);
+        this.entityData.set(DATA_STRUCK_R63, new Vector3f((float) dir.x * s, (float) dir.y * s, (float) dir.z * s));
+        this.entityData.set(DATA_STRUCK_COUNT_R63, this.entityData.get(DATA_STRUCK_COUNT_R63) + 1);
+    }
+
+    /** How far the crystal's answer has died out, 1 to 0, and where in its swing it is (radians). */
+    private float struckEnvelopeR63(float partialTick)
+    {
+        float age = Mth.lerp(partialTick, this.struckAgeOR63, this.struckAgeR63);
+        return age > DECAY_R63 * 6 ? 0 : (float) Math.exp(-age / DECAY_R63);
+    }
+
+    /** Client: where the crystal is drawn from its place, in blocks: away from the blow and back. */
+    public Vec3 struckOffsetR63(float partialTick)
+    {
+        float envelope = this.struckEnvelopeR63(partialTick);
+        if (envelope <= 0) return Vec3.ZERO;
+        float age = Mth.lerp(partialTick, this.struckAgeOR63, this.struckAgeR63);
+        // Starts at rest, is farthest a quarter of a swing later.
+        float give = -RECOIL_R63 * envelope * Mth.sin(age * Mth.TWO_PI / SWING_R63);
+        return new Vec3(this.struckR63.x() * give, this.struckR63.y() * give, this.struckR63.z() * give);
+    }
+
+    /** Client: the axis the crystal tips about (level, across the blow) and by how much (degrees); null when it stands still. */
+    public org.joml.Vector4f struckTiltR63(float partialTick)
+    {
+        float envelope = this.struckEnvelopeR63(partialTick);
+        float strength = this.struckR63.length();
+        if (envelope <= 0 || strength < 1.0E-4F) return null;
+        float age = Mth.lerp(partialTick, this.struckAgeOR63, this.struckAgeR63);
+        // The tip follows the give by a quarter of a swing: the top goes last.
+        float angle = TILT_R63 * strength * envelope * Mth.sin((age - SWING_R63 / 4) * Mth.TWO_PI / SWING_R63);
+        float x = -this.struckR63.z(), z = this.struckR63.x(), flat = Mth.sqrt(x * x + z * z);
+        if (flat < 1.0E-4F) return null;
+        return new org.joml.Vector4f(x / flat, 0, z / flat, angle);
+    }
+
+    /** Client: how white the crystal is drawn, 0 to 1. */
+    public float struckFlashR63(float partialTick)
+    {
+        float age = Mth.lerp(partialTick, this.struckAgeOR63, this.struckAgeR63);
+        return age > FLASH_R63 * 4 ? 0 : Math.min(1, this.struckR63.length()) * (float) Math.exp(-age / FLASH_R63);
     }
 
     public boolean isExposed()
@@ -451,6 +527,15 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         super.tick();
         if (this.level().isClientSide)
         {
+            int struck = this.entityData.get(DATA_STRUCK_COUNT_R63);
+            this.struckAgeOR63 = this.struckAgeR63;
+            if (struck != this.struckSeenR63)
+            {
+                this.struckSeenR63 = struck;
+                this.struckR63 = new Vector3f(this.entityData.get(DATA_STRUCK_R63));
+                this.struckAgeR63 = this.struckAgeOR63 = 0;
+            }
+            else if (this.struckAgeR63 < 1000) this.struckAgeR63++;
             this.spinO = this.spin;
             this.spin += this.isCharging() || this.isDrilling() ? 6.0F : 0.75F;
             this.exposeProgressO = this.exposeProgress;
@@ -486,7 +571,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                     && eva.isMeleeWeapon() && !source.is(DamageTypeTags.IS_EXPLOSION);
             if (!this.level().isClientSide)
             {
-                this.deflect(source);
+                this.deflect(source, evaMelee ? STRUCK_BLOW_R63 : STRUCK_SHOT_R63);
                 if (evaMelee)
                 {
                     float remaining = Math.max(0.0F, this.getAtFieldEnergy() - amount);
@@ -494,21 +579,27 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                     if (remaining <= 0.0F)
                     {
                         this.playSound(ModSounds.CRYSTAL_BREAK.get(), 3.0F, 0.65F);
+                        this.struckR63(source.getSourcePosition(), STRUCK_BREAK_R63);
                     }
                 }
             }
             return false;
         }
-        return super.hurt(source, amount);
+        boolean hurt = super.hurt(source, amount);
+        // A hit that reaches the crystal itself: by how much of its health it took.
+        if (hurt && !this.level().isClientSide)
+            this.struckR63(source.getSourcePosition(), .5F + 3 * amount / Math.max(1, this.getMaxHealth()));
+        return hurt;
     }
 
-    private void deflect(DamageSource source)
+    private void deflect(DamageSource source, float strength)
     {
         if (this.rippleCooldown > 0)
         {
             return;
         }
         this.rippleCooldown = 3;
+        this.struckR63(source.getSourcePosition(), strength);
         Vec3 origin = source.getSourcePosition() != null ? source.getSourcePosition() : null;
         Vec3 core = this.beamOrigin();
         Vec3 dir = origin != null && origin.distanceToSqr(core) > 1.0E-4D
