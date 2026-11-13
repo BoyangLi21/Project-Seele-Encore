@@ -50,8 +50,8 @@ public final class FirstBattleDirector
         if(pilot==null||eva.getUnitVariant()!=EvaUnit01Entity.UNIT_01||eva.isExperimentalUnit()||eva.isNervLogisticsLocked()||eva.isLaunchSequenceActive()||eva.isCrucified()||!eva.isPoweredOn())return false;
         if(eva.isPilotProne()||eva.isPilotCrouching()||eva.getWeapon()==EvaUnit01Entity.WEAPON_N2||angel.hasUsedFirstBattle())return false;
         FirstBattleSavedData data=FirstBattleSavedData.get(level);if(data.active!=null)return false;
-        boolean selectedReplay=pilot.getUUID().equals(data.missionOwner)&&com.projectseele.world.TvCampaignSavedData.get(level).active.equals("sachiel");
-        if(!review&&!selectedReplay&&!eva.isBerserk()&&data.completedPilots.contains(pilot.getUUID())&&!angel.getTags().contains("seele_first_battle_replay"))return false;
+        // Every Sachiel fight that meets the conditions below ends this way, not only a pilot's first: Enter skips
+        // the scene for a pilot who has seen it. (completedPilots still records who has finished it.)
         Vec3 delta=angel.position().subtract(eva.position());double distance=delta.horizontalDistance();
         if(!review&&(angel.getHealth()>angel.getMaxHealth()*.32F||!stableSupport(eva)||distance<14||distance>46||Math.abs(delta.y)>4))
         {
