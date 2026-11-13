@@ -1,5 +1,6 @@
 package com.projectseele.client;
 
+import com.projectseele.client.screen.ScreenGuiScale;
 import net.minecraft.client.Minecraft;
 import net.minecraftforge.api.distmarker.Dist;
 import net.minecraftforge.event.TickEvent;
@@ -10,7 +11,7 @@ import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid="projectseele",value=Dist.CLIENT)
 public final class PianoScreenCompatibilityR22
 {
-    private static int previous=-1;
+    private static boolean fitted;
     public static boolean piano(Object screen){return screen!=null&&screen.getClass().getName().equals("com.solvane.grandpiano.client.gui.PianoPlayScreen");}
     public static boolean playTab(Object screen)
     {
@@ -20,15 +21,18 @@ public final class PianoScreenCompatibilityR22
     }
     @SubscribeEvent public static void tick(TickEvent.ClientTickEvent e)
     {
-        if(e.phase!=TickEvent.Phase.END)return;var mc=Minecraft.getInstance();
-        if(piano(mc.screen)&&previous<0)
+        if(e.phase!=TickEvent.Phase.END)return;var mc=Minecraft.getInstance();var window=mc.getWindow();
+        if(piano(mc.screen)&&!fitted)
         {
-            previous=mc.options.guiScale().get();int fit=Math.max(1,Math.min(mc.getWindow().getWidth()/444,mc.getWindow().getHeight()/294));
-            if(mc.getWindow().getGuiScaledWidth()<444||mc.getWindow().getGuiScaledHeight()<294)
-            {mc.options.guiScale().set(fit);mc.resizeDisplay();}
+            fitted=true;int fit=Math.max(1,Math.min(window.getWidth()/444,window.getHeight()/294));
+            if((window.getGuiScaledWidth()<444||window.getGuiScaledHeight()<294)&&ScreenGuiScale.set(mc,fit))
+                mc.screen.resize(mc,window.getGuiScaledWidth(),window.getGuiScaledHeight());
         }
-        else if(!piano(mc.screen)&&previous>=0)
-        {int restore=previous;previous=-1;mc.options.guiScale().set(restore);mc.resizeDisplay();}
+        else if(!piano(mc.screen)&&fitted)
+        {
+            fitted=false;
+            if(ScreenGuiScale.set(mc,ScreenGuiScale.normal(mc))&&mc.screen!=null)mc.screen.resize(mc,window.getGuiScaledWidth(),window.getGuiScaledHeight());
+        }
     }
     private PianoScreenCompatibilityR22(){}
 }
