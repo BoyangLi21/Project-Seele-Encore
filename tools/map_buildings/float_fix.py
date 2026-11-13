@@ -11,14 +11,32 @@ entity are never planned.
 import json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
-from mca import REGION, World
+from mca import REGION, WORLD, World
 from float_blocks import is_solid
 
 AIR = 'minecraft:air'
 
 
+def guards():
+    """The writer's protections (city lift towers, lifts, launch routes) for this world."""
+    sys.path.insert(0, str(Path(__file__).parent.parent))
+    from map_pipeline.city_protection import load as city
+    from map_pipeline.lift_protection import load as lift
+    from map_pipeline.launch_protection import load as launch
+    return [g(WORLD) for g in (city, lift, launch)]
+
+
 def main(pieces_file, out):
     w = World(REGION)
+    gs = guards()
+
+    def protected(cells):
+        for g in gs:
+            try:
+                g.assert_positions(list(cells))
+            except ValueError as e:
+                return str(e.args[0][1]) if e.args and isinstance(e.args[0], tuple) else 'protected'
+        return None
     rows, skipped = [], []
     for p in json.load(open(pieces_file)):
         x0, y0, z0, x1, y1, z1 = p['bbox']
@@ -43,6 +61,10 @@ def main(pieces_file, out):
             continue
         if any(w.block_entity(*c) for c in seen):
             skipped.append([p['at'], 'block entity'])
+            continue
+        hit = protected(seen)
+        if hit:
+            skipped.append([p['at'], 'protected: ' + hit])     # part of a city lift tower, lift or launch route
             continue
         rows += [[*c, w.get(*c), AIR] for c in sorted(seen)]
     Path(out).mkdir(parents=True, exist_ok=True)
