@@ -180,7 +180,12 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
             if(contact.isPresent())
             {
                 Vec3 impact=contact.orElse(start);
-                strikeHit=true;boolean hit=com.projectseele.event.EvaHitFeedback.hurt(strikeTarget,damageSources().mobAttack(this),mode==SachielStrike.PILE?55:(float)getAttributeValue(Attributes.ATTACK_DAMAGE),impact,f.direction());
+                // The overhead knocks a Unit the way the hand is going. The frame's direction runs along the forearm,
+                // and against a Unit taller than Sachiel's shoulder that points up (0.88 to 0.96 of it): a blow
+                // brought down on a Unit threw it upward.
+                Vec3 struck=f.direction(),going=f.hand().subtract(prior.hand());
+                if(mode==SachielStrike.OVERHEAD&&going.lengthSqr()>1.0E-4)struck=going.normalize();
+                strikeHit=true;boolean hit=com.projectseele.event.EvaHitFeedback.hurt(strikeTarget,damageSources().mobAttack(this),mode==SachielStrike.PILE?55:(float)getAttributeValue(Attributes.ATTACK_DAMAGE),impact,struck);
                 if(hit)
                 {
                     if(!(strikeTarget instanceof EvaUnit01Entity))strikeTarget.push(f.direction().x*.65,.16,f.direction().z*.65);
