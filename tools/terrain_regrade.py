@@ -11,6 +11,7 @@ Rows: [x, y, z, before, after] with full block states, as write_deep_cells.py re
 from concurrent.futures import ProcessPoolExecutor
 import io
 import json
+import os
 import random
 import zlib
 
@@ -51,7 +52,11 @@ def kind(state):
 
 def _region(job):
     world, rx, rz, chunks, y0, y1 = job
-    buf = open(f'{world}/{REGION}/r.{rx}.{rz}.mca', 'rb').read()
+    path = f'{world}/{REGION}/r.{rx}.{rz}.mca'
+    if not os.path.exists(path):
+        # a box that reaches past the generated map: those chunks count as not loaded
+        return [(cx, cz, None, None, None) for cx, cz in chunks]
+    buf = open(path, 'rb').read()
     res = []
     for cx, cz in chunks:
         i = 4 * ((cx & 31) + (cz & 31) * 32)
