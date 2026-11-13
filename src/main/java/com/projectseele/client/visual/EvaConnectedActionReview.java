@@ -603,6 +603,9 @@ public final class EvaConnectedActionReview
         if(ARMS!=null){armsR63(mc);positionCamera(mc,eva);return;}
         if(EVADE){evadeR63(mc,eva);positionCamera(mc,eva);return;}
         if(HITS){hitsR63(mc,eva);positionCamera(mc,eva);return;}
+        if(RAMIEL){ramielR63(mc,eva);positionCamera(mc,eva);return;}
+        if(ANSWER){answerR63(mc,eva);positionCamera(mc,eva);return;}
+        if(STOMP){stompR63(mc,eva);positionCamera(mc,eva);return;}
         int t=tick+TOUR_START;
         boolean move=CLIMB?t>=40&&t<104||t>=134&&t<166||t>=222&&t<236
                 :t>=40&&t<Math.max(140,DASH_END+10)||t>=360&&t<420||t>=500&&t<580||t>=720&&t<800
@@ -922,6 +925,157 @@ public final class EvaConnectedActionReview
             if(at(row+190))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
         }
     }
+    /**
+     * -Dprojectseele.tourRamielR63=true: a still Ramiel ahead with its field sealed takes a punch, a heavy blow and
+     * a shot, a fresh one each time (a crystal without its mind does not count its ripple pause down); a fourth
+     * takes a string of punches, which its field answers by throwing the unit off. The log carries how far the
+     * crystal gives, tips and flashes every other tick. Run with tourEnd=540 and tourCapture.
+     */
+    private static final boolean RAMIEL=Boolean.getBoolean("projectseele.tourRamielR63");
+    private static void ramielR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize();
+        String crystal="@e[type=projectseele:ramiel,limit=1,sort=nearest]";
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");}
+        for(int placed:new int[]{2,110,210,320})
+        {
+            if(at(placed))removeTargetR63(mc,"ramiel");
+            if(at(placed+10))
+            {
+                // A fist reaches 24 blocks ahead at 47 blocks up, a kicking foot 25 ahead at 38 up (measured): the crystal,
+                // twelve blocks across, stands with its near face 20 ahead and from 36 to 48 up. Two blocks over the
+                // ground and 18 ahead, every punch of the first run passed over it.
+                Vec3 a=eva.position().add(fwd.scale(26)).add(0,36,0);
+                mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:ramiel %.1f %.1f %.1f {NoAI:1b,Silent:1b}",a.x,a.y,a.z));
+            }
+        }
+        if(at(50))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(150))send(ServerboundEvaControlPacket.ACTION_SMASH);
+        // A shot: the crystal is immune to the damage command's arrow, so the unit takes its rifle and fires.
+        if(at(232))mc.player.connection.sendCommand(ARM+"rifle");
+        if(at(262))send(ServerboundEvaControlPacket.ACTION_RIFLE_FIRE);
+        if(at(300))mc.player.connection.sendCommand(ARM+"fists");
+        if(at(370)||at(392)||at(414)||at(436))send(ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(530))removeTargetR63(mc,"ramiel");
+        // The crystal nearest the unit: one taken away stands 600 blocks up until it is gone.
+        com.projectseele.entity.RamielEntity near=null;
+        for(var seen:mc.level.entitiesForRendering())if(seen instanceof com.projectseele.entity.RamielEntity r&&(near==null||r.distanceToSqr(eva)<near.distanceToSqr(eva)))near=r;
+        if(tick>=40&&tick%2==0&&near!=null&&near.distanceToSqr(eva)<120*120)
+        {
+            var r=near;
+            var give=r.struckOffsetR63(0);var tip=r.struckTiltR63(0);
+            ProjectSeele.LOGGER.info("R63RAMIEL tick {} give {} {} {} tip {} flash {} field {}",tick,String.format(java.util.Locale.ROOT,"%.2f",give.x),
+                    String.format(java.util.Locale.ROOT,"%.2f",give.y),String.format(java.util.Locale.ROOT,"%.2f",give.z),String.format(java.util.Locale.ROOT,"%.1f",tip==null?0F:tip.w),
+                    String.format(java.util.Locale.ROOT,"%.2f",r.struckFlashR63(0)),r.getAtFieldEnergy());
+        }
+    }
+    /**
+     * -Dprojectseele.tourAnswerR63=true: a live Sachiel 22 blocks ahead. The piloted unit keeps facing it, walks up
+     * while it is more than 20 blocks off and strikes every 30 ticks while it is within 24, a heavy blow and a
+     * punch in turn; it is repaired every 100 ticks (its field stays down: a blow that reaches it is seen in its
+     * health). The server says of every blow Sachiel reads what it does about it (R63SACHIEL), and the log carries
+     * the range and Sachiel's strike every tick (R63ANSWER). Standing still with its field up, the first form of
+     * this tour had two blows in 540 ticks begin within Sachiel's reach. Run with tourEnd=1500.
+     */
+    private static final boolean ANSWER=Boolean.getBoolean("projectseele.tourAnswerR63");
+    /**
+     * -Dprojectseele.tourAnswerKickUnderR64=true, with the answer tour: the unit throws nothing by the clock, and
+     * begins its heavy blow (the side kick) as Sachiel's overhead reaches its 14th to 17th tick as the client sees
+     * it, in turn; the overhead lands at its 20th or 21st on the server, a tick or two ahead of the client's
+     * count (sent at the 18th, the knock-down came first). For a knock-down in the first ticks of the unit's own move.
+     */
+    private static final boolean KICK_UNDER_R64=Boolean.getBoolean("projectseele.tourAnswerKickUnderR64");
+    private static int kickUnderTurnR64;private static boolean kickUnderSentR64;
+    private static void answerR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
+        com.projectseele.entity.SachielEntity sachiel=null;
+        for(var seen:mc.level.entitiesForRendering())
+            if(seen instanceof com.projectseele.entity.SachielEntity s&&s.isAlive()&&(sachiel==null||s.distanceToSqr(eva)<sachiel.distanceToSqr(eva)))sachiel=s;
+        double range=sachiel==null?Double.NaN:sachiel.position().subtract(eva.position()).horizontalDistance();
+        boolean close=sachiel!=null&&range>20&&tick>=30;
+        mc.options.keyUp.setDown(close);mc.player.input.up=close;mc.player.input.forwardImpulse=close?1:0;mc.player.zza=close?1:0;mc.player.xxa=0;
+        if(sachiel!=null)
+        {
+            Vec3 to=sachiel.position().subtract(eva.position());
+            mc.player.setYRot((float)Math.toDegrees(Math.atan2(-to.x,to.z)));
+        }
+        else mc.player.setYRot(0);
+        mc.player.setXRot(0);
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");}
+        if(at(14))
+        {
+            Vec3 a=eva.position().add(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(22));
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {Silent:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+        }
+        // (the tour's tick can step over one: the last multiple reached is what counts)
+        int repair=tick/100*100,blow=tick/30*30;
+        if(repair>=100&&at(repair))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        if(KICK_UNDER_R64)
+        {
+            boolean overhead=sachiel!=null&&sachiel.isStrikeActive()&&sachiel.strikeMode()==4;
+            if(!overhead)kickUnderSentR64=false;
+            else if(!kickUnderSentR64&&sachiel.strikeAge(0)>=14+kickUnderTurnR64%4)
+            {
+                kickUnderSentR64=true;kickUnderTurnR64++;send(ServerboundEvaControlPacket.ACTION_SMASH);
+                ProjectSeele.LOGGER.info("R64KICKUNDER tick {}: heavy blow sent at the overhead's tick {}",tick,String.format(java.util.Locale.ROOT,"%.1f",sachiel.strikeAge(0)));
+            }
+        }
+        else if(blow>=60&&at(blow)&&range<24)
+            send((blow/30)%2==0?ServerboundEvaControlPacket.ACTION_SMASH:ServerboundEvaControlPacket.ACTION_MELEE);
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+        if(tick>=30&&sachiel!=null)
+            ProjectSeele.LOGGER.info("R63ANSWER tick {} range {} strike {} mode {} live {} phase {} heavy {} health {}",tick,
+                    String.format(java.util.Locale.ROOT,"%.1f",range),sachiel.isStrikeActive(),sachiel.strikeMode(),
+                    eva.hasLiveActionForRender(0),String.format(java.util.Locale.ROOT,"%.2f",eva.combatPhaseR31()),eva.isHeavyMotionActive()||eva.isKickMotionActive(0),Math.round(eva.getHealth()));
+    }
+    /**
+     * -Dprojectseele.tourStompR63=true: a live Sachiel 20 blocks ahead, the piloted unit standing with its field
+     * down. Every 340 ticks three heavy blows knock the unit down toward Sachiel: they are Sachiel's by cause, and
+     * come from a marker 30 blocks behind the unit, so the body falls at Sachiel's feet, where it stomps on a body
+     * that is down. With -Dprojectseele.bodyDiagR63=true the server says what the fallen body does every tick.
+     * The blows are 60 each and the unit is repaired every 16 ticks while it is down: at 50 a piloted Unit-01 goes
+     * berserk and takes no more blows, and the first form's first row (three of 75, then the stomp) left it there
+     * for the rest of the tour. Run with tourEnd=1400.
+     */
+    private static final boolean STOMP=Boolean.getBoolean("projectseele.tourStompR63");
+    private static void stompR63(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;mc.player.setXRot(0);
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",marker="@e[tag=r63push,limit=1]",unit=eva.getStringUUID();
+        com.projectseele.entity.SachielEntity sachiel=null;
+        for(var seen:mc.level.entitiesForRendering())
+            if(seen instanceof com.projectseele.entity.SachielEntity a&&a.isAlive()&&(sachiel==null||a.distanceToSqr(eva)<sachiel.distanceToSqr(eva)))sachiel=a;
+        if(sachiel!=null){Vec3 to=sachiel.position().subtract(eva.position());mc.player.setYRot((float)Math.toDegrees(Math.atan2(-to.x,to.z)));}
+        if(at(1)){mc.player.connection.sendCommand("time set noon");mc.player.connection.sendCommand("weather clear");mc.player.connection.sendCommand("kill @e[tag=r63push]");}
+        if(at(14))
+        {
+            Vec3 a=eva.position().add(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(20));
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon projectseele:sachiel %.1f %.1f %.1f {Silent:1b,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+            Vec3 m=eva.position().subtract(Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize().scale(30)).add(0,20,0);
+            mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"summon minecraft:armor_stand %.1f %.1f %.1f {Invisible:1b,Marker:1b,NoGravity:1b,Tags:[\"r63push\"]}",m.x,m.y,m.z));
+        }
+        int row=60+(tick-60)/340*340;
+        if(tick>=60&&sachiel!=null)
+        {
+            // The marker goes behind the unit, away from Sachiel, before the row's blows.
+            if(at(row-6))
+            {
+                Vec3 away=eva.position().subtract(sachiel.position()).multiply(1,0,1);away=away.lengthSqr()<1e-6?new Vec3(0,0,-1):away.normalize();
+                Vec3 m=eva.position().add(away.scale(30)).add(0,20,0);
+                mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,"tp %s %.1f %.1f %.1f",marker,m.x,m.y,m.z));
+            }
+            for(int n=0;n<3;n++)if(at(row+n*14))mc.player.connection.sendCommand("damage "+unit+" 60 minecraft:mob_attack by "+marker+" from "+angel);
+            for(int n=0;n<14;n++)if(at(row+34+n*16))mc.player.connection.sendCommand("effect give "+unit+" minecraft:instant_health 1 6 true");
+        }
+        if(at(TOUR_END-12)){removeTargetR63(mc,"sachiel");mc.player.connection.sendCommand("kill @e[tag=r63push]");}
+        if(tick>=30&&tick%2==0&&sachiel!=null)
+            ProjectSeele.LOGGER.info("R63STOMP tick {} range {} strike {} mode {} health {} at {} {} {}",tick,
+                    String.format(java.util.Locale.ROOT,"%.1f",sachiel.position().subtract(eva.position()).horizontalDistance()),sachiel.isStrikeActive(),sachiel.strikeMode(),
+                    Math.round(eva.getHealth()),String.format(java.util.Locale.ROOT,"%.1f",eva.getX()),String.format(java.util.Locale.ROOT,"%.1f",eva.getY()),String.format(java.util.Locale.ROOT,"%.1f",eva.getZ()));
+    }
     private static void evadeR63(Minecraft mc,EvaUnit01Entity eva)
     {
         mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
@@ -1083,8 +1237,9 @@ public final class EvaConnectedActionReview
     }
 
     /**
-     * -Dprojectseele.reviewPilotViewR63=true: the view stays with the pilot. What only the pilot's view shows (here:
-     * where the third-person camera goes on a climb) never happens under the review's camera, an entity of its own.
+     * -Dprojectseele.reviewPilotViewR63=true: the view stays with the pilot. What only the pilot's view shows never
+     * happens under the review's camera, an entity of its own: camera kicks and the push of a blow that lands (a
+     * whole tour of blows logged none of either), and where the third-person camera goes on a climb.
      */
     private static final boolean PILOT_VIEW_R63=Boolean.getBoolean("projectseele.reviewPilotViewR63");
     private static void positionCamera(Minecraft mc, EvaUnit01Entity eva)
