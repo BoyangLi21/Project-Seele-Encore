@@ -4075,6 +4075,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     record RecoveryInputStampR51(int melee,int smash,int kick){}
     RecoveryInputStampR51 recoveryInputStampR51()
     {return new RecoveryInputStampR51(this.entityData.get(DATA_MELEE_SEQUENCE),this.entityData.get(DATA_SMASH_SEQUENCE),this.entityData.get(DATA_KICK_SEQUENCE));}
+    /** How loud and how high the swing of a blow that meets nothing is (a swing used to be 1.1 and 1). */
+    public static final float WHIFF_VOLUME_R63=.8F,WHIFF_PITCH_R63=1.18F;
     /**
      * True once the strike in hand has landed or missed and only its recovery is left. The phases are
      * the ones a retreating step already cancels a punch from (0.72), the end of the kick's sweep
@@ -4294,25 +4296,26 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             Vec3 p = fxCenter.add(side.scale(i * 1.6D));
             if(!anyHit)serverLevel.sendParticles(ParticleTypes.CLOUD,p.x,p.y,p.z,1,0,0,0,.02);
         }
+        // R63: a blade that meets nothing leaves a thin wake, a quarter of the burst of one that lands.
+        int wake = anyHit ? 4 : 1;
         if (knife)
         {
             // High-vibration blade wake.
             serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
-                    fxCenter.x, fxCenter.y, fxCenter.z, 30, 2.0D, 1.4D, 2.0D, 0.35D);
+                    fxCenter.x, fxCenter.y, fxCenter.z, 30 * wake / 4, 2.0D, 1.4D, 2.0D, 0.35D);
         }
         if (lance)
         {
             serverLevel.sendParticles(ParticleTypes.END_ROD,
-                    fxCenter.x, fxCenter.y, fxCenter.z, 44, 2.4D, 2.0D, 2.4D, 0.45D);
+                    fxCenter.x, fxCenter.y, fxCenter.z, 44 * wake / 4, 2.4D, 2.0D, 2.4D, 0.45D);
             serverLevel.sendParticles(ParticleTypes.ELECTRIC_SPARK,
-                    fxCenter.x, fxCenter.y, fxCenter.z, 52, 2.8D, 2.2D, 2.8D, 0.55D);
+                    fxCenter.x, fxCenter.y, fxCenter.z, 52 * wake / 4, 2.8D, 2.2D, 2.8D, 0.55D);
         }
         if (!anyHit)
         {
-            if(!EvaActionFoleyR61.strokeSwung(this))EvaMovementSounds.play(this,fxCenter,ModSounds.EVA_SWING.get(),1.1F,1);
-            // Whiff: a little air displacement so empty swings still feel weighty.
-            serverLevel.sendParticles(ParticleTypes.CLOUD, fxCenter.x, fxCenter.y, fxCenter.z,
-                    6, 1.2D, 0.8D, 1.2D, 0.02D);
+            // A blow that meets nothing is air and nothing else: a lighter, higher swing and the thin fan above. The
+            // puff of dust it also threw up where it would have landed read as a hit on something.
+            if(!EvaActionFoleyR61.strokeSwung(this))EvaMovementSounds.play(this,fxCenter,ModSounds.EVA_SWING.get(),WHIFF_VOLUME_R63,WHIFF_PITCH_R63);
         }
         return anyHit;
     }

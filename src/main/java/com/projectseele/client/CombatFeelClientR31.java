@@ -13,10 +13,22 @@ import net.minecraftforge.fml.common.Mod;
 @Mod.EventBusSubscriber(modid="projectseele",value=Dist.CLIENT)
 public final class CombatFeelClientR31
 {
+    /**
+     * R63: a blow of the piloted unit that lands pushes the pilot's view in by this fraction of its field for a
+     * moment, a heavier one (held two ticks) by the second. A blow that meets nothing never moves the view.
+     */
+    public static final float HIT_PUSH_R63=.012F,HIT_PUSH_HEAVY_R63=.022F;
     public static void receive(ClientboundCombatFeelR31 p)
     {
         var mc=Minecraft.getInstance();if(mc.level!=null&&mc.level.getEntity(p.entity()) instanceof LivingEntity actor)
-        {CombatFeelR31.receive(actor,p.beat(),p.phase());if(p.beat().kind()==CombatFeelR31.THROWN)actor.setDeltaMovement(p.beat().direction());}
+        {
+            CombatFeelR31.receive(actor,p.beat(),p.phase());if(p.beat().kind()==CombatFeelR31.THROWN)actor.setDeltaMovement(p.beat().direction());
+            if(p.beat().kind()==CombatFeelR31.CONTACT&&mc.player!=null&&mc.getCameraEntity()==mc.player&&actor==EvaPilotResolver.controlTarget(mc.player))
+            {
+                if(CameraKickR58.TOLD)com.projectseele.ProjectSeele.LOGGER.info("R63HITPUSH the piloted unit's blow landed, held {} ticks",p.beat().stopTicks());
+                CameraKickR58.kick(0,0,-(p.beat().stopTicks()<=1?HIT_PUSH_R63:HIT_PUSH_HEAVY_R63),3);
+            }
+        }
     }
     @SubscribeEvent public static void camera(ViewportEvent.ComputeCameraAngles e)
     {
