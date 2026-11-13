@@ -112,6 +112,9 @@ public final class EvaFootPlacement
         var body=eva.getPosition(partial);
         double land=ease((eva.getId()*2)^0x08000000,landSlope(eva,body,forward,root.m31()),LAND_EASE);
         witness[26]=land;
+        // R64 (C12): the way the body goes over the ground this tick, for holding planted soles across it.
+        double goX=eva.getX()-eva.xo,goZ=eva.getZ()-eva.zo,go=Math.hypot(goX,goZ);
+        Vector3f travel=SIDE_HOLD_R64&&go>.05?new Vector3f((float)(goX/go),0,(float)(goZ/go)):null;
         for(String s:List.of("l","r"))
         {
             var foot=model.getBone("foot_"+s).orElse(null);var leg=model.getBone("leg_"+s).orElse(null);var shin=model.getBone("shin_"+s).orElse(null);var ankle=model.getBone("ankle_"+s).orElse(null);
@@ -247,6 +250,11 @@ public final class EvaFootPlacement
             // slide back faster than the body moves: on a ledge that slid the
             // foot off the edge and the leg folded to keep it up there.
             updateHold(key,pivot,plant,!ramp&&Double.isFinite(ground)&&ground-root.m31()>.5);held=hold(key,pivot);
+            // Across the way it goes, a planted sole stays where it was set down. The walk's clips carry a standing
+            // foot 3.7 to 4 blocks sideways under a body that does not sway with it. Along the way it is left to
+            // the clip: held there too, the stride would shrink to what the body covers.
+            updateSideHold(key,new Vector3f(pivot).add(held),plant,travel!=null&&HOLDS.get(key)==null);
+            Vector3f side=sideHold(key,pivot,travel);
             // A sole on a slope lies along it, as far as an ankle gives. Kept level it was set at the
             // mean height of the ground under it: on a steep hillside its toes stood up to five
             // blocks inside the terrace above and its heel as far over the one below.
@@ -306,7 +314,11 @@ public final class EvaFootPlacement
             // wanted and eased correction, carry onto a ledge, draw-back, hold, height above the drawn plane, ramp.
             witness[index++]=lowest.y;witness[index++]=top;witness[index++]=below;witness[index++]=ground;witness[index++]=plant;witness[index++]=rise;
             witness[index++]=correction;witness[index++]=onto;witness[index++]=back;witness[index++]=holding;witness[index++]=lift;witness[index++]=ramp?1:0;
-            if(Math.abs(correction)<.005&&holding<.005&&back<.005&&onto<.005&&Math.abs(pitch)<.005F)continue;
+            if(Math.abs(correction)<.005&&holding<.005&&back<.005&&onto<.005&&Math.abs(pitch)<.005F)
+            {
+                if(sideSolve(root,leg,foot,side))changed.addAll(List.of("leg_"+s,"shin_"+s,"ankle_"+s,"foot_"+s));
+                continue;
+            }
             Vector3f target=new Vector3f(pivot).add(held.x+forward.x*shift,(float)correction,held.z+forward.z*shift);
             var turn=EvaRigTransforms.rotation(matrix);
             if(Math.abs(pitch)>=.005F)
@@ -334,6 +346,7 @@ public final class EvaFootPlacement
                 target.sub(forward.x*more,0,forward.z*more);
                 EvaRigTransforms.solveLegFaded(leg,shin,ankle,foot,target,turn,pole,root,1);
             }
+            sideSolve(root,leg,foot,side);
             changed.addAll(List.of("leg_"+s,"shin_"+s,"ankle_"+s,"foot_"+s));
         }
         if(LAST.size()>32)LAST.clear();LAST.put(eva.getId(),witness);
@@ -396,6 +409,56 @@ public final class EvaFootPlacement
         }
         // Sum of i squared over -4..4 is 60.
         return Math.max(-MAX_LAND_SLOPE,Math.min(MAX_LAND_SLOPE,moment/60/LAND_STEP));
+    }
+    private static final boolean SIDE_HOLD_R64=!"false".equals(System.getProperty("projectseele.footSideHoldR64"));
+    /** A sole held across the way is let go when the clip takes it further than this from where it stood (blocks). */
+    private static final float SIDE_FAR_R64=8F;
+    private static final class SideHold {float x,z,weight=1;long time;boolean on=true;}
+    private static final Map<Integer,SideHold> SIDE_HOLDS=new HashMap<>();
+    /** Offset across the way of travel from the clip's foot to where the sole was set down; none while the body stands. */
+    private static Vector3f sideHold(int key,Vector3f pivot,Vector3f travel)
+    {
+        var hold=SIDE_HOLDS.get(key);
+        if(hold==null||travel==null)return new Vector3f();
+        float ax=travel.z,az=-travel.x,across=(hold.x-pivot.x)*ax+(hold.z-pivot.z)*az;
+        if(hold.on&&Math.abs(across)>SIDE_FAR_R64)hold.on=false;
+        float w=hold.weight*hold.weight*(3-2*hold.weight);
+        return new Vector3f(ax*across*w,0,az*across*w);
+    }
+    /** Held from the frame a sole is planted, where it is drawn then; let go over 0.15 s as it lifts or the body stops. */
+    private static void updateSideHold(int key,Vector3f drawn,double plant,boolean allowed)
+    {
+        long now=com.projectseele.client.AircraftRenderClockR21.frameNanos();var hold=SIDE_HOLDS.get(key);
+        if(hold!=null&&now-hold.time>250_000_000L){SIDE_HOLDS.remove(key);hold=null;}
+        if(hold!=null&&hold.on&&(plant<.4||!allowed))hold.on=false;
+        if(hold==null)
+        {
+            if(!allowed||plant<=.6)return;
+            hold=new SideHold();hold.x=drawn.x;hold.z=drawn.z;hold.time=now;
+            if(SIDE_HOLDS.size()>64)SIDE_HOLDS.clear();
+            SIDE_HOLDS.put(key,hold);return;
+        }
+        float dt=Math.max(0,Math.min(.25F,(now-hold.time)/1e9F));hold.time=now;
+        if(!hold.on){hold.weight-=dt/.15F;if(hold.weight<=0)SIDE_HOLDS.remove(key);}
+    }
+    /**
+     * Moves a foot by the offset a side hold asks for by swinging its whole leg about the hip, the foot's own turn
+     * kept. Not by the leg solver: on a leg nearly straight that one reads the thigh's roll off the toes, and
+     * taking over a planted foot it rolled the thigh ten degrees in a frame. Swung, a straight leg comes up short
+     * by the cosine of the swing: a quarter of a block at four blocks aside.
+     */
+    private static boolean sideSolve(Matrix4f root,software.bernie.geckolib.cache.object.GeoBone leg,software.bernie.geckolib.cache.object.GeoBone foot,Vector3f side)
+    {
+        if(side.lengthSquared()<1e-6F)return false;
+        var hip=EvaRigTransforms.point(leg,EvaRigTransforms.pivot(leg),root);
+        var from=EvaRigTransforms.point(foot,EvaRigTransforms.pivot(foot),root).sub(hip);
+        if(from.lengthSquared()<1e-6F)return false;
+        var turn=EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(foot)));
+        var swing=new org.joml.Quaternionf().rotationTo(from,new Vector3f(from).add(side.x,0,side.z));
+        EvaRigTransforms.rotate(leg,EvaRigTransforms.rotation(EvaRigTransforms.parent(leg,root)).invert()
+                .mul(swing.mul(EvaRigTransforms.rotation(new Matrix4f(root).mul(EvaRigTransforms.model(leg))))));
+        EvaRigTransforms.rotate(foot,EvaRigTransforms.rotation(EvaRigTransforms.parent(foot,root)).invert().mul(turn));
+        return true;
     }
     private static final class Hold {float x,z,weight=1;long time;boolean on=true,far;}
     private static final Map<Integer,Hold> HOLDS=new HashMap<>();
