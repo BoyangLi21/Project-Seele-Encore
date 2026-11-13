@@ -21,8 +21,7 @@ public final class StaffConversationScreen extends Screen
     private String mission="sachiel";
     private boolean npcSortie;
     private String sortieEquipment="rifle";
-    private int x, y, panelWidth, panelHeight, tab, unit = 1, age, savedScale = -1, replyScroll, replyTop;
-    private boolean restoring,scaling;
+    private int x, y, panelWidth, panelHeight, tab, unit = 1, age, replyScroll, replyTop;
     private UUID humanPilot;
     private final Map<Integer,String> sortieCrewR54=new LinkedHashMap<>();
     private boolean sortieCrewInitializedR54;
@@ -82,20 +81,10 @@ public final class StaffConversationScreen extends Screen
 
     @Override protected void init()
     {
-        if(savedScale<0)savedScale=minecraft.options.guiScale().get();
-        if(!restoring&&!scaling)
-        {
-            var window=minecraft.getWindow();boolean unicode=minecraft.isEnforceUnicode();
-            int preferred=window.calculateScale(savedScale,unicode);
-            int selected=readableGuiScale(preferred,window.getWidth(),window.getHeight(),unicode);
-            if(minecraft.options.guiScale().get()!=selected)
-            {
-                scaling=true;
-                try{minecraft.options.guiScale().set(selected);minecraft.resizeDisplay();}
-                finally{scaling=false;}
-                return;
-            }
-        }
+        var window=minecraft.getWindow();
+        int fitScale=readableGuiScale(ScreenGuiScale.normal(minecraft),window.getWidth(),window.getHeight(),minecraft.isEnforceUnicode());
+        // resize() comes back here with the new scale already set, and builds the widgets.
+        if(ScreenGuiScale.set(minecraft,fitScale)){resize(minecraft,window.getGuiScaledWidth(),window.getGuiScaledHeight());return;}
         String draft=input==null?"":input.getValue();controlRows.clear();pageDenials.clear();buildingControls=false;
         panelWidth = Math.min(640, width - 16); panelHeight = Math.min(444, height - 16);
         x = (width - panelWidth) / 2; y = (height - panelHeight) / 2;
@@ -483,12 +472,7 @@ public final class StaffConversationScreen extends Screen
     @Override public void onClose() { send("CLOSE"); super.onClose(); }
     @Override public void removed()
     {
-        if (savedScale >= 0 && !restoring && minecraft.options.guiScale().get()!=savedScale)
-        {
-            restoring = true;
-            try{minecraft.options.guiScale().set(savedScale);minecraft.resizeDisplay();}
-            finally{restoring=false;}
-        }
+        ScreenGuiScale.set(minecraft,ScreenGuiScale.normal(minecraft));
         super.removed();
     }
     @Override public boolean isPauseScreen() { return false; }
