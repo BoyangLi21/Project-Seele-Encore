@@ -9,8 +9,8 @@
 | R60 | 2026-11-08 | 朋友小测试包，地图未完工 | 904 MB | 1,891 MB | `delivery/R60_20261108_receipt.json`，[说明](R60_RELEASE.zh.md)，[快速开始](R60_QUICKSTART.zh.md) |
 | R60 Hotfix1 | 2026-11-09 | 只换模组和光影，不含世界 | 414 MB（客户端和服务端共用 jar） | 同左 | `delivery/R60_Hotfix1_20261109_receipt.json`，安装步骤在 zip 内的“更新说明.txt” |
 | R61 | 2026-11-10 | 世界第 334 批，等待人工验收 | 955 MB | 2,010 MB | `delivery/R61_20261110_receipt.json`，[说明](R61_RELEASE.zh.md)，[快速开始](R61_QUICKSTART.zh.md) |
-| R62 | 2026-11-10 | 世界第 378 批，含 GeoFront 改造和 UN 基地迁移，等待人工验收 | 952 MB | 2,007 MB | `delivery/R62_20261110_receipt.json`，[说明](R62_RELEASE.zh.md)，[快速开始](R62_QUICKSTART.zh.md) |
-| R63 | — | 准备中：打包工具、说明草稿和重烘清单已就绪，等最后一批世界写入和外圈远景 | — | — | [清单](R63_REBAKE_CHECKLIST.zh.md)，[说明草稿](R63_RELEASE.zh.md)，[快速开始](R63_QUICKSTART.zh.md) |
+| R62 | 2026-11-10 | 世界第 378 批，含 GeoFront 改造和 UN 基地迁移，等待人工验收，上一版 | 952 MB | 2,007 MB | `delivery/R62_20261110_receipt.json`，[说明](R62_RELEASE.zh.md)，[快速开始](R62_QUICKSTART.zh.md) |
+| R63 | 2026-11-13 | 世界第 455 批，代码 main 60b20f5e；外圈新边界和远景，核心区 419 段远景沿用 R62；等待人工验收 | 1,515 MB | 2,578 MB | `delivery/R63_20261113_receipt.json`，[说明](R63_RELEASE.zh.md)，[快速开始](R63_QUICKSTART.zh.md)，[重烘清单](R63_REBAKE_CHECKLIST.zh.md) |
 
 版本号从 R55 直接到 R60。R56–R59 是开发轮次，没有发布过。
 
