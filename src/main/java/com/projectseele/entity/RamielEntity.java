@@ -108,6 +108,20 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
      * white for this long.
      */
     public static final float RECOIL_R63=1.6F,TILT_R63=7F,SWING_R63=11F,DECAY_R63=7F,FLASH_R63=3F;
+    /**
+     * R63: the crystal's answer to a Unit that keeps striking its field. BURST_BLOWS blows inside BURST_WINDOW ticks
+     * and the field throws the Unit off: it staggers back as from a blow of BURST_FORCE (no damage is done), and
+     * the field does not do it again for BURST_REST ticks.
+     */
+    public static final int BURST_BLOWS_R63=3,BURST_WINDOW_R63=60,BURST_REST_R63=100;
+    public static final float BURST_FORCE_R63=14F;
+    private int fieldBlowsR63;
+    /**
+     * Long ago, and still a time the game's clock can be taken from: from Long.MIN_VALUE the difference wrapped
+     * round to a negative number, the rest after a burst never ended and no first burst ever came.
+     */
+    private static final long NEVER_R63=Long.MIN_VALUE/2;
+    private long fieldBlowAtR63=NEVER_R63,burstAtR63=NEVER_R63;
     private int struckSeenR63;
     private float struckAgeR63=1000,struckAgeOR63=1000;
     private Vector3f struckR63=new Vector3f();
@@ -340,6 +354,38 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     public boolean fieldSealedR63()
     {
         return !this.isExposed() && this.hasAtField();
+    }
+
+    /** -Dprojectseele.poseDiag=true: every blow on the field and every burst goes to the log. */
+    private static final boolean TOLD_R63 = Boolean.getBoolean("projectseele.poseDiag");
+    /** Server: a Unit's blow has landed on the standing field. A run of them throws the Unit off. */
+    private void fieldBlowR63(EvaUnit01Entity striker)
+    {
+        long now = this.level().getGameTime();
+        this.fieldBlowsR63 = now - this.fieldBlowAtR63 > BURST_WINDOW_R63 ? 1 : this.fieldBlowsR63 + 1;
+        this.fieldBlowAtR63 = now;
+        if (TOLD_R63) com.projectseele.ProjectSeele.LOGGER.info("R63RAMIELBLOW at {} blows {} since the last burst {}", now, this.fieldBlowsR63, now - this.burstAtR63);
+        if (this.fieldBlowsR63 < BURST_BLOWS_R63 || now - this.burstAtR63 < BURST_REST_R63) return;
+        this.fieldBlowsR63 = 0;
+        this.burstAtR63 = now;
+        Vec3 away = striker.position().subtract(this.position()).multiply(1, 0, 1);
+        away = away.lengthSqr() < 1.0E-4D ? new Vec3(1, 0, 0) : away.normalize();
+        // The beat alone: the Unit is driven back and loses its footing for a moment, its hull is not touched.
+        CombatFeelR31.acceptedHit(striker, this, BURST_FORCE_R63, away, false);
+        // A stagger taken in the middle of a punch is read down to a flinch, and the burst that answers a run of
+        // punches finds the Unit in one: it is sent again as what it is. A berserk Unit in its strike is left with
+        // the flinch: nothing staggers it there.
+        var given = CombatFeelR31.beat(striker);
+        boolean raised = given != null && given.kind() == CombatFeelR31.FLINCH && !EvaBerserkMotionR34.striking(striker);
+        if (raised) CombatFeelR31.send(striker, CombatFeelR31.STAGGER, away, given.strength(), 16, 1);
+        this.spawnAtFieldRipple(this.beamOrigin().add(away.scale(SHELL_SURFACE_RADIUS * this.modelScaleR52())), away);
+        this.playSound(ModSounds.CRYSTAL_HIT.get(), 3.0F, 0.4F);
+        if (TOLD_R63)
+        {
+            var beat = CombatFeelR31.beat(striker);
+            com.projectseele.ProjectSeele.LOGGER.info("R63RAMIELBLOW burst: the Unit's beat is now {}, raised from a flinch {} (attack stage {} phase {})", beat == null ? "none" : beat.kind(),
+                    raised, striker.getOrdinaryAttackStage(), striker.getOrdinaryAttackProgress(0));
+        }
     }
 
     /** Server: the crystal answers a blow that came from there. */
@@ -581,6 +627,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                         this.playSound(ModSounds.CRYSTAL_BREAK.get(), 3.0F, 0.65F);
                         this.struckR63(source.getSourcePosition(), STRUCK_BREAK_R63);
                     }
+                    else if (source.getDirectEntity() instanceof EvaUnit01Entity striker) this.fieldBlowR63(striker);
                 }
             }
             return false;
