@@ -1,6 +1,6 @@
 # R63 重烘和打包清单
 
-R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做，正式世界不打开、不写入。工具是 `tools/rebake_r63.py`（重烘）和 `tools/package_r60.py`（打包，版本已改成 R63）。下面的命令都在仓库根目录跑。电话工具开着时，Python 的可执行文件名不能以 `python` 开头，用 `F:/eva/.claude/fable-review/pyfr/Scripts/frpy.exe`，下文写作 `frpy`。
+R63 的远景（Distant Horizons）和小地图（Xaero）都在副本上重做，正式世界不打开、不写入。工具是 `tools/rebake_r63.py`（重烘）和 `tools/package_r60.py`（打包，版本已改成 R63）。下面的命令都在仓库根目录跑。电话工具开着时，Python 的可执行文件名不能以 `python` 开头，用本机改过名的解释器，下文写作 `frpy`。
 
 ## 为什么要重做
 
@@ -91,7 +91,7 @@ map-edges 10:47 烘完外圈：库 908,496,896 字节，WAL 已合并，39,160 �
 - [ ] 地图会话说最后一批写完了。批次以 `docs/HAKONE_EXECUTION_ORDER_20261105.zh.md` 的批次表为准，`mirror --batch N` 会核对。之后任何一次写入都要从“镜像”重来；`core` 发现正式世界的区域文件在镜像之后变过会拒绝。
 - [ ] map-edges 的外圈烘焙停了（`loop.sh` 那个文件夹里放 `STOP`，或者等它自己结束），它的客户端已经退出。没烘完也可以打，覆盖率会写进说明（见“卡点”）。
 - [ ] 要进 R63 的分支都合进 main 并装进主客户端（`client/mods/projectseele-0.1.0-all.jar`）。拿 main 编一个 jar 给 `--compare-build` 比对：`slot.py status` 没有别人的 exclusive 时，在这个工作树里 `./gradlew build`。
-- [ ] `frpy F:/eva/.claude/client-slots/slot.py status`：没有别人的 exclusive。
+- [ ] `frpy slot.py status`（本机的客户端槽位工具）：没有别人的 exclusive。
 - [ ] F 盘至少 10 GB 空闲，E 盘至少 15 GB 空闲。
 
 ## 步骤
@@ -164,6 +164,6 @@ SQLite 就算用 `mode=ro` 只读打开 WAL 模式的库，也会在旁边建 `-
 
 ## 相关文件
 
-- 外圈烘焙进度：共享笔记 `map-edges-dh-outer-bake-handover-20261111.md`，工具在 `F:/eva/.claude/map-edges-work/f12bake/`。
-- R62 的远景和小地图流程：`F:/eva/.claude/worktrees/map-bdb53d/.claude/dhjob/driver4.sh`，以及 `F:/eva/.claude/motion-work/agent-render/HANDOFF_20261109.md`（小地图只认区域 zip、服务端远景要调早、客户端 4 线程）。
+- 外圈烘焙进度：map-edges 会话的交接笔记和它的 `f12bake` 工具（本机，不在仓库里）。
+- R62 的远景和小地图流程：地图会话的 `driver4.sh` 和 2026-11-09 的缓存排查交接（本机，不在仓库里）。要点：小地图只认区域 zip，服务端远景要调早，客户端开 4 线程。
 - 每一步的结果：`E:/eva-r63-rebake/logs/<步骤>.json`。
