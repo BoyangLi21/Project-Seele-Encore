@@ -35,6 +35,7 @@ public abstract class CameraMixin
     @org.spongepowered.asm.mixin.Unique private long projectseele$carrierFrame;
     @org.spongepowered.asm.mixin.Unique private boolean projectseele$loosePlugCamera;
     @org.spongepowered.asm.mixin.Unique private Vec3 projectseele$plugOrbitOffset=Vec3.ZERO;
+    @org.spongepowered.asm.mixin.Unique private int projectseele$diagTickR64=-1;
 
     @org.spongepowered.asm.mixin.Unique
     private static boolean projectseele$outsideCapsule(EntryPlugCarrierEntity plug,float partial,Vec3 point)
@@ -176,6 +177,16 @@ public abstract class CameraMixin
             Camera camera=(Camera)(Object)this;
             Vec3 position=pivot.add(Vec3.directionFromRotation(camera.getXRot(),camera.getYRot()).scale(-projectseele$carrierZoom));
             this.setPosition(position.x, position.y, position.z);
+            if(com.projectseele.client.EvaStepSmoothingR57.CAMERA_DIAG_R64&&controlled.tickCount!=projectseele$diagTickR64)
+            {
+                // Review only: where the camera is against its unit and the ground, once a tick.
+                projectseele$diagTickR64=controlled.tickCount;
+                com.projectseele.ProjectSeele.LOGGER.info("R64CAM tick {} zoom {} free {} step {} pivot clear {} camera clear {} pivot y {} entity y {}",controlled.tickCount,
+                        String.format(java.util.Locale.ROOT,"%.1f",projectseele$carrierZoom),String.format(java.util.Locale.ROOT,"%.1f",available),
+                        String.format(java.util.Locale.ROOT,"%.2f",com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick)),
+                        projectseele$cameraPointClear(controlled.level(),subject,pivot),projectseele$cameraPointClear(controlled.level(),subject,position),
+                        String.format(java.util.Locale.ROOT,"%.1f",pivot.y),String.format(java.util.Locale.ROOT,"%.1f",controlled.getPosition(partialTick).y));
+            }
             return;
         }
         projectseele$carrierCameraId=-1;projectseele$loosePlugCamera=false;projectseele$plugOrbitOffset=Vec3.ZERO;
