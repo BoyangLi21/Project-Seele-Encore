@@ -1028,7 +1028,10 @@ public final class EvaConnectedActionReview
         camera.xOld = camera.getX(); camera.yOld = camera.getY(); camera.zOld = camera.getZ();
         camera.yRotO = camera.getYRot(); camera.xRotO = camera.getXRot();
         mc.options.hideGui = true;
-        mc.options.setCameraType(CameraType.FIRST_PERSON);
+        // -Dprojectseele.reviewThirdPersonR63=true: the review camera counts as a third-person view. The first
+        // battle cuts into and out of a first-person view and glides into and out of any other: with the
+        // review camera always first-person, a capture never showed the glide.
+        mc.options.setCameraType(Boolean.getBoolean("projectseele.reviewThirdPersonR63") ? CameraType.THIRD_PERSON_BACK : CameraType.FIRST_PERSON);
         mc.setCameraEntity(camera);
     }
 
