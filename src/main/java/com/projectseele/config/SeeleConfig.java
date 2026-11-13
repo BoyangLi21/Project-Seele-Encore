@@ -46,6 +46,12 @@ public final class SeeleConfig
 
     // ----- common: EVA Unit-01 -----
     public static final ForgeConfigSpec.DoubleValue EVA_MAX_HEALTH;
+    // ----- common: EVA gait (R64) -----
+    public static final ForgeConfigSpec.DoubleValue EVA_WALK_SPEED_SCALE;
+    public static final ForgeConfigSpec.DoubleValue EVA_WALK_CADENCE_SCALE;
+    public static final ForgeConfigSpec.DoubleValue EVA_RUN_SPEED_SCALE;
+    public static final ForgeConfigSpec.DoubleValue EVA_RUN_CADENCE_SCALE;
+    public static final ForgeConfigSpec.DoubleValue EVA_SPRINT_CADENCE_SCALE;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_RANGE;
     public static final ForgeConfigSpec.IntValue EVA_RIFLE_INTERVAL_TICKS;
@@ -214,6 +220,31 @@ public final class SeeleConfig
         EVA_MAX_HEALTH = common
                 .comment("EVA Unit-01 max health. Tuned to survive two nuke beams and die to the third.")
                 .defineInRange("maxHealth", 300.0D, 1.0D, 10000.0D);
+        common.pop();
+
+        common.push("eva_gait");
+        EVA_WALK_SPEED_SCALE = common
+                .comment("Walking speed of a piloted EVA, times the built-in one (Unit-00 19.4, Unit-01 22.6, Unit-02 25.7 blocks a second).",
+                        "A foot on the ground slides backward unless speed and cadence fit the stride of the gait.",
+                        "What is left of the slide, as a share of what the body covers: about 2.4 * walkCadenceScale / walkSpeedScale - 1",
+                        "(1.4 with both at 1; 0 when the speed scale is 2.4 times the cadence scale).",
+                        "A first pair to try: walkSpeedScale 1.4 with walkCadenceScale 0.75 (about 0.3 left).")
+                .defineInRange("walkSpeedScale", 1.0D, 0.25D, 4.0D);
+        EVA_WALK_CADENCE_SCALE = common
+                .comment("Steps a second at a walk, times the built-in cadence (Unit-01: 1.9 steps a second).")
+                .defineInRange("walkCadenceScale", 1.0D, 0.2D, 2.0D);
+        EVA_RUN_SPEED_SCALE = common
+                .comment("Running speed, times the built-in one (Unit-00 34.6, Unit-01 41.9, Unit-02 47.8 blocks a second). The fast run is a multiple of it.",
+                        "What is left of the slide: about 2.7 * runCadenceScale / runSpeedScale - 1 (1.7 with both at 1).",
+                        "A first pair to try: runSpeedScale 1.4 with runCadenceScale 0.75 (about 0.45 left).")
+                .defineInRange("runSpeedScale", 1.0D, 0.25D, 4.0D);
+        EVA_RUN_CADENCE_SCALE = common
+                .comment("Steps a second at a run, times the built-in cadence (Unit-01: 2.8 steps a second).")
+                .defineInRange("runCadenceScale", 1.0D, 0.2D, 2.0D);
+        EVA_SPRINT_CADENCE_SCALE = common
+                .comment("Steps a second at the fast run (dash held), times the cadence it had through R63 (Unit-01: 5.6 steps a second at full speed).",
+                        "Its speed does not change with this. 0.7 since R64, where a foot on the ground stands about still; 1 is the old cadence.")
+                .defineInRange("sprintCadenceScale", 0.7D, 0.2D, 1.5D);
         common.pop();
 
         common.push("eva_pallet_smg");

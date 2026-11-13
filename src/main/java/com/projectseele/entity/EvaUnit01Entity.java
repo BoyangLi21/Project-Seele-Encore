@@ -342,6 +342,45 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     // speed without changing the human joint curves or their phase.
     private static final double WALK_CADENCE_GAIN = 1.75D;
     private static final double RUN_CADENCE_GAIN = 3.50D;
+    /**
+     * R64 (C12): the owner's gait keys. A standing foot slides because the body covers 25 blocks to a gait cycle of
+     * the walk and 31 of the run while the legs stride 60 and 84. The keys scale speed and cadence (steps a second)
+     * each on its own; what a cycle covers follows from both: the built-in distance times speed scale over cadence
+     * scale. All at 1, nothing changes.
+     */
+    /**
+     * Review only: -Dprojectseele.gait.<key>=<value> stands in for a key of [eva_gait] (walkSpeedScale and the
+     * others), so a capture can try a set of values without the client's config file being rewritten.
+     */
+    private static final java.util.Map<String,Double> GAIT_REVIEW_R64=new java.util.HashMap<>();
+    static
+    {
+        for(String name:new String[]{"walkSpeedScale","walkCadenceScale","runSpeedScale","runCadenceScale","sprintCadenceScale"})
+        {
+            String value=System.getProperty("projectseele.gait."+name);
+            if(value!=null)try{GAIT_REVIEW_R64.put(name,Double.parseDouble(value));}catch(NumberFormatException ignored){}
+        }
+    }
+    /** A key of the common config, or its default where no config is loaded (the checks run without one). */
+    private static double gaitKeyR64(net.minecraftforge.common.ForgeConfigSpec.DoubleValue key)
+    {
+        if(!GAIT_REVIEW_R64.isEmpty())
+        {
+            var path=key.getPath();Double value=GAIT_REVIEW_R64.get(path.get(path.size()-1));
+            if(value!=null)return value;
+        }
+        return SeeleConfig.COMMON_SPEC.isLoaded()?key.get():key.getDefault();
+    }
+    private static double gaitDistanceScaleR64(float run)
+    {
+        return Mth.lerp(run,gaitKeyR64(SeeleConfig.EVA_WALK_SPEED_SCALE)/gaitKeyR64(SeeleConfig.EVA_WALK_CADENCE_SCALE),
+                gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE)/gaitKeyR64(SeeleConfig.EVA_RUN_CADENCE_SCALE));
+    }
+    /** The fast run covers this to a cycle: its speed is a multiple of the run's, its cadence has a key of its own. */
+    private static double sprintStrideR64()
+    {
+        return EvaSprintR50.STRIDE_BLOCKS*gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE)/gaitKeyR64(SeeleConfig.EVA_SPRINT_CADENCE_SCALE);
+    }
     private static final double CROUCH_CYCLE_SECONDS = 1.0D;
     private static final double CRAWL_CYCLE_SECONDS = 1.4D;
 
@@ -1507,7 +1546,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {
                 // Distance-driven phase over the pack's measured stride keeps
                 // planted feet fixed to the ground at every speed.
-                double stride=com.projectseele.anim.EvaAnimator.strideWorld(this,run,EvaSprintR50.blend(this,1));
+                double stride=com.projectseele.anim.EvaAnimator.strideWorld(this,run,EvaSprintR50.blend(this,1))*gaitDistanceScaleR64(run);
                 double sign=EvaStrideHeadingR59.backward(this,dx,dz)?-1:1;
                 float phase=this.entityData.get(DATA_RIFLE_GAIT)+(float)(sign*distance/stride);phase-=Mth.floor(phase);this.entityData.set(DATA_RIFLE_GAIT,phase);
             }
@@ -1515,16 +1554,18 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             {
                 if(capturedCycle>0)
                 {
-                    float phase=this.entityData.get(DATA_RIFLE_GAIT)+(float)(1D/(20D*capturedCycle));
+                    // A cycle timed by the capture: the cadence keys shorten or lengthen its time.
+                    float phase=this.entityData.get(DATA_RIFLE_GAIT)+(float)(Mth.lerp(run,gaitKeyR64(SeeleConfig.EVA_WALK_CADENCE_SCALE),gaitKeyR64(SeeleConfig.EVA_RUN_CADENCE_SCALE))/(20D*capturedCycle));
                     phase-=Mth.floor(phase);this.entityData.set(DATA_RIFLE_GAIT,phase);
                 }
                 else
                 {
                 double standingStride=Mth.lerp(run,
                         EvaBodyPose.locomotionRuntimeStrideR44(this,"walk",EvaBodyPose.locomotionStrideR43(this,"walk",25.8334D*WALK_CADENCE_GAIN)/WALK_CADENCE_GAIN),
-                        EvaBodyPose.locomotionRuntimeStrideR44(this,"run",EvaBodyPose.locomotionStrideR43(this,"run",31.3944D*RUN_CADENCE_GAIN)/RUN_CADENCE_GAIN));
+                        EvaBodyPose.locomotionRuntimeStrideR44(this,"run",EvaBodyPose.locomotionStrideR43(this,"run",31.3944D*RUN_CADENCE_GAIN)/RUN_CADENCE_GAIN))
+                        *gaitDistanceScaleR64(run);
                 standingStride=Mth.lerp(EvaSprintR50.blend(this,1),standingStride,
-                        EvaBodyPose.rigKey(this)<=2?EvaSprintR50.STRIDE_BLOCKS:EvaBodyPose.locomotionRuntimeStrideR44(this,"dash_run",standingStride));
+                        EvaBodyPose.rigKey(this)<=2?sprintStrideR64():EvaBodyPose.locomotionRuntimeStrideR44(this,"dash_run",standingStride));
                 double stride=stance<=1?Mth.lerp(stance,standingStride,15D):Mth.lerp((stance-1)/2,15D,12D);
                 stride=EvaCombatSupportR33.stride(this,dx,dz,(float)stride);
                 double sign=EvaCombatSupportR33.gaitWeight(this,1)>.5F?1:EvaStrideHeadingR59.backward(this,dx,dz)?-1:1;
@@ -7780,6 +7821,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             case UNIT_02 -> this.isPilotSprinting() ? 0.90F : 0.48F;
             default -> this.isPilotSprinting() ? SPRINT_SPEED : WALK_SPEED;
         };
+        // R64 (C12): the owner's speed keys, 1 by default.
+        variantSpeed*=(float)(this.isPilotSprinting()?gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE):gaitKeyR64(SeeleConfig.EVA_WALK_SPEED_SCALE));
         float stance=this.rifleStanceInitialized?this.entityData.get(DATA_RIFLE_STANCE):this.isPilotProne()?3:this.isPilotCrouching()?1:0;
         float speed=stance<=1?Mth.lerp(stance,variantSpeed,CROUCH_SPEED):Mth.lerp(Mth.clamp((stance-1)/2,0,1),CROUCH_SPEED,PRONE_SPEED);
         return speed * synchronizationSpeed * EvaSprintR50.speed(this);

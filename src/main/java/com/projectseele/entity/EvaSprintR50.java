@@ -46,6 +46,9 @@ public final class EvaSprintR50
      * Travel per gait cycle at full sprint (blocks). This keeps the captured
      * sprint at about its own cadence; its full stride is far longer, and the
      * feet slide rather than the stride being warped.
+     * R64: what the cycle covers in the game is this over the config's sprintCadenceScale (0.7: 91 blocks, about
+     * four steps a second where there were five and a half). At 1 a foot on the ground went backward at 56 to
+     * 62 % of the body's speed; at 0.7 it stands within 3 %; at 0.5 the body carried it forward at 40 %.
      */
     static final double STRIDE_BLOCKS=64D;
     public static float speed(EvaUnit01Entity e){return 1+(GAIN-1)*blend(e,1);}
