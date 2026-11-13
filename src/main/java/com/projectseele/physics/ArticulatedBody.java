@@ -207,18 +207,59 @@ public final class ArticulatedBody implements AutoCloseable
     }
     public void velocity(org.joml.Vector3f velocity)
     {for(var body:bodies.values())body.setLinearVelocity(new Vector3f(velocity.x,velocity.y,velocity.z));}
-    public void motionFromPose(Map<String,org.joml.Matrix4f> previous,float seconds)
+    /** As far as this beyond its actor's own going, a pose is believed to have carried the body (units a second). */
+    public static final float POSE_CARRY_R64=1.5F;
+    /** From here on the difference between two poses is a cut from one move to the next, and no speed at all. */
+    public static final float POSE_CUT_R64=3F;
+    /**
+     * Starts every part at the speed its pose changed by since {@code previous}, {@code seconds} ago.
+     * {@code actor}, where given: how fast the actor itself went meanwhile (units a second, this body's frame).
+     * What the mass centre did beyond that is the pose's doing, and a pose carries a body only so fast: a move
+     * begun the tick before starts from a frame of its clip that stands elsewhere than the frame it follows (a
+     * side kick's first frame is five blocks aside of standing), and read as speed that threw a Unit 135 blocks.
+     * Up to POSE_CARRY_R64 the pose is believed; from there to POSE_CUT_R64 less and less of what it adds to the
+     * actor's going is kept, turning included, and past that none.
+     * Returns the mass centre's speed beyond the actor's and the share kept, or null where no actor was given.
+     */
+    public float[] motionFromPose(Map<String,org.joml.Matrix4f> previous,float seconds,org.joml.Vector3f actor)
     {
-        if(seconds<=0)return;
+        if(seconds<=0)return null;
+        Map<String,Vector3f> linear=new LinkedHashMap<>(),turning=new HashMap<>();float mass=0;Vector3f centre=new Vector3f();
         for(var entry:bodies.entrySet())
         {
             var before=previous.get(entry.getKey());if(before==null)continue;
             Transform old=transform(before);old.mul(binds.get(entry.getKey()));Transform now=entry.getValue().getCenterOfMassTransform(new Transform());
-            Vector3f speed=new Vector3f(now.origin);speed.sub(old.origin);speed.scale(1/seconds);if(speed.length()>5)speed.scale(5/speed.length());entry.getValue().setLinearVelocity(speed);
+            Vector3f speed=new Vector3f(now.origin);speed.sub(old.origin);speed.scale(1/seconds);linear.put(entry.getKey(),speed);
             Quat4f a=old.getRotation(new Quat4f()),b=now.getRotation(new Quat4f());a.conjugate();b.mul(a);if(b.w<0)b.scale(-1);
             float sin=(float)Math.sqrt(b.x*b.x+b.y*b.y+b.z*b.z),angle=2*(float)Math.atan2(sin,b.w);Vector3f angular=new Vector3f(b.x,b.y,b.z);
-            if(sin>.00001F)angular.scale(Math.min(9,angle/seconds)/sin);else angular.set(0,0,0);entry.getValue().setAngularVelocity(angular);
+            if(sin>.00001F)angular.scale(Math.min(9,angle/seconds)/sin);else angular.set(0,0,0);turning.put(entry.getKey(),angular);
+            if(entry.getValue().getInvMass()>0){float m=1/entry.getValue().getInvMass();mass+=m;centre.scaleAdd(m,speed,centre);}
         }
+        float beyond=0,kept=1;Vector3f went=actor==null?null:new Vector3f(actor.x,actor.y,actor.z);
+        if(went!=null&&mass>0)
+        {
+            centre.scale(1/mass);centre.sub(went);beyond=centre.length();
+            kept=beyond<=POSE_CARRY_R64?1:Math.max(0,(POSE_CUT_R64-beyond)/(POSE_CUT_R64-POSE_CARRY_R64));
+        }
+        for(var entry:linear.entrySet())
+        {
+            Vector3f speed=entry.getValue(),angular=turning.get(entry.getKey());
+            if(kept<1){speed.sub(went);speed.scale(kept);speed.add(went);angular.scale(kept);}
+            if(speed.length()>5)speed.scale(5/speed.length());
+            var body=bodies.get(entry.getKey());body.setLinearVelocity(speed);body.setAngularVelocity(angular);
+        }
+        return went==null?null:new float[]{beyond,kept};
+    }
+    /** The mass centre's velocity (units a second). */
+    public org.joml.Vector3f massCentreVelocity()
+    {
+        float mass=0;Vector3f sum=new Vector3f();
+        for(var body:bodies.values())
+        {
+            if(body.getInvMass()<=0)continue;
+            float m=1/body.getInvMass();mass+=m;sum.scaleAdd(m,body.getLinearVelocity(new Vector3f()),sum);
+        }
+        return mass<=0?new org.joml.Vector3f():new org.joml.Vector3f(sum.x/mass,sum.y/mass,sum.z/mass);
     }
     public void step(float seconds)
     {

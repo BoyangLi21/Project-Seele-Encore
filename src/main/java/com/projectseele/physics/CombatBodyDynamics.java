@@ -137,7 +137,11 @@ public final class CombatBodyDynamics
         {
             var transform=new Matrix4f().translation(local(s,history.position)).rotateY((s.yaw-history.yaw)*Mth.DEG_TO_RAD);
             Map<String,Matrix4f> previousFrames=new HashMap<>();history.matrices.forEach((n,m)->previousFrames.put(n,new Matrix4f(transform).mul(m)));
-            s.simulation.motionFromPose(previousFrames,since/20F);
+            // The actor's own going since that pose, in the body's frame: what a pose adds to it is believed only so far.
+            Vector3f went=POSE_CUT_R64?local(s,history.position).negate().div(since/20F):null;
+            float[] carried=s.simulation.motionFromPose(previousFrames,since/20F,went);
+            if(DIAG_R63&&carried!=null)ProjectSeele.LOGGER.info("R63BODY start from the pose of {} ticks before: the actor went {} units a second, the pose carried the mass centre {} beyond that, {} of it kept",
+                    since,String.format(java.util.Locale.ROOT,"%.2f",went.length()),String.format(java.util.Locale.ROOT,"%.2f",carried[0]),String.format(java.util.Locale.ROOT,"%.2f",carried[1]));
         }
         if(FUSE_R63)s.simulation.fuseR63(FUSE_SIDE_R63,FUSE_UP_R63);
         if(strength>=0)impulse(s,point,direction,strength);SERVER.put(entity,s);
@@ -146,6 +150,8 @@ public final class CombatBodyDynamics
         send(entity,s,1);ProjectSeele.LOGGER.info("Articulated impact started actor={} rig={} point={}",entity.getUUID(),s.profile.key(),point);return true;
     }
     private static final boolean FUSE_R63=!"false".equals(System.getProperty("projectseele.bodyFuseR63"));
+    /** -Dprojectseele.bodyPoseCutR64=false: every part starts at the speed its pose changed by, a cut between moves included. */
+    private static final boolean POSE_CUT_R64=!"false".equals(System.getProperty("projectseele.bodyPoseCutR64"));
     private static final float FUSE_SIDE_R63=Float.parseFloat(System.getProperty("projectseele.bodyFuseSideR63","6")),FUSE_UP_R63=Float.parseFloat(System.getProperty("projectseele.bodyFuseUpR63","4"));
     /** Review: every blow's impulse times this, and pointed up as Sachiel's overhead points it, to blow the fuse on purpose. */
     private static final float BLOW_SCALE_R63=Float.parseFloat(System.getProperty("projectseele.bodyBlowScaleR63","1"));
