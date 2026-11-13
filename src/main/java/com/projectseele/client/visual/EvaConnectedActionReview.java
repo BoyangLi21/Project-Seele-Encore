@@ -218,7 +218,7 @@ public final class EvaConnectedActionReview
             // A tour that built terrain clears it two ticks before its end; the
             // server needs time to run those commands before the client stops,
             // or half a hill stays in the save and blocks every later tour.
-            if (tick >= TOUR_END + (HILL || STEPS || CLIMB ? TERRAIN_GRACE : 0)) finish(mc, "complete");
+            if (tick >= TOUR_END + (HILL || STEEP_R64 || STEPS || CLIMB ? TERRAIN_GRACE : 0)) finish(mc, "complete");
             return;
         }
         if (RIFLE)
@@ -597,6 +597,7 @@ public final class EvaConnectedActionReview
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
         if(GAIT){gaitR64(mc);positionCamera(mc,eva);return;}
         if(HILL){hillR60(mc,lane(eva));positionCamera(mc,eva);return;}
+        if(STEEP_R64){steepR64(mc,eva,lane(eva));positionCamera(mc,eva);return;}
         if(STRIKE){strikeR60(mc,eva);positionCamera(mc,eva);return;}
         if(ATF){atFieldR63(mc,eva);positionCamera(mc,eva);return;}
         if(ARMS!=null){armsR63(mc);positionCamera(mc,eva);return;}
@@ -741,6 +742,64 @@ public final class EvaConnectedActionReview
         boolean up=t>=60&&t<120||t>=170&&t<300||t>=350&&t<410;
         mc.options.keyUp.setDown(up);mc.player.input.up=up;mc.player.input.forwardImpulse=up?1:0;mc.player.zza=up?1:0;mc.player.xxa=0;
         mc.player.setYRot(t<340?0:t<350?(t-340)*9:90);mc.player.setXRot(0);
+    }
+
+    /**
+     * -Dprojectseele.tourSteepR64=true: a terraced slope of one block up per block, 130 blocks high, as the
+     * pyramid's flank is; the hill tour's slope is gentle (26 blocks in 150). The unit goes straight up it from
+     * 44 blocks of flat ground (-Dprojectseele.tourSteepGaitR64=walk, run or fast; run by default) and stops on the
+     * flat top; 40 ticks later it is set 100 blocks above the middle of the slope and falls onto it. Run with
+     * tourEnd=340 for a run (460 for a walk). The log carries R64STEEP lines: when it reached the top, when it
+     * was dropped.
+     */
+    private static final boolean STEEP_R64=Boolean.getBoolean("projectseele.tourSteepR64");
+    private static final String STEEP_GAIT_R64=System.getProperty("projectseele.tourSteepGaitR64","run");
+    private static final int STEEP_FOOT_R64=-60,STEEP_RISE_R64=130,STEEP_TOP_R64=40;
+    private static int steepTopTickR64=-1;
+    private static void steepR64(Minecraft mc,EvaUnit01Entity eva,int x)
+    {
+        int t=tick;
+        if(at(1)){steepClearR64(mc,x);steepBlocksR64(mc,x);}
+        if(at(TOUR_END-2))steepClearR64(mc,x);
+        boolean fast=STEEP_GAIT_R64.equals("fast"),run=fast||STEEP_GAIT_R64.equals("run");
+        if(steepTopTickR64<0&&t>=40&&eva.getZ()>STEEP_FOOT_R64+STEEP_RISE_R64+STEEP_TOP_R64*.6)
+        {
+            steepTopTickR64=t;
+            ProjectSeele.LOGGER.info("R64STEEP tick {}: on the top at y {}",t,String.format(java.util.Locale.ROOT,"%.1f",eva.getY()));
+        }
+        boolean up=t>=40&&steepTopTickR64<0;
+        mc.options.keyUp.setDown(up);mc.player.input.up=up;mc.player.input.forwardImpulse=up?1:0;mc.player.zza=up?1:0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        mc.options.keySprint.setDown(up&&run);
+        com.projectseele.client.Keybinds.EVA_DASH.setDown(up&&fast&&t>=44);
+        if(run&&at(40))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(run&&steepTopTickR64==t)send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(steepTopTickR64>=0&&t==steepTopTickR64+40)
+        {
+            // Onto the middle of the slope from 100 blocks above it: a landing on the terraces.
+            int z=STEEP_FOOT_R64+STEEP_RISE_R64/2,y=-60+STEEP_RISE_R64/2+100;
+            mc.player.connection.sendCommand("tp "+eva.getStringUUID()+" "+x+" "+y+" "+z);
+            // The pilot's client moves a ridden unit: left where it stood here, it sent the unit back there.
+            eva.setPos(x+.5,y,z+.5);eva.xo=eva.xOld=eva.getX();eva.yo=eva.yOld=eva.getY();eva.zo=eva.zOld=eva.getZ();eva.setDeltaMovement(Vec3.ZERO);
+            ProjectSeele.LOGGER.info("R64STEEP tick {}: dropped from y {} over the slope at z {}",t,y,z);
+        }
+    }
+
+    /** The slope's own box only. */
+    private static void steepClearR64(Minecraft mc,int x)
+    {
+        for(int z=STEEP_FOOT_R64;z<=STEEP_FOOT_R64+STEEP_RISE_R64+STEEP_TOP_R64;z++)
+            mc.player.connection.sendCommand("fill "+(x-45)+" -60 "+z+" "+(x+46)+" "+(-60+STEEP_RISE_R64+2)+" "+z+" minecraft:air");
+    }
+
+    /** One block up per block along the way, 92 wide, with a flat top. */
+    private static void steepBlocksR64(Minecraft mc,int x)
+    {
+        for(int i=1;i<=STEEP_RISE_R64+STEEP_TOP_R64;i++)
+        {
+            int z=STEEP_FOOT_R64+i-1,height=Math.min(i,STEEP_RISE_R64);
+            mc.player.connection.sendCommand("fill "+(x-45)+" -60 "+z+" "+(x+46)+" "+(-61+height)+" "+z+" minecraft:grass_block");
+        }
     }
 
     /** The hill's own box only: nothing else on the review ground stands in it. */
@@ -1023,8 +1082,21 @@ public final class EvaConnectedActionReview
         SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(action));
     }
 
+    /**
+     * -Dprojectseele.reviewPilotViewR63=true: the view stays with the pilot. What only the pilot's view shows (here:
+     * where the third-person camera goes on a climb) never happens under the review's camera, an entity of its own.
+     */
+    private static final boolean PILOT_VIEW_R63=Boolean.getBoolean("projectseele.reviewPilotViewR63");
     private static void positionCamera(Minecraft mc, EvaUnit01Entity eva)
     {
+        if (PILOT_VIEW_R63)
+        {
+            if (mc.getCameraEntity() != mc.player) mc.setCameraEntity(mc.player);
+            mc.options.hideGui = true;
+            // From behind where the third-person camera is the subject (reviewThirdPersonR63), the pilot's eyes otherwise.
+            mc.options.setCameraType(Boolean.getBoolean("projectseele.reviewThirdPersonR63") ? CameraType.THIRD_PERSON_BACK : CameraType.FIRST_PERSON);
+            return;
+        }
         if (camera == null)
         {
             camera = EntityType.ARMOR_STAND.create(mc.level);
@@ -1113,6 +1185,11 @@ public final class EvaConnectedActionReview
         JsonArray position = new JsonArray();
         position.add(drawn.x); position.add(drawn.y); position.add(drawn.z);
         row.add("drawnPosition", position);
+        // How far below its entity the body is drawn this frame (zero or negative), and the entity at this frame.
+        row.addProperty("stepOffset", com.projectseele.client.EvaStepSmoothingR57.offset(eva, partialTick));
+        row.addProperty("entityY", eva.getPosition(partialTick).y);
+        row.addProperty("onGround", eva.onGround());
+        row.addProperty("airborne", eva.isVisuallyAirborneForRender());
         row.addProperty("bodyYaw", net.minecraft.util.Mth.rotLerp(partialTick, eva.yBodyRotO, eva.yBodyRot));
         JsonObject transforms = new JsonObject();
         // Every bone, anatomical hand joints included, so offline renders can
