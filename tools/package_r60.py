@@ -287,7 +287,13 @@ def xaero_map(source, world, address):
     stamp = lambda t: datetime.datetime.fromtimestamp(t).isoformat(timespec='seconds')
     gate(baked > newest, 'The world changed after the map was baked (oldest zip %s, newest region %s); bake it again'
          % (stamp(baked), stamp(newest)))
-    return regions | caches
+    # Cave mode type 2 ("full") makes Xaero use the one baked cave layer everywhere in the GeoFront.
+    config = source / 'dimension_config.txt'
+    caves = {n for n in regions if '/caves/' in n}
+    gate(not caves or (config.exists() and 'caveModeType:2' in config.read_text('utf8')),
+         'Baked cave layer without caveModeType:2 in ' + str(config))
+    settings = {f'xaero/world-map/Multiplayer_{address}/projectseele$geofront/dimension_config.txt': config} if caves else {}
+    return regions | caches | settings
 
 
 def jar_report(path, compare=None):
