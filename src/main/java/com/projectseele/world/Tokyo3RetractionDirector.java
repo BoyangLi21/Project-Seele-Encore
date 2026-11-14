@@ -352,6 +352,7 @@ public final class Tokyo3RetractionDirector
         for (ServerLevel level : server.getAllLevels())
         {
             tickLevel(level);
+            DhChunkRefreshR64.tick(level);
         }
     }
 
@@ -486,6 +487,11 @@ public final class Tokyo3RetractionDirector
                     ? district.queuedTargetDepth() : district.targetDepth();
             data.put(new StoredDistrict(district.origin(), nextDepth,
                     committedTarget, nextStepAt));
+            // Far-view columns only rebuild on chunk save; push the moving lots every few layers.
+            if (nextDepth % 4 == 0 || nextDepth == committedTarget)
+            {
+                DhChunkRefreshR64.queue(level, travelChunks(level, district.origin()));
+            }
             if (targetChanged)
             {
                 updateCoreStates(level, district.origin(),

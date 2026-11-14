@@ -753,9 +753,19 @@ public final class CityCreateDistrictR45
                     if (!finishEndpointOwners(false, began)) { checkpoint(); return; }
                     entities.clear();
                 }
+                // Far-view columns only rebuild on chunk save: show the emptied lots while the
+                // buildings travel as entities, and the placed ones before the FLUSH save lands.
+                if (stage == 1 || stage == 3) refreshFarView();
                 state.phase = next; state.index = state.cursor = 0;
             }
             checkpoint();
+        }
+
+        void refreshFarView()
+        {
+            long[] packed = new long[chunks.size()];
+            for (int i = 0; i < packed.length; i++) packed[i] = chunks.get(i).toLong();
+            DhChunkRefreshR64.queue(level, packed);
         }
 
         void spawn() throws Exception
