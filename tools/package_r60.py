@@ -352,6 +352,28 @@ def config_report(client):
     return dict(keys_in_code=len(spec), differ_from_default=differ, missing_filled_on_first_start=missing, not_in_code=stale)
 
 
+def server_xaerolib(client, current):
+    """The xaerolib jar both Xaero mods embed, unchanged, for the server's mods folder.
+
+    xaerolib requires itself on both sides, so a server without it shows as an incompatible FML server
+    in the list (R60-R63). Only the library goes to the server: Xaero's map mods there would hand clients
+    a world id and move their map folder away from the baked mw$default one (checked 2026-11-13).
+    """
+    found = {}
+    for name in sorted(n for n in current if re.fullmatch(r'mods/xaero(minimap|worldmap)-[^/]+\.jar', n)):
+        with zipfile.ZipFile(client / name) as z:
+            meta = json.loads(z.read('META-INF/jarjar/metadata.json')) if 'META-INF/jarjar/metadata.json' in z.namelist() else {'jars': []}
+            for jar in meta['jars']:
+                if jar['identifier']['artifact'].startswith('xaerolib-'):
+                    found.setdefault(jar['path'].rsplit('/', 1)[1], set()).add(z.read(jar['path']))
+    if not found:
+        return {}
+    gate(len(found) == 1 and all(len(v) == 1 for v in found.values()),
+         ('The Xaero mods embed different xaerolib builds', sorted(found)))
+    name, copies = next(iter(found.items()))
+    return {'mods/' + name: next(iter(copies))}
+
+
 def build_inputs(a, work):
     client, world = a.client.resolve(), a.world.resolve()
     assert (world / 'level.dat').is_file() and (client / MAIN_JAR).is_file()
@@ -405,6 +427,9 @@ def build_inputs(a, work):
     props = '\n'.join('motd=' + property_value(MOTD) if l.startswith('motd=') else l for l in props.splitlines())
     gate('level-name=' + SERVER_WORLD in props, 'Template server.properties does not name ' + SERVER_WORLD)
     server = {n: p for n, p in current.items() if n.startswith(('projectseele-local-maps/', 'config/', 'defaultconfigs/', 'licenses/')) or n in server_mods}
+    xaero = server_xaerolib(client, current)
+    server.update(xaero)
+    server_mods |= set(xaero)
     client_dh_text = current['config/DistantHorizons.toml'].read_text('utf8')
     server['config/DistantHorizons.toml'] = server_dh_config(client_dh_text)
     current['config/DistantHorizons.toml'] = client_dh_config(client_dh_text)
