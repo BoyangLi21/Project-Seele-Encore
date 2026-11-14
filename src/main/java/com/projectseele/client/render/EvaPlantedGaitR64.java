@@ -90,6 +90,8 @@ public final class EvaPlantedGaitR64
     private static final double SETTLE_DUTY=.56,SETTLE_SWING=.42,SETTLE_SWING_FAST=.30,SETTLE_LIFT=1.6;
     /** The body turns this fast (degrees a second) for the quickest steps on the spot. */
     private static final float SETTLE_TURN_FAST=80F;
+    /** Where ground is looked for about the body's own level, and how far over that level a step may be (blocks). */
+    private static final double GROUND_ABOVE=30,GROUND_BELOW=48,STEP_MOST=21.5;
     /** A foot stands at least this long (seconds), and is not lifted for a swing shorter than this. */
     private static final double MIN_STANCE=.06,MIN_SWING=.12;
     /** A step taken out of turn, because the leg no longer reached its foot (seconds). */
@@ -302,6 +304,7 @@ public final class EvaPlantedGaitR64
         s.still=s.moving||Math.abs(rate)>1?0:s.still+dt;
 
         // The feet have been left behind by something that moved the body: set them anew.
+        if(Double.isFinite(s.ground)&&Math.abs(s.ground-eva.getY())>rig.leg()*1.3){s.live=false;return;}
         double lost=rig.leg()*LOST_SHARE;
         for(Foot f:new Foot[]{s.left,s.right})
         {
@@ -472,18 +475,29 @@ public final class EvaPlantedGaitR64
         return Double.isFinite(best)?best:near;
     }
 
+    /**
+     * The ground at a place, looked for about the body's own level: from GROUND_ABOVE over it down to GROUND_BELOW
+     * under it. Ground more than STEP_MOST over the body's level is a wall and not a step, as it is for the body
+     * itself; a place roofed over at the top of the search is one too.
+     * <p>
+     * It was looked for 21 blocks either side of the level the feet stood on ({@code near}). Running up a slope
+     * of one in one the next footfall lies further above the feet than that: the search began inside the hill,
+     * found nothing, and the foot was set down at the feet's old level. From then on every footfall was, and the
+     * body, carried by its feet, was drawn 60 to 87 blocks down inside the slope while the Unit stood on its top.
+     */
     private static double ground(EvaUnit01Entity eva,double x,double z,double near)
     {
-        Vec3 from=new Vec3(x,near+21,z),to=new Vec3(x,near-21,z);
-        for(int i=0;i<5;i++)
+        double level=eva.getY();
+        Vec3 from=new Vec3(x,level+GROUND_ABOVE,z),to=new Vec3(x,level-GROUND_BELOW,z);
+        for(int i=0;i<6;i++)
         {
             var hit=eva.level().clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,eva));
             if(hit.getType()!=HitResult.Type.BLOCK)return Double.NaN;
-            // Starting inside a block: a wall stands there, not ground to step on.
-            if(i==0&&hit.getLocation().y>near+20.5)return Double.NaN;
+            // Starting inside a block: a wall stands there, or a roof over it.
+            if(i==0&&hit.getLocation().y>level+GROUND_ABOVE-.5)return Double.NaN;
             var pos=hit.getBlockPos();var state=eva.level().getBlockState(pos);
             var shape=state.getCollisionShape(eva.level(),pos,CollisionContext.of(eva));
-            if(!EvaObstacleCollision.ignores(eva,state,pos,shape))return hit.getLocation().y;
+            if(!EvaObstacleCollision.ignores(eva,state,pos,shape))return hit.getLocation().y>level+STEP_MOST?Double.NaN:hit.getLocation().y;
             from=new Vec3(x,pos.getY()-.001,z);
         }
         return Double.NaN;
