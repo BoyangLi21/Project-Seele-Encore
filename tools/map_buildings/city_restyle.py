@@ -34,6 +34,39 @@ def h(*v):
     return zlib.crc32(repr(v).encode()) & 0xffffffff
 
 
+# Facade families, so a skyline is not one grey: warm greys, white, beige and some dark glass.
+# wall: solid facade; trim: frames and floor bands; mull: curtain-wall mullions; glass: windows.
+PALETTES = (
+    ('warm_grey', 3, dict(wall='polished_andesite', trim='light_gray_concrete', mull='smooth_stone', glass='light_blue_stained_glass', band='andesite')),
+    ('white', 3, dict(wall='white_concrete', trim='smooth_quartz', mull='smooth_quartz', glass='light_blue_stained_glass', band='light_gray_concrete')),
+    ('beige', 2, dict(wall='white_terracotta', trim='smooth_sandstone', mull='white_terracotta', glass='glass', band='smooth_sandstone')),
+    ('grey', 2, dict(wall='light_gray_concrete', trim='gray_concrete', mull='light_gray_concrete', glass='light_blue_stained_glass', band='gray_concrete')),
+    ('dark_glass', 2, dict(wall='gray_concrete', trim='black_concrete', mull='gray_concrete', glass='gray_stained_glass', band='black_concrete')),
+)
+
+
+def palette(seed):
+    total = sum(w for _, w, _ in PALETTES)
+    r = h(seed, 'palette') % total
+    for name, w, p in PALETTES:
+        if r < w:
+            return dict(name=name, **{k: M(v) for k, v in p.items()})
+        r -= w
+
+
+# Lit vertical signs at muted saturation: a face of terracotta or concrete with a lit band every
+# third row, framed in black, top and bottom lit.
+SIGN_FACES = ('red_terracotta', 'orange_terracotta', 'yellow_terracotta', 'cyan_terracotta', 'light_blue_terracotta', 'white_concrete', 'lime_terracotta', 'pink_terracotta')
+SIGN_LIGHTS = (M('ochre_froglight[axis=y]'), M('pearlescent_froglight[axis=y]'), M('shroomlight'))
+
+
+def vsign(m, x, z, y0, y1, seed):
+    face = M(SIGN_FACES[h(seed, 'face') % len(SIGN_FACES)])
+    glow = SIGN_LIGHTS[h(seed, 'glow') % len(SIGN_LIGHTS)]
+    for y in range(y0, y1 + 1):
+        m.put(x, y, z, glow if y in (y0, y1) or (y - y0) % 3 == 0 else face)
+
+
 def topology():
     import nbtlib
     for f in Path(WORLD, 'dimensions/projectseele/geofront/data').glob('projectseele_city_rigid_topology_r45_*.dat'):
@@ -59,6 +92,7 @@ class Model:
 
     def __init__(self, W, D, seed):
         self.W, self.D, self.seed, self.v = W, D, seed, {}
+        self.pal = palette(seed)
 
     def put(self, x, y, z, s):
         if 0 <= x < self.W and 0 <= z < self.D and y >= 0:
@@ -141,11 +175,36 @@ def terrace(m, y, k_in, k_out):
                 m.put(x, y + 1, z, M('azalea_leaves[distance=1,persistent=true,waterlogged=false]'))
 
 
+def roof(m, H, k):
+    """Varied roof lines: plant room of some size, a stepped crown, a helipad or a sign frame."""
+    kind = h(m.seed, 'roof') % 4
+    w = min(m.W, m.D) - 2 * k
+    if kind == 1 and w >= 9:
+        for y in (H + 1, H + 2):
+            for x, z, u, c in m.ring(k + 1 + (y - H)):
+                m.put(x, y, z, m.pal['trim'])
+        m.fill(k + 3, H + 2, SLAB('smooth_stone'))
+    elif kind == 2 and w >= 11:
+        for x, z, u, c in m.ring(k):
+            m.put(x, H + 1, z, SLAB('smooth_quartz'))
+        a, b = m.W // 2, m.D // 2
+        for dz in range(-2, 3):                      # an H painted on the pad
+            m.put(a - 1, H, b + dz, M('white_concrete'))
+            m.put(a + 1, H, b + dz, M('white_concrete'))
+        m.put(a, H, b, M('white_concrete'))
+    elif kind == 3 and w >= 7:
+        roof_plant(m, H + 1, k, 3 + h(m.seed, 'rw') % 3)
+        for xx in range(k + 1, min(m.W - k - 1, k + 9)):     # rooftop sign frame along one face
+            m.put(xx, H + 1, k, M("black_concrete"))
+            m.put(xx, H + 2, k, M(SIGN_FACES[h(m.seed, 'rs') % len(SIGN_FACES)]))
+            m.put(xx, H + 3, k, M("black_concrete"))   # a tower box ends at H + 3
+    else:
+        roof_plant(m, H + 1, k, max(3, min(7, w - 4)))
+
+
 def office(m, H, landmark=False):
     W = m.W
-    glass = M('light_blue_stained_glass') if h(m.seed, 'g') % 3 else M('gray_stained_glass')
-    mull = (M('smooth_quartz'), M('light_gray_concrete'), M('white_concrete'))[h(m.seed, 'm') % 3]
-    band = M('gray_concrete') if h(m.seed, 'b') % 2 else M('light_gray_concrete')
+    glass, mull, band = m.pal['glass'], m.pal['mull'], m.pal['band']
     lobby(m, 7, 1, M('glass'), M('black_concrete'), M('polished_andesite'))
     for x, z, u, c in m.ring(0):
         m.put(x, 8, z, M('polished_andesite'))          # canopy over the recessed lobby
@@ -179,12 +238,13 @@ def office(m, H, landmark=False):
                 m.put(x, y, z, mull if c or u % 2 == 0 else glass)
         m.put(W // 2, H + 3, m.D // 2, M('lightning_rod[facing=up,powered=false,waterlogged=false]'))
     else:
-        roof_plant(m, H + 1, k, 7)
+        roof(m, H, k)
 
 
 def apartments(m, H):
-    wall = (M('white_concrete'), M('light_gray_concrete'), M('white_terracotta'))[h(m.seed, 'w') % 3]
-    trim = M('gray_concrete') if wall != M('light_gray_concrete') else M('white_concrete')
+    wall, trim = m.pal['wall'], m.pal['trim']
+    if m.pal['name'] == 'dark_glass':
+        wall, trim = M('light_gray_concrete'), M('gray_concrete')   # flats are not dark glass
     lobby(m, 4, 1, M('glass'), M('dark_oak_planks'), M('polished_andesite'))
     long_x = h(m.seed, 'axis') % 2 == 0
     for y in range(5, H + 1):
@@ -215,7 +275,7 @@ def apartments(m, H):
             lit(m, y, 1, 55)
     core(m, 1, H, M('light_gray_concrete'))
     m.fill(1, H, M('smooth_stone'))
-    roof_plant(m, H + 1, 1, 5)
+    roof(m, H, 1)
 
 
 SIGNS = ('white_concrete', 'light_gray_concrete', 'red_terracotta', 'cyan_terracotta', 'white_terracotta', 'blue_terracotta', 'black_concrete')   # muted: saturated wool reads as a toy at EVA scale
@@ -248,10 +308,7 @@ def mixed(m, H):
             m.put(x + 1, y, z + 1, s)
     # vertical signboards on two corners above the podium
     for n, (x, z) in enumerate(((0, 0), (m.W - 1, m.D - 1))):
-        col = M(SIGNS[h(m.seed, 'v', n) % len(SIGNS)])
-        top = min(H - 2, 9 + 12)
-        for y in range(9, top):
-            m.put(x, y, z, M('sea_lantern') if y in (9, top - 1) else col)
+        vsign(m, x, z, 9, min(H - 2, 9 + 10), h(m.seed, 'v', n))
 
 
 def lowrise(m, H):
@@ -283,8 +340,9 @@ def design(t):
         office(m, H)
         kind = 'office'
     elif H >= 34:
-        kind = 'apartments' if h(m.seed, 'k') % 2 else 'mixed'
-        (apartments if kind == 'apartments' else mixed)(m, H)
+        # many towers share a height, so the type is spread evenly over three
+        kind = ('apartments', 'mixed', 'office')[h(m.seed, 'k') % 3]
+        dict(apartments=apartments, mixed=mixed, office=office)[kind](m, H)
     else:
         lowrise(m, H)
         kind = 'lowrise'
@@ -361,8 +419,24 @@ def main_towers(ids, out):
     print('rows', len(allrows), 'blocks', sum(r['blocks_before'] for r in report), '->', sum(r['blocks_after'] for r in report))
 
 
+def preview_raised(ids, out):
+    """The designs standing at street level (base = street + 1), for city_preview only."""
+    T = {t['id']: t for t in topology()}
+    rows = []
+    for i in ids:
+        t = T[i]
+        m, _ = design(t)
+        cx, cy, cz = t['centre']
+        for (lx, ly, lz), st in m.v.items():
+            if ly <= t['H'] + 3:
+                rows.append([cx + t['fp'][0] + lx, cy + 1 + ly, cz + t['fp'][2] + lz, '', st])
+    Path(out).write_text(json.dumps(rows), 'utf8')
+
+
 if __name__ == '__main__':
-    if sys.argv[1] == 'towers':
+    if sys.argv[1] == 'raised':
+        preview_raised([int(v) for v in sys.argv[2].split(',')], sys.argv[3])
+    elif sys.argv[1] == 'towers':
         main_towers([int(v) for v in sys.argv[2].split(',')], sys.argv[3])
     elif sys.argv[1] == 'infill':
         from city_infill import main as infill
