@@ -30,6 +30,10 @@ public final class OuterBoundaryTerrain
     private static final SimplexNoise A = noise(1), B = noise(2), C = noise(3), D = noise(4), E = noise(5);
     private static final Edge EDGE = Edge.load();
     private static final Coast COAST = Coast.load();
+    private static final Saved SAVED = Saved.of(EDGE);
+    /** The saved sea's flat seabed along the seam, the generator's floor, and the seam fade width. */
+    static final int SEAM_BED = -90, SEA_FLOOR = -120;
+    static final double SEAM_BLEND = 48;
 
     /** Fallback coastline beyond the coast grid only, west to east with land on the left. */
     private static final double[][] FALLBACK = {
@@ -63,24 +67,57 @@ public final class OuterBoundaryTerrain
     /** Ground and water for one exterior column. */
     static HakoneSurfaceField.Surface surface(int x, int z)
     {
-        double away = EDGE.distance(x, z), edge = EDGE.ground(x, z);
+        double s = shoreline(x, z);
+        if (s > 0)
+        {
+            // Open sea: start from the saved shore or seabed at the seam, then the open-sea bed.
+            double edge = EDGE.groundSmooth(x, z);
+            double sea = s < 120 && rocky(z) >= 0.5 ? stack(x, z, (int) Math.round(openSeaBed(x, z, s))) : openSeaBed(x, z, s);
+            // Fade by distance from saved chunks, not from the surveyed rectangle: the unsaved
+            // surveyed sea beside it has already deepened, and must meet this column level.
+            double height = edge + (sea - edge) * smooth(SAVED.distance(x, z) / SEAM_BLEND);
+            return new HakoneSurfaceField.Surface((int) Math.round(Math.max(SEA_FLOOR, Math.min(300, height))), HakoneSurfaceField.SEA_Y);
+        }
+        // Interpolated, for the same reason as at sea: nearest cells print 8-block steps into the land.
+        double away = EDGE.distanceSmooth(x, z), edge = EDGE.groundSmooth(x, z);
         double target = ground(x, z, away);
         double height = edge + (target - edge) * smooth(away / 900);
-        int ground = (int) Math.round(Math.max(-120, Math.min(300, height)));
+        int ground = (int) Math.round(Math.max(SEA_FLOOR, Math.min(300, height)));
         return new HakoneSurfaceField.Surface(ground, HakoneSurfaceField.SEA_Y);
     }
 
     /**
-     * Unsaved surveyed sea from Manazuru to Yugawara keeps the field's coast and depth,
-     * with rock stacks added near the shore.
+     * Unsaved surveyed sea from Manazuru to Yugawara keeps the field's coast, deepens into
+     * the open-sea bed away from the saved chunks, and has rock stacks near the shore.
      */
     static HakoneSurfaceField.Surface surveyedSea(int x, int z, HakoneSurfaceField.Surface field)
     {
         if (field.water() != HakoneSurfaceField.SEA_Y || field.ground() >= HakoneSurfaceField.SEA_Y || EDGE.saved(x, z)) return field;
         double s = coast(x, z);
-        if (s <= 0 || s > 120 || rocky(z) < 0.5) return field;
-        int top = stack(x, z, field.ground());
-        return top == field.ground() ? field : new HakoneSurfaceField.Surface(top, HakoneSurfaceField.SEA_Y);
+        int ground = field.ground();
+        if (s > 0)
+        {
+            // Deepen only, faded in from the saved seabed, so the field's own shore stays.
+            double sea = Math.min(ground, openSeaBed(x, z, s));
+            ground = (int) Math.round(ground + (sea - ground) * smooth(SAVED.distance(x, z) / SEAM_BLEND));
+        }
+        if (s > 0 && s <= 120 && rocky(z) >= 0.5) ground = stack(x, z, ground);
+        return ground == field.ground() ? field : new HakoneSurfaceField.Surface(ground, HakoneSurfaceField.SEA_Y);
+    }
+
+    /**
+     * The open-sea bed (R64 M6): the saved sea's -90 at the seam, about -95 within 100 blocks,
+     * then deepening to the floor 1.6 km out; a shoreface rises to any coast. Broad noise keeps
+     * the depth contours from running parallel to the straight edge of the saved chunks.
+     */
+    static double openSeaBed(int x, int z, double coast)
+    {
+        double a = SAVED.distance(x, z);
+        double bed = SEAM_BED - 5 * smooth(a / 96) - (SEAM_BED - 5 - SEA_FLOOR) * smooth((a - 96) / 1500);
+        bed += (2.4 * fbm(D, x / 260.0 + 71, z / 260.0 - 33, 3) + 0.9 * B.getValue(x / 47.0 - 13, z / 47.0 + 29))
+                * smooth((a - 8) / 96);
+        double shoreface = HakoneSurfaceField.SEA_Y - 2 - coast / 5;
+        return Math.max(SEA_FLOOR, Math.min(HakoneSurfaceField.SEA_Y - 1, Math.max(bed, shoreface)));
     }
 
     /** Material for the top block, or null to keep the default grass or gravel. */
@@ -99,13 +136,14 @@ public final class OuterBoundaryTerrain
     static int cover(int x, int z, int ground)
     {
         boolean beach = rocky(z) < 0.5;
-        if (ground < HakoneSurfaceField.SEA_Y - 1) return coast(x, z) < 60 && beach ? 1 : 0;
+        // Sand only in the shallows right at a coast; the open seabed is gravel, as in the saved sea.
+        if (ground < HakoneSurfaceField.SEA_Y - 1) return shoreline(x, z) < 24 && ground >= HakoneSurfaceField.SEA_Y - 4 && beach ? 1 : 0;
         double steep = Math.max(Math.abs(surface(x + 2, z).ground() - surface(x - 2, z).ground()),
                 Math.abs(surface(x, z + 2).ground() - surface(x, z - 2).ground())) / 4.0;
         double snow = 228 + 10 * A.getValue(x / 90.0, z / 90.0);
         if (ground >= snow && steep < 1.4) return 2;
         if (steep >= 1.4 || ground > snow + 14) return 3;
-        if (ground <= HakoneSurfaceField.SEA_Y + 2 && coast(x, z) > -40) return beach ? 1 : 3;
+        if (ground <= HakoneSurfaceField.SEA_Y + 2 && shoreline(x, z) > -12) return beach ? 1 : 3;
         return 0;
     }
 
@@ -134,15 +172,10 @@ public final class OuterBoundaryTerrain
         return smooth((z - 1800) / 500.0);
     }
 
+    /** Exterior land; the sea side is openSeaBed. */
     private static double ground(int x, int z, double away)
     {
         double s = coast(x, z), r = rocky(z);
-        if (s > 0)
-        {
-            double depth = (2 + s / 30) * (1 - r) + (6 + s / 12) * r;
-            double bed = HakoneSurfaceField.SEA_Y - Math.min(38, depth) + 2 * B.getValue(x / 70.0, z / 70.0);
-            return r >= 0.5 && s < 120 ? stack(x, z, (int) Math.round(bed)) : bed;
-        }
         double peak = mountain(x, z, away);
         double plain = 340 * (1 - r) + 180 * r;
         double shore = HakoneSurfaceField.SEA_Y + 2 + 4 * r;
@@ -171,6 +204,20 @@ public final class OuterBoundaryTerrain
     }
 
     /** Signed distance to the coastline: positive at sea, negative on land. */
+    /**
+     * Where the exterior shore runs. The coast grid is a 16-block raster, so its zero line is a
+     * staircase; a wobble that fades in away from the saved coast makes it irregular and leaves
+     * the seam alone. Land relief keeps reading the plain coast distance, or the wobble would
+     * roughen the coastal plain.
+     */
+    static double shoreline(int x, int z)
+    {
+        double s = coast(x, z);
+        return COAST != null && COAST.covers(x, z)
+                ? s + (9 * A.getValue(x / 70.0 + 5, z / 70.0 - 8) + 4 * B.getValue(x / 23.0, z / 23.0)) * smooth(SAVED.distance(x, z) / 96)
+                : s;
+    }
+
     static double coast(int x, int z)
     {
         if (COAST != null && COAST.covers(x, z)) return COAST.sample(x, z);
@@ -298,6 +345,87 @@ public final class OuterBoundaryTerrain
         boolean saved(int bx, int bz)
         {
             return !outside(bx, bz) && saved[index(bx, bz)] != 0;
+        }
+
+        /** Bilinear distance: nearest-cell steps would print 8-block bands into the seabed. */
+        double distanceSmooth(int bx, int bz)
+        {
+            return bilinear(bx, bz, distance) + beyond(bx, bz);
+        }
+
+        double groundSmooth(int bx, int bz)
+        {
+            return bilinear(bx, bz, ground);
+        }
+
+        private double beyond(int bx, int bz)
+        {
+            double cx = Math.max(x, Math.min(x + (width - 1) * step, bx)), cz = Math.max(z, Math.min(z + (depth - 1) * step, bz));
+            return Math.hypot(bx - cx, bz - cz);
+        }
+
+        private double bilinear(int bx, int bz, short[] values)
+        {
+            double fx = Math.max(0, Math.min(width - 1.0001, (bx - x) / (double) step));
+            double fz = Math.max(0, Math.min(depth - 1.0001, (bz - z) / (double) step));
+            int i = (int) fx, j = (int) fz;
+            double dx = fx - i, dz = fz - j;
+            return (values[j * width + i] * (1 - dx) + values[j * width + i + 1] * dx) * (1 - dz)
+                    + (values[(j + 1) * width + i] * (1 - dx) + values[(j + 1) * width + i + 1] * dx) * dz;
+        }
+    }
+
+    /** Distance from the saved chunks alone (the surveyed rectangle does not count), on the edge grid. */
+    private record Saved(int x, int z, int step, int width, int depth, float[] blocks)
+    {
+        static Saved of(Edge edge)
+        {
+            if (edge == null) return null;
+            int w = edge.width(), d = edge.depth();
+            float[] cells = new float[w * d];
+            float far = 1e7F, diagonal = (float) Math.sqrt(2);
+            for (int k = 0; k < cells.length; k++) cells[k] = edge.saved()[k] != 0 ? 0 : far;
+            // Two-pass chamfer; within a few percent of Euclidean, which a seabed blend cannot show.
+            for (int j = 0; j < d; j++)
+                for (int i = 0; i < w; i++)
+                {
+                    float v = cells[j * w + i];
+                    if (i > 0) v = Math.min(v, cells[j * w + i - 1] + 1);
+                    if (j > 0)
+                    {
+                        v = Math.min(v, cells[(j - 1) * w + i] + 1);
+                        if (i > 0) v = Math.min(v, cells[(j - 1) * w + i - 1] + diagonal);
+                        if (i < w - 1) v = Math.min(v, cells[(j - 1) * w + i + 1] + diagonal);
+                    }
+                    cells[j * w + i] = v;
+                }
+            for (int j = d - 1; j >= 0; j--)
+                for (int i = w - 1; i >= 0; i--)
+                {
+                    float v = cells[j * w + i];
+                    if (i < w - 1) v = Math.min(v, cells[j * w + i + 1] + 1);
+                    if (j < d - 1)
+                    {
+                        v = Math.min(v, cells[(j + 1) * w + i] + 1);
+                        if (i < w - 1) v = Math.min(v, cells[(j + 1) * w + i + 1] + diagonal);
+                        if (i > 0) v = Math.min(v, cells[(j + 1) * w + i - 1] + diagonal);
+                    }
+                    cells[j * w + i] = v;
+                }
+            for (int k = 0; k < cells.length; k++) cells[k] *= edge.step();
+            return new Saved(edge.x(), edge.z(), edge.step(), w, d, cells);
+        }
+
+        double distance(int bx, int bz)
+        {
+            double fx = Math.max(0, Math.min(width - 1.0001, (bx - x) / (double) step));
+            double fz = Math.max(0, Math.min(depth - 1.0001, (bz - z) / (double) step));
+            int i = (int) fx, j = (int) fz;
+            double dx = fx - i, dz = fz - j;
+            double inside = (blocks[j * width + i] * (1 - dx) + blocks[j * width + i + 1] * dx) * (1 - dz)
+                    + (blocks[(j + 1) * width + i] * (1 - dx) + blocks[(j + 1) * width + i + 1] * dx) * dz;
+            double cx = Math.max(x, Math.min(x + (width - 1) * step, bx)), cz = Math.max(z, Math.min(z + (depth - 1) * step, bz));
+            return inside + Math.hypot(bx - cx, bz - cz);
         }
     }
 
