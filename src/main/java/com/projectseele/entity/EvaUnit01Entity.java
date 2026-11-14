@@ -4142,7 +4142,18 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         boolean retainedRoot=EvaMechanicalFrameR52.releasedHullRest(this);Vec3 actualRoot=retainedRoot?this.position():null;AABB before=retainedRoot?this.getBoundingBox():null;
         if(this.tickCount>0&&this.getPilotEntity()!=null&&!this.isNervLogisticsLocked()&&!this.isFirstBattleActive()
                 &&!EvaShutdownR30.disabled(this)&&!CombatFeelR31.restrained(this)&&!EvaCombatR31.locksFacing(this))motion=CombatSpacingR32.clip(this,motion);
+        // R64 (M2): the pilot's side moves the body and the server moves it again by what that side reports, to
+        // see that it could. A step up a terrace comes to it as a move up and along, and a body is carried up a
+        // step only from the ground: after one such move the server holds the body to be in the air (it went up
+        // and nothing stopped it going down), so the next step up, a tick later, it does not take, ends short of
+        // where its pilot's side is, and sets the body back there ("moved wrongly", 35 times in four seconds of
+        // a run up one in one: every other tick's travel undone, the body going up at half its speed and back
+        // and forth by 3.3 blocks). The body is on the ground for such a move if it stood on something at the
+        // end of the last, which is what its pilot's side went by.
+        boolean served=!this.level().isClientSide&&EvaMotionModelR64.planted(this);
+        if(served&&type==MoverType.PLAYER&&motion.y>0&&this.replaySupportedR64)this.setOnGround(true);
         super.move(type,motion);
+        if(served)this.replaySupportedR64=this.onGround()||motion.y>=0&&!this.level().noCollision(this,this.getBoundingBox().move(0,-.05,0));
         if(retainedRoot)
         {
             // Vanilla derives feet from box-centre/minY. The real retained
@@ -8456,6 +8467,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private float slopeAheadR64;
     private final double[] slopeTrailXR64=new double[6],slopeTrailZR64=new double[6];
     private int slopeTrailAtR64;
+    /** R64 (M2), server: the body stood on something at the end of the last move its pilot's side reported. */
+    private boolean replaySupportedR64;
     /** Review only: what the slope ahead is read as and what it leaves of the speed, every half second. */
     private static final boolean SLOPE_DIAG_R64=Boolean.getBoolean("projectseele.plantedDiagR64");
 
