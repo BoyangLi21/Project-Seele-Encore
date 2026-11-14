@@ -29,7 +29,7 @@ public final class CombatBodyProfiles
                 byte[] bytes=Files.readAllBytes(path);
                 loadedFingerprint=java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes));
                 com.projectseele.ProjectSeele.LOGGER.info("Combat physical profile resolved: file={} sha256={}",path.toAbsolutePath().normalize(),loadedFingerprint);
-                var json=JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject();
+                var json=com.projectseele.util.SharedJsonLeaves.share(JsonParser.parseString(new String(bytes,java.nio.charset.StandardCharsets.UTF_8)).getAsJsonObject());
                 if(!"projectseele.articulated-body.v1".equals(json.get("schema").getAsString()))throw new IllegalArgumentException("Body profile version");
                 Map<String,Profile> result=new HashMap<>();
                 for(var entry:json.getAsJsonObject("models").entrySet())

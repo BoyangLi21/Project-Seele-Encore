@@ -125,7 +125,8 @@ public final class EvaGameplayMotionR32
                 if(data.get("schema").getAsInt()!=2||data.get("rig_key").getAsInt()!=key)throw new IllegalArgumentException("Gameplay rig contract");
                 com.projectseele.ProjectSeele.LOGGER.info("EVA gameplay profile resolved: rig={} file={} sha256={}",key,file.toAbsolutePath().normalize(),
                         java.util.HexFormat.of().formatHex(java.security.MessageDigest.getInstance("SHA-256").digest(bytes)));
-                return Optional.of(data);
+                // Kept for the whole session and read in place: share equal numbers instead of holding 88 bytes for each.
+                return Optional.of(com.projectseele.util.SharedJsonLeaves.share(data));
             }
             catch(Exception error){throw new IllegalStateException("Gameplay motion rejected: "+file,error);}
         }).orElse(null);
