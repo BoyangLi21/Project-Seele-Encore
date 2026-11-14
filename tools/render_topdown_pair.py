@@ -26,7 +26,7 @@ def colour(name):
     return (180, 140, 160)
 
 
-def top_rgb(world, x0, x1, z0, z1, y0=-64, y1=260):
+def top_rgb(world, x0, x1, z0, z1, y0=-160, y1=260):  # the Odawara block lies near y -80
     b = tr.Box(world, x0, x1, y0, y1, z0, z1)
     k = b.kind_grid()
     n = k.shape[0]

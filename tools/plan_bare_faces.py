@@ -140,7 +140,8 @@ def plan_tile(box, x0, x1, z0, z1, kept, a, seed):
     steep_stripe = stripe & (slope >= a.moss_slope)
     moss_patch = vnoise(wx, wz, 6, seed + 9) * .75 + hash01(wx, wz, seed + 10) * .25
     moss = state('minecraft:moss_block')
-    share = np.where(slope >= a.moss_slope + .4, min(a.stripe_moss * 1.5, .8), a.stripe_moss)
+    # moss on more than about half the steps turns the slope flat green again: cap it at --stripe-moss
+    share = np.where(slope >= a.moss_slope + .4, a.stripe_moss, a.stripe_moss * .8)
     for z, x in zip(*np.nonzero(steep_stripe & (moss_patch > 1 - share))):
         j = int(ground[z, x]) - by
         if 0 <= j < ids.shape[0] and names[box.ids[j, z, x]] == 'minecraft:grass_block':
