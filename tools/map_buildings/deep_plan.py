@@ -68,7 +68,7 @@ def plan_building(b):
             if cur != want and not (want == STONE and is_natural(cur) and (x, y, z) not in cells):
                 rows[x, y, z] = [x, y, z, cur, want]
     blend(rows, cols)
-    tidy(rows, cols, cells)
+    tidy(rows, cols, cells, heights=b.get("set_heights"))
     if b.get('drop_signs'):
         drop_signs(rows, b, F, hi)
     keep_be = bool(b.get('drop_signs'))
@@ -97,7 +97,7 @@ def drop_signs(rows, b, F, hi):
                 rows[x, y, z] = [x, y, z, s, fill]
 
 
-def tidy(rows, cols, cells, reach=18):
+def tidy(rows, cols, cells, reach=18, heights=None):
     """After the fill: no lone pillar or 1-2 column island, and no step of two or more next to a
     changed column. Natural terraces are contour steps; a raised column with fewer than two
     neighbours at its height is lowered to its second-highest neighbour, then every step of two
@@ -199,6 +199,12 @@ def tidy(rows, cols, cells, reach=18):
             t = sorted(ns)[-2]
             if t < H[c]:
                 lower(c, t)
+    for x, z, t in heights or ():     # a reviewer's spot fix: these columns end at this ground height
+        c = (x, z)
+        if c in H and t > H[c]:
+            raise_(c, t)
+        elif c in H and t < H[c]:
+            lower(c, t)
 
 
 def blend(rows, cols, reach=16):
