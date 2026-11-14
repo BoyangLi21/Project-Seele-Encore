@@ -54,6 +54,7 @@
     "client.BufferBuilderDirectMixin",
     "client.LclBubbleR54Mixin",
     "client.GeoFrontMissionDayTimeR54Mixin",
+    "client.TvGeoFrontHorizonR64Mixin",
     "client.GeoFrontMissionSunR54Mixin",
     "client.RamielDistantProjectionR52Mixin",
     "client.SbwPhantomLoadR24Mixin",
