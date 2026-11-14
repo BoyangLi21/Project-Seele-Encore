@@ -923,9 +923,18 @@ def step_xaero(a):
     shutil.copyfile(WORK / 'jars/final.jar', guard(game / JAR))
     held = WORK / 'mods-held'
     moved = hold_mods(game, ['DistantHorizons-*.jar', 'oculus-*.jar'], held)
+    pregen = None
     try:
+        if a.xaero_pregen:
+            # The outer ring was never saved as chunks; generate them on this mirror only, in a run of its own.
+            args = client_args(game, {'projectseele.xaeroBakePregen': a.xaero_pregen}, 'xaero-pregen.args', world=XAERO_COPY)
+            pregen = run_client(args, a.pregen_minutes, 'Xaero bake outer ring pregeneration', a.exclusive)
+            text = (game / 'logs/latest.log').read_text('utf8', 'replace')
+            if 'Xaero bake pregeneration finished' not in text or not client_log()['ok']:
+                save('xaero', dict(ok=False, pregen=pregen, pregen_finished=False, mirror=info))
+                raise SystemExit('Outer ring pregeneration did not finish')
         args = client_args(game, {'projectseele.xaeroBake': 'true'}, 'xaero.args', world=XAERO_COPY)
-        result = run_client(args, 25, 'R63 Xaero minimap bake', a.exclusive)
+        result = run_client(args, 25 if not a.xaero_pregen else 90, 'R63 Xaero minimap bake', a.exclusive)
     finally:
         restore_mods(game, held)
     logtext = (game / 'logs/latest.log').read_text('utf8', 'replace')
@@ -936,7 +945,7 @@ def step_xaero(a):
         if out.exists():
             shutil.rmtree(guard(out))
         shutil.copytree(baked, guard(out))
-    save('xaero', dict(ok=finished and bool(zips), client=result, finished=finished, region_zips=len(zips), held_mods=moved,
+    save('xaero', dict(ok=finished and bool(zips), client=result, pregen=pregen, finished=finished, region_zips=len(zips), held_mods=moved,
                        mirror=info, output=str(out)))
     if not (finished and zips):
         raise SystemExit('Minimap bake did not finish')
@@ -970,6 +979,8 @@ def main():
     p.add_argument('--no-lock', action='store_true', help='mirror: copy without holding session.lock (trial runs only, never for packing)')
     p.add_argument('--batch', type=int, help='mirror: the batch the formal world should be at; refuse if the batch table says otherwise')
     p.add_argument('--work', help='work folder (default E:/eva-r63-rebake)')
+    p.add_argument('--xaero-pregen', help='xaero: x0,z0,x1,z1 block bounds to generate and save on the mirror first (outer ring: -6464,-5408,7584,5920)')
+    p.add_argument('--pregen-minutes', type=int, default=240, help='xaero --xaero-pregen: client time limit for the pregeneration run')
     a = p.parse_args()
     # Review session, 2026-11-13: with the machine to ourselves R62's 8 GB / 4 threads; shared, 6 GB / 3 threads.
     a.heap = a.heap or ('8G' if a.exclusive else '6G')
