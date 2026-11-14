@@ -29,6 +29,7 @@ def main():
     p.add_argument('--keep-file', type=Path)
     p.add_argument('--dens-lo', type=float, default=.05, help='step-line density where --lattice smoothing starts')
     p.add_argument('--dens-span', type=float, default=.07, help='density above --dens-lo where it reaches full strength')
+    p.add_argument('--warp', type=float, nargs=2, help='AMPLITUDE SCALE: wave straight terraces by a sideways shift')
     p.add_argument('--max-change', type=float, default=1000, help='largest cut or fill per column')
     p.add_argument('--lattice', action='store_true', help='smooth only where straight 1-block steps crowd together')
     p.add_argument('--seed', type=int, default=31)
@@ -70,6 +71,28 @@ def main():
         lines = runs_along(sx, 0, 8) | runs_along(sz, 1, 8)
         dens = ndimage.uniform_filter(lines.astype(float), 33)
         fade = fade * ndimage.gaussian_filter(np.clip((dens - a.dens_lo) / a.dens_span, 0, 1), 8)
+    if a.warp:
+        # sparse straight terraces: sample the (lightly smoothed) ground through a low-frequency sideways shift, so
+        # long ruler-straight contour steps come out wavy; only near long straight step runs
+        from scan_artificial_terrain import runs_along
+        from plan_bare_faces import vnoise
+        amp, scale = a.warp
+        g16 = ground.astype(np.int16)
+        nat = ~frozen
+        sx = np.zeros(g16.shape, bool)
+        sx[:, :-1] = (np.abs(np.diff(g16, axis=1)) >= 1) & nat[:, :-1] & nat[:, 1:]
+        sz = np.zeros(g16.shape, bool)
+        sz[:-1] = (np.abs(np.diff(g16, axis=0)) >= 1) & nat[:-1] & nat[1:]
+        straight = runs_along(sx, 0, 14) | runs_along(sz, 1, 14)
+        near = ndimage.gaussian_filter(ndimage.binary_dilation(straight, iterations=10).astype(float), 6)
+        zz_, xx_ = np.mgrid[0:ground.shape[0], 0:ground.shape[1]]
+        wxx, wzz = xx_ + bx, zz_ + bz
+        dx = (vnoise(wxx, wzz, scale, a.seed + 1) - .5) * 2 * amp
+        dz = (vnoise(wxx, wzz, scale, a.seed + 2) - .5) * 2 * amp
+        base = ndimage.gaussian_filter(gf, 1.2)
+        warped = ndimage.map_coordinates(base, [np.clip(zz_ + dz, 0, gf.shape[0] - 1), np.clip(xx_ + dx, 0, gf.shape[1] - 1)], order=1)
+        smooth = warped
+        fade = fade * np.clip(near, 0, 1)
     target = gf + fade * (smooth - gf)
     # climb back to anything kept at a slope of one
     if frozen.any():
