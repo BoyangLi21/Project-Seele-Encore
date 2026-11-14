@@ -5519,6 +5519,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaGameplayMotionR32.tick(this);
         EvaSprintR50.tick(this);
         EvaMotionModelR64.tick(this);
+        this.slopeAheadR64=EvaMotionModelR64.walks(this)?Mth.lerp(.25F,this.slopeAheadR64,this.slopeProbeR64()):0;
+        if(SLOPE_DIAG_R64&&this.tickCount%10==0&&this.isVehicle())
+            ProjectSeele.LOGGER.info("R64SLOPE {} tick {}: slope ahead {} scale {} walks {} on ground {} speed {}",
+                    this.level().isClientSide?"client":"server",this.tickCount,this.slopeAheadR64,
+                    EvaMotionModelR64.slopeScale(this,this.isPilotSprinting(),this.slopeAheadR64),EvaMotionModelR64.walks(this),
+                    this.onGround(),this.getSpeed());
         if(!this.level().isClientSide&&this.getPilotEntity() instanceof ServerPlayer player
                 &&(player.zza<-.15F||Math.abs(player.xxa)>.15F)
                 &&this.entityData.get(DATA_LIVE_ACTION_PHASE)>=.72F
@@ -7864,6 +7870,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         variantSpeed*=(float)(this.isPilotSprinting()?gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE):gaitKeyR64(SeeleConfig.EVA_WALK_SPEED_SCALE));
         // R64 (M1): the planted model's gait tier sets the walk and the run.
         variantSpeed*=EvaMotionModelR64.speedScale(this,this.isPilotSprinting());
+        // R64 (M2): and the slope ahead holds it.
+        variantSpeed*=EvaMotionModelR64.slopeScale(this,this.isPilotSprinting(),this.slopeAheadR64);
         float stance=this.rifleStanceInitialized?this.entityData.get(DATA_RIFLE_STANCE):this.isPilotProne()?3:this.isPilotCrouching()?1:0;
         float speed=stance<=1?Mth.lerp(stance,variantSpeed,CROUCH_SPEED):Mth.lerp(Mth.clamp((stance-1)/2,0,1),CROUCH_SPEED,PRONE_SPEED);
         return speed * synchronizationSpeed * EvaSprintR50.speed(this);
@@ -8398,6 +8406,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                                 >= PASSIVE_FALL_SPEED_CONFIRM_TICKS
                         && this.clientVisualVerticalSpeed
                                 <= PASSIVE_FALL_MIN_SPEED);
+                // R64 (M2): a Unit the planted model walks is off the ground from terrace to terrace as it runs
+                // down a slope, for longer and further than this takes for a fall. Drawn as falling it went
+                // between the falling pose and its run seven times down a slope of 130 blocks, the pelvis 7
+                // blocks up and down with each change. It begins to fall only where no ground is within a step
+                // under it. (Begins: a Unit that is falling goes on falling until it lands. Asked every tick, a
+                // Unit dropped from a height stopped falling 24 blocks over the ground and was drawn standing on
+                // it, 40 blocks down in a frame, while its box came down the rest of the way.)
+                if (confirmedFall && !this.clientVisualAirborne && EvaMotionModelR64.walks(this)
+                        && this.groundUnderR64(EvaMotionModelR64.FALL_GROUND))
+                    confirmedFall = false;
                 this.clientVisualAirborne = confirmedFall;
                 this.clientVisualAscending = false;
             }
@@ -8432,6 +8450,58 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     public boolean isVisuallyAirborneForRender()
     {
         return this.visuallyAirborne();
+    }
+
+    /** R64 (M2): the rise of the ground ahead of the body over the run to it, eased over a few ticks (up positive). */
+    private float slopeAheadR64;
+    private final double[] slopeTrailXR64=new double[6],slopeTrailZR64=new double[6];
+    private int slopeTrailAtR64;
+    /** Review only: what the slope ahead is read as and what it leaves of the speed, every half second. */
+    private static final boolean SLOPE_DIAG_R64=Boolean.getBoolean("projectseele.plantedDiagR64");
+
+    /**
+     * The rise of the ground from under the body to a little ahead of it, the way it is going, over the run
+     * between: 0 standing, with no ground at either place, or where what is there is a ledge or a drop and not a
+     * slope. (From under the body and not from its own height: its box rests on the terrace under its leading
+     * edge, half its depth up the slope already, and read from there a slope of one in one came to 0.3.)
+     */
+    private float slopeProbeR64()
+    {
+        // The way it has gone over the last six ticks. (Its velocity is no guide: the side that drives the body
+        // keeps none between ticks.)
+        int at=this.slopeTrailAtR64=(this.slopeTrailAtR64+1)%this.slopeTrailXR64.length;
+        double goneX=this.getX()-this.slopeTrailXR64[at],goneZ=this.getZ()-this.slopeTrailZR64[at];
+        this.slopeTrailXR64[at]=this.getX();this.slopeTrailZR64[at]=this.getZ();
+        double flat=Math.hypot(goneX,goneZ);
+        if(flat<.3D||flat>120D)return 0;
+        double run=EvaMotionModelR64.SLOPE_AHEAD;
+        double here=this.groundAtR64(this.getX(),this.getZ()),ahead=this.groundAtR64(this.getX()+goneX/flat*run,this.getZ()+goneZ/flat*run);
+        if(Double.isNaN(here)||Double.isNaN(ahead))return 0;
+        double slope=(ahead-here)/run;
+        return Math.abs(slope)>EvaMotionModelR64.SLOPE_MOST?0:(float)slope;
+    }
+
+    /** The ground the body could stand on at a place, within 30 blocks of its own height; NaN with none. */
+    private double groundAtR64(double x,double z)
+    {
+        Vec3 from=new Vec3(x,this.getY()+30,z),to=new Vec3(x,this.getY()-30,z);
+        for(int i=0;i<6;i++)
+        {
+            var hit=this.level().clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this));
+            if(hit.getType()!=net.minecraft.world.phys.HitResult.Type.BLOCK||i==0&&hit.getLocation().y>this.getY()+29.5)return Double.NaN;
+            BlockPos pos=hit.getBlockPos();BlockState state=this.level().getBlockState(pos);
+            if(!EvaObstacleCollision.ignores(this,state,pos,state.getCollisionShape(this.level(),pos,net.minecraft.world.phys.shapes.CollisionContext.of(this))))
+                return hit.getLocation().y;
+            from=new Vec3(x,pos.getY()-.001,z);
+        }
+        return Double.NaN;
+    }
+
+    /** Any block the body could stand on within this far under its box. */
+    private boolean groundUnderR64(double depth)
+    {
+        AABB box=this.getBoundingBox();
+        return this.level().getBlockCollisions(this,new AABB(box.minX+1,box.minY-depth,box.minZ+1,box.maxX-1,box.minY,box.maxZ-1)).iterator().hasNext();
     }
 
     private boolean visuallyAirborne()

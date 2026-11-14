@@ -49,6 +49,31 @@ public final class EvaMotionModelR64
     /** Sideways and backward, as a share of the walking speed (up to R63: 0.7 and 0.6 of the walk or the run, whichever was held). */
     public static final double SIDE_SHARE=.45,BACK_SHARE=.6;
 
+    /** A Unit the planted model walks is falling only with no ground within this far under its box (blocks: its step, and what a slope of one in one drops over half its box). */
+    public static final double FALL_GROUND=24;
+
+    /**
+     * R64 (M2): the slope in the controller. A slope takes a share of the speed, from a rise over run of
+     * SLOPE_FROM on, up to SLOPE_UP of it going up one in one and SLOPE_DOWN coming down it; and the body rises
+     * no more than CLIMB_MOST blocks a second and drops no more than DESCENT_MOST, which is what holds a fast
+     * run. On a slope of one in one: walk 32 to 16 up and 22 down, run 66 to 33 and 46, fast run 189 to 40 and
+     * 60. (Up to M1 a slope took nothing off: a footfall of level ground's length up one in one is as far up as
+     * along, which no leg reaches.)
+     */
+    public static final double CLIMB_MOST=40,DESCENT_MOST=60,SLOPE_FROM=.3,SLOPE_UP=.5,SLOPE_DOWN=.3;
+    /** How far ahead of the body the ground's rise is read (blocks), and the rise over that run past which it is a ledge or a drop and no slope. */
+    public static final double SLOPE_AHEAD=12,SLOPE_MOST=1.5;
+
+    /** What a slope leaves of the speed (rise over run of the ground ahead, up positive): all of it on gentle ground. */
+    public static float slopeScale(EvaUnit01Entity e,boolean running,float slope)
+    {
+        if(Math.abs(slope)<1e-3||!walks(e))return 1;
+        Tier t=tier(e);
+        double nominal=(running?t.run():t.walk())*EvaSprintR50.speed(e),steep=Mth.clamp((Math.abs(slope)-SLOPE_FROM)/(1-SLOPE_FROM),0,1);
+        double share=1-(slope>0?SLOPE_UP:SLOPE_DOWN)*steep;
+        return (float)Math.min(share,(slope>0?CLIMB_MOST:DESCENT_MOST)/Math.abs(slope)/nominal);
+    }
+
     /** Register base accessors before any subclass allocates its own IDs. */
     public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData data){data.define(MODEL,LEGACY);data.define(TIER,(byte)0);}
@@ -143,7 +168,9 @@ public final class EvaMotionModelR64
         if(v<=t.walk())
         {
             double u=v/t.walk();
-            return new Gait(t.walkCadence()*(.55+.45*u),.66-.04*u,.5-.05*u,1.6+1.8*u,.35+.65*u,0,1-.2*u);
+            // (R64 M2: the slowest steps at three quarters of the walk's cadence, not 0.55 of it: a body
+            // running out of a fast run hung a foot in the air for most of a second.)
+            return new Gait(t.walkCadence()*(.75+.25*u),.66-.04*u,.5-.05*u,1.6+1.8*u,.35+.65*u,0,1-.2*u);
         }
         if(v<=t.run())
         {

@@ -90,8 +90,6 @@ public final class EvaPlantedGaitR64
     private static final double SETTLE_DUTY=.56,SETTLE_SWING=.42,SETTLE_SWING_FAST=.30,SETTLE_LIFT=1.6;
     /** The body turns this fast (degrees a second) for the quickest steps on the spot. */
     private static final float SETTLE_TURN_FAST=80F;
-    /** Where ground is looked for about the body's own level, and how far over that level a step may be (blocks). */
-    private static final double GROUND_ABOVE=30,GROUND_BELOW=48,STEP_MOST=21.5;
     /** A foot stands at least this long (seconds), and is not lifted for a swing shorter than this. */
     private static final double MIN_STANCE=.06,MIN_SWING=.12;
     /** A step taken out of turn, because the leg no longer reached its foot (seconds). */
@@ -104,6 +102,10 @@ public final class EvaPlantedGaitR64
     private static final double LOST_SHARE=1.6;
     /** Seconds over which the measured speed, the pelvis height, the bearing foot and the ground level are eased. */
     private static final double VELOCITY_EASE=.07,HEIGHT_EASE=.045,SUPPORT_EASE=.09,GROUND_EASE=.15;
+    /** Seconds of the body's trail its pace is read over, over which that is eased, and over which its place is eased for its steps. */
+    private static final double PACE_WINDOW=.4,PACE_EASE=.12,PLACE_EASE=.15;
+    /** Frames of the body's drawn place kept for its pace. */
+    private static final int TRAIL=96;
     /** Each foot is turned out by this (degrees). */
     private static final float TOE_OUT=3F;
     /** Going sideways the feet are set this far either side of the body (blocks) and step at least this often a second. */
@@ -115,6 +117,40 @@ public final class EvaPlantedGaitR64
     /** The trunk tips this many degrees for each block a second squared it gathers, and banks as much into a turn; at most. */
     private static final float LEAN_GAIN=.045F,LEAN_MOST=7F,BANK_GAIN=.05F,BANK_MOST=9F;
     private static final float LEAN_RATE=9F;
+    /**
+     * R64 (M2), the ground a sole stands on. It is read at this many stations from heel to toes, each side of the
+     * sole's middle line by this much (blocks). Under this rise the ground is level. A rise of more than
+     * KERB_RISE of which one step between two stations holds KERB_SHARE is a kerb: the sole stands on one level,
+     * moved on or back until all of it does (by SHIFT_MOST at most, EDGE_MARGIN clear of the edge). Anything else
+     * is a slope, and the sole lies along it as far as an ankle gives (degrees).
+     */
+    private static final int STATIONS=7;
+    private static final double FLAT_RISE=.6,KERB_RISE=2.5,KERB_SHARE=.65,SHIFT_MOST=7,EDGE_MARGIN=.6;
+    private static final float SOLE_SLOPE_MOST=30F;
+    private static final double SLOPE_SINK=.1;
+    /** On a slope the pelvis is carried lower by this share of what half a step rises or falls there. */
+    private static final double SLOPE_DROP=.45;
+    /** How much of a sole lying on a slope is on the block it rests on, at the least (blocks). */
+    private static final double SOLE_HOLD=.5;
+    /**
+     * Where ground is looked for about the body's own level, how far over that level a footfall may be, and the
+     * rise from one station under a sole to the next that is a wall and not a kerb (blocks). Up a slope of one in
+     * one a running footfall lies up to 25 blocks over the box's own level; held to the box's step of 21 the
+     * toes' stations found "a wall", the footfall was taken at half the step instead, and it went between the
+     * two from frame to frame, 6 blocks up and down the slope.
+     */
+    private static final double GROUND_ABOVE=30,GROUND_BELOW=48,STEP_MOST=29,WALL=20.5;
+    /**
+     * The rise over run from which a slope shortens the step, the step a footfall on level ground is never over
+     * and the step on a slope of one in one (blocks), and the cadence that is not passed for it (steps a second).
+     */
+    private static final double STEEP_FROM=.3,STEP_LEVEL=48,STEP_STEEP=15,STEEP_CADENCE=3.2;
+    /** A swinging sole passes this far over the ground on its way (blocks). */
+    private static final double CLEARANCE=1.2;
+    /** The trunk leans into a slope by this share of its angle, at most this far forward and back (degrees). */
+    private static final float SLOPE_LEAN=.35F,SLOPE_LEAN_UP=14F,SLOPE_LEAN_DOWN=6F;
+    /** Landing from a fall the pelvis gives this much for each block a second over LAND_FROM, at most LAND_MOST (blocks). */
+    private static final double LAND_FROM=12,LAND_GIVE=.075,LAND_MOST=5.5;
     /** How far the pelvis gives at a footfall (blocks): a step on the spot, a walk, a run; and how fast it comes back (1/s). */
     private static final double DIP_SPOT=.25,DIP_WALK=.6,DIP_RUN=1.0,DIP_RATE=13;
 
@@ -145,6 +181,13 @@ public final class EvaPlantedGaitR64
         /** As drawn in the last frame: the ankle, the pitch (degrees, toes up). */
         double ankleX,ankleY,ankleZ;
         float pitch,drawnYaw,landWith;
+        /** The lie of the ground under the sole (degrees, rising toward the toes): standing, as it left, where it lands, as drawn. */
+        float slope,fromSlope,toSlope,drawnSlope;
+        /** Swinging: how much higher than its own arc it goes to clear what stands in its way; a footfall has been chosen. */
+        double clear;
+        boolean targeted,settled;
+        /** Swinging: the share of its step it takes (less where the whole step had nothing to stand on). */
+        double share=1;
         /** Swinging: seconds until it lands, and how long the swing was to be as it began. */
         double timeLeft,swingTime=.4;
         float support=1;
@@ -153,7 +196,7 @@ public final class EvaPlantedGaitR64
     }
 
     /** Lengths of the rig as it is drawn (blocks). */
-    private record Rig(float scale,float hipHalf,float footHalf,float leg,float ankle,float toe,float heel){}
+    private record Rig(float scale,float hipHalf,float footHalf,float leg,float ankle,float toe,float heel,float sole,float tip,float tipUp){}
 
     private static final class State
     {
@@ -162,11 +205,25 @@ public final class EvaPlantedGaitR64
         boolean live,running,moving;
         Rig rig;
         double phase,cycle=1.5,duty=.62,swingSeconds=.5,stanceSeconds=.9,half=4,speed,land=.5,lift=3,sink=.4,bounce,forwardSpeed,lateral;
-        double vx,vz,originX,originZ;
+        double vx,vz,originX,originZ,pace,px,pz;
+        /** Where the body is for its steps: its place eased, and carried on by what the easing lags at this pace. */
+        double easedX,easedZ,atX,atZ;
+        final long[] trailTime=new long[TRAIL];
+        final double[] trailX=new double[TRAIL],trailZ=new double[TRAIL];
+        int trailAt,trailFilled;
         float yaw,yawRate,still,landPitch,startAge=99;
+        /** How far the ground is carrying the box up and down (0 on level ground, 1 over terraces and kerbs), eased. */
+        float rough,carried;
         double height=Double.NaN,ground=Double.NaN,sway,fast,slow;
         float lean,leanRate,bank,bankRate;
         double lastStep,dip,dipRate;long lastSound;
+        /** Ground heights by block column, kept a second: a footfall is chosen anew every frame of a swing. */
+        final HashMap<Long,Double> columns=new HashMap<>();
+        long columnsAt;
+        double columnsNear=Double.NaN;
+        /** The lie of the ground along the body's heading (degrees, eased); the fastest it fell while off the ground, and when. */
+        double slopeAhead,fall,bodyGround=Double.NaN;
+        long airAt=Long.MIN_VALUE/2;
         final Foot left=new Foot("l",1,.5),right=new Foot("r",-1,0);
     }
 
@@ -205,6 +262,32 @@ public final class EvaPlantedGaitR64
      */
     static boolean begin(EvaUnit01Entity eva,float partial)
     {
+        long began=DIAG?System.nanoTime():0;
+        try
+        {
+            return begun(eva,partial);
+        }
+        finally
+        {
+            if(DIAG)cost(System.nanoTime()-began,true);
+        }
+    }
+
+    /** -Dprojectseele.plantedDiagR64=true: what this model costs a frame, logged every 600 frames it poses. */
+    private static long costNanos,costFrames,costMost;
+    private static void cost(long nanos,boolean first)
+    {
+        costNanos+=nanos;
+        if(!first)return;
+        if(++costFrames>=600)
+        {
+            ProjectSeele.LOGGER.info("R64PLANT cost: {} microseconds a frame over {} frames (steps, pelvis and legs of every Unit it walks)",costNanos/costFrames/1000,costFrames);
+            costNanos=0;costFrames=0;
+        }
+    }
+
+    private static boolean begun(EvaUnit01Entity eva,float partial)
+    {
         long now=AircraftRenderClockR21.frameNanos();
         State s=STATES.get(eva);
         boolean wanted=wanted(eva,partial);
@@ -217,7 +300,16 @@ public final class EvaPlantedGaitR64
         }
         if(!wanted)
         {
-            if(s!=null)s.live=false;
+            if(s!=null)
+            {
+                s.live=false;
+                // Off the ground: how fast it comes down is what its legs will take up as it lands.
+                if(!eva.onGround()||eva.isVisuallyAirborneForRender())
+                {
+                    s.fall=Math.max(s.fall,(eva.yOld-eva.getY())*20);s.airAt=now;
+                }
+            }
+            LAST.remove(eva.getId());
             eva.plantedClipReleaseR64();
             return false;
         }
@@ -266,16 +358,81 @@ public final class EvaPlantedGaitR64
         s.yaw=Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot);
         float rate=Mth.wrapDegrees(eva.yBodyRot-eva.yBodyRotO)*20;
         s.yawRate+=(rate-s.yawRate)*(float)ease;
-        double speed=Math.hypot(s.vx,s.vz);
+        double going=Math.hypot(s.vx,s.vz);
         // A teleport, or a correction of the body's place: not a speed to step by.
-        if(speed>400){s.live=false;return;}
+        if(going>400){s.live=false;return;}
+        // The pace the gait goes by: what the body has covered over the last three tenths of a second, by its
+        // drawn place. Over terraces the box is carried up a step in one tick and stands in the next (3.3 blocks,
+        // none, 3.3, none, up a slope of one in one): stepped by the speed of the tick, cadence, stance and
+        // footfall changed with every tick and the legs were thrown about, and that speed eased came to 56
+        // blocks a second where the body made 37, so every footfall was chosen half a step too far up the slope
+        // and the legs did not reach.
+        int at=s.trailAt=(s.trailAt+1)%TRAIL;
+        s.trailTime[at]=AircraftRenderClockR21.frameNanos();s.trailX[at]=s.originX;s.trailZ[at]=s.originZ;
+        s.trailFilled=Math.min(TRAIL,s.trailFilled+1);
+        double span=0;int count=1;
+        for(int i=1;i<s.trailFilled;i++)
+        {
+            int newer=(at-i+1+TRAIL)%TRAIL,older=(at-i+TRAIL)%TRAIL;
+            double stepped=Math.hypot(s.trailX[newer]-s.trailX[older],s.trailZ[newer]-s.trailZ[older]);
+            // A jump of the body's place, or a gap in the frames: the trail starts anew from here.
+            if(stepped>40||s.trailTime[newer]-s.trailTime[older]>250_000_000L){s.trailFilled=i;break;}
+            count=i+1;span=(s.trailTime[at]-s.trailTime[older])/1e9;
+            if(span>=PACE_WINDOW)break;
+        }
+        // The line through that trail (least squares), not its length. Up a slope of one in one the body's place
+        // is set back a tick's travel every tick or two and forward again (its driver's side and the server's
+        // do not agree on a terrace; M3), 3.3 blocks back and forth: by its length the trail made 54 blocks a
+        // second where the body made 38, and every footfall was chosen a third of a step too far up the slope.
+        double meanT=0,meanX=0,meanZ=0;
+        for(int i=0;i<count;i++)
+        {
+            int k=(at-i+TRAIL)%TRAIL;
+            meanT+=(s.trailTime[k]-s.trailTime[at])/1e9;meanX+=s.trailX[k];meanZ+=s.trailZ[k];
+        }
+        meanT/=count;meanX/=count;meanZ/=count;
+        double overT=0,fitX=0,fitZ=0;
+        for(int i=0;i<count;i++)
+        {
+            int k=(at-i+TRAIL)%TRAIL;double t=(s.trailTime[k]-s.trailTime[at])/1e9-meanT;
+            overT+=t*t;fitX+=t*(s.trailX[k]-meanX);fitZ+=t*(s.trailZ[k]-meanZ);
+        }
+        if(overT>1e-6){fitX/=overT;fitZ/=overT;}else{fitX=s.vx;fitZ=s.vz;}
+        double fit=Math.hypot(fitX,fitZ);
+        // Until there is a tenth of a second of trail, and whenever the body has all but stopped, the speed of the tick.
+        // And never far from it: a body that brakes is not carried on at the pace it had (the trail lags it by
+        // half its length), while a tick's speed over terraces stays within this of the trail's.
+        double measured=span>=.1&&going>MOVE_AT?Mth.clamp(fit,going*.5,going*2):going;
+        // Only where the ground carries the box up and down, though. On level ground the tick's own speed is the
+        // body's, and the trail lags a body that gathers way: read off it, a fast run's feet were chosen and
+        // swung for 113 blocks a second while the body made 160, and a leg was 10 blocks short of its foot.
+        float stepped=Math.abs(eva.getY()-eva.yOld)*20>2?1:0;
+        s.rough+=(stepped-s.rough)*(float)(1-Math.exp(-dt/(stepped>s.rough?.05:.5)));
+        // What the pelvis stands over follows that more slowly: taken up as quickly as the pace is, the pelvis
+        // went from over the feet's own level to over the ground under the body in two frames at the foot of a
+        // hill, 4 blocks up in one of them.
+        s.carried+=(s.rough-s.carried)*(float)(1-Math.exp(-dt/.35));
+        double wanted=Mth.lerp(s.rough,going,measured),easedOver=s.rough*PACE_EASE;
+        s.pace=easedOver<1e-3?wanted:s.pace+(wanted-s.pace)*(1-Math.exp(-dt/easedOver));
+        double speed=s.pace;
         s.speed=speed;
+        // Where the body is going, at that pace: the way it has gone over that trail, or the way of the tick.
+        if(s.rough>.5F&&span>=.1&&fit>1){s.px=fitX/fit*speed;s.pz=fitZ/fit*speed;}
+        else{s.px=going>.5?s.vx/going*speed:s.vx;s.pz=going>.5?s.vz/going*speed:s.vz;}
+        // And where it is, for its steps and its pelvis. The box hops up a terrace every tick or two and its place
+        // between ticks goes back and forth by a block; a footfall chosen from it went with it, 4 to 7 blocks up
+        // and down a steep slope from frame to frame. The place is eased over a tenth of a second and carried on
+        // by what that lags at the pace, which on level ground is the place itself.
+        double place=1-Math.exp(-dt/PLACE_EASE);
+        s.easedX+=(s.originX-s.easedX)*place;s.easedZ+=(s.originZ-s.easedZ)*place;
+        if(Math.hypot(s.originX-s.easedX,s.originZ-s.easedZ)>60){s.easedX=s.originX;s.easedZ=s.originZ;}
+        s.atX=Mth.lerp(s.rough,s.originX,s.easedX+s.px*PLACE_EASE);s.atZ=Mth.lerp(s.rough,s.originZ,s.easedZ+s.pz*PLACE_EASE);
         float radians=s.yaw*Mth.DEG_TO_RAD;
         double fx=-Mth.sin(radians),fz=Mth.cos(radians),lx=Mth.cos(radians),lz=Mth.sin(radians);
         s.forwardSpeed=s.vx*fx+s.vz*fz;
         double sideSpeed=s.vx*lx+s.vz*lz;
-        s.lateral=speed>1e-3?Math.abs(sideSpeed)/speed:0;
-        s.moving=speed>MOVE_AT;
+        s.lateral=going>1e-3?Math.min(1,Math.abs(sideSpeed)/going):0;
+        s.moving=going>MOVE_AT;
         // By the speed the body has, whatever gave it that speed: a pilot whose synchronisation carries the body
         // slower walks and runs in the gait of that speed.
         var gait=EvaMotionModelR64.gait(EvaMotionModelR64.tier(eva),speed);
@@ -287,11 +444,15 @@ public final class EvaPlantedGaitR64
             // Sideways and backward a leg cannot take a walking step's length: more steps of less.
             cadence=Math.max(cadence,SIDE_CADENCE*s.lateral*Math.min(1,speed/10));
             if(s.forwardSpeed<0)cadence=Math.max(cadence,-s.forwardSpeed/BACK_STEP);
+            // Nor up or down a steep slope: a step of level ground's length is as much up as along on a slope of
+            // one in one, further than a leg is long. More steps of less, as far as legs go quicker.
+            double steep=Mth.clamp((Math.abs(Math.tan(Math.toRadians(s.slopeAhead)))-STEEP_FROM)/(1-STEEP_FROM),0,1);
+            if(steep>0)cadence=Math.max(cadence,Math.min(STEEP_CADENCE,speed/Mth.lerp(steep,STEP_LEVEL,STEP_STEEP)));
             s.duty=gait.duty();s.cycle=2/cadence;s.land=gait.land();s.lift=gait.lift();s.sink=gait.sink();s.bounce=gait.bounce();
             double half=rig.footHalf()*gait.width();
             s.half=Mth.lerp(s.lateral*Math.min(1,speed/8),half,Math.max(half,WIDE_HALF));
             // Heel first at a walk going forward; flat at a run, and going sideways or backward.
-            double walking=Mth.clamp((s.duty-.40)/.22,0,1),ahead=Mth.clamp(s.forwardSpeed/Math.max(speed,1e-3)*2-1,0,1);
+            double walking=Mth.clamp((s.duty-.40)/.22,0,1),ahead=Mth.clamp(s.forwardSpeed/Math.max(going,1e-3)*2-1,0,1);
             s.landPitch=(float)(Math.min(12,.45*speed)*walking*ahead);
         }
         else
@@ -308,7 +469,7 @@ public final class EvaPlantedGaitR64
         double lost=rig.leg()*LOST_SHARE;
         for(Foot f:new Foot[]{s.left,s.right})
         {
-            if(f.down&&Math.hypot(f.x-s.originX,f.z-s.originZ)>lost){s.live=false;return;}
+            if(f.down&&Math.hypot(f.x-s.atX,f.z-s.atZ)>lost){s.live=false;return;}
             if(f.down)f.stood+=dt;
         }
 
@@ -387,6 +548,11 @@ public final class EvaPlantedGaitR64
         // steps. A run's clip leans of itself.
         double walk=EvaMotionModelR64.tier(eva).walk();
         leanTarget+=POSTURE_LEAN*(float)(Mth.clamp(s.forwardSpeed/walk,-.4,1)*(1-.6*Mth.clamp((.62-s.duty)/.22,0,1)));
+        // And into a slope: forward going up it, a little back coming down.
+        double before=column(s,eva,s.atX-fx*6,s.atZ-fz*6),after=column(s,eva,s.atX+fx*6,s.atZ+fz*6);
+        double lie=Double.isFinite(before)&&Double.isFinite(after)?Math.toDegrees(Math.atan2(after-before,12)):0;
+        s.slopeAhead+=(lie-s.slopeAhead)*(1-Math.exp(-dt/.3));
+        leanTarget+=Mth.clamp((float)s.slopeAhead*SLOPE_LEAN,-SLOPE_LEAN_DOWN,SLOPE_LEAN_UP)*(float)Mth.clamp(s.forwardSpeed/walk,-1,1);
         float bankTarget=Mth.clamp(s.yawRate*Mth.DEG_TO_RAD*(float)s.fast*BANK_GAIN,-BANK_MOST,BANK_MOST);
         int steps=Math.max(1,Mth.ceil(dt/.004F));float h=dt/steps;
         for(int i=0;i<steps;i++)
@@ -406,7 +572,7 @@ public final class EvaPlantedGaitR64
     {
         boolean tidy=s.still>TIDY_AFTER;
         double side=f.lat*s.rig.footHalf();
-        double x=s.originX+leftX(s.yaw)*side,z=s.originZ+leftZ(s.yaw)*side;
+        double x=s.atX+leftX(s.yaw)*side,z=s.atZ+leftZ(s.yaw)*side;
         double distance=Math.hypot(x-f.x,z-f.z),turn=Math.abs(Mth.wrapDegrees(s.yaw-f.lat*TOE_OUT-f.yaw));
         return Math.max(distance/(tidy?TIDY_AT:STEP_AT),turn/(tidy?TIDY_TURN:STEP_TURN));
     }
@@ -414,8 +580,8 @@ public final class EvaPlantedGaitR64
     /** From standing, the foot that is further behind on the way the body goes steps first; level, the one on the side it goes to. */
     private static Foot firstToStep(State s)
     {
-        double speed=Math.max(s.speed,1e-3),dx=s.vx/speed,dz=s.vz/speed;
-        double left=(s.left.x-s.originX)*dx+(s.left.z-s.originZ)*dz,right=(s.right.x-s.originX)*dx+(s.right.z-s.originZ)*dz;
+        double speed=Math.max(Math.hypot(s.vx,s.vz),1e-3),dx=s.vx/speed,dz=s.vz/speed;
+        double left=(s.left.x-s.atX)*dx+(s.left.z-s.atZ)*dz,right=(s.right.x-s.atX)*dx+(s.right.z-s.atZ)*dz;
         if(Math.abs(left-right)>1)return left<right?s.left:s.right;
         double toLeft=dx*leftX(s.yaw)+dz*leftZ(s.yaw);
         if(Math.abs(toLeft)>.3)return (toLeft>0)==(s.left.lat>0)?s.left:s.right;
@@ -425,8 +591,8 @@ public final class EvaPlantedGaitR64
     private static void lift(State s,Foot f,boolean quick)
     {
         f.down=false;f.swing=0;f.quick=quick;f.liftLocal=0;f.landWith=0;f.swingTime=QUICK_SWING;
-        f.fromX=f.ankleX;f.fromY=f.ankleY;f.fromZ=f.ankleZ;f.fromYaw=f.yaw;f.fromPitch=f.pitch;f.fromGround=f.y;
-        f.toX=f.x;f.toY=f.y;f.toZ=f.z;f.toYaw=f.yaw;
+        f.fromX=f.ankleX;f.fromY=f.ankleY;f.fromZ=f.ankleZ;f.fromYaw=f.yaw;f.fromPitch=f.pitch;f.fromGround=f.y;f.fromSlope=f.slope;
+        f.toX=f.x;f.toY=f.y;f.toZ=f.z;f.toYaw=f.yaw;f.toSlope=f.slope;f.clear=0;f.targeted=false;f.settled=false;f.share=1;
         s.lastStep=f.sign;
     }
 
@@ -437,21 +603,112 @@ public final class EvaPlantedGaitR64
         f.timeLeft=left;
         // Over its footfall the foot only comes down: the footfall is settled. Chosen anew to the last frame, a
         // foot coming down through a curve went 0.9 blocks over the ground in its last quarter block of height.
-        if(!f.quick&&f.swing>=OVER_BY)return;
+        if(f.swing>=(f.quick?.8F:OVER_BY))
+        {
+            // Settled where it is, on the ground as it is there: taken up over a twentieth of a second, the height
+            // of a footfall that had just moved onto a kerb was still a block short of the kerb's top when the
+            // foot stopped looking, and the foot stood a block inside the kerb.
+            if(!f.settled)
+            {
+                Footing last=footing(s,eva,s.rig,f.toX,f.toZ,f.toYaw,f.toY);
+                if(last.found())
+                {
+                    f.toY=last.y();f.toSlope=last.slope();
+                    // What is left of a small move along the sole goes with it (that height is the moved footfall's).
+                    if(Math.abs(last.shift())<=1)
+                    {
+                        f.toX+=-Mth.sin(f.toYaw*Mth.DEG_TO_RAD)*last.shift();f.toZ+=Mth.cos(f.toYaw*Mth.DEG_TO_RAD)*last.shift();
+                    }
+                }
+                f.settled=true;
+            }
+            return;
+        }
         // Where the body will face over that foot. No further ahead than a third of a second: a body coming to rest
         // has a long cycle, and a turn begun then read on over all of it swung the footfall 50 degrees round and
         // back within two frames.
         float yaw=s.yaw+Mth.clamp(s.yawRate*(float)Math.min(TURN_AHEAD,left+s.stanceSeconds*.5),-30,30);
-        double side=f.lat*s.half;
-        double x=s.originX+s.vx*ahead+leftX(yaw)*side,z=s.originZ+s.vz*ahead+leftZ(yaw)*side;
-        f.toX=x;f.toZ=z;f.toYaw=yaw-f.lat*TOE_OUT;
-        f.toY=soleGround(eva,s.rig,x,z,f.toYaw,Double.isFinite(s.ground)?s.ground:eva.getY());
+        double side=f.lat*s.half,near=Double.isFinite(s.ground)?s.ground:eva.getY();
+        float heading=yaw-f.lat*TOE_OUT;
+        double x=s.atX+s.px*ahead+leftX(yaw)*side,z=s.atZ+s.pz*ahead+leftZ(yaw)*side;
+        x=s.atX+s.px*ahead*f.share+leftX(yaw)*side;z=s.atZ+s.pz*ahead*f.share+leftZ(yaw)*side;
+        Footing ground=footing(s,eva,s.rig,x,z,heading,near);
+        // Nothing to stand on there (a wall, a drop past the leg's reach): a shorter step, down to one under the
+        // hip, and for the rest of this swing (a footfall that went back and forth between the two carried the foot with it).
+        while(!ground.found()&&f.share>0)
+        {
+            f.share=f.share>.5?.5:0;
+            x=s.atX+s.px*ahead*f.share+leftX(yaw)*side;z=s.atZ+s.pz*ahead*f.share+leftZ(yaw)*side;
+            ground=footing(s,eva,s.rig,x,z,heading,near);
+        }
+        if(ground.shift()!=0)
+        {
+            // Across a kerb's edge: on, or back, until the whole sole stands on one level.
+            x+=-Mth.sin(heading*Mth.DEG_TO_RAD)*ground.shift();z+=Mth.cos(heading*Mth.DEG_TO_RAD)*ground.shift();
+        }
+        if(f.targeted)
+        {
+            // Chosen anew every frame as the ground under it changes: taken up over a twentieth of a second, so a
+            // footfall that goes from one side of an edge to the other does not carry the foot with it in one frame.
+            // (Quicker as the foot nears its footfall: by then it is where it will be.)
+            double take=1-Math.exp(-s.dt/(.01+.04*Math.max(0,1-f.swing/OVER_BY)));
+            f.toX+=(x-f.toX)*take;f.toZ+=(z-f.toZ)*take;f.toY+=(ground.y()-f.toY)*take;f.toSlope+=(ground.slope()-f.toSlope)*(float)take;
+            f.toYaw+=Mth.wrapDegrees(heading-f.toYaw)*(float)take;
+        }
+        else
+        {
+            f.toX=x;f.toZ=z;f.toY=ground.y();f.toSlope=ground.slope();f.toYaw=heading;f.targeted=true;
+        }
+        // The way there: how much higher than its own arc the foot must go to clear what stands between.
+        Vector3f to=ankleAt(s.rig,f.toX,f.toY,f.toZ,f.toYaw,f.toSlope,0,new Vector3f());
+        double distance=Math.hypot(to.x-f.fromX,to.z-f.fromZ),need=0;
+        for(float at:new float[]{.2F,.35F,.5F,.65F,.8F})
+        {
+            double along=along(s,f,at,distance);
+            double px=Mth.lerp(along,f.fromX,to.x),pz=Mth.lerp(along,f.fromZ,to.z);
+            // Under the ankle, the toes and the heel: the ankle cleared a terrace's edge and the toes went 3 blocks into it.
+            double ux=distance>1e-3?(to.x-f.fromX)/distance:0,uz=distance>1e-3?(to.z-f.fromZ)/distance:0;
+            for(double reach:new double[]{-s.rig.heel()*.8,0,s.rig.toe()*.8})
+            {
+                double under=column(s,eva,px+ux*reach,pz+uz*reach);
+                if(Double.isFinite(under))need=Math.max(need,under+s.rig.ankle()+CLEARANCE-swingHeight(s,f,at,to.y,distance));
+            }
+        }
+        // Taken up quickly and let go slowly, never in one frame: what it needs changes block by block.
+        f.clear+=(need-f.clear)*(1-Math.exp(-s.dt/(need>f.clear?.05:.2)));
+    }
+
+    /** How far along its way over the ground a swinging foot is (0 to 1). */
+    private static double along(State s,Foot f,float swing,double distance)
+    {
+        // Over the ground the ankle leaves at the body's own speed, as the toes that it rolled over let it
+        // go, and is over its footfall a little before it is down on it, so it comes down and does not
+        // skid in. Eased from rest it fell 5 blocks further behind a fast run's hip in its first frames,
+        // past the leg's reach, and the thigh whipped after it (34 degrees in a frame); eased to the very
+        // end it was within a quarter block of the ground with 0.8 blocks still to go.
+        float over=Math.min(1,swing/OVER_BY);
+        double carried=Mth.clamp(s.speed*f.swingTime*OVER_BY/Math.max(distance,1e-3),0,1.2);
+        return (over*over*over-2*over*over+over)*carried+(3-2*over)*over*over;
+    }
+
+    /** How high a swinging foot's ankle is, before what it adds to clear the ground on its way. */
+    private static double swingHeight(State s,Foot f,float swing,double toY,double distance)
+    {
+        // Up or down by as much of the way as it has gone over the ground: along a slope it follows the slope. (What
+        // stands in its way, a kerb's edge, is cleared by what the foot adds for that.) Risen first and gone over
+        // after, a foot climbing a slope of one in one was level with its own hip while still behind it and passed
+        // through the hip's place on its way forward: with no line left from hip to ankle the leg turned over, 150
+        // to 180 degrees in a frame, once a step.
+        double height=Mth.lerp(along(s,f,swing,distance),f.fromY,toY);
+        // A fast run folds the leg up behind it at once: the lift comes early.
+        double fast=Mth.clamp((s.speed-FAST_FROM)/(EvaMotionModelR64.SPRINT-FAST_FROM),0,1);
+        return height+s.lift*Mth.clamp(distance/4,.35,1)*Math.sin(Math.PI*Math.pow(swing,Mth.lerp(fast,1,.62)));
     }
 
     private static void land(State s,EvaUnit01Entity eva,Foot f)
     {
         double step=Math.hypot(f.toX-f.fromX,f.toZ-f.fromZ);
-        f.down=true;f.x=f.toX;f.y=f.toY;f.z=f.toZ;f.yaw=f.toYaw;f.stood=0;f.strike=Math.max(0,f.landWith);f.swing=0;f.quick=false;
+        f.down=true;f.x=f.toX;f.y=f.toY;f.z=f.toZ;f.yaw=f.toYaw;f.slope=f.toSlope;f.stood=0;f.strike=Math.max(0,f.landWith);f.swing=0;f.quick=false;
         f.roll=Mth.clamp(.2*s.stanceSeconds,.05,.2);
         // The weight comes down on the foot: the pelvis gives by this much and comes back (a damped spring).
         double give=s.moving?Mth.lerp(Mth.clamp((.62-s.duty)/.32,0,1),DIP_WALK,DIP_RUN)*Mth.clamp(s.speed/20,.3,1):DIP_SPOT;
@@ -460,19 +717,110 @@ public final class EvaPlantedGaitR64
     }
 
     /**
-     * The ground a sole stands on at a place: the highest under its heel, its middle and its toes, so a sole is
-     * set on a kerb and not into it. NaN-free: where nothing is found the level given stands in.
+     * What a sole stands on at a place: the height under its ankle, the lie of the ground along it, how far the
+     * footfall should move along the sole to stand on one level of a kerb, and whether there is ground at all.
      */
-    private static double soleGround(EvaUnit01Entity eva,Rig rig,double x,double z,float yaw,double near)
+    private record Footing(double y,float slope,double shift,boolean found){}
+
+    private static Footing footing(State s,EvaUnit01Entity eva,Rig rig,double x,double z,float yaw,double near)
     {
-        float radians=yaw*Mth.DEG_TO_RAD;double hx=-Mth.sin(radians),hz=Mth.cos(radians);
-        double best=Double.NEGATIVE_INFINITY;
-        for(double along:new double[]{-rig.heel()*.8,(rig.toe()-rig.heel())*.5,rig.toe()*.8})
+        float radians=yaw*Mth.DEG_TO_RAD;double hx=-Mth.sin(radians),hz=Mth.cos(radians),lx=Mth.cos(radians),lz=Mth.sin(radians);
+        double[] at=new double[STATIONS],high=new double[STATIONS];int found=0;
+        // Each block read, by where along the sole it begins and ends: its top and those two.
+        double[] tops=new double[STATIONS*3],begins=new double[STATIONS*3],ends=new double[STATIONS*3];int blocks=0;
+        // Half of what a block one across measures along the sole's heading.
+        double span=(Math.abs(hx)+Math.abs(hz))*.5;
+        for(int i=0;i<STATIONS;i++)
         {
-            double ground=ground(eva,x+hx*along,z+hz*along,near);
-            if(Double.isFinite(ground))best=Math.max(best,ground);
+            at[i]=Mth.lerp(i/(STATIONS-1D),-rig.heel()*.92,rig.toe()*.92);
+            double best=Double.NaN;
+            for(double side:new double[]{-rig.sole()*.8,0,rig.sole()*.8})
+            {
+                double px=x+hx*at[i]+lx*side,pz=z+hz*at[i]+lz*side,under=column(s,eva,px,pz);
+                if(!Double.isFinite(under))continue;
+                if(!(best>=under))best=under;
+                double middle=(Mth.floor(px)+.5-x)*hx+(Mth.floor(pz)+.5-z)*hz;
+                tops[blocks]=under;begins[blocks]=middle-span;ends[blocks++]=middle+span;
+            }
+            high[i]=best;if(Double.isFinite(best))found++;
         }
-        return Double.isFinite(best)?best:near;
+        if(found*2<STATIONS)return new Footing(near,0,0,false);
+        // A station over a gap or in a wall: as the nearest one that found ground.
+        for(int i=0;i<STATIONS;i++)
+        {
+            if(Double.isFinite(high[i]))continue;
+            for(int d=1;d<STATIONS&&!Double.isFinite(high[i]);d++)
+            {
+                if(i-d>=0&&Double.isFinite(high[i-d]))high[i]=high[i-d];
+                else if(i+d<STATIONS&&Double.isFinite(high[i+d]))high[i]=high[i+d];
+            }
+        }
+        double low=Double.POSITIVE_INFINITY,top=Double.NEGATIVE_INFINITY;
+        for(double h:high){low=Math.min(low,h);top=Math.max(top,h);}
+        double rise=top-low;
+        if(rise<FLAT_RISE)return new Footing(top,0,0,true);
+        int edge=0;double jump=0;
+        for(int i=0;i+1<STATIONS;i++)if(Math.abs(high[i+1]-high[i])>jump){jump=Math.abs(high[i+1]-high[i]);edge=i;}
+        if(rise>KERB_RISE&&jump>=KERB_SHARE*rise)
+        {
+            // A kerb: the sole stands on one level, the one more of it is over.
+            double where=(at[edge]+at[edge+1])*.5;
+            boolean beyond=(STATIONS-1-edge)*2>=STATIONS;
+            // A rise the body itself could not step is a wall: the sole stands on the near side of it, whichever way it faces.
+            if(jump>WALL)beyond=high[edge+1]<high[edge];
+            double level=Double.NEGATIVE_INFINITY;
+            for(int i=beyond?edge+1:0;i<(beyond?STATIONS:edge+1);i++)level=Math.max(level,high[i]);
+            double shift=beyond?where+rig.heel()+EDGE_MARGIN:where-rig.toe()-EDGE_MARGIN;
+            return new Footing(level,0,Mth.clamp(shift,-SHIFT_MOST,SHIFT_MOST),true);
+        }
+        // A slope (terraces are one): the sole lies along it, on its highest points.
+        double meanAt=0,meanHigh=0;
+        for(int i=0;i<STATIONS;i++){meanAt+=at[i];meanHigh+=high[i];}
+        meanAt/=STATIONS;meanHigh/=STATIONS;
+        double over=0,under=0;
+        for(int i=0;i<STATIONS;i++){over+=(at[i]-meanAt)*(high[i]-meanHigh);under+=(at[i]-meanAt)*(at[i]-meanAt);}
+        double most=Math.tan(SOLE_SLOPE_MOST*Mth.DEG_TO_RAD),lie=Mth.clamp(over/under,-most,most);
+        // It rests on the block that stands highest over its line, at that block's downhill edge: a terrace's
+        // corner. Taken where the block happened to be read, up to a block in from its corner, the sole lay half a
+        // block inside every corner of a slope of one in two and a half.
+        // And only on blocks under it as it lies: along a slope it covers less ground than it is long. Read to
+        // its full length, a sole lying at 30 degrees on a slope of one in one rested on a block half a block
+        // past its toes and stood half a block over the ground.
+        double flat=1/Math.sqrt(1+lie*lie),from=-rig.heel()*flat,to=rig.toe()*flat;
+        double rest=Double.NEGATIVE_INFINITY,where=0;
+        for(int i=0;i<blocks;i++)
+        {
+            if(begins[i]>to||ends[i]<from)continue;
+            double touch=lie>0?Math.max(begins[i],from):Math.min(ends[i],to),stands=tops[i]-lie*touch;
+            if(stands>rest){rest=stands;where=touch;}
+        }
+        if(rest==Double.NEGATIVE_INFINITY)return new Footing(meanHigh-lie*meanAt-SLOPE_SINK,(float)Math.toDegrees(Math.atan(lie)),0,true);
+        // A block under no more than the last of its toes (or of its heel, the ground falling toward the toes)
+        // does not carry it: the flat of the sole ends a tenth of a block short of the foot's length, and resting
+        // on such a block it stood 0.8 blocks over the one before. The footfall moves on until half a block of
+        // the sole is on what it rests on.
+        double shift=lie>0?Math.max(0,where-(to-SOLE_HOLD)):Math.min(0,where-(from+SOLE_HOLD));
+        if(shift!=0)rest+=lie*shift;
+        // On the corners of terraces a sole lying on the highest of them stands clear of all the rest: it is let
+        // a tenth of a block into them, between standing in the ground and standing over it.
+        return new Footing(rest-SLOPE_SINK,(float)Math.toDegrees(Math.atan(lie)),shift,true);
+    }
+
+    /** The ground in a block column, as last read within a second and with the body at about the same level. */
+    private static double column(State s,EvaUnit01Entity eva,double x,double z)
+    {
+        long now=AircraftRenderClockR21.frameNanos();
+        double level=eva.getY();
+        if(now-s.columnsAt>1_000_000_000L||!(Math.abs(level-s.columnsNear)<3)||s.columns.size()>4096)
+        {
+            s.columns.clear();s.columnsAt=now;s.columnsNear=level;
+        }
+        long key=((long)Mth.floor(x)<<32)^(Mth.floor(z)&0xffffffffL);
+        Double known=s.columns.get(key);
+        if(known!=null)return known;
+        double y=ground(eva,Mth.floor(x)+.5,Mth.floor(z)+.5,s.columnsNear);
+        s.columns.put(key,y);
+        return y;
     }
 
     /**
@@ -480,14 +828,13 @@ public final class EvaPlantedGaitR64
      * under it. Ground more than STEP_MOST over the body's level is a wall and not a step, as it is for the body
      * itself; a place roofed over at the top of the search is one too.
      * <p>
-     * It was looked for 21 blocks either side of the level the feet stood on ({@code near}). Running up a slope
-     * of one in one the next footfall lies further above the feet than that: the search began inside the hill,
-     * found nothing, and the foot was set down at the feet's old level. From then on every footfall was, and the
-     * body, carried by its feet, was drawn 60 to 87 blocks down inside the slope while the Unit stood on its top.
+     * Up to M1 it was looked for 21 blocks either side of the level the feet stood on. Running up a slope of one
+     * in one the next footfall lies further above the feet than that: the search began inside the hill, found
+     * nothing, and the foot was set down at the feet's old level. From then on every footfall was, and the body,
+     * carried by its feet, was drawn 60 to 87 blocks down inside the slope while the Unit stood on its top.
      */
-    private static double ground(EvaUnit01Entity eva,double x,double z,double near)
+    private static double ground(EvaUnit01Entity eva,double x,double z,double level)
     {
-        double level=eva.getY();
         Vec3 from=new Vec3(x,level+GROUND_ABOVE,z),to=new Vec3(x,level-GROUND_BELOW,z);
         for(int i=0;i<6;i++)
         {
@@ -510,7 +857,7 @@ public final class EvaPlantedGaitR64
                 String.format(java.util.Locale.ROOT,"%.1f",step),String.format(java.util.Locale.ROOT,"%.1f",s.speed),
                 String.format(java.util.Locale.ROOT,"%.2f",2/s.cycle),String.format(java.util.Locale.ROOT,"%.2f",s.duty),
                 String.format(java.util.Locale.ROOT,"%.1f",f.x),String.format(java.util.Locale.ROOT,"%.1f",f.y),String.format(java.util.Locale.ROOT,"%.1f",f.z));
-        if(eva.isSilent()||!eva.onGround())return;
+        if(eva.isSilent()||eva.isVisuallyAirborneForRender())return;
         long now=AircraftRenderClockR21.frameNanos();
         if(now-s.lastSound<120_000_000L)return;
         s.lastSound=now;
@@ -543,42 +890,46 @@ public final class EvaPlantedGaitR64
         float scale=root.getScale(new Vector3f()).y;
         Vector3f hip=EvaRigTransforms.pivot(leg),knee=EvaRigTransforms.knee(shin),ankle=EvaRigTransforms.pivot(foot);
         float length=(hip.distance(knee)+knee.distance(ankle))*scale;
-        float height=ankle.y*scale,toe=height*1.9F,heel=height*.75F;
+        float height=ankle.y*scale,toe=height*1.9F,heel=height*.75F,wide=height*.45F,tip=toe,tipUp=0;
         var points=EvaMeshPointsR63.of(eva,EvaGroundContactR56.PARTS).feet().get("l");
         if(points!=null&&points.length>0)
         {
             float low=Float.POSITIVE_INFINITY;
             for(Vector3f p:points)low=Math.min(low,p.y);
-            float front=0,rear=0;
+            float front=0,rear=0,side=0;
             // What stands on the ground: the part of the foot within half a block of its lowest point.
             for(Vector3f p:points)
             {
                 if(p.y>low+.5F/scale)continue;
-                front=Math.max(front,ankle.z-p.z);rear=Math.max(rear,p.z-ankle.z);
+                front=Math.max(front,ankle.z-p.z);rear=Math.max(rear,p.z-ankle.z);side=Math.max(side,Math.abs(p.x-ankle.x));
             }
-            height=(ankle.y-low)*scale;toe=front*scale;heel=rear*scale;
+            height=(ankle.y-low)*scale;toe=front*scale;heel=rear*scale;wide=side*scale;
+            // The foremost point of the whole foot: the toe cap, which stands up off the ground ahead of the sole.
+            float foremost=Float.NEGATIVE_INFINITY;
+            for(Vector3f p:points)if(ankle.z-p.z>foremost){foremost=ankle.z-p.z;tipUp=(p.y-low)*scale;}
+            tip=Math.max(toe,foremost*scale);
         }
-        Rig rig=new Rig(scale,Math.abs(hip.x)*scale,Math.abs(ankle.x)*scale,length,height,toe,heel);
-        ProjectSeele.LOGGER.info("R64PLANT rig of unit {}: scale {} leg {} hip half {} foot half {} ankle {} toe {} heel {} (mesh {})",
-                eva.getUnitVariant(),rig.scale(),rig.leg(),rig.hipHalf(),rig.footHalf(),rig.ankle(),rig.toe(),rig.heel(),points!=null&&points.length>0);
+        Rig rig=new Rig(scale,Math.abs(hip.x)*scale,Math.abs(ankle.x)*scale,length,height,toe,heel,wide,tip,tipUp);
+        ProjectSeele.LOGGER.info("R64PLANT rig of unit {}: scale {} leg {} hip half {} foot half {} ankle {} toe {} heel {} sole half {} (mesh {})",
+                eva.getUnitVariant(),rig.scale(),rig.leg(),rig.hipHalf(),rig.footHalf(),rig.ankle(),rig.toe(),rig.heel(),rig.sole(),points!=null&&points.length>0);
         return rig;
     }
 
-    /** The ankle of a foot whose flat sole would stand at a place, rolled over its heel (pitch above 0) or its toes (below). */
-    private static Vector3f ankleAt(Rig rig,double x,double y,double z,float yaw,float pitch,Vector3f out)
+    /**
+     * The ankle of a foot whose sole would lie on the ground at a place (the ground rising toward its toes by
+     * {@code slope} degrees), rolled from there over its heel (pitch above 0) or its toes (below).
+     */
+    private static Vector3f ankleAt(Rig rig,double x,double y,double z,float yaw,float slope,float pitch,Vector3f out)
     {
         float radians=yaw*Mth.DEG_TO_RAD;double hx=-Mth.sin(radians),hz=Mth.cos(radians);
-        double along,up;
-        if(pitch>=0)
-        {
-            float a=pitch*Mth.DEG_TO_RAD;
-            along=-rig.heel()+rig.heel()*Mth.cos(a)-rig.ankle()*Mth.sin(a);up=rig.heel()*Mth.sin(a)+rig.ankle()*Mth.cos(a);
-        }
-        else
-        {
-            float a=-pitch*Mth.DEG_TO_RAD;
-            along=rig.toe()-rig.toe()*Mth.cos(a)+rig.ankle()*Mth.sin(a);up=rig.toe()*Mth.sin(a)+rig.ankle()*Mth.cos(a);
-        }
+        float lie=slope*Mth.DEG_TO_RAD,turn=(slope+pitch)*Mth.DEG_TO_RAD;
+        // The point it rolls over, on the line of the ground through the place; from there to the ankle in the turned foot.
+        double reach=pitch>=0?-rig.heel():rig.toe();
+        double along=reach*Mth.cos(lie)-reach*Mth.cos(turn)-rig.ankle()*Mth.sin(turn);
+        double up=reach*Mth.sin(lie)-reach*Mth.sin(turn)+rig.ankle()*Mth.cos(turn);
+        // Far up on its toes the foot stands on its toe cap, not on the front of its sole: rolled about the
+        // sole's front the cap went a block into the ground (a foot left behind by a body that had just stopped).
+        if(pitch<0)up+=Math.max(0,(rig.tip()-rig.toe())*Mth.sin(-pitch*Mth.DEG_TO_RAD)-rig.tipUp()*Mth.cos(-pitch*Mth.DEG_TO_RAD));
         return out.set((float)(x+hx*along),(float)(y+up),(float)(z+hz*along));
     }
 
@@ -615,10 +966,10 @@ public final class EvaPlantedGaitR64
      * foot rolls toward the body, onto its toes where the body has gone on ahead of it, onto its heel where the
      * body is behind it, as far as the leg needs and no further than an ankle gives.
      */
-    private static float rolled(Rig rig,double x,double y,double z,float yaw,float pitch,double hipX,double hipZ,double above,double nominal)
+    private static float rolled(Rig rig,double x,double y,double z,float yaw,float slope,float pitch,double hipX,double hipZ,double above,double nominal)
     {
         Vector3f probe=new Vector3f();
-        if(reach(rig,ankleAt(rig,x,y,z,yaw,pitch,probe),hipX,hipZ,above)>=nominal)return pitch;
+        if(reach(rig,ankleAt(rig,x,y,z,yaw,slope,pitch,probe),hipX,hipZ,above)>=nominal)return pitch;
         float radians=yaw*Mth.DEG_TO_RAD;
         double along=(hipX-x)*-Mth.sin(radians)+(hipZ-z)*Mth.cos(radians);
         boolean ahead=along>0;
@@ -626,12 +977,12 @@ public final class EvaPlantedGaitR64
         // set down wide of the body rolled to its limit in the frame it landed (25 degrees) and gained nothing.
         float limit=(ahead?-HEEL_OFF_MOST:TOES_UP_MOST)*(float)Mth.clamp(Math.abs(along)/(.25*rig.leg()),0,1);
         if(ahead?pitch<=limit:pitch>=limit)return pitch;
-        if(reach(rig,ankleAt(rig,x,y,z,yaw,limit,probe),hipX,hipZ,above)<nominal)return limit;
+        if(reach(rig,ankleAt(rig,x,y,z,yaw,slope,limit,probe),hipX,hipZ,above)<nominal)return limit;
         float low=pitch,high=limit;
         for(int k=0;k<9;k++)
         {
             float mid=(low+high)*.5F;
-            if(reach(rig,ankleAt(rig,x,y,z,yaw,mid,probe),hipX,hipZ,above)<nominal)low=mid;else high=mid;
+            if(reach(rig,ankleAt(rig,x,y,z,yaw,slope,mid,probe),hipX,hipZ,above)<nominal)low=mid;else high=mid;
         }
         return high;
     }
@@ -647,6 +998,19 @@ public final class EvaPlantedGaitR64
      * Poses the pelvis and the legs for this frame, over whatever the clips have written.
      */
     static EvaMotionEngineV2.BoneWrites apply(EvaUnit01Entity eva,BakedGeoModel model,float partial,Matrix4f root)
+    {
+        long began=DIAG?System.nanoTime():0;
+        try
+        {
+            return applying(eva,model,partial,root);
+        }
+        finally
+        {
+            if(DIAG)cost(System.nanoTime()-began,false);
+        }
+    }
+
+    private static EvaMotionEngineV2.BoneWrites applying(EvaUnit01Entity eva,BakedGeoModel model,float partial,Matrix4f root)
     {
         State s=STATES.get(eva);
         long now=AircraftRenderClockR21.frameNanos();
@@ -671,6 +1035,8 @@ public final class EvaPlantedGaitR64
             s.live=true;s.running=false;s.phase=0;s.still=0;s.yawRate=0;s.lean=s.leanRate=s.bank=s.bankRate=0;s.sway=0;
             s.originX=root.m30();s.originZ=root.m32();s.dip=s.dipRate=0;s.startAge=99;
             s.vx=(eva.getX()-eva.xOld)*20;s.vz=(eva.getZ()-eva.zOld)*20;s.fast=s.slow=0;
+            s.pace=Math.hypot(s.vx,s.vz);s.px=s.vx;s.pz=s.vz;s.trailFilled=0;s.rough=0;s.carried=0;
+            s.easedX=s.originX-s.px*PLACE_EASE;s.easedZ=s.originZ-s.pz*PLACE_EASE;s.atX=s.originX;s.atZ=s.originZ;
             s.yaw=Mth.rotLerp(partial,eva.yBodyRotO,eva.yBodyRot);
             // Which hip is on the body's left: from where the hips are, not from what the bones are called.
             Vector3f hipL=EvaRigTransforms.point(legs[0],EvaRigTransforms.pivot(legs[0]),root),hipR=EvaRigTransforms.point(legs[1],EvaRigTransforms.pivot(legs[1]),root);
@@ -685,11 +1051,15 @@ public final class EvaPlantedGaitR64
                 f.down=true;f.swing=0;f.quick=false;f.stood=1;f.strike=0;f.support=1;f.reachShort=0;
                 f.yaw=Math.hypot(toes.x,toes.z)>.2?(float)(Mth.atan2(-toes.x,toes.z)*Mth.RAD_TO_DEG):s.yaw;
                 f.x=at.x;f.z=at.z;
-                f.y=soleGround(eva,rig,f.x,f.z,f.yaw,at.y-rig.ankle());
+                Footing ground=footing(s,eva,rig,f.x,f.z,f.yaw,at.y-rig.ankle());
+                f.y=ground.y();f.slope=f.drawnSlope=ground.slope();f.clear=0;
                 f.pitch=0;f.drawnYaw=f.yaw;f.ankleX=at.x;f.ankleY=f.y+rig.ankle();f.ankleZ=at.z;
                 sum+=f.y;
             }
-            s.ground=sum/2;s.height=Double.NaN;
+            s.ground=sum/2;s.height=Double.NaN;s.slopeAhead=0;s.bodyGround=Double.NaN;
+            // Come down from a fall: the legs take it up, the pelvis giving by how fast it fell.
+            if(now-s.airAt<400_000_000L&&s.fall>LAND_FROM)s.dipRate-=Math.min(LAND_MOST,(s.fall-LAND_FROM)*LAND_GIVE)*DIP_RATE*Math.E;
+            s.fall=0;
             s.half=rig.footHalf();s.sink=.35;s.bounce=0;s.duty=SETTLE_DUTY;s.cycle=SETTLE_SWING/(1-SETTLE_DUTY);
             s.swingSeconds=SETTLE_SWING;s.stanceSeconds=s.cycle*s.duty;s.moving=false;s.speed=0;s.landPitch=0;
             fresh=true;
@@ -711,7 +1081,8 @@ public final class EvaPlantedGaitR64
         double share=s.moving?Mth.lerp(Mth.clamp((.62-s.duty)/.22,0,1),SWAY_WALK,SWAY_RUN):SWAY_SPOT;
         double swayTarget=bearing*share*s.half;
         if(fresh)s.sway+=(swayTarget-s.sway)*(1-Math.exp(-dt/.12));
-        double originX=root.m30(),originZ=root.m32();
+        // Over the body's eased place (which is the frame's own place where this is its first frame).
+        double originX=s.atX,originZ=s.atZ;
         double wantX=originX+leftX(s.yaw)*s.sway,wantZ=originZ+leftZ(s.yaw)*s.sway;
         double shiftX=wantX-centre.x,shiftZ=wantZ-centre.z;
 
@@ -720,7 +1091,15 @@ public final class EvaPlantedGaitR64
         for(Foot f:both)level+=f.down?f.y:Mth.lerp(smooth(f.swing),f.fromGround,f.toY);
         level/=2;
         if(fresh)s.ground=Double.isFinite(s.ground)?s.ground+(level-s.ground)*(1-Math.exp(-dt/GROUND_EASE)):level;
-        double nominal=s.ground+rig.ankle()+rig.leg()-s.sink;
+        // Carried over the ground under the body, where the feet stand about it: over the feet's own mean it went
+        // up a stair with every footfall on a slope. And lower on a slope by what half a step rises or falls
+        // there: the downhill leg does not reach further, and held at that leg's full length the pelvis went
+        // from one leg's limit to the other's with each step.
+        double under=column(s,eva,s.atX,s.atZ);
+        if(!Double.isFinite(under)||Math.abs(under-level)>rig.leg()*.6)under=level;
+        if(fresh)s.bodyGround=Double.isFinite(s.bodyGround)&&Math.abs(s.bodyGround-under)<rig.leg()?s.bodyGround+(under-s.bodyGround)*(1-Math.exp(-dt/GROUND_EASE)):under;
+        double drop=Math.abs(Math.tan(Math.toRadians(s.slopeAhead)))*s.speed*s.cycle*.25*SLOPE_DROP;
+        double nominal=Mth.lerp(s.carried,s.ground,s.bodyGround)+rig.ankle()+rig.leg()-s.sink-Math.min(drop,rig.leg()*.45);
         // A run rises between its footfalls and is lowest over each foot.
         if(s.bounce>0&&s.running)nominal-=s.bounce*Math.cos(4*Math.PI*(s.phase-s.duty*.5));
         nominal+=Math.min(0,s.dip);
@@ -734,9 +1113,9 @@ public final class EvaPlantedGaitR64
             double hipX=hips[i].x+shiftX,hipZ=hips[i].z+shiftZ,above=hips[i].y-centre.y;
             if(f.down)
             {
-                float pitch=rolled(rig,f.x,f.y,f.z,f.yaw,scheduled(s,f,rig,hipX,hipZ),hipX,hipZ,above,nominal);
-                ankleAt(rig,f.x,f.y,f.z,f.yaw,pitch,anklesAt[i]);
-                f.pitch=pitch;f.drawnYaw=f.yaw;reaches[i]=reach(rig,anklesAt[i],hipX,hipZ,above);
+                float pitch=rolled(rig,f.x,f.y,f.z,f.yaw,f.slope,scheduled(s,f,rig,hipX,hipZ),hipX,hipZ,above,nominal);
+                ankleAt(rig,f.x,f.y,f.z,f.yaw,f.slope,pitch,anklesAt[i]);
+                f.pitch=pitch;f.drawnYaw=f.yaw;f.drawnSlope=f.slope;reaches[i]=reach(rig,anklesAt[i],hipX,hipZ,above);
             }
             else
             {
@@ -748,23 +1127,15 @@ public final class EvaPlantedGaitR64
                 // Rolled for where its hip will be as it lands, which the footfall was chosen from: read off where
                 // the hip is now, a fast run's foot came down rolled for a hip still far behind it and lost 14
                 // degrees in its last frame.
-                double thenX=hipX+s.vx*f.timeLeft,thenZ=hipZ+s.vz*f.timeLeft;
-                f.landWith=rolled(rig,f.toX,f.toY,f.toZ,f.toYaw,s.landPitch>0?s.landPitch:heel(s,rig,f.toX,f.toZ,f.toYaw,thenX,thenZ),thenX,thenZ,above,nominal);
+                double thenX=hipX+s.px*f.timeLeft,thenZ=hipZ+s.pz*f.timeLeft;
+                f.landWith=rolled(rig,f.toX,f.toY,f.toZ,f.toYaw,f.toSlope,s.landPitch>0?s.landPitch:heel(s,rig,f.toX,f.toZ,f.toYaw,thenX,thenZ),thenX,thenZ,above,nominal);
                 float pitch=Mth.lerp(t,f.fromPitch,f.landWith);
-                Vector3f to=ankleAt(rig,f.toX,f.toY,f.toZ,f.toYaw,f.landWith,new Vector3f());
-                double distance=Math.hypot(to.x-f.fromX,to.z-f.fromZ);
-                // Over the ground the ankle leaves at the body's own speed, as the toes that it rolled over let it
-                // go, and is over its footfall a little before it is down on it, so it comes down and does not
-                // skid in. Eased from rest it fell 5 blocks further behind a fast run's hip in its first frames,
-                // past the leg's reach, and the thigh whipped after it (34 degrees in a frame); eased to the very
-                // end it was within a quarter block of the ground with 0.8 blocks still to go.
-                float over=Math.min(1,f.swing/OVER_BY);
-                double carried=Mth.clamp(s.speed*f.swingTime*OVER_BY/Math.max(distance,1e-3),0,1.2);
-                double along=(over*over*over-2*over*over+over)*carried+(3-2*over)*over*over;
-                // A fast run folds the leg up behind it at once: the lift comes early.
-                double fast=Mth.clamp((s.speed-FAST_FROM)/(EvaMotionModelR64.SPRINT-FAST_FROM),0,1);
-                double lift=s.lift*Mth.clamp(distance/4,.35,1)*Math.sin(Math.PI*Math.pow(f.swing,Mth.lerp(fast,1,.62)));
-                anklesAt[i].set((float)Mth.lerp(along,f.fromX,to.x),(float)(Mth.lerp(t,f.fromY,to.y)+lift),(float)Mth.lerp(along,f.fromZ,to.z));
+                Vector3f to=ankleAt(rig,f.toX,f.toY,f.toZ,f.toYaw,f.toSlope,f.landWith,new Vector3f());
+                double distance=Math.hypot(to.x-f.fromX,to.z-f.fromZ),along=along(s,f,f.swing,distance);
+                // Higher by what stands in its way, from soon after it leaves until it is over its footfall.
+                double cleared=f.clear*smooth(f.swing/.18F)*smooth((1-f.swing)/.12F);
+                anklesAt[i].set((float)Mth.lerp(along,f.fromX,to.x),(float)(swingHeight(s,f,f.swing,to.y,distance)+cleared),(float)Mth.lerp(along,f.fromZ,to.z));
+                f.drawnSlope=Mth.lerp(t,f.fromSlope,f.toSlope);
                 f.pitch=pitch;f.drawnYaw=yaw;
                 // A foot in the air holds the pelvis down only as it comes to land: a foot just lifted is far
                 // behind, and held to its reach the pelvis was pulled 3 to 9 blocks down at each lift-off of a
@@ -814,11 +1185,19 @@ public final class EvaPlantedGaitR64
         {
             Foot f=both[i];
             // Minecraft yaw grows clockwise from above, world rotations the other way.
-            var turn=new Quaternionf().rotationY(Mth.wrapDegrees(s.yaw-f.drawnYaw)*Mth.DEG_TO_RAD).mul(frame).rotateX(f.pitch*Mth.DEG_TO_RAD);
+            var turn=new Quaternionf().rotationY(Mth.wrapDegrees(s.yaw-f.drawnYaw)*Mth.DEG_TO_RAD).mul(frame).rotateX((f.drawnSlope+f.pitch)*Mth.DEG_TO_RAD);
             float heading=f.drawnYaw*Mth.DEG_TO_RAD;
-            // The knee bends the way the foot and the body point.
-            var pole=new Vector3f(-Mth.sin(heading)-Mth.sin(body),0,Mth.cos(heading)+Mth.cos(body));
-            if(pole.lengthSquared()<1e-4F)pole.set(-Mth.sin(body),0,Mth.cos(body));
+            // The knee bends the way the foot and the body point: it lies on the one side of the line from hip to
+            // ankle that a knee can, the side reached by turning that line a quarter turn from forward toward up.
+            // Given only "forward", a leg reaching forward and up a steep slope had its hip-to-ankle line along
+            // that pole; the solver then went by the toes, which said up in one frame and down in the next, and
+            // thigh and shin turned 160 degrees and back within three frames.
+            var ahead=new Vector3f(-Mth.sin(heading)-Mth.sin(body),0,Mth.cos(heading)+Mth.cos(body));
+            if(ahead.lengthSquared()<1e-4F)ahead.set(-Mth.sin(body),0,Mth.cos(body));
+            ahead.normalize();
+            var line=new Vector3f(anklesAt[i]).sub(hips[i]);
+            var pole=new Vector3f(ahead).mul(-line.y).add(0,line.dot(ahead),0);
+            if(pole.lengthSquared()<1e-4F)pole.set(ahead);
             double off=EvaRigTransforms.solveLeg(legs[i],shins[i],ankles[i],feet[i],anklesAt[i],turn,pole.normalize(),root);
             f.reachShort=Math.max(0,hips[i].distance(anklesAt[i])-s.rig.leg()*REACH);
             if(DIAG&&off>.05)ProjectSeele.LOGGER.info("R64PLANT leg {} is {} blocks short of its foot",f.side,String.format(java.util.Locale.ROOT,"%.2f",off));
@@ -867,7 +1246,7 @@ public final class EvaPlantedGaitR64
         for(int i=0;i<2;i++)
         {
             Foot f=both[i];int at=6+i*11;
-            w[at]=f.down?1:0;w[at+1]=f.swing;w[at+2]=f.pitch;
+            w[at]=f.down?1:0;w[at+1]=f.swing;w[at+2]=f.drawnSlope+f.pitch;
             w[at+3]=f.down?f.x:f.toX;w[at+4]=f.down?f.y:f.toY;w[at+5]=f.down?f.z:f.toZ;
             w[at+6]=anklesAt[i].x;w[at+7]=anklesAt[i].y;w[at+8]=anklesAt[i].z;w[at+9]=f.reachShort;w[at+10]=f.drawnYaw;
         }

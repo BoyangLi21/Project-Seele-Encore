@@ -130,6 +130,9 @@ public final class EvaConnectedActionReview
     private static final boolean EVERY_FRAME=Boolean.getBoolean("projectseele.recordEveryFrame");
     private static float poseTime = Float.NaN;
     private static final int TOUR_END=Integer.getInteger("projectseele.tourEnd",1600)-TOUR_START;
+    /** Where the piloted unit stood as the tour began, and the ticks a tour that built nothing waits after its end for the server to set it back there. */
+    private static Vec3 tourHomeR64;
+    private static final int HOME_GRACE_R64=8;
     private static final String BATCH = LocalDateTime.now().format(DateTimeFormatter.ofPattern("yyyyMMdd_HHmmss"));
     private static int wait;
     private static int tick;
@@ -214,11 +217,26 @@ public final class EvaConnectedActionReview
         if (TOUR)
         {
             tour(mc, eva);
+            // R64 (M2): a tour that has gone far sets its unit back where it began before the client stops. The
+            // lab brings a unit back to its pad as the next tour enters it, but not always one left hundreds of
+            // blocks away (its chunk is not loaded yet): that tour then ran where it stood, in chunks the client
+            // had not loaded. The pose records end at the tour's end, before this.
+            if (tourHomeR64 == null) tourHomeR64 = eva.position();
+            if (at(TOUR_END) && eva.position().distanceTo(tourHomeR64) > 48)
+            {
+                Vec3 home = tourHomeR64;
+                mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT, "tp %s %.2f %.2f %.2f", eva.getStringUUID(), home.x, home.y, home.z));
+                // The pilot's client moves a ridden unit: left where it stood here, it sent the unit back there.
+                eva.setPos(home.x, home.y, home.z);
+                eva.xo = eva.xOld = home.x; eva.yo = eva.yOld = home.y; eva.zo = eva.zOld = home.z;
+                eva.setDeltaMovement(Vec3.ZERO);
+                ProjectSeele.LOGGER.info("Connected action review: unit set back to {} at the tour's end", home);
+            }
             previousTick = tick;
             // A tour that built terrain clears it two ticks before its end; the
             // server needs time to run those commands before the client stops,
             // or half a hill stays in the save and blocks every later tour.
-            if (tick >= TOUR_END + (HILL || STEEP_R64 || STEPS || CLIMB ? TERRAIN_GRACE : 0)) finish(mc, "complete");
+            if (tick >= TOUR_END + (HILL || STEEP_R64 || STEPS || CLIMB ? TERRAIN_GRACE : HOME_GRACE_R64)) finish(mc, "complete");
             return;
         }
         if (RIFLE)
@@ -758,7 +776,8 @@ public final class EvaConnectedActionReview
     private static final boolean STEEP_R64=Boolean.getBoolean("projectseele.tourSteepR64");
     private static final String STEEP_GAIT_R64=System.getProperty("projectseele.tourSteepGaitR64","run");
     private static final int STEEP_FOOT_R64=-60,STEEP_RISE_R64=130,STEEP_TOP_R64=40;
-    private static int steepTopTickR64=-1;
+    private static int steepTopTickR64=-1,steepDownEndR64=-1;
+    private static final boolean STEEP_DOWN_R64=Boolean.getBoolean("projectseele.tourSteepDownR64");
     private static void steepR64(Minecraft mc,EvaUnit01Entity eva,int x)
     {
         int t=tick;
@@ -771,12 +790,26 @@ public final class EvaConnectedActionReview
             ProjectSeele.LOGGER.info("R64STEEP tick {}: on the top at y {}",t,String.format(java.util.Locale.ROOT,"%.1f",eva.getY()));
         }
         boolean up=t>=40&&steepTopTickR64<0;
+        // -Dprojectseele.tourSteepDownR64=true: instead of the drop, the unit turns about on the top and comes
+        // back down the slope in the same gait, to 30 blocks out on the flat (tourEnd 420 for a run, 620 for a walk).
+        boolean down=STEEP_DOWN_R64&&steepTopTickR64>=0&&t>=steepTopTickR64+30&&eva.getZ()>STEEP_FOOT_R64-30;
+        up|=down;
         mc.options.keyUp.setDown(up);mc.player.input.up=up;mc.player.input.forwardImpulse=up?1:0;mc.player.zza=up?1:0;mc.player.xxa=0;
-        mc.player.setYRot(0);mc.player.setXRot(0);
+        mc.player.setYRot(STEEP_DOWN_R64&&steepTopTickR64>=0&&t>=steepTopTickR64+4?180:0);mc.player.setXRot(0);
         mc.options.keySprint.setDown(up&&run);
         com.projectseele.client.Keybinds.EVA_DASH.setDown(up&&fast&&t>=44);
         if(run&&at(40))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
         if(run&&steepTopTickR64==t)send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        if(STEEP_DOWN_R64)
+        {
+            if(run&&steepTopTickR64>=0&&t==steepTopTickR64+30)send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+            if(run&&steepDownEndR64<0&&steepTopTickR64>=0&&t>steepTopTickR64+30&&!down)
+            {
+                steepDownEndR64=t;send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+                ProjectSeele.LOGGER.info("R64STEEP tick {}: back down on the flat",t);
+            }
+            return;
+        }
         if(steepTopTickR64>=0&&t==steepTopTickR64+40)
         {
             // Onto the middle of the slope from 100 blocks above it: a landing on the terraces.
