@@ -177,7 +177,8 @@ def terrace(m, y, k_in, k_out):
 
 def roof(m, H, k):
     """Varied roof lines: plant room of some size, a stepped crown, a helipad or a sign frame."""
-    kind = h(m.seed, 'roof') % 4
+    r = h(m.seed, 'roof') % 20                     # plant room 10, crown 4, sign frame 4, helipad 2 (tall only)
+    kind = 0 if r < 10 else 1 if r < 14 else 3 if r < 18 else (2 if H >= 56 else 0)
     w = min(m.W, m.D) - 2 * k
     if kind == 1 and w >= 9:
         for y in (H + 1, H + 2):
@@ -209,7 +210,14 @@ def office(m, H, landmark=False):
     for x, z, u, c in m.ring(0):
         m.put(x, 8, z, M('polished_andesite'))          # canopy over the recessed lobby
     s1, s2 = int(H * 0.5), int(H * 0.78)
-    ks = [(9, s1, 1), (s1, s2, 2), (s2, H, 3)] if W >= 15 else [(9, H, 1)]
+    form = 2 if landmark else h(m.seed, 'form') % 3      # straight, one setback, two setbacks
+    if W < 15 or form == 0:
+        ks = [(9, H, 1)]
+    elif form == 1:
+        s1 = int(H * (0.55 + 0.1 * (h(m.seed, 'f1') % 3)))
+        ks = [(9, s1, 1), (s1, H, 2)]
+    else:
+        ks = [(9, s1, 1), (s1, s2, 2), (s2, H, 3)]
     for a, b, k in ks:
         if a > 9:
             terrace(m, a, k, k - 1)
