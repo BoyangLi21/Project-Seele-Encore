@@ -790,7 +790,8 @@ public final class EvaBodyPose
             applyLocomotionContactGoalsR44(entity,body,partial);
             EvaCombatSupportR33.preventFreeFootPenetrationR44(entity,body,partial);
         }
-        EvaStrideHeadingR59.apply(entity,body,partial);
+        // R64 (M1): the planted model steps the way the body goes with the hips square; nothing to turn.
+        if(!EvaMotionModelR64.walks(entity))EvaStrideHeadingR59.apply(entity,body,partial);
         EvaPunchAimR59.apply(entity,body,partial);
         supportProneFirearmChestR45(entity,body,partial);
         EvaCervicalKinematicsR25.apply(entity,body,partial);

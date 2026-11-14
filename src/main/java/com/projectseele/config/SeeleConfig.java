@@ -52,6 +52,9 @@ public final class SeeleConfig
     public static final ForgeConfigSpec.DoubleValue EVA_RUN_SPEED_SCALE;
     public static final ForgeConfigSpec.DoubleValue EVA_RUN_CADENCE_SCALE;
     public static final ForgeConfigSpec.DoubleValue EVA_SPRINT_CADENCE_SCALE;
+    // ----- common: EVA movement model (R64, M1) -----
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_MOTION_MODEL;
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_GAIT_TIER;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_RANGE;
     public static final ForgeConfigSpec.IntValue EVA_RIFLE_INTERVAL_TICKS;
@@ -245,6 +248,21 @@ public final class SeeleConfig
                 .comment("Steps a second at the fast run (dash held), times the cadence it had through R63 (Unit-01: 5.6 steps a second at full speed).",
                         "Its speed does not change with this. 0.7 since R64, where a foot on the ground stands about still; 1 is the old cadence.")
                 .defineInRange("sprintCadenceScale", 0.7D, 0.2D, 1.5D);
+        common.pop();
+
+        common.push("eva_motion");
+        EVA_MOTION_MODEL = common
+                .comment("How a piloted EVA moves. legacy: as up to R63. planted: a foot on the ground stays where it was set down,",
+                        "the body is carried by its feet, and it gathers way, brakes and turns with weight (Unit-01 only for now;",
+                        "the other Units keep the old model). The server's value goes for everyone on it. In game: /seele motion.")
+                .defineInList("model", "legacy", java.util.List.of("legacy", "planted"));
+        EVA_GAIT_TIER = common
+                .comment("The planted model's gait, Unit-01's speed in blocks a second and its steps a second:",
+                        "A: walk 32 at 1.35, run 66 at 2.0 (steps of 0.8 leg).",
+                        "B: walk 43 at 1.78, run 88 at 2.68 (the cadence up to R63, so nearly twice its speed).",
+                        "C: walk 22.6 at 1.25, run 41.9 at 1.75 (the speeds up to R63, in small steps).",
+                        "The fast run is 189 at 3.8 in all three. Up to R63: walk 22.6 at 1.78, run 41.9 at 2.68, the feet sliding.")
+                .defineInList("gaitTier", "A", java.util.List.of("A", "B", "C"));
         common.pop();
 
         common.push("eva_pallet_smg");

@@ -95,7 +95,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  */
 public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBattleSignals.Actor, com.projectseele.world.TvEncounterEquipmentControlR45.CannonAccess
 {
-    private static final boolean DORSAL_SIGNALS_READY=EvaDorsalMechanism.bootstrap() && EvaTerrainSupport.bootstrap() && EvaShutdownR30.bootstrap() && EvaAirTransportR31.bootstrap() && EvaMechanicalFrameR52.bootstrap() && EvaCombatR31.bootstrap() && EvaGameplayMotionR32.bootstrap() && EvaCombatSupportR33.bootstrap() && EvaBayRepairR33.bootstrap() && EvaBerserkMotionR34.bootstrap() && EvaCapturedLocomotionR44.bootstrap() && EvaWeaponHandlingR45.bootstrap() && EvaSprintR50.bootstrap();
+    private static final boolean DORSAL_SIGNALS_READY=EvaDorsalMechanism.bootstrap() && EvaTerrainSupport.bootstrap() && EvaShutdownR30.bootstrap() && EvaAirTransportR31.bootstrap() && EvaMechanicalFrameR52.bootstrap() && EvaCombatR31.bootstrap() && EvaGameplayMotionR32.bootstrap() && EvaCombatSupportR33.bootstrap() && EvaBayRepairR33.bootstrap() && EvaBerserkMotionR34.bootstrap() && EvaCapturedLocomotionR44.bootstrap() && EvaWeaponHandlingR45.bootstrap() && EvaSprintR50.bootstrap() && EvaMotionModelR64.bootstrap();
     private static final EntityDataAccessor<Integer> MECHANICAL_REVISION_R30=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.INT);
     private static final FirstBattleSignals.SignalSet FIRST_BATTLE=new FirstBattleSignals.SignalSet(EvaUnit01Entity.class);
     @Override public FirstBattleSignals.SignalSet firstBattleSignals(){return FIRST_BATTLE;}
@@ -779,6 +779,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaMechanicalFrameR52.define(this.entityData);
         EvaGameplayMotionR32.define(this.entityData);
         EvaSprintR50.define(this.entityData);
+        EvaMotionModelR64.define(this.entityData);
         EvaWeaponHandlingR45.define(this.entityData);
         EvaCombatSupportR33.define(this.entityData);
         EvaBerserkMotionR34.define(this.entityData);
@@ -1455,12 +1456,23 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private float rifleSignal(int i,EntityDataAccessor<Float> key,float p)
     {
         if(!this.level().isClientSide)return this.entityData.get(key);
+        // R64 (M1): while the planted model walks the body, the clips above the legs follow its steps.
+        if(i==4&&FirstBattleSignals.clientFrameTime()-plantedClipFrameR64<250_000_000L)return plantedClipPhaseR64;
         float value=poseSignalClocks[i].sample(FirstBattleSignals.clientFrameTime());
         value=i>=4&&i<=6?EvaCombatSupportR33.renderLocomotionSignalR44(this,p,i,value):value;
         long frame=FirstBattleSignals.clientFrameTime();
         return i==4?gaitClockR57.sample(this,p,value,frame):i==5||i==6?blendEaseR57[i-5].sample(value,frame):value;
     }
     private final EvaGaitClockR57 gaitClockR57=new EvaGaitClockR57();
+    private float plantedClipPhaseR64;
+    private long plantedClipFrameR64=Long.MIN_VALUE/2;
+    /** Client: the phase of the walking clips (0 to 1) that goes with the planted model's steps this frame. */
+    public void plantedClipPhaseR64(float phase)
+    {
+        plantedClipPhaseR64=phase-Mth.floor(phase);plantedClipFrameR64=FirstBattleSignals.clientFrameTime();
+    }
+    /** Client: the planted model has let go of the body. */
+    public void plantedClipReleaseR64(){plantedClipFrameR64=Long.MIN_VALUE/2;}
     private final EvaSignalEaseR57[] blendEaseR57={new EvaSignalEaseR57(),new EvaSignalEaseR57()};
     public float rifleCrouchBlend(float p){return rifleSignal(0,DATA_RIFLE_CROUCH,p);}
     public float rifleProneBlend(float p){return rifleSignal(1,DATA_RIFLE_PRONE,p);}
@@ -5506,6 +5518,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaWeaponHandlingR45.tick(this);
         EvaGameplayMotionR32.tick(this);
         EvaSprintR50.tick(this);
+        EvaMotionModelR64.tick(this);
         if(!this.level().isClientSide&&this.getPilotEntity() instanceof ServerPlayer player
                 &&(player.zza<-.15F||Math.abs(player.xxa)>.15F)
                 &&this.entityData.get(DATA_LIVE_ACTION_PHASE)>=.72F
@@ -7499,6 +7512,10 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(this.getWeapon()==WEAPON_RIFLE)deadZone=0;
         float maxTurn = moving ? PILOT_BODY_MOVING_TURN_PER_TICK
                 : PILOT_BODY_IDLE_TURN_PER_TICK;
+        // R64 (M1): the planted model turns by its speed, a walk quicker than a run, the fast run slowest.
+        if(EvaMotionModelR64.walks(this))
+            maxTurn=!moving?EvaMotionModelR64.TURN_STANDING:EvaSprintR50.blend(this,1)>.5F?EvaMotionModelR64.TURN_SPRINT
+                    :this.isPilotSprinting()?EvaMotionModelR64.TURN_RUN:EvaMotionModelR64.TURN_WALK;
         if(EvaGameplayMotionR32.directed(this)&&EvaCombatSupportR33.strike(this))
         {
             float phase=isHeavyMotionActive()?heavyMotionProgress(0):getOrdinaryAttackProgress(0);
@@ -7766,6 +7783,15 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // where vanilla friction alone gave 3. The gait blend (6 ticks) now
         // keeps up with the body instead of trailing a sliding start.
         Vec3 held = this.riddenInputR58;
+        if(EvaMotionModelR64.walks(this))
+        {
+            // R64 (M1): to full speed and back in a set time, along the line from what is held to what is asked.
+            double most=1D/(this.isPilotSprinting()?EvaMotionModelR64.RUN_RAMP_TICKS:EvaMotionModelR64.WALK_RAMP_TICKS);
+            Vec3 change=wanted.subtract(held);double length=change.length();
+            held=length<=most?wanted:held.add(change.scale(most/length));
+            this.riddenInputR58=held;
+            return held;
+        }
         boolean gathering = wanted.lengthSqr() >= held.lengthSqr();
         double step = gathering ? RIDDEN_GATHER_R58 : RIDDEN_RELEASE_R58;
         held = new Vec3(Mth.approach((float) held.x, (float) wanted.x, (float) step), 0,
@@ -7797,6 +7823,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         double strafe = this.isPilotProne() ? 0.28D
                 : this.isPilotCrouching() ? 0.45D : 0.7D;
+        if(EvaMotionModelR64.walks(this))
+        {
+            // R64 (M1): a leg takes a walking step's length only ahead of the body. Sideways and backward the
+            // planted model goes at a share of its walk, whatever the run and dash keys say.
+            double pace=EvaMotionModelR64.walkShare(this,this.isPilotSprinting())/EvaSprintR50.speed(this);
+            return new Vec3(player.xxa*EvaMotionModelR64.SIDE_SHARE*pace,0.0D,
+                    player.zza>=0.0F?player.zza:player.zza*EvaMotionModelR64.BACK_SHARE*pace);
+        }
         return new Vec3(player.xxa * strafe, 0.0D,
                 player.zza >= 0.0F ? player.zza : player.zza * 0.6D);
     }
@@ -7828,6 +7862,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         };
         // R64 (C12): the owner's speed keys, 1 by default.
         variantSpeed*=(float)(this.isPilotSprinting()?gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE):gaitKeyR64(SeeleConfig.EVA_WALK_SPEED_SCALE));
+        // R64 (M1): the planted model's gait tier sets the walk and the run.
+        variantSpeed*=EvaMotionModelR64.speedScale(this,this.isPilotSprinting());
         float stance=this.rifleStanceInitialized?this.entityData.get(DATA_RIFLE_STANCE):this.isPilotProne()?3:this.isPilotCrouching()?1:0;
         float speed=stance<=1?Mth.lerp(stance,variantSpeed,CROUCH_SPEED):Mth.lerp(Mth.clamp((stance-1)/2,0,1),CROUCH_SPEED,PRONE_SPEED);
         return speed * synchronizationSpeed * EvaSprintR50.speed(this);

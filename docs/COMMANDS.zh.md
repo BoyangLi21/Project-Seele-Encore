@@ -54,6 +54,9 @@
 | `/seele eva prepare <机体> [geofront\|surface\|hakone]` | 整备，可指定出口 |
 | `/seele eva cancel\|launch\|recover <机体>` | 取消后续操作、发射、回收 |
 | `/seele eva reset <机体>` | 抢救用：把机体、插入栓、驾驶员复位到机库 |
+| `/seele motion` | 查看 EVA 的移动模型和步态档 |
+| `/seele motion legacy\|planted` | 切换移动模型：`legacy` 是 R63 及以前的，`planted` 是 R64 的落脚模型（脚落地不滑，暂时只有初号机）。写进服务器的 `[eva_motion]` 配置，全服生效 |
+| `/seele motion tier A\|B\|C` | 落脚模型的步态档（初号机速度 / 步频）：A 走 32 / 1.35、跑 66 / 2.0；B 走 43 / 1.78、跑 88 / 2.68；C 走 22.6 / 1.25、跑 41.9 / 1.75 |
 | `/seele armament deploy\|recall [rifle\|sword\|shield]` | 升起或收回武器井；不写类型时操作 128 格内最近的一座 |
 | `/seele armament status` | 最近兵装升降站的状态 |
 | `/seele city status` | 第三新东京市升降状态 |

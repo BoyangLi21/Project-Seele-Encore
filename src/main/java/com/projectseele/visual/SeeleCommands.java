@@ -54,6 +54,7 @@ public final class SeeleCommands
                 .then(SeeleTravelCommandsR43.tpCommand().requires(ADMIN))
                 .then(SeeleTravelCommandsR43.enterCommand().requires(ADMIN))
                 .then(EvaLogisticsCommands.evaCommand().requires(ADMIN))
+                .then(EvaMotionCommandsR64.motionCommand().requires(ADMIN))
                 .then(ArmamentStationCommands.armamentCommand().requires(ADMIN))
                 .then(ThirdTokyoCommands.cityCommand().requires(ADMIN))
                 .then(Commands.literal("admin").requires(ADMIN)

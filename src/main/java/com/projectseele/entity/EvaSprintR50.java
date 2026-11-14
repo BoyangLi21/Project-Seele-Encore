@@ -51,6 +51,6 @@ public final class EvaSprintR50
      * 62 % of the body's speed; at 0.7 it stands within 3 %; at 0.5 the body carried it forward at 40 %.
      */
     static final double STRIDE_BLOCKS=64D;
-    public static float speed(EvaUnit01Entity e){return 1+(GAIN-1)*blend(e,1);}
+    public static float speed(EvaUnit01Entity e){return 1+(EvaMotionModelR64.sprintGain(e,GAIN)-1)*blend(e,1);}
     private EvaSprintR50(){}
 }

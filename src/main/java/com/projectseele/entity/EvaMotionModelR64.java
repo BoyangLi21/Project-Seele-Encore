@@ -1,0 +1,160 @@
+package com.projectseele.entity;
+
+import com.projectseele.config.SeeleConfig;
+import net.minecraft.network.syncher.EntityDataAccessor;
+import net.minecraft.network.syncher.EntityDataSerializers;
+import net.minecraft.network.syncher.SynchedEntityData;
+import net.minecraft.util.Mth;
+
+/**
+ * R64 (M1): which movement model a Unit runs, and the gait table of the new one.
+ * <p>
+ * The model up to R63 slides one box over the ground and plays clips of a human walking on the level by the
+ * distance covered; whatever the feet do on the ground is put right afterwards, layer upon layer. In the new
+ * model the feet decide: a foot on the ground stays where it was set down, the next footfall is chosen ahead of
+ * the body, and the pelvis is solved from the feet. For a foot not to slide, speed must be cadence times
+ * step length, so the three are one table here and the step is whatever it comes to.
+ * <p>
+ * The server's config decides ([eva_motion] model and gaitTier) and every Unit carries the answer to its
+ * clients, so all of them draw the same model. The old model stays the default until the owner says otherwise.
+ */
+public final class EvaMotionModelR64
+{
+    public static final byte LEGACY=0,PLANTED=1;
+    private static final EntityDataAccessor<Byte> MODEL=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BYTE);
+    private static final EntityDataAccessor<Byte> TIER=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BYTE);
+    /** Review only: -Dprojectseele.motionModelR64=planted and -Dprojectseele.gaitTierR64=A, B or C stand in for the config. */
+    private static final String REVIEW_MODEL=System.getProperty("projectseele.motionModelR64"),REVIEW_TIER=System.getProperty("projectseele.gaitTierR64");
+
+    /**
+     * One row of the gait table: Unit-01's speed (blocks a second, at a synchronisation that adds nothing) and
+     * steps a second, walking and running. The fast run is the same in every row.
+     */
+    public record Tier(String name,double walk,double run,double walkCadence,double runCadence){}
+    /** A: steps of 0.8 leg at the cadence approved on 2026-11-13. B: the cadence up to R63. C: the speeds up to R63. */
+    private static final Tier[] TIERS={new Tier("A",32,66,1.35,2.0),new Tier("B",43,88,1.78,2.68),new Tier("C",22.6,41.9,1.25,1.75)};
+    /** The fast run (dash held): blocks a second and steps a second, as up to R63 (cadence as since R64's 0.7 key). */
+    public static final double SPRINT=189,SPRINT_CADENCE=3.8;
+    /** What the built-in speeds come to in the game (blocks a second), which the tiers are scaled from. */
+    private static final double LEGACY_WALK=22.6,LEGACY_RUN=41.9;
+    /**
+     * Ticks from rest to full input and back, walking and running; up to R63 ten up, eight down. With the two
+     * ticks a key takes to reach the body and the two the ground's friction adds, the body is at nine tenths of
+     * its speed 0.35 and 0.6 seconds after the key (measured at 7 and 12 ticks: 0.5 and 0.7).
+     */
+    public static final double WALK_RAMP_TICKS=5,RUN_RAMP_TICKS=10;
+    /** Degrees a tick the body may turn: standing, walking, running, at the fast run (up to R63: 2.5 standing, 6 moving). */
+    public static final float TURN_STANDING=4F,TURN_WALK=9F,TURN_RUN=6F,TURN_SPRINT=3F;
+
+    /** Sideways and backward, as a share of the walking speed (up to R63: 0.7 and 0.6 of the walk or the run, whichever was held). */
+    public static final double SIDE_SHARE=.45,BACK_SHARE=.6;
+
+    /** Register base accessors before any subclass allocates its own IDs. */
+    public static boolean bootstrap(){return true;}
+    public static void define(SynchedEntityData data){data.define(MODEL,LEGACY);data.define(TIER,(byte)0);}
+
+    /** Server, every tick: the config decides. */
+    public static void tick(EvaUnit01Entity e)
+    {
+        if(e.level().isClientSide)return;
+        byte model=configuredModel(),tier=configuredTier();
+        if(e.getEntityData().get(MODEL)!=model)e.getEntityData().set(MODEL,model);
+        if(e.getEntityData().get(TIER)!=tier)e.getEntityData().set(TIER,tier);
+    }
+
+    private static byte configuredModel()
+    {
+        String value=REVIEW_MODEL!=null?REVIEW_MODEL:SeeleConfig.COMMON_SPEC.isLoaded()?SeeleConfig.EVA_MOTION_MODEL.get():"legacy";
+        return "planted".equalsIgnoreCase(value)?PLANTED:LEGACY;
+    }
+
+    private static byte configuredTier()
+    {
+        String value=REVIEW_TIER!=null?REVIEW_TIER:SeeleConfig.COMMON_SPEC.isLoaded()?SeeleConfig.EVA_GAIT_TIER.get():"A";
+        for(byte i=0;i<TIERS.length;i++)if(TIERS[i].name().equalsIgnoreCase(value))return i;
+        return 0;
+    }
+
+    /** The new model is this Unit's: asked for, and a Unit it is built for (Unit-01 until the others' rigs are measured). */
+    public static boolean planted(EvaUnit01Entity e)
+    {
+        return e.getEntityData().get(MODEL)==PLANTED&&!e.isExperimentalUnit()&&e.getUnitVariant()==EvaUnit01Entity.UNIT_01
+                &&!(e instanceof EvaPrototypeEntity);
+    }
+
+    public static Tier tier(EvaUnit01Entity e)
+    {
+        return TIERS[Mth.clamp(e.getEntityData().get(TIER),0,TIERS.length-1)];
+    }
+
+    /**
+     * Whether the new model walks this Unit now, as far as both sides know: piloted freely on its feet, bare
+     * handed or with the knife, nothing else owning the body. The client asks more of what it draws.
+     */
+    public static boolean walks(EvaUnit01Entity e)
+    {
+        return planted(e)&&e.isPoweredOn()&&!e.isFirstBattleActive()&&!e.isBerserk()&&!e.isCrucified()&&!e.isNervLogisticsLocked()
+                &&!e.isLaunchSequenceActive()&&e.getActivationTicks()<=0&&e.getVisualPose()==0
+                &&(e.getWeapon()==EvaUnit01Entity.WEAPON_FISTS||e.getWeapon()==EvaUnit01Entity.WEAPON_KNIFE)
+                &&!e.isPilotProne()&&!e.isPilotCrouching()&&!e.hasLiveActionForRender(0)
+                &&!com.projectseele.physics.CombatBodyDynamics.active(e);
+    }
+
+    /** What the built-in walking or running speed is multiplied by. */
+    public static float speedScale(EvaUnit01Entity e,boolean running)
+    {
+        if(!planted(e))return 1;
+        Tier t=tier(e);
+        return (float)(running?t.run()/LEGACY_RUN:t.walk()/LEGACY_WALK);
+    }
+
+    /** The walking speed over the speed of the gait that is held: 1 at a walk. */
+    public static double walkShare(EvaUnit01Entity e,boolean running)
+    {
+        Tier t=tier(e);
+        return running?t.walk()/t.run():1;
+    }
+
+    /** The fast run as a multiple of the run: the fast run itself keeps its speed whatever the run's is. */
+    public static float sprintGain(EvaUnit01Entity e,float legacy)
+    {
+        return planted(e)?(float)(SPRINT/tier(e).run()):legacy;
+    }
+
+    /**
+     * How a body going at a speed steps. All of it follows the speed alone, so a body gathering way or running
+     * out of it passes through every gait between.
+     *
+     * @param cadence steps a second
+     * @param duty    the share of a cycle (two steps) a foot is on the ground: over a half there is a time on both
+     *                feet, under it a time in the air
+     * @param land    the share of what the body covers over a standing foot that the foot is set down ahead of the hip
+     * @param lift    how high the swinging foot is carried (blocks)
+     * @param sink    how far under its straight-legged height the pelvis is carried (blocks)
+     * @param bounce  the rise and fall of a run about that height (blocks)
+     * @param width   how far apart the feet are set, as a share of their standing width
+     */
+    public record Gait(double cadence,double duty,double land,double lift,double sink,double bounce,double width){}
+
+    /** @param speed blocks a second over the ground, with the pilot's synchronisation bonus taken out */
+    public static Gait gait(Tier t,double speed)
+    {
+        double v=Math.max(0,speed);
+        if(v<=t.walk())
+        {
+            double u=v/t.walk();
+            return new Gait(t.walkCadence()*(.55+.45*u),.66-.04*u,.5-.05*u,1.6+1.8*u,.35+.65*u,0,1-.2*u);
+        }
+        if(v<=t.run())
+        {
+            double r=(v-t.walk())/(t.run()-t.walk()),s=r*r*(3-2*r);
+            return new Gait(Mth.lerp(r,t.walkCadence(),t.runCadence()),Mth.lerp(s,.62,.40),Mth.lerp(s,.45,.40),
+                    Mth.lerp(s,3.4,5.5),Mth.lerp(s,1.0,2.6),Mth.lerp(s,0,1.3),Mth.lerp(s,.8,.55));
+        }
+        double d=Math.min(1,(v-t.run())/(SPRINT-t.run()));
+        return new Gait(Mth.lerp(d,t.runCadence(),SPRINT_CADENCE),Mth.lerp(d,.40,.30),Mth.lerp(d,.40,.32),
+                Mth.lerp(d,5.5,10),Mth.lerp(d,2.6,3.6),Mth.lerp(d,1.3,1.8),Mth.lerp(d,.55,.4));
+    }
+
+    private EvaMotionModelR64(){}
+}
