@@ -36,6 +36,7 @@ def main():
     p.add_argument('--ease', type=float, default=24, help='blocks over which the cover rises from a quarter to full away from buildings')
     p.add_argument('--clump', type=float, default=1.0, help='strength of the grove noise')
     p.add_argument('--seed', type=int, default=21)
+    p.add_argument('--debug', action='store_true', help='also save the planning layers to debug.npz')
     a = p.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
     sx0, sx1, sz0, sz1 = a.site
@@ -89,6 +90,9 @@ def main():
     wood_share = max(float(existing[wooded].mean()) if wooded.any() else .6, .3)
     want = np.clip(rel * mod - existing / wood_share, 0, 1)
     chance = (np.clip(25 * d_forest * share_c * want, 0, .9), np.clip(49 * d_forest * (1 - share_c) * want, 0, .9))
+    if a.debug:
+        np.savez_compressed(a.out / 'debug.npz', origin=np.array([x0, z0]), ground=ground, built=built, wet=wet, canopy=canopy, keepout=keepout,
+                            zone=zone, rel=rel, mod=mod, existing=existing, want=want, chance_c=chance[0], chance_b=chance[1])
     ids = box.ids.copy()
     tr.replant(box, ids, ground, zone, keepout, random.Random(a.seed), chance=chance)
     leaf = np.char.endswith(np.array([q.split('[')[0] for q in box.palette]).astype(str), '_leaves')
