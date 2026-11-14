@@ -34,6 +34,8 @@ def ground(x, z, top):
 
 def plan_building(b):
     cells = dc.building_set(b)
+    if b.get('blocks'):     # take only these blocks (a leftover pad next to a road the flood would reach)
+        cells = {c for c in cells if base(w.get(*c)).split(':')[-1] in b['blocks']}
     cols = {(x, z) for x, y, z in cells}
     x0 = min(c[0] for c in cols); x1 = max(c[0] for c in cols)
     z0 = min(c[1] for c in cols); z1 = max(c[1] for c in cols)
@@ -66,7 +68,93 @@ def plan_building(b):
             if cur != want and not (want == STONE and is_natural(cur) and (x, y, z) not in cells):
                 rows[x, y, z] = [x, y, z, cur, want]
     blend(rows, cols)
-    return [r for r in rows.values() if not w.block_entity(*r[:3])], len(samples)
+    tidy(rows, cols, cells)
+    return [r for r in rows.values() if not w.block_entity(*r[:3]) and r[3] != r[4]], len(samples)
+
+
+def tidy(rows, cols, cells, reach=18):
+    """After the fill: no lone pillar or 1-2 column island, and no step of two or more next to a
+    changed column. Natural terraces are contour steps; a raised column with fewer than two
+    neighbours at its height is lowered to its second-highest neighbour, then every step of two
+    or more beside a changed column is eased by raising the lower side to one below. Only
+    natural ground, the ruin's own blocks and open cells are touched; a column with a tree on it
+    keeps its height."""
+    def get(c):
+        return rows[c][4] if c in rows else w.get(*c)
+
+    def set_(c, after):
+        cur = w.get(*c)
+        if c in rows:
+            rows[c][4] = after
+        elif cur != after:
+            rows[c] = [*c, cur, after]
+
+    def top(x, z):
+        y = 200
+        while y > -64:
+            s = get((x, y, z))
+            if s is None:
+                return None
+            if not (is_open(s) or is_veg(s)):
+                return y if (is_natural(s) or (x, y, z) in cells) else None
+            y -= 1
+        return None
+    region = set()
+    for (x, z) in cols:
+        for dx in range(-reach, reach + 1):
+            for dz in range(-reach, reach + 1):
+                region.add((x + dx, z + dz))
+    H = {}
+    for c in region:
+        t = top(*c)
+        if t is not None:
+            H[c] = t
+    changed_cols = {(r[0], r[2]) for r in rows.values()}
+    nb4 = lambda c: ((c[0] + 1, c[1]), (c[0] - 1, c[1]), (c[0], c[1] + 1), (c[0], c[1] - 1))
+
+    def lower(c, t):
+        x, z = c
+        if is_veg(get((x, H[c] + 1, z)) or '') and '_log' in (get((x, H[c] + 1, z)) or ''):
+            return False
+        for y in range(t + 1, H[c] + 1):
+            set_((x, y, z), AIRS)
+        s = get((x, t, z))
+        if s and (is_natural(s) or (x, t, z) in cells):
+            set_((x, t, z), GRASS)
+        H[c] = t
+        changed_cols.add(c)
+        return True
+
+    def raise_(c, t):
+        x, z = c
+        for y in range(H[c] + 1, t + 1):
+            if not (is_open(get((x, y, z))) or is_veg(get((x, y, z)))):
+                return False
+        if base(get((x, H[c], z))) == 'minecraft:grass_block':
+            set_((x, H[c], z), DIRT)
+        for y in range(H[c] + 1, t + 1):
+            set_((x, y, z), GRASS if y == t else DIRT)
+        H[c] = t
+        changed_cols.add(c)
+        return True
+    for _ in range(12):
+        moved = 0
+        for c in list(H):
+            ns = [H[n] for n in nb4(c) if n in H]
+            if len(ns) < 4:
+                continue
+            if sum(h >= H[c] for h in ns) < 2:
+                t = sorted(ns)[-2]
+                if t < H[c] and lower(c, t):
+                    moved += 1
+        for c in list(H):
+            if c not in changed_cols:
+                continue
+            for n in nb4(c):
+                if n in H and H[c] - H[n] >= 2 and raise_(n, H[c] - 1):
+                    moved += 1
+        if not moved:
+            break
 
 
 def blend(rows, cols, reach=16):
@@ -129,14 +217,22 @@ if __name__ == '__main__':
         chosen = [b for b in dc.deep if b['id'] in ids]
     out = Path(sys.argv[2])
     out.mkdir(parents=True, exist_ok=True)
-    allrows, report = [], []
+    # buildings are planned one after another over the result of the earlier ones: the world reader
+    # sees the planned blocks, and a cell planned twice keeps its original block and the last new one
+    combined, report = {}, []
+    raw_get = w.get
+    w.get = lambda x, y, z: combined[x, y, z][4] if (x, y, z) in combined else raw_get(x, y, z)
     for b in chosen:
         rows, ns = plan_building(b)
         bes = [r[:3] for r in rows if w.block_entity(*r[:3])]
         kinds = Counter(short(r[3]) + '->' + short(r[4]) for r in rows)
         report.append(dict(id=b['id'], bbox=b['bbox'], cells=len(rows), samples=ns, block_entities=bes, kinds=dict(kinds.most_common(10))))
         print(b['id'], len(rows), 'samples', ns, 'BE', len(bes), kinds.most_common(6))
-        allrows += rows
+        for r in rows:
+            k = tuple(r[:3])
+            combined[k] = [*k, combined[k][3] if k in combined else r[3], r[4]]
+    w.get = raw_get
+    allrows = [r for r in combined.values() if r[3] != r[4]]
     (out / 'rows.json').write_text(json.dumps(allrows), 'utf8')
     (out / 'report.json').write_text(json.dumps(report, ensure_ascii=False, indent=1), 'utf8')
     print('total', len(allrows))
