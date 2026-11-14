@@ -78,7 +78,8 @@ public final class AngelAlarmSystem
                 removed = true;
             }
         }
-        // A combat mission sounds the alarm from its alert phase until its Angel is confirmed dead or it ends.
+        // A combat mission sounds the alarm from its alert phase until its Angel is confirmed dead or it ends,
+        // and drops it while the mission pauses for its commander or has lost its Angel (MissionAudioR64).
         boolean mission = com.projectseele.config.SeeleConfig.ALARM_ENABLED.get()
                 && com.projectseele.world.MissionAudioR64.missionActive(server);
         if (mission && !ENGAGED.contains(MISSION))
