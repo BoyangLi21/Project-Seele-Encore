@@ -96,15 +96,20 @@ def main():
         h, lists = pending_hits(world, rows, a.near)
         per['pending_lists'] = lists
         bad |= h
+    # whole trees and plants go together; terrain blocks (rock, moss, grass blocks) are dropped one by one, so one
+    # touched cell does not take out a whole slope
+    def plant(i):
+        n = rows[i][4].split('[')[0]
+        return n.endswith(('_leaves', '_log')) or n in ('minecraft:grass', 'minecraft:fern', 'minecraft:tall_grass', 'minecraft:large_fern')
     drop = set(bad)
-    queue = deque(bad)
+    queue = deque(i for i in bad if plant(i))
     while queue:
         x, y, z = rows[queue.popleft()][:3]
         for dx in (-1, 0, 1):
             for dy in (-1, 0, 1):
                 for dz in (-1, 0, 1):
                     j = pos.get((x + dx, y + dy, z + dz))
-                    if j is not None and j not in drop:
+                    if j is not None and j not in drop and plant(j):
                         drop.add(j)
                         queue.append(j)
     kept = [r for i, r in enumerate(rows) if i not in drop]
