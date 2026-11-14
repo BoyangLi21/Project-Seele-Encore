@@ -170,6 +170,7 @@ public class ClientEvents
     @SubscribeEvent
     public static void onRegisterReloadListeners(RegisterClientReloadListenersEvent event)
     {
+        event.registerReloadListener(com.projectseele.client.render.HeavyTextureLoad.reloadListener());
         event.registerReloadListener((ResourceManagerReloadListener) resourceManager ->
         {
             LocalTriangleMeshLayer.clearCache();
