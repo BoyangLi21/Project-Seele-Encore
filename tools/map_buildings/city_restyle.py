@@ -218,7 +218,7 @@ def apartments(m, H):
     roof_plant(m, H + 1, 1, 5)
 
 
-SIGNS = ('red_concrete', 'yellow_concrete', 'blue_concrete', 'orange_concrete', 'white_concrete', 'lime_concrete', 'magenta_concrete')
+SIGNS = ('white_concrete', 'light_gray_concrete', 'red_terracotta', 'cyan_terracotta', 'white_terracotta', 'blue_terracotta', 'black_concrete')   # muted: saturated wool reads as a toy at EVA scale
 
 
 def mixed(m, H):
@@ -231,7 +231,7 @@ def mixed(m, H):
             floor_ring(m, y, 1, 1, M('smooth_stone'))
     for x, z, u, c in m.ring(0):
         shop = u // 5
-        m.put(x, 6, z, M('white_wool') if (u + shop) % 2 else M(('red_wool', 'green_wool', 'blue_wool', 'orange_wool')[h(m.seed, shop) % 4]))
+        m.put(x, 6, z, M('white_terracotta') if (u + shop) % 2 else M(('red_terracotta', 'green_terracotta', 'blue_terracotta', 'brown_terracotta')[h(m.seed, shop) % 4]))
     for y in (7, 8):
         for x, z, u, c in m.ring(0):
             m.put(x, y, z, M(SIGNS[h(m.seed, x // 5, z // 5) % len(SIGNS)]) if not c else M('black_concrete'))

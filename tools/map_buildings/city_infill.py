@@ -16,7 +16,7 @@ from city_restyle import Model, apartments, lowrise, M, SLAB, h, AIR
 from float_fix import guards
 
 Y = 80
-WALL_POST = M('polished_blackstone_wall[east=none,north=none,south=none,up=true,waterlogged=false,west=none]')
+POST = M('polished_basalt[axis=y]')   # the city's own street lamp: basalt post, sea lantern, slab cap
 
 
 def tree(cells, x, z, kind):
@@ -33,8 +33,15 @@ def tree(cells, x, z, kind):
 
 def lamp(cells, x, z):
     for y in range(Y + 1, Y + 5):
-        cells[x, y, z] = WALL_POST
-    cells[x, Y + 5, z] = M('lantern[hanging=false,waterlogged=false]')
+        cells[x, y, z] = POST
+    cells[x, Y + 5, z] = M('sea_lantern')
+    cells[x, Y + 6, z] = SLAB('smooth_stone')
+
+
+def city_posts(w, x0, z0, x1, z1):
+    """Street lamps the city already has on or next to the parcel (kept; nothing planted beside them)."""
+    return [(x, z) for x in range(x0 - 2, x1 + 3) for z in range(z0 - 2, z1 + 3)
+            if 'polished_basalt' in (w.get(x, Y + 1, z) or '') and 'sea_lantern' in (w.get(x, Y + 5, z) or '')]
 
 
 def shelter(cells, x0, z0, along_x):
@@ -68,13 +75,15 @@ def main(box, out):
             edge = min(x - x0, x1 - x, z - z0, z1 - z)
             if edge < 4:
                 cells[x, Y, z] = M('smooth_stone') if edge else M('polished_andesite')   # kerb, then paving
-    # street trees and lamps on the sidewalk, one cell in from the kerb
-    for i, x in enumerate(range(x0 + 3, x1 - 2, 6)):
-        for z in (z0 + 1, z1 - 1):
-            (tree(cells, x, z, 'birch') if i % 2 == 0 else lamp(cells, x, z))
-    for i, z in enumerate(range(z0 + 6, z1 - 5, 6)):
-        for x in (x0 + 1, x1 - 1):
-            (tree(cells, x, z, 'birch') if i % 2 else lamp(cells, x, z))
+    # street trees and lamps on the sidewalk, one cell in from the kerb; the city's own lamps stay and
+    # nothing goes within 3 cells of them (a canopy over a lamp hides its light)
+    posts = city_posts(w, x0, z0, x1, z1)
+    clear = lambda x, z: all(max(abs(x - px), abs(z - pz)) > 3 for px, pz in posts)
+    spots = [(x, z, i % 2 == 0) for i, x in enumerate(range(x0 + 3, x1 - 2, 6)) for z in (z0 + 1, z1 - 1)]
+    spots += [(x, z, i % 2 == 1) for i, z in enumerate(range(z0 + 6, z1 - 5, 6)) for x in (x0 + 1, x1 - 1)]
+    for x, z, is_tree in spots:
+        if clear(x, z):
+            (tree(cells, x, z, 'birch') if is_tree else lamp(cells, x, z))
     shelter(cells, x0 + (x1 - x0) // 2 - 2, z1 - 2, True)
     ix0, iz0, ix1, iz1 = x0 + 4, z0 + 4, x1 - 4, z1 - 4
     W, D = ix1 - ix0 + 1, iz1 - iz0 + 1
@@ -93,7 +102,7 @@ def main(box, out):
     for x in range(px0 + 1, px1, 3):
         cells[x, Y + 1, pz1] = M('spruce_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]')
     gs = guards()
-    rows, refused = [], Counter()
+    rows, refused, refused_at = [], Counter(), []
     for (x, y, z), want in cells.items():
         cur = w.get(x, y, z)
         if cur is None or cur == want:
@@ -101,6 +110,7 @@ def main(box, out):
         ground = y == Y and ('grass' in cur or 'dirt' in cur or 'stone' in cur)
         if not (is_open(cur) or ground or 'leaves' in cur or 'short_grass' in cur or 'tall_grass' in cur):
             refused['occupied'] += 1
+            refused_at.append([x, y, z, cur, want])
             continue
         try:
             for g in gs:
@@ -114,4 +124,5 @@ def main(box, out):
         rows.append([x, y, z, cur, want])
     Path(out).mkdir(parents=True, exist_ok=True)
     (Path(out) / 'rows.json').write_text(json.dumps(rows), 'utf8')
+    (Path(out) / 'refused.json').write_text(json.dumps(refused_at), 'utf8')
     print('infill rows', len(rows), 'refused', dict(refused))

@@ -8,6 +8,7 @@ box, so the rows hold what is really there now. A piece that has grown a support
 (the flood leaves its box or reaches the ground) is skipped and reported. Blocks with a block
 entity are never planned.
 """
+import os
 import json, sys
 from pathlib import Path
 sys.path.insert(0, str(Path(__file__).parent))
@@ -23,7 +24,8 @@ def guards():
     from map_pipeline.city_protection import load as city
     from map_pipeline.lift_protection import load as lift
     from map_pipeline.launch_protection import load as launch
-    return [g(WORLD) for g in (city, lift, launch)]
+    # GUARDS_WORLD: read the protection tables from another world (a region-only copy has none)
+    return [g(os.environ.get('GUARDS_WORLD', WORLD)) for g in (city, lift, launch)]
 
 
 def main(pieces_file, out):
