@@ -44,8 +44,8 @@ def main(seed, radius, out):
         y, s = surface(w, x, z)
         if y is None or s.split('[')[0] not in ROCK:
             continue
-        if any(not is_open(w.get(x, yy, z) or 'minecraft:air') for yy in range(y + 1, y + 40)):
-            continue        # under a roof or a deck: not part of the open cut
+        if any(not (is_open(s) or is_veg(s)) for s in (w.get(x, yy, z) or 'minecraft:air' for yy in range(y + 1, y + 40))):
+            continue        # under a roof or a deck (tree crowns do not count): not part of the open cut
         cut[x, z] = y
         for dx, dz in ((1, 0), (-1, 0), (0, 1), (0, -1)):
             n = (x + dx, z + dz)
