@@ -69,7 +69,32 @@ def plan_building(b):
                 rows[x, y, z] = [x, y, z, cur, want]
     blend(rows, cols)
     tidy(rows, cols, cells)
-    return [r for r in rows.values() if not w.block_entity(*r[:3]) and r[3] != r[4]], len(samples)
+    if b.get('drop_signs'):
+        drop_signs(rows, b, F, hi)
+    keep_be = bool(b.get('drop_signs'))
+    return [r for r in rows.values() if (keep_be or not w.block_entity(*r[:3])) and r[3] != r[4]], len(samples)
+
+
+def drop_signs(rows, b, F, hi):
+    """Signs and banners left in a closed ruin go too (the writer then needs --allow-block-entities):
+    each becomes what most of its six neighbours are after the fill."""
+    x0, z0, x1, z1 = b['bbox']
+
+    def after(c):
+        return rows[c][4] if c in rows else w.get(*c)
+    for x in range(x0 - 2, x1 + 3):
+        for z in range(z0 - 2, z1 + 3):
+            for y in range(F - 2, hi + 8):
+                s = w.get(x, y, z) or ''
+                if not any(k in s for k in ('_sign', '_banner')):
+                    continue
+                around = Counter(after(n) for n in ((x + 1, y, z), (x - 1, y, z), (x, y + 1, z), (x, y - 1, z), (x, y, z + 1), (x, y, z - 1)))
+                fill = next((a for a, _ in around.most_common() if a and not any(k in a for k in ('_sign', '_banner'))), AIRS)
+                if not (is_open(fill) or is_natural(fill)):
+                    fill = AIRS
+                if base(fill) == 'minecraft:grass_block' and not is_open(after((x, y + 1, z)) or AIRS):
+                    fill = DIRT         # buried: earth, not turf
+                rows[x, y, z] = [x, y, z, s, fill]
 
 
 def tidy(rows, cols, cells, reach=18):
@@ -147,6 +172,19 @@ def tidy(rows, cols, cells, reach=18):
                 t = sorted(ns)[-2]
                 if t < H[c] and lower(c, t):
                     moved += 1
+        # straighten contours: a one-column jog in a terrace edge shows a single dirt face that reads as
+        # a lone post, so each changed column takes the median height of its 3x3 neighbourhood
+        for c in list(H):
+            if c not in changed_cols:
+                continue
+            box = sorted(H[n] for n in ((c[0] + dx, c[1] + dz) for dx in (-1, 0, 1) for dz in (-1, 0, 1)) if n in H)
+            if len(box) < 9:
+                continue
+            m = box[4]
+            if m > H[c] and raise_(c, m):
+                moved += 1
+            elif m < H[c] and lower(c, m):
+                moved += 1
         for c in list(H):
             if c not in changed_cols:
                 continue
@@ -155,6 +193,12 @@ def tidy(rows, cols, cells, reach=18):
                     moved += 1
         if not moved:
             break
+    for c in list(H):      # the median can leave a lone column behind on its last round
+        ns = [H[n] for n in nb4(c) if n in H]
+        if len(ns) == 4 and sum(h >= H[c] for h in ns) < 2:
+            t = sorted(ns)[-2]
+            if t < H[c]:
+                lower(c, t)
 
 
 def blend(rows, cols, reach=16):
