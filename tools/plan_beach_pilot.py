@@ -121,28 +121,33 @@ def main():
     air = S(tr.AIR_STATE)
     zz, xx = np.mgrid[0:ground.shape[0], 0:ground.shape[1]]
     wx, wz = xx + bx, zz + bz
-    nmix = vnoise(wx, wz, 5, a.seed) * .7 + hash01(wx, wz, a.seed + 1) * .3
+    # coarse at the water, finer inland; three scales of noise and a per-block roll so no pattern repeats
+    nmix = vnoise(wx, wz, 9, a.seed) * .45 + vnoise(wx, wz, 3, a.seed + 6) * .3 + hash01(wx, wz, a.seed + 1) * .25
+    sand_patch = vnoise(wx, wz, 14, a.seed + 7)
     counts = dict(beach_columns=int(beach.sum()), pines=0, dune_plants=0, under_plants=0)
-    mix = [('minecraft:gravel', .42), ('minecraft:andesite', .2), ('minecraft:tuff', .16), ('minecraft:cobblestone', .12), ('minecraft:gravel', .1)]
+    zones = [(4, [('minecraft:cobblestone', .3), ('minecraft:andesite', .14), ('minecraft:stone', .16), ('minecraft:tuff', .16), ('minecraft:gravel', .19), ('minecraft:sand', .05)]),
+             (12, [('minecraft:gravel', .32), ('minecraft:cobblestone', .2), ('minecraft:tuff', .18), ('minecraft:andesite', .1), ('minecraft:stone', .12), ('minecraft:sand', .08)]),
+             (999, [('minecraft:gravel', .36), ('minecraft:tuff', .2), ('minecraft:cobblestone', .16), ('minecraft:sand', .08), ('minecraft:coarse_dirt', .08), ('minecraft:andesite', .12)])]
     for z, x in zip(*np.nonzero(beach)):
         j = int(ground[z, x]) - by
+        mix = next(m_ for d_, m_ in zones if d_sea[z, x] <= d_)
         for d in (0, 1):
             if names[box.ids[j - d, z, x]] not in ('minecraft:gravel', 'minecraft:sand'):
                 continue
-            if d_sea[z, x] <= 2 and hash01(wx[z, x], wz[z, x], a.seed + 2) < .6:
-                s = 'minecraft:sand'
+            if sand_patch[z, x] > .88 and d_sea[z, x] > 2:
+                s_ = 'minecraft:sand'
             else:
-                u = (nmix[z, x] + .2 * d) % 1
+                u = (nmix[z, x] + .37 * d) % 1
                 acc = 0
                 for state, w in mix:
                     acc += w
                     if u < acc:
-                        s = state
+                        s_ = state
                         break
-            ids[j - d, z, x] = S(s)
+            ids[j - d, z, x] = S(s_)
     grassy = inside & ~keep & ~wet & (top_name == 'minecraft:grass_block') & open_sky
     dune = grassy & (d_beach <= 3)
-    belt = grassy & (d_beach > a.belt_from) & (d_beach <= a.belt_to)
+    belt = grassy & (d_beach > a.belt_from)
     rng = np.random.default_rng(a.seed)
     for z, x in zip(*np.nonzero(dune)):
         j = int(ground[z, x]) - by
@@ -153,16 +158,15 @@ def main():
         elif u < .65:
             ids[j + 1, z, x] = S('minecraft:grass')
             counts['dune_plants'] += 1
-    # pines on a jittered grid, denser toward the sea side of the belt like a planted windbreak
-    sp = a.spacing
+    # pines scattered 4-6 apart in a belt whose depth wanders between 6 and 22 blocks (two to four trees deep)
+    depth = 6 + 16 * vnoise(wx, wz, 30, a.seed + 8)
+    belt &= d_beach <= depth
     taken = np.zeros(ground.shape, bool)
-    for z, x in zip(*np.nonzero(belt & (hash01(wx // sp, wz // sp, a.seed + 3) < 2))):
-        if (wx[z, x] % int(sp)) != int(hash01(wx[z, x] // sp, wz[z, x] // sp, a.seed + 4) * sp) or \
-           (wz[z, x] % int(sp)) != int(hash01(wx[z, x] // sp, wz[z, x] // sp, a.seed + 5) * sp):
-            continue
-        if taken[max(0, z - 2):z + 3, max(0, x - 2):x + 3].any():
-            continue
-        if rng.random() > .85 - .3 * (d_beach[z, x] - a.belt_from) / max(a.belt_to - a.belt_from, 1):
+    cand = list(zip(*np.nonzero(belt)))
+    rng.shuffle(cand)
+    for z, x in cand:
+        r = 2 + int(rng.random() * 2)
+        if taken[max(0, z - r):z + r + 1, max(0, x - r):x + r + 1].any() or rng.random() > .55:
             continue
         j = int(ground[z, x]) - by
         if pine(ids, j, z, x, rng, S, air):
