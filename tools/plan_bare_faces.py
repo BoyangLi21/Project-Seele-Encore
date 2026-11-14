@@ -30,9 +30,10 @@ import terrain_regrade as tr
 from plan_forest_transitions import keep_columns
 
 REPLACE = ('minecraft:dirt', 'minecraft:coarse_dirt', 'minecraft:grass_block', 'minecraft:rooted_dirt', 'minecraft:stone')
-ROCK = [('minecraft:andesite', .42), ('minecraft:stone', .28), ('minecraft:tuff', .14), ('minecraft:cobblestone', .06), ('minecraft:andesite', .10)]
-BANK = [('minecraft:moss_block', .42), ('minecraft:rooted_dirt', .10), ('minecraft:coarse_dirt', .10), ('minecraft:andesite', .12),
-        ('minecraft:mossy_cobblestone', .06), (None, .20)]
+# Minecraft andesite reads pale; tuff and stone carry the darker grey of Hakone's weathered andesite
+ROCK = [('minecraft:stone', .32), ('minecraft:tuff', .27), ('minecraft:andesite', .25), ('minecraft:cobblestone', .10), ('minecraft:tuff', .06)]
+BANK = [('minecraft:moss_block', .46), ('minecraft:rooted_dirt', .10), ('minecraft:coarse_dirt', .10), ('minecraft:andesite', .06),
+        ('minecraft:tuff', .04), ('minecraft:mossy_cobblestone', .06), (None, .18)]
 LEAVES = 'minecraft:{}_leaves[distance=1,persistent=true,waterlogged=false]'
 
 
@@ -139,7 +140,8 @@ def plan_tile(box, x0, x1, z0, z1, kept, a, seed):
     steep_stripe = stripe & (slope >= a.moss_slope)
     moss_patch = vnoise(wx, wz, 6, seed + 9) * .75 + hash01(wx, wz, seed + 10) * .25
     moss = state('minecraft:moss_block')
-    for z, x in zip(*np.nonzero(steep_stripe & (moss_patch > 1 - a.stripe_moss))):
+    share = np.where(slope >= a.moss_slope + .4, min(a.stripe_moss * 1.5, .8), a.stripe_moss)
+    for z, x in zip(*np.nonzero(steep_stripe & (moss_patch > 1 - share))):
         j = int(ground[z, x]) - by
         if 0 <= j < ids.shape[0] and names[box.ids[j, z, x]] == 'minecraft:grass_block':
             ids[j, z, x] = moss
@@ -206,10 +208,10 @@ def main():
     p.add_argument('--tile', type=int, default=256)
     p.add_argument('--rock-slope', type=float, default=2.2)
     p.add_argument('--stripe-slope', type=float, default=.85)
-    p.add_argument('--stripe-cover', type=float, default=.35)
+    p.add_argument('--stripe-cover', type=float, default=.45)
     p.add_argument('--foot-cover', type=float, default=.55)
     p.add_argument('--ledge-shrubs', type=float, default=.04)
-    p.add_argument('--stripe-moss', type=float, default=.3, help='share of step tops turned to moss on steep terraces')
+    p.add_argument('--stripe-moss', type=float, default=.5, help='share of step tops turned to moss on steep terraces')
     p.add_argument('--moss-slope', type=float, default=.9)
     p.add_argument('--keep-rows', nargs='*', default=[])
     p.add_argument('--keep-days', type=float, default=4)
@@ -263,7 +265,7 @@ def main():
             done.add((X0, Z0))
             continue
         ylo, yhi = int(g.min()) - 40, int(g.max()) + 4
-        box = tr.Box(a.world, X0 - 2, X1 + 2, max(ylo, -64), min(yhi, 319), Z0 - 2, Z1 + 2)
+        box = tr.Box(a.world, X0 - 2, X1 + 2, ylo, yhi, Z0 - 2, Z1 + 2)
         kept = np.zeros(box.loaded.shape, bool)
         for kx in range((X0 - 2) // a.tile, (X1 + 2) // a.tile + 1):
             for kz in range((Z0 - 2) // a.tile, (Z1 + 2) // a.tile + 1):
