@@ -27,6 +27,10 @@ def main():
     p.add_argument('--sigma', type=float, default=5)
     p.add_argument('--blend', type=float, default=24)
     p.add_argument('--keep-file', type=Path)
+    p.add_argument('--dens-lo', type=float, default=.05, help='step-line density where --lattice smoothing starts')
+    p.add_argument('--dens-span', type=float, default=.07, help='density above --dens-lo where it reaches full strength')
+    p.add_argument('--max-change', type=float, default=1000, help='largest cut or fill per column')
+    p.add_argument('--lattice', action='store_true', help='smooth only where straight 1-block steps crowd together')
     p.add_argument('--seed', type=int, default=31)
     a = p.parse_args()
     a.out.mkdir(parents=True, exist_ok=True)
@@ -54,6 +58,18 @@ def main():
     inside = np.zeros(ground.shape, bool)
     inside[z0 - bz:z1 - bz + 1, x0 - bx:x1 - bx + 1] = True
     fade = np.clip(ndimage.distance_transform_edt(inside) / a.blend, 0, 1)
+    if a.lattice:
+        # only where straight 1-block steps crowd together (the grid terrain); natural slopes keep their shape
+        from scan_artificial_terrain import runs_along
+        g16 = ground.astype(np.int16)
+        nat = ~frozen
+        sx = np.zeros(g16.shape, bool)
+        sx[:, :-1] = (np.abs(np.diff(g16, axis=1)) == 1) & nat[:, :-1] & nat[:, 1:]
+        sz = np.zeros(g16.shape, bool)
+        sz[:-1] = (np.abs(np.diff(g16, axis=0)) == 1) & nat[:-1] & nat[1:]
+        lines = runs_along(sx, 0, 8) | runs_along(sz, 1, 8)
+        dens = ndimage.uniform_filter(lines.astype(float), 33)
+        fade = fade * ndimage.gaussian_filter(np.clip((dens - a.dens_lo) / a.dens_span, 0, 1), 8)
     target = gf + fade * (smooth - gf)
     # climb back to anything kept at a slope of one
     if frozen.any():
@@ -61,6 +77,8 @@ def main():
         dist, (iz, ix) = d
         anchor = gf[iz, ix]
         target = np.clip(target, anchor - dist, anchor + dist)
+    # grid steps are a block or two high; anything that needs more is a real pit, cliff or opening and stays
+    target = np.clip(target, gf - a.max_change, gf + a.max_change)
     target = np.where(frozen | ~inside, gf, target)
     names = np.array([q.split('[')[0] for q in box.palette]).astype(str)
     wooded = ndimage.binary_dilation(np.char.endswith(names, '_leaves')[box.ids].any(0), iterations=2) & ~built
