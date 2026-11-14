@@ -33,7 +33,7 @@ public final class OuterBoundaryTerrain
     private static final Saved SAVED = Saved.of(EDGE);
     /** The saved sea's flat seabed along the seam, the generator's floor, and the seam fade width. */
     static final int SEAM_BED = -90, SEA_FLOOR = -120;
-    static final double SEAM_BLEND = 48;
+    static final double SEAM_BLEND = 48, SHORE_JOIN = 96;
 
     /** Fallback coastline beyond the coast grid only, west to east with land on the left. */
     private static final double[][] FALLBACK = {
@@ -203,21 +203,26 @@ public final class OuterBoundaryTerrain
         return 85 + amplitude * massif * ridges + 12 * fbm(D, x / 230.0, z / 230.0, 3);
     }
 
-    /** Signed distance to the coastline: positive at sea, negative on land. */
     /**
-     * Where the exterior shore runs. The coast grid is a 16-block raster, so its zero line is a
-     * staircase; a wobble that fades in away from the saved coast makes it irregular and leaves
-     * the seam alone. Land relief keeps reading the plain coast distance, or the wobble would
-     * roughen the coastal plain.
+     * Where the exterior shore runs. Beside the saved chunks it follows them: their edge ground says
+     * land or sea (ten blocks of distance per block of height), and the coast grid takes over within
+     * SHORE_JOIN blocks. East of the surveyed rectangle the saved coast (extrapolated field) and the
+     * grid's (GSI tiles) disagree by ~50 blocks, and deciding by the grid alone left a straight sand
+     * spit along the seam. The grid is a 16-block raster, so its zero line is a staircase; a wobble
+     * that fades in away from the saved chunks makes it irregular. Land relief keeps reading the
+     * plain coast distance, or the wobble would roughen the coastal plain.
      */
     static double shoreline(int x, int z)
     {
-        double s = coast(x, z);
-        return COAST != null && COAST.covers(x, z)
-                ? s + (9 * A.getValue(x / 70.0 + 5, z / 70.0 - 8) + 4 * B.getValue(x / 23.0, z / 23.0)) * smooth(SAVED.distance(x, z) / 96)
-                : s;
+        double s = coast(x, z), a = SAVED.distance(x, z);
+        if (COAST != null && COAST.covers(x, z))
+            s += (9 * A.getValue(x / 70.0 + 5, z / 70.0 - 8) + 4 * B.getValue(x / 23.0, z / 23.0)) * smooth(a / 96);
+        if (a >= SHORE_JOIN) return s;
+        double saved = -10 * (EDGE.groundSmooth(x, z) - HakoneSurfaceField.SEA_Y);
+        return saved + (s - saved) * smooth(a / SHORE_JOIN);
     }
 
+    /** Signed distance to the coastline: positive at sea, negative on land. */
     static double coast(int x, int z)
     {
         if (COAST != null && COAST.covers(x, z)) return COAST.sample(x, z);
