@@ -26,7 +26,13 @@ public final class CombatBodyDynamics
             net.minecraft.server.level.TicketType.create("projectseele_articulated_terrain",Comparator.comparingLong(net.minecraft.world.level.ChunkPos::toLong),80);
     private static final Map<LivingEntity,State> SERVER=new IdentityHashMap<>();
     private static final com.projectseele.util.WeakIdentityMap<LivingEntity,ClientState> CLIENT=new com.projectseele.util.WeakIdentityMap<>();
-    private record History(long tick,Vec3 position,float yaw,Map<String,Matrix4f> matrices) {}
+    /**
+     * The most of an actor's own going that a knocked-down body starts with (physics units a second; one is 25
+     * blocks): out of a move (a run is 1.7), in a move, and with the fast run held (7.6).
+     */
+    private static final float OWN_GOING_R64=2F,OWN_GOING_IN_A_MOVE_R64=1F,OWN_GOING_FAST_R64=8F;
+    /** A body's pose a tick or two ago, and where the actor stood at the record before that one. */
+    private record History(long tick,Vec3 position,float yaw,Map<String,Matrix4f> matrices,Vec3 earlier,long earlierTick) {}
     private static final com.projectseele.util.WeakIdentityMap<LivingEntity,History> HISTORY=new com.projectseele.util.WeakIdentityMap<>();
     private static final com.projectseele.util.WeakIdentityMap<LivingEntity,Long> HANDOFF=new com.projectseele.util.WeakIdentityMap<>();
     private static final Set<EvaUnit01Entity> ACTION_OWNERS=Collections.newSetFromMap(new IdentityHashMap<>());
@@ -78,7 +84,9 @@ public final class CombatBodyDynamics
         if(actor.tickCount%2!=0||active(actor)||scripted(actor)||!(actor instanceof EvaUnit01Entity||actor instanceof SachielEntity)||!available(actor))return;
         if(actor instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||eva.isFirstBattleActive()||EvaAirTransportR31.active(eva)))return;
         var profile=CombatBodyProfiles.get(actor);var pose=raw(actor,0);AnatomicalLimbConstraints.apply(pose,profile);
-        HISTORY.put(actor,new History(actor.level().getGameTime(),actor.position(),actor.getYRot(),CombatBodyProfiles.physicalMatrices(pose,profile)));
+        var before=HISTORY.get(actor);
+        HISTORY.put(actor,new History(actor.level().getGameTime(),actor.position(),actor.getYRot(),CombatBodyProfiles.physicalMatrices(pose,profile),
+                before==null?null:before.position(),before==null?Long.MIN_VALUE:before.tick()));
     }
     public static EvaBodyPose.Sample sample(LivingEntity entity,float partial)
     {
@@ -139,9 +147,34 @@ public final class CombatBodyDynamics
             Map<String,Matrix4f> previousFrames=new HashMap<>();history.matrices.forEach((n,m)->previousFrames.put(n,new Matrix4f(transform).mul(m)));
             // The actor's own going since that pose, in the body's frame: what a pose adds to it is believed only so far.
             Vector3f went=POSE_CUT_R64?local(s,history.position).negate().div(since/20F):null;
+            float measured=went==null?0:went.length(),earlier=Float.NaN;
+            if(went!=null)
+            {
+                // And the actor's going itself only as far as it was going before: a move's first frame sets the
+                // actor aside as it sets the pose aside (a side kick, 3.8 to 7.3 blocks in its first tick), and read
+                // as the body's speed that threw a Unit 65 and 148 blocks with the pose's own share already cut.
+                // Before is what it covered between the two records before this, or its own motion where there is one record.
+                long gap=history.earlier==null?0:history.tick-history.earlierTick;
+                Vector3f was=gap>0&&gap<=4&&history.earlier.distanceTo(history.position)<12
+                        ?local(s,history.position).sub(local(s,history.earlier)).div(gap/20F)
+                        :motion.toVector3f().rotateY(-(180-s.yaw)*Mth.DEG_TO_RAD).mul(20*SCALE);
+                earlier=was.length();
+                Vector3f jump=new Vector3f(went).sub(was);float size=jump.length();
+                if(size>ArticulatedBody.POSE_CARRY_R64)
+                    went=was.add(jump.mul(Math.max(0,(ArticulatedBody.POSE_CUT_R64-size)/(ArticulatedBody.POSE_CUT_R64-ArticulatedBody.POSE_CARRY_R64))));
+                // And no more of it than the body's own legs give it. A move carries the actor along its own path:
+                // a side kick's lunge, 55 and then 77 blocks a second over two records running, agreed with itself
+                // and went into the fall whole, and the Unit slid 53 and 86 blocks. In a move a walk's pace is
+                // believed; out of one a run's, and the fast run's while that is held.
+                float most=OWN_GOING_R64;
+                if(entity instanceof EvaUnit01Entity eva)
+                    most=eva.hasLiveActionForRender(0)?OWN_GOING_IN_A_MOVE_R64:Mth.lerp(com.projectseele.entity.EvaSprintR50.blend(eva,1),OWN_GOING_R64,OWN_GOING_FAST_R64);
+                if(went.length()>most)went.mul(most/went.length());
+            }
             float[] carried=s.simulation.motionFromPose(previousFrames,since/20F,went);
-            if(DIAG_R63&&carried!=null)ProjectSeele.LOGGER.info("R63BODY start from the pose of {} ticks before: the actor went {} units a second, the pose carried the mass centre {} beyond that, {} of it kept",
-                    since,String.format(java.util.Locale.ROOT,"%.2f",went.length()),String.format(java.util.Locale.ROOT,"%.2f",carried[0]),String.format(java.util.Locale.ROOT,"%.2f",carried[1]));
+            if(DIAG_R63&&carried!=null)ProjectSeele.LOGGER.info("R63BODY start from the pose of {} ticks before: the actor went {} units a second ({} before that, {} believed), the pose carried the mass centre {} beyond that, {} of it kept",
+                    since,String.format(java.util.Locale.ROOT,"%.2f",measured),String.format(java.util.Locale.ROOT,"%.2f",earlier),String.format(java.util.Locale.ROOT,"%.2f",went.length()),
+                    String.format(java.util.Locale.ROOT,"%.2f",carried[0]),String.format(java.util.Locale.ROOT,"%.2f",carried[1]));
         }
         if(FUSE_R63)s.simulation.fuseR63(FUSE_SIDE_R63,FUSE_UP_R63);
         if(strength>=0)impulse(s,point,direction,strength);SERVER.put(entity,s);
