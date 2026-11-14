@@ -13,6 +13,9 @@ import java.util.*;
 public final class TvMissionAlertR30
 {
     private static final Map<ServerLevel,List<BlockPos>> BEACONS=new WeakHashMap<>();
+    /** The two NERV HQ PA speakers the alert sounds from. */
+    private static final List<net.minecraft.world.phys.Vec3> SPEAKERS=List.of(
+            net.minecraft.world.phys.Vec3.atCenterOf(new BlockPos(30,-412,289)),net.minecraft.world.phys.Vec3.atCenterOf(new BlockPos(30,-391,-240)));
     private static final Map<ServerLevel,Long> LAST_LINE=new WeakHashMap<>();
     public static boolean active(ServerLevel level){return TvCampaignSavedData.get(level).phase.equals("alert");}
     private static List<BlockPos> beacons(ServerLevel level)
@@ -30,8 +33,11 @@ public final class TvMissionAlertR30
         {var s=level.getBlockState(p);boolean lit=age<180&&age%20<10;if(s.is(ModBlocks.NERV_ALERT_LIGHT.get())&&s.getValue(BlockStateProperties.LIT)!=lit)level.setBlock(p,s.setValue(BlockStateProperties.LIT,lit),2);}
         if(age<180&&age%60==0)
         {
-            for(BlockPos p:List.of(new BlockPos(30,-412,289),new BlockPos(30,-391,-240)))
-                FacilityPaR31.warning(level,net.minecraft.world.phys.Vec3.atCenterOf(p));
+            for(var p:SPEAKERS)FacilityPaR31.warning(level,p);
+            // R64: the city alarm already carries the siren to everyone; without it, participants still get it at the ear.
+            if(!com.projectseele.config.SeeleConfig.ALARM_ENABLED.get())
+                MissionAudioR64.toParticipants(level,data,com.projectseele.registry.ModSounds.FACILITY.get("facility_siren").get(),
+                        net.minecraft.sounds.SoundSource.BLOCKS,.48F,SPEAKERS);
         }
         Long lastLine=LAST_LINE.get(level);
         if(commander!=null&&data.alertLine<5&&age>=data.alertLine*35L
@@ -43,8 +49,13 @@ public final class TvMissionAlertR30
             {var pilot=level.getServer().getPlayerList().getPlayer(crew.commander);if(pilot!=null&&pilot.level()==level)NervStaffDialogue.say(pilot,line[0]+" · 指挥通信",line[1]);}
             // Character dialogue remains text. This is a separate building-wide
             // announcement, without a named character or an actor-like voice.
-            if(index==2)for(BlockPos speaker:List.of(new BlockPos(30,-412,289),new BlockPos(30,-391,-240)))
-                FacilityPaR31.announce(level,net.minecraft.world.phys.Vec3.atCenterOf(speaker),"pa_combat_r31");
+            if(index==2)
+            {
+                for(var speaker:SPEAKERS)FacilityPaR31.announce(level,speaker,"pa_combat_r31");
+                // R64: participants away from NERV HQ hear the same announcement at the ear.
+                MissionAudioR64.toParticipants(level,data,com.projectseele.registry.ModSounds.FACILITY.get("pa_combat_r31").get(),
+                        net.minecraft.sounds.SoundSource.BLOCKS,1F,SPEAKERS);
+            }
             LAST_LINE.put(level,level.getGameTime());data.setDirty();
         }
         return age>=180&&data.alertLine>=5;

@@ -45,6 +45,9 @@ public final class TvCampaignSavedData extends SavedData
     {sorties.put(unit,new Sortie(unit,commander,npc,rifle));setDirty();}
     public static TvCampaignSavedData get(ServerLevel level)
     { return level.getDataStorage().computeIfAbsent(TvCampaignSavedData::load, TvCampaignSavedData::new, "projectseele_tv_campaign_r24"); }
+    /** The level's campaign without creating one where none was ever started. */
+    public static TvCampaignSavedData peek(ServerLevel level)
+    { return level.getDataStorage().get(TvCampaignSavedData::load, "projectseele_tv_campaign_r24"); }
     public static TvCampaignSavedData load(CompoundTag tag)
     {
         var data = new TvCampaignSavedData();

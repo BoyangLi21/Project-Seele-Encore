@@ -692,6 +692,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             SeeleNetwork.CHANNEL.send(
                     PacketDistributor.DIMENSION.with(serverLevel::dimension),
                     new ClientboundNukeFxPacket(impact.x, impact.y, impact.z, 2.6F, true));
+            com.projectseele.world.MissionAudioR64.echo(serverLevel, impact, ModSounds.CROSS_EXPLOSION.get(),
+                    net.minecraft.sounds.SoundSource.HOSTILE);
             serverLevel.sendParticles(ParticleTypes.END_ROD, impact.x, impact.y, impact.z, 64, 2.0D, 2.0D, 2.0D, 0.22D);
             serverLevel.sendParticles(ParticleTypes.EXPLOSION_EMITTER, impact.x, impact.y + 2.0D, impact.z, 9, 5.0D, 2.5D, 5.0D, 0.0D);
             // Mushroom stem and cap.
@@ -706,6 +708,9 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
                     impact.x, impact.y + 1.0D, impact.z, 70, 4.5D, 1.6D, 4.5D, 0.09D);
         }
         this.playSound(ModSounds.BEAM_FIRE.get(), 5.0F, 1.0F);
+        // R64: the shot echoes across the city at night for everyone within 1,500 blocks.
+        if (this.level() instanceof ServerLevel echoLevel)
+            com.projectseele.world.MissionAudioR64.echo(echoLevel, this.position(), ModSounds.BEAM_FIRE.get(), this.getSoundSource());
     }
 
     // ----- boss bar -----
