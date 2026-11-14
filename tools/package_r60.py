@@ -430,6 +430,10 @@ def build_inputs(a, work):
     xaero = server_xaerolib(client, current)
     server.update(xaero)
     server_mods |= set(xaero)
+    xaero_map_mods = sorted(n for n in current if re.fullmatch(r'mods/xaero(minimap|worldmap)-[^/]+\.jar', n))
+    gate(not xaero_map_mods or len(xaero) == 1, ('The client has Xaero map mods but the server would lack their xaerolib', xaero_map_mods))
+    gate(not any(re.match(r'mods/xaero(minimap|worldmap)-', n) for n in server_mods),
+         'Xaero map mods must stay off the server: they move the clients\' map folder away from the baked minimap')
     client_dh_text = current['config/DistantHorizons.toml'].read_text('utf8')
     server['config/DistantHorizons.toml'] = server_dh_config(client_dh_text)
     current['config/DistantHorizons.toml'] = client_dh_config(client_dh_text)
