@@ -1269,7 +1269,8 @@ public final class EvaPlantedGaitR64
     private static void witness(EvaUnit01Entity eva,State s,Vector3f[] hips,Vector3f[] anklesAt)
     {
         if(LAST.size()>32)LAST.clear();
-        double[] w=new double[32];
+        // (32 to 35 are the arms': how far each hand must be drawn in to clear a wall, and whether it is in one as drawn.)
+        double[] w=new double[36];
         w[0]=frac(s.phase);w[1]=s.running?1:0;w[2]=s.moving?1:0;w[3]=s.speed;w[4]=2/s.cycle;w[5]=s.duty;
         Foot[] both={s.left,s.right};
         for(int i=0;i<2;i++)

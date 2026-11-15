@@ -408,6 +408,8 @@ public final class EvaPoseGraph
         EvaPoseContinuity.settle(entity,model,planted?EvaPlantedGaitR64.OWNER:EvaAnimatorGecko.OWNER.equals(continuityOwner)||EvaFixedCannonBodyR55.OWNER.equals(continuityOwner)?continuityOwner:"LEGACY",String.valueOf(continuityOwner),partialTick);
         // The blend from the pose before may have moved the pelvis and turned the legs: the feet go back where they stand.
         if(planted)EvaPlantedGaitR64.finishLegs(entity,model,modelToWorld);
+        // R64 (M3): and its arms keep out of walls.
+        if(planted){EvaArmWallR64.apply(entity,model,modelToWorld);EvaPoseContinuity.trace(entity,model,"arm.wall");}
         // Follow-through, the joint limits and the settle each turn a shin: seated again before the soles are checked.
         seatHinges(model);
         if(!planted)EvaGroundContactR56.keepSolesUp(entity,model,modelToWorld);

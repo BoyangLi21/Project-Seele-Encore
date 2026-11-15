@@ -84,6 +84,13 @@ public final class EvaMotionModelR64
         return (float)Math.min(share,(slope>0?CLIMB_MOST:DESCENT_MOST)/Math.abs(slope)/nominal);
     }
 
+    /**
+     * R64 (M3): an edge is a drop of more than EDGE_DROP blocks under where the toes (EDGE_TOE ahead of the body's
+     * middle) or the heels (EDGE_HEEL behind it) of the feet (EDGE_HALF to either side) stand. A Unit left
+     * standing over one walks back from it at EDGE_INPUT of its walking input.
+     */
+    public static final double EDGE_DROP=10,EDGE_TOE=5.5,EDGE_HEEL=5.3,EDGE_HALF=4.8,EDGE_INPUT=.2;
+
     /** Register base accessors before any subclass allocates its own IDs. */
     public static boolean bootstrap(){return true;}
     public static void define(SynchedEntityData data)

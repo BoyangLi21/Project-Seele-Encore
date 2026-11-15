@@ -779,6 +779,9 @@ public final class EvaConnectedActionReview
     private static final int STEEP_FOOT_R64=-60,STEEP_RISE_R64=130,STEEP_TOP_R64=40;
     private static int steepTopTickR64=-1,steepDownEndR64=-1;
     private static final boolean STEEP_DOWN_R64=Boolean.getBoolean("projectseele.tourSteepDownR64");
+    /** -Dprojectseele.tourSteepEdgeR64=true: on the top the unit goes on to the far edge (a drop of 130) and is left there, toes over it. */
+    private static final boolean STEEP_EDGE_R64=Boolean.getBoolean("projectseele.tourSteepEdgeR64");
+    private static int steepEdgeTickR64=-1;
     private static void steepR64(Minecraft mc,EvaUnit01Entity eva,int x)
     {
         int t=tick;
@@ -791,6 +794,18 @@ public final class EvaConnectedActionReview
             ProjectSeele.LOGGER.info("R64STEEP tick {}: on the top at y {}",t,String.format(java.util.Locale.ROOT,"%.1f",eva.getY()));
         }
         boolean up=t>=40&&steepTopTickR64<0;
+        if(STEEP_EDGE_R64)
+        {
+            // The top ends at z = foot + rise + top; the box may go half its width past it.
+            up=t>=40&&steepEdgeTickR64<0;
+            if(up&&eva.getZ()>STEEP_FOOT_R64+STEEP_RISE_R64+STEEP_TOP_R64-2.5)
+            {
+                up=false;steepEdgeTickR64=t;
+                ProjectSeele.LOGGER.info("R64STEEP tick {}: left at the edge, z {}",t,String.format(java.util.Locale.ROOT,"%.1f",eva.getZ()));
+            }
+            if(steepEdgeTickR64>=0&&(t-steepEdgeTickR64)%20==0)
+                ProjectSeele.LOGGER.info("R64STEEP tick {}: {} ticks after, z {}",t,t-steepEdgeTickR64,String.format(java.util.Locale.ROOT,"%.1f",eva.getZ()));
+        }
         // -Dprojectseele.tourSteepDownR64=true: instead of the drop, the unit turns about on the top and comes
         // back down the slope in the same gait, to 30 blocks out on the flat (tourEnd 420 for a run, 620 for a walk).
         boolean down=STEEP_DOWN_R64&&steepTopTickR64>=0&&t>=steepTopTickR64+30&&eva.getZ()>STEEP_FOOT_R64-30;
@@ -811,6 +826,7 @@ public final class EvaConnectedActionReview
             }
             return;
         }
+        if(STEEP_EDGE_R64)return;
         if(steepTopTickR64>=0&&t==steepTopTickR64+40)
         {
             // Onto the middle of the slope from 100 blocks above it: a landing on the terraces.
@@ -828,18 +844,29 @@ public final class EvaConnectedActionReview
      * camera swings through one wall and into the end wall), the unit turns after the look and walks out again.
      * For the pilot's camera: run with the pilot view and the camera log, tourEnd=360. R64STREET lines mark the
      * stages. -Dprojectseele.tourStreetHighR64=60 makes the walls that high instead (a camera carried up can
-     * see over those).
+     * see over those). -Dprojectseele.tourStreetSideR64=true: instead, the unit bears left until its box is
+     * against the left wall and walks on along it, its left arm where the wall is (tourEnd=300).
      */
     private static final boolean STREET_R64=Boolean.getBoolean("projectseele.tourStreetR64");
     private static final int STREET_FROM_R64=-60,STREET_END_R64=40,STREET_HALF_R64=26,STREET_HIGH_R64=-60+Integer.getInteger("projectseele.tourStreetHighR64",100);
     private static int streetStageR64,streetAtR64=-1;
+    private static final boolean STREET_SIDE_R64=Boolean.getBoolean("projectseele.tourStreetSideR64");
     private static void streetR64(Minecraft mc,EvaUnit01Entity eva,int x)
     {
         int t=tick;
         if(at(1)){streetBlocksR64(mc,x,"minecraft:air",40);streetBlocksR64(mc,x,"minecraft:stone",STREET_HIGH_R64);}
         if(at(TOUR_END-2))streetBlocksR64(mc,x,"minecraft:air",40);
         float yaw=0;boolean go=false;
-        if(streetStageR64==0)
+        if(STREET_SIDE_R64)
+        {
+            // Left of a body facing +z is +x.
+            boolean against=eva.getX()-x>STREET_HALF_R64-9.2;
+            go=t>=40&&eva.getZ()<STREET_END_R64-20;
+            yaw=go&&!against&&eva.getZ()>STREET_FROM_R64+4?-45:0;
+            if(against&&streetStageR64==0){streetStageR64=1;ProjectSeele.LOGGER.info("R64STREET tick {}: against the wall",t);}
+            if(!go&&t>=40&&streetStageR64<2){streetStageR64=2;ProjectSeele.LOGGER.info("R64STREET tick {}: stopped",t);}
+        }
+        else if(streetStageR64==0)
         {
             go=t>=40;
             if(eva.getZ()>STREET_END_R64-20){streetStageR64=1;streetAtR64=t;ProjectSeele.LOGGER.info("R64STREET tick {}: stopped 20 short of the end",t);}

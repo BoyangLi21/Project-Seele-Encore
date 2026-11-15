@@ -7805,6 +7805,13 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         Vec3 held = this.riddenInputR58;
         if(EvaMotionModelR64.walks(this))
         {
+            // R64 (M3): left standing with its toes (or its heels) over a drop it could not step down, it steps
+            // back (or on) until both feet have ground under them.
+            if(EDGE_BACK_R64&&wanted.lengthSqr()<1e-4D)
+            {
+                int edge=this.edgeR64();
+                if(edge!=0)wanted=new Vec3(0,0,-edge*EvaMotionModelR64.EDGE_INPUT);
+            }
             // R64 (M1): to full speed and back in a set time, along the line from what is held to what is asked.
             double most=1D/(this.isPilotSprinting()?EvaMotionModelR64.RUN_RAMP_TICKS:EvaMotionModelR64.WALK_RAMP_TICKS);
             Vec3 change=wanted.subtract(held);double length=change.length();
@@ -8511,6 +8518,36 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             from=new Vec3(x,pos.getY()-.001,z);
         }
         return Double.NaN;
+    }
+
+    /** -Dprojectseele.edgeBackR64=false: a Unit left standing over an edge stays there, as up to M2. */
+    private static final boolean EDGE_BACK_R64=!"false".equals(System.getProperty("projectseele.edgeBackR64"));
+
+    /**
+     * R64 (M3): 1 standing with the toes of either foot over a drop of more than EDGE_DROP blocks and the heels
+     * on the ground, -1 with the heels over one and the toes on the ground, 0 otherwise. (A slope of one in one
+     * falls 5.5 blocks under the toes, a kerb less than the drop asked for: neither is an edge.)
+     */
+    private int edgeR64()
+    {
+        if(!this.onGround())return 0;
+        float radians=this.yBodyRot*Mth.DEG_TO_RAD;
+        double fx=-Mth.sin(radians),fz=Mth.cos(radians),lx=Mth.cos(radians),lz=Mth.sin(radians);
+        boolean front=false,back=false;
+        for(int side=-1;side<=1;side+=2)
+        {
+            double sx=this.getX()+lx*side*EvaMotionModelR64.EDGE_HALF,sz=this.getZ()+lz*side*EvaMotionModelR64.EDGE_HALF;
+            front|=this.dropAtR64(sx+fx*EvaMotionModelR64.EDGE_TOE,sz+fz*EvaMotionModelR64.EDGE_TOE);
+            back|=this.dropAtR64(sx-fx*EvaMotionModelR64.EDGE_HEEL,sz-fz*EvaMotionModelR64.EDGE_HEEL);
+        }
+        return front&&!back?1:back&&!front?-1:0;
+    }
+
+    /** Nothing to stand on at a place from a little over the feet's level down to EDGE_DROP under it. */
+    private boolean dropAtR64(double x,double z)
+    {
+        Vec3 from=new Vec3(x,this.getY()+1.5,z),to=new Vec3(x,this.getY()-EvaMotionModelR64.EDGE_DROP,z);
+        return this.level().clip(new ClipContext(from,to,ClipContext.Block.COLLIDER,ClipContext.Fluid.NONE,this)).getType()==net.minecraft.world.phys.HitResult.Type.MISS;
     }
 
     /** Any block the body could stand on within this far under its box. */
