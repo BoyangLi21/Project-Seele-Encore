@@ -850,6 +850,34 @@ public final class EvaPlantedGaitR64
         return Double.NaN;
     }
 
+    /**
+     * R64 (M3): what the Unit walks through (a fence, a lamp's foot, anything its body does not stop at) is seen
+     * and heard to give under a foot set down on it: the block's own fragments and its breaking sound, four
+     * blocks a footfall at most. Nothing in the world is changed: the map is not the Unit's to break.
+     */
+    private static void trodden(State s,EvaUnit01Entity eva,Foot f)
+    {
+        var level=eva.level();var random=eva.getRandom();
+        float radians=f.yaw*Mth.DEG_TO_RAD;double hx=-Mth.sin(radians),hz=Mth.cos(radians);
+        int found=0;long last=Long.MIN_VALUE;
+        for(double along=-s.rig.heel();along<=s.rig.toe()&&found<4;along+=1)
+            for(double side:new double[]{-s.rig.sole()*.6,0,s.rig.sole()*.6})
+                for(int up=0;up<3&&found<4;up++)
+                {
+                    BlockPos pos=BlockPos.containing(f.x+hx*along+hz*side,f.y+.1+up,f.z+hz*along-hx*side);
+                    if(pos.asLong()==last)continue;
+                    var state=level.getBlockState(pos);
+                    if(state.isAir())continue;
+                    var shape=state.getCollisionShape(level,pos,CollisionContext.of(eva));
+                    if(shape.isEmpty()||!EvaObstacleCollision.ignores(eva,state,pos,shape))continue;
+                    last=pos.asLong();found++;
+                    for(int i=0;i<10;i++)
+                        level.addParticle(new BlockParticleOption(ParticleTypes.BLOCK,state),pos.getX()+random.nextDouble(),pos.getY()+random.nextDouble(),
+                                pos.getZ()+random.nextDouble(),random.nextGaussian()*.12,random.nextDouble()*.2,random.nextGaussian()*.12);
+                    if(found==1)level.playLocalSound(pos.getX()+.5,pos.getY()+.5,pos.getZ()+.5,state.getSoundType().getBreakSound(),SoundSource.BLOCKS,1.6F,.8F,false);
+                }
+    }
+
     /** A footfall is heard and seen where it is drawn: each client sounds its own (the server sounds none for this model). */
     private static void footfall(State s,EvaUnit01Entity eva,Foot f,double step)
     {
@@ -869,6 +897,7 @@ public final class EvaPlantedGaitR64
         float load=s.moving?1+.28F*run:.55F;
         SoundEvent sound=(soil?ModSounds.EVA_FOOT_SOIL:ModSounds.EVA_FOOT_CONCRETE).get();
         level.playLocalSound(f.x,f.y,f.z,SoundEvent.createFixedRangeEvent(sound.getLocation(),384F),SoundSource.PLAYERS,2.5F*load,1F,false);
+        trodden(s,eva,f);
         if(EvaSprintR50.blend(eva,1)>.5F&&!state.isAir())
         {
             // A sprinting footfall throws the ground up behind it.

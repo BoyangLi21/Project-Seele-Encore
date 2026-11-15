@@ -236,7 +236,7 @@ public final class EvaConnectedActionReview
             // A tour that built terrain clears it two ticks before its end; the
             // server needs time to run those commands before the client stops,
             // or half a hill stays in the save and blocks every later tour.
-            if (tick >= TOUR_END + (HILL || STEEP_R64 || STEPS || CLIMB ? TERRAIN_GRACE : HOME_GRACE_R64)) finish(mc, "complete");
+            if (tick >= TOUR_END + (HILL || STEEP_R64 || STREET_R64 || STEPS || CLIMB ? TERRAIN_GRACE : HOME_GRACE_R64)) finish(mc, "complete");
             return;
         }
         if (RIFLE)
@@ -616,6 +616,7 @@ public final class EvaConnectedActionReview
         if(GAIT){gaitR64(mc);positionCamera(mc,eva);return;}
         if(HILL){hillR60(mc,lane(eva));positionCamera(mc,eva);return;}
         if(STEEP_R64){steepR64(mc,eva,lane(eva));positionCamera(mc,eva);return;}
+        if(STREET_R64){streetR64(mc,eva,lane(eva));positionCamera(mc,eva);return;}
         if(STRIKE){strikeR60(mc,eva);positionCamera(mc,eva);return;}
         if(ATF){atFieldR63(mc,eva);positionCamera(mc,eva);return;}
         if(ARMS!=null){armsR63(mc);positionCamera(mc,eva);return;}
@@ -819,6 +820,58 @@ public final class EvaConnectedActionReview
             eva.setPos(x+.5,y,z+.5);eva.xo=eva.xOld=eva.getX();eva.yo=eva.yOld=eva.getY();eva.zo=eva.zOld=eva.getZ();eva.setDeltaMovement(Vec3.ZERO);
             ProjectSeele.LOGGER.info("R64STEEP tick {}: dropped from y {} over the slope at z {}",t,y,z);
         }
+    }
+
+    /**
+     * -Dprojectseele.tourStreetR64=true: a street 52 blocks wide between two walls 100 high, closed at its far
+     * end. The unit walks in to 20 blocks short of the end, its pilot looks round to the left and behind (the
+     * camera swings through one wall and into the end wall), the unit turns after the look and walks out again.
+     * For the pilot's camera: run with the pilot view and the camera log, tourEnd=360. R64STREET lines mark the
+     * stages. -Dprojectseele.tourStreetHighR64=60 makes the walls that high instead (a camera carried up can
+     * see over those).
+     */
+    private static final boolean STREET_R64=Boolean.getBoolean("projectseele.tourStreetR64");
+    private static final int STREET_FROM_R64=-60,STREET_END_R64=40,STREET_HALF_R64=26,STREET_HIGH_R64=-60+Integer.getInteger("projectseele.tourStreetHighR64",100);
+    private static int streetStageR64,streetAtR64=-1;
+    private static void streetR64(Minecraft mc,EvaUnit01Entity eva,int x)
+    {
+        int t=tick;
+        if(at(1)){streetBlocksR64(mc,x,"minecraft:air",40);streetBlocksR64(mc,x,"minecraft:stone",STREET_HIGH_R64);}
+        if(at(TOUR_END-2))streetBlocksR64(mc,x,"minecraft:air",40);
+        float yaw=0;boolean go=false;
+        if(streetStageR64==0)
+        {
+            go=t>=40;
+            if(eva.getZ()>STREET_END_R64-20){streetStageR64=1;streetAtR64=t;ProjectSeele.LOGGER.info("R64STREET tick {}: stopped 20 short of the end",t);}
+        }
+        else if(streetStageR64==1)
+        {
+            // Stands, then looks round: a quarter turn by 30 ticks on, half a turn by 60, held to 90.
+            int since=t-streetAtR64;
+            yaw=since<10?0:Math.min(180,(since-10)*3.6F);
+            if(since==10)ProjectSeele.LOGGER.info("R64STREET tick {}: looking round",t);
+            if(since>=90){streetStageR64=2;ProjectSeele.LOGGER.info("R64STREET tick {}: walking out",t);}
+        }
+        else
+        {
+            yaw=180;go=eva.getZ()>STREET_FROM_R64-30;
+            if(!go&&streetStageR64==2){streetStageR64=3;ProjectSeele.LOGGER.info("R64STREET tick {}: out",t);}
+        }
+        mc.options.keyUp.setDown(go);mc.player.input.up=go;mc.player.input.forwardImpulse=go?1:0;mc.player.zza=go?1:0;mc.player.xxa=0;
+        mc.player.setYRot(yaw);mc.player.setXRot(8);
+        mc.options.keySprint.setDown(false);
+    }
+
+    /** The street's two walls and its end, or the air where they stood. */
+    private static void streetBlocksR64(Minecraft mc,int x,String block,int top)
+    {
+        for(int z=STREET_FROM_R64;z<STREET_END_R64;z++)
+        {
+            mc.player.connection.sendCommand("fill "+(x-STREET_HALF_R64-8)+" -60 "+z+" "+(x-STREET_HALF_R64)+" "+top+" "+z+" "+block);
+            mc.player.connection.sendCommand("fill "+(x+STREET_HALF_R64)+" -60 "+z+" "+(x+STREET_HALF_R64+8)+" "+top+" "+z+" "+block);
+        }
+        for(int z=STREET_END_R64;z<STREET_END_R64+8;z++)
+            mc.player.connection.sendCommand("fill "+(x-STREET_HALF_R64-8)+" -60 "+z+" "+(x+STREET_HALF_R64+8)+" "+top+" "+z+" "+block);
     }
 
     /** The slope's own box only. */

@@ -144,6 +144,30 @@ public abstract class CameraMixin
             Vec3 base=mechanical?com.projectseele.entity.EvaMechanicalFrameR52.frame(controlled,partialTick).translation()
                     :controlled.hasActiveCarrierMotion()?controlled.carrierRenderPosition(partialTick)
                     :controlled.getPosition(partialTick).add(0,com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick),0);
+            if(!mechanical&&!controlled.hasActiveCarrierMotion()&&!com.projectseele.entity.EvaAirTransportR31.active(controlled)
+                    &&com.projectseele.client.EvaChaseCameraR64.owns(controlled))
+            {
+                // R64 (M3): a Unit of the planted model, on its own feet, has the chase camera of that model.
+                Camera chase=(Camera)(Object)this;
+                double wanted=4*(net.minecraft.client.Minecraft.getInstance().options.getCameraType().isMirrored()?22.0D:11.6D);
+                Vec3 place=com.projectseele.client.EvaChaseCameraR64.place(controlled,subject,partialTick,chase.getXRot(),chase.getYRot(),wanted);
+                this.setPosition(place.x,place.y,place.z);
+                projectseele$carrierZoom=com.projectseele.client.EvaChaseCameraR64.zoom();
+                projectseele$carrierCameraId=controlled.getId();projectseele$carrierFrame=now;projectseele$loosePlugCamera=false;
+                if(com.projectseele.client.EvaStepSmoothingR57.CAMERA_DIAG_R64&&controlled.tickCount!=projectseele$diagTickR64)
+                {
+                    projectseele$diagTickR64=controlled.tickCount;
+                    Vec3 turns=place.add(Vec3.directionFromRotation(chase.getXRot(),chase.getYRot()).scale(projectseele$carrierZoom));
+                    com.projectseele.ProjectSeele.LOGGER.info("R64CAM tick {} zoom {} free {} step {} pivot clear {} camera clear {} pivot y {} entity y {} in unit {} lift {}",controlled.tickCount,
+                            String.format(java.util.Locale.ROOT,"%.1f",projectseele$carrierZoom),String.format(java.util.Locale.ROOT,"%.1f",com.projectseele.client.EvaChaseCameraR64.open()),
+                            String.format(java.util.Locale.ROOT,"%.2f",com.projectseele.client.EvaChaseCameraR64.lag(controlled,partialTick)),
+                            projectseele$cameraPointClear(controlled.level(),subject,turns),projectseele$cameraPointClear(controlled.level(),subject,place),
+                            String.format(java.util.Locale.ROOT,"%.1f",turns.y),String.format(java.util.Locale.ROOT,"%.1f",controlled.getPosition(partialTick).y),
+                            com.projectseele.client.EvaChaseCameraR64.inUnit(controlled,partialTick,place),
+                            String.format(java.util.Locale.ROOT,"%.1f",com.projectseele.client.EvaChaseCameraR64.lift()));
+                }
+                return;
+            }
             // A 60-metre EVA needs a chest-height orbit even when the silo
             // wall contracts its zoom. Never inherit the low rider seat or
             // ease back toward the old 30-metre waist pivot.
@@ -181,11 +205,12 @@ public abstract class CameraMixin
             {
                 // Review only: where the camera is against its unit and the ground, once a tick.
                 projectseele$diagTickR64=controlled.tickCount;
-                com.projectseele.ProjectSeele.LOGGER.info("R64CAM tick {} zoom {} free {} step {} pivot clear {} camera clear {} pivot y {} entity y {}",controlled.tickCount,
+                com.projectseele.ProjectSeele.LOGGER.info("R64CAM tick {} zoom {} free {} step {} pivot clear {} camera clear {} pivot y {} entity y {} in unit {} lift 0.0",controlled.tickCount,
                         String.format(java.util.Locale.ROOT,"%.1f",projectseele$carrierZoom),String.format(java.util.Locale.ROOT,"%.1f",available),
                         String.format(java.util.Locale.ROOT,"%.2f",com.projectseele.client.EvaStepSmoothingR57.offset(controlled,partialTick)),
                         projectseele$cameraPointClear(controlled.level(),subject,pivot),projectseele$cameraPointClear(controlled.level(),subject,position),
-                        String.format(java.util.Locale.ROOT,"%.1f",pivot.y),String.format(java.util.Locale.ROOT,"%.1f",controlled.getPosition(partialTick).y));
+                        String.format(java.util.Locale.ROOT,"%.1f",pivot.y),String.format(java.util.Locale.ROOT,"%.1f",controlled.getPosition(partialTick).y),
+                        com.projectseele.client.EvaChaseCameraR64.inUnit(controlled,partialTick,position));
             }
             return;
         }
