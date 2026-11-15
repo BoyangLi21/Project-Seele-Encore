@@ -365,6 +365,12 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         this.fieldBlowsR63 = now - this.fieldBlowAtR63 > BURST_WINDOW_R63 ? 1 : this.fieldBlowsR63 + 1;
         this.fieldBlowAtR63 = now;
         if (TOLD_R63) com.projectseele.ProjectSeele.LOGGER.info("R63RAMIELBLOW at {} blows {} since the last burst {}", now, this.fieldBlowsR63, now - this.burstAtR63);
+        // R64 (M5): the blow before the one that is thrown back rings a warning.
+        if (this.fieldBlowsR63 == BURST_BLOWS_R63 - 1 && now - this.burstAtR63 >= BURST_REST_R63 && this.level() instanceof ServerLevel warnLevel)
+        {
+            Vec3 toward = striker.position().subtract(this.position()).multiply(1, 0, 1);
+            AngelTellsR64.fieldWarns(warnLevel, this.beamOrigin(), toward.lengthSqr() < 1.0E-4D ? new Vec3(1, 0, 0) : toward.normalize());
+        }
         if (this.fieldBlowsR63 < BURST_BLOWS_R63 || now - this.burstAtR63 < BURST_REST_R63) return;
         this.fieldBlowsR63 = 0;
         this.burstAtR63 = now;
@@ -567,6 +573,12 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             this.entityData.set(DATA_BEAM_TICKS, remaining);
             int chargeRemaining=com.projectseele.world.TvYashimaCombatCommsR54.chargeRemainingR54(this);
             this.setExposed(remaining > 0 || this.isCharging() && chargeRemaining > 0 && chargeRemaining <= 20);
+            // R64 (M5): the open core is ringed with light that thins as its window runs out, and seals with a note.
+            if(!com.projectseele.world.ShieldCoverR48.yashima(this)&&this.level() instanceof ServerLevel tellLevel)
+            {
+                if(remaining>0)AngelTellsR64.exposed(tellLevel,this.beamOrigin(),remaining,BEAM_RENDER_TICKS);
+                else if(previous>0)AngelTellsR64.sealed(tellLevel,this.beamOrigin());
+            }
             if(previous>0&&remaining==0)com.projectseele.world.TvYashimaCombatCommsR54.onBeamEnded(this,
                     pacedRemainingR54(this.beamCooldown,this.beamCooldownReadyAtR54));
         }
@@ -1031,6 +1043,7 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
     }
 
     /** Telegraphed charge-up followed by a hitscan beam and explosion. */
+    private static final boolean BEAM_TOLD_R64=Boolean.getBoolean("projectseele.combatDiagR64");
     static class BeamAttackGoal extends Goal
     {
         private final RamielEntity ramiel;
@@ -1048,6 +1061,12 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
         {
             LivingEntity target = this.ramiel.getTarget();
             double range = this.ramiel.effectiveBeamRangeR45();
+            // Review only (-Dprojectseele.combatDiagR64=true): why the beam does or does not begin, twice a second.
+            if(BEAM_TOLD_R64&&this.ramiel.tickCount%20<2)
+                com.projectseele.ProjectSeele.LOGGER.info("R64RAMIELAI tick {} target {} cooldown {} allowed {} drilling {} distance {} of {} sight {}",this.ramiel.level().getGameTime(),
+                        target==null?"none":target.getType().toShortString(),pacedRemainingR54(this.ramiel.beamCooldown,this.ramiel.beamCooldownReadyAtR54),
+                        com.projectseele.world.TvYashimaDirectorR50.fireAiAllowedR50(this.ramiel),this.ramiel.isDrilling(),
+                        target==null?"-":String.valueOf(Math.round(Math.sqrt(this.ramiel.distanceToSqr(target)))),Math.round(range),target!=null&&this.ramiel.beamLineOfSightR45(target));
             return pacedRemainingR54(this.ramiel.beamCooldown,this.ramiel.beamCooldownReadyAtR54) <= 0
                     && com.projectseele.world.TvYashimaDirectorR50.fireAiAllowedR50(this.ramiel)
                     && (!this.ramiel.isDrilling()||com.projectseele.world.TvEncounterRulesR45.missionRamielAnchor(this.ramiel)!=null)
@@ -1112,6 +1131,8 @@ public class RamielEntity extends FlyingMob implements Enemy, Angel, com.project
             {
                 Vec3 core = this.ramiel.beamOrigin();
                 serverLevel.sendParticles(CHARGE_DUST, core.x, core.y, core.z, 4, 1.6D, 1.6D, 1.6D, 0.0D);
+                // R64 (M5): where the beam would land now. The Yashima mission counts its own charge down.
+                if(!com.projectseele.world.ShieldCoverR48.yashima(this.ramiel))AngelTellsR64.charge(serverLevel,core,target,this.chargeTicks);
             }
 
             this.chargeTicks=pacedRemainingR54(Math.max(0,this.chargeTicks-1),this.chargeReadyAtR54);

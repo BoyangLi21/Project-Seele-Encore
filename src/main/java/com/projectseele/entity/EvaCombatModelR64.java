@@ -50,5 +50,19 @@ public final class EvaCombatModelR64
     /** Under the new core: the pause at a hit goes by how hard the blow is (the owner's choice, 2026-11-15); otherwise as up to M3. */
     public static boolean tiered(EvaUnit01Entity e){return frames(e)&&e.getEntityData().hasItem(TIERED)&&e.getEntityData().get(TIERED);}
 
+    /**
+     * R64 (M5): the Angels fight by the M5 rules (Sachiel's intents and strings, the tells, the dust where a body
+     * meets ground or wall). They have no switch of their own: they follow the server's combat core, since what
+     * they read of a Unit's blow is the frames core's row. Review only: -Dprojectseele.angelIntentR64=false keeps
+     * the Angels of M4 under the frames core, to measure against.
+     */
+    private static final boolean ANGELS=!"false".equals(System.getProperty("projectseele.angelIntentR64"));
+    public static boolean angels()
+    {
+        if(!ANGELS)return false;
+        String model=REVIEW_MODEL!=null?REVIEW_MODEL:SeeleConfig.COMMON_SPEC.isLoaded()?SeeleConfig.EVA_COMBAT_MODEL.get():"legacy";
+        return "frames".equalsIgnoreCase(model);
+    }
+
     private EvaCombatModelR64(){}
 }

@@ -272,7 +272,9 @@ public final class SeeleConfig
                 .comment("How a piloted EVA fights. legacy: as up to R63. frames: every blow is a row of frame data (start-up,",
                         "active, recovery, what it cancels into) read by one machine, with the pilot's presses buffered (Unit-01",
                         "with bare hands or the knife for now; the rest keeps the old core). The server's value goes for",
-                        "everyone on it. In game: /seele combat.")
+                        "everyone on it. In game: /seele combat. The Angels follow it: under frames Sachiel fights in strings with a",
+                        "breath between them, calls every strike, and punishes a blow that misses; Ramiel shows where its beam",
+                        "will land and how long its core stays open; a body driven into a wall or the ground throws up dust.")
                 .defineInList("model", "legacy", java.util.List.of("legacy", "frames"));
         EVA_HIT_STOP = common
                 .comment("Under the frames core, the pause at a hit. tiered: by how hard the blow is (light 2 to 3 ticks, heavy 4",

@@ -47,6 +47,15 @@ public final class EvaChaseCameraR64
     private static final double LIFT_UP=40,LIFT_DOWN=14,OUT_LEAST=12,OUT_GAIN=2.5;
     /** A fast run carries the camera this share further back. */
     private static final double SPRINT_OUT=.12;
+    /**
+     * R64 (M5), frames core only: while the Unit is in a blow with an Angel in reach of its soft lock, the camera
+     * stands this share further back and turns about a point carried this share of the way to the Angel (at most
+     * so many blocks), so that both bodies are in the picture. The pilot's view is not turned. Eased in over a
+     * quarter of a second and out over one. Rollback: -Dprojectseele.lockCameraR64=false.
+     */
+    private static final double LOCK_OUT=.16,LOCK_SHARE=.22,LOCK_MOST=9,LOCK_IN=.25,LOCK_LEAVE=1.0;
+    private static final boolean LOCK=!"false".equals(System.getProperty("projectseele.lockCameraR64"));
+    private static double lock;private static Vec3 lockTo=Vec3.ZERO;private static long lockLooked;
 
     private static int unit=-1;
     private static long frame;
@@ -85,7 +94,23 @@ public final class EvaChaseCameraR64
             pivotRate=(pivotRate-FOLLOW*carried)*decay;
             pivotY=Mth.clamp(at.y+(behind+carried)*decay,at.y-LAG_MOST,at.y+LAG_MOST);
         }
-        double reach=wanted*(1+SPRINT_OUT*EvaSprintR50.blend(e,partial));
+        // The Angel is looked for four times a second; the offset to it is eased, so that a change of target is not a jump.
+        boolean fighting=LOCK&&com.projectseele.entity.EvaCombatModelR64.frames(e)&&e.hasLiveActionForRender(partial)&&e.isMeleeWeapon();
+        if(fresh){lock=0;lockTo=Vec3.ZERO;}
+        if(fighting&&now-lockLooked>250_000_000L)
+        {
+            lockLooked=now;Vec3 found=null;double least=64*64;
+            for(var other:e.level().getEntitiesOfClass(net.minecraft.world.entity.LivingEntity.class,e.getBoundingBox().inflate(64,40,64),
+                    o->o instanceof com.projectseele.entity.Angel&&o.isAlive()))
+            {
+                Vec3 to=other.position().subtract(at).multiply(1,0,1);double d=to.lengthSqr();
+                if(d<least){least=d;found=to;}
+            }
+            if(found==null)fighting=false;
+            else{double d=Math.sqrt(least),carried=Math.min(LOCK_MOST,d*LOCK_SHARE);lockTo=d<1e-3?Vec3.ZERO:found.scale(carried/d);}
+        }
+        lock+=((fighting?1:0)-lock)*(1-Math.exp(-dt/(fighting?LOCK_IN:LOCK_LEAVE)));
+        double reach=wanted*(1+SPRINT_OUT*EvaSprintR50.blend(e,partial)+LOCK_OUT*lock);
         far=fresh?reach:far+(reach-far)*(1-Math.exp(-dt/.5));
         Vec3 back=Vec3.directionFromRotation(xRot,yRot).scale(-1);
         BlockGetter level=e.level();
@@ -103,7 +128,7 @@ public final class EvaChaseCameraR64
         // Carried up and let down at a rate, never in one frame: swung into a wall behind the Unit the point
         // went up 22 blocks in three ticks (7 blocks in one).
         lift=fresh?chosen:lift+Mth.clamp(chosen-lift,-LIFT_DOWN*dt,LIFT_UP*dt);
-        Vec3 pivot=new Vec3(at.x,pivotY+PIVOT+lift,at.z);
+        Vec3 pivot=new Vec3(at.x+lockTo.x*lock,pivotY+PIVOT+lift,at.z+lockTo.z*lock);
         open=free(level,subject,pivot,back,far);
         if(fresh)zoom=open;
         else zoom=Math.min(open,zoom+Math.max(0,Math.min(open-zoom,Math.max(OUT_LEAST,OUT_GAIN*(open-zoom))*dt)));

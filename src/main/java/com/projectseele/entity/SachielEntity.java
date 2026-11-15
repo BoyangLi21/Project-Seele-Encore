@@ -134,6 +134,25 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         if(from!=null)entityData.set(STRIKE_FROM,from);
         return true;
     }
+    /**
+     * R64 (M5): the next strike of a string. It comes out of the rest of the strike before it (once that has been
+     * thrown) or out of the pause that follows one, from the pose the body is in; with the arm free it is begun
+     * as any strike.
+     */
+    public boolean followStrikeR64(LivingEntity target,int mode)
+    {
+        if(level().isClientSide||isFirstBattleActive()||!target.isAlive()||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(isStrikeActive())
+        {
+            if(entityData.get(STRIKE_AGE)<=SachielStrike.contactEnd(strikeMode()))return false;
+        }
+        else if(meleeRecovery<=0)return beginStrike(target,mode);
+        var from=BREAK_SMOOTH_R63&&SachielGameplayMotionR32.phrases()?EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)):null;
+        entityData.set(STRIKE_AGE,-1);strikeTarget=null;strikeHit=false;meleeRecovery=0;
+        if(!beginStrike(target,mode))return false;
+        if(from!=null)entityData.set(STRIKE_FROM,from);
+        return true;
+    }
     public boolean beginStrike(LivingEntity target,int mode)
     {
         if(level().isClientSide||isStrikeActive()||isFirstBattleActive()||!target.isAlive()||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
@@ -168,6 +187,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     {
         if(CombatFeelR31.hitPaused(this))return;
         int mode=strikeMode(),age=entityData.get(STRIKE_AGE)+1;entityData.set(STRIKE_AGE,age);getNavigation().stop();setDeltaMovement(getDeltaMovement().multiply(0,1,0));
+        AngelTellsR64.strike(this,mode,age);AngelTellsR64.stomp(this,mode,age);
         if(age<=SachielStrike.windup(mode)-4&&strikeTarget!=null&&strikeTarget.isAlive())
         {
             Vec3 to=strikeTarget.position().subtract(position());float wanted=(float)Math.toDegrees(Math.atan2(-to.x,to.z));
@@ -297,6 +317,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     @Override
     protected void registerGoals()
     {
+        this.goalSelector.addGoal(1,new SachielIntentR64(this));
         this.goalSelector.addGoal(1,new SachielTacticsR36(this));
         this.goalSelector.addGoal(1,new SachielTacticsR34(this));
         this.goalSelector.addGoal(2, new MeleeAttackGoal(this, 1.0D, true){@Override public boolean canUse(){return !SachielGameplayMotionR32.directed()&&super.canUse();}});

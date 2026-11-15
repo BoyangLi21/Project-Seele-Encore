@@ -37,7 +37,7 @@ public final class SachielTacticsR36 extends Goal
     /** -Dprojectseele.sachielRecoveryJabR64=false: the jab waits for Sachiel's own recovery, as up to R63. */
     private static final boolean RECOVERY_JAB_R64=!"false".equals(System.getProperty("projectseele.sachielRecoveryJabR64"));
     /** -Dprojectseele.sachielAnswersR63=false: Sachiel does not answer, as before. */
-    private static final boolean ANSWERS_R63=Boolean.parseBoolean(System.getProperty("projectseele.sachielAnswersR63","true"));
+    static final boolean ANSWERS_R63=Boolean.parseBoolean(System.getProperty("projectseele.sachielAnswersR63","true"));
     /** -Dprojectseele.sachielRollR63=0..99, review only: every answer is rolled as this number, to see one answer many times in a fight. */
     private static final int ROLL_R63=Integer.getInteger("projectseele.sachielRollR63",-1);
     private int rollR63(){return ROLL_R63>=0?ROLL_R63:actor.getRandom().nextInt(100);}
@@ -89,7 +89,7 @@ public final class SachielTacticsR36 extends Goal
                 unit.isHeavyMotionActive(),unit.isKickMotionActive(1),unit.getOrdinaryAttackStage(),roll,actor.isStrikeActive()?actor.strikeMode():-1,actor.strikeAge(0),what);
     }
     public SachielTacticsR36(SachielEntity actor){this.actor=actor;setFlags(EnumSet.of(Flag.MOVE,Flag.LOOK));}
-    @Override public boolean canUse(){return SachielGameplayMotionR32.phrases()&&!actor.isFirstBattleActive()&&!actor.isSelfDestructing()&&actor.getTarget()!=null&&actor.getTarget().isAlive();}
+    @Override public boolean canUse(){return !EvaCombatModelR64.angels()&&SachielGameplayMotionR32.phrases()&&!actor.isFirstBattleActive()&&!actor.isSelfDestructing()&&actor.getTarget()!=null&&actor.getTarget().isAlive();}
     @Override public boolean requiresUpdateEveryTick(){return true;}
     @Override public void stop(){velocity=Vec3.ZERO;SachielTacticsR34.recordMotion(actor,Vec3.ZERO);actor.getNavigation().stop();}
     @Override public void tick()

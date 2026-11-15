@@ -4139,6 +4139,14 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(this.getWeapon()==WEAPON_KNIFE)level.sendParticles(ParticleTypes.ELECTRIC_SPARK,point.x,point.y,point.z,7,2.0D,1.4D,2.0D,0.35D);
         EvaMovementSounds.play(this,point,ModSounds.EVA_SWING.get(),WHIFF_VOLUME_R63,WHIFF_PITCH_R63);
     }
+    /** R64 (M5): a finisher comes down on the ground ahead of the Unit: dust and the landing sound. No block is touched. */
+    void rowGroundR64(boolean landed)
+    {
+        if(!(this.level() instanceof ServerLevel level))return;
+        Vec3 forward=this.getForward().multiply(1,0,1);
+        if(forward.lengthSqr()<1.0e-8D)return;
+        AngelTellsR64.ground(level,this.position().add(forward.normalize().scale(10)),landed?1.25F:.85F);
+    }
     /** The row is left for a step: as the old retreat out of a recovery. */
     void leaveRowR64()
     {EvaGameplayMotionR32.releaseToMovement(this);this.cancelLiveActionsForStanceChange();this.cancelHeavyMotion();}

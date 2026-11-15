@@ -159,6 +159,8 @@ public final class EvaCombatMachineR64
             hit=true;
             if(DIAG)ProjectSeele.LOGGER.info("R64MOVE tick {} {} landed at tick {} (live {}..{})",e.level().getGameTime(),row.name(),now,startup+1,startup+active);
         }
+        // R64 (M5): a finisher's weight comes down, landed or not.
+        if(now==startup+active&&row.level()==EvaMoveTableR64.FINISHER)e.rowGroundR64(hit);
         if(now==startup+active&&!hit&&!whiffed)
         {
             whiffed=true;e.rowWhiffR64(row);
@@ -184,16 +186,37 @@ public final class EvaCombatMachineR64
         // blow): the moment it reached the contact is searched for between the two ticks.
         // (From three ticks back: a blow's first ticks are drawn ahead of their phase by that blend, and the phase
         // of the tick before still stood the limb past the contact.)
-        float lo=phase(Math.max(0,now-3),0),hi=phase(now,0);double reach=at.distanceTo(from);Vec3 along=to.subtract(from).scale(1/whole);
-        for(int i=0;i<6;i++)
+        // R64 (M5): and it is the moment the limb is nearest the contact that is looked for, not the one it crosses
+        // a plane at: a mark that stands inside the Unit's guard is met by the limb where the tick began, and a
+        // search that only ran on from there took the opening jab seven blocks back into its wind-up.
+        float lo=phase(Math.max(0,now-3),0),hi=phase(now,0),best=hi;double least=Double.MAX_VALUE;
+        for(int i=0;i<=8;i++)
         {
-            float mid=(lo+hi)*.5F;e.rowPhaseR64(mid);Vec3 limb=e.blowLimbR64();
+            float tried=lo+(hi-lo)*i/8F;e.rowPhaseR64(tried);Vec3 limb=e.blowLimbR64();
             if(limb==null){e.rowPhaseR64(hi);return;}
-            if(limb.subtract(from).dot(along)>reach)hi=mid;else lo=mid;
+            double d=limb.distanceToSqr(at);
+            if(d<least){least=d;best=tried;}
         }
-        e.rowPhaseR64((lo+hi)*.5F);
+        float span=(hi-lo)/8F;
+        for(int i=0;i<4;i++)
+        {
+            span*=.5F;
+            for(float tried:new float[]{best-span,best+span})
+            {
+                if(tried<lo||tried>hi)continue;
+                e.rowPhaseR64(tried);Vec3 limb=e.blowLimbR64();
+                if(limb==null)continue;
+                double d=limb.distanceToSqr(at);
+                if(d<least){least=d;best=tried;}
+            }
+        }
+        e.rowPhaseR64(best);
     }
 
+    /** The blow in hand has landed. */
+    public boolean landed(){return row!=null&&hit;}
+    /** Ticks of the row in hand still to play. */
+    public int recoveryLeft(){return row==null?0:Math.max(0,startup+active+recovery-e.rowElapsedR64(row));}
     /** The blow in hand has landed or missed and only its recovery is left. */
     public boolean spent(){return row!=null&&(hit||e.rowElapsedR64(row)>=startup+active);}
     /** An evade or a jump may take the row's place now. With nothing in hand, always. */

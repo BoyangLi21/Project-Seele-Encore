@@ -20,6 +20,8 @@ public final class CombatFeelR31
     private static final WeakIdentityMap<LivingEntity,Double> POISE=new WeakIdentityMap<>();
     private static final WeakIdentityMap<LivingEntity,Long> POISE_AT=new WeakIdentityMap<>();
     private static final WeakIdentityMap<LivingEntity,Float> PHASES=new WeakIdentityMap<>();
+    /** R64 (M5): the beat in which a body pushed back was last told to have met a wall. */
+    private static final WeakIdentityMap<LivingEntity,Long> WALLED=new WeakIdentityMap<>();
     public static Beat beat(LivingEntity e){if(com.projectseele.physics.CombatBodyDynamics.rawSampling(e))return null;var b=BEATS.get(e);return b!=null&&e.level().getGameTime()-b.start<b.duration?b:null;}
     public static float age(LivingEntity e,float partial){var b=beat(e);return b==null?0:(float)((e.level().getGameTime()-b.start)+(double)partial);}
     public static boolean restrained(LivingEntity e){if(com.projectseele.physics.CombatBodyDynamics.active(e))return true;var b=beat(e);return b!=null&&b.kind>=STAGGER&&b.kind<=THROWN&&age(e,0)<(b.kind==STAGGER?pushedUntil(b):b.duration-8);}
@@ -157,6 +159,9 @@ public final class CombatFeelR31
             Vec3 d=b.direction.multiply(1,0,1).normalize();v=new Vec3(d.x*speed,v.y,d.z*speed);
         }
         boolean grounded=e.onGround();e.move(MoverType.SELF,v);e.resetFallDistance();
+        // R64 (M5): pushed back into a wall. Told once a beat with chips, dust and the impact; nothing is broken.
+        if(e.horizontalCollision&&b.kind!=THROWN&&v.x*v.x+v.z*v.z>.36&&e.level() instanceof ServerLevel wallLevel&&EvaCombatModelR64.angels()&&WALLED.getOrDefault(e,-1L)!=b.start)
+        {WALLED.put(e,b.start);AngelTellsR64.wall(wallLevel,e,new Vec3(v.x,0,v.z).normalize());}
         if(grounded&&Math.abs(v.y)<.002)
         {
             var box=e.getBoundingBox();var sole=new net.minecraft.world.phys.AABB(box.minX+.1,box.minY-.12,box.minZ+.1,box.maxX-.1,box.minY+.01,box.maxZ-.1);
