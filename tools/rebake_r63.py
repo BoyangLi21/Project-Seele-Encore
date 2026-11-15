@@ -14,8 +14,9 @@ Steps, in order (each is resumable and writes WORK/logs/<step>.json):
   xaero     fresh mirror, final jar without DH and Oculus, -Dprojectseele.xaeroBake=true; WORK/out has the baked map
   report    the package_r60.py command for these outputs
 
-Changed chunks are found by comparing every GeoFront chunk with the world inside the R62 server zip, which is
-exactly the world the current LOD database was built from. The map writer does not update chunk timestamps.
+Changed chunks are found by comparing every GeoFront chunk with the world inside the reference server zip
+(REFERENCE_SERVER_ZIP), which must be exactly the world the starting LOD database was built from: for R64 the
+R63r server zip (batch 455), whose GeoFront database is passed to prepare with --db. The map writer does not update chunk timestamps.
 Run with a Python whose executable name does not start with "python" while the phone tool is running.
 """
 from contextlib import contextmanager, nullcontext
@@ -37,7 +38,8 @@ import zipfile
 ROOT = Path(__file__).resolve().parents[1]
 FORMAL = Path('F:/eva/artifacts/r53_repair_20261015/client/saves/HOTFIX_20261025')
 SHIP = Path('F:/eva/artifacts/r53_repair_20261015/client')
-R62_SERVER_ZIP = Path('F:/eva/delivery/Project_SEELE_Encore_R62_20261110_Server.zip')
+# The world the starting LOD database was built from. R64 starts from R63r's (batch 455, the R63 far view).
+REFERENCE_SERVER_ZIP = Path('F:/eva/delivery/Project_SEELE_Encore_R63r_20261115_Server.zip')
 RING_DB = Path('E:/eva-map-edges/client/saves/MAP_REVIEW/dimensions/projectseele/geofront/data/DistantHorizons.sqlite')
 WORK = Path('E:/eva-r63-rebake')
 ARGS_TEMPLATE = Path('F:/eva/.claude/map-work/run17.args')
@@ -74,8 +76,9 @@ INSTANCE_SKIP = ('saves', 'logs', 'crash-reports', 'screenshots', 'xaero', 'Dist
 SECTION_REACH = 40        # level-0 sections a viewpoint fills around itself (2,560 blocks; DH radius is 192 chunks)
 SECTIONS_PER_MINUTE = 80  # saved-chunk rebuild per hover minute: about 50 in the 6 GB trial (OOM), about 170 in R62 (8 GB, 6 threads)
 CLIENT_START_MIN = 4
+# R64: rows the bake writes use LZ4 (perf: LZMA2 keeps 1.1 GB of compressors resident); older rows keep their own mode.
 DH_BAKE = {'enableDistantGeneration': 'true', 'distantGeneratorMode': '"PRE_EXISTING_ONLY"', 'numberOfThreads': '4',
-           'threadRunTimeRatio': '"1.0"'}
+           'threadRunTimeRatio': '"1.0"', 'dataCompression': '"LZ4"'}
 
 
 def log_path(step):
@@ -210,8 +213,8 @@ def saved_chunks(world):
     return saved
 
 
-def chunk_changes(world, server_zip=R62_SERVER_ZIP):
-    """Chunks that differ from the R62 world: changed payload, added, removed."""
+def chunk_changes(world, server_zip=REFERENCE_SERVER_ZIP):
+    """Chunks that differ from the reference server zip's world: changed payload, added, removed."""
     changed, added, removed = set(), set(), set()
     with zipfile.ZipFile(server_zip) as z:
         old = {n[len(R62_PREFIX):] for n in z.namelist() if n.startswith(R62_PREFIX) and n.endswith('.mca')}
@@ -485,7 +488,7 @@ def jar_classes(path):
 
 def step_check(a):
     problems, notes = [], []
-    for name, path in (('formal world', FORMAL / 'level.dat'), ('shipped client jar', SHIP / JAR), ('R62 server zip', R62_SERVER_ZIP),
+    for name, path in (('formal world', FORMAL / 'level.dat'), ('shipped client jar', SHIP / JAR), ('reference server zip', REFERENCE_SERVER_ZIP),
                        ('outer ring LOD database', RING_DB), ('args template', ARGS_TEMPLATE), ('probe jar', PROBE_JAR),
                        ('javaw', JAVAW), ('slot tool', SLOT)):
         if not path.exists():
@@ -542,7 +545,7 @@ def step_check(a):
         newest_region=datetime.datetime.fromtimestamp(newest).isoformat(timespec='seconds'),
         shipped_jar=dict(path=str(SHIP / JAR), modified=jar_time, bytes=(SHIP / JAR).stat().st_size, r63_classes_missing=missing),
         javaw=dict(path=str(JAVAW), from_java_home=JAVAW != JAVAW_FALLBACK, version=version[:1]),
-        chunks=dict(saved=len(saved), changed_since_r62=len(changed), added=len(added), removed=len(removed)),
+        chunks=dict(saved=len(saved), changed_since_reference=len(changed), added=len(added), removed=len(removed)),
         lod=dict(formal_rows=len(core_rows), ring_rows=len(ring_rows), drop=len(plan['drop']), drop_by_reason=plan['why'],
                  take_from_ring=len(plan['take']), flag_parent_rebuild=len(plan['flag']), rebuild_level0=len(plan['rebuild']),
                  viewpoints=[dict(x=x, z=z, sections=c) for x, z, c in points],

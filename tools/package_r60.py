@@ -5,7 +5,7 @@ and writes nothing but its report. The previous release's packages (--template, 
 supply the server bootstrap (libraries, start scripts), server.properties, the icon and the PCL manifest.
 --pack holds the world's session.lock while it reads, so nothing may have the world open.
 --geofront-lod takes the GeoFront LOD database from tools/rebake_r63.py instead of the formal world's,
-so the R63 far view never has to be written into the formal world.
+so a re-baked far view never has to be written into the formal world.
 """
 from contextlib import contextmanager, nullcontext
 from pathlib import Path
@@ -25,7 +25,7 @@ import tomllib
 import zipfile
 
 ROOT = Path(__file__).resolve().parents[1]
-VERSION = 'R63'
+VERSION = 'R64'
 NAME = 'EVANGELION_Encore_' + VERSION
 SHADER = 'SEELE_Local_Cavern_R53_Review_20261026.zip'
 SERVER_WORLD = 'SEELE_R53_WORLD'
@@ -36,10 +36,15 @@ DH_MOD = 'mods/DistantHorizons-2.3.4-b-1.20.1-fabric-forge.jar'
 TRAFFICCRAFT = 'mods/trafficcraft-forge-1.20.1-1.1.3.jar'
 MTR = 'mods/MTR-forge-4.0.5+1.20.1.jar'
 MAIN_JAR = 'mods/projectseele-0.1.0-all.jar'
-# Must be in the shipped jar: outer boundary generator, perf batches 1-2, Fable phases 3-5, MTR ride sync.
-R63_CLASSES = ('world/OuterBoundaryTerrain', 'world/SbwIdlePause', 'physics/GiantInsideBlocks', 'physics/TerrainPruningBroadphase',
-               'client/render/EntityShadowRange', 'client/render/EvaRackReleaseR63', 'client/render/EvaKneeHingeR63',
-               'client/render/EvaArmClearanceR63', 'mixin/client/MtrRideSyncR63Mixin')
+# Must be in the shipped jar. R63: outer boundary generator, perf batches 1-2, Fable phases 3-5, MTR ride sync.
+# R64: mission audio and its headset, the sea-level horizon, off-thread entity textures, shared JSON leaves.
+RELEASE_CLASSES = ('world/OuterBoundaryTerrain', 'world/SbwIdlePause', 'physics/GiantInsideBlocks', 'physics/TerrainPruningBroadphase',
+                   'client/render/EntityShadowRange', 'client/render/EvaRackReleaseR63', 'client/render/EvaKneeHingeR63',
+                   'client/render/EvaArmClearanceR63', 'mixin/client/MtrRideSyncR63Mixin',
+                   'world/MissionAudioR64', 'client/sound/HeadsetSoundsR64', 'mixin/client/TvGeoFrontHorizonR64Mixin',
+                   'client/render/HeavyTextureLoad', 'util/SharedJsonLeaves')
+GRASS_PACK = 'SEELE_GreenGrassSide.zip'  # R64: enabled for every client (owner-approved), built by tools/gen_green_grass_side.py
+SBW_SERVER = 'serverconfig/superbwarfare-server.toml'
 GEOFRONT_LOD = 'dimensions/projectseele/geofront/data/DistantHorizons.sqlite'
 CHECK = None  # a list while --check runs: failed gates are collected there instead of raised
 
@@ -242,17 +247,42 @@ def dh_config(text, settings):
     return text.encode('utf8')
 
 
+# R64 (perf): LZMA2 keeps 32 compressors of 34 MB resident (1.1 GB); with LZ4 a 7.2 GB client heap had no full GC.
+# The database grows up to about 1.3x; rows already stored keep their own compression mode and stay readable.
+DH_COMPRESSION = {'dataCompression': '"LZ4"'}
+
+
 def server_dh_config(text):
     # Remote city motion must update LODs outside vanilla chunk tracking, without generating distant terrain.
     return dh_config(text, {'numberOfThreads': '2', 'threadRunTimeRatio': '"0.5"', 'enableDistantGeneration': 'false',
                             'distantGeneratorMode': '"PRE_EXISTING_ONLY"', 'enableRealTimeUpdates': 'true',
                             'realTimeUpdateDistanceRadiusInChunks': '256', 'synchronizeOnLoad': 'true',
-                            'sendLevelKeys': 'true', 'levelKeyPrefix': '""'})
+                            'sendLevelKeys': 'true', 'levelKeyPrefix': '""', **DH_COMPRESSION})
 
 
 def client_dh_config(text):
     # Two threads at half duty leave the preinstalled terrain filling in for a minute after joining.
-    return dh_config(text, {'numberOfThreads': '4', 'threadRunTimeRatio': '"1.0"'})
+    return dh_config(text, {'numberOfThreads': '4', 'threadRunTimeRatio': '"1.0"', **DH_COMPRESSION})
+
+
+def sbw_server_config(text):
+    """R64 (perf): with vehicle chunk loading on, SuperbWarfare gives every vehicle loaded at shutdown a permanent
+    radius-3 ticket at the next start (93 tickets, 969 chunks, 92 MB, nearly all at the UN base), and the set only
+    grows. Nothing of ours relies on it: our sites keep their own tickets and parked vehicles already drop theirs."""
+    gate(re.search(r'(?m)^\s*vehicle_chunk_loading\s*=', text), SBW_SERVER + ' has no vehicle_chunk_loading key')
+    return re.sub(r'(?m)^(\s*vehicle_chunk_loading\s*=\s*)true\b', r'\1false', text).encode('utf8')
+
+
+def grass_pack():
+    """The green grass-side pack, built here from its generator so the release never carries a stale copy."""
+    import importlib.util
+    spec = importlib.util.spec_from_file_location('gen_green_grass_side', ROOT / 'tools/gen_green_grass_side.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    with tempfile.TemporaryDirectory() as folder:
+        target = Path(folder) / GRASS_PACK
+        module.build(target)
+        return target.read_bytes()
 
 
 def servers_dat(name, address):
@@ -297,16 +327,16 @@ def xaero_map(source, world, address):
 
 
 def jar_report(path, compare=None):
-    """Size, digest and R63 marker classes of the shipped mod jar; with a build of current main, every class must match."""
+    """Size, digest and release marker classes of the shipped mod jar; with a build of current main, every class must match."""
     digest = hashlib.sha256()
     with path.open('rb') as handle:
         for block in iter(lambda: handle.read(1 << 20), b''):
             digest.update(block)
     with zipfile.ZipFile(path) as z:
         classes = {i.filename: i.CRC for i in z.infolist() if i.filename.startswith('com/projectseele/') and i.filename.endswith('.class')}
-    missing = [c for c in R63_CLASSES if 'com/projectseele/' + c + '.class' not in classes]
-    gate(not missing, ('Shipped mod jar lacks R63 classes', missing))
-    report = dict(bytes=path.stat().st_size, sha256=digest.hexdigest(), classes=len(classes), r63_classes_missing=missing,
+    missing = [c for c in RELEASE_CLASSES if 'com/projectseele/' + c + '.class' not in classes]
+    gate(not missing, ('Shipped mod jar lacks release classes', missing))
+    report = dict(bytes=path.stat().st_size, sha256=digest.hexdigest(), classes=len(classes), release_classes_missing=missing,
                   modified=datetime.datetime.fromtimestamp(path.stat().st_mtime).isoformat(timespec='seconds'))
     if compare:
         with zipfile.ZipFile(compare) as z:
@@ -385,7 +415,7 @@ def build_inputs(a, work):
     assert (world / 'level.dat').is_file() and (client / MAIN_JAR).is_file()
     seed, provenance = dh_identifier(client, world)
     client_lod, world_lod, lod_details = distant_caches(world, seed, a.pack, work, a.geofront_lod and a.geofront_lod.resolve())
-    gate(a.geofront_lod, 'R63 needs --geofront-lod: the formal world still has the R62 far view (tools/rebake_r63.py core)')
+    gate(a.geofront_lod, VERSION + ' needs --geofront-lod: the formal world still has the R62 far view (tools/rebake_r63.py core)')
     jar = jar_report(client / MAIN_JAR, a.compare_build)
     config = config_report(client)
 
@@ -399,9 +429,16 @@ def build_inputs(a, work):
     gate(not missing, ('Declared runtime resource absent', missing))
     gate('shaderPack=' + SHADER in (client / 'config/oculus.properties').read_text('utf8'), 'Oculus does not have ' + SHADER + ' selected')
     current['shaderpacks/' + SHADER] = shader_payload(current['shaderpacks/' + SHADER])
-    current['options.txt'] = client / 'options.txt'
-    options = (client / 'options.txt').read_text('utf8')
-    packs = json.loads(next(l.split(':', 1)[1] for l in options.splitlines() if l.startswith('resourcePacks:')))
+    raw_options = (client / 'options.txt').read_bytes()
+    pack_line = next(l for l in raw_options.decode('utf8').splitlines() if l.startswith('resourcePacks:'))
+    packs = json.loads(pack_line.split(':', 1)[1])
+    if 'file/' + GRASS_PACK not in packs:
+        # Last in the list is applied on top: above the terrain pack whose 128 px grass maps the shader reads.
+        packs.append('file/' + GRASS_PACK)
+        raw_options = raw_options.replace(pack_line.encode('utf8'),
+                                          ('resourcePacks:' + json.dumps(packs, separators=(',', ':'))).encode('utf8'), 1)
+    current['options.txt'] = raw_options
+    current['resourcepacks/' + GRASS_PACK] = grass_pack()
     required = ['resourcepacks/' + n.removeprefix('file/') for n in packs if n.startswith('file/')]
     gate(all(n in current for n in required), ('Enabled resource pack missing', [n for n in required if n not in current]))
     if (client / 'COMPLEMENTARY_CREDITS.txt').is_file():
@@ -416,13 +453,18 @@ def build_inputs(a, work):
 
     world_files = {p.relative_to(world).as_posix(): p for p in files(world)}
     world_files.update(world_lod)
+    if gate(SBW_SERVER in world_files, 'World has no ' + SBW_SERVER):
+        source = world_files[SBW_SERVER]
+        world_files[SBW_SERVER] = sbw_server_config(source.read_bytes().decode('utf8') if isinstance(source, Path) else source.decode('utf8'))
     gate(any(n.startswith('dimensions/projectseele/geofront/data/city_rigid_generation_r45/') for n in world_files),
          'City generation data missing from the world')
 
     template = a.delivery / f'Project_SEELE_Encore_{a.template}_Server.zip'
     with zipfile.ZipFile(template) as z:
         names = [n for n in z.namelist() if not n.endswith('/')]
-        server_mods = {n for n in names if n.startswith('mods/') and n.endswith('.jar')} | {DH_MOD, TRAFFICCRAFT, MTR, MAIN_JAR}
+        # The template's xaerolib (R63r on) is not a client jar: server_xaerolib() below takes it out of the Xaero mods.
+        server_mods = {n for n in names if n.startswith('mods/') and n.endswith('.jar') and not re.fullmatch(r'mods/xaerolib-[^/]+\.jar', n)}
+        server_mods |= {DH_MOD, TRAFFICCRAFT, MTR, MAIN_JAR}
         bootstrap = {n for n in names if n.startswith('libraries/') or n in {'Start-Server.bat', 'start-server.sh', 'user_jvm_args.txt', 'eula.txt'}}
         absent = server_mods - set(current)
         gate(not absent, ('Server mod missing from the client', sorted(absent)))
@@ -526,7 +568,7 @@ def main():
     p.add_argument('--xaero-map', type=Path, help='xaero/world-map/WORLD/projectseele$geofront written by a -Dprojectseele.xaeroBake=true run on a copy of --world')
     p.add_argument('--geofront-lod', type=Path, help='GeoFront DistantHorizons.sqlite from tools/rebake_r63.py (WORK/out/geofront_lod.sqlite)')
     p.add_argument('--compare-build', type=Path, help='A jar built from current main: every com/projectseele class of the shipped jar must match it')
-    p.add_argument('--template', default='R62_20261110', help='Version and date of the previous release whose zips supply the bootstrap')
+    p.add_argument('--template', default='R63r_20261115', help='Version and date of the previous release whose zips supply the bootstrap')
     group = p.add_mutually_exclusive_group()
     group.add_argument('--pack', action='store_true')
     group.add_argument('--check', type=Path, metavar='REPORT', help='Run every gate, write the report here, never pack')
