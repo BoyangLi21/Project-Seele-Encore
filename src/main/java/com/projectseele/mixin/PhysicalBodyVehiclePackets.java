@@ -95,5 +95,21 @@ public abstract class PhysicalBodyVehiclePackets
             }
             else CombatBodyDynamics.acknowledgeHandoff(actor);
         }
+        // R64 (M3): a server that is not its pilot's own machine sets a vehicle back that has gone more than 10
+        // blocks from where it stood as the tick began ("moved too quickly"). A Unit's fast run is 9.45 blocks a
+        // tick over the ground: two of its packets in one tick, one going up a slope, or a run's step onto a
+        // ledge over 10 blocks high (its step is 20) are all past that, and the Unit is set back each time. That
+        // cannot be seen where the pilot hosts the game, which is where every capture is made, and fits the two
+        // faults filmed on the server (the body flipping on a slope, hanging at its top) better than anything
+        // else found. For a Unit of the planted model the measure starts from this packet, as far as a Unit can
+        // have gone since its last (a fast run's tick and a full step up, with room for a second packet); the
+        // move itself is still made again on the server and set back if the Unit could not have made it.
+        if(!callback.isCancelled()&&actor instanceof EvaUnit01Entity unit&&com.projectseele.entity.EvaMotionModelR64.planted(unit)
+                &&actor.distanceToSqr(packet.getX(),packet.getY(),packet.getZ())<=SEELE_PACKET_MOST*SEELE_PACKET_MOST)
+        {
+            vehicleFirstGoodX=packet.getX();vehicleFirstGoodY=packet.getY();vehicleFirstGoodZ=packet.getZ();
+        }
     }
+    /** How far a Unit of the planted model may have gone between two of its packets (blocks). */
+    @Unique private static final double SEELE_PACKET_MOST=48;
 }

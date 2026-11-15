@@ -5530,6 +5530,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaGameplayMotionR32.tick(this);
         EvaSprintR50.tick(this);
         EvaMotionModelR64.tick(this);
+        EvaMotionModelR64.serverKeys(this,(float)gaitKeyR64(SeeleConfig.EVA_WALK_SPEED_SCALE),(float)gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE));
         this.slopeAheadR64=EvaMotionModelR64.walks(this)?Mth.lerp(.25F,this.slopeAheadR64,this.slopeProbeR64()):0;
         if(SLOPE_DIAG_R64&&this.tickCount%10==0&&this.isVehicle())
             ProjectSeele.LOGGER.info("R64SLOPE {} tick {}: slope ahead {} scale {} walks {} on ground {} speed {}",
@@ -7869,8 +7870,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             return 0.02F;
         }
-        float synchronizationSpeed = EvaPilotCapability.mobilityMultiplier(
-                this.getPilotSynchronization());
+        float synchronizationSpeed = EvaMotionModelR64.mobility(this, this.getPilotSynchronization());
         float variantSpeed = switch (this.getUnitVariant())
         {
             case UNIT_00 -> this.isPilotSprinting() ? 0.65F : 0.36F;
@@ -7878,7 +7878,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             default -> this.isPilotSprinting() ? SPRINT_SPEED : WALK_SPEED;
         };
         // R64 (C12): the owner's speed keys, 1 by default.
-        variantSpeed*=(float)(this.isPilotSprinting()?gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE):gaitKeyR64(SeeleConfig.EVA_WALK_SPEED_SCALE));
+        variantSpeed*=(float)EvaMotionModelR64.speedKey(this,this.isPilotSprinting(),
+                this.isPilotSprinting()?gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE):gaitKeyR64(SeeleConfig.EVA_WALK_SPEED_SCALE));
         // R64 (M1): the planted model's gait tier sets the walk and the run.
         variantSpeed*=EvaMotionModelR64.speedScale(this,this.isPilotSprinting());
         // R64 (M2): and the slope ahead holds it.

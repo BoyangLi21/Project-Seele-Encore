@@ -23,6 +23,16 @@ public final class EvaMotionModelR64
     public static final byte LEGACY=0,PLANTED=1;
     private static final EntityDataAccessor<Byte> MODEL=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BYTE);
     private static final EntityDataAccessor<Byte> TIER=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BYTE);
+    /**
+     * R64 (M3): the server's [eva_gait] walkSpeedScale and runSpeedScale and its [eva_synchronization]
+     * maxMobilityBonus, carried to every client. They are common config, which is not sent to clients: the side
+     * that moves a Unit read its own file, so a pilot whose file differed from the server's drove at their own
+     * speed, and at the server's whenever the server took the Unit over (an Angel near, a strike), with a jump
+     * in speed at each change.
+     */
+    private static final EntityDataAccessor<Float> WALK_KEY=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> RUN_KEY=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
+    private static final EntityDataAccessor<Float> MOBILITY_KEY=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     /** Review only: -Dprojectseele.motionModelR64=planted and -Dprojectseele.gaitTierR64=A, B or C stand in for the config. */
     private static final String REVIEW_MODEL=System.getProperty("projectseele.motionModelR64"),REVIEW_TIER=System.getProperty("projectseele.gaitTierR64");
 
@@ -76,7 +86,34 @@ public final class EvaMotionModelR64
 
     /** Register base accessors before any subclass allocates its own IDs. */
     public static boolean bootstrap(){return true;}
-    public static void define(SynchedEntityData data){data.define(MODEL,LEGACY);data.define(TIER,(byte)0);}
+    public static void define(SynchedEntityData data)
+    {
+        data.define(MODEL,LEGACY);data.define(TIER,(byte)0);
+        data.define(WALK_KEY,1F);data.define(RUN_KEY,1F);data.define(MOBILITY_KEY,.25F);
+    }
+
+    /** Server, every tick: its own speed keys (as the Unit reads them) and mobility bonus, for the clients. */
+    public static void serverKeys(EvaUnit01Entity e,float walk,float run)
+    {
+        if(e.level().isClientSide)return;
+        float mobility=SeeleConfig.COMMON_SPEC.isLoaded()?SeeleConfig.EVA_SYNC_MAX_MOBILITY_BONUS.get().floatValue():.25F;
+        if(e.getEntityData().get(WALK_KEY)!=walk)e.getEntityData().set(WALK_KEY,walk);
+        if(e.getEntityData().get(RUN_KEY)!=run)e.getEntityData().set(RUN_KEY,run);
+        if(e.getEntityData().get(MOBILITY_KEY)!=mobility)e.getEntityData().set(MOBILITY_KEY,mobility);
+    }
+
+    /** The speed key a Unit is driven by: the server's for a Unit of the planted model, this side's own otherwise. */
+    public static double speedKey(EvaUnit01Entity e,boolean running,double own)
+    {
+        return planted(e)?e.getEntityData().get(running?RUN_KEY:WALK_KEY):own;
+    }
+
+    /** What the pilot's synchronisation adds to the speed, by the server's bonus for a Unit of the planted model. */
+    public static float mobility(EvaUnit01Entity e,float synchronization)
+    {
+        return planted(e)?com.projectseele.capability.EvaPilotCapability.mobilityMultiplier(synchronization,e.getEntityData().get(MOBILITY_KEY))
+                :com.projectseele.capability.EvaPilotCapability.mobilityMultiplier(synchronization);
+    }
 
     /** Server, every tick: the config decides. */
     public static void tick(EvaUnit01Entity e)
