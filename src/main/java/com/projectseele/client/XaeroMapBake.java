@@ -181,7 +181,8 @@ public final class XaeroMapBake
         for (Iterator<ChunkPos> it = outstanding.iterator(); it.hasNext(); )
         {
             ChunkPos pos = it.next();
-            if (!chunks.hasChunk(pos.x, pos.z)) continue;
+            // hasChunk only asks whether the ticket level reached FULL, not whether generation finished.
+            if (chunks.getChunkNow(pos.x, pos.z) == null) continue;
             chunks.removeRegionTicket(PREGEN_TICKET, pos, 0, pos);
             it.remove();
             done++;
