@@ -1,4 +1,4 @@
-"""Original resource pack: grass-block sides green all the way down (R63 Hotfix1, owner-approved).
+"""Original resource pack SEELE_GreenGrassSide.zip: grass-block sides green all the way down (from R63r, owner-approved).
 
 On hillsides the grass block's side shows dirt with a thin tinted fringe, read as brown stripes.
 This pack replaces minecraft:block/grass_block_side_overlay with an opaque greyscale grass texture,
