@@ -53,6 +53,7 @@ R63（2026-11-10）负责人试听后重做蓄力、落点爆炸和钻击：`too
 | `textures/item/positron_rifle.png` | 32×32 | 原创：`tools/gen_textures.ps1` 程序绘制 |
 | `textures/item/core_fragment.png` | 32×32 | 同上 |
 | `textures/entity/ramiel.png` | 32×32 | 同上（渐变+棱面纹理） |
+| 资源包 `SEELE_GreenGrassSide_R63H1.zip`：`minecraft:block/grass_block_side_overlay` 及其 `_n`、`_s`（R63 Hotfix1，负责人批准） | 128×128，LabPBR 1.3 | 原创：`tools/gen_green_grass_side.py` 程序生成（固定种子的可平铺噪声，亮度按 SEELE 地形包草顶面的平均值对齐，未复制任何像素），不含 Mojang 或其他资源包的贴图；随项目按 MIT 发布 |
 
 欢迎社区高清重绘（资源包可直接覆盖）。
 
