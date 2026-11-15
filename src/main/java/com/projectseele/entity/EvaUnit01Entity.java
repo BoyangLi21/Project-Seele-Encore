@@ -4150,7 +4150,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // a run up one in one: every other tick's travel undone, the body going up at half its speed and back
         // and forth by 3.3 blocks). The body is on the ground for such a move if it stood on something at the
         // end of the last, which is what its pilot's side went by.
-        boolean served=!this.level().isClientSide&&EvaMotionModelR64.planted(this);
+        // (For every Unit since the owner's word of 2026-11-15: the old model was set back the same way, 86 times
+        // walking up that slope and 46 running.)
+        boolean served=!this.level().isClientSide;
         if(served&&type==MoverType.PLAYER&&motion.y>0&&this.replaySupportedR64)this.setOnGround(true);
         super.move(type,motion);
         if(served)this.replaySupportedR64=this.onGround()||motion.y>=0&&!this.level().noCollision(this,this.getBoundingBox().move(0,-.05,0));
