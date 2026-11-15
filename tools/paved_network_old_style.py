@@ -17,6 +17,7 @@ from plan_station_access_corridor import CapturedSurface
 
 ROAD = ('minecraft:black_concrete', 'projectseele:road_asphalt_slab', 'projectseele:road_marking_slab')
 FOOTWAY = ('minecraft:smooth_stone', 'minecraft:smooth_stone_slab')
+PAINT = ('minecraft:white_concrete',)     # old dashes: carriageway where at least 3 of the 8 neighbours are carriageway
 FOOT, MIN_PIECE = 4, 40
 AIR = ('minecraft:air', 'minecraft:cave_air')
 
@@ -29,6 +30,7 @@ H, W = top.shape
 x0, z0, x1, z1 = map(int, sys.argv[3:7]) if len(sys.argv) > 6 else (cx, cz, cx + W - 1, cz + H - 1)
 road = np.zeros((H, W), bool)
 foot = np.zeros((H, W), bool)
+paint = np.zeros((H, W), bool)
 grade2 = np.zeros((H, W), np.int16)
 
 
@@ -58,12 +60,16 @@ for t in np.unique(tile):
             road[z, x] = True
         elif n in FOOTWAY:
             foot[z, x] = True
+        elif n in PAINT:
+            paint[z, x] = True
         else:
             continue
         grade2[z, x] = int(round((height(s, yy) - 1) * 2))
     del cap
     gc.collect()
     print('tile', t, len(sel), flush=True)
+around = ndimage.convolve(road.astype(int), np.ones((3, 3), int), mode='constant')
+road |= paint & (around >= 3)
 lab, n = ndimage.label(road, np.ones((3, 3), int))
 sizes = ndimage.sum(road, lab, range(1, n + 1))
 road &= np.isin(lab, 1 + np.flatnonzero(sizes >= MIN_PIECE))
