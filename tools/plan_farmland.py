@@ -272,6 +272,7 @@ def main():
     p.add_argument('--mix', type=float, nargs=5, default=[.55, .17, .08, .06, .14], help='planted flooded wheat veg fallow')
     p.add_argument('--house-every', type=int, default=5)
     p.add_argument('--feather', type=float, default=40)
+    p.add_argument('--edge-band', type=float, default=60, help='blocks this close to the plain edge may be orchards or hedged meadows')
     p.add_argument('--keep-file', type=Path)
     p.add_argument('--plain-mask', type=Path, help='npz with mask and origin: where fields may go; feather from its edge')
     p.add_argument('--seed', type=int, default=91)
@@ -320,7 +321,7 @@ def main():
             plain[zs - bz:ze - bz, xs - bx:xe - bx] = mk[zs - pz0:ze - pz0, xs - px0:xe - px0]
         free &= plain
         # feather from the plain's outer edge; ditches and lanes inside it are holes, not edges
-        outer = ndimage.binary_fill_holes(ndimage.binary_closing(np.pad(plain, 12, constant_values=True), iterations=10))[12:-12, 12:-12]
+        outer = ndimage.binary_fill_holes(ndimage.binary_closing(np.pad(plain, 12, constant_values=False), iterations=10))[12:-12, 12:-12] | plain
         d_edge = ndimage.distance_transform_edt(np.pad(outer, 1, constant_values=True))[1:-1, 1:-1]
     else:
         d_edge = ndimage.distance_transform_edt(inside)
@@ -382,8 +383,10 @@ def main():
             fb = float(np.mean(feather[bsl][bfree]))
             u_fate = float(hash01(bi, bj, a.seed + 13))
             fate = 'fields'
-            if fb < .85:
-                fate = 'orchard' if u_fate < .3 else 'meadow' if u_fate < .55 else 'fields'
+            # blocks that reach within --edge-band of the plain's outer edge become orchards and hedged meadows as often
+            # as fields, so the farmland thins out instead of stopping on a line
+            if float(d_edge[bsl][bfree].min()) < a.edge_band:
+                fate = 'orchard' if u_fate < .25 else 'meadow' if u_fate < .5 else 'fields'
             # a hamlet in the south-east corner, or a shrine in the north-east
             if fate == 'fields' and fb > .6 and hash01(bi, bj, a.seed + 4) < 1 / a.house_every:
                 hz, hx = Z1 - 26, X1 - 30
@@ -579,17 +582,26 @@ def main():
         g0[fp[0] - 1:fp[1] + 2, fp[2] - 1:fp[3] + 2] = False
         g0[fp[1] + 1:fp[1] + 10, fp[2] + 2:fp[3] - 1] = False
         grove |= g0
-    # bus shelters and vending machines where tracks meet roads
-    for (zr, xr, vend) in junctions[:max(2, len(junctions))]:
-        for dz in range(0, 6):
-            zc = zr + dz
-            if not (0 <= zc < H_ and 0 <= xr < W_) or not (1 <= dist_built[zc, xr] <= 4) or kept[zc, xr] or wet[zc, xr]:
-                continue
-            if top_name[zc, xr] != 'minecraft:grass_block':
-                continue
-            if shelter(ids, box.kinds, ground, zc, xr + (0 if vend else 3), S, air, by, vending=vend):
-                counts['vending' if vend else 'shelters'] += 1
+    # bus shelters and vending machines where tracks meet roads: the nearest spot 2-6 blocks off the road whose whole
+    # footprint is grass and not taken by plots, tracks or another structure
+    road_side = (dist_built >= 2) & (dist_built <= 8) & (top_name == 'minecraft:grass_block') & ~kept & ~wet & ~reserved \
+        & (plot_id < 0) & ~track & box.loaded
+    for (zr, xr, vend) in junctions:
+        placed = False
+        cand = [(abs(dz) + abs(dx), zr + dz, xr + dx) for dz in range(-12, 13) for dx in range(-12, 13)]
+        for _, zc, xc in sorted(cand):
+            if placed:
                 break
+            for kind in ((['vending'] if vend else ['shelter', 'vending'])):
+                fz0, fz1, fx0, fx1 = (zc, zc, xc, xc) if kind == 'vending' else (zc - 1, zc, xc - 3, xc)
+                if fz0 < 0 or fx0 < 0 or fz1 >= H_ or fx1 >= W_ or not road_side[fz0:fz1 + 1, fx0:fx1 + 1].all():
+                    continue
+                counts['spot_' + kind] = counts.get('spot_' + kind, 0) + 1
+                if shelter(ids, box.kinds, ground, zc, xc, S, air, by, vending=(kind == 'vending')):
+                    counts['vending' if kind == 'vending' else 'shelters'] += 1
+                    road_side[max(fz0 - 2, 0):fz1 + 3, max(fx0 - 2, 0):fx1 + 3] = False
+                    placed = True
+                    break
     windbreak &= free & (plot_id < 0) & ~track
     kitchen &= free & (plot_id < 0) & ~track
     for z, x in zip(*np.nonzero(kitchen)):
