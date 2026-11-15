@@ -27,6 +27,10 @@ final class RigidMachineryPartR44
     private final float[] bounds;
     private final ResourceLocation texture;
     private final boolean importedTriangles;
+    /** Set instead of vertices on a deferred part: builds the same array again. */
+    private final java.util.function.Supplier<float[]> deferredR64;
+    /** A deferred part's vertices, kept only once the per-frame CPU path has had to draw it. */
+    private float[] fallbackR64;
 
     private RigidMachineryPartR44(float[] vertices, float[] bounds)
     {
@@ -40,10 +44,29 @@ final class RigidMachineryPartR44
 
     private RigidMachineryPartR44(float[] vertices,float[] bounds,ResourceLocation texture,boolean importedTriangles)
     {
+        this(vertices,bounds,texture,importedTriangles,null);
+    }
+
+    private RigidMachineryPartR44(float[] vertices,float[] bounds,ResourceLocation texture,boolean importedTriangles,
+                                  java.util.function.Supplier<float[]> deferred)
+    {
         this.vertices = vertices;
         this.bounds = bounds;
         this.texture = texture;
         this.importedTriangles=importedTriangles;
+        this.deferredR64=deferred;
+    }
+
+    /**
+     * For static geometry that is large and drawn from the GPU cache: the rear rails are 730,000 triangles
+     * in 32 m cells, and kept as vertices they held 123 MB for the whole session although a cell's array
+     * is read only when the cell is uploaded. This part keeps its bounds and builds the array again for
+     * each upload. The source must give the same builder contents every time.
+     */
+    static RigidMachineryPartR44 deferredR64(java.util.function.Supplier<Builder> source)
+    {
+        var first=source.get().finish();
+        return new RigidMachineryPartR44(null,first.bounds,PAINT,false,()->source.get().finish().vertices);
     }
 
     /** Imported rigid triangles keep their original UVs and smooth vertex normals. */
@@ -63,7 +86,7 @@ final class RigidMachineryPartR44
     /** Texture may follow parts in a resource document. Bind only after the
      * whole assembly is validated; the primitive vertices are never copied. */
     RigidMachineryPartR44 withTexture(ResourceLocation material)
-    {return new RigidMachineryPartR44(vertices,bounds,material,importedTriangles);}
+    {return new RigidMachineryPartR44(vertices,bounds,material,importedTriangles,deferredR64);}
 
     static RigidMachineryPartR44 readTextured(JsonReader encoded) throws IOException
     {
@@ -179,7 +202,12 @@ final class RigidMachineryPartR44
         // Keep the source arrays unchanged. Only imported smooth triangles
         // omit their duplicated fourth point; vanilla outlines remain quads.
         boolean triangles=importedTriangles&&!(buffers instanceof OutlineBufferSource);
-        if (RigidMachineryGpuR44.draw(this, vertices, texture, poses, buffers, light,triangles)) return true;
+        if (deferredR64==null?RigidMachineryGpuR44.draw(this, vertices, texture, poses, buffers, light,triangles)
+                :RigidMachineryGpuR44.draw(this, deferredR64, texture, poses, buffers, light,triangles)) return true;
+        // No GPU cache in this pass (outline, switched off, or no usable shader): this path reads the
+        // vertices every frame, so a deferred part keeps them from here on.
+        float[] vertices=this.vertices;
+        if(vertices==null){if(fallbackR64==null)fallbackR64=deferredR64.get();vertices=fallbackR64;}
         VertexConsumer out = buffers.getBuffer(triangles?ModelRenderTypesR49.solidTriangles(texture):ModelRenderTypesR49.solid(texture));
         var frame = poses.last();
         boolean reflected = frame.pose().determinant() < 0;

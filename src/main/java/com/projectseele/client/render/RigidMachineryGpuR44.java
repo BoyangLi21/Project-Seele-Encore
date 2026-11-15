@@ -64,13 +64,18 @@ public final class RigidMachineryGpuR44
 
     static boolean draw(Object identity, float[] vertices, ResourceLocation texture,
                         PoseStack poses, MultiBufferSource buffers, int light,boolean triangles)
-    {return draw(identity,vertices,texture,poses,buffers,light,triangles,false);}
+    {return draw(identity,vertices,null,texture,poses,buffers,light,triangles,false);}
+
+    /** The source is asked for the vertices only when this state has no uploaded buffer yet. */
+    static boolean draw(Object identity, java.util.function.Supplier<float[]> source, ResourceLocation texture,
+                        PoseStack poses, MultiBufferSource buffers, int light,boolean triangles)
+    {return draw(identity,null,source,texture,poses,buffers,light,triangles,false);}
 
     static boolean drawCutout(Object identity,float[] vertices,ResourceLocation texture,
                               PoseStack poses,MultiBufferSource buffers,int light)
-    {return draw(identity,vertices,texture,poses,buffers,light,true,true);}
+    {return draw(identity,vertices,null,texture,poses,buffers,light,true,true);}
 
-    private static boolean draw(Object identity,float[] vertices,ResourceLocation texture,
+    private static boolean draw(Object identity,float[] vertices,java.util.function.Supplier<float[]> source,ResourceLocation texture,
                                 PoseStack poses,MultiBufferSource buffers,int light,boolean triangles,boolean cutout)
     {
         if (!enabled() || buffers instanceof OutlineBufferSource)
@@ -103,6 +108,7 @@ public final class RigidMachineryGpuR44
             Mesh mesh = variants.get(key);
             if (mesh == null)
             {
+                if (vertices == null) vertices = source.get();
                 int count = triangles?vertices.length/44*3:vertices.length/11;
                 // One shared upload builder: a new native builder per cache miss is never freed in 1.20.1.
                 var builder = RigidCapsuleGpu.beginUpload(triangles?VertexFormat.Mode.TRIANGLES:VertexFormat.Mode.QUADS);
