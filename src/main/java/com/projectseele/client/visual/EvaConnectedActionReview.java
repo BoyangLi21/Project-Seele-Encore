@@ -1284,7 +1284,7 @@ public final class EvaConnectedActionReview
     /**
      * -Dprojectseele.tourImpactR64=true (tourEnd=420): what is seen and heard where a body meets a wall or the
      * ground. A wall of stone is put up 13 blocks behind a still Sachiel with its field down; the unit kicks it
-     * into the wall (40), then throws the light string whose last blow fells it (150 to 168), then kicks again a
+     * into the wall (62: pictures are taken every forty ticks, and its mark meets the wall at 78), then throws the light string whose last blow fells it (150 to 168), then kicks again a
      * fresh one with no wall behind it (300). The wall is taken down at the end. With combatDiagR64 (R64TELL).
      */
     private static final boolean IMPACT_R64=Boolean.getBoolean("projectseele.tourImpactR64");
@@ -1302,7 +1302,7 @@ public final class EvaConnectedActionReview
             mc.player.connection.sendCommand(String.format("fill %d %d %d %d %d %d minecraft:stone",impactWallR64[0],impactWallR64[1],impactWallR64[2],impactWallR64[3],impactWallR64[1]+34,impactWallR64[5]));
             mc.player.connection.sendCommand(String.format("fill %d %d %d %d %d %d minecraft:stone",impactWallR64[0],impactWallR64[1]+35,impactWallR64[2],impactWallR64[3],impactWallR64[4],impactWallR64[5]));
         }
-        if(at(40))heavyR64();
+        if(at(62))heavyR64();
         if(at(150)||at(156)||at(162)||at(168))lightR64();
         if(at(255)&&impactWallR64!=null)
         {

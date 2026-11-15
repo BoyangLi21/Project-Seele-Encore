@@ -49,7 +49,7 @@ public final class AngelTellsR64
             CombatFoleyR36.angelSwing(actor,limb,heavy?2.8F:1.5F,heavy?.5F:1.75F);
             told(level,"sachiel strike "+mode+(heavy?" heavy":" light")+": called "+SachielStrike.windup(mode)+" ticks before it can land");
         }
-        if(heavy&&age%2==1)GiantParticles.send(level,HEAVY,limb.x,limb.y,limb.z,7,1.5,1.5,1.5,.02);
+        if(heavy&&age%2==1)GiantParticles.send(level,HEAVY,limb.x,limb.y,limb.z,18,2.4,2.4,2.4,.02);
     }
 
     /** Sachiel's stomp comes down. */
@@ -75,7 +75,7 @@ public final class AngelTellsR64
             for(double d=6+run;d<length;d+=gap)
             {
                 Vec3 p=core.add(line.scale(d/length));
-                GiantParticles.send(level,last?LOCKED:AIM,p.x,p.y,p.z,1,0,0,0,0);
+                GiantParticles.send(level,last?LOCKED:AIM,p.x,p.y,p.z,3,.35,.35,.35,0);
             }
         }
         if(last&&left%2==0)
@@ -84,7 +84,7 @@ public final class AngelTellsR64
             for(int i=0;i<16;i++)
             {
                 double a=i*Math.PI/8+left*.2;
-                GiantParticles.send(level,LOCKED,target.getX()+Math.cos(a)*9,y,target.getZ()+Math.sin(a)*9,1,0,0,0,0);
+                GiantParticles.send(level,LOCKED,target.getX()+Math.cos(a)*9,y,target.getZ()+Math.sin(a)*9,3,.3,.1,.3,0);
             }
         }
         if(left==20||left==10||left==5)told(level,"ramiel charge "+left+" ticks to go: line "+Math.round(length)+" blocks, ring and note");
@@ -134,6 +134,10 @@ public final class AngelTellsR64
         double y=under.getY()+1.4;
         if(!floor.isAir())GiantParticles.send(level,new BlockParticleOption(ParticleTypes.BLOCK,floor),at.x,y,at.z,Math.round(54*strength),5*strength,.6,5*strength,.16);
         GiantParticles.send(level,ParticleTypes.POOF,at.x,y+.6,at.z,Math.round(22*strength),4*strength,.6,4*strength,.12);
+        // Chips of a block are a tenth of a block across: under bodies seventy blocks tall nothing of them was to be
+        // seen four ticks after a finisher came down. Puffs two blocks across and a bank of cloud carry it.
+        GiantParticles.send(level,ParticleTypes.EXPLOSION,at.x,y+1.5,at.z,Math.round(5*strength),4*strength,.8,4*strength,0);
+        GiantParticles.send(level,ParticleTypes.CLOUD,at.x,y+1,at.z,Math.round(60*strength),5*strength,1.2,5*strength,.12);
         level.playSound(null,under.above(),ModSounds.EVA_LAND.get(),SoundSource.HOSTILE,4.5F*strength,.72F);
     }
 
@@ -147,6 +151,8 @@ public final class AngelTellsR64
         told(level,"wall: "+body.getType().toShortString()+" pushed into "+state.getBlock().getName().getString()+" at "+String.format(java.util.Locale.ROOT,"%.1f %.1f %.1f",at.x,at.y,at.z));
         if(!state.isAir())GiantParticles.send(level,new BlockParticleOption(ParticleTypes.BLOCK,state),at.x,at.y,at.z,60,3,6,3,.2);
         GiantParticles.send(level,ParticleTypes.POOF,at.x,at.y,at.z,24,3,5,3,.14);
+        GiantParticles.send(level,ParticleTypes.EXPLOSION,at.x,at.y,at.z,6,2.5,6,2.5,0);
+        GiantParticles.send(level,ParticleTypes.CLOUD,at.x,at.y,at.z,70,3,7,3,.15);
         level.playSound(null,BlockPos.containing(at),ModSounds.EVA_IMPACT.get(),SoundSource.HOSTILE,5F,.66F);
         level.playSound(null,BlockPos.containing(at),ModSounds.EVA_LAND.get(),SoundSource.HOSTILE,3F,.6F);
     }
