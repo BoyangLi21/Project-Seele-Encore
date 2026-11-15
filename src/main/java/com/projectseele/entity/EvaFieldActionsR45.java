@@ -104,7 +104,7 @@ public final class EvaFieldActionsR45
         // takes its place at once. It used to be held until the strike had played out, and was only
         // accepted in the strike's last eight ticks: up to four tenths of a second between the key
         // and the body moving, with an Angel's blow on its way.
-        if(CANCEL_R63&&!active(e)&&!e.isPilotControlLocked()&&e.strikeSpentR63())
+        if(CANCEL_R63&&!active(e)&&!e.isPilotControlLocked()&&e.evadeCutsInR64())
         {
             e.interruptCombatR31();
             return start(e,pilot,directions,sprinting,requestedYaw(e,directions,sprinting));
@@ -218,8 +218,11 @@ public final class EvaFieldActionsR45
     {
         if(runtime.pending==null)return;
         if(!pendingValid(e,runtime)){runtime.pending=null;return;}
-        if(active(e)||e.hasLiveActionForRender(0)||e.hasLegacyStrikeForRender())return;
+        // R64 (M4): under the frames core an evade asked for early waits for the row's window, not for its end.
+        boolean cut=!active(e)&&e.combatR64().busy()&&e.combatR64().evadeOpen()&&!e.isPilotControlLocked();
+        if(!cut&&(active(e)||e.hasLiveActionForRender(0)||e.hasLegacyStrikeForRender()))return;
         if(e.isPilotControlLocked()){runtime.pending=null;return;}
+        if(cut)e.interruptCombatR31();
         var pending=runtime.pending;runtime.pending=null;
         start(e,(ServerPlayer)e.getPilotEntity(),pending.directions(),pending.sprinting(),pending.yaw());
     }

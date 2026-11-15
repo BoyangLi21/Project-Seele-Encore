@@ -44,6 +44,8 @@ public final class SachielTacticsR36 extends Goal
     /** -Dprojectseele.poseDiag=true: every blow read off the Unit and what was done about it goes to the log. */
     private static final boolean TOLD_R63=Boolean.getBoolean("projectseele.poseDiag");
     private boolean unitLive;
+    /** R64 (M4): the frames core numbers its blows; a string's next blow is a new number whatever the phase did. */
+    private int unitSerial;
     private float unitPhase;
     private int giveGround,giveSide;
     /** Ticks since the Unit's blow in hand began, -1 with none to answer. */
@@ -54,7 +56,7 @@ public final class SachielTacticsR36 extends Goal
     /** A strike is broken off for an answer no later than this many ticks before its wind-up ends. */
     public static final int BREAK_R63=3;
     /** A heavy blow or a kick: the two the Unit's own flags mark, set by the server when the motion starts. */
-    private static boolean slowR63(EvaUnit01Entity unit){return unit.isHeavyMotionActive()||unit.isKickMotionActive(1);}
+    private static boolean slowR63(EvaUnit01Entity unit){return unit.readSlowR64();}
     /** With poseDiag: the body as it stood a tick ago, and for how many more ticks its turning is told after an answer. */
     private EvaBodyPose.Sample toldPoseR63;
     private int toldTicksR63;
@@ -100,9 +102,9 @@ public final class SachielTacticsR36 extends Goal
         {
             // Begun: the Unit has gone into a blow, or from one blow of a string into the next.
             boolean live=unit.hasLiveActionForRender(1)&&!unit.strikeSpentR63();float phase=unit.combatPhaseR31();
-            if(live&&(!unitLive||phase<unitPhase-.2F)){blowAge=0;jabRoll=-1;}
+            if(live&&(!unitLive||phase<unitPhase-.2F||unit.combatR64().serial()!=unitSerial)){blowAge=0;jabRoll=-1;}
             else if(blowAge>=0)blowAge=live&&blowAge<READ_UNTIL_R63?blowAge+1:-1;
-            unitLive=live;unitPhase=phase;
+            unitLive=live;unitPhase=phase;unitSerial=unit.combatR64().serial();
         }
         else blowAge=-1;
         if(blowAge<0)jabRoll=-1;

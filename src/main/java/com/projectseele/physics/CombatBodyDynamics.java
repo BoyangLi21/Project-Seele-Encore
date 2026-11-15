@@ -292,6 +292,10 @@ public final class CombatBodyDynamics
         {
             LivingEntity entity=entry.getKey();State s=entry.getValue();
             if(entity.isRemoved()||scripted(entity)||entity instanceof EvaUnit01Entity e&&(e.isNervLogisticsLocked()||EvaAirTransportR31.active(e))){cancel(entity);acknowledgeHandoff(entity);continue;}
+            // R64 (M4), hit-stop "tiered": a body felled by a blow stands held on it with the one that struck, and
+            // falls when the hold ends. (A hold of one tick or two, all there was up to R63, is not waited for.)
+            var heldR64=com.projectseele.entity.CombatFeelR31.beat(entity);
+            if(heldR64!=null&&heldR64.stopTicks()>2&&com.projectseele.entity.CombatFeelR31.hitPaused(entity))continue;
             try
             {
                 s.age++;

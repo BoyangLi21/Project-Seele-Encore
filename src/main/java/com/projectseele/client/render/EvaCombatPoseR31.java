@@ -132,6 +132,8 @@ public final class EvaCombatPoseR31
                 FROZEN.put(e,pose);STAMP.put(e,beat.start());
             }
             for(var b:all){var held=FROZEN.get(e).get(b.getName());if(held==null)continue;EvaRigTransforms.rotate(b,held.rotation);b.setPosX(held.position.x);b.setPosY(held.position.y);b.setPosZ(held.position.z);changed.add(b.getName());position.add(b.getName());}
+            var shake=CombatFeelR31.tremble(e,partial);
+            if(shake!=null)m.getBone("root").ifPresent(b->{b.setPosX(b.getPosX()+shake[0]);b.setPosZ(b.getPosZ()+shake[1]);});
         }
         return new EvaMotionEngineV2.BoneWrites(Set.copyOf(changed),Set.copyOf(position),"MOTION_ENGINE_LIVE_ACTION");
     }

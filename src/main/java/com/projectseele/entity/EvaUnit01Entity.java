@@ -95,7 +95,7 @@ import software.bernie.geckolib.util.GeckoLibUtil;
  */
 public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBattleSignals.Actor, com.projectseele.world.TvEncounterEquipmentControlR45.CannonAccess
 {
-    private static final boolean DORSAL_SIGNALS_READY=EvaDorsalMechanism.bootstrap() && EvaTerrainSupport.bootstrap() && EvaShutdownR30.bootstrap() && EvaAirTransportR31.bootstrap() && EvaMechanicalFrameR52.bootstrap() && EvaCombatR31.bootstrap() && EvaGameplayMotionR32.bootstrap() && EvaCombatSupportR33.bootstrap() && EvaBayRepairR33.bootstrap() && EvaBerserkMotionR34.bootstrap() && EvaCapturedLocomotionR44.bootstrap() && EvaWeaponHandlingR45.bootstrap() && EvaSprintR50.bootstrap() && EvaMotionModelR64.bootstrap();
+    private static final boolean DORSAL_SIGNALS_READY=EvaDorsalMechanism.bootstrap() && EvaTerrainSupport.bootstrap() && EvaShutdownR30.bootstrap() && EvaAirTransportR31.bootstrap() && EvaMechanicalFrameR52.bootstrap() && EvaCombatR31.bootstrap() && EvaGameplayMotionR32.bootstrap() && EvaCombatSupportR33.bootstrap() && EvaBayRepairR33.bootstrap() && EvaBerserkMotionR34.bootstrap() && EvaCapturedLocomotionR44.bootstrap() && EvaWeaponHandlingR45.bootstrap() && EvaSprintR50.bootstrap() && EvaMotionModelR64.bootstrap() && EvaCombatModelR64.bootstrap();
     private static final EntityDataAccessor<Integer> MECHANICAL_REVISION_R30=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.INT);
     private static final FirstBattleSignals.SignalSet FIRST_BATTLE=new FirstBattleSignals.SignalSet(EvaUnit01Entity.class);
     @Override public FirstBattleSignals.SignalSet firstBattleSignals(){return FIRST_BATTLE;}
@@ -418,6 +418,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private final int[] rifleSignalTicks=new int[8];
     private final EvaPoseSignalClock[] poseSignalClocks={new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock().extrapolating(),new EvaPoseSignalClock(),new EvaPoseSignalClock(),new EvaPoseSignalClock()};
     private final EvaPoseSignalClock actionSignalClock=new EvaPoseSignalClock().extrapolating();
+    /**
+     * R64 (M4): the frames core. It exists for every Unit and takes presses only where EvaCombatModelR64.frames says
+     * so. Made on first use: the checks build a Unit without running its initialisers.
+     */
+    private EvaCombatMachineR64 combatMachineR64;
+    EvaCombatMachineR64 combatR64()
+    {
+        if(this.combatMachineR64==null)this.combatMachineR64=new EvaCombatMachineR64(this);
+        return this.combatMachineR64;
+    }
     private float rifleStanceVelocity;
     private boolean rifleStanceInitialized;
     private double riflePreviousX=Double.NaN,riflePreviousZ;
@@ -780,6 +790,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaGameplayMotionR32.define(this.entityData);
         EvaSprintR50.define(this.entityData);
         EvaMotionModelR64.define(this.entityData);
+        EvaCombatModelR64.define(this.entityData);
         EvaWeaponHandlingR45.define(this.entityData);
         EvaCombatSupportR33.define(this.entityData);
         EvaBerserkMotionR34.define(this.entityData);
@@ -3303,11 +3314,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     /** Left-click from the plug: Tiger-reviewed strikes and weapon clips. */
     public void meleeAttack(ServerPlayer pilot)
-    { meleeAttack((LivingEntity)pilot); }
+    { this.combatR64().toldPress(false);meleeAttack((LivingEntity)pilot); }
 
     private void meleeAttack(LivingEntity pilot)
     {
         if(this.getWeapon()==WEAPON_SWORD_R45){EvaSwordActionsR45.request(this,pilot,false);return;}
+        if(this.combatR64().press(pilot,EvaCombatMachineR64.LIGHT))return;
         if(CombatFeelR31.restrained(this)){EvaCombatIntentR32.offer(this,pilot,0);return;}
         if(EvaCombatR31.attack(this,false))return;
         if (this.isPilotControlLocked() || !this.isMeleeWeapon())
@@ -3443,7 +3455,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return Math.max(1, Math.round(synchronizedTicks / MELEE_RATE_R43));
     }
 
-    private void beginOrdinaryGroupCAttack()
+    private void beginOrdinaryGroupCAttack(){this.beginOrdinaryGroupCAttack(-1);}
+    /** forcedR64: the frames core names the punch (0 jab, 1 cross, 2 hook); -1: the old string decides. */
+    private void beginOrdinaryGroupCAttack(int forcedR64)
     {
         this.clearLegacyRecoveryR51();
         com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"punch");
@@ -3453,11 +3467,11 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(EvaGameplayMotionR32.ready(this)&&!EvaGameplayMotionR32.directed(this))EvaMovementSounds.swing(this,.8F);
         boolean continuing = this.ordinaryAttackComboGraceTicks > 0;
         boolean selectedThreeStage=EvaGameplayMotionR32.selectedThreeStageR45(this);
-        int stage = continuing
+        int stage = forcedR64>=0 ? forcedR64 : continuing
                 ? Math.floorMod(this.ordinaryAttackComboStage + 1,
                         selectedThreeStage?3:EvaGameplayMotionR32.phrases(this)?2:ORDINARY_ATTACK_FRAME_INTERVALS.length)
                 : 0;
-        int visualStage = (!EvaGameplayMotionR32.phrases(this)||selectedThreeStage)&&continuing&&stage==0?3:stage;
+        int visualStage = forcedR64<0&&(!EvaGameplayMotionR32.phrases(this)||selectedThreeStage)&&continuing&&stage==0?3:stage;
         int visualTicks = this.ordinaryAttackVisualTicks(visualStage);
         this.ordinaryAttackComboStage = stage;
         this.ordinaryAttackComboGraceTicks = Math.max(
@@ -3534,11 +3548,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     /** Crouch + attack: a slow two-handed slam that flattens the area ahead. */
     public void smashAttack(ServerPlayer pilot)
-    { smashAttack((LivingEntity)pilot); }
+    { this.combatR64().toldPress(true);smashAttack((LivingEntity)pilot); }
 
     private void smashAttack(LivingEntity pilot)
     {
         if(this.getWeapon()==WEAPON_SWORD_R45){EvaSwordActionsR45.request(this,pilot,true);return;}
+        if(this.combatR64().press(pilot,EvaCombatMachineR64.HEAVY))return;
         if(CombatFeelR31.restrained(this)){EvaCombatIntentR32.offer(this,pilot,1);return;}
         if(EvaCombatR31.attack(this,true))return;
         // Standing bare-handed, the heavy is the side kick (it had its own B
@@ -3745,6 +3760,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
 
     private void stompAttack(LivingEntity pilot)
     {
+        if(this.combatR64().press(pilot,EvaCombatMachineR64.HEAVY))return;
         if(CombatFeelR31.restrained(this)||EvaCombatR31.active(this))return;
         if (this.isHeavyMotionActive())
         {
@@ -3960,6 +3976,190 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         this.kickAfterOrdinaryBufferTicks = 0;
     }
 
+    // ---- R64 (M4): what the frames core asks of the old one -------------------------------------------------
+
+    /**
+     * Begins a row: the old core's clip and flags for it, made the row's length. The old contact tests are marked
+     * done (the machine tests the row's live ticks itself) and the old queues are emptied.
+     */
+    void beginRowR64(EvaMoveTableR64.Row row,int ticks)
+    {
+        EvaGameplayMotionR32.beginAction(this);
+        this.cancelOrdinaryGroupCAttack();this.cancelSideKick();this.cancelKnifeMotion();this.cancelHeavyMotion();
+        this.clearLegacyRecoveryR51();this.meleeInputBufferTicks=0;this.kickAfterOrdinaryBufferTicks=0;
+        switch(row.kind())
+        {
+            case EvaMoveTableR64.PUNCH ->
+            {
+                this.beginOrdinaryGroupCAttack(row.stage());
+                this.ordinaryAttackVisualTicks=ticks;this.ordinaryAttackDurationAtStart=ticks;this.ordinaryAttackComboGraceTicks=0;
+                this.pendingOrdinaryContactTicks=0;this.pendingOrdinaryContactStage=-1;this.gameplayOrdinaryContactR32=true;
+            }
+            case EvaMoveTableR64.SLAM ->
+            {
+                this.entityData.set(DATA_SMASH_SEQUENCE,(this.entityData.get(DATA_SMASH_SEQUENCE)+1)&Integer.MAX_VALUE);
+                com.projectseele.world.CombatCommandBriefR47.attackCommitted(this,"smash");
+                CombatFoleyR36.load(this);
+                this.heavyDuration=ticks;this.heavyTicks=ticks;this.heavyElapsed=0;this.heavyContact=true;
+                this.liveCombatRootPrevious=EvaGameplayMotionR32.root(this,"heavy",0);
+                this.entityData.set(DATA_LIVE_ACTION_PHASE,0F);this.entityData.set(DATA_HEAVY_ACTIVE,true);
+            }
+            case EvaMoveTableR64.KICK ->
+            {
+                this.beginSideKick();
+                this.kickVisualTicks=ticks;this.kickDurationAtStart=ticks;this.pendingKickContactTicks=0;this.kickContactR60=true;
+            }
+            default ->
+            {
+                boolean reverse=row.stage()==1;
+                if(reverse)this.entityData.set(DATA_SMASH_SEQUENCE,(this.entityData.get(DATA_SMASH_SEQUENCE)+1)&Integer.MAX_VALUE);
+                else
+                {
+                    this.leftSwing=false;this.entityData.set(DATA_MELEE_LEFT,false);
+                    this.entityData.set(DATA_MELEE_SEQUENCE,(this.entityData.get(DATA_MELEE_SEQUENCE)+1)&Integer.MAX_VALUE);
+                }
+                this.beginKnifeMotion(reverse);
+                this.knifeVisualTicks=ticks;this.knifeDurationAtStart=ticks;this.pendingKnifeContactTicks=0;
+            }
+        }
+    }
+    private static String rowClipR64(EvaMoveTableR64.Row row)
+    {
+        return switch(row.kind())
+        {
+            case EvaMoveTableR64.PUNCH -> EvaGameplayMotionR32.ordinary(row.stage());
+            case EvaMoveTableR64.SLAM -> "heavy";
+            case EvaMoveTableR64.KICK -> "kick";
+            default -> row.stage()==1?"knife_reverse":"knife_forward";
+        };
+    }
+    /** The row's blow is still the one the old flags are playing. */
+    boolean rowLiveR64(EvaMoveTableR64.Row row)
+    {
+        return switch(row.kind())
+        {
+            case EvaMoveTableR64.PUNCH -> this.ordinaryAttackVisualTicks>0&&this.getOrdinaryAttackStage()==row.stage();
+            case EvaMoveTableR64.SLAM -> this.heavyTicks>0;
+            case EvaMoveTableR64.KICK -> this.kickVisualTicks>0;
+            default -> this.knifeVisualTicks>0&&this.getWeapon()==WEAPON_KNIFE&&this.entityData.get(DATA_KNIFE_TYPE)==row.stage();
+        };
+    }
+    /** Ticks of the row the old clock has played. */
+    int rowElapsedR64(EvaMoveTableR64.Row row)
+    {
+        return switch(row.kind())
+        {
+            case EvaMoveTableR64.PUNCH -> this.ordinaryAttackElapsedTicks;
+            case EvaMoveTableR64.SLAM -> this.heavyElapsed;
+            case EvaMoveTableR64.KICK -> this.kickElapsedTicks;
+            default -> this.knifeElapsedTicks;
+        };
+    }
+    /** Where in the row's clip the limb meets its mark. */
+    float rowContactPhaseR64(EvaMoveTableR64.Row row)
+    {
+        if(row.kind()==EvaMoveTableR64.KICK)
+            return EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.contactPhase(this,"kick"):KICK_CONTACT_FRAME/(float)KICK_FRAME_INTERVALS;
+        if(row.kind()==EvaMoveTableR64.KNIFE&&!EvaGameplayMotionR32.knifeReady(this))
+            return row.stage()==1?KNIFE_REVERSE_CONTACT_FRAME/(float)KNIFE_REVERSE_FRAME_INTERVALS:KNIFE_FORWARD_CONTACT_FRAME/(float)KNIFE_FORWARD_FRAME_INTERVALS;
+        return EvaGameplayMotionR32.contactPhase(this,rowClipR64(row));
+    }
+    /** The swing is heard as the blow goes out. */
+    void rowSwingR64(EvaMoveTableR64.Row row)
+    {EvaMovementSounds.swing(this,row.kind()==EvaMoveTableR64.SLAM?2.8F:row.kind()==EvaMoveTableR64.KICK?2.4F:2.1F);}
+    /**
+     * One live tick of a row: the limb's sweep since the last tick against every body in reach, quietly when it
+     * meets none. The kick tests the whole leg against Angels (its longer reach must not catch a friendly Unit
+     * standing beside it) and the foot's sweep against anything.
+     */
+    boolean rowContactR64(EvaMoveTableR64.Row row,LivingEntity pilot,boolean first)
+    {
+        float damage=row.damage()*this.getMeleeMultiplier();double radius=row.radius();
+        if(row.kind()==EvaMoveTableR64.KICK)
+        {
+            Vec3[] leg=EvaGameplayMotionR32.kickingLeg(this,EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.side(this,"kick"):"l",1);
+            Vec3 hip=leg[0],foot=this.kickFootR64(),previous=this.kickPreviousFootR60==null?foot:this.kickPreviousFootR60;
+            this.kickPreviousFootR60=foot;
+            this.strikeAngelsOnlyR60=true;
+            try{if(this.strikeZoneR32(pilot,new AABB(hip,foot).inflate(radius),damage,row.knock(),foot,hip,radius,true))return true;}
+            finally{this.strikeAngelsOnlyR60=false;}
+            this.combatR64().sweeps(true);
+            try{return this.strikeZoneR32(pilot,new AABB(previous,foot).inflate(radius),damage,row.knock(),foot,previous,radius,true);}
+            finally{this.combatR64().sweeps(false);}
+        }
+        if(row.kind()==EvaMoveTableR64.KNIFE&&!EvaGameplayMotionR32.knifeReady(this))
+        {
+            if(first)this.resolveKnifeContact(pilot);
+            return first;
+        }
+        Vec3 point=EvaGameplayMotionR32.contact(this,rowClipR64(row),1),previous=EvaGameplayMotionR32.previousContact(this,point);
+        this.combatR64().sweeps(true);
+        try{return this.strikeZoneR32(pilot,new AABB(previous,point).inflate(radius),damage,row.knock(),point,previous,radius,true);}
+        finally{this.combatR64().sweeps(false);}
+    }
+    /** The frames core sets the row's place in its clip (the moment of first contact, for the hold). */
+    void rowPhaseR64(float phase){this.entityData.set(DATA_LIVE_ACTION_PHASE,Mth.clamp(phase,0,1));}
+    /** The frames core turns the body on the tick a row begins. */
+    void faceR64(float yaw){this.setYRot(yaw);this.yBodyRot=yaw;this.yHeadRot=yaw;}
+    /**
+     * Where the kicking foot is. With a kick clip in the motion bundle, the posed foot. Without one the server's
+     * pose stands through the kick (the old every-tick test swept the standing leg, and a kick landed when the
+     * body's own advance brought that leg against its mark): the foot's measured path is used instead, the one the
+     * old single contact read.
+     */
+    Vec3 kickFootR64()
+    {
+        if(EvaGameplayMotionR32.kickReady(this))return EvaGameplayMotionR32.kickingLeg(this,EvaGameplayMotionR32.side(this,"kick"),1)[1];
+        Vec3 forward=this.getForward().multiply(1,0,1).normalize(),lateral=new Vec3(forward.z,0,-forward.x);
+        Vec3 foot=EvaLiveCombatMotion.kickContact(this.liveActionProgress(1));
+        return this.position().add(lateral.scale(foot.x)).add(0,foot.y,0).add(forward.scale(foot.z));
+    }
+    /** Review: where the striking limb's end is drawn now, or null. */
+    Vec3 blowLimbR64()
+    {
+        if(this.entityData.get(DATA_KICK_ACTIVE))return this.kickFootR64();
+        String clip=EvaGameplayMotionR32.activeGroundClip(this,0);
+        return clip.isEmpty()||!EvaGameplayMotionR32.ready(this)||EvaFieldActionsR45.active(this)||EvaSwordActionsR45.active(this)?null
+                :EvaGameplayMotionR32.contact(this,clip,1);
+    }
+    /** A row whose live ticks ended on nothing: air, told once (the R63 miss: a lighter, higher swing and a thin fan). */
+    void rowWhiffR64(EvaMoveTableR64.Row row)
+    {
+        if(!(this.level() instanceof ServerLevel level))return;
+        if(row.kind()==EvaMoveTableR64.KNIFE&&!EvaGameplayMotionR32.knifeReady(this))return;
+        Vec3 point=row.kind()==EvaMoveTableR64.KICK
+                ?this.kickPreviousFootR60!=null?this.kickPreviousFootR60:this.position().add(0,this.getBbHeight()*.4,0)
+                :EvaGameplayMotionR32.contact(this,rowClipR64(row),1);
+        Vec3 side=this.getForward().yRot((float)Math.toRadians(90.0D));
+        for(int i=-1;i<=1;i++)
+        {
+            Vec3 p=point.add(side.scale(i*1.6D));
+            level.sendParticles(ParticleTypes.CLOUD,p.x,p.y,p.z,1,0,0,0,.02);
+        }
+        if(this.getWeapon()==WEAPON_KNIFE)level.sendParticles(ParticleTypes.ELECTRIC_SPARK,point.x,point.y,point.z,7,2.0D,1.4D,2.0D,0.35D);
+        EvaMovementSounds.play(this,point,ModSounds.EVA_SWING.get(),WHIFF_VOLUME_R63,WHIFF_PITCH_R63);
+    }
+    /** The row is left for a step: as the old retreat out of a recovery. */
+    void leaveRowR64()
+    {EvaGameplayMotionR32.releaseToMovement(this);this.cancelLiveActionsForStanceChange();this.cancelHeavyMotion();}
+    /** An evade may take the place of the blow in hand now. */
+    boolean evadeCutsInR64(){return this.combatR64().busy()?this.combatR64().evadeOpen():this.strikeSpentR63();}
+    /** What an Angel reading the Unit takes for a blow it has time to answer. */
+    boolean readSlowR64(){return this.combatR64().busy()?this.combatR64().row().slow():this.isHeavyMotionActive()||this.isKickMotionActive(1);}
+    /** Review: the blow the flags show, by either core's names, and a stamp that changes with every blow begun. */
+    String blowNameR64()
+    {
+        if(EvaFieldActionsR45.active(this))return "evade";
+        if(this.isHeavyMotionActive())return "slam";
+        int stage=this.getOrdinaryAttackStage();
+        if(stage>=0)return stage==1?"cross":stage==2?"hook":"jab";
+        if(this.entityData.get(DATA_KICK_ACTIVE))return "kick";
+        int knife=this.entityData.get(DATA_KNIFE_TYPE);
+        return knife<0?"":knife==1?"knife_reverse":"knife_forward";
+    }
+    int blowStampR64()
+    {return this.entityData.get(DATA_MELEE_SEQUENCE)+this.entityData.get(DATA_SMASH_SEQUENCE)*31+this.entityData.get(DATA_KICK_SEQUENCE)*961;}
+
     public void interruptCombatR31()
     {cancelLiveActionsForStanceChange();cancelHeavyMotion();chargingHeld=false;}
     public void beginPhysicalControlR35(){interruptCombatR31();clearJumpRequestState();pilotMovementRequested=false;}
@@ -3972,10 +4172,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             return;
         }
         this.knifeElapsedTicks++;
-        EvaActionFoleyR61.knifeStroke(this,this.knifeReverseMotion,this.knifeElapsedTicks,this.knifeDurationAtStart);
-        this.entityData.set(DATA_LIVE_ACTION_PHASE, Mth.clamp(
-                this.knifeElapsedTicks / this.knifeDurationAtStart, 0.0F, 1.0F));
-        float phase=Mth.clamp(this.knifeElapsedTicks/this.knifeDurationAtStart,0,1);
+        if(!this.combatR64().busy())EvaActionFoleyR61.knifeStroke(this,this.knifeReverseMotion,this.knifeElapsedTicks,this.knifeDurationAtStart);
+        float phase=this.combatR64().phase(this.knifeElapsedTicks,Mth.clamp(this.knifeElapsedTicks/this.knifeDurationAtStart,0,1));
+        this.entityData.set(DATA_LIVE_ACTION_PHASE, phase);
         Vec3 authored=EvaGameplayMotionR32.knifeReady(this)
                 ?EvaGameplayMotionR32.root(this,this.knifeReverseMotion?"knife_reverse":"knife_forward",phase)
                 :EvaLiveCombatMotion.knife(this.knifeReverseMotion,phase);
@@ -3997,19 +4196,21 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.ordinaryAttackElapsedTicks++;
             elapsed = this.ordinaryAttackElapsedTicks;
             float swingPhase=EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.swingSoundPhaseR45(this,EvaGameplayMotionR32.ordinary(this.ordinaryAttackRootStage)):.26F;
-            if(EvaGameplayMotionR32.directed(this)&&elapsed>=duration*swingPhase&&elapsed-1<duration*swingPhase)EvaMovementSounds.swing(this,2.1F);
-            authored = EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.root(this,EvaGameplayMotionR32.ordinary(this.ordinaryAttackRootStage),Mth.clamp(elapsed/duration,0,1))
-                    :EvaLiveCombatMotion.ordinary(this.ordinaryAttackRootStage,Mth.clamp(elapsed/duration,0,1));
+            if(!this.combatR64().busy()&&EvaGameplayMotionR32.directed(this)&&elapsed>=duration*swingPhase&&elapsed-1<duration*swingPhase)EvaMovementSounds.swing(this,2.1F);
+            float at=this.combatR64().phase(elapsed,Mth.clamp(elapsed/duration,0,1));
+            authored = EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.root(this,EvaGameplayMotionR32.ordinary(this.ordinaryAttackRootStage),at)
+                    :EvaLiveCombatMotion.ordinary(this.ordinaryAttackRootStage,at);
         }
         else
         {
             this.kickElapsedTicks++;
             elapsed = this.kickElapsedTicks;
-            if(elapsed==EvaActionFoleyR61.strokeTick(duration,this.kickContactTicks()))EvaMovementSounds.swing(this,2.4F);
-            authored = EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.root(this,"kick",Mth.clamp(elapsed/duration,0,1))
-                    :EvaLiveCombatMotion.kick(Mth.clamp(elapsed/duration,0,1));
+            if(!this.combatR64().busy()&&elapsed==EvaActionFoleyR61.strokeTick(duration,this.kickContactTicks()))EvaMovementSounds.swing(this,2.4F);
+            float at=this.combatR64().phase(elapsed,Mth.clamp(elapsed/duration,0,1));
+            authored = EvaGameplayMotionR32.kickReady(this)?EvaGameplayMotionR32.root(this,"kick",at)
+                    :EvaLiveCombatMotion.kick(at);
         }
-        this.entityData.set(DATA_LIVE_ACTION_PHASE, Mth.clamp(elapsed / duration, 0.0F, 1.0F));
+        this.entityData.set(DATA_LIVE_ACTION_PHASE, this.combatR64().phase(elapsed,Mth.clamp(elapsed / duration, 0.0F, 1.0F)));
         this.applyAuthoredRootDelta(authored,elapsed==1);
     }
 
@@ -4096,6 +4297,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
      */
     boolean strikeSpentR63()
     {
+        if(this.combatR64().busy())return this.combatR64().spent();
         float phase=this.entityData.get(DATA_LIVE_ACTION_PHASE);
         if(this.getKnifeMotionType(0)>=0)return phase>=.45F;
         if(this.isKickMotionActive(0))return phase>=.78F;
@@ -4103,7 +4305,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         return false;
     }
     boolean recoveryInputTailR51()
-    {return this.ordinaryAttackVisualTicks>0&&this.ordinaryAttackVisualTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
+    {return this.combatR64().busy()||this.ordinaryAttackVisualTicks>0&&this.ordinaryAttackVisualTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
             ||this.heavyTicks>0&&this.heavyTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
             ||this.kickVisualTicks>0&&this.kickVisualTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51
             ||this.knifeVisualTicks>0&&this.knifeVisualTicks<=RECOVERY_INPUT_BUFFER_TICKS_R51;}
@@ -4285,6 +4487,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             var admission=ordinary?this.ordinaryAcceptedTargetsR45.admit(actualSequence,target.getUUID()):com.projectseele.combat.EvaContactHitsR45.Admission.FIRST;
             if(!admission.allowsDamage())
             {anyHit|=admission.countsAsAcceptedContact();continue;}
+            this.combatR64().meets(from,fxCenter,hitPoint);
             long actualStartedAt=this.ordinaryAcceptedTargetsR45.startedAt();boolean accepted=false,fieldAbsorbed=false;
             try
             {
@@ -4301,6 +4504,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 finally{if(ordinary)this.ordinaryAcceptedTargetsR45.finishAttempt(actualSequence,actualStartedAt,target.getUUID(),accepted||fieldAbsorbed);}
             }
             if(!accepted&&!field&&!fieldAbsorbed)continue;
+            this.combatR64().toldLanded(target,hitPoint,fxCenter,accepted&&!field&&!fieldAbsorbed);
             if(!anyHit)
             {
                 if(knife)EvaMovementSounds.play(this,hitPoint,ModSounds.EVA_KNIFE_CUT.get(),3.8F,1);
@@ -4543,6 +4747,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 return false;
             }
         }
+        // R64 (M4): under the frames core a jump leaves a blow where an evade may, and waits in its buffer until then.
+        if(this.combatR64().busy()&&!this.combatR64().evadeOpen())return false;
         this.cancelLiveActionsForStanceChange();
         this.cancelHeavyMotion();
         if(!EvaGameplayMotionR32.prepareJump(this))return false;
@@ -5532,6 +5738,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaGameplayMotionR32.tick(this);
         EvaSprintR50.tick(this);
         EvaMotionModelR64.tick(this);
+        EvaCombatModelR64.tick(this);
         EvaMotionModelR64.serverKeys(this,(float)gaitKeyR64(SeeleConfig.EVA_WALK_SPEED_SCALE),(float)gaitKeyR64(SeeleConfig.EVA_RUN_SPEED_SCALE));
         this.slopeAheadR64=EvaMotionModelR64.walks(this)?Mth.lerp(.25F,this.slopeAheadR64,this.slopeProbeR64()):0;
         if(SLOPE_DIAG_R64&&this.tickCount%10==0&&this.isVehicle())
@@ -5543,7 +5750,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 &&(player.zza<-.15F||Math.abs(player.xxa)>.15F)
                 &&this.entityData.get(DATA_LIVE_ACTION_PHASE)>=.72F
                 &&(this.getOrdinaryAttackStage()>=0||this.isHeavyMotionActive())
-                &&!CombatFeelR31.hitPaused(this)&&!this.isPilotControlLocked())
+                &&!CombatFeelR31.hitPaused(this)&&!this.isPilotControlLocked()&&!this.combatR64().busy())
         {
             // Preserve wind-up/contact. A deliberate retreat can leave the recovery
             // rather than committing the player to another buffered stationary combo.
@@ -5613,8 +5820,16 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             sealedPilot.setInvisible(true);
         }
-        if(!CombatFeelR31.hitPaused(this))
+        boolean heldR64=CombatFeelR31.hitPaused(this);
+        if(!heldR64)
         {
+        // R64 (M4): the frames core begins and ends its rows before the old clocks run, and tests their contacts
+        // after the body has been moved to this tick's place in the clip (below).
+        {
+            LivingEntity pilotR64=this.getPilotEntity();
+            if(!(pilotR64 instanceof ServerPlayer)&&!(pilotR64 instanceof TrainingPilotEntity))pilotR64=null;
+            this.combatR64().before(pilotR64);
+        }
         if (this.ordinaryAttackComboGraceTicks > 0)
         {
             this.ordinaryAttackComboGraceTicks--;
@@ -5690,9 +5905,9 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 this.cancelHeavyMotion();
             else
             {
-                float phase = Mth.clamp(++this.heavyElapsed / (float)this.heavyDuration, 0, 1);
+                float phase = this.combatR64().phase(++this.heavyElapsed,Mth.clamp(this.heavyElapsed / (float)this.heavyDuration, 0, 1));
                 float swingPhase=EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.swingSoundPhaseR45(this,"heavy"):.40F;
-                if(EvaGameplayMotionR32.directed(this)&&heavyElapsed>=heavyDuration*swingPhase&&heavyElapsed-1<heavyDuration*swingPhase)EvaMovementSounds.swing(this,2.8F);
+                if(!this.combatR64().busy()&&EvaGameplayMotionR32.directed(this)&&heavyElapsed>=heavyDuration*swingPhase&&heavyElapsed-1<heavyDuration*swingPhase)EvaMovementSounds.swing(this,2.8F);
                 this.entityData.set(DATA_LIVE_ACTION_PHASE, phase);
                 this.applyAuthoredRootDelta(EvaGameplayMotionR32.ready(this)?EvaGameplayMotionR32.root(this,"heavy",phase):EvaLiveCombatMotion.heavy(phase),this.heavyElapsed==1);
                 if(EvaGameplayMotionR32.ready(this))
@@ -5721,6 +5936,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         {
             this.resolveKnifeContact(combatPilot);
         }
+        this.combatR64().contact(combatPilot);
         if (this.ordinaryAttackVisualTicks > 0)
         {
             // Buffered follow-ups leave from the braking pose. Waiting for the
@@ -5832,6 +6048,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             this.rifleCooldown--;
         }
         }
+        this.combatR64().told(heldR64);
         if (this.jumpCooldown > 0)
         {
             this.jumpCooldown--;
@@ -7563,6 +7780,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         // Preserve the previous tick for render interpolation. Assigning both
         // values to the camera yaw made the sixty-block chassis teleport under
         // the pilot whenever the mouse moved.
+        bodyYaw=this.combatR64().yaw(previousBodyYaw,bodyYaw,player.getYRot());
         if(EvaCombatR31.locksFacing(this))bodyYaw=Mth.approachDegrees(previousBodyYaw,EvaCombatR31.facing(this),6);
         this.setRot(bodyYaw, 0.0F);
         if(longHull)this.setBoundingBox(stanceBounds(bodyYaw));

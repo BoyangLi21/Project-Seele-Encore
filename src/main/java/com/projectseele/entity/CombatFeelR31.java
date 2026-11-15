@@ -22,12 +22,43 @@ public final class CombatFeelR31
     private static final WeakIdentityMap<LivingEntity,Float> PHASES=new WeakIdentityMap<>();
     public static Beat beat(LivingEntity e){if(com.projectseele.physics.CombatBodyDynamics.rawSampling(e))return null;var b=BEATS.get(e);return b!=null&&e.level().getGameTime()-b.start<b.duration?b:null;}
     public static float age(LivingEntity e,float partial){var b=beat(e);return b==null?0:(float)((e.level().getGameTime()-b.start)+(double)partial);}
-    public static boolean restrained(LivingEntity e){if(com.projectseele.physics.CombatBodyDynamics.active(e))return true;var b=beat(e);return b!=null&&b.kind>=STAGGER&&b.kind<=THROWN&&age(e,0)<(b.kind==STAGGER?7:b.duration-8);}
+    public static boolean restrained(LivingEntity e){if(com.projectseele.physics.CombatBodyDynamics.active(e))return true;var b=beat(e);return b!=null&&b.kind>=STAGGER&&b.kind<=THROWN&&age(e,0)<(b.kind==STAGGER?pushedUntil(b):b.duration-8);}
     public static boolean hitPaused(LivingEntity e){var b=beat(e);return b!=null&&age(e,0)<b.stopTicks;}
+    /** Review only: -Dprojectseele.combatDiagR64=true tells every beat sent (R64FEEL). */
+    private static final boolean TOLD_R64=Boolean.getBoolean("projectseele.combatDiagR64");
+    /**
+     * R64 (M4), hit-stop "tiered". Up to R63 a beat held its body for one tick or two and its motion ran from the
+     * blow. A beat held longer begins its motion when the hold ends: this many ticks after the blow.
+     */
+    public static int lead(Beat b){return lead(b.stopTicks);}
+    private static int lead(int stop){return stop>2?stop-1:0;}
+    /**
+     * R64 (M4): a stagger of exactly this length past its hold is a knock-back: pushed for ten ticks longer and
+     * further, and caught in four steps instead of two. (The beat carries no other mark; the staggers of R63 are
+     * 16 and 24 ticks long.)
+     */
+    public static final int KNOCK_TICKS=26;
+    public static boolean far(Beat b){return b.kind==STAGGER&&b.duration-lead(b)==KNOCK_TICKS;}
+    /** Ticks into a stagger its body is still being pushed (seven up to R63). */
+    public static int pushedUntil(Beat b){return 7+lead(b)+(far(b)?10:0);}
+    /**
+     * R64 (M4): a body held on a blow for three ticks or more shivers in place, dying away as the hold ends. Model
+     * units along x and z, or null.
+     */
+    public static float[] tremble(LivingEntity e,float partial)
+    {
+        var b=beat(e);if(b==null||b.kind==CONTACT||b.stopTicks<4)return null;
+        float t=age(e,partial);if(t>=b.stopTicks)return null;
+        float amount=1.5F*(1-t/b.stopTicks)*Math.min(1.2F,b.strength+.3F);
+        return new float[]{amount*(float)Math.sin(t*9.1),amount*(float)Math.cos(t*7.3)};
+    }
     public static void clear(LivingEntity e){BEATS.remove(e);POISE.remove(e);POISE_AT.remove(e);PHASES.remove(e);com.projectseele.physics.CombatBodyDynamics.cancel(e);}
     public static float frozenPhase(EvaUnit01Entity e){return PHASES.getOrDefault(e,e.combatPhaseR31());}
     public static void receive(LivingEntity e,Beat beat,float phase){CombatReactionsR36.capture(e,beat);com.projectseele.physics.ShamshelPosedContactsR48.captureBeforeReaction(e);BEATS.put(e,beat);PHASES.put(e,phase);}
     public static void send(LivingEntity e,int kind,Vec3 direction,float strength,int duration,int stop)
+    {send(e,kind,direction,strength,duration,stop,0);}
+    /** push: how far the pilot's view is pushed in when this is the beat of his own blow landing (0: by the R63 rule). */
+    public static void send(LivingEntity e,int kind,Vec3 direction,float strength,int duration,int stop,float push)
     {
         if(!(e.level() instanceof ServerLevel))return;
         if(kind==CONTACT&&restrained(e))return;
@@ -37,7 +68,9 @@ public final class CombatFeelR31
         var beat=new Beat(kind,e.level().getGameTime(),duration,direction,strength,stop);CombatReactionsR36.capture(e,beat);com.projectseele.physics.ShamshelPosedContactsR48.captureBeforeReaction(e);BEATS.put(e,beat);
         float phase=e instanceof EvaUnit01Entity eva?eva.combatPhaseR31():0;PHASES.put(e,phase);
         if((kind==DOWN||kind==THROWN)&&e instanceof EvaPrototypeEntity un)un.stopUNFlight();
-        SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(()->e),new ClientboundCombatFeelR31(e.getId(),beat,phase));
+        SeeleNetwork.CHANNEL.send(PacketDistributor.TRACKING_ENTITY_AND_SELF.with(()->e),new ClientboundCombatFeelR31(e.getId(),beat,phase,push));
+        if(TOLD_R64)com.projectseele.ProjectSeele.LOGGER.info("R64FEEL tick {} {} {} kind {} strength {} duration {} stop {}",e.level().getGameTime(),
+                e.getType().toShortString(),e.getId(),kind,String.format(java.util.Locale.ROOT,"%.2f",strength),duration,stop);
         if(kind!=CONTACT&&e instanceof Mob mob)mob.getNavigation().stop();
         if(kind>=STAGGER&&kind<=THROWN&&e instanceof EvaUnit01Entity eva){eva.interruptCombatR31();EvaCombatR31.clear(eva);}
     }
@@ -53,9 +86,17 @@ public final class CombatFeelR31
         float strength=(float)Math.min(1.35,.25+Math.sqrt(damage/Math.max(1,target.getMaxHealth()))*2.2);
         long now=target.level().getGameTime(),last=POISE_AT.getOrDefault(target,now);
         double poise=Math.max(0,POISE.getOrDefault(target,0D)-(now-last)*.012)+(guard?.08:melee?strength:.10);
-        POISE_AT.put(target,now);int kind=guard?BLOCKED:crushing||poise>3.20?DOWN:melee?STAGGER:FLINCH;
+        POISE_AT.put(target,now);
+        // R64 (M4): a blow of the frames core lands as hard as its row says: a light one makes its mark flinch, a
+        // medium one stagger, a heavy one is a knock-back, and only a finisher fells (up to R63 the kick did too).
+        var rowR64=source instanceof EvaUnit01Entity unitR64&&unitR64.combatR64().busy()?unitR64.combatR64().row():null;
+        if(rowR64!=null)crushing=rowR64.level()==EvaMoveTableR64.FINISHER;
+        int kind=guard?BLOCKED:crushing||poise>3.20?DOWN:melee?rowR64!=null&&rowR64.level()==EvaMoveTableR64.LIGHT?FLINCH:STAGGER:FLINCH;
+        boolean knockR64=kind==STAGGER&&rowR64!=null&&rowR64.level()==EvaMoveTableR64.HEAVY;
         var previous=beat(target);
-        if(kind==STAGGER&&target instanceof EvaUnit01Entity e&&e.getOrdinaryAttackStage()>=0)
+        // R64 (M4): under the frames core the row in hand says in which ticks the Unit keeps its blow.
+        if(kind==STAGGER&&target instanceof EvaUnit01Entity armored&&armored.combatR64().armored())kind=FLINCH;
+        if(kind==STAGGER&&target instanceof EvaUnit01Entity e&&e.getOrdinaryAttackStage()>=0&&!e.combatR64().busy())
         {
             float phase=e.getOrdinaryAttackProgress(0);
             if(phase>=.18F&&phase<=.66F)kind=FLINCH;
@@ -70,8 +111,14 @@ public final class CombatFeelR31
                 &&kind!=DOWN&&!com.projectseele.physics.CombatBodyDynamics.active(target))return;
         if(!guard&&(kind==DOWN||com.projectseele.physics.CombatBodyDynamics.active(target)))
             com.projectseele.physics.CombatBodyDynamics.start(target,point,direction,strength);
-        send(target,kind,direction,strength,kind==DOWN?64:kind==STAGGER?16:10,guard?1:crushing?2:1);
-        if(source!=null&&melee)send(source,CONTACT,direction,strength,6,crushing?2:1);
+        int stop=guard?1:crushing?2:1;
+        // R64 (M4), hit-stop "tiered": both bodies are held by how hard the blow is. The tick of the blow is already
+        // under way, so a stop of n+1 holds them n ticks. An Angel's blow on a Unit of the frames core: 3, a crushing one 5.
+        if(rowR64!=null&&EvaCombatModelR64.tiered((EvaUnit01Entity)source))stop=rowR64.stop()+1;
+        else if(source instanceof Angel&&target instanceof EvaUnit01Entity struckR64&&EvaCombatModelR64.tiered(struckR64))stop=(crushing?5:3)+1;
+        if(knockR64)strength=Math.min(1.5F,strength*1.25F);
+        send(target,kind,direction,strength,(kind==DOWN?64:kind==STAGGER?knockR64?KNOCK_TICKS:16:10)+lead(stop),stop);
+        if(source!=null&&melee)send(source,CONTACT,direction,strength,Math.max(6,stop+3),stop,rowR64!=null?rowR64.push():0);
     }
     public static void throwBody(LivingEntity target,Vec3 velocity)
     {
@@ -90,7 +137,7 @@ public final class CombatFeelR31
             if(e instanceof SachielEntity&&CombatReactionsR36.enabled(e)&&!e.level().isClientSide)
             {
                 float age=age(e,0);
-                if(age>=b.stopTicks&&age<6)
+                if(age>=b.stopTicks&&age<6+lead(b))
                 {
                     boolean grounded=e.onGround();double speed=1.15*b.strength*Math.exp(-(age-b.stopTicks)/3);
                     Vec3 force=b.direction.multiply(1,0,1).normalize().scale(speed);e.move(MoverType.SELF,CombatSpacingR32.clip(e,force));
@@ -101,12 +148,12 @@ public final class CombatFeelR31
         }
         if(e instanceof EvaUnit01Entity eva&&(eva.isNervLogisticsLocked()||!eva.isControlledByLocalInstance()))return false;
         if(!(e instanceof EvaUnit01Entity)&&e.level().isClientSide)return false;
-        double t=age(e,0);if(t>=(b.kind==STAGGER?7:b.duration-8))return false;
+        double t=age(e,0);if(t>=(b.kind==STAGGER?pushedUntil(b):b.duration-8))return false;
         Vec3 v=e.getDeltaMovement();
         if(t<b.stopTicks){e.setDeltaMovement(0,v.y,0);return true;}
         if(b.kind!=THROWN)
         {
-            double speed=(b.kind==DOWN?2.9:b.kind==STAGGER?1.6:.55)*b.strength*Math.exp(-(t-b.stopTicks)/6);
+            double speed=(b.kind==DOWN?2.9:b.kind==STAGGER?1.6:.55)*b.strength*Math.exp(-(t-b.stopTicks)/(far(b)?10:6));
             Vec3 d=b.direction.multiply(1,0,1).normalize();v=new Vec3(d.x*speed,v.y,d.z*speed);
         }
         boolean grounded=e.onGround();e.move(MoverType.SELF,v);e.resetFallDistance();

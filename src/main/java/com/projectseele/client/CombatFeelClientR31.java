@@ -26,7 +26,7 @@ public final class CombatFeelClientR31
             if(p.beat().kind()==CombatFeelR31.CONTACT&&mc.player!=null&&mc.getCameraEntity()==mc.player&&actor==EvaPilotResolver.controlTarget(mc.player))
             {
                 if(CameraKickR58.TOLD)com.projectseele.ProjectSeele.LOGGER.info("R63HITPUSH the piloted unit's blow landed, held {} ticks",p.beat().stopTicks());
-                CameraKickR58.kick(0,0,-(p.beat().stopTicks()<=1?HIT_PUSH_R63:HIT_PUSH_HEAVY_R63),3);
+                CameraKickR58.kick(0,0,-(p.push()>0?p.push():p.beat().stopTicks()<=1?HIT_PUSH_R63:HIT_PUSH_HEAVY_R63),3);
             }
         }
     }
@@ -41,7 +41,7 @@ public final class CombatFeelClientR31
             float t=CombatFeelR31.age(eva,(float)e.getPartialTick());
             // A heavier blow holds both bodies longer and swings the view further: by a quarter more for
             // each tick held past the first. Landing the kick on an Angel used to move it a third of a degree.
-            float weight=b.stopTicks()<=1?1F:.75F+.25F*b.stopTicks();
+            float weight=b.stopTicks()<=1?1F:Math.min(2.2F,.75F+.25F*b.stopTicks());
             pulse=(float)(Math.exp(-t/3.5)*Math.sin(t*1.15))*b.strength()*weight;
             // While the bodies are held on the blow the view rattles, dying away as they let go.
             if(t<b.stopTicks())held=(float)Math.sin(t*6.5)*(1-t/b.stopTicks())*b.strength()*.55F;

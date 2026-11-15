@@ -55,6 +55,8 @@ public final class SeeleConfig
     // ----- common: EVA movement model (R64, M1) -----
     public static final ForgeConfigSpec.ConfigValue<String> EVA_MOTION_MODEL;
     public static final ForgeConfigSpec.ConfigValue<String> EVA_GAIT_TIER;
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_COMBAT_MODEL;
+    public static final ForgeConfigSpec.ConfigValue<String> EVA_HIT_STOP;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_DAMAGE;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_RANGE;
     public static final ForgeConfigSpec.IntValue EVA_RIFLE_INTERVAL_TICKS;
@@ -263,6 +265,19 @@ public final class SeeleConfig
                         "C: walk 22.6 at 1.25, run 41.9 at 1.75 (the speeds up to R63, in small steps).",
                         "The fast run is 189 at 3.8 in all three. Up to R63: walk 22.6 at 1.78, run 41.9 at 2.68, the feet sliding.")
                 .defineInList("gaitTier", "A", java.util.List.of("A", "B", "C"));
+        common.pop();
+
+        common.push("eva_combat");
+        EVA_COMBAT_MODEL = common
+                .comment("How a piloted EVA fights. legacy: as up to R63. frames: every blow is a row of frame data (start-up,",
+                        "active, recovery, what it cancels into) read by one machine, with the pilot's presses buffered (Unit-01",
+                        "with bare hands or the knife for now; the rest keeps the old core). The server's value goes for",
+                        "everyone on it. In game: /seele combat.")
+                .defineInList("model", "legacy", java.util.List.of("legacy", "frames"));
+        EVA_HIT_STOP = common
+                .comment("Under the frames core, the pause at a hit. tiered: by how hard the blow is (light 2 to 3 ticks, heavy 4",
+                        "to 6, a finisher 8), both bodies held. flat: as up to R63. In game: /seele combat hitstop.")
+                .defineInList("hitStop", "tiered", java.util.List.of("tiered", "flat"));
         common.pop();
 
         common.push("eva_pallet_smg");

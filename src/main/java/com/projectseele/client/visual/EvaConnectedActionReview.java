@@ -621,6 +621,7 @@ public final class EvaConnectedActionReview
         if(ATF){atFieldR63(mc,eva);positionCamera(mc,eva);return;}
         if(ARMS!=null){armsR63(mc);positionCamera(mc,eva);return;}
         if(EVADE){evadeR63(mc,eva);positionCamera(mc,eva);return;}
+        if(COMBAT_R64){combatR64(mc,eva);positionCamera(mc,eva);return;}
         if(HITS){hitsR63(mc,eva);positionCamera(mc,eva);return;}
         if(RAMIEL){ramielR63(mc,eva);positionCamera(mc,eva);return;}
         if(ANSWER){answerR63(mc,eva);positionCamera(mc,eva);return;}
@@ -1189,6 +1190,85 @@ public final class EvaConnectedActionReview
                     String.format(java.util.Locale.ROOT,"%.1f",sachiel.position().subtract(eva.position()).horizontalDistance()),sachiel.isStrikeActive(),sachiel.strikeMode(),
                     Math.round(eva.getHealth()),String.format(java.util.Locale.ROOT,"%.1f",eva.getX()),String.format(java.util.Locale.ROOT,"%.1f",eva.getY()),String.format(java.util.Locale.ROOT,"%.1f",eva.getZ()));
     }
+    /**
+     * -Dprojectseele.tourCombatR64=true (tourEnd=1900): the piloted unit's blows on a Sachiel that stands still with
+     * its field down, the same presses for either combat core, to be read with -Dprojectseele.combatDiagR64=true.
+     * One jab; four light presses six ticks apart; a light and a heavy; a heavy; four light presses twelve apart.
+     * Then two presses three ticks apart and a light with a heavy one tick behind it (what the buffer keeps), an
+     * evade asked for seven ticks into a jab, the target 31 degrees to the right and to the left of the body's
+     * facing, and blows at the air. With the knife: a cut, a cut left for the reverse cut, the reverse cut, and a
+     * light press as an evade ends. Last, the unit is struck standing, and again four ticks into a jab.
+     */
+    private static final boolean COMBAT_R64=Boolean.getBoolean("projectseele.tourCombatR64");
+    private static void sentR64(String what)
+    {ProjectSeele.LOGGER.info("R64TOUR tick {} game {} sent {}",tick,Minecraft.getInstance().level.getGameTime(),what);}
+    private static void lightR64(){sentR64("light");send(ServerboundEvaControlPacket.ACTION_MELEE);}
+    private static void heavyR64(){sentR64("heavy");send(ServerboundEvaControlPacket.ACTION_SMASH);}
+    private static void evadeBackR64()
+    {sentR64("evade");SeeleNetwork.CHANNEL.sendToServer(new ServerboundEvaControlPacket(ServerboundEvaControlPacket.ACTION_CANCEL_LAUNCH,2));}
+    private static void dummyR64(Minecraft mc,EvaUnit01Entity eva,double ahead,double right)
+    {
+        removeTargetR63(mc,"sachiel");
+        Vec3 fwd=Vec3.directionFromRotation(0,eva.getYRot()).multiply(1,0,1).normalize(),side=new Vec3(-fwd.z,0,fwd.x);
+        Vec3 a=eva.position().add(fwd.scale(ahead)).add(side.scale(right));
+        mc.player.connection.sendCommand(String.format(java.util.Locale.ROOT,
+                "summon projectseele:sachiel %.1f %.1f %.1f {NoAI:1b,Silent:1b,SachielAtField:0f,Rotation:[%.1fF,0F]}",a.x,a.y,a.z,eva.getYRot()+180));
+        ProjectSeele.LOGGER.info("R64TOUR tick {} game {} target {} ahead {} right",tick,mc.level.getGameTime(),ahead,right);
+    }
+    private static void combatR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
+        mc.player.setYRot(0);mc.player.setXRot(0);
+        String angel="@e[type=projectseele:sachiel,limit=1,sort=nearest]",unit=eva.getStringUUID();
+        // A fresh target for every part: one felled by the part before lies where it fell for three seconds.
+        if(at(20)||at(90)||at(200)||at(290)||at(370)||at(500)||at(590)||at(670)||at(1370)||at(1470)||at(1550))dummyR64(mc,eva,20,0);
+        if(at(60))lightR64();
+        if(at(120)||at(126)||at(132)||at(138))lightR64();
+        if(at(230))lightR64();
+        if(at(236))heavyR64();
+        if(at(320))heavyR64();
+        if(at(400)||at(412)||at(424)||at(436))lightR64();
+        if(at(540)||at(543))lightR64();
+        if(at(620))lightR64();
+        if(at(621))heavyR64();
+        if(at(700))lightR64();
+        if(at(707))evadeBackR64();
+        if(at(790))dummyR64(mc,eva,20,12);
+        if(at(830)||at(838)||at(846))lightR64();
+        if(at(900))dummyR64(mc,eva,20,-12);
+        if(at(940))heavyR64();
+        if(at(1000))removeTargetR63(mc,"sachiel");
+        if(at(1030))lightR64();
+        if(at(1090)||at(1096))lightR64();
+        if(at(1160))heavyR64();
+        if(at(1230))mc.player.connection.sendCommand(ARM+"knife");
+        if(at(1240))dummyR64(mc,eva,20,0);
+        if(at(1320))lightR64();
+        if(at(1400))lightR64();
+        if(at(1417))heavyR64();
+        if(at(1500))heavyR64();
+        if(at(1580))evadeBackR64();
+        if(at(1598)||at(1604))lightR64();
+        if(at(1680))dummyR64(mc,eva,20,0);
+        if(at(1690))mc.player.connection.sendCommand(ARM+"fists");
+        if(at(1730)||at(1790))
+        {
+            mc.player.connection.sendCommand("damage "+unit+" 30 minecraft:mob_attack by "+angel);
+            ProjectSeele.LOGGER.info("R64TOUR tick {} game {} the unit is struck",tick,mc.level.getGameTime());
+        }
+        if(at(1786))lightR64();
+        if(at(TOUR_END-12))removeTargetR63(mc,"sachiel");
+        if(tick%2==0)
+        {
+            var near=mc.level.getEntitiesOfClass(com.projectseele.entity.SachielEntity.class,eva.getBoundingBox().inflate(120)).stream()
+                    .min(java.util.Comparator.comparingDouble(eva::distanceToSqr)).orElse(null);
+            if(near!=null)ProjectSeele.LOGGER.info("R64DUMMY tick {} game {} target at {} {} unit at {} {} yaw {}",tick,mc.level.getGameTime(),
+                    String.format(java.util.Locale.ROOT,"%.2f",near.getX()),String.format(java.util.Locale.ROOT,"%.2f",near.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.2f",eva.getX()),String.format(java.util.Locale.ROOT,"%.2f",eva.getZ()),
+                    String.format(java.util.Locale.ROOT,"%.1f",eva.getYRot()));
+        }
+    }
+
     private static void evadeR63(Minecraft mc,EvaUnit01Entity eva)
     {
         mc.options.keyUp.setDown(false);mc.player.input.up=false;mc.player.input.forwardImpulse=0;mc.player.zza=0;mc.player.xxa=0;
