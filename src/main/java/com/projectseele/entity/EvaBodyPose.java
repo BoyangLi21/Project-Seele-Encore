@@ -172,6 +172,10 @@ public final class EvaBodyPose
                     smoothGaitsR59(combatClips,variant);
                 }
             }
+            // One instance per equal rotation and position (130 MB of clip entries become about 30); every reader copies before it changes anything.
+            var sharedValues=new com.projectseele.util.SharedPoseValues();
+            for(var clip:clips.values()){sharedValues.share(clip.rotations());sharedValues.share(clip.positions());}
+            for(var set:combatClips.values())for(var clip:set.values()){sharedValues.share(clip.rotations());sharedValues.share(clip.positions());}
             data=new Data(names,index,Map.copyOf(clips),Map.copyOf(rigs),Map.copyOf(support),object(all,"prone"),object(all,"grip"),object(all,"rifle_mocap"),Map.copyOf(eyes),Map.copyOf(rigSupport),Map.copyOf(carrierHulls),Map.copyOf(combatClips),object(all,"locomotion_contract_r43"));
             ProjectSeele.LOGGER.info("EVA shared body/socket pose loaded: private={} clips={} bones={} gameplayProfiles={}",Files.isRegularFile(path),clips.size(),names.length,combatClips.values().stream().filter(c->c.containsKey("r32_jab")).count());
         }
