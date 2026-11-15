@@ -125,9 +125,11 @@ def main():
     nmix = vnoise(wx, wz, 9, a.seed) * .45 + vnoise(wx, wz, 3, a.seed + 6) * .3 + hash01(wx, wz, a.seed + 1) * .25
     sand_patch = vnoise(wx, wz, 14, a.seed + 7)
     counts = dict(beach_columns=int(beach.sum()), pines=0, dune_plants=0, under_plants=0)
-    zones = [(4, [('minecraft:cobblestone', .3), ('minecraft:andesite', .14), ('minecraft:stone', .16), ('minecraft:tuff', .16), ('minecraft:gravel', .19), ('minecraft:sand', .05)]),
-             (12, [('minecraft:gravel', .32), ('minecraft:cobblestone', .2), ('minecraft:tuff', .18), ('minecraft:andesite', .1), ('minecraft:stone', .12), ('minecraft:sand', .08)]),
-             (999, [('minecraft:gravel', .36), ('minecraft:tuff', .2), ('minecraft:cobblestone', .16), ('minecraft:sand', .08), ('minecraft:coarse_dirt', .08), ('minecraft:andesite', .12)])]
+    # Hakone's beaches are dark volcanic pebbles; Minecraft's andesite, stone and gravel read pale, so basalt and
+    # tuff carry the colour
+    zones = [(4, [('minecraft:tuff', .25), ('minecraft:cobblestone', .25), ('minecraft:smooth_basalt', .1), ('minecraft:stone', .1), ('minecraft:gravel', .2), ('minecraft:andesite', .05), ('minecraft:sand', .05)]),
+             (12, [('minecraft:gravel', .3), ('minecraft:tuff', .25), ('minecraft:cobblestone', .2), ('minecraft:smooth_basalt', .08), ('minecraft:andesite', .07), ('minecraft:sand', .1)]),
+             (999, [('minecraft:gravel', .35), ('minecraft:tuff', .2), ('minecraft:cobblestone', .15), ('minecraft:coarse_dirt', .1), ('minecraft:sand', .1), ('minecraft:andesite', .1)])]
     for z, x in zip(*np.nonzero(beach)):
         j = int(ground[z, x]) - by
         mix = next(m_ for d_, m_ in zones if d_sea[z, x] <= d_)
