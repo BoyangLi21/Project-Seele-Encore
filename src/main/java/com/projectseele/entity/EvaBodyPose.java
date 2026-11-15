@@ -172,6 +172,8 @@ public final class EvaBodyPose
                     smoothGaitsR59(combatClips,variant);
                 }
             }
+            // The clips above were the only readers of the gameplay profiles' per-bone channels.
+            EvaGameplayMotionR32.dropBoneChannelsR64();
             // One instance per equal rotation and position (130 MB of clip entries become about 30); every reader copies before it changes anything.
             var sharedValues=new com.projectseele.util.SharedPoseValues();
             for(var clip:clips.values()){sharedValues.share(clip.rotations());sharedValues.share(clip.positions());}

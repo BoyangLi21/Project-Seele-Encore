@@ -132,6 +132,15 @@ public final class EvaGameplayMotionR32
         }).orElse(null);
     }
     public static synchronized void reload(){PROFILES.clear();}
+    /** Called once EvaBodyPose has built its clips from the profiles loaded so far. Each frame's per-bone rotations
+     * and offsets are read only for that, and they are nine tenths of every profile (about 200 MB over the five
+     * rigs). The profiles are replaced by ones without them; a reader still holding an old one is not disturbed. */
+    public static synchronized void dropBoneChannelsR64()
+    {
+        for(var entry:PROFILES.entrySet())
+            if(entry.getValue().isPresent())
+                entry.setValue(Optional.of(com.projectseele.util.JsonClipFrames.without(entry.getValue().get(),"rotation_wxyz","bone_position_xyz")));
+    }
     public static int variant(EvaUnit01Entity e){return e instanceof EvaPrototypeEntity un?3+un.getUNSerial():e.getUnitVariant();}
     public static float guardWeight(EvaUnit01Entity e){return e.getEntityData().get(GUARD);}
     public static boolean ready(EvaUnit01Entity e){return profile(variant(e))!=null;}
