@@ -1245,7 +1245,7 @@ public final class EvaConnectedActionReview
         if(at(1240))dummyR64(mc,eva,20,0);
         if(at(1320))lightR64();
         if(at(1400))lightR64();
-        if(at(1417))heavyR64();
+        if(at(1422))heavyR64();
         if(at(1500))heavyR64();
         if(at(1580))evadeBackR64();
         if(at(1598)||at(1604))lightR64();
