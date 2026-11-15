@@ -28,7 +28,8 @@ def exposed(w, x, y, z):
         return None
     for dx, dz in SIDES:
         t = w.get(x + dx, y, z + dz)
-        if t is not None and is_open(t):
+        # leaves count as open: cut-off crowns decay as soon as a client ticks the chunk
+        if t is not None and (is_open(t) or 'leaves' in t):
             return s
     return None
 
