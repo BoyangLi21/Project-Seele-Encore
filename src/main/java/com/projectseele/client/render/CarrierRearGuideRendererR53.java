@@ -69,19 +69,27 @@ final class CarrierRearGuideRendererR53
 
     private static Loaded load()
     {
-        var source=CarrierRearGuideR53.fixed();var builders=new LinkedHashMap<Key,RigidMachineryPartR44.Builder>();
+        var source=CarrierRearGuideR53.fixed();var members=new LinkedHashMap<Key,List<CarrierRearGuideR53.Fixed>>();
         var memberships=new HashMap<Key,Set<String>>();
         for(var piece:source.pieces())
         {
             var centre=piece.bounds().getCenter();var key=new Key((int)Math.floor(centre.x/32),(int)Math.floor(centre.y/32),(int)Math.floor(centre.z/32));
-            var builder=builders.computeIfAbsent(key,k->new RigidMachineryPartR44.Builder());
+            members.computeIfAbsent(key,k->new ArrayList<>()).add(piece);
             memberships.computeIfAbsent(key,k->new HashSet<>()).add(piece.leg());
-            var rgb=piece.steel().rgb();for(int i=0;i<rgb.length;i+=18)builder.triangleNormalizedR52(rgb,i,piece.steel().frame(),key.origin());
         }
         var cells=new ArrayList<Cell>();
-        builders.forEach((key,builder)->
+        members.forEach((key,pieces)->
         {
-            var mesh=builder.finish();var box=mesh.bounds();var centre=key.origin().add((box[0]+box[3])/2,(box[1]+box[4])/2,(box[2]+box[5])/2);
+            // A cell's vertices are built from its pieces again for each GPU upload and not kept:
+            // all cells together were 123 MB that nothing read between uploads.
+            var steel=List.copyOf(pieces);
+            var mesh=RigidMachineryPartR44.deferredR64(()->
+            {
+                var builder=new RigidMachineryPartR44.Builder();
+                for(var piece:steel){var rgb=piece.steel().rgb();for(int i=0;i<rgb.length;i+=18)builder.triangleNormalizedR52(rgb,i,piece.steel().frame(),key.origin());}
+                return builder;
+            });
+            var box=mesh.bounds();var centre=key.origin().add((box[0]+box[3])/2,(box[1]+box[4])/2,(box[2]+box[5])/2);
             var anchors=new ArrayList<CarrierRearGuideR53.Anchor>();
             for(var leg:memberships.get(key))
             {
