@@ -107,7 +107,135 @@ def fallback_land(xs, zs):
     return inside
 
 
+def nbt_payload(f, t):
+    if t == 1: return f.read(1)[0]
+    if t == 2: return struct.unpack('>h', f.read(2))[0]
+    if t == 3: return struct.unpack('>i', f.read(4))[0]
+    if t == 4: return struct.unpack('>q', f.read(8))[0]
+    if t == 5: return struct.unpack('>f', f.read(4))[0]
+    if t == 6: return struct.unpack('>d', f.read(8))[0]
+    if t == 7: n = struct.unpack('>i', f.read(4))[0]; f.read(n); return None
+    if t == 8: n = struct.unpack('>H', f.read(2))[0]; return f.read(n).decode('utf8', 'replace')
+    if t == 9:
+        et = f.read(1)[0]; n = struct.unpack('>i', f.read(4))[0]; return [nbt_payload(f, et) for _ in range(n)]
+    if t == 10:
+        d = {}
+        while True:
+            et = f.read(1)[0]
+            if et == 0: return d
+            n = struct.unpack('>H', f.read(2))[0]; k = f.read(n).decode('utf8', 'replace'); d[k] = nbt_payload(f, et)
+    if t == 11: n = struct.unpack('>i', f.read(4))[0]; f.read(4 * n); return None
+    if t == 12: n = struct.unpack('>i', f.read(4))[0]; return struct.unpack('>%dq' % n, f.read(8 * n))
+
+
+# Chunk statuses that already carry terrain; earlier ones (structure_starts, biomes) are generated live.
+TERRAIN = {'minecraft:noise', 'minecraft:surface', 'minecraft:carvers', 'minecraft:liquid_carvers', 'minecraft:features',
+           'minecraft:initialize_light', 'minecraft:light', 'minecraft:spawn', 'minecraft:heightmaps', 'minecraft:full'}
+MIN_Y, HEIGHTMAP_BITS = -1344, 11
+
+
+def terrain_chunks(region_dir, drop):
+    """Saved chunks that have terrain, with each one's ground heightmap (top solid block, None if absent)."""
+    import zlib, io
+    out = {}
+    for path in Path(region_dir).glob('r.*.mca'):
+        rx, rz = map(int, path.stem.split('.')[1:3])
+        data = path.read_bytes()
+        if len(data) < 4096:
+            continue
+        for i in range(1024):
+            loc = struct.unpack('>I', data[i * 4:i * 4 + 4])[0]
+            if not loc >> 8:
+                continue
+            chunk = (rx * 32 + (i & 31), rz * 32 + (i >> 5))
+            if chunk in drop:
+                continue
+            off = (loc >> 8) * 4096
+            n = struct.unpack('>I', data[off:off + 4])[0]
+            raw = data[off + 5:off + 4 + n]
+            body = zlib.decompress(raw) if data[off + 4] == 2 else raw
+            f = io.BytesIO(body); t = f.read(1)[0]; f.read(struct.unpack('>H', f.read(2))[0])
+            root = nbt_payload(f, t)
+            if root.get('Status') not in TERRAIN:
+                continue
+            maps = root.get('Heightmaps') or {}
+            longs = maps.get('OCEAN_FLOOR') or maps.get('WORLD_SURFACE')
+            ground = None
+            if longs:
+                per, mask, vals = 64 // HEIGHTMAP_BITS, (1 << HEIGHTMAP_BITS) - 1, []
+                for word in longs:
+                    word &= (1 << 64) - 1
+                    vals.extend((word >> (k * HEIGHTMAP_BITS)) & mask for k in range(per))
+                ground = np.array(vals[:256], np.int32).reshape(16, 16) + MIN_Y - 1
+            out[chunk] = ground
+    return out
+
+
+def build_edge(a):
+    """outer_edge.bin.gz alone, on a grid covering every saved terrain chunk (R64 M6 land edges).
+
+    Known = surveyed rectangle or terrain chunk; ground from the field where it has data, else the chunk's
+    own heightmap. Unknown cells take the nearest known ground blurred more the further out they are, so
+    the exterior no longer repeats one boundary column outward as straight streaks.
+    """
+    (fx0, fz0, fstep, fw, fd), heights, waters = read_field(a.field)
+    drop = {tuple(c) for c in json.loads(Path(a.drop).read_text('utf8'))['chunks']} if a.drop else set()
+    chunks = terrain_chunks(a.region_dir, drop)
+    cx = [c[0] for c in chunks]; cz = [c[1] for c in chunks]
+    margin = 512
+    x0 = (min(fx0, min(cx) * 16) - margin) // 16 * 16
+    z0 = (min(fz0, min(cz) * 16) - margin) // 16 * 16
+    x1 = max(fx0 + (fw - 1) * fstep, max(cx) * 16 + 15) + margin
+    z1 = max(fz0 + (fd - 1) * fstep, max(cz) * 16 + 15) + margin
+    xs = np.arange(x0, x1 + 1, 8); zs = np.arange(z0, z1 + 1, 8)
+    X, Z = np.meshgrid(xs, zs)
+    dem = (X >= DEM[0]) & (X <= DEM[2]) & (Z >= DEM[1]) & (Z <= DEM[3])
+    have = np.zeros(X.shape, bool); ground = np.zeros(X.shape, np.float64); valid = np.zeros(X.shape, bool)
+    infield = (X >= fx0) & (X <= fx0 + (fw - 1) * fstep) & (Z >= fz0) & (Z <= fz0 + (fd - 1) * fstep)
+    fi = np.clip((Z - fz0) // fstep, 0, fd - 1); fj = np.clip((X - fx0) // fstep, 0, fw - 1)
+    ground[infield] = np.round(heights[fi, fj][infield] / 16.0)
+    valid |= infield
+    missing = 0
+    for j, z in enumerate(zs):
+        for i, x in enumerate(xs):
+            key = (int(x) >> 4, int(z) >> 4)
+            if key not in chunks:
+                continue
+            have[j, i] = True
+            if not infield[j, i]:
+                g = chunks[key]
+                if g is None:
+                    missing += 1
+                else:
+                    ground[j, i] = g[int(z) & 15, int(x) & 15]; valid[j, i] = True
+    known = (dem | have) & valid
+    dist, (iz, ix) = ndimage.distance_transform_edt(~known, return_indices=True)
+    nearest = ground[iz, ix]
+    # Blur grows with distance: near-exact within 2 cells (16 blocks; the sea seam and shore read the
+    # ground close in), then about 0.6 cell of blur per cell out, up to 96 cells. Starting later left a
+    # fringe of short streaks along the edge.
+    sigma = np.clip((dist - 2) * 0.6, 0, 96)
+    scales = [0, 2, 4, 8, 16, 32, 64, 96]
+    blurred = [nearest] + [ndimage.gaussian_filter(nearest, s, mode='nearest') for s in scales[1:]]
+    smooth = nearest.copy()
+    for lo, hi, a_lo, a_hi in zip(scales, scales[1:], blurred, blurred[1:]):
+        sel = (sigma > lo) & (sigma <= hi)
+        t = (sigma[sel] - lo) / (hi - lo)
+        smooth[sel] = a_lo[sel] * (1 - t) + a_hi[sel] * t
+    smooth[known] = ground[known]
+    edge = struct.pack('>6i', 0x484B4532, int(x0), int(z0), 8, len(xs), len(zs))
+    edge += np.clip(np.round(dist * 8), 0, 32767).astype('>i2').tobytes()
+    edge += np.clip(np.round(smooth), -2048, 2047).astype('>i2').tobytes()
+    edge += have.astype(np.uint8).tobytes()
+    (Path(a.out) / 'outer_edge.bin.gz').write_bytes(gzip.compress(edge, 9))
+    print(json.dumps(dict(grid=[int(x0), int(z0), int(x1), int(z1)], cells=int(X.size), terrain_chunks=len(chunks),
+                          chunks_without_heightmap_outside_field=missing, known_cells=int(known.sum()),
+                          have_cells=int(have.sum()), world_written=False)))
+
+
 def build(a):
+    if a.edge_only:
+        return build_edge(a)
     (fx0, fz0, fstep, fw, fd), heights, waters = read_field(a.field)
     drop = {tuple(c) for c in json.loads(Path(a.drop).read_text('utf8'))['chunks']} if a.drop else set()
     saved = saved_chunks(a.region_dir, drop)
@@ -186,6 +314,8 @@ if __name__ == '__main__':
     parser.add_argument('--drop', help='JSON {"chunks": [[cx, cz], ...]} treated as deleted')
     parser.add_argument('--gsi', help='folder written by fetch')
     parser.add_argument('--tiles', help='fetch: JSON list of [x, y] z12 tiles')
+    parser.add_argument('--edge-only', action='store_true',
+                        help='build: rewrite outer_edge.bin.gz only (grid over every terrain chunk, blurred ground); keeps outer_coast')
     parser.add_argument('--out', required=True)
     args = parser.parse_args()
     globals()[args.mode](args)
