@@ -22,7 +22,11 @@ public final class SachielTacticsR36 extends Goal
      * GIVE: it gives ground for GIVE_TICKS at GIVE_SPEED blocks a tick, a little to one side; the rest of the time
      * it does what it would have done. A strike of its own still in the wind-up is broken off for either.
      */
-    public static final int COUNTER_R63=25,GIVE_R63=35,GIVE_TICKS_R63=9;
+    /**
+     * (R64: the share of the jab was 25 until the owner asked for it more often, 2026-11-15. The share that
+     * gives ground is as it was, so Sachiel now does what it would have done 25 times in a hundred, not 40.)
+     */
+    public static final int COUNTER_R63=40,GIVE_R63=35,GIVE_TICKS_R63=9;
     public static final double THREAT_R63=24,GIVE_SPEED_R63=.9;
     /**
      * The threat of a heavy blow or a kick: the Unit is carried forward by them, and throws them from farther off.
@@ -30,6 +34,8 @@ public final class SachielTacticsR36 extends Goal
      * answered.
      */
     public static final double THREAT_SLOW_R63=36;
+    /** -Dprojectseele.sachielRecoveryJabR64=false: the jab waits for Sachiel's own recovery, as up to R63. */
+    private static final boolean RECOVERY_JAB_R64=!"false".equals(System.getProperty("projectseele.sachielRecoveryJabR64"));
     /** -Dprojectseele.sachielAnswersR63=false: Sachiel does not answer, as before. */
     private static final boolean ANSWERS_R63=Boolean.parseBoolean(System.getProperty("projectseele.sachielAnswersR63","true"));
     /** -Dprojectseele.sachielRollR63=0..99, review only: every answer is rolled as this number, to see one answer many times in a fight. */
@@ -120,6 +126,18 @@ public final class SachielTacticsR36 extends Goal
                 else toldR63(range,age,unit,roll,"goes on with its strike");
             }
         }
+        // R64: and a strike that has been thrown is left for the jab. The rest of a strike and the pause after it
+        // are most of the time Sachiel is not winding up; held to them the jab came a quarter as often as it was rolled.
+        if(RECOVERY_JAB_R64&&actor.isStrikeActive()&&blowAge>=READ_FROM_R63&&target instanceof EvaUnit01Entity unit&&slowR63(unit)
+                &&range<THREAT_SLOW_R63&&!CombatFeelR31.hitPaused(actor))
+        {
+            int roll=jabRoll>=0?jabRoll:rollR63();jabRoll=roll;
+            if(roll<COUNTER_R63&&actor.hasLineOfSight(target)&&actor.jabOutOfRecoveryR64(target))
+            {
+                int age=blowAge;blowAge=-1;jabRoll=-1;toldR63(range,age,unit,roll,"jab out of its own recovery (strike)");
+                choice++;wasStriking=true;stop();return;
+            }
+        }
         if(actor.isStrikeActive()) {wasStriking=true;stop();return;}
         if(wasStriking){wasStriking=false;regroup=actor.lastStrikeConnectedR36()?9:16;}
         if(CombatFeelR31.restrained(actor)||CombatFeelR31.hitPaused(actor)||EvaCombatR31.holds(actor)){stop();return;}
@@ -143,6 +161,12 @@ public final class SachielTacticsR36 extends Goal
                     if(facing&&actor.strikeReadyR34()&&actor.hasLineOfSight(target)&&actor.beginStrike(target,SachielStrike.JAB))
                     {
                         blowAge=-1;jabRoll=-1;toldR63(range,age,unit,roll,"jab");
+                        choice++;wasStriking=true;stop();return;
+                    }
+                    // R64: or out of the pause after a strike of its own.
+                    if(RECOVERY_JAB_R64&&facing&&actor.hasLineOfSight(target)&&actor.jabOutOfRecoveryR64(target))
+                    {
+                        blowAge=-1;jabRoll=-1;toldR63(range,age,unit,roll,"jab out of its own recovery (pause)");
                         choice++;wasStriking=true;stop();return;
                     }
                     // The arm is still coming back from a strike of its own: the jab waits for it, on the same

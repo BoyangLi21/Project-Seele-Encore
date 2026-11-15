@@ -113,6 +113,27 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
         if(from!=null)entityData.set(STRIKE_FROM,from);
         return true;
     }
+    /**
+     * R64: the jab that gets in ahead of a Unit's heavy blow does not wait for Sachiel's own recovery. It comes
+     * out of the rest of a strike that has been thrown (after its contact; not out of a jab) or out of the pause
+     * that follows one. Sachiel is in one or the other nearly all the time it is not winding up: asked for a jab
+     * at every heavy blow it threw 10 of 17, and with the dice as they are 2 of the 8 it rolled.
+     */
+    public boolean jabOutOfRecoveryR64(LivingEntity target)
+    {
+        if(level().isClientSide||isFirstBattleActive()||!target.isAlive()||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
+        if(isStrikeActive())
+        {
+            // Still to be thrown, or being thrown: that is no recovery.
+            if(strikeMode()==SachielStrike.JAB||entityData.get(STRIKE_AGE)<=SachielStrike.contactEnd(strikeMode()))return false;
+        }
+        else if(meleeRecovery<=0)return false;
+        var from=BREAK_SMOOTH_R63&&SachielGameplayMotionR32.phrases()?EvaShutdownR30.encode(SachielBodyPoseR35.sample(this,0)):null;
+        entityData.set(STRIKE_AGE,-1);strikeTarget=null;strikeHit=false;meleeRecovery=0;
+        if(!beginStrike(target,SachielStrike.JAB))return false;
+        if(from!=null)entityData.set(STRIKE_FROM,from);
+        return true;
+    }
     public boolean beginStrike(LivingEntity target,int mode)
     {
         if(level().isClientSide||isStrikeActive()||isFirstBattleActive()||!target.isAlive()||meleeRecovery>0||CombatFeelR31.restrained(this)||EvaCombatR31.holds(this))return false;
