@@ -275,7 +275,13 @@ def plan_lot(cx, cz, w, special=None):
             if e <= 3:
                 cells[x, Y, z] = M('polished_andesite') if e == 3 else M('smooth_stone')
     posts = city_posts(w, x0, z0, x0 + 2 * HALF, z0 + 2 * HALF)
-    clear = lambda x, z: all(max(abs(x - px), abs(z - pz)) > 3 for px, pz in posts)
+    # a road that cuts into the lot (the east edge road, a ramp) keeps its lane: no tree, lamp or canopy
+    # within 2 cells of it, and nothing at all is planned on its columns
+    # (asphalt only: TrafficCraft concrete is the city's own kerb and sidewalk round every lot)
+    road = {(x, z) for x in range(x0 + 1, x0 + 2 * HALF) for z in range(z0 + 1, z0 + 2 * HALF)
+            if 'asphalt' in (w.get(x, Y, z) or '')}
+    clear = lambda x, z: (all(max(abs(x - px), abs(z - pz)) > 3 for px, pz in posts)
+                          and all(max(abs(x - rx), abs(z - rz)) > 2 for rx, rz in road))
     spots = []
     for i, t in enumerate(range(6, 2 * HALF - 5, 7)):
         spots += [(x0 + t, z0 + 2, i), (x0 + t, z0 + 2 * HALF - 2, i + 1), (x0 + 2, z0 + t, i + 1), (x0 + 2 * HALF - 2, z0 + t, i)]
@@ -309,6 +315,15 @@ def plan_lot(cx, cz, w, special=None):
             cells[ix0 + px + lx, Y + ly, iz0 + pz + lz] = s
         report.append(dict(parcel=[ix0 + px, iz0 + pz, pw, pd], kind=kind, palette=m.pal['name'],
                            height=max((ly for (_, ly, _) in m.v), default=0)))
+    on_road = [k for k in cells if (k[0], k[2]) in road]
+    # a tree whose trunk stands on the road goes whole, so no crown is left hanging
+    for x, z in {(k[0], k[2]) for k in on_road if '_log' in cells[k]}:
+        on_road += [k for k in cells if '_leaves' in cells[k] and k[1] > Y + 2
+                    and max(abs(k[0] - x), abs(k[2] - z)) <= 2 and k not in on_road]
+    for k in set(on_road):
+        del cells[k]
+    if any(k[1] > Y for k in on_road):
+        report.append(dict(road_cells_dropped=sum(1 for k in on_road if k[1] > Y)))
     return cells, report
 
 
@@ -332,7 +347,7 @@ def main(sel, out, lots_file='E:/eva-map-buildings/plans/m5-lots.json'):
         want = {tuple(int(v) for v in p.split(',')) for p in sel.split(';')}
         chosen = [l for l in lots if (l['cx'], l['cz']) in want]
     specials = specials_for([l for l in lots if candidate(l)] + [l for l in chosen if not candidate(l)])
-    rows, refused, report = [], Counter(), []
+    rows, refused, report, refused_at = [], Counter(), [], []
     for l in chosen:
         cx, cz = l['cx'], l['cz']
         cells, rep = plan_lot(cx, cz, w, specials.get((cx, cz)))
@@ -351,6 +366,7 @@ def main(sel, out, lots_file='E:/eva-map-buildings/plans/m5-lots.json'):
                 continue
             if not writable(cur, y, x, z, box):
                 refused['occupied'] += 1
+                refused_at.append([x, y, z, cur, want])
                 continue
             try:
                 for g in gs:
@@ -364,10 +380,11 @@ def main(sel, out, lots_file='E:/eva-map-buildings/plans/m5-lots.json'):
             rows.append([x, y, z, cur, want])
             lot_rows += 1
         report.append(dict(lot=[cx, cz], rows=lot_rows, parcels=rep, special=specials.get((cx, cz))))
-        print(cx, cz, lot_rows, [(p['kind'], p['palette'], p['height']) for p in rep])
+        print(cx, cz, lot_rows, [(p['kind'], p['palette'], p['height']) if 'kind' in p else p for p in rep])
     Path(out).mkdir(parents=True, exist_ok=True)
     (Path(out) / 'rows.json').write_text(json.dumps(rows), 'utf8')
     (Path(out) / 'report.json').write_text(json.dumps(report, indent=1), 'utf8')
+    (Path(out) / 'refused.json').write_text(json.dumps(refused_at), 'utf8')
     print('lots', len(chosen), 'rows', len(rows), 'refused', dict(refused))
 
 
