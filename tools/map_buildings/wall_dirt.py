@@ -1,12 +1,13 @@
-"""Face bare earth beside a retaining wall or a house cut with masonry.
+"""Face the bare earth of a cut hillside (house plots dug into a slope) with masonry.
 
 wall_dirt.py <x0,z0,x1,z1> <y0,y1> <out>
 
-Every dirt cell in the box with open air on a horizontal side is a bare earth face (a hill cut off
-beside a house, a terrace edge). It becomes stone bricks, the masonry of a Japanese retaining wall
-(kenchi-ishi), with a mossy brick here and there. Grass tops stay: only the exposed dirt below them
-changes, so the slope keeps its green edge. Cells inside a writer protection or with a block entity
-are refused.
+A cut face is a column run, at least 4 high, of solid cells each with open air on a horizontal side:
+the vertical stone face of a dug plot with its dirt cap, or a trench beside a house. Dirt in such a
+run becomes stone bricks, the masonry of a Japanese retaining wall (kenchi-ishi), with a mossy brick
+here and there. One- to three-high grass terrace steps on the natural slope are not cuts and stay;
+grass tops stay too, so every wall keeps its green lip. Cells inside a writer protection or with a
+block entity are refused.
 """
 import json, sys
 from collections import Counter
@@ -18,17 +19,35 @@ from city_restyle import M, h
 from float_fix import guards
 
 SIDES = ((1, 0), (-1, 0), (0, 1), (0, -1))
+MIN_CUT = 4
 
 
-def bare(w, x, y, z):
+def exposed(w, x, y, z):
     s = w.get(x, y, z) or ''
-    if 'dirt' not in s or 'grass' in s:
-        return False
+    if not s or is_open(s) or 'leaves' in s or 'log' in s:
+        return None
     for dx, dz in SIDES:
         t = w.get(x + dx, y, z + dz)
         if t is not None and is_open(t):
-            return True
-    return False
+            return s
+    return None
+
+
+def cut_dirt(w, x, z, y0, y1):
+    """Dirt cells of this column that sit in an exposed run at least MIN_CUT high."""
+    col = [exposed(w, x, y, z) for y in range(y0, y1 + 1)]
+    out, i = [], 0
+    while i < len(col):
+        if col[i] is None:
+            i += 1
+            continue
+        j = i
+        while j < len(col) and col[j] is not None:
+            j += 1
+        if j - i >= MIN_CUT:
+            out += [y0 + k for k in range(i, j) if 'dirt' in col[k] and 'grass' not in col[k]]
+        i = j
+    return out
 
 
 def main(box, ys, out):
@@ -38,9 +57,7 @@ def main(box, ys, out):
     rows, refused = [], Counter()
     for x in range(x0, x1 + 1):
         for z in range(z0, z1 + 1):
-            for y in range(ys[0], ys[1] + 1):
-                if not bare(w, x, y, z):
-                    continue
+            for y in cut_dirt(w, x, z, ys[0], ys[1]):
                 want = M('mossy_stone_bricks') if h('moss', x, y, z) % 6 == 0 else M('stone_bricks')
                 try:
                     for g in gs:
