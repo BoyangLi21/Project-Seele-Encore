@@ -14,7 +14,8 @@ public final class HeadsetSoundsR64
     // (VenueReverbR61 low-passes and wets them), as from hills and towers at different ranges.
     private static final int[] ECHO_DELAY_TICKS = {9, 18, 32};
     private static final float[] ECHO_GAIN = {.50F, .35F, .22F};
-    private static final float ECHO_PITCH = .94F;
+    /** Echoes at the shot's own pitch: detuned takes clashed with its tail (owner, preview 3b). */
+    private static final float ECHO_PITCH = 1F;
 
     private HeadsetSoundsR64() {}
 
