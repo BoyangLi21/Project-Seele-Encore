@@ -19,7 +19,7 @@ from mca import REGION, World
 from blocks import is_open
 from city_restyle import (Model, office, apartments, mixed, lowrise, vsign, floor_ring, lit, roof_plant,
                           M, SLAB, h, AIR, SIGN_FACES)
-from city_infill import tree, lamp, city_posts, Y
+from city_infill import tree, lamp, city_posts, Y, SUMMER_TREES, species, crown
 from float_fix import guards
 
 HALF, IN = 16, 4                      # lot half size; buildings start 4 in from the lot edge
@@ -150,33 +150,29 @@ def shrine(m):
         m.put(x, 1, z, M('stone_bricks'))
         m.put(x, 2, z, M('lantern[hanging=false,waterlogged=false]'))
     for x, z in ((0, m.D - 1), (m.W - 1, m.D - 1), (0, 1), (m.W - 1, 1)):
-        trunk(m, x, z, 'oak' if (x + z) % 2 else 'cherry')
+        trunk(m, x, z, 'camphor' if (x + z) % 2 else 'dark_oak')
 
 
 def trunk(m, x, z, kind, H=4):
-    log, leaf = M(kind + '_log[axis=y]'), M(kind + '_leaves[distance=1,persistent=true,waterlogged=false]')
+    log, leaf, flat = species(kind)
     for y in range(1, H + 1):
         m.put(x, y, z, log)
-    for dy in (H, H + 1, H + 2):
-        r = 2 if dy < H + 2 else 1
-        for dx in range(-r, r + 1):
-            for dz in range(-r, r + 1):
-                if (dx, dz) != (0, 0) or dy > H:
-                    if abs(dx) + abs(dz) <= r + 1 and (x + dx, dy, z + dz) not in m.v:
-                        m.put(x + dx, dy, z + dz, leaf)
+    for dx, dy, dz in crown(flat):
+        if (x + dx, H + dy, z + dz) not in m.v:
+            m.put(x + dx, H + dy, z + dz, leaf)
 
 
 def park(m, seed):
-    """Grass, a looping path, trees of three kinds, benches and a small lit pavilion."""
+    """Grass, a looping path, summer trees, benches and a small lit pavilion."""
     m.fill(0, 0, M('grass_block[snowy=false]'))
     for x, z, u, c in m.ring(2):
         m.put(x, 0, z, M('smooth_stone'))
     for i in range(m.W):
         m.put(i, 0, m.D // 2, M('smooth_stone'))
-    kinds = ('oak', 'birch', 'cherry')
+    kinds = SUMMER_TREES
     for n, (x, z) in enumerate(((5, 5), (m.W - 6, 5), (5, m.D - 6), (m.W - 6, m.D - 6), (m.W // 2, 5), (m.W // 2, m.D - 6))):
         if 0 < x < m.W - 1 and 0 < z < m.D - 1:
-            trunk(m, x, z, kinds[h(seed, n) % 3], 4 + h(seed, 'h', n) % 2)
+            trunk(m, x, z, kinds[h(seed, n) % len(kinds)], 4 + h(seed, 'h', n) % 2)
     for x in range(4, m.W - 4, 4):
         m.put(x, 1, m.D // 2 + 1, M('spruce_stairs[facing=north,half=bottom,shape=straight,waterlogged=false]'))
     if m.W >= 15:
@@ -193,7 +189,7 @@ def park(m, seed):
 
 def school(m, seed):
     """School: a four-storey classroom wing along one side, a sand sports ground with a track line,
-    cherry trees along the ground and a clock on the wing."""
+    camphor trees along the ground and a clock on the wing."""
     wing = 9
     wm = Model(m.W, wing, seed)
     H = 16
@@ -225,7 +221,7 @@ def school(m, seed):
             if 0.82 <= d <= 1.0:
                 m.put(x, 0, z, M('white_concrete'))
     for x in range(2, m.W - 1, 5):
-        trunk(m, x, m.D - 1, 'cherry')
+        trunk(m, x, m.D - 1, 'camphor')
 
 
 # --- one lot -------------------------------------------------------------------------------------
@@ -285,7 +281,7 @@ def plan_lot(cx, cz, w, special=None):
         spots += [(x0 + t, z0 + 2, i), (x0 + t, z0 + 2 * HALF - 2, i + 1), (x0 + 2, z0 + t, i + 1), (x0 + 2 * HALF - 2, z0 + t, i)]
     for x, z, i in spots:
         if clear(x, z):
-            (tree(cells, x, z, ('birch', 'oak', 'cherry')[h(seed, 'tk') % 3]) if i % 2 == 0 else lamp(cells, x, z))
+            (tree(cells, x, z, SUMMER_TREES[h(seed, 'tk') % len(SUMMER_TREES)]) if i % 2 == 0 else lamp(cells, x, z))
     ix0, iz0 = x0 + IN, z0 + IN
     if special:
         parcels = [((0, 0, N, N), special)]
@@ -335,7 +331,7 @@ def main(sel, out, lots_file='E:/eva-map-buildings/plans/m5-lots.json'):
     else:
         want = {tuple(int(v) for v in p.split(',')) for p in sel.split(';')}
         chosen = [l for l in lots if (l['cx'], l['cz']) in want]
-    specials = specials_for(chosen)
+    specials = specials_for([l for l in lots if candidate(l)] + [l for l in chosen if not candidate(l)])
     rows, refused, report = [], Counter(), []
     for l in chosen:
         cx, cz = l['cx'], l['cz']
@@ -384,13 +380,21 @@ def candidate(l):
     return g.get('grass_block', 0) >= 800 and leaves <= 120 and road < 60
 
 
+SCHOOLS = {(-210, 180)}                # the west school, written in batch 1
+
+
 def specials_for(lots):
-    """A whole park on about one lot in eight; one school on each side of the city."""
+    """A whole park on about one lot in eight; one school on each side of the city. Called with every
+    candidate lot of the city, so batches planned one at a time agree on where the schools go."""
     out = {}
     for l in lots:
         if h('park', l['cx'], l['cz']) % 8 == 0:
             out[l['cx'], l['cz']] = 'park'
     for side in (-1, 1):
+        fixed = [s for s in SCHOOLS if (s[0] - 30) * side > 0]
+        if fixed:
+            out.update({s: 'school' for s in fixed})
+            continue
         cand = sorted((l for l in lots if (l['cx'] - 30) * side > 0 and (l['cx'], l['cz']) not in out), key=lambda l: h('school', l['cx'], l['cz']))
         if cand:
             out[cand[0]['cx'], cand[0]['cz']] = 'school'

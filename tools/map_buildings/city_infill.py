@@ -19,16 +19,40 @@ Y = 80
 POST = M('polished_basalt[axis=y]')   # the city's own street lamp: basalt post, sea lantern, slab cap
 
 
+# Tokyo-3 is in the endless summer after Second Impact: deep green trees only, never cherry.
+# 'camphor' stands in for camphor and zelkova street trees: oak trunk, jungle-leaf canopy, flat top.
+SUMMER_TREES = ('oak', 'birch', 'dark_oak', 'camphor')
+
+
+def species(kind):
+    """(log, leaves, flat top) for a tree kind; the canopy never grows wider than 2, so street trees
+    stay over the sidewalk."""
+    if kind == 'camphor':
+        return M('oak_log[axis=y]'), M('jungle_leaves[distance=1,persistent=true,waterlogged=false]'), True
+    return M(kind + '_log[axis=y]'), M(kind + '_leaves[distance=1,persistent=true,waterlogged=false]'), False
+
+
 def tree(cells, x, z, kind):
-    log, leaf = M(kind + '_log[axis=y]'), M(kind + '_leaves[distance=1,persistent=true,waterlogged=false]')
+    log, leaf, flat = species(kind)
     for y in range(Y + 1, Y + 5):
         cells[x, y, z] = log
-    for dy in (4, 5, 6):
-        r = 2 if dy < 6 else 1
-        for dx in range(-r, r + 1):
-            for dz in range(-r, r + 1):
-                if abs(dx) + abs(dz) <= r + (1 if dy == 5 else 0) and (dx, dz) != (0, 0) or dy == 6:
-                    cells.setdefault((x + dx, Y + dy, z + dz), leaf)
+    for dx, dy, dz in crown(flat):
+        cells.setdefault((x + dx, Y + 4 + dy, z + dz), leaf)
+
+
+def crown(flat):
+    """Leaf offsets from the top of the trunk: a round crown 5 wide, or a broad flat one."""
+    out = []
+    for dx in range(-2, 3):
+        for dz in range(-2, 3):
+            d = abs(dx) + abs(dz)
+            if 0 < d <= 2:
+                out.append((dx, 0, dz))                   # around the trunk top
+            if d <= 3:
+                out.append((dx, 1, dz))
+            if (d <= 3) if flat else (max(abs(dx), abs(dz)) <= 1):
+                out.append((dx, 2, dz))
+    return out
 
 
 def lamp(cells, x, z):

@@ -37,7 +37,7 @@ def h(*v):
 # Facade families, so a skyline is not one grey: warm greys, white, beige and some dark glass.
 # wall: solid facade; trim: frames and floor bands; mull: curtain-wall mullions; glass: windows.
 PALETTES = (
-    ('warm_grey', 3, dict(wall='polished_andesite', trim='light_gray_concrete', mull='smooth_stone', glass='light_blue_stained_glass', band='andesite')),
+    ('warm_grey', 3, dict(wall='polished_andesite', trim='light_gray_concrete', mull='smooth_stone', glass='light_gray_stained_glass', band='andesite')),
     ('white', 3, dict(wall='white_concrete', trim='smooth_quartz', mull='smooth_quartz', glass='light_blue_stained_glass', band='light_gray_concrete')),
     ('beige', 2, dict(wall='white_terracotta', trim='smooth_sandstone', mull='white_terracotta', glass='glass', band='smooth_sandstone')),
     ('grey', 2, dict(wall='light_gray_concrete', trim='gray_concrete', mull='light_gray_concrete', glass='light_blue_stained_glass', band='gray_concrete')),
@@ -203,9 +203,23 @@ def roof(m, H, k):
         roof_plant(m, H + 1, k, max(3, min(7, w - 4)))
 
 
+def skin(style, c, u, y, glass, mull, band, wall):
+    """One facade cell of an office floor band. Grid: curtain wall with a mullion every third cell and
+    a spandrel every fourth row. Ribbon: two rows of glass between two-row spandrels, few mullions.
+    Punched: solid wall with paired windows."""
+    if c:
+        return mull
+    if style == 1:
+        return band if y % 4 in (0, 1) else mull if u % 6 == 0 else glass
+    if style == 2:
+        return glass if u % 3 != 0 and y % 4 in (1, 2) else wall
+    return mull if u % 3 == 0 else band if y % 4 == 0 else glass
+
+
 def office(m, H, landmark=False):
     W = m.W
-    glass, mull, band = m.pal['glass'], m.pal['mull'], m.pal['band']
+    glass, mull, band, wall = m.pal['glass'], m.pal['mull'], m.pal['band'], m.pal['wall']
+    style = 0 if landmark else (0, 0, 1, 2)[h(m.seed, 'skin') % 4]   # grid, ribbon windows, punched
     lobby(m, 7, 1, M('glass'), M('black_concrete'), M('polished_andesite'))
     for x, z, u, c in m.ring(0):
         m.put(x, 8, z, M('polished_andesite'))          # canopy over the recessed lobby
@@ -223,12 +237,7 @@ def office(m, H, landmark=False):
             terrace(m, a, k, k - 1)
         for y in range(a + (1 if a > 9 else 0), b + 1):
             for x, z, u, c in m.ring(k):
-                if c or u % 3 == 0:
-                    m.put(x, y, z, mull)
-                elif y % 4 == 0:
-                    m.put(x, y, z, band)
-                else:
-                    m.put(x, y, z, glass)
+                m.put(x, y, z, skin(style, c, u, y, glass, mull, band, wall))
             if landmark and k > 1:
                 for x, z, u, c in m.ring(k - 1):
                     if not c and u % 3 == 0 and (y // 4) % 2 == 0:

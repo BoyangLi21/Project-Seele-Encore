@@ -9,7 +9,7 @@ import json, sys
 from PIL import Image, ImageDraw
 
 COLOURS = (
-    ('froglight', (250, 220, 150)), ('shroomlight', (240, 160, 80)), ('sea_lantern', (200, 230, 225)), ('lantern', (240, 200, 120)),
+    ('dark_oak_leaves', (45, 85, 35)), ('jungle_leaves', (60, 115, 40)), ('froglight', (250, 220, 150)), ('shroomlight', (240, 160, 80)), ('sea_lantern', (200, 230, 225)), ('lantern', (240, 200, 120)),
     ('light_blue_stained_glass', (150, 190, 225)), ('gray_stained_glass', (90, 100, 110)), ('white_stained_glass', (225, 235, 240)),
     ('light_gray_stained_glass', (175, 180, 185)), ('glass', (185, 215, 230)),
     ('white_concrete', (225, 228, 228)), ('smooth_quartz', (235, 230, 225)), ('light_gray_concrete', (150, 150, 145)),
