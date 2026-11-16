@@ -56,6 +56,13 @@ public final class ModBlocks
     public static final RegistryObject<Block> NERV_SHAFT_PANEL=structuralFinish("nerv_shaft_panel");
     public static final RegistryObject<Block> NERV_EXIT_APRON_SKIRT_R53=BLOCKS.register("nerv_exit_apron_skirt_r53",
             ()->new com.projectseele.world.NervExitApronSkirtR53(BlockBehaviour.Properties.copy(Blocks.REINFORCED_DEEPSLATE).noOcclusion()));
+    /** Placed and removed only by a ground hatch's own gate record; nothing else builds with it. */
+    public static final RegistryObject<Block> NERV_GROUND_HATCH=BLOCKS.register("nerv_ground_hatch",
+            ()->new com.projectseele.world.GroundHatchBlockR64(BlockBehaviour.Properties.of()
+                    .mapColor(net.minecraft.world.level.material.MapColor.GRASS).strength(-1.0F,3600000.0F)
+                    .sound(net.minecraft.world.level.block.SoundType.GRASS).noLootTable().noOcclusion()
+                    .isValidSpawn((state,level,position,type)->false)
+                    .pushReaction(net.minecraft.world.level.material.PushReaction.BLOCK)));
     public static final RegistryObject<Block> NERV_LAUNCH_ARMOR=BLOCKS.register("nerv_launch_armor",
             ()->new com.projectseele.world.LaunchArmorBlockR53(BlockBehaviour.Properties.copy(Blocks.REINFORCED_DEEPSLATE)));
     public static final RegistryObject<Block> NERV_MACHINE_EDGE=structuralFinish("nerv_machine_edge");

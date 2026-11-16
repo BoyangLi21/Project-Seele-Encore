@@ -36,7 +36,12 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
     public record Visual(UUID id,RigidTransform frame,List<FixedCell> supports){public Visual{supports=List.copyOf(supports);}}
     public record Crane(Visual visual,RigidTransform stow,double initialBottom,double stowBottom,Vec3 railAxis,double railMin,double railMax,double hoistStep,List<FixedCell> frameCells){public Crane{frameCells=List.copyOf(frameCells);}}
     public record Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports,SiloHatchMechanism.Spec siloHatch,NervHangarGateGeometryR52.Spec hangarStack)
-    {public Gate{collisionSteps=collisionSteps.stream().map(List::copyOf).toList();supports=List.copyOf(supports);}public Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports){this(resource,visual,kind,variant,stage,frame,width,height,collisionSteps,supports,null,null);}public Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports,SiloHatchMechanism.Spec siloHatch){this(resource,visual,kind,variant,stage,frame,width,height,collisionSteps,supports,siloHatch,null);}}
+    {public Gate{collisionSteps=collisionSteps.stream().map(List::copyOf).toList();supports=List.copyOf(supports);}
+        /** Whether the collision cells stand open at this door progress. A gate keeps its closed cells until it
+         * is fully open. A hatch level with open ground has a visible cover for its closed cells, which would hide
+         * the moving leaves: its cells are closed only while it is fully closed. */
+        public boolean cellsOpenAt(float progress){return siloHatch!=null&&siloHatch.groundFlush()?progress>0:progress==1;}
+        public Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports){this(resource,visual,kind,variant,stage,frame,width,height,collisionSteps,supports,null,null);}public Gate(String resource,UUID visual,GateKind kind,int variant,int stage,RigidTransform frame,float width,float height,List<List<Cell>> collisionSteps,List<FixedCell> supports,SiloHatchMechanism.Spec siloHatch){this(resource,visual,kind,variant,stage,frame,width,height,collisionSteps,supports,siloHatch,null);}}
     public record HullHandoff(List<FixedCell> supports,int lowerTicks){public HullHandoff{supports=List.copyOf(supports);require(!supports.isEmpty()&&lowerTicks>0,"Actual fallen-hull receiver required");}}
     public record UnitPlant(int variant,UUID eva,UUID plug,UUID npc,UUID seat,RigidTransform bay,RigidTransform dock,Vec3 boarding,List<Vec3> dismount,List<List<FixedCell>> bridgeStates,List<List<Cell>> lcl,Visual gantry,Crane crane,List<FixedCell> carrierSupport,int raiseTicks,RigidTransform seatFrame,List<FixedCell> chair,Vec3 phone,Vec3 standby,List<Vec3> boardPath,List<Vec3> returnPath,double boardingRadius,HullHandoff hullHandoff,List<List<Cell>> personnelDoors)
     {public UnitPlant{dismount=List.copyOf(dismount);bridgeStates=bridgeStates.stream().map(List::copyOf).toList();lcl=lcl.stream().map(List::copyOf).toList();carrierSupport=List.copyOf(carrierSupport);boardPath=List.copyOf(boardPath);returnPath=List.copyOf(returnPath);chair=List.copyOf(chair);personnelDoors=personnelDoors.stream().map(List::copyOf).toList();}}
@@ -1275,7 +1280,7 @@ public final class NervAssemblyOwnerR52 implements AssemblyOwner,NervOriginalAct
         if(gateTicks.getOrDefault(g.resource(),Long.MIN_VALUE)==l.getGameTime())return gateLeafAtRestR54(l,g,open);
         if(l.getEntity(g.visual()) instanceof NervHangarDoorEntity door){door.applyDeclaredR52(g.variant(),g.hangarStack(),open);proposed=door.proposedDeclaredProgressR52(open);}
         else {var door=(NervSiloDoorEntity)l.getEntity(g.visual());door.configureDeclaredR52(g.variant(),g.stage(),g.frame(),open,g.siloHatch());proposed=door.proposedDeclaredProgressR52(open);}
-        int completed=proposed==1?g.collisionSteps().size():0;
+        int completed=g.cellsOpenAt(proposed)?g.collisionSteps().size():0;
 
 
         var moving=new HashSet<BlockPos>();for(var step:g.collisionSteps())for(var cell:step)moving.add(cell.at());var supports=new HashSet<BlockPos>();for(var cell:g.supports())supports.add(cell.at());

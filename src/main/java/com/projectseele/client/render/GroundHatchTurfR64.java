@@ -8,6 +8,7 @@ import com.mojang.blaze3d.vertex.VertexConsumer;
 import com.projectseele.ProjectSeele;
 import com.projectseele.entity.NervSiloDoorEntity;
 import com.projectseele.entity.SiloHatchMechanism;
+import com.projectseele.registry.ModBlocks;
 import com.projectseele.world.NervSiloHatchGeometryR52;
 import net.minecraft.client.Minecraft;
 import net.minecraft.client.renderer.BiomeColors;
@@ -32,9 +33,10 @@ import java.util.Map;
 import java.util.UUID;
 
 /**
- * The ground a flush hatch carries. Closed, its leaves and collar show the grass of the terrain around them,
- * with the resource pack's own grass texture and the biome's tint; each leaf keeps its piece of ground when
- * it sinks and slides away.
+ * The ground a flush hatch carries on its leaves while it moves. Closed, the hatch is covered by blocks
+ * ({@link com.projectseele.world.GroundHatchBlockR64}) and nothing is drawn here. Once those are gone each leaf
+ * shows the same grass in the same place, with the resource pack's own texture and the biome's tint, and keeps
+ * its piece of ground while it sinks and slides away.
  */
 public final class GroundHatchTurfR64
 {
@@ -46,17 +48,17 @@ public final class GroundHatchTurfR64
     private static final double CELL = 16;
     /** The tint follows chunks that arrive later and a changed blend setting. */
     private static final int TINT_TICKS = 200;
-    /** Above the steel it lies on. The leaves' own top is 1 cm under the ground, so this is the ground's level. */
-    private static final double LEAF_LIFT = .01, COLLAR_LIFT = .004;
     private static final int STRIDE = 7;
 
     /** Where a hatch shows a top, in its own frame with the leaves closed. */
     private record Leaf(double[] box, int side, int index) {}
-    private record Layout(List<Leaf> leaves, double leafTop, List<double[]> collar, double collarTop, float[] bounds) {}
+    private record Layout(List<Leaf> leaves, double leafTop, float[] bounds) {}
     private static final class Cover
     {
         Level level;SiloHatchMechanism.Spec spec;Vec3 at;float yaw;long built;
-        Layout layout;float[][] leaves;float[] collar;
+        Layout layout;float[][] leaves;
+        /** The top of the hatch's layer of cells, in its own frame: where the cover blocks' tops are. */
+        double ground;BlockPos cell;
     }
 
     private static final Map<SiloHatchMechanism.Spec, Layout> LAYOUTS = new HashMap<>();
@@ -79,6 +81,8 @@ public final class GroundHatchTurfR64
         ResourceLocation texture = texture();
         if (texture == null) return;
         Cover cover = cover(door, spec);
+        // The cover blocks are there: they are the ground, and the leaves lie inside them.
+        if (door.level().getBlockState(cover.cell).is(ModBlocks.NERV_GROUND_HATCH.get())) return;
         if (!ShaderShadowPassR44.active() && RigidMachineryPartR44.outsideClipR60(cover.layout.bounds(),
                 RenderSystem.getProjectionMatrix(), RenderSystem.getModelViewMatrix(), poses.last().pose())) return;
         // One buffer for all of it: asking for another type in between would end this batch.
@@ -90,9 +94,8 @@ public final class GroundHatchTurfR64
             Leaf leaf = cover.layout.leaves().get(n);
             var panel = SiloHatchMechanism.panel(leaf.index(), open, spec);
             emit(out, pose, normal, cover.leaves[n], (float)(leaf.side() * (panel.x() - leaf.index() * spec.panelWidth())),
-                    (float)(cover.layout.leafTop() + LEAF_LIFT + panel.y()), light);
+                    (float)(cover.ground + panel.y()), light);
         }
-        emit(out, pose, normal, cover.collar, 0, (float)(cover.layout.collarTop() + COLLAR_LIFT), light);
     }
 
     private static void emit(VertexConsumer out, Matrix4f pose, Matrix3f normal, float[] v, float dx, float y, int light)
@@ -114,12 +117,14 @@ public final class GroundHatchTurfR64
         cover.level = level;cover.spec = spec;cover.at = door.position();cover.yaw = door.getYRot();cover.built = now;
         cover.layout = LAYOUTS.computeIfAbsent(spec, key -> layout(door.declaredGeometryR52()));
         var frame = door.actualFrameR52();
+        int layer = (int)Math.floor(cover.at.y + cover.layout.leafTop() - .5);
+        cover.cell = BlockPos.containing(cover.at.x, layer, cover.at.z);
+        cover.ground = layer + 1 - cover.at.y;
         // Texture coordinates stay small numbers wherever the hatch stands.
         double originX = Math.floor(cover.at.x / BLOCKS) * BLOCKS, originZ = Math.floor(cover.at.z / BLOCKS) * BLOCKS;
         cover.leaves = new float[cover.layout.leaves().size()][];
         for (int n = 0; n < cover.leaves.length; n++)
-            cover.leaves[n] = pieces(level, frame, List.of(cover.layout.leaves().get(n).box()), cover.layout.leafTop(), originX, originZ);
-        cover.collar = pieces(level, frame, cover.layout.collar(), cover.layout.collarTop(), originX, originZ);
+            cover.leaves[n] = pieces(level, frame, List.of(cover.layout.leaves().get(n).box()), cover.ground, originX, originZ);
         COVERS.put(door.getUUID(), cover);
         return cover;
     }
@@ -157,7 +162,7 @@ public final class GroundHatchTurfR64
         return all;
     }
 
-    /** Read from the hatch's own parts: each leaf's footprint and the collar's top faces. */
+    /** Read from the hatch's own parts: each leaf's footprint, and the collar's top faces for where the leaves end. */
     private static Layout layout(NervSiloHatchGeometryR52 geometry)
     {
         var leaves = new ArrayList<Leaf>();
@@ -211,7 +216,7 @@ public final class GroundHatchTurfR64
         var spec = geometry.spec();
         double reach = Math.max(outer, spec.caseOuterX());
         float[] bounds = {(float)-reach, (float)(-spec.maximumTier() - 1), (float)-depth, (float)reach, (float)(collarTop + 1), (float)depth};
-        return new Layout(List.copyOf(leaves), leafTop, List.copyOf(collar), collarTop, bounds);
+        return new Layout(List.copyOf(leaves), leafTop, bounds);
     }
 
     /** The pack's grass top, tiled with the terrain's four turns and mipmapped like the block atlas. */

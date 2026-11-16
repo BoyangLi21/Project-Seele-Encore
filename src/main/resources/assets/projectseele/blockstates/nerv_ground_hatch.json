@@ -1,0 +1,21 @@
+{
+  "variants": {
+    "": [
+      {
+        "model": "projectseele:block/nerv_ground_hatch"
+      },
+      {
+        "model": "projectseele:block/nerv_ground_hatch",
+        "y": 90
+      },
+      {
+        "model": "projectseele:block/nerv_ground_hatch",
+        "y": 180
+      },
+      {
+        "model": "projectseele:block/nerv_ground_hatch",
+        "y": 270
+      }
+    ]
+  }
+}

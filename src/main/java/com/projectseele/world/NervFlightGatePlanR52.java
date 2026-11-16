@@ -26,7 +26,7 @@ public final class NervFlightGatePlanR52
             if(actor instanceof NervSiloDoorEntity door){if(!door.matchesDeclaredR52(g.siloHatch()))return null;frame=door.actualFrameR52();progress=door.actualOpenProgressR52();if(!NervR50CarrierModeR53.enabled()&&!door.clearDeclaredSweepR52(l,progress,1,members,moving,supports))return null;for(var p:door.declaredGeometryR52().pieces(1))mesh.add(new Mesh(new NervRigidMeshSweepR52(p.part().xyz()),frame.compose(p.local())));}
             else if(actor instanceof NervHangarDoorEntity door){if(door.declaredStackR52()==null)return null;frame=door.actualFrameR52();progress=door.actualOpenProgressR52();if(!NervR50CarrierModeR53.enabled()&&!door.clearDeclaredSweepR52(l,progress,1,members,moving,supports))return null;for(var p:door.declaredGeometryR52().pieces(1))mesh.add(new Mesh(new NervRigidMeshSweepR52(p.part().xyz()),frame.compose(p.local())));}
             else return null;if(!NervAirTransportManifestR52.same(frame,g.frame()))return null;
-            for(var step:g.collisionSteps())for(var cell:step){var expected=progress==1?cell.open():cell.closed();if(!l.hasChunkAt(cell.at())||!NervMechanicalMaterialR53.samePhase(l.getBlockState(cell.at()),expected)||cells.putIfAbsent(cell.at(),l.getBlockState(cell.at()))!=null)return null;}
+            for(var step:g.collisionSteps())for(var cell:step){var expected=g.cellsOpenAt(progress)?cell.open():cell.closed();if(!l.hasChunkAt(cell.at())||!NervMechanicalMaterialR53.samePhase(l.getBlockState(cell.at()),expected)||cells.putIfAbsent(cell.at(),l.getBlockState(cell.at()))!=null)return null;}
             open.put(g.visual(),List.copyOf(mesh));samples.add(new Sample(g.visual(),frame,progress));
         }
         return new NervFlightGatePlanR52(l,cells,open,samples);
@@ -42,7 +42,7 @@ public final class NervFlightGatePlanR52
         if(actor instanceof NervSiloDoorEntity door){if(g.kind()!=NervAssemblyOwnerR52.GateKind.SILO||door.getVariant()!=g.variant()||door.getBulkheadStage()!=g.stage()||!door.matchesDeclaredR52(g.siloHatch()))return false;frame=door.actualFrameR52();progress=door.actualOpenProgressR52();}
         else if(actor instanceof NervHangarDoorEntity door){if(g.kind()!=NervAssemblyOwnerR52.GateKind.HANGAR||door.getVariant()!=g.variant()||!door.matchesDeclaredR52(g.hangarStack()))return false;frame=door.actualFrameR52();progress=door.actualOpenProgressR52();}
         else return false;if(!Float.isFinite(progress)||progress<0||progress>1||!NervAirTransportManifestR52.same(frame,g.frame()))return false;
-        for(var step:g.collisionSteps())for(var cell:step)if(!l.hasChunkAt(cell.at())||!NervMechanicalMaterialR53.samePhase(l.getBlockState(cell.at()),progress==1?cell.open():cell.closed()))return false;
+        for(var step:g.collisionSteps())for(var cell:step)if(!l.hasChunkAt(cell.at())||!NervMechanicalMaterialR53.samePhase(l.getBlockState(cell.at()),g.cellsOpenAt(progress)?cell.open():cell.closed()))return false;
         return true;
     }
     public boolean current(ServerLevel l)
