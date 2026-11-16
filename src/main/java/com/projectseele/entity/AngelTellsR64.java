@@ -58,7 +58,7 @@ public final class AngelTellsR64
             // Light gathers in the palm: more of it, and closer in, as the lance is about to be driven out.
             float done=age/(float)SachielStrike.windup(mode);
             double spread=2.4-1.7*done;
-            GiantParticles.send(level,LANCE,limb.x,limb.y,limb.z,4+Math.round(14*done),spread,spread,spread,.01);
+            GiantParticles.send(level,LANCE,limb.x,limb.y,limb.z,8+Math.round(28*done),spread,spread,spread,.01);
         }
     }
 
@@ -71,8 +71,8 @@ public final class AngelTellsR64
         Vec3 face=core.add(line.scale(7/length));
         boolean last=left<=20;
         // Drawn in from a wide shell to a point: the shell closes as the charge runs out.
-        double shell=last?1.2:2.5+9*Math.min(1,left/50D);
-        GiantParticles.send(level,last?READY:GATHER,face.x,face.y,face.z,last?14:6,shell,shell,shell,.01);
+        double shell=last?2.0:3+9*Math.min(1,left/50D);
+        GiantParticles.send(level,last?READY:GATHER,face.x,face.y,face.z,last?40:16,shell,shell,shell,.01);
         if(left==20||left==10||left==5)
         {
             told(level,"ramiel charge "+left+" ticks to go: light at the face toward its target "+Math.round(length)+" blocks off, crystal rings");
@@ -127,6 +127,20 @@ public final class AngelTellsR64
         GiantParticles.send(level,ParticleTypes.EXPLOSION,at.x,y+1.5,at.z,Math.round(5*strength),4*strength,.8,4*strength,0);
         GiantParticles.send(level,ParticleTypes.CLOUD,at.x,y+1,at.z,Math.round(60*strength),5*strength,1.2,5*strength,.12);
         level.playSound(null,under.above(),ModSounds.EVA_LAND.get(),SoundSource.HOSTILE,4.5F*strength,.72F);
+        streaks(level,new Vec3(at.x,y+2,at.z),new Vec3(0,1,0),Math.min(1.2F,strength));
+    }
+
+    /**
+     * The mod's own impact streaks at a point. Vanilla particles are drawn for a world of two-block bodies: a puff
+     * two blocks across is six pixels on a body seventy blocks tall seen whole, and in three captures of a body
+     * driven into a wall nothing of the chips, puffs and cloud above was to be made out. The streaks are drawn at
+     * the giants' scale. A cloud of dust at that scale needs an effect of its own and is not made here.
+     */
+    private static void streaks(ServerLevel level,Vec3 at,Vec3 direction,float strength)
+    {
+        com.projectseele.network.SeeleNetwork.CHANNEL.send(
+                net.minecraftforge.network.PacketDistributor.NEAR.with(()->new net.minecraftforge.network.PacketDistributor.TargetPoint(at.x,at.y,at.z,192,level.dimension())),
+                new com.projectseele.network.ClientboundCombatImpactR36(at,direction,strength,false));
     }
 
     /** A body pushed back by a blow meets a wall: chips of what it met, dust, the heavy impact. */
@@ -143,6 +157,7 @@ public final class AngelTellsR64
         GiantParticles.send(level,ParticleTypes.CLOUD,at.x,at.y,at.z,70,3,7,3,.15);
         level.playSound(null,BlockPos.containing(at),ModSounds.EVA_IMPACT.get(),SoundSource.HOSTILE,5F,.66F);
         level.playSound(null,BlockPos.containing(at),ModSounds.EVA_LAND.get(),SoundSource.HOSTILE,3F,.6F);
+        streaks(level,at,direction.scale(-1),1.2F);
     }
 
     private AngelTellsR64(){}
