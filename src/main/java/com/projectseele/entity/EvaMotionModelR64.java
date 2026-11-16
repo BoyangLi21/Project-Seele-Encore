@@ -54,7 +54,13 @@ public final class EvaMotionModelR64
      */
     public static final double WALK_RAMP_TICKS=5,RUN_RAMP_TICKS=10;
     /** Degrees a tick the body may turn: standing, walking, running, at the fast run (up to R63: 2.5 standing, 6 moving). */
-    public static final float TURN_STANDING=4F,TURN_WALK=9F,TURN_RUN=6F,TURN_SPRINT=3F;
+    /**
+     * (2026-11-16, after the owner's first play: walking was 9 and running 6. At nine degrees a tick the body turns
+     * half a circle in a second while a foot stands for most of one: the feet were left wherever the body had
+     * been facing, the legs crossed, and no placing of the next step can keep up with it. A body this heavy does
+     * not turn like that either. Now a walk turns 80 degrees a second, a run 60, a fast run 40.)
+     */
+    public static final float TURN_STANDING=4F,TURN_WALK=4F,TURN_RUN=3F,TURN_SPRINT=2F;
 
     /** Sideways and backward, as a share of the walking speed (up to R63: 0.7 and 0.6 of the walk or the run, whichever was held). */
     public static final double SIDE_SHARE=.45,BACK_SHARE=.6;

@@ -110,10 +110,33 @@ public final class EvaPlantedGaitR64
     private static final float TOE_OUT=3F;
     /** Going sideways the feet are set this far either side of the body (blocks) and step at least this often a second. */
     private static final double WIDE_HALF=7,SIDE_CADENCE=1.9;
+    /** Steps a second in a turn of TURN_FULL degrees a second or more (see where the cadence is set). */
+    private static final double TURN_CADENCE=2.6,TURN_FULL=80;
     /** A step backward is this long at most (blocks). */
     private static final double BACK_STEP=15;
     /** The pelvis goes this share of the way toward the bearing foot: on the spot, walking, running. */
-    private static final double SWAY_SPOT=.45,SWAY_WALK=.3,SWAY_RUN=.14;
+    private static final double SWAY_SPOT=.20,SWAY_WALK=.12,SWAY_RUN=.06;
+    /**
+     * The owner's first play of the planted model (2026-11-16): "the legs come out of line" and "the crotch swings
+     * from side to side". Neither was on the scorecard, which measured what the feet do on the ground and never
+     * how the leg between hip and foot is turned, nor how far the pelvis is carried sideways.
+     * <p>
+     * The legs: a walking Unit turns up to nine degrees a tick and a foot stands for most of a second, so a foot
+     * planted before a turn was left pointing up to 160 degrees off the body, and the knee, which is pointed
+     * halfway between foot and body, with it. A planted foot now turns on the ground with the body once it is this
+     * many degrees off it (as a foot does on its ball in a turn): the scorecard's "foot turns on the ground" was
+     * held under two degrees by never letting it.
+     * <p>
+     * The pelvis: it was carried 0.30 of the half-width of the stance toward the standing foot at a walk (1.2
+     * blocks either way, a quarter of the distance between the hips), eased in an eighth of a second. A walking
+     * body carries it about a third of that. Now 0.12 (0.20 standing, 0.06 running), eased in a fifth of a second.
+     */
+    /**
+     * (Above STEP_TURN and the toe-out, so that a foot standing through a turn on the spot is still asked to step
+     * first, as before: held at 18 it turned on the ground instead of stepping, 20 degrees at the median.)
+     */
+    private static final float TWIST_MOST=24;
+    private static final double SWAY_EASE=.20;
     /** The trunk tips this many degrees for each block a second squared it gathers, and banks as much into a turn; at most. */
     private static final float LEAN_GAIN=.045F,LEAN_MOST=7F,BANK_GAIN=.05F,BANK_MOST=9F;
     private static final float LEAN_RATE=9F;
@@ -443,6 +466,10 @@ public final class EvaPlantedGaitR64
             if(s.startAge<START_BOOST)cadence=Math.max(cadence,Mth.lerp(s.startAge/START_BOOST,START_CADENCE,cadence));
             // Sideways and backward a leg cannot take a walking step's length: more steps of less.
             cadence=Math.max(cadence,SIDE_CADENCE*s.lateral*Math.min(1,speed/10));
+            // In a turn the steps come quicker, and so shorter. A foot planted a long stride ahead is carried across
+            // the body as the body turns over it: at a walk turning 80 degrees a second the body turned 59 degrees
+            // in one step and the legs crossed. At TURN_CADENCE steps a second it turns 31 in one.
+            cadence=Math.max(cadence,TURN_CADENCE*Math.min(1,Math.abs(s.yawRate)/TURN_FULL));
             if(s.forwardSpeed<0)cadence=Math.max(cadence,-s.forwardSpeed/BACK_STEP);
             // Nor up or down a steep slope: a step of level ground's length is as much up as along on a slope of
             // one in one, further than a leg is long. More steps of less, as far as legs go quicker.
@@ -1109,7 +1136,7 @@ public final class EvaPlantedGaitR64
         double bearing=s.left.support*s.left.lat+s.right.support*s.right.lat;
         double share=s.moving?Mth.lerp(Mth.clamp((.62-s.duty)/.22,0,1),SWAY_WALK,SWAY_RUN):SWAY_SPOT;
         double swayTarget=bearing*share*s.half;
-        if(fresh)s.sway+=(swayTarget-s.sway)*(1-Math.exp(-dt/.12));
+        if(fresh)s.sway+=(swayTarget-s.sway)*(1-Math.exp(-dt/SWAY_EASE));
         // Over the body's eased place (which is the frame's own place where this is its first frame).
         double originX=s.atX,originZ=s.atZ;
         double wantX=originX+leftX(s.yaw)*s.sway,wantZ=originZ+leftZ(s.yaw)*s.sway;
@@ -1142,6 +1169,9 @@ public final class EvaPlantedGaitR64
             double hipX=hips[i].x+shiftX,hipZ=hips[i].z+shiftZ,above=hips[i].y-centre.y;
             if(f.down)
             {
+                // A planted foot turns on the ground with the body once the body has turned TWIST_MOST past it.
+                float twisted=Mth.wrapDegrees(f.yaw-s.yaw);
+                if(Math.abs(twisted)>TWIST_MOST)f.yaw=s.yaw+Math.copySign(TWIST_MOST,twisted);
                 float pitch=rolled(rig,f.x,f.y,f.z,f.yaw,f.slope,scheduled(s,f,rig,hipX,hipZ),hipX,hipZ,above,nominal);
                 ankleAt(rig,f.x,f.y,f.z,f.yaw,f.slope,pitch,anklesAt[i]);
                 f.pitch=pitch;f.drawnYaw=f.yaw;f.drawnSlope=f.slope;reaches[i]=reach(rig,anklesAt[i],hipX,hipZ,above);
@@ -1207,7 +1237,25 @@ public final class EvaPlantedGaitR64
         pelvis.setPosX(pelvis.getPosX()-local.x*16);pelvis.setPosY(pelvis.getPosY()+local.y*16);pelvis.setPosZ(pelvis.getPosZ()+local.z*16);
     }
 
+    /** Review (plantedDiagR64), twenty times a second: R64TWIST. See the hand-in of 2026-11-16 for why these three. */
+    private static final float[] twistTold=new float[2],kneeTold=new float[2];
+    private static long twistToldAt;
     private static void solve(State s,Foot[] both,GeoBone[] legs,GeoBone[] shins,GeoBone[] ankles,GeoBone[] feet,Vector3f[] hips,Vector3f[] anklesAt,Quaternionf frame,Matrix4f root)
+    {
+        solveLegs(s,both,legs,shins,ankles,feet,hips,anklesAt,frame,root);
+        long now=System.nanoTime();
+        if(DIAG&&now-twistToldAt>=50_000_000L)
+        {
+            twistToldAt=now;
+            double across=Math.hypot(hips[0].x-hips[1].x,hips[0].z-hips[1].z)*.5,feetAcross=Math.hypot(anklesAt[0].x-anklesAt[1].x,anklesAt[0].z-anklesAt[1].z)*.5;
+            ProjectSeele.LOGGER.info("R64TWIST moving {} speed {} foot {} {} down {} {} knee {} {} sway {} half {} hips {} ankles {}",s.moving,
+                    String.format(java.util.Locale.ROOT,"%.1f",s.speed),String.format(java.util.Locale.ROOT,"%.1f",twistTold[0]),String.format(java.util.Locale.ROOT,"%.1f",twistTold[1]),
+                    both[0].down,both[1].down,String.format(java.util.Locale.ROOT,"%.1f",kneeTold[0]),String.format(java.util.Locale.ROOT,"%.1f",kneeTold[1]),
+                    String.format(java.util.Locale.ROOT,"%.2f",s.sway),String.format(java.util.Locale.ROOT,"%.2f",s.half),
+                    String.format(java.util.Locale.ROOT,"%.2f",across),String.format(java.util.Locale.ROOT,"%.2f",feetAcross));
+        }
+    }
+    private static void solveLegs(State s,Foot[] both,GeoBone[] legs,GeoBone[] shins,GeoBone[] ankles,GeoBone[] feet,Vector3f[] hips,Vector3f[] anklesAt,Quaternionf frame,Matrix4f root)
     {
         float body=s.yaw*Mth.DEG_TO_RAD;
         for(int i=0;i<2;i++)
@@ -1229,6 +1277,8 @@ public final class EvaPlantedGaitR64
             if(pole.lengthSquared()<1e-4F)pole.set(ahead);
             double off=EvaRigTransforms.solveLeg(legs[i],shins[i],ankles[i],feet[i],anklesAt[i],turn,pole.normalize(),root);
             f.reachShort=Math.max(0,hips[i].distance(anklesAt[i])-s.rig.leg()*REACH);
+            twistTold[i]=Mth.wrapDegrees(f.drawnYaw-s.yaw);
+            kneeTold[i]=Mth.wrapDegrees((float)(Mth.atan2(-ahead.x,ahead.z)*Mth.RAD_TO_DEG)-s.yaw);
             if(DIAG&&off>.05)ProjectSeele.LOGGER.info("R64PLANT leg {} is {} blocks short of its foot",f.side,String.format(java.util.Locale.ROOT,"%.2f",off));
         }
     }
