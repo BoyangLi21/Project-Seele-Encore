@@ -5,8 +5,12 @@ cells, panels that stow downward under the ground instead of upward), writes its
 layer and moves the door entity with it. The runtime only accepts a door whose entity stands exactly on the
 declared frame with the declared hatch, so the three are changed together or not at all.
 
+The door's closed cells are ground hatch covers (grass on top) instead of barriers, and the frame stands 1 cm
+under the door layer's top, so that the closed door is the cover blocks alone and none of its steel shows.
+
 Run it after the block rows of the same change have been written: the new support cells must already be structural
-panels and the new door layer must already be closed. The files it replaces are copied to --out first.
+panels and the new door layer must already be closed with cover blocks. The files it replaces are copied to --out
+first. The world then needs a jar that has the cover block (projectseele:nerv_ground_hatch).
 
     python tools/lower_air_shaft_door.py --world <save> --out <new backup folder> [--door-layer 26]
 """
@@ -27,6 +31,8 @@ OWNER = 'ROOT_MECHANICAL_OWNER.json'
 REGION = 'dimensions/projectseele/geofront/region'
 ENTITIES = 'dimensions/projectseele/geofront/entities'
 SUPPORT = 'projectseele:nerv_structural_panel'
+COVER = 'projectseele:nerv_ground_hatch'
+BEAM_BOTTOM = -1.99          # with the frame 1 cm under a block top, the beam seats land on one
 
 
 def bearing_points(centre_x, centre_z, hatch, sign):
@@ -42,10 +48,10 @@ def bearing_points(centre_x, centre_z, hatch, sign):
 def plan(gate, layer):
     """The gate record for a door whose closed layer is `layer`, and its collision cells."""
     x, old_y, z = gate['frame']['position']
-    hatch = dict(gate['silo_hatch'], separation_sign=-1)
+    hatch = dict(gate['silo_hatch'], separation_sign=-1, beam_bottom=BEAM_BOTTOM)
     if hatch['opening_x'] < 64 or hatch.get('service_column_ports') or hatch.get('upright_guide_ports'):
         raise SystemExit('Only the large plain hatch of the air shaft is lowered by this tool')
-    frame_y = layer + .01
+    frame_y = round(layer - .01, 2)
     seat = frame_y + hatch['beam_bottom']
     if abs(seat - round(seat)) > 1e-9:
         raise SystemExit('The beam seats must land on a block top')
@@ -76,9 +82,10 @@ def main():
     table_path = a.world / gate['collision_steps']['cells_file']
     steps = json.loads(gzip.decompress(table_path.read_bytes()))
     new, old_y, frame_y = plan(gate, a.door_layer)
-    if abs(old_y - frame_y) < 1e-9 and gate['silo_hatch'].get('separation_sign', 1) == -1:
+    new_steps = [[dict(cell, position=[cell['position'][0], a.door_layer, cell['position'][2]], closed=COVER, open='minecraft:air')
+                  for cell in step] for step in steps]
+    if new == dict(gate, collision_steps=new['collision_steps']) and new_steps == steps:
         raise SystemExit('The door is already on this layer; nothing changed')
-    new_steps = [[dict(cell, position=[cell['position'][0], a.door_layer, cell['position'][2]]) for cell in step] for step in steps]
     packed = gzip.compress(json.dumps(new_steps, separators=(',', ':')).encode('utf-8'), mtime=0)
     new['collision_steps'] = dict(gate['collision_steps'], sha256=hashlib.sha256(packed).hexdigest())
     owner['gates'][index] = new
@@ -108,7 +115,7 @@ def main():
             raise SystemExit(f'Support cells are not structural panels yet: {wrong[:4]}')
         open_cells = [c['position'] for step in new_steps for c in step if state_at(*c['position']) != c['closed']]
         if open_cells:
-            raise SystemExit(f'{len(open_cells)} cells of the new door layer are not closed yet, first {open_cells[0]}')
+            raise SystemExit(f'{len(open_cells)} cells of the new door layer are not cover blocks yet, first {open_cells[0]}')
 
         buf = bytearray(entities.read_bytes())
         cx, cz = int(x) >> 4, int(z) >> 4
@@ -128,6 +135,7 @@ def main():
             raise SystemExit('The door entity declares another hatch than the gate record')
         door['Pos'] = nbtlib.List[nbtlib.Double]([nbtlib.Double(x), nbtlib.Double(frame_y), nbtlib.Double(z)])
         spec['SeparationSign'] = nbtlib.Int(-1)
+        spec['BeamBottom'] = nbtlib.Double(BEAM_BOTTOM)
         write_chunk(buf, slot, loc, count, root)
 
         a.out.mkdir(parents=True, exist_ok=False)
@@ -138,7 +146,7 @@ def main():
         table_path.write_bytes(packed)
         owner_path.write_bytes(json.dumps(owner, indent=1, ensure_ascii=False).replace('\n', '\r\n').encode('utf-8'))
         entities.write_bytes(buf)
-    print(json.dumps({'gate': GATE, 'frame_y': [old_y, frame_y], 'door_layer': a.door_layer,
+    print(json.dumps({'gate': GATE, 'frame_y': [old_y, frame_y], 'door_layer': a.door_layer, 'closed_cells': COVER,
                       'supports': [s['position'] for s in new['supports']], 'collision_cells': sum(len(s) for s in new_steps),
                       'collision_table_sha256': new['collision_steps']['sha256'], 'backup': str(a.out)}))
 
