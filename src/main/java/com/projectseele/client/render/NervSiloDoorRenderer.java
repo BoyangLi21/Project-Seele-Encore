@@ -49,7 +49,9 @@ public final class NervSiloDoorRenderer
         poses.pushPose();
         var spec=door.declaredSpecR52();if(spec!=null)poses.mulPose(door.actualFrameR52().rotation());
         TvFacilityMeshes.withBuffers(buffers,()->{if(spec==null)TvFacilityMeshes.shaftHatch(poses,packedLight,open);else TvFacilityMeshes.shaftHatchDeclared(poses,packedLight,open,spec,door.declaredGeometryR52());});
-        if(!door.isTvBulkhead())renderSplitLogo(poses, buffers, open,spec);
+        // A hatch lying level with open ground shows that ground and no emblem.
+        if(spec!=null&&spec.groundFlush())GroundHatchTurfR64.draw(poses,buffers,door,spec,open,packedLight);
+        else if(!door.isTvBulkhead())renderSplitLogo(poses, buffers, open,spec);
         poses.popPose();
         super.render(door, yaw, partialTick, poses, buffers, packedLight);
     }
