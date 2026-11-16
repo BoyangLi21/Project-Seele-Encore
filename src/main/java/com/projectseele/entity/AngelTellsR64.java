@@ -19,77 +19,65 @@ import org.joml.Vector3f;
  * hear when it meets the ground or a wall. Particles and sounds only, sent by the server: nothing here changes a
  * block or a number of the fight. All of it is on where the server runs the frames core (EvaCombatModelR64.angels).
  * <p>
- * Sachiel: up to M4 a strike made its first sound on the tick it could land. Now every strike is called on its
- * first tick: a light one with a short high note of its own air sound, a heavy one (overhead, lance, stomp) with a
- * long low one and with red dust at the hand or foot it is thrown with for as long as it winds up.
- * <p>
- * Ramiel: the charge draws a dotted line from the core to where the beam would land now and, in its last second,
- * a ring on the ground there, with three rising notes at 20, 10 and 5 ticks to go. The open core is ringed with
- * light that thins as the window runs out, and seals with a low note. The second blow of three on its sealed field
- * rings a warning: the third is thrown back.
+ * The owner's rule (2026-11-16): what is shown has to belong to the world of the original, not to an action game's
+ * interface. So there are no marks, lines or rings drawn for the player's benefit. Each tell is something the
+ * Angel itself does in the original:
+ * <ul>
+ * <li>Sachiel's lance is light: before it is driven out, light gathers in the palm it comes from. Its other
+ * strikes have no light; they are heard, a low note of the moving limb, on their first tick.</li>
+ * <li>Ramiel gathers light where its body faces its target before it fires, and its crystal rings higher as the
+ * charge completes. Its open core bleeds a thin ring of light that fades as it closes; its field, struck, rings.</li>
+ * <li>A giant thrown into a building or onto the ground raises a cloud of dust and debris.</li>
+ * </ul>
  */
 public final class AngelTellsR64
 {
-    private static final DustParticleOptions HEAVY=new DustParticleOptions(new Vector3f(1F,.10F,.06F),4.5F);
-    private static final DustParticleOptions AIM=new DustParticleOptions(new Vector3f(1F,.55F,.70F),3F);
-    private static final DustParticleOptions LOCKED=new DustParticleOptions(new Vector3f(1F,.95F,.95F),3.5F);
+    /** The light of Sachiel's lance, and of Ramiel's charge as it gathers and when it is about to go. */
+    private static final DustParticleOptions LANCE=new DustParticleOptions(new Vector3f(1F,.82F,.95F),4F);
+    private static final DustParticleOptions GATHER=new DustParticleOptions(new Vector3f(1F,.55F,.70F),3F);
+    private static final DustParticleOptions READY=new DustParticleOptions(new Vector3f(1F,.95F,.95F),4F);
     /** Review only: -Dprojectseele.combatDiagR64=true tells every tell (R64TELL). */
     private static final boolean DIAG=Boolean.getBoolean("projectseele.combatDiagR64");
     private static void told(ServerLevel level,String what)
     {if(DIAG)com.projectseele.ProjectSeele.LOGGER.info("R64TELL tick {} {}",level.getGameTime(),what);}
 
-    /** Sachiel, each tick of a strike. */
+    /** Sachiel, each tick of a strike's wind-up. */
     public static void strike(SachielEntity actor,int mode,int age)
     {
         if(!EvaCombatModelR64.angels()||!(actor.level() instanceof ServerLevel level)||age>SachielStrike.windup(mode))return;
-        boolean heavy=mode==SachielStrike.OVERHEAD||mode==SachielStrike.PILE||mode==SachielStrike.STOMP;
+        boolean lance=mode==SachielStrike.PILE,heavy=lance||mode==SachielStrike.OVERHEAD||mode==SachielStrike.STOMP;
         Vec3 limb=SachielStrike.sample(actor,age,1,SachielStrike.strikingLeft(mode)).hand();
         if(age==1)
         {
-            CombatFoleyR36.angelSwing(actor,limb,heavy?2.8F:1.5F,heavy?.5F:1.75F);
-            told(level,"sachiel strike "+mode+(heavy?" heavy":" light")+": called "+SachielStrike.windup(mode)+" ticks before it can land");
+            // The limb is heard as it begins to move: low and long for a heavy strike, short for the palm.
+            CombatFoleyR36.angelSwing(actor,limb,heavy?2.8F:1.5F,lance?.62F:heavy?.5F:1.2F);
+            told(level,"sachiel strike "+mode+(lance?" lance":heavy?" heavy":" light")+": called "+SachielStrike.windup(mode)+" ticks before it can land");
         }
-        if(heavy&&age%2==1)GiantParticles.send(level,HEAVY,limb.x,limb.y,limb.z,18,2.4,2.4,2.4,.02);
+        if(lance)
+        {
+            // Light gathers in the palm: more of it, and closer in, as the lance is about to be driven out.
+            float done=age/(float)SachielStrike.windup(mode);
+            double spread=2.4-1.7*done;
+            GiantParticles.send(level,LANCE,limb.x,limb.y,limb.z,4+Math.round(14*done),spread,spread,spread,.01);
+        }
     }
 
-    /** Sachiel's stomp comes down. */
-    public static void stomp(SachielEntity actor,int mode,int age)
-    {
-        if(!EvaCombatModelR64.angels()||mode!=SachielStrike.STOMP||age!=SachielStrike.contactStart(mode)||!(actor.level() instanceof ServerLevel level))return;
-        Vec3 sole=SachielStrike.sample(actor,age,1,SachielStrike.strikingLeft(mode)).hand();
-        told(level,"sachiel stomp comes down");
-        ground(level,new Vec3(sole.x,actor.getY(),sole.z),1F);
-    }
-
-    /** Ramiel, each tick of its charge: where the beam would land now. */
+    /** Ramiel, each tick of its charge: light gathers where its body faces its target. */
     public static void charge(ServerLevel level,Vec3 core,LivingEntity target,int left)
     {
         if(!EvaCombatModelR64.angels()||target==null)return;
-        Vec3 mark=target.position().add(0,target.getBbHeight()*.5,0),line=mark.subtract(core);double length=line.length();
+        Vec3 line=target.position().add(0,target.getBbHeight()*.5,0).subtract(core);double length=line.length();
         if(length<1)return;
+        Vec3 face=core.add(line.scale(7/length));
         boolean last=left<=20;
-        // A dotted line, running toward the mark; solid and white through the last second.
-        if(last||left%2==0)
-        {
-            double gap=last?4:7,run=(level.getGameTime()%4)/4D*gap;
-            for(double d=6+run;d<length;d+=gap)
-            {
-                Vec3 p=core.add(line.scale(d/length));
-                GiantParticles.send(level,last?LOCKED:AIM,p.x,p.y,p.z,3,.35,.35,.35,0);
-            }
-        }
-        if(last&&left%2==0)
-        {
-            double y=target.getY()+.3;
-            for(int i=0;i<16;i++)
-            {
-                double a=i*Math.PI/8+left*.2;
-                GiantParticles.send(level,LOCKED,target.getX()+Math.cos(a)*9,y,target.getZ()+Math.sin(a)*9,3,.3,.1,.3,0);
-            }
-        }
-        if(left==20||left==10||left==5)told(level,"ramiel charge "+left+" ticks to go: line "+Math.round(length)+" blocks, ring and note");
+        // Drawn in from a wide shell to a point: the shell closes as the charge runs out.
+        double shell=last?1.2:2.5+9*Math.min(1,left/50D);
+        GiantParticles.send(level,last?READY:GATHER,face.x,face.y,face.z,last?14:6,shell,shell,shell,.01);
         if(left==20||left==10||left==5)
-            level.playSound(null,BlockPos.containing(mark),ModSounds.CRYSTAL_HIT.get(),SoundSource.HOSTILE,3.5F,left==20?1.25F:left==10?1.55F:1.9F);
+        {
+            told(level,"ramiel charge "+left+" ticks to go: light at the face toward its target "+Math.round(length)+" blocks off, crystal rings");
+            level.playSound(null,BlockPos.containing(face),ModSounds.CRYSTAL_HIT.get(),SoundSource.HOSTILE,3.5F,left==20?1.25F:left==10?1.55F:1.9F);
+        }
     }
 
     /** Ramiel, each tick its core is open: left of total ticks of the window. */
@@ -101,7 +89,7 @@ public final class AngelTellsR64
         for(int i=0;i<points;i++)
         {
             double a=i*2*Math.PI/points+left*.3;
-            GiantParticles.send(level,ParticleTypes.END_ROD,core.x+Math.cos(a)*7,core.y+Math.sin(a*2)*1.5,core.z+Math.sin(a)*7,1,0,0,0,0);
+            GiantParticles.send(level,ParticleTypes.END_ROD,core.x+Math.cos(a)*7,core.y,core.z+Math.sin(a)*7,1,0,0,0,0);
         }
     }
     /** Ramiel's core has closed. */
@@ -111,7 +99,7 @@ public final class AngelTellsR64
         told(level,"ramiel core sealed");
         level.playSound(null,BlockPos.containing(core),ModSounds.CRYSTAL_HIT.get(),SoundSource.HOSTILE,3.5F,.42F);
     }
-    /** Ramiel's sealed field has taken the blow before the one it throws back. */
+    /** Ramiel's sealed field has taken the blow before the one it throws back: it rings, and flares toward the striker. */
     public static void fieldWarns(ServerLevel level,Vec3 core,Vec3 toward)
     {
         if(!EvaCombatModelR64.angels())return;

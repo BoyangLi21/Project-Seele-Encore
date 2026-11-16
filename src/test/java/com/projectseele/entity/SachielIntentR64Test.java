@@ -1,6 +1,6 @@
 package com.projectseele.entity;
 
-/** Sachiel's strings (R64 M5): what it throws from where, and the tempo that leaves the Unit its turn. */
+/** Sachiel's strings (R64 M5): only what it does in the original, thrown from where it would throw it. */
 public final class SachielIntentR64Test
 {
     private static void check(boolean condition,String message)
@@ -11,34 +11,39 @@ public final class SachielIntentR64Test
     public static void main(String[] args)
     {
         int strings=0;
-        for(boolean rage:new boolean[]{false,true})for(boolean low:new boolean[]{false,true})
-            for(double range=8;range<=41;range+=1.5)for(int pick=0;pick<8;pick++)
+        for(boolean low:new boolean[]{false,true})
+            for(double range=8;range<=41;range+=1.5)for(int pick=0;pick<9;pick++)
             {
-                int[] string=SachielIntentR64.string(range,low,rage,pick);strings++;
-                String at="range "+range+" pick "+pick+(rage?" enraged":"")+(low?" low":"");
+                int[] string=SachielIntentR64.string(range,low,pick);strings++;
+                String at="range "+range+" pick "+pick+(low?" low":"");
+                // Too near for the lance, a Unit on the ground is only looked at.
+                if(string==null){check(low&&range<SachielIntentR64.LANCE_MIN,at+": no string only for a fallen Unit too near for the lance");continue;}
+                for(int mode:string)if(mode==SachielStrike.PILE&&string[0]==SachielStrike.PILE)check(range>=SachielIntentR64.LANCE_MIN,at+": the lance is not begun nearer than it can land");
                 check(string.length>=1&&string.length<=3,at+": one to three strikes");
-                check(string.length<=(rage?3:2),at+": three strikes only when enraged");
-                for(int mode:string)check(mode>=SachielStrike.JAB&&mode<=SachielStrike.STOMP,at+": a strike Sachiel has");
-                // The first strike can be begun from where the string is chosen, or from a few steps in.
-                check(SachielIntentR64.reach(string[0])>=SachielIntentR64.REACH_SHOVE,at+": reach");
-                boolean stomp=false,crushing=false;
                 for(int i=0;i<string.length;i++)
                 {
-                    stomp|=string[i]==SachielStrike.STOMP;
-                    // The blow that fells a Unit ends a string: nothing is thrown at a Unit already on its way down.
-                    if(string[i]==SachielStrike.OVERHEAD||string[i]==SachielStrike.STOMP)check(i==string.length-1,at+": the crushing strike is the last");
-                    crushing|=string[i]==SachielStrike.OVERHEAD||string[i]==SachielStrike.STOMP;
+                    int mode=string[i];
+                    // The lance, the palm, the downward blow. No jab, no hook, no stomp.
+                    check(mode==SachielStrike.PILE||mode==SachielStrike.SHOVE||mode==SachielStrike.OVERHEAD,at+": a strike of Sachiel's own");
+                    // The palm seizes: it opens a string and nothing leads into it. The downward blow fells: it is thrown alone.
+                    if(mode==SachielStrike.SHOVE)check(i==0,at+": the palm opens a string");
+                    if(mode==SachielStrike.OVERHEAD)check(string.length==1,at+": the downward blow is thrown alone");
+                    // What follows the first strike is the lance.
+                    if(i>0)check(mode==SachielStrike.PILE,at+": the lance follows");
                 }
-                check(!stomp||low&&range<SachielIntentR64.REACH_STOMP,at+": the stomp is for a Unit on the ground, in reach");
-                check(!(low&&range<SachielIntentR64.REACH_STOMP)||stomp,at+": a Unit on the ground in reach is stamped on");
-                if(!low&&range>SachielIntentR64.LANCE)check(string[0]==SachielStrike.PILE,at+": beyond the hands' reach the string opens with the lance");
-                if(!low&&range<SachielIntentR64.CLOSE)check(string[0]!=SachielStrike.PILE&&string[0]!=SachielStrike.OVERHEAD,at+": close in, a string opens with a fast strike");
+                check(SachielIntentR64.reach(string[0])>=SachielIntentR64.REACH_PALM,at+": reach");
+                if(low)check(string.length==2&&string[0]==SachielStrike.PILE,at+": a Unit on the ground is given the lance twice");
+                else if(range>SachielIntentR64.LANCE)check(string[0]==SachielStrike.PILE,at+": beyond the hands' reach it is the lance");
+                else if(range<SachielIntentR64.CLOSE)check(string[0]!=SachielStrike.PILE,at+": close in, the palm or the downward blow comes first");
             }
-        check(strings>500,"strings checked");
-        // The breath is longer than any one strike, and shorter when enraged; a punish cannot follow a punish at once.
-        check(SachielIntentR64.BREATH>27&&SachielIntentR64.BREATH_RAGE<SachielIntentR64.BREATH,"breath (a jab is 27 ticks long)");
-        check(SachielIntentR64.PUNISH_EVERY>=SachielIntentR64.BREATH_RAGE,"punishes are spaced");
-        check(SachielIntentR64.NEAR<SachielIntentR64.FAR&&SachielIntentR64.FAR<SachielIntentR64.ENGAGE&&SachielIntentR64.ENGAGE<SachielIntentR64.AWAY,"ranges in order");
+        check(strings>300,"strings checked");
+        // It regards for longer than its lance takes to land (30 ticks), longer still when it has been hurt; it
+        // walks at one slow pace; seizures are spaced by more than a stare.
+        check(SachielIntentR64.STARE>30&&SachielIntentR64.STARE_HURT>SachielIntentR64.STARE,"the stare");
+        check(SachielIntentR64.SEIZE_EVERY>=SachielIntentR64.STARE,"seizures are spaced");
+        check(SachielIntentR64.STARE_IDLE<SachielIntentR64.STARE&&SachielIntentR64.STARE_IDLE>18,"an idle Unit is regarded for less, and for longer than the old pause");
+        check(SachielIntentR64.PACE>.3&&SachielIntentR64.PACE<.8,"one slow pace");
+        check(SachielIntentR64.CLOSE<SachielIntentR64.LANCE&&SachielIntentR64.LANCE<SachielIntentR64.ENGAGE&&SachielIntentR64.ENGAGE<SachielIntentR64.REACH_LANCE,"ranges in order");
         System.out.println("Sachiel intent strings: "+strings+" cases PASS");
     }
 

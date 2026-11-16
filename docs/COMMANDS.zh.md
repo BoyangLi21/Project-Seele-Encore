@@ -58,7 +58,7 @@
 | `/seele motion legacy\|planted` | 切换移动模型：`legacy` 是 R63 及以前的，`planted` 是 R64 的落脚模型（脚落地不滑，暂时只有初号机）。写进服务器的 `[eva_motion]` 配置，全服生效 |
 | `/seele motion tier A\|B\|C` | 落脚模型的步态档（初号机速度 / 步频）：A 走 32 / 1.35、跑 66 / 2.0；B 走 43 / 1.78、跑 88 / 2.68；C 走 22.6 / 1.25、跑 41.9 / 1.75 |
 | `/seele combat` | 查看 EVA 的战斗核心和顿帧方式 |
-| `/seele combat legacy\|frames` | 切换战斗核心：`legacy` 是 R63 及以前的，`frames` 是 R64 的帧表核心（每一招一条帧数据，输入有缓冲；暂时只有初号机徒手和持刀）。写进服务器的 `[eva_combat] model`，对全服生效。使徒跟着这个开关：`frames` 下萨基尔成串出招、串与串之间留一口气、每一招出手前有提示、会惩罚打空的招；拉米尔蓄力时画出落点、露核时有光环；身体撞墙砸地有碎屑和声音（不改方块） |
+| `/seele combat legacy\|frames` | 切换战斗核心：`legacy` 是 R63 及以前的，`frames` 是 R64 的帧表核心（每一招一条帧数据，输入有缓冲；暂时只有初号机徒手和持刀）。写进服务器的 `[eva_combat] model`，对全服生效。使徒跟着这个开关：`frames` 下萨基尔缓步走向机体、站定凝视、然后突然出光枪和掌击，会抓住打空的招；拉米尔开火前光聚在朝向目标的一面；身体撞墙砸地有烟尘和声音（不改方块） |
 | `/seele combat hitstop tiered\|flat` | 帧表核心下命中时的停顿：`tiered` 按招的轻重分档，`flat` 同 R63 |
 | `/seele armament deploy\|recall [rifle\|sword\|shield]` | 升起或收回武器井；不写类型时操作 128 格内最近的一座 |
 | `/seele armament status` | 最近兵装升降站的状态 |

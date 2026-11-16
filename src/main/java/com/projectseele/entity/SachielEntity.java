@@ -187,7 +187,7 @@ public class SachielEntity extends Monster implements Angel, GeoEntity, SiegeAnc
     {
         if(CombatFeelR31.hitPaused(this))return;
         int mode=strikeMode(),age=entityData.get(STRIKE_AGE)+1;entityData.set(STRIKE_AGE,age);getNavigation().stop();setDeltaMovement(getDeltaMovement().multiply(0,1,0));
-        AngelTellsR64.strike(this,mode,age);AngelTellsR64.stomp(this,mode,age);
+        AngelTellsR64.strike(this,mode,age);
         if(age<=SachielStrike.windup(mode)-4&&strikeTarget!=null&&strikeTarget.isAlive())
         {
             Vec3 to=strikeTarget.position().subtract(position());float wanted=(float)Math.toDegrees(Math.atan2(-to.x,to.z));
