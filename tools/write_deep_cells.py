@@ -209,7 +209,7 @@ def apply(a):
         from map_pipeline.lift_protection import load as lift_protection
         lift_protection(a.world).assert_positions(positions)
     from map_pipeline.launch_protection import load as launch_protection
-    launch_protection(a.world).assert_positions(positions)
+    launch_protection(a.world, allow_air_shaft=a.allow_air_shaft).assert_positions(positions)
     folder = a.world / REGION
     if given:
         # Rows that bring their own paint replace marked blocks; any other replaced block entity goes with its block.
@@ -349,6 +349,8 @@ if __name__ == '__main__':
     parser.add_argument('--allow-city-lift', action='store_true', help='only to restore the hatch cover of the city lift itself')
     parser.add_argument('--signs', type=Path, help='JSON list of {pos, front, back, color, glow}: writes only those sign block entities')
     parser.add_argument('--allow-lift-shaft', action='store_true', help='only to clear the travel space of a lift itself')
+    parser.add_argument('--allow-air-shaft', action='store_true',
+                        help='only to clear the travel space of the remote air shaft itself or to rebuild its surface door')
     parser.add_argument('--allow-block-entities', action='store_true',
                         help='let rows replace blocks that carry a block entity (chests, signs, machines) and drop that entity; off by default')
     parser.add_argument('--refresh-heightmaps', action='store_true', help='drop the stored heightmaps of touched chunks, for terrain cut or raised')
