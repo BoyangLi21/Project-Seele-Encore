@@ -2,7 +2,7 @@ import tempfile
 import unittest
 from pathlib import Path
 import numpy as np
-from map_pipeline.launch_protection import LaunchProtection
+from map_pipeline.launch_protection import LaunchProtection, airshaft_volume
 
 
 class LaunchProtectionTest(unittest.TestCase):
@@ -22,6 +22,24 @@ class LaunchProtectionTest(unittest.TestCase):
             np.savez(p, coordinates=[[-2, -1]], ranges=[0, 1], indices=[offset], before=[0], after=[1])
             with self.assertRaisesRegex(ValueError, 'support'):
                 guard.assert_delta(p)
+
+    def test_air_shaft_is_guarded_over_its_whole_flight_height(self):
+        hatch = dict(opening_x=164, opening_z=164)
+        gates = [dict(frame=dict(position=[-1120, 68.01, -720]), silo_hatch=hatch),
+                 dict(frame=dict(position=[-1120, -89.99, -720]), silo_hatch=hatch)]
+        # Between the gates only: the volume that let terrain close the shaft under its lower gate.
+        self.assertEqual(airshaft_volume(gates, []), [-1204, -93, -804, -1036, 72, -636])
+        shafts = [dict(motion='AIRCRAFT', occupancy=['space/c-33_-11_-21', 'space/c-38_9_-25']),
+                  dict(motion='GROUND_MECHANICAL', occupancy=['space/c0_-16_0', 'space/c0_12_0'])]
+        box = airshaft_volume(gates, shafts)
+        self.assertEqual(box, [-1204, -352, -804, -1036, 319, -636])
+        guard = LaunchProtection([('retained-airshaft', box)])
+        for y in (-300, -110, 0, 200):
+            with self.assertRaisesRegex(ValueError, 'retained-airshaft'):
+                guard.assert_positions([(-1120, y, -720)])
+        # Ground beside the shaft wall stays editable.
+        guard.assert_positions([(-1206, 20, -720), (-1120, 20, -634)])
+        self.assertIsNone(airshaft_volume([], shafts))
 
     def test_vertical_extent_cannot_wrap(self):
         with tempfile.TemporaryDirectory() as root:
