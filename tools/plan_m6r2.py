@@ -268,9 +268,13 @@ def cmd_roadcut(a):
     A = Area(a, x0, x1, z0, z1, margin=6, built_gap=0)
     bname = A.names[np.take_along_axis(A.box.ids, np.clip(tr.top_of(A.k == tr.BUILT, A.by) - A.by, 0, A.k.shape[0] - 1)[None], 0)[0]]
     road = (np.char.startswith(bname, 'trafficcraft:') | (np.char.find(bname, 'asphalt') >= 0)) & (tr.top_of(A.k == tr.BUILT, A.by) >= A.by)
+    # the kerb and sidewalk beside the carriageway count as road too
+    walk = np.isin(bname, ['minecraft:smooth_stone', 'minecraft:smooth_stone_slab', 'minecraft:stone_bricks', 'minecraft:polished_andesite'])         & ndimage.binary_dilation(road, iterations=3) & (tr.top_of(A.k == tr.BUILT, A.by) >= A.by)
+    if a.sidewalk:
+        road |= walk
     solidtop = tr.top_of((A.k == tr.BUILT) | (A.k == tr.SOIL), A.by)
     d, (iz, ix) = ndimage.distance_transform_edt(~road, return_indices=True)
-    road_y = solidtop[iz, ix]
+    road_y = tr.top_of(A.k == tr.BUILT, A.by)[iz, ix]  # the road surface, even under soil
     natural = ~A.built & ~A.wet & ~A.kept & A.box.loaded
     cut = natural & (d >= 1) & (d <= a.reach) & (A.ground - road_y >= a.min_h)
     cut = ndimage.binary_opening(cut, iterations=1) | (cut & ndimage.binary_dilation(cut, iterations=1))
@@ -278,11 +282,12 @@ def cmd_roadcut(a):
     # down to the road
     builttop = tr.top_of(A.k == tr.BUILT, A.by)
     hang = road & (A.ground > builttop) & ~A.kept & A.box.loaded
-    # only thin lips: at most 3 soil blocks thick and no wider than 2 columns; tunnel roofs and covered roads stay
+    # only lips: at most 6 soil blocks thick and no wider than 4 columns (a road is wider); tunnel roofs stay
     soil_n = ((A.k == tr.SOIL) & (np.arange(A.k.shape[0])[:, None, None] + A.by > builttop[None])).sum(0)
-    hang &= soil_n <= 3
-    wide = ndimage.binary_dilation(ndimage.binary_erosion(hang, iterations=1), iterations=2)
-    hang &= ~wide
+    hang &= soil_n <= a.lip_thick
+    if a.lip_narrow:
+        wide = ndimage.binary_dilation(ndimage.binary_erosion(hang, iterations=2), iterations=3)
+        hang &= ~wide
     air = A.S(tr.AIR_STATE)
     hung = 0
     for z, x in zip(*np.nonzero(hang)):
@@ -443,6 +448,71 @@ def cmd_terrace(a):
     return rows, dict(zone_columns=int(zone.sum()), paddies=n_p, paddy_columns=int(paddies.sum()), cells=len(rows)), zone, A
 
 
+def cmd_terrace2(a):
+    """Regrade an open slope into level benches (--step blocks high, from the smoothed slope, so each bench follows
+    the contour), face the risers with mossy stone, and make paddies of the bench floors with a grass bund on the
+    outer edge."""
+    X, Z = a.at
+    R = 160
+    A = Area(a, X - R, X + R, Z - R, Z + R)
+    # trees on the slope are cleared for the fields, as real terraces are
+    cand = ~A.keepout & (A.slope > .12) & (A.slope < .7) & np.isin(A.top, ['minecraft:grass_block', 'minecraft:dirt'])         & ~ndimage.binary_dilation(A.built, iterations=6)
+    cand = ndimage.binary_opening(cand, iterations=2)
+    zone = pick_zone(A, cand, (X, Z), a.cells)
+    zone = ndimage.binary_erosion(zone, iterations=1)
+    g = A.ground.astype(np.float32)
+    smooth = ndimage.gaussian_filter(g, 3)
+    step = a.step
+    bench = np.floor(smooth / step) * step
+    target = np.where(zone, bench, g)
+    # ease the zone edge back to the old ground at a slope of one
+    d_out = ndimage.distance_transform_edt(zone)
+    target = np.where(zone & (d_out <= 2), np.clip(target, g - d_out, g + d_out), target)
+    frozen = ~zone
+    A.clear_trees(zone)
+    new_ids, change = tr.apply_heights(A.box, A.ground, target, frozen, rng_seed=a.seed, cover=False)
+    A.ids = new_ids
+    t = np.round(target).astype(int)
+    # risers: a bench column with a lower neighbour; its exposed cells become mossy stone
+    pad = np.pad(t, 1, mode='edge')
+    low = np.min([pad[:-2, 1:-1], pad[2:, 1:-1], pad[1:-1, :-2], pad[1:-1, 2:]], axis=0)
+    riser = zone & (low < t)
+    stone = [A.S('minecraft:mossy_cobblestone'), A.S('minecraft:cobblestone'), A.S('minecraft:mossy_stone_bricks')]
+    for z, x in zip(*np.nonzero(riser)):
+        for y in range(int(low[z, x]) + 1, int(t[z, x])):
+            jj = y - A.by
+            if A.box.kinds[A.ids[jj, z, x]] == tr.SOIL:
+                A.ids[jj, z, x] = stone[int(hash01(A.wx[z, x], y, A.wz[z, x], 51) * 3)]
+    # paddy floors: bench columns away from the riser edge; bund = the outer row
+    # the riser top is the bund; everything behind it on the bench is paddy (the zone edge stays grass)
+    floor = zone & ~riser & ndimage.binary_erosion(zone, iterations=1)
+    lab, n = ndimage.label(floor)
+    sizes = ndimage.sum(floor, lab, range(1, n + 1)) if n else []
+    keep = np.isin(lab, 1 + np.nonzero(np.array(sizes) >= 12)[0]) if n else floor
+    paddy = keep
+    air = A.S(tr.AIR_STATE)
+    flooded = hash01(lab, 7, 52) < .25
+    nf = 0
+    for z, x in zip(*np.nonzero(paddy)):
+        j = int(t[z, x]) - A.by
+        if A.box.kinds[A.ids[j + 1, z, x]] == tr.SOFT:
+            A.ids[j + 1, z, x] = air
+        A.ids[j, z, x] = air
+        held = all(int(t[z + dz, x + dx]) >= int(t[z, x]) for dz, dx in ((1, 0), (-1, 0), (0, 1), (0, -1)))
+        if flooded[z, x] and held:
+            A.ids[j - 1, z, x] = A.S('minecraft:water[level=0]')
+            A.ids[j - 2, z, x] = A.S('minecraft:mud')
+            nf += 1
+            if A.wx[z, x] % 3 == 0 and hash01(A.wx[z, x], A.wz[z, x], 53) < .4:
+                A.ids[j - 1, z, x] = A.S('minecraft:seagrass')
+        else:
+            A.ids[j - 1, z, x] = A.S('minecraft:farmland[moisture=7]')
+            A.ids[j, z, x] = A.S(f'minecraft:wheat[age={1 + int(hash01(lab[z, x], 9, 54) * 3)}]')
+    rows = A.rows(X - R, X + R, Z - R, Z + R)
+    return rows, dict(zone_columns=int(zone.sum()), changed_columns=int(change.sum()), riser_columns=int(riser.sum()), paddy_columns=int(paddy.sum()),
+                      flooded_columns=nf, cells=len(rows)), zone, A
+
+
 def cmd_owaku(a):
     zz = np.load(a.zone)
     zx0, zz0 = (int(v) for v in zz['origin'])
@@ -482,8 +552,9 @@ def cmd_owaku(a):
             A.ids[j + dy, z, x] = A.S(n.replace('minecraft:', 'minecraft:stripped_') + '[axis=y]')
     mix_grey = [('minecraft:calcite', .24), ('minecraft:diorite', .14), ('minecraft:tuff', .2), ('minecraft:gravel', .18), ('minecraft:white_terracotta', .08),
                 ('minecraft:light_gray_terracotta', .16)]
-    mix_brown = [('minecraft:yellow_terracotta', .26), ('minecraft:terracotta', .2), ('minecraft:coarse_dirt', .24), ('minecraft:brown_terracotta', .08),
-                 ('minecraft:gravel', .22)]
+    # yellow-brown, not yellow: ochre is only a fleck; sulphur yellow stays round the vents
+    mix_brown = [('minecraft:terracotta', .22), ('minecraft:coarse_dirt', .24), ('minecraft:packed_mud', .14), ('minecraft:brown_terracotta', .1),
+                 ('minecraft:gravel', .2), ('minecraft:yellow_terracotta', .1)]
     tone = vnoise(A.wx, A.wz, 18, 42) * .7 + vnoise(A.wx, A.wz, 5, 43) * .3
     replace = np.isin(A.names, ['minecraft:grass_block', 'minecraft:dirt', 'minecraft:coarse_dirt', 'minecraft:podzol', 'minecraft:stone',
                                 'minecraft:moss_block', 'minecraft:rooted_dirt', 'minecraft:gravel', 'minecraft:andesite', 'minecraft:tuff'])
@@ -559,7 +630,7 @@ def cmd_owaku(a):
 
 def main():
     p = argparse.ArgumentParser(description=__doc__)
-    p.add_argument('mode', choices=['plantation', 'pampas', 'roadcut', 'bamboo', 'terrace', 'owaku'])
+    p.add_argument('mode', choices=['plantation', 'pampas', 'roadcut', 'bamboo', 'terrace', 'terrace2', 'owaku'])
     p.add_argument('--world', type=Path, required=True)
     p.add_argument('--mosaic', type=Path, required=True)
     p.add_argument('--out', type=Path, required=True)
@@ -567,6 +638,7 @@ def main():
     p.add_argument('--area', type=int, nargs=4)
     p.add_argument('--cells', type=int, default=30000)
     p.add_argument('--lone', type=int, default=7)
+    p.add_argument('--step', type=int, default=2, help='terrace2: bench height')
     p.add_argument('--zone', type=Path)
     p.add_argument('--core', type=int, nargs=2, default=[230, 960])
     p.add_argument('--cable-z', type=int, default=840)
@@ -574,6 +646,9 @@ def main():
     p.add_argument('--vent-gap', type=int, default=11)
     p.add_argument('--reach', type=int, default=4, help='roadcut: faces up to this far from the road')
     p.add_argument('--min-h', type=int, default=3, help='roadcut: least height above the road')
+    p.add_argument('--lip-thick', type=int, default=3, help='roadcut: thickest soil cleared off a road')
+    p.add_argument('--lip-wide-ok', dest='lip_narrow', action='store_false', help='roadcut: clear lips of any width (only where the road is known to be open)')
+    p.add_argument('--sidewalk', action='store_true', help='roadcut: count kerbs and sidewalks as road')
     p.add_argument('--keep-file', type=Path)
     p.add_argument('--seed', type=int, default=61)
     a = p.parse_args()
