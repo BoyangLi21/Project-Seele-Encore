@@ -178,6 +178,7 @@ public class ClientEvents
             RiggedAngelLayer.clearCache();
             com.projectseele.client.render.EvaFootPlacement.clear();
             LocalVisualAssetFingerprint.clearCache();
+            com.projectseele.client.render.GroundHatchTurfR64.forget();
             EvaPoseGraph.reload(resourceManager);
             EvaMotionEngineV2.reload(resourceManager);
             EvaUnit01Renderer.prewarmLocalBodyMeshes(resourceManager);

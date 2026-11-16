@@ -26,6 +26,8 @@ public final class SiloHatchMechanism
         // beam's unchanged bearing plane. It is never relocated by a hatch.
         public double serviceColumnDatumOffsetY(){return beamBottom+2.04;}
         public com.projectseele.world.RigidTransform serviceGantryRelativeFrame(){return new com.projectseele.world.RigidTransform(new net.minecraft.world.phys.Vec3(0,serviceColumnDatumOffsetY(),0),0,serviceGantryYawDegrees==180?1:0,0,serviceGantryYawDegrees==0?1:0);}
+        /** A large plain hatch whose leaves stow under its own collar lies level with open ground and carries that ground on top. */
+        public boolean groundFlush(){return separationSign<0&&openingX>=64&&!serviceColumnPorts&&!uprightGuidePorts;}
         public boolean compact(){return openingX>31&&openingX<64;}
         public double panelWidth(){return compact()?openingX/(2D*PANELS):(openingX+1D)/(2*PANELS);}
         public double pocketX(){return openingX/2D+(compact()?.15*openingX/33D:.9D);}
