@@ -230,6 +230,13 @@ def shader_payload(path):
             if replacement not in text:
                 assert text.count(original) == 1
                 patched[member] = text.replace(original, replacement)
+        # R64 V2: entities beyond the real chunks no longer show through the far view. Same file name, so
+        # oculus.properties and the pack's .zip.txt need no change.
+        depth = tool_module('shader_dh_entity_depth_v2')
+        for member, margin in depth.TARGETS.items():
+            text = patched.get(member, source.read(member).decode('utf8'))
+            if depth.patch_text(text, margin) != text:
+                patched[member] = depth.patch_text(text, margin)
         if not patched:
             return path
         output = io.BytesIO()
@@ -273,15 +280,20 @@ def sbw_server_config(text):
     return re.sub(r'(?m)^(\s*vehicle_chunk_loading\s*=\s*)true\b', r'\1false', text).encode('utf8')
 
 
-def grass_pack():
-    """The green grass-side pack, built here from its generator so the release never carries a stale copy."""
+def tool_module(name):
+    """One of the repository's tools, so a pack-time change has a single source that also runs on its own."""
     import importlib.util
-    spec = importlib.util.spec_from_file_location('gen_green_grass_side', ROOT / 'tools/gen_green_grass_side.py')
+    spec = importlib.util.spec_from_file_location(name, ROOT / 'tools' / (name + '.py'))
     module = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(module)
+    return module
+
+
+def grass_pack():
+    """The green grass-side pack, built here from its generator so the release never carries a stale copy."""
     with tempfile.TemporaryDirectory() as folder:
         target = Path(folder) / GRASS_PACK
-        module.build(target)
+        tool_module('gen_green_grass_side').build(target)
         return target.read_bytes()
 
 

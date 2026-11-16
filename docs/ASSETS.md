@@ -529,3 +529,11 @@ R60：`assets/projectseele/motion/eva_dash_r59.json` 来自 Bandai Namco Researc
 ## GeoFront 改造的布局来源（polcuenca，CC BY）
 
 GeoFront 倒挂城市的楼群布局，以及后续的湖面和螺旋路线，取自 [Evangelion Geofront](https://sketchfab.com/3d-models/evangelion-geofront-1fb54331408147c3b9fb502b6c883cb0)（作者 polcuenca，Sketchfab，2014-10-18，Creative Commons Attribution）。我们用它的网格位置转成原版方块，没有使用它的贴图。发布时在说明里署名作者并附上述链接。模型文件留在本机 `external-assets/incoming/geofront_polcuenca_20261108/`，不进仓库。做法见 [GeoFront 改造计划](GEOFRONT_REMODEL_PLAN.zh.md)。
+
+## R64 光影包 V2：远景深度测试（2026-11-16）
+
+发布的光影包 `SEELE_Local_Cavern_R53_Review_20261026.zip` 是 Complementary Unbound 的 SEELE 派生包，照 R38 的先例：保留作者的原文件和 `License.txt`，改动都在打包时由 `tools/package_r60.py` 在同名包上可复现地生成，光影 zip 不进仓库。包名不变，所以 `config/oculus.properties` 和同名 `.zip.txt` 的光影设置不用跟着改。
+
+- R63 起（`package_r60.py` 的 `SHADER_PATCHES`）：`shaders/lib/uniforms.glsl`（GeoFront 不算干旱生物群系）、`shaders/lib/seele/cavern.glsl`、`shaders/program/dh_terrain.glsl`、`shaders/program/dh_water.glsl`（附近区块还没建好网格时，远景不提前淡出）。
+- R64 起（V2，perf 的修正，主会话批准）：`shaders/program/gbuffers_entities.glsl`、`shaders/program/gbuffers_spidereyes.glsl` 在片元程序开头加一段远景深度测试（`tools/shader_dh_entity_depth_v2.py`，可单独运行，打印前后 SHA-256），实体比同一像素上的远景地形远 1 格以上就丢掉，远处建筑里的机体、发射井里的门不再隔着远景透出来。没有改别的文件，没有加入外来素材。
+- 对 R63r 包的结果：源 sha256 `2d8fe9400ede85903ffe5eaba53caae7911f500b8ff2ff8976a9948c49e811a3`，输出 `c084ade40c989f261ce9e07cda791b290e98fc83d69b36e90d95bc4530188072`；两个着色器文件和 perf 实测用的包逐字节相同。
