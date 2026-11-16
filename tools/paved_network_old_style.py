@@ -6,7 +6,7 @@ For every generated column the block on the measured top (or one above it) is re
 road; smooth stone within FOOT blocks of a carriageway makes footway (smooth stone further away is a yard or
 a plaza and stays out). Carriageway pieces smaller than MIN_PIECE columns are dropped (single slabs in
 gardens). Writes road, walk, grade2 (walking height x2 - 2) and bounds, the arrays the converter reads.
-usage: paved_network_old_style.py <capture> <out.npz> [x0 z0 x1 z1]"""
+usage: paved_network_old_style.py <capture> <out.npz> [x0 z0 x1 z1] [--highest] [--touch net.npz]"""
 import gc
 import sys
 
@@ -21,13 +21,21 @@ PAINT = ('minecraft:white_concrete',)     # old dashes: carriageway where at lea
 FOOT, MIN_PIECE = 4, 40
 AIR = ('minecraft:air', 'minecraft:cave_air')
 
-src = sys.argv[1]
+args = [a for a in sys.argv[1:] if not a.startswith('--')]
+HIGHEST = '--highest' in sys.argv
+TOUCH_NET = sys.argv[sys.argv.index('--touch') + 1] if '--touch' in sys.argv else None
+if TOUCH_NET:
+    args.remove(TOUCH_NET)
+    ROAD = ROAD + ('minecraft:gray_concrete',)
+TOUCH = 3
+SKIP_ENDS = ('_leaves', '_log', 'grass', 'fern', 'flower', 'snow', 'bush', 'vine', 'sapling', 'lantern', 'torch', 'carpet', 'button')
+src = args[0]
 cap = CapturedSurface(src, partial=True)
 cx, cz = map(int, cap.bounds[:2])
-top, full = cap.measured['top'], cap.measured['full'].astype(bool)
+top, full = cap.measured['highest' if HIGHEST else 'top'], cap.measured['full'].astype(bool)
 del cap
 H, W = top.shape
-x0, z0, x1, z1 = map(int, sys.argv[3:7]) if len(sys.argv) > 6 else (cx, cz, cx + W - 1, cz + H - 1)
+x0, z0, x1, z1 = map(int, args[2:6]) if len(args) > 5 else (cx, cz, cx + W - 1, cz + H - 1)
 road = np.zeros((H, W), bool)
 foot = np.zeros((H, W), bool)
 paint = np.zeros((H, W), bool)
@@ -49,9 +57,9 @@ for t in np.unique(tile):
         y = int(top[z, x])
         X, Z = int(x + cx), int(z + cz)
         try:
-            for yy in (y + 1, y):
+            for yy in (range(y + 2, y - 14, -1) if HIGHEST else (y + 1, y)):
                 s = cap.state(X, yy, Z)
-                if s.split('[')[0] not in AIR:
+                if s.split('[')[0] not in AIR and not (HIGHEST and s.split('[')[0].endswith(SKIP_ENDS)):
                     break
         except ValueError:
             continue
@@ -73,7 +81,16 @@ road |= paint & (around >= 3)
 lab, n = ndimage.label(road, np.ones((3, 3), int))
 sizes = ndimage.sum(road, lab, range(1, n + 1))
 road &= np.isin(lab, 1 + np.flatnonzero(sizes >= MIN_PIECE))
+if TOUCH_NET:
+    with np.load(TOUCH_NET) as f:
+        tc, tg = f['road'], f['grade2']
+        tb = f['bounds']
+    assert int(tb[0]) == cx and int(tb[1]) == cz and tc.shape == road.shape, 'touch network must share the capture grid'
+    dist, idx = ndimage.distance_transform_edt(~tc, return_indices=True)
+    meets = road & (dist <= TOUCH) & (np.abs(grade2 - tg[idx[0], idx[1]]) <= 2)
+    lab, n = ndimage.label(road, np.ones((3, 3), int))
+    road &= np.isin(lab, np.unique(lab[meets]))
 near = ndimage.binary_dilation(road, iterations=FOOT)
 walk = road | (foot & near)
-np.savez_compressed(sys.argv[2], road=road, walk=walk, grade2=grade2, bounds=np.array([cx, cz, cx + W - 1, cz + H - 1]))
+np.savez_compressed(args[1], road=road, walk=walk, grade2=grade2, bounds=np.array([cx, cz, cx + W - 1, cz + H - 1]))
 print('road columns', int(road.sum()), 'footway columns', int((walk & ~road).sum()), 'dropped road pieces', int((sizes < MIN_PIECE).sum()))
