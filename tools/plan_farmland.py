@@ -219,6 +219,28 @@ def shrine(ids, kinds, g, z, x, S, air, by):
     return (z0, z1, x0, x1)
 
 
+def shelter_ns(ids, kinds, g, z, x, S, air, by, road_east=True):
+    """Bus shelter for a north-south road: 2 wide (x) by 4 long (z) ending at (z, x), glass back on the side away from
+    the road, bench facing the road."""
+    z0, x0 = z - 3, x - 1
+    if not flat(g, z0, z, x0, x):
+        return None
+    j = int(g[z, x]) - by
+    if not clear_ok(ids, kinds, j, z0, z, x0, x, 4):
+        return None
+    back, front = (x0, x) if road_east else (x, x0)
+    for zz in range(z0, z + 1):
+        ids[j, zz, x0] = ids[j, zz, x] = S('minecraft:smooth_stone')
+        ids[j + 1, zz, back] = ids[j + 2, zz, back] = S('minecraft:glass')
+        ids[j + 3, zz, x0] = ids[j + 3, zz, x] = S('minecraft:smooth_stone_slab[type=bottom,waterlogged=false]')
+    for zz in (z0, z):
+        ids[j + 1, zz, front] = ids[j + 2, zz, front] = S('minecraft:spruce_fence[east=false,north=false,south=false,waterlogged=false,west=false]')
+    facing = 'west' if road_east else 'east'
+    for zz in range(z0 + 1, z):
+        ids[j + 1, zz, front] = S(f'minecraft:spruce_stairs[facing={facing},half=bottom,shape=straight,waterlogged=false]')
+    return (z0, z, x0, x)
+
+
 def shelter(ids, kinds, g, z, x, S, air, by, vending=False):
     """Bus shelter 4 x 2 (glass back, slab roof, bench facing south) or a vending machine (white body, lit panel)."""
     if vending:
@@ -592,12 +614,18 @@ def main():
         for _, zc, xc in sorted(cand):
             if placed:
                 break
-            for kind in ((['vending'] if vend else ['shelter', 'vending'])):
-                fz0, fz1, fx0, fx1 = (zc, zc, xc, xc) if kind == 'vending' else (zc - 1, zc, xc - 3, xc)
+            for kind in ((['vending'] if vend else ['shelter', 'shelter_ns', 'vending'])):
+                fz0, fz1, fx0, fx1 = {'vending': (zc, zc, xc, xc), 'shelter': (zc - 1, zc, xc - 3, xc), 'shelter_ns': (zc - 3, zc, xc - 1, xc)}[kind]
                 if fz0 < 0 or fx0 < 0 or fz1 >= H_ or fx1 >= W_ or not road_side[fz0:fz1 + 1, fx0:fx1 + 1].all():
                     continue
                 counts['spot_' + kind] = counts.get('spot_' + kind, 0) + 1
-                if shelter(ids, box.kinds, ground, zc, xc, S, air, by, vending=(kind == 'vending')):
+                if kind == 'shelter_ns':
+                    # bench toward the road: the road lies on the side with the smaller distance
+                    east = dist_built[zc, min(xc + 1, W_ - 1)] < dist_built[zc, max(xc - 2, 0)]
+                    built_ok = shelter_ns(ids, box.kinds, ground, zc, xc, S, air, by, road_east=bool(east))
+                else:
+                    built_ok = shelter(ids, box.kinds, ground, zc, xc, S, air, by, vending=(kind == 'vending'))
+                if built_ok:
                     counts['vending' if kind == 'vending' else 'shelters'] += 1
                     road_side[max(fz0 - 2, 0):fz1 + 3, max(fx0 - 2, 0):fx1 + 3] = False
                     placed = True

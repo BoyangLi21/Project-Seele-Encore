@@ -29,6 +29,7 @@ def main():
     p.add_argument('--out', type=Path, required=True)
     p.add_argument('--run', type=float, default=1.5)
     p.add_argument('--reach', type=int, default=10)
+    p.add_argument('--one-side', action='store_true', help='lay back only one bank of each channel (east or south)')
     p.add_argument('--keep-file', type=Path)
     p.add_argument('--seed', type=int, default=41)
     a = p.parse_args()
@@ -57,7 +58,12 @@ def main():
     dist, (iz, ix) = ndimage.distance_transform_edt(~wet, return_indices=True)
     level = fluid_top[iz, ix]
     bank = level + 1 + np.floor((dist - 1) / a.run)
-    target = np.where(inside & ~frozen & (dist <= a.reach), np.minimum(ground, bank), ground).astype(float)
+    side = np.ones(ground.shape, bool)
+    if a.one_side:
+        # lay back only the bank on the east or south of each channel; the other side keeps its edge
+        zz_, xx_ = np.mgrid[0:ground.shape[0], 0:ground.shape[1]]
+        side = ((xx_ - ix) + (zz_ - iz)) > 0
+    target = np.where(inside & ~frozen & side & (dist <= a.reach), np.minimum(ground, bank), ground).astype(float)
     hard = frozen & ~wet
     if hard.any():
         dh, (hz, hx) = ndimage.distance_transform_edt(~hard, return_indices=True)
