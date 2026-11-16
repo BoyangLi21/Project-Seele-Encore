@@ -27,6 +27,13 @@ final class EvaAirDriveR59
 
     static int gather(int action){return action==EvaCombatR31.AIR_SLAM?KICK_GATHER:HAMMER_GATHER;}
 
+    /** An aerial attack has the body's speed (EvaLeapR64 leaves it alone). */
+    static boolean drives(EvaUnit01Entity e)
+    {
+        int action=EvaCombatR31.action(e);
+        return (action==EvaCombatR31.AIR_STRIKE||action==EvaCombatR31.AIR_SLAM)&&!e.onGround();
+    }
+
     static void apply(EvaUnit01Entity e)
     {
         int action=EvaCombatR31.action(e);

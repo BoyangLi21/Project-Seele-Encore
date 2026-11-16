@@ -33,6 +33,10 @@ public final class EvaMotionModelR64
     private static final EntityDataAccessor<Float> WALK_KEY=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> RUN_KEY=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     private static final EntityDataAccessor<Float> MOBILITY_KEY=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
+    /** R64: the server's [eva_motion] jumpHeight, for the side that flies a jump, which is the pilot's own (EvaLeapR64). */
+    private static final EntityDataAccessor<Float> JUMP_KEY=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
+    /** Review only: -Dprojectseele.jumpHeightR64=<blocks> stands in for the config (0: the jump as up to R63). */
+    private static final String REVIEW_JUMP=System.getProperty("projectseele.jumpHeightR64");
     /** Review only: -Dprojectseele.motionModelR64=planted and -Dprojectseele.gaitTierR64=A, B or C stand in for the config. */
     private static final String REVIEW_MODEL=System.getProperty("projectseele.motionModelR64"),REVIEW_TIER=System.getProperty("projectseele.gaitTierR64");
 
@@ -102,7 +106,7 @@ public final class EvaMotionModelR64
     public static void define(SynchedEntityData data)
     {
         data.define(MODEL,LEGACY);data.define(TIER,(byte)0);
-        data.define(WALK_KEY,1F);data.define(RUN_KEY,1F);data.define(MOBILITY_KEY,.25F);
+        data.define(WALK_KEY,1F);data.define(RUN_KEY,1F);data.define(MOBILITY_KEY,.25F);data.define(JUMP_KEY,0F);
     }
 
     /** Server, every tick: its own speed keys (as the Unit reads them) and mobility bonus, for the clients. */
@@ -135,7 +139,12 @@ public final class EvaMotionModelR64
         byte model=configuredModel(),tier=configuredTier();
         if(e.getEntityData().get(MODEL)!=model)e.getEntityData().set(MODEL,model);
         if(e.getEntityData().get(TIER)!=tier)e.getEntityData().set(TIER,tier);
+        float jump=REVIEW_JUMP!=null?Float.parseFloat(REVIEW_JUMP):SeeleConfig.COMMON_SPEC.isLoaded()?SeeleConfig.EVA_JUMP_HEIGHT.get().floatValue():0F;
+        if(e.getEntityData().get(JUMP_KEY)!=jump)e.getEntityData().set(JUMP_KEY,jump);
     }
+
+    /** Blocks a Unit of the planted model jumps (the server's); 0 for a Unit that jumps as up to R63. */
+    public static float jumpHeight(EvaUnit01Entity e){return planted(e)?e.getEntityData().get(JUMP_KEY):0F;}
 
     private static byte configuredModel()
     {

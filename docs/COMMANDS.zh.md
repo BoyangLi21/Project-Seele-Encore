@@ -56,6 +56,7 @@
 | `/seele eva reset <机体>` | 抢救用：把机体、插入栓、驾驶员复位到机库 |
 | `/seele motion` | 查看 EVA 的移动模型和步态档 |
 | `/seele motion legacy\|planted` | 切换移动模型：`legacy` 是 R63 及以前的，`planted` 是 R64 的落脚模型（脚落地不滑，暂时只有初号机）。写进服务器的 `[eva_motion]` 配置，全服生效 |
+| `/seele motion jump <0-120>` | 落脚模型的跳跃高度（格，从地面到最高点；机体高 60 格）。默认 90；`0` 用回 R63 的跳（26 格）。写进服务器的 `[eva_motion] jumpHeight` |
 | `/seele motion tier A\|B\|C` | 落脚模型的步态档（初号机速度 / 步频）：A 走 32 / 1.35、跑 66 / 2.0；B 走 43 / 1.78、跑 88 / 2.68；C 走 22.6 / 1.25、跑 41.9 / 1.75 |
 | `/seele combat` | 查看 EVA 的战斗核心和顿帧方式 |
 | `/seele combat legacy\|frames` | 切换战斗核心：`legacy` 是 R63 及以前的，`frames` 是 R64 的帧表核心（每一招一条帧数据，输入有缓冲；暂时只有初号机徒手和持刀）。写进服务器的 `[eva_combat] model`，对全服生效。使徒跟着这个开关：`frames` 下萨基尔缓步走向机体、站定凝视、然后突然出光枪和掌击，会抓住打空的招；拉米尔开火前光聚在朝向目标的一面；身体撞墙砸地有烟尘和声音（不改方块） |

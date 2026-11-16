@@ -684,6 +684,12 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     private boolean leftSwing;
     private int atRegenDelay;
     private int jumpCooldown;
+    /** R64 (EvaLeapR64): on the side that moves the body, the fastest it has fallen since it left the ground (blocks a tick) and the ticks its keys are still unheard after a hard landing; on the server, the ticks it may not strike or jump again. */
+    private double leapFallR64;
+    private int leapStunR64,leapLockR64,leapAirTicksR64;
+    /** R64 (EvaLeapR64), on the side that moves the body: where it was a tick ago, whether it is off the ground, and the speed over the ground it left with (blocks a tick). */
+    private double leapAtXR64,leapAtZR64,leapCarryR64,leapLandedAtR64;
+    private boolean leapFlyingR64;
     private int jumpBufferTicks;
     private int groundedGraceTicks;
     private int lastJumpRequestId = Integer.MIN_VALUE;
@@ -1899,7 +1905,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 this.entityData.get(DATA_JUMP_SEQUENCE) + 1);
         if(EvaGameplayMotionR32.serverMovement(this))
         {
-            Vec3 motion=this.getDeltaMovement();this.setDeltaMovement(motion.x,JUMP_VELOCITY,motion.z);
+            Vec3 motion=this.getDeltaMovement();this.setDeltaMovement(motion.x,this.jumpSpeedR64(),motion.z);
             this.setOnGround(false);this.hasImpulse=true;
         }
         this.explicitJumpInProgress = true;
@@ -4762,7 +4768,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         if(!EvaGameplayMotionR32.prepareJump(this))return false;
         if(EvaGameplayMotionR32.serverMovement(this))
         {
-            Vec3 motion=this.getDeltaMovement();this.setDeltaMovement(motion.x,JUMP_VELOCITY,motion.z);
+            Vec3 motion=this.getDeltaMovement();this.setDeltaMovement(motion.x,this.jumpSpeedR64(),motion.z);
             this.setOnGround(false);this.hasImpulse=true;
         }
         if (!EvaGameplayMotionR32.sharedJump(this)) this.triggerAnim("strike", "takeoff");
@@ -4789,6 +4795,26 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         EvaActionFoleyR61.takeoff(this);
         return true;
     }
+
+    /** R64: the speed a jump leaves the ground at: by the height set for a Unit of the planted model, as up to R63 for the rest. */
+    private double jumpSpeedR64(){return EvaLeapR64.on(this)?EvaLeapR64.launch(this):JUMP_VELOCITY;}
+
+    /** R64, server: the body has come down this hard (0 to 1). It does not strike or jump again until it has taken the landing up. */
+    void leapLandedR64(float hard)
+    {
+        this.leapLockR64=EvaLeapR64.stun(hard);
+        this.jumpCooldown=Math.max(this.jumpCooldown,this.leapLockR64);
+        this.meleeCooldown=Math.max(this.meleeCooldown,this.leapLockR64);
+        if(this.level() instanceof ServerLevel level)
+        {
+            // The ground answers: dust thrown further out than a step's, and a lower thud that carries further.
+            level.sendParticles(ParticleTypes.CLOUD,this.getX(),this.getY()+.6D,this.getZ(),Math.round(70*hard),7D,.4D,7D,.09D);
+            this.playSound(ModSounds.EVA_LAND.get(),1.9F+1.6F*hard,1F-.3F*hard);
+        }
+    }
+
+    /** R64: taking a hard landing up, on the server (no blow begins) or on the side that moves the body (it does not move off). */
+    public boolean leapLockedR64(){return this.leapLockR64>0||this.leapStunR64>0;}
 
     private boolean hasJumpSupport()
     {
@@ -6057,6 +6083,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         }
         }
         this.combatR64().told(heldR64);
+        if(this.leapLockR64>0)this.leapLockR64--;
         if (this.jumpCooldown > 0)
         {
             this.jumpCooldown--;
@@ -7979,11 +8006,64 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
         var airframe=this.getAttribute(ForgeMod.ENTITY_GRAVITY.get());
         if(airframe!=null)
         {
-            double pull=this.onGround()?AIRFRAME_GRAVITY:this.getDeltaMovement().y>0?AIR_RISE_GRAVITY:AIR_FALL_GRAVITY;
+            boolean leap=EvaLeapR64.on(this),own=this.level().isClientSide&&this.isControlledByLocalInstance();
+            // R64: what the body covered over the ground in the tick before this one.
+            double stepX=this.getX()-this.leapAtXR64,stepZ=this.getZ()-this.leapAtZR64;
+            this.leapAtXR64=this.getX();this.leapAtZR64=this.getZ();
+            // (Only a jump: a body stepping down a terraced slope is off the ground every other tick.)
+            boolean flying=leap&&!this.onGround()&&!EvaAirDriveR59.drives(this)
+                    &&(this.level().isClientSide?this.clientExplicitJumpInProgress:this.explicitJumpInProgress);
+            if(flying&&!this.leapFlyingR64)
+            {
+                // Off the ground it goes on as it was going over the ground. Vanilla leaves a body in the air only
+                // what the ground's friction left of its last step, about half: a jump from a run came down as
+                // if from a walk. (A step longer than a body can take is a body that was put there.)
+                double step=Math.hypot(stepX,stepZ);
+                if(step>EvaLeapR64.CARRY_MOST)stepX=stepZ=step=0;
+                this.leapCarryR64=step;
+                Vec3 motion=this.getDeltaMovement();
+                this.setDeltaMovement(stepX,own?motion.y/EvaLeapR64.OWN_SIDE:motion.y,stepZ);
+            }
+            else if(leap&&own&&(!this.onGround()||this.getDeltaMovement().y>0))
+            {
+                // And it gets back what aiStep took off a body its own side drives.
+                Vec3 motion=this.getDeltaMovement();
+                this.setDeltaMovement(flying?motion.x/EvaLeapR64.OWN_SIDE:motion.x,motion.y/EvaLeapR64.OWN_SIDE,flying?motion.z/EvaLeapR64.OWN_SIDE:motion.z);
+            }
+            this.leapFlyingR64=flying;
+            double rising=this.getDeltaMovement().y;
+            double pull=leap?rising>0?EvaLeapR64.RISE:this.onGround()?AIRFRAME_GRAVITY:EvaLeapR64.FALL
+                    :this.onGround()?AIRFRAME_GRAVITY:rising>0?AIR_RISE_GRAVITY:AIR_FALL_GRAVITY;
             if(airframe.getBaseValue()!=pull)airframe.setBaseValue(pull);
+            if(!this.onGround()){this.leapFallR64=Math.max(this.leapFallR64,-rising);this.leapLandedAtR64=this.getDeltaMovement().horizontalDistance();this.leapAirTicksR64++;}
         }
         EvaAirDriveR59.apply(this);
         if(!EvaImmersionR50.travel(this,input))super.travel(input);
+        if(this.leapFlyingR64&&!this.onGround())
+        {
+            // R64: in the air nothing slows it over the ground but its pilot. Vanilla's air friction is given back,
+            // and the keys add no more than the speed it left the ground with (or than AIR_OWN, for a body that
+            // left it standing).
+            Vec3 motion=this.getDeltaMovement();
+            double x=motion.x/EvaLeapR64.AIR_FRICTION,z=motion.z/EvaLeapR64.AIR_FRICTION,speed=Math.hypot(x,z),most=Math.max(this.leapCarryR64,EvaLeapR64.AIR_OWN);
+            if(speed>most){x*=most/speed;z*=most/speed;}
+            this.setDeltaMovement(x,motion.y,z);
+        }
+        if(this.onGround())
+        {
+            // R64: come down hard, the body takes the landing up before it moves off.
+            if(this.leapFallR64>0)
+            {
+                // (And a body that comes down faster over the ground than it can run does not run on: it brakes.
+                // Only out of the air, though: a fast run is off the ground for a tick at every kerb it steps
+                // down, and where the client waits for a chunk; braked there, it stopped and set off again.)
+                this.leapStunR64=!EvaLeapR64.on(this)?0:Math.max(EvaLeapR64.stun(EvaLeapR64.hard(this.leapFallR64)),
+                        this.leapAirTicksR64>=EvaLeapR64.BRAKE_AIR_TICKS&&this.leapLandedAtR64>EvaLeapR64.LAND_RUNNING?EvaLeapR64.BRAKE_TICKS:0);
+                this.leapFallR64=0;
+            }
+            else if(this.leapStunR64>0)this.leapStunR64--;
+            this.leapAirTicksR64=0;
+        }
         EvaCombatR31.approach(this);
         if (this.level().isClientSide)
         {
@@ -8007,7 +8087,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
                 && this.isControlledByLocalInstance())
         {
             Vec3 motion = this.getDeltaMovement();
-            this.setDeltaMovement(motion.x, JUMP_VELOCITY, motion.z);
+            this.setDeltaMovement(motion.x, this.jumpSpeedR64(), motion.z);
             this.hasImpulse = true;
             this.clientJumpImpulsePending = false;
             if (this.getVisualPose() == VISUAL_LIVE_JUMP)
@@ -8024,6 +8104,7 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
     {
         Vec3 wanted = this.pilotInputR58(player);
         if (wanted == null) { this.riddenInputR58 = Vec3.ZERO; return Vec3.ZERO; }
+        if(this.leapStunR64>0)wanted=Vec3.ZERO;
         // A sixty-metre body gathers into its stride and runs out of it: the
         // pilot's input reaches full speed over ~8 ticks and lets go over ~6,
         // where vanilla friction alone gave 3. The gait blend (6 ticks) now
@@ -8040,6 +8121,8 @@ public class EvaUnit01Entity extends PathfinderMob implements GeoEntity, FirstBa
             }
             // R64 (M1): to full speed and back in a set time, along the line from what is held to what is asked.
             double most=1D/(this.isPilotSprinting()?EvaMotionModelR64.RUN_RAMP_TICKS:EvaMotionModelR64.WALK_RAMP_TICKS);
+            // R64: braking out of a landing the keys are let go of in three ticks (a run's ten carried a fast run 60 blocks on).
+            if(this.leapStunR64>0)most=Math.max(most,1D/3);
             Vec3 change=wanted.subtract(held);double length=change.length();
             held=length<=most?wanted:held.add(change.scale(most/length));
             this.riddenInputR58=held;

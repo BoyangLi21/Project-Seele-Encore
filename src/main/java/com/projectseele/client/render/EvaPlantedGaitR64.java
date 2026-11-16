@@ -174,6 +174,19 @@ public final class EvaPlantedGaitR64
     private static final float SLOPE_LEAN=.35F,SLOPE_LEAN_UP=14F,SLOPE_LEAN_DOWN=6F;
     /** Landing from a fall the pelvis gives this much for each block a second over LAND_FROM, at most LAND_MOST (blocks). */
     private static final double LAND_FROM=12,LAND_GIVE=.075,LAND_MOST=5.5;
+    /**
+     * R64 (EvaLeapR64): the hardest landing lets the pelvis down this far (blocks; the hips stand 35 up), on a
+     * spring this slow (a second; the footfalls' own is DIP_RATE), and a body gathering to jump carries its hips
+     * this far back over its heels at the bottom of its squat.
+     */
+    private static final double ABSORB_MOST=12,ABSORB_RATE=5.5,SQUAT_BACK=2.5,SQUAT_EASE=.035;
+    /**
+     * R64: a body that comes down going faster over the ground than SKID_FROM of its walk slides on its feet, set
+     * as they came down, until it is slower than SKID_UNTIL of it (or for SKID_LONGEST seconds). Its feet used to
+     * be planted where it came down: from a fast run the body went on 30 blocks in the next six ticks, and with
+     * its feet left that far behind it was drawn flat on the ground until they were set anew.
+     */
+    private static final double SKID_FROM=1.3,SKID_UNTIL=.6,SKID_LONGEST=.6,SKID_AIR=.35;
     /** How far the pelvis gives at a footfall (blocks): a step on the spot, a walk, a run; and how fast it comes back (1/s). */
     private static final double DIP_SPOT=.25,DIP_WALK=.6,DIP_RUN=1.0,DIP_RATE=13;
 
@@ -240,6 +253,15 @@ public final class EvaPlantedGaitR64
         double height=Double.NaN,ground=Double.NaN,sway,fast,slow;
         float lean,leanRate,bank,bankRate;
         double lastStep,dip,dipRate;long lastSound;
+        /** R64: the rate of the pelvis' spring now (slower while a hard landing is taken up), and how far a squat lets the pelvis down. */
+        double dipStiff=DIP_RATE,squat;
+        /** R64: sliding on its feet after coming down fast, for how long, where each foot is from the body, and when dust was last thrown. */
+        boolean skidding;
+        /** When the stretch off the ground that airAt is the last frame of began. */
+        long airFrom=Long.MIN_VALUE/2;
+        double skidAge;
+        final double[] skidX=new double[2],skidZ=new double[2];
+        long skidDust;
         /** Ground heights by block column, kept a second: a footfall is chosen anew every frame of a swing. */
         final HashMap<Long,Double> columns=new HashMap<>();
         long columnsAt;
@@ -329,6 +351,7 @@ public final class EvaPlantedGaitR64
                 // Off the ground: how fast it comes down is what its legs will take up as it lands.
                 if(!eva.onGround()||eva.isVisuallyAirborneForRender())
                 {
+                    if(now-s.airAt>120_000_000L)s.airFrom=now;
                     s.fall=Math.max(s.fall,(eva.yOld-eva.getY())*20);s.airAt=now;
                 }
             }
@@ -456,6 +479,39 @@ public final class EvaPlantedGaitR64
         double sideSpeed=s.vx*lx+s.vz*lz;
         s.lateral=going>1e-3?Math.min(1,Math.abs(sideSpeed)/going):0;
         s.moving=going>MOVE_AT;
+        if(s.skidding)
+        {
+            s.skidAge+=dt;
+            if(going<EvaMotionModelR64.tier(eva).walk()*SKID_UNTIL||s.skidAge>SKID_LONGEST)s.skidding=false;
+            else
+            {
+                // The feet go with the body, set as they came down, and no step is taken.
+                Foot[] feet={s.left,s.right};
+                long nanos=AircraftRenderClockR21.frameNanos();
+                boolean dust=nanos-s.skidDust>50_000_000L&&!eva.isSilent();
+                if(dust)s.skidDust=nanos;
+                for(int i=0;i<2;i++)
+                {
+                    Foot f=feet[i];
+                    f.x=s.atX+s.skidX[i];f.z=s.atZ+s.skidZ[i];f.down=true;f.swing=0;f.quick=false;
+                    double under=column(s,eva,f.x,f.z);
+                    if(Double.isFinite(under)&&Math.abs(under-f.y)<rig.leg()*.3)f.y=under;
+                    if(!dust)continue;
+                    // What the soles tear up is thrown ahead of them.
+                    var state=eva.level().getBlockState(BlockPos.containing(f.x,f.y-.2,f.z));
+                    if(state.isAir())continue;
+                    var random=eva.getRandom();
+                    double ax=s.vx/Math.max(going,1e-3),az=s.vz/Math.max(going,1e-3);
+                    for(int k=0;k<14;k++)
+                        eva.level().addParticle(new BlockParticleOption(ParticleTypes.BLOCK,state),f.x+random.nextGaussian()*2.2,f.y+.3+random.nextDouble()*.3,
+                                f.z+random.nextGaussian()*2.2,ax*.35+random.nextGaussian()*.12,.1+random.nextDouble()*.2,az*.35+random.nextGaussian()*.12);
+                    for(int k=0;k<3;k++)
+                        eva.level().addParticle(ParticleTypes.POOF,f.x+random.nextGaussian()*2,f.y+.6,f.z+random.nextGaussian()*2,
+                                ax*.08+random.nextGaussian()*.04,random.nextDouble()*.05,az*.08+random.nextGaussian()*.04);
+                }
+                s.moving=false;s.running=false;
+            }
+        }
         // By the speed the body has, whatever gave it that speed: a pilot whose synchronisation carries the body
         // slower walks and runs in the gait of that speed.
         var gait=EvaMotionModelR64.gait(EvaMotionModelR64.tier(eva),speed);
@@ -584,7 +640,7 @@ public final class EvaPlantedGaitR64
         int steps=Math.max(1,Mth.ceil(dt/.004F));float h=dt/steps;
         for(int i=0;i<steps;i++)
         {
-            s.dipRate+=(-2*DIP_RATE*s.dipRate-DIP_RATE*DIP_RATE*s.dip)*h;s.dip+=s.dipRate*h;
+            s.dipRate+=(-2*s.dipStiff*s.dipRate-s.dipStiff*s.dipStiff*s.dip)*h;s.dip+=s.dipRate*h;
             s.leanRate+=(-2*LEAN_RATE*s.leanRate-LEAN_RATE*LEAN_RATE*(s.lean-leanTarget))*h;s.lean+=s.leanRate*h;
             s.bankRate+=(-2*LEAN_RATE*s.bankRate-LEAN_RATE*LEAN_RATE*(s.bank-bankTarget))*h;s.bank+=s.bankRate*h;
         }
@@ -739,7 +795,7 @@ public final class EvaPlantedGaitR64
         f.roll=Mth.clamp(.2*s.stanceSeconds,.05,.2);
         // The weight comes down on the foot: the pelvis gives by this much and comes back (a damped spring).
         double give=s.moving?Mth.lerp(Mth.clamp((.62-s.duty)/.32,0,1),DIP_WALK,DIP_RUN)*Mth.clamp(s.speed/20,.3,1):DIP_SPOT;
-        s.dipRate-=give*DIP_RATE*Math.E;
+        s.dipRate-=give*s.dipStiff*Math.E;
         footfall(s,eva,f,step);
     }
 
@@ -1114,7 +1170,19 @@ public final class EvaPlantedGaitR64
             }
             s.ground=sum/2;s.height=Double.NaN;s.slopeAhead=0;s.bodyGround=Double.NaN;
             // Come down from a fall: the legs take it up, the pelvis giving by how fast it fell.
-            if(now-s.airAt<400_000_000L&&s.fall>LAND_FROM)s.dipRate-=Math.min(LAND_MOST,(s.fall-LAND_FROM)*LAND_GIVE)*DIP_RATE*Math.E;
+            s.dipStiff=DIP_RATE;s.squat=0;
+            // R64: down from the air too fast over the ground for a step to catch, it slides on its feet.
+            // (Out of the air, that is: SKID_AIR seconds off the ground at least. A fast run is off it for a tick at a kerb.)
+            s.skidding=now-s.airAt<400_000_000L&&s.airAt-s.airFrom>=(long)(SKID_AIR*1e9)&&Math.hypot(s.vx,s.vz)>EvaMotionModelR64.tier(eva).walk()*SKID_FROM;s.skidAge=0;
+            s.skidX[0]=s.left.x-s.atX;s.skidZ[0]=s.left.z-s.atZ;s.skidX[1]=s.right.x-s.atX;s.skidZ[1]=s.right.z-s.atZ;
+            if(now-s.airAt<400_000_000L&&s.fall>LAND_FROM)
+            {
+                double give=Math.min(LAND_MOST,(s.fall-LAND_FROM)*LAND_GIVE);
+                // R64: a hard landing goes deeper and comes up slowly.
+                float hard=com.projectseele.entity.EvaLeapR64.on(eva)?com.projectseele.entity.EvaLeapR64.hard(s.fall/20):0;
+                give=Mth.lerp(hard,give,ABSORB_MOST);s.dipStiff=Mth.lerp(hard,DIP_RATE,ABSORB_RATE);
+                s.dipRate-=give*s.dipStiff*Math.E;
+            }
             s.fall=0;
             s.half=rig.footHalf();s.sink=.35;s.bounce=0;s.duty=SETTLE_DUTY;s.cycle=SETTLE_SWING/(1-SETTLE_DUTY);
             s.swingSeconds=SETTLE_SWING;s.stanceSeconds=s.cycle*s.duty;s.moving=false;s.speed=0;s.landPitch=0;
@@ -1159,6 +1227,19 @@ public final class EvaPlantedGaitR64
         // A run rises between its footfalls and is lowest over each foot.
         if(s.bounce>0&&s.running)nominal-=s.bounce*Math.cos(4*Math.PI*(s.phase-s.duty*.5));
         nominal+=Math.min(0,s.dip);
+        // The landing taken up, the spring is the footfalls' own again.
+        if(fresh&&s.dipStiff<DIP_RATE&&s.dip>-.3&&Math.abs(s.dipRate)<2)s.dipStiff=Math.min(DIP_RATE,s.dipStiff+dt*20);
+        // R64: gathering to jump, the pelvis is let down over the planted feet and driven up again, the hips back over the heels.
+        float gather=com.projectseele.entity.EvaLeapR64.on(eva)?com.projectseele.entity.EvaGameplayMotionR32.takeoffProgressR64(eva,partial):-1;
+        double depth=Mth.lerp(Mth.clamp(s.speed/EvaMotionModelR64.tier(eva).run(),0,1),com.projectseele.entity.EvaLeapR64.SQUAT_STANDING,com.projectseele.entity.EvaLeapR64.SQUAT_RUNNING);
+        double squatTarget=depth*com.projectseele.entity.EvaLeapR64.squat(gather);
+        if(fresh)s.squat+=(squatTarget-s.squat)*(1-Math.exp(-dt/SQUAT_EASE));
+        if(s.squat>1e-3)
+        {
+            nominal-=s.squat;
+            double back=SQUAT_BACK*s.squat/com.projectseele.entity.EvaLeapR64.SQUAT_STANDING*(1-Mth.clamp(s.speed/EvaMotionModelR64.tier(eva).walk(),0,1));
+            shiftX+=Mth.sin(s.yaw*Mth.DEG_TO_RAD)*back;shiftZ-=Mth.cos(s.yaw*Mth.DEG_TO_RAD)*back;
+        }
 
         // The feet: where each ankle is and how the foot lies.
         Vector3f[] anklesAt={new Vector3f(),new Vector3f()};

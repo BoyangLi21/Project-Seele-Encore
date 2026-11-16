@@ -96,7 +96,7 @@ public final class EvaCombatMachineR64
         if(pilot==null||e.isPilotControlLocked()||CombatFeelR31.restrained(e))return;
         if(row==null)
         {
-            if(button<0||!owns()||e.hasLiveActionForRender(0))return;
+            if(button<0||!owns()||e.hasLiveActionForRender(0)||e.leapLockedR64())return;
             Row next=sinceEnd<=LINK&&last!=null?follow(last,button):null;
             if(next==null)next=EvaMoveTableR64.opener(e.getWeapon(),button==HEAVY,sinceEvade<=AFTER_EVADE);
             if(next!=null&&ready(next))start(next,"standing");

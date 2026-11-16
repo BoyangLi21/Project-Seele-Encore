@@ -55,6 +55,7 @@ public final class SeeleConfig
     // ----- common: EVA movement model (R64, M1) -----
     public static final ForgeConfigSpec.ConfigValue<String> EVA_MOTION_MODEL;
     public static final ForgeConfigSpec.ConfigValue<String> EVA_GAIT_TIER;
+    public static final ForgeConfigSpec.DoubleValue EVA_JUMP_HEIGHT;
     public static final ForgeConfigSpec.ConfigValue<String> EVA_COMBAT_MODEL;
     public static final ForgeConfigSpec.ConfigValue<String> EVA_HIT_STOP;
     public static final ForgeConfigSpec.DoubleValue EVA_RIFLE_DAMAGE;
@@ -265,6 +266,11 @@ public final class SeeleConfig
                         "C: walk 22.6 at 1.25, run 41.9 at 1.75 (the speeds up to R63, in small steps).",
                         "The fast run is 189 at 3.8 in all three. Up to R63: walk 22.6 at 1.78, run 41.9 at 2.68, the feet sliding.")
                 .defineInList("gaitTier", "A", java.util.List.of("A", "B", "C"));
+        EVA_JUMP_HEIGHT = common
+                .comment("How high a Unit of the planted model jumps: blocks from the ground to the top of its jump (a Unit stands 60",
+                        "tall). 90 since R64, one and a half times its height. 0 keeps the jump as up to R63 (26 blocks). The",
+                        "server's value goes for everyone on it. In game: /seele motion jump <blocks>.")
+                .defineInRange("jumpHeight", 90D, 0D, 120D);
         common.pop();
 
         common.push("eva_combat");

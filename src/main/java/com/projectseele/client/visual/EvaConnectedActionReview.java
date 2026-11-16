@@ -614,6 +614,7 @@ public final class EvaConnectedActionReview
         if(FX){fxR58(mc,eva);positionCamera(mc,eva);return;}
         if(MOVES){movesR59(mc);positionCamera(mc,eva);return;}
         if(GAIT){gaitR64(mc);positionCamera(mc,eva);return;}
+        if(LEAP_R64){leapR64(mc,eva);positionCamera(mc,eva);return;}
         if(HILL){hillR60(mc,lane(eva));positionCamera(mc,eva);return;}
         if(STEEP_R64){steepR64(mc,eva,lane(eva));positionCamera(mc,eva);return;}
         if(STREET_R64){streetR64(mc,eva,lane(eva));positionCamera(mc,eva);return;}
@@ -965,6 +966,52 @@ public final class EvaConnectedActionReview
         if(at(200)||at(350))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
         if(at(310)||at(350+GAIT_FAST_R64))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
     }
+
+    /**
+     * -Dprojectseele.tourLeapR64=true: jumps on level ground, for tools/fr_jump.py. One from standing, one at a walk,
+     * one at a run (back the way it came), one at the fast run, one from standing again, and one from standing
+     * with a still Sachiel in view, where the server has the Unit's movement as the jump is asked for; then the
+     * kick from near the top of a jump at that Sachiel, and the hammer early in the rise of another. It turns
+     * about only while it stands, so that it stays on its lane. Run with tourEnd=1080.
+     * With -Dprojectseele.tourLeapRoofR64=true a block 50 high is then stood 52 ahead: it jumps onto it at a walk,
+     * jumps again where it stands, and walks off the far edge. Run with tourEnd=1460.
+     */
+    private static final boolean LEAP_R64=Boolean.getBoolean("projectseele.tourLeapR64"),LEAP_ROOF_R64=Boolean.getBoolean("projectseele.tourLeapRoofR64");
+    private static int roofX,roofZ,roofTurn;
+    private static void leapR64(Minecraft mc,EvaUnit01Entity eva)
+    {
+        int t=tick;
+        boolean walk=t>=120&&t<230||LEAP_ROOF_R64&&(t>=1120&&t<1175||t>=1320&&t<1400),run=t>=300&&t<400,fast=t>=440&&t<520,move=walk||run||fast;
+        mc.options.keyUp.setDown(move);mc.player.input.up=move;mc.player.input.forwardImpulse=move?1:0;mc.player.zza=move?1:0;mc.player.xxa=0;
+        mc.player.setYRot(t>=245&&t<385?180:0);mc.player.setXRot(0);
+        // The client re-syncs held sprint and dash to the real keys, so hold them.
+        mc.options.keySprint.setDown(run||fast);
+        com.projectseele.client.Keybinds.EVA_DASH.setDown(t>=444&&t<520);
+        if(at(300)||at(440))send(ServerboundEvaControlPacket.ACTION_SPRINT_START);
+        if(at(400)||at(520))send(ServerboundEvaControlPacket.ACTION_SPRINT_STOP);
+        int[] presses=LEAP_ROOF_R64?new int[]{40,160,335,458,620,780,880,960,1136,1240}:new int[]{40,160,335,458,620,780,880,960};
+        boolean press=false;
+        for(int when:presses){press|=t>=when&&t<when+3;if(at(when))sentR64("jump");}
+        mc.options.keyJump.setDown(press);
+        if(at(720))dummyR64(mc,eva,90,0);
+        // The kick 28 ticks after its press (near the top), the hammer 18 after its (6 ticks off the ground).
+        if(at(908))heavyR64();
+        if(at(978))lightR64();
+        if(at(1050))removeTargetR63(mc,"sachiel");
+        if(!LEAP_ROOF_R64)return;
+        // The block: 41 wide, 99 deep, its top 50 over the ground, its near face 52 ahead of where the Unit stands
+        // (it leaves the ground about 38 on and is back down to 50 about 56 further).
+        if(at(1100)){roofX=Mth.floor(eva.getX());roofZ=Mth.floor(eva.getZ());roofTurn=Math.abs(Mth.wrapDegrees(eva.getYRot()))<90?1:-1;}
+        if(at(1100)||at(1450))
+        {
+            String block=at(1100)?" minecraft:stone":" minecraft:air";
+            int near=roofZ+roofTurn*52,far=roofZ+roofTurn*150,ground=Mth.floor(eva.getY());
+            if(at(1450))ground=roofGround;else roofGround=ground;
+            for(int y=0;y<50;y+=5)
+                mc.player.connection.sendCommand("fill "+(roofX-20)+" "+(ground+y)+" "+Math.min(near,far)+" "+(roofX+20)+" "+(ground+y+4)+" "+Math.max(near,far)+block);
+        }
+    }
+    private static int roofGround;
 
     private static void movesR59(Minecraft mc)
     {

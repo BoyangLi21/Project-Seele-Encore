@@ -27,16 +27,18 @@ public final class EvaGameplayMotionR32
     private static final EntityDataAccessor<Boolean> LOW_TARGET=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<Boolean> SERVER_MOVEMENT=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.BOOLEAN);
     private static final EntityDataAccessor<CompoundTag> RELEASE_FROM=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.COMPOUND_TAG);
+    /** R64 (EvaLeapR64): how hard the last landing was, 0 to 1. */
+    private static final EntityDataAccessor<Float> IMPACT=SynchedEntityData.defineId(EvaUnit01Entity.class,EntityDataSerializers.FLOAT);
     private static final WeakIdentityMap<EvaUnit01Entity,State> STATES=new WeakIdentityMap<>();
     private static final Map<Integer,Optional<JsonObject>> PROFILES=new HashMap<>();
     private static final class State
     {
-        boolean air,guard;double y;float velocity;int scan;Vec3 previousContact;
+        boolean air,guard;double y;float velocity,fall;int scan;Vec3 previousContact;
         EvaBodyPose.Sample lastActionPose;String lastClip="";long lastPoseTick=-1;int lastRig=-1;
         Vec3 lastOrigin;float lastYaw;
     }
     public static boolean bootstrap(){return true;}
-    public static void define(SynchedEntityData d){d.define(AIR,-1L);d.define(LAND,-1L);d.define(TAKEOFF,-1L);d.define(FLOOR,-1000000F);d.define(VERTICAL,0F);d.define(GUARD,0F);d.define(LAND_FROM,new CompoundTag());d.define(ACTION_FROM,new CompoundTag());d.define(LOW_TARGET,false);d.define(SERVER_MOVEMENT,false);d.define(RELEASE_FROM,new CompoundTag());}
+    public static void define(SynchedEntityData d){d.define(AIR,-1L);d.define(LAND,-1L);d.define(TAKEOFF,-1L);d.define(FLOOR,-1000000F);d.define(VERTICAL,0F);d.define(GUARD,0F);d.define(LAND_FROM,new CompoundTag());d.define(ACTION_FROM,new CompoundTag());d.define(LOW_TARGET,false);d.define(SERVER_MOVEMENT,false);d.define(RELEASE_FROM,new CompoundTag());d.define(IMPACT,0F);}
     public static boolean serverMovement(EvaUnit01Entity e){return e.getEntityData().get(SERVER_MOVEMENT);}
     public static boolean movementMayComposeR45(EvaUnit01Entity e)
     {
@@ -47,11 +49,21 @@ public final class EvaGameplayMotionR32
     }
     private static int takeoffTicks(EvaUnit01Entity e)
     {
+        if(EvaLeapR64.on(e))return EvaLeapR64.SQUAT_TICKS;
         var c=clip(e,"jump_start");
         // A sixty-metre body needs a visible knee bend before it leaves the
         // ground: in three ticks the squat was gone before it was drawn.
         return c.has("preparation_ticks")?Mth.clamp(c.get("preparation_ticks").getAsInt(),3,10):6;
     }
+    /** R64: how far through its squat a body about to jump is (0 to 1, and on until it leaves the ground); -1 when it is not about to. */
+    public static float takeoffProgressR64(EvaUnit01Entity e,float partial)
+    {
+        float age=age(e,TAKEOFF,partial);
+        return age<0||airAge(e,partial)>=0?-1:age/takeoffTicks(e);
+    }
+    /** R64: how hard the last landing was (0 to 1; 0 for a Unit that jumps as up to R63), and the ticks its pose runs. */
+    public static float impactR64(EvaUnit01Entity e){return EvaLeapR64.on(e)?e.getEntityData().get(IMPACT):0;}
+    public static float landingTicksR64(EvaUnit01Entity e){return EvaLeapR64.landingTicks(impactR64(e));}
     public static boolean prepareJump(EvaUnit01Entity e)
     {
         if(!ready(e))return true;
@@ -155,7 +167,7 @@ public final class EvaGameplayMotionR32
     public static boolean sharedJumpActive(EvaUnit01Entity e,float partial)
     {
         return sharedJump(e)&&(age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0
-                ||landAge(e,partial)>=0&&landAge(e,partial)<18);
+                ||landAge(e,partial)>=0&&landAge(e,partial)<landingTicksR64(e));
     }
     public static boolean sharedHands(EvaUnit01Entity e,float partial)
     {
@@ -348,6 +360,7 @@ public final class EvaGameplayMotionR32
         boolean air=!blocked&&!e.onGround()&&e.isVisuallyAirborneForRender();
         if(air)
         {
+            state.fall=Math.max(state.fall,-state.velocity);
             double floor=-1000000;float offset=e.getBbWidth()*.3F;
             for(float[] p:new float[][]{{0,0},{offset,offset},{offset,-offset},{-offset,offset},{-offset,-offset}})
             {
@@ -361,7 +374,12 @@ public final class EvaGameplayMotionR32
         {
             e.getEntityData().set(LAND_FROM,EvaShutdownR30.encode(EvaBodyPose.sample(e,0)));
             e.getEntityData().set(LAND,e.level().getGameTime());e.getEntityData().set(AIR,-1L);
+            // R64: by how fast it came down, for the pose and for how long the body takes the landing up.
+            float hard=EvaLeapR64.on(e)?EvaLeapR64.hard(state.fall):0;
+            e.getEntityData().set(IMPACT,hard);
+            if(hard>0)e.leapLandedR64(hard);
         }
+        if(!air)state.fall=0;
         if(blocked){e.getEntityData().set(AIR,-1L);e.getEntityData().set(LAND,-1L);}
         state.air=air;
         if(air||blocked||age(e,TAKEOFF,0)>takeoffTicks(e)+5)e.getEntityData().set(TAKEOFF,-1L);
@@ -391,7 +409,7 @@ public final class EvaGameplayMotionR32
         if(EvaDorsalMechanism.bow(e)>.001F||EvaDorsalMechanism.open(e)>.001F)return false;
         if(EvaFieldActionsR45.active(e)||EvaSwordActionsR45.active(e))return true;
         if(EvaCombatSupportR33.ready(e)&&sharedWeapon(e)&&!e.hasLiveActionForRender(partial)&&e.rifleStanceLevel(partial)<1)return true;
-        return age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0||landAge(e,partial)>=0&&landAge(e,partial)<18||e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()
+        return age(e,TAKEOFF,partial)>=0||airAge(e,partial)>=0||landAge(e,partial)>=0&&landAge(e,partial)<landingTicksR64(e)||e.getOrdinaryAttackStage()>=0||e.isHeavyMotionActive()
                 ||e.isKickMotionActive(partial)&&kickReady(e)||e.getKnifeMotionType(partial)>=0&&knifeReady(e)
                 ||sharedWeapon(e)&&!e.hasLiveActionForRender(partial)&&!e.isPilotProne()&&!e.isPilotCrouching()&&e.getEntityData().get(GUARD)>.01F;
     }
@@ -486,7 +504,7 @@ public final class EvaGameplayMotionR32
             }
             return pose;
         }
-        if(land>=0&&land<EvaJumpChoreographyR57.LANDING_TICKS&&e.getOrdinaryAttackStage()<0&&!e.isHeavyMotionActive())
+        if(land>=0&&land<landingTicksR64(e)&&e.getOrdinaryAttackStage()<0&&!e.isHeavyMotionActive())
         {
             var from=EvaBodyPose.neutralForTransportR32(e);EvaShutdownR30.decode(e.getEntityData().get(LAND_FROM),from);
             return EvaJumpChoreographyR57.landing(e,from,groundLocomotion(e,base,partial,capturedBase,null),land);
