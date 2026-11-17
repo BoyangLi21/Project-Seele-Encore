@@ -40,7 +40,10 @@ for (bx, bz) in sorted(cols):
         continue
     ry = float(pts[near, 1])
     for y in range(int(np.floor(ry)), int(np.ceil(ry + 4.6))):
-        st = cap.state(bx, y, bz)
+        try:
+            st = cap.state(bx, y, bz)
+        except ValueError:
+            break                       # outside the capture (map edge or below its floor)
         name = st.split('[')[0]
         if name in PASS or name.startswith('mtr:'):
             continue
