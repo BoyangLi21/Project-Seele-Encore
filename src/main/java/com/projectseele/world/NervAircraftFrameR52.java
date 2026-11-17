@@ -14,7 +14,10 @@ public final class NervAircraftFrameR52
 {
     private static final EntityDataAccessor<CompoundTag> DATA=SynchedEntityData.defineId(UNTransportEntity.class,EntityDataSerializers.COMPOUND_TAG);
     private static final Map<String,NervAirframeGeometryR52> CLIENT_GEOMETRY=new HashMap<>();
-    private static final Map<UNTransportEntity,ClientFrameR54> CLIENT_FRAMES=new WeakHashMap<>();
+    // An aircraft that flew out of a player's range with its cradle out and returns empty must start from its
+    // new sample: blended with the old one, the cradle reaches for a payload left a kilometre away and its
+    // stroke check stops the client.
+    private static final ClientEntityStateR64<UNTransportEntity,ClientFrameR54> CLIENT_FRAMES=new ClientEntityStateR64<>();
     private static final class ClientFrameR54
     {
         final com.projectseele.entity.MechanicalVisualClockR54 clock=new com.projectseele.entity.MechanicalVisualClockR54();
@@ -87,7 +90,7 @@ public final class NervAircraftFrameR52
     }
     private static ClientFrameR54 clientFrame(UNTransportEntity p,long now)
     {
-        var visual=CLIENT_FRAMES.computeIfAbsent(p,ignored->new ClientFrameR54());
+        var visual=CLIENT_FRAMES.of(p,ClientFrameR54::new);
         visual.receive(p.getEntityData().get(DATA),now);return visual;
     }
     public static Frame frame(UNTransportEntity p,float partial)
@@ -112,7 +115,17 @@ public final class NervAircraftFrameR52
     public static double renderRotorClock(UNTransportEntity p,float partial)
     {long now=com.projectseele.entity.MechanicalVisualClockR54.presentationTime(p.level().getGameTime(),partial);return clientFrame(p,now).rotor(now);}
     public static List<NervAirframeGeometryR52.Part> renderCradleParts(UNTransportEntity p,float partial)
-    {long now=com.projectseele.entity.MechanicalVisualClockR54.presentationTime(p.level().getGameTime(),partial);var visual=clientFrame(p,now);return renderGeometry(p).cradleParts(visual.sample(now),visual.anchors(now),visual.axes(now),false);}
+    {long now=com.projectseele.entity.MechanicalVisualClockR54.presentationTime(p.level().getGameTime(),partial);var visual=clientFrame(p,now);
+        // A frame blended between two samples can leave the cradle's physical stroke. That is presentation, not
+        // a state of the machine: such a frame is drawn without the cradle instead of stopping the client.
+        try{return renderGeometry(p).cradleParts(visual.sample(now),visual.anchors(now),visual.axes(now),false);}
+        catch(IllegalStateException blended)
+        {
+            if(cradleWarnedR64!=p.getId()){cradleWarnedR64=p.getId();com.projectseele.ProjectSeele.LOGGER.warn("Aircraft {} drawn without its cradle for a blended frame: {}",p.getId(),blended.getMessage());}
+            return List.of();
+        }
+    }
+    private static int cradleWarnedR64=Integer.MIN_VALUE;
     public static double rotorClock(UNTransportEntity p){return p.getEntityData().get(DATA).getDouble("RotorCurrent");}
     public static long sampledAt(UNTransportEntity p){return p.getEntityData().get(DATA).getLong("At");}
     public static List<Vec3> jawAxes(UNTransportEntity p){var list=new ArrayList<Vec3>();for(var a:p.getEntityData().get(DATA).getList("JawAxes",Tag.TAG_COMPOUND))list.add(readPoint((CompoundTag)a));return List.copyOf(list);}
