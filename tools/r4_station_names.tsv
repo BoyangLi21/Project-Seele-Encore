@@ -1,0 +1,83 @@
+# kind	old	new (Japanese|Chinese|English); real stations use the real Japanese name and Hepburn with macrons
+stations	上大井駅	上大井|上大井|Kami-Ōi
+stations	下曽我駅	下曽我|下曾我|Shimo-Soga
+stations	五百羅漢駅	五百羅漢|五百罗汉|Gohyaku-Rakan
+stations	井細田駅	井細田|井细田|Isaida
+stations	入生田駅	入生田|入生田|Iriuda
+stations	和田河原駅	和田河原|和田河原|Wadagahara
+stations	塔ノ沢駅	塔ノ沢|塔之泽|Tōnosawa
+stations	塚原駅	塚原|冢原|Tsukahara
+stations	大平台駅	大平台|大平台|Ōhiradai
+stations	宮ノ下駅	宮ノ下|宫之下|Miyanoshita
+stations	富水駅	富水|富水|Tomizu
+stations	小涌谷駅	小涌谷|小涌谷|Kowakidani
+stations	小田原駅	小田原|小田原|Odawara
+stations	岩原駅	岩原|岩原|Iwahara
+stations	強羅駅	強羅|强罗|Gōra
+stations	強羅駅 北口	強羅北口|强罗北口|Gōra North
+stations	彫刻の森駅	彫刻の森|雕刻之森|Chōkoku-no-Mori
+stations	早川駅	早川|早川|Hayakawa
+stations	栢山駅	栢山|栢山|Kayama
+stations	相模沼田駅	相模沼田|相模沼田|Sagami-Numata
+stations	穴部駅	穴部|穴部|Anabe
+stations	箱根板橋駅	箱根板橋|箱根板桥|Hakone-Itabashi
+stations	箱根湯本駅	箱根湯本|箱根汤本|Hakone-Yumoto
+stations	緑町駅	緑町|绿町|Midorichō
+stations	螢田駅	螢田|萤田|Hotaruda
+stations	風祭駅	風祭|风祭|Kazamatsuri
+stations	飯田岡駅	飯田岡|饭田冈|Iidaoka
+stations	鴨宮駅	鴨宮|鸭宫|Kamonomiya
+stations	上強羅	上強羅|上强罗|Kami-Gōra
+stations	中強羅	中強羅|中强罗|Naka-Gōra
+stations	公園上	公園上|公园上|Kōen-kami
+stations	公園下	公園下|公园下|Kōen-shimo
+stations	早雲山	早雲山|早云山|Sōunzan
+stations	大涌谷	大涌谷|大涌谷|Ōwakudani
+stations	姥子	姥子|姥子|Ubako
+stations	桃源台	桃源台|桃源台|Tōgendai
+stations	桃源台港	桃源台港|桃源台港|Tōgendai Port
+stations	元箱根港	元箱根港|元箱根港|Moto-Hakone Port
+stations	箱根町港	箱根町港|箱根町港|Hakone-machi Port
+stations	第三新东京中央	第3新東京市中央|第三新东京市中央|Tokyo-3 Central
+stations	新箱根中央	新箱根中央|新箱根中央|Shin-Hakone Central
+stations	新箱根市民广场	新箱根市民広場|新箱根市民广场|Shin-Hakone Civic Plaza
+stations	新箱根机场	新箱根空港|新箱根机场|Shin-Hakone Airport
+stations	箱根湾机场	箱根湾空港|箱根湾机场|Hakone Bay Airport
+stations	联合国总部机场	国連本部空港|联合国总部机场|UN HQ Airport
+stations	箱根山谷站	箱根山谷|箱根山谷|Hakone Valley
+stations	西部城区	西部市街|西部城区|West District
+stations	南部住宅区	南部住宅地区|南部住宅区|South Residential
+stations	雾里住宅区	霧里住宅地区|雾里住宅区|Kirisato Residential
+stations	湾岸防卫区	湾岸防衛区|湾岸防卫区|Bayside Defence District
+stations	地下都市入口	ジオフロント入口|地下都市入口|GeoFront Entrance
+stations	GeoFront 地底站	ジオフロント|GeoFront 地底|GeoFront
+stations	NERV 总部	NERV本部|NERV 总部|NERV HQ
+stations	NERV 地面入口	NERV地上入口|NERV 地面入口|NERV Surface Entrance
+stations	总部人员出口站	本部職員出口|总部人员出口|HQ Staff Exit
+stations	EVA 机库	エヴァ格納庫|EVA 机库|EVA Hangar
+stations	整备补给中心	整備補給センター|整备补给中心|Maintenance and Supply Centre
+stations	研究模拟区	研究シミュレーション区|研究模拟区|Research Simulation Area
+stations	地区技术中心	地区技術センター|地区技术中心|District Technical Centre
+stations	NERV 港口	NERV港|NERV 港口|NERV Port
+stations	NERV 航空基地	NERV航空基地|NERV 航空基地|NERV Air Base
+routes	大雄山線 小田原—和田河原	大雄山線 小田原—和田河原|大雄山线 小田原—和田河原|Daiyūzan Line Odawara–Wadagahara
+routes	小田急線 小田原—栢山 東線	小田急線 小田原—栢山 東線|小田急线 小田原—栢山 东线|Odakyū Line Odawara–Kayama East
+routes	小田急線 小田原—栢山 西線	小田急線 小田原—栢山 西線|小田急线 小田原—栢山 西线|Odakyū Line Odawara–Kayama West
+routes	御殿場線 上大井—下曽我	御殿場線 上大井—下曽我|御殿场线 上大井—下曾我|Gotemba Line Kami-Ōi–Shimo-Soga
+routes	東海道線 小田原—鴨宮 東線	東海道線 小田原—鴨宮 東線|东海道线 小田原—鸭宫 东线|Tōkaidō Line Odawara–Kamonomiya East
+routes	東海道線 小田原—鴨宮 西線	東海道線 小田原—鴨宮 西線|东海道线 小田原—鸭宫 西线|Tōkaidō Line Odawara–Kamonomiya West
+routes	東海道線 早川—小田原 東線	東海道線 早川—小田原 東線|东海道线 早川—小田原 东线|Tōkaidō Line Hayakawa–Odawara East
+routes	東海道線 早川—小田原 西線	東海道線 早川—小田原 西線|东海道线 早川—小田原 西线|Tōkaidō Line Hayakawa–Odawara West
+routes	箱根登山線 小田原—箱根湯本	箱根登山線 小田原—強羅|箱根登山线 小田原—强罗|Hakone Tozan Line Odawara–Gōra
+routes	箱根登山ケーブルカー 早雲山—強羅	箱根登山ケーブルカー 早雲山—強羅|箱根登山缆车 早云山—强罗|Hakone Tozan Cable Car Sōunzan–Gōra
+routes	箱根索道 大涌谷—早云山	箱根ロープウェイ 大涌谷—早雲山|箱根索道 大涌谷—早云山|Hakone Ropeway Ōwakudani–Sōunzan
+routes	箱根索道 桃源台—姥子—大涌谷	箱根ロープウェイ 桃源台—姥子—大涌谷|箱根索道 桃源台—姥子—大涌谷|Hakone Ropeway Tōgendai–Ubako–Ōwakudani
+routes	芦之湖 桃源台—箱根町—元箱根	芦ノ湖遊覧船 桃源台—箱根町—元箱根|芦之湖游船 桃源台—箱根町—元箱根|Lake Ashi Cruise Tōgendai–Hakone-machi–Moto-Hakone
+routes	強羅接驳线	強羅連絡線|强罗接驳线|Gōra Link Line
+routes	雾里—箱根—第三新东京—湾岸机场贯通线	霧里—箱根—第3新東京市—湾岸空港 直通線|雾里—箱根—第三新东京—湾岸机场贯通线|Kirisato–Hakone–Tokyo-3–Bayside Airport Through Line
+routes	新箱根机场—NERV—湾岸港口贯通线	新箱根空港—NERV—湾岸港 直通線|新箱根机场—NERV—湾岸港口贯通线|Shin-Hakone Airport–NERV–Bayside Port Through Line
+routes	GeoFront 螺旋线	ジオフロント螺旋線 NERV車両輸送|GeoFront 螺旋线 NERV 车辆运输|GeoFront Spiral Line NERV Vehicle Train
+routes	NERV 总部联络线	NERV本部連絡線|NERV 总部联络线|NERV HQ Link Line
+routes	NERV 整备联络线	NERV整備連絡線|NERV 整备联络线|NERV Maintenance Link Line
+routes	NERV—联合国总部高速运输线	NERV—国連本部 高速輸送線|NERV—联合国总部高速运输线|NERV–UN HQ Express Transport Line
+routes	箱根湾—新箱根航班	箱根湾—新箱根 航空便|箱根湾—新箱根航班|Hakone Bay–Shin-Hakone Flight
