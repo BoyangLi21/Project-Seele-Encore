@@ -158,6 +158,9 @@ def station_row(row):
     if names:
         return f'{arrow}{multi(names)}'
     r = re.match(r'^(\w+) · (.+)$', text)
+    if r and r.group(2) in R.SHORT_ROUTES:
+        ja, zh, en = R.SHORT_ROUTES[r.group(2)]
+        return f'{arrow}{r.group(1)} {ja}|{r.group(1)} {zh}|{r.group(1)} {en}'
     if r and r.group(2) in R.ROUTES:
         ja, zh, en = R.ROUTES[r.group(2)]
         return f'{arrow}{r.group(1)} {ja}|{zh}|{en}'
