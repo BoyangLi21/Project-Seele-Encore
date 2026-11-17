@@ -71,7 +71,10 @@ public final class EvaMoveTableR64
         row(new Row("cross", PUNCH,1,  4, 3, 12, .091F,.047F, 20, 3.2F,1.1, LIGHT,   3,  .014F, 8,    2,    8,  12, 7,  10, 12,  3,10,   0,  false, "jab2",  "kick"));
         row(new Row("jab2",  PUNCH,0,  4, 3, 10, .066F,.093F, 20, 3.2F,1.1, MEDIUM,  4,  .018F, 7,    2,    8,  12, 7,  10, 12,  3,10,   0,  false, "slam",  "kick"));
         row(new Row("slam",  SLAM, 0,  9, 4, 25, .030F,.055F, 35, 4F,  2.0, FINISHER,8,  .030F, 5,    4,    -1, -1, 18, 22, 24,  5,13,   0,  true,  null,    null));
-        row(new Row("kick",  KICK, 0,  7, 4, 7,  .078F,.142F, 50, 4F,  2.4, HEAVY,   5,  .022F, 6,    3,    -1, -1, 12, 14, 15,  -1,-1,  44, true,  null,    null));
+        // (The kick's recovery was 7 ticks: the leg came back from its highest to the ground in 10, and the owner
+        // said after his second play that it comes back too fast. 13: the same part of the clip at a little over
+        // half its captured pace, 15 ticks to the ground. An evade or a step still leaves it from the ticks they did.)
+        row(new Row("kick",  KICK, 0,  7, 4, 13, .078F,.142F, 50, 4F,  2.4, HEAVY,   5,  .022F, 6,    3,    -1, -1, 12, 14, 15,  -1,-1,  44, true,  null,    null));
         // The knife. Up to R63 and in the first frames core the light press was the thrust (wound up from behind
         // the hip, driven in and held: 44 ticks) and the heavy press the reverse grip. The owner after his second
         // play (2026-11-16): what the light press does belongs on the heavy one, and the light press is to be an
